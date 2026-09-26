@@ -172,10 +172,29 @@ export function HistoryFileActions({
     removePlain();
   }
 
-  async function confirmRemoval(resolution: "delete" | "keep" | "retry") {
+  async function confirmRemoval(
+    resolution: "remove" | "delete" | "keep" | "retry",
+  ) {
     setRemoveDialogError(null);
     try {
-      const result = await forget.mutateAsync({ id: file.id, resolution });
+      // What the dialog showed for a title with no recorded fingerprint (#786 follow-up), echoed back so the
+      // server can check the file still matches before delete or keep touch it. Harmless to send for retry or a
+      // plain remove, which never look at it.
+      const confirm =
+        removeDialogOptions &&
+        !removeDialogOptions.fingerprint_recorded &&
+        removeDialogOptions.unconfirmed_size_bytes != null &&
+        removeDialogOptions.unconfirmed_modified_at != null
+          ? {
+              size_bytes: removeDialogOptions.unconfirmed_size_bytes,
+              modified_at: removeDialogOptions.unconfirmed_modified_at,
+            }
+          : undefined;
+      const result = await forget.mutateAsync({
+        id: file.id,
+        resolution,
+        confirm,
+      });
       setRemoveDialogOptions(null);
       onRemoved(result?.detail ?? "Done.");
     } catch (error) {

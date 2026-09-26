@@ -3,6 +3,7 @@ using Weir.Core.Json;
 using Weir.Core.Media;
 using Weir.Core.MediaManagers;
 using Weir.Core.Processing;
+using Weir.Core.Time;
 using Weir.Infrastructure.Activity;
 using Weir.Infrastructure.MediaManagers;
 using Weir.Infrastructure.Sqlite;
@@ -33,6 +34,14 @@ public sealed class HistoryFileRemovalService
     /// </summary>
     private const string ChangedFileMessage =
         "This file has changed since it failed, so Weir won't delete it. It will be looked at again on the next scan.";
+
+    /// <summary>
+    /// The refusal for a row with no recorded fingerprint (#786 follow-up) whose confirmed file no longer matches
+    /// what is on disk, or was never confirmed at all: unlike <see cref="ChangedFileMessage"/>, Weir has nothing of
+    /// its own to compare against, so this says only what is true — the dialog needs reopening.
+    /// </summary>
+    private const string UnconfirmedChangedMessage =
+        "This file changed after you opened this dialog. Close it and try again.";
 
     private readonly IMediaManagerPorts _ports;
     private readonly MediaManagerConnectionService _connections;
@@ -84,11 +93,35 @@ public sealed class HistoryFileRemovalService
         }
 
         var route = await ResolveManagerRouteAsync(uow, library!, file.RelativePath, source, cancellationToken).ConfigureAwait(false);
-        return new FileRemovalOptions(true, route.Label, route.DeleteHandled, route.KeepNotifies);
+        var fingerprintRecorded = file.FingerprintSizeBytes is not null && file.FingerprintMtimeNs is not null;
+        long? unconfirmedSize = null;
+        string? unconfirmedModifiedAt = null;
+        if (!fingerprintRecorded)
+        {
+            // What the dialog shows the owner to confirm, since Weir recorded nothing of its own for this row
+            // (#786 follow-up). Left null on a read race right after the exists check above; delete/keep refuse all
+            // the same with nothing to confirm against.
+            try
+            {
+                var current = SourceFiles.Fingerprint(source);
+                unconfirmedSize = current.SizeBytes;
+                unconfirmedModifiedAt = FormatModifiedAt(current.ModifiedTimeNs);
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+                // Left null.
+            }
+        }
+
+        return new FileRemovalOptions(true, route.Label, route.DeleteHandled, route.KeepNotifies, fingerprintRecorded, unconfirmedSize, unconfirmedModifiedAt);
     }
 
-    /// <summary>"Delete the download": the manager the file came from, the library's linked manager, or Weir itself.</summary>
-    public async Task<FileRemovalOutcome> DeleteAsync(UnitOfWork uow, ProcessingFileRecord file, CancellationToken cancellationToken)
+    /// <summary>
+    /// "Delete the download": the manager the file came from, the library's linked manager, or Weir itself.
+    /// <paramref name="confirmation"/> is what the dialog showed the owner for a row with no recorded fingerprint
+    /// (#786 follow-up); it is ignored when the row has one, and required when it does not.
+    /// </summary>
+    public async Task<FileRemovalOutcome> DeleteAsync(UnitOfWork uow, ProcessingFileRecord file, FileRemovalConfirmation? confirmation, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(uow);
         ArgumentNullException.ThrowIfNull(file);
@@ -108,9 +141,9 @@ public sealed class HistoryFileRemovalService
             return await FinishDeleteAsync(uow, file, new RejectRouteOutcome(false, exception.Message)).ConfigureAwait(false);
         }
 
-        if (!TryVerifyFingerprint(file, source, out _))
+        if (!TryVerifyFingerprint(file, source, confirmation, out _, out var refusal))
         {
-            return await FinishDeleteAsync(uow, file, new RejectRouteOutcome(false, ChangedFileMessage)).ConfigureAwait(false);
+            return await FinishDeleteAsync(uow, file, new RejectRouteOutcome(false, refusal)).ConfigureAwait(false);
         }
 
         var watchedRoot = RemuxPassPaths.Resolve(library.WatchedFolder);
@@ -141,8 +174,12 @@ public sealed class HistoryFileRemovalService
     /// <summary>Clears a "keep" marker for this file, when there is one — used by "delete" above and by "retry" on the remove dialog.</summary>
     public Task ClearSkipMarkerAsync(UnitOfWork uow, long libraryId, string relativePath) => _skipMarkers.ClearAsync(uow, libraryId, relativePath);
 
-    /// <summary>"Keep the file, but don't process it again": a skip marker, and a hand-off's manager told it will not be imported.</summary>
-    public async Task<FileRemovalOutcome> KeepAsync(UnitOfWork uow, ProcessingFileRecord file, CancellationToken cancellationToken)
+    /// <summary>
+    /// "Keep the file, but don't process it again": a skip marker, and a hand-off's manager told it will not be
+    /// imported. <paramref name="confirmation"/> is what the dialog showed the owner for a row with no recorded
+    /// fingerprint (#786 follow-up); it is ignored when the row has one, and required when it does not.
+    /// </summary>
+    public async Task<FileRemovalOutcome> KeepAsync(UnitOfWork uow, ProcessingFileRecord file, FileRemovalConfirmation? confirmation, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(uow);
         ArgumentNullException.ThrowIfNull(file);
@@ -167,9 +204,9 @@ public sealed class HistoryFileRemovalService
             return await FinishKeepAsync(uow, file, new RejectRouteOutcome(false, "The file is no longer in the watched folder, so there is nothing to keep.")).ConfigureAwait(false);
         }
 
-        if (!TryVerifyFingerprint(file, source, out var fingerprint))
+        if (!TryVerifyFingerprint(file, source, confirmation, out var fingerprint, out var refusal))
         {
-            return await FinishKeepAsync(uow, file, new RejectRouteOutcome(false, ChangedFileMessage)).ConfigureAwait(false);
+            return await FinishKeepAsync(uow, file, new RejectRouteOutcome(false, refusal)).ConfigureAwait(false);
         }
 
         var route = await ResolveManagerRouteAsync(uow, library, file.RelativePath, source, cancellationToken).ConfigureAwait(false);
@@ -257,14 +294,33 @@ public sealed class HistoryFileRemovalService
     }
 
     /// <summary>
-    /// Whether the file on disk right now is still the one Weir recorded a fingerprint for when this title became
-    /// failed or rejected (#786 review of #785). False for a row with no recorded fingerprint (from before migration
-    /// 0025, or one that could not be read at the time) — refusing is the safe default when Weir cannot tell.
+    /// Whether the file on disk right now is still the one Weir decided about when this title became failed or
+    /// rejected (#786 review of #785, and its follow-up). A row with a recorded fingerprint is checked against that;
+    /// a row without one (from before migration 0025, or one that could not be read at the time) is checked against
+    /// <paramref name="confirmation"/> — what the remove dialog showed the owner — and refused outright when there
+    /// is none to check, rather than guessing. <paramref name="refusalMessage"/> names which of the two is true, so
+    /// the caller never blames "since it failed" on a file Weir never actually fingerprinted.
     /// </summary>
-    private static bool TryVerifyFingerprint(ProcessingFileRecord file, string source, out SourceFingerprint fingerprint)
+    private static bool TryVerifyFingerprint(ProcessingFileRecord file, string source, FileRemovalConfirmation? confirmation, out SourceFingerprint fingerprint, out string refusalMessage)
     {
         fingerprint = default;
-        if (file.FingerprintSizeBytes is not { } size || file.FingerprintMtimeNs is not { } mtime)
+        if (file.FingerprintSizeBytes is { } size && file.FingerprintMtimeNs is { } mtime)
+        {
+            refusalMessage = ChangedFileMessage;
+            try
+            {
+                fingerprint = SourceFiles.Fingerprint(source);
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+                return false;
+            }
+
+            return fingerprint.SizeBytes == size && fingerprint.ModifiedTimeNs == mtime;
+        }
+
+        refusalMessage = UnconfirmedChangedMessage;
+        if (confirmation is not { } confirmed)
         {
             return false;
         }
@@ -278,8 +334,16 @@ public sealed class HistoryFileRemovalService
             return false;
         }
 
-        return fingerprint.SizeBytes == size && fingerprint.ModifiedTimeNs == mtime;
+        return fingerprint.SizeBytes == confirmed.SizeBytes && FormatModifiedAt(fingerprint.ModifiedTimeNs) == confirmed.ModifiedAt;
     }
+
+    /// <summary>
+    /// A file's modified time, rounded to the whole second a person is shown, as stable UTC text a browser can
+    /// round-trip exactly. The raw nanoseconds <see cref="SourceFingerprint"/> carries would lose precision the
+    /// moment a browser parsed it into a JSON number — this never needs to survive that.
+    /// </summary>
+    private static string FormatModifiedAt(long modifiedTimeNs) =>
+        Timestamp.FromUtc(DateTime.UnixEpoch.AddSeconds(modifiedTimeNs / 1_000_000_000)).ToWireText();
 
     private static string? TryResolveSource(ProcessingLibraryRecord library, string relativePath)
     {

@@ -4091,7 +4091,9 @@ export interface components {
      * ProcessingFileForgetIn
      * @description History's remove dialog (#785). `resolution` is only meaningful for a failed or rejected file whose
      *     original is still in the watched folder (see ProcessingFileRemoveOptionsOut); anything else is always a plain
-     *     remove, whatever `resolution` asks for.
+     *     remove, whatever `resolution` asks for. `confirm_size_bytes` and `confirm_modified_at` are the file's current
+     *     details as `remove-options` reported them (#786 follow-up): required for `delete` or `keep` on a title whose
+     *     `fingerprint_recorded` is false, ignored otherwise.
      */
     ProcessingFileForgetIn: {
       /** Csrf Token */
@@ -4102,6 +4104,10 @@ export interface components {
        * @enum {string}
        */
       resolution: "remove" | "delete" | "keep" | "retry";
+      /** Confirm Size Bytes */
+      confirm_size_bytes?: number | null;
+      /** Confirm Modified At */
+      confirm_modified_at?: string | null;
     };
     /**
      * ProcessingFileRemoveOptionsOut
@@ -4116,6 +4122,12 @@ export interface components {
       delete_handled_by_manager: boolean;
       /** Keep Notifies Manager */
       keep_notifies_manager: boolean;
+      /** Fingerprint Recorded */
+      fingerprint_recorded: boolean;
+      /** Unconfirmed Size Bytes */
+      unconfirmed_size_bytes: number | null;
+      /** Unconfirmed Modified At */
+      unconfirmed_modified_at: string | null;
     };
     /**
      * ProcessingFileRemovalOut

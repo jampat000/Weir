@@ -182,15 +182,34 @@ export async function fetchProcessingFileRemoveOptions(
  */
 export type ProcessingFileRemovalResult = Schema<"ProcessingFileRemovalOut">;
 
+/**
+ * The file's current details, exactly as `remove-options` reported them, for a title with no recorded fingerprint
+ * (#786 follow-up: migration 0025 only records one going forward). `delete` and `keep` need this echoed back so
+ * Weir can check the file on disk still matches what the dialog showed before touching anything.
+ */
+export interface ProcessingFileRemovalConfirm {
+  size_bytes: number;
+  modified_at: string;
+}
+
 export async function forgetProcessingFile(
   id: number,
   resolution?: ProcessingFileRemovalResolution,
+  confirm?: ProcessingFileRemovalConfirm,
 ): Promise<ProcessingFileRemovalResult | undefined> {
   const path = `${processingFilesPath()}/${id}`;
   const response = await sendJson(
     path,
     "DELETE",
-    resolution ? { resolution } : {},
+    {
+      ...(resolution ? { resolution } : {}),
+      ...(confirm
+        ? {
+            confirm_size_bytes: confirm.size_bytes,
+            confirm_modified_at: confirm.modified_at,
+          }
+        : {}),
+    },
     "Could not remove that file from the list",
   );
   return readJson<ProcessingFileRemovalResult | undefined>(response);

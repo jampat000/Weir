@@ -110,7 +110,7 @@ public sealed class HistoryFileRemovalServiceTests : IDisposable
         Assert.False(options.DeleteHandledByManager);
         Assert.Null(options.ManagerLabel);
 
-        var outcome = await _fixture.Db(uow => Service().DeleteAsync(uow, file, CancellationToken.None));
+        var outcome = await _fixture.Db(uow => Service().DeleteAsync(uow, file, null, CancellationToken.None));
 
         Assert.True(outcome.Done);
         Assert.False(File.Exists(source));
@@ -128,7 +128,7 @@ public sealed class HistoryFileRemovalServiceTests : IDisposable
         var options = await _fixture.Db(uow => Service().EvaluateAsync(uow, file, CancellationToken.None));
         Assert.False(options.KeepNotifiesManager);
 
-        var outcome = await _fixture.Db(uow => Service().KeepAsync(uow, file, CancellationToken.None));
+        var outcome = await _fixture.Db(uow => Service().KeepAsync(uow, file, null, CancellationToken.None));
 
         Assert.True(outcome.Done);
         Assert.True(File.Exists(source));
@@ -142,7 +142,7 @@ public sealed class HistoryFileRemovalServiceTests : IDisposable
         var library = await LibraryAsync();
         var file = await FileRowAsync(library, "../outside.mkv", null);
 
-        var outcome = await _fixture.Db(uow => Service().DeleteAsync(uow, file, CancellationToken.None));
+        var outcome = await _fixture.Db(uow => Service().DeleteAsync(uow, file, null, CancellationToken.None));
 
         Assert.False(outcome.Done);
         Assert.Equal(1, await _fixture.Store.Scalar("SELECT count(*) FROM files"));
@@ -166,7 +166,7 @@ public sealed class HistoryFileRemovalServiceTests : IDisposable
         Assert.True(options.DeleteHandledByManager);
         Assert.Equal("Radarr", options.ManagerLabel);
 
-        var outcome = await _fixture.Db(uow => Service().DeleteAsync(uow, file, CancellationToken.None));
+        var outcome = await _fixture.Db(uow => Service().DeleteAsync(uow, file, null, CancellationToken.None));
 
         Assert.True(outcome.Done);
         Assert.Single(_fixture.Http.RequestsTo(HttpMethod.Delete, "/api/v3/queue/55"));
@@ -192,7 +192,7 @@ public sealed class HistoryFileRemovalServiceTests : IDisposable
         Assert.False(options.DeleteHandledByManager);
         Assert.Null(options.ManagerLabel);
 
-        var outcome = await _fixture.Db(uow => Service().DeleteAsync(uow, file, CancellationToken.None));
+        var outcome = await _fixture.Db(uow => Service().DeleteAsync(uow, file, null, CancellationToken.None));
 
         Assert.True(outcome.Done);
         Assert.False(File.Exists(source));
@@ -217,7 +217,7 @@ public sealed class HistoryFileRemovalServiceTests : IDisposable
         Assert.True(options.DeleteHandledByManager);
         Assert.Equal("Deluno", options.ManagerLabel);
 
-        var outcome = await _fixture.Db(uow => Service().DeleteAsync(uow, file, CancellationToken.None));
+        var outcome = await _fixture.Db(uow => Service().DeleteAsync(uow, file, null, CancellationToken.None));
 
         Assert.True(outcome.Done);
         Assert.False(File.Exists(source));
@@ -243,7 +243,7 @@ public sealed class HistoryFileRemovalServiceTests : IDisposable
         var options = await _fixture.Db(uow => Service().EvaluateAsync(uow, file, CancellationToken.None));
         Assert.False(options.DeleteHandledByManager);
 
-        var outcome = await _fixture.Db(uow => Service().DeleteAsync(uow, file, CancellationToken.None));
+        var outcome = await _fixture.Db(uow => Service().DeleteAsync(uow, file, null, CancellationToken.None));
 
         Assert.True(outcome.Done);
         Assert.False(File.Exists(source));
@@ -266,7 +266,7 @@ public sealed class HistoryFileRemovalServiceTests : IDisposable
         Assert.True(options.KeepNotifiesManager);
         Assert.Equal("Deluno", options.ManagerLabel);
 
-        var outcome = await _fixture.Db(uow => Service().KeepAsync(uow, file, CancellationToken.None));
+        var outcome = await _fixture.Db(uow => Service().KeepAsync(uow, file, null, CancellationToken.None));
 
         Assert.True(outcome.Done);
         Assert.True(File.Exists(source));
@@ -291,7 +291,7 @@ public sealed class HistoryFileRemovalServiceTests : IDisposable
         _fixture.Http.Json(HttpMethod.Get, ManifestPath, """{"capabilities":["processor-reject-regrab"],"libraries":[]}""");
         _fixture.Http.Json(HttpMethod.Post, EventsPath, "{}", HttpStatusCode.Conflict);
 
-        var outcome = await _fixture.Db(uow => Service().KeepAsync(uow, file, CancellationToken.None));
+        var outcome = await _fixture.Db(uow => Service().KeepAsync(uow, file, null, CancellationToken.None));
 
         Assert.False(outcome.Done);
         Assert.True(File.Exists(source));
@@ -310,7 +310,7 @@ public sealed class HistoryFileRemovalServiceTests : IDisposable
         // A new, different release lands at the same path after the title failed.
         File.WriteAllBytes(source, "a completely different release replaced this one"u8.ToArray());
 
-        var outcome = await _fixture.Db(uow => Service().DeleteAsync(uow, file, CancellationToken.None));
+        var outcome = await _fixture.Db(uow => Service().DeleteAsync(uow, file, null, CancellationToken.None));
 
         Assert.False(outcome.Done);
         Assert.Equal(
@@ -328,7 +328,7 @@ public sealed class HistoryFileRemovalServiceTests : IDisposable
         var file = await FileRowAsync(library, "Film/film.mkv", source, "rejected");
         File.WriteAllBytes(source, "a completely different release replaced this one"u8.ToArray());
 
-        var outcome = await _fixture.Db(uow => Service().KeepAsync(uow, file, CancellationToken.None));
+        var outcome = await _fixture.Db(uow => Service().KeepAsync(uow, file, null, CancellationToken.None));
 
         Assert.False(outcome.Done);
         Assert.Equal(
@@ -346,10 +346,120 @@ public sealed class HistoryFileRemovalServiceTests : IDisposable
         // No fingerprint recorded: as for every row from before migration 0025.
         var file = await FileRowAsync(library, "Film/film.mkv", null);
 
-        var outcome = await _fixture.Db(uow => Service().DeleteAsync(uow, file, CancellationToken.None));
+        var outcome = await _fixture.Db(uow => Service().DeleteAsync(uow, file, null, CancellationToken.None));
 
         Assert.False(outcome.Done);
+        Assert.Equal(
+            "This file changed after you opened this dialog. Close it and try again.",
+            outcome.Message);
         Assert.True(File.Exists(source));
+    }
+
+    // --- a pre-upgrade row (#786 follow-up: migration 0025 only records a fingerprint going forward) ---------
+
+    [Fact]
+    public async Task A_row_with_no_recorded_fingerprint_offers_its_current_file_details_to_confirm()
+    {
+        var library = await LibraryAsync();
+        var source = _folders.Source("Film/film.mkv");
+        var file = await FileRowAsync(library, "Film/film.mkv", null);
+
+        var options = await _fixture.Db(uow => Service().EvaluateAsync(uow, file, CancellationToken.None));
+
+        Assert.True(options.RequiresChoice);
+        Assert.False(options.FingerprintRecorded);
+        Assert.Equal(new FileInfo(source).Length, options.UnconfirmedSizeBytes);
+        Assert.NotNull(options.UnconfirmedModifiedAt);
+    }
+
+    [Fact]
+    public async Task A_row_with_no_recorded_fingerprint_deletes_when_the_confirmed_details_match()
+    {
+        var library = await LibraryAsync();
+        var source = _folders.Source("Film/film.mkv");
+        var file = await FileRowAsync(library, "Film/film.mkv", null);
+        var options = await _fixture.Db(uow => Service().EvaluateAsync(uow, file, CancellationToken.None));
+        var confirmation = new FileRemovalConfirmation(options.UnconfirmedSizeBytes!.Value, options.UnconfirmedModifiedAt!);
+
+        var outcome = await _fixture.Db(uow => Service().DeleteAsync(uow, file, confirmation, CancellationToken.None));
+
+        Assert.True(outcome.Done);
+        Assert.False(File.Exists(source));
+    }
+
+    [Fact]
+    public async Task A_row_with_no_recorded_fingerprint_refuses_delete_when_the_confirmed_details_no_longer_match()
+    {
+        var library = await LibraryAsync();
+        var source = _folders.Source("Film/film.mkv");
+        var file = await FileRowAsync(library, "Film/film.mkv", null);
+        var options = await _fixture.Db(uow => Service().EvaluateAsync(uow, file, CancellationToken.None));
+        // A different release lands at the same path between the dialog opening and the owner confirming.
+        File.WriteAllBytes(source, "a completely different release replaced this one"u8.ToArray());
+        var confirmation = new FileRemovalConfirmation(options.UnconfirmedSizeBytes!.Value, options.UnconfirmedModifiedAt!);
+
+        var outcome = await _fixture.Db(uow => Service().DeleteAsync(uow, file, confirmation, CancellationToken.None));
+
+        Assert.False(outcome.Done);
+        Assert.Equal(
+            "This file changed after you opened this dialog. Close it and try again.",
+            outcome.Message);
+        Assert.True(File.Exists(source));
+    }
+
+    [Fact]
+    public async Task A_row_with_no_recorded_fingerprint_keeps_when_the_confirmed_details_match()
+    {
+        var library = await LibraryAsync();
+        var source = _folders.Source("Film/film.mkv");
+        var file = await FileRowAsync(library, "Film/film.mkv", null, "rejected");
+        var options = await _fixture.Db(uow => Service().EvaluateAsync(uow, file, CancellationToken.None));
+        var confirmation = new FileRemovalConfirmation(options.UnconfirmedSizeBytes!.Value, options.UnconfirmedModifiedAt!);
+
+        var outcome = await _fixture.Db(uow => Service().KeepAsync(uow, file, confirmation, CancellationToken.None));
+
+        Assert.True(outcome.Done);
+        Assert.True(File.Exists(source));
+        Assert.Equal(1, await _fixture.Store.Scalar("SELECT count(*) FROM file_skip_markers"));
+    }
+
+    [Fact]
+    public async Task A_row_with_no_recorded_fingerprint_refuses_keep_when_the_confirmed_details_no_longer_match()
+    {
+        var library = await LibraryAsync();
+        var source = _folders.Source("Film/film.mkv");
+        var file = await FileRowAsync(library, "Film/film.mkv", null, "rejected");
+        var options = await _fixture.Db(uow => Service().EvaluateAsync(uow, file, CancellationToken.None));
+        File.WriteAllBytes(source, "a completely different release replaced this one"u8.ToArray());
+        var confirmation = new FileRemovalConfirmation(options.UnconfirmedSizeBytes!.Value, options.UnconfirmedModifiedAt!);
+
+        var outcome = await _fixture.Db(uow => Service().KeepAsync(uow, file, confirmation, CancellationToken.None));
+
+        Assert.False(outcome.Done);
+        Assert.Equal(
+            "This file changed after you opened this dialog. Close it and try again.",
+            outcome.Message);
+        Assert.Equal(0, await _fixture.Store.Scalar("SELECT count(*) FROM file_skip_markers"));
+    }
+
+    // --- the recorded-fingerprint paths are unchanged by the above (#786 follow-up) --------------------------
+
+    [Fact]
+    public async Task A_row_with_a_recorded_fingerprint_still_deletes_without_any_confirmation()
+    {
+        var library = await LibraryAsync();
+        var source = _folders.Source("Film/film.mkv");
+        var file = await FileRowAsync(library, "Film/film.mkv", source);
+
+        var options = await _fixture.Db(uow => Service().EvaluateAsync(uow, file, CancellationToken.None));
+        Assert.True(options.FingerprintRecorded);
+        Assert.Null(options.UnconfirmedSizeBytes);
+        Assert.Null(options.UnconfirmedModifiedAt);
+
+        var outcome = await _fixture.Db(uow => Service().DeleteAsync(uow, file, null, CancellationToken.None));
+
+        Assert.True(outcome.Done);
+        Assert.False(File.Exists(source));
     }
 
     // --- a stale "keep" marker must not outlive the file it was for (#786 review of #785) ------------------
@@ -363,7 +473,7 @@ public sealed class HistoryFileRemovalServiceTests : IDisposable
         // A marker left from an earlier, different release at this same path.
         await _fixture.Db(async uow => { await _skipMarkers.SetAsync(uow, library, "Film/film.mkv", 1, 1); return 0; });
 
-        var outcome = await _fixture.Db(uow => Service().DeleteAsync(uow, file, CancellationToken.None));
+        var outcome = await _fixture.Db(uow => Service().DeleteAsync(uow, file, null, CancellationToken.None));
 
         Assert.True(outcome.Done);
         Assert.Equal(0, await _fixture.Store.Scalar("SELECT count(*) FROM file_skip_markers"));

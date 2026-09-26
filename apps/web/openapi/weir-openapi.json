@@ -4171,7 +4171,7 @@
       },
       "ProcessingFileForgetIn": {
         "additionalProperties": false,
-        "description": "History's remove dialog (#785). `resolution` is only meaningful for a failed or rejected file whose\noriginal is still in the watched folder (see ProcessingFileRemoveOptionsOut); anything else is always a plain\nremove, whatever `resolution` asks for.",
+        "description": "History's remove dialog (#785). `resolution` is only meaningful for a failed or rejected file whose\noriginal is still in the watched folder (see ProcessingFileRemoveOptionsOut); anything else is always a plain\nremove, whatever `resolution` asks for. `confirm_size_bytes` and `confirm_modified_at` are the file's current\ndetails as `remove-options` reported them (#786 follow-up): required for `delete` or `keep` on a title whose\n`fingerprint_recorded` is false, ignored otherwise.",
         "properties": {
           "csrf_token": {
             "minLength": 1,
@@ -4188,6 +4188,30 @@
             ],
             "title": "Resolution",
             "type": "string"
+          },
+          "confirm_size_bytes": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confirm Size Bytes"
+          },
+          "confirm_modified_at": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confirm Modified At"
           }
         },
         "required": [
@@ -4221,13 +4245,42 @@
           "keep_notifies_manager": {
             "title": "Keep Notifies Manager",
             "type": "boolean"
+          },
+          "fingerprint_recorded": {
+            "title": "Fingerprint Recorded",
+            "type": "boolean"
+          },
+          "unconfirmed_size_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unconfirmed Size Bytes"
+          },
+          "unconfirmed_modified_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unconfirmed Modified At"
           }
         },
         "required": [
           "requires_choice",
           "manager_label",
           "delete_handled_by_manager",
-          "keep_notifies_manager"
+          "keep_notifies_manager",
+          "fingerprint_recorded",
+          "unconfirmed_size_bytes",
+          "unconfirmed_modified_at"
         ],
         "title": "ProcessingFileRemoveOptionsOut",
         "type": "object"

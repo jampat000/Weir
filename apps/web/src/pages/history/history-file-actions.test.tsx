@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type {
@@ -32,6 +38,25 @@ vi.mock("../../lib/processing/libraries-queries", () => ({
     data: [{ id: 1, name: "Movies", media_type: "movie" }],
   }),
 }));
+vi.mock("../../lib/settings/queries", () => ({
+  useAppSettingsQuery: () => ({ data: undefined }),
+}));
+
+/** A `remove-options` response with a recorded fingerprint — the everyday case, needing nothing confirmed. */
+function removeOptionsResult(
+  partial: Partial<ProcessingFileRemoveOptions> = {},
+): ProcessingFileRemoveOptions {
+  return {
+    requires_choice: true,
+    manager_label: null,
+    delete_handled_by_manager: false,
+    keep_notifies_manager: false,
+    fingerprint_recorded: true,
+    unconfirmed_size_bytes: null,
+    unconfirmed_modified_at: null,
+    ...partial,
+  };
+}
 
 function file(partial: Partial<ProcessingFile> = {}): ProcessingFile {
   return {
@@ -82,12 +107,9 @@ describe("HistoryFileActions remove dialog", () => {
   });
 
   it("removes a plain title immediately, with no dialog, when it does not qualify for a choice", async () => {
-    removeOptions.mockResolvedValue({
-      requires_choice: false,
-      manager_label: null,
-      delete_handled_by_manager: false,
-      keep_notifies_manager: false,
-    });
+    removeOptions.mockResolvedValue(
+      removeOptionsResult({ requires_choice: false }),
+    );
     renderActions({ status: "processed" });
 
     fireEvent.click(screen.getByRole("button", { name: "Remove from list" }));
@@ -99,12 +121,7 @@ describe("HistoryFileActions remove dialog", () => {
   });
 
   it("opens the dialog naming Weir alone when no manager is linked", async () => {
-    removeOptions.mockResolvedValue({
-      requires_choice: true,
-      manager_label: null,
-      delete_handled_by_manager: false,
-      keep_notifies_manager: false,
-    });
+    removeOptions.mockResolvedValue(removeOptionsResult());
     renderActions();
 
     fireEvent.click(screen.getByRole("button", { name: "Remove from list" }));
@@ -122,12 +139,12 @@ describe("HistoryFileActions remove dialog", () => {
   });
 
   it("names the manager that will delete the download and search again", async () => {
-    removeOptions.mockResolvedValue({
-      requires_choice: true,
-      manager_label: "Radarr",
-      delete_handled_by_manager: true,
-      keep_notifies_manager: false,
-    });
+    removeOptions.mockResolvedValue(
+      removeOptionsResult({
+        manager_label: "Radarr",
+        delete_handled_by_manager: true,
+      }),
+    );
     renderActions();
 
     fireEvent.click(screen.getByRole("button", { name: "Remove from list" }));
@@ -145,12 +162,13 @@ describe("HistoryFileActions remove dialog", () => {
   });
 
   it("says the manager will be told the file will not be imported when keep notifies it", async () => {
-    removeOptions.mockResolvedValue({
-      requires_choice: true,
-      manager_label: "Deluno",
-      delete_handled_by_manager: true,
-      keep_notifies_manager: true,
-    });
+    removeOptions.mockResolvedValue(
+      removeOptionsResult({
+        manager_label: "Deluno",
+        delete_handled_by_manager: true,
+        keep_notifies_manager: true,
+      }),
+    );
     renderActions();
 
     fireEvent.click(screen.getByRole("button", { name: "Remove from list" }));
@@ -163,12 +181,7 @@ describe("HistoryFileActions remove dialog", () => {
   });
 
   it("sends the chosen resolution when a choice other than delete is confirmed", async () => {
-    removeOptions.mockResolvedValue({
-      requires_choice: true,
-      manager_label: null,
-      delete_handled_by_manager: false,
-      keep_notifies_manager: false,
-    });
+    removeOptions.mockResolvedValue(removeOptionsResult());
     renderActions();
     fireEvent.click(screen.getByRole("button", { name: "Remove from list" }));
     fireEvent.click(
@@ -183,12 +196,12 @@ describe("HistoryFileActions remove dialog", () => {
   });
 
   it("shows the server's refusal in the dialog and keeps it open when the action fails", async () => {
-    removeOptions.mockResolvedValue({
-      requires_choice: true,
-      manager_label: "Radarr",
-      delete_handled_by_manager: true,
-      keep_notifies_manager: false,
-    });
+    removeOptions.mockResolvedValue(
+      removeOptionsResult({
+        manager_label: "Radarr",
+        delete_handled_by_manager: true,
+      }),
+    );
     forget.mockRejectedValueOnce(
       new Error("Radarr did not accept the rejection, so nothing was removed."),
     );
@@ -204,5 +217,94 @@ describe("HistoryFileActions remove dialog", () => {
       ),
     ).toBeInTheDocument();
     expect(screen.getByTestId("history-remove-dialog")).toBeInTheDocument();
+  });
+
+  it("shows the file's current details to confirm for a title with no recorded fingerprint", async () => {
+    removeOptions.mockResolvedValue(
+      removeOptionsResult({
+        fingerprint_recorded: false,
+        unconfirmed_size_bytes: 4_200_000_000,
+        unconfirmed_modified_at: "2026-09-24T10:04:00Z",
+      }),
+    );
+    renderActions();
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove from list" }));
+
+    const unconfirmed = await screen.findByTestId(
+      "history-remove-dialog-unconfirmed",
+    );
+    expect(within(unconfirmed).getByText(/3\.91 GB/)).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Weir didn't note this file's details when it failed, so check it's the one you mean.",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("never shows the file's current details to confirm for a title with a recorded fingerprint", async () => {
+    removeOptions.mockResolvedValue(removeOptionsResult());
+    renderActions();
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove from list" }));
+
+    await screen.findByTestId("history-remove-dialog");
+    expect(
+      screen.queryByTestId("history-remove-dialog-unconfirmed"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("sends the file's confirmed details with delete or keep for a title with no recorded fingerprint", async () => {
+    removeOptions.mockResolvedValue(
+      removeOptionsResult({
+        fingerprint_recorded: false,
+        unconfirmed_size_bytes: 4_200_000_000,
+        unconfirmed_modified_at: "2026-09-24T10:04:00Z",
+      }),
+    );
+    renderActions();
+    fireEvent.click(screen.getByRole("button", { name: "Remove from list" }));
+    await screen.findByTestId("history-remove-dialog");
+
+    fireEvent.click(screen.getByTestId("history-remove-dialog-confirm"));
+
+    await waitFor(() =>
+      expect(forget).toHaveBeenCalledWith({
+        id: 7,
+        resolution: "delete",
+        confirm: {
+          size_bytes: 4_200_000_000,
+          modified_at: "2026-09-24T10:04:00Z",
+        },
+      }),
+    );
+  });
+
+  it("always offers a way to just remove the title without touching the file", async () => {
+    removeOptions.mockResolvedValue(
+      removeOptionsResult({
+        fingerprint_recorded: false,
+        unconfirmed_size_bytes: 4_200_000_000,
+        unconfirmed_modified_at: "2026-09-24T10:04:00Z",
+      }),
+    );
+    renderActions();
+    fireEvent.click(screen.getByRole("button", { name: "Remove from list" }));
+    fireEvent.click(
+      await screen.findByTestId("history-remove-dialog-choice-remove"),
+    );
+
+    fireEvent.click(screen.getByTestId("history-remove-dialog-confirm"));
+
+    await waitFor(() =>
+      expect(forget).toHaveBeenCalledWith({
+        id: 7,
+        resolution: "remove",
+        confirm: {
+          size_bytes: 4_200_000_000,
+          modified_at: "2026-09-24T10:04:00Z",
+        },
+      }),
+    );
   });
 });

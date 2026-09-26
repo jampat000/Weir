@@ -226,7 +226,10 @@ internal sealed class ProcessingFilesEndpointHandlers
             .Set("requires_choice", options.RequiresChoice)
             .Set("manager_label", options.ManagerLabel)
             .Set("delete_handled_by_manager", options.DeleteHandledByManager)
-            .Set("keep_notifies_manager", options.KeepNotifiesManager));
+            .Set("keep_notifies_manager", options.KeepNotifiesManager)
+            .Set("fingerprint_recorded", options.FingerprintRecorded)
+            .Set("unconfirmed_size_bytes", options.UnconfirmedSizeBytes)
+            .Set("unconfirmed_modified_at", options.UnconfirmedModifiedAt));
     }
 
     /// <summary>
@@ -250,15 +253,24 @@ internal sealed class ProcessingFilesEndpointHandlers
             resolution = parsedResolution;
         }
 
+        // What `remove-options` showed the owner for a row with no recorded fingerprint (#786 follow-up): both or
+        // neither, since one without the other confirms nothing.
+        var confirmSizeBytes = model.OptionalInt("confirm_size_bytes", ge: 0);
+        var confirmModifiedAt = model.OptionalStr("confirm_modified_at", maxLength: 64);
+
         model.Finish(ExtraFields.Forbid);
         issues.ThrowIfAny();
 
         await request.RequireUserAsync(UserRoles.OperatorOrAdmin).ConfigureAwait(false);
         request.RequireConfirmationToken(csrfToken);
 
+        var confirmation = confirmSizeBytes is { } size && confirmModifiedAt is { } modifiedAt
+            ? new FileRemovalConfirmation(size, modifiedAt)
+            : (FileRemovalConfirmation?)null;
+
         var uow = await request.DbAsync().ConfigureAwait(false);
         var row = await ProcessingFilesEndpoints.RequireFileAsync(uow, _files, id).ConfigureAwait(false);
-        var chosen = await TryApplyChosenResolutionAsync(request, uow, row, resolution).ConfigureAwait(false);
+        var chosen = await TryApplyChosenResolutionAsync(request, uow, row, resolution, confirmation).ConfigureAwait(false);
         if (chosen is { } result)
         {
             return result;
@@ -274,7 +286,7 @@ internal sealed class ProcessingFilesEndpointHandlers
     /// <paramref name="resolution"/> is <see cref="FileRemovalResolutions.Remove"/>, or the title turned out not to
     /// qualify, so the caller's plain remove applies instead.
     /// </summary>
-    private async Task<ApiResult?> TryApplyChosenResolutionAsync(ApiRequest request, UnitOfWork uow, ProcessingFileRecord row, string resolution)
+    private async Task<ApiResult?> TryApplyChosenResolutionAsync(ApiRequest request, UnitOfWork uow, ProcessingFileRecord row, string resolution, FileRemovalConfirmation? confirmation)
     {
         if (resolution == FileRemovalResolutions.Retry)
         {
@@ -300,8 +312,8 @@ internal sealed class ProcessingFilesEndpointHandlers
         }
 
         var outcome = resolution == FileRemovalResolutions.Delete
-            ? await _removal.DeleteAsync(uow, row, request.Context.RequestAborted).ConfigureAwait(false)
-            : await _removal.KeepAsync(uow, row, request.Context.RequestAborted).ConfigureAwait(false);
+            ? await _removal.DeleteAsync(uow, row, confirmation, request.Context.RequestAborted).ConfigureAwait(false)
+            : await _removal.KeepAsync(uow, row, confirmation, request.Context.RequestAborted).ConfigureAwait(false);
         await request.CommitAsync().ConfigureAwait(false);
         return outcome.Done
             ? ApiRoutes.Ok(new WireObject().Set("done", true).Set("detail", outcome.Message))

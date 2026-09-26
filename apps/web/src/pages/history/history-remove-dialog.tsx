@@ -1,18 +1,25 @@
 import { useState } from "react";
 
+import { FileName } from "../../components/shared/file-name";
 import { ConfirmDialog } from "../../components/ui/confirm-dialog";
+import { formatBytes } from "../../lib/format/bytes";
 import type {
   ProcessingFileRemoveOptions,
   ProcessingFileRemovalResolution,
 } from "../../lib/processing/files-api";
+import { useAppDateFormatter } from "../../lib/ui/mm-format-date";
 
-/** The three choices offered when a title's file is still in the watched folder (#785). */
+/** The four choices offered when a title's file is still in the watched folder (#785). */
 type HistoryRemoveChoice = Extract<
   ProcessingFileRemovalResolution,
-  "delete" | "keep" | "retry"
+  "remove" | "delete" | "keep" | "retry"
 >;
 
-/** The label and explanation for one of the three choices, built from what `remove-options` reported. */
+/**
+ * The label and explanation for each choice, built from what `remove-options` reported. "remove" is always
+ * offered, whatever the other three say, since it is the one choice that never needs the file's identity
+ * confirmed — it never touches the file at all (#786 follow-up).
+ */
 function choices(
   options: ProcessingFileRemoveOptions,
 ): { value: HistoryRemoveChoice; label: string; detail: string }[] {
@@ -42,14 +49,23 @@ function choices(
       label: "Try it again",
       detail: "Weir processes it on the next pass.",
     },
+    {
+      value: "remove",
+      label: "Just remove it from the list",
+      detail:
+        "Leaves the file exactly as it is. Weir stops watching it, so a later scan could pick it up again.",
+    },
   ];
 }
 
 /**
  * History's remove dialog for a failed or rejected title whose file is still in the watched folder (#785):
  * delete the download (naming whichever manager will do it, or saying Weir will delete it itself), keep it
- * without processing it again, or try it again. A title that does not qualify for this — finished, or its file
- * already gone — keeps the plain confirm in {@link HistoryFileActions} instead of this dialog.
+ * without processing it again, try it again, or just remove it from the list. A title that does not qualify for
+ * this — finished, or its file already gone — keeps the plain confirm in {@link HistoryFileActions} instead of
+ * this dialog. When `options.fingerprint_recorded` is false (a title that failed or was rejected before Weir
+ * started recording one, #786 follow-up), the file Weir means is shown plainly so the owner can check it before
+ * choosing delete or keep — "remove" needs no such check, since it never touches the file.
  */
 export function HistoryRemoveDialog({
   fileName,
@@ -67,6 +83,7 @@ export function HistoryRemoveDialog({
   onConfirm: (resolution: HistoryRemoveChoice) => void;
 }) {
   const [choice, setChoice] = useState<HistoryRemoveChoice>("delete");
+  const formatDate = useAppDateFormatter();
 
   return (
     <ConfirmDialog
@@ -84,6 +101,25 @@ export function HistoryRemoveDialog({
           <legend className="mb-2">
             Its file is still in the watched folder.
           </legend>
+          {!options.fingerprint_recorded ? (
+            <div
+              className="mb-3"
+              data-testid="history-remove-dialog-unconfirmed"
+            >
+              <p className="font-medium">
+                <FileName path={fileName} />
+                {" · "}
+                {formatBytes(options.unconfirmed_size_bytes ?? 0)}
+                {options.unconfirmed_modified_at
+                  ? ` · modified ${formatDate(options.unconfirmed_modified_at)}`
+                  : ""}
+              </p>
+              <p className="mm-quiet-note">
+                Weir didn&apos;t note this file&apos;s details when it failed,
+                so check it&apos;s the one you mean.
+              </p>
+            </div>
+          ) : null}
           {choices(options).map((opt) => (
             <label
               key={opt.value}

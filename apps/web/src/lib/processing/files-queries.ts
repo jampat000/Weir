@@ -19,6 +19,7 @@ import {
   requeueProcessingFile,
   requeueProcessingFiles,
   type ProcessingBulkRequeueQuery,
+  type ProcessingFileRemovalConfirm,
   type ProcessingFileRemovalResolution,
   type ProcessingFilesPage,
   type ProcessingFilesQuery,
@@ -80,10 +81,12 @@ export function useForgetProcessingFile() {
     mutationFn: ({
       id,
       resolution,
+      confirm,
     }: {
       id: number;
       resolution?: ProcessingFileRemovalResolution;
-    }) => forgetProcessingFile(id, resolution),
+      confirm?: ProcessingFileRemovalConfirm;
+    }) => forgetProcessingFile(id, resolution, confirm),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: processingKeys.files });
       void qc.invalidateQueries({ queryKey: activityKeys.recent });

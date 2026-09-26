@@ -26,10 +26,29 @@ public static class FileRemovalResolutions
 /// <summary>
 /// What the remove dialog should offer for one title, read before it is shown (#785): whether the title even
 /// qualifies for a choice, and — when it does — which manager "delete" would ask, or that Weir would delete the
-/// file itself, and whether "keep" has a manager to tell.
+/// file itself, and whether "keep" has a manager to tell. <paramref name="FingerprintRecorded"/> is false for a row
+/// from before migration 0025 (or one whose fingerprint could not be read at the time): Weir has nothing of its own
+/// to check the file against, so the dialog must show the owner what is on disk right now —
+/// <paramref name="UnconfirmedSizeBytes"/> and <paramref name="UnconfirmedModifiedAt"/> — for them to confirm.
 /// </summary>
-public sealed record FileRemovalOptions(bool RequiresChoice, string? ManagerLabel, bool DeleteHandledByManager, bool KeepNotifiesManager)
+public sealed record FileRemovalOptions(
+    bool RequiresChoice,
+    string? ManagerLabel,
+    bool DeleteHandledByManager,
+    bool KeepNotifiesManager,
+    bool FingerprintRecorded,
+    long? UnconfirmedSizeBytes,
+    string? UnconfirmedModifiedAt)
 {
     /// <summary>A title that keeps today's plain confirm: finished, or its file is already gone.</summary>
-    public static readonly FileRemovalOptions PlainRemove = new(false, null, false, false);
+    public static readonly FileRemovalOptions PlainRemove = new(false, null, false, false, true, null, null);
 }
+
+/// <summary>
+/// What the remove dialog showed the owner for a title with no recorded fingerprint, echoed back on "delete" or
+/// "keep" so the server can check the file on disk still matches before touching anything (#786 follow-up:
+/// migration 0025 only records a fingerprint going forward, so every row that failed or was rejected before it
+/// shipped has none). <see cref="ModifiedAt"/> is the same whole-second UTC text <c>remove-options</c> sent, so the
+/// comparison is an exact string match rather than a lossy round trip through a browser's floating-point numbers.
+/// </summary>
+public readonly record struct FileRemovalConfirmation(long SizeBytes, string ModifiedAt);
