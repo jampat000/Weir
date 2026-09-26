@@ -18,8 +18,17 @@ public static class UserRoles
     public static readonly IReadOnlySet<string> OperatorOrAdmin = new HashSet<string>(StringComparer.Ordinal) { Admin, Operator };
 }
 
-/// <summary>A <c>users</c> row.</summary>
-public sealed record UserRecord(long Id, string Username, string PasswordHash, string Role, bool IsActive);
+/// <summary>Values persisted in <c>users.app_theme</c>. Null means no preference: follow the system setting.</summary>
+public static class AppThemes
+{
+    public const string Light = "light";
+    public const string Dark = "dark";
+
+    public static readonly IReadOnlyList<string> All = [Light, Dark];
+}
+
+/// <summary>A <c>users</c> row. <see cref="AppTheme"/> is null until the person picks one.</summary>
+public sealed record UserRecord(long Id, string Username, string PasswordHash, string Role, bool IsActive, string? AppTheme = null);
 
 /// <summary>A <c>user_sessions</c> row. <see cref="Id"/> is the stored 32-character hex UUID.</summary>
 public sealed record UserSessionRecord(

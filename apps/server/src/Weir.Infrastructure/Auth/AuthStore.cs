@@ -8,7 +8,7 @@ namespace Weir.Infrastructure.Auth;
 /// <summary>The <c>users</c> and <c>user_sessions</c> tables and the queries sign-in, sessions and recovery run on them.</summary>
 public sealed class AuthStore
 {
-    private const string UserColumns = "id, username, password_hash, role, is_active";
+    private const string UserColumns = "id, username, password_hash, role, is_active, app_theme";
 
     private const string SessionColumns =
         "id, user_id, token_hash, created_at, absolute_expires_at, is_trusted_device, last_seen_at, revoked_at, client_label";
@@ -59,6 +59,12 @@ public sealed class AuthStore
         Checked(uow).ExecuteAsync(
             "UPDATE users SET is_active=$active, updated_at=CURRENT_TIMESTAMP WHERE users.id = $id",
             ("$active", isActive ? 1 : 0),
+            ("$id", userId));
+
+    public Task<int> UpdateAppThemeAsync(UnitOfWork uow, long userId, string appTheme) =>
+        Checked(uow).ExecuteAsync(
+            "UPDATE users SET app_theme=$theme, updated_at=CURRENT_TIMESTAMP WHERE users.id = $id",
+            ("$theme", appTheme),
             ("$id", userId));
 
     /// <summary>Every account, alphabetically.</summary>
@@ -185,7 +191,8 @@ public sealed class AuthStore
         SqliteValues.GetString(reader, 1),
         SqliteValues.GetString(reader, 2),
         SqliteValues.GetString(reader, 3),
-        SqliteValues.GetBool(reader, 4));
+        SqliteValues.GetBool(reader, 4),
+        SqliteValues.GetStringOrNull(reader, 5));
 
     private static UserSessionRecord ReadSession(SqliteDataReader reader) => new(
         SqliteValues.GetString(reader, 0),

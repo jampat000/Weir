@@ -105,6 +105,7 @@ vi.mock("../../lib/settings/queries", () => ({
 }));
 vi.mock("../../lib/auth/queries", () => ({
   useMeQuery: () => ({ data: { role: "operator" } }),
+  useSetThemeMutation: () => ({ mutate: vi.fn(), isError: false }),
 }));
 vi.mock("../../lib/activity/queries", () => ({
   useActivityRecentQuery: (filters: { event_type: string }) => ({
