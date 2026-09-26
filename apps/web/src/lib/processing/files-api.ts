@@ -175,17 +175,25 @@ export async function fetchProcessingFileRemoveOptions(
   return readJson<ProcessingFileRemoveOptions>(response);
 }
 
+/**
+ * `delete`, `keep` and `retry` answer what actually happened (#786 review of #785) — `retry`'s `done` is false only
+ * when a concluded file's original is gone, in which case `detail` says so instead of claiming it was queued.
+ * A plain remove (no `resolution`) answers no body at all.
+ */
+export type ProcessingFileRemovalResult = Schema<"ProcessingFileRemovalOut">;
+
 export async function forgetProcessingFile(
   id: number,
   resolution?: ProcessingFileRemovalResolution,
-): Promise<void> {
+): Promise<ProcessingFileRemovalResult | undefined> {
   const path = `${processingFilesPath()}/${id}`;
-  await sendJson(
+  const response = await sendJson(
     path,
     "DELETE",
     resolution ? { resolution } : {},
     "Could not remove that file from the list",
   );
+  return readJson<ProcessingFileRemovalResult | undefined>(response);
 }
 
 export type ProcessingFileMoveToTopResult =

@@ -809,6 +809,46 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/processing/kept-files": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Processing Kept Files
+     * @description Every file kept without processing again from History's remove dialog (#785).
+     */
+    get: operations["get_processing_kept_files_api_v1_processing_kept_files_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/processing/kept-files/{id}/process-again": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Post Processing Kept File Process Again
+     * @description Clears the marker and queues its library's watched folder to be looked at again.
+     */
+    post: operations["post_processing_kept_file_process_again_api_v1_processing_kept_files__id__process_again_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/processing/files/{file_id}/log": {
     parameters: {
       query?: never;
@@ -4076,6 +4116,49 @@ export interface components {
       delete_handled_by_manager: boolean;
       /** Keep Notifies Manager */
       keep_notifies_manager: boolean;
+    };
+    /**
+     * ProcessingFileRemovalOut
+     * @description What a `delete`, `keep` or `retry` resolution on `DELETE .../files/{file_id}` actually did (#786 review of #785). `done` is false only for `retry` skipping a concluded file with its original gone — `delete` and `keep` fail the whole request (502) instead of answering `done: false`.
+     */
+    ProcessingFileRemovalOut: {
+      /** Done */
+      done: boolean;
+      /** Detail */
+      detail: string;
+    };
+    /**
+     * ProcessingKeptFileOut
+     * @description One file kept without processing again from History's remove dialog (#785).
+     */
+    ProcessingKeptFileOut: {
+      /** Id */
+      id: number;
+      /** Library Id */
+      library_id: number;
+      /** Library Name */
+      library_name: string;
+      /** Relative Path */
+      relative_path: string;
+      /** Size Bytes */
+      size_bytes: number;
+      /** Kept At */
+      kept_at: string;
+    };
+    /** ProcessingKeptFilesOut */
+    ProcessingKeptFilesOut: {
+      /** Files */
+      files: components["schemas"]["ProcessingKeptFileOut"][];
+    };
+    /** ProcessingKeptFileProcessAgainIn */
+    ProcessingKeptFileProcessAgainIn: {
+      /** Csrf Token */
+      csrf_token: string;
+    };
+    /** ProcessingKeptFileProcessAgainOut */
+    ProcessingKeptFileProcessAgainOut: {
+      /** Detail */
+      detail: string;
     };
     /**
      * ProcessingFileLogEntryOut
@@ -8721,7 +8804,16 @@ export interface operations {
       };
     };
     responses: {
-      /** @description Successful Response */
+      /** @description Successful Response for delete, keep or retry */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ProcessingFileRemovalOut"];
+        };
+      };
+      /** @description Successful Response for a plain remove */
       204: {
         headers: {
           [name: string]: unknown;
@@ -8743,6 +8835,68 @@ export interface operations {
           [name: string]: unknown;
         };
         content?: never;
+      };
+    };
+  };
+  get_processing_kept_files_api_v1_processing_kept_files_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ProcessingKeptFilesOut"];
+        };
+      };
+    };
+  };
+  post_processing_kept_file_process_again_api_v1_processing_kept_files__id__process_again_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ProcessingKeptFileProcessAgainIn"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ProcessingKeptFileProcessAgainOut"];
+        };
+      };
+      /** @description Weir has no kept file with that id */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
       };
     };
   };

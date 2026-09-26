@@ -35,14 +35,6 @@ const CONCLUDED: readonly ProcessingFileStatus[] = [
   "cancelled",
 ];
 
-/** What the notice says for each choice on the remove dialog, once it has gone through (#785). */
-const REMOVE_RESOLUTION_MESSAGES: Record<"delete" | "keep" | "retry", string> =
-  {
-    delete: "Deleted and removed from the list.",
-    keep: "Kept. Weir will leave it alone until it changes.",
-    retry: "Queued to be processed again.",
-  };
-
 /**
  * Every action for the file open in History. Each shows only where it can do something: a running file cannot be
  * started earlier, and a button that looked like it worked would be worse than no button. Every action disables the
@@ -183,9 +175,9 @@ export function HistoryFileActions({
   async function confirmRemoval(resolution: "delete" | "keep" | "retry") {
     setRemoveDialogError(null);
     try {
-      await forget.mutateAsync({ id: file.id, resolution });
+      const result = await forget.mutateAsync({ id: file.id, resolution });
       setRemoveDialogOptions(null);
-      onRemoved(REMOVE_RESOLUTION_MESSAGES[resolution]);
+      onRemoved(result?.detail ?? "Done.");
     } catch (error) {
       setRemoveDialogError(
         errorMessage(error, "That file could not be removed."),
