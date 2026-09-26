@@ -27,8 +27,8 @@ internal sealed class MediaManagerFixture : IDisposable
         Ledger = new HandoffLedgerStore(Store.Clock, Targets, Files);
         Jobs = new ProcessingJobStore(Store.Database, Store.Clock);
         SkipMarkers = new FileSkipMarkerStore();
-        Intake = new MediaManagerIntake(Store.Options, Connections, ConnectionStore, Ledger, Targets, Jobs, SkipMarkers, Store.Clock);
         Reporter = new HandoffCompletionReporter(Connections, ConnectionStore, Ledger, Targets, Libraries, Http);
+        Intake = new MediaManagerIntake(Store.Options, Connections, ConnectionStore, Ledger, Targets, Jobs, SkipMarkers, Reporter, Store.Clock);
         OperatorSettings = new OperatorSettingsStore();
         Cancellation = new PendingJobCancellation(Ledger, Reporter, Files);
     }
