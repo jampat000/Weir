@@ -1,10 +1,12 @@
 using System.Globalization;
 using System.Net;
+using Weir.Core.Activity;
 using Weir.Core.Jobs;
 using Weir.Core.Json;
 using Weir.Core.MediaManagers;
 using Weir.Core.Rules;
 using Weir.Infrastructure.MediaManagers;
+using Weir.Infrastructure.Processing.RemuxPass;
 
 namespace Weir.Infrastructure.Tests.MediaManagers;
 
@@ -483,6 +485,57 @@ public sealed class MediaManagerServiceTests
         Assert.Equal(1, await fixture.Store.Scalar("SELECT count(*) FROM media_manager_handoffs WHERE handoff_id = 'h1' AND state = 'queued' AND relative_path = 'Blade.Runner.2049'"));
         // #531: the handed-over file's size is known from the moment it arrives.
         Assert.Equal(5, await fixture.Store.Scalar("SELECT size_bytes FROM files WHERE relative_path = 'Blade.Runner.2049/Blade.Runner.2049.mkv'"));
+    }
+
+    /// <summary>
+    /// "Keep" is not scan-only (#786 review of #785): a manager handing the very same, unchanged file back to Weir
+    /// (a resend, or a fresh grab of a release with the same name) must not undo a person's choice to leave it
+    /// alone. Weir queues nothing for it and says so once in Activity.
+    /// </summary>
+    [Fact]
+    public async Task A_hand_off_for_a_kept_file_with_a_matching_fingerprint_is_not_queued()
+    {
+        using var fixture = new MediaManagerFixture();
+        var watched = fixture.Store.Home.Join("movies");
+        Directory.CreateDirectory(Path.Join(watched, "Film"));
+        var path = Path.Join(watched, "Film", "film.mkv");
+        await File.WriteAllTextAsync(path, "not a real film");
+        var libraryId = await fixture.LibraryAsync("movie", watched);
+        var fingerprint = SourceFiles.Fingerprint(path);
+        await fixture.Db(async uow =>
+        {
+            await fixture.SkipMarkers.SetAsync(uow, libraryId, "Film/film.mkv", fingerprint.SizeBytes, fingerprint.ModifiedTimeNs);
+            return 0;
+        });
+
+        await fixture.Db(uow => fixture.Intake.EnqueueRefineAsync(uow, Handoff("h1", Path.Join(watched, "Film", "film.mkv"))));
+
+        Assert.Empty(await Jobs(fixture));
+        Assert.Equal(
+            1,
+            await fixture.Store.Scalar($"SELECT count(*) FROM activity_events WHERE event_type = '{ActivityEventTypes.ProcessingFileRemovalKept}'"));
+    }
+
+    /// <summary>A hand-off for a file that has since changed is not shadowed by a stale marker: it is queued as normal.</summary>
+    [Fact]
+    public async Task A_hand_off_for_a_file_that_changed_since_it_was_kept_is_queued_as_normal()
+    {
+        using var fixture = new MediaManagerFixture();
+        var watched = fixture.Store.Home.Join("movies");
+        Directory.CreateDirectory(Path.Join(watched, "Film"));
+        var path = Path.Join(watched, "Film", "film.mkv");
+        await File.WriteAllTextAsync(path, "not a real film");
+        var libraryId = await fixture.LibraryAsync("movie", watched);
+        await fixture.Db(async uow =>
+        {
+            // A stale marker for bytes this file no longer has.
+            await fixture.SkipMarkers.SetAsync(uow, libraryId, "Film/film.mkv", 999_999, 1);
+            return 0;
+        });
+
+        await fixture.Db(uow => fixture.Intake.EnqueueRefineAsync(uow, Handoff("h2", Path.Join(watched, "Film", "film.mkv"))));
+
+        Assert.Single(await Jobs(fixture));
     }
 
     [Fact]

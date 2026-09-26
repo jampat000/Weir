@@ -59,6 +59,7 @@ public static class ProcessingApi
         services.AddSingleton<ProcessingFileTracksEndpointHandlers>();
         services.AddSingleton<ProcessingFilesEndpointHandlers>();
         services.AddSingleton<ProcessingJobsEndpointHandlers>();
+        services.AddSingleton<ProcessingKeptFilesEndpointHandlers>();
         services.AddSingleton<ProcessingLibraryEndpointHandlers>();
         services.AddSingleton<ProcessingLibraryCleansEndpointHandlers>();
         services.AddSingleton<ProcessingLibraryDiscoveryEndpointHandlers>();
@@ -106,6 +107,7 @@ public static class ProcessingApi
         endpoints.MapProcessingLibraryCleansEndpoints();
         endpoints.MapProcessingDirectPlayEndpoints();
         endpoints.MapProcessingJobsEndpoints();
+        endpoints.MapProcessingKeptFilesEndpoints();
         endpoints.MapProcessingRemuxPassEndpoints();
         endpoints.MapProcessingRulesPreviewEndpoints();
         endpoints.MapProcessingOverviewMaintenanceEndpoints();

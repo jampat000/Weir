@@ -1,11 +1,15 @@
 using Microsoft.Data.Sqlite;
+using Weir.Core.Activity;
 using Weir.Core.Configuration;
 using Weir.Core.Jobs;
 using Weir.Core.Json;
+using Weir.Core.Media;
 using Weir.Core.MediaManagers;
 using Weir.Core.Processing;
+using Weir.Infrastructure.Activity;
 using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.Processing;
+using Weir.Infrastructure.Processing.RemuxPass;
 using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Infrastructure.MediaManagers;
@@ -57,6 +61,7 @@ public sealed class MediaManagerIntake
     private readonly HandoffLedgerStore _ledger;
     private readonly HandoffTargetStore _targets;
     private readonly ProcessingJobStore _jobs;
+    private readonly FileSkipMarkerStore _skipMarkers;
     private readonly TimeProvider _time;
 
     public MediaManagerIntake(
@@ -66,6 +71,7 @@ public sealed class MediaManagerIntake
         HandoffLedgerStore ledger,
         HandoffTargetStore targets,
         ProcessingJobStore jobs,
+        FileSkipMarkerStore skipMarkers,
         TimeProvider time)
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
@@ -74,6 +80,7 @@ public sealed class MediaManagerIntake
         _ledger = ledger ?? throw new ArgumentNullException(nameof(ledger));
         _targets = targets ?? throw new ArgumentNullException(nameof(targets));
         _jobs = jobs ?? throw new ArgumentNullException(nameof(jobs));
+        _skipMarkers = skipMarkers ?? throw new ArgumentNullException(nameof(skipMarkers));
         _time = time ?? throw new ArgumentNullException(nameof(time));
     }
 
@@ -270,8 +277,20 @@ public sealed class MediaManagerIntake
         var targets = HandoffMediaFiles(library, relativePath);
         var baseKey = IntakeRules.BaseDedupeKey(importEvent, NewGuid);
         var covered = new List<string>(targets.Count);
+        // #786 review of #785: a target someone chose to keep must not be reprocessed just because a manager
+        // handed it over again — the marker is scan-only otherwise, and this is the same hand-off path a folder
+        // detection or a resend both use. Read once per hand-off, not per target.
+        var keptMarkers = library is not null
+            ? await _skipMarkers.ForLibraryAsync(uow, library.Id).ConfigureAwait(false)
+            : new Dictionary<string, FileSkipMarker>(StringComparer.Ordinal);
         foreach (var target in targets)
         {
+            if (library is not null && IsKept(keptMarkers, library, target))
+            {
+                await RecordKeptHandoffAsync(uow, importEvent.SourceKey, target).ConfigureAwait(false);
+                continue;
+            }
+
             var dedupeKey = IntakeRules.DedupeKeyFor(baseKey, targets, target, relativePath);
             var payload = IntakeRules.Payload(importEvent, library, relativePath, target);
             var connection = uow.Connection;
@@ -357,6 +376,46 @@ public sealed class MediaManagerIntake
             ("@payload", IntakeRules.PayloadJson(existing)),
             ("@id", active.Id));
         return true;
+    }
+
+    /// <summary>Whether <paramref name="relativePath"/>'s current bytes still match a "keep" marker recorded for it (#786 review of #785).</summary>
+    private static bool IsKept(Dictionary<string, FileSkipMarker> markers, IntakeLibrary library, string relativePath)
+    {
+        if (!markers.TryGetValue(relativePath, out var marker))
+        {
+            return false;
+        }
+
+        try
+        {
+            var fingerprint = SourceFiles.Fingerprint(Path.Join(library.WatchedFolder, relativePath));
+            return fingerprint.SizeBytes == marker.SizeBytes && fingerprint.ModifiedTimeNs == marker.MtimeNs;
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// One Activity line for a hand-off target Weir did not queue because it is kept (#786 review of #785): the
+    /// manager is not told anything back here — its own hand-off protocol has no answer for "already decided
+    /// against, by hand, before you sent this" — but the file is never reprocessed just because it arrived again.
+    /// </summary>
+    private static Task<long> RecordKeptHandoffAsync(UnitOfWork uow, string sourceKey, string relativePath)
+    {
+        var manager = MediaManagerKinds.LabelForConnection(sourceKey, null);
+        var fileName = MediaPathNames.Name(relativePath, OperatingSystem.IsWindows());
+        var detail = new WireObject()
+            .Set("relative_media_path", relativePath)
+            .Set("manager", manager)
+            .Set("trigger", "webhook")
+            .Set("result", "skipped");
+        return SqliteActivityWriter.RecordAsync(uow, new ActivityEventDraft(
+            ActivityEventTypes.ProcessingFileRemovalKept,
+            "processing",
+            $"{manager} handed {fileName} to Weir again, but it is kept, so Weir left it alone",
+            WireStrings.Slice(WireJsonWriter.Dumps(detail, WireJsonFormat.Compact), 10_000)));
     }
 
     /// <summary>

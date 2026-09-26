@@ -129,8 +129,14 @@ public sealed partial class HandoffCompletionReporter
         return new HandoffReportDelivery(false, $"failed: {name} answered HTTP {status.ToString(CultureInfo.InvariantCulture)}");
     }
 
-    /// <summary>Record the report in Activity, in plain words, accepted or not.</summary>
-    public static Task RecordHandoffReportAsync(UnitOfWork uow, HandoffReportTarget target, WireObject body, HandoffReportDelivery delivery, string? relativePath)
+    /// <summary>
+    /// Record the report in Activity, in plain words, accepted or not. <paramref name="acceptedTitle"/> names a
+    /// deliberate hold plainly — "Told Deluno you chose to keep {file} without processing it" for History's "keep"
+    /// (#786 review of #785) — rather than let the generic wording below, written for a hold that just happened to a
+    /// pass, say Weir "could not process" a file a person chose to leave alone.
+    /// </summary>
+    public static Task RecordHandoffReportAsync(
+        UnitOfWork uow, HandoffReportTarget target, WireObject body, HandoffReportDelivery delivery, string? relativePath, Func<string, string, string>? acceptedTitle = null)
     {
         ArgumentNullException.ThrowIfNull(target);
         ArgumentNullException.ThrowIfNull(body);
@@ -143,6 +149,10 @@ public sealed partial class HandoffCompletionReporter
         if (!delivery.Accepted)
         {
             title = $"Weir could not tell {name} about {fileName}";
+        }
+        else if (acceptedTitle is not null)
+        {
+            title = acceptedTitle(name, fileName);
         }
         else if (body.Get("disposition") is WireString { Value: "rejected" })
         {
