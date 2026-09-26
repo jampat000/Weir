@@ -114,6 +114,7 @@ public sealed class SchemaMigrator
         new(22, "0057_downloaded_scan_setting", "Weir.Infrastructure.Migrations.0022_downloaded_scan_setting.sql"),
         new(23, "0058_download_client_connections", "Weir.Infrastructure.Migrations.0023_download_client_connections.sql"),
         new(24, "0059_file_skip_markers", "Weir.Infrastructure.Migrations.0024_file_skip_markers.sql"),
+        new(25, "0060_file_content_fingerprint", "Weir.Infrastructure.Migrations.0025_file_content_fingerprint.sql"),
     ];
 
     /// <summary>

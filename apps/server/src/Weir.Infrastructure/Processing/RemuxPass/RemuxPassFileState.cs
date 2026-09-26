@@ -61,9 +61,11 @@ public static class RemuxPassFileState
     /// A rejection always upserts a Files row, whether or not a scan had already seen the file, so a hand-off rejected
     /// before any watched-folder scan still appears on the Files screen (#532). Sets status <c>rejected</c>, the reason and the failure class; clears
     /// <c>blocked_by_connection</c> and <c>hold_until</c> the same way <see cref="MarkFileStatusAsync"/> does for any status
-    /// that is neither <c>blocked_upstream</c> nor <c>on_hold</c>.
+    /// that is neither <c>blocked_upstream</c> nor <c>on_hold</c>. <paramref name="sourcePath"/>, when the source is still
+    /// there to read, becomes the row's fingerprint (#785) — null when the reject route already removed it, since a
+    /// removed file needs no fingerprint to protect.
     /// </summary>
-    public static async Task UpsertRejectedAsync(UnitOfWork uow, long libraryId, string relativePath, string reason, string? failureClass)
+    public static async Task UpsertRejectedAsync(UnitOfWork uow, long libraryId, string relativePath, string reason, string? failureClass, string? sourcePath)
     {
         ArgumentNullException.ThrowIfNull(uow);
         if (await FindAsync(uow, libraryId, relativePath).ConfigureAwait(false) is null)
@@ -83,6 +85,7 @@ public static class RemuxPassFileState
             ("$class", failureClass),
             ("$library", libraryId),
             ("$path", relativePath)).ConfigureAwait(false);
+        await RecordFingerprintFromPathAsync(uow, libraryId, relativePath, sourcePath).ConfigureAwait(false);
     }
 
     /// <summary>The four failure fields cleared, after a success, a wait or a content rejection.</summary>
@@ -116,17 +119,68 @@ public static class RemuxPassFileState
 
         var value = WireStrings.Strip(failureClass).ToLowerInvariant();
         var decision = RetryPolicy.DecideForRecordedFailure(library, value, row.FailureAttempts, row.FailureClass, now);
+        var status = decision.Quarantined ? ProcessingFileStatuses.OnHold : ProcessingFileStatuses.ProcessingFailed;
         await uow.ExecuteAsync(
             "UPDATE files SET status = $status, status_reason = $reason, failure_class = $class, failure_attempts = $attempts, " +
             "next_retry_at = $next, last_attempt_at = $now, updated_at = CURRENT_TIMESTAMP WHERE id = $id",
-            ("$status", decision.Quarantined ? ProcessingFileStatuses.OnHold : ProcessingFileStatuses.ProcessingFailed),
+            ("$status", status),
             ("$reason", WireStrings.Slice(WireStrings.Strip($"{reason} {decision.Reason}"), 10000)),
             ("$class", value),
             ("$attempts", row.FailureAttempts + 1),
             ("$next", decision.NextRetryAt is { } next ? TimestampColumns.Orm(next) : null),
             ("$now", TimestampColumns.Orm(now)),
             ("$id", row.Id)).ConfigureAwait(false);
+
+        // #785: the file's identity the moment it became failed, so History's remove dialog can tell a later,
+        // different release at the same path from the one that actually failed. Only for the terminal status a
+        // person can act on from that dialog; a quarantined (on_hold) file is not one of them.
+        if (status == ProcessingFileStatuses.ProcessingFailed)
+        {
+            await RecordCurrentFingerprintAsync(uow, library, relativePath).ConfigureAwait(false);
+        }
+
         return decision;
+    }
+
+    /// <summary>Resolves the source under the library's watched folder, then <see cref="RecordFingerprintFromPathAsync"/>.</summary>
+    internal static Task RecordCurrentFingerprintAsync(UnitOfWork uow, ProcessingLibraryRecord library, string relativePath)
+    {
+        string? source;
+        try
+        {
+            source = RemuxPassPaths.ResolveMediaFileUnderRoot(library.WatchedFolder, relativePath);
+        }
+        catch (ArgumentException)
+        {
+            source = null;
+        }
+
+        return RecordFingerprintFromPathAsync(uow, library.Id, relativePath, source);
+    }
+
+    /// <summary>
+    /// Stats <paramref name="sourcePath"/> now and records its size and modification time on the row, or clears them
+    /// when it is null or cannot be read — never leaves a stale fingerprint from an earlier attempt standing in for
+    /// this one (#785). <paramref name="sourcePath"/> is already resolved and contained by the caller.
+    /// </summary>
+    internal static async Task RecordFingerprintFromPathAsync(UnitOfWork uow, long libraryId, string relativePath, string? sourcePath)
+    {
+        SourceFingerprint? fingerprint = null;
+        if (sourcePath is not null)
+        {
+            try
+            {
+                fingerprint = SourceFiles.Fingerprint(sourcePath);
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+                // Nothing readable to fingerprint; the columns are cleared below so a stale value never lingers.
+            }
+        }
+
+        await uow.ExecuteAsync(
+            "UPDATE files SET fingerprint_size_bytes = $size, fingerprint_mtime_ns = $mtime WHERE library_id = $library AND relative_path = $path",
+            ("$size", fingerprint?.SizeBytes), ("$mtime", fingerprint?.ModifiedTimeNs), ("$library", libraryId), ("$path", relativePath)).ConfigureAwait(false);
     }
 
     /// <summary>

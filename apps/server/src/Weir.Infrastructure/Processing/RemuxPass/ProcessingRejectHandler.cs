@@ -175,7 +175,9 @@ public sealed partial class ProcessingRejectHandler : IJobHandler
                     // the release was rejected (from the job payload — e.g. "no retainable audio") alongside what
                     // happened to the download, rather than the acceptance sentence alone replacing it.
                     var rejectedReason = WireStrings.Slice(WireStrings.Strip($"{reason} {attempt.Reason}"), 10_000);
-                    await RemuxPassFileState.UpsertRejectedAsync(uow, libraryId.Value, relativePath, rejectedReason, failureClass).ConfigureAwait(false);
+                    // #785: no fingerprint for a source the reject route already removed — there is nothing left to protect.
+                    await RemuxPassFileState.UpsertRejectedAsync(uow, libraryId.Value, relativePath, rejectedReason, failureClass, File.Exists(source) ? source : null)
+                        .ConfigureAwait(false);
                     if (origin is not null)
                     {
                         await _ledger.RecordOutcomeAsync(uow, origin.SourceKey, origin.HandoffId, HandoffLedgerRules.Rejected, null, attempt.Reason).ConfigureAwait(false);
@@ -196,6 +198,8 @@ public sealed partial class ProcessingRejectHandler : IJobHandler
                         uow, libraryId.Value, relativePath, ProcessingFileStatuses.ProcessingFailed,
                         WireStrings.Slice($"{reason} {attempt.Reason} Weir is handing the original back unchanged instead.", 10_000),
                         now).ConfigureAwait(false);
+                    // #785: the original is untouched here, so its current bytes are exactly the fingerprint to protect.
+                    await RemuxPassFileState.RecordFingerprintFromPathAsync(uow, libraryId.Value, relativePath, File.Exists(source) ? source : null).ConfigureAwait(false);
                     eventType = ActivityEventTypes.ProcessingFileRejectFellBack;
                     title = $"{MediaPathNames.Name(relativePath, OperatingSystem.IsWindows())} could not be rejected, so it is being handed back";
                     detail.Set("next_action", "Weir queued the original to be handed back unchanged.");
