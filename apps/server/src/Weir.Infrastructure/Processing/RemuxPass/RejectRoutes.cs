@@ -16,6 +16,22 @@ public sealed record RejectRouteOutcome(bool Done, string Reason, string? Manage
 }
 
 /// <summary>
+/// The single queue row, across every queue-capable connection, that safely identifies the download for a source
+/// file — or the plain reason none could be used safely. The same rule decides what "delete" would tell the History
+/// remove dialog and what it actually does, so the two can never disagree (#786 review of #785): unreachable queues,
+/// no match, more than one match, a season pack sharing a download id, and a folder holding more than one video file
+/// all refuse rather than guess.
+/// </summary>
+public sealed record QueueMatch(ManagerConnection? Connection, WireObject? Row, string? RefusalReason, string? RefusalManager)
+{
+    public bool Found => Connection is not null && Row is not null;
+
+    public static QueueMatch Refused(string reason, string? manager = null) => new(null, null, reason, manager);
+
+    public static QueueMatch Ok(ManagerConnection connection, WireObject row) => new(connection, row, null, null);
+}
+
+/// <summary>
 /// The two ways Weir asks a media manager to take back a bad release (#465, #471, #785): through a manager whose
 /// port removes queue items directly (Sonarr, Radarr), or by reporting a hand-off's failure to the manager that
 /// handed the file over (Deluno and any other external integration). Both <see cref="ProcessingRejectHandler"/>'s
@@ -41,6 +57,46 @@ public sealed class RejectRoutes
     {
         ArgumentNullException.ThrowIfNull(connections);
         ArgumentNullException.ThrowIfNull(source);
+        var match = await MatchQueueItemAsync(connections, source, cancellationToken).ConfigureAwait(false);
+        if (!match.Found)
+        {
+            return new RejectRouteOutcome(false, match.RefusalReason!, match.RefusalManager);
+        }
+
+        var connection = match.Connection!;
+        var row = match.Row!;
+        var label = connection.Label;
+        var downloadId = ManagerValues.FirstText(row, "downloadId");
+        var removePort = _ports.PortForKind(connection.Kind)!;
+        try
+        {
+            await removePort.RemoveQueueItemAsync(connection, row, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception exception) when (exception is MediaManagerHttpException or IOException)
+        {
+            return new RejectRouteOutcome(
+                false, $"{label} did not accept the rejection, so nothing was removed.", label,
+                new WireObject().Set("technical_detail", WireStrings.Slice(exception.Message, 500)));
+        }
+
+        return new RejectRouteOutcome(
+            true,
+            $"{label} removed the download and blocklisted the release, so it will not be grabbed again and {label} can search for a different one.",
+            label,
+            new WireObject().Set("route", "queue").Set("queue_item", row.Get("id") ?? WireNull.Instance).Set("download_id", downloadId));
+    }
+
+    /// <summary>
+    /// The one queue row, across <paramref name="connections"/>, whose download safely identifies <paramref name="source"/>:
+    /// an unreachable queue, no match, more than one match, a season pack (several items sharing a download id), or a
+    /// folder holding more than one video file all refuse rather than guess which download to act on. Read-only — no
+    /// queue item is removed here, so this also answers "would delete work, and through which manager" for the
+    /// History remove dialog (<see cref="Weir.Infrastructure.Processing.RemuxPass.HistoryFileRemovalService"/>).
+    /// </summary>
+    public async Task<QueueMatch> MatchQueueItemAsync(IReadOnlyList<ManagerConnection> connections, string source, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(connections);
+        ArgumentNullException.ThrowIfNull(source);
         var matches = new List<(ManagerConnection Connection, WireObject Row, bool IsFolder, int Index)>();
         var rowsByConnection = new Dictionary<int, List<WireObject>>();
         var wanted = NormalizeStoragePath(source);
@@ -56,8 +112,7 @@ public sealed class RejectRoutes
             var signal = await port.QueueRowsAsync(connection, cancellationToken).ConfigureAwait(false);
             if (!signal.IsReported)
             {
-                return new RejectRouteOutcome(
-                    false,
+                return QueueMatch.Refused(
                     signal.Status == SignalStatus.Unreachable
                         ? ManagerWaitMessages.RejectNotAnswering(connection.Label)
                         : signal.Detail ?? $"Weir could not read {connection.Label}'s queue.",
@@ -88,12 +143,12 @@ public sealed class RejectRoutes
 
         if (matches.Count == 0)
         {
-            return new RejectRouteOutcome(false, "No download in the linked media manager's queue points at this file, so Weir could not reject it safely.");
+            return QueueMatch.Refused("No download in the linked media manager's queue points at this file, so Weir could not reject it safely.");
         }
 
         if (matches.Count > 1)
         {
-            return new RejectRouteOutcome(false, "More than one download in the queue points at this file, so Weir could not tell which one to reject.");
+            return QueueMatch.Refused("More than one download in the queue points at this file, so Weir could not tell which one to reject.");
         }
 
         var (matchedConnection, matchedRow, isFolder, matchedIndex) = matches[0];
@@ -104,8 +159,7 @@ public sealed class RejectRoutes
             var siblings = rowsByConnection.GetValueOrDefault(matchedIndex, []).Count(row => ManagerValues.FirstText(row, "downloadId") == downloadId);
             if (siblings > 1)
             {
-                return new RejectRouteOutcome(
-                    false,
+                return QueueMatch.Refused(
                     $"This file is part of a download that {label} tracks as {siblings} items (a season pack or " +
                     "similar). Rejecting it would delete the others too, so Weir handed the original back instead.",
                     label);
@@ -118,8 +172,7 @@ public sealed class RejectRoutes
             var only = SingleVideoFileUnder(downloadFolder);
             if (only is null || !string.Equals(only, RemuxPassPaths.Resolve(source), PathComparison))
             {
-                return new RejectRouteOutcome(
-                    false,
+                return QueueMatch.Refused(
                     $"The download holds more than this one video file. Rejecting it in {label} would delete the " +
                     "others too, so Weir handed the original back instead.",
                     label);
@@ -129,25 +182,10 @@ public sealed class RejectRoutes
         var removePort = _ports.PortForKind(matchedConnection.Kind);
         if (removePort is null)
         {
-            return new RejectRouteOutcome(false, $"Weir does not know how to ask {label} to remove a download.", label);
+            return QueueMatch.Refused($"Weir does not know how to ask {label} to remove a download.", label);
         }
 
-        try
-        {
-            await removePort.RemoveQueueItemAsync(matchedConnection, matchedRow, cancellationToken).ConfigureAwait(false);
-        }
-        catch (Exception exception) when (exception is MediaManagerHttpException or IOException)
-        {
-            return new RejectRouteOutcome(
-                false, $"{label} did not accept the rejection, so nothing was removed.", label,
-                new WireObject().Set("technical_detail", WireStrings.Slice(exception.Message, 500)));
-        }
-
-        return new RejectRouteOutcome(
-            true,
-            $"{label} removed the download and blocklisted the release, so it will not be grabbed again and {label} can search for a different one.",
-            label,
-            new WireObject().Set("route", "queue").Set("queue_item", matchedRow.Get("id") ?? WireNull.Instance).Set("download_id", downloadId));
+        return QueueMatch.Ok(matchedConnection, matchedRow);
     }
 
     /// <summary>A manager that hands files over gets a failed report with disposition: rejected.</summary>

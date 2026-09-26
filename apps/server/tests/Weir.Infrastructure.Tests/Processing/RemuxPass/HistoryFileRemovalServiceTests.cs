@@ -46,10 +46,19 @@ public sealed class HistoryFileRemovalServiceTests : IDisposable
     private Task LinkAsync(long libraryId, long connectionId) =>
         _fixture.Store.Execute($"INSERT INTO library_manager_links (library_id, connection_id) VALUES ({libraryId}, {connectionId})");
 
-    private async Task<ProcessingFileRecord> FileRowAsync(long libraryId, string relativePath, string status = "processing_failed")
+    /// <summary>
+    /// Seeds a file row exactly as it stands the moment it becomes failed or rejected: with the fingerprint of
+    /// <paramref name="source"/> on it when the source exists, matching what <c>RemuxPassFileState</c> now records at
+    /// that moment (#786 review of #785). Null <paramref name="source"/> for a test whose file never existed.
+    /// </summary>
+    private async Task<ProcessingFileRecord> FileRowAsync(long libraryId, string relativePath, string? source, string status = "processing_failed")
     {
+        var fingerprint = source is not null && File.Exists(source) ? SourceFiles.Fingerprint(source) : (SourceFingerprint?)null;
         await _fixture.Store.Execute(
-            $"INSERT INTO files (library_id, relative_path, status, status_reason) VALUES ({libraryId}, '{relativePath}', '{status}', 'ffmpeg could not read the audio track.')");
+            "INSERT INTO files (library_id, relative_path, status, status_reason, fingerprint_size_bytes, fingerprint_mtime_ns) " +
+            $"VALUES ({libraryId}, '{relativePath}', '{status}', 'ffmpeg could not read the audio track.', " +
+            $"{(fingerprint is { } f ? f.SizeBytes.ToString(CultureInfo.InvariantCulture) : "NULL")}, " +
+            $"{(fingerprint is { } f2 ? f2.ModifiedTimeNs.ToString(CultureInfo.InvariantCulture) : "NULL")})");
         return await _fixture.Db(uow => _fixture.Files.FindAsync(uow, libraryId, relativePath)) ?? throw new InvalidOperationException("Seeded row not found.");
     }
 
@@ -61,22 +70,14 @@ public sealed class HistoryFileRemovalServiceTests : IDisposable
         await _fixture.Jobs.EnqueueOrGetAsync($"seed:{handoffId}", "processing.file.remux_pass.v1", payload);
     }
 
-    private async Task<string> ScalarText(string sql)
-    {
-        using var connection = _fixture.Store.Database.Open();
-        using var command = connection.CreateCommand();
-        command.CommandText = sql;
-        return Convert.ToString(await command.ExecuteScalarAsync(), CultureInfo.InvariantCulture) ?? string.Empty;
-    }
-
     // --- who qualifies for the choice ------------------------------------------------------------------
 
     [Fact]
     public async Task A_finished_title_does_not_qualify_for_a_choice()
     {
         var library = await LibraryAsync();
-        _folders.Source("Film/film.mkv");
-        var file = await FileRowAsync(library, "Film/film.mkv", "processed");
+        var source = _folders.Source("Film/film.mkv");
+        var file = await FileRowAsync(library, "Film/film.mkv", source, "processed");
 
         var options = await _fixture.Db(uow => Service().EvaluateAsync(uow, file, CancellationToken.None));
 
@@ -88,7 +89,7 @@ public sealed class HistoryFileRemovalServiceTests : IDisposable
     {
         var library = await LibraryAsync();
         // Deliberately never written to disk.
-        var file = await FileRowAsync(library, "Film/film.mkv");
+        var file = await FileRowAsync(library, "Film/film.mkv", null);
 
         var options = await _fixture.Db(uow => Service().EvaluateAsync(uow, file, CancellationToken.None));
 
@@ -102,7 +103,7 @@ public sealed class HistoryFileRemovalServiceTests : IDisposable
     {
         var library = await LibraryAsync();
         var source = _folders.Source("Film/film.mkv");
-        var file = await FileRowAsync(library, "Film/film.mkv");
+        var file = await FileRowAsync(library, "Film/film.mkv", source);
 
         var options = await _fixture.Db(uow => Service().EvaluateAsync(uow, file, CancellationToken.None));
         Assert.True(options.RequiresChoice);
@@ -122,7 +123,7 @@ public sealed class HistoryFileRemovalServiceTests : IDisposable
     {
         var library = await LibraryAsync();
         var source = _folders.Source("Film/film.mkv");
-        var file = await FileRowAsync(library, "Film/film.mkv");
+        var file = await FileRowAsync(library, "Film/film.mkv", source);
 
         var options = await _fixture.Db(uow => Service().EvaluateAsync(uow, file, CancellationToken.None));
         Assert.False(options.KeepNotifiesManager);
@@ -139,7 +140,7 @@ public sealed class HistoryFileRemovalServiceTests : IDisposable
     public async Task Delete_refuses_a_relative_path_that_escapes_the_watched_folder()
     {
         var library = await LibraryAsync();
-        var file = await FileRowAsync(library, "../outside.mkv");
+        var file = await FileRowAsync(library, "../outside.mkv", null);
 
         var outcome = await _fixture.Db(uow => Service().DeleteAsync(uow, file, CancellationToken.None));
 
@@ -154,7 +155,7 @@ public sealed class HistoryFileRemovalServiceTests : IDisposable
     {
         var library = await LibraryAsync();
         var source = _folders.Source("Film/film.mkv");
-        var file = await FileRowAsync(library, "Film/film.mkv");
+        var file = await FileRowAsync(library, "Film/film.mkv", source);
         var connection = await _fixture.AddConnectionAsync("radarr", "Radarr", "http://10.0.0.5:7878", "k");
         await LinkAsync(library, connection);
         var outputPath = Path.GetFullPath(source).Replace('\\', '/');
@@ -172,23 +173,30 @@ public sealed class HistoryFileRemovalServiceTests : IDisposable
         Assert.Equal(0, await _fixture.Store.Scalar("SELECT count(*) FROM files"));
     }
 
+    /// <summary>
+    /// A linked manager whose queue does not actually reference this file (the same "cannot tell which download"
+    /// refusal the automatic reject job hits) is not one that "can do it": the wording and the action must agree
+    /// (#786 review of #785), so both say Weir alone, and Weir deletes the file itself.
+    /// </summary>
     [Fact]
-    public async Task A_manager_that_refuses_the_queue_removal_fails_the_whole_action()
+    public async Task A_linked_manager_with_no_matching_queue_item_is_treated_as_weir_alone()
     {
         var library = await LibraryAsync();
         var source = _folders.Source("Film/film.mkv");
-        var file = await FileRowAsync(library, "Film/film.mkv");
+        var file = await FileRowAsync(library, "Film/film.mkv", source);
         var connection = await _fixture.AddConnectionAsync("radarr", "Radarr", "http://10.0.0.5:7878", "k");
         await LinkAsync(library, connection);
-        // No matching queue row: the same "cannot tell which download" refusal the automatic reject job hits.
         _fixture.Http.Json(HttpMethod.Get, "/api/v3/queue", """{"records":[]}""");
+
+        var options = await _fixture.Db(uow => Service().EvaluateAsync(uow, file, CancellationToken.None));
+        Assert.False(options.DeleteHandledByManager);
+        Assert.Null(options.ManagerLabel);
 
         var outcome = await _fixture.Db(uow => Service().DeleteAsync(uow, file, CancellationToken.None));
 
-        Assert.False(outcome.Done);
-        Assert.True(File.Exists(source));
-        Assert.Equal(1, await _fixture.Store.Scalar("SELECT count(*) FROM files"));
-        Assert.Equal("processing_failed", await ScalarText("SELECT status FROM files"));
+        Assert.True(outcome.Done);
+        Assert.False(File.Exists(source));
+        Assert.Empty(_fixture.Http.RequestsTo(HttpMethod.Delete, "/api/v3/queue/55"));
     }
 
     // --- through a hand-off (Deluno) -----------------------------------------------------------------------
@@ -198,7 +206,7 @@ public sealed class HistoryFileRemovalServiceTests : IDisposable
     {
         var library = await LibraryAsync();
         var source = _folders.Source("Film/film.mkv");
-        var file = await FileRowAsync(library, "Film/film.mkv");
+        var file = await FileRowAsync(library, "Film/film.mkv", source);
         var connection = await _fixture.AddConnectionAsync("deluno", "Deluno", "http://192.0.2.30:5099", "k1");
         await LinkAsync(library, connection);
         await GiveHandoffOriginAsync(library, "Film/film.mkv", "h1");
@@ -224,7 +232,7 @@ public sealed class HistoryFileRemovalServiceTests : IDisposable
     {
         var library = await LibraryAsync();
         var source = _folders.Source("Film/film.mkv");
-        var file = await FileRowAsync(library, "Film/film.mkv");
+        var file = await FileRowAsync(library, "Film/film.mkv", source);
         var connection = await _fixture.AddConnectionAsync("deluno", "Deluno", "http://192.0.2.30:5099", "k1");
         await LinkAsync(library, connection);
         await GiveHandoffOriginAsync(library, "Film/film.mkv", "h2");
@@ -247,7 +255,7 @@ public sealed class HistoryFileRemovalServiceTests : IDisposable
     {
         var library = await LibraryAsync();
         var source = _folders.Source("Film/film.mkv");
-        var file = await FileRowAsync(library, "Film/film.mkv");
+        var file = await FileRowAsync(library, "Film/film.mkv", source);
         var connection = await _fixture.AddConnectionAsync("deluno", "Deluno", "http://192.0.2.30:5099", "k1");
         await LinkAsync(library, connection);
         await GiveHandoffOriginAsync(library, "Film/film.mkv", "h3");
@@ -276,7 +284,7 @@ public sealed class HistoryFileRemovalServiceTests : IDisposable
     {
         var library = await LibraryAsync();
         var source = _folders.Source("Film/film.mkv");
-        var file = await FileRowAsync(library, "Film/film.mkv");
+        var file = await FileRowAsync(library, "Film/film.mkv", source);
         var connection = await _fixture.AddConnectionAsync("deluno", "Deluno", "http://192.0.2.30:5099", "k1");
         await LinkAsync(library, connection);
         await GiveHandoffOriginAsync(library, "Film/film.mkv", "h4");
@@ -289,5 +297,75 @@ public sealed class HistoryFileRemovalServiceTests : IDisposable
         Assert.True(File.Exists(source));
         Assert.Equal(0, await _fixture.Store.Scalar("SELECT count(*) FROM file_skip_markers"));
         Assert.Equal(1, await _fixture.Store.Scalar("SELECT count(*) FROM files"));
+    }
+
+    // --- a different release lands at the same path (#786 review of #785) ---------------------------------
+
+    [Fact]
+    public async Task Delete_refuses_a_file_that_changed_since_it_failed()
+    {
+        var library = await LibraryAsync();
+        var source = _folders.Source("Film/film.mkv");
+        var file = await FileRowAsync(library, "Film/film.mkv", source);
+        // A new, different release lands at the same path after the title failed.
+        File.WriteAllBytes(source, "a completely different release replaced this one"u8.ToArray());
+
+        var outcome = await _fixture.Db(uow => Service().DeleteAsync(uow, file, CancellationToken.None));
+
+        Assert.False(outcome.Done);
+        Assert.Equal(
+            "This file has changed since it failed, so Weir won't delete it. It will be looked at again on the next scan.",
+            outcome.Message);
+        Assert.True(File.Exists(source));
+        Assert.Equal(1, await _fixture.Store.Scalar("SELECT count(*) FROM files"));
+    }
+
+    [Fact]
+    public async Task Keep_refuses_a_file_that_changed_since_it_was_rejected()
+    {
+        var library = await LibraryAsync();
+        var source = _folders.Source("Film/film.mkv");
+        var file = await FileRowAsync(library, "Film/film.mkv", source, "rejected");
+        File.WriteAllBytes(source, "a completely different release replaced this one"u8.ToArray());
+
+        var outcome = await _fixture.Db(uow => Service().KeepAsync(uow, file, CancellationToken.None));
+
+        Assert.False(outcome.Done);
+        Assert.Equal(
+            "This file has changed since it failed, so Weir won't delete it. It will be looked at again on the next scan.",
+            outcome.Message);
+        Assert.Equal(0, await _fixture.Store.Scalar("SELECT count(*) FROM file_skip_markers"));
+        Assert.Equal(1, await _fixture.Store.Scalar("SELECT count(*) FROM files"));
+    }
+
+    [Fact]
+    public async Task A_row_with_no_recorded_fingerprint_refuses_delete_rather_than_guess()
+    {
+        var library = await LibraryAsync();
+        var source = _folders.Source("Film/film.mkv");
+        // No fingerprint recorded: as for every row from before migration 0025.
+        var file = await FileRowAsync(library, "Film/film.mkv", null);
+
+        var outcome = await _fixture.Db(uow => Service().DeleteAsync(uow, file, CancellationToken.None));
+
+        Assert.False(outcome.Done);
+        Assert.True(File.Exists(source));
+    }
+
+    // --- a stale "keep" marker must not outlive the file it was for (#786 review of #785) ------------------
+
+    [Fact]
+    public async Task Delete_clears_a_leftover_keep_marker_for_the_same_path()
+    {
+        var library = await LibraryAsync();
+        var source = _folders.Source("Film/film.mkv");
+        var file = await FileRowAsync(library, "Film/film.mkv", source);
+        // A marker left from an earlier, different release at this same path.
+        await _fixture.Db(async uow => { await _skipMarkers.SetAsync(uow, library, "Film/film.mkv", 1, 1); return 0; });
+
+        var outcome = await _fixture.Db(uow => Service().DeleteAsync(uow, file, CancellationToken.None));
+
+        Assert.True(outcome.Done);
+        Assert.Equal(0, await _fixture.Store.Scalar("SELECT count(*) FROM file_skip_markers"));
     }
 }

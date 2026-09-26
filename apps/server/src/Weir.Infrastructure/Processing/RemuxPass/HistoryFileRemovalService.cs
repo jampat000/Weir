@@ -26,6 +26,14 @@ public sealed class HistoryFileRemovalService
     private const string DeleteReason = "A person chose to delete this download and ask for another copy.";
     private const string KeepReason = "A person chose to keep this file without processing it again.";
 
+    /// <summary>
+    /// A different release can land at the same watched-folder path after a title fails or is rejected. Neither
+    /// choice ever acts without first checking the file on disk still is the one Weir actually decided about (#786
+    /// review of #785).
+    /// </summary>
+    private const string ChangedFileMessage =
+        "This file has changed since it failed, so Weir won't delete it. It will be looked at again on the next scan.";
+
     private readonly IMediaManagerPorts _ports;
     private readonly MediaManagerConnectionService _connections;
     private readonly HandoffCompletionReporter _reporter;
@@ -69,12 +77,13 @@ public sealed class HistoryFileRemovalService
         }
 
         var library = await RemuxPassHandler.ResolveLibraryAsync(uow, _libraries, file.LibraryId, null).ConfigureAwait(false);
-        if (library is null || !SourceFileExists(library, file.RelativePath))
+        var source = library is null ? null : TryResolveSource(library, file.RelativePath);
+        if (source is null || !File.Exists(source))
         {
             return FileRemovalOptions.PlainRemove;
         }
 
-        var route = await ResolveManagerRouteAsync(uow, library, file.RelativePath, cancellationToken).ConfigureAwait(false);
+        var route = await ResolveManagerRouteAsync(uow, library!, file.RelativePath, source, cancellationToken).ConfigureAwait(false);
         return new FileRemovalOptions(true, route.Label, route.DeleteHandled, route.KeepNotifies);
     }
 
@@ -99,8 +108,13 @@ public sealed class HistoryFileRemovalService
             return await FinishDeleteAsync(uow, file, new RejectRouteOutcome(false, exception.Message)).ConfigureAwait(false);
         }
 
+        if (!TryVerifyFingerprint(file, source, out _))
+        {
+            return await FinishDeleteAsync(uow, file, new RejectRouteOutcome(false, ChangedFileMessage)).ConfigureAwait(false);
+        }
+
         var watchedRoot = RemuxPassPaths.Resolve(library.WatchedFolder);
-        var route = await ResolveManagerRouteAsync(uow, library, file.RelativePath, cancellationToken).ConfigureAwait(false);
+        var route = await ResolveManagerRouteAsync(uow, library, file.RelativePath, source, cancellationToken).ConfigureAwait(false);
 
         // Released before any network call or disk delete, the way the automatic reject job releases it (#708):
         // no other lane ever waits on this one for SQLite's write lock.
@@ -114,8 +128,18 @@ public sealed class HistoryFileRemovalService
                 ? await _routes.ThroughHandoffAsync(route.HandoffTarget, route.Origin!, source, watchedRoot, DeleteReason, null, cancellationToken).ConfigureAwait(false)
                 : await _routes.ThroughQueueAsync(route.QueueConnections, source, cancellationToken).ConfigureAwait(false);
 
+        if (outcome.Done)
+        {
+            // A stale "keep" marker from before this file last changed would otherwise linger, pointless, in the
+            // Kept files list once its own file is deleted (#786 review of #785).
+            await _skipMarkers.ClearAsync(uow, file.LibraryId, file.RelativePath).ConfigureAwait(false);
+        }
+
         return await FinishDeleteAsync(uow, file, outcome).ConfigureAwait(false);
     }
+
+    /// <summary>Clears a "keep" marker for this file, when there is one — used by "delete" above and by "retry" on the remove dialog.</summary>
+    public Task ClearSkipMarkerAsync(UnitOfWork uow, long libraryId, string relativePath) => _skipMarkers.ClearAsync(uow, libraryId, relativePath);
 
     /// <summary>"Keep the file, but don't process it again": a skip marker, and a hand-off's manager told it will not be imported.</summary>
     public async Task<FileRemovalOutcome> KeepAsync(UnitOfWork uow, ProcessingFileRecord file, CancellationToken cancellationToken)
@@ -143,8 +167,12 @@ public sealed class HistoryFileRemovalService
             return await FinishKeepAsync(uow, file, new RejectRouteOutcome(false, "The file is no longer in the watched folder, so there is nothing to keep.")).ConfigureAwait(false);
         }
 
-        var route = await ResolveManagerRouteAsync(uow, library, file.RelativePath, cancellationToken).ConfigureAwait(false);
-        var fingerprint = SourceFiles.Fingerprint(source);
+        if (!TryVerifyFingerprint(file, source, out var fingerprint))
+        {
+            return await FinishKeepAsync(uow, file, new RejectRouteOutcome(false, ChangedFileMessage)).ConfigureAwait(false);
+        }
+
+        var route = await ResolveManagerRouteAsync(uow, library, file.RelativePath, source, cancellationToken).ConfigureAwait(false);
 
         // Released before any network call, the same as DeleteAsync above.
         await uow.CommitAsync().ConfigureAwait(false);
@@ -186,7 +214,7 @@ public sealed class HistoryFileRemovalService
             : new RejectRouteOutcome(false, cleanup.Detail);
     }
 
-    private async Task<ManagerRoute> ResolveManagerRouteAsync(UnitOfWork uow, ProcessingLibraryRecord library, string relativePath, CancellationToken cancellationToken)
+    private async Task<ManagerRoute> ResolveManagerRouteAsync(UnitOfWork uow, ProcessingLibraryRecord library, string relativePath, string source, CancellationToken cancellationToken)
     {
         var originJson = await HandoffOriginCarry.FindAsync(uow, library.Id, relativePath).ConfigureAwait(false);
         var origin = originJson is not null ? HandoffOrigin.FromPayload(new WireObject().Set("origin", originJson)) : null;
@@ -203,8 +231,16 @@ public sealed class HistoryFileRemovalService
         var connectionIds = await _libraries.ManagerConnectionIdsAsync(uow, library.Id).ConfigureAwait(false);
         var linked = await _connections.ConnectionsByIdAsync(uow, connectionIds).ConfigureAwait(false);
         var queueConnections = linked.Where(connection => _ports.PortForKind(connection.Kind)?.Capabilities().RemovesQueueItems == true).ToList();
-        return queueConnections.Count > 0
-            ? new ManagerRoute(null, null, queueConnections, queueConnections[0].Label, true, false)
+        if (queueConnections.Count == 0)
+        {
+            return ManagerRoute.None;
+        }
+
+        // The exact rule ThroughQueueAsync itself uses to pick a download (#786 review of #785): naming a manager
+        // the action would not actually use, or the reverse, would tell the operator one thing and do another.
+        var match = await _routes.MatchQueueItemAsync(queueConnections, source, cancellationToken).ConfigureAwait(false);
+        return match.Found
+            ? new ManagerRoute(null, null, queueConnections, match.Connection!.Label, true, false)
             : ManagerRoute.None;
     }
 
@@ -220,15 +256,40 @@ public sealed class HistoryFileRemovalService
         return description.Status == SignalStatus.Reported && description.AdvertisedCapabilities?.Contains(RejectSupportRules.RejectCapability) == true;
     }
 
-    private static bool SourceFileExists(ProcessingLibraryRecord library, string relativePath)
+    /// <summary>
+    /// Whether the file on disk right now is still the one Weir recorded a fingerprint for when this title became
+    /// failed or rejected (#786 review of #785). False for a row with no recorded fingerprint (from before migration
+    /// 0025, or one that could not be read at the time) — refusing is the safe default when Weir cannot tell.
+    /// </summary>
+    private static bool TryVerifyFingerprint(ProcessingFileRecord file, string source, out SourceFingerprint fingerprint)
+    {
+        fingerprint = default;
+        if (file.FingerprintSizeBytes is not { } size || file.FingerprintMtimeNs is not { } mtime)
+        {
+            return false;
+        }
+
+        try
+        {
+            fingerprint = SourceFiles.Fingerprint(source);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            return false;
+        }
+
+        return fingerprint.SizeBytes == size && fingerprint.ModifiedTimeNs == mtime;
+    }
+
+    private static string? TryResolveSource(ProcessingLibraryRecord library, string relativePath)
     {
         try
         {
-            return File.Exists(RemuxPassPaths.ResolveMediaFileUnderRoot(library.WatchedFolder, relativePath));
+            return RemuxPassPaths.ResolveMediaFileUnderRoot(library.WatchedFolder, relativePath);
         }
         catch (ArgumentException)
         {
-            return false;
+            return null;
         }
     }
 
@@ -242,15 +303,19 @@ public sealed class HistoryFileRemovalService
         FinishAsync(
             uow, file, outcome, ActivityEventTypes.ProcessingFileRemovalKept,
             successTitle: fileName => $"{fileName} was kept without processing it again",
-            failureTitle: fileName => $"{fileName} could not be kept");
+            failureTitle: fileName => $"{fileName} could not be kept",
+            // #786 review of #785: this is a deliberate hold, not the generic "Weir could not process" wording
+            // RecordHandoffReportAsync would otherwise give a hold it did not choose.
+            handoffReportTitle: (manager, fileName) => $"Told {manager} you chose to keep {fileName} without processing it");
 
     /// <summary>Records what happened in Activity, forgets the file's row on success, and never leaves a failure unrecorded.</summary>
     private async Task<FileRemovalOutcome> FinishAsync(
-        UnitOfWork uow, ProcessingFileRecord file, RejectRouteOutcome outcome, string eventType, Func<string, string> successTitle, Func<string, string> failureTitle)
+        UnitOfWork uow, ProcessingFileRecord file, RejectRouteOutcome outcome, string eventType, Func<string, string> successTitle, Func<string, string> failureTitle,
+        Func<string, string, string>? handoffReportTitle = null)
     {
         if (outcome.Report is { } report)
         {
-            await HandoffCompletionReporter.RecordHandoffReportAsync(uow, report.Target, report.Body, report.Delivery, file.RelativePath).ConfigureAwait(false);
+            await HandoffCompletionReporter.RecordHandoffReportAsync(uow, report.Target, report.Body, report.Delivery, file.RelativePath, handoffReportTitle).ConfigureAwait(false);
         }
 
         var detail = new WireObject()

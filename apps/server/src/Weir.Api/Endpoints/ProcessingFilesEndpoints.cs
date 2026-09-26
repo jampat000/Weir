@@ -214,7 +214,7 @@ internal sealed class ProcessingFilesEndpointHandlers
     /// </summary>
     public async Task<ApiResult> GetRemoveOptionsAsync(ApiRequest request)
     {
-        await request.RequireUserAsync().ConfigureAwait(false);
+        await request.RequireUserAsync(UserRoles.OperatorOrAdmin).ConfigureAwait(false);
         var issues = new ValidationIssues();
         var id = request.PathInt("file_id", issues);
         issues.ThrowIfAny();
@@ -278,9 +278,14 @@ internal sealed class ProcessingFilesEndpointHandlers
     {
         if (resolution == FileRemovalResolutions.Retry)
         {
-            await new RequeueStore(_jobs, _libraries).RequeueFileAsync(uow, row).ConfigureAwait(false);
+            // A leftover "keep" marker must not shadow the very reprocessing a person just asked for (#786 review
+            // of #785); harmless when there was never one.
+            await _removal.ClearSkipMarkerAsync(uow, row.LibraryId, row.RelativePath).ConfigureAwait(false);
+            // #786 review of #785: a skipped requeue (the library or original is gone) is not an error, but it is
+            // not "queued again" either, so the caller reports whichever actually happened.
+            var result = await new RequeueStore(_jobs, _libraries).RequeueFileAsync(uow, row).ConfigureAwait(false);
             await request.CommitAsync().ConfigureAwait(false);
-            return NoContentResult();
+            return ApiRoutes.Ok(new WireObject().Set("done", result.Requeued > 0).Set("detail", result.Detail));
         }
 
         if (resolution is not (FileRemovalResolutions.Delete or FileRemovalResolutions.Keep))
@@ -298,7 +303,9 @@ internal sealed class ProcessingFilesEndpointHandlers
             ? await _removal.DeleteAsync(uow, row, request.Context.RequestAborted).ConfigureAwait(false)
             : await _removal.KeepAsync(uow, row, request.Context.RequestAborted).ConfigureAwait(false);
         await request.CommitAsync().ConfigureAwait(false);
-        return outcome.Done ? NoContentResult() : throw new ApiException(StatusCodes.Status502BadGateway, outcome.Message);
+        return outcome.Done
+            ? ApiRoutes.Ok(new WireObject().Set("done", true).Set("detail", outcome.Message))
+            : throw new ApiException(StatusCodes.Status502BadGateway, outcome.Message);
     }
 
     private static CustomApiResult NoContentResult() =>
