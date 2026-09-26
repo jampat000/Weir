@@ -5,6 +5,7 @@ import {
   fetchActiveSessions,
   postChangePassword,
   postChangeUsername,
+  postSetTheme,
   fetchMe,
   postBootstrap,
   postLogin,
@@ -12,6 +13,7 @@ import {
   postRevokeOtherSessions,
   postRevokeSession,
 } from "../api/auth-api";
+import type { UserPublic } from "../api/types";
 import { markLoginSucceeded } from "./session-kept";
 import { activityKeys } from "../activity/query-keys";
 import { authKeys } from "./query-keys";
@@ -161,6 +163,20 @@ export function useChangeUsernameMutation() {
       // The session is untouched by a rename, so only the displayed identity needs refreshing.
       void qc.invalidateQueries({ queryKey: authKeys.me });
       void qc.invalidateQueries({ queryKey: activityKeys.recent });
+    },
+  });
+}
+
+export function useSetThemeMutation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: postSetTheme,
+    onSuccess: (data) => {
+      // The switch already applied the theme locally and instantly; this only carries the choice
+      // to the cached account so every other screen reading /auth/me agrees with it too (#790).
+      qc.setQueryData(authKeys.me, (previous: UserPublic | null | undefined) =>
+        previous ? { ...previous, app_theme: data.app_theme } : previous,
+      );
     },
   });
 }

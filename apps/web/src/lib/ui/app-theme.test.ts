@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   APP_THEME_STORAGE_KEY,
+  applyAccountAppTheme,
   applyAppThemeToDocument,
   currentAppTheme,
   followSystemAppTheme,
@@ -101,6 +102,59 @@ describe("app-theme", () => {
 
     persistAppTheme("dark");
     system.change(true);
+
+    expect(document.documentElement.getAttribute("data-mm-theme")).toBe("dark");
+    stop();
+  });
+
+  it("applies the signed-in account's theme and refreshes the local cache to match it", () => {
+    persistAppTheme("dark");
+
+    applyAccountAppTheme("light");
+
+    expect(localStorage.getItem(APP_THEME_STORAGE_KEY)).toBe("light");
+    expect(document.documentElement.getAttribute("data-mm-theme")).toBe(
+      "light",
+    );
+  });
+
+  it("clears a stale local choice and follows the system once the account has no preference", () => {
+    stubSystemPrefersLight(true);
+    persistAppTheme("dark");
+
+    applyAccountAppTheme(null);
+
+    expect(readStoredAppTheme()).toBeNull();
+    expect(document.documentElement.getAttribute("data-mm-theme")).toBe(
+      "light",
+    );
+  });
+
+  it("switches an already-open tab when another tab changes the stored theme", () => {
+    const stop = followSystemAppTheme();
+    localStorage.setItem(APP_THEME_STORAGE_KEY, "light");
+
+    window.dispatchEvent(
+      new StorageEvent("storage", {
+        key: APP_THEME_STORAGE_KEY,
+        newValue: "light",
+      }),
+    );
+
+    expect(document.documentElement.getAttribute("data-mm-theme")).toBe(
+      "light",
+    );
+    stop();
+  });
+
+  it("ignores a storage event for an unrelated key", () => {
+    applyAppThemeToDocument("dark");
+    const stop = followSystemAppTheme();
+    localStorage.setItem("some-other-key", "light");
+
+    window.dispatchEvent(
+      new StorageEvent("storage", { key: "some-other-key", newValue: "light" }),
+    );
 
     expect(document.documentElement.getAttribute("data-mm-theme")).toBe("dark");
     stop();

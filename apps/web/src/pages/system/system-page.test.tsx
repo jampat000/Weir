@@ -23,8 +23,18 @@ import type {
 } from "../../lib/settings/types";
 import { SystemPage } from "./system-page";
 
-const operatorMe: UserPublic = { id: 1, username: "alice", role: "operator" };
-const viewerMe: UserPublic = { id: 2, username: "bob", role: "viewer" };
+const operatorMe: UserPublic = {
+  id: 1,
+  username: "alice",
+  role: "operator",
+  app_theme: null,
+};
+const viewerMe: UserPublic = {
+  id: 2,
+  username: "bob",
+  role: "viewer",
+  app_theme: null,
+};
 
 const minimalAppSettings: AppSettings = {
   product_display_name: "Weir",

@@ -1,6 +1,9 @@
 /**
- * Browser-local colour theme; not synced to the server and safe to change instantly. Until someone
- * picks a theme with the switch, Weir follows the system's light or dark setting (#697).
+ * The colour theme: a per-account preference (`UserPublic.app_theme`), cached here for first paint
+ * before anyone is signed in or before `/auth/me` has answered (#790). Once signed in, the account's
+ * theme overrides whatever this cache holds — see `useAccountThemeSync`, which keeps this module's
+ * copy in step. Until someone has a saved preference, Weir follows the system's light or dark
+ * setting (#697). A local change applies to the document straight away, never waiting on the network.
  */
 
 import { useSyncExternalStore } from "react";
@@ -57,13 +60,46 @@ export function persistAppTheme(theme: AppTheme): void {
   window.dispatchEvent(new Event(THEME_CHOSEN_EVENT));
 }
 
+/** Forgets this browser's cached theme choice, so it falls back to following the system setting. */
+function clearStoredAppTheme(): void {
+  try {
+    localStorage.removeItem(APP_THEME_STORAGE_KEY);
+  } catch (error) {
+    if (!(error instanceof DOMException)) throw error;
+  }
+  applyAppThemeToDocument(currentAppTheme());
+  window.dispatchEvent(new Event(THEME_CHOSEN_EVENT));
+}
+
+/**
+ * Applies the signed-in account's theme, overriding whatever this browser had cached: the fix for
+ * dark mode being forgotten on another browser or address (#790). A saved preference is written
+ * back to local storage so the next load's first paint already matches it; no preference clears the
+ * local cache instead, so first paint goes back to following the system setting.
+ */
+export function applyAccountAppTheme(theme: AppTheme | null): void {
+  if (theme) {
+    persistAppTheme(theme);
+  } else {
+    clearStoredAppTheme();
+  }
+}
+
 function subscribeToAppTheme(onChange: () => void): () => void {
   const system = systemPrefersLight();
+  const onStorage = (event: StorageEvent) => {
+    // A null key means the whole store was cleared; otherwise only react to this app's own key.
+    if (event.key === null || event.key === APP_THEME_STORAGE_KEY) onChange();
+  };
   system?.addEventListener("change", onChange);
   window.addEventListener(THEME_CHOSEN_EVENT, onChange);
+  // `storage` fires only in a browser's *other* same-origin tabs, never the one that made the
+  // change, so a choice made here still needs THEME_CHOSEN_EVENT to update this tab (#790).
+  window.addEventListener("storage", onStorage);
   return () => {
     system?.removeEventListener("change", onChange);
     window.removeEventListener(THEME_CHOSEN_EVENT, onChange);
+    window.removeEventListener("storage", onStorage);
   };
 }
 
