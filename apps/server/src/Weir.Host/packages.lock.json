@@ -60,8 +60,8 @@
       "weir.api": {
         "type": "Project",
         "dependencies": {
-          "Weir.Core": "[3.2.6, )",
-          "Weir.Infrastructure": "[3.2.6, )"
+          "Weir.Core": "[3.2.7, )",
+          "Weir.Infrastructure": "[3.2.7, )"
         }
       },
       "weir.core": {
@@ -74,7 +74,7 @@
         "type": "Project",
         "dependencies": {
           "Microsoft.Data.Sqlite": "[10.0.12, )",
-          "Weir.Core": "[3.2.6, )"
+          "Weir.Core": "[3.2.7, )"
         }
       },
       "Microsoft.Data.Sqlite": {
