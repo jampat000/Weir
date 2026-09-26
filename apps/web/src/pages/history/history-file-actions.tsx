@@ -35,6 +35,14 @@ const CONCLUDED: readonly ProcessingFileStatus[] = [
   "cancelled",
 ];
 
+/** What the notice says for each choice on the remove dialog, once it has gone through (#785). */
+const REMOVE_RESOLUTION_MESSAGES: Record<"delete" | "keep" | "retry", string> =
+  {
+    delete: "Deleted and removed from the list.",
+    keep: "Kept. Weir will leave it alone until it changes.",
+    retry: "Queued to be processed again.",
+  };
+
 /**
  * Every action for the file open in History. Each shows only where it can do something: a running file cannot be
  * started earlier, and a button that looked like it worked would be worse than no button. Every action disables the
@@ -140,15 +148,6 @@ export function HistoryFileActions({
       "That file could not be queued again.",
     );
 
-  const REMOVE_RESOLUTION_MESSAGES: Record<
-    "delete" | "keep" | "retry",
-    string
-  > = {
-    delete: "Deleted and removed from the list.",
-    keep: "Kept. Weir will leave it alone until it changes.",
-    retry: "Queued to be processed again.",
-  };
-
   /** The plain remove every title without a choice keeps: forget the row, touch nothing else. */
   const removePlain = () =>
     void run(async () => {
@@ -193,6 +192,7 @@ export function HistoryFileActions({
       );
     }
   }
+
   const button = (
     label: string,
     title: string,
