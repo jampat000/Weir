@@ -21,9 +21,10 @@ REQUIRED_SURFACES: tuple[tuple[str, str], ...] = (
     ("POST", "/api/v1/processing/rule-sets"),
     ("PUT", "/api/v1/processing/rule-sets/{rule_set_id}"),
     ("DELETE", "/api/v1/processing/rule-sets/{rule_set_id}"),
-    # Files — list, log, remove, requeue, move to top, bulk requeue, why-held.
+    # Files — list, log, remove, requeue, move to top, bulk requeue, why-held, remove-options (#785).
     ("GET", "/api/v1/processing/files"),
     ("DELETE", "/api/v1/processing/files/{file_id}"),
+    ("GET", "/api/v1/processing/files/{file_id}/remove-options"),
     ("GET", "/api/v1/processing/files/{file_id}/log"),
     ("GET", "/api/v1/processing/files/{file_id}/log/download"),
     ("GET", "/api/v1/processing/files/{file_id}/why-held"),
