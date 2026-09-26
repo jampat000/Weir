@@ -1,4 +1,5 @@
 import { apiFetch, readJson, requireOk } from "./client";
+import type { AppTheme } from "../ui/app-theme";
 import type {
   ActiveSession,
   BootstrapResult,
@@ -148,6 +149,20 @@ export async function postChangePassword(
     }),
   });
   await requireOk(path, r, "Could not change the password");
+  return readJson(r);
+}
+
+export async function postSetTheme(
+  theme: AppTheme,
+): Promise<{ message: string; app_theme: AppTheme }> {
+  const csrf_token = await fetchCsrfToken();
+  const path = "/api/v1/auth/theme";
+  const r = await apiFetch(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ csrf_token, theme }),
+  });
+  await requireOk(path, r, "Could not save the theme");
   return readJson(r);
 }
 

@@ -327,6 +327,26 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/auth/theme": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Post Set Theme
+     * @description Save the signed-in user's own colour theme, so it follows them to another browser or device.
+     */
+    post: operations["post_set_theme_api_v1_auth_theme_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/download-clients/connections": {
     parameters: {
       query?: never;
@@ -7082,6 +7102,26 @@ export interface components {
       /** Windows Installer Url */
       windows_installer_url?: string | null;
     };
+    /** ThemeIn */
+    ThemeIn: {
+      /** Csrf Token */
+      csrf_token: string;
+      /**
+       * Theme
+       * @enum {string}
+       */
+      theme: "light" | "dark";
+    };
+    /** ThemeOut */
+    ThemeOut: {
+      /** Message */
+      message: string;
+      /**
+       * App Theme
+       * @enum {string}
+       */
+      app_theme: "light" | "dark";
+    };
     /**
      * TrackNameOverrides
      * @description Issue #498: per-flag track name templates, checked forced, then hearing-impaired, then commentary, then audio description; the first whose flag matches on a track and whose template is non-empty wins over track_name_template. Each template is validated the same way (unknown placeholder is a 400).
@@ -7170,6 +7210,11 @@ export interface components {
       role: string;
       /** Username */
       username: string;
+      /**
+       * App Theme
+       * @description Null until the person picks a theme; until then the app follows the system setting.
+       */
+      app_theme: ("light" | "dark") | null;
     };
     /** ValidationError */
     ValidationError: {
@@ -7802,6 +7847,39 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["SessionActionOut"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  post_set_theme_api_v1_auth_theme_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ThemeIn"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ThemeOut"];
         };
       };
       /** @description Validation Error */

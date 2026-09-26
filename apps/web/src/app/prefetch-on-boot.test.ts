@@ -7,7 +7,12 @@ import type { UserPublic } from "../lib/api/types";
 import { settingsKeys } from "../lib/settings/query-keys";
 import { queryClient } from "./query-client";
 
-const SIGNED_IN: UserPublic = { id: 1, role: "operator", username: "user1" };
+const SIGNED_IN: UserPublic = {
+  id: 1,
+  role: "operator",
+  username: "user1",
+  app_theme: null,
+};
 const SETTINGS = { product_display_name: "Weir" };
 
 vi.mock("../lib/api/auth-api", () => ({

@@ -18,7 +18,7 @@ public sealed class AuthApiTests
 
         using var login = await client.LoginAsync();
         Assert.Equal(HttpStatusCode.OK, login.StatusCode);
-        Assert.Equal("{\"user\":{\"id\":1,\"username\":\"alice\",\"role\":\"admin\"}}", await login.Content.ReadAsStringAsync());
+        Assert.Equal("{\"user\":{\"id\":1,\"username\":\"alice\",\"role\":\"admin\",\"app_theme\":null}}", await login.Content.ReadAsStringAsync());
         Assert.True(client.Cookies["weir_session"].Length > 20);
 
         using var me = await client.GetAsync("/api/v1/auth/me");
@@ -444,6 +444,35 @@ public sealed class AuthApiTests
         Assert.Equal("user1", (await Json(await client.GetAsync("/api/v1/auth/me")))["user"]!["username"]!.GetValue<string>());
         Assert.Equal(HttpStatusCode.OK, (await client.LoginAsync("USER1")).StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, (await client.LoginAsync("alice")).StatusCode);
+    }
+
+    [Fact]
+    public async Task Saving_the_theme_needs_csrf_and_a_valid_value_and_each_account_keeps_its_own()
+    {
+        await using var server = await StartServerAsync();
+        await TestDatabase.SeedAdminAsync(server);
+        await TestDatabase.SeedViewerAsync(server);
+        var admin = new ApiTestClient(server);
+        await admin.SignInAsync();
+
+        using var badCsrf = await admin.PostAsync("/api/v1/auth/theme", new { theme = "light", csrf_token = "invalid-token" });
+        Assert.Equal(HttpStatusCode.BadRequest, badCsrf.StatusCode);
+        Assert.Equal("Invalid or expired CSRF token.", await Detail(badCsrf));
+
+        using var invalid = await admin.PostAsync("/api/v1/auth/theme", new { theme = "purple", csrf_token = await admin.CsrfAsync() });
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, invalid.StatusCode);
+
+        using var saved = await admin.PostAsync("/api/v1/auth/theme", new { theme = "light", csrf_token = await admin.CsrfAsync() });
+        Assert.Equal("{\"message\":\"Theme saved.\",\"app_theme\":\"light\"}", await saved.Content.ReadAsStringAsync());
+        Assert.Equal("light", (await Json(await admin.GetAsync("/api/v1/auth/me")))["user"]!["app_theme"]!.GetValue<string>());
+
+        // A viewer may set their own theme too, and it never touches another account's preference.
+        var viewer = new ApiTestClient(server);
+        await viewer.SignInAsync("bob", ViewerPassword);
+        using var viewerSaved = await viewer.PostAsync("/api/v1/auth/theme", new { theme = "dark", csrf_token = await viewer.CsrfAsync() });
+        Assert.Equal(HttpStatusCode.OK, viewerSaved.StatusCode);
+        Assert.Equal("dark", (await Json(await viewer.GetAsync("/api/v1/auth/me")))["user"]!["app_theme"]!.GetValue<string>());
+        Assert.Equal("light", (await Json(await admin.GetAsync("/api/v1/auth/me")))["user"]!["app_theme"]!.GetValue<string>());
     }
 
     [Fact]

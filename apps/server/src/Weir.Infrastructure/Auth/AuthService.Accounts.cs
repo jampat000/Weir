@@ -5,7 +5,7 @@ using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Infrastructure.Auth;
 
-/// <summary>Changing a signed-in user's own credentials, and first-admin bootstrap.</summary>
+/// <summary>Changing a signed-in user's own credentials or preferences, and first-admin bootstrap.</summary>
 public sealed partial class AuthService
 {
     /// <summary>Changes the username after checking the current password. Throws <see cref="WireValueException"/> with the operator message.</summary>
@@ -69,6 +69,18 @@ public sealed partial class AuthService
 
         await _users.UpdatePasswordHashAsync(uow, user.Id, PasswordHasher.Hash(newPassword)).ConfigureAwait(false);
         await _users.RevokeActiveSessionsForUserAsync(uow, user.Id, Now()).ConfigureAwait(false);
+    }
+
+    /// <summary>Sets the signed-in user's own colour theme. <paramref name="theme"/> must already be a validated <see cref="AppThemes"/> value.</summary>
+    public async Task SetAppThemeAsync(UnitOfWork uow, long userId, string theme)
+    {
+        var user = await _users.GetUserAsync(uow, userId).ConfigureAwait(false);
+        if (user is null || !user.IsActive)
+        {
+            throw new WireValueException("Account is not available.");
+        }
+
+        await _users.UpdateAppThemeAsync(uow, user.Id, theme).ConfigureAwait(false);
     }
 
     /// <summary>Bootstrap is allowed while no usable (active) admin exists.</summary>
