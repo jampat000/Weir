@@ -108,6 +108,17 @@ public sealed record ProcessingFileRecord
     /// <summary>Modification time (ns since the Unix epoch) of that source, as <c>SourceFiles.Fingerprint</c> measures it.</summary>
     public long? ProcessedSourceMtimeNs { get; init; }
 
+    /// <summary>
+    /// The size and modification time Weir read from the source at the moment this row most recently became
+    /// <see cref="ProcessingFileStatuses.ProcessingFailed"/> or <see cref="ProcessingFileStatuses.Rejected"/> (#785).
+    /// Null before migration 0025, or when the file could not be read at that moment. History's remove dialog compares
+    /// these against the file on disk before "delete" or "keep" act, so a different release that has since landed at the
+    /// same path is never mistaken for the one that actually failed.
+    /// </summary>
+    public long? FingerprintSizeBytes { get; init; }
+
+    public long? FingerprintMtimeNs { get; init; }
+
     public Timestamp CreatedAt { get; init; }
     public Timestamp UpdatedAt { get; init; }
 }

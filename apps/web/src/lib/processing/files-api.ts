@@ -151,14 +151,68 @@ export async function fetchProcessingFiles(
   return readJson<ProcessingFilesPage>(r);
 }
 
-export async function forgetProcessingFile(id: number): Promise<void> {
+/**
+ * History's remove dialog (#785): what to offer for one title before it is shown, and the choice a person made.
+ * "remove" (the default) is today's plain forget; the other three only apply to a title `remove-options` says
+ * `requires_choice` for.
+ */
+export type ProcessingFileRemovalResolution =
+  Schema<"ProcessingFileForgetIn">["resolution"];
+
+export type ProcessingFileRemoveOptions =
+  Schema<"ProcessingFileRemoveOptionsOut">;
+
+export async function fetchProcessingFileRemoveOptions(
+  id: number,
+): Promise<ProcessingFileRemoveOptions> {
+  const path = `${processingFilesPath()}/${id}/remove-options`;
+  const response = await apiFetch(path);
+  await requireOk(
+    path,
+    response,
+    "Could not read what removing this file would do",
+  );
+  return readJson<ProcessingFileRemoveOptions>(response);
+}
+
+/**
+ * `delete`, `keep` and `retry` answer what actually happened (#786 review of #785) — `retry`'s `done` is false only
+ * when a concluded file's original is gone, in which case `detail` says so instead of claiming it was queued.
+ * A plain remove (no `resolution`) answers no body at all.
+ */
+export type ProcessingFileRemovalResult = Schema<"ProcessingFileRemovalOut">;
+
+/**
+ * The file's current details, exactly as `remove-options` reported them, for a title with no recorded fingerprint
+ * (#786 follow-up: migration 0025 only records one going forward). `delete` and `keep` need this echoed back so
+ * Weir can check the file on disk still matches what the dialog showed before touching anything.
+ */
+export interface ProcessingFileRemovalConfirm {
+  size_bytes: number;
+  modified_at: string;
+}
+
+export async function forgetProcessingFile(
+  id: number,
+  resolution?: ProcessingFileRemovalResolution,
+  confirm?: ProcessingFileRemovalConfirm,
+): Promise<ProcessingFileRemovalResult | undefined> {
   const path = `${processingFilesPath()}/${id}`;
-  await sendJson(
+  const response = await sendJson(
     path,
     "DELETE",
-    {},
+    {
+      ...(resolution ? { resolution } : {}),
+      ...(confirm
+        ? {
+            confirm_size_bytes: confirm.size_bytes,
+            confirm_modified_at: confirm.modified_at,
+          }
+        : {}),
+    },
     "Could not remove that file from the list",
   );
+  return readJson<ProcessingFileRemovalResult | undefined>(response);
 }
 
 export type ProcessingFileMoveToTopResult =

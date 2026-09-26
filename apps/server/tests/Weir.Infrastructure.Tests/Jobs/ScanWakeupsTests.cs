@@ -65,7 +65,7 @@ public sealed class ScanWakeupsTests
         var jobs = new ProcessingJobStore(store.Database, store.Clock);
         var wakeups = new ScanWakeups();
         var handler = new ProcessingWatchedFolderScanDispatchJobHandler(
-            store.Database, store.Clock, store.Options, jobs, connections, new SuiteSettingsStore(new AuthStore()), new OperatorSettingsStore(), Libraries, Files, wakeups);
+            store.Database, store.Clock, store.Options, jobs, connections, new SuiteSettingsStore(new AuthStore()), new OperatorSettingsStore(), Libraries, Files, new FileSkipMarkerStore(), wakeups);
         await store.Execute(
             "INSERT INTO operator_settings (id, min_file_age_seconds, min_input_file_size_mb, minimum_free_disk_space_mb) " +
             "VALUES (1, 0, 0, 0) ON CONFLICT(id) DO UPDATE SET min_file_age_seconds = 0, min_input_file_size_mb = 0, minimum_free_disk_space_mb = 0");

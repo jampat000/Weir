@@ -1,11 +1,15 @@
 using Microsoft.Data.Sqlite;
+using Weir.Core.Activity;
 using Weir.Core.Configuration;
 using Weir.Core.Jobs;
 using Weir.Core.Json;
+using Weir.Core.Media;
 using Weir.Core.MediaManagers;
 using Weir.Core.Processing;
+using Weir.Infrastructure.Activity;
 using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.Processing;
+using Weir.Infrastructure.Processing.RemuxPass;
 using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Infrastructure.MediaManagers;
@@ -51,12 +55,17 @@ public readonly record struct MediaManagerIntakeIdentity(bool Authenticated, lon
 /// </summary>
 public sealed class MediaManagerIntake
 {
+    /// <summary>Why a kept target's hand-off report says it was not delivered (#786 review of #785).</summary>
+    private const string KeptReason = "A person chose to keep this file without processing it again.";
+
     private readonly WeirOptions _options;
     private readonly MediaManagerConnectionService _connections;
     private readonly MediaManagerConnectionStore _connectionStore;
     private readonly HandoffLedgerStore _ledger;
     private readonly HandoffTargetStore _targets;
     private readonly ProcessingJobStore _jobs;
+    private readonly FileSkipMarkerStore _skipMarkers;
+    private readonly HandoffCompletionReporter _reporter;
     private readonly TimeProvider _time;
 
     public MediaManagerIntake(
@@ -66,6 +75,8 @@ public sealed class MediaManagerIntake
         HandoffLedgerStore ledger,
         HandoffTargetStore targets,
         ProcessingJobStore jobs,
+        FileSkipMarkerStore skipMarkers,
+        HandoffCompletionReporter reporter,
         TimeProvider time)
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
@@ -74,6 +85,8 @@ public sealed class MediaManagerIntake
         _ledger = ledger ?? throw new ArgumentNullException(nameof(ledger));
         _targets = targets ?? throw new ArgumentNullException(nameof(targets));
         _jobs = jobs ?? throw new ArgumentNullException(nameof(jobs));
+        _reporter = reporter ?? throw new ArgumentNullException(nameof(reporter));
+        _skipMarkers = skipMarkers ?? throw new ArgumentNullException(nameof(skipMarkers));
         _time = time ?? throw new ArgumentNullException(nameof(time));
     }
 
@@ -270,8 +283,24 @@ public sealed class MediaManagerIntake
         var targets = HandoffMediaFiles(library, relativePath);
         var baseKey = IntakeRules.BaseDedupeKey(importEvent, NewGuid);
         var covered = new List<string>(targets.Count);
+        // #786 review of #785: a target someone chose to keep must not be reprocessed just because a manager
+        // handed it over again — the marker is scan-only otherwise, and this is the same hand-off path a folder
+        // detection or a resend both use. Read once per hand-off, not per target.
+        var keptMarkers = library is not null
+            ? await _skipMarkers.ForLibraryAsync(uow, library.Id).ConfigureAwait(false)
+            : new Dictionary<string, FileSkipMarker>(StringComparer.Ordinal);
+        var kept = new List<string>();
         foreach (var target in targets)
         {
+            if (library is not null && IsKept(keptMarkers, library, target))
+            {
+                // Tracked as one of this hand-off's own targets below (covered), exactly like any other file, so a
+                // folder hand-off with a mix of kept and new files still waits for all of them before it reports.
+                kept.Add(target);
+                covered.Add(target);
+                continue;
+            }
+
             var dedupeKey = IntakeRules.DedupeKeyFor(baseKey, targets, target, relativePath);
             var payload = IntakeRules.Payload(importEvent, library, relativePath, target);
             var connection = uow.Connection;
@@ -301,6 +330,26 @@ public sealed class MediaManagerIntake
             var rowId = await _ledger.RecordReceivedAsync(
                 uow, importEvent.SourceKey, importEvent.HandoffId, library?.Id, relativePath, ownerConnectionId, importEvent.DownloadId).ConfigureAwait(false);
             await _targets.AddAsync(uow, rowId, covered).ConfigureAwait(false);
+
+            // #786 review of #785: answered the same way HistoryFileRemovalService's "keep" answers a live hand-off
+            // — a failed/held completion report, through the exact owed-report/ledger machinery a real pass's
+            // outcome uses (ReportHandoffCompletionAsync), so a restart between here and delivery still finds it,
+            // and the hand-off ends in the ledger instead of waiting forever on a file nobody is going to process.
+            foreach (var target in kept)
+            {
+                var keptPayload = IntakeRules.Payload(importEvent, library, relativePath, target);
+                var keptResult = new WireObject().Set("ok", false).Set("outcome", "failed").Set("relative_media_path", target).Set("reason", KeptReason);
+                await _reporter.ReportHandoffCompletionAsync(uow, IntakeRules.PayloadJson(keptPayload), keptResult).ConfigureAwait(false);
+            }
+        }
+        else
+        {
+            // No hand-off to answer through (a plain webhook import names no id): at least Activity says why
+            // nothing was queued, rather than the file silently vanishing.
+            foreach (var target in kept)
+            {
+                await RecordKeptHandoffAsync(uow, importEvent.SourceKey, target).ConfigureAwait(false);
+            }
         }
 
         if (library is not null)
@@ -357,6 +406,46 @@ public sealed class MediaManagerIntake
             ("@payload", IntakeRules.PayloadJson(existing)),
             ("@id", active.Id));
         return true;
+    }
+
+    /// <summary>Whether <paramref name="relativePath"/>'s current bytes still match a "keep" marker recorded for it (#786 review of #785).</summary>
+    private static bool IsKept(Dictionary<string, FileSkipMarker> markers, IntakeLibrary library, string relativePath)
+    {
+        if (!markers.TryGetValue(relativePath, out var marker))
+        {
+            return false;
+        }
+
+        try
+        {
+            var fingerprint = SourceFiles.Fingerprint(Path.Join(library.WatchedFolder, relativePath));
+            return fingerprint.SizeBytes == marker.SizeBytes && fingerprint.ModifiedTimeNs == marker.MtimeNs;
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// One Activity line for a hand-off target Weir did not queue because it is kept (#786 review of #785): the
+    /// manager is not told anything back here — its own hand-off protocol has no answer for "already decided
+    /// against, by hand, before you sent this" — but the file is never reprocessed just because it arrived again.
+    /// </summary>
+    private static Task<long> RecordKeptHandoffAsync(UnitOfWork uow, string sourceKey, string relativePath)
+    {
+        var manager = MediaManagerKinds.LabelForConnection(sourceKey, null);
+        var fileName = MediaPathNames.Name(relativePath, OperatingSystem.IsWindows());
+        var detail = new WireObject()
+            .Set("relative_media_path", relativePath)
+            .Set("manager", manager)
+            .Set("trigger", "webhook")
+            .Set("result", "skipped");
+        return SqliteActivityWriter.RecordAsync(uow, new ActivityEventDraft(
+            ActivityEventTypes.ProcessingFileRemovalKept,
+            "processing",
+            $"{manager} handed {fileName} to Weir again, but it is kept, so Weir left it alone",
+            WireStrings.Slice(WireJsonWriter.Dumps(detail, WireJsonFormat.Compact), 10_000)));
     }
 
     /// <summary>

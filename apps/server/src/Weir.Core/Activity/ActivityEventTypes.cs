@@ -58,6 +58,12 @@ public static class ActivityEventTypes
 
     /// <summary>Weir asked a Sonarr/Radarr connection to run its Downloaded Scan over a file it just wrote.</summary>
     public const string ProcessingDownloadedScanRequested = "processing.downloaded_scan_requested";
+
+    /// <summary>History's remove dialog, "delete": the download was removed, by a manager or by Weir itself (#785).</summary>
+    public const string ProcessingFileRemovalDeleted = "processing.file_removal_deleted";
+
+    /// <summary>History's remove dialog, "keep": the file stays, and scans skip it until it changes (#785).</summary>
+    public const string ProcessingFileRemovalKept = "processing.file_removal_kept";
 }
 
 /// <summary>

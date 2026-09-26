@@ -502,6 +502,28 @@ public sealed class RemuxPassPathsTests : IDisposable
         Assert.True(Directory.Exists(watched));
         Assert.True(File.Exists(outside));
     }
+
+    /// <summary>
+    /// A lexical prefix match is not enough: a junction (Windows) or symlink (elsewhere) placed under the watched
+    /// folder can point straight out of it, and deleting through it would remove a file that actually lives
+    /// somewhere else (#786 review of #785). Shared by the automatic reject job and History's remove-dialog "delete".
+    /// </summary>
+    [Fact]
+    public void A_rejected_file_reached_through_a_linked_folder_is_left_alone()
+    {
+        var watched = Directory.CreateDirectory(_root.Join("watched")).FullName;
+        var elsewhere = Directory.CreateDirectory(_root.Join("elsewhere", "Release")).FullName;
+        var real = Path.Join(elsewhere, "film.mkv");
+        File.WriteAllText(real, "x");
+        var linked = Path.Join(watched, "Release");
+        FolderLinks.Create(linked, elsewhere);
+
+        var result = RemuxPassPaths.CleanupRejectedFile(watched, Path.Join(linked, "film.mkv"), "delete_file");
+
+        Assert.False(result.Deleted);
+        Assert.Contains("reached through a link", result.Detail, StringComparison.Ordinal);
+        Assert.True(File.Exists(real));
+    }
 }
 
 /// <summary>The guarded file lifecycle writes the pass publishes through.</summary>
