@@ -10075,6 +10075,52 @@
         "title": "SuiteUpdateStatusOut",
         "type": "object"
       },
+      "ThemeIn": {
+        "additionalProperties": false,
+        "properties": {
+          "csrf_token": {
+            "minLength": 1,
+            "title": "Csrf Token",
+            "type": "string"
+          },
+          "theme": {
+            "enum": [
+              "light",
+              "dark"
+            ],
+            "title": "Theme",
+            "type": "string"
+          }
+        },
+        "required": [
+          "theme",
+          "csrf_token"
+        ],
+        "title": "ThemeIn",
+        "type": "object"
+      },
+      "ThemeOut": {
+        "properties": {
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "app_theme": {
+            "enum": [
+              "light",
+              "dark"
+            ],
+            "title": "App Theme",
+            "type": "string"
+          }
+        },
+        "required": [
+          "message",
+          "app_theme"
+        ],
+        "title": "ThemeOut",
+        "type": "object"
+      },
       "TrackNameOverrides": {
         "additionalProperties": false,
         "description": "Issue #498: per-flag track name templates, checked forced, then hearing-impaired, then commentary, then audio description; the first whose flag matches on a track and whose template is non-empty wins over track_name_template. Each template is validated the same way (unknown placeholder is a 400).",
@@ -10214,12 +10260,29 @@
           "username": {
             "title": "Username",
             "type": "string"
+          },
+          "app_theme": {
+            "anyOf": [
+              {
+                "enum": [
+                  "light",
+                  "dark"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null until the person picks a theme; until then the app follows the system setting.",
+            "title": "App Theme"
           }
         },
         "required": [
           "id",
           "username",
-          "role"
+          "role",
+          "app_theme"
         ],
         "title": "UserPublic",
         "type": "object"
@@ -11520,6 +11583,48 @@
           }
         },
         "summary": "Post Revoke Session",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/theme": {
+      "post": {
+        "description": "Save the signed-in user's own colour theme, so it follows them to another browser or device.",
+        "operationId": "post_set_theme_api_v1_auth_theme_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ThemeIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThemeOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Set Theme",
         "tags": [
           "auth"
         ]

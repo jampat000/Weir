@@ -105,4 +105,34 @@ describe("app-theme", () => {
     expect(document.documentElement.getAttribute("data-mm-theme")).toBe("dark");
     stop();
   });
+
+  it("switches an already-open tab when another tab changes the stored theme", () => {
+    const stop = followSystemAppTheme();
+    localStorage.setItem(APP_THEME_STORAGE_KEY, "light");
+
+    window.dispatchEvent(
+      new StorageEvent("storage", {
+        key: APP_THEME_STORAGE_KEY,
+        newValue: "light",
+      }),
+    );
+
+    expect(document.documentElement.getAttribute("data-mm-theme")).toBe(
+      "light",
+    );
+    stop();
+  });
+
+  it("ignores a storage event for an unrelated key", () => {
+    applyAppThemeToDocument("dark");
+    const stop = followSystemAppTheme();
+    localStorage.setItem("some-other-key", "light");
+
+    window.dispatchEvent(
+      new StorageEvent("storage", { key: "some-other-key", newValue: "light" }),
+    );
+
+    expect(document.documentElement.getAttribute("data-mm-theme")).toBe("dark");
+    stop();
+  });
 });

@@ -1,6 +1,10 @@
 /**
- * Browser-local colour theme; not synced to the server and safe to change instantly. Until someone
- * picks a theme with the switch, Weir follows the system's light or dark setting (#697).
+ * The colour theme: a per-account preference (`UserPublic.app_theme`), cached here for first paint
+ * before anyone is signed in or before `/auth/me` has answered. Once signed in, `useAccountThemeSync`
+ * reconciles the account's preference with this cache: an account preference wins, and a preference
+ * this browser has but the account does not gets adopted onto the account rather than discarded.
+ * Until either has a preference, Weir follows the system's light or dark setting (#697). A local
+ * change applies to the document straight away, never waiting on the network.
  */
 
 import { useSyncExternalStore } from "react";
@@ -59,11 +63,19 @@ export function persistAppTheme(theme: AppTheme): void {
 
 function subscribeToAppTheme(onChange: () => void): () => void {
   const system = systemPrefersLight();
+  const onStorage = (event: StorageEvent) => {
+    // A null key means the whole store was cleared; otherwise only react to this app's own key.
+    if (event.key === null || event.key === APP_THEME_STORAGE_KEY) onChange();
+  };
   system?.addEventListener("change", onChange);
   window.addEventListener(THEME_CHOSEN_EVENT, onChange);
+  // `storage` fires only in a browser's *other* same-origin tabs, never the one that made the
+  // change, so a choice made here still needs THEME_CHOSEN_EVENT to update this tab.
+  window.addEventListener("storage", onStorage);
   return () => {
     system?.removeEventListener("change", onChange);
     window.removeEventListener(THEME_CHOSEN_EVENT, onChange);
+    window.removeEventListener("storage", onStorage);
   };
 }
 

@@ -27,7 +27,7 @@ public sealed partial class AuthService
     public static WireObject UserPublic(UserRecord user)
     {
         ArgumentNullException.ThrowIfNull(user);
-        return new WireObject().Set("id", user.Id).Set("username", user.Username).Set("role", user.Role);
+        return new WireObject().Set("id", user.Id).Set("username", user.Username).Set("role", user.Role).Set("app_theme", user.AppTheme);
     }
 
     /// <summary>The user's active sessions, newest first, with the request's own session as it is held in memory.</summary>

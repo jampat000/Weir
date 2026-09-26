@@ -154,6 +154,23 @@ public sealed class AuthAndSettingsStoreTests
     }
 
     [Fact]
+    public async Task A_new_user_has_no_theme_preference_until_one_is_set()
+    {
+        using var fixture = new StoreFixture();
+        var id = await fixture.WithUnitOfWork(uow => fixture.Users.InsertUserAsync(uow, "alice", PasswordHasher.Hash(Password), "admin", true));
+
+        Assert.Null((await fixture.WithUnitOfWork(uow => fixture.Users.GetUserAsync(uow, id)))!.AppTheme);
+
+        await fixture.WithUnitOfWork(async uow =>
+        {
+            await fixture.Auth.SetAppThemeAsync(uow, id, AppThemes.Dark);
+            return 0;
+        });
+
+        Assert.Equal(AppThemes.Dark, (await fixture.WithUnitOfWork(uow => fixture.Users.GetUserAsync(uow, id)))!.AppTheme);
+    }
+
+    [Fact]
     public async Task A_configuration_snapshot_is_written_when_due_and_path_traversal_is_refused()
     {
         using var fixture = new StoreFixture();

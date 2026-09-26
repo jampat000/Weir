@@ -6,8 +6,9 @@ import {
   WorkspaceTabList,
 } from "./workspace-shell";
 
-// The title row carries Pause, which talks to the server; this test is about the tabs.
+// The title row carries Pause and the theme switch, which talk to the server; this test is about the tabs.
 vi.mock("../shell/pause-control", () => ({ PauseControl: () => null }));
+vi.mock("../shell/theme-toggle", () => ({ ThemeToggle: () => null }));
 
 describe("workspace shell", () => {
   it("connects the themed horizontal tabs to their shared panel", () => {

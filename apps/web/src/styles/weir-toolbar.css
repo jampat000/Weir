@@ -74,6 +74,29 @@
   font-size: 0.8125rem;
 }
 
+.mm-theme-control {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* Floats below the switch, like the pause menu, so a failed save never reflows the title row. */
+.mm-theme-alert {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 20;
+  width: max-content;
+  max-width: 220px;
+  margin: 0;
+  padding: 6px calc(10px * var(--mm-density-ui-scale));
+  border: 1px solid var(--mm-border);
+  border-radius: 8px;
+  background: var(--mm-surface1, var(--mm-bg, #fff));
+  box-shadow: 0 8px 24px rgb(0 0 0 / 18%);
+  font-size: 0.75rem;
+}
+
 .mm-theme-toggle {
   position: static;
   display: inline-flex;

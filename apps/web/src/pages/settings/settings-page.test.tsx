@@ -13,6 +13,9 @@ import { SettingsPage } from "./settings-page";
 vi.mock("../../components/shell/pause-control", () => ({
   PauseControl: () => null,
 }));
+vi.mock("../../components/shell/theme-toggle", () => ({
+  ThemeToggle: () => null,
+}));
 vi.mock("./tabs/libraries/libraries-tab", () => ({
   LibrariesTab: () => <div>Libraries content</div>,
 }));
