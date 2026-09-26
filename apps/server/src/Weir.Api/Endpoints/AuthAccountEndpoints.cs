@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Weir.Api.Http;
 using Weir.Core.Activity;
+using Weir.Core.Auth;
 using Weir.Core.Json;
 using Weir.Core.Security;
 using Weir.Core.Validation;
@@ -11,7 +12,7 @@ using Weir.Infrastructure.Activity;
 
 namespace Weir.Api.Endpoints;
 
-/// <summary>Changing the signed-in user's own username or password.</summary>
+/// <summary>Changing the signed-in user's own username, password or app theme.</summary>
 public static class AuthAccountEndpoints
 {
     public static IEndpointRouteBuilder MapAuthAccountEndpoints(this IEndpointRouteBuilder endpoints)
@@ -19,6 +20,7 @@ public static class AuthAccountEndpoints
         var handlers = endpoints.ServiceProvider.GetRequiredService<AuthAccountEndpointHandlers>();
         endpoints.MapV1("POST", "/auth/change-username", handlers.PostChangeUsernameAsync);
         endpoints.MapV1("POST", "/auth/change-password", handlers.PostChangePasswordAsync);
+        endpoints.MapV1("POST", "/auth/theme", handlers.PostSetThemeAsync);
         return endpoints;
     }
 }
@@ -102,5 +104,37 @@ internal sealed class AuthAccountEndpointHandlers
         AuthEndpoints.Logger(request).LogInformation("auth event: password changed (user_id={UserId})", user.User.Id);
         await _activity.RecordAsync(uow, ActivityEventTypes.AuthPasswordChanged, "auth", "Password changed", user.User.Username).ConfigureAwait(false);
         return ApiRoutes.Ok(new WireObject().Set("message", "Password changed. Sign in again with your new password."));
+    }
+
+    /// <summary>Saves the signed-in user's own colour theme, so it follows them to another browser or device (#790).</summary>
+    public async Task<ApiResult> PostSetThemeAsync(ApiRequest request)
+    {
+        var body = await request.ReadBodyAsync().ConfigureAwait(false);
+        var user = await request.RequireUserAsync().ConfigureAwait(false);
+        var issues = new ValidationIssues();
+        var model = new BodyModel(body, issues);
+        var theme = model.Literal("theme", AppThemes.All);
+        var csrfToken = model.Str("csrf_token", minLength: 1);
+        model.Finish(ExtraFields.Forbid);
+        issues.ThrowIfAny();
+
+        var secret = request.RequireSessionSecret();
+        request.ValidateBrowserPostOrigin();
+        if (!request.VerifyCsrf(secret, csrfToken, allowAnonymous: false))
+        {
+            throw new ApiException(StatusCodes.Status400BadRequest, AuthEndpoints.InvalidCsrf);
+        }
+
+        var uow = await request.DbAsync().ConfigureAwait(false);
+        try
+        {
+            await request.Auth.SetAppThemeAsync(uow, user.User.Id, theme).ConfigureAwait(false);
+        }
+        catch (WireValueException exception)
+        {
+            throw new ApiException(StatusCodes.Status400BadRequest, exception.Message);
+        }
+
+        return ApiRoutes.Ok(new WireObject().Set("message", "Theme saved.").Set("app_theme", theme));
     }
 }
