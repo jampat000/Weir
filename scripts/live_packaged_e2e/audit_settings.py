@@ -63,8 +63,8 @@ class AuditSettingsMixin:
         self.open_sidebar("History")
         self.visible(self.page.get_by_test_id("history-page"), "History page")
         chips = self.page.get_by_role("group", name="Show").get_by_role("button")
-        # Six groups since library cleans joined downloads in History (#695): a skip is its own
-        # neutral group rather than counting as Failed, and on_hold sits under Needs you.
+        # A skip is its own neutral group rather than counting as Failed, on_hold sits under Needs you,
+        # and Kept lists the files the owner chose to keep without processing.
         expected_chip_labels = [
             "All",
             "In progress",
@@ -72,6 +72,7 @@ class AuditSettingsMixin:
             "Needs you",
             "Skipped",
             "Failed",
+            "Kept",
         ]
         chip_texts = chips.all_inner_texts()
         self.require(

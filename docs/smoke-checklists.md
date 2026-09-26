@@ -38,7 +38,7 @@ Use the Velopack setup exe from the release being validated.
 ## Docker smoke
 
 Use the published release image, not a locally built image. The Git tag is `vX.Y.Z`; the image tag
-drops the `v`, so `ghcr.io/jampat000/weir:3.2.6` is the image for tag `v3.2.6`. Run the checks on
+drops the `v`, so `ghcr.io/jampat000/weir:3.2.7` is the image for tag `v3.2.7`. Run the checks on
 both `linux/amd64` and `linux/arm64` when hardware for both is available.
 
 1. Pull the versioned image:
