@@ -57,6 +57,7 @@ vi.mock("../../lib/processing/files-queries", async (importOriginal) => {
     useRequeueProcessingFiles: () => mutation(requeueFiles),
     useRequeueProcessingFile: () => mutation(requeue),
     useForgetProcessingFile: () => mutation(),
+    useProcessingFileRemoveOptions: () => mutation(),
     useMoveProcessingFileToTop: () => mutation(),
     useProcessingWhyHeld: () => mutation(),
     useProcessProcessingFileNow: () => mutation(processNow),

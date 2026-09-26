@@ -151,12 +151,39 @@ export async function fetchProcessingFiles(
   return readJson<ProcessingFilesPage>(r);
 }
 
-export async function forgetProcessingFile(id: number): Promise<void> {
+/**
+ * History's remove dialog (#785): what to offer for one title before it is shown, and the choice a person made.
+ * "remove" (the default) is today's plain forget; the other three only apply to a title `remove-options` says
+ * `requires_choice` for.
+ */
+export type ProcessingFileRemovalResolution =
+  Schema<"ProcessingFileForgetIn">["resolution"];
+
+export type ProcessingFileRemoveOptions =
+  Schema<"ProcessingFileRemoveOptionsOut">;
+
+export async function fetchProcessingFileRemoveOptions(
+  id: number,
+): Promise<ProcessingFileRemoveOptions> {
+  const path = `${processingFilesPath()}/${id}/remove-options`;
+  const response = await apiFetch(path);
+  await requireOk(
+    path,
+    response,
+    "Could not read what removing this file would do",
+  );
+  return readJson<ProcessingFileRemoveOptions>(response);
+}
+
+export async function forgetProcessingFile(
+  id: number,
+  resolution?: ProcessingFileRemovalResolution,
+): Promise<void> {
   const path = `${processingFilesPath()}/${id}`;
   await sendJson(
     path,
     "DELETE",
-    {},
+    resolution ? { resolution } : {},
     "Could not remove that file from the list",
   );
 }

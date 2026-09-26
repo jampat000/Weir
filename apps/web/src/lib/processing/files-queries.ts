@@ -9,6 +9,7 @@ import { activityKeys } from "../activity/query-keys";
 import { postProcessingFileRemuxPassEnqueue } from "./file-remux-pass-api";
 import {
   fetchProcessingFiles,
+  fetchProcessingFileRemoveOptions,
   forgetProcessingFile,
   fetchProcessingFileLog,
   fetchProcessingFileTracks,
@@ -18,6 +19,7 @@ import {
   requeueProcessingFile,
   requeueProcessingFiles,
   type ProcessingBulkRequeueQuery,
+  type ProcessingFileRemovalResolution,
   type ProcessingFilesPage,
   type ProcessingFilesQuery,
   type ProcessingManualPlanChoice,
@@ -75,12 +77,28 @@ export function useLibraryCleansQuery(query: LibraryCleansQuery) {
 export function useForgetProcessingFile() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: number) => forgetProcessingFile(id),
+    mutationFn: ({
+      id,
+      resolution,
+    }: {
+      id: number;
+      resolution?: ProcessingFileRemovalResolution;
+    }) => forgetProcessingFile(id, resolution),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: processingKeys.files });
       void qc.invalidateQueries({ queryKey: activityKeys.recent });
       void qc.invalidateQueries({ queryKey: processingKeys.jobsInspection });
     },
+  });
+}
+
+/**
+ * What History's remove dialog should offer for one title (#785), asked only when someone opens the dialog for
+ * it — not for every row on every render.
+ */
+export function useProcessingFileRemoveOptions() {
+  return useMutation({
+    mutationFn: (id: number) => fetchProcessingFileRemoveOptions(id),
   });
 }
 

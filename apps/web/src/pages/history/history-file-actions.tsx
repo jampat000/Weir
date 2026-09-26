@@ -4,6 +4,7 @@ import { ConfirmDialog } from "../../components/ui/confirm-dialog";
 import { errorMessage } from "../../lib/api/error-message";
 import type {
   ProcessingFile,
+  ProcessingFileRemoveOptions,
   ProcessingFileStatus,
   ProcessingFileTracks,
   ProcessingManualPlanChoice,
@@ -13,6 +14,7 @@ import {
   useMoveProcessingFileToTop,
   useProcessProcessingFileNow,
   useProcessingCheckLibraryAgain,
+  useProcessingFileRemoveOptions,
   useProcessingFileTracks,
   useProcessingWhyHeld,
   useRequeueProcessingFile,
@@ -20,6 +22,7 @@ import {
 } from "../../lib/processing/files-queries";
 import { useProcessingLibrariesQuery } from "../../lib/processing/libraries-queries";
 import { mmActionButtonClass } from "../../lib/ui/mm-control-roles";
+import { HistoryRemoveDialog } from "./history-remove-dialog";
 
 const PASS_THROUGH_EXPLAINED =
   "Weir will skip the audio, subtitle and metadata rules, copy and check the original in this library's output folder, then remove the watched original the way it does after any finished file. Readiness checks still apply, so a download still being written is left alone.";
@@ -49,6 +52,7 @@ export function HistoryFileActions({
 }) {
   const libraries = useProcessingLibrariesQuery();
   const forget = useForgetProcessingFile();
+  const removeOptions = useProcessingFileRemoveOptions();
   const moveToTop = useMoveProcessingFileToTop();
   const requeue = useRequeueProcessingFile();
   const whyHeld = useProcessingWhyHeld();
@@ -62,6 +66,11 @@ export function HistoryFileActions({
   const [tracksError, setTracksError] = useState<string | null>(null);
   const [planError, setPlanError] = useState<string | null>(null);
   const [confirmingPassThrough, setConfirmingPassThrough] = useState(false);
+  const [removeDialogOptions, setRemoveDialogOptions] =
+    useState<ProcessingFileRemoveOptions | null>(null);
+  const [removeDialogError, setRemoveDialogError] = useState<string | null>(
+    null,
+  );
 
   if (!editable) return null;
 
@@ -72,6 +81,7 @@ export function HistoryFileActions({
 
   const anyPending =
     forget.isPending ||
+    removeOptions.isPending ||
     moveToTop.isPending ||
     requeue.isPending ||
     whyHeld.isPending ||
@@ -129,6 +139,60 @@ export function HistoryFileActions({
       async () => (await requeue.mutateAsync(file.id)).detail,
       "That file could not be queued again.",
     );
+
+  const REMOVE_RESOLUTION_MESSAGES: Record<
+    "delete" | "keep" | "retry",
+    string
+  > = {
+    delete: "Deleted and removed from the list.",
+    keep: "Kept. Weir will leave it alone until it changes.",
+    retry: "Queued to be processed again.",
+  };
+
+  /** The plain remove every title without a choice keeps: forget the row, touch nothing else. */
+  const removePlain = () =>
+    void run(async () => {
+      const message = "Removed from the list. The file on disk is untouched.";
+      await forget.mutateAsync({ id: file.id });
+      onRemoved(message);
+      return message;
+    }, "That file could not be removed from the list.");
+
+  /** Asks whether this title qualifies for the dialog before showing anything (#785). */
+  async function startRemoval() {
+    setNotice(null);
+    try {
+      const options = await removeOptions.mutateAsync(file.id);
+      if (options.requires_choice) {
+        setRemoveDialogError(null);
+        setRemoveDialogOptions(options);
+        return;
+      }
+    } catch (error) {
+      setNotice(
+        errorMessage(
+          error,
+          "Weir could not check what removing this file would do.",
+        ),
+      );
+      return;
+    }
+
+    removePlain();
+  }
+
+  async function confirmRemoval(resolution: "delete" | "keep" | "retry") {
+    setRemoveDialogError(null);
+    try {
+      await forget.mutateAsync({ id: file.id, resolution });
+      setRemoveDialogOptions(null);
+      onRemoved(REMOVE_RESOLUTION_MESSAGES[resolution]);
+    } catch (error) {
+      setRemoveDialogError(
+        errorMessage(error, "That file could not be removed."),
+      );
+    }
+  }
   const button = (
     label: string,
     title: string,
@@ -259,19 +323,14 @@ export function HistoryFileActions({
         {status !== "processing"
           ? button(
               "Remove from list",
-              "Forgets Weir's record of this file. The file on disk is untouched.",
-              () =>
-                void run(async () => {
-                  const message =
-                    "Removed from the list. The file on disk is untouched.";
-                  await forget.mutateAsync(file.id);
-                  onRemoved(message);
-                  return message;
-                }, "That file could not be removed from the list."),
+              "Forgets Weir's record of this file. Asks what to do first when its download is still in the watched folder.",
+              () => void startRemoval(),
               {
                 variant: "tertiary",
-                pending: forget.isPending,
-                pendingLabel: "Removing…",
+                pending: forget.isPending || removeOptions.isPending,
+                pendingLabel: removeOptions.isPending
+                  ? "Checking…"
+                  : "Removing…",
               },
             )
           : null}
@@ -296,6 +355,16 @@ export function HistoryFileActions({
               return "Queued to pass through unchanged. Weir checks the copy before removing the original.";
             }, "That file could not be queued to pass through. Refresh and review its library's folders.");
           }}
+        />
+      ) : null}
+      {removeDialogOptions ? (
+        <HistoryRemoveDialog
+          fileName={file.relative_path}
+          options={removeDialogOptions}
+          busy={forget.isPending}
+          error={removeDialogError}
+          onCancel={() => setRemoveDialogOptions(null)}
+          onConfirm={(resolution) => void confirmRemoval(resolution)}
         />
       ) : null}
       {notice ? (

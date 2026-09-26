@@ -769,6 +769,26 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/processing/files/{file_id}/remove-options": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Processing File Remove Options
+     * @description What History's remove dialog should offer for this title (#785), read before it is shown.
+     */
+    get: operations["get_processing_file_remove_options_api_v1_files__file_id__remove_options_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/processing/files/{file_id}": {
     parameters: {
       query?: never;
@@ -781,7 +801,7 @@ export interface paths {
     post?: never;
     /**
      * Delete Processing File
-     * @description Forget a file. Removes Weir's record of it, never the file on disk.
+     * @description History's "Remove from list" (#785). `resolution` chooses what happens to a failed or rejected file whose original is still in the watched folder: `delete` asks a manager to remove the download and search again, or Weir deletes it itself; `keep` leaves the file but skips it until it changes; `retry` queues it again. Anything else is always a plain remove.
      */
     delete: operations["delete_processing_file_api_v1_files__file_id__delete"];
     options?: never;
@@ -4027,10 +4047,35 @@ export interface components {
       /** Path */
       path?: string | null;
     };
-    /** ProcessingFileForgetIn */
+    /**
+     * ProcessingFileForgetIn
+     * @description History's remove dialog (#785). `resolution` is only meaningful for a failed or rejected file whose
+     *     original is still in the watched folder (see ProcessingFileRemoveOptionsOut); anything else is always a plain
+     *     remove, whatever `resolution` asks for.
+     */
     ProcessingFileForgetIn: {
       /** Csrf Token */
       csrf_token: string;
+      /**
+       * Resolution
+       * @default remove
+       * @enum {string}
+       */
+      resolution: "remove" | "delete" | "keep" | "retry";
+    };
+    /**
+     * ProcessingFileRemoveOptionsOut
+     * @description What History's remove dialog should offer for one title, read before it is shown (#785).
+     */
+    ProcessingFileRemoveOptionsOut: {
+      /** Requires Choice */
+      requires_choice: boolean;
+      /** Manager Label */
+      manager_label: string | null;
+      /** Delete Handled By Manager */
+      delete_handled_by_manager: boolean;
+      /** Keep Notifies Manager */
+      keep_notifies_manager: boolean;
     };
     /**
      * ProcessingFileLogEntryOut
@@ -8630,6 +8675,37 @@ export interface operations {
       };
     };
   };
+  get_processing_file_remove_options_api_v1_files__file_id__remove_options_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        file_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ProcessingFileRemoveOptionsOut"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
   delete_processing_file_api_v1_files__file_id__delete: {
     parameters: {
       query?: never;
@@ -8660,6 +8736,13 @@ export interface operations {
         content: {
           "application/json": components["schemas"]["HTTPValidationError"];
         };
+      };
+      /** @description delete or keep could not reach, or was refused by, the media manager it asked */
+      502: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
       };
     };
   };
