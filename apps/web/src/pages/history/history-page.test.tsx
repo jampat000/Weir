@@ -7,6 +7,7 @@ import type {
   ProcessingFile,
   ProcessingFileLog,
 } from "../../lib/processing/files-api";
+import type { KeptFile } from "../../lib/processing/kept-files-api";
 import type { LibraryClean } from "../../lib/processing/library-cleans-api";
 import { HistoryPage } from "./history-page";
 
@@ -15,7 +16,13 @@ const files: {
   status_counts: Record<string, number>;
 } = { files: [], status_counts: {} };
 const cleans: { cleans: LibraryClean[] } = { cleans: [] };
+const kept: { files: KeptFile[] } = { files: [] };
 const filesQueryState: {
+  isLoading: boolean;
+  isError: boolean;
+  error: unknown;
+} = { isLoading: false, isError: false, error: null };
+const keptQueryState: {
   isLoading: boolean;
   isError: boolean;
   error: unknown;
@@ -23,6 +30,7 @@ const filesQueryState: {
 const requeue = vi.fn();
 const requeueFiles = vi.fn();
 const processNow = vi.fn();
+const processKeptAgain = vi.fn();
 const fetchLog = vi.fn<(id: number) => Promise<ProcessingFileLog>>();
 
 vi.mock("../../lib/processing/files-queries", async (importOriginal) => {
@@ -69,6 +77,28 @@ vi.mock("../../lib/processing/files-queries", async (importOriginal) => {
 vi.mock("../../lib/processing/libraries-queries", () => ({
   useProcessingLibrariesQuery: () => ({
     data: [{ id: 1, name: "TV", media_type: "tv" }],
+  }),
+}));
+vi.mock("../../lib/processing/kept-files-queries", () => ({
+  useKeptFilesQuery: () => ({
+    data: kept,
+    isLoading: keptQueryState.isLoading,
+    isError: keptQueryState.isError,
+    error: keptQueryState.error,
+  }),
+  useProcessKeptFileAgain: () => ({
+    mutate: (
+      input: number,
+      opts?: {
+        onSuccess?: (r: unknown) => void;
+        onError?: (e: unknown) => void;
+      },
+    ) =>
+      void Promise.resolve(processKeptAgain(input)).then(
+        opts?.onSuccess,
+        opts?.onError,
+      ),
+    isPending: false,
   }),
 }));
 vi.mock("../../lib/auth/queries", () => ({
@@ -144,11 +174,16 @@ describe("HistoryPage", () => {
       detail: "Queued 2 files again.",
     });
     processNow.mockReset();
+    processKeptAgain.mockReset();
     fetchLog.mockReset();
     cleans.cleans = [];
+    kept.files = [];
     filesQueryState.isLoading = false;
     filesQueryState.isError = false;
     filesQueryState.error = null;
+    keptQueryState.isLoading = false;
+    keptQueryState.isError = false;
+    keptQueryState.error = null;
     files.files = [
       file({ id: 1 }),
       file({
@@ -379,5 +414,75 @@ describe("HistoryPage", () => {
     renderPage();
 
     expect(screen.getAllByText("Heat.mkv").length).toBeGreaterThan(0);
+  });
+
+  it("counts kept files on their own chip, since a kept file has no entry to count", () => {
+    kept.files = [
+      {
+        id: 7,
+        library_id: 1,
+        library_name: "Movies",
+        relative_path: "Film/film.mkv",
+        size_bytes: 100,
+        kept_at: "2026-09-26T00:00:00",
+      },
+    ];
+    renderPage();
+
+    const chips = screen.getByRole("group", { name: "Show" });
+    expect(
+      within(chips).getByRole("button", { name: /Kept\s*1/ }),
+    ).toBeInTheDocument();
+  });
+
+  it("lists kept files under the Kept chip, with the way back to processing them again", async () => {
+    kept.files = [
+      {
+        id: 7,
+        library_id: 1,
+        library_name: "Movies",
+        relative_path: "Film (2024)/Film.2024.1080p.WEB-DL.mkv",
+        size_bytes: 4_000_000_000,
+        kept_at: "2026-09-26T00:00:00",
+      },
+    ];
+    processKeptAgain.mockResolvedValue({
+      detail:
+        "Weir is checking this file's library now and will queue it once it is ready.",
+    });
+    renderPage("/history?show=kept");
+
+    expect(await screen.findByTestId("kept-file-row-7")).toBeInTheDocument();
+    expect(screen.getByText("Movies")).toBeInTheDocument();
+    expect(screen.getByText("3.73 GB")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Process again" }));
+
+    expect(
+      await screen.findByText(
+        "Weir is checking this file's library now and will queue it once it is ready.",
+      ),
+    ).toBeInTheDocument();
+    expect(processKeptAgain).toHaveBeenCalledWith(7);
+  });
+
+  it("says nothing is kept right now instead of showing an empty history pane", () => {
+    renderPage("/history?show=kept");
+
+    expect(
+      screen.getByText("No files are kept right now."),
+    ).toBeInTheDocument();
+  });
+
+  it("says its kept files could not load, through the shared load-error wording", () => {
+    keptQueryState.isError = true;
+    keptQueryState.error = new Error("boom");
+    renderPage("/history?show=kept");
+
+    expect(
+      screen.getByText(
+        "Weir couldn't load your kept files. Reload the page to try again.",
+      ),
+    ).toBeInTheDocument();
   });
 });
