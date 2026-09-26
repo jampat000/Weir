@@ -60,6 +60,28 @@
   margin-top: 1rem;
 }
 
+/* One radio option inside a dialog body (e.g. History's remove dialog, #785): a label, its explanation, and a
+   radio input, styled the same whichever dialog uses it. */
+.mm-dialog-choice {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  gap: 0.625rem;
+  padding: 0.625rem 0;
+  color: var(--mm-text2);
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  cursor: pointer;
+}
+
+.mm-dialog-choice + .mm-dialog-choice {
+  border-top: 1px solid var(--mm-border);
+}
+
+.mm-dialog-choice--chosen {
+  color: var(--mm-text1);
+}
+
 /* The folder picker (components/ui/server-folder-picker-button.tsx): a tall panel on the right. */
 .mm-folder-picker {
   position: fixed;

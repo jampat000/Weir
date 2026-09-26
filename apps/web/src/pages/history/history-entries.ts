@@ -25,9 +25,13 @@ export const cleanEntry = (clean: LibraryClean): HistoryEntry => ({
   clean,
 });
 
-/** The six ways History sorts an entry, in the order the chips read. */
+/**
+ * The ways History sorts an entry, in the order the chips read. "kept" is not an entry group at all — a kept
+ * file has no `files` row left to be one (#786 review of #785) — but it lives in the same chip row and count
+ * pattern, since removing a title to keep it is still something History did with it.
+ */
 export type HistoryGroup =
-  "all" | "working" | "finished" | "needs" | "skipped" | "failed";
+  "all" | "working" | "finished" | "needs" | "skipped" | "failed" | "kept";
 
 export const HISTORY_GROUPS: { id: HistoryGroup; label: string }[] = [
   { id: "all", label: "All" },
@@ -36,6 +40,7 @@ export const HISTORY_GROUPS: { id: HistoryGroup; label: string }[] = [
   { id: "needs", label: "Needs you" },
   { id: "skipped", label: "Skipped" },
   { id: "failed", label: "Failed" },
+  { id: "kept", label: "Kept" },
 ];
 
 const WORKING: readonly ProcessingFileStatus[] = [

@@ -1,6 +1,7 @@
 using System.Net;
 using Microsoft.Extensions.DependencyInjection;
 using Weir.Core.Activity;
+using Weir.Infrastructure.Processing.RemuxPass;
 
 namespace Weir.Api.Tests.Platform;
 
@@ -261,5 +262,337 @@ public sealed class ProcessingFilesApiTests
         // independently rather than one flag governing both.
         using var jobsAlert = await client.GetAsync("/api/v1/processing/jobs/inspection?status=failed&known_files_only=true");
         Assert.Empty((await ApiTestClient.Json(jobsAlert))!["jobs"]!.AsArray());
+    }
+}
+
+/// <summary>
+/// The remove dialog's server side (#785): what <c>GET .../remove-options</c> reports before the dialog is shown,
+/// and what each <c>resolution</c> on <c>DELETE .../files/{id}</c> actually does. The manager conversations
+/// themselves are covered against real fakes in <c>HistoryFileRemovalServiceTests</c>; these are the HTTP contract
+/// and the plain-remove fallback for a title that never qualifies for a choice.
+/// </summary>
+public sealed class ProcessingFilesRemoveDialogApiTests
+{
+    private static async Task<(long LibraryId, string Watched)> SeedLibraryWithFoldersAsync(WeirTestServer server)
+    {
+        var watched = Path.Combine(server.Home, "watch-" + Guid.NewGuid().ToString("N"));
+        var output = Path.Combine(server.Home, "out-" + Guid.NewGuid().ToString("N"));
+        var work = Path.Combine(server.Home, "work-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(watched);
+        Directory.CreateDirectory(output);
+        Directory.CreateDirectory(work);
+        var libraryId = await TestDatabase.ScalarAsync(
+            server,
+            "INSERT INTO libraries (name, media_type, watched_folder, output_folder, work_folder, display_order) " +
+            "VALUES ($name, 'movie', $w, $o, $k, 1) RETURNING id",
+            ("$name", "Movies " + Guid.NewGuid().ToString("N")[..8]), ("$w", watched), ("$o", output), ("$k", work));
+        return (libraryId, watched);
+    }
+
+    /// <summary>
+    /// A failed row carrying the fingerprint of the file actually on disk at <paramref name="fullPath"/>, exactly as
+    /// it stands the moment a title becomes failed (#786 review of #785): without it, the remove dialog's identity
+    /// check would refuse every seeded test file as "changed".
+    /// </summary>
+    private static async Task<long> SeedFailedFileAsync(WeirTestServer server, long libraryId, string relativePath, string fullPath)
+    {
+        var fingerprint = SourceFiles.Fingerprint(fullPath);
+        return await TestDatabase.ScalarAsync(
+            server,
+            "INSERT INTO files (library_id, relative_path, status, status_reason, size_bytes, last_seen_at, fingerprint_size_bytes, fingerprint_mtime_ns) " +
+            "VALUES ($lib, $path, 'processing_failed', 'Weir could not read the audio track.', $size, CURRENT_TIMESTAMP, $fsize, $fmtime) RETURNING id",
+            ("$lib", libraryId), ("$path", relativePath), ("$size", fingerprint.SizeBytes), ("$fsize", fingerprint.SizeBytes), ("$fmtime", fingerprint.ModifiedTimeNs));
+    }
+
+    /// <summary>
+    /// A failed row exactly as every title left by a pre-#786-follow-up Weir stands: nothing recorded in
+    /// <c>fingerprint_size_bytes</c>/<c>fingerprint_mtime_ns</c>, since migration 0025 only fills those columns going
+    /// forward. The remove dialog must offer the file's current details to confirm rather than refuse outright.
+    /// </summary>
+    private static async Task<long> SeedFailedFileWithoutFingerprintAsync(WeirTestServer server, long libraryId, string relativePath, long sizeBytes) =>
+        await TestDatabase.ScalarAsync(
+            server,
+            "INSERT INTO files (library_id, relative_path, status, status_reason, size_bytes, last_seen_at) " +
+            "VALUES ($lib, $path, 'processing_failed', 'Weir could not read the audio track.', $size, CURRENT_TIMESTAMP) RETURNING id",
+            ("$lib", libraryId), ("$path", relativePath), ("$size", sizeBytes));
+
+    [Fact]
+    public async Task A_failed_title_whose_file_still_exists_qualifies_for_a_choice_with_no_manager_to_ask()
+    {
+        await using var server = await ApiTestClient.StartServerAsync();
+        await TestDatabase.SeedAdminAsync(server);
+        var client = new ApiTestClient(server);
+        await client.SignInAsync();
+        var (libraryId, watched) = await SeedLibraryWithFoldersAsync(server);
+        var path = Path.Combine(watched, "film.mkv");
+        await File.WriteAllBytesAsync(path, "not a real film"u8.ToArray());
+        var fileId = await SeedFailedFileAsync(server, libraryId, "film.mkv", path);
+
+        using var response = await client.GetAsync($"/api/v1/processing/files/{fileId}/remove-options");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await ApiTestClient.Json(response);
+        Assert.True(body!["requires_choice"]!.GetValue<bool>());
+        Assert.False(body["delete_handled_by_manager"]!.GetValue<bool>());
+        Assert.False(body["keep_notifies_manager"]!.GetValue<bool>());
+        Assert.Null(body["manager_label"]);
+    }
+
+    [Fact]
+    public async Task A_finished_title_never_requires_a_choice()
+    {
+        await using var server = await ApiTestClient.StartServerAsync();
+        await TestDatabase.SeedAdminAsync(server);
+        var client = new ApiTestClient(server);
+        await client.SignInAsync();
+        var (libraryId, watched) = await SeedLibraryWithFoldersAsync(server);
+        await File.WriteAllBytesAsync(Path.Combine(watched, "film.mkv"), "done"u8.ToArray());
+        var fileId = await TestDatabase.ScalarAsync(
+            server,
+            "INSERT INTO files (library_id, relative_path, status, last_seen_at) VALUES ($lib, 'film.mkv', 'processed', CURRENT_TIMESTAMP) RETURNING id",
+            ("$lib", libraryId));
+
+        using var response = await client.GetAsync($"/api/v1/processing/files/{fileId}/remove-options");
+
+        Assert.False((await ApiTestClient.Json(response))!["requires_choice"]!.GetValue<bool>());
+    }
+
+    [Fact]
+    public async Task Resolution_delete_deletes_the_file_and_removes_it_from_history()
+    {
+        await using var server = await ApiTestClient.StartServerAsync();
+        await TestDatabase.SeedAdminAsync(server);
+        var client = new ApiTestClient(server);
+        await client.SignInAsync();
+        var (libraryId, watched) = await SeedLibraryWithFoldersAsync(server);
+        var path = Path.Combine(watched, "film.mkv");
+        await File.WriteAllBytesAsync(path, "not a real film"u8.ToArray());
+        var fileId = await SeedFailedFileAsync(server, libraryId, "film.mkv", path);
+
+        using var response = await client.SendAsync(
+            HttpMethod.Delete, $"/api/v1/processing/files/{fileId}", new { csrf_token = await client.CsrfAsync(), resolution = "delete" });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await ApiTestClient.Json(response);
+        Assert.True(body!["done"]!.GetValue<bool>());
+        Assert.False(File.Exists(path));
+        Assert.Equal(0, await TestDatabase.ScalarAsync(server, "SELECT count(*) FROM files"));
+    }
+
+    [Fact]
+    public async Task Resolution_keep_records_a_skip_marker_leaves_the_file_and_removes_it_from_history()
+    {
+        await using var server = await ApiTestClient.StartServerAsync();
+        await TestDatabase.SeedAdminAsync(server);
+        var client = new ApiTestClient(server);
+        await client.SignInAsync();
+        var (libraryId, watched) = await SeedLibraryWithFoldersAsync(server);
+        var path = Path.Combine(watched, "film.mkv");
+        await File.WriteAllBytesAsync(path, "not a real film"u8.ToArray());
+        var fileId = await SeedFailedFileAsync(server, libraryId, "film.mkv", path);
+
+        using var response = await client.SendAsync(
+            HttpMethod.Delete, $"/api/v1/processing/files/{fileId}", new { csrf_token = await client.CsrfAsync(), resolution = "keep" });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.True((await ApiTestClient.Json(response))!["done"]!.GetValue<bool>());
+        Assert.True(File.Exists(path));
+        Assert.Equal(0, await TestDatabase.ScalarAsync(server, "SELECT count(*) FROM files"));
+        Assert.Equal(1, await TestDatabase.ScalarAsync(server, "SELECT count(*) FROM file_skip_markers"));
+    }
+
+    [Fact]
+    public async Task Resolution_retry_queues_the_file_again_without_forgetting_it()
+    {
+        await using var server = await ApiTestClient.StartServerAsync();
+        await TestDatabase.SeedAdminAsync(server);
+        var client = new ApiTestClient(server);
+        await client.SignInAsync();
+        var (libraryId, watched) = await SeedLibraryWithFoldersAsync(server);
+        var path = Path.Combine(watched, "film.mkv");
+        await File.WriteAllBytesAsync(path, "not a real film"u8.ToArray());
+        var fileId = await SeedFailedFileAsync(server, libraryId, "film.mkv", path);
+
+        using var response = await client.SendAsync(
+            HttpMethod.Delete, $"/api/v1/processing/files/{fileId}", new { csrf_token = await client.CsrfAsync(), resolution = "retry" });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await ApiTestClient.Json(response);
+        Assert.True(body!["done"]!.GetValue<bool>());
+        Assert.Contains("Queued again", body["detail"]!.GetValue<string>(), StringComparison.Ordinal);
+        Assert.True(File.Exists(path));
+        Assert.Equal(1, await TestDatabase.ScalarAsync(server, "SELECT count(*) FROM files"));
+        Assert.Equal("unprocessed", await TestDatabase.ScalarStringAsync(server, "SELECT status FROM files WHERE id = $id", ("$id", fileId)));
+        Assert.Equal(1, await TestDatabase.ScalarAsync(server, "SELECT count(*) FROM jobs WHERE job_kind = 'processing.file.remux_pass.v1'"));
+    }
+
+    [Fact]
+    public async Task Resolution_retry_reports_a_skip_reason_instead_of_claiming_it_queued()
+    {
+        await using var server = await ApiTestClient.StartServerAsync();
+        await TestDatabase.SeedAdminAsync(server);
+        var client = new ApiTestClient(server);
+        await client.SignInAsync();
+        var (libraryId, watched) = await SeedLibraryWithFoldersAsync(server);
+        var path = Path.Combine(watched, "film.mkv");
+        await File.WriteAllBytesAsync(path, "not a real film"u8.ToArray());
+        var fileId = await SeedFailedFileAsync(server, libraryId, "film.mkv", path);
+        // A concluded file with its original gone: RequeueFileAsync skips rather than queues it (#786 review of #785).
+        await TestDatabase.ExecuteAsync(server, "UPDATE files SET status = 'rejected' WHERE id = $id", ("$id", fileId));
+        File.Delete(path);
+
+        using var response = await client.SendAsync(
+            HttpMethod.Delete, $"/api/v1/processing/files/{fileId}", new { csrf_token = await client.CsrfAsync(), resolution = "retry" });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await ApiTestClient.Json(response);
+        Assert.False(body!["done"]!.GetValue<bool>());
+        Assert.Contains("no longer in the watched folder", body["detail"]!.GetValue<string>(), StringComparison.Ordinal);
+        Assert.Equal(0, await TestDatabase.ScalarAsync(server, "SELECT count(*) FROM jobs WHERE job_kind = 'processing.file.remux_pass.v1'"));
+    }
+
+    [Fact]
+    public async Task An_unknown_resolution_is_rejected_with_422()
+    {
+        await using var server = await ApiTestClient.StartServerAsync();
+        await TestDatabase.SeedAdminAsync(server);
+        var client = new ApiTestClient(server);
+        await client.SignInAsync();
+        var (libraryId, watched) = await SeedLibraryWithFoldersAsync(server);
+        var path = Path.Combine(watched, "film.mkv");
+        await File.WriteAllBytesAsync(path, "not a real film"u8.ToArray());
+        var fileId = await SeedFailedFileAsync(server, libraryId, "film.mkv", path);
+
+        using var response = await client.SendAsync(
+            HttpMethod.Delete, $"/api/v1/processing/files/{fileId}", new { csrf_token = await client.CsrfAsync(), resolution = "discard" });
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+        Assert.Equal(1, await TestDatabase.ScalarAsync(server, "SELECT count(*) FROM files"));
+    }
+
+    [Fact]
+    public async Task A_viewer_cannot_read_remove_options()
+    {
+        await using var server = await ApiTestClient.StartServerAsync();
+        await TestDatabase.SeedViewerAsync(server);
+        var (libraryId, watched) = await SeedLibraryWithFoldersAsync(server);
+        var path = Path.Combine(watched, "film.mkv");
+        await File.WriteAllBytesAsync(path, "not a real film"u8.ToArray());
+        var fileId = await SeedFailedFileAsync(server, libraryId, "film.mkv", path);
+        var viewer = new ApiTestClient(server);
+        await viewer.SignInAsync("bob", ApiTestClient.ViewerPassword);
+
+        using var response = await viewer.GetAsync($"/api/v1/processing/files/{fileId}/remove-options");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    /// <summary>
+    /// A pre-#786-follow-up row (#786 follow-up): every title that failed or was rejected before migration 0025
+    /// shipped has no recorded fingerprint. Refusing outright would strand exactly the titles an owner is trying
+    /// to clear right after upgrading, so remove-options instead offers the file's current details to confirm.
+    /// </summary>
+    [Fact]
+    public async Task A_row_with_no_recorded_fingerprint_offers_the_files_current_details_over_http()
+    {
+        await using var server = await ApiTestClient.StartServerAsync();
+        await TestDatabase.SeedAdminAsync(server);
+        var client = new ApiTestClient(server);
+        await client.SignInAsync();
+        var (libraryId, watched) = await SeedLibraryWithFoldersAsync(server);
+        var path = Path.Combine(watched, "film.mkv");
+        await File.WriteAllBytesAsync(path, "not a real film"u8.ToArray());
+        var fileId = await SeedFailedFileWithoutFingerprintAsync(server, libraryId, "film.mkv", new FileInfo(path).Length);
+
+        using var response = await client.GetAsync($"/api/v1/processing/files/{fileId}/remove-options");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await ApiTestClient.Json(response);
+        Assert.True(body!["requires_choice"]!.GetValue<bool>());
+        Assert.False(body["fingerprint_recorded"]!.GetValue<bool>());
+        Assert.Equal(new FileInfo(path).Length, body["unconfirmed_size_bytes"]!.GetValue<long>());
+        Assert.False(string.IsNullOrEmpty(body["unconfirmed_modified_at"]!.GetValue<string>()));
+    }
+
+    [Fact]
+    public async Task Resolution_delete_succeeds_for_a_pre_upgrade_row_when_the_confirmed_details_match()
+    {
+        await using var server = await ApiTestClient.StartServerAsync();
+        await TestDatabase.SeedAdminAsync(server);
+        var client = new ApiTestClient(server);
+        await client.SignInAsync();
+        var (libraryId, watched) = await SeedLibraryWithFoldersAsync(server);
+        var path = Path.Combine(watched, "film.mkv");
+        await File.WriteAllBytesAsync(path, "not a real film"u8.ToArray());
+        var fileId = await SeedFailedFileWithoutFingerprintAsync(server, libraryId, "film.mkv", new FileInfo(path).Length);
+        var options = await ApiTestClient.Json(await client.GetAsync($"/api/v1/processing/files/{fileId}/remove-options"));
+
+        using var response = await client.SendAsync(
+            HttpMethod.Delete,
+            $"/api/v1/processing/files/{fileId}",
+            new
+            {
+                csrf_token = await client.CsrfAsync(),
+                resolution = "delete",
+                confirm_size_bytes = options!["unconfirmed_size_bytes"]!.GetValue<long>(),
+                confirm_modified_at = options["unconfirmed_modified_at"]!.GetValue<string>(),
+            });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.True((await ApiTestClient.Json(response))!["done"]!.GetValue<bool>());
+        Assert.False(File.Exists(path));
+        Assert.Equal(0, await TestDatabase.ScalarAsync(server, "SELECT count(*) FROM files"));
+    }
+
+    [Fact]
+    public async Task Resolution_delete_refuses_a_pre_upgrade_row_when_the_confirmed_details_no_longer_match()
+    {
+        await using var server = await ApiTestClient.StartServerAsync();
+        await TestDatabase.SeedAdminAsync(server);
+        var client = new ApiTestClient(server);
+        await client.SignInAsync();
+        var (libraryId, watched) = await SeedLibraryWithFoldersAsync(server);
+        var path = Path.Combine(watched, "film.mkv");
+        await File.WriteAllBytesAsync(path, "not a real film"u8.ToArray());
+        var fileId = await SeedFailedFileWithoutFingerprintAsync(server, libraryId, "film.mkv", new FileInfo(path).Length);
+        var options = await ApiTestClient.Json(await client.GetAsync($"/api/v1/processing/files/{fileId}/remove-options"));
+        // A different release lands at the same path between the dialog opening and the owner confirming.
+        await File.WriteAllBytesAsync(path, "a completely different release replaced this one"u8.ToArray());
+
+        using var response = await client.SendAsync(
+            HttpMethod.Delete,
+            $"/api/v1/processing/files/{fileId}",
+            new
+            {
+                csrf_token = await client.CsrfAsync(),
+                resolution = "delete",
+                confirm_size_bytes = options!["unconfirmed_size_bytes"]!.GetValue<long>(),
+                confirm_modified_at = options["unconfirmed_modified_at"]!.GetValue<string>(),
+            });
+
+        Assert.Equal(HttpStatusCode.BadGateway, response.StatusCode);
+        Assert.Contains("This file changed after you opened this dialog.", await ApiTestClient.Detail(response), StringComparison.Ordinal);
+        Assert.True(File.Exists(path));
+        Assert.Equal(1, await TestDatabase.ScalarAsync(server, "SELECT count(*) FROM files"));
+    }
+
+    [Fact]
+    public async Task Resolution_delete_refuses_a_pre_upgrade_row_with_no_confirmation_at_all()
+    {
+        await using var server = await ApiTestClient.StartServerAsync();
+        await TestDatabase.SeedAdminAsync(server);
+        var client = new ApiTestClient(server);
+        await client.SignInAsync();
+        var (libraryId, watched) = await SeedLibraryWithFoldersAsync(server);
+        var path = Path.Combine(watched, "film.mkv");
+        await File.WriteAllBytesAsync(path, "not a real film"u8.ToArray());
+        var fileId = await SeedFailedFileWithoutFingerprintAsync(server, libraryId, "film.mkv", new FileInfo(path).Length);
+
+        using var response = await client.SendAsync(
+            HttpMethod.Delete, $"/api/v1/processing/files/{fileId}", new { csrf_token = await client.CsrfAsync(), resolution = "delete" });
+
+        Assert.Equal(HttpStatusCode.BadGateway, response.StatusCode);
+        Assert.True(File.Exists(path));
+        Assert.Equal(1, await TestDatabase.ScalarAsync(server, "SELECT count(*) FROM files"));
     }
 }

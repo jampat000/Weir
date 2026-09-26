@@ -31,7 +31,7 @@ public sealed class FileStateStore
         "video_codec, audio_track_count, subtitle_track_count, duration_seconds, audio_codecs, video_bit_depth, size_changed_at, " +
         "hold_until, failure_class, failure_attempts, next_retry_at, output_collision_policy, output_collision_action, " +
         "output_collision_reason, hardware_method, hardware_fell_back_to_software, hardware_reason, last_seen_at, last_attempt_at, " +
-        "created_at, updated_at, processed_source_size, processed_source_mtime_ns";
+        "created_at, updated_at, processed_source_size, processed_source_mtime_ns, fingerprint_size_bytes, fingerprint_mtime_ns";
     private const string InsertSql =
         "INSERT INTO files (library_id, relative_path, status, status_reason, blocked_by_connection, hold_until, " +
         "size_bytes, size_changed_at, last_seen_at, last_attempt_at) VALUES (@lib, @path, @status, @reason, @blocked, @hold, " +
@@ -295,6 +295,8 @@ public sealed class FileStateStore
         UpdatedAt = SqliteValues.GetDateTime(reader, 29),
         ProcessedSourceSize = reader.IsDBNull(30) ? null : reader.GetInt64(30),
         ProcessedSourceMtimeNs = reader.IsDBNull(31) ? null : reader.GetInt64(31),
+        FingerprintSizeBytes = reader.IsDBNull(32) ? null : reader.GetInt64(32),
+        FingerprintMtimeNs = reader.IsDBNull(33) ? null : reader.GetInt64(33),
     };
 
     /// <summary>One state write's values, shared by the upsert and the scan's conditional write.</summary>

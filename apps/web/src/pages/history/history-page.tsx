@@ -10,6 +10,7 @@ import {
   useLibraryCleansQuery,
   useRequeueProcessingFiles,
 } from "../../lib/processing/files-queries";
+import { useKeptFilesQuery } from "../../lib/processing/kept-files-queries";
 import { useProcessingLibrariesQuery } from "../../lib/processing/libraries-queries";
 import { mmActionButtonClass } from "../../lib/ui/mm-control-roles";
 import { useNow } from "../../lib/ui/use-now";
@@ -29,6 +30,7 @@ import {
   PERIODS,
   type SetParam,
 } from "./history-filters";
+import { HistoryKeptList } from "./history-kept-list";
 import { HistoryList } from "./history-list";
 
 /** "min ago" moves on its own between refreshes. */
@@ -108,6 +110,7 @@ export function HistoryPage() {
   const files = useFileHistoryQuery({ ...query, limit: FILES_LIMIT });
   const cleans = useLibraryCleansQuery(query);
   const libraries = useProcessingLibrariesQuery();
+  const kept = useKeptFilesQuery();
   const editable = useCanEdit();
 
   const all = useMemo(
@@ -115,14 +118,20 @@ export function HistoryPage() {
     [files.data, cleans.data],
   );
   const shown = all.filter((entry) => inGroup(entry, group));
-  const counts = Object.fromEntries(
-    HISTORY_GROUPS.map((g) => [
-      g.id,
-      all.filter((entry) => inGroup(entry, g.id)).length,
-    ]),
-  ) as Record<HistoryGroup, number>;
+  const counts = {
+    ...(Object.fromEntries(
+      HISTORY_GROUPS.map((g) => [
+        g.id,
+        all.filter((entry) => inGroup(entry, g.id)).length,
+      ]),
+    ) as Record<HistoryGroup, number>),
+    // A kept file has no `files` row left to count as an entry (#786 review of #785), so its count comes from
+    // the kept-files list instead of the entry-based counting every other chip uses.
+    kept: kept.data?.files.length ?? 0,
+  };
   const selected = selectedEntry(shown, selectedFileId, selectedCleanId);
-  const cappedAtLimit = (files.data?.returned ?? 0) >= FILES_LIMIT;
+  const cappedAtLimit =
+    group !== "kept" && (files.data?.returned ?? 0) >= FILES_LIMIT;
 
   const setParam: SetParam = (name, value) => {
     setRemovedNotice(null);
@@ -178,7 +187,19 @@ export function HistoryPage() {
         </p>
       ) : null}
 
-      {files.isError ? (
+      {group === "kept" ? (
+        kept.isError ? (
+          <LoadError thing="your kept files" error={kept.error} />
+        ) : kept.isLoading ? (
+          <PanelLoading label="Reading kept files…" />
+        ) : (
+          <HistoryKeptList
+            files={kept.data?.files ?? []}
+            editable={editable}
+            onProcessed={setRemovedNotice}
+          />
+        )
+      ) : files.isError ? (
         <LoadError thing="your file history" error={files.error} />
       ) : files.isLoading ? (
         <PanelLoading label="Reading history…" />

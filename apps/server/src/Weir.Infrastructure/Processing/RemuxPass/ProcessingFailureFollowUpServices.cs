@@ -18,6 +18,8 @@ public static class ProcessingFailureFollowUpServices
         services.AddWeirRemuxPass(options);
 
         services.TryAddSingleton<RejectSupportEvaluator>();
+        services.TryAddSingleton<RejectRoutes>();
+        services.TryAddSingleton<HistoryFileRemovalService>();
         services.TryAddSingleton<RejectPacing>();
 
         services.TryAddSingleton<ProcessingPassThroughHandler>();

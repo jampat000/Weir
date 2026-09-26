@@ -33,6 +33,7 @@ public sealed class ProcessingRejectHandlerTests : IDisposable
             _fixture.Ports,
             _fixture.Connections,
             _fixture.Reporter,
+            new RejectRoutes(_fixture.Ports, _fixture.Reporter),
             _fixture.Ledger,
             _fixture.Jobs,
             new RejectPacing(TimeProvider.System),

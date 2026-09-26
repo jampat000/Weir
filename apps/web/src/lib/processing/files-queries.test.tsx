@@ -26,7 +26,7 @@ describe("useForgetProcessingFile", () => {
       wrapper: withQueryClient(qc),
     });
 
-    result.current.mutate(1);
+    result.current.mutate({ id: 1 });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
     // The Files list itself (what the removal reads from)...
@@ -58,7 +58,7 @@ describe("useForgetProcessingFile", () => {
     const { result } = renderHook(() => useForgetProcessingFile(), {
       wrapper: withQueryClient(qc),
     });
-    result.current.mutate(1);
+    result.current.mutate({ id: 1 });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
     expect(query?.isStale()).toBe(true);
