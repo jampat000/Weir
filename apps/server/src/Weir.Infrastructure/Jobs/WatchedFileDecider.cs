@@ -67,9 +67,22 @@ internal sealed class WatchedFileDecider
         };
     }
 
+    /// <summary>
+    /// A person chose "Keep" for this exact file (#785): its watched-folder bytes have not moved on since, so
+    /// nothing is recorded and nothing is queued. A same-name replacement fails this check on size or modification
+    /// time alone, and is picked up as an ordinary new candidate.
+    /// </summary>
+    private bool IsKept(string rel, WatchedMediaFile file) =>
+        _lookups.SkipMarkers.TryGetValue(rel, out var marker) && marker.SizeBytes == file.SizeBytes && marker.MtimeNs == file.ModifiedTimeNs;
+
     /// <summary>The full decision for a file whose size and times were just read from the file itself.</summary>
     public async Task<WatchedFileDecision> DecideAsync(WatchedMediaFile file, string rel, ProcessingFileRecord? previous)
     {
+        if (IsKept(rel, file))
+        {
+            return new WatchedFileDecision { RelativePath = rel };
+        }
+
         if (Settled(file, rel, previous) is { } settled)
         {
             return settled;

@@ -33,15 +33,17 @@ internal sealed record ScanAdmissionWindow(bool InWindow, string? PauseReason, D
 internal sealed record WatchedFolderScanLookups(
     IReadOnlyDictionary<string, ProcessingFileRecord> Rows,
     HashSet<string> ActivePasses,
-    IReadOnlyDictionary<string, DateTimeOffset> HeldBackPasses)
+    IReadOnlyDictionary<string, DateTimeOffset> HeldBackPasses,
+    IReadOnlyDictionary<string, FileSkipMarker> SkipMarkers)
 {
-    public static async Task<WatchedFolderScanLookups> ReadAsync(UnitOfWork reads, FileStateStore files, WatchedFolderScan scan)
+    public static async Task<WatchedFolderScanLookups> ReadAsync(UnitOfWork reads, FileStateStore files, FileSkipMarkerStore skipMarkers, WatchedFolderScan scan)
     {
         var rows = await files.ListForLibraryAsync(reads, scan.Library.Id).ConfigureAwait(false);
         return new WatchedFolderScanLookups(
             rows.ToDictionary(row => row.RelativePath, StringComparer.Ordinal),
             await ActiveRemuxPasses.PathsAsync(reads, scan.MediaScope, scan.Library.Id).ConfigureAwait(false),
-            await ActiveRemuxPasses.HeldBackStartsAsync(reads, scan.MediaScope, scan.Library.Id, scan.Now).ConfigureAwait(false));
+            await ActiveRemuxPasses.HeldBackStartsAsync(reads, scan.MediaScope, scan.Library.Id, scan.Now).ConfigureAwait(false),
+            await skipMarkers.ForLibraryAsync(reads, scan.Library.Id).ConfigureAwait(false));
     }
 }
 

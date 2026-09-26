@@ -33,7 +33,7 @@ public sealed class ProcessingWatchedFolderScanDispatchManagerQueueSignalTests
         var connections = new MediaManagerConnectionService(store.Options, cipher, ports, new MediaManagerConnectionStore());
         var jobs = new ProcessingJobStore(store.Database, store.Clock);
         var handler = new ProcessingWatchedFolderScanDispatchJobHandler(
-            store.Database, store.Clock, store.Options, jobs, connections, new SuiteSettingsStore(new AuthStore()), new OperatorSettingsStore(), Libraries, Files);
+            store.Database, store.Clock, store.Options, jobs, connections, new SuiteSettingsStore(new AuthStore()), new OperatorSettingsStore(), Libraries, Files, new FileSkipMarkerStore());
         await store.Execute(
             "INSERT INTO operator_settings (id, min_file_age_seconds, min_input_file_size_mb, minimum_free_disk_space_mb) " +
             "VALUES (1, 0, 0, 0) ON CONFLICT(id) DO UPDATE SET min_file_age_seconds = 0, min_input_file_size_mb = 0, minimum_free_disk_space_mb = 0");

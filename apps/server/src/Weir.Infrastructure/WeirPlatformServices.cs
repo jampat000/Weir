@@ -52,6 +52,7 @@ public static class WeirPlatformServices
         // MediaManagers and Processing alike, so they live here rather than in any one area's own registration.
         services.TryAddSingleton<LibraryStore>();
         services.TryAddSingleton<FileStateStore>();
+        services.TryAddSingleton<FileSkipMarkerStore>();
 
         // #555: WEIR_CHOWN_OUTPUT/WEIR_FILE_MODE_OUTPUT/WEIR_DIR_MODE_OUTPUT. Windows gets a no-op tools
         // implementation (there is no POSIX owner or mode there) and, when an operator actually set one of these,

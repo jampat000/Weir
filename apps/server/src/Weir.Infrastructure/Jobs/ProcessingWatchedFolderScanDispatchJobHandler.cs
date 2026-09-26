@@ -33,6 +33,7 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandler : IJobHandler
     private readonly OperatorSettingsStore _operatorSettings;
     private readonly LibraryStore _libraries;
     private readonly FileStateStore _files;
+    private readonly FileSkipMarkerStore _skipMarkers;
 
     private readonly ScanWakeups? _wakeups;
 
@@ -46,6 +47,7 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandler : IJobHandler
         OperatorSettingsStore operatorSettings,
         LibraryStore libraries,
         FileStateStore files,
+        FileSkipMarkerStore skipMarkers,
         ScanWakeups? wakeups = null)
     {
         _database = database ?? throw new ArgumentNullException(nameof(database));
@@ -57,6 +59,7 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandler : IJobHandler
         _operatorSettings = operatorSettings ?? throw new ArgumentNullException(nameof(operatorSettings));
         _libraries = libraries ?? throw new ArgumentNullException(nameof(libraries));
         _files = files ?? throw new ArgumentNullException(nameof(files));
+        _skipMarkers = skipMarkers ?? throw new ArgumentNullException(nameof(skipMarkers));
         _wakeups = wakeups;
     }
 
@@ -83,7 +86,7 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandler : IJobHandler
         var reads = await UnitOfWork.OpenAsync(_database, cancellationToken).ConfigureAwait(false);
         await using (reads.ConfigureAwait(false))
         {
-            var lookups = await WatchedFolderScanLookups.ReadAsync(reads, _files, scan).ConfigureAwait(false);
+            var lookups = await WatchedFolderScanLookups.ReadAsync(reads, _files, _skipMarkers, scan).ConfigureAwait(false);
             var run = new WatchedFolderScanRun(_database, _jobStore, _files, scan, lookups, reads, new ScanPassRequest(context.Id, request.Trigger, budget));
             await run.RunAsync(candidates.Entries, cancellationToken).ConfigureAwait(false);
 
