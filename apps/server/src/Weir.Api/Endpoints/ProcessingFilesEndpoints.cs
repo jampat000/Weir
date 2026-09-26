@@ -13,6 +13,7 @@ using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.MediaManagers;
 using Weir.Infrastructure.Processing;
 using Weir.Infrastructure.Processing.DirectPlay;
+using Weir.Infrastructure.Processing.RemuxPass;
 using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Api.Endpoints;
@@ -29,6 +30,7 @@ public static class ProcessingFilesEndpoints
     {
         var handlers = endpoints.ServiceProvider.GetRequiredService<ProcessingFilesEndpointHandlers>();
         endpoints.MapV1("GET", "/processing/files", handlers.GetFilesAsync);
+        endpoints.MapV1("GET", "/processing/files/{file_id}/remove-options", handlers.GetRemoveOptionsAsync);
         endpoints.MapV1("DELETE", "/processing/files/{file_id}", handlers.DeleteFileAsync);
         endpoints.MapV1("POST", "/processing/files/{file_id}/move-to-top", handlers.MoveToTopAsync);
         endpoints.MapV1("POST", "/processing/files/{file_id}/requeue", handlers.RequeueOneAsync);
@@ -54,6 +56,7 @@ internal sealed class ProcessingFilesEndpointHandlers
     private readonly HandbackStore _handback;
     private readonly ProcessingJobStore _jobs;
     private readonly LibraryStore _libraries;
+    private readonly HistoryFileRemovalService _removal;
 
     public ProcessingFilesEndpointHandlers(
         FileStateStore files,
@@ -61,7 +64,8 @@ internal sealed class ProcessingFilesEndpointHandlers
         LiveProgressStore liveProgress,
         HandbackStore handback,
         ProcessingJobStore jobs,
-        LibraryStore libraries)
+        LibraryStore libraries,
+        HistoryFileRemovalService removal)
     {
         _files = files ?? throw new ArgumentNullException(nameof(files));
         _directPlay = directPlay ?? throw new ArgumentNullException(nameof(directPlay));
@@ -69,6 +73,7 @@ internal sealed class ProcessingFilesEndpointHandlers
         _handback = handback ?? throw new ArgumentNullException(nameof(handback));
         _jobs = jobs ?? throw new ArgumentNullException(nameof(jobs));
         _libraries = libraries ?? throw new ArgumentNullException(nameof(libraries));
+        _removal = removal ?? throw new ArgumentNullException(nameof(removal));
     }
 
     private static WireObject FileOut(ProcessingFileRecord row, string libraryName, List<DirectPlayBadge> directPlay, LiveProgress? progress)
@@ -201,6 +206,39 @@ internal sealed class ProcessingFilesEndpointHandlers
         return statuses;
     }
 
+    /// <summary>
+    /// What History's remove dialog should offer for this title (#785), read before it is shown: whether it
+    /// qualifies for a choice at all (only a failed or rejected file whose original is still in the watched
+    /// folder does), and when it does, which manager "delete" would ask — or that Weir would delete the file
+    /// itself — and whether "keep" has a manager to tell it will not be imported.
+    /// </summary>
+    public async Task<ApiResult> GetRemoveOptionsAsync(ApiRequest request)
+    {
+        await request.RequireUserAsync(UserRoles.OperatorOrAdmin).ConfigureAwait(false);
+        var issues = new ValidationIssues();
+        var id = request.PathInt("file_id", issues);
+        issues.ThrowIfAny();
+
+        var uow = await request.DbAsync().ConfigureAwait(false);
+        var row = await ProcessingFilesEndpoints.RequireFileAsync(uow, _files, id).ConfigureAwait(false);
+        var options = await _removal.EvaluateAsync(uow, row, request.Context.RequestAborted).ConfigureAwait(false);
+        return ApiRoutes.Ok(new WireObject()
+            .Set("requires_choice", options.RequiresChoice)
+            .Set("manager_label", options.ManagerLabel)
+            .Set("delete_handled_by_manager", options.DeleteHandledByManager)
+            .Set("keep_notifies_manager", options.KeepNotifiesManager)
+            .Set("fingerprint_recorded", options.FingerprintRecorded)
+            .Set("unconfirmed_size_bytes", options.UnconfirmedSizeBytes)
+            .Set("unconfirmed_modified_at", options.UnconfirmedModifiedAt));
+    }
+
+    /// <summary>
+    /// "Remove from list" (#785). <c>resolution</c> chooses what happens to a failed or rejected file whose
+    /// original is still in the watched folder: <c>delete</c> asks a manager to remove the download and search
+    /// again, or Weir deletes it itself; <c>keep</c> leaves the file but skips it until it changes; <c>retry</c>
+    /// queues it again, exactly as "Process again" does. A title that does not qualify for a choice — finished, or
+    /// its file already gone — is always a plain remove, whatever <c>resolution</c> asks for.
+    /// </summary>
     public async Task<ApiResult> DeleteFileAsync(ApiRequest request)
     {
         var payload = await request.ReadBodyAsync().ConfigureAwait(false);
@@ -208,22 +246,86 @@ internal sealed class ProcessingFilesEndpointHandlers
         var id = request.PathInt("file_id", issues);
         var model = new BodyModel(payload, issues);
         var csrfToken = model.Str("csrf_token", minLength: 1);
+        var rawResolution = model.OptionalStr("resolution");
+        var resolution = FileRemovalResolutions.Remove;
+        if (rawResolution is not null && FieldRules.TryLiteral(WireValue.Of(rawResolution), ["body", "resolution"], FileRemovalResolutions.All, issues, out var parsedResolution))
+        {
+            resolution = parsedResolution;
+        }
+
+        // What `remove-options` showed the owner for a row with no recorded fingerprint (#786 follow-up): both or
+        // neither, since one without the other confirms nothing.
+        var confirmSizeBytes = model.OptionalInt("confirm_size_bytes", ge: 0);
+        var confirmModifiedAt = model.OptionalStr("confirm_modified_at", maxLength: 64);
+
         model.Finish(ExtraFields.Forbid);
         issues.ThrowIfAny();
 
         await request.RequireUserAsync(UserRoles.OperatorOrAdmin).ConfigureAwait(false);
         request.RequireConfirmationToken(csrfToken);
 
+        var confirmation = confirmSizeBytes is { } size && confirmModifiedAt is { } modifiedAt
+            ? new FileRemovalConfirmation(size, modifiedAt)
+            : (FileRemovalConfirmation?)null;
+
         var uow = await request.DbAsync().ConfigureAwait(false);
-        await ProcessingFilesEndpoints.RequireFileAsync(uow, _files, id).ConfigureAwait(false);
+        var row = await ProcessingFilesEndpoints.RequireFileAsync(uow, _files, id).ConfigureAwait(false);
+        var chosen = await TryApplyChosenResolutionAsync(request, uow, row, resolution, confirmation).ConfigureAwait(false);
+        if (chosen is { } result)
+        {
+            return result;
+        }
+
         await _files.ForgetAsync(uow, id).ConfigureAwait(false);
         await request.CommitAsync().ConfigureAwait(false);
-        return new CustomApiResult(context =>
+        return NoContentResult();
+    }
+
+    /// <summary>
+    /// <c>retry</c>, or a <c>delete</c>/<c>keep</c> for a title that qualifies for the choice. Null when
+    /// <paramref name="resolution"/> is <see cref="FileRemovalResolutions.Remove"/>, or the title turned out not to
+    /// qualify, so the caller's plain remove applies instead.
+    /// </summary>
+    private async Task<ApiResult?> TryApplyChosenResolutionAsync(ApiRequest request, UnitOfWork uow, ProcessingFileRecord row, string resolution, FileRemovalConfirmation? confirmation)
+    {
+        if (resolution == FileRemovalResolutions.Retry)
+        {
+            // A leftover "keep" marker must not shadow the very reprocessing a person just asked for (#786 review
+            // of #785); harmless when there was never one.
+            await _removal.ClearSkipMarkerAsync(uow, row.LibraryId, row.RelativePath).ConfigureAwait(false);
+            // #786 review of #785: a skipped requeue (the library or original is gone) is not an error, but it is
+            // not "queued again" either, so the caller reports whichever actually happened.
+            var result = await new RequeueStore(_jobs, _libraries).RequeueFileAsync(uow, row).ConfigureAwait(false);
+            await request.CommitAsync().ConfigureAwait(false);
+            return ApiRoutes.Ok(new WireObject().Set("done", result.Requeued > 0).Set("detail", result.Detail));
+        }
+
+        if (resolution is not (FileRemovalResolutions.Delete or FileRemovalResolutions.Keep))
+        {
+            return null;
+        }
+
+        var options = await _removal.EvaluateAsync(uow, row, request.Context.RequestAborted).ConfigureAwait(false);
+        if (!options.RequiresChoice)
+        {
+            return null;
+        }
+
+        var outcome = resolution == FileRemovalResolutions.Delete
+            ? await _removal.DeleteAsync(uow, row, confirmation, request.Context.RequestAborted).ConfigureAwait(false)
+            : await _removal.KeepAsync(uow, row, confirmation, request.Context.RequestAborted).ConfigureAwait(false);
+        await request.CommitAsync().ConfigureAwait(false);
+        return outcome.Done
+            ? ApiRoutes.Ok(new WireObject().Set("done", true).Set("detail", outcome.Message))
+            : throw new ApiException(StatusCodes.Status502BadGateway, outcome.Message);
+    }
+
+    private static CustomApiResult NoContentResult() =>
+        new(context =>
         {
             ApiResponses.NoContentJson(context);
             return Task.CompletedTask;
         });
-    }
 
     public async Task<ApiResult> MoveToTopAsync(ApiRequest request)
     {

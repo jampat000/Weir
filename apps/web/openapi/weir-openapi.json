@@ -4171,6 +4171,196 @@
       },
       "ProcessingFileForgetIn": {
         "additionalProperties": false,
+        "description": "History's remove dialog (#785). `resolution` is only meaningful for a failed or rejected file whose\noriginal is still in the watched folder (see ProcessingFileRemoveOptionsOut); anything else is always a plain\nremove, whatever `resolution` asks for. `confirm_size_bytes` and `confirm_modified_at` are the file's current\ndetails as `remove-options` reported them (#786 follow-up): required for `delete` or `keep` on a title whose\n`fingerprint_recorded` is false, ignored otherwise.",
+        "properties": {
+          "csrf_token": {
+            "minLength": 1,
+            "title": "Csrf Token",
+            "type": "string"
+          },
+          "resolution": {
+            "default": "remove",
+            "enum": [
+              "remove",
+              "delete",
+              "keep",
+              "retry"
+            ],
+            "title": "Resolution",
+            "type": "string"
+          },
+          "confirm_size_bytes": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confirm Size Bytes"
+          },
+          "confirm_modified_at": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confirm Modified At"
+          }
+        },
+        "required": [
+          "csrf_token"
+        ],
+        "title": "ProcessingFileForgetIn",
+        "type": "object"
+      },
+      "ProcessingFileRemoveOptionsOut": {
+        "description": "What History's remove dialog should offer for one title, read before it is shown (#785).",
+        "properties": {
+          "requires_choice": {
+            "title": "Requires Choice",
+            "type": "boolean"
+          },
+          "manager_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Manager Label"
+          },
+          "delete_handled_by_manager": {
+            "title": "Delete Handled By Manager",
+            "type": "boolean"
+          },
+          "keep_notifies_manager": {
+            "title": "Keep Notifies Manager",
+            "type": "boolean"
+          },
+          "fingerprint_recorded": {
+            "title": "Fingerprint Recorded",
+            "type": "boolean"
+          },
+          "unconfirmed_size_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unconfirmed Size Bytes"
+          },
+          "unconfirmed_modified_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unconfirmed Modified At"
+          }
+        },
+        "required": [
+          "requires_choice",
+          "manager_label",
+          "delete_handled_by_manager",
+          "keep_notifies_manager",
+          "fingerprint_recorded",
+          "unconfirmed_size_bytes",
+          "unconfirmed_modified_at"
+        ],
+        "title": "ProcessingFileRemoveOptionsOut",
+        "type": "object"
+      },
+      "ProcessingFileRemovalOut": {
+        "description": "What a `delete`, `keep` or `retry` resolution on `DELETE .../files/{file_id}` actually did (#786 review of #785). `done` is false only for `retry` skipping a concluded file with its original gone — `delete` and `keep` fail the whole request (502) instead of answering `done: false`.",
+        "properties": {
+          "done": {
+            "title": "Done",
+            "type": "boolean"
+          },
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          }
+        },
+        "required": [
+          "done",
+          "detail"
+        ],
+        "title": "ProcessingFileRemovalOut",
+        "type": "object"
+      },
+      "ProcessingKeptFileOut": {
+        "description": "One file kept without processing again from History's remove dialog (#785).",
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "library_id": {
+            "title": "Library Id",
+            "type": "integer"
+          },
+          "library_name": {
+            "title": "Library Name",
+            "type": "string"
+          },
+          "relative_path": {
+            "title": "Relative Path",
+            "type": "string"
+          },
+          "size_bytes": {
+            "title": "Size Bytes",
+            "type": "integer"
+          },
+          "kept_at": {
+            "title": "Kept At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "library_id",
+          "library_name",
+          "relative_path",
+          "size_bytes",
+          "kept_at"
+        ],
+        "title": "ProcessingKeptFileOut",
+        "type": "object"
+      },
+      "ProcessingKeptFilesOut": {
+        "properties": {
+          "files": {
+            "items": {
+              "$ref": "#/components/schemas/ProcessingKeptFileOut"
+            },
+            "title": "Files",
+            "type": "array"
+          }
+        },
+        "required": [
+          "files"
+        ],
+        "title": "ProcessingKeptFilesOut",
+        "type": "object"
+      },
+      "ProcessingKeptFileProcessAgainIn": {
+        "additionalProperties": false,
         "properties": {
           "csrf_token": {
             "minLength": 1,
@@ -4181,7 +4371,20 @@
         "required": [
           "csrf_token"
         ],
-        "title": "ProcessingFileForgetIn",
+        "title": "ProcessingKeptFileProcessAgainIn",
+        "type": "object"
+      },
+      "ProcessingKeptFileProcessAgainOut": {
+        "properties": {
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          }
+        },
+        "required": [
+          "detail"
+        ],
+        "title": "ProcessingKeptFileProcessAgainOut",
         "type": "object"
       },
       "ProcessingFileLogEntryOut": {
@@ -12811,9 +13014,54 @@
         ]
       }
     },
+    "/api/v1/processing/files/{file_id}/remove-options": {
+      "get": {
+        "description": "What History's remove dialog should offer for this title (#785), read before it is shown.",
+        "operationId": "get_processing_file_remove_options_api_v1_files__file_id__remove_options_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "file_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "title": "File Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProcessingFileRemoveOptionsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Processing File Remove Options",
+        "tags": [
+          "processing",
+          "processing"
+        ]
+      }
+    },
     "/api/v1/processing/files/{file_id}": {
       "delete": {
-        "description": "Forget a file. Removes Weir's record of it, never the file on disk.",
+        "description": "History's \"Remove from list\" (#785). `resolution` chooses what happens to a failed or rejected file whose original is still in the watched folder: `delete` asks a manager to remove the download and search again, or Weir deletes it itself; `keep` leaves the file but skips it until it changes; `retry` queues it again. Anything else is always a plain remove.",
         "operationId": "delete_processing_file_api_v1_files__file_id__delete",
         "parameters": [
           {
@@ -12838,8 +13086,102 @@
           "required": true
         },
         "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProcessingFileRemovalOut"
+                }
+              }
+            },
+            "description": "Successful Response for delete, keep or retry"
+          },
           "204": {
+            "description": "Successful Response for a plain remove"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "502": {
+            "description": "delete or keep could not reach, or was refused by, the media manager it asked"
+          }
+        },
+        "summary": "Delete Processing File",
+        "tags": [
+          "processing",
+          "processing"
+        ]
+      }
+    },
+    "/api/v1/processing/kept-files": {
+      "get": {
+        "description": "Every file kept without processing again from History's remove dialog (#785).",
+        "operationId": "get_processing_kept_files_api_v1_processing_kept_files_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProcessingKeptFilesOut"
+                }
+              }
+            },
             "description": "Successful Response"
+          }
+        },
+        "summary": "Get Processing Kept Files",
+        "tags": [
+          "processing",
+          "processing"
+        ]
+      }
+    },
+    "/api/v1/processing/kept-files/{id}/process-again": {
+      "post": {
+        "description": "Clears the marker and queues its library's watched folder to be looked at again.",
+        "operationId": "post_processing_kept_file_process_again_api_v1_processing_kept_files__id__process_again_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "title": "Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProcessingKeptFileProcessAgainIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProcessingKeptFileProcessAgainOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "Weir has no kept file with that id"
           },
           "422": {
             "content": {
@@ -12852,7 +13194,7 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Delete Processing File",
+        "summary": "Post Processing Kept File Process Again",
         "tags": [
           "processing",
           "processing"

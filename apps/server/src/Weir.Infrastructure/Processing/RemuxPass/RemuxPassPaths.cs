@@ -335,6 +335,13 @@ public static class RemuxPassPaths
             return new RejectedFileCleanupResult(false, "Weir did not delete the rejected path because it is not a regular file inside the watched folder.");
         }
 
+        // A junction or symlinked folder above the file, or the file itself being a link, would delete something
+        // that actually lives outside the watched folder (#786 review of #785).
+        if (PathContainment.HasLinkBelowRoot(root, source))
+        {
+            return new RejectedFileCleanupResult(false, "Weir did not delete the rejected file because it is reached through a link, not a plain path inside the watched folder.");
+        }
+
         try
         {
             File.Delete(source);

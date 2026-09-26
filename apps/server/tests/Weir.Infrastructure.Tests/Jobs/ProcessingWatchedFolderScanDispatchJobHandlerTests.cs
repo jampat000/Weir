@@ -6,6 +6,7 @@ using Weir.Infrastructure.Auth;
 using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.MediaManagers;
 using Weir.Infrastructure.Processing;
+using Weir.Infrastructure.Processing.RemuxPass;
 using Weir.Infrastructure.Settings;
 using Weir.Infrastructure.Sqlite;
 using Weir.Infrastructure.Tests.MediaManagers;
@@ -23,6 +24,7 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandlerTests
 {
     private static readonly LibraryStore Libraries = new();
     private static readonly FileStateStore Files = new();
+    private static readonly FileSkipMarkerStore SkipMarkers = new();
 
     private static async Task<(StoreFixture Store, ProcessingJobStore Jobs, ProcessingWatchedFolderScanDispatchJobHandler Handler)> BuildAsync()
     {
@@ -32,7 +34,7 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandlerTests
         var connections = new MediaManagerConnectionService(store.Options, cipher, ports, new MediaManagerConnectionStore());
         var jobs = new ProcessingJobStore(store.Database, store.Clock);
         var handler = new ProcessingWatchedFolderScanDispatchJobHandler(
-            store.Database, store.Clock, store.Options, jobs, connections, new SuiteSettingsStore(new AuthStore()), new OperatorSettingsStore(), Libraries, Files);
+            store.Database, store.Clock, store.Options, jobs, connections, new SuiteSettingsStore(new AuthStore()), new OperatorSettingsStore(), Libraries, Files, SkipMarkers);
         // Zero out the operator-wide minimum age/size so these tests assert scan
         // dispatch itself, not the settling/hold-timer gates a freshly written test file would otherwise trip.
         await store.Execute(
@@ -249,7 +251,8 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandlerTests
     /// "Remove from list" does, and all it does) makes the next scan see a plain new candidate and queue it —
     /// true whether or not a job or Activity row for the old attempt still exists, since neither is consulted here.
     /// A person forgetting a failed file to let Weir try it again from scratch is the ordinary use of "Remove from
-    /// list", so this is pinned as today's behaviour, not treated as something this fix owes a change.
+    /// list", so this is pinned as today's behaviour, not treated as something this fix owes a change. #785's "Keep"
+    /// choice is the one exception: <see cref="A_kept_file_is_not_reprocessed_after_being_forgotten"/> below pins that.
     /// </summary>
     [Fact]
     public async Task A_failed_file_with_its_original_still_present_is_queued_again_after_being_forgotten()
@@ -308,6 +311,76 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandlerTests
         }
 
         await ForgetFileAsync(store, fileId);
+        await RunScanAsync(handler, jobs, libraryId, enqueueRemuxJobs: true);
+
+        var remuxCount = await store.Scalar("SELECT COUNT(*) FROM jobs WHERE job_kind = 'processing.file.remux_pass.v1'");
+        Assert.Equal(1, remuxCount);
+    }
+
+    /// <summary>
+    /// "Keep, but don't process it again" (#785) changes the behaviour the two tests above pin: once a skip marker
+    /// is recorded for this file's exact bytes, a rescan leaves it alone even though its row was forgotten the same
+    /// way "Remove from list" forgets one.
+    /// </summary>
+    [Fact]
+    public async Task A_kept_file_is_not_reprocessed_after_being_forgotten()
+    {
+        var (store, jobs, handler) = await BuildAsync();
+        using var _ = store;
+        var watched = store.Home.Join("watch");
+        var output = store.Home.Join("out");
+        Directory.CreateDirectory(watched);
+        Directory.CreateDirectory(output);
+        var source = Path.Combine(watched, "Kept Failed Movie 2001.mkv");
+        File.WriteAllBytes(source, "not a real film"u8.ToArray());
+        var fingerprint = SourceFiles.Fingerprint(source);
+
+        var libraryId = await CreateLibraryAsync(store, watched, output);
+        long fileId;
+        await using (var uow = await UnitOfWork.OpenAsync(store.Database))
+        {
+            fileId = Convert.ToInt64(await uow.ExecuteScalarWriteAsync(
+                "INSERT INTO files (library_id, relative_path, status, size_bytes, last_seen_at) VALUES (@lib, @path, 'processing_failed', @size, CURRENT_TIMESTAMP) RETURNING id",
+                ("@lib", libraryId), ("@path", "Kept Failed Movie 2001.mkv"), ("@size", new FileInfo(source).Length)));
+            await SkipMarkers.SetAsync(uow, libraryId, "Kept Failed Movie 2001.mkv", fingerprint.SizeBytes, fingerprint.ModifiedTimeNs);
+            await uow.CommitAsync();
+        }
+
+        await ForgetFileAsync(store, fileId);
+        await RunScanAsync(handler, jobs, libraryId, enqueueRemuxJobs: true);
+
+        var remuxCount = await store.Scalar("SELECT COUNT(*) FROM jobs WHERE job_kind = 'processing.file.remux_pass.v1'");
+        Assert.Equal(0, remuxCount);
+    }
+
+    /// <summary>A kept file's skip marker is tied to its exact bytes: once the file changes, it is a new candidate.</summary>
+    [Fact]
+    public async Task A_kept_file_that_changes_is_reprocessed()
+    {
+        var (store, jobs, handler) = await BuildAsync();
+        using var _ = store;
+        var watched = store.Home.Join("watch");
+        var output = store.Home.Join("out");
+        Directory.CreateDirectory(watched);
+        Directory.CreateDirectory(output);
+        var source = Path.Combine(watched, "Kept Then Changed Movie 2001.mkv");
+        File.WriteAllBytes(source, "not a real film"u8.ToArray());
+        var stale = SourceFiles.Fingerprint(source);
+
+        var libraryId = await CreateLibraryAsync(store, watched, output);
+        long fileId;
+        await using (var uow = await UnitOfWork.OpenAsync(store.Database))
+        {
+            fileId = Convert.ToInt64(await uow.ExecuteScalarWriteAsync(
+                "INSERT INTO files (library_id, relative_path, status, size_bytes, last_seen_at) VALUES (@lib, @path, 'processing_failed', @size, CURRENT_TIMESTAMP) RETURNING id",
+                ("@lib", libraryId), ("@path", "Kept Then Changed Movie 2001.mkv"), ("@size", new FileInfo(source).Length)));
+            await SkipMarkers.SetAsync(uow, libraryId, "Kept Then Changed Movie 2001.mkv", stale.SizeBytes, stale.ModifiedTimeNs);
+            await uow.CommitAsync();
+        }
+
+        await ForgetFileAsync(store, fileId);
+        File.WriteAllBytes(source, "a genuinely different release, longer than the first one"u8.ToArray());
+
         await RunScanAsync(handler, jobs, libraryId, enqueueRemuxJobs: true);
 
         var remuxCount = await store.Scalar("SELECT COUNT(*) FROM jobs WHERE job_kind = 'processing.file.remux_pass.v1'");

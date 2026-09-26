@@ -5,6 +5,7 @@ using Weir.Core.Json;
 using Weir.Core.MediaManagers;
 using Weir.Core.Rules;
 using Weir.Infrastructure.MediaManagers;
+using Weir.Infrastructure.Processing.RemuxPass;
 
 namespace Weir.Infrastructure.Tests.MediaManagers;
 
@@ -483,6 +484,76 @@ public sealed class MediaManagerServiceTests
         Assert.Equal(1, await fixture.Store.Scalar("SELECT count(*) FROM media_manager_handoffs WHERE handoff_id = 'h1' AND state = 'queued' AND relative_path = 'Blade.Runner.2049'"));
         // #531: the handed-over file's size is known from the moment it arrives.
         Assert.Equal(5, await fixture.Store.Scalar("SELECT size_bytes FROM files WHERE relative_path = 'Blade.Runner.2049/Blade.Runner.2049.mkv'"));
+    }
+
+    /// <summary>
+    /// "Keep" is not scan-only (#786 review of #785): a manager handing the very same, unchanged file back to Weir
+    /// (a resend, or a fresh grab of a release with the same name) must not undo a person's choice to leave it
+    /// alone. Nothing is queued for it, and the hand-off is answered exactly the way HistoryFileRemovalService's own
+    /// "keep" answers one — a failed/held completion report to the fake Deluno, through the same owed-report/ledger
+    /// machinery a real pass's outcome uses — so the hand-off ends cleanly instead of Deluno waiting on it forever.
+    /// </summary>
+    [Fact]
+    public async Task A_hand_off_for_a_kept_file_is_answered_once_and_the_hand_off_completes()
+    {
+        const string EventsPath = "/api/integrations/processors/events";
+        using var fixture = new MediaManagerFixture();
+        await fixture.AddConnectionAsync("deluno", "Deluno", "http://192.0.2.30:5099", "k1");
+        fixture.Http.Json(HttpMethod.Post, EventsPath, "{}", HttpStatusCode.Accepted);
+        var watched = fixture.Store.Home.Join("movies");
+        Directory.CreateDirectory(Path.Join(watched, "Film"));
+        var path = Path.Join(watched, "Film", "film.mkv");
+        await File.WriteAllTextAsync(path, "not a real film");
+        var libraryId = await fixture.LibraryAsync("movie", watched);
+        var fingerprint = SourceFiles.Fingerprint(path);
+        await fixture.Db(async uow =>
+        {
+            await fixture.SkipMarkers.SetAsync(uow, libraryId, "Film/film.mkv", fingerprint.SizeBytes, fingerprint.ModifiedTimeNs);
+            return 0;
+        });
+
+        await fixture.Db(uow => fixture.Intake.EnqueueRefineAsync(uow, Handoff("h1", Path.Join(watched, "Film", "film.mkv"))));
+
+        Assert.Empty(await Jobs(fixture));
+        var post = Assert.Single(fixture.Http.RequestsTo(HttpMethod.Post, EventsPath));
+        var body = (WireObject)post.Json!;
+        Assert.Equal("failed", WireConvert.Str(body["status"]));
+        Assert.Equal("held", WireConvert.Str(body["disposition"]));
+        Assert.False(((WireBool)body["sourceRemoved"]).Value);
+        // The hand-off ends in the ledger — not left "queued" for Deluno to keep waiting on — and nothing is left
+        // owed once the report above was accepted.
+        Assert.Equal("failed", await ScalarText(fixture, "SELECT state FROM media_manager_handoffs WHERE handoff_id = 'h1'"));
+        Assert.Equal(string.Empty, await ScalarText(fixture, "SELECT pending_report_json FROM media_manager_handoffs WHERE handoff_id = 'h1'"));
+    }
+
+    private static async Task<string> ScalarText(MediaManagerFixture fixture, string sql)
+    {
+        using var connection = fixture.Store.Database.Open();
+        using var command = connection.CreateCommand();
+        command.CommandText = sql;
+        return Convert.ToString(await command.ExecuteScalarAsync(), CultureInfo.InvariantCulture) ?? string.Empty;
+    }
+
+    /// <summary>A hand-off for a file that has since changed is not shadowed by a stale marker: it is queued as normal.</summary>
+    [Fact]
+    public async Task A_hand_off_for_a_file_that_changed_since_it_was_kept_is_queued_as_normal()
+    {
+        using var fixture = new MediaManagerFixture();
+        var watched = fixture.Store.Home.Join("movies");
+        Directory.CreateDirectory(Path.Join(watched, "Film"));
+        var path = Path.Join(watched, "Film", "film.mkv");
+        await File.WriteAllTextAsync(path, "not a real film");
+        var libraryId = await fixture.LibraryAsync("movie", watched);
+        await fixture.Db(async uow =>
+        {
+            // A stale marker for bytes this file no longer has.
+            await fixture.SkipMarkers.SetAsync(uow, libraryId, "Film/film.mkv", 999_999, 1);
+            return 0;
+        });
+
+        await fixture.Db(uow => fixture.Intake.EnqueueRefineAsync(uow, Handoff("h2", Path.Join(watched, "Film", "film.mkv"))));
+
+        Assert.Single(await Jobs(fixture));
     }
 
     [Fact]
