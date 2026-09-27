@@ -60,33 +60,14 @@ public sealed class SqliteDatabase
     private const int SqliteCantOpen = 14;
 
     /// <summary>
-    /// The database file's identity the last time a pool was filled for a given connection string, keyed the
-    /// same way as <see cref="PoolGates"/>. A pooled native handle keeps working on a file that has been deleted
-    /// or replaced underneath it (Linux lets an open file be unlinked and still read or written through a
-    /// descriptor opened before the unlink), so checking only when a pool is first created would miss a file that
-    /// changed while the pool already held warm connections.
+    /// Connection strings whose pool has been filled with at least one connection, keyed the same way as
+    /// <see cref="PoolGates"/>. <c>Mode=ReadWriteCreate</c> may only conjure the database file into existence on
+    /// a pool's very first open; once a pool holds a warm connection, every further open must find a real file
+    /// still at <see cref="DatabasePath"/> — a pooled native handle otherwise keeps working on one that has been
+    /// deleted or replaced by a directory underneath it (Linux lets an open file be unlinked and still read or
+    /// written through a descriptor opened before the unlink).
     /// </summary>
-    private static readonly ConcurrentDictionary<string, FileIdentity> PoolFileIdentities = new(StringComparer.Ordinal);
-
-    /// <summary>
-    /// Whether the database file exists and, if it does, when it was created — enough to tell a file apart from
-    /// a different file later placed at the same path, without the platform-specific inode or file-index lookups
-    /// a heavier identity check would need. Deliberately not the last-write time: WAL checkpoints and ordinary
-    /// growth keep touching that on a healthy database, which would make every long-lived pool look replaced.
-    /// </summary>
-    private readonly record struct FileIdentity(bool Exists, DateTime CreationTimeUtc)
-    {
-        /// <summary>
-        /// One native stat call: reading <see cref="FileSystemInfo.Exists"/> first populates the same cached
-        /// metadata <see cref="FileSystemInfo.CreationTimeUtc"/> then reads, so this costs no more than checking
-        /// existence alone.
-        /// </summary>
-        public static FileIdentity Of(string path)
-        {
-            var info = new FileInfo(path);
-            return info.Exists ? new FileIdentity(true, info.CreationTimeUtc) : default;
-        }
-    }
+    private static readonly ConcurrentDictionary<string, bool> PoolsWithAFileOnDisk = new(StringComparer.Ordinal);
 
     private readonly Lock? _poolGate;
     private readonly ILogger? _logger;
@@ -257,15 +238,9 @@ public sealed class SqliteDatabase
             {
                 lock (_poolGate)
                 {
-                    var hadBaseline = RefuseIfFileIdentityChanged();
+                    RefuseIfTheFileIsGone();
                     connection.Open();
-                    if (!hadBaseline)
-                    {
-                        // The very first open for this connection string: there was nothing to compare against
-                        // above (the file may not even have existed until Mode=ReadWriteCreate just made it), so
-                        // the baseline is the identity the file has now that opening it succeeded.
-                        PoolFileIdentities.TryAdd(ConnectionString, FileIdentity.Of(DatabasePath));
-                    }
+                    PoolsWithAFileOnDisk.TryAdd(ConnectionString, true);
                 }
             }
 
@@ -279,24 +254,21 @@ public sealed class SqliteDatabase
     }
 
     /// <summary>
-    /// Refuse to hand out a connection — pooled or fresh — once the file backing this pool has been deleted or
-    /// replaced. Must run under <see cref="_poolGate"/> so it can never race a concurrent open filling the pool or
-    /// <see cref="ClearPool"/> emptying it.
+    /// Refuse to hand out a connection — pooled or fresh — once this pool has been filled and the file it was
+    /// filled against is no longer there or no longer a regular file. Existence as a regular file is all this
+    /// checks: Weir never swaps its database file under a running server (restoring a backup replaces the
+    /// configuration bundle, not this file), so telling one file apart from a different one placed at the same
+    /// path is not a case that needs handling. Must run under <see cref="_poolGate"/> so it can never race a
+    /// concurrent open filling the pool or <see cref="ClearPool"/> emptying it.
     /// </summary>
-    /// <returns>Whether a baseline identity was already recorded for this connection string.</returns>
-    private bool RefuseIfFileIdentityChanged()
+    private void RefuseIfTheFileIsGone()
     {
-        if (!PoolFileIdentities.TryGetValue(ConnectionString, out var baseline))
+        if (!PoolsWithAFileOnDisk.ContainsKey(ConnectionString) || File.Exists(DatabasePath))
         {
-            return false;
+            return;
         }
 
-        if (FileIdentity.Of(DatabasePath) == baseline)
-        {
-            return true;
-        }
-
-        PoolFileIdentities.TryRemove(ConnectionString, out _);
+        PoolsWithAFileOnDisk.TryRemove(ConnectionString, out _);
         ClearPool();
         throw new SqliteException("unable to open database file", SqliteCantOpen);
     }
@@ -306,8 +278,8 @@ public sealed class SqliteDatabase
     /// timeout, so a long writer makes health slow for at most a second instead of thirty. Never throws.
     /// </summary>
     /// <remarks>
-    /// <see cref="OpenAsync"/> itself refuses a connection once the file has been deleted or replaced, so this
-    /// needs no file check of its own.
+    /// <see cref="OpenAsync"/> itself refuses a connection once the file has been deleted or replaced by a
+    /// directory, so this needs no file check of its own.
     /// </remarks>
     public async Task<bool> IsConnectedAsync(CancellationToken cancellationToken = default)
     {
