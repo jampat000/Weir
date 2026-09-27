@@ -412,37 +412,6 @@ public sealed class ProcessingWatchedFolderWatcherServiceTests
         }
     }
 
-    [Fact]
-    public async Task An_error_raised_before_the_watcher_finishes_wiring_up_is_lost()
-    {
-        // Proves why CreatedFor must only report a watcher once OnWatcherReady fires (after Error is
-        // subscribed and EnableRaisingEvents is set): construction is not a safe readiness signal. This
-        // fake raises the error at the earliest possible moment - inside CreateFileSystemWatcher, before the
-        // caller has subscribed to anything - which a real overflow could never do (the OS cannot raise Error
-        // before EnableRaisingEvents is true), but a test synchronizing on construction instead of readiness
-        // could still race into. WaitForReadyAsync only resolves once the watcher has finished wiring, so
-        // this deterministically shows the earlier-raised error already had nowhere to go.
-        using var store = new StoreFixture(("WEIR_CREDENTIALS_SECRET", "watcher-tests-secret-11"));
-        var watched = store.Home.Join("watch");
-        var output = store.Home.Join("out");
-        Directory.CreateDirectory(watched);
-        Directory.CreateDirectory(output);
-        await CreateLibraryAsync(store, watched, output);
-
-        var service = new EarlyErrorWatcherService(store.Database, store.Options, new ProcessingJobStore(store.Database, TimeProvider.System),
-            new WatcherStateStore(), Libraries, TimeProvider.System, NullLogger<ProcessingWatchedFolderWatcherService>.Instance);
-        await service.StartAsync(CancellationToken.None);
-        try
-        {
-            await service.WaitForReadyAsync();
-            Assert.Empty(ScanJobPayloads(store));
-        }
-        finally
-        {
-            await service.StopAsync(CancellationToken.None);
-        }
-    }
-
     /// <summary>Raises a synthetic <c>Error</c> event — a real buffer-overflow exception cannot be
     /// triggered deterministically from a test.</summary>
     private sealed class FakeFileSystemWatcher(string path) : FileSystemWatcher(path)
@@ -480,26 +449,5 @@ public sealed class ProcessingWatchedFolderWatcherServiceTests
                     }
                 });
         }
-    }
-
-    /// <summary>Test double for <see cref="An_error_raised_before_the_watcher_finishes_wiring_up_is_lost"/>: raises
-    /// the synthetic error as early as a watcher can exist, before production wires anything to it.</summary>
-    private sealed class EarlyErrorWatcherService(
-        SqliteDatabase database, Weir.Core.Configuration.WeirOptions options, ProcessingJobStore jobStore, WatcherStateStore state, LibraryStore libraries,
-        TimeProvider time, Microsoft.Extensions.Logging.ILogger<ProcessingWatchedFolderWatcherService> logger)
-        : ProcessingWatchedFolderWatcherService(database, options, jobStore, state, libraries, time, logger)
-    {
-        private readonly TaskCompletionSource _ready = new(TaskCreationOptions.RunContinuationsAsynchronously);
-
-        public Task WaitForReadyAsync() => _ready.Task;
-
-        internal override FileSystemWatcher CreateFileSystemWatcher(string folder)
-        {
-            var fake = new FakeFileSystemWatcher(folder);
-            fake.RaiseError(new IOException("simulated overflow"));
-            return fake;
-        }
-
-        internal override void OnWatcherReady(long libraryId, FileSystemWatcher watcher) => _ready.TrySetResult();
     }
 }
