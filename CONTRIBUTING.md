@@ -31,7 +31,7 @@ cd ../..
 node scripts/check-dead-code.mjs
 ```
 
-The contract suite and the E2E smoke are Python test runners that judge a running .NET server from outside. Install their locked dependencies once (Python 3.11+):
+The contract suite and the E2E smoke are Python test runners that judge a running .NET server from outside. Install their locked dependencies once (Python 3.13+):
 
 ```powershell
 python -m pip install --require-hashes -r tests/requirements.txt
