@@ -18,7 +18,9 @@
 #     "https://mcr.microsoft.com/v2/dotnet/runtime-deps/manifests/10.0-noble" | grep -i docker-content-digest
 # (Docker Hub images such as node need a bearer token first: GET
 # https://auth.docker.io/token?service=registry.docker.io&scope=repository:library/node:pull.)
-FROM node:26-bookworm-slim@sha256:662933cf47f013bc8e4beb31a6116448427a82057ba7c42c97e4c5ba766504c2 AS web
+# The node major here must match the root .node-version file, which every setup-node step in CI also
+# reads; scripts/check-node-docker-version.mjs (repo-checks) fails the build otherwise.
+FROM node:24-bookworm-slim@sha256:0e0ff40c39bc087845bfb27465a0df4ea419520094bc35842ff83dd8cbe6f9b6 AS web
 WORKDIR /src/apps/web
 # Only the manifest and lockfile go in before the install, so this layer (and the BuildKit cache
 # mount below, which survives even when the layer cache is cold) is reused for every build that

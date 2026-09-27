@@ -6,7 +6,7 @@ stopped. It never imports Weir (epic #514, this suite is #516, decision record A
 
 ## Running it
 
-From the repo root. The suite is written in Python, so it needs a Python 3.11+ interpreter with the
+From the repo root. The suite is written in Python, so it needs a Python 3.13+ interpreter with the
 locked runner dependencies, the .NET 10 SDK to build the server, and the built web app (the server
 serves `apps/web/dist`):
 

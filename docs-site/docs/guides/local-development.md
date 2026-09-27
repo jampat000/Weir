@@ -154,7 +154,7 @@ the server first, or restart it afterwards.
 ## Contract and E2E tests (optional)
 
 The contract suite (`tests/contract`) and the browser E2E tests (`tests/e2e/weir`) are written in
-Python. They act as outside judges of the running .NET server, so they need a Python 3.11
+Python. They act as outside judges of the running .NET server, so they need a Python 3.13
 interpreter even though Weir itself does not.
 
 ```powershell
