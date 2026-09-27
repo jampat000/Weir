@@ -56,6 +56,19 @@ public sealed class SqliteDatabase
 
     private static readonly object TunedMarker = new();
 
+    /// <summary>SQLite's result code for a database file that cannot be opened (<c>SQLITE_CANTOPEN</c>).</summary>
+    private const int SqliteCantOpen = 14;
+
+    /// <summary>
+    /// Connection strings whose pool has been filled with at least one connection, keyed the same way as
+    /// <see cref="PoolGates"/>. <c>Mode=ReadWriteCreate</c> may only conjure the database file into existence on
+    /// a pool's very first open; once a pool holds a warm connection, every further open must find a real file
+    /// still at <see cref="DatabasePath"/> — a pooled native handle otherwise keeps working on one that has been
+    /// deleted or replaced by a directory underneath it (Linux lets an open file be unlinked and still read or
+    /// written through a descriptor opened before the unlink).
+    /// </summary>
+    private static readonly ConcurrentDictionary<string, bool> PoolsWithAFileOnDisk = new(StringComparer.Ordinal);
+
     private readonly Lock? _poolGate;
     private readonly ILogger? _logger;
     private readonly int _busyTimeoutMilliseconds;
@@ -225,7 +238,9 @@ public sealed class SqliteDatabase
             {
                 lock (_poolGate)
                 {
+                    RefuseIfTheFileIsGone();
                     connection.Open();
+                    PoolsWithAFileOnDisk.TryAdd(ConnectionString, true);
                 }
             }
 
@@ -239,21 +254,35 @@ public sealed class SqliteDatabase
     }
 
     /// <summary>
-    /// The health probe: the database file is still there, and <c>SELECT 1</c> answers with a one second
-    /// busy timeout, so a long writer makes health slow for at most a second instead of thirty. Never throws.
+    /// Refuse to hand out a connection — pooled or fresh — once this pool has been filled and the file it was
+    /// filled against is no longer there or no longer a regular file. Existence as a regular file is all this
+    /// checks: Weir never swaps its database file under a running server (restoring a backup replaces the
+    /// configuration bundle, not this file), so telling one file apart from a different one placed at the same
+    /// path is not a case that needs handling. Must run under <see cref="_poolGate"/> so it can never race a
+    /// concurrent open filling the pool or <see cref="ClearPool"/> emptying it.
+    /// </summary>
+    private void RefuseIfTheFileIsGone()
+    {
+        if (!PoolsWithAFileOnDisk.ContainsKey(ConnectionString) || File.Exists(DatabasePath))
+        {
+            return;
+        }
+
+        PoolsWithAFileOnDisk.TryRemove(ConnectionString, out _);
+        ClearPool();
+        throw new SqliteException("unable to open database file", SqliteCantOpen);
+    }
+
+    /// <summary>
+    /// The health probe: the database can still be opened, and <c>SELECT 1</c> answers with a one second busy
+    /// timeout, so a long writer makes health slow for at most a second instead of thirty. Never throws.
     /// </summary>
     /// <remarks>
-    /// The file check comes first because a pooled connection keeps working on a file that has been deleted
-    /// or replaced underneath it (Linux lets an open file be unlinked), so <c>SELECT 1</c> alone would report
-    /// a database that no new connection can open as healthy.
+    /// <see cref="OpenAsync"/> itself refuses a connection once the file has been deleted or replaced by a
+    /// directory, so this needs no file check of its own.
     /// </remarks>
     public async Task<bool> IsConnectedAsync(CancellationToken cancellationToken = default)
     {
-        if (!File.Exists(DatabasePath))
-        {
-            return false;
-        }
-
         try
         {
             var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
