@@ -230,6 +230,15 @@ public class ProcessingWatchedFolderWatcherService : BackgroundService
     /// buffer-overflow exception cannot be triggered deterministically from a test.</summary>
     internal virtual FileSystemWatcher CreateFileSystemWatcher(string folder) => new(folder);
 
+    /// <summary>Test seam: fires once a watcher's event subscriptions are wired and
+    /// <see cref="FileSystemWatcher.EnableRaisingEvents"/> is set, never at construction. A real overflow cannot
+    /// reach a watcher any earlier than this, so a test that needs to know a watcher can now legitimately raise an
+    /// event must synchronize on this, not on <see cref="CreateFileSystemWatcher"/> returning — a synthetic error
+    /// raised before this point has no subscriber and is silently dropped, exactly as a genuine one would be.</summary>
+    internal virtual void OnWatcherReady(long libraryId, FileSystemWatcher watcher)
+    {
+    }
+
     private LibraryWatch CreateWatch(
         ProcessingLibraryRecord library,
         string folder,
@@ -287,6 +296,7 @@ public class ProcessingWatchedFolderWatcherService : BackgroundService
             };
 
             watcher.EnableRaisingEvents = true;
+            OnWatcherReady(libraryId, watcher);
 
             var report = new WatcherReport(
                 library.Id,
