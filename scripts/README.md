@@ -18,11 +18,13 @@ work, not rewritten for its own sake. Scripts are named in kebab-case.
 | `ci-passed.mjs` | CI's single verdict: every job due for the change passed, every other job was skipped (`ci-passed.test.mjs`). |
 | `check-agent-docs.mjs` | Checks that the agent documentation map (`AGENTS.md` and its links) is valid. |
 | `check-github-action-pins.mjs` | Fails when a workflow uses an action that is not pinned to a full commit SHA. |
+| `check-node-docker-version.mjs` | Fails when the Dockerfile's node image major does not match the root `.node-version`. |
 | `check-release-workflow-gates.mjs` | Checks the shape of `release.yml` and `ci.yml`: only `publish` publishes, `latest` moves last, `ci-passed` judges every job. |
 | `check-release-version.mjs` | Fails a release whose tag does not match `WeirVersion` and `apps/web/package.json`. |
 | `verify-ci-for-release.mjs` | Makes a release prove `ci.yml`'s `ci-passed` passed on the tagged commit (`verify-ci-for-release.test.mjs`). |
 | `check-dead-code.mjs` | Dead-code guard for the web app: unused exports (allowlist in `dead-code-allowlist.json`) and unstyled class names. |
 | `check-dotnet-vulnerabilities.mjs` | Fails on High or Critical NuGet advisories in a .NET solution. |
+| `npm-audit-retry.mjs` | Runs `npm audit`, retrying only a registry-side failure; fails on a real High/Critical finding (`npm-audit-retry.test.mjs`). Used by apps/web's audit step and imported by `docs-site/scripts/audit-dependencies.mjs`. |
 | `wait-for-health.mjs` | Waits for a server's `/health`, printing a container's log if it never answers. |
 | `ffmpeg-cache-key.mjs` | Prints the cache key for the Windows package's vendored FFmpeg: upstream's current build checksum. |
 

@@ -22,9 +22,10 @@ updates:
       test-runners:
         patterns:
           - "*"
-    # pyee 14.0.0 requires Python >=3.12 and the workflows run 3.11, so the whole
-    # test-runners group fails to install and every update in it is held hostage.
-    # Lift this together with the Python version in ci.yml and release.yml.
+    # The workflows moved to Python 3.13 (pyee 14.0.0's own floor), but pyee is still held: the
+    # pinned playwright==1.63.0 (the latest release) itself requires "pyee<14,>=13", so 14.0.0
+    # cannot be installed alongside it regardless of the Python version. Lift this once playwright
+    # raises that bound, or once we intentionally drop below the version playwright pins.
     ignore:
       - dependency-name: "pyee"
         versions:
@@ -116,3 +117,11 @@ updates:
       docker:
         patterns:
           - "*"
+    # The web build stage's node major must match the root .node-version (scripts/check-node-docker-
+    # version.mjs enforces it); #788 bumped the Dockerfile alone and briefly split it from CI's node
+    # major. This keeps patch and digest updates within 24 flowing while holding a major bump until
+    # .node-version, the Dockerfile and every setup-node step are raised together on purpose.
+    ignore:
+      - dependency-name: "node"
+        versions:
+          - ">=25"

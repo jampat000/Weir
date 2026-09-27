@@ -24,7 +24,9 @@ on:
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  # A superseded pull request run is cancelled; a push to main never is, so two merges landing close
+  # together each get a real, uncancelled run instead of leaving a cancelled one on main's history.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
@@ -158,13 +160,16 @@ jobs:
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
-          node-version: "24"
+          node-version-file: .node-version
 
       - name: Weir agent documentation map
         run: node scripts/check-agent-docs.mjs
 
       - name: GitHub Actions pin check
         run: node scripts/check-github-action-pins.mjs
+
+      - name: Dockerfile node major matches .node-version
+        run: node scripts/check-node-docker-version.mjs
 
       - name: Release and CI gate rules
         run: |
@@ -248,7 +253,7 @@ jobs:
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
-          node-version: "24"
+          node-version-file: .node-version
           cache: npm
           cache-dependency-path: apps/web/package-lock.json
 
@@ -276,7 +281,7 @@ jobs:
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
-          node-version: "24"
+          node-version-file: .node-version
           cache: npm
           cache-dependency-path: apps/web/package-lock.json
 
@@ -294,10 +299,12 @@ jobs:
       - name: Weir dead-code guard
         run: node scripts/check-dead-code.mjs
 
+      # scripts/npm-audit-retry.mjs retries only a registry-side failure (an outage or dropped
+      # connection); a real High/Critical advisory fails immediately, same as a plain `npm audit`.
       - name: Frontend dependency vulnerability scan
         if: needs.changes.outputs.run_web_audit == 'true'
         working-directory: apps/web
-        run: npm audit --audit-level=high
+        run: node ../../scripts/npm-audit-retry.mjs --level=high
 
   e2e-smoke:
     needs: [changes, web-dist]
@@ -330,7 +337,7 @@ jobs:
 
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
-          python-version: "3.11"
+          python-version: "3.13"
           cache: pip
           cache-dependency-path: tests/requirements.txt
 

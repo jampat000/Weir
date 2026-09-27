@@ -12,7 +12,8 @@ on:
 
 concurrency:
   group: codeql-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  # See ci.yml's own concurrency block: cancel a superseded pull request run, never a push to main.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
