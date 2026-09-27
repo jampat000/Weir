@@ -56,6 +56,38 @@ public sealed class SqliteDatabase
 
     private static readonly object TunedMarker = new();
 
+    /// <summary>SQLite's result code for a database file that cannot be opened (<c>SQLITE_CANTOPEN</c>).</summary>
+    private const int SqliteCantOpen = 14;
+
+    /// <summary>
+    /// The database file's identity the last time a pool was filled for a given connection string, keyed the
+    /// same way as <see cref="PoolGates"/>. A pooled native handle keeps working on a file that has been deleted
+    /// or replaced underneath it (Linux lets an open file be unlinked and still read or written through a
+    /// descriptor opened before the unlink), so checking only when a pool is first created would miss a file that
+    /// changed while the pool already held warm connections.
+    /// </summary>
+    private static readonly ConcurrentDictionary<string, FileIdentity> PoolFileIdentities = new(StringComparer.Ordinal);
+
+    /// <summary>
+    /// Whether the database file exists and, if it does, when it was created — enough to tell a file apart from
+    /// a different file later placed at the same path, without the platform-specific inode or file-index lookups
+    /// a heavier identity check would need. Deliberately not the last-write time: WAL checkpoints and ordinary
+    /// growth keep touching that on a healthy database, which would make every long-lived pool look replaced.
+    /// </summary>
+    private readonly record struct FileIdentity(bool Exists, DateTime CreationTimeUtc)
+    {
+        /// <summary>
+        /// One native stat call: reading <see cref="FileSystemInfo.Exists"/> first populates the same cached
+        /// metadata <see cref="FileSystemInfo.CreationTimeUtc"/> then reads, so this costs no more than checking
+        /// existence alone.
+        /// </summary>
+        public static FileIdentity Of(string path)
+        {
+            var info = new FileInfo(path);
+            return info.Exists ? new FileIdentity(true, info.CreationTimeUtc) : default;
+        }
+    }
+
     private readonly Lock? _poolGate;
     private readonly ILogger? _logger;
     private readonly int _busyTimeoutMilliseconds;
@@ -225,7 +257,15 @@ public sealed class SqliteDatabase
             {
                 lock (_poolGate)
                 {
+                    var hadBaseline = RefuseIfFileIdentityChanged();
                     connection.Open();
+                    if (!hadBaseline)
+                    {
+                        // The very first open for this connection string: there was nothing to compare against
+                        // above (the file may not even have existed until Mode=ReadWriteCreate just made it), so
+                        // the baseline is the identity the file has now that opening it succeeded.
+                        PoolFileIdentities.TryAdd(ConnectionString, FileIdentity.Of(DatabasePath));
+                    }
                 }
             }
 
@@ -239,21 +279,38 @@ public sealed class SqliteDatabase
     }
 
     /// <summary>
-    /// The health probe: the database file is still there, and <c>SELECT 1</c> answers with a one second
-    /// busy timeout, so a long writer makes health slow for at most a second instead of thirty. Never throws.
+    /// Refuse to hand out a connection — pooled or fresh — once the file backing this pool has been deleted or
+    /// replaced. Must run under <see cref="_poolGate"/> so it can never race a concurrent open filling the pool or
+    /// <see cref="ClearPool"/> emptying it.
     /// </summary>
-    /// <remarks>
-    /// The file check comes first because a pooled connection keeps working on a file that has been deleted
-    /// or replaced underneath it (Linux lets an open file be unlinked), so <c>SELECT 1</c> alone would report
-    /// a database that no new connection can open as healthy.
-    /// </remarks>
-    public async Task<bool> IsConnectedAsync(CancellationToken cancellationToken = default)
+    /// <returns>Whether a baseline identity was already recorded for this connection string.</returns>
+    private bool RefuseIfFileIdentityChanged()
     {
-        if (!File.Exists(DatabasePath))
+        if (!PoolFileIdentities.TryGetValue(ConnectionString, out var baseline))
         {
             return false;
         }
 
+        if (FileIdentity.Of(DatabasePath) == baseline)
+        {
+            return true;
+        }
+
+        PoolFileIdentities.TryRemove(ConnectionString, out _);
+        ClearPool();
+        throw new SqliteException("unable to open database file", SqliteCantOpen);
+    }
+
+    /// <summary>
+    /// The health probe: the database can still be opened, and <c>SELECT 1</c> answers with a one second busy
+    /// timeout, so a long writer makes health slow for at most a second instead of thirty. Never throws.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="OpenAsync"/> itself refuses a connection once the file has been deleted or replaced, so this
+    /// needs no file check of its own.
+    /// </remarks>
+    public async Task<bool> IsConnectedAsync(CancellationToken cancellationToken = default)
+    {
         try
         {
             var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
