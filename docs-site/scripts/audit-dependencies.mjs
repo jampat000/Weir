@@ -1,25 +1,25 @@
 import { readFileSync } from "node:fs";
-import { spawnSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+
+import { auditWithRetry, RegistryUnavailableError } from "../../scripts/npm-audit-retry.mjs";
 
 const siteRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const exceptions = JSON.parse(readFileSync(path.join(siteRoot, "dependency-audit-exceptions.json"), "utf8"));
 const allowed = new Map(exceptions.exceptions.map((item) => [item.advisory, item]));
-const npm = process.platform === "win32" ? process.env.ComSpec : "npm";
-const npmArgs = process.platform === "win32" ? ["/d", "/s", "/c", "npm audit --json"] : ["audit", "--json"];
-const result = spawnSync(npm, npmArgs, {
-  cwd: siteRoot,
-  encoding: "utf8",
-  stdio: ["ignore", "pipe", "pipe"],
-});
 
 let report;
 try {
-  report = JSON.parse(result.stdout || "{}");
-} catch {
-  console.error(result.stderr || result.stdout || "[docs-audit] npm audit did not return JSON.");
-  process.exit(result.status || 1);
+  // Retries only a registry-side failure (an outage or dropped connection); a real advisory in the
+  // report is judged below exactly as before, on the first attempt.
+  report = await auditWithRetry({ cwd: siteRoot });
+} catch (error) {
+  if (error instanceof RegistryUnavailableError) {
+    console.error(`[docs-audit] ${error.message}`);
+    console.error("[docs-audit] This is the npm registry, not a Weir problem. Re-run the job once npm's audit endpoint recovers.");
+    process.exit(1);
+  }
+  throw error;
 }
 
 const vulnerabilities = report.vulnerabilities ?? {};
@@ -63,11 +63,6 @@ if (unexpected.size || expired.size) {
   for (const item of unexpected) console.error(`- ${item}`);
   for (const item of expired) console.error(`- Expired exception: ${item}`);
   process.exit(1);
-}
-
-if (result.status !== 0 && seenAdvisories.size === 0) {
-  console.error(result.stderr || "[docs-audit] npm audit failed without a documented advisory.");
-  process.exit(result.status || 1);
 }
 
 console.log(`[docs-audit] ${seenAdvisories.size} advisory path(s) are covered by current exception metadata.`);

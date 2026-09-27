@@ -24,6 +24,7 @@ work, not rewritten for its own sake. Scripts are named in kebab-case.
 | `verify-ci-for-release.mjs` | Makes a release prove `ci.yml`'s `ci-passed` passed on the tagged commit (`verify-ci-for-release.test.mjs`). |
 | `check-dead-code.mjs` | Dead-code guard for the web app: unused exports (allowlist in `dead-code-allowlist.json`) and unstyled class names. |
 | `check-dotnet-vulnerabilities.mjs` | Fails on High or Critical NuGet advisories in a .NET solution. |
+| `npm-audit-retry.mjs` | Runs `npm audit`, retrying only a registry-side failure; fails on a real High/Critical finding (`npm-audit-retry.test.mjs`). Used by apps/web's audit step and imported by `docs-site/scripts/audit-dependencies.mjs`. |
 | `wait-for-health.mjs` | Waits for a server's `/health`, printing a container's log if it never answers. |
 | `ffmpeg-cache-key.mjs` | Prints the cache key for the Windows package's vendored FFmpeg: upstream's current build checksum. |
 
