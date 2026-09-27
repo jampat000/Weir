@@ -55,9 +55,13 @@ updates:
           - "minor"
           - "patch"
     # Keep unsupported toolchain majors quiet until their peer ecosystem catches up.
-    # eslint-plugin-jsx-a11y 6.10.2 rejects ESLint 10, while openapi-typescript 7.13.0
-    # supports TypeScript 5.x only. Dependabot will resume these automatically
-    # when the bounds below are deliberately revised with the corresponding migration.
+    # Checked 2026-09-27: eslint-plugin-jsx-a11y 6.10.2 (latest) still declares
+    # peerDependencies eslint "^3 || ... || ^9" and rejects ESLint 10.11.0 (latest);
+    # see jsx-eslint/eslint-plugin-jsx-a11y#1075. openapi-typescript 7.13.0 (latest)
+    # still declares peerDependencies typescript "^5.x" and has no TypeScript 6/7
+    # support yet; see openapi-ts/openapi-typescript#2723 (TS6) and #2841 (TS7).
+    # Dependabot will resume these automatically when the bounds below are
+    # deliberately revised with the corresponding migration.
     ignore:
       - dependency-name: "eslint"
         versions:
@@ -81,8 +85,11 @@ updates:
         update-types:
           - "minor"
           - "patch"
-    # Docusaurus 3.10.2 still inherits the removed baseUrl compiler option,
-    # so its published tsconfig cannot be typechecked by TypeScript 7 yet.
+    # Checked 2026-09-27: @docusaurus/tsconfig (from Docusaurus 3.10.2, latest;
+    # no newer major is out) still sets "baseUrl": "." in its published tsconfig,
+    # which TypeScript 7.0.2 rejects outright (error TS5102, "Option 'baseUrl'
+    # has been removed"); see facebook/docusaurus#11893. Lift this once Docusaurus
+    # drops baseUrl from that config.
     ignore:
       - dependency-name: "typescript"
         versions:
