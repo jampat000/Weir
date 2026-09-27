@@ -429,11 +429,16 @@ public sealed class ProcessingWatchedFolderWatcherServiceTests
         public List<FakeFileSystemWatcher> CreatedFor(string folder) =>
             _created.TryGetValue(Path.GetFullPath(folder), out var list) ? list.ToList() : [];
 
-        internal override FileSystemWatcher CreateFileSystemWatcher(string folder)
+        internal override FileSystemWatcher CreateFileSystemWatcher(string folder) => new FakeFileSystemWatcher(folder);
+
+        // Recorded on readiness, not construction: CreatedFor must never report a watcher before production
+        // has subscribed to it, or a caller racing to act on "created" (as this test's overflow scenario does)
+        // could act before there is anything to act on.
+        internal override void OnWatcherReady(long libraryId, FileSystemWatcher watcher)
         {
-            var fake = new FakeFileSystemWatcher(folder);
+            var fake = (FakeFileSystemWatcher)watcher;
             _created.AddOrUpdate(
-                Path.GetFullPath(folder),
+                Path.GetFullPath(watcher.Path),
                 _ => [fake],
                 (_, existing) =>
                 {
@@ -443,7 +448,6 @@ public sealed class ProcessingWatchedFolderWatcherServiceTests
                         return existing;
                     }
                 });
-            return fake;
         }
     }
 }
