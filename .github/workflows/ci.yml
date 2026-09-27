@@ -24,7 +24,9 @@ on:
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  # A superseded pull request run is cancelled; a push to main never is, so two merges landing close
+  # together each get a real, uncancelled run instead of leaving a cancelled one on main's history.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
