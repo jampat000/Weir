@@ -158,13 +158,16 @@ jobs:
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
-          node-version: "24"
+          node-version-file: .node-version
 
       - name: Weir agent documentation map
         run: node scripts/check-agent-docs.mjs
 
       - name: GitHub Actions pin check
         run: node scripts/check-github-action-pins.mjs
+
+      - name: Dockerfile node major matches .node-version
+        run: node scripts/check-node-docker-version.mjs
 
       - name: Release and CI gate rules
         run: |
@@ -248,7 +251,7 @@ jobs:
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
-          node-version: "24"
+          node-version-file: .node-version
           cache: npm
           cache-dependency-path: apps/web/package-lock.json
 
@@ -276,7 +279,7 @@ jobs:
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
-          node-version: "24"
+          node-version-file: .node-version
           cache: npm
           cache-dependency-path: apps/web/package-lock.json
 

@@ -7,7 +7,7 @@ This **Weir** repository contains **`apps/server`** (the C# / .NET 10 server: HT
 ## Prerequisites
 
 - **.NET 10 SDK** (pinned in **`apps/server/global.json`**)
-- **Node.js 24** (npm on `PATH`)
+- **Node.js** (pinned in **`.node-version`**; npm on `PATH`)
 - **Python 3.11+** only for the contract suite and E2E test runners (they judge the server from outside; nothing in Weir runs on Python)
 
 ## One-time setup (after cloning)
