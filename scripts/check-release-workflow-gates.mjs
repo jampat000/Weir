@@ -213,6 +213,7 @@ requireOrder(
   windowsSmoke,
   [
     "- name: Validate release version alignment",
+    "- name: Verify no other-version release assets",
     "- name: Sign Velopack release artifacts",
     "- name: Verify Velopack setup signature",
     "- name: Generate release artifact checksums",

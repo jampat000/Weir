@@ -86,6 +86,18 @@ jobs:
         shell: bash
         run: node scripts/check-release-version.mjs "$TAG"
 
+      # The delta base for `vpk pack` below. A 404 (no release published yet) is not an error: it
+      # leaves this empty, packaging/windows/build-velopack.ps1 skips the cache lookup, and `vpk
+      # download` itself already tolerates having nothing to fetch (docs/release.md).
+      - name: Previous release version
+        id: previous
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          tag="$(gh api "repos/${{ github.repository }}/releases/latest" --jq .tag_name 2>/dev/null || true)"
+          echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
+
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
         with:
           global-json-file: apps/server/global.json
@@ -116,14 +128,43 @@ jobs:
           restore-keys: |
             mkvtoolnix-vendor-${{ runner.os }}-
 
+      # The FFmpeg and MKVToolNix *source* archives fetch-bundled-tool-sources.ps1 attaches to the
+      # release for licence compliance, cached against the same pins as the binaries above (both live
+      # in the one file), so a release only ever downloads them once per pin.
+      - name: Cache bundled tool source archives
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: packaging/windows/vendor/tool-sources
+          key: tool-sources-vendor-${{ runner.os }}-${{ hashFiles('packaging/windows/build-velopack-vendored-media-tools.ps1') }}
+
+      # The previous release's full nupkg (#804): `vpk pack` needs it on disk to build a delta, but it
+      # is otherwise unchanged from release to release, so this is keyed strictly on that release's own
+      # version - never a prefix or restore-key fallback, so a stale package can never be served.
+      - name: Cache previous release nupkg
+        if: steps.previous.outputs.version != ''
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: packaging/windows/vendor/previous-release
+          key: weir-prev-nupkg-${{ steps.previous.outputs.version }}
+
       # Builds the web app, publishes the .NET server (win-x64 single file) and the tray, vendors FFmpeg and
-      # MKVToolNix, installs the pinned vpk CLI, downloads the previous release to diff against, and packs.
+      # MKVToolNix, installs the pinned vpk CLI, fetches the previous release to diff against (cached above),
+      # packs, and prunes that previous release's own package back out of the output (#804).
       - name: Build Weir Windows package (Velopack)
         env:
           WEIR_BUILD_VERSION: ${{ steps.version.outputs.plain }}
           VITE_SUPPORT_URL: ${{ vars.VITE_SUPPORT_URL }}
           GITHUB_TOKEN: ${{ github.token }}
-        run: powershell -ExecutionPolicy Bypass -File packaging/windows/build-velopack.ps1 -PreviousReleaseRepoUrl "${{ github.server_url }}/${{ github.repository }}"
+        run: >-
+          powershell -ExecutionPolicy Bypass -File packaging/windows/build-velopack.ps1
+          -PreviousReleaseRepoUrl "${{ github.server_url }}/${{ github.repository }}"
+          -PreviousReleaseVersion "${{ steps.previous.outputs.version }}"
+
+      # Defense in depth for the prune step build-velopack.ps1 just ran: fail here, before anything is
+      # uploaded, rather than silently re-shipping a package for a version other than this release's.
+      - name: Verify no other-version release assets
+        shell: bash
+        run: node scripts/check-release-assets-single-version.mjs dist/windows/releases "${{ steps.version.outputs.plain }}"
 
       - name: Smoke test packaged Windows server
         run: powershell -ExecutionPolicy Bypass -File scripts/smoke-windows-package.ps1 -ExpectedVersion "${{ steps.version.outputs.plain }}"
@@ -340,6 +381,7 @@ jobs:
           load: true
           platforms: linux/amd64
           push: false
+          build-args: WEIR_VERSION=${{ steps.version.outputs.plain }}
           tags: weir-release-candidate:${{ steps.version.outputs.plain }}
           cache-to: type=gha,mode=max,scope=weir-release-amd64,ignore-error=true
 
@@ -416,6 +458,7 @@ jobs:
           file: ./Dockerfile
           platforms: linux/arm64
           push: false
+          build-args: WEIR_VERSION=${{ steps.version.outputs.plain }}
           tags: weir-release-candidate:${{ steps.version.outputs.plain }}-arm64
           cache-to: type=gha,mode=max,scope=weir-release-arm64,ignore-error=true
 
@@ -479,6 +522,7 @@ jobs:
           push: true
           provenance: true
           sbom: true
+          build-args: WEIR_VERSION=${{ steps.version.outputs.plain }}
           cache-from: |
             type=gha,scope=weir-release-amd64
             type=gha,scope=weir-release-arm64
