@@ -1,4 +1,5 @@
 import { useProcessingRuntimeSettingsQuery } from "../../../../lib/processing/maintenance-queries";
+import { REPOSITORY_URL, LICENSE_URL } from "../../../../lib/repository";
 import {
   toolVersion,
   useMediaToolsQuery,
@@ -66,6 +67,33 @@ export function AboutFacts() {
         <div>
           <dt>Re-encoding</dt>
           <dd>Never. Weir copies the tracks it keeps as they are.</dd>
+        </div>
+        <div>
+          <dt>Licence</dt>
+          <dd>
+            <a
+              href={LICENSE_URL}
+              target="_blank"
+              rel="noreferrer"
+              className="mm-quiet-link"
+            >
+              AGPL-3.0-or-later →
+            </a>
+          </dd>
+        </div>
+        <div>
+          <dt>Source code</dt>
+          <dd>
+            <a
+              href={REPOSITORY_URL}
+              target="_blank"
+              rel="noreferrer"
+              className="mm-quiet-link"
+              data-testid="about-source-code-link"
+            >
+              View on GitHub →
+            </a>
+          </dd>
         </div>
         {runtime.data ? (
           <>

@@ -123,6 +123,16 @@ class AuditSettingsMixin:
             > 0,
             "runtime facts are missing from About",
         )
+        # #799: the packaged build must still link out to source and licence, not just the dev build.
+        self.require(
+            self.page.get_by_test_id("about-source-code-link").get_attribute("href")
+            == "https://github.com/jampat000/Weir",
+            "About is missing the Source code link",
+        )
+        self.require(
+            self.page.get_by_text("AGPL-3.0-or-later", exact=False).count() > 0,
+            "About is missing the licence name",
+        )
         # Display density was removed in 3.2 and must not come back.
         self.require(
             not self.page.get_by_text("Display density", exact=False).count(),
