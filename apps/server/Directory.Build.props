@@ -18,6 +18,16 @@
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
     <InvariantGlobalization>true</InvariantGlobalization>
+    <!--
+      Weir has no localized UI text of its own (the web app's strings are hard-coded English;
+      the tray's WinForms dialogs are hard-coded English too — grep finds no .resx anywhere in the
+      repo), so the only thing this drops from a self-contained publish is the framework's own
+      translated exception/diagnostic strings for cultures other than English, which nothing in Weir
+      shows to a user. Restricting to "en" keeps that language's resources (the neutral fallback
+      Weir would use anyway) and removes the ~30 other satellite-resource folders a self-contained
+      win-x64 publish otherwise carries.
+    -->
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
     <Company>Weir</Company>
     <Product>Weir</Product>
     <Copyright>Weir contributors</Copyright>
