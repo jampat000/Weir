@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Diagnostics;
+using Weir.Tray.Firewall;
 
 namespace Weir.Tray;
 
@@ -194,6 +195,9 @@ sealed class TrayApp : IDisposable
         _portMenuItem.Click += (_, _) => BackgroundWork.Observe("Change port", ChangePortAsync());
         menu.Items.Add(_portMenuItem);
 
+        menu.Items.Add("Allow other devices on your network...").Click +=
+            (_, _) => BackgroundWork.Observe("Allow other devices on your network", AllowLanAsync());
+
         menu.Items.Add(new ToolStripSeparator());
 
         _updateMenuItem = new ToolStripMenuItem();
@@ -275,6 +279,33 @@ sealed class TrayApp : IDisposable
         await _server.StopAsync();
         _notifyIcon!.Visible = false;
         Application.Exit();
+    }
+
+    // -- Firewall -----------------------------------------------------------
+
+    // Runs on the thread pool: FirewallElevation blocks on the elevated child process (and the UAC prompt the
+    // person answers), which must never freeze the tray's message loop.
+    private async Task AllowLanAsync()
+    {
+        TrayLog.Write("Allow other devices on your network: requested from the tray menu.");
+        var outcome = await Task.Run(() => FirewallElevation.ConfigureElevated(TrayLog.Write)).ConfigureAwait(false);
+        OnUi(() => ShowFirewallOutcome(outcome));
+    }
+
+    private void ShowFirewallOutcome(FirewallElevation.Outcome outcome)
+    {
+        switch (outcome)
+        {
+            case FirewallElevation.Outcome.Configured:
+                ShowBalloon("Weir", "Other devices on your network can now reach Weir.", ToolTipIcon.Info);
+                break;
+            case FirewallElevation.Outcome.Declined:
+                ShowBalloon("Weir", "Windows admin access was not granted, so other devices still cannot reach Weir.", ToolTipIcon.Warning);
+                break;
+            default:
+                ShowBalloon("Weir", "Could not allow other devices on your network. See tray-host.log in the data folder.", ToolTipIcon.Warning);
+                break;
+        }
     }
 
     // -- Port -------------------------------------------------------------

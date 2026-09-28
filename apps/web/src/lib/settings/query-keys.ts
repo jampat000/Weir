@@ -6,6 +6,7 @@ export const settingsKeys = {
   securityOverview: ["settings", "security-overview"] as const,
   configurationBackups: ["settings", "configuration-backups"] as const,
   updateStatus: ["settings", "update-status"] as const,
+  networkAccess: ["settings", "network-access"] as const,
   updateSettings: ["settings", "update-settings"] as const,
   updateState: ["settings", "update-state"] as const,
   logs: ["settings", "logs"] as const,
