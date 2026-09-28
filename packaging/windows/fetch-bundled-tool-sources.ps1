@@ -6,10 +6,17 @@ param(
   # vendor folders in build-velopack-vendored-media-tools.ps1: release.yml caches this directory
   # (actions/cache, keyed on a hash of that file, so a pin bump always invalidates it), so a release
   # only ever downloads these three archives once per pin, not once per release.
-  [string]$CacheDir = (Join-Path $PSScriptRoot "vendor\\tool-sources")
+  [string]$CacheDir = ""
 )
 
 $ErrorActionPreference = "Stop"
+
+# Resolved here, not as the param's own default: $PSScriptRoot is unset while a script-level param
+# block's default-value expressions are evaluated when the script also has a mandatory parameter (a
+# PowerShell quirk, confirmed locally - Join-Path then fails with "Path" bound to an empty string).
+if (-not $CacheDir) {
+  $CacheDir = Join-Path $PSScriptRoot "vendor\\tool-sources"
+}
 
 # Downloads and hash-verifies the exact source of the FFmpeg and MKVToolNix binaries the
 # Windows package bundles (build-velopack-vendored-media-tools.ps1 vendors the binaries; this fetches
