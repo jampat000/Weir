@@ -8,6 +8,7 @@ import {
   fetchServerMetrics,
   fetchSecurityOverview,
   fetchAppSettings,
+  fetchNetworkAccess,
   fetchUpdateStatus,
   fetchUpdateSettings,
   fetchUpdateState,
@@ -48,6 +49,16 @@ export function useConfigurationBackupsQuery(enabled: boolean) {
     queryFn: () => fetchConfigurationBackupList(),
     enabled,
     staleTime: 15_000,
+  });
+}
+
+/** System › About's network-reach state. Independent of every other card on the page (ux-common: no panel waits on another's data). */
+export function useNetworkAccessQuery() {
+  return useQuery({
+    queryKey: settingsKeys.networkAccess,
+    queryFn: () => fetchNetworkAccess(),
+    staleTime: 30_000,
+    retry: false,
   });
 }
 

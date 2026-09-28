@@ -1902,6 +1902,26 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/suite/network-access": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Suite Network Access
+     * @description Whether other devices on the network can reach Weir (System › About). Windows package only; other platforms report not_applicable.
+     */
+    get: operations["get_suite_network_access_api_v1_suite_network_access_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/suite/notification-channels": {
     parameters: {
       query?: never;
@@ -6857,6 +6877,19 @@ export interface components {
       route: string;
     };
     /**
+     * SuiteNetworkAccessOut
+     * @description Whether another device on the network can currently reach Weir.
+     */
+    SuiteNetworkAccessOut: {
+      /**
+       * State
+       * @description allowed, blocked, not_configured, or not_applicable
+       */
+      state: string;
+      /** Summary */
+      summary: string;
+    };
+    /**
      * SuiteOperationalHistoryResetIn
      * @description Body for ``POST /suite/operational-history/reset``.
      */
@@ -10940,6 +10973,26 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["SuiteMetricsOut"];
+        };
+      };
+    };
+  };
+  get_suite_network_access_api_v1_suite_network_access_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["SuiteNetworkAccessOut"];
         };
       };
     };

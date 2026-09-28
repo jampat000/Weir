@@ -1,0 +1,113 @@
+namespace Weir.Tray.Firewall;
+
+/// <summary>
+/// The one firewall rule Weir manages, and the decisions around it: what it looks like, which of the firewall's
+/// other rules count as blocking it, and what state that adds up to. Pure logic over <see cref="IFirewallPolicy"/>,
+/// so it is testable without the real Windows Firewall.
+/// </summary>
+static class WeirFirewallRule
+{
+    /// <summary>The one rule Weir creates. A fixed name so there is only ever one, and it is easy to find again.</summary>
+    internal const string RuleName = "Weir";
+
+    /// <summary>Where the bundled server lives under a Velopack install, relative to the <c>current</c> folder.</summary>
+    internal const string ServerRelativePath = @"server\WeirServer.exe";
+
+    /// <summary>
+    /// Weir listens on TCP only; the rule never opens UDP or any other protocol it does not use.
+    /// </summary>
+    internal const string Protocol = "TCP";
+
+    /// <summary>Private and Domain only, per the owner's decision. Public is never included: an untrusted network never gets a hole punched for Weir.</summary>
+    internal const FirewallProfiles AllowedProfiles = FirewallProfiles.Domain | FirewallProfiles.Private;
+
+    /// <summary>
+    /// The server executable's path, scoped to Velopack's stable <c>current</c> folder
+    /// (<see cref="InstallProcesses.Root"/>) rather than a versioned one, so the rule keeps matching the running
+    /// server across every update without being touched again.
+    /// </summary>
+    internal static string ServerProgramPath(string installRoot) =>
+        Path.GetFullPath(Path.Combine(installRoot, ServerRelativePath));
+
+    /// <summary>The rule Weir wants in place: one inbound TCP allow rule for its own server, on Private and Domain only.</summary>
+    internal static FirewallRule DesiredRule(string installRoot) => new(
+        RuleName,
+        ServerProgramPath(installRoot),
+        FirewallRuleAction.Allow,
+        FirewallRuleDirection.Inbound,
+        AllowedProfiles,
+        Enabled: true);
+
+    /// <summary>
+    /// Adds or updates Weir's allow rule, and removes every inbound block rule that targets Weir's own server exe
+    /// (for example one Windows created when its own "blocked some features" prompt was cancelled). Never touches
+    /// a rule for any other program. Idempotent: running it again when everything already matches changes nothing.
+    /// </summary>
+    internal static FirewallChangeSummary Configure(IFirewallPolicy policy, string installRoot)
+    {
+        ArgumentNullException.ThrowIfNull(policy);
+        var programPath = ServerProgramPath(installRoot);
+        policy.AddOrUpdateRule(DesiredRule(installRoot));
+
+        // Snapshotted first: removing a rule while still enumerating the collection it came from is not safe,
+        // whether that collection is this in-memory list (tests) or a COM one materialized fresh per read.
+        var blockRules = OwnBlockRules(policy, programPath).ToList();
+        foreach (var blockRule in blockRules)
+        {
+            policy.RemoveRule(blockRule.Name);
+        }
+        return new FirewallChangeSummary(AllowRuleWritten: true, BlockRulesRemoved: blockRules.Count);
+    }
+
+    /// <summary>Removes Weir's allow rule. Leaves any block rules alone: they are not Weir's to manage on the way out.</summary>
+    internal static void Remove(IFirewallPolicy policy)
+    {
+        ArgumentNullException.ThrowIfNull(policy);
+        policy.RemoveRule(RuleName);
+    }
+
+    /// <summary>
+    /// Every inbound block rule that targets exactly Weir's own server exe at <paramref name="programPath"/>.
+    /// Windows compares program paths case-insensitively, and so does this.
+    /// </summary>
+    internal static IEnumerable<FirewallRule> OwnBlockRules(IFirewallPolicy policy, string programPath) =>
+        policy.Rules.Where(rule =>
+            rule.Direction == FirewallRuleDirection.Inbound
+            && rule.Action == FirewallRuleAction.Block
+            && string.Equals(rule.ProgramPath, programPath, StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>
+    /// What System › About or System › Status should tell the operator, worked out from the same read-only data
+    /// <see cref="IFirewallPolicy"/> exposes without admin rights: Weir's own rule, and the network(s) this
+    /// machine is on right now.
+    /// </summary>
+    internal static NetworkAccessState ReadState(IFirewallPolicy policy, string installRoot)
+    {
+        ArgumentNullException.ThrowIfNull(policy);
+        var programPath = ServerProgramPath(installRoot);
+
+        if (OwnBlockRules(policy, programPath).Any())
+        {
+            return NetworkAccessState.Blocked;
+        }
+
+        var allowRule = policy.Rules.FirstOrDefault(rule =>
+            string.Equals(rule.Name, RuleName, StringComparison.Ordinal)
+            && rule.Direction == FirewallRuleDirection.Inbound
+            && rule.Action == FirewallRuleAction.Allow
+            && string.Equals(rule.ProgramPath, programPath, StringComparison.OrdinalIgnoreCase));
+
+        if (allowRule is null)
+        {
+            return NetworkAccessState.NotConfigured;
+        }
+
+        // A rule that exists but is disabled, or does not cover the network this machine is on right now (for
+        // example Public, which Weir never requests), reaches nobody: that reads as blocked, not configured.
+        var coversCurrentNetwork = (allowRule.Profiles & policy.CurrentProfiles) != FirewallProfiles.None;
+        return allowRule.Enabled && coversCurrentNetwork ? NetworkAccessState.Allowed : NetworkAccessState.Blocked;
+    }
+}
+
+/// <summary>What <see cref="WeirFirewallRule.Configure"/> did, for logging and exit-code decisions.</summary>
+sealed record FirewallChangeSummary(bool AllowRuleWritten, int BlockRulesRemoved);

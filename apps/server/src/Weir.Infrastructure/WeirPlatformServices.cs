@@ -11,6 +11,7 @@ using Weir.Infrastructure.Activity;
 using Weir.Infrastructure.Auth;
 using Weir.Infrastructure.Notifications;
 using Weir.Infrastructure.Processing;
+using Weir.Infrastructure.Runtime;
 using Weir.Infrastructure.Scheduling;
 using Weir.Infrastructure.Settings;
 using Weir.Infrastructure.Sqlite;
@@ -74,6 +75,11 @@ public static class WeirPlatformServices
             return new WindowsOutputOwnershipTools();
         });
         services.TryAddSingleton<IOutputOwnership, OutputOwnership>();
+
+        // Reading Weir's own firewall rule for System › About (docs/security-hardening.md#windows-firewall): the
+        // Windows package only, gated the same way as the ownership tools above.
+        services.TryAddSingleton<INetworkAccessReader>(_ =>
+            OperatingSystem.IsWindows() ? new WindowsNetworkAccessReader() : new UnsupportedNetworkAccessReader());
         return services;
     }
 

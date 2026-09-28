@@ -178,6 +178,13 @@ open (`apps/tray/Weir.Tray/InheritedStdioHandles.cs`); `scripts/smoke-windows-pa
 this against the real `Weir-win-Setup.exe` and the real installed `Weir.exe`, both piped the way a
 capturing caller would.
 
+A silent install never shows the one-time Windows admin (UAC) prompt Weir otherwise asks to create its firewall
+rule for LAN access, so other devices on the network cannot reach a silently-installed Weir until that rule
+exists. A program that needs that can run the installed `Weir.exe --allow-lan` from a process that is already
+elevated: it configures the rule with no prompt of any kind and never tries to elevate itself, so an unelevated
+caller gets a non-zero exit and a log line explaining why instead of a UAC prompt nobody can answer. Full detail:
+[Windows Installer → Firewall and LAN access](https://github.com/jampat000/Weir/blob/main/docs-site/docs/deployment/windows.md#firewall-and-lan-access).
+
 Full detail, including `WEIR_PORT` as an alternative to `--port`: [Windows Installer → Installing
 Weir from another program](https://github.com/jampat000/Weir/blob/main/docs-site/docs/deployment/windows.md).
 
