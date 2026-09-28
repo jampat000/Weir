@@ -44,8 +44,13 @@ RUN npm run build
 # Pinned to the exact SDK in apps/server/global.json so image builds match CI.
 FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:10.0.401-noble@sha256:35d40304542c8689331f8cab17c65926cdf48fe711e289321d71924b230a7d29 AS server-build
 ARG TARGETARCH
+# #804: the product version, taken from the release tag at build time (release.yml passes it; a plain
+# `docker build` leaves it empty and the image reports Directory.Build.props' placeholder version
+# instead, the same fallback packaging/windows/build-velopack.ps1 uses for a non-release build).
+ARG WEIR_VERSION=""
 WORKDIR /src
-# The solution-level MSBuild files (Directory.Build.props holds the product version) and, below, only
+# The solution-level MSBuild files (Directory.Build.props holds the placeholder WeirVersion the WEIR_VERSION
+# build-arg above overrides) and, below, only
 # each project's .csproj and packages.lock.json (Directory.Build.props sets RestorePackagesWithLockFile,
 # so restore expects it next to the .csproj): enough for `dotnet restore` to resolve every package,
 # without the .cs source that changes on nearly every build. The restored packages live in the image layer
@@ -83,7 +88,9 @@ RUN case "$TARGETARCH" in \
       arm64) profile=linux-arm64 ;; \
       *) echo "Dockerfile: unsupported TARGETARCH '$TARGETARCH'" >&2; exit 1 ;; \
     esac; \
-    dotnet publish apps/server/src/Weir.Host -p:PublishProfile="$profile" -p:PublishDir=/out/ --no-restore
+    versionArg=""; \
+    if [ -n "$WEIR_VERSION" ]; then versionArg="-p:Version=$WEIR_VERSION"; fi; \
+    dotnet publish apps/server/src/Weir.Host -p:PublishProfile="$profile" -p:PublishDir=/out/ --no-restore $versionArg
 
 # A self-contained single-file publish needs only the native dependencies .NET itself uses (libc,
 # OpenSSL; not ICU, because Directory.Build.props sets InvariantGlobalization), which is exactly what
