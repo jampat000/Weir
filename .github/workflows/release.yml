@@ -117,15 +117,24 @@ jobs:
             mkvtoolnix-vendor-${{ runner.os }}-
 
       # Builds the web app, publishes the .NET server (win-x64 single file) and the tray, vendors FFmpeg and
-      # MKVToolNix, installs the pinned vpk CLI and packs.
+      # MKVToolNix, installs the pinned vpk CLI, downloads the previous release to diff against (#799), and packs.
       - name: Build Weir Windows package (Velopack)
         env:
           WEIR_BUILD_VERSION: ${{ steps.version.outputs.plain }}
           VITE_SUPPORT_URL: ${{ vars.VITE_SUPPORT_URL }}
-        run: powershell -ExecutionPolicy Bypass -File packaging/windows/build-velopack.ps1
+          GITHUB_TOKEN: ${{ github.token }}
+        run: powershell -ExecutionPolicy Bypass -File packaging/windows/build-velopack.ps1 -PreviousReleaseRepoUrl "${{ github.server_url }}/${{ github.repository }}"
 
       - name: Smoke test packaged Windows server
         run: powershell -ExecutionPolicy Bypass -File scripts/smoke-windows-package.ps1 -ExpectedVersion "${{ steps.version.outputs.plain }}"
+
+      # #799 licence compliance: the exact corresponding source for the bundled LGPL FFmpeg and GPL
+      # MKVToolNix binaries, hash-verified against the pins in
+      # packaging/windows/build-velopack-vendored-media-tools.ps1, placed alongside the Windows
+      # artifacts so they ride the same upload-artifact/attest/release steps below without a separate
+      # publish path.
+      - name: Fetch bundled tool source archives
+        run: powershell -ExecutionPolicy Bypass -File packaging/windows/fetch-bundled-tool-sources.ps1 -OutputDir dist/windows/releases
 
       - name: Detect Windows code signing configuration
         id: codesign

@@ -1,7 +1,13 @@
 param(
   [switch]$SkipWebBuild,
   [switch]$SkipDotnetPublish,
-  [switch]$SkipSmoke
+  [switch]$SkipSmoke,
+  # #799: when set, the previous release's full nupkg is downloaded into $velopackOut before `vpk
+  # pack` runs, so vpk builds a delta package against it as well as the full one. Left empty for
+  # local builds and the PR-triggered windows-package-smoke job (ci-packaging.yml): neither ships
+  # anything, and a delta with no consumer is just a slower, network-dependent build. release.yml
+  # passes the repo URL so every real release gets a delta wherever a base release exists.
+  [string]$PreviousReleaseRepoUrl = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -18,8 +24,10 @@ $ErrorActionPreference = "Stop"
 #                                     not collide with the tray's own Weir.exe; the tray's
 #                                     FindServerExeDirectory looks for this name)
 #   server\web-dist\                  the built web app (the tray sets WEIR_WEB_DIST to it)
-#   server\bin\ffmpeg\{ffmpeg,ffprobe}.exe
-#                                     found by the server's MediaToolResolver as <app>\bin\ffmpeg
+#   server\bin\ffmpeg\{ffmpeg,ffprobe}.exe + av*.dll
+#                                     found by the server's MediaToolResolver as <app>\bin\ffmpeg;
+#                                     the shared BtbN build (#799), so the av*.dll libraries sit
+#                                     beside the exes instead of being statically linked into each
 #   server\bin\mkvtoolnix\mkvmerge.exe
 #                                     found by MediaToolResolver.ResolveMkvmerge as
 #                                     <app>\bin\mkvtoolnix (#548)
@@ -286,11 +294,15 @@ if (Test-Path -LiteralPath $serverPdb) {
 Copy-Item -Path $webDistDir -Destination (Join-Path $serverDestDir "web-dist") -Recurse -Force
 
 # Matches the <packaged-app-dir>\bin\ffmpeg candidate in
-# apps/server/src/Weir.Core/Media/MediaToolLocations.cs.
+# apps/server/src/Weir.Core/Media/MediaToolLocations.cs. #799: ffmpeg.exe/ffprobe.exe are the shared
+# BtbN build, so their av*.dll siblings ($ffmpegSharedLibrarySha256's keys) come along too — Windows
+# resolves them from the exe's own directory before ever consulting PATH.
 $serverFfmpegDir = Join-Path $serverDestDir "bin\\ffmpeg"
 New-Item -ItemType Directory -Path $serverFfmpegDir -Force | Out-Null
-Copy-Item -Path (Join-Path $ffmpegVendorDir "ffmpeg.exe") -Destination $serverFfmpegDir -Force
-Copy-Item -Path (Join-Path $ffmpegVendorDir "ffprobe.exe") -Destination $serverFfmpegDir -Force
+$ffmpegVendoredFileNames = @("ffmpeg.exe", "ffprobe.exe") + @($ffmpegSharedLibrarySha256.Keys)
+foreach ($ffmpegFileName in $ffmpegVendoredFileNames) {
+  Copy-Item -Path (Join-Path $ffmpegVendorDir $ffmpegFileName) -Destination $serverFfmpegDir -Force
+}
 
 # #548: matches the <packaged-app-dir>\bin\mkvtoolnix candidate in
 # MediaToolLocations.MkvtoolnixCandidateDirectories (MkvtoolnixBundleDirectory). Without it
@@ -301,8 +313,7 @@ New-Item -ItemType Directory -Path $serverMkvtoolnixDir -Force | Out-Null
 Copy-Item -Path (Join-Path $mkvtoolnixVendorDir "mkvmerge.exe") -Destination $serverMkvtoolnixDir -Force
 
 # ── vpk pack (packId Weir, mainExe Weir.exe: the install identity every release keeps) ──
-Start-BuildPhase "vpk pack"
-Write-Host "Running vpk pack..."
+Start-BuildPhase "vpk install"
 # The vpk CLI must match the Velopack library the tray was built with, pinned in the tray's central package file.
 $trayPackagesPath = Join-Path $repoRoot "apps\\tray\\Directory.Packages.props"
 [xml]$trayPackages = Get-Content -LiteralPath $trayPackagesPath -Raw
@@ -333,6 +344,29 @@ if (-not (Test-Path -LiteralPath $vpkExe)) {
   throw "vpk CLI was not found after install. Ensure the .NET global tools directory is available."
 }
 
+# #799: fetch the previous release's full nupkg into $velopackOut first. `vpk pack` (below) then
+# finds it there on its own (Velopack.Packaging.ReleaseEntryHelper.GetPreviousFullRelease) and emits
+# a delta nupkg alongside the full one at no extra flag — --delta defaults to BestSpeed. When no
+# previous release exists yet (a brand-new repo, or every existing release predates this channel),
+# `vpk download github` logs a warning and returns without error, and pack simply produces the full
+# package as before: the full package is always the fallback, never a hard dependency on there being
+# a prior release to diff against.
+if ($PreviousReleaseRepoUrl) {
+  Start-BuildPhase "Fetch previous release for delta"
+  Write-Host "Downloading the previous full release from $PreviousReleaseRepoUrl for delta packaging..."
+  $downloadArgs = @(
+    "download", "github",
+    "--repoUrl", $PreviousReleaseRepoUrl,
+    "--outputDir", $velopackOut
+  )
+  if ($env:GITHUB_TOKEN) {
+    $downloadArgs += @("--token", $env:GITHUB_TOKEN)
+  }
+  Invoke-Native -FilePath $vpkExe -ArgumentList $downloadArgs
+}
+
+Start-BuildPhase "vpk pack"
+Write-Host "Running vpk pack..."
 Invoke-Native -FilePath $vpkExe -ArgumentList @(
   "pack",
   "--packId", "Weir",
@@ -346,5 +380,11 @@ Invoke-Native -FilePath $vpkExe -ArgumentList @(
 Write-Host ""
 Write-Host "Velopack packaging output:"
 Get-ChildItem -Path $velopackOut | Select-Object Name, Length
+$deltaPackages = @(Get-ChildItem -Path $velopackOut -Filter "*-delta.nupkg")
+if ($deltaPackages.Count -gt 0) {
+  Write-Host "Delta package(s) built against the previous release: $($deltaPackages.Name -join ', ')"
+} elseif ($PreviousReleaseRepoUrl) {
+  Write-Host "No delta package was built (no previous full release was found to diff against); the full package is the fallback."
+}
 
 Write-BuildPhaseSummary

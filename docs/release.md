@@ -107,6 +107,14 @@ The release workflow publishes GHCR images with the repository `GITHUB_TOKEN` an
 
 The Velopack-based Windows package is the supported Windows release artifact. Release builds produce a setup exe, full nupkg, and delta nupkg under `dist/windows/releases/`.
 
+The delta nupkg is built by `packaging/windows/build-velopack.ps1 -PreviousReleaseRepoUrl <repo>`,
+which downloads the previous GitHub Release's full nupkg into the output directory (`vpk download
+github`) before `vpk pack` runs; `vpk pack` then finds it there on its own and emits a delta package
+alongside the full one. `release.yml` always passes `-PreviousReleaseRepoUrl`. If there is no previous
+release to diff against (a gap in the chain, or the very first release), only the full package is
+produced — every install can always fall back to it. Local and PR builds omit
+`-PreviousReleaseRepoUrl` and never fetch anything or produce a delta, so they stay offline and fast.
+
 If you build the Windows package locally and want the installer to include the Support section of **System › About**, set `VITE_SUPPORT_URL` before running `packaging/windows/build-velopack.ps1`:
 
 ```powershell
