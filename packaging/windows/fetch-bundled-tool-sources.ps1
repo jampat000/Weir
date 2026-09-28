@@ -5,7 +5,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-# #799: downloads and hash-verifies the exact source of the FFmpeg and MKVToolNix binaries the
+# Downloads and hash-verifies the exact source of the FFmpeg and MKVToolNix binaries the
 # Windows package bundles (build-velopack-vendored-media-tools.ps1 vendors the binaries; this fetches
 # their source under the same pinned-hash discipline), so release.yml can attach them to the GitHub
 # Release. THIRD_PARTY_NOTICES.md points readers at "the GitHub Release" rather than a fixed URL for

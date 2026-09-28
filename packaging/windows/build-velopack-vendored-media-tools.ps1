@@ -18,7 +18,7 @@
 # that same mutable release, which proves a download wasn't corrupted in transit, not who built it
 # or that it is the build Weir was tested against.
 #
-# #799: the shared build (ffmpeg.exe/ffprobe.exe linked against av*.dll instead of each embedding its
+# The shared build (ffmpeg.exe/ffprobe.exe linked against av*.dll instead of each embedding its
 # own copy of every library) rather than BtbN's static build, because Weir vendors both exes: the
 # static zip is ~163 MB compressed with each exe carrying its own ~130 MB of statically-linked
 # libraries, while the shared zip is ~73 MB compressed with the exes under 1 MB combined and the six
@@ -75,7 +75,7 @@ $mkvtoolnixVendorDir = Join-Path $PSScriptRoot "vendor\\mkvtoolnix"
 $mkvtoolnixArchiveName = "mkvtoolnix-64-bit-$mkvtoolnixVersion.zip"
 $mkvtoolnixArchiveUrl = "https://mkvtoolnix.download/windows/releases/$mkvtoolnixVersion/$mkvtoolnixArchiveName"
 
-# #799: AGPL/LGPL/GPL source-availability pins, downloaded and hash-verified by
+# AGPL/LGPL/GPL source-availability pins, downloaded and hash-verified by
 # fetch-bundled-tool-sources.ps1 and attached to each GitHub Release, so the exact source behind the
 # bundled binaries above travels with the release rather than only a link to the projects (the
 # binary pins above prove what was bundled; these prove where its source is). Each pin identifies the

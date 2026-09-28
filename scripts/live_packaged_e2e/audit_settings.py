@@ -123,7 +123,7 @@ class AuditSettingsMixin:
             > 0,
             "runtime facts are missing from About",
         )
-        # #799: the packaged build must still link out to source and licence, not just the dev build.
+        # The packaged build must still link out to source and licence, not just the dev build.
         self.require(
             self.page.get_by_test_id("about-source-code-link").get_attribute("href")
             == "https://github.com/jampat000/Weir",

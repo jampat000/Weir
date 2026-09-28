@@ -19,7 +19,7 @@
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
     <InvariantGlobalization>true</InvariantGlobalization>
     <!--
-      #799: Weir has no localized UI text of its own (the web app's strings are hard-coded English;
+      Weir has no localized UI text of its own (the web app's strings are hard-coded English;
       the tray's WinForms dialogs are hard-coded English too — grep finds no .resx anywhere in the
       repo), so the only thing this drops from a self-contained publish is the framework's own
       translated exception/diagnostic strings for cultures other than English, which nothing in Weir
