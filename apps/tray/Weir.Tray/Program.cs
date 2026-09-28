@@ -37,6 +37,15 @@ static class Program
     [STAThread]
     static int Main(string[] args)
     {
+        // --configure-firewall, --remove-firewall and --allow-lan are Weir's own one-shot, headless commands, not
+        // Velopack's install machinery — checked first, before RunInstallerHooks, so the elevated relaunch this
+        // process itself starts for the first-run prompt (FirewallElevation, below) can never re-enter Velopack's
+        // own first-run handling a second time. Whoever called them waits for this process to exit.
+        if (FirewallCommand.Handles(args))
+        {
+            return FirewallCommand.Run(args, LogToConsoleAndFile);
+        }
+
         RunInstallerHooks();
 
         if (args.Contains("--version"))
@@ -45,14 +54,6 @@ static class Program
                 .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
                 ?.InformationalVersion ?? "unknown");
             return 0;
-        }
-
-        // --configure-firewall, --remove-firewall and --allow-lan are one-shot, headless commands: whoever called
-        // them (the elevated relaunch in FirewallElevation, or a program driving Weir unattended) waits for this
-        // process to exit, so they run and return before anything about the tray itself starts.
-        if (FirewallCommand.Handles(args))
-        {
-            return FirewallCommand.Run(args, LogToConsoleAndFile);
         }
 
         using var mutex = new Mutex(false, MutexName, out bool createdNew);
