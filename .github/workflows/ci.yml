@@ -8,12 +8,14 @@
 # requires, and the one the release asks for on the tagged commit (scripts/verify-ci-for-release.mjs).
 # scripts/check-release-workflow-gates.mjs checks that ci-passed needs every job here.
 #
-# A push to main always runs server-windows, tray and packaging, whatever changed, so every commit a release
-# can tag has had its server tested on Windows, its tray tested, and its Docker and Windows packages built and
-# smoked in that exact tree. On a pull request, packaging runs only when a packaging-relevant path changes
-# (see the `packaging` filter below); a server or web change outside that list is still caught by the package
-# smokes on the next push to main, just not on every pull request, which is the trade-off for not running the
-# two slowest jobs in the workflow on nearly every PR.
+# server-windows and tray use the same path filter on a push to main as on a pull request, so a commit
+# that only touched, say, a release notes file runs neither again: the tree those jobs cover has not
+# changed since the last commit that did, and that commit already proved it on that same filter (#804 -
+# a release no longer needs a version-bump commit, so this is what keeps cutting one cheap). packaging
+# is different: its own pull-request filter is deliberately narrow (see the `packaging` filter below), so
+# a server or web change that is not itself a packaging-path change still forces packaging on the next
+# push to main, the one place nothing has tested it yet in that tree. A workflow-file change or a manual
+# run still forces every job, on either event.
 name: CI
 
 on:
@@ -132,22 +134,26 @@ jobs:
         run: |
           set -euo pipefail
           either() { for value in "$@"; do if [ "$value" = true ]; then echo true; return; fi; done; echo false; }
+          both() { for value in "$@"; do if [ "$value" != true ]; then echo false; return; fi; done; echo true; }
           manual=$([ "$EVENT" = workflow_dispatch ] && echo true || echo false)
           main_push=$([ "$EVENT" = push ] && echo true || echo false)
           all=$(either "$manual" "$WORKFLOWS")
           on_pull_request() { if [ "$main_push" = true ]; then echo false; else echo "$1"; fi; }
 
           web=$(either "$all" "$SERVER" "$HARNESS" "$WEB")
+          # packaging's own filter stays narrow on a pull request (see below); a server or web change
+          # outside it still needs packaging tested once it lands on main, since nothing else will.
+          packaging_reached_by_main=$(both "$main_push" "$(either "$SERVER" "$WEB")")
           {
             echo "run_server_linux=$(either "$all" "$SERVER")"
-            echo "run_server_windows=$(either "$all" "$SERVER" "$main_push")"
+            echo "run_server_windows=$(either "$all" "$SERVER")"
             echo "run_server_audit=$(on_pull_request "$(either "$all" "$SERVER")")"
             echo "run_web=$web"
             echo "run_web_audit=$(on_pull_request "$(either "$all" "$WEB")")"
             echo "run_e2e=$(on_pull_request "$web")"
             echo "run_contract=$(either "$all" "$CONTRACT")"
-            echo "run_tray=$(either "$all" "$TRAY" "$main_push")"
-            echo "run_packaging=$(either "$all" "$PACKAGING" "$main_push")"
+            echo "run_tray=$(either "$all" "$TRAY")"
+            echo "run_packaging=$(either "$all" "$PACKAGING" "$packaging_reached_by_main")"
             echo "run_arm64=$(either "$manual" "$DOCKER")"
           } | tee -a "$GITHUB_OUTPUT"
 
