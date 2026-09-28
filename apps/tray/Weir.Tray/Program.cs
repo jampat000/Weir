@@ -2,8 +2,10 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Security.AccessControl;
 using Velopack;
+using Weir.Tray.Firewall;
 
 namespace Weir.Tray;
 
@@ -45,6 +47,14 @@ static class Program
             return 0;
         }
 
+        // --configure-firewall, --remove-firewall and --allow-lan are one-shot, headless commands: whoever called
+        // them (the elevated relaunch in FirewallElevation, or a program driving Weir unattended) waits for this
+        // process to exit, so they run and return before anything about the tray itself starts.
+        if (FirewallCommand.Handles(args))
+        {
+            return FirewallCommand.Run(args, LogToConsoleAndFile);
+        }
+
         using var mutex = new Mutex(false, MutexName, out bool createdNew);
         if (!createdNew)
         {
@@ -71,6 +81,7 @@ static class Program
                 TrayLog.Write($"Velopack: before uninstall v{v}");
                 KillRunningProcesses($"Velopack before uninstall v{v}");
                 StartupRegistration.Deregister();
+                RemoveFirewallRuleIfElevated();
             })
             .OnBeforeUpdateFastCallback((v) =>
             {
@@ -81,7 +92,70 @@ static class Program
                 TrayLog.Write($"Velopack: after update to v{v}");
                 StartupRegistration.Register();
             })
+            // Unlike the FastCallback hooks above, OnFirstRun runs in-process as part of a normal app start and is
+            // allowed to show UI (docs.velopack.io) — the one place Weir asks its one Windows admin (UAC) prompt
+            // for LAN access, per the owner's decision. It never runs for a --silent start's first launch either,
+            // because --silent skips Velopack's post-install app launch entirely (docs/release.md, #779).
+            .OnFirstRun((v) => PromptForFirewallAccess())
             .Run();
+
+    // A FastCallback hook has a 30-second budget and must show nothing (Velopack.VelopackApp docs), so this never
+    // asks for elevation — it only acts when the uninstaller already happens to be running elevated. Left in place
+    // otherwise, the rule is harmless: it names a program that will not exist once uninstall finishes.
+    private static void RemoveFirewallRuleIfElevated()
+    {
+        if (!FirewallCommand.IsElevated())
+        {
+            TrayLog.Write("Uninstall: leaving the Weir firewall rule in place (not running elevated).");
+            return;
+        }
+        try
+        {
+            WeirFirewallRule.Remove(new ComFirewallPolicy());
+            TrayLog.Write("Uninstall: removed the Weir firewall rule.");
+        }
+        catch (Exception ex) when (ex is COMException or InvalidOperationException or UnauthorizedAccessException)
+        {
+            TrayLog.Write($"Uninstall: could not remove the Weir firewall rule: {ex.Message}");
+        }
+    }
+
+    // The one Windows admin (UAC) prompt Weir ever asks for on its own, and only once: FirewallPromptFile records
+    // the answer, even a decline, so a person who said no is never asked again at every start. "Allow other
+    // devices on your network..." in the tray menu is how they revisit it later.
+    private static void PromptForFirewallAccess()
+    {
+        var runtimeHome = RuntimeHome();
+        try
+        {
+            if (FirewallPromptFile.AlreadyAsked(runtimeHome))
+            {
+                return;
+            }
+
+            var allow = MessageBox.Show(
+                "Other devices on your network, such as Deluno, need Weir allowed through Windows Firewall to reach it. Allow Weir on your network?",
+                "Weir",
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Question) == DialogResult.Yes;
+
+            var outcome = allow ? FirewallElevation.ConfigureElevated(TrayLog.Write) : FirewallElevation.Outcome.Declined;
+            FirewallPromptFile.MarkAsked(runtimeHome, outcome);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            TrayLog.Write($"First-run firewall prompt could not record its answer: {ex.Message}");
+        }
+    }
+
+    // --configure-firewall, --remove-firewall and --allow-lan have no window to report to, so their outcome goes
+    // to whatever console launched them (a script watching the exit code still wants a reason for it) as well as
+    // tray-host.log, the same place every other startup decision is recorded.
+    private static void LogToConsoleAndFile(string message)
+    {
+        TrayLog.Write(message);
+        Console.Error.WriteLine(message);
+    }
 
     // Weir is already running in this session: a second start only opens it, if the person asked for that.
     private static void HandOverToRunningTray(string[] args)

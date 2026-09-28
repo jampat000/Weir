@@ -19,11 +19,13 @@ import type {
   UpdateSettingsOut,
   UpdateSettingsPutBody,
   UpdateStateOut,
+  NetworkAccessStatus,
 } from "./types";
 
 export const appSettingsPath = () => "/api/v1/suite/settings";
 export const securityOverviewPath = () => "/api/v1/suite/security-overview";
 export const updateStatusPath = () => "/api/v1/suite/update-status";
+export const networkAccessPath = () => "/api/v1/suite/network-access";
 export const serverLogsPath = () => "/api/v1/suite/logs";
 export const serverLogsDownloadPath = () => "/api/v1/suite/logs/download";
 export const serverMetricsPath = () => "/api/v1/suite/metrics";
@@ -70,6 +72,13 @@ export async function fetchUpdateStatus(): Promise<UpdateStatus> {
   const r = await apiFetch(path);
   await requireOk(path, r, "Could not check for updates");
   return readJson<UpdateStatus>(r);
+}
+
+export async function fetchNetworkAccess(): Promise<NetworkAccessStatus> {
+  const path = networkAccessPath();
+  const r = await apiFetch(path);
+  await requireOk(path, r, "Could not check network access");
+  return readJson<NetworkAccessStatus>(r);
 }
 
 export async function fetchServerLogs(filters?: {

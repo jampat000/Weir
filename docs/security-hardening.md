@@ -48,6 +48,22 @@ This checklist defines the current practical hardening baseline for Weir.
 - Public issues are not used for unpatched vulnerabilities.
 - CI runs a NuGet vulnerability scan (`node scripts/check-dotnet-vulnerabilities.mjs apps/server/Weir.slnx`, failing on High or Critical) and `npm audit` in addition to CodeQL and standard test gates.
 
+## Windows Firewall
+
+- The Windows package can create exactly one inbound firewall rule, named `Weir`, scoped to the installed
+  server's program path (`server\WeirServer.exe` under Velopack's stable `current` folder) — never a port-wide
+  rule, and the program path is fixed by the installer, never taken from user input.
+- The rule's profiles are Private and Domain only. Public is never included, at install, from the tray's
+  "Allow other devices on your network..." menu item, or from `--allow-lan`.
+- Creating or removing it needs a Windows admin (UAC) elevation; Weir asks for that once, at first run, with a
+  plain explanation, and never asks again automatically if declined.
+- `--allow-lan` (for a program driving Weir unattended) never elevates itself and never prompts: it acts only when
+  already elevated, and otherwise logs and exits non-zero.
+- Reading the current state (for System › About) needs no admin rights and touches nothing; only the Windows
+  build does this, gated by OS — Docker and a bare source install report nothing.
+- Weir never modifies a firewall rule it did not create: removing block rules is limited to inbound rules whose
+  program path matches Weir's own server exe exactly.
+
 ## Release controls
 
 - Releases are built from tagged source.
