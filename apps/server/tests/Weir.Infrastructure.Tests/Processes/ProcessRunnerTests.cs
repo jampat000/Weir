@@ -10,15 +10,26 @@ public sealed class ProcessRunnerTests
 {
     private static readonly ProcessRunner Runner = new();
 
-    /// <summary>The long-lived child <see cref="ShellWithSleepingChild"/> starts underneath the shell.</summary>
-    private static string LingeringChildProcessName => OperatingSystem.IsWindows() ? "ping" : "sleep";
+    private const string StandInName = "Weir.TestChild";
+
+    /// <summary>Long enough for the stand-in to have started its own child, so a kill always finds the whole tree.</summary>
+    private static readonly TimeSpan KillAfter = TimeSpan.FromSeconds(2);
+
+    private static string StandInPath { get; } = Path.Combine(AppContext.BaseDirectory, OperatingSystem.IsWindows() ? StandInName + ".exe" : StandInName);
 
     private static string[] Shell(string windows, string posix) =>
         OperatingSystem.IsWindows() ? ["cmd.exe", "/d", "/c", windows] : ["/bin/sh", "-c", posix];
 
-    /// <summary>A shell that starts a long-lived child, so killing only the shell would leave the child holding the pipes.</summary>
-    private static string[] ShellWithSleepingChild() =>
-        Shell("ping -n 60 127.0.0.1 >NUL & echo done", "sleep 60; echo done");
+    /// <summary>A slow tool that says something first and never finishes on its own.</summary>
+    private static string[] TalkativeSlowTool() => [StandInPath, "announce-and-hold"];
+
+    /// <summary>
+    /// A tool that starts a slow child of its own and waits for it, so killing only the tool would leave the child
+    /// holding the pipes. It prints a line only after that child ends.
+    /// </summary>
+    private static string[] ToolWithSlowChild() => [StandInPath, "hold-through-child"];
+
+    private static int RunningStandIns() => Process.GetProcessesByName(StandInName).Length;
 
     [Fact]
     public async Task Stdout_stderr_and_exit_code_are_captured()
@@ -84,13 +95,13 @@ public sealed class ProcessRunnerTests
     [Fact]
     public async Task A_timeout_kills_the_whole_tree_and_returns_promptly()
     {
-        var before = Process.GetProcessesByName(LingeringChildProcessName).Length;
+        var before = RunningStandIns();
 
-        var result = await Runner.RunAsync(new ProcessRequest { Argv = ShellWithSleepingChild(), Timeout = TimeSpan.FromMilliseconds(500) });
+        var result = await Runner.RunAsync(new ProcessRequest { Argv = ToolWithSlowChild(), Timeout = KillAfter });
 
         Assert.Equal(ProcessTimeoutKind.Overall, result.Timeout);
         Assert.DoesNotContain("done", Encoding.UTF8.GetString(result.Stdout), StringComparison.Ordinal);
-        await Eventually.ThatAsync(() => Process.GetProcessesByName(LingeringChildProcessName).Length <= before);
+        await Eventually.ThatAsync(() => RunningStandIns() <= before);
     }
 
     [Fact]
@@ -98,29 +109,29 @@ public sealed class ProcessRunnerTests
     {
         // #539 item 4: a progress loop that only checks its timeout as a line arrives would hang forever on a
         // process that never writes one - stuck reading its input, for instance.
-        // Here the child (ping/sleep, redirected to NUL/dev-null) writes nothing until well after "echo done",
-        // which never runs within the timeout; the timeout is still enforced, on the wall-clock timer alone.
+        // Here the tool writes nothing until its child ends, which is long after the timeout; the timeout is still
+        // enforced, on the wall-clock timer alone.
         var lines = new List<string>();
-        var before = Process.GetProcessesByName(LingeringChildProcessName).Length;
+        var before = RunningStandIns();
 
         var result = await Runner.RunAsync(new ProcessRequest
         {
-            Argv = ShellWithSleepingChild(),
+            Argv = ToolWithSlowChild(),
             OnStdoutLine = lines.Add,
-            Timeout = TimeSpan.FromMilliseconds(500),
+            Timeout = KillAfter,
         });
 
         Assert.Equal(ProcessTimeoutKind.Overall, result.Timeout);
         Assert.Empty(lines);
-        await Eventually.ThatAsync(() => Process.GetProcessesByName(LingeringChildProcessName).Length <= before);
+        await Eventually.ThatAsync(() => RunningStandIns() <= before);
     }
 
     [Fact]
     public async Task Cancellation_kills_the_tree_and_throws()
     {
-        using var cancel = new CancellationTokenSource(TimeSpan.FromMilliseconds(500));
+        using var cancel = new CancellationTokenSource(KillAfter);
 
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => Runner.RunAsync(new ProcessRequest { Argv = ShellWithSleepingChild() }, cancel.Token));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => Runner.RunAsync(new ProcessRequest { Argv = ToolWithSlowChild() }, cancel.Token));
     }
 
     [Fact]
@@ -128,9 +139,7 @@ public sealed class ProcessRunnerTests
     {
         var error = await Assert.ThrowsAsync<InvalidOperationException>(() => Runner.RunAsync(new ProcessRequest
         {
-            // The line comes from the long-lived process itself. A line the shell echoes before starting its child
-            // races the child's creation: under load the tree kill can run before the child exists to be found.
-            Argv = Shell("ping -n 60 127.0.0.1", "echo first; exec sleep 60"),
+            Argv = TalkativeSlowTool(),
             OnStdoutLine = _ => throw new InvalidOperationException("stop"),
         }));
 

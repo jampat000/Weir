@@ -147,6 +147,9 @@
           "Weir.Core": "[0.0.1-dev, )"
         }
       },
+      "weir.testchild": {
+        "type": "Project"
+      },
       "Microsoft.Data.Sqlite": {
         "type": "CentralTransitive",
         "requested": "[10.0.12, )",

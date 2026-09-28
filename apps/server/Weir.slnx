@@ -9,5 +9,6 @@
     <Project Path="tests/Weir.Api.Tests/Weir.Api.Tests.csproj" />
     <Project Path="tests/Weir.Core.Tests/Weir.Core.Tests.csproj" />
     <Project Path="tests/Weir.Infrastructure.Tests/Weir.Infrastructure.Tests.csproj" />
+    <Project Path="tests/Weir.TestChild/Weir.TestChild.csproj" />
   </Folder>
 </Solution>
