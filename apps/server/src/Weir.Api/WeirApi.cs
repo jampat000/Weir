@@ -52,6 +52,7 @@ public static class WeirApi
         services.AddSingleton<SuiteDiagnosticsEndpointHandlers>();
         services.AddSingleton<SuiteFileEndpointHandlers>();
         services.AddSingleton<SuiteUpdateEndpointHandlers>();
+        services.AddSingleton<SuiteNetworkAccessEndpointHandlers>();
         services.AddSingleton<SuiteOperationalHistoryEndpointHandlers>();
         services.AddSingleton<SuitePauseEndpointHandlers>();
         services.AddSingleton<MediaManagerConnectionsEndpointHandlers>();

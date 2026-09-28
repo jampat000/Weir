@@ -9558,6 +9558,28 @@
         "title": "SuiteMetricsRouteOut",
         "type": "object"
       },
+      "SuiteNetworkAccessOut": {
+        "additionalProperties": false,
+        "description": "Whether another device on the network can currently reach Weir.",
+        "properties": {
+          "state": {
+            "description": "allowed, blocked, not_configured, or not_applicable",
+            "minLength": 1,
+            "title": "State",
+            "type": "string"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          }
+        },
+        "required": [
+          "state",
+          "summary"
+        ],
+        "title": "SuiteNetworkAccessOut",
+        "type": "object"
+      },
       "SuiteOperationalHistoryResetIn": {
         "additionalProperties": false,
         "description": "Body for ``POST /suite/operational-history/reset``.",
@@ -16297,6 +16319,28 @@
           }
         },
         "summary": "Get Suite Metrics",
+        "tags": [
+          "suite"
+        ]
+      }
+    },
+    "/api/v1/suite/network-access": {
+      "get": {
+        "description": "Whether other devices on the network can reach Weir (System › About). Windows package only; other platforms report not_applicable.",
+        "operationId": "get_suite_network_access_api_v1_suite_network_access_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuiteNetworkAccessOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Suite Network Access",
         "tags": [
           "suite"
         ]
