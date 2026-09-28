@@ -4,13 +4,26 @@ Weir bundles or installs the following third-party runtime tools for packaged us
 
 ## FFmpeg
 
-Windows builds bundle FFmpeg and ffprobe from the BtbN FFmpeg Builds project. Docker builds install FFmpeg from the Debian package repositories.
+Windows builds bundle FFmpeg and ffprobe from the BtbN FFmpeg Builds project (the shared build: the
+exes link against a handful of av*.dll libraries instead of each statically embedding its own copy,
+which is what keeps the Windows package smaller). Docker builds install FFmpeg from the Debian
+package repositories.
 
-FFmpeg is a third-party project and is not owned by Weir. FFmpeg licensing depends on the specific build configuration used by the distributor. Weir's Windows package uses the LGPL-labelled BtbN Windows build archive.
+FFmpeg is a third-party project and is not owned by Weir. FFmpeg licensing depends on the specific
+build configuration used by the distributor. Weir's Windows package uses the LGPL-labelled BtbN
+Windows shared build archive.
 
 - Project: https://ffmpeg.org/
 - Windows build source: https://github.com/BtbN/FFmpeg-Builds
 - License information: https://ffmpeg.org/legal.html
+- Exact source for the bundled version: attached to each GitHub Release as
+  `ffmpeg-source-<commit>.tar.gz` (FFmpeg's own source at the exact commit BtbN built) and
+  `ffmpeg-build-scripts-<tag>.tar.gz` (BtbN's build scripts at the release tag that produced the
+  bundled binaries), both hash-pinned in `packaging/windows/build-velopack-vendored-media-tools.ps1`
+  and fetched by `packaging/windows/fetch-bundled-tool-sources.ps1` (called from
+  `.github/workflows/release.yml`). The Debian/Ubuntu package used by the Docker image publishes its
+  own source packages at https://packages.debian.org/source/stable/ffmpeg and
+  https://packages.ubuntu.com/source/ffmpeg.
 
 ## MKVToolNix (mkvmerge)
 
@@ -22,6 +35,12 @@ MKVToolNix is a third-party project and is not owned by Weir. It is distributed 
 - Windows build source: https://mkvtoolnix.download/windows/releases/
 - Source code: https://gitlab.com/mbunkus/mkvtoolnix
 - License: https://www.gnu.org/licenses/old-licenses/gpl-2.0.html
+- Exact source for the bundled version: attached to each GitHub Release as
+  `mkvtoolnix-source-<version>.tar.xz` (the pinned version's own source tarball), hash-pinned in
+  `packaging/windows/build-velopack-vendored-media-tools.ps1` and fetched by
+  `packaging/windows/fetch-bundled-tool-sources.ps1` (called from `.github/workflows/release.yml`).
+  The Debian/Ubuntu `mkvtoolnix` package used by the Docker image publishes its own source packages
+  at https://packages.debian.org/source/stable/mkvtoolnix and https://packages.ubuntu.com/source/mkvtoolnix.
 
 ## Outfit font
 
