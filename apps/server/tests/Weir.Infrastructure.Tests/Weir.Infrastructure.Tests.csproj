@@ -8,6 +8,8 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\Weir.Infrastructure\Weir.Infrastructure.csproj" />
+    <!-- The slow-tool stand-in the process runner tests start; its apphost is copied next to the test assembly. -->
+    <ProjectReference Include="..\Weir.TestChild\Weir.TestChild.csproj" />
   </ItemGroup>
   <ItemGroup>
     <!-- The frozen Alembic-head schema reference (see SchemaParityTests). -->

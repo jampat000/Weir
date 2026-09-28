@@ -15,6 +15,7 @@ Solution: `apps/server/Weir.slnx`.
 | `tests/Weir.Core.Tests` | Unit tests for `Weir.Core`, including the rules and ffmpeg golden fixtures. |
 | `tests/Weir.Infrastructure.Tests` | Tests against a real SQLite database and real files, including migration tests. |
 | `tests/Weir.Api.Tests` | Endpoint tests over HTTP, including `OpenApiDocumentParityTests`. |
+| `tests/Weir.TestChild` | A slow-program stand-in that the process runner tests start instead of a system tool. |
 
 The language-neutral contract suite (`tests/contract`) and the E2E smoke (`tests/e2e/weir`) judge a running server from outside. See [`tests/contract/README.md`](../../tests/contract/README.md).
 
@@ -28,6 +29,8 @@ dotnet test apps/server/Weir.slnx
 ```
 
 `RealFfmpegTests` run real ffprobe and ffmpeg and skip unless the tools are found through `WEIR_FFMPEG_DIR` or `PATH`.
+
+A test that needs a slow or long-lived child uses `Weir.TestChild`, never a system console program such as `ping` run through `cmd.exe`. When a console program inherits its shell's console and the shell is killed while the program starts, Windows can hand the program a fresh console, and on a desktop where Windows Terminal is the default terminal that opens an error window (#806). No automated test can watch for that: the window belongs to the desktop session, CI has no Windows Terminal, and it needs a specific kill timing. After changing `ProcessRunnerTests` or anything that starts processes in tests, run them on a Windows desktop and check that no console, Windows Terminal or `PING.EXE` window appears.
 
 ## Run
 
