@@ -549,6 +549,34 @@ try {
     }
   }
 
+  # --configure-firewall (#801): the elevated helper mode that creates Weir's one inbound LAN-access rule. The
+  # CI runner is elevated and disposable, so this proves the rule against the real installed package and the
+  # real Windows Firewall, independently of Weir's own code, with the NetSecurity PowerShell module. The
+  # matching --remove-firewall proof is below: the Velopack uninstaller runs it, since this runner is elevated.
+  Write-Host "Running the installed Weir.exe --configure-firewall..."
+  $installedServerExe = Join-Path (Split-Path -Parent $installedTrayExe) "server\WeirServer.exe"
+  $firewallProc = Start-Process -FilePath $installedTrayExe -ArgumentList @("--configure-firewall") -PassThru -Wait -WindowStyle Hidden
+  if ($firewallProc.ExitCode -ne 0) {
+    throw "Weir.exe --configure-firewall exited with code $($firewallProc.ExitCode)."
+  }
+
+  $weirFirewallRule = Get-NetFirewallRule -DisplayName "Weir" -ErrorAction SilentlyContinue
+  if (-not $weirFirewallRule) {
+    throw "--configure-firewall did not create a firewall rule named 'Weir'."
+  }
+  if ($weirFirewallRule.Direction -ne "Inbound" -or $weirFirewallRule.Action -ne "Allow" -or $weirFirewallRule.Enabled -ne "True") {
+    throw "The Weir firewall rule is not an enabled inbound allow rule (Direction=$($weirFirewallRule.Direction), Action=$($weirFirewallRule.Action), Enabled=$($weirFirewallRule.Enabled))."
+  }
+  $weirFirewallProfile = [string]$weirFirewallRule.Profile
+  if ($weirFirewallProfile -notmatch "Private" -or $weirFirewallProfile -notmatch "Domain" -or $weirFirewallProfile -match "Public") {
+    throw "The Weir firewall rule's profile is '$weirFirewallProfile'; expected exactly Private and Domain, never Public."
+  }
+  $weirFirewallProgram = (Get-NetFirewallApplicationFilter -AssociatedNetFirewallRule $weirFirewallRule).Program
+  if ($weirFirewallProgram -ne $installedServerExe) {
+    throw "The Weir firewall rule's program is '$weirFirewallProgram', expected '$installedServerExe'."
+  }
+  Write-Host "Weir firewall rule verified: inbound allow, profile '$weirFirewallProfile', scoped to $weirFirewallProgram."
+
   Write-Host "Uninstalling with the Velopack uninstaller..."
   if (-not (Test-Path -LiteralPath $updateExe)) {
     throw "Velopack updater not found at $updateExe; cannot uninstall."
@@ -558,6 +586,15 @@ try {
     throw "Update.exe uninstall --silent exited with code $($uninstallProc.ExitCode)."
   }
   Write-Host "Uninstalled cleanly (exit code 0)."
+
+  # Uninstall's before-uninstall hook removes the firewall rule itself when already elevated (this runner is);
+  # see Weir.Tray/Program.cs RemoveFirewallRuleIfElevated. A rule surviving uninstall would point at a program
+  # that no longer exists.
+  $weirFirewallRuleAfterUninstall = Get-NetFirewallRule -DisplayName "Weir" -ErrorAction SilentlyContinue
+  if ($weirFirewallRuleAfterUninstall) {
+    throw "The Weir firewall rule still exists after uninstall."
+  }
+  Write-Host "Confirmed: uninstall removed the Weir firewall rule."
 } catch {
   Write-Host "Real installer smoke failed."
   $installedLogPath = Join-Path $defaultRuntimeHome "tray-host.log"
