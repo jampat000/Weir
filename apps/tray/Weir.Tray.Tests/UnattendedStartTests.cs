@@ -64,6 +64,34 @@ public sealed class UnattendedStartTests
         Assert.False(Program.HasInteractiveDesktop(["--silent"], () => throw new Xunit.Sdk.XunitException("Silent must not consult the desktop heuristic at all.")));
     }
 
+    // -- The first-run firewall prompt: the same rule, belt and suspenders ---
+
+    [Fact]
+    public void The_first_run_firewall_prompt_never_shows_during_a_silent_start_even_on_a_desktop()
+    {
+        Assert.False(Program.ShouldPromptForFirewallAccess(["--silent"], () => true));
+    }
+
+    [Fact]
+    public void The_first_run_firewall_prompt_never_shows_without_an_interactive_desktop()
+    {
+        Assert.False(Program.ShouldPromptForFirewallAccess([], () => false));
+    }
+
+    [Fact]
+    public void The_first_run_firewall_prompt_can_show_on_an_interactive_desktop()
+    {
+        Assert.True(Program.ShouldPromptForFirewallAccess([], () => true));
+    }
+
+    [Fact]
+    public void The_first_run_firewall_prompt_never_consults_the_desktop_heuristic_when_silent()
+    {
+        Assert.False(Program.ShouldPromptForFirewallAccess(
+            ["--silent"],
+            () => throw new Xunit.Sdk.XunitException("A silent start must never consult the desktop heuristic at all.")));
+    }
+
     [Fact]
     public void A_silent_start_with_a_supplied_port_is_used_without_asking_even_though_a_desktop_is_reported()
     {

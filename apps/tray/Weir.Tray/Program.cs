@@ -46,7 +46,7 @@ static class Program
             return FirewallCommand.Run(args, LogToConsoleAndFile);
         }
 
-        RunInstallerHooks();
+        RunInstallerHooks(args);
 
         if (args.Contains("--version"))
         {
@@ -69,7 +69,7 @@ static class Program
 
     // Velopack runs Weir.exe with its own arguments to install, update and uninstall; these hooks run then and
     // exit, and a normal start falls through.
-    private static void RunInstallerHooks() =>
+    private static void RunInstallerHooks(string[] args) =>
         VelopackApp.Build()
             .OnAfterInstallFastCallback((v) =>
             {
@@ -95,9 +95,11 @@ static class Program
             })
             // Unlike the FastCallback hooks above, OnFirstRun runs in-process as part of a normal app start and is
             // allowed to show UI (docs.velopack.io) — the one place Weir asks its one Windows admin (UAC) prompt
-            // for LAN access, per the owner's decision. It never runs for a --silent start's first launch either,
-            // because --silent skips Velopack's post-install app launch entirely (docs/release.md, #779).
-            .OnFirstRun((v) => PromptForFirewallAccess())
+            // for LAN access, per the owner's decision. --silent Setup skips Velopack's post-install app launch
+            // entirely (docs/release.md, #779), so this should never run during a silent install either way;
+            // PromptForFirewallAccess checks IsSilent and the interactive desktop itself too, rather than relying
+            // only on that.
+            .OnFirstRun((v) => PromptForFirewallAccess(args))
             .Run();
 
     // A FastCallback hook has a 30-second budget and must show nothing (Velopack.VelopackApp docs), so this never
@@ -124,8 +126,14 @@ static class Program
     // The one Windows admin (UAC) prompt Weir ever asks for on its own, and only once: FirewallPromptFile records
     // the answer, even a decline, so a person who said no is never asked again at every start. "Allow other
     // devices on your network..." in the tray menu is how they revisit it later.
-    private static void PromptForFirewallAccess()
+    private static void PromptForFirewallAccess(string[] args)
     {
+        if (!ShouldPromptForFirewallAccess(args, PortChoice.HasInteractiveDesktop))
+        {
+            TrayLog.Write("First-run firewall prompt skipped: silent start or no interactive desktop.");
+            return;
+        }
+
         var runtimeHome = RuntimeHome();
         try
         {
@@ -373,6 +381,15 @@ static class Program
     /// side effects) so the override is testable without a real desktop.
     /// </summary>
     internal static bool HasInteractiveDesktop(IEnumerable<string> args, Func<bool> desktopCheck) => !IsSilent(args) && desktopCheck();
+
+    /// <summary>
+    /// Whether the first-run firewall prompt (<see cref="PromptForFirewallAccess"/>) may show anything at all.
+    /// Belt and suspenders alongside Setup's own <c>--silent</c> skipping the post-install app launch entirely
+    /// (docs/release.md, #779): this never shows the prompt during a silent start or without an interactive
+    /// desktop to show it on, whatever else changes about how this process was started.
+    /// </summary>
+    internal static bool ShouldPromptForFirewallAccess(IEnumerable<string> args, Func<bool> desktopCheck) =>
+        HasInteractiveDesktop(args, desktopCheck);
 
     internal static bool OpenBrowser(
         int port,
