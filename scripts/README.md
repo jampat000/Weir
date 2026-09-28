@@ -20,8 +20,10 @@ work, not rewritten for its own sake. Scripts are named in kebab-case.
 | `check-github-action-pins.mjs` | Fails when a workflow uses an action that is not pinned to a full commit SHA. |
 | `check-node-docker-version.mjs` | Fails when the Dockerfile's node image major does not match the root `.node-version`. |
 | `check-release-workflow-gates.mjs` | Checks the shape of `release.yml` and `ci.yml`: only `publish` publishes, `latest` moves last, `ci-passed` judges every job. |
-| `check-release-version.mjs` | Fails a release whose tag does not match `WeirVersion` and `apps/web/package.json`. |
+| `check-release-version.mjs` | Fails a release whose tag is not a well-formed `X.Y.Z` version (`check-release-version.test.mjs`). No file carries the release version; every build that ships takes it from the tag instead (#804). |
 | `verify-ci-for-release.mjs` | Makes a release prove `ci.yml`'s `ci-passed` passed on the tagged commit (`verify-ci-for-release.test.mjs`). |
+| `prune-release-feed.mjs` | Removes the previous release's full nupkg (fetched only as the Windows package's delta base) and its feed entries from a `vpk pack` output directory, keeping just the version being released (`prune-release-feed.test.mjs`). |
+| `check-release-assets-single-version.mjs` | Release gate: fails if the Windows package output still names any version other than the one being released, as a backstop for `prune-release-feed.mjs` (`check-release-assets-single-version.test.mjs`). |
 | `check-dead-code.mjs` | Dead-code guard for the web app: unused exports (allowlist in `dead-code-allowlist.json`) and unstyled class names. |
 | `check-dotnet-vulnerabilities.mjs` | Fails on High or Critical NuGet advisories in a .NET solution. |
 | `npm-audit-retry.mjs` | Runs `npm audit`, retrying only a registry-side failure; fails on a real High/Critical finding (`npm-audit-retry.test.mjs`). Used by apps/web's audit step and imported by `docs-site/scripts/audit-dependencies.mjs`. |
