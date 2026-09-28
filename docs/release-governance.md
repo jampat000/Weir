@@ -30,7 +30,9 @@ This is the canonical governance checklist for keeping Weir releases controlled 
 ## After every release
 
 1. Confirm the GitHub Release exists for the pushed tag.
-2. Confirm `Weir-win-Setup.exe` is attached to the release.
+2. Confirm `Weir-win-Setup.exe` is attached to the release, alongside exactly one full and (when a
+   previous release existed) one delta nupkg for this version only — no earlier version's full nupkg
+   (`scripts/check-release-assets-single-version.mjs` gates this in `windows-smoke`; #804).
 3. Confirm the published release body is plain-language and matches the approved `docs/release-notes/vX.Y.Z.md` content.
 4. Confirm the release notes/install guidance names the attached `Weir-win-Setup.exe` installer and explains any one-time upgrade requirement for older installs.
 5. Confirm the GHCR image exists for both `vX.Y.Z` and `latest` (`latest` moves only after the version's image passed its smoke and the release was published).

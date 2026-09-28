@@ -2,12 +2,19 @@ param(
   [switch]$SkipWebBuild,
   [switch]$SkipDotnetPublish,
   [switch]$SkipSmoke,
-  # When set, the previous release's full nupkg is downloaded into $velopackOut before `vpk
+  # When set, the previous release's full nupkg is fetched into $velopackOut before `vpk
   # pack` runs, so vpk builds a delta package against it as well as the full one. Left empty for
   # local builds and the PR-triggered windows-package-smoke job (ci-packaging.yml): neither ships
   # anything, and a delta with no consumer is just a slower, network-dependent build. release.yml
   # passes the repo URL so every real release gets a delta wherever a base release exists.
-  [string]$PreviousReleaseRepoUrl = ""
+  [string]$PreviousReleaseRepoUrl = "",
+
+  # The previous release's bare version (e.g. "3.2.10"), when known. Lets the fetch above be served
+  # from release.yml's own actions/cache instead of a `vpk download` on every release: the cache is
+  # keyed on this exact version, so it can never serve a stale package (packaging/windows/vendor/
+  # previous-release, gitignored the same as the FFmpeg/MKVToolNix vendor folders). Left empty when
+  # the previous version is not known up front (local builds; the very first release).
+  [string]$PreviousReleaseVersion = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -34,12 +41,16 @@ $ErrorActionPreference = "Stop"
 #
 # scripts/smoke-windows-package.ps1 then proves the assembled server works end to end.
 #
-# Phase timing (Start-BuildPhase/Stop-BuildPhase/Write-BuildPhaseSummary) and the vendored FFmpeg/
-# MKVToolNix provisioning (Ensure-WindowsFfmpegRuntime/Ensure-WindowsMkvtoolnixRuntime) are split into
-# sibling files and dot-sourced below, so this script stays under the project's line-count guideline
-# (#747). Dot-sourcing runs them in this script's own scope, exactly as if they were inline here.
+# Phase timing (Start-BuildPhase/Stop-BuildPhase/Write-BuildPhaseSummary), the vendored FFmpeg/MKVToolNix
+# provisioning (Ensure-WindowsFfmpegRuntime/Ensure-WindowsMkvtoolnixRuntime), the background web build
+# (Start-WeirWebBuild/Wait-WeirWebBuild) and the previous release's delta base
+# (Get-WeirPreviousReleaseFullNupkg) are split into sibling files and dot-sourced below, so this script
+# stays under the project's line-count guideline (#747). Dot-sourcing runs them in this script's own
+# scope, exactly as if they were inline here.
 . "$PSScriptRoot\build-velopack-phase-timing.ps1"
 . "$PSScriptRoot\build-velopack-vendored-media-tools.ps1"
+. "$PSScriptRoot\build-velopack-web-build.ps1"
+. "$PSScriptRoot\build-velopack-previous-release.ps1"
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\\..")).Path
 $serverProjectDir = Join-Path $repoRoot "apps\\server\\src\\Weir.Host"
@@ -65,76 +76,33 @@ function Invoke-Native {
   }
 }
 
-# ── Resolve version from apps/server/Directory.Build.props (WeirVersion) ──
-# The one product version; the server's own assembly version is stamped from the same line.
+# ── Resolve the version to build ──
+# #804: there is no per-release version checked into the tree any more. WEIR_BUILD_VERSION (release.yml
+# sets it from the tag) is the real product version and is trusted as-is; every local or PR build that
+# leaves it unset falls back to WeirVersion in apps/server/Directory.Build.props, which is a fixed
+# placeholder that never ships (scripts/check-release-version.mjs validates the tag itself before this
+# script ever runs).
 $propsPath = Join-Path $repoRoot "apps\\server\\Directory.Build.props"
 $propsMatch = [regex]::Match((Get-Content -LiteralPath $propsPath -Raw), '<WeirVersion>([^<]+)</WeirVersion>')
 if (-not $propsMatch.Success) {
   throw "WeirVersion was not found in $propsPath."
 }
-$projectVersion = $propsMatch.Groups[1].Value.Trim()
 $buildVersion = if ($env:WEIR_BUILD_VERSION) {
   $env:WEIR_BUILD_VERSION
 } else {
-  $projectVersion
+  $propsMatch.Groups[1].Value.Trim()
 }
 if ($buildVersion.StartsWith("v")) {
   $buildVersion = $buildVersion.Substring(1)
 }
-if ($buildVersion -ne $projectVersion) {
-  throw "WEIR_BUILD_VERSION '$buildVersion' does not match WeirVersion '$projectVersion' in apps/server/Directory.Build.props."
-}
 
-# ── Web build ──
-Start-BuildPhase "Web build"
-if (-not $SkipWebBuild) {
-  $webBuildRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("weir-web-build-" + [System.Guid]::NewGuid().ToString("N"))
-  $webBuildWebDir = Join-Path $webBuildRoot "apps\\web"
-  $webBuildScriptsDir = Join-Path $webBuildRoot "scripts"
-  try {
-    New-Item -ItemType Directory -Path $webBuildWebDir | Out-Null
-    New-Item -ItemType Directory -Path $webBuildScriptsDir | Out-Null
-    Copy-Item -LiteralPath (Join-Path $repoRoot "scripts\\dev-ports.json") -Destination (Join-Path $webBuildScriptsDir "dev-ports.json") -Force
-    $copyArgs = @(
-      $webDir,
-      $webBuildWebDir,
-      "/MIR",
-      "/XD",
-      "node_modules",
-      "dist",
-      ".vite",
-      "tmp",
-      "/XF",
-      "*.log"
-    )
-    & robocopy @copyArgs | Out-Host
-    if ($LASTEXITCODE -gt 7) {
-      throw ("Command failed with exit code {0}: robocopy {1}" -f $LASTEXITCODE, ($copyArgs -join " "))
-    }
-
-    Push-Location $webBuildWebDir
-    Invoke-Native -FilePath npm.cmd -ArgumentList @("ci")
-    Invoke-Native -FilePath npm.cmd -ArgumentList @("run", "build")
-
-    $sourceDist = Join-Path $webBuildWebDir "dist"
-    $targetDist = Join-Path $webDir "dist"
-    if (Test-Path $targetDist) {
-      Remove-Item -LiteralPath $targetDist -Recurse -Force
-    }
-    Copy-Item -LiteralPath $sourceDist -Destination $targetDist -Recurse -Force
-  } finally {
-    if ((Get-Location).Path -eq $webBuildRoot) {
-      Pop-Location
-    }
-    if (Test-Path $webBuildRoot) {
-      Remove-Item -LiteralPath $webBuildRoot -Recurse -Force -ErrorAction SilentlyContinue
-    }
-  }
-}
-$webDistDir = Join-Path $webDir "dist"
-if (-not (Test-Path -LiteralPath (Join-Path $webDistDir "index.html"))) {
-  throw "Expected a built web app at $webDistDir (index.html missing). Re-run without -SkipWebBuild."
-}
+# ── Web build (started in the background; nothing needs its output until the server publish smoke
+#    below, so it overlaps FFmpeg/MKVToolNix vendoring and the .NET server publish instead of blocking
+#    them; see build-velopack-web-build.ps1) ──
+# Timed with its own stopwatch, not Start-BuildPhase: it overlaps the phases that follow, so folding
+# its time into their sequential total would overstate how long the build actually took end to end.
+$webBuildStopwatch = [System.Diagnostics.Stopwatch]::StartNew()
+$webBuildJob = Start-WeirWebBuild -RepoRoot $repoRoot -WebDir $webDir -Skip:$SkipWebBuild
 
 # ── Clean dist ──
 if ($SkipDotnetPublish) {
@@ -194,6 +162,15 @@ if (-not (Test-Path -LiteralPath $publishedServerExe)) {
 $serverVersion = (& $publishedServerExe --version).Trim()
 if ($serverVersion -ne $buildVersion) {
   throw "Published Weir.exe (server) reports version '$serverVersion' but expected build version is '$buildVersion'."
+}
+
+# ── Join the background web build: the smoke below is the first thing that needs its output ──
+Wait-WeirWebBuild -Job $webBuildJob
+$webBuildStopwatch.Stop()
+Write-Host ("--- Web build (background): {0}s, overlapped with the phases above ---" -f [math]::Round($webBuildStopwatch.Elapsed.TotalSeconds, 1))
+$webDistDir = Join-Path $webDir "dist"
+if (-not (Test-Path -LiteralPath (Join-Path $webDistDir "index.html"))) {
+  throw "Expected a built web app at $webDistDir (index.html missing). Re-run without -SkipWebBuild."
 }
 
 # ── Smoke: the raw published server exe, before packing (temp WEIR_HOME + the built web dist) ──
@@ -344,25 +321,12 @@ if (-not (Test-Path -LiteralPath $vpkExe)) {
   throw "vpk CLI was not found after install. Ensure the .NET global tools directory is available."
 }
 
-# Fetch the previous release's full nupkg into $velopackOut first. `vpk pack` (below) then
-# finds it there on its own (Velopack.Packaging.ReleaseEntryHelper.GetPreviousFullRelease) and emits
-# a delta nupkg alongside the full one at no extra flag — --delta defaults to BestSpeed. When no
-# previous release exists yet (a brand-new repo, or every existing release predates this channel),
-# `vpk download github` logs a warning and returns without error, and pack simply produces the full
-# package as before: the full package is always the fallback, never a hard dependency on there being
-# a prior release to diff against.
+# Fetch the previous release's full nupkg into $velopackOut first (build-velopack-previous-release.ps1),
+# so `vpk pack` (below) finds it there on its own and emits a delta nupkg alongside the full one at no
+# extra flag — --delta defaults to BestSpeed.
 if ($PreviousReleaseRepoUrl) {
   Start-BuildPhase "Fetch previous release for delta"
-  Write-Host "Downloading the previous full release from $PreviousReleaseRepoUrl for delta packaging..."
-  $downloadArgs = @(
-    "download", "github",
-    "--repoUrl", $PreviousReleaseRepoUrl,
-    "--outputDir", $velopackOut
-  )
-  if ($env:GITHUB_TOKEN) {
-    $downloadArgs += @("--token", $env:GITHUB_TOKEN)
-  }
-  Invoke-Native -FilePath $vpkExe -ArgumentList $downloadArgs
+  Get-WeirPreviousReleaseFullNupkg -RepoUrl $PreviousReleaseRepoUrl -Version $PreviousReleaseVersion -OutputDir $velopackOut -VpkExePath $vpkExe
 }
 
 Start-BuildPhase "vpk pack"
@@ -385,6 +349,20 @@ if ($deltaPackages.Count -gt 0) {
   Write-Host "Delta package(s) built against the previous release: $($deltaPackages.Name -join ', ')"
 } elseif ($PreviousReleaseRepoUrl) {
   Write-Host "No delta package was built (no previous full release was found to diff against); the full package is the fallback."
+}
+
+# The previous release's full nupkg, fetched above only so vpk could build the delta against it, is
+# still sitting in $velopackOut and listed in its feed files alongside $buildVersion's own packages.
+# Remove it before anything here gets uploaded (#804): a client on the previous version already has
+# that release's own full package; it only needs this release's delta.
+# scripts/check-release-assets-single-version.mjs re-checks this in release.yml, right before upload.
+if ($PreviousReleaseRepoUrl) {
+  Start-BuildPhase "Prune stale release feed entries"
+  Invoke-Native -FilePath node -ArgumentList @(
+    (Join-Path $repoRoot "scripts\\prune-release-feed.mjs"),
+    "--output-dir", $velopackOut,
+    "--version", $buildVersion
+  )
 }
 
 Write-BuildPhaseSummary

@@ -12,19 +12,22 @@ Weir is released under AGPL-3.0-or-later. Release artifacts are built from the t
 
 ## Contract
 
-1. Update the version in both files in a normal PR:
-   - `<WeirVersion>` in `apps/server/Directory.Build.props`
-   - `version` in `apps/web/package.json`
+There is no version-bump PR (#804): no file in the tree carries the release version. Every build
+that ships (the Windows package, the Docker image) stamps its own version on the command line, taken
+from the tag itself — `WeirVersion` in `apps/server/Directory.Build.props` is a fixed placeholder that
+never changes. Cutting a release is:
 
-   The release workflow checks that the tag `vX.Y.Z` matches both and stops if either differs.
-2. Merge to `main` after `CI / ci-passed` passes. The tag's commit must then pass `CI` on `main`
-   as well: the release checks for that run instead of re-running the tests itself (below).
-3. Create user-facing release notes for the target tag before pushing it:
+1. Pick a commit on `main` whose `CI / ci-passed` run has already passed — normally just the current
+   `main` HEAD, once its own push run is green.
+2. Create user-facing release notes for the target tag and merge them to `main` as a normal PR:
 
    - Create `docs/release-notes/vX.Y.Z.md` using `docs/release-notes/TEMPLATE.md`.
    - Keep wording operator-friendly and focused on what changed for users.
 
-4. Create an annotated tag on the merge commit:
+   This PR touches nothing under `apps/`, `packaging/` or `Dockerfile`, so `CI / ci-passed` on it and
+   on its merge to `main` both finish in well under a minute (path-aware CI skips everything but the
+   repository checks).
+3. Create an annotated tag on that merge commit:
 
    ```bash
    git fetch origin
@@ -34,8 +37,12 @@ Weir is released under AGPL-3.0-or-later. Release artifacts are built from the t
    git push origin vX.Y.Z
    ```
 
-5. Pushing `v*` triggers `.github/workflows/release.yml`.
-6. The release workflow requires `docs/release-notes/vX.Y.Z.md` for the tag and publishes that file as the GitHub Release body.
+4. Pushing `v*` triggers `.github/workflows/release.yml`. Its `ci-passed` job confirms `CI` already
+   passed on that exact commit (`scripts/verify-ci-for-release.mjs`) instead of re-running it, and
+   `windows-smoke` validates the tag itself is a well-formed `X.Y.Z` version
+   (`scripts/check-release-version.mjs`) before stamping it onto the server, the tray, the Windows
+   package and the Docker image.
+5. The release workflow requires `docs/release-notes/vX.Y.Z.md` for the tag and publishes that file as the GitHub Release body.
 
 Local Docker is not required for this release path. Docker build, publish,
 manifest verification, and container smoke testing all run on GitHub-hosted
@@ -107,13 +114,24 @@ The release workflow publishes GHCR images with the repository `GITHUB_TOKEN` an
 
 The Velopack-based Windows package is the supported Windows release artifact. Release builds produce a setup exe, full nupkg, and delta nupkg under `dist/windows/releases/`.
 
-The delta nupkg is built by `packaging/windows/build-velopack.ps1 -PreviousReleaseRepoUrl <repo>`,
-which downloads the previous GitHub Release's full nupkg into the output directory (`vpk download
-github`) before `vpk pack` runs; `vpk pack` then finds it there on its own and emits a delta package
-alongside the full one. `release.yml` always passes `-PreviousReleaseRepoUrl`. If there is no previous
-release to diff against (a gap in the chain, or the very first release), only the full package is
-produced — every install can always fall back to it. Local and PR builds omit
-`-PreviousReleaseRepoUrl` and never fetch anything or produce a delta, so they stay offline and fast.
+The delta nupkg is built by `packaging/windows/build-velopack.ps1 -PreviousReleaseRepoUrl <repo>
+-PreviousReleaseVersion <X.Y.Z>`, which fetches the previous GitHub Release's full nupkg into the
+output directory before `vpk pack` runs; `vpk pack` then finds it there on its own and emits a delta
+package alongside the full one. `release.yml` resolves `-PreviousReleaseVersion` itself (the latest
+published release, via the GitHub API) and caches that one file across runs, keyed strictly on that
+version, so a release only ever downloads it once. If there is no previous release to diff against (a
+gap in the chain, or the very first release), only the full package is produced — every install can
+always fall back to it. Local and PR builds omit `-PreviousReleaseRepoUrl` and never fetch anything or
+produce a delta, so they stay offline and fast.
+
+`vpk pack` also carries that downloaded previous-version nupkg forward into its own feed files
+(`releases.win.json`, the legacy `RELEASES`), since it has no reason to know it should not. Right
+after packing, `build-velopack.ps1` removes that package and rewrites both feed files to list only the
+version being released (`scripts/prune-release-feed.mjs`); `release.yml` re-checks the result before
+upload (`scripts/check-release-assets-single-version.mjs`) and fails the release if anything for another
+version is still there. A client already on the previous version has that version's own full package
+cached locally from when it installed or last updated, and needs only this release's delta; an older
+client chains deltas across the feed entries of the releases in between instead.
 
 If you build the Windows package locally and want the installer to include the Support section of **System › About**, set `VITE_SUPPORT_URL` before running `packaging/windows/build-velopack.ps1`:
 

@@ -34,12 +34,18 @@
   </PropertyGroup>
 
   <!--
-    One version for the whole product. The server, the Windows package (packaging/windows/build-velopack.ps1),
-    the Docker image and the release workflow all read WeirVersion from this line; apps/web/package.json
-    carries the same number, and the release workflow refuses a tag that does not match both.
+    A fixed placeholder, not the product version: releases no longer bump it (#804). Every build that
+    ships stamps its own real version on the command line instead — `-p:Version=X.Y.Z`, taken from the
+    release tag at build time (packaging/windows/build-velopack.ps1's $buildVersion, the Dockerfile's
+    WEIR_VERSION build-arg) — so there is nothing left to bump, and nothing here to keep in sync with a
+    tag. Ordinary builds (a plain `dotnet build`, CI) never pass that override, so they run as this
+    placeholder; that is fine, since none of them ship. Leave this line alone: bumping it would only
+    require the four packages.lock.json files that pin a Weir.* project reference at this exact version
+    (apps/server/src/Weir.Api, apps/server/src/Weir.Host and their test projects) to be regenerated for
+    no reason.
   -->
   <PropertyGroup>
-    <WeirVersion>3.2.10</WeirVersion>
+    <WeirVersion>0.0.1-dev</WeirVersion>
     <Version>$(WeirVersion)</Version>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
   </PropertyGroup>
