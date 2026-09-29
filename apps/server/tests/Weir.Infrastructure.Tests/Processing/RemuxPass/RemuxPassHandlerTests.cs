@@ -277,9 +277,29 @@ public sealed class RemuxPassHandlerTests : IDisposable
 
         Assert.Equal(ProcessingFileStatuses.Rejected, file.Status);
         Assert.Equal($"{ForeignOnlyReason} {WeirOnlyRejection.LeftInPlace}", file.StatusReason);
-        Assert.Equal((ProcessingFailureClasses.Preflight, 0L, null), (file.FailureClass, file.FailureAttempts, file.NextRetryAt));
+        Assert.Equal((ProcessingFailureClasses.Rules, 0L, null), (file.FailureClass, file.FailureAttempts, file.NextRetryAt));
         Assert.True(File.Exists(ForeignFile));
         Assert.Equal(0, await _fixture.Store.Scalar("SELECT count(*) FROM jobs WHERE job_kind <> 'processing.file.remux_pass.v1'"));
+    }
+
+    [Fact]
+    public async Task A_rules_rejection_with_no_media_manager_is_titled_as_a_rejection_in_activity()
+    {
+        await RejectedForeignFileAsync();
+
+        Assert.Equal(
+            "Rejected Foreign Again (2020).mkv: no English audio for the \"English only\" rules",
+            await ScalarText("SELECT title FROM activity_events WHERE event_type = 'processing.file_remux_pass_completed'"));
+    }
+
+    [Fact]
+    public async Task Under_the_reject_policy_the_activity_title_for_the_pass_is_unchanged()
+    {
+        await RejectedForeignFileAsync(failurePolicy: "reject");
+
+        Assert.Equal(
+            "Foreign Again (2020).mkv could not be checked",
+            await ScalarText("SELECT title FROM activity_events WHERE event_type = 'processing.file_remux_pass_completed'"));
     }
 
     [Fact]

@@ -1,5 +1,6 @@
 using Weir.Core.Json;
 using Weir.Core.Processing;
+using Weir.Core.Processing.RemuxPass;
 
 namespace Weir.Infrastructure.Processing.RemuxPass;
 
@@ -27,16 +28,22 @@ public static class WeirOnlyRejection
     }
 
     /// <summary>
-    /// Puts the reason in the words a person reads: the plain explanation the pass wrote, when it wrote one, replaces the
-    /// technical sentence a manager's report would carry.
+    /// Marks the result as a rejection no manager is involved in, and puts it in the words a person reads: the plain
+    /// explanation the pass wrote, when it wrote one, replaces the technical sentence a manager's report would carry.
     /// </summary>
-    public static void UsePlainReason(WireObject result)
+    public static void Present(WireObject result)
     {
         ArgumentNullException.ThrowIfNull(result);
+        result.Set(RejectionResultKeys.WithoutManager, true);
         if (result.Get("rejection_explanation") is WireString { Value.Length: > 0 } explanation)
         {
             result.Set("reason", explanation.Value);
             result.Set("preflight_reason", explanation.Value);
+        }
+
+        if (result.Get(RejectionResultKeys.Summary) is not { IsTruthy: true } && result.Get("rejection_kind") is WireString { Value: "no_video_stream" })
+        {
+            result.Set(RejectionResultKeys.Summary, "it has no video");
         }
     }
 }

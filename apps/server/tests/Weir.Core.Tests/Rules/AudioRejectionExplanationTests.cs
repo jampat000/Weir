@@ -25,7 +25,7 @@ public sealed class AudioRejectionExplanationTests
     private static string Explain(ProcessingRulesConfig config, string? profile, params ProbeStreamInfo[] audio)
     {
         Assert.Null(RemuxRules.PlanRemux([Video], audio, [], config));
-        return AudioRejectionExplanation.Explain(config, audio, profile);
+        return AudioRejectionExplanation.Explain(config, audio, profile).Sentence;
     }
 
     [Fact]
@@ -88,5 +88,15 @@ public sealed class AudioRejectionExplanationTests
         var reason = Explain(RemuxRules.DefaultConfig(), null);
 
         Assert.Equal("Rejected: this file has no audio tracks, so there would be nothing to keep.", reason);
+    }
+
+    [Fact]
+    public void The_summary_for_a_title_names_the_language_and_the_rules()
+    {
+        var audio = new[] { Audio(1, "jpn") };
+
+        var rejection = AudioRejectionExplanation.Explain(EnglishOnly(), audio, "Movies");
+
+        Assert.Equal("no English audio for the \"Movies\" rules", rejection.Summary);
     }
 }

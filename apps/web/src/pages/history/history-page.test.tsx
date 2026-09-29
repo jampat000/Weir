@@ -401,6 +401,7 @@ describe("HistoryPage", () => {
       file({
         id: 1,
         status: "rejected",
+        failure_class: "rules",
         status_reason:
           "Rejected: none of its audio tracks are in English, and your rules keep only English audio, so there would be nothing to keep. The file was left where it is.",
       }),
@@ -415,6 +416,15 @@ describe("HistoryPage", () => {
       within(chips).getByRole("button", { name: /Skipped\s*0/ }),
     ).toBeInTheDocument();
     expect(screen.getAllByText("Rejected").length).toBeGreaterThan(0);
+  });
+
+  it("says a file was rejected for a replacement when a media manager was asked for another copy", () => {
+    files.files = [
+      file({ id: 1, status: "rejected", failure_class: "preflight" }),
+    ];
+    renderPage();
+
+    expect(screen.getByText("Rejected for a replacement")).toBeInTheDocument();
   });
 
   it("lists a library clean alongside downloads, as its own kind of entry", () => {

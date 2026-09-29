@@ -16,7 +16,7 @@ public sealed partial class RemuxPassHandler
         var weirOnly = WeirOnlyRejection.Applies(library, origin);
         if (weirOnly)
         {
-            WeirOnlyRejection.UsePlainReason(result);
+            WeirOnlyRejection.Present(result);
         }
 
         var deletes = string.Equals(WireStrings.Strip(library.RejectedFileAction ?? string.Empty), RejectedFileActions.DeleteFile, StringComparison.OrdinalIgnoreCase)
@@ -47,6 +47,6 @@ public sealed partial class RemuxPassHandler
     {
         await RemuxPassFileState.ClearFailureFieldsAsync(uow, library.Id, relativePath).ConfigureAwait(false);
         var source = result.Get("inspected_source_path") is WireString { Value.Length: > 0 } inspected && File.Exists(inspected.Value) ? inspected.Value : null;
-        await RemuxPassFileState.UpsertRejectedAsync(uow, library.Id, relativePath, reason, ProcessingFailureClasses.Preflight, source).ConfigureAwait(false);
+        await RemuxPassFileState.UpsertRejectedAsync(uow, library.Id, relativePath, reason, ProcessingFailureClasses.Rules, source).ConfigureAwait(false);
     }
 }

@@ -270,13 +270,15 @@ public sealed partial class RemuxPassRunner
 
         if (plan is null)
         {
+            var rejection = AudioRejectionExplanation.Explain(config, audio, request.RulesProfileName);
             return FailBefore(
                 relativeMediaPath,
                 "remux plan could not be built (no retainable audio)",
                 inspected,
                 new WireObject()
                     .Set("rejection_kind", "no_retainable_audio")
-                    .Set("rejection_explanation", AudioRejectionExplanation.Explain(config, audio, request.RulesProfileName))
+                    .Set("rejection_explanation", rejection.Sentence)
+                    .Set(RejectionResultKeys.Summary, rejection.Summary)
                     .Set("media_scope", scope)
                     .Set("processing_watched_folder_resolved", watchedRoot));
         }
