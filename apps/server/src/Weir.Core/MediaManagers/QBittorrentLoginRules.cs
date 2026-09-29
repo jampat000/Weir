@@ -9,8 +9,9 @@ public readonly record struct QBittorrentLogin(bool Accepted, string? SessionCoo
 /// <summary>
 /// Reads the answer to <c>POST /api/v2/auth/login</c> with no I/O. Older versions answer 200 with <c>Ok.</c> or
 /// <c>Fails.</c> and name the session cookie <c>SID</c>. 5.x answers a good login with 204 and an empty body and
-/// names the cookie <c>QBT_SID_&lt;port&gt;</c>, so the cookie is taken by whatever name it carries and an empty
-/// body only counts as a login when a session cookie came with it (#842).
+/// names the cookie <c>QBT_SID_&lt;port&gt;</c>, so the cookie is taken by whatever name it carries. An empty body
+/// is a good login whether or not a cookie came with it: a server answers 204 without one when it already trusts the
+/// caller, for example when the login carried a live session (#842, #856).
 /// </summary>
 public static class QBittorrentLoginRules
 {
@@ -26,7 +27,7 @@ public static class QBittorrentLoginRules
 
         var cookie = SessionCookie(setCookie);
         var text = body.Trim();
-        var accepted = text.Length == 0 ? cookie is not null : string.Equals(text, AcceptedBody, StringComparison.Ordinal);
+        var accepted = text.Length == 0 || string.Equals(text, AcceptedBody, StringComparison.Ordinal);
         return accepted ? new QBittorrentLogin(true, cookie) : QBittorrentLogin.Refused;
     }
 
