@@ -6,6 +6,9 @@ from __future__ import annotations
 
 from .config import TIMEOUT_MS
 
+# The audit's media manager is named after its kind and address, not typed.
+AUDIT_MANAGER_NAME = "Deluno on 127.0.0.1"
+
 
 class AuditNotificationsMixin:
     def settings_notifications(self) -> None:
@@ -150,7 +153,7 @@ class AuditNotificationsMixin:
             "Settings media managers panel",
         )
         for card in self.page.get_by_test_id("media-manager-card").all():
-            if "Live audit manager" in card.inner_text():
+            if AUDIT_MANAGER_NAME in card.inner_text():
                 self.click(
                     card.get_by_test_id("media-manager-remove"),
                     "ask to remove leftover media manager",
@@ -164,7 +167,7 @@ class AuditNotificationsMixin:
                 ) as delete_response:
                     self.confirm_removal(
                         "media-manager-remove-confirm",
-                        "Live audit manager",
+                        AUDIT_MANAGER_NAME,
                         "remove leftover media manager",
                     )
                 self.require(
@@ -175,14 +178,13 @@ class AuditNotificationsMixin:
         self.click(
             self.page.get_by_test_id("media-manager-add"), "open media manager form"
         )
-        self.page.get_by_test_id("media-manager-name").fill("Live audit manager")
         self.page.get_by_test_id("media-manager-base-url").fill("http://127.0.0.1:9")
         self.page.get_by_test_id("media-manager-api-key").fill("audit-secret")
         self.click(
             self.page.get_by_test_id("media-manager-save"), "create media manager"
         )
         card = self.page.get_by_test_id("media-manager-card").filter(
-            has_text="Live audit manager"
+            has_text=AUDIT_MANAGER_NAME
         )
         self.visible(card, "created media manager")
         self.visible(
@@ -250,7 +252,7 @@ class AuditNotificationsMixin:
         ) as delete_response:
             self.confirm_removal(
                 "media-manager-remove-confirm",
-                "Live audit manager",
+                AUDIT_MANAGER_NAME,
                 "remove media manager",
             )
         self.require(
@@ -258,7 +260,7 @@ class AuditNotificationsMixin:
         )
         self.require(
             not self.page.get_by_test_id("media-manager-card")
-            .filter(has_text="Live audit manager")
+            .filter(has_text=AUDIT_MANAGER_NAME)
             .count(),
             "media manager was not removed",
         )
