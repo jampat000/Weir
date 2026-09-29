@@ -11,6 +11,7 @@ namespace Weir.Infrastructure.Processing;
 /// <param name="ElapsedSeconds">How long the pass has been writing.</param>
 /// <param name="RemovedAudio">The audio tracks this pass is taking out, as the plan describes each one.</param>
 /// <param name="RemovedSubtitles">The subtitle tracks this pass is taking out.</param>
+/// <param name="Stage">The step the pass is on, one of <see cref="PassStages"/>; <see langword="null"/> when the report names none.</param>
 public sealed record LiveProgress(
     double? Percent,
     string? Message,
@@ -19,7 +20,8 @@ public sealed record LiveProgress(
     string? Speed,
     double? ElapsedSeconds,
     IReadOnlyList<string> RemovedAudio,
-    IReadOnlyList<string> RemovedSubtitles)
+    IReadOnlyList<string> RemovedSubtitles,
+    string? Stage = null)
 {
     /// <summary>Builds the live entry from one of <see cref="RemuxPass.ActivityProgressReporter"/>'s reports.</summary>
     public static LiveProgress FromReport(WireObject body)
@@ -33,7 +35,8 @@ public sealed record LiveProgress(
             Text(body, "speed"),
             CoerceSeconds(body.TryGetValue("elapsed_seconds", out var el) ? el : null),
             Strings(body, "removed_audio"),
-            Strings(body, "removed_subtitles"));
+            Strings(body, "removed_subtitles"),
+            PassStages.Normalize(Text(body, "stage")));
     }
 
     /// <summary><c>str(body.get("status") or "processing")</c>.</summary>

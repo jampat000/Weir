@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Time.Testing;
+using Weir.Core.Json;
 using Weir.Infrastructure.Processing;
 
 namespace Weir.Infrastructure.Tests.Processing;
@@ -149,5 +150,28 @@ public sealed class LiveProgressStoreTests
 
         var results = await Task.WhenAll(waiters).WaitAsync(TimeSpan.FromMinutes(1));
         Assert.All(results, version => Assert.Equal(store.Version, version));
+    }
+
+    [Theory]
+    [InlineData("checking", "checking")]
+    [InlineData(" Planning ", "planning")]
+    [InlineData("writing", "writing")]
+    [InlineData("verifying", "verifying")]
+    [InlineData("handing_back", "handing_back")]
+    [InlineData("polishing", null)]
+    [InlineData("", null)]
+    public void A_report_names_its_stage_only_when_Weir_knows_it(string named, string? expected)
+    {
+        var body = new WireObject().Set("status", "processing").Set("stage", named);
+
+        Assert.Equal(expected, LiveProgress.FromReport(body).Stage);
+    }
+
+    [Fact]
+    public void A_report_that_names_no_stage_has_none()
+    {
+        var body = new WireObject().Set("status", "processing").Set("percent", 12.0);
+
+        Assert.Null(LiveProgress.FromReport(body).Stage);
     }
 }

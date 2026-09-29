@@ -346,6 +346,7 @@ describe("a running title's row through the pass", () => {
     return {
       relativePath: "The.Quiet.Harbour.S01E03.1080p.WEB-DL.mkv",
       status: "processing",
+      stage: null,
       percent: 10,
       etaSeconds: 120,
       message: "Weir has started writing the cleaned-up file.",

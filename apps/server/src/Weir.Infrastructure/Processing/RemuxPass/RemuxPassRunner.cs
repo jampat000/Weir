@@ -164,6 +164,7 @@ public sealed partial class RemuxPassRunner
             return guardrailResult;
         }
 
+        ReportStage(report, relativeMediaPath, "processing", PassStages.Checking, "Weir is checking the file.");
         JsonElement probeJson;
         IReadOnlyList<string> sourceWarnings;
         try
@@ -236,6 +237,7 @@ public sealed partial class RemuxPassRunner
             return waiting;
         }
 
+        ReportStage(report, relativeMediaPath, "processing", PassStages.Planning, "Weir is working out which tracks to keep.");
         var config = request.RulesConfig ?? RemuxRules.DefaultConfig();
         WireObject? originalLanguage = null;
         if (!passThrough && request.ManualPlan is null && config.OriginalLanguage is { Enabled: true } originalRules)

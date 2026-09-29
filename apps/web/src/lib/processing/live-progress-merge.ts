@@ -20,6 +20,7 @@ export function mergeLiveProgress(
     return {
       ...file,
       progress_status: entry.status,
+      progress_stage: entry.stage,
       progress_percent: entry.percent,
       progress_eta_seconds: entry.etaSeconds,
       progress_message: entry.message,

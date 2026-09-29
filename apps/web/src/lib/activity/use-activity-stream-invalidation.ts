@@ -17,6 +17,8 @@ const INVALIDATE_OPTIONS = { cancelRefetch: false } as const;
 export type LiveProgressEntry = {
   relativePath: string;
   status: string;
+  /** The step the pass names itself as being on; null from a server that does not say. */
+  stage: string | null;
   percent: number | null;
   etaSeconds: number | null;
   message: string | null;
@@ -86,6 +88,7 @@ function isNewActivity(payload: LatestPayload): boolean {
 type RawProgressEntry = {
   relative_path?: unknown;
   status?: unknown;
+  stage?: unknown;
   percent?: unknown;
   eta_seconds?: unknown;
   message?: unknown;
@@ -119,6 +122,7 @@ function parseProgressPayload(data: string): LiveProgressEntry[] | null {
         {
           relativePath,
           status: text(raw.status) ?? "processing",
+          stage: text(raw.stage),
           percent: number(raw.percent),
           etaSeconds: number(raw.eta_seconds),
           message: text(raw.message),
