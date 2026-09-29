@@ -25,6 +25,7 @@ services:
   weir:
     image: ghcr.io/jampat000/weir:latest
     container_name: weir
+    hostname: my-server   # what Weir calls itself: "Weir on my-server"
     ports:
       - "9347:9347"
     volumes:
@@ -67,18 +68,26 @@ your browser on the same PC, so it never asks for this.
 
 The setup wizard has three parts:
 
+- **Downloads and workflows**: first, how your downloads reach Weir. A workflow is one route a file
+  takes: a **Watched folder**, where your downloads finish, and an **Output folder**, where Weir puts
+  each cleaned file.
+  - **Deluno**, **Sonarr / Radarr** or **a download client** (SABnzbd, NZBGet, qBittorrent, Deluge,
+    Transmission): connect it with its address and key, and Weir tests it. Weir then reads where it
+    saves finished downloads and offers a Movies and a TV workflow with the folders filled in. Tick
+    the ones you want and change any folder before you finish. Nothing is created until you press
+    **Finish setup**, and any problem with a folder shows next to it first. Workflows offered from
+    Deluno, Sonarr or Radarr are marked as linked to it; a download client only suggests folders.
+  - **Neither**: type the folders yourself, a watched and an output folder for Movies and the same for TV.
 - **Basics**: your time zone.
-- **Libraries**: a **Watched folder** and an **Output folder** for Movies, and the same for TV.
-  - **Watched folder**: where your downloads finish. Weir cleans whatever lands here.
-  - **Output folder**: where Weir puts each cleaned file.
 - **Automatic backups**: whether Weir keeps a rolling copy of its configuration, and how often.
 
-You can skip the wizard and set these later: libraries under **Settings › Libraries**, backups
-under **System › Backups**.
+If Weir cannot reach what you connect, it says so and you can go back or choose **Neither**. You can
+skip the wizard and set these later: workflows under **Settings › Workflows**, connections under
+**Settings › Media managers**, backups under **System › Backups**.
 
 ## 4. Choose what to keep
 
-Under **Settings › Rules**, set the audio and subtitle rules your libraries use. For example, keep
+Under **Settings › Rules**, set the audio and subtitle rules your workflows use. For example, keep
 English and Japanese audio, keep English subtitles, and drop commentary tracks.
 
 ## 5. Try it with a real file
@@ -90,7 +99,7 @@ of relying on filesystem notifications.
 - The file shows up on **Processing** while Weir works on it.
 - Once it's done, it shows up in **History**, and the cleaned copy is in the output folder.
 
-Already have a library you want to clean up? In **Settings › Libraries**, edit the library and add
+Already have a library you want to clean up? In **Settings › Workflows**, edit the workflow and add
 its folders under **Files already in your library**. Then open **Library**, pick the library from
 the title and press **Check again**. Weir shows you what it would remove and how much space that
 frees before it changes anything.

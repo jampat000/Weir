@@ -14,7 +14,7 @@ When Weir cleans a file, it writes the new copy — with the tracks you didn't a
 — into a **work folder**, not straight into your output folder. Your original file in the watched
 folder is only ever read, never modified, while this happens.
 
-- If your library doesn't set its own work folder, Weir uses a default one under its own data
+- If your workflow doesn't set its own work folder, Weir uses a default one under its own data
   folder, separate for movies and TV.
 - Before it starts writing, Weir checks there's enough free disk space at both the work folder and
   the output folder. If there isn't, it skips the file and tells you why, rather than starting a
@@ -46,7 +46,7 @@ still only exposes it under its real name once that copy is complete.
 If Weir can't produce a usable result — the release turns out to have no tracks worth keeping, for
 example — it doesn't leave a broken file behind or silently drop your download. It hands the
 original file back unchanged and tells you why in History, so you (or your media manager) can
-decide what to do next. That is the default. The library's **When retries run out** setting can
+decide what to do next. That is the default. The workflow's **When retries run out** setting can
 keep the file on hold or reject the release instead.
 
 ## Subtitles and other extra files travel too, safely

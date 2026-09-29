@@ -135,7 +135,7 @@ A folder layout that works well:
 
 ## Work folder placement
 
-By default a library's work folder is a private folder inside `/data/weir`, which in Docker is
+By default a workflow's work folder is a private folder inside `/data/weir`, which in Docker is
 usually a different volume from your media. Weir can still finish files that way, but each one is
 *copied* from the work folder to the output folder rather than moved, which on a large file takes
 about as long again as the clean itself. Put the work folder on the same volume as the output
@@ -157,7 +157,7 @@ services:
     restart: unless-stopped
 ```
 
-Then, in the library's settings, set **Work folder** to something like `/media/weir/movies-work` —
+Then, in the workflow's settings, set **Work folder** to something like `/media/weir/movies-work` —
 alongside `/media/weir/movies` (the output folder) rather than under `/data/weir`.
 
 ## What's in the image
