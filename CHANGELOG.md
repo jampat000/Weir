@@ -9,6 +9,7 @@ list first.
 
 ## 3.x
 
+- **3.2.13** (2026-09-30). First run connects your media manager first, Settings libraries become Weir-only or linked workflows, Weir is named after its computer, and the folder checks say when things are in sync and exactly what to change when they are not. [notes](docs/release-notes/v3.2.13.md) · [release](https://github.com/jampat000/Weir/releases/tag/v3.2.13)
 - **3.2.12** (2026-09-29). A maintenance release built with the quicker release process; nothing changes in how Weir works. [notes](docs/release-notes/v3.2.12.md) · [release](https://github.com/jampat000/Weir/releases/tag/v3.2.12)
 - **3.2.11** (2026-09-29). Weir on Windows is reachable only from this PC until you allow other devices on your network. [notes](docs/release-notes/v3.2.11.md) · [release](https://github.com/jampat000/Weir/releases/tag/v3.2.11)
 - **3.2.10** (2026-09-28). Other devices on your network can reach Weir on Windows, a smaller Windows download, and updates that download only what changed. [notes](docs/release-notes/v3.2.10.md) · [release](https://github.com/jampat000/Weir/releases/tag/v3.2.10)
