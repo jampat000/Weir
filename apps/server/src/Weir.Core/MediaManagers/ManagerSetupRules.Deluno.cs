@@ -9,10 +9,18 @@ public static partial class ManagerSetupRules
     /// What Weir can read reliably from its manifest (<c>GET /api/integrations/external/manifest</c>) is each library's
     /// workflow, its <c>downloadsPath</c> ("downloads arrive in") and its <c>processorOutputPath</c>. A hand-off's file
     /// has to sit inside the watched folder (<see cref="HandoffPaths.RelativeMediaPathForHandoff"/>), compared the same
-    /// case- and separator-insensitive way here.
+    /// case- and separator-insensitive way here. The manifest publishes no download client's save folder, only the
+    /// library's declared <c>downloadsPath</c> and each client's category, so a declared path inside the watched folder is
+    /// reported as <see cref="SetupCheckLine.Unverified"/>, never as a pass, and each enabled client gets its own line saying
+    /// the same.
     /// </summary>
     public static DelunoSetupResult EvaluateDeluno(
-        string managerLabel, string mediaScope, string watchedFolder, string outputFolder, IReadOnlyList<ManagerLibraryDescriptor> libraries)
+        string managerLabel,
+        string mediaScope,
+        string watchedFolder,
+        string outputFolder,
+        IReadOnlyList<ManagerLibraryDescriptor> libraries,
+        IReadOnlyList<ManagerDownloadClientDescriptor>? downloadClients = null)
     {
         ArgumentNullException.ThrowIfNull(libraries);
         var scopeWord = mediaScope == MediaManagerKinds.Tv ? "TV" : "movie";
@@ -41,14 +49,15 @@ public static partial class ManagerSetupRules
         if (downloads.Length == 0)
         {
             lines.Add(new SetupCheckLine(
-                SetupCheckLine.Note,
-                $"{managerLabel} does not say where {library.Name}'s downloads arrive. Its hand-offs have to sit inside this library's watched folder."));
+                SetupCheckLine.Unverified,
+                $"{managerLabel} does not say where {library.Name}'s downloads arrive, so Weir cannot verify that its hand-offs sit inside this library's watched folder."));
         }
         else if (watched.Length > 0 && Inside(downloads, watched))
         {
             lines.Add(new SetupCheckLine(
-                SetupCheckLine.Ok,
-                $"{library.Name}'s downloads arrive in {downloads}, inside the watched folder, so Weir accepts its hand-offs."));
+                SetupCheckLine.Unverified,
+                $"{managerLabel} says its {library.Name} library downloads to {downloads} (inside Weir's watched folder). " +
+                "Weir can't see where each download client really saves."));
         }
         else
         {
@@ -57,6 +66,8 @@ public static partial class ManagerSetupRules
                 $"{library.Name}'s downloads arrive in {downloads}, which is not inside the watched folder, so Weir would refuse its hand-offs. " +
                 $"Use {managerLabel}'s folders."));
         }
+
+        lines.AddRange(DownloadClientLines(managerLabel, mediaScope, downloadClients ?? []));
 
         var processed = WireStrings.Strip(library.OutputPath ?? string.Empty);
         var output = WireStrings.Strip(outputFolder ?? string.Empty);
@@ -71,6 +82,21 @@ public static partial class ManagerSetupRules
         }
 
         return new DelunoSetupResult(downloads.Length > 0 ? downloads : null, processed.Length > 0 ? processed : null, lines);
+    }
+
+    /// <summary>One unverified line per enabled Deluno download client: the category it files this media type under, and no folder to check.</summary>
+    private static IEnumerable<SetupCheckLine> DownloadClientLines(
+        string managerLabel, string mediaScope, IReadOnlyList<ManagerDownloadClientDescriptor> downloadClients)
+    {
+        foreach (var client in downloadClients.Where(client => client.Enabled))
+        {
+            var category = mediaScope == MediaManagerKinds.Tv ? client.TvCategory : client.MoviesCategory;
+            var filedUnder = category is null ? "its downloads" : $"the category \"{category}\"";
+            yield return new SetupCheckLine(
+                SetupCheckLine.Unverified,
+                $"{managerLabel}'s {client.Name} files this library's downloads under {filedUnder}, but {managerLabel} does not publish where it saves them. " +
+                "Weir cannot verify they land inside the watched folder.");
+        }
     }
 
     /// <summary><paramref name="path"/> is <paramref name="folder"/> or inside it: case- and separator-insensitive, as <c>HandoffPaths</c> compares.</summary>

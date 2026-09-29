@@ -163,6 +163,45 @@ it("surfaces a bare download client's own lines and readiness", async () => {
   ).toBeInTheDocument();
 });
 
+it("does not show a green Ready for a manager whose folders Weir could only read as a declaration", async () => {
+  vi.spyOn(chainApi, "fetchLibraryFolderChain").mockResolvedValue(
+    chain({
+      managers: [
+        {
+          connection_id: 4,
+          kind: "deluno",
+          name: "Deluno",
+          label: "Deluno",
+          flow: "handoff",
+          ready: true,
+          mapping: null,
+          lines: [
+            {
+              state: "unverified",
+              text: "Deluno says its Movies library downloads to /media/in (inside Weir's watched folder). Weir can't see where each download client really saves.",
+            },
+          ],
+        },
+      ],
+    }),
+  );
+
+  render(
+    <LibraryFolderChain
+      libraryId={12}
+      watchedFolder="/media/in"
+      workFolder=""
+      outputFolder="/media/out"
+      mediaType="movie"
+    />,
+    { wrapper },
+  );
+
+  const block = await screen.findByRole("region", { name: "Deluno" });
+  expect(within(block).getByText("Not verified")).toBeInTheDocument();
+  expect(within(block).queryByText("Ready")).not.toBeInTheDocument();
+});
+
 it("says when it could not check just now", async () => {
   vi.spyOn(chainApi, "fetchLibraryFolderChain").mockRejectedValue(
     new Error("Could not reach the server."),

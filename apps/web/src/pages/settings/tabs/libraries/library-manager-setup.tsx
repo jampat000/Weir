@@ -13,6 +13,11 @@ import {
   PROCESSING_MEDIA_TYPE_LABELS,
   type ProcessingMediaType,
 } from "../../../../lib/processing/libraries-api";
+import {
+  READINESS_CLASSES,
+  READINESS_LABELS,
+  readinessOf,
+} from "../../../../lib/processing/library-folder-chain-api";
 import { type ProcessingManagerSetupItem } from "../../../../lib/processing/library-managers-api";
 import { useProcessingManagerSetupQuery } from "../../../../lib/processing/libraries-queries";
 import { useDebouncedValue } from "../../../../lib/ui/use-debounced-value";
@@ -65,7 +70,13 @@ function CheckLines({
                   : "text-mm-text3"
             }
           >
-            {line.state === "ok" ? "✓" : line.state === "problem" ? "✗" : "·"}
+            {line.state === "ok"
+              ? "✓"
+              : line.state === "problem"
+                ? "✗"
+                : line.state === "unverified"
+                  ? "?"
+                  : "·"}
           </span>
           <span
             className={
@@ -79,7 +90,9 @@ function CheckLines({
                 ? "Fine: "
                 : line.state === "problem"
                   ? "Needs a fix: "
-                  : "Note: "}
+                  : line.state === "unverified"
+                    ? "Not verified: "
+                    : "Note: "}
             </span>
             {line.text}
           </span>
@@ -381,13 +394,9 @@ export function LibraryManagerSetup({
                 <p className="text-sm font-medium text-mm-text1">
                   {item.label}
                   <span
-                    className={`ml-2 text-xs ${
-                      item.ready
-                        ? "mm-status-text--healthy"
-                        : "mm-status-text--warning"
-                    }`}
+                    className={`ml-2 text-xs ${READINESS_CLASSES[readinessOf(item.ready, item.lines)]}`}
                   >
-                    {item.ready ? "Ready" : "Needs attention"}
+                    {READINESS_LABELS[readinessOf(item.ready, item.lines)]}
                   </span>
                 </p>
                 {item.flow === "handoff" ? (
