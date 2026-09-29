@@ -20,13 +20,14 @@ sealed class TrayUpdates
 
     private readonly string _runtimeHome;
     private readonly UpdateSettings _settings;
-    private readonly UpdateService _service = new(TrayLog.Write);
+    private readonly IUpdateService _service;
     private readonly Action<Action> _onUi;
     private readonly Action _changed;
     private readonly Action<UpdateMode> _announce;
     private readonly Action _applyNow;
     private int _activity;
 
+    /// <param name="service">Velopack: checking for updates and downloading them. A download installs nothing.</param>
     /// <param name="runtimeHome">Where update-state.json and the apply-now flag live.</param>
     /// <param name="settings">The operator's update choices.</param>
     /// <param name="onUi">Runs an action on the tray's UI thread.</param>
@@ -34,6 +35,7 @@ sealed class TrayUpdates
     /// <param name="announce">An update was found or downloaded under this mode; tell the person.</param>
     /// <param name="applyNow">The server's Settings page asked to apply the downloaded update now.</param>
     internal TrayUpdates(
+        IUpdateService service,
         string runtimeHome,
         UpdateSettings settings,
         Action<Action> onUi,
@@ -41,6 +43,7 @@ sealed class TrayUpdates
         Action<UpdateMode> announce,
         Action applyNow)
     {
+        _service = service;
         _runtimeHome = runtimeHome;
         _settings = settings;
         _onUi = onUi;
@@ -87,10 +90,6 @@ sealed class TrayUpdates
     internal void CheckInBackground() => BackgroundWork.Forget("Update check", CheckAsync);
 
     internal void DownloadInBackground() => BackgroundWork.Forget("Update download", DownloadAsync);
-
-    internal void ApplyAndRestart() => _service.ApplyAndRestart();
-
-    internal void ApplyOnExit() => _service.ApplyOnExit();
 
     private async Task CheckPeriodicallyAsync(TimeSpan interval, CancellationToken cancellationToken)
     {
@@ -151,10 +150,6 @@ sealed class TrayUpdates
             if (await _service.DownloadUpdateAsync().ConfigureAwait(false))
             {
                 WriteUpdateState(true, _service.PendingVersion);
-                if (_settings.Mode == UpdateMode.Auto)
-                {
-                    _service.ApplyOnExit();
-                }
                 var mode = _settings.Mode;
                 _onUi(() => _announce(mode));
             }
