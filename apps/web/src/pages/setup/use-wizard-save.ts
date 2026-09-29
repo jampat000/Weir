@@ -110,7 +110,6 @@ export function useWizardSave({
     onMessage(null);
     try {
       await saveAppSettings.mutateAsync({
-        product_display_name: settings.product_display_name,
         signed_in_home_notice: settings.signed_in_home_notice,
         setup_wizard_state: "skipped",
         app_timezone: settings.app_timezone,
@@ -144,7 +143,6 @@ export function useWizardSave({
         await saveLibrary(libraries, "tv", draft.tv);
       }
       await saveAppSettings.mutateAsync({
-        product_display_name: settings.product_display_name,
         signed_in_home_notice: settings.signed_in_home_notice,
         setup_wizard_state: "completed",
         app_timezone: draft.timezone,

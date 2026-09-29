@@ -24,7 +24,6 @@ function wrapper({ children }: { children: ReactNode }) {
 }
 
 const SETTINGS: AppSettings = {
-  product_display_name: "Weir",
   signed_in_home_notice: null,
   setup_wizard_state: "completed",
   app_timezone: "UTC",

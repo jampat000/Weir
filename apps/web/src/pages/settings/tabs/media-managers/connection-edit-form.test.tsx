@@ -41,25 +41,36 @@ afterEach(() => {
 });
 
 describe("ConnectionEditForm", () => {
-  it("saves the name and address without touching the api key when it is left blank", async () => {
+  it("has no field for a name: the connection is named after its address", () => {
+    render(<ConnectionEditForm connection={connection()} onClose={vi.fn()} />, {
+      wrapper,
+    });
+
+    expect(
+      screen.queryByTestId("media-manager-edit-name"),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Name")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Address")).toBeInTheDocument();
+  });
+
+  it("saves the address without touching the api key when it is left blank", async () => {
     const update = vi
       .spyOn(api, "updateMediaManagerConnection")
-      .mockResolvedValue(connection({ name: "Deluno 2" }));
+      .mockResolvedValue(connection({ name: "Deluno on 192.0.2.11" }));
     const onClose = vi.fn();
 
     render(<ConnectionEditForm connection={connection()} onClose={onClose} />, {
       wrapper,
     });
 
-    fireEvent.change(screen.getByTestId("media-manager-edit-name"), {
-      target: { value: "Deluno 2" },
+    fireEvent.change(screen.getByTestId("media-manager-edit-base-url"), {
+      target: { value: "http://192.0.2.11:5099" },
     });
     fireEvent.click(screen.getByTestId("media-manager-edit-save"));
 
     await waitFor(() => expect(update).toHaveBeenCalledTimes(1));
     expect(update).toHaveBeenCalledWith(1, {
-      name: "Deluno 2",
-      base_url: "http://192.0.2.10:5099",
+      base_url: "http://192.0.2.11:5099",
     });
     await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
   });
@@ -80,7 +91,6 @@ describe("ConnectionEditForm", () => {
 
     await waitFor(() => expect(update).toHaveBeenCalledTimes(1));
     expect(update).toHaveBeenCalledWith(1, {
-      name: "Deluno",
       base_url: "http://192.0.2.10:5099",
       api_key: "new-key",
     });
@@ -96,8 +106,8 @@ describe("ConnectionEditForm", () => {
       wrapper,
     });
 
-    fireEvent.change(screen.getByTestId("media-manager-edit-name"), {
-      target: { value: "Deluno 2" },
+    fireEvent.change(screen.getByTestId("media-manager-edit-base-url"), {
+      target: { value: "http://192.0.2.11:5099" },
     });
     fireEvent.click(screen.getByTestId("media-manager-edit-save"));
 
@@ -176,7 +186,6 @@ describe("ConnectionEditForm", () => {
 
     await waitFor(() => expect(update).toHaveBeenCalledTimes(1));
     expect(update).toHaveBeenCalledWith(1, {
-      name: "Sonarr",
       base_url: "http://192.0.2.10:5099",
       downloaded_scan_enabled: true,
     });
@@ -191,15 +200,14 @@ describe("ConnectionEditForm", () => {
       wrapper,
     });
 
-    fireEvent.change(screen.getByTestId("media-manager-edit-name"), {
-      target: { value: "Deluno 2" },
+    fireEvent.change(screen.getByTestId("media-manager-edit-base-url"), {
+      target: { value: "http://192.0.2.11:5099" },
     });
     fireEvent.click(screen.getByTestId("media-manager-edit-save"));
 
     await waitFor(() => expect(update).toHaveBeenCalledTimes(1));
     expect(update).toHaveBeenCalledWith(1, {
-      name: "Deluno 2",
-      base_url: "http://192.0.2.10:5099",
+      base_url: "http://192.0.2.11:5099",
     });
   });
 
@@ -209,8 +217,8 @@ describe("ConnectionEditForm", () => {
       wrapper,
     });
 
-    fireEvent.change(screen.getByTestId("media-manager-edit-name"), {
-      target: { value: "Deluno 2" },
+    fireEvent.change(screen.getByTestId("media-manager-edit-base-url"), {
+      target: { value: "http://192.0.2.11:5099" },
     });
     fireEvent.click(screen.getByTestId("media-manager-edit-cancel"));
 

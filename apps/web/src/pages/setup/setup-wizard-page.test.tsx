@@ -98,7 +98,6 @@ function renderWizard() {
   });
   client.setQueryData(authKeys.me, { id: 1, username: "admin", role: "admin" });
   client.setQueryData(settingsKeys.app, {
-    product_display_name: "Weir",
     signed_in_home_notice: null,
     setup_wizard_state: "pending",
     app_timezone: "UTC",
