@@ -134,5 +134,5 @@ public sealed class DownloadClientHttpClient
     }
 
     private static DownloadClientUnreachableException Unreachable(Exception exception) =>
-        new($"<urlopen error {MediaManagerHttpClient.ClassifyTransportFailure(exception)}>", exception);
+        new($"The connection failed: {MediaManagerHttpClient.ClassifyTransportFailure(exception)}.", exception);
 }
