@@ -195,6 +195,51 @@ describe("HistoryFileActions remove dialog", () => {
     );
   });
 
+  it("opens with nothing chosen, Remove disabled and focus on the first choice", async () => {
+    removeOptions.mockResolvedValue(removeOptionsResult());
+    renderActions();
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove from list" }));
+
+    await screen.findByTestId("history-remove-dialog");
+    for (const radio of screen.getAllByRole("radio")) {
+      expect(radio).not.toBeChecked();
+    }
+    expect(screen.getByTestId("history-remove-dialog-confirm")).toBeDisabled();
+    expect(screen.getAllByRole("radio")[0]).toHaveFocus();
+  });
+
+  it("removes nothing when Enter or a click reaches Remove before a choice is made", async () => {
+    removeOptions.mockResolvedValue(removeOptionsResult());
+    renderActions();
+    fireEvent.click(screen.getByRole("button", { name: "Remove from list" }));
+    await screen.findByTestId("history-remove-dialog");
+
+    fireEvent.keyDown(document.activeElement ?? document.body, {
+      key: "Enter",
+    });
+    fireEvent.click(screen.getByTestId("history-remove-dialog-confirm"));
+
+    expect(forget).not.toHaveBeenCalled();
+    expect(screen.getByTestId("history-remove-dialog")).toBeInTheDocument();
+  });
+
+  it("enables Remove once a choice is made and sends exactly that resolution", async () => {
+    removeOptions.mockResolvedValue(removeOptionsResult());
+    renderActions();
+    fireEvent.click(screen.getByRole("button", { name: "Remove from list" }));
+    fireEvent.click(
+      await screen.findByTestId("history-remove-dialog-choice-retry"),
+    );
+
+    const remove = screen.getByTestId("history-remove-dialog-confirm");
+    expect(remove).toBeEnabled();
+    fireEvent.click(remove);
+
+    await waitFor(() => expect(forget).toHaveBeenCalledTimes(1));
+    expect(forget).toHaveBeenCalledWith({ id: 7, resolution: "retry" });
+  });
+
   it("shows the server's refusal in the dialog and keeps it open when the action fails", async () => {
     removeOptions.mockResolvedValue(
       removeOptionsResult({
@@ -207,7 +252,9 @@ describe("HistoryFileActions remove dialog", () => {
     );
     renderActions();
     fireEvent.click(screen.getByRole("button", { name: "Remove from list" }));
-    await screen.findByTestId("history-remove-dialog");
+    fireEvent.click(
+      await screen.findByTestId("history-remove-dialog-choice-delete"),
+    );
 
     fireEvent.click(screen.getByTestId("history-remove-dialog-confirm"));
 
@@ -264,7 +311,9 @@ describe("HistoryFileActions remove dialog", () => {
     );
     renderActions();
     fireEvent.click(screen.getByRole("button", { name: "Remove from list" }));
-    await screen.findByTestId("history-remove-dialog");
+    fireEvent.click(
+      await screen.findByTestId("history-remove-dialog-choice-delete"),
+    );
 
     fireEvent.click(screen.getByTestId("history-remove-dialog-confirm"));
 

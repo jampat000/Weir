@@ -22,7 +22,7 @@ const PROCESSING_FILE_STATUS_LABELS: Record<ProcessingFileStatus, string> = {
 };
 
 /** How the server marks a rejection by the rules themselves, where no media manager was asked for another copy. */
-const REJECTED_BY_RULES = "rules";
+export const REJECTED_BY_RULES = "rules";
 
 /** The plain word for a file's state. A rejection no media manager was asked about is just "Rejected". */
 export function processingFileStatusLabel(

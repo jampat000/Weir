@@ -4,7 +4,20 @@ import {
   formatDuration,
   formatProcessingSpeed,
   formatSavings,
+  outcomeLabel,
 } from "./pass-detail";
+
+it("calls a rules rejection Rejected, and a real failure by what failed", () => {
+  expect(
+    outcomeLabel({
+      outcome: "failed_before_execution",
+      rejected_without_manager: true,
+    }),
+  ).toBe("Rejected");
+  expect(outcomeLabel({ outcome: "failed_before_execution" })).toBe(
+    "Could not check file",
+  );
+});
 
 it("keeps the speed's full precision and names the unit", () => {
   expect(formatProcessingSpeed("123.456789x")).toBe("123.456789x realtime");

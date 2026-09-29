@@ -6,7 +6,13 @@ import { parseAppTime } from "../../lib/ui/mm-format-date";
 export type HandedBackTone = "ok" | "same" | "warn";
 
 export function handedBackTone(item: FinishedFile): HandedBackTone {
-  if (item.kind === "passed" || item.kind === "failed") return "warn";
+  if (
+    item.kind === "passed" ||
+    item.kind === "rejected" ||
+    item.kind === "failed"
+  ) {
+    return "warn";
+  }
   return item.kind === "already" ? "same" : "ok";
 }
 

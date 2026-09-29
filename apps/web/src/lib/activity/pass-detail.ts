@@ -25,6 +25,10 @@ export type RemuxPassDetail = {
   live_mutations_skipped?: boolean;
   output_file?: string;
   reason?: string;
+  /** Set when the rules rejected the file and no media manager was involved. */
+  rejected_without_manager?: boolean;
+  /** What happened to a rejected file, such as "The file was left where it is." */
+  rejected_cleanup_detail?: string;
   job_id?: number;
   ffmpeg_argv?: string[];
   ffmpeg_argv_truncated?: boolean;
@@ -59,11 +63,25 @@ export type FileProgressDetail = {
   reason?: string | null;
 };
 
+/** A rejection by the rules with no media manager involved: a decision, not a failure. */
+export function isRejectedByRules(
+  detail: { rejected_without_manager?: unknown } | null | undefined,
+): boolean {
+  return detail?.rejected_without_manager === true;
+}
+
 export function outcomeLabel(
-  outcome: string | undefined,
-  passThroughUnchanged = false,
+  detail: Pick<
+    RemuxPassDetail,
+    "outcome" | "pass_through_unchanged" | "rejected_without_manager"
+  >,
 ): string {
-  if (passThroughUnchanged && outcome === "live_skipped_not_required") {
+  const { outcome } = detail;
+  if (isRejectedByRules(detail)) return "Rejected";
+  if (
+    detail.pass_through_unchanged &&
+    outcome === "live_skipped_not_required"
+  ) {
     return "Passed through unchanged";
   }
   switch (outcome) {

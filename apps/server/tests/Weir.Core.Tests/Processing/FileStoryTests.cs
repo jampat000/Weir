@@ -1,5 +1,6 @@
 using Weir.Core.Json;
 using Weir.Core.Processing;
+using Weir.Core.Processing.RemuxPass;
 
 namespace Weir.Core.Tests.Processing;
 
@@ -61,6 +62,46 @@ public sealed class FileStoryTests
 
         var failed = Assert.Single(steps);
         Assert.Equal("Weir could not process this file, and the record does not say why.", failed.Sentence);
+    }
+
+    [Fact]
+    public void A_rejection_no_media_manager_is_involved_in_reads_as_rejected_with_its_reason_and_what_became_of_the_file()
+    {
+        var detail = new WireObject()
+            .Set("ok", false)
+            .Set(RejectionResultKeys.WithoutManager, true)
+            .Set("reason", "Rejected: none of its audio tracks are in English, so there would be nothing to keep.")
+            .Set("rejected_cleanup_detail", "The file was left where it is.");
+
+        var rejected = Assert.Single(FileStory.NarratePass(detail, string.Empty));
+
+        Assert.Equal("Rejected", rejected.Heading);
+        Assert.Equal("None of its audio tracks are in English, so there would be nothing to keep. The file was left where it is.", rejected.Sentence);
+        Assert.Equal(StoryTone.Warn, rejected.Tone);
+    }
+
+    [Fact]
+    public void A_rejection_whose_reason_is_missing_still_says_it_was_rejected()
+    {
+        var detail = new WireObject().Set("ok", false).Set(RejectionResultKeys.WithoutManager, true);
+
+        var rejected = Assert.Single(FileStory.NarratePass(detail, string.Empty));
+
+        Assert.Equal("Rejected", rejected.Heading);
+        Assert.Equal("Weir rejected this file.", rejected.Sentence);
+    }
+
+    [Fact]
+    public void A_pass_that_failed_while_a_media_manager_is_asked_to_replace_the_release_still_reads_as_could_not_finish()
+    {
+        var detail = new WireObject()
+            .Set("ok", false)
+            .Set("reject_queued", true)
+            .Set("reason", "No retainable audio track.");
+
+        var failed = Assert.Single(FileStory.NarratePass(detail, string.Empty));
+
+        Assert.Equal("Could not finish", failed.Heading);
     }
 
     [Fact]
