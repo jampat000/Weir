@@ -50,7 +50,7 @@ it("starts a value of its own from the Performance setting, and saves it", async
   await screen.findByText("Uses the Performance setting: 10 seconds");
 
   fireEvent.click(
-    screen.getAllByRole("button", { name: "Set for this library" })[1],
+    screen.getAllByRole("button", { name: "Set for this workflow" })[1],
   );
   const wait = screen.getByLabelText(WAIT);
   expect(wait).toHaveValue("10");
