@@ -100,6 +100,7 @@ export function AddConnectionForm({
           >
             <input
               data-testid="media-manager-base-url"
+              autoComplete="url"
               className="mm-input"
               value={form.base_url}
               placeholder="http://192.0.2.10:5099"
@@ -114,6 +115,7 @@ export function AddConnectionForm({
             <input
               data-testid="media-manager-api-key"
               type="password"
+              autoComplete="new-password"
               className="mm-input"
               value={form.api_key}
               onChange={(e) => change("api_key", e.target.value)}

@@ -95,6 +95,7 @@ export function DownloadClientEditForm({
         <Field label="Address" width="wide">
           <input
             data-testid="download-client-edit-base-url"
+            autoComplete="url"
             className={mmEditableTextFieldClass}
             value={form.base_url}
             onChange={(e) => change("base_url", e.target.value)}
@@ -111,6 +112,7 @@ export function DownloadClientEditForm({
           <input
             data-testid="download-client-edit-api-key"
             type="password"
+            autoComplete="new-password"
             className={mmEditableTextFieldClass}
             value={form.api_key}
             onChange={(e) => change("api_key", e.target.value)}
@@ -123,6 +125,7 @@ export function DownloadClientEditForm({
           <Field label="Username" width="medium">
             <input
               data-testid="download-client-edit-username"
+              autoComplete="off"
               className={mmEditableTextFieldClass}
               value={form.username}
               onChange={(e) => change("username", e.target.value)}
@@ -136,6 +139,7 @@ export function DownloadClientEditForm({
             <input
               data-testid="download-client-edit-password"
               type="password"
+              autoComplete="new-password"
               className={mmEditableTextFieldClass}
               value={form.password}
               onChange={(e) => change("password", e.target.value)}
@@ -153,6 +157,7 @@ export function DownloadClientEditForm({
           <input
             data-testid="download-client-edit-password"
             type="password"
+            autoComplete="new-password"
             className={mmEditableTextFieldClass}
             value={form.password}
             onChange={(e) => change("password", e.target.value)}

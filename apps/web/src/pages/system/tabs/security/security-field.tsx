@@ -48,6 +48,7 @@ export function RevealablePasswordField({
   label,
   revealLabel,
   disabled,
+  autoComplete,
   ...input
 }: FieldProps & { revealLabel: string }) {
   const id = useId();
@@ -62,6 +63,7 @@ export function RevealablePasswordField({
           {...input}
           id={id}
           type={shown ? "text" : "password"}
+          autoComplete={autoComplete}
           className="mm-input mm-security-field"
           disabled={disabled}
           onChange={(e) => {
