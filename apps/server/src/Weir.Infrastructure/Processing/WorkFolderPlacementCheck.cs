@@ -51,7 +51,7 @@ public sealed class WorkFolderPlacementCheck : BackgroundService
         }
         catch (SqliteException exception)
         {
-            _logger.LogDebug(exception, "Weir could not read the libraries to check where their work folders are.");
+            _logger.LogDebug(exception, "Weir could not read the workflows to check where their work folders are.");
             return;
         }
 

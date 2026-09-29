@@ -13,12 +13,17 @@ public sealed record ArrDownloadClientEntry(
     public bool IsTorrent => string.Equals(Protocol, "torrent", StringComparison.OrdinalIgnoreCase);
 }
 
-/// <summary>One line of a setup check: fine, a problem with its fix, or a note worth reading.</summary>
+/// <summary>
+/// One line of a setup check: fine, a problem with its fix, a note worth reading, or something Weir could not verify.
+/// <see cref="Ok"/> is only ever used for a fact Weir has read for itself; a claim it can only take on someone's word is
+/// <see cref="Unverified"/>, which never counts as a problem and never as a pass.
+/// </summary>
 public sealed record SetupCheckLine(string State, string Text)
 {
     public const string Ok = "ok";
     public const string Problem = "problem";
     public const string Note = "note";
+    public const string Unverified = "unverified";
 
     public WireObject ToOut() => new WireObject().Set("state", State).Set("text", Text);
 }
@@ -26,5 +31,17 @@ public sealed record SetupCheckLine(string State, string Text)
 /// <summary>What a Sonarr/Radarr check found: the hosts to map, and the lines to show.</summary>
 public sealed record ArrSetupResult(IReadOnlyList<string> Hosts, IReadOnlyList<SetupCheckLine> Lines);
 
+/// <summary>
+/// One download client Deluno says it uses (its manifest's <c>downloadClients</c>). The manifest names the category each media
+/// type is filed under but publishes no save folder, so a folder is never part of this.
+/// </summary>
+public sealed record ManagerDownloadClientDescriptor(string Name, bool Enabled, string? MoviesCategory, string? TvCategory);
+
 /// <summary>What a Deluno check found: the folders it reports for this media type, and the lines to show.</summary>
 public sealed record DelunoSetupResult(string? WatchedFolder, string? OutputFolder, IReadOnlyList<SetupCheckLine> Lines);
+
+/// <summary>
+/// The folders one connected Sonarr, Radarr or Deluno reports for a media type, before any library exists to compare
+/// them with. <see cref="Problem"/> is the plain sentence to show when it has no watched folder to offer.
+/// </summary>
+public sealed record ManagerFolderSuggestion(long ConnectionId, string Label, string? WatchedFolder, string? OutputFolder, string? Problem);

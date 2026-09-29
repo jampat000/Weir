@@ -1,5 +1,3 @@
-import type { CSSProperties } from "react";
-
 import { FileName } from "../../components/shared/file-name";
 import { formatBytes } from "../../lib/format/bytes";
 import type { ProcessingFile } from "../../lib/processing/files-api";
@@ -13,20 +11,7 @@ import {
   speedWords,
   timeLeft,
 } from "./processing-words";
-
-const STEPS = ["Check", "Plan", "Write", "Verify", "Hand back"];
-/** The step a pass is on once it is writing; the ones before it are done. */
-const WRITING_STEP = 2;
-/** The thinnest the progress bar's fill gets, so a pass that has just started still shows. */
-const MIN_FILL_PERCENT = 2;
-
-type StepState = "done" | "now" | "next";
-
-function stepState(index: number, writing: boolean): StepState {
-  const current = writing ? WRITING_STEP : 0;
-  if (index < current) return "done";
-  return index === current ? "now" : "next";
-}
+import { StageFlow } from "./stage-flow";
 
 /** What the pass is doing, in numbers from the server's own progress and the file's size and length. */
 function workingStats(item: WorkingItem): [string, string][] {
@@ -61,46 +46,15 @@ function removedTracks(item: WorkingItem): string[] {
   return removed;
 }
 
-function StepList({ writing }: { writing: boolean }) {
-  return (
-    <ol className="mm-live-steps" aria-label="Steps">
-      {STEPS.map((step, index) => {
-        const state = stepState(index, writing);
-        return (
-          <li key={step} className={`mm-live-step mm-live-step--${state}`}>
-            {state === "now" && !writing ? "Checking" : step}
-            {state === "done" ? <span className="sr-only"> (done)</span> : null}
-          </li>
-        );
-      })}
-    </ol>
-  );
-}
-
-function ProgressBar({
-  item,
-  writing,
-}: {
-  item: WorkingItem;
-  writing: boolean;
-}) {
+/** Cleaning in place reports no percentage, so the bar only says the pass is running. */
+function CleaningBar({ name }: { name: string }) {
   return (
     <div
-      className={`mm-live-bar${writing ? "" : " mm-live-bar--busy"}`}
+      className="mm-live-bar"
       role="progressbar"
-      aria-label={`Progress for ${item.name}`}
-      aria-valuemin={0}
-      aria-valuemax={100}
-      aria-valuenow={writing ? Math.round(item.percent ?? 0) : undefined}
+      aria-label={`Progress for ${name}`}
     >
-      <span
-        className="mm-live-bar__fill"
-        style={
-          {
-            "--mm-live-fill": Math.max(MIN_FILL_PERCENT, item.percent ?? 0),
-          } as CSSProperties
-        }
-      />
+      <span className="mm-live-bar__fill" />
     </div>
   );
 }
@@ -150,8 +104,11 @@ export function WorkingCard({
           </span>
         </div>
       </div>
-      <ProgressBar item={item} writing={writing} />
-      {item.source === "download" ? <StepList writing={writing} /> : null}
+      {item.source === "download" ? (
+        <StageFlow position={item.step} percent={item.percent} />
+      ) : (
+        <CleaningBar name={item.name} />
+      )}
       {stats.length ? (
         <dl className="mm-live-work__stats" data-testid="live-working-stats">
           {stats.map(([label, value]) => (

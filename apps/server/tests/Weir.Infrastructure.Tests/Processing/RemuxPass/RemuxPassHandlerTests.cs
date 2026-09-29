@@ -3,10 +3,12 @@ using System.Net;
 using Microsoft.Extensions.Logging.Abstractions;
 using Weir.Core.Jobs;
 using Weir.Core.Json;
+using Weir.Core.Processing;
 using Weir.Core.Processing.RemuxPass;
 using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.Media;
 using Weir.Infrastructure.MediaManagers;
+using Weir.Infrastructure.Processing;
 using Weir.Infrastructure.Processing.RemuxPass;
 using Weir.Infrastructure.Tests.Media;
 using Weir.Infrastructure.Tests.MediaManagers;
@@ -71,8 +73,8 @@ public sealed class RemuxPassHandlerTests : IDisposable
         await _fixture.Store.Execute("DELETE FROM libraries");
         return Convert.ToInt64(await _fixture.Db(uow => uow.ExecuteScalarWriteAsync(
             "INSERT INTO libraries (name, media_type, watched_folder, output_folder, work_folder, failure_policy, max_attempts, " +
-            "rejected_file_action, retry_backoff_seconds, min_file_age_seconds, display_order) " +
-            "VALUES ('Movies', $type, $w, $o, $k, $policy, $max, $action, 60, 0, 1) RETURNING id",
+            "rejected_file_action, retry_backoff_seconds, display_order) " +
+            "VALUES ('Movies', $type, $w, $o, $k, $policy, $max, $action, 60, 1) RETURNING id",
             ("$type", mediaType),
             ("$w", _folders.Watched),
             ("$o", _folders.Output),
@@ -170,7 +172,7 @@ public sealed class RemuxPassHandlerTests : IDisposable
         await _fixture.Store.Execute("UPDATE operator_settings SET min_file_age_seconds = 60");
         var source = _folders.Source(Path.Join("Film", "film.mkv"));
         await FileRowAsync(library, "Film/film.mkv");
-        await _fixture.AddConnectionAsync("native", "Manager", "http://192.0.2.30:5099", "k1");
+        await _fixture.AddConnectionAsync("native", "http://192.0.2.30:5099", "k1");
         await _fixture.Db(async uow => { await _fixture.Ledger.RecordReceivedAsync(uow, "native", "h632", library, "Film/film.mkv"); return 0; });
         var handoff = $$$"""{"relative_media_path":"Film/film.mkv","media_scope":"movie","trigger":"webhook","library_id":{{{library}}},"origin":{"source_key":"native","handoff_id":"h632","callback_path":"{{{EventsPath}}}","release_name":"Film.2001"}}""";
         var first = await EnqueueAsync(handoff, "remux:h632");
@@ -232,10 +234,139 @@ public sealed class RemuxPassHandlerTests : IDisposable
         await Handler().HandleAsync(Context(5, $$$"""{"relative_media_path":"audio-only.mpg","library_id":{{{library}}}}"""), CancellationToken.None);
 
         Assert.False(File.Exists(source));
-        Assert.StartsWith("skipped|0|", await ScalarText("SELECT status || '|' || failure_attempts || '|' || status_reason FROM files"), StringComparison.Ordinal);
-        Assert.Contains("deleted the rejected file", await ScalarText("SELECT status_reason FROM files"), StringComparison.Ordinal);
+        Assert.StartsWith("rejected|0|", await ScalarText("SELECT status || '|' || failure_attempts || '|' || status_reason FROM files"), StringComparison.Ordinal);
+        Assert.EndsWith(WeirOnlyRejection.Deleted, await ScalarText("SELECT status_reason FROM files"), StringComparison.Ordinal);
         Assert.Equal(1, await _fixture.Store.Scalar("SELECT count(*) FROM file_logs WHERE title = 'Rejected file cleanup finished'"));
         Assert.Equal(0, await _fixture.Store.Scalar("SELECT count(*) FROM jobs WHERE job_kind <> 'processing.file.remux_pass.v1'"));
+    }
+
+    private const string ForeignOnlyReason =
+        "Rejected: none of its audio tracks are in English, and the \"English only\" rules keep only English audio, so there would be nothing to keep. " +
+        "It has Japanese audio. To accept files like this, change the first-choice language or \"How to choose audio\" in Settings › Rules.";
+
+    /// <summary>Gives the library a rules profile that keeps English audio only, so a Japanese-only file has nothing to keep.</summary>
+    private async Task EnglishOnlyRulesAsync(long libraryId)
+    {
+        var ruleSetId = Convert.ToInt64(await _fixture.Db(uow => uow.ExecuteScalarWriteAsync(
+            "INSERT INTO rule_sets (name, primary_audio_lang, audio_preference_mode) VALUES ('English only', 'eng', 'preferred_langs_strict') RETURNING id")), CultureInfo.InvariantCulture);
+        await _fixture.Store.Execute($"UPDATE libraries SET rule_set_id = {ruleSetId} WHERE id = {libraryId}");
+    }
+
+    private string ForeignFile => Path.Join(_folders.Watched, "Foreign Again (2020).mkv");
+
+    private HistoryFileRemovalService Removal() =>
+        new(_fixture.Ports, _fixture.Connections, _fixture.Reporter, new RejectRoutes(_fixture.Ports, _fixture.Reporter), _fixture.Libraries, _fixture.Files, new FileSkipMarkerStore());
+
+    private async Task<ProcessingFileRecord> RejectedForeignFileAsync(string failurePolicy = "pass_through", string rejectedFileAction = "leave")
+    {
+        var library = await LibraryAsync(failurePolicy, rejectedFileAction: rejectedFileAction);
+        await EnglishOnlyRulesAsync(library);
+        _folders.Source("Foreign Again (2020).mkv");
+        _media.DefaultProbe = FakeMediaRunner.JapaneseOnly;
+        await FileRowAsync(library, "Foreign Again (2020).mkv");
+
+        await Handler().HandleAsync(Context(31, $$$"""{"relative_media_path":"Foreign Again (2020).mkv","media_scope":"movie","library_id":{{{library}}}}"""), CancellationToken.None);
+
+        return await _fixture.Db(uow => _fixture.Files.FindAsync(uow, library, "Foreign Again (2020).mkv")) ?? throw new InvalidOperationException("The file row is missing.");
+    }
+
+    [Fact]
+    public async Task A_file_the_rules_reject_with_no_media_manager_is_recorded_as_rejected_in_plain_words()
+    {
+        var file = await RejectedForeignFileAsync();
+
+        Assert.Equal(ProcessingFileStatuses.Rejected, file.Status);
+        Assert.Equal($"{ForeignOnlyReason} {WeirOnlyRejection.LeftInPlace}", file.StatusReason);
+        Assert.Equal((ProcessingFailureClasses.Rules, 0L, null), (file.FailureClass, file.FailureAttempts, file.NextRetryAt));
+        Assert.True(File.Exists(ForeignFile));
+        Assert.Equal(0, await _fixture.Store.Scalar("SELECT count(*) FROM jobs WHERE job_kind <> 'processing.file.remux_pass.v1'"));
+    }
+
+    [Fact]
+    public async Task A_rules_rejection_with_no_media_manager_is_titled_as_a_rejection_in_activity()
+    {
+        await RejectedForeignFileAsync();
+
+        Assert.Equal(
+            "Rejected Foreign Again (2020).mkv: no English audio for the \"English only\" rules",
+            await ScalarText("SELECT title FROM activity_events WHERE event_type = 'processing.file_remux_pass_completed'"));
+    }
+
+    [Fact]
+    public async Task Under_the_reject_policy_the_activity_title_for_the_pass_is_unchanged()
+    {
+        await RejectedForeignFileAsync(failurePolicy: "reject");
+
+        Assert.Equal(
+            "Foreign Again (2020).mkv could not be checked",
+            await ScalarText("SELECT title FROM activity_events WHERE event_type = 'processing.file_remux_pass_completed'"));
+    }
+
+    [Fact]
+    public async Task A_rules_rejection_with_no_media_manager_offers_the_remove_dialog_and_deletes_only_the_file_it_recorded()
+    {
+        var file = await RejectedForeignFileAsync();
+        Assert.NotNull(file.FingerprintSizeBytes);
+
+        var options = await _fixture.Db(uow => Removal().EvaluateAsync(uow, file, CancellationToken.None));
+        var outcome = await _fixture.Db(uow => Removal().DeleteAsync(uow, file, null, CancellationToken.None));
+
+        Assert.True(options.RequiresChoice);
+        Assert.False(options.DeleteHandledByManager);
+        Assert.True(outcome.Done);
+        Assert.False(File.Exists(ForeignFile));
+    }
+
+    [Fact]
+    public async Task A_rules_rejection_with_no_media_manager_refuses_to_delete_a_file_that_changed_since()
+    {
+        var file = await RejectedForeignFileAsync();
+        File.AppendAllText(ForeignFile, "a different release landed here");
+
+        var outcome = await _fixture.Db(uow => Removal().DeleteAsync(uow, file, null, CancellationToken.None));
+
+        Assert.False(outcome.Done);
+        Assert.True(File.Exists(ForeignFile));
+    }
+
+    [Fact]
+    public async Task A_rules_rejection_stays_rejected_when_the_library_deletes_rejected_files()
+    {
+        var file = await RejectedForeignFileAsync(rejectedFileAction: "delete_file");
+
+        Assert.Equal(ProcessingFileStatuses.Rejected, file.Status);
+        Assert.Equal($"{ForeignOnlyReason} {WeirOnlyRejection.Deleted}", file.StatusReason);
+        Assert.False(File.Exists(ForeignFile));
+        Assert.Null(file.FingerprintSizeBytes);
+    }
+
+    [Fact]
+    public async Task Under_the_reject_policy_a_rules_rejection_keeps_the_wording_a_media_manager_is_sent()
+    {
+        var file = await RejectedForeignFileAsync(failurePolicy: "reject");
+
+        Assert.Equal(ProcessingFileStatuses.Skipped, file.Status);
+        Assert.StartsWith("remux plan could not be built (no retainable audio)", file.StatusReason, StringComparison.Ordinal);
+        var reject = (WireObject)WireJsonParser.Parse(await ScalarText("SELECT payload_json FROM jobs WHERE job_kind = 'processing.file.reject.v1'"));
+        Assert.Equal("remux plan could not be built (no retainable audio)", WireConvert.Str(reject["reason"]));
+    }
+
+    [Fact]
+    public async Task A_rules_rejection_of_a_handed_off_file_keeps_the_wording_its_manager_is_sent()
+    {
+        var library = await LibraryAsync();
+        await EnglishOnlyRulesAsync(library);
+        _folders.Source("Film/film.mkv");
+        _media.DefaultProbe = FakeMediaRunner.JapaneseOnly;
+        await FileRowAsync(library, "Film/film.mkv");
+        await _fixture.AddConnectionAsync("deluno", "http://192.0.2.30:5099", "k1");
+        await _fixture.Db(async uow => { await _fixture.Ledger.RecordReceivedAsync(uow, "deluno", "h31", library, "Film/film.mkv"); return 0; });
+        var handoff = $$$"""{"relative_media_path":"Film/film.mkv","media_scope":"movie","trigger":"webhook","library_id":{{{library}}},"origin":{"source_key":"deluno","handoff_id":"h31","callback_path":"{{{EventsPath}}}","release_name":"Film.2001"}}""";
+
+        await Handler().HandleAsync(Context(32, handoff), CancellationToken.None);
+
+        Assert.Equal("skipped", await ScalarText("SELECT status FROM files"));
+        Assert.StartsWith("remux plan could not be built (no retainable audio)", await ScalarText("SELECT status_reason FROM files"), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -246,7 +377,7 @@ public sealed class RemuxPassHandlerTests : IDisposable
         _media.DefaultProbe = FakeMediaRunner.EnglishAndJapanese;
         _media.RemuxError = "Conversion failed";
         await FileRowAsync(library, "Film/film.mkv");
-        await _fixture.AddConnectionAsync("deluno", "Deluno", "http://192.0.2.30:5099", "k1");
+        await _fixture.AddConnectionAsync("deluno", "http://192.0.2.30:5099", "k1");
         await _fixture.Db(async uow => { await _fixture.Ledger.RecordReceivedAsync(uow, "deluno", "h1", library, "Film/film.mkv"); return 0; });
         var handoff = $$$"""{"relative_media_path":"Film/film.mkv","media_scope":"movie","trigger":"webhook","library_id":{{{library}}},"origin":{"source_key":"deluno","handoff_id":"h1","callback_path":"{{{EventsPath}}}","release_name":"Film.2001"}}""";
         var first = await EnqueueAsync(handoff, "remux:h1");
@@ -325,7 +456,7 @@ public sealed class RemuxPassHandlerTests : IDisposable
         var library = await LibraryAsync();
         _folders.Source(Path.Join("Film", "film.mkv"));
         await FileRowAsync(library, "Film/film.mkv", "processing_failed");
-        await _fixture.AddConnectionAsync("deluno", "Deluno", "http://192.0.2.30:5099", "k1");
+        await _fixture.AddConnectionAsync("deluno", "http://192.0.2.30:5099", "k1");
         await _fixture.Db(async uow => { await _fixture.Ledger.RecordReceivedAsync(uow, "deluno", "h2", library, "Film/film.mkv"); return 0; });
         await EnqueueAsync($$$"""{"relative_media_path":"Film/film.mkv","library_id":{{{library}}},"origin":{"source_key":"deluno","handoff_id":"h2","callback_path":"{{{EventsPath}}}"}}""", "remux:h2");
         var retryPayload = $$"""{"relative_media_path":"Film/film.mkv","media_scope":"movie","library_id":{{library}},"trigger":"scheduled"}""";

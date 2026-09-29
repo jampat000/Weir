@@ -1,5 +1,3 @@
-using System.Diagnostics;
-
 using Xunit;
 
 namespace Weir.Tray.Tests;
@@ -11,26 +9,11 @@ namespace Weir.Tray.Tests;
 public sealed class InstallProcessesTests : IDisposable
 {
     private readonly TempDirectory _root = TempDirectory.Create();
-    private readonly List<Process> _started = [];
+    private readonly StandInServers _servers = new();
 
     public void Dispose()
     {
-        foreach (var p in _started)
-        {
-            try
-            {
-                if (!p.HasExited)
-                {
-                    p.Kill(entireProcessTree: true);
-                }
-                p.WaitForExit(5_000);
-            }
-            catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception)
-            {
-                // Already gone, which is what this clean-up wants.
-            }
-            p.Dispose();
-        }
+        _servers.Dispose();
         _root.Dispose();
     }
 
@@ -51,16 +34,15 @@ public sealed class InstallProcessesTests : IDisposable
 
     /// <summary>
     /// A real process named WeirServer inside the install root, and another outside it. Only the
-    /// one inside is stopped. (ping.exe, copied and renamed, stands in for the server: it stays
-    /// alive long enough and needs nothing else.)
+    /// one inside is stopped. (The stand-in server, copied and renamed, stands in for the real one.)
     /// </summary>
     [Fact]
-    public void Stops_this_installs_server_and_leaves_another_weir_running()
+    public async Task Stops_this_installs_server_and_leaves_another_weir_running()
     {
         var install = Path.Combine(_root.Path, "install", "current");
         var elsewhere = Path.Combine(_root.Path, "Deluno", "Weir", "app", "current");
-        var inside = StartFakeServer(Path.Combine(install, "server"));
-        var outside = StartFakeServer(Path.Combine(elsewhere, "server"));
+        var inside = await _servers.StartAsync(Path.Combine(install, "server"));
+        var outside = await _servers.StartAsync(Path.Combine(elsewhere, "server"));
         var log = new List<string>();
 
         var stopped = InstallProcesses.StopOwn(install, sameSessionOnly: false, log.Add, "test");
@@ -72,19 +54,31 @@ public sealed class InstallProcessesTests : IDisposable
         Assert.Contains(log, line => line.Contains($"pid {outside.Id}") && line.Contains("not part of this install"));
     }
 
-    private Process StartFakeServer(string directory)
+    [Fact]
+    public async Task Asks_this_installs_server_to_stop_before_killing_it()
     {
-        Directory.CreateDirectory(directory);
-        var exe = Path.Combine(directory, "WeirServer.exe");
-        File.Copy(Path.Combine(Environment.SystemDirectory, "PING.EXE"), exe);
-        var p = Process.Start(new ProcessStartInfo(exe, "-n 120 127.0.0.1")
-        {
-            UseShellExecute = false,
-            CreateNoWindow = true,
-            RedirectStandardOutput = true,
-        })!;
-        _started.Add(p);
-        Assert.False(p.WaitForExit(500), "the stand-in server exited immediately");
-        return p;
+        var install = Path.Combine(_root.Path, "install", "current");
+        var server = await _servers.StartAsync(Path.Combine(install, "server"));
+        var log = new List<string>();
+
+        InstallProcesses.StopOwn(install, sameSessionOnly: false, log.Add, "test");
+
+        Assert.True(server.WaitForExit(5_000), "the install's own server should have been stopped");
+        Assert.Equal(0, server.ExitCode);
+        Assert.Contains(log, line => line.Contains($"pid {server.Id}") && line.Contains("cleanly"));
+    }
+
+    [Fact]
+    public async Task Kills_this_installs_server_when_it_cannot_be_asked_to_stop()
+    {
+        var install = Path.Combine(_root.Path, "install", "current");
+        var server = await _servers.StartAsync(Path.Combine(install, "server"), "no-stop-event");
+        var log = new List<string>();
+
+        var stopped = InstallProcesses.StopOwn(install, sameSessionOnly: false, log.Add, "test");
+
+        Assert.Contains(server.Id, stopped);
+        Assert.True(server.WaitForExit(5_000), "the install's own server should have been stopped");
+        Assert.DoesNotContain(log, line => line.Contains("cleanly"));
     }
 }

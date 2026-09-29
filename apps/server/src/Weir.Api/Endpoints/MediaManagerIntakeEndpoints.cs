@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Weir.Api.Http;
 using Weir.Core.Activity;
+using Weir.Core.Configuration;
 using Weir.Core.Json;
 using Weir.Core.MediaManagers;
 using Weir.Core.Validation;
@@ -39,9 +40,11 @@ internal sealed class MediaManagerIntakeEndpointHandlers
     private readonly MediaManagerIntake _intake;
     private readonly HandbackOutcomes _handbackOutcomes;
     private readonly LibraryStore _libraries;
+    private readonly MachineIdentity _machine;
 
-    public MediaManagerIntakeEndpointHandlers(MediaManagerIntake intake, HandbackOutcomes handbackOutcomes, LibraryStore libraries)
+    public MediaManagerIntakeEndpointHandlers(MediaManagerIntake intake, HandbackOutcomes handbackOutcomes, LibraryStore libraries, MachineIdentity machine)
     {
+        _machine = machine ?? throw new ArgumentNullException(nameof(machine));
         _intake = intake ?? throw new ArgumentNullException(nameof(intake));
         _handbackOutcomes = handbackOutcomes ?? throw new ArgumentNullException(nameof(handbackOutcomes));
         _libraries = libraries ?? throw new ArgumentNullException(nameof(libraries));
@@ -129,7 +132,9 @@ internal sealed class MediaManagerIntakeEndpointHandlers
         var presented = request.FirstHeader("X-Webhook-Secret");
         var uow = await request.DbAsync().ConfigureAwait(false);
         await RefusalsAsApiErrors(() => _intake.RequireSecretAsync(uow, presented, null)).ConfigureAwait(false);
-        return ApiRoutes.Ok(new WireObject().Set("capabilities", new WireArray(IntakeRules.HandoffCapabilities.Select(c => (WireValue)new WireString(c)))));
+        return ApiRoutes.Ok(new WireObject()
+            .Set("capabilities", new WireArray(IntakeRules.HandoffCapabilities.Select(c => (WireValue)new WireString(c))))
+            .Set("machine_name", _machine.Name));
     }
 
     /// <summary>

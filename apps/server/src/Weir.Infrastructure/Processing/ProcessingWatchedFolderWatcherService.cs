@@ -113,7 +113,7 @@ public class ProcessingWatchedFolderWatcherService : BackgroundService
                     catch (Exception exception) when (exception is not OperationCanceledException)
 #pragma warning restore CA1031
                     {
-                        _logger.LogError(exception, "Filesystem watcher could not read library settings; keeping the previous watch set.");
+                        _logger.LogError(exception, "Filesystem watcher could not read workflow settings; keeping the previous watch set.");
                     }
                 }
 

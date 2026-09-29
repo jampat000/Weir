@@ -13,6 +13,7 @@ import {
 import { useAppSettingsSaveMutation } from "../../lib/settings/queries";
 import type { AppSettings } from "../../lib/settings/types";
 import type { BackupDraft } from "./setup-wizard-parts";
+import type { SuggestedLibraryPlan } from "./use-suggested-libraries";
 
 export type LibraryFolders = { watched: string; output: string };
 
@@ -23,10 +24,16 @@ export type WizardDraft = {
   tv: LibraryFolders;
 };
 
+/** Where the libraries come from: folders typed by hand, or the libraries offered from what was connected. */
+export type LibraryChoice =
+  { kind: "typed" } | { kind: "offered"; plan: SuggestedLibraryPlan[] };
+
 const LIBRARY_NAMES: Record<ProcessingMediaType, string> = {
   movie: "Movies",
   tv: "TV",
 };
+
+const TRAILING_SEPARATORS = /[\\/]+$/;
 
 /** The library the wizard edits for a media type: the first one, when any exist. */
 export function firstLibraryOfType(
@@ -49,7 +56,28 @@ function missingOutputFolder(draft: WizardDraft): string | null {
   return null;
 }
 
-/** Saves the wizard: the app settings first, then the first Movies and TV library. */
+function comparableFolder(folder: string): string {
+  return folder.trim().replace(TRAILING_SEPARATORS, "").toLowerCase();
+}
+
+/**
+ * The library an offered one is saved into: the empty one it was offered for, or, when a first attempt already
+ * created it and only a later step failed, the library now sitting at the same watched folder.
+ */
+function libraryToFill(
+  libraries: ProcessingLibrary[],
+  offered: SuggestedLibraryPlan,
+): ProcessingLibrary | undefined {
+  return libraries.find((library) =>
+    offered.libraryId !== null
+      ? library.id === offered.libraryId
+      : library.media_type === offered.mediaType &&
+        comparableFolder(library.watched_folder) ===
+          comparableFolder(offered.watched),
+  );
+}
+
+/** Saves the wizard: the libraries first, then the app settings. */
 export function useWizardSave({
   settings,
   libraries,
@@ -71,7 +99,7 @@ export function useWizardSave({
    * The wizard edits the first library of each media type. When there is none yet it adds one, but
    * only if a folder was entered: an empty library would do nothing.
    */
-  async function saveLibrary(
+  async function saveTypedLibrary(
     current: ProcessingLibrary[],
     mediaType: ProcessingMediaType,
     folders: LibraryFolders,
@@ -105,12 +133,43 @@ export function useWizardSave({
     });
   }
 
+  /** An offered library fills in the empty one it was offered for, and is linked to the managers that cover it. */
+  async function saveOfferedLibrary(
+    current: ProcessingLibrary[],
+    offered: SuggestedLibraryPlan,
+  ) {
+    const existing = libraryToFill(current, offered);
+    if (existing) {
+      await updateLibrary.mutateAsync({
+        id: existing.id,
+        data: {
+          ...writeFromProcessingLibrary(existing),
+          watched_folder: offered.watched,
+          output_folder: offered.output,
+          manager_connection_ids: [
+            ...new Set([
+              ...existing.manager_connection_ids,
+              ...offered.managerConnectionIds,
+            ]),
+          ],
+        },
+      });
+      return;
+    }
+    await createLibrary.mutateAsync({
+      name: offered.name,
+      media_type: offered.mediaType,
+      watched_folder: offered.watched,
+      output_folder: offered.output,
+      manager_connection_ids: offered.managerConnectionIds,
+    });
+  }
+
   /** Skipping leaves what is already saved alone: only the wizard's own state moves on. */
   async function skip() {
     onMessage(null);
     try {
       await saveAppSettings.mutateAsync({
-        product_display_name: settings.product_display_name,
         signed_in_home_notice: settings.signed_in_home_notice,
         setup_wizard_state: "skipped",
         app_timezone: settings.app_timezone,
@@ -127,24 +186,32 @@ export function useWizardSave({
     }
   }
 
+  async function saveLibraries(draft: WizardDraft, choice: LibraryChoice) {
+    if (!libraries) return;
+    if (choice.kind === "offered") {
+      for (const offered of choice.plan) {
+        await saveOfferedLibrary(libraries, offered);
+      }
+      return;
+    }
+    await saveTypedLibrary(libraries, "movie", draft.movie);
+    await saveTypedLibrary(libraries, "tv", draft.tv);
+  }
+
   /**
    * Libraries save before settings, so a library failure never leaves `setup_wizard_state` marked
    * "completed" over work that did not actually finish.
    */
-  async function finish(draft: WizardDraft) {
+  async function finish(draft: WizardDraft, choice: LibraryChoice) {
     onMessage(null);
-    const missing = missingOutputFolder(draft);
+    const missing = choice.kind === "typed" ? missingOutputFolder(draft) : null;
     if (missing) {
       onMessage(missing);
       return;
     }
     try {
-      if (libraries) {
-        await saveLibrary(libraries, "movie", draft.movie);
-        await saveLibrary(libraries, "tv", draft.tv);
-      }
+      await saveLibraries(draft, choice);
       await saveAppSettings.mutateAsync({
-        product_display_name: settings.product_display_name,
         signed_in_home_notice: settings.signed_in_home_notice,
         setup_wizard_state: "completed",
         app_timezone: draft.timezone,

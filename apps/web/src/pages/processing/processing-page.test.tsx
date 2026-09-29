@@ -1,7 +1,8 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ProcessingFile } from "../../lib/processing/files-api";
+import { LEAVING_CARD_MS } from "./leaving-cards";
 import { LIBRARY_CLEAN_JOB_KIND } from "./processing-model";
 import { ProcessingPage } from "./processing-page";
 
@@ -35,6 +36,7 @@ const libraries = [
     enabled: true,
     watched_folder: "D:/downloads/tv",
     min_file_age_seconds: 60,
+    effective_min_file_age_seconds: 60,
   },
   {
     id: 2,
@@ -42,6 +44,7 @@ const libraries = [
     enabled: true,
     watched_folder: "D:/downloads/movies",
     min_file_age_seconds: 60,
+    effective_min_file_age_seconds: 60,
   },
 ];
 const readiness = {
@@ -57,7 +60,8 @@ vi.mock("../../lib/activity/use-activity-stream-invalidation", () => ({
 }));
 vi.mock("../../lib/processing/files-queries", () => ({
   useProcessingFilesQuery: () => ({
-    data: files,
+    // A new object each call, so a test that changes `files` and re-renders sees the lists change.
+    data: { ...files },
     isPending: false,
     isError: false,
     refetch: refetchFiles,
@@ -195,6 +199,28 @@ describe("ProcessingPage", () => {
     );
     expect(refetchFiles).toHaveBeenCalled();
     expect(refetchLibraries).toHaveBeenCalled();
+  });
+
+  it("names the wait every library is held to now, whether it is the library's own or Performance's", () => {
+    const before = libraries.map(
+      (library) => library.effective_min_file_age_seconds,
+    );
+    libraries.forEach((library) => {
+      library.effective_min_file_age_seconds = 10;
+    });
+    try {
+      renderLive();
+
+      expect(
+        screen.getByText(
+          /new downloads wait 10 seconds after they stop changing/,
+        ),
+      ).toBeInTheDocument();
+    } finally {
+      libraries.forEach((library, index) => {
+        library.effective_min_file_age_seconds = before[index];
+      });
+    }
   });
 
   it("counts a file waiting on its manager down to Weir's next look", () => {
@@ -380,6 +406,102 @@ describe("ProcessingPage", () => {
     expect(screen.getByTestId("live-lane-waiting")).toHaveTextContent(
       "Nothing waiting",
     );
+  });
+
+  describe("a file that leaves Working", () => {
+    const RUNNING = {
+      id: 1,
+      relative_path: "Glass.Orchard.S01E04.2160p.WEB-DL.mkv",
+      progress_percent: 60,
+      progress_stage: "writing",
+    };
+
+    function rerenderLive(view: ReturnType<typeof renderLive>) {
+      view.rerender(
+        <MemoryRouter>
+          <ProcessingPage />
+        </MemoryRouter>,
+      );
+    }
+
+    function startRunning() {
+      files.files = [file({ ...RUNNING, status: "processing" })];
+      const view = renderLive();
+      expect(screen.getByTestId("live-working")).toBeInTheDocument();
+      return view;
+    }
+
+    it("keeps its card with every step ticked for a moment when it finishes, then lets it drop", () => {
+      const view = startRunning();
+
+      files.files = [file({ id: 1, status: "processed" })];
+      rerenderLive(view);
+
+      const ended = screen.getByTestId("live-leaving");
+      expect(ended).toHaveAttribute("data-outcome", "done");
+      expect(ended).toHaveTextContent("Glass Orchard S01E04");
+      expect(within(ended).getAllByText(/\(done\)/)).toHaveLength(5);
+      expect(screen.queryByTestId("live-working")).toBeNull();
+
+      act(() => {
+        vi.advanceTimersByTime(LEAVING_CARD_MS);
+      });
+      expect(screen.queryByTestId("live-leaving")).toBeNull();
+    });
+
+    it("marks the step it failed at and says why", () => {
+      const view = startRunning();
+
+      files.files = [
+        file({
+          id: 1,
+          status: "processing_failed",
+          status_reason: "The new file would not play. The original is safe.",
+        }),
+      ];
+      rerenderLive(view);
+
+      const ended = screen.getByTestId("live-leaving");
+      expect(ended).toHaveAttribute("data-outcome", "failed");
+      expect(ended).toHaveTextContent("Write (failed)");
+      expect(ended).toHaveTextContent("The new file would not play.");
+    });
+
+    it("shows a rejection on the Plan step", () => {
+      const view = startRunning();
+
+      files.files = [
+        file({
+          id: 1,
+          status: "rejected",
+          status_reason: "Nothing in this file needs changing.",
+        }),
+      ];
+      rerenderLive(view);
+
+      const ended = screen.getByTestId("live-leaving");
+      expect(ended).toHaveAttribute("data-outcome", "rejected");
+      expect(ended).toHaveTextContent("Plan (failed)");
+      expect(ended).toHaveTextContent("Nothing in this file needs changing.");
+    });
+
+    it("leaves no card behind for a file that only went back to waiting", () => {
+      const view = startRunning();
+
+      files.files = [file({ id: 1, status: "unprocessed" })];
+      rerenderLive(view);
+
+      expect(screen.queryByTestId("live-leaving")).toBeNull();
+    });
+
+    it("does not treat narrowing the page to another kind of file as a file leaving", () => {
+      startRunning();
+
+      fireEvent.click(screen.getByRole("button", { name: "Library cleaning" }));
+
+      expect(screen.queryByTestId("live-working")).toBeNull();
+      expect(screen.queryByTestId("live-leaving")).toBeNull();
+    });
   });
 
   it("says what needs a person, and nothing when a healthy install has nothing to say", () => {

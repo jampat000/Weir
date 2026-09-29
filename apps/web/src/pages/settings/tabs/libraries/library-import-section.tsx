@@ -66,11 +66,11 @@ function DiscoveredLibrary({
 
 function DriftList({ items }: { items: ProcessingLibraryDrift[] }) {
   return (
-    <div className="mt-6" aria-label="Library comparison">
+    <div className="mt-6" aria-label="Workflow comparison">
       <h4 className="text-sm font-medium text-mm-text1">Comparison result</h4>
       {items.length === 0 ? (
         <p className="text-sm text-mm-status-healthy-text">
-          No manager/library path differences were found.
+          No manager/workflow path differences were found.
         </p>
       ) : (
         items.map((item, index) => (
@@ -131,7 +131,7 @@ export function LibraryImportSection({
     setSelectedKeys([]);
     askManager(
       (id) => discover.mutateAsync(id),
-      "Weir could not discover libraries from that media manager.",
+      "Weir could not discover workflows from that media manager.",
     );
   };
 
@@ -145,9 +145,9 @@ export function LibraryImportSection({
       setSelectedKeys([]);
       await discover.mutateAsync(id);
       onNotice(
-        `${plural(created.length, "library was", "libraries were")} imported. Review its local paths before enabling processing.`,
+        `${plural(created.length, "workflow was", "workflows were")} imported. Review its local paths before enabling processing.`,
       );
-    }, "Those libraries could not be imported.");
+    }, "Those workflows could not be imported.");
   };
 
   return (
@@ -156,7 +156,7 @@ export function LibraryImportSection({
       heading="Import from a media manager"
     >
       <p className="mm-quiet-note">
-        Ask a connected manager which libraries it owns. Comparisons report path
+        Ask a connected manager which workflows it owns. Comparisons report path
         differences and never change an existing watched folder.
       </p>
       <div className="mt-5 flex flex-wrap items-end gap-2">
@@ -185,7 +185,7 @@ export function LibraryImportSection({
           onClick={discoverLibraries}
           disabled={!connectionId || discover.isPending}
         >
-          Discover libraries
+          Discover workflows
         </button>
         <button
           type="button"
@@ -193,7 +193,7 @@ export function LibraryImportSection({
           onClick={() =>
             askManager(
               (id) => drift.mutateAsync(id),
-              "Weir could not compare libraries with that media manager.",
+              "Weir could not compare workflows with that media manager.",
             )
           }
           disabled={!connectionId || drift.isPending}
@@ -203,10 +203,10 @@ export function LibraryImportSection({
       </div>
 
       {discover.data ? (
-        <div className="mt-5" aria-label="Discovered libraries">
+        <div className="mt-5" aria-label="Discovered workflows">
           {discover.data.length === 0 ? (
             <p className="text-sm text-mm-text3">
-              That manager did not report any libraries.
+              That manager did not report any workflows.
             </p>
           ) : (
             discover.data.map((item) => (

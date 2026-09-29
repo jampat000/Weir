@@ -112,7 +112,7 @@ public sealed class FilesAtOnceTests
 
         Assert.Equal(FilesAtOnceRules.LibraryLimit, readout.WaitingFor);
         Assert.Equal(
-            "1 file is waiting: Movies runs 1 at once, and 1 file of its own is running. Change that in the library's own settings.",
+            "1 file is waiting: Movies runs 1 at once, and 1 file of its own is running. Change that in the workflow's own settings.",
             readout.Message);
     }
 

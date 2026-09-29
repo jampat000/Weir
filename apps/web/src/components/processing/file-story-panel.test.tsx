@@ -24,7 +24,7 @@ function log(over: Partial<ProcessingFileLog> = {}): ProcessingFileLog {
         story: [
           {
             heading: "Picked up",
-            sentence: "Weir took this file as a film in the Films 4K library.",
+            sentence: "Weir took this file as a film in the Films 4K workflow.",
             tone: "neutral",
           },
           {

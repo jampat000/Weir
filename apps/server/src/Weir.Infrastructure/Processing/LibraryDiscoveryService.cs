@@ -144,7 +144,7 @@ public sealed class LibraryDiscoveryService
     }
 
     /// <summary><paramref name="wanted"/>, or the first numbered variant of it not already in <paramref name="existing"/>.</summary>
-    private static string UniqueName(HashSet<string> existing, string wanted)
+    internal static string UniqueName(HashSet<string> existing, string wanted)
     {
         if (!existing.Contains(wanted))
         {
@@ -160,7 +160,7 @@ public sealed class LibraryDiscoveryService
             }
         }
 
-        throw new ProcessingDiscoveryException($"Too many libraries already named like {WireStrings.Repr(wanted)}.");
+        throw new ProcessingDiscoveryException($"Too many workflows already named like {WireStrings.Repr(wanted)}.");
     }
 
     /// <summary>
@@ -273,8 +273,8 @@ public sealed class LibraryDiscoveryService
                     row.Name,
                     null,
                     string.IsNullOrEmpty(row.WatchedFolder) ? null : row.WatchedFolder,
-                    $"{connectionRow.Name} no longer reports this library. Weir has left it exactly as it is — " +
-                    "remove it here if it is genuinely gone, or unlink it to keep it as a manual one."));
+                    $"{connectionRow.Name} no longer reports the library this workflow came from. Weir has left it exactly as it is — " +
+                    "remove it here if it is genuinely gone, or unlink it to keep it as a Weir-only workflow."));
                 continue;
             }
 
@@ -289,7 +289,7 @@ public sealed class LibraryDiscoveryService
                     row.Name,
                     managerRoot,
                     saved,
-                    $"{connectionRow.Name} now says this library lives at {WireStrings.Repr(managerRoot)}, but Weir is " +
+                    $"{connectionRow.Name} now puts this workflow's library at {WireStrings.Repr(managerRoot)}, but Weir is " +
                     $"watching {WireStrings.Repr(saved)}. Nothing has been changed — Weir deletes source folders after a " +
                     "successful pass, so a watched folder only moves when you move it."));
             }

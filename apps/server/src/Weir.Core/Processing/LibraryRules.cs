@@ -25,10 +25,14 @@ public sealed record ProcessingLibraryInput
     public string ExcludeMarkersCsv { get; init; } = string.Empty;
     public string IncludePatternsCsv { get; init; } = string.Empty;
     public string ExcludePatternsCsv { get; init; } = string.Empty;
-    public long MinFileSizeMb { get; init; }
+
+    /// <summary>Null follows Settings › Performance; see <see cref="ProcessingLibraryRecord.MinFileSizeMb"/>.</summary>
+    public long? MinFileSizeMb { get; init; }
     public long MaxFileSizeMb { get; init; }
     public string RejectedFileAction { get; init; } = "leave";
-    public long MinFileAgeSeconds { get; init; } = 60;
+
+    /// <summary>Null follows Settings › Performance; see <see cref="ProcessingLibraryRecord.MinFileAgeSeconds"/>.</summary>
+    public long? MinFileAgeSeconds { get; init; }
     public Time.Timestamp? CreatedAfter { get; init; }
     public Time.Timestamp? CreatedBefore { get; init; }
     public Time.Timestamp? ModifiedAfter { get; init; }
@@ -97,12 +101,12 @@ public static partial class LibraryRules
         var label = (name ?? string.Empty).Trim();
         if (label.Length == 0)
         {
-            throw new ProcessingLibraryException("Give the library a name so you can tell it apart later.");
+            throw new ProcessingLibraryException("Give the workflow a name so you can tell it apart later.");
         }
 
         if (existingNames.Contains(label, StringComparer.Ordinal))
         {
-            throw new ProcessingLibraryException($"A library named '{label}' already exists.");
+            throw new ProcessingLibraryException($"A workflow named '{label}' already exists.");
         }
 
         return label;

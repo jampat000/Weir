@@ -17,7 +17,7 @@ public sealed class HandoffWaitingReportTests
     public async Task A_report_the_manager_did_not_answer_waits_in_plain_words_and_goes_when_it_answers()
     {
         using var fixture = new MediaManagerFixture();
-        await fixture.AddConnectionAsync("deluno", "Deluno", "http://192.0.2.30:5099", "k1");
+        await fixture.AddConnectionAsync("deluno", "http://192.0.2.30:5099", "k1");
         var library = await fixture.LibraryAsync("movie", fixture.Store.Home.Join("watched"));
         await fixture.Db(async uow =>
         {
@@ -33,9 +33,9 @@ public sealed class HandoffWaitingReportTests
 
         var status = await fixture.Db(uow => fixture.Reporter.ReportHandoffCompletionAsync(uow, payload, result), commit: false);
 
-        Assert.Equal("failed: could not reach Deluno", status);
+        Assert.Equal("failed: could not reach Deluno on 192.0.2.30", status);
         Assert.Equal(
-            "Finished processing this file. Waiting for Deluno, which is not answering. Weir will tell it this file is ready when it answers.",
+            "Finished processing this file. Waiting for Deluno on 192.0.2.30, which is not answering. Weir will tell it this file is ready when it answers.",
             await ReasonAsync(fixture));
         Assert.Equal(1, await fixture.Store.Scalar("SELECT count(*) FROM media_manager_handoffs WHERE pending_report_json IS NOT NULL"));
 
@@ -49,11 +49,11 @@ public sealed class HandoffWaitingReportTests
 
         Assert.Equal(0, await fixture.Store.Scalar("SELECT count(*) FROM media_manager_handoffs WHERE pending_report_json IS NOT NULL"));
         Assert.Equal(
-            "Finished processing this file. Deluno is answering again, and Weir has told it this file is ready.",
+            "Finished processing this file. Deluno on 192.0.2.30 is answering again, and Weir has told it this file is ready.",
             await ReasonAsync(fixture));
         var delivered = fixture.Http.RequestsTo(HttpMethod.Post, Callback)[^1];
         Assert.Equal("completed", ((WireString)((WireObject)delivered.Json!)["status"]).Value);
-        Assert.Equal(1, await fixture.Store.Scalar("SELECT count(*) FROM activity_events WHERE title = 'Told Deluno that film.mkv is ready to import'"));
+        Assert.Equal(1, await fixture.Store.Scalar("SELECT count(*) FROM activity_events WHERE title = 'Told Deluno on 192.0.2.30 that film.mkv is ready to import'"));
         Assert.Equal(0, await fixture.Db(uow => fixture.Reporter.SendWaitingReportsAsync(uow, "deluno"), commit: false));
     }
 

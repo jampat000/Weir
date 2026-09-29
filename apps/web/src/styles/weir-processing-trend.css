@@ -282,13 +282,11 @@
   .mm-live-pulse::after,
   .mm-live-spin,
   .mm-live-done,
-  .mm-live-bar__fill::after,
-  .mm-live-bar--busy .mm-live-bar__fill::before,
+  .mm-live-bar__fill::before,
   .mm-live-ring--checking .mm-live-ring__fill {
     animation: none;
   }
 
-  .mm-live-bar__fill,
   .mm-live-ring__fill,
   .mm-live-spark__bar {
     transition: none;

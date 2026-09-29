@@ -4,6 +4,7 @@ using System.Text;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Weir.Api.Http;
 using Weir.Core.Activity;
@@ -24,6 +25,12 @@ public static class ActivityEndpoints
 {
     /// <summary>The reconnect delay the stream sends as its <c>retry:</c> hint.</summary>
     public const int StreamRetryMilliseconds = 5000;
+
+    /// <summary>
+    /// The event id a frame carries while no Activity exists yet. A change no Activity row records (#816) still has to reach
+    /// the screens on an install that has recorded nothing.
+    /// </summary>
+    private const long NoActivityYetId = 0;
 
     /// <summary>How long the stream stays quiet before it sends a keepalive comment.</summary>
     public static readonly TimeSpan StreamKeepalive = TimeSpan.FromSeconds(16);
@@ -79,10 +86,7 @@ public static class ActivityEndpoints
 
             lastSeenVersion = changed.Version;
             lastSentId = lastSentId is { } sent && changed.LatestId is { } heard ? Math.Max(sent, heard) : lastSentId ?? changed.LatestId;
-            if (lastSentId is { } latest)
-            {
-                yield return ActivityHistory.LatestEventFrame(latest, lastSeenVersion);
-            }
+            yield return ActivityHistory.LatestEventFrame(lastSentId ?? NoActivityYetId, lastSeenVersion);
         }
     }
 
@@ -119,12 +123,18 @@ internal sealed class ActivityEndpointHandlers
     private readonly ActivityHistoryStore _history;
     private readonly SuiteSettingsStore _suiteSettings;
     private readonly ActivityProgressFrames _progressFrames;
+    private readonly IHostApplicationLifetime _lifetime;
 
-    public ActivityEndpointHandlers(ActivityHistoryStore history, SuiteSettingsStore suiteSettings, ActivityProgressFrames progressFrames)
+    public ActivityEndpointHandlers(
+        ActivityHistoryStore history,
+        SuiteSettingsStore suiteSettings,
+        ActivityProgressFrames progressFrames,
+        IHostApplicationLifetime lifetime)
     {
         _history = history ?? throw new ArgumentNullException(nameof(history));
         _suiteSettings = suiteSettings ?? throw new ArgumentNullException(nameof(suiteSettings));
         _progressFrames = progressFrames ?? throw new ArgumentNullException(nameof(progressFrames));
+        _lifetime = lifetime ?? throw new ArgumentNullException(nameof(lifetime));
     }
 
     public async Task<ApiResult> GetRecentAsync(ApiRequest request)
@@ -259,9 +269,13 @@ internal sealed class ActivityEndpointHandlers
         var notifier = ActivityNotifications.For(database);
         var progressFrames = _progressFrames;
         var time = request.Time;
+        var lifetime = _lifetime;
         var logger = request.LoggerFactory.CreateLogger("weir.platform.activity.router");
         return new CustomApiResult(async context =>
         {
+            // A stream that outlived the server stopping would hold the shutdown up for as long as a browser keeps it open.
+            using var streamEnded = CancellationTokenSource.CreateLinkedTokenSource(context.RequestAborted, lifetime.ApplicationStopping);
+            var streamEndedToken = streamEnded.Token;
             context.Response.StatusCode = StatusCodes.Status200OK;
             context.Response.ContentType = "text/event-stream; charset=utf-8";
             context.Response.Headers.CacheControl = "no-store, no-cache";
@@ -271,11 +285,11 @@ internal sealed class ActivityEndpointHandlers
             var writeGate = new SemaphoreSlim(1, 1);
             async Task WriteFrameAsync(string chunk)
             {
-                await writeGate.WaitAsync(context.RequestAborted).ConfigureAwait(false);
+                await writeGate.WaitAsync(streamEndedToken).ConfigureAwait(false);
                 try
                 {
-                    await context.Response.Body.WriteAsync(Encoding.UTF8.GetBytes(chunk), context.RequestAborted).ConfigureAwait(false);
-                    await context.Response.Body.FlushAsync(context.RequestAborted).ConfigureAwait(false);
+                    await context.Response.Body.WriteAsync(Encoding.UTF8.GetBytes(chunk), streamEndedToken).ConfigureAwait(false);
+                    await context.Response.Body.FlushAsync(streamEndedToken).ConfigureAwait(false);
                 }
                 finally
                 {
@@ -299,13 +313,13 @@ internal sealed class ActivityEndpointHandlers
                     time,
                     ActivityEndpoints.StreamKeepalive,
                     logger,
-                    context.RequestAborted));
-                var progressLoop = PumpAsync(progressFrames.ForAsync(time, context.RequestAborted));
+                    streamEndedToken));
+                var progressLoop = PumpAsync(progressFrames.ForAsync(time, streamEndedToken));
                 await Task.WhenAll(activityLoop, progressLoop).ConfigureAwait(false);
             }
-            catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested)
+            catch (OperationCanceledException) when (streamEndedToken.IsCancellationRequested)
             {
-                // The client went away.
+                // The client went away, or the server is stopping.
             }
         });
     }

@@ -75,12 +75,12 @@ public static class OperatorJobStatus
 
         if (lower.Contains("not a supported processing media", StringComparison.Ordinal) || lower.Contains("unsupported processing", StringComparison.Ordinal) || lower.Contains("processing does not process", StringComparison.Ordinal) || lower.Contains("weir does not process", StringComparison.Ordinal))
         {
-            return ($"This file is not a supported media file for this pass{subject}.", "Choose a supported video file or update the library’s media types, then start it again.", technical);
+            return ($"This file is not a supported media file for this pass{subject}.", "Choose a supported video file or update the workflow’s media types, then start it again.", technical);
         }
 
         if (lower.Contains("could not find this file", StringComparison.Ordinal) || lower.Contains("file not found", StringComparison.Ordinal) || lower.Contains("no such file", StringComparison.Ordinal))
         {
-            return ($"Weir could not find this file under the saved watched folder{subject}.", "Check the library path or restore the file, then use Start again.", technical);
+            return ($"Weir could not find this file under the saved watched folder{subject}.", "Check the workflow’s folder or restore the file, then use Start again.", technical);
         }
 
         if (lower.Contains("ffprobe failed", StringComparison.Ordinal) || lower.Contains("could not read this media", StringComparison.Ordinal))

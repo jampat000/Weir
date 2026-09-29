@@ -198,7 +198,7 @@ public sealed class LibraryFileFacetsMigrationTests : IDisposable
     {
         SeedScan(
             ("/lib/novideo.mkv", "{\"streams\": []}", "cannot_process", "This file has no video track that Weir could find."),
-            ("/lib/noaudio.mkv", FilmProbe, "cannot_process", "No audio track would remain after applying this library's rules, so Weir will not touch this file."),
+            ("/lib/noaudio.mkv", FilmProbe, "cannot_process", "No audio track would remain after applying this workflow's rules, so Weir will not touch this file."),
             ("/lib/fine.mkv", FilmProbe, "matches", null));
 
         Upgrade();

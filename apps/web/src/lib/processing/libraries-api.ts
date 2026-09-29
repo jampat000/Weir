@@ -27,10 +27,16 @@ export interface ProcessingLibrary {
   exclude_markers_csv: string;
   include_patterns_csv: string;
   exclude_patterns_csv: string;
-  min_file_size_mb: number;
+  /** The library's own minimum size, or null when it uses the Performance setting. */
+  min_file_size_mb: number | null;
+  /** What the library is held to now: its own value, or Performance's. */
+  effective_min_file_size_mb: number;
   max_file_size_mb: number;
   rejected_file_action: "leave" | "delete_file";
-  min_file_age_seconds: number;
+  /** The library's own wait after a file last changes, or null when it uses the Performance setting. */
+  min_file_age_seconds: number | null;
+  /** What the library waits now: its own value, or Performance's. */
+  effective_min_file_age_seconds: number;
   created_after: string | null;
   created_before: string | null;
   modified_after: string | null;
@@ -98,10 +104,12 @@ export interface ProcessingLibraryWrite {
   exclude_markers_csv: string;
   include_patterns_csv: string;
   exclude_patterns_csv: string;
-  min_file_size_mb: number;
+  /** Null uses the Performance setting. */
+  min_file_size_mb: number | null;
   max_file_size_mb: number;
   rejected_file_action: "leave" | "delete_file";
-  min_file_age_seconds: number;
+  /** Null uses the Performance setting. */
+  min_file_age_seconds: number | null;
   created_after: string | null;
   created_before: string | null;
   modified_after: string | null;
@@ -158,7 +166,7 @@ const libraryPath = (id: number) => `${processingLibrariesPath()}/${id}`;
 export async function fetchProcessingLibraries(): Promise<ProcessingLibrary[]> {
   const path = processingLibrariesPath();
   const r = await apiFetch(path);
-  await requireOk(path, r, "Could not load libraries");
+  await requireOk(path, r, "Could not load workflows");
   return readJson<ProcessingLibrary[]>(r);
 }
 
@@ -166,7 +174,7 @@ export async function createProcessingLibrary(
   data: ProcessingLibraryCreate,
 ): Promise<ProcessingLibrary> {
   const path = processingLibrariesPath();
-  const r = await sendJson(path, "POST", data, "Could not add that library");
+  const r = await sendJson(path, "POST", data, "Could not add that workflow");
   return readJson<ProcessingLibrary>(r);
 }
 
@@ -175,7 +183,7 @@ export async function updateProcessingLibrary(
   data: ProcessingLibraryWrite,
 ): Promise<ProcessingLibrary> {
   const path = libraryPath(id);
-  const r = await sendJson(path, "PUT", data, "Could not save that library");
+  const r = await sendJson(path, "PUT", data, "Could not save that workflow");
   return readJson<ProcessingLibrary>(r);
 }
 
@@ -185,7 +193,7 @@ export async function deleteProcessingLibrary(id: number): Promise<void> {
     libraryPath(id),
     "DELETE",
     {},
-    "Could not remove that library",
+    "Could not remove that workflow",
   );
 }
 
@@ -197,7 +205,7 @@ export async function reorderProcessingLibraries(
     path,
     "POST",
     { library_ids_in_order },
-    "Could not reorder libraries",
+    "Could not reorder workflows",
   );
   return readJson<ProcessingLibrary[]>(r);
 }

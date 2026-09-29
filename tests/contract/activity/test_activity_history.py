@@ -113,7 +113,6 @@ def test_the_activity_horizon_is_a_saved_setting(admin: WeirClient) -> None:
     current = client.get(f"{API}/suite/settings").json()
     assert current["activity_retention_days"] == 90
     body = {
-        "product_display_name": current["product_display_name"],
         "app_timezone": current["app_timezone"],
         "log_retention_days": current["log_retention_days"],
         "activity_retention_days": 365,
@@ -134,7 +133,6 @@ def test_the_activity_horizon_is_a_saved_setting(admin: WeirClient) -> None:
 def _put_activity_retention(client: WeirClient, days: int) -> None:
     current = client.get(f"{API}/suite/settings").json()
     body = {
-        "product_display_name": current["product_display_name"],
         "app_timezone": current["app_timezone"],
         "log_retention_days": current["log_retention_days"],
         "activity_retention_days": days,

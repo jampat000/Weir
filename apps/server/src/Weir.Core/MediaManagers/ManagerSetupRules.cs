@@ -89,7 +89,7 @@ public static partial class ManagerSetupRules
 
         if (!watched.IsRooted || !output.IsRooted)
         {
-            lines.Add(new SetupCheckLine(SetupCheckLine.Problem, "Set this library's watched and output folders first; the mapping is built from them."));
+            lines.Add(new SetupCheckLine(SetupCheckLine.Problem, "Set this workflow's watched and output folders first; the mapping is built from them."));
             return new ArrSetupResult(hosts, lines);
         }
 
@@ -231,13 +231,13 @@ public static partial class ManagerSetupRules
             }
 
             var category = WireStrings.Strip(client.Category ?? string.Empty);
-            if (category.Length > 0 && !watched.Segments.Contains(category, StringComparer.OrdinalIgnoreCase))
-            {
-                yield return new SetupCheckLine(
-                    SetupCheckLine.Note,
-                    $"{client.Name} files {managerLabel}'s downloads under the category \"{category}\". {managerLabel} does not say where " +
-                    $"that category saves, so make sure its folder is {watched} or inside it.");
-            }
+            yield return new SetupCheckLine(
+                SetupCheckLine.Unverified,
+                category.Length > 0
+                    ? $"{client.Name} files {managerLabel}'s downloads under the category \"{category}\", but {managerLabel} does not say where that category saves. " +
+                      $"Weir cannot verify its folder is {watched} or inside it. Connect {client.Name} to Weir under Settings → Media managers to check it."
+                    : $"{managerLabel} does not say where {client.Name} saves its downloads. " +
+                      $"Weir cannot verify they land in {watched} or inside it. Connect {client.Name} to Weir under Settings → Media managers to check it.");
         }
     }
 

@@ -25,7 +25,6 @@ const DOWNLOADED_SCAN_KINDS = new Set<MediaManagerConnection["kind"]>([
 ]);
 
 type EditForm = {
-  name: string;
   base_url: string;
   api_key: string;
   downloaded_scan_enabled: boolean;
@@ -33,7 +32,6 @@ type EditForm = {
 
 function formFrom(connection: MediaManagerConnection): EditForm {
   return {
-    name: connection.name,
     base_url: connection.base_url,
     api_key: "",
     downloaded_scan_enabled: connection.downloaded_scan_enabled,
@@ -42,7 +40,6 @@ function formFrom(connection: MediaManagerConnection): EditForm {
 
 function sameForm(a: EditForm, b: EditForm): boolean {
   return (
-    a.name === b.name &&
     a.base_url === b.base_url &&
     a.api_key === b.api_key &&
     a.downloaded_scan_enabled === b.downloaded_scan_enabled
@@ -52,14 +49,13 @@ function sameForm(a: EditForm, b: EditForm): boolean {
 /**
  * A blank API key means "leave the saved one alone" — it is only sent when someone typed one.
  * `downloaded_scan_enabled` is only sent for a kind that offers it; a Deluno connection never shows
- * the toggle, so its own hand-off setup is never touched by editing name or address.
+ * the toggle, so its own hand-off setup is never touched by editing its address.
  */
 function changesFrom(
   form: EditForm,
   kind: MediaManagerConnection["kind"],
 ): MediaManagerConnectionUpdate {
   const changes: MediaManagerConnectionUpdate = {
-    name: form.name.trim(),
     base_url: form.base_url.trim(),
   };
   if (form.api_key.trim()) changes.api_key = form.api_key.trim();
@@ -71,7 +67,7 @@ function changesFrom(
 }
 
 /**
- * Name, address and API key, edited in place. Nothing is sent until Save; Cancel asks first when
+ * Address and API key, edited in place. Nothing is sent until Save; Cancel asks first when
  * anything changed, through the same guard every Settings panel with a Save/Cancel pair uses.
  */
 export function ConnectionEditForm({
@@ -104,14 +100,6 @@ export function ConnectionEditForm({
       data-testid="media-manager-edit-form"
     >
       <div className="mm-field-row">
-        <Field label="Name" width="medium">
-          <input
-            data-testid="media-manager-edit-name"
-            className={mmEditableTextFieldClass}
-            value={form.name}
-            onChange={(e) => change("name", e.target.value)}
-          />
-        </Field>
         <Field label="Address" width="wide">
           <input
             data-testid="media-manager-edit-base-url"
@@ -170,9 +158,7 @@ export function ConnectionEditForm({
           type="button"
           data-testid="media-manager-edit-save"
           className={mmActionButtonClass({ variant: "primary" })}
-          disabled={
-            update.isPending || !form.name.trim() || !form.base_url.trim()
-          }
+          disabled={update.isPending || !form.base_url.trim()}
           onClick={save}
         >
           {update.isPending ? "Saving…" : "Save"}

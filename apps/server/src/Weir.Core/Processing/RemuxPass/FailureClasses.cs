@@ -18,6 +18,9 @@ public static class ProcessingFailureClasses
     /// <summary>A guardrail deliberately stopped the file. Never retried automatically.</summary>
     public const string Guardrail = "guardrail";
 
+    /// <summary>The rules themselves left nothing to keep, and no media manager was asked about it. Terminal.</summary>
+    public const string Rules = "rules";
+
     /// <summary>Something Weir could not attribute. Terminal.</summary>
     public const string Unknown = "unknown";
 
@@ -82,7 +85,7 @@ public static class RetryPolicy
                 false,
                 null,
                 $"Weir tried this file {attemptsSoFar.ToString(CultureInfo.InvariantCulture)} times and stopped, because the {library.Name} " +
-                $"library allows {maxAttempts.ToString(CultureInfo.InvariantCulture)}. You can still start it again by hand.");
+                $"workflow allows {maxAttempts.ToString(CultureInfo.InvariantCulture)}. You can still start it again by hand.");
         }
 
         // Indexed by failures so far, not by the attempt about to happen.
@@ -127,7 +130,7 @@ public static class RetryPolicy
             "A safety check stopped this file. Weir does not retry those automatically — the check " +
             "is the answer, not something to get past.",
         ProcessingFailureClasses.Execution =>
-            $"This failed while being processed, and the {library.Name} library is set not to retry those. " +
+            $"This failed while being processed, and the {library.Name} workflow is set not to retry those. " +
             "You can start it again by hand.",
         _ => "Weir could not work out why this failed, so it is not retrying automatically. You can start it again by hand.",
     };

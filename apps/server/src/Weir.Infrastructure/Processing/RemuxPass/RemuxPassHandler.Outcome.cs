@@ -46,7 +46,11 @@ public sealed partial class RemuxPassHandler
                         }
 
                         var reason = $"{rejectionReason} {cleanupDetail}";
-                        if (await RemuxPassFileState.MarkFileStatusAsync(uow, library.Id, rel, ProcessingFileStatuses.Skipped, reason, now).ConfigureAwait(false))
+                        if (WeirOnlyRejection.Applies(library, origin))
+                        {
+                            await RecordWeirOnlyRejectionAsync(uow, library, rel, reason, result).ConfigureAwait(false);
+                        }
+                        else if (await RemuxPassFileState.MarkFileStatusAsync(uow, library.Id, rel, ProcessingFileStatuses.Skipped, reason, now).ConfigureAwait(false))
                         {
                             await RemuxPassFileState.ClearFailureFieldsAsync(uow, library.Id, rel).ConfigureAwait(false);
                         }
@@ -102,7 +106,7 @@ public sealed partial class RemuxPassHandler
                             : "Finished processing this file.";
                     if (result.Get("source_kept_by_library_setting") is WireBool { Value: true })
                     {
-                        processedReason += " The original download was kept in the watched folder, as this library asks.";
+                        processedReason += " The original download was kept in the watched folder, as this workflow asks.";
                     }
 
                     if (await RemuxPassFileState.MarkFileStatusAsync(uow, library.Id, rel, ProcessingFileStatuses.Processed, processedReason, now).ConfigureAwait(false))

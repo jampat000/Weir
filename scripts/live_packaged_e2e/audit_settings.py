@@ -14,7 +14,7 @@ class AuditSettingsMixin:
         self.open_sidebar("Settings")
         self.visible(self.page.get_by_test_id("suite-settings-page"), "Settings page")
         expected = {
-            "Libraries": "processing-libraries-section",
+            "Workflows": "processing-libraries-section",
             "Rules": "processing-rule-set-workspace",
             "Media managers": "suite-settings-media-managers",
             "Performance": "processing-direct-play-section",
@@ -31,17 +31,21 @@ class AuditSettingsMixin:
             )
             self.visible(self.page.get_by_test_id(test_id), f"Settings {tab} panel")
 
-            if tab == "Libraries":
+            if tab == "Workflows":
+                self.visible(
+                    self.page.get_by_test_id("workflow-kind-badge").first,
+                    "each workflow says whether it is Weir only or linked to a media manager",
+                )
                 edit_buttons = self.page.get_by_role("button", name="Edit", exact=True)
                 if edit_buttons.count():
-                    self.click(edit_buttons.first, "open library editor")
+                    self.click(edit_buttons.first, "open workflow editor")
                     self.visible(
                         self.page.get_by_test_id("processing-library-form"),
-                        "library form",
+                        "workflow form",
                     )
                     cancel = self.page.get_by_role("button", name="Cancel", exact=True)
                     if cancel.count():
-                        self.click(cancel.last, "cancel library editor")
+                        self.click(cancel.last, "cancel workflow editor")
             elif tab == "Schedule":
                 # A week per library, the time zone above them (canvas board 6).
                 self.visible(
@@ -55,7 +59,7 @@ class AuditSettingsMixin:
 
         self.screenshot("settings")
         self.record(
-            "Settings libraries, rules, media managers, performance, cleanup, schedule, and alerts tabs"
+            "Settings workflows, rules, media managers, performance, cleanup, schedule, and alerts tabs"
         )
 
     def history_and_jobs(self) -> None:
@@ -162,6 +166,10 @@ class AuditSettingsMixin:
         )
         self.visible(
             self.page.get_by_test_id("setup-wizard-skip"), "re-entered setup wizard"
+        )
+        self.visible(
+            self.page.get_by_text("How do your downloads reach Weir?"),
+            "re-entered setup wizard asks how downloads reach Weir",
         )
         self.require(
             not self.page.get_by_text("Display density", exact=False).count(),

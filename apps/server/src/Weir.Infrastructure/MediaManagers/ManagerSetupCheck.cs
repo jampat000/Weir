@@ -28,17 +28,26 @@ public sealed class ManagerSetupCheck
         _handlers = handlers ?? throw new ArgumentNullException(nameof(handlers));
     }
 
-    /// <summary>One entry per enabled connection that covers <paramref name="mediaScope"/>, in connection order.</summary>
+    /// <summary>
+    /// One entry per enabled connection that covers <paramref name="mediaScope"/>, in connection order. A workflow only
+    /// depends on the managers it is linked to, so <paramref name="linkedConnectionIds"/> narrows the answer to those; null
+    /// means every connection that covers the media type, as for folders not yet saved.
+    /// </summary>
     public async Task<List<WireObject>> CheckAsync(
-        UnitOfWork uow, string mediaScope, string watchedFolder, string outputFolder, bool removesOriginals = true, CancellationToken cancellationToken = default)
+        UnitOfWork uow,
+        string mediaScope,
+        string watchedFolder,
+        string outputFolder,
+        IReadOnlySet<long>? linkedConnectionIds,
+        bool removesOriginals = true,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(uow);
         var results = new List<WireObject>();
         foreach (var row in await _connectionStore.ListEnabledAsync(uow).ConfigureAwait(false))
         {
-            var isArr = ManagerKindProfiles.ForKind(row.Kind) is { IsArr: true } profile && profile.ArrScope == mediaScope;
-            var isDeluno = string.Equals(row.Kind, "deluno", StringComparison.OrdinalIgnoreCase);
-            if (!isArr && !isDeluno)
+            var isArr = IsArrFor(row, mediaScope);
+            if ((!isArr && !IsDeluno(row)) || (linkedConnectionIds is not null && !linkedConnectionIds.Contains(row.Id)))
             {
                 continue;
             }
@@ -54,11 +63,12 @@ public sealed class ManagerSetupCheck
             var connection = _connections.ConnectionFromRow(row);
             if (connection is null)
             {
-                lines = [new SetupCheckLine(SetupCheckLine.Problem, $"{label} has no address or API key saved, so Weir cannot check it. Add them under Settings → Media managers.")];
+                lines = [new SetupCheckLine(SetupCheckLine.Problem, MissingCredentialsText(label))];
             }
             else if (isArr)
             {
-                (var hosts, lines, var suggestedWatchedFolder) = await CheckArrAsync(connection, mediaScope, watchedFolder, outputFolder, removesOriginals, cancellationToken).ConfigureAwait(false);
+                (var hosts, lines, var suggestedWatchedFolder, var arrFacts) = await CheckArrAsync(connection, mediaScope, watchedFolder, outputFolder, removesOriginals, cancellationToken).ConfigureAwait(false);
+                entry.Set("story", SourceFactsOut(arrFacts));
                 entry.Set("mapping", new WireObject()
                     .Set("hosts", new WireArray(hosts.Select(host => (WireValue)new WireString(host))))
                     .Set("remote_path", WireStrings.Strip(watchedFolder))
@@ -67,7 +77,8 @@ public sealed class ManagerSetupCheck
             }
             else
             {
-                var deluno = await CheckDelunoAsync(connection, label, mediaScope, watchedFolder, outputFolder, cancellationToken).ConfigureAwait(false);
+                var (deluno, delunoFacts) = await CheckDelunoAsync(connection, label, mediaScope, watchedFolder, outputFolder, cancellationToken).ConfigureAwait(false);
+                entry.Set("story", SourceFactsOut(delunoFacts));
                 lines = deluno.Lines;
                 entry.Set("suggested_watched_folder", deluno.WatchedFolder).Set("suggested_output_folder", deluno.OutputFolder);
             }
@@ -80,7 +91,80 @@ public sealed class ManagerSetupCheck
         return results;
     }
 
-    private async Task<(IReadOnlyList<string> Hosts, IReadOnlyList<SetupCheckLine> Lines, string? SuggestedWatchedFolder)> CheckArrAsync(
+    /// <summary>
+    /// What each enabled connection that covers <paramref name="mediaScope"/> reports as the folder its downloads land in,
+    /// with no library to compare against: Sonarr's and Radarr's own download client directory, Deluno's Refine-before-import
+    /// downloads and output folders. A connection that cannot say still gets an entry, with the reason.
+    /// </summary>
+    public async Task<List<ManagerFolderSuggestion>> SuggestFoldersAsync(UnitOfWork uow, string mediaScope, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(uow);
+        var results = new List<ManagerFolderSuggestion>();
+        foreach (var row in await _connectionStore.ListEnabledAsync(uow).ConfigureAwait(false))
+        {
+            var isArr = IsArrFor(row, mediaScope);
+            if (!isArr && !IsDeluno(row))
+            {
+                continue;
+            }
+
+            if (_connections.ConnectionFromRow(row) is not { } connection)
+            {
+                var label = MediaManagerKinds.LabelForConnection(row.Kind, row.Name);
+                results.Add(new ManagerFolderSuggestion(row.Id, label, null, null, MissingCredentialsText(label)));
+                continue;
+            }
+
+            results.Add(isArr
+                ? await SuggestArrFoldersAsync(row.Id, connection, mediaScope, cancellationToken).ConfigureAwait(false)
+                : await SuggestDelunoFoldersAsync(row.Id, connection, mediaScope, cancellationToken).ConfigureAwait(false));
+        }
+
+        return results;
+    }
+
+    private static bool IsArrFor(MediaManagerConnectionRecord row, string mediaScope) =>
+        ManagerKindProfiles.ForKind(row.Kind) is { IsArr: true } profile && profile.ArrScope == mediaScope;
+
+    private static bool IsDeluno(MediaManagerConnectionRecord row) => string.Equals(row.Kind, "deluno", StringComparison.OrdinalIgnoreCase);
+
+    private static string MissingCredentialsText(string label) =>
+        $"{label} has no address or API key saved, so Weir cannot check it. Add them under Settings → Media managers.";
+
+    private async Task<ManagerFolderSuggestion> SuggestArrFoldersAsync(
+        long connectionId, ManagerConnection connection, string mediaScope, CancellationToken cancellationToken)
+    {
+        WireValue? clients;
+        try
+        {
+            var client = new MediaManagerHttpClient(connection.BaseUrl, connection.ApiKey, _handlers, ManagerDialectRules.DescribeTimeout);
+            clients = await client.GetJsonAsync(ManagerSetupRules.DownloadClientPath, cancellationToken: cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception exception) when (exception is MediaManagerHttpException or MediaManagerUnreachableException)
+        {
+            return new ManagerFolderSuggestion(
+                connectionId, connection.Label, null, null, ManagerDialectRules.Unreachable(connection, exception, "where its downloads are saved"));
+        }
+
+        var folder = WatchFolderSuggestionRules.SuggestArrWatchedFolder(ManagerSetupRules.ParseDownloadClients(clients, mediaScope));
+        return new ManagerFolderSuggestion(
+            connectionId, connection.Label, folder, null, folder is null ? $"{connection.Label} does not say where its downloads are saved." : null);
+    }
+
+    private async Task<ManagerFolderSuggestion> SuggestDelunoFoldersAsync(
+        long connectionId, ManagerConnection connection, string mediaScope, CancellationToken cancellationToken)
+    {
+        var (deluno, _) = await CheckDelunoAsync(connection, connection.Label, mediaScope, string.Empty, string.Empty, cancellationToken).ConfigureAwait(false);
+        var problem = deluno.WatchedFolder is null ? deluno.Lines.Select(line => line.Text).FirstOrDefault() : null;
+        return new ManagerFolderSuggestion(connectionId, connection.Label, deluno.WatchedFolder, deluno.OutputFolder, problem);
+    }
+
+    private static WireObject SourceFactsOut(ManagerSourceFacts facts) => new WireObject()
+        .Set("source_category", facts.Category)
+        .Set("manager_library", facts.ManagerLibrary)
+        .Set("root_folder", facts.RootFolder);
+
+    private async Task<(IReadOnlyList<string> Hosts, IReadOnlyList<SetupCheckLine> Lines, string? SuggestedWatchedFolder, ManagerSourceFacts Facts)> CheckArrAsync(
         ManagerConnection connection, string mediaScope, string watchedFolder, string outputFolder, bool removesOriginals, CancellationToken cancellationToken)
     {
         WireValue? mappings;
@@ -93,7 +177,7 @@ public sealed class ManagerSetupCheck
         }
         catch (Exception exception) when (exception is MediaManagerHttpException or MediaManagerUnreachableException)
         {
-            return ([], [new SetupCheckLine(SetupCheckLine.Problem, ManagerDialectRules.Unreachable(connection, exception, "its remote path mappings"))], null);
+            return ([], [new SetupCheckLine(SetupCheckLine.Problem, ManagerDialectRules.Unreachable(connection, exception, "its remote path mappings"))], null, ManagerSourceFacts.None);
         }
 
         var parsedClients = ManagerSetupRules.ParseDownloadClients(clients, mediaScope);
@@ -107,7 +191,20 @@ public sealed class ManagerSetupCheck
             await CompletedDownloadHandlingAsync(connection, cancellationToken).ConfigureAwait(false),
             await QueueOutputPathsAsync(connection, cancellationToken).ConfigureAwait(false),
             removesOriginals);
-        return (result.Hosts, result.Lines, WatchFolderSuggestionRules.SuggestArrWatchedFolder(parsedClients));
+        var facts = ManagerSourceFactsRules.ForArr(parsedClients, await RootFoldersAsync(connection, cancellationToken).ConfigureAwait(false));
+        return (result.Hosts, result.Lines, WatchFolderSuggestionRules.SuggestArrWatchedFolder(parsedClients), facts);
+    }
+
+    /// <summary>The root folders the manager imports into, through its port; none when it cannot say.</summary>
+    private async Task<IReadOnlyList<string>> RootFoldersAsync(ManagerConnection connection, CancellationToken cancellationToken)
+    {
+        if (_connections.Ports.PortForKind(connection.Kind) is not { } port)
+        {
+            return [];
+        }
+
+        var description = await port.DescribeAsync(connection, cancellationToken).ConfigureAwait(false);
+        return description.Status == SignalStatus.Reported ? description.LibraryRoots : [];
     }
 
     /// <summary>Queued downloads' <c>outputPath</c>s, through the manager port's own queue read; none when the queue cannot be read.</summary>
@@ -141,17 +238,18 @@ public sealed class ManagerSetupCheck
         }
     }
 
-    private async Task<DelunoSetupResult> CheckDelunoAsync(
+    private async Task<(DelunoSetupResult Result, ManagerSourceFacts Facts)> CheckDelunoAsync(
         ManagerConnection connection, string label, string mediaScope, string watchedFolder, string outputFolder, CancellationToken cancellationToken)
     {
         if (_connections.Ports.PortForKind(connection.Kind) is not { } port)
         {
-            return new DelunoSetupResult(null, null, [new SetupCheckLine(SetupCheckLine.Problem, $"Weir does not know how to ask {label} what it manages.")]);
+            return (new DelunoSetupResult(null, null, [new SetupCheckLine(SetupCheckLine.Problem, $"Weir does not know how to ask {label} what it manages.")]), ManagerSourceFacts.None);
         }
 
         var description = await port.DescribeAsync(connection, cancellationToken).ConfigureAwait(false);
         return description.Status != SignalStatus.Reported
-            ? new DelunoSetupResult(null, null, [new SetupCheckLine(SetupCheckLine.Problem, description.Detail ?? $"{label} did not answer.")])
-            : ManagerSetupRules.EvaluateDeluno(label, mediaScope, watchedFolder, outputFolder, description.Libraries);
+            ? (new DelunoSetupResult(null, null, [new SetupCheckLine(SetupCheckLine.Problem, description.Detail ?? $"{label} did not answer.")]), ManagerSourceFacts.None)
+            : (ManagerSetupRules.EvaluateDeluno(label, mediaScope, watchedFolder, outputFolder, description.Libraries, description.DownloadClients),
+                ManagerSourceFactsRules.ForDeluno(mediaScope, description.Libraries, description.DownloadClients));
     }
 }

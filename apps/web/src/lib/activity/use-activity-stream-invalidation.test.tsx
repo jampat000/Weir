@@ -153,6 +153,46 @@ describe("useActivityStreamInvalidations", () => {
     expect(spy).toHaveBeenCalledTimes(2);
   });
 
+  it("refreshes the Processing file lists when a scan finds files, with no reload and no new activity row (#816)", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(10_000);
+    vi.stubGlobal(
+      "EventSource",
+      FakeEventSource as unknown as typeof EventSource,
+    );
+    const qc = new QueryClient();
+    const spy = vi.spyOn(qc, "invalidateQueries");
+    const lists = [processingKeys.fileList({ limit: 200 })] as const;
+
+    renderHook(
+      () => useActivityStreamInvalidations(lists, { throttleMs: 750 }),
+      { wrapper: withQueryClient(qc) },
+    );
+    const src = FakeEventSource.instances[0];
+    src.emit(
+      "activity.latest",
+      JSON.stringify({ latest_event_id: 5, activity_revision: 0 }),
+    );
+    vi.advanceTimersByTime(1_000);
+    spy.mockClear();
+
+    // A scan writes its files in batches, and each batch moves only the revision.
+    for (let revision = 1; revision <= 100; revision += 1) {
+      src.emit(
+        "activity.latest",
+        JSON.stringify({ latest_event_id: 5, activity_revision: revision }),
+      );
+    }
+
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(spy).toHaveBeenCalledWith(
+      { queryKey: lists[0], exact: false },
+      CANCEL_REFETCH_FALSE,
+    );
+    vi.advanceTimersByTime(750);
+    expect(spy).toHaveBeenCalledTimes(2);
+  });
+
   it("ignores a message that repeats the same event id and revision already seen", () => {
     vi.stubGlobal(
       "EventSource",
@@ -396,6 +436,7 @@ describe("useLiveProgress", () => {
             {
               relative_path: "Film/Film.mkv",
               status: "processing",
+              stage: "writing",
               percent: 42.5,
               eta_seconds: 12,
               message: "Weir is writing the cleaned-up file.",
@@ -412,6 +453,7 @@ describe("useLiveProgress", () => {
     expect(result.current["Film/Film.mkv"]).toEqual({
       relativePath: "Film/Film.mkv",
       status: "processing",
+      stage: "writing",
       percent: 42.5,
       etaSeconds: 12,
       message: "Weir is writing the cleaned-up file.",

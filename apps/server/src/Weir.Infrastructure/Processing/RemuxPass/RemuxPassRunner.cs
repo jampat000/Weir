@@ -137,7 +137,7 @@ public sealed partial class RemuxPassRunner
         {
             return FailBefore(
                 relativeMediaPath,
-                "Weir could not find this file under the saved watched folder. Check the library path or restore the file, then try again.",
+                "Weir could not find this file under the saved watched folder. Check the workflow's folder or restore the file, then try again.",
                 inspected);
         }
 
@@ -154,7 +154,7 @@ public sealed partial class RemuxPassRunner
             return FailBefore(
                 relativeMediaPath,
                 $"Weir does not process {(suffix.Length > 0 ? suffix : "this")} files in this pass. " +
-                "Use a supported media file or update the library's media types, then try again.",
+                "Use a supported media file or update the workflow's media types, then try again.",
                 inspected);
         }
 
@@ -164,6 +164,7 @@ public sealed partial class RemuxPassRunner
             return guardrailResult;
         }
 
+        ReportStage(report, relativeMediaPath, "processing", PassStages.Checking, "Weir is checking the file.");
         JsonElement probeJson;
         IReadOnlyList<string> sourceWarnings;
         try
@@ -236,6 +237,7 @@ public sealed partial class RemuxPassRunner
             return waiting;
         }
 
+        ReportStage(report, relativeMediaPath, "processing", PassStages.Planning, "Weir is working out which tracks to keep.");
         var config = request.RulesConfig ?? RemuxRules.DefaultConfig();
         WireObject? originalLanguage = null;
         if (!passThrough && request.ManualPlan is null && config.OriginalLanguage is { Enabled: true } originalRules)
@@ -270,12 +272,15 @@ public sealed partial class RemuxPassRunner
 
         if (plan is null)
         {
+            var rejection = AudioRejectionExplanation.Explain(config, audio, request.RulesProfileName);
             return FailBefore(
                 relativeMediaPath,
                 "remux plan could not be built (no retainable audio)",
                 inspected,
                 new WireObject()
                     .Set("rejection_kind", "no_retainable_audio")
+                    .Set("rejection_explanation", rejection.Sentence)
+                    .Set(RejectionResultKeys.Summary, rejection.Summary)
                     .Set("media_scope", scope)
                     .Set("processing_watched_folder_resolved", watchedRoot));
         }

@@ -28,7 +28,7 @@ Use the Velopack setup exe from the release being validated.
 20. In Settings › Workflows, open a workflow's editor and use `Browse` on a folder field to pick a local folder.
 21. Enter a UNC path (`\\server\share\folder`) manually and confirm it saves; a missing folder is a warning, not a save blocker.
 22. Open Library, pick the library from the title and confirm `Check again` runs.
-23. Quit Weir from the tray icon.
+23. Quit Weir from the tray icon, and confirm `tray-host.log` in `C:\ProgramData\Weir` says the server host `stopped cleanly` within a few seconds, not `killing it`. Do the same after switching LAN access on or off from the tray menu.
 24. Relaunch Weir and confirm the existing user, settings, and wizard completion state persist.
 25. Install the next version over the current version and confirm Velopack applies a delta update cleanly.
 26. Uninstall and reinstall only when intentionally testing clean-install behavior.

@@ -6,10 +6,14 @@
  */
 
 import { QuietFieldGroup } from "../../../../components/shared/quiet-section";
+import { SetupCheckLines } from "../../../../components/shared/setup-check-lines";
 import type { ProcessingMediaType } from "../../../../lib/processing/libraries-api";
-import type {
-  FolderChainLine,
-  LibraryFolderChainDownloadClient,
+import {
+  READINESS_CLASSES,
+  READINESS_LABELS,
+  readinessOf,
+  type FolderChainLine,
+  type LibraryFolderChainDownloadClient,
 } from "../../../../lib/processing/library-folder-chain-api";
 import type { ProcessingManagerSetupItem } from "../../../../lib/processing/library-managers-api";
 import { useLibraryFolderChainQuery } from "../../../../lib/processing/libraries-queries";
@@ -18,51 +22,17 @@ import { useDebouncedValue } from "../../../../lib/ui/use-debounced-value";
 /** The folders as the user types them settle for a moment before each check, same as the media-manager check above. */
 const SETTLE_MS = 700;
 
-function ChainLines({ lines }: { lines: FolderChainLine[] }) {
+function ReadinessBadge({
+  ready,
+  lines,
+}: {
+  ready: boolean;
+  lines: FolderChainLine[];
+}) {
+  const readiness = readinessOf(ready, lines);
   return (
-    <ul className="space-y-1.5 text-sm leading-5">
-      {lines.map((line, index) => (
-        <li key={index} className="flex gap-2">
-          <span
-            aria-hidden="true"
-            className={
-              line.state === "ok"
-                ? "mm-status-text--healthy"
-                : line.state === "problem"
-                  ? "mm-status-text--warning"
-                  : "text-mm-text3"
-            }
-          >
-            {line.state === "ok" ? "✓" : line.state === "problem" ? "✗" : "·"}
-          </span>
-          <span
-            className={
-              line.state === "problem"
-                ? "mm-status-text--warning"
-                : "text-mm-text2"
-            }
-          >
-            <span className="sr-only">
-              {line.state === "ok"
-                ? "Fine: "
-                : line.state === "problem"
-                  ? "Needs a fix: "
-                  : "Note: "}
-            </span>
-            {line.text}
-          </span>
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-function ReadinessBadge({ ready }: { ready: boolean }) {
-  return (
-    <span
-      className={`ml-2 text-xs ${ready ? "mm-status-text--healthy" : "mm-status-text--warning"}`}
-    >
-      {ready ? "Ready" : "Needs attention"}
+    <span className={`ml-2 text-xs ${READINESS_CLASSES[readiness]}`}>
+      {READINESS_LABELS[readiness]}
     </span>
   );
 }
@@ -72,9 +42,9 @@ function ManagerSection({ item }: { item: ProcessingManagerSetupItem }) {
     <section aria-label={item.label} className="space-y-3">
       <p className="text-sm font-medium text-mm-text1">
         {item.label}
-        <ReadinessBadge ready={item.ready} />
+        <ReadinessBadge ready={item.ready} lines={item.lines} />
       </p>
-      <ChainLines lines={item.lines} />
+      <SetupCheckLines label={item.label} lines={item.lines} />
     </section>
   );
 }
@@ -88,9 +58,9 @@ function DownloadClientSection({
     <section aria-label={item.label} className="space-y-3">
       <p className="text-sm font-medium text-mm-text1">
         {item.label}
-        <ReadinessBadge ready={item.ready} />
+        <ReadinessBadge ready={item.ready} lines={item.lines} />
       </p>
-      <ChainLines lines={item.lines} />
+      <SetupCheckLines label={item.label} lines={item.lines} />
     </section>
   );
 }
@@ -133,7 +103,7 @@ export function LibraryFolderChain({
         detail="Whether Weir's own folders line up, end to end, and whether each connected media manager will pick up what Weir writes."
       >
         <p className="mm-quiet-note">
-          Save this library first to check its folder chain.
+          Save this workflow first to check its folder chain.
         </p>
       </QuietFieldGroup>
     );
@@ -156,10 +126,12 @@ export function LibraryFolderChain({
     >
       <div data-testid="library-folder-chain" className="space-y-6">
         {chain.isLoading ? (
-          <p className="mm-quiet-note">Checking this library&apos;s folders…</p>
+          <p className="mm-quiet-note">
+            Checking this workflow&apos;s folders…
+          </p>
         ) : chain.isError ? (
           <p className="mm-quiet-note mm-status-text--warning" role="alert">
-            Weir could not check this library&apos;s folder chain just now. Try
+            Weir could not check this workflow&apos;s folder chain just now. Try
             Check again in a moment.
           </p>
         ) : chain.data ? (
@@ -167,9 +139,15 @@ export function LibraryFolderChain({
             <section aria-label="Weir's own folders" className="space-y-3">
               <p className="text-sm font-medium text-mm-text1">
                 Weir&apos;s own folders
-                <ReadinessBadge ready={chain.data.local.ready} />
+                <ReadinessBadge
+                  ready={chain.data.local.ready}
+                  lines={chain.data.local.lines}
+                />
               </p>
-              <ChainLines lines={chain.data.local.lines} />
+              <SetupCheckLines
+                label="Weir's own folders"
+                lines={chain.data.local.lines}
+              />
             </section>
             {chain.data.managers.map((item) => (
               <ManagerSection key={item.connection_id} item={item} />

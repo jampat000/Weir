@@ -26,12 +26,15 @@ public sealed class DownloadClientSuggestions
     public async Task<List<WireObject>> SuggestAsync(UnitOfWork uow, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(uow);
-        return [.. (await ReadAllAsync(uow, cancellationToken).ConfigureAwait(false)).Select(item => Entry(item.Row, item.Folders))];
+        return [.. (await ReadAllAsync(uow, cancellationToken).ConfigureAwait(false))
+            .Where(item => !string.IsNullOrEmpty(item.Folders.CompletedFolder) || item.Folders.CategoryFolders.Count > 0)
+            .Select(item => Entry(item.Row, item.Folders))];
     }
 
     /// <summary>
-    /// Every enabled connection whose client answered, with its own folders — the same read <see cref="SuggestAsync"/>
-    /// does, reused by the folder chain check so it needs no second round trip to each client.
+    /// Every enabled connection with its own folders — the same read <see cref="SuggestAsync"/> does, reused by the folder
+    /// chain check so it needs no second round trip to each client. A client that did not answer is still listed, with
+    /// <see cref="DownloadClientFolders.Empty"/>, so the check can say it could not verify it.
     /// </summary>
     public async Task<List<(DownloadClientConnectionRecord Row, DownloadClientFolders Folders)>> ReadAllAsync(UnitOfWork uow, CancellationToken cancellationToken = default)
     {
@@ -44,13 +47,7 @@ public sealed class DownloadClientSuggestions
                 continue;
             }
 
-            var folders = await port.ReadFoldersAsync(connection, cancellationToken).ConfigureAwait(false);
-            if (string.IsNullOrEmpty(folders.CompletedFolder) && folders.CategoryFolders.Count == 0)
-            {
-                continue;
-            }
-
-            results.Add((row, folders));
+            results.Add((row, await port.ReadFoldersAsync(connection, cancellationToken).ConfigureAwait(false)));
         }
 
         return results;

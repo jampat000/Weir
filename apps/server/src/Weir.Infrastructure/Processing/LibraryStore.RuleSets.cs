@@ -110,7 +110,7 @@ public sealed partial class LibraryStore
         if (used > 0)
         {
             throw new ProcessingLibraryException(
-                $"{row.Name} is still used by {used} librar{(used == 1 ? "y" : "ies")}. " +
+                $"{row.Name} is still used by {used} workflow{(used == 1 ? string.Empty : "s")}. " +
                 "Point them at another rule set first — removing it would strip their audio and subtitle handling.");
         }
 

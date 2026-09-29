@@ -111,7 +111,7 @@ export function ScheduleGridEditor({
     <div className="mm-schedule-grid" data-testid="schedule-grid">
       <p className="text-xs text-mm-text3">
         {unrestricted
-          ? "No schedule set — this library runs at any time. Select hours to limit it."
+          ? "No schedule set — this workflow runs at any time. Select hours to limit it."
           : "Selected hours are when Weir may start work. Work already running finishes."}{" "}
         Drag across the hours, or use the arrow keys and press Space to switch
         one on or off.

@@ -13,6 +13,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Weir.Tray\Weir.Tray.csproj" />
+    <!-- The stand-in server the install-process tests start; its apphost is copied next to the test assembly. -->
+    <ProjectReference Include="..\Weir.Tray.StandInServer\Weir.Tray.StandInServer.csproj" />
   </ItemGroup>
 
 </Project>

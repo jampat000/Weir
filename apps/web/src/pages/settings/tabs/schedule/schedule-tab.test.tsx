@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, expect, it, vi } from "vitest";
@@ -24,7 +24,6 @@ function wrapper({ children }: { children: ReactNode }) {
 }
 
 const SETTINGS: AppSettings = {
-  product_display_name: "Weir",
   signed_in_home_notice: null,
   setup_wizard_state: "completed",
   app_timezone: "UTC",
@@ -52,9 +51,11 @@ function library(over: Partial<ProcessingLibrary> = {}): ProcessingLibrary {
     include_patterns_csv: "",
     exclude_patterns_csv: "",
     min_file_size_mb: 0,
+    effective_min_file_size_mb: 0,
     max_file_size_mb: 0,
     rejected_file_action: "leave",
     min_file_age_seconds: 60,
+    effective_min_file_age_seconds: 60,
     created_after: null,
     created_before: null,
     modified_after: null,
@@ -92,7 +93,7 @@ function library(over: Partial<ProcessingLibrary> = {}): ProcessingLibrary {
     manager_connection_ids: [],
     manager_coverage: "no_upstream_signal",
     manager_coverage_detail:
-      "No media manager has been tested for this library.",
+      "No media manager has been tested for this workflow.",
     discovered_from_connection_id: null,
     discovered_library_key: null,
     active_job_count: 0,
@@ -141,11 +142,14 @@ it("asks before an unsaved library's hours are replaced by another library's", a
 
   render(<ScheduleTab />, { wrapper });
 
+  // Each row is asked for its own button: a role query over the whole page would also have to name
+  // the open editor's 168 hour cells, slow enough to starve the test when the machine is busy.
+  const [movies, tv] = await screen.findAllByTestId("schedule-library-row");
   fireEvent.click(
-    (await screen.findAllByRole("button", { name: "Change hours" }))[0],
+    within(movies!).getByRole("button", { name: "Change hours" }),
   );
   fireEvent.pointerDown(screen.getByTestId("schedule-cell-0-9"));
-  fireEvent.click(screen.getAllByRole("button", { name: "Change hours" })[1]);
+  fireEvent.click(within(tv!).getByRole("button", { name: "Change hours" }));
 
   expect(screen.getByTestId("settings-unsaved-changes")).toHaveTextContent(
     "You have unsaved changes to Movies's hours. Leave without saving?",

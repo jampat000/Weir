@@ -201,7 +201,7 @@ internal sealed class WatchedFileDecider
         if (_scan.Rules.RejectedFileAction == "delete_file")
         {
             removal = new RejectedFileRemoval(write.RelativePath, filePath, reason, _scan.Rules.RejectedFileAction);
-            reason = $"{reason} This library is set to delete rejected files; Weir will record this decision before removing only this file.";
+            reason = $"{reason} This workflow is set to delete rejected files; Weir will record this decision before removing only this file.";
         }
 
         return decision with { Write = write with { Verdict = new FileStateVerdict(ProcessingFileStatuses.Skipped, reason) }, Removal = removal };

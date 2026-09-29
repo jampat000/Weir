@@ -38,6 +38,10 @@ media library, and it keeps its name. A workflow is the path new files take.
 The API still says "library" for what the app calls a workflow (for example the `library-folders`
 capability below), so existing integrations keep working.
 
+You don't name a connection. Weir names it after the kind and the host in its address: "Deluno on
+RIG", "Radarr on nas", "qBittorrent on 10.1.1.51". Two of one kind on the same host also show their
+port, like "Radarr on nas (7879)". Change the address and the name follows.
+
 ## How the folders fit together
 
 However your setup is arranged, three things own three different folders, and every install works
@@ -68,6 +72,9 @@ retyping them by hand (advertised as the `library-folders` capability at `/api/v
 can read a connected manager's or download client's own configuration and offer its folders as a
 one-click suggestion in the workflow editor. Weir never changes a folder on its own — a suggestion is
 only ever applied when you press the button, and a folder you typed yourself always stays.
+
+The same `/api/v1/intake/capabilities` answer carries `machine_name`, the name of the machine Weir
+runs on, so a manager can call its connection to Weir "Weir on RIG".
 
 ## Deluno: automatic hand-off
 
@@ -140,6 +147,15 @@ Sonarr reports one, and it's never applied without you pressing it.
 In Weir, press **Check again** in the workflow's **Media manager** section. Weir reads Sonarr's remote path
 mappings, download clients and queue — it never changes Sonarr's settings — and shows ✓, or a plain
 explanation of what to fix.
+
+A ✓ means Weir read the fact itself. Where it can only take someone's word for it, the line says so and
+shows a **?** and **Not verified** instead of a tick. Sonarr and Radarr tell Weir a download client's own
+folder only when the client has one set; a client that files downloads by category has no folder Weir can
+read from them, so it stays not verified until you connect that client to Weir directly. Deluno publishes
+each library's downloads folder and each client's category, but not where its clients really save, so a
+Deluno line reads "Deluno says its Movies library downloads to …" and stays not verified. A download client
+you connect to Weir directly is read for itself: each folder it saves to is checked against the watched
+folder, and a client saving outside it is a problem naming both folders.
 
 ### What you'll see
 

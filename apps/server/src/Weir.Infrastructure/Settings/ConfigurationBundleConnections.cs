@@ -21,9 +21,8 @@ public sealed class ConfigurationBundleConnections
     public const string MediaManagersSection = "media_manager_connections";
     public const string AlertsSection = "notification_channels";
 
-    // Matches the create/update request models (MediaManagerEndpoints, NotificationEndpoints): a restored row
-    // must fit the same columns a hand-typed one does.
-    private const int MediaManagerNameMaxLength = 200;
+    // Matches the create/update request model (NotificationEndpoints): a restored row must fit the same
+    // column a hand-typed one does.
     private const int AlertLabelMaxLength = 255;
 
     private readonly NotificationChannelStore _channels;
@@ -57,9 +56,11 @@ public sealed class ConfigurationBundleConnections
     }
 
     /// <summary>
-    /// Adds the bundle's media managers this install does not have (matched by name). Returns each exported
-    /// connection id mapped to the id it has here, or <see langword="null"/> when the bundle has no media managers
-    /// section, so the libraries that name a connection can be pointed at the right row.
+    /// Adds the bundle's media managers this install does not have. A bundle's connection is the one here with the
+    /// same kind and address. Its saved name is compared only for a connection with no address, because a name is
+    /// derived from the address (#826) and a bundle can carry a typed one. Returns each exported connection id
+    /// mapped to the id it has here, or <see langword="null"/> when the bundle has no media managers section, so
+    /// the libraries that name a connection can be pointed at the right row.
     /// </summary>
     public async Task<Dictionary<long, long>?> RestoreMediaManagersAsync(UnitOfWork uow, WireObject bundle)
     {
@@ -68,25 +69,32 @@ public sealed class ConfigurationBundleConnections
             return null;
         }
 
-        var existing = (await _connections.ListAsync(uow).ConfigureAwait(false))
-            .ToDictionary(connection => connection.Name, connection => connection.Id, StringComparer.Ordinal);
+        var known = (await _connections.ListAsync(uow).ConfigureAwait(false))
+            .Select(connection => new KnownConnection(connection.Id, connection.Kind, connection.BaseUrl, connection.Name))
+            .ToList();
         var restoredIds = new Dictionary<long, long>();
         foreach (var row in rows.Items)
         {
             var data = row as WireObject ?? throw new WireValueException("This backup's media managers are not in a form Weir can read.");
-            var name = RequiredText(data, "name", MediaManagerNameMaxLength);
             var kind = RequiredText(data, "kind");
+            var savedName = OptionalText(data, "name").Trim();
+            var described = savedName.Length > 0 ? savedName : MediaManagerKinds.ProductLabel(kind);
             if (!MediaManagerKinds.All.Contains(kind, StringComparer.Ordinal))
             {
-                throw new WireValueException($"This backup has a media manager, {name}, of a kind this version of Weir does not support.");
+                throw new WireValueException($"This backup has a media manager, {described}, of a kind this version of Weir does not support.");
             }
 
-            var baseUrl = ValidateRestoredBaseUrl(name, OptionalText(data, "base_url"));
-            if (!existing.TryGetValue(name, out var id))
+            var baseUrl = ValidateRestoredBaseUrl(described, OptionalText(data, "base_url"));
+            var match = known.Find(connection => connection.IsSameAs(kind, baseUrl, savedName));
+            long id;
+            if (match is null)
             {
-                id = await _connections.InsertAsync(
-                    uow, kind, name, enabled: false, baseUrl, apiKeyCiphertext: null).ConfigureAwait(false);
-                existing[name] = id;
+                id = await _connections.InsertAsync(uow, kind, enabled: false, baseUrl, apiKeyCiphertext: null).ConfigureAwait(false);
+                known.Add(new KnownConnection(id, kind, baseUrl, savedName));
+            }
+            else
+            {
+                id = match.Id;
             }
 
             if (TryReadId(data.Get("id"), out var exportedId))
@@ -145,6 +153,16 @@ public sealed class ConfigurationBundleConnections
         }
     }
 
+    /// <summary>A connection that exists here, or was just added from the bundle, as far as matching a bundle row needs it.</summary>
+    private sealed record KnownConnection(long Id, string Kind, string BaseUrl, string Name)
+    {
+        public bool IsSameAs(string kind, string baseUrl, string savedName) =>
+            Kind == kind &&
+            (baseUrl.Length > 0
+                ? string.Equals(BaseUrl, baseUrl, StringComparison.OrdinalIgnoreCase)
+                : BaseUrl.Length == 0 && string.Equals(Name, savedName, StringComparison.OrdinalIgnoreCase));
+    }
+
     private static bool TryReadId(WireValue? value, out long id)
     {
         id = 0;
@@ -179,7 +197,7 @@ public sealed class ConfigurationBundleConnections
     /// so a bad address cannot enter through a restore instead. Refuses the whole restore, naming the connection,
     /// rather than silently dropping or blanking the address.
     /// </summary>
-    private static string ValidateRestoredBaseUrl(string connectionName, string rawBaseUrl)
+    private static string ValidateRestoredBaseUrl(string connectionDescription, string rawBaseUrl)
     {
         try
         {
@@ -187,7 +205,7 @@ public sealed class ConfigurationBundleConnections
         }
         catch (MediaManagerConnectionException exception)
         {
-            throw new WireValueException($"This backup has a media manager, {connectionName}, with an address Weir will not use: {exception.Message}");
+            throw new WireValueException($"This backup has a media manager, {connectionDescription}, with an address Weir will not use: {exception.Message}");
         }
     }
 }

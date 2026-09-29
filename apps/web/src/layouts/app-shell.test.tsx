@@ -34,22 +34,15 @@ vi.mock("../lib/system/readiness-queries", () => ({
   useSystemReadinessQuery: () => ({
     data: {
       version: "2.1.2",
+      machine_name: "RIG",
     },
   }),
 }));
 
-// The Processing entry says how many files are being written right now.
-const filesAtOnce = { running: 0 };
-vi.mock("../lib/processing/queries", () => ({
-  useProcessingFilesAtOnceQuery: () => ({ data: filesAtOnce }),
-}));
-
-vi.mock("../lib/settings/queries", () => ({
-  useAppSettingsQuery: () => ({
-    data: {
-      product_display_name: "Weir",
-    },
-  }),
+// The Processing entry says how many cards the Working lane is showing.
+const workingLane = { count: 0 };
+vi.mock("../pages/processing/working-count", () => ({
+  useWorkingCount: () => workingLane.count,
 }));
 
 describe("AppShell", () => {
@@ -166,8 +159,8 @@ describe("AppShell", () => {
     expect(current()).toEqual([]);
   });
 
-  it("shows how many files are being written beside Processing, and nothing when none are", () => {
-    filesAtOnce.running = 2;
+  it("shows how many files the Working lane holds beside Processing, and nothing when none are", () => {
+    workingLane.count = 2;
     const view = render(
       <MemoryRouter initialEntries={["/library"]}>
         <Routes>
@@ -182,7 +175,7 @@ describe("AppShell", () => {
       within(live).getByTestId("nav-processing-working"),
     ).toHaveTextContent("2 working");
 
-    filesAtOnce.running = 0;
+    workingLane.count = 0;
     view.rerender(
       <MemoryRouter initialEntries={["/library"]}>
         <Routes>
@@ -218,6 +211,23 @@ describe("AppShell", () => {
     expect(sidebar).not.toHaveClass("mm-sidebar--collapsed");
   });
 
+  it("names Weir after the machine in the browser tab and the sidebar", () => {
+    render(
+      <MemoryRouter initialEntries={["/"]}>
+        <Routes>
+          <Route path="/" element={<AppShell />}>
+            <Route index element={<div>Main</div>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(document.title).toBe("Weir · RIG");
+    expect(
+      within(screen.getByRole("complementary")).getAllByText("Weir · RIG"),
+    ).not.toHaveLength(0);
+  });
+
   it("names the sidebar landmark after the product", () => {
     render(
       <MemoryRouter initialEntries={["/"]}>
@@ -229,9 +239,8 @@ describe("AppShell", () => {
       </MemoryRouter>,
     );
 
-    // It was "Product", left over from the suite this stopped being.
     expect(
-      screen.getByRole("complementary", { name: "Weir" }),
+      screen.getByRole("complementary", { name: "Weir · RIG" }),
     ).toBeInTheDocument();
     expect(
       screen.queryByRole("complementary", { name: "Product" }),

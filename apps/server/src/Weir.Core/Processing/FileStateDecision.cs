@@ -22,7 +22,7 @@ public static class FileStateDecision
         DateTimeOffset? settlingStableAt,
         string? accessProblem,
         string? blockedByConnection,
-        long? minimumAgeSeconds,
+        long minimumAgeSeconds,
         DateTimeOffset now)
     {
         ArgumentNullException.ThrowIfNull(library);
@@ -30,7 +30,7 @@ public static class FileStateDecision
 
         if (!library.Enabled)
         {
-            return new FileStateVerdict(ProcessingFileStatuses.Disabled, $"The {library.Name} library is switched off, so Weir is leaving its files alone.");
+            return new FileStateVerdict(ProcessingFileStatuses.Disabled, $"The {library.Name} workflow is switched off, so Weir is leaving its files alone.");
         }
 
         if (!string.IsNullOrEmpty(pausedReason))
@@ -42,12 +42,11 @@ public static class FileStateDecision
         {
             return new FileStateVerdict(
                 ProcessingFileStatuses.OutOfSchedule,
-                $"The {library.Name} library only runs inside its scheduled hours, and now is outside them. Weir will pick this up when the window opens.",
+                $"The {library.Name} workflow only runs inside its scheduled hours, and now is outside them. Weir will pick this up when the window opens.",
                 HoldUntil: windowReopensAt);
         }
 
-        var configuredAge = minimumAgeSeconds ?? library.MinFileAgeSeconds;
-        var holdSeconds = Math.Max(0, configuredAge) + (Math.Max(0, library.HoldMinutes) * 60);
+        var holdSeconds = Math.Max(0, minimumAgeSeconds) + (Math.Max(0, library.HoldMinutes) * 60);
         if (sizeIsSettling)
         {
             return new FileStateVerdict(

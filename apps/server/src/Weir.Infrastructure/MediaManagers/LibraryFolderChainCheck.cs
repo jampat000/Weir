@@ -41,11 +41,13 @@ public sealed class LibraryFolderChainCheck
 
     /// <summary>
     /// One library's chain: <c>{ library_id, local: { ready, lines }, managers: [...], download_clients: [...], ready }</c>.
-    /// <c>managers</c> is exactly what <see cref="ManagerSetupCheck.CheckAsync"/> already returns for this library's
-    /// watched/output folders and media type, reused as-is. <c>download_clients</c> is one entry per enabled bare
+    /// <c>managers</c> is what <see cref="ManagerSetupCheck.CheckAsync"/> returns for this library's watched/output
+    /// folders and media type, for the managers the library is linked to only: a Weir-only library has none, and a
+    /// manager it is not linked to never appears in its chain. A library with no id yet (a proposal) is checked against
+    /// every manager that covers its media type, since that is what it would be linked to. <c>download_clients</c> is one entry per enabled bare
     /// download-client connection, checking whether any of its folders is this library's watched folder
-    /// (<see cref="LibraryFolderChainRules.CheckDownloadClientFolder"/>) — with none connected, an empty list never
-    /// makes the library not ready, the same as with no manager connected.
+    /// (<see cref="LibraryFolderChainRules.CheckDownloadClientFolders"/>), one line per folder it saves to — with none
+    /// connected, an empty list never makes the library not ready, the same as with no manager connected.
     /// </summary>
     public async Task<WireObject> CheckForLibraryAsync(UnitOfWork uow, ProcessingLibraryRecord library, CancellationToken cancellationToken)
     {
@@ -58,8 +60,11 @@ public sealed class LibraryFolderChainCheck
         var localLines = LibraryFolderChainRules.CheckLocalFolders(library.WatchedFolder, workFolder, workFolderIsDefault, library.OutputFolder, _probe);
         var localReady = localLines.All(line => line.State != SetupCheckLine.Problem);
 
+        var linked = library.Id == 0
+            ? null
+            : (IReadOnlySet<long>)(await _libraries.ManagerConnectionIdsAsync(uow, library.Id).ConfigureAwait(false)).ToHashSet();
         var managers = await _managerSetupCheck
-            .CheckAsync(uow, library.MediaType, library.WatchedFolder, library.OutputFolder, library.RemoveOriginalAfterSuccess, cancellationToken)
+            .CheckAsync(uow, library.MediaType, library.WatchedFolder, library.OutputFolder, linked, library.RemoveOriginalAfterSuccess, cancellationToken)
             .ConfigureAwait(false);
         var managersReady = managers.All(entry => entry.Get("ready") is WireBool { Value: true });
 
@@ -82,14 +87,14 @@ public sealed class LibraryFolderChainCheck
         return [.. connections.Select(item =>
         {
             var label = DownloadClientKinds.LabelForConnection(item.Row.Kind, item.Row.Name);
-            var line = LibraryFolderChainRules.CheckDownloadClientFolder(label, watchedFolder, item.Folders);
+            var lines = LibraryFolderChainRules.CheckDownloadClientFolders(label, watchedFolder, item.Folders);
             return new WireObject()
                 .Set("connection_id", item.Row.Id)
                 .Set("kind", item.Row.Kind)
                 .Set("name", item.Row.Name)
                 .Set("label", label)
-                .Set("ready", line.State != SetupCheckLine.Problem)
-                .Set("lines", new WireArray([(WireValue)line.ToOut()]));
+                .Set("ready", lines.All(line => line.State != SetupCheckLine.Problem))
+                .Set("lines", new WireArray(lines.Select(line => (WireValue)line.ToOut())));
         })];
     }
 

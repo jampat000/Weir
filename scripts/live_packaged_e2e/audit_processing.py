@@ -197,7 +197,7 @@ class AuditProcessingMixin:
         for sidebar, first, first_id, second, second_param, second_id in (
             (
                 "Settings",
-                "Libraries",
+                "Workflows",
                 "processing-libraries-section",
                 "Schedule",
                 "tab=schedule",

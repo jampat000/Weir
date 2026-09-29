@@ -49,6 +49,8 @@ export function useProcessingOperatorSettingsSaveMutation() {
       void qc.invalidateQueries({
         queryKey: processingKeys.runtimeSettings,
       });
+      // A library that uses these settings reports what they come to for it.
+      void qc.invalidateQueries({ queryKey: processingKeys.libraries });
     },
   });
 }

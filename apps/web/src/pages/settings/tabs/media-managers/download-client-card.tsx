@@ -66,7 +66,7 @@ function DownloadClientStatus({
   );
 }
 
-function RemoveDownloadClientDialog({
+export function RemoveDownloadClientDialog({
   connection,
   remove,
   onClose,

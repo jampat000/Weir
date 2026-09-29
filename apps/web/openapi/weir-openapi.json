@@ -877,8 +877,8 @@
             "type": "string"
           },
           "name": {
+            "description": "Accepted and ignored: a connection is named after its kind and the host in its address.",
             "maxLength": 200,
-            "minLength": 1,
             "title": "Name",
             "type": "string"
           },
@@ -899,8 +899,7 @@
         },
         "required": [
           "csrf_token",
-          "kind",
-          "name"
+          "kind"
         ],
         "title": "DownloadClientConnectionCreateIn",
         "type": "object"
@@ -939,6 +938,7 @@
             "type": "string"
           },
           "name": {
+            "description": "The connection's name: its kind and the host in its address, set by Weir.",
             "title": "Name",
             "type": "string"
           },
@@ -1109,13 +1109,13 @@
             "anyOf": [
               {
                 "maxLength": 200,
-                "minLength": 1,
                 "type": "string"
               },
               {
                 "type": "null"
               }
             ],
+            "description": "Accepted and ignored: a connection is named after its kind and the host in its address.",
             "title": "Name"
           },
           "password": {
@@ -2115,6 +2115,199 @@
           "libraries"
         ],
         "title": "LibraryFoldersOut",
+        "type": "object"
+      },
+      "ProposedLibraryCheckIn": {
+        "additionalProperties": false,
+        "description": "The Movies and TV folders to check. A media type with neither folder is left out of the answer.",
+        "properties": {
+          "csrf_token": {
+            "minLength": 1,
+            "title": "Csrf Token",
+            "type": "string"
+          },
+          "movie_watched_folder": {
+            "default": "",
+            "description": "Where Movies downloads land.",
+            "maxLength": 4000,
+            "title": "Movie Watched Folder",
+            "type": "string"
+          },
+          "movie_output_folder": {
+            "default": "",
+            "description": "Where cleaned Movies files go.",
+            "maxLength": 4000,
+            "title": "Movie Output Folder",
+            "type": "string"
+          },
+          "tv_watched_folder": {
+            "default": "",
+            "description": "Where TV downloads land.",
+            "maxLength": 4000,
+            "title": "Tv Watched Folder",
+            "type": "string"
+          },
+          "tv_output_folder": {
+            "default": "",
+            "description": "Where cleaned TV files go.",
+            "maxLength": 4000,
+            "title": "Tv Output Folder",
+            "type": "string"
+          }
+        },
+        "required": [
+          "csrf_token"
+        ],
+        "title": "ProposedLibraryCheckIn",
+        "type": "object"
+      },
+      "ProposedLibraryCheckItemOut": {
+        "description": "What one proposed library would run into. `problem` is the sentence creating it would be refused with; otherwise `chain` is its folder chain, with `library_id` 0 because nothing is saved.",
+        "properties": {
+          "problem": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Problem"
+          },
+          "chain": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LibraryFolderChainOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "problem",
+          "chain"
+        ],
+        "title": "ProposedLibraryCheckItemOut",
+        "type": "object"
+      },
+      "ProposedLibraryCheckOut": {
+        "properties": {
+          "movie": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProposedLibraryCheckItemOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "tv": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProposedLibraryCheckItemOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "movie",
+          "tv"
+        ],
+        "title": "ProposedLibraryCheckOut",
+        "type": "object"
+      },
+      "SuggestedLibraryOut": {
+        "description": "A library setup can offer to create or fill in. Never saved by itself: the person confirms and edits it first.",
+        "properties": {
+          "library_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The existing library with no folders yet that this would fill in, or null when it would be a new one.",
+            "title": "Library Id"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "media_type": {
+            "enum": [
+              "movie",
+              "tv"
+            ],
+            "title": "Media Type",
+            "type": "string"
+          },
+          "watched_folder": {
+            "title": "Watched Folder",
+            "type": "string"
+          },
+          "output_folder": {
+            "description": "Empty when there is no sensible default.",
+            "title": "Output Folder",
+            "type": "string"
+          },
+          "source_label": {
+            "description": "Who reported the watched folder, e.g. Deluno or SABnzbd.",
+            "title": "Source Label",
+            "type": "string"
+          },
+          "manager_connection_ids": {
+            "description": "The media managers that cover this media type.",
+            "items": {
+              "type": "integer"
+            },
+            "title": "Manager Connection Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "library_id",
+          "name",
+          "media_type",
+          "watched_folder",
+          "output_folder",
+          "source_label",
+          "manager_connection_ids"
+        ],
+        "title": "SuggestedLibraryOut",
+        "type": "object"
+      },
+      "LibrarySuggestionsOut": {
+        "properties": {
+          "libraries": {
+            "items": {
+              "$ref": "#/components/schemas/SuggestedLibraryOut"
+            },
+            "title": "Libraries",
+            "type": "array"
+          },
+          "notes": {
+            "description": "Plain sentences about anything connected that could not say where its downloads are saved.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Notes",
+            "type": "array"
+          }
+        },
+        "required": [
+          "libraries",
+          "notes"
+        ],
+        "title": "LibrarySuggestionsOut",
         "type": "object"
       },
       "LibraryLeaveAloneIn": {
@@ -3140,16 +3333,15 @@
             "type": "string"
           },
           "name": {
+            "description": "Accepted and ignored: a connection is named after its kind and the host in its address.",
             "maxLength": 200,
-            "minLength": 1,
             "title": "Name",
             "type": "string"
           }
         },
         "required": [
           "csrf_token",
-          "kind",
-          "name"
+          "kind"
         ],
         "title": "MediaManagerConnectionCreateIn",
         "type": "object"
@@ -3246,6 +3438,7 @@
             "title": "Last Test Ok"
           },
           "name": {
+            "description": "The connection's name: its kind and the host in its address, set by Weir.",
             "title": "Name",
             "type": "string"
           },
@@ -3390,13 +3583,13 @@
             "anyOf": [
               {
                 "maxLength": 200,
-                "minLength": 1,
                 "type": "string"
               },
               {
                 "type": "null"
               }
             ],
+            "description": "Accepted and ignored: a connection is named after its kind and the host in its address.",
             "title": "Name"
           }
         },
@@ -4010,6 +4203,16 @@
       },
       "ReadinessResponse": {
         "properties": {
+          "machine_name": {
+            "description": "The name of the machine Weir runs on. Weir is named after it.",
+            "title": "Machine Name",
+            "type": "string"
+          },
+          "machine_name_looks_generated": {
+            "description": "True when the machine name looks like a container's generated one, so the compose file has no hostname.",
+            "title": "Machine Name Looks Generated",
+            "type": "boolean"
+          },
           "ready": {
             "title": "Ready",
             "type": "boolean"
@@ -4045,6 +4248,8 @@
         "required": [
           "ready",
           "version",
+          "machine_name",
+          "machine_name_looks_generated",
           "status",
           "startup_seconds",
           "steps"
@@ -4764,6 +4969,18 @@
             ],
             "description": "The running pass's speed as ffmpeg reports it, for example 148x.",
             "title": "Progress Speed"
+          },
+          "progress_stage": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The step the running pass is on: checking, planning, writing, verifying or handing_back. Null when nothing is in flight or the pass names none.",
+            "title": "Progress Stage"
           },
           "progress_status": {
             "anyOf": [
@@ -5970,18 +6187,32 @@
             "type": "string"
           },
           "min_file_age_seconds": {
-            "default": 60,
-            "maximum": 604800.0,
-            "minimum": 0.0,
-            "title": "Min File Age Seconds",
-            "type": "integer"
+            "anyOf": [
+              {
+                "maximum": 604800.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Seconds a file must go unchanged. Null uses the Performance setting.",
+            "title": "Min File Age Seconds"
           },
           "min_file_size_mb": {
-            "default": 0,
-            "maximum": 1000000.0,
-            "minimum": 0.0,
-            "title": "Min File Size Mb",
-            "type": "integer"
+            "anyOf": [
+              {
+                "maximum": 1000000.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Smallest file the library takes. Null uses the Performance setting.",
+            "title": "Min File Size Mb"
           },
           "modified_after": {
             "anyOf": [
@@ -6281,6 +6512,16 @@
             "title": "Display Order",
             "type": "integer"
           },
+          "effective_min_file_age_seconds": {
+            "description": "Seconds a file must go unchanged now: the library's own value, or the Performance setting.",
+            "title": "Effective Min File Age Seconds",
+            "type": "integer"
+          },
+          "effective_min_file_size_mb": {
+            "description": "Smallest file the library takes now: its own value, or the Performance setting.",
+            "title": "Effective Min File Size Mb",
+            "type": "integer"
+          },
           "enabled": {
             "title": "Enabled",
             "type": "boolean"
@@ -6386,12 +6627,28 @@
             "type": "string"
           },
           "min_file_age_seconds": {
-            "title": "Min File Age Seconds",
-            "type": "integer"
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Seconds a file must go unchanged. Null means the library uses the Performance setting.",
+            "title": "Min File Age Seconds"
           },
           "min_file_size_mb": {
-            "title": "Min File Size Mb",
-            "type": "integer"
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Smallest file the library takes. Null means the library uses the Performance setting.",
+            "title": "Min File Size Mb"
           },
           "modified_after": {
             "anyOf": [
@@ -6594,9 +6851,11 @@
           "include_patterns_csv",
           "exclude_patterns_csv",
           "min_file_size_mb",
+          "effective_min_file_size_mb",
           "max_file_size_mb",
           "rejected_file_action",
           "min_file_age_seconds",
+          "effective_min_file_age_seconds",
           "created_after",
           "created_before",
           "modified_after",
@@ -6841,18 +7100,32 @@
             "type": "string"
           },
           "min_file_age_seconds": {
-            "default": 60,
-            "maximum": 604800.0,
-            "minimum": 0.0,
-            "title": "Min File Age Seconds",
-            "type": "integer"
+            "anyOf": [
+              {
+                "maximum": 604800.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Seconds a file must go unchanged. Null uses the Performance setting.",
+            "title": "Min File Age Seconds"
           },
           "min_file_size_mb": {
-            "default": 0,
-            "maximum": 1000000.0,
-            "minimum": 0.0,
-            "title": "Min File Size Mb",
-            "type": "integer"
+            "anyOf": [
+              {
+                "maximum": 1000000.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Smallest file the library takes. Null uses the Performance setting.",
+            "title": "Min File Size Mb"
           },
           "modified_after": {
             "anyOf": [
@@ -9796,12 +10069,6 @@
             "title": "Log Retention Days",
             "type": "integer"
           },
-          "product_display_name": {
-            "description": "Shown in the sidebar and settings.",
-            "maxLength": 120,
-            "title": "Product Display Name",
-            "type": "string"
-          },
           "setup_wizard_state": {
             "description": "First-run wizard state: pending, skipped, or completed.",
             "maxLength": 32,
@@ -9829,7 +10096,6 @@
           }
         },
         "required": [
-          "product_display_name",
           "setup_wizard_state",
           "app_timezone",
           "log_retention_days",
@@ -9915,12 +10181,6 @@
             "title": "Log Retention Days",
             "type": "integer"
           },
-          "product_display_name": {
-            "maxLength": 120,
-            "minLength": 1,
-            "title": "Product Display Name",
-            "type": "string"
-          },
           "setup_wizard_state": {
             "anyOf": [
               {
@@ -9949,7 +10209,6 @@
         },
         "required": [
           "csrf_token",
-          "product_display_name",
           "app_timezone",
           "log_retention_days"
         ],
@@ -10353,11 +10612,12 @@
         "description": "One line of a setup check.",
         "properties": {
           "state": {
-            "description": "``ok``, ``problem`` (with its fix in the sentence) or ``note``.",
+            "description": "``ok`` (Weir read it for itself), ``problem`` (with its fix in the sentence), ``note``, or ``unverified`` (Weir can only take someone's word for it).",
             "enum": [
               "ok",
               "problem",
-              "note"
+              "note",
+              "unverified"
             ],
             "title": "State",
             "type": "string"
@@ -10403,6 +10663,54 @@
           "local_path"
         ],
         "title": "ManagerSetupMappingOut",
+        "type": "object"
+      },
+      "ManagerSourceFactsOut": {
+        "description": "What a media manager calls the places a workflow's files come from and go to, in its own words.",
+        "properties": {
+          "source_category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The category the manager files this media type's downloads under in its download client.",
+            "title": "Source Category"
+          },
+          "manager_library": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Deluno: its library that imports the cleaned file.",
+            "title": "Manager Library"
+          },
+          "root_folder": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Sonarr and Radarr: the root folder the cleaned file is imported into.",
+            "title": "Root Folder"
+          }
+        },
+        "required": [
+          "source_category",
+          "manager_library",
+          "root_folder"
+        ],
+        "title": "ManagerSourceFactsOut",
         "type": "object"
       },
       "ManagerSetupItemOut": {
@@ -10455,6 +10763,10 @@
               }
             ],
             "description": "Sonarr and Radarr only."
+          },
+          "story": {
+            "$ref": "#/components/schemas/ManagerSourceFactsOut",
+            "description": "What the manager calls where this workflow's files come from and go to. Any of it is null when the manager did not report it."
           },
           "suggested_watched_folder": {
             "anyOf": [
@@ -11988,12 +12300,24 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": {
-                    "items": {
-                      "type": "string"
+                  "properties": {
+                    "capabilities": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "title": "Capabilities",
+                      "type": "array"
                     },
-                    "type": "array"
+                    "machine_name": {
+                      "description": "The name of the machine Weir runs on, for a media manager to name its connection to Weir.",
+                      "title": "Machine Name",
+                      "type": "string"
+                    }
                   },
+                  "required": [
+                    "capabilities",
+                    "machine_name"
+                  ],
                   "title": "Response Get Intake Capabilities Api V1 Intake Capabilities Get",
                   "type": "object"
                 }
@@ -15285,6 +15609,48 @@
         ]
       }
     },
+    "/api/v1/processing/library-check": {
+      "post": {
+        "description": "Check the folders a first-run setup is about to create Movies and TV libraries with, before anything is created: what creating them would be refused for, and for a folder that passes, its folder chain. Saves nothing.",
+        "operationId": "post_processing_library_check_api_v1_processing_library_check_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProposedLibraryCheckIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProposedLibraryCheckOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Processing Library Check",
+        "tags": [
+          "processing"
+        ]
+      }
+    },
     "/api/v1/processing/library-cleans": {
       "get": {
         "description": "What the newest library clean did to each library file, filtered the way the file list is.",
@@ -15380,6 +15746,28 @@
         "summary": "Get Library Cleans",
         "tags": [
           "processing",
+          "processing"
+        ]
+      }
+    },
+    "/api/v1/processing/library-suggestions": {
+      "get": {
+        "description": "The libraries first-run setup can offer once a media manager or download client is connected: one per media type, with the watched folder the connection already knows and a default output folder beside it. Read only: nothing is created.",
+        "operationId": "get_processing_library_suggestions_api_v1_processing_library_suggestions_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LibrarySuggestionsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Processing Library Suggestions",
+        "tags": [
           "processing"
         ]
       }
@@ -15498,6 +15886,19 @@
               "default": true,
               "title": "Remove Original After Success",
               "type": "boolean"
+            }
+          },
+          {
+            "description": "The media managers the workflow is linked to; only these are checked. Leave it out to check every manager that covers the media type; send it empty for a Weir-only workflow.",
+            "in": "query",
+            "name": "connection_ids",
+            "required": false,
+            "schema": {
+              "items": {
+                "type": "integer"
+              },
+              "title": "Connection Ids",
+              "type": "array"
             }
           }
         ],

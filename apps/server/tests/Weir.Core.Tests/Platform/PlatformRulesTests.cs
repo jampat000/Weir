@@ -142,13 +142,12 @@ public sealed class PlatformRulesTests
     {
         var zones = new FakeZones();
         string Error(SuiteSettingsUpdate update) => Assert.Throws<WireValueException>(() => SuiteSettingsRules.Normalize(update, zones)).Message;
-        Assert.Equal("Product name cannot be empty.", Error(new("   ", null, "UTC", 30)));
-        Assert.Equal("Choose a valid timezone (for example: UTC, Europe/London, America/New_York).", Error(new("Weir", null, "Not/A_Real_Zone", 30)));
-        Assert.Equal("Log retention must be between 1 and 3650 days.", Error(new("Weir", null, "UTC", 0)));
-        Assert.Equal("Setup wizard state must be pending, skipped, or completed.", Error(new("Weir", null, "UTC", 30, "later")));
-        Assert.Equal("Backup time must use HH:MM in 24-hour time.", Error(new("Weir", null, "UTC", 30, ConfigurationBackupPreferredTime: "ab:cd")));
-        var normalized = SuiteSettingsRules.Normalize(new("  House ", "  ", "UTC", 45, "COMPLETED", ConfigurationBackupPreferredTime: "3:5"), zones);
-        Assert.Equal(("House", (string?)null, "completed", "03:05"), (normalized.ProductDisplayName, normalized.SignedInHomeNotice, normalized.SetupWizardState, normalized.ConfigurationBackupPreferredTime));
+        Assert.Equal("Choose a valid timezone (for example: UTC, Europe/London, America/New_York).", Error(new(null, "Not/A_Real_Zone", 30)));
+        Assert.Equal("Log retention must be between 1 and 3650 days.", Error(new(null, "UTC", 0)));
+        Assert.Equal("Setup wizard state must be pending, skipped, or completed.", Error(new(null, "UTC", 30, "later")));
+        Assert.Equal("Backup time must use HH:MM in 24-hour time.", Error(new(null, "UTC", 30, ConfigurationBackupPreferredTime: "ab:cd")));
+        var normalized = SuiteSettingsRules.Normalize(new("  ", "UTC", 45, "COMPLETED", ConfigurationBackupPreferredTime: "3:5"), zones);
+        Assert.Equal(((string?)null, "completed", "03:05"), (normalized.SignedInHomeNotice, normalized.SetupWizardState, normalized.ConfigurationBackupPreferredTime));
         Assert.Equal("skipped", SuiteSettingsRules.DefaultSetupWizardState(1));
         Assert.Equal("pending", SuiteSettingsRules.DefaultSetupWizardState(0));
     }
@@ -368,14 +367,14 @@ public sealed class PlatformRulesTests
         // "exhausted all retry attempts", using the same #488 vocabulary WorkerFailures uses for the
         // stored job error.
         Assert.Equal(
-            ("processing_job_completed", "Weir job completed", "Job 5 (processing.test.v1) finished successfully."),
-            NotificationRules.JobNotification("processing", "completed", 5, "processing.test.v1"));
+            ("processing_job_completed", "Weir on RIG job completed", "Job 5 (processing.test.v1) finished successfully."),
+            NotificationRules.JobNotification("processing", "completed", 5, "processing.test.v1", "Weir on RIG"));
         Assert.Equal(
-            ("processing_job_failed", "Weir job failed", "Job 5 (processing.test.v1) exhausted all retry attempts."),
-            NotificationRules.JobNotification("processing", "failed", 5, "processing.test.v1"));
+            ("processing_job_failed", "Weir on RIG job failed", "Job 5 (processing.test.v1) exhausted all retry attempts."),
+            NotificationRules.JobNotification("processing", "failed", 5, "processing.test.v1", "Weir on RIG"));
         Assert.Equal(
-            ("processing_job_failed", "Weir job failed", "Job 5 (processing.test.v1) failed. Weir will try this job again shortly."),
-            NotificationRules.JobNotification("processing", "failed", 5, "processing.test.v1", willRetry: true));
+            ("processing_job_failed", "Weir on RIG job failed", "Job 5 (processing.test.v1) failed. Weir will try this job again shortly."),
+            NotificationRules.JobNotification("processing", "failed", 5, "processing.test.v1", "Weir on RIG", willRetry: true));
     }
 
     private static UserSessionRecord Session(DateTime now, DateTime absolute, DateTime lastSeen) =>

@@ -14,7 +14,8 @@ public sealed partial class RemuxPassHandler
         ProcessingOperatorSettingsRecord? Operator = null,
         ProcessingLibraryRecord? Library = null,
         ProcessingRulesConfig? Rules = null,
-        ProcessingPathRuntime? Runtime = null);
+        ProcessingPathRuntime? Runtime = null,
+        string? RulesProfileName = null);
 
     /// <summary>
     /// Read what the pass needs and mark the file as being processed, then commit: no ffprobe or ffmpeg work runs while the
@@ -27,14 +28,14 @@ public sealed partial class RemuxPassHandler
             {
                 var operatorSettings = await _operatorSettings.EnsureAsync(uow).ConfigureAwait(false);
                 var library = await ResolveLibraryAsync(uow, _libraries, libraryId, mediaScope).ConfigureAwait(false);
-                var rules = library is not null ? await RulesConfigForAsync(uow, library).ConfigureAwait(false) : null;
+                var (rules, rulesProfileName) = library is not null ? await RulesConfigForAsync(uow, library).ConfigureAwait(false) : (null, null);
                 rules ??= await LoadScopeRulesConfigAsync(uow, mediaScope).ConfigureAwait(false);
                 ProcessingPathRuntime? runtime;
                 string? problem;
                 if (library is null)
                 {
                     var label = mediaScope == "tv" ? "TV" : "Movies";
-                    (runtime, problem) = (null, $"No library covers {label}. Add one on Processing → Libraries, then queue this work again.");
+                    (runtime, problem) = (null, $"No workflow covers {label}. Add one in Settings › Workflows, then queue this work again.");
                 }
                 else
                 {
@@ -58,7 +59,7 @@ public sealed partial class RemuxPassHandler
                         .ConfigureAwait(false);
                 }
 
-                return new Claim(null, operatorSettings, library, rules, runtime);
+                return new Claim(null, operatorSettings, library, rules, runtime, rulesProfileName);
             },
             _logger,
             "claim processing file",
@@ -76,10 +77,10 @@ public sealed partial class RemuxPassHandler
         return await libraries.SeededForScopeAsync(uow, mediaScope ?? "movie").ConfigureAwait(false);
     }
 
-    private async Task<ProcessingRulesConfig?> RulesConfigForAsync(UnitOfWork uow, ProcessingLibraryRecord library) =>
+    private async Task<(ProcessingRulesConfig? Config, string? ProfileName)> RulesConfigForAsync(UnitOfWork uow, ProcessingLibraryRecord library) =>
         library.RuleSetId is { } ruleSetId && await _libraries.GetRuleSetAsync(uow, ruleSetId).ConfigureAwait(false) is { } ruleSet
-            ? RemuxPassPaths.RulesConfigFor(ruleSet)
-            : null;
+            ? (RemuxPassPaths.RulesConfigFor(ruleSet), ruleSet.Name)
+            : (null, null);
 
     /// <summary>The seeded library's rule set for the scope, or the shipped defaults.</summary>
     private async Task<ProcessingRulesConfig> LoadScopeRulesConfigAsync(UnitOfWork uow, string mediaScope)

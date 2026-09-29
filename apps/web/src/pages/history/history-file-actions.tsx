@@ -25,7 +25,7 @@ import { mmActionButtonClass } from "../../lib/ui/mm-control-roles";
 import { HistoryRemoveDialog } from "./history-remove-dialog";
 
 const PASS_THROUGH_EXPLAINED =
-  "Weir will skip the audio, subtitle and metadata rules, copy and check the original in this library's output folder, then remove the watched original the way it does after any finished file. Readiness checks still apply, so a download still being written is left alone.";
+  "Weir will skip the audio, subtitle and metadata rules, copy and check the original in this workflow's output folder, then remove the watched original the way it does after any finished file. Readiness checks still apply, so a download still being written is left alone.";
 
 /** States Weir is done with a file in, one way or another: it can only be processed again from here. */
 const CONCLUDED: readonly ProcessingFileStatus[] = [
@@ -291,22 +291,22 @@ export function HistoryFileActions({
         status === "out_of_schedule"
           ? button(
               "Check again",
-              "Checks this library now and queues files that are ready.",
+              "Checks this workflow now and queues files that are ready.",
               () =>
                 void run(async () => {
                   await checkAgain.mutateAsync({
                     media_scope: scope,
                     library_id: file.library_id,
                   });
-                  return "Weir is checking this library again and will queue the file when it is ready.";
-                }, "That library could not be checked again. Review its watched folder and try again."),
+                  return "Weir is checking this workflow again and will queue the file when it is ready.";
+                }, "That workflow could not be checked again. Review its watched folder and try again."),
               { pending: checkAgain.isPending, pendingLabel: "Checking…" },
             )
           : null}
         {status === "blocked_upstream" || status === "on_hold"
           ? button(
               "Why is this held?",
-              "Asks every media manager covering this library what it is doing with this file, right now.",
+              "Asks every media manager covering this workflow what it is doing with this file, right now.",
               () =>
                 void run(async () => {
                   const answer = await whyHeld.mutateAsync(file.id);
@@ -364,7 +364,7 @@ export function HistoryFileActions({
                 pass_through_unchanged: true,
               });
               return "Queued to pass through unchanged. Weir checks the copy before removing the original.";
-            }, "That file could not be queued to pass through. Refresh and review its library's folders.");
+            }, "That file could not be queued to pass through. Refresh and review its workflow's folders.");
           }}
         />
       ) : null}

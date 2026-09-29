@@ -14,7 +14,10 @@ import {
 import { useCreateMediaManagerConnection } from "../../../../lib/media-managers/queries";
 import { mmActionButtonClass } from "../../../../lib/ui/mm-control-roles";
 
-const KINDS: MediaManagerKind[] = ["radarr", "sonarr", "deluno", "native"];
+/** Selected first when it is one of the choices. */
+const PREFERRED_KIND: MediaManagerKind = "deluno";
+
+const ALL_KINDS: MediaManagerKind[] = ["radarr", "sonarr", "deluno", "native"];
 
 /** What choosing each one means, without naming what Weir does internally. */
 const KIND_BLURBS: Record<MediaManagerKind, string> = {
@@ -28,27 +31,28 @@ const KIND_BLURBS: Record<MediaManagerKind, string> = {
 
 type FormState = {
   kind: MediaManagerKind;
-  name: string;
   base_url: string;
   api_key: string;
 };
 
-const EMPTY_FORM: FormState = {
-  kind: "deluno",
-  name: "",
-  base_url: "",
-  api_key: "",
-};
+function emptyForm(kind: MediaManagerKind): FormState {
+  return { kind, base_url: "", api_key: "" };
+}
 
 export function AddConnectionForm({
+  kinds = ALL_KINDS,
   onCancel,
   onCreated,
 }: {
+  /** Which media managers can be chosen. With just one, there is nothing to choose. */
+  kinds?: MediaManagerKind[];
   onCancel: () => void;
   /** Called instead of `onCancel` once the media manager is actually created. */
   onCreated: (connection: MediaManagerConnection) => void;
 }) {
-  const [form, setForm] = useState<FormState>(EMPTY_FORM);
+  const [form, setForm] = useState<FormState>(() =>
+    emptyForm(kinds.includes(PREFERRED_KIND) ? PREFERRED_KIND : kinds[0]),
+  );
   const create = useCreateMediaManagerConnection();
   const change = <K extends keyof FormState>(key: K, value: FormState[K]) =>
     setForm((current) => ({ ...current, [key]: value }));
@@ -66,35 +70,28 @@ export function AddConnectionForm({
       <QuietFieldGroup title="Add a media manager">
         <div className="mm-quiet-stack">
           <div className="mm-field-row">
-            <Field
-              label="Which media manager is it?"
-              hint={KIND_BLURBS[form.kind]}
-              width="medium"
-            >
-              <select
-                data-testid="media-manager-kind"
-                className="mm-input"
-                value={form.kind}
-                onChange={(e) =>
-                  change("kind", e.target.value as MediaManagerKind)
-                }
+            {kinds.length > 1 ? (
+              <Field
+                label="Which media manager is it?"
+                hint={KIND_BLURBS[form.kind]}
+                width="medium"
               >
-                {KINDS.map((kind) => (
-                  <option key={kind} value={kind}>
-                    {MEDIA_MANAGER_KIND_LABELS[kind]}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            <Field label="Name" width="medium">
-              <input
-                data-testid="media-manager-name"
-                className="mm-input"
-                value={form.name}
-                placeholder="Deluno"
-                onChange={(e) => change("name", e.target.value)}
-              />
-            </Field>
+                <select
+                  data-testid="media-manager-kind"
+                  className="mm-input"
+                  value={form.kind}
+                  onChange={(e) =>
+                    change("kind", e.target.value as MediaManagerKind)
+                  }
+                >
+                  {kinds.map((kind) => (
+                    <option key={kind} value={kind}>
+                      {MEDIA_MANAGER_KIND_LABELS[kind]}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            ) : null}
           </div>
           <Field
             label="Where to find it"
@@ -135,7 +132,7 @@ export function AddConnectionForm({
             type="submit"
             data-testid="media-manager-save"
             className={mmActionButtonClass({ variant: "primary" })}
-            disabled={create.isPending || !form.name.trim()}
+            disabled={create.isPending || !form.base_url.trim()}
           >
             {create.isPending ? "Adding…" : "Add"}
           </button>

@@ -125,7 +125,7 @@ export function LibraryPicker({
         <div
           className="mm-library-menu"
           role="listbox"
-          aria-label="Choose a library"
+          aria-label="Choose a workflow"
           ref={menu}
           tabIndex={-1}
           onKeyDown={moveFocus}
@@ -134,8 +134,8 @@ export function LibraryPicker({
             <input
               type="search"
               className="mm-input"
-              aria-label="Find a library"
-              placeholder="Find a library"
+              aria-label="Find a workflow"
+              placeholder="Find a workflow"
               value={find}
               onChange={(event) => setFind(event.target.value)}
             />
@@ -165,7 +165,7 @@ export function LibraryPicker({
             );
           })}
           {shown.length === 0 ? (
-            <p className="mm-library-menu__empty">No library by that name.</p>
+            <p className="mm-library-menu__empty">No workflow by that name.</p>
           ) : null}
         </div>
       ) : null}

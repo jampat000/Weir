@@ -1526,6 +1526,26 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/processing/library-check": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Post Processing Library Check
+     * @description Check the folders a first-run setup is about to create Movies and TV libraries with, before anything is created: what creating them would be refused for, and for a folder that passes, its folder chain. Saves nothing.
+     */
+    post: operations["post_processing_library_check_api_v1_processing_library_check_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/processing/library-cleans": {
     parameters: {
       query?: never;
@@ -1538,6 +1558,26 @@ export interface paths {
      * @description What the newest library clean did to each library file, filtered the way the file list is.
      */
     get: operations["get_library_cleans_api_v1_library_cleans_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/processing/library-suggestions": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Processing Library Suggestions
+     * @description The libraries first-run setup can offer once a media manager or download client is connected: one per media type, with the watched folder the connection already knows and a default output folder beside it. Read only: nothing is created.
+     */
+    get: operations["get_processing_library_suggestions_api_v1_processing_library_suggestions_get"];
     put?: never;
     post?: never;
     delete?: never;
@@ -2651,8 +2691,11 @@ export interface components {
        * @enum {string}
        */
       kind: "sabnzbd" | "nzbget" | "qbittorrent" | "deluge" | "transmission";
-      /** Name */
-      name: string;
+      /**
+       * Name
+       * @description Accepted and ignored: a connection is named after its kind and the host in its address.
+       */
+      name?: string;
       /**
        * Password
        * @description NZBGet/qBittorrent/Deluge/Transmission. Stored encrypted. Empty means no password.
@@ -2683,7 +2726,10 @@ export interface components {
        * @enum {string}
        */
       kind: "sabnzbd" | "nzbget" | "qbittorrent" | "deluge" | "transmission";
-      /** Name */
+      /**
+       * Name
+       * @description The connection's name: its kind and the host in its address, set by Weir.
+       */
       name: string;
       /** Enabled */
       enabled: boolean;
@@ -2737,7 +2783,10 @@ export interface components {
       csrf_token: string;
       /** Enabled */
       enabled?: boolean | null;
-      /** Name */
+      /**
+       * Name
+       * @description Accepted and ignored: a connection is named after its kind and the host in its address.
+       */
       name?: string | null;
       /**
        * Password
@@ -3162,6 +3211,97 @@ export interface components {
     LibraryFoldersOut: {
       /** Libraries */
       libraries: components["schemas"]["PublishedLibraryFoldersOut"][];
+    };
+    /**
+     * ProposedLibraryCheckIn
+     * @description The Movies and TV folders to check. A media type with neither folder is left out of the answer.
+     */
+    ProposedLibraryCheckIn: {
+      /** Csrf Token */
+      csrf_token: string;
+      /**
+       * Movie Watched Folder
+       * @description Where Movies downloads land.
+       * @default
+       */
+      movie_watched_folder: string;
+      /**
+       * Movie Output Folder
+       * @description Where cleaned Movies files go.
+       * @default
+       */
+      movie_output_folder: string;
+      /**
+       * Tv Watched Folder
+       * @description Where TV downloads land.
+       * @default
+       */
+      tv_watched_folder: string;
+      /**
+       * Tv Output Folder
+       * @description Where cleaned TV files go.
+       * @default
+       */
+      tv_output_folder: string;
+    };
+    /**
+     * ProposedLibraryCheckItemOut
+     * @description What one proposed library would run into. `problem` is the sentence creating it would be refused with; otherwise `chain` is its folder chain, with `library_id` 0 because nothing is saved.
+     */
+    ProposedLibraryCheckItemOut: {
+      /** Problem */
+      problem: string | null;
+      chain: components["schemas"]["LibraryFolderChainOut"] | null;
+    };
+    /** ProposedLibraryCheckOut */
+    ProposedLibraryCheckOut: {
+      movie: components["schemas"]["ProposedLibraryCheckItemOut"] | null;
+      tv: components["schemas"]["ProposedLibraryCheckItemOut"] | null;
+    };
+    /**
+     * SuggestedLibraryOut
+     * @description A library setup can offer to create or fill in. Never saved by itself: the person confirms and edits it first.
+     */
+    SuggestedLibraryOut: {
+      /**
+       * Library Id
+       * @description The existing library with no folders yet that this would fill in, or null when it would be a new one.
+       */
+      library_id: number | null;
+      /** Name */
+      name: string;
+      /**
+       * Media Type
+       * @enum {string}
+       */
+      media_type: "movie" | "tv";
+      /** Watched Folder */
+      watched_folder: string;
+      /**
+       * Output Folder
+       * @description Empty when there is no sensible default.
+       */
+      output_folder: string;
+      /**
+       * Source Label
+       * @description Who reported the watched folder, e.g. Deluno or SABnzbd.
+       */
+      source_label: string;
+      /**
+       * Manager Connection Ids
+       * @description The media managers that cover this media type.
+       */
+      manager_connection_ids: number[];
+    };
+    /** LibrarySuggestionsOut */
+    LibrarySuggestionsOut: {
+      /** Libraries */
+      libraries: components["schemas"]["SuggestedLibraryOut"][];
+      /**
+       * Notes
+       * @description Plain sentences about anything connected that could not say where its downloads are saved.
+       */
+      notes: string[];
     };
     /**
      * LibraryLeaveAloneIn
@@ -3667,8 +3807,11 @@ export interface components {
        * @enum {string}
        */
       kind: "radarr" | "sonarr" | "deluno" | "native";
-      /** Name */
-      name: string;
+      /**
+       * Name
+       * @description Accepted and ignored: a connection is named after its kind and the host in its address.
+       */
+      name?: string;
     };
     /** MediaManagerConnectionDeleteIn */
     MediaManagerConnectionDeleteIn: {
@@ -3709,7 +3852,10 @@ export interface components {
       last_test_detail?: string | null;
       /** Last Test Ok */
       last_test_ok?: boolean | null;
-      /** Name */
+      /**
+       * Name
+       * @description The connection's name: its kind and the host in its address, set by Weir.
+       */
       name: string;
       /**
        * Unsigned Webhook Warning
@@ -3764,7 +3910,10 @@ export interface components {
       downloaded_scan_enabled?: boolean | null;
       /** Enabled */
       enabled?: boolean | null;
-      /** Name */
+      /**
+       * Name
+       * @description Accepted and ignored: a connection is named after its kind and the host in its address.
+       */
       name?: string | null;
     };
     /** MediaManagerSearchLaneIn */
@@ -4062,6 +4211,16 @@ export interface components {
     };
     /** ReadinessResponse */
     ReadinessResponse: {
+      /**
+       * Machine Name
+       * @description The name of the machine Weir runs on. Weir is named after it.
+       */
+      machine_name: string;
+      /**
+       * Machine Name Looks Generated
+       * @description True when the machine name looks like a container's generated one, so the compose file has no hostname.
+       */
+      machine_name_looks_generated: boolean;
       /** Ready */
       ready: boolean;
       /** Startup Seconds */
@@ -4386,6 +4545,11 @@ export interface components {
        * @description The running pass's speed as ffmpeg reports it, for example 148x.
        */
       progress_speed?: string | null;
+      /**
+       * Progress Stage
+       * @description The step the running pass is on: checking, planning, writing, verifying or handing_back. Null when nothing is in flight or the pass names none.
+       */
+      progress_stage?: string | null;
       /**
        * Progress Status
        * @description processing while the file is written; finishing during the final checks and hand-back. Null when nothing is in flight.
@@ -4995,14 +5159,14 @@ export interface components {
       media_type: "movie" | "tv";
       /**
        * Min File Age Seconds
-       * @default 60
+       * @description Seconds a file must go unchanged. Null uses the Performance setting.
        */
-      min_file_age_seconds: number;
+      min_file_age_seconds?: number | null;
       /**
        * Min File Size Mb
-       * @default 0
+       * @description Smallest file the library takes. Null uses the Performance setting.
        */
-      min_file_size_mb: number;
+      min_file_size_mb?: number | null;
       /**
        * Modified After
        * @description Only admit files whose last-modified time is on or after this instant.
@@ -5180,6 +5344,16 @@ export interface components {
       discovered_library_key?: string | null;
       /** Display Order */
       display_order: number;
+      /**
+       * Effective Min File Age Seconds
+       * @description Seconds a file must go unchanged now: the library's own value, or the Performance setting.
+       */
+      effective_min_file_age_seconds: number;
+      /**
+       * Effective Min File Size Mb
+       * @description Smallest file the library takes now: its own value, or the Performance setting.
+       */
+      effective_min_file_size_mb: number;
       /** Enabled */
       enabled: boolean;
       /** Exclude Hidden */
@@ -5242,10 +5416,16 @@ export interface components {
        * @enum {string}
        */
       media_type: "movie" | "tv";
-      /** Min File Age Seconds */
-      min_file_age_seconds: number;
-      /** Min File Size Mb */
-      min_file_size_mb: number;
+      /**
+       * Min File Age Seconds
+       * @description Seconds a file must go unchanged. Null means the library uses the Performance setting.
+       */
+      min_file_age_seconds: number | null;
+      /**
+       * Min File Size Mb
+       * @description Smallest file the library takes. Null means the library uses the Performance setting.
+       */
+      min_file_size_mb: number | null;
       /** Modified After */
       modified_after: string | null;
       /** Modified Before */
@@ -5466,14 +5646,14 @@ export interface components {
       media_type: "movie" | "tv";
       /**
        * Min File Age Seconds
-       * @default 60
+       * @description Seconds a file must go unchanged. Null uses the Performance setting.
        */
-      min_file_age_seconds: number;
+      min_file_age_seconds?: number | null;
       /**
        * Min File Size Mb
-       * @default 0
+       * @description Smallest file the library takes. Null uses the Performance setting.
        */
-      min_file_size_mb: number;
+      min_file_size_mb?: number | null;
       /**
        * Modified After
        * @description Only admit files whose last-modified time is on or after this instant.
@@ -7035,11 +7215,6 @@ export interface components {
        */
       log_retention_days: number;
       /**
-       * Product Display Name
-       * @description Shown in the sidebar and settings.
-       */
-      product_display_name: string;
-      /**
        * Setup Wizard State
        * @description First-run wizard state: pending, skipped, or completed.
        */
@@ -7085,8 +7260,6 @@ export interface components {
       csrf_token: string;
       /** Log Retention Days */
       log_retention_days: number;
-      /** Product Display Name */
-      product_display_name: string;
       /** Setup Wizard State */
       setup_wizard_state?: string | null;
       /** Signed In Home Notice */
@@ -7269,10 +7442,10 @@ export interface components {
     ManagerSetupLineOut: {
       /**
        * State
-       * @description ``ok``, ``problem`` (with its fix in the sentence) or ``note``.
+       * @description ``ok`` (Weir read it for itself), ``problem`` (with its fix in the sentence), ``note``, or ``unverified`` (Weir can only take someone's word for it).
        * @enum {string}
        */
-      state: "ok" | "problem" | "note";
+      state: "ok" | "problem" | "note" | "unverified";
       /**
        * Text
        * @description One plain sentence.
@@ -7299,6 +7472,27 @@ export interface components {
        * @description The library's output folder, as Weir sees it.
        */
       local_path: string;
+    };
+    /**
+     * ManagerSourceFactsOut
+     * @description What a media manager calls the places a workflow's files come from and go to, in its own words.
+     */
+    ManagerSourceFactsOut: {
+      /**
+       * Source Category
+       * @description The category the manager files this media type's downloads under in its download client.
+       */
+      source_category: string | null;
+      /**
+       * Manager Library
+       * @description Deluno: its library that imports the cleaned file.
+       */
+      manager_library: string | null;
+      /**
+       * Root Folder
+       * @description Sonarr and Radarr: the root folder the cleaned file is imported into.
+       */
+      root_folder: string | null;
     };
     /**
      * ManagerSetupItemOut
@@ -7328,6 +7522,8 @@ export interface components {
       lines: components["schemas"]["ManagerSetupLineOut"][];
       /** @description Sonarr and Radarr only. */
       mapping?: components["schemas"]["ManagerSetupMappingOut"] | null;
+      /** @description What the manager calls where this workflow's files come from and go to. Any of it is null when the manager did not report it. */
+      story?: components["schemas"]["ManagerSourceFactsOut"];
       /**
        * Suggested Watched Folder
        * @description Deluno: where this media type's downloads arrive, as Deluno reports it. Sonarr/Radarr: the first enabled download client's own directory, when one is set.
@@ -8162,7 +8358,13 @@ export interface operations {
         };
         content: {
           "application/json": {
-            [key: string]: string[];
+            /** Capabilities */
+            capabilities: string[];
+            /**
+             * Machine Name
+             * @description The name of the machine Weir runs on, for a media manager to name its connection to Weir.
+             */
+            machine_name: string;
           };
         };
       };
@@ -10265,6 +10467,39 @@ export interface operations {
       };
     };
   };
+  post_processing_library_check_api_v1_processing_library_check_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ProposedLibraryCheckIn"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ProposedLibraryCheckOut"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
   get_library_cleans_api_v1_library_cleans_get: {
     parameters: {
       query?: {
@@ -10295,6 +10530,26 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_processing_library_suggestions_api_v1_processing_library_suggestions_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["LibrarySuggestionsOut"];
         };
       };
     };
@@ -10359,6 +10614,8 @@ export interface operations {
         watched_folder?: string;
         output_folder?: string;
         remove_original_after_success?: boolean;
+        /** @description The media managers the workflow is linked to; only these are checked. Leave it out to check every manager that covers the media type; send it empty for a Weir-only workflow. */
+        connection_ids?: number[];
       };
       header?: never;
       path?: never;

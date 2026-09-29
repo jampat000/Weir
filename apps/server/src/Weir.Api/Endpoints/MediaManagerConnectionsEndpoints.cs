@@ -21,6 +21,8 @@ public static class MediaManagerConnectionsEndpoints
 {
     internal const string InvalidCsrf = "Invalid or expired CSRF token.";
 
+    private const int ConnectionNameMaxLength = 200;
+
     public static IEndpointRouteBuilder MapMediaManagerConnectionsEndpoints(this IEndpointRouteBuilder endpoints)
     {
         var handlers = endpoints.ServiceProvider.GetRequiredService<MediaManagerConnectionsEndpointHandlers>();
@@ -36,6 +38,13 @@ public static class MediaManagerConnectionsEndpoints
         endpoints.MapV1("GET", "/media-managers/connections/{connection_id}/folder-chain", handlers.GetConnectionFolderChainAsync);
         return endpoints;
     }
+
+    /// <summary>
+    /// Deluno still sends a <c>name</c> when it creates its connection to Weir. Connections are named after their
+    /// kind and address now (#826), so the field is accepted and dropped rather than refused as an unknown one.
+    /// Shared with <see cref="DownloadClientConnectionsEndpoints"/>.
+    /// </summary>
+    internal static void AcceptIgnoredName(BodyModel model) => model.OptionalStr("name", maxLength: ConnectionNameMaxLength);
 
     /// <summary>Browser origin, session secret, then a session-bound CSRF token; 400 on a bad token. Shared
     /// with <see cref="MediaManagerReconciliationEndpoints"/> and <see cref="DownloadClientConnectionsEndpoints"/>,
@@ -90,7 +99,7 @@ internal sealed class MediaManagerConnectionsEndpointHandlers
         var model = new BodyModel(body, issues);
         var csrfToken = model.Str("csrf_token", minLength: 1);
         var kind = model.Literal("kind", MediaManagerKinds.All);
-        var name = model.Str("name", minLength: 1, maxLength: 200);
+        MediaManagerConnectionsEndpoints.AcceptIgnoredName(model);
         var enabled = model.Bool("enabled", defaultValue: true);
         var baseUrl = StrWithDefault(model, body, "base_url", string.Empty, 2000);
         var apiKey = StrWithDefault(model, body, "api_key", string.Empty, 2000);
@@ -104,7 +113,7 @@ internal sealed class MediaManagerConnectionsEndpointHandlers
         try
         {
             id = await _connections
-                .CreateAsync(uow, kind, name, baseUrl, apiKey.Length > 0 ? apiKey : null, enabled, downloadedScanEnabled).ConfigureAwait(false);
+                .CreateAsync(uow, kind, baseUrl, apiKey.Length > 0 ? apiKey : null, enabled, downloadedScanEnabled).ConfigureAwait(false);
         }
         catch (MediaManagerConnectionException exception)
         {
@@ -179,7 +188,7 @@ internal sealed class MediaManagerConnectionsEndpointHandlers
         var connectionId = ConnectionId(request, issues);
         var model = new BodyModel(body, issues);
         var csrfToken = model.Str("csrf_token", minLength: 1);
-        var name = model.OptionalStr("name", minLength: 1, maxLength: 200);
+        MediaManagerConnectionsEndpoints.AcceptIgnoredName(model);
         var enabled = model.OptionalBool("enabled");
         var baseUrl = model.OptionalStr("base_url", maxLength: 2000);
         var apiKey = model.OptionalStr("api_key", maxLength: 2000);
@@ -192,7 +201,7 @@ internal sealed class MediaManagerConnectionsEndpointHandlers
         var row = await RequireConnectionAsync(uow, _connectionStore, connectionId).ConfigureAwait(false);
         try
         {
-            await _connections.UpdateAsync(uow, row, name, baseUrl, apiKey, enabled, downloadedScanEnabled).ConfigureAwait(false);
+            await _connections.UpdateAsync(uow, row, baseUrl, apiKey, enabled, downloadedScanEnabled).ConfigureAwait(false);
         }
         catch (MediaManagerConnectionException exception)
         {

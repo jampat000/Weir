@@ -110,7 +110,6 @@ def test_record_activity_event_does_not_prune_history_using_log_retention(server
     saved = client.put_csrf(
         f"{API}/suite/settings",
         json={
-            "product_display_name": current["product_display_name"],
             "app_timezone": current["app_timezone"],
             "log_retention_days": 1,
             "activity_retention_days": current["activity_retention_days"],

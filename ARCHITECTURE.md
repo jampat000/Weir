@@ -42,7 +42,8 @@ Weir is a self-hosted media operations app:
   [ADR-0017](docs/adr/ADR-0017-backend-on-dotnet.md).
 - Frontend: React + Vite under `apps/web/src`, served by the server from `WEIR_WEB_DIST`.
 - Packaging: a Docker image (linux/amd64 and linux/arm64) and a Windows Velopack installer whose
-  .NET tray app (`apps/tray`) starts and watches the server. Both carry ffmpeg and mkvmerge
+  .NET tray app (`apps/tray`) starts and watches the server, and stops it by setting a named Windows event
+  the server listens for (`Local\Weir-Stop-<pid>`), killing it only if it does not exit in time. Both carry ffmpeg and mkvmerge
   (MKVToolNix) — the Docker image installs them from Debian packages, the Windows package vendors
   checksum-verified builds. See [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
 - Runtime data: `WEIR_HOME`.

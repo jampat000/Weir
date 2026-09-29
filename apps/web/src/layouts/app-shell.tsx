@@ -13,10 +13,10 @@ import {
   NavIconSignOut,
 } from "../components/shell/nav-icons";
 import { useLogoutMutation } from "../lib/auth/queries";
-import { useProcessingFilesAtOnceQuery } from "../lib/processing/queries";
-import { useAppSettingsQuery } from "../lib/settings/queries";
+import { appTitle } from "../lib/system/app-title";
 import { useSystemReadinessQuery } from "../lib/system/readiness-queries";
 import { useModalFocus } from "../lib/ui/use-modal-focus";
+import { useWorkingCount } from "../pages/processing/working-count";
 
 // Between phone width (a drawer below 921px) and 1100px the side menu shrinks to icons by itself, so
 // the Processing lanes keep their room; a click on Collapse or Expand overrides it until a reload.
@@ -46,7 +46,6 @@ export function AppShell() {
   const navigate = useNavigate();
   const location = useLocation();
   const logout = useLogoutMutation();
-  const suite = useAppSettingsQuery();
   const readiness = useSystemReadinessQuery();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   // On phones the side menu is a drawer: opening it moves focus in, Escape closes it, and focus goes
@@ -60,11 +59,15 @@ export function AppShell() {
   const [collapsedChoice, setCollapsedChoice] = useState<boolean | null>(null);
   const laptop = useMediaQuery(LAPTOP_WIDTH);
   const sidebarCollapsed = collapsedChoice ?? laptop;
-  // How many files are being written right now, beside Processing wherever you are in the app.
-  const working = useProcessingFilesAtOnceQuery().data?.running ?? 0;
-  const productTitle =
-    (suite.data?.product_display_name ?? "Weir").trim() || "Weir";
+  // How many cards Processing's Working lane shows, beside Processing wherever you are in the app.
+  const working = useWorkingCount();
+  const productTitle = appTitle(readiness.data?.machine_name);
   const appVersion = readiness.data?.version;
+
+  // The tab says which Weir it is, so two of them side by side can be told apart.
+  useEffect(() => {
+    document.title = productTitle;
+  }, [productTitle]);
 
   useEffect(() => {
     window.scrollTo(0, 0);

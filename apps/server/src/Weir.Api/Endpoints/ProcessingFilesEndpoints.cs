@@ -106,6 +106,7 @@ internal sealed class ProcessingFilesEndpointHandlers
             // What Live shows on a working file (docs/archive/live-and-library.md): which step, how fast,
             // and what is coming out. All null when nothing is running on the file.
             .Set("progress_status", progress?.Status)
+            .Set("progress_stage", progress?.Stage)
             .Set("progress_speed", progress?.Speed)
             .Set("progress_elapsed_seconds", progress?.ElapsedSeconds is { } elapsed ? WireValue.Of(elapsed) : WireValue.Null)
             .Set("progress_removed_audio", progress is null ? WireValue.Null : new WireArray(progress.RemovedAudio.Select(t => (WireValue)WireValue.Of(t))))
@@ -159,7 +160,7 @@ internal sealed class ProcessingFilesEndpointHandlers
         var files = new List<WireValue>();
         foreach (var row in rows)
         {
-            var libraryName = libraryNames.GetValueOrDefault(row.LibraryId, "Unknown library");
+            var libraryName = libraryNames.GetValueOrDefault(row.LibraryId, "Unknown workflow");
             var directPlay = DirectPlayService.ForRow(row, devices);
             progressByPath.TryGetValue(row.RelativePath, out var progress);
             // #652: the copy Weir handed back, and what a media manager said about it, for History.

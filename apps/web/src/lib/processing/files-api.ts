@@ -6,23 +6,44 @@ import type { RequestBody, Schema } from "../api/types";
 export type ProcessingFileStatus = Schema<"ProcessingFileOut">["status"];
 
 /** Plain words for each state. The reason string carries the detail. */
-export const PROCESSING_FILE_STATUS_LABELS: Record<
-  ProcessingFileStatus,
-  string
-> = {
+const PROCESSING_FILE_STATUS_LABELS: Record<ProcessingFileStatus, string> = {
   unprocessed: "Waiting",
   processing: "Processing",
   processed: "Done",
   processing_failed: "Failed",
   skipped: "Skipped",
-  disabled: "Library off",
+  disabled: "Workflow off",
   on_hold: "On hold",
-  out_of_schedule: "Waiting for library hours",
+  out_of_schedule: "Waiting for workflow hours",
   blocked_upstream: "Waiting for your media manager",
   passed_through: "Passed through unchanged",
   rejected: "Rejected for a replacement",
   cancelled: "Cancelled",
 };
+
+/** How the server marks a rejection by the rules themselves, where no media manager was asked for another copy. */
+const REJECTED_BY_RULES = "rules";
+
+/** The plain word for a file's state. A rejection no media manager was asked about is just "Rejected". */
+export function processingFileStatusLabel(
+  file: Pick<ProcessingFile, "status" | "failure_class">,
+): string {
+  if (file.status === "rejected" && file.failure_class === REJECTED_BY_RULES) {
+    return "Rejected";
+  }
+  return PROCESSING_FILE_STATUS_LABELS[file.status] ?? file.status;
+}
+
+/** The state and its reason as one lead. A reason that already opens with the state's word ("Rejected: …") stands alone. */
+export function processingFileLead(
+  file: Pick<ProcessingFile, "status" | "failure_class" | "status_reason">,
+): string {
+  const label = processingFileStatusLabel(file);
+  if (!file.status_reason) return label;
+  return file.status_reason.startsWith(`${label}:`)
+    ? file.status_reason
+    : `${label}. ${file.status_reason}`;
+}
 
 /** Whether one device the operator owns will play the file without the media server converting it. */
 export type ProcessingDirectPlayVerdict = "yes" | "no" | "maybe" | "unknown";
@@ -93,6 +114,8 @@ export interface ProcessingFile {
   progress_eta_seconds: number | null;
   /** `processing` while the file is written, `finishing` during the final checks. What the Processing lanes key on. */
   progress_status?: string | null;
+  /** The step the running pass is on: checking, planning, writing, verifying or handing_back. Null from an older server. */
+  progress_stage?: string | null;
   /** ffmpeg's speed as it reports it, for example "148x". */
   progress_speed?: string | null;
   progress_elapsed_seconds?: number | null;

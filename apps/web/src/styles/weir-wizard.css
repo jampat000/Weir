@@ -74,3 +74,45 @@
     max-width: 36rem;
   }
 }
+
+/* How downloads reach Weir: the four choices, and what was connected. */
+.mm-wizard-choices {
+  display: grid;
+  min-width: 0;
+  gap: 0.6rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.mm-wizard-choice {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  cursor: pointer;
+  color: var(--mm-text1);
+}
+
+.mm-wizard-connection {
+  display: grid;
+  min-width: 0;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--mm-border);
+  border-radius: var(--mm-radius-sm);
+}
+
+/* One library setup offers: a tick, its folders, and what the check found. */
+.mm-wizard-found {
+  display: grid;
+  min-width: 0;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--mm-border);
+  border-radius: var(--mm-radius-sm);
+}
+
+.mm-wizard-found--off {
+  opacity: 0.65;
+}

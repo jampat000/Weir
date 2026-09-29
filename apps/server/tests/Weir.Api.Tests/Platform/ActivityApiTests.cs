@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Net;
 using System.Text.Json.Nodes;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
 using Weir.Api.Endpoints;
@@ -288,6 +289,28 @@ public sealed class ActivityApiTests
     }
 
     [Fact]
+    public async Task An_open_stream_ends_when_the_server_starts_stopping()
+    {
+        // A browser keeps its stream open for as long as Weir is on screen; a stream that outlived the stop would hold
+        // the shutdown up until the host gave up waiting for it.
+        await using var server = await SeededServerAsync();
+        var client = await AdminAsync(server);
+        using var reader = await OpenStreamAsync(server, client);
+        await NextBlockAsync(reader); // "retry: ..."
+
+        server.Services.GetRequiredService<IHostApplicationLifetime>().StopApplication();
+
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+        string? line;
+        do
+        {
+            line = await reader.ReadLineAsync(timeout.Token);
+        }
+        while (line is not null);
+        Assert.Null(line);
+    }
+
+    [Fact]
     public async Task An_event_written_outside_the_apps_own_connection_still_reaches_the_stream_and_the_list()
     {
         // A raw insert on its own connection, like `weir recover` or a restored backup: nobody calls
@@ -347,6 +370,37 @@ public sealed class ActivityApiTests
                 "event: activity.latest\ndata: {\"latest_event_id\":11,\"activity_revision\":3}\n\n",
             ],
             frames);
+    }
+
+    [Theory]
+    [InlineData(10L, 10L)]
+    [InlineData(null, 0L)]
+    public async Task A_change_no_activity_row_records_still_reaches_the_stream(long? newestEventId, long expectedFrameId)
+    {
+        var notifier = new ActivityLatestNotifier();
+        var frames = new List<string>();
+        // The retry hint, the opening frame when there is an event to name, then the frame the change sends.
+        var framesInAll = newestEventId is null ? 2 : 3;
+
+        await foreach (var frame in ActivityEndpoints.LatestFramesAsync(
+            _ =>
+            {
+                // A change landing while the stream opens still reaches it.
+                notifier.NotifyChanged();
+                return Task.FromResult(newestEventId);
+            },
+            notifier, TimeProvider.System, TimeSpan.FromMinutes(1), NullLogger.Instance, CancellationToken.None))
+        {
+            frames.Add(frame);
+            if (frames.Count == framesInAll)
+            {
+                break;
+            }
+        }
+
+        Assert.Equal(
+            $"event: activity.latest\ndata: {{\"latest_event_id\":{expectedFrameId},\"activity_revision\":1}}\n\n",
+            frames.Last());
     }
 
     [Fact]
@@ -453,10 +507,11 @@ public sealed class ActivityApiTests
         var dataA = JsonNode.Parse(blockA[1]["data: ".Length..])!;
         Assert.Equal("Film/Film.mkv", dataA["files"]![0]!["relative_path"]!.GetValue<string>());
         Assert.Equal(42.0, dataA["files"]![0]!["percent"]!.GetValue<double>());
+        Assert.Equal("writing", dataA["files"]![0]!["stage"]!.GetValue<string>());
         Assert.Equal(blockA[1], blockB[1]);
     }
 
-    private static LiveProgress Progress(double percent) => new(percent, "Weir is writing the cleaned-up file.", 30.0, "processing", "120x", 5.0, [], []);
+    private static LiveProgress Progress(double percent) => new(percent, "Weir is writing the cleaned-up file.", 30.0, "processing", "120x", 5.0, [], [], "writing");
 
     private static async Task<StreamReader> OpenStreamAsync(WeirTestServer server, ApiTestClient client)
     {

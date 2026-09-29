@@ -30,7 +30,9 @@ internal static class ProcessingLibraryMapping
     {
         var managerIds = await libraries.ManagerConnectionIdsAsync(uow, row.Id).ConfigureAwait(false);
         var activeJobs = await libraries.ActiveJobCountAsync(uow, row).ConfigureAwait(false);
-        var periodicScan = await PeriodicScanStatusAsync(request, uow, row, operatorSettings, suiteSettings, looks).ConfigureAwait(false);
+        var performance = await operatorSettings.EnsureAsync(uow).ConfigureAwait(false);
+        var intake = IntakeLimits.Resolve(row, performance);
+        var periodicScan = await PeriodicScanStatusAsync(request, uow, row, performance, suiteSettings, looks).ConfigureAwait(false);
 
         // manager_coverage: the linked connections' last saved connection-test result (no live call — a
         // listing must not depend on every linked manager answering right now).
@@ -80,10 +82,13 @@ internal static class ProcessingLibraryMapping
             .Set("exclude_markers_csv", row.ExcludeMarkersCsv)
             .Set("include_patterns_csv", row.IncludePatternsCsv)
             .Set("exclude_patterns_csv", row.ExcludePatternsCsv)
+            // Null is "uses the Performance setting"; the effective_ pair is what the library is held to right now.
             .Set("min_file_size_mb", row.MinFileSizeMb)
+            .Set("effective_min_file_size_mb", intake.MinFileSizeMb)
             .Set("max_file_size_mb", row.MaxFileSizeMb)
             .Set("rejected_file_action", row.RejectedFileAction.Length > 0 ? row.RejectedFileAction : "leave")
             .Set("min_file_age_seconds", row.MinFileAgeSeconds)
+            .Set("effective_min_file_age_seconds", intake.MinFileAgeSeconds)
             .Set("created_after", row.CreatedAfter?.ToWireText())
             .Set("created_before", row.CreatedBefore?.ToWireText())
             .Set("modified_after", row.ModifiedAfter?.ToWireText())
@@ -137,9 +142,8 @@ internal static class ProcessingLibraryMapping
     /// <summary>Resolves <see cref="PeriodicScanStatus"/> for one library from the same switches and schedule window
     /// the periodic scan-dispatch scheduler and the worker's upkeep admission read.</summary>
     private static async Task<PeriodicScanStatus> PeriodicScanStatusAsync(
-        ApiRequest request, UnitOfWork uow, ProcessingLibraryRecord row, OperatorSettingsStore operatorSettingsStore, SuiteSettingsStore suiteSettingsStore, ScanWakeups? looks)
+        ApiRequest request, UnitOfWork uow, ProcessingLibraryRecord row, ProcessingOperatorSettingsRecord operatorSettings, SuiteSettingsStore suiteSettingsStore, ScanWakeups? looks)
     {
-        var operatorSettings = await operatorSettingsStore.EnsureAsync(uow).ConfigureAwait(false);
         var suite = await suiteSettingsStore.EnsureAsync(uow).ConfigureAwait(false);
         var timezoneName = string.IsNullOrWhiteSpace(suite.AppTimezone) ? "UTC" : suite.AppTimezone.Trim();
         var now = request.Time.GetUtcNow();
@@ -165,10 +169,11 @@ internal static class ProcessingLibraryMapping
         var excludeMarkersCsv = model.OptionalStr("exclude_markers_csv", defaultValue: "", maxLength: 1000) ?? "";
         var includePatternsCsv = model.OptionalStr("include_patterns_csv", defaultValue: "", maxLength: 1000) ?? "";
         var excludePatternsCsv = model.OptionalStr("exclude_patterns_csv", defaultValue: "", maxLength: 1000) ?? "";
-        var minFileSizeMb = model.Number("min_file_size_mb", 0, required: false, ge: 0, le: 1_000_000);
+        // Left out or null, a library follows Settings › Performance for its minimum size and wait.
+        var minFileSizeMb = model.OptionalInt("min_file_size_mb", ge: 0, le: 1_000_000);
         var maxFileSizeMb = model.Number("max_file_size_mb", 0, required: false, ge: 0, le: 1_000_000);
         var rejectedFileAction = model.Literal("rejected_file_action", [.. RejectedFileActions.All], defaultValue: RejectedFileActions.Leave);
-        var minFileAgeSeconds = model.Number("min_file_age_seconds", 60, required: false, ge: 0, le: 604800);
+        var minFileAgeSeconds = model.OptionalInt("min_file_age_seconds", ge: 0, le: 604800);
         var createdAfter = model.OptionalDateTime("created_after");
         var createdBefore = model.OptionalDateTime("created_before");
         var modifiedAfter = model.OptionalDateTime("modified_after");
@@ -320,7 +325,7 @@ internal static class ProcessingLibraryMapping
         if (!support.Available)
         {
             await uow.RollbackAsync().ConfigureAwait(false);
-            throw new ApiException(StatusCodes.Status400BadRequest, $"This library cannot use Reject yet. {support.Reason}");
+            throw new ApiException(StatusCodes.Status400BadRequest, $"This workflow cannot use Reject yet. {support.Reason}");
         }
     }
 }

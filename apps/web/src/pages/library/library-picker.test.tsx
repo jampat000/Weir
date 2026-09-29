@@ -68,14 +68,14 @@ describe("LibraryPicker", () => {
     expect(document.activeElement).toBe(trigger);
   });
 
-  it("finds a library by name once there are enough to search", () => {
+  it("finds a workflow by name once there are enough to search", () => {
     const many = Array.from({ length: 8 }, (_, i) =>
       library(i + 1, `Lib ${i + 1}`),
     );
     render(<LibraryPicker libraries={many} chosenId={1} onPick={vi.fn()} />);
 
     fireEvent.click(screen.getByRole("button", { name: /Lib 1$/ }));
-    fireEvent.change(screen.getByPlaceholderText("Find a library"), {
+    fireEvent.change(screen.getByPlaceholderText("Find a workflow"), {
       target: { value: "Lib 3" },
     });
 

@@ -152,7 +152,7 @@ public static class FileStory
 
         if (where.Length > 0)
         {
-            sentence += $" in the {where} library";
+            sentence += $" in the {where} workflow";
         }
 
         return new StoryStep("Picked up", $"{sentence}.");

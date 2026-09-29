@@ -45,6 +45,41 @@ def test_a_manager_with_no_columns_of_its_own_can_be_added(operator: WeirClient)
     assert sorted(lane["lane"] for lane in row["lanes"]) == ["missing", "upgrade"]
 
 
+def test_deluno_can_create_its_connection_with_the_body_it_sends(operator: WeirClient) -> None:
+    """Deluno sends a name when it wires itself up. Weir accepts it and names the connection itself."""
+
+    response = operator.post_csrf(
+        f"{API}/media-managers/connections",
+        {
+            "kind": "deluno",
+            "name": "Deluno",
+            "base_url": "http://192.0.2.10:5099",
+            "api_key": "deluno_secret_key",
+            "enabled": True,
+        },
+    )
+
+    assert response.status_code == 201, response.text
+    assert response.json()["name"] == "Deluno on 192.0.2.10"
+
+
+def test_a_connection_is_named_after_its_kind_and_the_host_in_its_address(operator: WeirClient) -> None:
+    _, on_a_name = _create(operator, kind="radarr", name="Anything", base_url="http://nas:7878")
+    _, on_an_address = _create(operator, kind="sonarr", name="Anything", base_url="http://10.1.1.51:8989")
+
+    assert on_a_name["name"] == "Radarr on nas"
+    assert on_an_address["name"] == "Sonarr on 10.1.1.51"
+
+
+def test_connections_of_one_kind_on_one_host_are_told_apart_by_port(operator: WeirClient) -> None:
+    _create(operator, kind="radarr", base_url="http://nas:7878")
+    _create(operator, kind="radarr", base_url="http://nas:7879")
+
+    listed = operator.get(f"{API}/media-managers/connections").json()
+
+    assert [row["name"] for row in listed] == ["Radarr on nas (7878)", "Radarr on nas (7879)"]
+
+
 def test_the_api_key_is_never_returned_only_whether_it_is_saved(operator: WeirClient) -> None:
     _, row = _create(operator)
     assert row["api_key_is_saved"] is True
@@ -64,13 +99,6 @@ def test_an_unknown_kind_is_refused(operator: WeirClient) -> None:
     assert code in (400, 422)
 
 
-def test_duplicate_names_are_refused(operator: WeirClient) -> None:
-    assert _create(operator, name="Same")[0] == 201
-    code, body = _create(operator, name="Same", kind="radarr")
-    assert code == 400
-    assert "already exists" in body["detail"]
-
-
 def test_an_address_that_cannot_work_is_refused(operator: WeirClient) -> None:
     code, body = _create(operator, base_url="not-a-url")
     assert code == 400
@@ -79,9 +107,24 @@ def test_an_address_that_cannot_work_is_refused(operator: WeirClient) -> None:
 
 def test_omitting_the_api_key_on_update_leaves_it_alone(operator: WeirClient) -> None:
     _, row = _create(operator)
-    updated = operator.put_csrf(f"{API}/media-managers/connections/{row['id']}", {"name": "Deluno renamed"}).json()
-    assert updated["name"] == "Deluno renamed"
+    updated = operator.put_csrf(f"{API}/media-managers/connections/{row['id']}", {"enabled": False}).json()
+    assert updated["enabled"] is False
     assert updated["api_key_is_saved"] is True
+
+
+def test_a_name_sent_on_update_is_ignored(operator: WeirClient) -> None:
+    _, row = _create(operator)
+    updated = operator.put_csrf(f"{API}/media-managers/connections/{row['id']}", {"name": "Deluno renamed"})
+    assert updated.status_code == 200, updated.text
+    assert updated.json()["name"] == "Deluno on 192.0.2.10"
+
+
+def test_moving_a_connection_to_another_host_renames_it(operator: WeirClient) -> None:
+    _, row = _create(operator)
+    updated = operator.put_csrf(
+        f"{API}/media-managers/connections/{row['id']}", {"base_url": "http://192.0.2.11:5099"}
+    ).json()
+    assert updated["name"] == "Deluno on 192.0.2.11"
 
 
 def test_an_empty_api_key_on_update_clears_it(operator: WeirClient) -> None:

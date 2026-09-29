@@ -82,7 +82,7 @@ public sealed class ProcessingWatchedFolderScanDispatchManagerQueueSignalTests
         var mkv = Path.Combine(watched, "Held By Radarr 2001.mkv");
         File.WriteAllBytes(mkv, [1]);
 
-        var connectionId = await store.WithUnitOfWork(uow => connections.CreateAsync(uow, "radarr", "Main", "http://radarr.local", "key"));
+        var connectionId = await store.WithUnitOfWork(uow => connections.CreateAsync(uow, "radarr", "http://radarr.local", "key"));
         var outputPathJson = mkv.Replace("\\", "\\\\", StringComparison.Ordinal);
         RouteQueue(http, "[{\"status\":\"downloading\",\"outputPath\":\"" + outputPathJson + "\",\"movie\":{\"title\":\"Held By Radarr\",\"year\":2001}}]");
 
@@ -96,8 +96,8 @@ public sealed class ProcessingWatchedFolderScanDispatchManagerQueueSignalTests
         var file = await Files.FindAsync(uow, libraryId, "Held By Radarr 2001.mkv");
         Assert.NotNull(file);
         Assert.Equal(ProcessingFileStatuses.BlockedUpstream, file!.Status);
-        Assert.Equal("Radarr (Main)", file.BlockedByConnection);
-        Assert.Contains("Radarr (Main) is still importing this file", file.StatusReason, StringComparison.Ordinal);
+        Assert.Equal("Radarr on radarr.local", file.BlockedByConnection);
+        Assert.Contains("Radarr on radarr.local is still importing this file", file.StatusReason, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -111,7 +111,7 @@ public sealed class ProcessingWatchedFolderScanDispatchManagerQueueSignalTests
         Directory.CreateDirectory(output);
         File.WriteAllBytes(Path.Combine(watched, "Clear 2002.mkv"), [1]);
 
-        var connectionId = await store.WithUnitOfWork(uow => connections.CreateAsync(uow, "radarr", "Main", "http://radarr.local", "key"));
+        var connectionId = await store.WithUnitOfWork(uow => connections.CreateAsync(uow, "radarr", "http://radarr.local", "key"));
         RouteQueue(http, "[]");
 
         var libraryId = await CreateLibraryAsync(store, watched, output, [connectionId]);
@@ -132,7 +132,7 @@ public sealed class ProcessingWatchedFolderScanDispatchManagerQueueSignalTests
         Directory.CreateDirectory(output);
         File.WriteAllBytes(Path.Combine(watched, "Unrelated 2003.mkv"), [1]);
 
-        var connectionId = await store.WithUnitOfWork(uow => connections.CreateAsync(uow, "radarr", "Main", "http://radarr.local", "key"));
+        var connectionId = await store.WithUnitOfWork(uow => connections.CreateAsync(uow, "radarr", "http://radarr.local", "key"));
         RouteQueue(http, """[{"status":"downloading","outputPath":"D:\\Other\\Somewhere Else 1999.mkv","movie":{"title":"Somewhere Else","year":1999}}]""");
 
         var libraryId = await CreateLibraryAsync(store, watched, output, [connectionId]);

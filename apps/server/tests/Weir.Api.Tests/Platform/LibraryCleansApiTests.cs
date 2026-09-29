@@ -56,7 +56,7 @@ public sealed class LibraryCleansApiTests
         await using var server = await ApiTestClient.StartServerAsync();
         var (client, libraryId) = await SignInWithALibraryAsync(server);
         await SeedEventAsync(server, "processing.file_remux_pass_completed", libraryId, "Heat/heat.mkv", "Finished.", "2026-09-21 10:00:00");
-        await SeedEventAsync(server, "library.file_skipped", libraryId, "/films/Up.mkv", "This file already matches the library's rules; nothing to clean.", "2026-09-21 11:00:00");
+        await SeedEventAsync(server, "library.file_skipped", libraryId, "/films/Up.mkv", "This file already matches the workflow's rules; nothing to clean.", "2026-09-21 11:00:00");
 
         var clean = Assert.Single(await CleansAsync(client));
 

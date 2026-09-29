@@ -160,7 +160,7 @@ public sealed partial class LibraryStore
         }
 
         await InsertAsync(uow, row).ConfigureAwait(false);
-        var created = await GetByNameAsync(uow, name).ConfigureAwait(false) ?? throw new InvalidOperationException("Library insert race.");
+        var created = await GetByNameAsync(uow, name).ConfigureAwait(false) ?? throw new InvalidOperationException("Workflow insert race.");
         await SetManagerLinksAsync(uow, created.Id, body.ManagerConnectionIds).ConfigureAwait(false);
         return created;
     }
@@ -177,7 +177,7 @@ public sealed partial class LibraryStore
         LibraryRules.ValidateFolders(row.WatchedFolder, row.WorkFolder, row.OutputFolder, others, weirHome);
 
         await UpdateRowAsync(uow, row).ConfigureAwait(false);
-        var updated = await GetAsync(uow, existing.Id).ConfigureAwait(false) ?? throw new InvalidOperationException("Library disappeared during update.");
+        var updated = await GetAsync(uow, existing.Id).ConfigureAwait(false) ?? throw new InvalidOperationException("Workflow disappeared during update.");
         await SetManagerLinksAsync(uow, updated.Id, body.ManagerConnectionIds).ConfigureAwait(false);
         return updated;
     }
@@ -201,7 +201,7 @@ public sealed partial class LibraryStore
 
         await InsertAsync(uow, row).ConfigureAwait(false);
         var created = await GetByNameAsync(uow, row.Name).ConfigureAwait(false)
-            ?? throw new InvalidOperationException("Discovered library insert race.");
+            ?? throw new InvalidOperationException("Discovered workflow insert race.");
         if (row.DiscoveredFromConnectionId is { } connectionId)
         {
             await SetManagerLinksAsync(uow, created.Id, [connectionId]).ConfigureAwait(false);
@@ -218,7 +218,7 @@ public sealed partial class LibraryStore
             "updated_at = CURRENT_TIMESTAMP WHERE id = @id",
             ("@id", row.Id)).ConfigureAwait(false);
         return await GetAsync(uow, row.Id).ConfigureAwait(false)
-            ?? throw new InvalidOperationException("Library disappeared during unlink.");
+            ?? throw new InvalidOperationException("Workflow disappeared during unlink.");
     }
 
     public async Task DeleteAsync(UnitOfWork uow, ProcessingLibraryRecord row)
@@ -228,7 +228,7 @@ public sealed partial class LibraryStore
         {
             throw new ProcessingLibraryException(
                 $"{row.Name} still has {active} job{(active == 1 ? string.Empty : "s")} queued or running. " +
-                "Wait for them to finish, or cancel them, before removing the library — they resolve their folders from it.");
+                "Wait for them to finish, or cancel them, before removing the workflow — they resolve their folders from it.");
         }
 
         await uow.ExecuteAsync("DELETE FROM libraries WHERE id = @id", ("@id", row.Id)).ConfigureAwait(false);
@@ -240,12 +240,12 @@ public sealed partial class LibraryStore
         var unknown = orderedIds.Where(id => !rows.ContainsKey(id)).ToList();
         if (unknown.Count > 0)
         {
-            throw new ProcessingLibraryException($"No library with id {unknown[0]}.");
+            throw new ProcessingLibraryException($"No workflow with id {unknown[0]}.");
         }
 
         if (orderedIds.Distinct().Count() != rows.Count)
         {
-            throw new ProcessingLibraryException("Reordering must list every library exactly once.");
+            throw new ProcessingLibraryException("Reordering must list every workflow exactly once.");
         }
 
         for (var position = 0; position < orderedIds.Count; position++)
@@ -278,7 +278,8 @@ public sealed partial class LibraryStore
         }
     }
 
-    private async Task<List<OtherLibraryFolders>> OtherFoldersAsync(UnitOfWork uow, long? excludeId)
+    /// <summary>The watched and output folders of every library but <paramref name="excludeId"/>, for the overlap check.</summary>
+    public async Task<List<OtherLibraryFolders>> OtherFoldersAsync(UnitOfWork uow, long? excludeId)
     {
         var rows = await ListAsync(uow).ConfigureAwait(false);
         return [.. rows.Where(r => r.Id != excludeId).Select(r => new OtherLibraryFolders(r.Id, r.Name, r.WatchedFolder, r.OutputFolder))];

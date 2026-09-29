@@ -163,16 +163,16 @@ public sealed class MediaManagerConnectionStore
             ReadConnection);
     }
 
-    public async Task<bool> NameExistsAsync(UnitOfWork uow, string name, long? exceptId = null)
-    {
-        ArgumentNullException.ThrowIfNull(uow);
-        var id = await uow.ScalarAsync("SELECT id FROM media_manager_connections WHERE name = $name LIMIT 1", ("$name", name)).ConfigureAwait(false);
-        return id is not null and not DBNull && (exceptId is null || Convert.ToInt64(id, System.Globalization.CultureInfo.InvariantCulture) != exceptId);
-    }
+    /// <summary>
+    /// Give every connection the name derived from its kind and address (<see cref="ConnectionNaming"/>). Every write
+    /// that can change a derived name does this itself; startup calls it to bring names stored before they were derived in line.
+    /// </summary>
+    public Task RefreshNamesAsync(UnitOfWork uow) =>
+        ConnectionNameColumn.RefreshAsync(uow, "media_manager_connections", MediaManagerKinds.ProductLabel);
 
     /// <summary>Insert a connection and its two default lanes; returns the new id.</summary>
     public async Task<long> InsertAsync(
-        UnitOfWork uow, string kind, string name, bool enabled, string baseUrl, string? apiKeyCiphertext, bool downloadedScanEnabled = false)
+        UnitOfWork uow, string kind, bool enabled, string baseUrl, string? apiKeyCiphertext, bool downloadedScanEnabled = false)
     {
         ArgumentNullException.ThrowIfNull(uow);
         var id = Convert.ToInt64(
@@ -181,7 +181,7 @@ public sealed class MediaManagerConnectionStore
                 "last_connection_test_ok, last_connection_test_at, last_connection_test_detail, downloaded_scan_enabled) " +
                 "VALUES ($kind, $name, $enabled, $base_url, $key, NULL, NULL, NULL, NULL, $scan) RETURNING id",
                 ("$kind", kind),
-                ("$name", name),
+                ("$name", ConnectionNameColumn.NewPlaceholder()),
                 ("$enabled", enabled ? 1 : 0),
                 ("$base_url", baseUrl),
                 ("$key", apiKeyCiphertext),
@@ -195,6 +195,7 @@ public sealed class MediaManagerConnectionStore
                 ("$lane", lane)).ConfigureAwait(false);
         }
 
+        await RefreshNamesAsync(uow).ConfigureAwait(false);
         return id;
     }
 
@@ -213,6 +214,10 @@ public sealed class MediaManagerConnectionStore
         await uow.ExecuteAsync(
             $"UPDATE media_manager_connections SET {string.Join(", ", sets)}, updated_at = CURRENT_TIMESTAMP WHERE id = $id",
             parameters).ConfigureAwait(false);
+        if (changes.Any(change => change.Column == "base_url"))
+        {
+            await RefreshNamesAsync(uow).ConfigureAwait(false);
+        }
     }
 
     /// <summary>Delete the lanes first, then the connection, so no lane is left without its connection.</summary>
@@ -221,6 +226,7 @@ public sealed class MediaManagerConnectionStore
         ArgumentNullException.ThrowIfNull(uow);
         await uow.ExecuteAsync("DELETE FROM media_manager_search_lanes WHERE connection_id = $id", ("$id", connectionId)).ConfigureAwait(false);
         await uow.ExecuteAsync("DELETE FROM media_manager_connections WHERE id = $id", ("$id", connectionId)).ConfigureAwait(false);
+        await RefreshNamesAsync(uow).ConfigureAwait(false);
     }
 
     /// <summary>The conditional test-result write: 0 when the connection was removed meanwhile.</summary>

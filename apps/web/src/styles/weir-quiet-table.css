@@ -157,3 +157,9 @@
     position: sticky;
   }
 }
+
+/* The kind of a workflow: linked to a media manager, or Weir only. */
+.mm-workflow-badge--linked {
+  border-color: var(--mm-accent-bright);
+  color: var(--mm-accent-bright);
+}

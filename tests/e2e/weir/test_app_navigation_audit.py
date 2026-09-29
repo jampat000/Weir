@@ -18,7 +18,7 @@ pytestmark = [
 
 # Settings tab -> what it shows. Settings is about your media; Weir itself is System.
 SETTINGS_TABS = (
-    ("Libraries", "processing-libraries-section"),
+    ("Workflows", "processing-libraries-section"),
     ("Rules", "processing-rule-set-workspace"),
     ("Media managers", "suite-settings-media-managers"),
     ("Performance", "processing-direct-play-section"),

@@ -38,7 +38,14 @@ if (args.Contains("--healthcheck"))
 WebApplication app;
 try
 {
-    app = WeirServer.Build(args, WeirServer.CurrentRuntime());
+    app = WeirServer.Build(args, WeirServer.CurrentRuntime(), builder =>
+    {
+        // The Windows tray stops the server through this event (#833). Elsewhere the platform's own signals do it.
+        if (OperatingSystem.IsWindows())
+        {
+            builder.Services.AddStopRequestListener(StopRequest.EventName(Environment.ProcessId));
+        }
+    });
 }
 catch (Exception exception) when (exception is WeirConfigurationException or DatabaseSchemaMismatchException)
 {

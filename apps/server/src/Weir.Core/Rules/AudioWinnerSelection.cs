@@ -3,7 +3,7 @@ namespace Weir.Core.Rules;
 /// <summary>Picks a single overall winning audio track under the three audio-preference policies (issue #497's <c>audio_keep_mode: single</c>, the default).</summary>
 public static partial class RemuxRules
 {
-    private static List<string> OrderedPreferenceLangs(ProcessingRulesConfig config)
+    internal static List<string> OrderedPreferenceLangs(ProcessingRulesConfig config)
     {
         var result = new List<string>();
         foreach (var raw in new[] { config.PrimaryAudioLang, config.SecondaryAudioLang, config.TertiaryAudioLang })

@@ -11,7 +11,6 @@ public sealed record LibraryAdmissionRules(
     long MinFileSizeMb,
     long MaxFileSizeMb,
     string RejectedFileAction,
-    long MinFileAgeSeconds,
     DateTimeOffset? CreatedAfter,
     DateTimeOffset? CreatedBefore,
     DateTimeOffset? ModifiedAfter,
@@ -24,8 +23,8 @@ public sealed record LibraryAdmissionRules(
             ? []
             : [.. csv.Split(',').Select(v => v.Trim()).Where(v => v.Length > 0)];
 
-    /// <summary>Read the rules off a library row, clamping sizes and ages to zero or more.</summary>
-    public static LibraryAdmissionRules For(ProcessingLibraryRecord library)
+    /// <summary>Read the rules off a library row; the minimum size is the one <paramref name="limits"/> resolved for it.</summary>
+    public static LibraryAdmissionRules For(ProcessingLibraryRecord library, IntakeLimits limits)
     {
         ArgumentNullException.ThrowIfNull(library);
         return new LibraryAdmissionRules(
@@ -33,10 +32,9 @@ public sealed record LibraryAdmissionRules(
             ExcludeMarkers: CsvValues(library.ExcludeMarkersCsv).Select(v => v.ToLowerInvariant()).ToHashSet(StringComparer.Ordinal),
             IncludePatterns: CsvValues(library.IncludePatternsCsv),
             ExcludePatterns: CsvValues(library.ExcludePatternsCsv),
-            MinFileSizeMb: Math.Max(0, library.MinFileSizeMb),
+            MinFileSizeMb: limits.MinFileSizeMb,
             MaxFileSizeMb: Math.Max(0, library.MaxFileSizeMb),
             RejectedFileAction: string.Equals((library.RejectedFileAction ?? string.Empty).Trim(), "delete_file", StringComparison.OrdinalIgnoreCase) ? "delete_file" : "leave",
-            MinFileAgeSeconds: Math.Max(0, library.MinFileAgeSeconds),
             CreatedAfter: library.CreatedAfter?.AsUtc,
             CreatedBefore: library.CreatedBefore?.AsUtc,
             ModifiedAfter: library.ModifiedAfter?.AsUtc,
@@ -68,14 +66,14 @@ public static class LibraryAdmission
         if (rules.MinFileSizeMb > 0 && facts.SizeBytes < rules.MinFileSizeMb * 1024 * 1024)
         {
             return new LibraryAdmissionRejection(
-                $"Skipped because this file is {sizeMb.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)} MB and the {rules.MinFileSizeMb} MB library minimum is not met.",
+                $"Skipped because this file is {sizeMb.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)} MB, under the {rules.MinFileSizeMb} MB minimum.",
                 "skipped_below_minimum_file_size");
         }
 
         if (rules.MaxFileSizeMb > 0 && facts.SizeBytes > rules.MaxFileSizeMb * 1024 * 1024)
         {
             return new LibraryAdmissionRejection(
-                $"Skipped because this file is {sizeMb.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)} MB and exceeds the {rules.MaxFileSizeMb} MB library maximum.",
+                $"Skipped because this file is {sizeMb.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)} MB and exceeds the {rules.MaxFileSizeMb} MB workflow maximum.",
                 "skipped_above_maximum_file_size");
         }
 
@@ -84,14 +82,14 @@ public static class LibraryAdmission
             if (rules.CreatedAfter is { } createdAfter && createdAt < createdAfter)
             {
                 return new LibraryAdmissionRejection(
-                    $"Skipped because its filesystem creation time ({Timestamp.FromDateTimeOffset(createdAt).IsoFormat()}) is before this library's allowed window.",
+                    $"Skipped because its filesystem creation time ({Timestamp.FromDateTimeOffset(createdAt).IsoFormat()}) is before this workflow's allowed window.",
                     "skipped_before_created_window");
             }
 
             if (rules.CreatedBefore is { } createdBefore && createdAt >= createdBefore)
             {
                 return new LibraryAdmissionRejection(
-                    $"Skipped because its filesystem creation time ({Timestamp.FromDateTimeOffset(createdAt).IsoFormat()}) is after this library's allowed window.",
+                    $"Skipped because its filesystem creation time ({Timestamp.FromDateTimeOffset(createdAt).IsoFormat()}) is after this workflow's allowed window.",
                     "skipped_after_created_window");
             }
         }
@@ -101,14 +99,14 @@ public static class LibraryAdmission
             if (rules.ModifiedAfter is { } modifiedAfter && modifiedAt < modifiedAfter)
             {
                 return new LibraryAdmissionRejection(
-                    $"Skipped because its last-modified time ({Timestamp.FromDateTimeOffset(modifiedAt).IsoFormat()}) is before this library's allowed window.",
+                    $"Skipped because its last-modified time ({Timestamp.FromDateTimeOffset(modifiedAt).IsoFormat()}) is before this workflow's allowed window.",
                     "skipped_before_modified_window");
             }
 
             if (rules.ModifiedBefore is { } modifiedBefore && modifiedAt >= modifiedBefore)
             {
                 return new LibraryAdmissionRejection(
-                    $"Skipped because its last-modified time ({Timestamp.FromDateTimeOffset(modifiedAt).IsoFormat()}) is after this library's allowed window.",
+                    $"Skipped because its last-modified time ({Timestamp.FromDateTimeOffset(modifiedAt).IsoFormat()}) is after this workflow's allowed window.",
                     "skipped_after_modified_window");
             }
         }
@@ -117,13 +115,13 @@ public static class LibraryAdmission
         var includes = rules.IncludePatterns.Select(p => p.Trim().ToLowerInvariant()).Where(p => p.Length > 0).ToList();
         if (includes.Count > 0 && !pathValues.Any(value => includes.Any(pattern => FnMatch(value, pattern))))
         {
-            return new LibraryAdmissionRejection("Skipped because its path does not match this library's include patterns.", "skipped_by_include_pattern");
+            return new LibraryAdmissionRejection("Skipped because its path does not match this workflow's include patterns.", "skipped_by_include_pattern");
         }
 
         var excludes = rules.ExcludePatterns.Select(p => p.Trim().ToLowerInvariant()).Where(p => p.Length > 0).ToList();
         if (pathValues.Any(value => excludes.Any(pattern => FnMatch(value, pattern))))
         {
-            return new LibraryAdmissionRejection("Skipped because its path matches this library's exclude patterns.", "skipped_by_exclude_pattern");
+            return new LibraryAdmissionRejection("Skipped because its path matches this workflow's exclude patterns.", "skipped_by_exclude_pattern");
         }
 
         return null;

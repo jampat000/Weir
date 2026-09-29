@@ -49,7 +49,7 @@ it("asks the library to save first when it has no id yet", () => {
   );
 
   expect(
-    screen.getByText("Save this library first to check its folder chain."),
+    screen.getByText("Save this workflow first to check its folder chain."),
   ).toBeInTheDocument();
 });
 
@@ -135,7 +135,7 @@ it("surfaces a bare download client's own lines and readiness", async () => {
           lines: [
             {
               state: "problem",
-              text: "None of SABnzbd's folders match this library's watched folder /media/in.",
+              text: "None of SABnzbd's folders match this workflow's watched folder /media/in.",
             },
           ],
         },
@@ -158,9 +158,48 @@ it("surfaces a bare download client's own lines and readiness", async () => {
   expect(within(block).getByText("Needs attention")).toBeInTheDocument();
   expect(
     within(block).getByText(
-      "None of SABnzbd's folders match this library's watched folder /media/in.",
+      "None of SABnzbd's folders match this workflow's watched folder /media/in.",
     ),
   ).toBeInTheDocument();
+});
+
+it("does not show a green Ready for a manager whose folders Weir could only read as a declaration", async () => {
+  vi.spyOn(chainApi, "fetchLibraryFolderChain").mockResolvedValue(
+    chain({
+      managers: [
+        {
+          connection_id: 4,
+          kind: "deluno",
+          name: "Deluno",
+          label: "Deluno",
+          flow: "handoff",
+          ready: true,
+          mapping: null,
+          lines: [
+            {
+              state: "unverified",
+              text: "Deluno says its Movies library downloads to /media/in (inside Weir's watched folder). Weir can't see where each download client really saves.",
+            },
+          ],
+        },
+      ],
+    }),
+  );
+
+  render(
+    <LibraryFolderChain
+      libraryId={12}
+      watchedFolder="/media/in"
+      workFolder=""
+      outputFolder="/media/out"
+      mediaType="movie"
+    />,
+    { wrapper },
+  );
+
+  const block = await screen.findByRole("region", { name: "Deluno" });
+  expect(within(block).getByText("Not verified")).toBeInTheDocument();
+  expect(within(block).queryByText("Ready")).not.toBeInTheDocument();
 });
 
 it("says when it could not check just now", async () => {
@@ -181,7 +220,7 @@ it("says when it could not check just now", async () => {
 
   expect(
     await screen.findByText(
-      /Weir could not check this library's folder chain just now/,
+      /Weir could not check this workflow's folder chain just now/,
     ),
   ).toBeInTheDocument();
 });
