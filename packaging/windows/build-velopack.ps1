@@ -18,6 +18,9 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+# Windows PowerShell 5.1 redraws Invoke-WebRequest's progress bar for every chunk it receives, which
+# makes a download many times slower than the transfer itself; nothing reads that progress here.
+$ProgressPreference = "SilentlyContinue"
 
 # Builds the Weir Windows package (Velopack): the web app, the .NET server
 # (apps/server/src/Weir.Host, self-contained single-file win-x64), the tray app (apps/tray/Weir.Tray)

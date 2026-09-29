@@ -7,7 +7,7 @@ title: Versions and updates
 
 ## Version numbers
 
-Weir versions have three numbers, major.minor.patch, for example `3.2.11`. Each release is tagged
+Weir versions have three numbers, major.minor.patch, for example `3.2.0`. Each release is tagged
 `vX.Y.Z` on GitHub. The Windows installer and the Docker image of a release always carry the same
 version.
 
@@ -54,8 +54,10 @@ Each release is also published under its version number. To stay on one release 
 to move, pin it:
 
 ```yaml
-image: ghcr.io/jampat000/weir:3.2.11
+image: ghcr.io/jampat000/weir:X.Y.Z
 ```
+
+Replace `X.Y.Z` with a version from [the releases page](https://github.com/jampat000/Weir/releases).
 
 To update, change the number to the new version and run the two commands above. Images are
 published for linux/amd64 and linux/arm64.

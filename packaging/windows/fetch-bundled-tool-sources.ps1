@@ -2,14 +2,16 @@ param(
   [Parameter(Mandatory)]
   [string]$OutputDir,
 
-  # Ignored by version control and reused between builds, the same as the FFmpeg/MKVToolNix binary
-  # vendor folders in build-velopack-vendored-media-tools.ps1: release.yml caches this directory
-  # (actions/cache, keyed on a hash of that file, so a pin bump always invalidates it), so a release
-  # only ever downloads these three archives once per pin, not once per release.
+  # Ignored by version control and reused between local builds, the same as the FFmpeg/MKVToolNix
+  # binary vendor folders in build-velopack-vendored-media-tools.ps1. A release downloads the three
+  # archives fresh: its caches are scoped to its own tag, so no other release could ever reuse them.
   [string]$CacheDir = ""
 )
 
 $ErrorActionPreference = "Stop"
+# Windows PowerShell 5.1 redraws Invoke-WebRequest's progress bar for every chunk it receives, which
+# makes a download many times slower than the transfer itself; nothing reads that progress here.
+$ProgressPreference = "SilentlyContinue"
 
 # Resolved here, not as the param's own default: $PSScriptRoot is unset while a script-level param
 # block's default-value expressions are evaluated when the script also has a mandatory parameter (a
