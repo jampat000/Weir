@@ -7269,10 +7269,10 @@ export interface components {
     ManagerSetupLineOut: {
       /**
        * State
-       * @description ``ok``, ``problem`` (with its fix in the sentence) or ``note``.
+       * @description ``ok`` (Weir read it for itself), ``problem`` (with its fix in the sentence), ``note``, or ``unverified`` (Weir can only take someone's word for it).
        * @enum {string}
        */
-      state: "ok" | "problem" | "note";
+      state: "ok" | "problem" | "note" | "unverified";
       /**
        * Text
        * @description One plain sentence.
