@@ -18,11 +18,18 @@ export type WorkflowKind =
 
 const REMOVED_MANAGER = "a removed media manager";
 
+/** The one rule that tells the two kinds apart: a workflow is Weir only when no media manager is linked to it. */
+export function workflowKindName(
+  workflow: Pick<ProcessingLibrary, "manager_connection_ids">,
+): WorkflowKind["kind"] {
+  return workflow.manager_connection_ids.length === 0 ? "weir_only" : "linked";
+}
+
 export function workflowKindOf(
   workflow: Pick<ProcessingLibrary, "manager_connection_ids">,
   connections: MediaManagerConnection[],
 ): WorkflowKind {
-  if (workflow.manager_connection_ids.length === 0) {
+  if (workflowKindName(workflow) === "weir_only") {
     return { kind: "weir_only" };
   }
   return {

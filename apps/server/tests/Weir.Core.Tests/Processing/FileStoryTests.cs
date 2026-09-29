@@ -134,6 +134,28 @@ public sealed class FileStoryTests
     }
 
     [Fact]
+    public void A_file_of_a_linked_workflow_is_said_to_be_handed_back_for_the_media_manager_to_import()
+    {
+        var detail = new WireObject().Set("ok", true).Set("output_file", "/ready/movies/Film.mkv");
+
+        var handedBack = Assert.Single(FileStory.NarratePass(detail, "Movies", HandBackTarget.MediaManager), s => s.Heading == "Handed back");
+
+        Assert.Equal("The result was written to /ready/movies/Film.mkv for your media manager to import.", handedBack.Sentence);
+    }
+
+    [Fact]
+    public void A_file_of_a_workflow_with_no_media_manager_is_said_to_be_in_the_output_folder()
+    {
+        var detail = new WireObject().Set("ok", true).Set("output_file", "/ready/movies/Film.mkv");
+
+        var steps = FileStory.NarratePass(detail, "Movies", HandBackTarget.OutputFolder);
+
+        var cleaned = Assert.Single(steps, s => s.Heading == "Cleaned copy");
+        Assert.Equal("The cleaned copy is in the output folder, at /ready/movies/Film.mkv.", cleaned.Sentence);
+        Assert.DoesNotContain(steps, s => s.Sentence.Contains("media manager", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void An_unparseable_field_is_skipped_rather_than_throwing()
     {
         // narrate_pass never raises on a partial record: garbage in a numeric-looking field is ignored.

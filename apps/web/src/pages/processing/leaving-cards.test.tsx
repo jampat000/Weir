@@ -104,8 +104,13 @@ describe("outcomeFor", () => {
     expect(outcomeFor(undefined, "write")).toBeNull();
   });
 
-  it("gives nothing for a file that went back to waiting", () => {
-    expect(outcomeFor(file(1, "unprocessed"), "write")).toBeNull();
+  it("waits while the list still calls the file Waiting, as it does for a pass that has not reached it yet", () => {
+    expect(outcomeFor(file(1, "unprocessed"), "write")).toBe("waiting");
+    expect(outcomeFor(file(1, "out_of_schedule"), "write")).toBe("waiting");
+  });
+
+  it("gives nothing for a file that went on hold to try again later", () => {
+    expect(outcomeFor(file(1, "on_hold"), "write")).toBeNull();
   });
 });
 
@@ -164,6 +169,15 @@ describe("advance", () => {
     ]);
   });
 
+  it("shows the end of a pass that finished before the list stopped calling the file Waiting", () => {
+    const waiting = advance(before, [], [file(1, "unprocessed")], START + 500);
+    expect(endedCards(waiting)).toHaveLength(0);
+
+    const settled = advance(waiting, [], [file(1, "processed")], START + 900);
+
+    expect(endedCards(settled)).toMatchObject([{ outcome: { kind: "done" } }]);
+  });
+
   it("gives up on a list that never says what became of the file", () => {
     const waiting = advance(before, [], [file(1, "processing")], START + 500);
 
@@ -178,7 +192,7 @@ describe("advance", () => {
   });
 
   it("shows nothing for a file that went back to another lane", () => {
-    const state = advance(before, [], [file(1, "unprocessed")], START + 500);
+    const state = advance(before, [], [file(1, "on_hold")], START + 500);
 
     expect(endedCards(state)).toHaveLength(0);
     expect(state.departures).toHaveLength(0);

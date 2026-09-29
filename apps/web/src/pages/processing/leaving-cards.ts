@@ -70,7 +70,9 @@ function rejectedAt(step: FlowStepId): FlowStepId {
 
 /**
  * What became of a file that left the lanes: an outcome to show, `"waiting"` while the list still has it
- * mid-pass, or null when it went somewhere that is not an end (back to waiting, on hold for a while).
+ * mid-pass or still Waiting (a live progress frame can show a pass running before the list has heard of it, and
+ * a pass can end before the list hears of that), or null when it went somewhere that is not an end (on hold for a
+ * while).
  */
 export function outcomeFor(
   file: ProcessingFile | undefined,
@@ -79,6 +81,8 @@ export function outcomeFor(
   if (!file) return null;
   switch (file.status) {
     case "processing":
+    case "unprocessed":
+    case "out_of_schedule":
       return "waiting";
     case "processed":
     case "passed_through":

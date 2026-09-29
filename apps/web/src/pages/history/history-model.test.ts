@@ -158,7 +158,7 @@ describe("what became of the copy Weir handed back", () => {
       release_note:
         "Weir removed its copy from the hand-back folder, because Sonarr has the file now.",
     };
-    expect(handbackStory(handback, now)).toEqual({
+    expect(handbackStory(handback, now, "linked")).toEqual({
       heading: "Imported by Sonarr",
       sentence:
         "Sonarr imported it 6 min ago. It is in the library at /tv/Show/Season 01/Show - S01E01.mkv. Weir removed its copy from the hand-back folder, because Sonarr has the file now.",
@@ -177,17 +177,40 @@ describe("what became of the copy Weir handed back", () => {
           "Deluno will not import this file: The release is a sample. Weir kept its copy in the hand-back folder.",
       },
       now,
+      "linked",
     );
     expect(story?.heading).toBe("Deluno will not import it");
     expect(story?.tone).toBe("warn");
   });
 
   it("says Weir is still waiting when no media manager has said anything", () => {
-    expect(handbackStory(copy, now)?.sentence).toBe(
+    expect(handbackStory(copy, now, "linked")?.sentence).toBe(
       "Weir put the cleaned copy at /hand-back/Show/Show.S01E01.mkv 1 h ago for your media manager to import. No media manager has said it imported it yet.",
     );
-    expect(handbackStory(null, now)).toBeNull();
+    expect(handbackStory(null, now, "linked")).toBeNull();
     expect(importedLabel(file({ handback: copy }))).toBeNull();
+  });
+
+  it("says a Weir-only workflow's copy is in the output folder, with no import or waiting wording", () => {
+    const story = handbackStory(copy, now, "weir_only");
+
+    expect(story).toEqual({
+      heading: "Cleaned copy",
+      sentence:
+        "The cleaned copy is in the output folder, at /hand-back/Show/Show.S01E01.mkv. It was written 1 h ago.",
+      tone: "neutral",
+    });
+    expect(story?.sentence).not.toMatch(/import|media manager|yet/i);
+  });
+
+  it("still tells what a media manager said about a copy whose workflow has since been unlinked", () => {
+    const story = handbackStory(
+      { ...copy, outcome: "imported", outcome_by: "Sonarr" },
+      now,
+      "weir_only",
+    );
+
+    expect(story?.heading).toBe("Imported by Sonarr");
   });
 });
 
