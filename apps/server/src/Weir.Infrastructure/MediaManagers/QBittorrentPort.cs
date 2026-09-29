@@ -5,7 +5,7 @@ namespace Weir.Infrastructure.MediaManagers;
 /// <summary>
 /// qBittorrent, read only: a cookie login (<c>POST /api/v2/auth/login</c>, session in <c>Set-Cookie</c>, read by
 /// <see cref="QBittorrentLoginRules"/>) followed by its categories and preferences. The cookie is captured per call
-/// rather than kept in a jar across requests — each read is otherwise independent, so there is nothing to share.
+/// rather than kept in a jar across requests, and the login is sent without one, so every read starts a fresh session.
 /// </summary>
 public sealed class QBittorrentPort : IDownloadClientPort
 {
@@ -65,7 +65,7 @@ public sealed class QBittorrentPort : IDownloadClientPort
         }
     }
 
-    /// <summary>Older versions answer 200 whether the login succeeded or not, so the body decides; 5.x answers 204 with a session cookie (#842).</summary>
+    /// <summary>Older versions answer 200 whether the login succeeded or not, so the body decides; 5.x answers 204, with a session cookie unless the login already carried one (#842, #856).</summary>
     private static async Task<QBittorrentLogin> LoginAsync(DownloadClientHttpClient client, DownloadClientConnection connection, CancellationToken cancellationToken)
     {
         var form = new FormUrlEncodedContent(new Dictionary<string, string>

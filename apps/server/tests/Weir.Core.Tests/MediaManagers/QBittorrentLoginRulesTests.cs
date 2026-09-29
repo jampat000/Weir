@@ -33,9 +33,18 @@ public sealed class QBittorrentLoginRulesTests
     }
 
     [Theory]
-    [InlineData(204, "", null)]
-    [InlineData(204, "", "")]
-    [InlineData(204, "", "SID=; path=/")]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("SID=; path=/")]
+    public void A_5x_login_with_204_and_an_empty_body_is_accepted_without_a_new_session_cookie(string? setCookie)
+    {
+        var login = QBittorrentLoginRules.Read(204, string.Empty, setCookie);
+
+        Assert.True(login.Accepted);
+        Assert.Null(login.SessionCookie);
+    }
+
+    [Theory]
     [InlineData(200, "Fails.", "SID=abc123")]
     [InlineData(200, "<html>a login page</html>", "SID=abc123")]
     [InlineData(401, "", "SID=abc123")]
