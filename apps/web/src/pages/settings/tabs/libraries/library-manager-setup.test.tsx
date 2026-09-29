@@ -3,8 +3,6 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, expect, it, vi } from "vitest";
 
-import * as downloadClientsApi from "../../../../lib/download-clients/download-clients-api";
-import type { DownloadClientSuggestion } from "../../../../lib/download-clients/download-clients-api";
 import * as managersApi from "../../../../lib/processing/library-managers-api";
 import type { ProcessingManagerSetupItem } from "../../../../lib/processing/library-managers-api";
 import { LibraryManagerSetup } from "./library-manager-setup";
@@ -55,14 +53,7 @@ const deluno: ProcessingManagerSetupItem = {
   ],
 };
 
-function setup(
-  managers: ProcessingManagerSetupItem[],
-  downloadClients: DownloadClientSuggestion[] = [],
-) {
-  vi.spyOn(
-    downloadClientsApi,
-    "fetchDownloadClientSuggestions",
-  ).mockResolvedValue(downloadClients);
+function setup(managers: ProcessingManagerSetupItem[]) {
   return vi
     .spyOn(managersApi, "fetchProcessingManagerSetup")
     .mockResolvedValue({ media_type: "tv", managers });
@@ -72,7 +63,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-it("shows Sonarr exactly what to enter, with copy buttons, and what is still wrong", async () => {
+it("shows Sonarr exactly what to enter, with copy buttons, and leaves what is still wrong to the folder chain", async () => {
   const fetch = setup([sonarr]);
   const writeText = vi.fn().mockResolvedValue(undefined);
   Object.assign(navigator, { clipboard: { writeText } });
@@ -82,6 +73,7 @@ it("shows Sonarr exactly what to enter, with copy buttons, and what is still wro
       mediaType="tv"
       watchedFolder="/media/downloads/complete"
       outputFolder="/media/downloads/weir"
+      linkedConnectionIds={[3]}
       editable
       onUseFolders={() => {}}
     />,
@@ -100,12 +92,9 @@ it("shows Sonarr exactly what to enter, with copy buttons, and what is still wro
     within(table).getByText("/media/downloads/complete"),
   ).toBeInTheDocument();
   expect(within(table).getByText("/media/downloads/weir")).toBeInTheDocument();
-  expect(within(block).getByText("Needs attention")).toBeInTheDocument();
-  expect(
-    within(block).getByText(
-      "Sonarr has no remote path mapping for /media/downloads/complete yet — add the one above.",
-    ),
-  ).toBeInTheDocument();
+  // Whether the mapping is right is the folder chain's to say, once, in its own section.
+  expect(within(block).queryByText("Needs attention")).not.toBeInTheDocument();
+  expect(within(block).queryByText(/Needs a fix/)).not.toBeInTheDocument();
 
   fireEvent.click(
     within(block).getByRole("button", { name: "Copy Sonarr Local Path" }),
@@ -117,6 +106,7 @@ it("shows Sonarr exactly what to enter, with copy buttons, and what is still wro
     "/media/downloads/complete",
     "/media/downloads/weir",
     true,
+    [3],
   );
 });
 
@@ -129,6 +119,7 @@ it("offers a Sonarr download client's own folder as a suggested watched folder",
       mediaType="tv"
       watchedFolder="/media/downloads/complete"
       outputFolder="/media/downloads/weir"
+      linkedConnectionIds={[3]}
       editable
       onUseFolders={onUseFolders}
     />,
@@ -154,6 +145,7 @@ it("does not suggest a Sonarr download client folder that is already the watched
       mediaType="tv"
       watchedFolder="/media/downloads/complete"
       outputFolder="/media/downloads/weir"
+      linkedConnectionIds={[3]}
       editable
       onUseFolders={() => {}}
     />,
@@ -168,7 +160,7 @@ it("does not suggest a Sonarr download client folder that is already the watched
   ).not.toBeInTheDocument();
 });
 
-it("tells a Deluno library there is nothing to map and offers Deluno's own folders", async () => {
+it("tells a Deluno workflow there is nothing to map and offers Deluno's own folders", async () => {
   setup([deluno]);
   const onUseFolders = vi.fn();
 
@@ -177,6 +169,7 @@ it("tells a Deluno library there is nothing to map and offers Deluno's own folde
       mediaType="tv"
       watchedFolder="/media/tv"
       outputFolder=""
+      linkedConnectionIds={[5]}
       editable
       onUseFolders={onUseFolders}
     />,
@@ -185,7 +178,7 @@ it("tells a Deluno library there is nothing to map and offers Deluno's own folde
 
   const block = await screen.findByRole("region", { name: "Deluno" });
   expect(
-    within(block).getByText(/so there is nothing to map/),
+    within(block).getByText(/Deluno reports downloads in/),
   ).toBeInTheDocument();
   expect(within(block).queryByRole("table")).not.toBeInTheDocument();
   expect(
@@ -201,7 +194,7 @@ it("tells a Deluno library there is nothing to map and offers Deluno's own folde
   );
 });
 
-it("does not offer Deluno's folders once the library already uses them", async () => {
+it("does not offer Deluno's folders once the workflow already uses them", async () => {
   setup([{ ...deluno, ready: true, lines: [] }]);
 
   render(
@@ -209,6 +202,7 @@ it("does not offer Deluno's folders once the library already uses them", async (
       mediaType="tv"
       watchedFolder="/media/downloads/complete/tv"
       outputFolder="/media/downloads/weir/tv"
+      linkedConnectionIds={[5]}
       editable
       onUseFolders={() => {}}
     />,
@@ -216,20 +210,20 @@ it("does not offer Deluno's folders once the library already uses them", async (
   );
 
   const block = await screen.findByRole("region", { name: "Deluno" });
-  expect(within(block).getByText("Ready")).toBeInTheDocument();
   expect(
     within(block).queryByRole("button", { name: "Use Deluno's folders" }),
   ).not.toBeInTheDocument();
 });
 
-it("says how to get help when no media manager covers the library", async () => {
-  setup([]);
+it("reads nothing while the workflow is linked to no media manager", async () => {
+  const fetch = setup([sonarr]);
 
   render(
     <LibraryManagerSetup
       mediaType="movie"
       watchedFolder="/in"
       outputFolder="/out"
+      linkedConnectionIds={[]}
       editable
       onUseFolders={() => {}}
     />,
@@ -237,53 +231,7 @@ it("says how to get help when no media manager covers the library", async () => 
   );
 
   expect(
-    await screen.findByText(
-      /No Sonarr, Radarr or Deluno connection covers Movies/,
-    ),
+    await screen.findByTestId("library-manager-setup"),
   ).toBeInTheDocument();
-});
-
-it("offers a bare download client's own folder as a suggested watched folder, with no manager connected", async () => {
-  const onUseFolders = vi.fn();
-  const sabnzbd: DownloadClientSuggestion = {
-    connection_id: 9,
-    kind: "sabnzbd",
-    name: "SABnzbd",
-    label: "SABnzbd",
-    flow: "download_client",
-    ready: true,
-    lines: [
-      {
-        state: "ok",
-        text: "SABnzbd's default completed-downloads folder is /downloads/complete.",
-      },
-    ],
-    suggested_watched_folder: "/downloads/complete",
-    category_folders: [],
-  };
-  setup([], [sabnzbd]);
-
-  render(
-    <LibraryManagerSetup
-      mediaType="movie"
-      watchedFolder="/media/movies"
-      outputFolder="/media/movies-out"
-      editable
-      onUseFolders={onUseFolders}
-    />,
-    { wrapper },
-  );
-
-  expect(
-    screen.queryByText(/No Sonarr, Radarr or Deluno connection covers/),
-  ).not.toBeInTheDocument();
-  const block = await screen.findByRole("region", { name: "SABnzbd" });
-  expect(within(block).getByText("/downloads/complete")).toBeInTheDocument();
-
-  fireEvent.click(
-    within(block).getByRole("button", {
-      name: "Use this as the watched folder",
-    }),
-  );
-  expect(onUseFolders).toHaveBeenCalledWith("/downloads/complete", null);
+  expect(fetch).not.toHaveBeenCalled();
 });

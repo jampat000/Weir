@@ -6,6 +6,7 @@
  */
 
 import { QuietFieldGroup } from "../../../../components/shared/quiet-section";
+import { SetupCheckLines } from "../../../../components/shared/setup-check-lines";
 import type { ProcessingMediaType } from "../../../../lib/processing/libraries-api";
 import {
   READINESS_CLASSES,
@@ -20,53 +21,6 @@ import { useDebouncedValue } from "../../../../lib/ui/use-debounced-value";
 
 /** The folders as the user types them settle for a moment before each check, same as the media-manager check above. */
 const SETTLE_MS = 700;
-
-function ChainLines({ lines }: { lines: FolderChainLine[] }) {
-  return (
-    <ul className="space-y-1.5 text-sm leading-5">
-      {lines.map((line, index) => (
-        <li key={index} className="flex gap-2">
-          <span
-            aria-hidden="true"
-            className={
-              line.state === "ok"
-                ? "mm-status-text--healthy"
-                : line.state === "problem"
-                  ? "mm-status-text--warning"
-                  : "text-mm-text3"
-            }
-          >
-            {line.state === "ok"
-              ? "✓"
-              : line.state === "problem"
-                ? "✗"
-                : line.state === "unverified"
-                  ? "?"
-                  : "·"}
-          </span>
-          <span
-            className={
-              line.state === "problem"
-                ? "mm-status-text--warning"
-                : "text-mm-text2"
-            }
-          >
-            <span className="sr-only">
-              {line.state === "ok"
-                ? "Fine: "
-                : line.state === "problem"
-                  ? "Needs a fix: "
-                  : line.state === "unverified"
-                    ? "Not verified: "
-                    : "Note: "}
-            </span>
-            {line.text}
-          </span>
-        </li>
-      ))}
-    </ul>
-  );
-}
 
 function ReadinessBadge({
   ready,
@@ -90,7 +44,7 @@ function ManagerSection({ item }: { item: ProcessingManagerSetupItem }) {
         {item.label}
         <ReadinessBadge ready={item.ready} lines={item.lines} />
       </p>
-      <ChainLines lines={item.lines} />
+      <SetupCheckLines label={item.label} lines={item.lines} />
     </section>
   );
 }
@@ -106,7 +60,7 @@ function DownloadClientSection({
         {item.label}
         <ReadinessBadge ready={item.ready} lines={item.lines} />
       </p>
-      <ChainLines lines={item.lines} />
+      <SetupCheckLines label={item.label} lines={item.lines} />
     </section>
   );
 }
@@ -188,7 +142,10 @@ export function LibraryFolderChain({
                   lines={chain.data.local.lines}
                 />
               </p>
-              <ChainLines lines={chain.data.local.lines} />
+              <SetupCheckLines
+                label="Weir's own folders"
+                lines={chain.data.local.lines}
+              />
             </section>
             {chain.data.managers.map((item) => (
               <ManagerSection key={item.connection_id} item={item} />

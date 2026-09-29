@@ -5,6 +5,9 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type { ReactNode } from "react";
+import { MemoryRouter } from "react-router-dom";
 import { afterEach, expect, it, vi } from "vitest";
 
 import * as managerApi from "../../../../lib/media-managers/media-managers-api";
@@ -356,4 +359,54 @@ it("says what unlinking does in plain words, and unlinks on Save", async () => {
       expect.objectContaining({ manager_connection_ids: [] }),
     ),
   );
+});
+
+function wrapperAt(url: string) {
+  return function Wrapper({ children }: { children: ReactNode }) {
+    const qc = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+    return (
+      <MemoryRouter initialEntries={[url]}>
+        <QueryClientProvider client={qc}>{children}</QueryClientProvider>
+      </MemoryRouter>
+    );
+  };
+}
+
+it("opens a workflow's editor from a link on another page", async () => {
+  withConnections(connection({}));
+  vi.spyOn(api, "fetchProcessingLibraries").mockResolvedValue([
+    library({ id: 4, name: "Kids" }),
+  ]);
+
+  render(<LibrariesTab />, {
+    wrapper: wrapperAt("/settings?tab=libraries&edit=4"),
+  });
+
+  const form = await screen.findByTestId("processing-library-form");
+  expect(within(form).getByDisplayValue("Kids")).toBeInTheDocument();
+});
+
+it("opens the add choice already on the media manager it was linked from", async () => {
+  withConnections(
+    connection({}),
+    connection({ id: 6, kind: "sonarr", name: "Sonarr" }),
+  );
+  vi.spyOn(api, "fetchProcessingLibraries").mockResolvedValue([library()]);
+
+  render(<LibrariesTab />, {
+    wrapper: wrapperAt("/settings?tab=libraries&addFrom=6"),
+  });
+
+  const choice = within(await screen.findByTestId("add-workflow-choice"));
+  expect(
+    choice.getByRole("radio", { name: /From a media manager/ }),
+  ).toBeChecked();
+  expect(
+    choice.getByRole("combobox", { name: "Which media manager?" }),
+  ).toHaveValue("6");
 });

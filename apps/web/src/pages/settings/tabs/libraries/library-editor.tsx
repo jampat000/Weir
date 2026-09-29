@@ -30,6 +30,7 @@ import {
   LibraryIntakeGroup,
   LibraryReadinessGroup,
 } from "./library-intake-groups";
+import { LibraryDownloadClientSuggestions } from "./library-download-client-suggestions";
 import { LibraryLinkSection } from "./library-link-section";
 import { LibraryManagerSetup } from "./library-manager-setup";
 import {
@@ -122,6 +123,14 @@ export function LibraryEditor({
               binding.update({ manager_connection_id: String(connectionId) })
             }
             onUnlink={() => binding.update({ manager_connection_id: "" })}
+          />
+          <LibraryDownloadClientSuggestions
+            mediaType={form.media_type}
+            watchedFolder={form.watched_folder}
+            editable={editable}
+            onUseFolder={(watched) =>
+              binding.update({ watched_folder: watched })
+            }
           />
           {linkedIds.length > 0 ? (
             <LibraryManagerSetup

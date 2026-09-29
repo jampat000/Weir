@@ -1,8 +1,10 @@
 /**
- * For one media manager connection: which of its linked libraries are fully chained end to end (Weir's own
- * folders plus this connection's own setup), compact enough to sit under `LinkedLibraries` without pushing the card
- * around. Each library's own detail is the same lines `LibraryFolderChain` shows in the library editor.
+ * For one media manager connection: whether each workflow it feeds is fully chained end to end (Weir's own folders
+ * plus this connection's own setup), compact enough to sit under `FedWorkflows` without pushing the card around.
+ * The lines behind each answer are shown once, in the workflow editor's Folder chain, which each row opens.
  */
+
+import { Link } from "react-router-dom";
 
 import {
   READINESS_CLASSES,
@@ -21,7 +23,7 @@ function libraryName(
 ): string {
   return (
     libraries?.find((library) => library.id === libraryId)?.name ??
-    `Library ${libraryId}`
+    `Workflow ${libraryId}`
   );
 }
 
@@ -31,26 +33,6 @@ function chainLines(chain: LibraryFolderChain) {
     ...chain.managers.flatMap((manager) => manager.lines),
     ...chain.download_clients.flatMap((client) => client.lines),
   ];
-}
-
-function ChainDetail({ chain }: { chain: LibraryFolderChain }) {
-  const lines = chainLines(chain);
-  return (
-    <ul className="mt-1 space-y-1 pl-4">
-      {lines.map((line, index) => (
-        <li
-          key={index}
-          className={
-            line.state === "problem"
-              ? "mm-status-text--warning"
-              : "text-mm-text2"
-          }
-        >
-          {line.text}
-        </li>
-      ))}
-    </ul>
-  );
 }
 
 export function ConnectionFolderChain({
@@ -64,17 +46,17 @@ export function ConnectionFolderChain({
   if (chain.isLoading) {
     return (
       <p className="mt-2 text-xs text-mm-text2">
-        Checking its libraries&apos; folder chains…
+        Checking its workflows&apos; folder chains…
       </p>
     );
   }
 
   if (chain.isError) {
-    // Quiet failure, like LinkedLibraries above it: this is an auxiliary, always-on background check inside a card
+    // Quiet failure, like FedWorkflows above it: this is an auxiliary, always-on background check inside a card
     // full of other alerts, not a user-initiated action, so it does not compete for the page's one role="alert".
     return (
       <p className="mm-status-text--warning mt-2 text-xs">
-        Weir could not check its libraries&apos; folder chains just now.
+        Weir could not check its workflows&apos; folder chains just now.
       </p>
     );
   }
@@ -86,21 +68,23 @@ export function ConnectionFolderChain({
 
   return (
     <div className="mt-2 space-y-1" data-testid="media-manager-folder-chain">
-      {entries.map((entry) => (
-        <details key={entry.library_id} className="text-xs text-mm-text2">
-          <summary className="cursor-pointer">
+      {entries.map((entry) => {
+        const readiness = readinessOf(entry.ready, chainLines(entry));
+        return (
+          <p key={entry.library_id} className="text-xs text-mm-text2">
             {libraryName(libraries.data, entry.library_id)}{" "}
-            <span
-              className={
-                READINESS_CLASSES[readinessOf(entry.ready, chainLines(entry))]
-              }
+            <span className={READINESS_CLASSES[readiness]}>
+              {READINESS_LABELS[readiness]}
+            </span>{" "}
+            <Link
+              className="mm-quiet-link"
+              to={`/settings?tab=libraries&edit=${entry.library_id}`}
             >
-              {READINESS_LABELS[readinessOf(entry.ready, chainLines(entry))]}
-            </span>
-          </summary>
-          <ChainDetail chain={entry} />
-        </details>
-      ))}
+              See its folder chain
+            </Link>
+          </p>
+        );
+      })}
     </div>
   );
 }

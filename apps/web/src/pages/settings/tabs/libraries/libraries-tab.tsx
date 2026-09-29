@@ -1,5 +1,4 @@
-import { useEffect, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useCallback, useState } from "react";
 
 import { PageLoading } from "../../../../components/shared/page-loading";
 import { errorMessage } from "../../../../lib/api/error-message";
@@ -28,8 +27,10 @@ import {
 import { LibraryImportSection } from "./library-import-section";
 import { LibraryListSection } from "./library-list-section";
 import { RemoveLibraryDialog } from "./remove-library-dialog";
-
-const ADD_FROM_PARAM = "addFrom";
+import {
+  useWorkflowDeepLinks,
+  type WorkflowDeepLink,
+} from "./use-workflow-deep-links";
 
 type Editing =
   | { kind: "closed" }
@@ -61,24 +62,20 @@ export function LibrariesTab() {
   const [editing, setEditing] = useState<Editing>({ kind: "closed" });
   const [removing, setRemoving] = useState<ProcessingLibrary | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [params, setParams] = useSearchParams();
-  const addFrom = Number(params.get(ADD_FROM_PARAM));
-  const connectionsLoaded = connections.data !== undefined;
-
-  // Arriving from a media manager's "Add a workflow from ..." opens the add choice already on that manager.
-  useEffect(() => {
-    if (!Number.isInteger(addFrom) || addFrom <= 0 || !connectionsLoaded)
-      return;
-    setEditing({ kind: "choosing", fromConnectionId: addFrom });
-    setParams(
-      (current) => {
-        const next = new URLSearchParams(current);
-        next.delete(ADD_FROM_PARAM);
-        return next;
-      },
-      { replace: true },
-    );
-  }, [addFrom, connectionsLoaded, setParams]);
+  const openDeepLink = useCallback(
+    (link: WorkflowDeepLink) =>
+      setEditing(
+        link.kind === "add-from"
+          ? { kind: "choosing", fromConnectionId: link.connectionId }
+          : { kind: "editing", library: link.library },
+      ),
+    [],
+  );
+  useWorkflowDeepLinks({
+    libraries: libraries.data,
+    connectionsLoaded: connections.data !== undefined,
+    onOpen: openDeepLink,
+  });
 
   if (libraries.isPending) return <PageLoading label="Loading libraries" />;
   if (libraries.isError) return <SettingsLoadError what="libraries" />;
