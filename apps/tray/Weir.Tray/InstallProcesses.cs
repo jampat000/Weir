@@ -13,7 +13,9 @@ namespace Weir.Tray;
 /// </summary>
 static class InstallProcesses
 {
-    internal static readonly string[] Names = ["Weir", "WeirServer"];
+    private const string ServerName = "WeirServer";
+
+    internal static readonly string[] Names = ["Weir", ServerName];
 
     /// <summary>
     /// The directory this install runs from: the folder holding this Weir.exe. Velopack runs the
@@ -106,6 +108,13 @@ static class InstallProcesses
                         continue;
                     }
 
+                    if (name == ServerName && ExitsWhenAskedToStop(proc))
+                    {
+                        stopped.Add(proc.Id);
+                        log($"{why}: stopped {name} (pid {proc.Id}) at {path} cleanly.");
+                        continue;
+                    }
+
                     try
                     {
                         proc.Kill(entireProcessTree: true);
@@ -121,5 +130,19 @@ static class InstallProcesses
             }
         }
         return stopped;
+    }
+
+    // A server that is asked first finishes its running jobs and closes its database; one that cannot be asked, or
+    // does not exit in time, is killed by the caller (#833).
+    private static bool ExitsWhenAskedToStop(Process server)
+    {
+        try
+        {
+            return ServerStopRequest.TrySend(server.Id, out _) && server.WaitForExit(ServerStopTimeouts.Default.Graceful);
+        }
+        catch (Exception ex) when (ex is Win32Exception or InvalidOperationException or NotSupportedException)
+        {
+            return false;
+        }
     }
 }
