@@ -2,7 +2,7 @@
 
 Trial date: 2026-09-17. Answers [#503](https://github.com/jampat000/Weir/issues/503).
 
-**Outcome.** Adopted in [#548](https://github.com/jampat000/Weir/issues/548). A library's writer is
+**Outcome.** Adopted in [#548](https://github.com/jampat000/Weir/issues/548). A workflow's writer is
 `best` by default: mkvmerge writes Matroska when it is installed and ffmpeg writes everything else,
 and a write that fails to run or fails output validation is rewritten by ffmpeg and validated again
 (`apps/server/src/Weir.Core/Media/RemuxWriterChoice.cs`). `ffmpeg` is the other choice. ffmpeg's own
@@ -161,7 +161,7 @@ ffmpeg -hide_banner -loglevel error -xerror -err_detect explode -nostdin -y \
 ```
 
 This is a real, currently-shipping defect, independent of the mkvmerge
-decision: **any Weir library with ASS/SSA subtitles carrying a custom font
+decision: **any Weir workflow with ASS/SSA subtitles carrying a custom font
 attachment loses that font on every remux**, which silently degrades to a
 fallback font (or squares/tofu) in players that don't ship the same font.
 The issue suspected exactly this.

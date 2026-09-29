@@ -43,6 +43,11 @@ The tray icon provides:
 - **Check for updates** — checks GitHub for a newer release; once one is found the item becomes **Download update**, then **Restart to update**
 - **Quit** — stops Weir, and applies an update that has already downloaded
 
+Every stop the tray does itself (Quit, Change port, the LAN access items and Restart to update) asks the
+server to shut down and waits up to 10 seconds, so running work and the database close in order. Only a
+server that does not exit in that time is ended by force. `tray-host.log` in `C:\ProgramData\Weir` says which
+happened: `stopped cleanly in 0.3 s`, or `did not stop in 10.0 s; killing it`.
+
 ## Updates
 
 The tray app installs updates itself, using Velopack:

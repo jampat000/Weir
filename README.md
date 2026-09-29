@@ -45,7 +45,7 @@ Movie and TV files often come with a dozen audio tracks and subtitles in languag
 Weir removes them, so every file ends up with just the tracks you chose.
 
 - **You set the rules once.** For example: keep English and Japanese audio, keep English subtitles, drop commentary.
-- **New downloads are cleaned automatically.** Weir watches a folder, cleans each file that lands there, and puts the result in an output folder.
+- **New downloads are cleaned automatically.** A **workflow** watches a folder, cleans each file that lands there, and puts the result in an output folder. You can have as many workflows as you like, each with its own rules.
 - **Your existing library can be cleaned too.** Weir scans it, shows you what it would remove and how much space that saves, and only removes anything once you confirm.
 - **It never re-encodes.** Tracks are copied as they are, so there's no quality loss and it's fast.
 - **Nothing is lost if something goes wrong.** Weir works on a copy and only replaces a file once the new one checks out.
@@ -54,7 +54,7 @@ Beyond the cleaning itself:
 
 - **History** keeps a record of every file Weir handled: which tracks it kept and removed, and why a file was held or skipped.
 - **Library** lists the files already on your storage, library by library. You can open any file and choose its tracks yourself when the rules don't fit it.
-- **Schedules** set the hours each library may start work, so cleaning a large library can wait for the night.
+- **Schedules** set the hours each workflow may start work, so cleaning a large library can wait for the night.
 - **Alerts** go to Discord or any webhook when a file finishes or fails.
 - **Media managers** work alongside Weir. Deluno hands files over and imports them once they're clean. Sonarr and Radarr import from Weir's output folder, and Weir checks their queues before it touches a file.
 
@@ -97,6 +97,7 @@ services:
   weir:
     image: ghcr.io/jampat000/weir:latest
     container_name: weir
+    hostname: my-server   # what Weir calls itself: "Weir on my-server"
     ports:
       - "9347:9347"
     volumes:
@@ -113,6 +114,9 @@ docker compose up -d
 Open **http://your-server-ip:9347** and create your account. That's it.
 
 `./weir-data` holds Weir's database, settings, logs and backups. Keep it and you keep everything.
+
+Weir is named after the machine it runs on, so there is no name to type. In Docker the machine is the
+container, which gets a random name unless you set `hostname:`. Set it to your server's name.
 
 ### With your media folders
 
@@ -218,7 +222,8 @@ Every Docker option is in [docker/README.md](docker/README.md).
 4. Your browser opens Weir. Create your account.
 
 Weir lives in the system tray, next to the clock. Right-click the icon to open Weir, open its data
-folder, change the port, check for updates or quit.
+folder, change the port, check for updates or quit. Quitting, changing the port and restarting to update all ask
+Weir to shut down properly first, so running work and the database close in order.
 
 - Weir is installed to `%LocalAppData%\Weir`. Your data (database, logs, backups) is kept in `C:\ProgramData\Weir`.
 - Weir runs as you, not as a Windows service, so it can reach your mapped network drives and NAS shares.
@@ -236,12 +241,20 @@ More in the [Windows guide](https://jampat000.github.io/Weir/docs/deployment/win
 ## First steps
 
 1. **Create your account.** The first time you open Weir, it asks for a username and password. This is the admin account.
-2. **Follow the setup wizard.** Pick your time zone, then give Weir two folders for Movies and two for TV:
-   - **Watched folder**: where your downloads finish. Weir cleans whatever lands here.
-   - **Output folder**: where Weir puts each cleaned file.
+2. **Follow the setup wizard.** It first asks how your downloads reach Weir: **Deluno**, **Sonarr / Radarr**, a
+   download client such as SABnzbd or qBittorrent, or **Neither**.
+   - **Deluno, Sonarr / Radarr or a download client:** connect it with its address and key. Weir tests the
+     connection, reads where it saves finished downloads and offers a Movies and a TV workflow with the folders
+     filled in. Tick the ones you want and change any folder. Nothing is created until you press
+     **Finish setup**, and a problem with a folder shows next to it first. If Weir cannot reach what you
+     connect, it says so and you can choose **Neither**.
+   - **Neither:** give Weir two folders for Movies and two for TV yourself:
+     - **Watched folder**: where your downloads finish. Weir cleans whatever lands here.
+     - **Output folder**: where Weir puts each cleaned file.
 
-   You can skip the wizard and add libraries later under **Settings › Libraries**.
-3. **Choose what to keep.** Under **Settings › Rules**, set the audio and subtitle languages each library keeps.
+   Each pair is a **workflow**. Then pick your time zone. You can skip the wizard and add workflows later under
+   **Settings › Workflows**.
+3. **Choose what to keep.** Under **Settings › Rules**, set the audio and subtitle languages each workflow keeps.
 4. **Try it.** Put a file in a watched folder. Weir usually notices within seconds. On network shares
    and in Docker it can take up to five minutes, because Weir falls back to checking on a timer.
    The file shows up on **Processing** while it's being worked on, and in **History** once it's done.
@@ -250,9 +263,36 @@ To clean a library you already have, open **Library**, pick the library from the
 **Check again**. Weir shows you what it would remove and how much space that frees before it changes
 anything.
 
+### Workflows
+
+A **workflow** is one route a file takes through Weir: a **watched folder** where files arrive, a
+private **work folder** where Weir cleans them, an **output folder** for the cleaned copy, and the
+rules and schedule that apply to it. You manage them under **Settings › Workflows**.
+
+There are two kinds, and both can run side by side:
+
+- **Weir only (local folders).** Weir watches a folder you choose and writes the cleaned file to
+  another. No other app is involved. It suits a folder of home videos or a kids' collection.
+- **Linked to a media manager (Deluno, Sonarr or Radarr).** The watched folder is where your download
+  client finishes files, and the output folder is where the manager imports from. Weir describes the link
+  in the manager's own words: for Deluno, its download client category and the Deluno library the
+  file is imported into; for Radarr and Sonarr, the download client category and the root folder.
+
+Each row in **Settings › Workflows** says which kind it is: **Weir only**, or **Linked to Deluno** (or
+Sonarr, or Radarr). **Add workflow** asks which kind first: **Local folders**, or **From a media
+manager**, which asks the manager for its folders and opens the editor filled in and linked. A download
+client on its own only suggests a watched folder; it never makes a workflow linked. Under **Settings ›
+Media managers**, each connection lists the workflows it feeds.
+
+**Library** is a separate thing: it cleans files that are already in place in your media library.
+A workflow is the path new files take; **Library** works on what has already arrived.
+
+The Weir API still says "library" for what the app calls a workflow, so existing integrations keep working.
+
 ### Connecting other apps
 
-Under **Settings › Media managers** you can connect:
+Under **Settings › Media managers** you can connect the apps below. You never name a connection: Weir
+calls it after its kind and the host in its address, like "Deluno on RIG" or "Radarr on nas".
 
 - **Deluno** hands each file to Weir, waits for it to be cleaned, then imports it. This is the fully automatic setup.
 - **Sonarr and Radarr** import the cleaned files from Weir's output folder. Weir also checks their
@@ -267,14 +307,16 @@ folder, and Sonarr or Radarr import from there. You connect them with a **remote
 tells Sonarr "when the download client says a file is in the downloads folder, look in Weir's output
 folder instead." Sonarr then only ever sees cleaned files.
 
-1. **In Weir**, open **Settings › Libraries** and edit the library.
+1. **In Weir**, open **Settings › Workflows** and edit the workflow (or add one).
    - **Watched folder**: where your download client finishes files, e.g. `/media/downloads/complete/tv`
    - **Output folder**: where Weir puts cleaned files, e.g. `/media/weir/tv`
    - Using torrents? Turn **After cleaning, remove the original download** off, so the torrent keeps
      seeding. Your download client or Sonarr removes it later, as they normally would.
 2. **Connect Sonarr** under **Settings › Media managers**, with its address and API key
    (Sonarr shows its API key on its **General** settings page).
-3. Back in the library, the **Media manager** section shows the exact mapping to add, with copy buttons.
+3. Back in the workflow, choose Sonarr in its **Media manager** section, press **Link to a media
+   manager** and save. (**Add workflow › From a media manager** links it for you.) The **What your media
+   manager needs** section then shows the exact mapping to add, with copy buttons.
 4. **In Sonarr**, go to **Settings › Download Clients › Remote Path Mappings** and press **+**:
    - **Host**: exactly what's in your download client's **Host** field on that same screen, e.g. `qbittorrent`
    - **Remote Path**: Weir's watched folder, e.g. `/media/downloads/complete/tv/`
@@ -282,7 +324,7 @@ folder instead." Sonarr then only ever sees cleaned files.
 
    The output folder has to exist before Sonarr will save the mapping.
 5. Keep **Completed Download Handling** switched on in Sonarr. This setup relies on it.
-6. Back in Weir, press **Check again** in the library's **Media manager** section. It reads Sonarr's
+6. Back in Weir, press **Check again** in the workflow's **Folder chain** section. It reads Sonarr's
    settings (it never changes them) and shows ✓, or tells you exactly what to fix.
 
 Radarr works the same way, with its own movies folders. After a download finishes, Sonarr shows
