@@ -152,14 +152,33 @@ public sealed class DownloadClientPortsTests
     }
 
     [Fact]
-    public async Task QBittorrent_refuses_a_204_login_that_sets_no_session_cookie()
+    public async Task QBittorrent_accepts_a_204_login_that_sets_no_session_cookie_and_reads_without_one()
     {
-        var http = new FakeManagerHttp().Route(HttpMethod.Post, "/api/v2/auth/login", _ => FakeManagerHttp.Response(HttpStatusCode.NoContent));
+        var http = new FakeManagerHttp()
+            .Route(HttpMethod.Post, "/api/v2/auth/login", _ => FakeManagerHttp.Response(HttpStatusCode.NoContent))
+            .Json(HttpMethod.Get, "/api/v2/app/preferences", """{"save_path":"/downloads/complete"}""");
         var port = new QBittorrentPort(http);
 
-        var (ok, _) = await port.TestAsync(Connection(DownloadClientKinds.QBittorrent, username: "admin", password: "wrong"));
+        var (ok, _) = await port.TestAsync(Connection(DownloadClientKinds.QBittorrent, username: "deluno", password: "right"));
 
-        Assert.False(ok);
+        Assert.True(ok);
+        Assert.False(http.RequestsTo(HttpMethod.Get, "/api/v2/app/preferences").Single().Headers.ContainsKey("Cookie"));
+    }
+
+    [Fact]
+    public async Task QBittorrent_sends_its_login_without_a_session_cookie()
+    {
+        var http = new FakeManagerHttp()
+            .Route(HttpMethod.Post, "/api/v2/auth/login", _ => FakeManagerHttp.Response(HttpStatusCode.NoContent, null, ("Set-Cookie", "QBT_SID_8081=xyz789; HttpOnly")))
+            .Json(HttpMethod.Get, "/api/v2/app/preferences", """{"save_path":"/downloads/complete"}""");
+        var port = new QBittorrentPort(http);
+
+        await port.TestAsync(Connection(DownloadClientKinds.QBittorrent, username: "deluno", password: "right"));
+        await port.TestAsync(Connection(DownloadClientKinds.QBittorrent, username: "deluno", password: "right"));
+
+        var logins = http.RequestsTo(HttpMethod.Post, "/api/v2/auth/login");
+        Assert.Equal(2, logins.Count);
+        Assert.All(logins, login => Assert.False(login.Headers.ContainsKey("Cookie")));
     }
 
     [Fact]
