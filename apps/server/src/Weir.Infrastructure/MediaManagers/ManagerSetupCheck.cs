@@ -36,9 +36,8 @@ public sealed class ManagerSetupCheck
         var results = new List<WireObject>();
         foreach (var row in await _connectionStore.ListEnabledAsync(uow).ConfigureAwait(false))
         {
-            var isArr = ManagerKindProfiles.ForKind(row.Kind) is { IsArr: true } profile && profile.ArrScope == mediaScope;
-            var isDeluno = string.Equals(row.Kind, "deluno", StringComparison.OrdinalIgnoreCase);
-            if (!isArr && !isDeluno)
+            var isArr = IsArrFor(row, mediaScope);
+            if (!isArr && !IsDeluno(row))
             {
                 continue;
             }
@@ -54,7 +53,7 @@ public sealed class ManagerSetupCheck
             var connection = _connections.ConnectionFromRow(row);
             if (connection is null)
             {
-                lines = [new SetupCheckLine(SetupCheckLine.Problem, $"{label} has no address or API key saved, so Weir cannot check it. Add them under Settings → Media managers.")];
+                lines = [new SetupCheckLine(SetupCheckLine.Problem, MissingCredentialsText(label))];
             }
             else if (isArr)
             {
@@ -78,6 +77,74 @@ public sealed class ManagerSetupCheck
         }
 
         return results;
+    }
+
+    /// <summary>
+    /// What each enabled connection that covers <paramref name="mediaScope"/> reports as the folder its downloads land in,
+    /// with no library to compare against: Sonarr's and Radarr's own download client directory, Deluno's Refine-before-import
+    /// downloads and output folders. A connection that cannot say still gets an entry, with the reason.
+    /// </summary>
+    public async Task<List<ManagerFolderSuggestion>> SuggestFoldersAsync(UnitOfWork uow, string mediaScope, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(uow);
+        var results = new List<ManagerFolderSuggestion>();
+        foreach (var row in await _connectionStore.ListEnabledAsync(uow).ConfigureAwait(false))
+        {
+            var isArr = IsArrFor(row, mediaScope);
+            if (!isArr && !IsDeluno(row))
+            {
+                continue;
+            }
+
+            if (_connections.ConnectionFromRow(row) is not { } connection)
+            {
+                var label = MediaManagerKinds.LabelForConnection(row.Kind, row.Name);
+                results.Add(new ManagerFolderSuggestion(row.Id, label, null, null, MissingCredentialsText(label)));
+                continue;
+            }
+
+            results.Add(isArr
+                ? await SuggestArrFoldersAsync(row.Id, connection, mediaScope, cancellationToken).ConfigureAwait(false)
+                : await SuggestDelunoFoldersAsync(row.Id, connection, mediaScope, cancellationToken).ConfigureAwait(false));
+        }
+
+        return results;
+    }
+
+    private static bool IsArrFor(MediaManagerConnectionRecord row, string mediaScope) =>
+        ManagerKindProfiles.ForKind(row.Kind) is { IsArr: true } profile && profile.ArrScope == mediaScope;
+
+    private static bool IsDeluno(MediaManagerConnectionRecord row) => string.Equals(row.Kind, "deluno", StringComparison.OrdinalIgnoreCase);
+
+    private static string MissingCredentialsText(string label) =>
+        $"{label} has no address or API key saved, so Weir cannot check it. Add them under Settings → Media managers.";
+
+    private async Task<ManagerFolderSuggestion> SuggestArrFoldersAsync(
+        long connectionId, ManagerConnection connection, string mediaScope, CancellationToken cancellationToken)
+    {
+        WireValue? clients;
+        try
+        {
+            var client = new MediaManagerHttpClient(connection.BaseUrl, connection.ApiKey, _handlers, ManagerDialectRules.DescribeTimeout);
+            clients = await client.GetJsonAsync(ManagerSetupRules.DownloadClientPath, cancellationToken: cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception exception) when (exception is MediaManagerHttpException or MediaManagerUnreachableException)
+        {
+            return new ManagerFolderSuggestion(
+                connectionId, connection.Label, null, null, ManagerDialectRules.Unreachable(connection, exception, "where its downloads are saved"));
+        }
+
+        var folder = WatchFolderSuggestionRules.SuggestArrWatchedFolder(ManagerSetupRules.ParseDownloadClients(clients, mediaScope));
+        return new ManagerFolderSuggestion(
+            connectionId, connection.Label, folder, null, folder is null ? $"{connection.Label} does not say where its downloads are saved." : null);
+    }
+
+    private async Task<ManagerFolderSuggestion> SuggestDelunoFoldersAsync(
+        long connectionId, ManagerConnection connection, string mediaScope, CancellationToken cancellationToken)
+    {
+        var deluno = await CheckDelunoAsync(connection, connection.Label, mediaScope, string.Empty, string.Empty, cancellationToken).ConfigureAwait(false);
+        var problem = deluno.WatchedFolder is null ? deluno.Lines.Select(line => line.Text).FirstOrDefault() : null;
+        return new ManagerFolderSuggestion(connectionId, connection.Label, deluno.WatchedFolder, deluno.OutputFolder, problem);
     }
 
     private async Task<(IReadOnlyList<string> Hosts, IReadOnlyList<SetupCheckLine> Lines, string? SuggestedWatchedFolder)> CheckArrAsync(
