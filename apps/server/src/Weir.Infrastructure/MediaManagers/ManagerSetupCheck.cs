@@ -12,8 +12,8 @@ namespace Weir.Infrastructure.MediaManagers;
 /// <remarks>
 /// Read only, by construction: the only calls are <c>GET</c>s — <see cref="ManagerSetupRules.RemotePathMappingPath"/>,
 /// <see cref="ManagerSetupRules.DownloadClientPath"/>, <see cref="ManagerSetupRules.DownloadClientConfigPath"/> and the
-/// queue (<see cref="IMediaManagerPort.QueueRowsAsync"/>) for Sonarr/Radarr, and Deluno's manifest through
-/// <see cref="IMediaManagerPort.DescribeAsync"/>. Weir never changes a
+/// queue (<see cref="IMediaManagerPort.QueueRowsAsync"/>) for Sonarr/Radarr, and for Deluno its manifest through
+/// <see cref="IMediaManagerPort.DescribeAsync"/> and its download destinations (<see cref="DelunoDestinationRules.DownloadDestinationsPath"/>). Weir never changes a
 /// manager's settings; the user makes the mapping, and this says whether it is right.
 /// </remarks>
 public sealed partial class ManagerSetupCheck
@@ -51,7 +51,9 @@ public sealed partial class ManagerSetupCheck
     /// <summary>
     /// One entry per enabled connection that covers <paramref name="mediaScope"/>, in connection order. A workflow only
     /// depends on the managers it is linked to, so <paramref name="linkedConnectionIds"/> narrows the answer to those; null
-    /// means every connection that covers the media type, as for folders not yet saved.
+    /// means every connection that covers the media type, as for folders not yet saved. <paramref name="delunoLibrary"/> is
+    /// the Deluno library the workflow was created from, when it was: that connection's check is made against that library.
+    /// Each Deluno connection is asked once per call.
     /// </summary>
     public async Task<List<WireObject>> CheckAsync(
         UnitOfWork uow,
@@ -60,6 +62,7 @@ public sealed partial class ManagerSetupCheck
         string outputFolder,
         IReadOnlySet<long>? linkedConnectionIds,
         bool removesOriginals = true,
+        DelunoLibraryLink? delunoLibrary = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(uow);
@@ -97,7 +100,8 @@ public sealed partial class ManagerSetupCheck
             }
             else
             {
-                var (deluno, delunoFacts) = await CheckDelunoAsync(connection, label, mediaScope, watchedFolder, outputFolder, cancellationToken).ConfigureAwait(false);
+                var preferredLibraryKey = delunoLibrary is { } link && link.ConnectionId == row.Id ? link.LibraryKey : null;
+                var (deluno, delunoFacts) = await CheckDelunoAsync(connection, label, mediaScope, watchedFolder, outputFolder, preferredLibraryKey, cancellationToken).ConfigureAwait(false);
                 entry.Set("story", SourceFactsOut(delunoFacts));
                 lines = deluno.Lines;
                 entry.Set("suggested_watched_folder", deluno.WatchedFolder).Set("suggested_output_folder", deluno.OutputFolder);
@@ -174,7 +178,7 @@ public sealed partial class ManagerSetupCheck
     private async Task<ManagerFolderSuggestion> SuggestDelunoFoldersAsync(
         long connectionId, ManagerConnection connection, string mediaScope, CancellationToken cancellationToken)
     {
-        var (deluno, _) = await CheckDelunoAsync(connection, connection.Label, mediaScope, string.Empty, string.Empty, cancellationToken).ConfigureAwait(false);
+        var deluno = await ReadDelunoFoldersAsync(connection, mediaScope, cancellationToken).ConfigureAwait(false);
         var problem = deluno.WatchedFolder is null ? deluno.Lines.Select(line => line.Text).FirstOrDefault() : null;
         return new ManagerFolderSuggestion(connectionId, connection.Label, deluno.WatchedFolder, deluno.OutputFolder, problem);
     }
@@ -258,18 +262,4 @@ public sealed partial class ManagerSetupCheck
         }
     }
 
-    private async Task<(DelunoSetupResult Result, ManagerSourceFacts Facts)> CheckDelunoAsync(
-        ManagerConnection connection, string label, string mediaScope, string watchedFolder, string outputFolder, CancellationToken cancellationToken)
-    {
-        if (_connections.Ports.PortForKind(connection.Kind) is not { } port)
-        {
-            return (new DelunoSetupResult(null, null, [new SetupCheckLine(SetupCheckLine.Problem, $"Weir does not know how to ask {label} what it manages.")]), ManagerSourceFacts.None);
-        }
-
-        var description = await port.DescribeAsync(connection, cancellationToken).ConfigureAwait(false);
-        return description.Status != SignalStatus.Reported
-            ? (new DelunoSetupResult(null, null, [new SetupCheckLine(SetupCheckLine.Problem, description.Detail ?? $"{label} did not answer.")]), ManagerSourceFacts.None)
-            : (ManagerSetupRules.EvaluateDeluno(label, mediaScope, watchedFolder, outputFolder, description.Libraries, description.DownloadClients, _folders),
-                ManagerSourceFactsRules.ForDeluno(mediaScope, description.Libraries, description.DownloadClients));
-    }
 }

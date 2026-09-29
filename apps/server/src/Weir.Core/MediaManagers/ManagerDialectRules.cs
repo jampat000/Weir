@@ -34,6 +34,9 @@ public static class ManagerDialectRules
     public static readonly TimeSpan LibraryTimeout = TimeSpan.FromSeconds(120);
     public static readonly TimeSpan DescribeTimeout = TimeSpan.FromSeconds(15);
 
+    /// <summary>Deluno asks each download client in turn, allowing each 8 seconds, so its answer can take longer than a manifest.</summary>
+    public static readonly TimeSpan DownloadDestinationsTimeout = TimeSpan.FromSeconds(30);
+
     private static readonly HashSet<string> SettledStates = new(StringComparer.Ordinal)
     {
         "completed", "complete", "done", "finished", "succeeded", "success", "ok", "failed", "failure", "error",
@@ -268,12 +271,12 @@ public static class ManagerDialectRules
         return set;
     }
 
-    /// <summary>A manifest library's <c>id</c>, numeric or text.</summary>
-    public static string? ManifestLibraryKey(WireObject library)
+    /// <summary>A library's id (<c>id</c> in the manifest, <c>libraryId</c> in the download destinations), numeric or text.</summary>
+    public static string? ManifestLibraryKey(WireObject library, string idField = "id")
     {
         ArgumentNullException.ThrowIfNull(library);
-        var number = ManagerValues.FirstNumber(library, "id");
-        return number is { } n ? n.ToString(CultureInfo.InvariantCulture) : ManagerValues.FirstText(library, "id");
+        var number = ManagerValues.FirstNumber(library, idField);
+        return number is { } n ? n.ToString(CultureInfo.InvariantCulture) : ManagerValues.FirstText(library, idField);
     }
 
     /// <summary>A manifest library, read against the confirmed Deluno contract.</summary>

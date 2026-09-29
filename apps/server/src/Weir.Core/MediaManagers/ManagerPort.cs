@@ -154,6 +154,15 @@ public class MediaManagerHttpException : Exception
         : base(message, innerException)
     {
     }
+
+    public MediaManagerHttpException(string message, int statusCode)
+        : base(message)
+    {
+        StatusCode = statusCode;
+    }
+
+    /// <summary>The HTTP status the manager answered with, when it answered at all.</summary>
+    public int? StatusCode { get; }
 }
 
 /// <summary>The manager answered 429. Back off; never retry inside the call.</summary>
