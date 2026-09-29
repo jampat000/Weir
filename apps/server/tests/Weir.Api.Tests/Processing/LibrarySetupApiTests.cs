@@ -297,15 +297,19 @@ public sealed class LibrarySetupApiTests
     }
 
     [Fact]
-    public async Task Suggestions_are_refused_without_a_session()
+    public async Task Suggestions_need_an_operator_session()
     {
         var (server, _, _) = await StartAsync();
         await using var _server = server;
-        var anonymous = new ApiTestClient(server);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await new ApiTestClient(server).GetAsync(Suggestions)).StatusCode);
 
-        using var response = await anonymous.GetAsync(Suggestions);
+        await TestDatabase.SeedViewerAsync(server);
+        var viewer = new ApiTestClient(server);
+        await viewer.SignInAsync("bob", ViewerPassword);
 
-        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        using var response = await viewer.GetAsync(Suggestions);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
     [Fact]

@@ -55,7 +55,7 @@ internal sealed class ProcessingLibrarySetupEndpointHandlers
     /// clients know a folder for, and a plain sentence for each connection that could not say.</summary>
     public async Task<ApiResult> GetLibrarySuggestionsAsync(ApiRequest request)
     {
-        await request.RequireUserAsync().ConfigureAwait(false);
+        await request.RequireUserAsync(UserRoles.OperatorOrAdmin).ConfigureAwait(false);
         var uow = await request.DbAsync().ConfigureAwait(false);
         var suggested = await _suggestions.SuggestAsync(uow, request.Context.RequestAborted).ConfigureAwait(false);
         return ApiRoutes.Ok(new WireObject()
