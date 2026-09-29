@@ -116,6 +116,22 @@ class AuditPublicMixin:
             self.visible(wizard_or_shell, "setup wizard or the signed-in shell after login")
 
         if wizard_skip.count() and wizard_skip.is_visible():
+            self.visible(
+                self.page.get_by_text("How do your downloads reach Weir?"),
+                "setup wizard asks how downloads reach Weir first",
+            )
+            self.require(
+                self.page.get_by_role("radio").count() == 4,
+                "setup wizard does not offer Deluno, Sonarr / Radarr, a download client and Neither",
+            )
+            self.click(
+                self.page.get_by_role("radio", name="Neither"),
+                "choose to pick the folders yourself in the setup wizard",
+            )
+            self.visible(
+                self.page.get_by_role("textbox", name="Movies watched folder"),
+                "setup wizard shows the typed-folder form for Neither",
+            )
             self.click(
                 wizard_skip, "skip setup wizard after exercising its entry path"
             )

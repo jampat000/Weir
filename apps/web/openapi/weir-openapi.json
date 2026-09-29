@@ -2117,6 +2117,199 @@
         "title": "LibraryFoldersOut",
         "type": "object"
       },
+      "ProposedLibraryCheckIn": {
+        "additionalProperties": false,
+        "description": "The Movies and TV folders to check. A media type with neither folder is left out of the answer.",
+        "properties": {
+          "csrf_token": {
+            "minLength": 1,
+            "title": "Csrf Token",
+            "type": "string"
+          },
+          "movie_watched_folder": {
+            "default": "",
+            "description": "Where Movies downloads land.",
+            "maxLength": 4000,
+            "title": "Movie Watched Folder",
+            "type": "string"
+          },
+          "movie_output_folder": {
+            "default": "",
+            "description": "Where cleaned Movies files go.",
+            "maxLength": 4000,
+            "title": "Movie Output Folder",
+            "type": "string"
+          },
+          "tv_watched_folder": {
+            "default": "",
+            "description": "Where TV downloads land.",
+            "maxLength": 4000,
+            "title": "Tv Watched Folder",
+            "type": "string"
+          },
+          "tv_output_folder": {
+            "default": "",
+            "description": "Where cleaned TV files go.",
+            "maxLength": 4000,
+            "title": "Tv Output Folder",
+            "type": "string"
+          }
+        },
+        "required": [
+          "csrf_token"
+        ],
+        "title": "ProposedLibraryCheckIn",
+        "type": "object"
+      },
+      "ProposedLibraryCheckItemOut": {
+        "description": "What one proposed library would run into. `problem` is the sentence creating it would be refused with; otherwise `chain` is its folder chain, with `library_id` 0 because nothing is saved.",
+        "properties": {
+          "problem": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Problem"
+          },
+          "chain": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LibraryFolderChainOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "problem",
+          "chain"
+        ],
+        "title": "ProposedLibraryCheckItemOut",
+        "type": "object"
+      },
+      "ProposedLibraryCheckOut": {
+        "properties": {
+          "movie": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProposedLibraryCheckItemOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "tv": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProposedLibraryCheckItemOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "movie",
+          "tv"
+        ],
+        "title": "ProposedLibraryCheckOut",
+        "type": "object"
+      },
+      "SuggestedLibraryOut": {
+        "description": "A library setup can offer to create or fill in. Never saved by itself: the person confirms and edits it first.",
+        "properties": {
+          "library_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The existing library with no folders yet that this would fill in, or null when it would be a new one.",
+            "title": "Library Id"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "media_type": {
+            "enum": [
+              "movie",
+              "tv"
+            ],
+            "title": "Media Type",
+            "type": "string"
+          },
+          "watched_folder": {
+            "title": "Watched Folder",
+            "type": "string"
+          },
+          "output_folder": {
+            "description": "Empty when there is no sensible default.",
+            "title": "Output Folder",
+            "type": "string"
+          },
+          "source_label": {
+            "description": "Who reported the watched folder, e.g. Deluno or SABnzbd.",
+            "title": "Source Label",
+            "type": "string"
+          },
+          "manager_connection_ids": {
+            "description": "The media managers that cover this media type.",
+            "items": {
+              "type": "integer"
+            },
+            "title": "Manager Connection Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "library_id",
+          "name",
+          "media_type",
+          "watched_folder",
+          "output_folder",
+          "source_label",
+          "manager_connection_ids"
+        ],
+        "title": "SuggestedLibraryOut",
+        "type": "object"
+      },
+      "LibrarySuggestionsOut": {
+        "properties": {
+          "libraries": {
+            "items": {
+              "$ref": "#/components/schemas/SuggestedLibraryOut"
+            },
+            "title": "Libraries",
+            "type": "array"
+          },
+          "notes": {
+            "description": "Plain sentences about anything connected that could not say where its downloads are saved.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Notes",
+            "type": "array"
+          }
+        },
+        "required": [
+          "libraries",
+          "notes"
+        ],
+        "title": "LibrarySuggestionsOut",
+        "type": "object"
+      },
       "LibraryLeaveAloneIn": {
         "additionalProperties": false,
         "description": "Library mode: set one file aside so nothing cleans it, or bring it back. Weir server (.NET) only.",
@@ -15364,6 +15557,48 @@
         ]
       }
     },
+    "/api/v1/processing/library-check": {
+      "post": {
+        "description": "Check the folders a first-run setup is about to create Movies and TV libraries with, before anything is created: what creating them would be refused for, and for a folder that passes, its folder chain. Saves nothing.",
+        "operationId": "post_processing_library_check_api_v1_processing_library_check_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProposedLibraryCheckIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProposedLibraryCheckOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Processing Library Check",
+        "tags": [
+          "processing"
+        ]
+      }
+    },
     "/api/v1/processing/library-cleans": {
       "get": {
         "description": "What the newest library clean did to each library file, filtered the way the file list is.",
@@ -15459,6 +15694,28 @@
         "summary": "Get Library Cleans",
         "tags": [
           "processing",
+          "processing"
+        ]
+      }
+    },
+    "/api/v1/processing/library-suggestions": {
+      "get": {
+        "description": "The libraries first-run setup can offer once a media manager or download client is connected: one per media type, with the watched folder the connection already knows and a default output folder beside it. Read only: nothing is created.",
+        "operationId": "get_processing_library_suggestions_api_v1_processing_library_suggestions_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LibrarySuggestionsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Processing Library Suggestions",
+        "tags": [
           "processing"
         ]
       }

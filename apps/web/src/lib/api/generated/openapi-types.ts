@@ -1526,6 +1526,26 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/processing/library-check": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Post Processing Library Check
+     * @description Check the folders a first-run setup is about to create Movies and TV libraries with, before anything is created: what creating them would be refused for, and for a folder that passes, its folder chain. Saves nothing.
+     */
+    post: operations["post_processing_library_check_api_v1_processing_library_check_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/processing/library-cleans": {
     parameters: {
       query?: never;
@@ -1538,6 +1558,26 @@ export interface paths {
      * @description What the newest library clean did to each library file, filtered the way the file list is.
      */
     get: operations["get_library_cleans_api_v1_library_cleans_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/processing/library-suggestions": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Processing Library Suggestions
+     * @description The libraries first-run setup can offer once a media manager or download client is connected: one per media type, with the watched folder the connection already knows and a default output folder beside it. Read only: nothing is created.
+     */
+    get: operations["get_processing_library_suggestions_api_v1_processing_library_suggestions_get"];
     put?: never;
     post?: never;
     delete?: never;
@@ -3171,6 +3211,97 @@ export interface components {
     LibraryFoldersOut: {
       /** Libraries */
       libraries: components["schemas"]["PublishedLibraryFoldersOut"][];
+    };
+    /**
+     * ProposedLibraryCheckIn
+     * @description The Movies and TV folders to check. A media type with neither folder is left out of the answer.
+     */
+    ProposedLibraryCheckIn: {
+      /** Csrf Token */
+      csrf_token: string;
+      /**
+       * Movie Watched Folder
+       * @description Where Movies downloads land.
+       * @default
+       */
+      movie_watched_folder: string;
+      /**
+       * Movie Output Folder
+       * @description Where cleaned Movies files go.
+       * @default
+       */
+      movie_output_folder: string;
+      /**
+       * Tv Watched Folder
+       * @description Where TV downloads land.
+       * @default
+       */
+      tv_watched_folder: string;
+      /**
+       * Tv Output Folder
+       * @description Where cleaned TV files go.
+       * @default
+       */
+      tv_output_folder: string;
+    };
+    /**
+     * ProposedLibraryCheckItemOut
+     * @description What one proposed library would run into. `problem` is the sentence creating it would be refused with; otherwise `chain` is its folder chain, with `library_id` 0 because nothing is saved.
+     */
+    ProposedLibraryCheckItemOut: {
+      /** Problem */
+      problem: string | null;
+      chain: components["schemas"]["LibraryFolderChainOut"] | null;
+    };
+    /** ProposedLibraryCheckOut */
+    ProposedLibraryCheckOut: {
+      movie: components["schemas"]["ProposedLibraryCheckItemOut"] | null;
+      tv: components["schemas"]["ProposedLibraryCheckItemOut"] | null;
+    };
+    /**
+     * SuggestedLibraryOut
+     * @description A library setup can offer to create or fill in. Never saved by itself: the person confirms and edits it first.
+     */
+    SuggestedLibraryOut: {
+      /**
+       * Library Id
+       * @description The existing library with no folders yet that this would fill in, or null when it would be a new one.
+       */
+      library_id: number | null;
+      /** Name */
+      name: string;
+      /**
+       * Media Type
+       * @enum {string}
+       */
+      media_type: "movie" | "tv";
+      /** Watched Folder */
+      watched_folder: string;
+      /**
+       * Output Folder
+       * @description Empty when there is no sensible default.
+       */
+      output_folder: string;
+      /**
+       * Source Label
+       * @description Who reported the watched folder, e.g. Deluno or SABnzbd.
+       */
+      source_label: string;
+      /**
+       * Manager Connection Ids
+       * @description The media managers that cover this media type.
+       */
+      manager_connection_ids: number[];
+    };
+    /** LibrarySuggestionsOut */
+    LibrarySuggestionsOut: {
+      /** Libraries */
+      libraries: components["schemas"]["SuggestedLibraryOut"][];
+      /**
+       * Notes
+       * @description Plain sentences about anything connected that could not say where its downloads are saved.
+       */
+      notes: string[];
     };
     /**
      * LibraryLeaveAloneIn
@@ -10313,6 +10444,39 @@ export interface operations {
       };
     };
   };
+  post_processing_library_check_api_v1_processing_library_check_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ProposedLibraryCheckIn"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ProposedLibraryCheckOut"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
   get_library_cleans_api_v1_library_cleans_get: {
     parameters: {
       query?: {
@@ -10343,6 +10507,26 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_processing_library_suggestions_api_v1_processing_library_suggestions_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["LibrarySuggestionsOut"];
         };
       };
     };

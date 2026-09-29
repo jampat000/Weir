@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { AuthBrandStack } from "../../components/brand/auth-brand-stack";
 import { ServerFolderPickerButton } from "../../components/ui/server-folder-picker-button";
 import { mmActionButtonClass } from "../../lib/ui/mm-control-roles";
+import type { ConnectedSource } from "./wizard-source";
 
 const BACKUP_INTERVAL_OPTIONS = [
   { value: "24", label: "Every day" },
@@ -147,23 +148,43 @@ export function BackupFields({
   );
 }
 
-const NEXT_STEPS = [
-  {
-    label: "Choose which tracks to keep",
-    to: "/settings?tab=rules",
-  },
-  {
-    label: "Connect Sonarr, Radarr or Deluno",
-    to: "/settings?tab=media-managers",
-  },
-  {
-    label: "Clean files you already have",
-    to: "/library",
-  },
-] as const;
+const KEEP_TRACKS_STEP = {
+  label: "Choose which tracks to keep",
+  to: "/settings?tab=rules",
+};
+const CONNECT_STEP = {
+  label: "Connect Sonarr, Radarr or Deluno",
+  to: "/settings?tab=media-managers",
+};
+const MAPPING_STEP = {
+  label: "Finish setting up Sonarr and Radarr",
+  to: "/settings?tab=libraries",
+};
+const CLEAN_STEP = {
+  label: "Clean files you already have",
+  to: "/library",
+};
+
+/**
+ * What is worth doing next. Connecting a manager is offered only when none was connected in setup; Sonarr and
+ * Radarr need a remote path mapping before they pick up what Weir writes, which the library editor shows.
+ */
+function nextSteps(connected: ConnectedSource | null) {
+  return [
+    KEEP_TRACKS_STEP,
+    ...(connected === null ? [CONNECT_STEP] : []),
+    ...(connected === "arr" ? [MAPPING_STEP] : []),
+    CLEAN_STEP,
+  ];
+}
 
 /** The wizard's last screen: setup is done, and here is what is worth doing next. */
-export function WizardWhatsNext() {
+export function WizardWhatsNext({
+  connected,
+}: {
+  /** What was connected in setup, or null when nothing was. */
+  connected: ConnectedSource | null;
+}) {
   return (
     <main className="mm-auth-body" id="mm-main-content" tabIndex={-1}>
       <div className="mm-auth-frame">
@@ -176,7 +197,7 @@ export function WizardWhatsNext() {
             doing next, whenever you are ready.
           </p>
           <ul className="mm-quiet-stack mt-4 list-none">
-            {NEXT_STEPS.map((step) => (
+            {nextSteps(connected).map((step) => (
               <li key={step.to}>
                 <Link
                   to={step.to}
