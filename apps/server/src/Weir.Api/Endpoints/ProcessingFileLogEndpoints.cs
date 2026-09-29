@@ -30,12 +30,14 @@ internal sealed class ProcessingFileLogEndpointHandlers
     private readonly OperatorSettingsStore _operatorSettings;
     private readonly FileLogStore _fileLogs;
     private readonly FileStateStore _files;
+    private readonly LibraryStore _libraries;
 
-    public ProcessingFileLogEndpointHandlers(OperatorSettingsStore operatorSettings, FileLogStore fileLogs, FileStateStore files)
+    public ProcessingFileLogEndpointHandlers(OperatorSettingsStore operatorSettings, FileLogStore fileLogs, FileStateStore files, LibraryStore libraries)
     {
         _operatorSettings = operatorSettings ?? throw new ArgumentNullException(nameof(operatorSettings));
         _fileLogs = fileLogs ?? throw new ArgumentNullException(nameof(fileLogs));
         _files = files ?? throw new ArgumentNullException(nameof(files));
+        _libraries = libraries ?? throw new ArgumentNullException(nameof(libraries));
     }
 
     public async Task<ApiResult> GetFileLogAsync(ApiRequest request)
@@ -50,13 +52,16 @@ internal sealed class ProcessingFileLogEndpointHandlers
         var row = await ProcessingFilesEndpoints.RequireFileAsync(uow, _files, id).ConfigureAwait(false);
         var operatorRow = await _operatorSettings.EnsureAsync(uow).ConfigureAwait(false);
         var rows = await _fileLogs.LogsForFileAsync(uow, row.RelativePath, limit).ConfigureAwait(false);
+        var target = (await _libraries.ManagerConnectionIdsAsync(uow, row.LibraryId).ConfigureAwait(false)).Count == 0
+            ? HandBackTarget.OutputFolder
+            : HandBackTarget.MediaManager;
         await request.CommitAsync().ConfigureAwait(false);
 
         var entries = new List<WireValue>();
         foreach (var entry in rows)
         {
             var detail = _fileLogs.ParseDetail(entry.DetailJson);
-            var story = FileStory.NarratePass(detail, entry.LibraryName);
+            var story = FileStory.NarratePass(detail, entry.LibraryName, target);
             entries.Add(new WireObject()
                 .Set("id", entry.Id)
                 .Set("recorded_at", entry.RecordedAt.ToWireText())
