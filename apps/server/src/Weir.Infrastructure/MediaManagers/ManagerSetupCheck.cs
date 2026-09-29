@@ -152,6 +152,6 @@ public sealed class ManagerSetupCheck
         var description = await port.DescribeAsync(connection, cancellationToken).ConfigureAwait(false);
         return description.Status != SignalStatus.Reported
             ? new DelunoSetupResult(null, null, [new SetupCheckLine(SetupCheckLine.Problem, description.Detail ?? $"{label} did not answer.")])
-            : ManagerSetupRules.EvaluateDeluno(label, mediaScope, watchedFolder, outputFolder, description.Libraries);
+            : ManagerSetupRules.EvaluateDeluno(label, mediaScope, watchedFolder, outputFolder, description.Libraries, description.DownloadClients);
     }
 }
