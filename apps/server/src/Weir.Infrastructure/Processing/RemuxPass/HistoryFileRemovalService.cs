@@ -128,7 +128,7 @@ public sealed class HistoryFileRemovalService
         var library = await RemuxPassHandler.ResolveLibraryAsync(uow, _libraries, file.LibraryId, null).ConfigureAwait(false);
         if (library is null)
         {
-            return await FinishDeleteAsync(uow, file, new RejectRouteOutcome(false, "The library this file belonged to no longer exists.")).ConfigureAwait(false);
+            return await FinishDeleteAsync(uow, file, new RejectRouteOutcome(false, "The workflow this file belonged to no longer exists.")).ConfigureAwait(false);
         }
 
         string source;
@@ -186,7 +186,7 @@ public sealed class HistoryFileRemovalService
         var library = await RemuxPassHandler.ResolveLibraryAsync(uow, _libraries, file.LibraryId, null).ConfigureAwait(false);
         if (library is null)
         {
-            return await FinishKeepAsync(uow, file, new RejectRouteOutcome(false, "The library this file belonged to no longer exists.")).ConfigureAwait(false);
+            return await FinishKeepAsync(uow, file, new RejectRouteOutcome(false, "The workflow this file belonged to no longer exists.")).ConfigureAwait(false);
         }
 
         string source;

@@ -15,14 +15,14 @@ import { ConnectionFolderChain } from "./connection-folder-chain";
 import { ConnectionSetup } from "./connection-setup";
 import {
   ConnectionStatusPanel,
-  LinkedLibraries,
+  FedWorkflows,
   UnsignedWebhookWarning,
 } from "./connection-status";
 
 const TEST_FAILURE = "The media manager could not be tested.";
 const TOGGLE_FAILURE = "This media manager could not be turned on or off.";
 
-function RemoveConnectionDialog({
+export function RemoveConnectionDialog({
   connection,
   remove,
   onClose,
@@ -100,7 +100,7 @@ export function ConnectionCard({
       <div className="mm-quiet-section__body">
         <ConnectionStatusPanel connection={connection} fmt={fmt} />
         <UnsignedWebhookWarning connection={connection} />
-        <LinkedLibraries connectionId={connection.id} />
+        <FedWorkflows connection={connection} />
 
         <div className="mt-3 flex flex-wrap gap-2">
           <button

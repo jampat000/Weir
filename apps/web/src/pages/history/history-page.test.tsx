@@ -532,7 +532,7 @@ describe("HistoryPage", () => {
     ];
     processKeptAgain.mockResolvedValue({
       detail:
-        "Weir is checking this file's library now and will queue it once it is ready.",
+        "Weir is checking this file's workflow now and will queue it once it is ready.",
     });
     renderPage("/history?show=kept");
 
@@ -544,7 +544,7 @@ describe("HistoryPage", () => {
 
     expect(
       await screen.findByText(
-        "Weir is checking this file's library now and will queue it once it is ready.",
+        "Weir is checking this file's workflow now and will queue it once it is ready.",
       ),
     ).toBeInTheDocument();
     expect(processKeptAgain).toHaveBeenCalledWith(7);

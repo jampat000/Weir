@@ -6,6 +6,7 @@
  */
 
 import { QuietFieldGroup } from "../../../../components/shared/quiet-section";
+import { SetupCheckLines } from "../../../../components/shared/setup-check-lines";
 import type { ProcessingMediaType } from "../../../../lib/processing/libraries-api";
 import {
   READINESS_CLASSES,
@@ -18,53 +19,6 @@ import type { ProcessingManagerSetupItem } from "../../../../lib/processing/libr
 import { useLibraryFolderChainQuery } from "../../../../lib/processing/libraries-queries";
 import { useDebouncedValue } from "../../../../lib/ui/use-debounced-value";
 import { FOLDER_CHECK_SETTLE_MS } from "./folder-check-settle";
-
-function ChainLines({ lines }: { lines: FolderChainLine[] }) {
-  return (
-    <ul className="space-y-1.5 text-sm leading-5">
-      {lines.map((line, index) => (
-        <li key={index} className="flex gap-2">
-          <span
-            aria-hidden="true"
-            className={
-              line.state === "ok"
-                ? "mm-status-text--healthy"
-                : line.state === "problem"
-                  ? "mm-status-text--warning"
-                  : "text-mm-text3"
-            }
-          >
-            {line.state === "ok"
-              ? "✓"
-              : line.state === "problem"
-                ? "✗"
-                : line.state === "unverified"
-                  ? "?"
-                  : "·"}
-          </span>
-          <span
-            className={
-              line.state === "problem"
-                ? "mm-status-text--warning"
-                : "text-mm-text2"
-            }
-          >
-            <span className="sr-only">
-              {line.state === "ok"
-                ? "Fine: "
-                : line.state === "problem"
-                  ? "Needs a fix: "
-                  : line.state === "unverified"
-                    ? "Not verified: "
-                    : "Note: "}
-            </span>
-            {line.text}
-          </span>
-        </li>
-      ))}
-    </ul>
-  );
-}
 
 function ReadinessBadge({
   ready,
@@ -88,7 +42,7 @@ function ManagerSection({ item }: { item: ProcessingManagerSetupItem }) {
         {item.label}
         <ReadinessBadge ready={item.ready} lines={item.lines} />
       </p>
-      <ChainLines lines={item.lines} />
+      <SetupCheckLines label={item.label} lines={item.lines} />
     </section>
   );
 }
@@ -104,7 +58,7 @@ function DownloadClientSection({
         {item.label}
         <ReadinessBadge ready={item.ready} lines={item.lines} />
       </p>
-      <ChainLines lines={item.lines} />
+      <SetupCheckLines label={item.label} lines={item.lines} />
     </section>
   );
 }
@@ -147,7 +101,7 @@ export function LibraryFolderChain({
         detail="Whether Weir's own folders line up, end to end, and whether each connected media manager will pick up what Weir writes."
       >
         <p className="mm-quiet-note">
-          Save this library first to check its folder chain.
+          Save this workflow first to check its folder chain.
         </p>
       </QuietFieldGroup>
     );
@@ -170,10 +124,12 @@ export function LibraryFolderChain({
     >
       <div data-testid="library-folder-chain" className="space-y-6">
         {chain.isLoading ? (
-          <p className="mm-quiet-note">Checking this library&apos;s folders…</p>
+          <p className="mm-quiet-note">
+            Checking this workflow&apos;s folders…
+          </p>
         ) : chain.isError ? (
           <p className="mm-quiet-note mm-status-text--warning" role="alert">
-            Weir could not check this library&apos;s folder chain just now. Try
+            Weir could not check this workflow&apos;s folder chain just now. Try
             Check again in a moment.
           </p>
         ) : chain.data ? (
@@ -186,7 +142,10 @@ export function LibraryFolderChain({
                   lines={chain.data.local.lines}
                 />
               </p>
-              <ChainLines lines={chain.data.local.lines} />
+              <SetupCheckLines
+                label="Weir's own folders"
+                lines={chain.data.local.lines}
+              />
             </section>
             {chain.data.managers.map((item) => (
               <ManagerSection key={item.connection_id} item={item} />

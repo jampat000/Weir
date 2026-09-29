@@ -95,7 +95,7 @@ function ScanNowButton({
         className={mmActionButtonClass({ variant: "secondary" })}
         disabled={!editable || !watchedSet || queueScan.isPending}
         title={
-          watchedSet ? undefined : "This library has no watched folder yet."
+          watchedSet ? undefined : "This workflow has no watched folder yet."
         }
         onClick={() =>
           queueScan.mutate({
@@ -145,7 +145,7 @@ export function LibraryHoursRow({
       <th scope="row" className="mm-quiet-table__name">
         {library.name}
         {!library.enabled ? (
-          <span className="mm-quiet-table__sub">Switched off in Libraries</span>
+          <span className="mm-quiet-table__sub">Switched off in Workflows</span>
         ) : null}
       </th>
       <td data-label="Week">

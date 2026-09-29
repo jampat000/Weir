@@ -39,3 +39,9 @@ public sealed record ManagerDownloadClientDescriptor(string Name, bool Enabled, 
 
 /// <summary>What a Deluno check found: the folders it reports for this media type, and the lines to show.</summary>
 public sealed record DelunoSetupResult(string? WatchedFolder, string? OutputFolder, IReadOnlyList<SetupCheckLine> Lines);
+
+/// <summary>
+/// The folders one connected Sonarr, Radarr or Deluno reports for a media type, before any library exists to compare
+/// them with. <see cref="Problem"/> is the plain sentence to show when it has no watched folder to offer.
+/// </summary>
+public sealed record ManagerFolderSuggestion(long ConnectionId, string Label, string? WatchedFolder, string? OutputFolder, string? Problem);

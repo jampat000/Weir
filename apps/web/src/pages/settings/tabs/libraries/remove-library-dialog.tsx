@@ -27,11 +27,11 @@ export function RemoveLibraryDialog({
           media file is touched. This cannot be undone.
         </p>
       }
-      confirmLabel="Remove library"
+      confirmLabel="Remove workflow"
       busy={remove.isPending}
       error={
         remove.isError
-          ? errorMessage(remove.error, "That library could not be removed.")
+          ? errorMessage(remove.error, "That workflow could not be removed.")
           : null
       }
       onCancel={() => {

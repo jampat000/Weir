@@ -89,7 +89,7 @@ describe("SettingsPage", () => {
 
   it("puts the tab in the address, so it can be bookmarked and gone back to", () => {
     const router = renderAt("/settings");
-    expect(selectedTab()).toBe("Libraries");
+    expect(selectedTab()).toBe("Workflows");
 
     fireEvent.click(screen.getByRole("tab", { name: "Alerts" }));
     expect(router.state.location.search).toBe("?tab=alerts");
@@ -103,7 +103,7 @@ describe("SettingsPage", () => {
 
     await act(() => router.navigate(-1));
     expect(router.state.location.search).toBe("");
-    expect(selectedTab()).toBe("Libraries");
+    expect(selectedTab()).toBe("Workflows");
     expect(screen.getByText("Libraries content")).toBeInTheDocument();
 
     await act(() => router.navigate(1));
@@ -111,7 +111,7 @@ describe("SettingsPage", () => {
 
     // The side menu's Settings link is a plain /settings.
     await act(() => router.navigate("/settings"));
-    expect(selectedTab()).toBe("Libraries");
+    expect(selectedTab()).toBe("Workflows");
   });
 
   describe("with unsaved changes on a tab", () => {

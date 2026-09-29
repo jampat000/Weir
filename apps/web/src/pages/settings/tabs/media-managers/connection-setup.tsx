@@ -33,8 +33,8 @@ function ArrInstructions({ name }: { name: string }) {
         data-testid="media-manager-mapping-pointer"
       >
         {name} picks up what Weir cleans through a remote path mapping from a
-        library&apos;s watched folder to its output folder. Open that library
-        under Settings → Libraries: its editor shows the exact values to enter
+        workflow&apos;s watched folder to its output folder. Open that workflow
+        under Settings → Workflows: its editor shows the exact values to enter
         and checks that {name} has them.
       </p>
       <p

@@ -271,13 +271,13 @@ public static class WatchedFolderScanOps
         var watchedRaw = (library.WatchedFolder ?? string.Empty).Trim();
         if (watchedRaw.Length == 0)
         {
-            return (null, $"The {label} library has no watched folder set. Manual remux and folder-scan jobs need a watched folder to resolve relative paths. Set it on Processing → Libraries before enqueueing or running those jobs.");
+            return (null, $"The {label} workflow has no watched folder set. Manual remux and folder-scan jobs need a watched folder to resolve relative paths. Set it in Settings › Workflows before enqueueing or running those jobs.");
         }
 
         var watchedPath = ProcessingLibraryFolders.ExpandForFilesystem(watchedRaw);
         if (!Directory.Exists(watchedPath))
         {
-            return (null, $"The {label} library's watched folder must be an existing directory.");
+            return (null, $"The {label} workflow's watched folder must be an existing directory.");
         }
 
         var folderRow = new ProcessingLibraryFolderRow(library.Id, library.MediaType, (int)library.DisplayOrder, library.WorkFolder, library.OutputFolder);
@@ -289,13 +289,13 @@ public static class WatchedFolderScanOps
         var outRaw = (library.OutputFolder ?? string.Empty).Trim();
         if (outRaw.Length == 0)
         {
-            return (null, $"The {label} library has no output folder set. Set it on Processing → Libraries before running a live remux pass.");
+            return (null, $"The {label} workflow has no output folder set. Set it in Settings › Workflows before running a live remux pass.");
         }
 
         var outputPath = ProcessingLibraryFolders.ExpandForFilesystem(outRaw);
         if (!Directory.Exists(outputPath))
         {
-            return (null, $"The {label} library's output folder must be an existing directory.");
+            return (null, $"The {label} workflow's output folder must be an existing directory.");
         }
 
         var separationError = ValidatePathSeparation(watchedPath, workPath, outputPath);
@@ -306,7 +306,7 @@ public static class WatchedFolderScanOps
 
         if (!workIsDefault && !Directory.Exists(workPath))
         {
-            return (null, $"The {label} library's work/temp folder must be an existing directory when set to a custom path.");
+            return (null, $"The {label} workflow's work/temp folder must be an existing directory when set to a custom path.");
         }
 
         return (new ProcessingScanPathRuntime(watchedPath, outputPath, workPath), null);

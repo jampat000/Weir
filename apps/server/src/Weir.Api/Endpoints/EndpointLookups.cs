@@ -12,7 +12,7 @@ namespace Weir.Api.Endpoints;
 /// <summary>Route lookups that several endpoint groups share: a row by id, or a 404 with a fixed detail.</summary>
 internal static class EndpointLookups
 {
-    public const string NoSuchLibrary = "That library does not exist.";
+    public const string NoSuchLibrary = "That workflow does not exist.";
 
     public const string NoSuchConnection = "That media manager connection does not exist.";
 

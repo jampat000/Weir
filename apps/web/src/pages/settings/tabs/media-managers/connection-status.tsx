@@ -1,3 +1,5 @@
+import { Link } from "react-router-dom";
+
 import type { MediaManagerConnection } from "../../../../lib/media-managers/media-managers-api";
 import { useProcessingLibrariesQuery } from "../../../../lib/processing/libraries-queries";
 
@@ -92,28 +94,53 @@ export function UnsignedWebhookWarning({
   );
 }
 
-/** The libraries linked to this app, so it is plain what depends on it. */
-export function LinkedLibraries({ connectionId }: { connectionId: number }) {
+/** Managers Weir can read folders from, and so can offer to start a workflow from. */
+const OFFERS_WORKFLOWS: MediaManagerConnection["kind"][] = [
+  "deluno",
+  "sonarr",
+  "radarr",
+];
+
+/**
+ * The workflows this connection feeds, so it is plain what depends on it, and a way to start one from what it
+ * reports. A workflow linked to it is fed by it; a Weir only workflow is not, and is listed on its own.
+ */
+export function FedWorkflows({
+  connection,
+}: {
+  connection: MediaManagerConnection;
+}) {
   const libraries = useProcessingLibrariesQuery();
   if (!libraries.data) return null;
-  const linked = libraries.data.filter((library) =>
-    library.manager_connection_ids.includes(connectionId),
+  const fed = libraries.data.filter((library) =>
+    library.manager_connection_ids.includes(connection.id),
   );
   return (
     <p
       className="mt-2 text-xs text-mm-text2"
       data-testid="media-manager-libraries"
     >
-      {linked.length > 0 ? (
+      {fed.length > 0 ? (
         <>
-          Libraries:{" "}
+          Workflows it feeds:{" "}
           <span className="font-medium text-mm-text">
-            {linked.map((library) => library.name).join(", ")}
+            {fed.map((library) => library.name).join(", ")}
           </span>
         </>
       ) : (
-        "No library uses it yet. Link one in Settings › Libraries."
+        "No workflow is linked to it yet."
       )}
+      {OFFERS_WORKFLOWS.includes(connection.kind) ? (
+        <>
+          {" "}
+          <Link
+            className="mm-quiet-link"
+            to={`/settings?tab=libraries&addFrom=${connection.id}`}
+          >
+            Add a workflow from {connection.name}
+          </Link>
+        </>
+      ) : null}
     </p>
   );
 }

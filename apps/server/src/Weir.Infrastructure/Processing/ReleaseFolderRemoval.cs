@@ -60,7 +60,7 @@ public static partial class ReleaseFolderRemoval
         var folder = Path.GetDirectoryName(Path.GetFullPath(file));
         if (folder is null || !PathContainment.IsUnder(root, folder))
         {
-            return new ReleaseRemoval(ReleaseRemovalKind.NothingRemoved, "The release folder is not inside the library folder, so Weir did not change it.");
+            return new ReleaseRemoval(ReleaseRemovalKind.NothingRemoved, "The release folder is not inside the workflow's folder, so Weir did not change it.");
         }
 
         if (PathContainment.HasLinkBelowRoot(root, folder))

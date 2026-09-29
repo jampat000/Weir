@@ -148,8 +148,8 @@ export function LibraryToolbar({
       <input
         type="search"
         className="mm-input mm-library-search"
-        placeholder="Search this library"
-        aria-label="Search this library"
+        placeholder="Search this workflow"
+        aria-label="Search this workflow"
         value={search}
         onChange={(event) => onSearch(event.target.value)}
       />

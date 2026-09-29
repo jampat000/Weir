@@ -72,7 +72,7 @@ public sealed class WatcherStateAndPendingChangesTests
         var (ok, detail) = store.Summary();
 
         Assert.True(ok);
-        Assert.Contains("No libraries", detail, StringComparison.Ordinal);
+        Assert.Contains("No workflows", detail, StringComparison.Ordinal);
     }
 
     [Fact]

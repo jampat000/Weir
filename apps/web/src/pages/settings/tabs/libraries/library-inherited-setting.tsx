@@ -51,7 +51,7 @@ export function InheritedNumberSetting({
           disabled={!binding.editable}
           onClick={() => binding.update({ [name]: String(inherited ?? 0) })}
         >
-          Set for this library
+          Set for this workflow
         </button>
         {hint ? <span className="mm-field__hint">{hint}</span> : null}
       </div>

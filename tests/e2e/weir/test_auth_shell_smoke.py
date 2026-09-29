@@ -40,6 +40,13 @@ def test_auth_shell_bootstrap_login_logout_guard(weir_shell: str) -> None:
             # Bootstrap signs the new admin in directly (#704): no separate sign-in screen follows.
             expect(page).to_have_url(re.compile(r".*/setup-wizard"))
             expect(page.get_by_role("heading", name="Set up Weir")).to_be_visible()
+
+            # A new install asks how downloads reach Weir before it shows any folder.
+            expect(page.get_by_text("How do your downloads reach Weir?")).to_be_visible()
+            expect(page.get_by_role("radio")).to_have_count(4)
+            expect(page.get_by_role("textbox", name="Movies watched folder")).to_have_count(0)
+            page.get_by_role("radio", name=re.compile("Neither")).check()
+            expect(page.get_by_role("textbox", name="Movies watched folder")).to_be_visible()
             page.get_by_test_id("setup-wizard-skip").click()
 
             expect(page).to_have_url(re.compile(r".*/(?:$|[/?#])"))

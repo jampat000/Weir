@@ -74,7 +74,7 @@ public sealed class ReadinessTests
             [
                 new ReadinessStep("database", "ready", "Local database is connected and migrations are complete."),
                 new ReadinessStep("workers", "ready", "Background workers and schedules are ready."),
-                new ReadinessStep("filesystem_watcher", "ready", "No libraries are being watched for filesystem events."),
+                new ReadinessStep("filesystem_watcher", "ready", "No workflows are being watched for filesystem events."),
             ],
             report.Steps);
     }

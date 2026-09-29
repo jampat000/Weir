@@ -34,7 +34,7 @@ type TabId =
   | "alerts";
 
 const SETTINGS_TABS: readonly WorkspaceTabOption<TabId>[] = [
-  { id: "libraries", label: "Libraries" },
+  { id: "libraries", label: "Workflows" },
   { id: "rules", label: "Rules" },
   { id: "media-managers", label: "Media managers" },
   { id: "performance", label: "Performance" },

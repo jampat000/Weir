@@ -95,7 +95,7 @@ function FolderList({
       {folders.length === 0 ? (
         <li className="mm-library-cleaning__empty">
           No folders yet, so the Library screen has nothing to show for this
-          library.
+          workflow.
         </li>
       ) : null}
     </ul>
@@ -158,7 +158,7 @@ function DailyCleanWarning({
     >
       <p>
         Once a day Weir will check these folders and remove the tracks this
-        library&apos;s rules remove, from every file that has them, without
+        workflow&apos;s rules remove, from every file that has them, without
         asking each time. Removed tracks cannot be put back. Files you have left
         alone are never touched.
       </p>
@@ -242,7 +242,7 @@ export function LibraryCleaningSettings({
       <div className="mm-library-cleaning__switches">
         <MmOnOffSwitch
           id={`library-${libraryId}-daily-clean`}
-          label="Check and clean once a day, inside this library's hours"
+          label="Check and clean once a day, inside this workflow's hours"
           enabled={draft.library_schedule_enabled}
           disabled={!editable || folders.length === 0}
           onChange={(next) =>

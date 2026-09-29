@@ -72,6 +72,6 @@ public sealed partial class VanishedFileSweepTask : IPeriodicTask
         }
     }
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "Forgot {Count} file(s) that left the watched folder of library {Library}: {Paths}")]
+    [LoggerMessage(Level = LogLevel.Information, Message = "Forgot {Count} file(s) that left the watched folder of workflow {Library}: {Paths}")]
     private partial void LogForgotten(int count, string library, string paths);
 }

@@ -132,13 +132,13 @@ public sealed class ProcessingWatchedFolderScanDispatchScheduleTask : IPeriodicT
             if (missed == 1)
             {
                 _logger.LogWarning(
-                    "Watched-folder scheduler missed {Missed} run for library {Library}; enqueueing one catch-up scan",
+                    "Watched-folder scheduler missed {Missed} run for workflow {Library}; enqueueing one catch-up scan",
                     missed, library.Name);
             }
             else if (missed > 1)
             {
                 _logger.LogWarning(
-                    "Watched-folder scheduler missed {Missed} runs for library {Library}; enqueueing one catch-up scan",
+                    "Watched-folder scheduler missed {Missed} runs for workflow {Library}; enqueueing one catch-up scan",
                     missed, library.Name);
             }
 
@@ -155,7 +155,7 @@ public sealed class ProcessingWatchedFolderScanDispatchScheduleTask : IPeriodicT
             catch (Exception exception) when (exception is not OperationCanceledException)
 #pragma warning restore CA1031
             {
-                _logger.LogError(exception, "Watched-folder scheduler failed for library {Library}", library.Name);
+                _logger.LogError(exception, "Watched-folder scheduler failed for workflow {Library}", library.Name);
                 nextDelay = PeriodicSchedule.FailureCooldown;
             }
 

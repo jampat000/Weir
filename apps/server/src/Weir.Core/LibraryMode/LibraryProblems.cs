@@ -80,9 +80,9 @@ public static class LibraryProblems
         LibraryProblemKind.NoPermission =>
             "Give the account Weir runs as read and write access to these files, then scan again.",
         LibraryProblemKind.NoVideo =>
-            "These are not video files Weir can work on. Move them out of the library folder, or narrow the library's file types.",
+            "These are not video files Weir can work on. Move them out of the library folder, or narrow the workflow's file types.",
         LibraryProblemKind.NoAudioLeft =>
-            "This library's rules keep no language these files have. Add one of their languages to the rule set, then scan again.",
+            "This workflow's rules keep no language these files have. Add one of their languages to the rule set, then scan again.",
         LibraryProblemKind.Seeding =>
             "A download client still shares this file, so cleaning it would free nothing. Wait until seeding finishes, or turn on \"Clean files still shared with a download\".",
         _ =>

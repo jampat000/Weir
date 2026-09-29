@@ -68,7 +68,7 @@ export function TimersSection({
   return (
     <QuietSection headingId={headingId} heading="Weir's own timers">
       <p className="mm-quiet-note">
-        These run on their own clocks, whatever the library hours say.
+        These run on their own clocks, whatever the workflow hours say.
       </p>
       <div className="mm-quiet-table-wrap mt-4">
         <table className="mm-quiet-table" data-testid="schedule-timers">
