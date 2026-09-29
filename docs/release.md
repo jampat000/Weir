@@ -24,6 +24,11 @@ never changes. Cutting a release is:
    - Create `docs/release-notes/vX.Y.Z.md` using `docs/release-notes/TEMPLATE.md`.
    - Keep wording operator-friendly and focused on what changed for users.
 
+   Change only the notes file and `CHANGELOG.md`. The docs, README and `compose.yaml` show pinned
+   versions as `X.Y.Z` on purpose, so they never need editing for a release. Touching `compose.yaml`,
+   `Dockerfile`, `docker/**` or `packaging/**` makes CI run both package smokes, on the PR and again on
+   `main`, which the release then waits for.
+
    This PR touches nothing under `apps/`, `packaging/` or `Dockerfile`, so `CI / ci-passed` on it and
    on its merge to `main` both finish in well under a minute (path-aware CI skips everything but the
    repository checks).
