@@ -1,11 +1,12 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { afterEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
 import * as managersApi from "../../../../lib/processing/library-managers-api";
 import type { ProcessingManagerSetupItem } from "../../../../lib/processing/library-managers-api";
 import { LibraryManagerSetup } from "./library-manager-setup";
+import { settleFolderChecks } from "./library-test-fixtures";
 
 function wrapper({ children }: { children: ReactNode }) {
   const qc = new QueryClient({
@@ -59,7 +60,13 @@ function setup(managers: ProcessingManagerSetupItem[]) {
     .mockResolvedValue({ media_type: "tv", managers });
 }
 
+// The folders settle after a debounce; the tests move the clock instead of waiting for it.
+beforeEach(() => {
+  vi.useFakeTimers({ shouldAdvanceTime: true });
+});
+
 afterEach(() => {
+  vi.useRealTimers();
   vi.restoreAllMocks();
 });
 
@@ -80,6 +87,7 @@ it("shows Sonarr exactly what to enter, with copy buttons, and leaves what is st
     />,
     { wrapper },
   );
+  await settleFolderChecks();
 
   const block = await screen.findByRole("region", { name: "Sonarr" });
   expect(
@@ -178,6 +186,7 @@ it("offers a Sonarr download client's own folder as a suggested watched folder",
     />,
     { wrapper },
   );
+  await settleFolderChecks();
 
   const block = await screen.findByRole("region", { name: "Sonarr" });
   expect(within(block).getByText("/downloads/tv-sonarr")).toBeInTheDocument();
@@ -205,6 +214,7 @@ it("does not suggest a Sonarr download client folder that is already the watched
     />,
     { wrapper },
   );
+  await settleFolderChecks();
 
   const block = await screen.findByRole("region", { name: "Sonarr" });
   expect(
@@ -230,6 +240,7 @@ it("tells a Deluno workflow there is nothing to map and offers Deluno's own fold
     />,
     { wrapper },
   );
+  await settleFolderChecks();
 
   const block = await screen.findByRole("region", { name: "Deluno" });
   expect(
@@ -264,6 +275,7 @@ it("does not offer Deluno's folders once the workflow already uses them", async 
     />,
     { wrapper },
   );
+  await settleFolderChecks();
 
   const block = await screen.findByRole("region", { name: "Deluno" });
   // The story already says where the files come from and go to; it is not said again.
@@ -290,6 +302,7 @@ it("reads nothing while the workflow is linked to no media manager", async () =>
     />,
     { wrapper },
   );
+  await settleFolderChecks();
 
   expect(
     await screen.findByTestId("library-manager-setup"),

@@ -73,6 +73,10 @@ vi.mock(
     }),
     useTriggerLibraryScan: () => ({ mutate: rescan, isPending: false }),
     useLibrarySettingsQuery: () => ({ data: librarySettingsResult }),
+    useLibraryRedownloadsQuery: () => ({
+      data: { library_id: 1, titles: [], total: 0 },
+      isError: false,
+    }),
   }),
 );
 vi.mock("../../lib/processing/rules-preview-api", () => ({
@@ -117,6 +121,14 @@ vi.mock("../../lib/processing/rules-preview-api", () => ({
 }));
 vi.mock("../../lib/settings/queries", () => ({
   useAppSettingsQuery: () => ({ data: { app_timezone: "UTC" } }),
+}));
+vi.mock("../../lib/auth/queries", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../lib/auth/queries")>()),
+  useMeQuery: () => ({ data: undefined }),
+}));
+vi.mock("../../lib/pause/pause-queries", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../lib/pause/pause-queries")>()),
+  usePauseQuery: () => ({ data: undefined }),
 }));
 vi.mock("../../lib/activity/queries", () => ({
   useActivityRecentQuery: () => ({ data: { items: [] } }),
