@@ -2651,8 +2651,11 @@ export interface components {
        * @enum {string}
        */
       kind: "sabnzbd" | "nzbget" | "qbittorrent" | "deluge" | "transmission";
-      /** Name */
-      name: string;
+      /**
+       * Name
+       * @description Accepted and ignored: a connection is named after its kind and the host in its address.
+       */
+      name?: string;
       /**
        * Password
        * @description NZBGet/qBittorrent/Deluge/Transmission. Stored encrypted. Empty means no password.
@@ -2683,7 +2686,10 @@ export interface components {
        * @enum {string}
        */
       kind: "sabnzbd" | "nzbget" | "qbittorrent" | "deluge" | "transmission";
-      /** Name */
+      /**
+       * Name
+       * @description The connection's name: its kind and the host in its address, set by Weir.
+       */
       name: string;
       /** Enabled */
       enabled: boolean;
@@ -2737,7 +2743,10 @@ export interface components {
       csrf_token: string;
       /** Enabled */
       enabled?: boolean | null;
-      /** Name */
+      /**
+       * Name
+       * @description Accepted and ignored: a connection is named after its kind and the host in its address.
+       */
       name?: string | null;
       /**
        * Password
@@ -3667,8 +3676,11 @@ export interface components {
        * @enum {string}
        */
       kind: "radarr" | "sonarr" | "deluno" | "native";
-      /** Name */
-      name: string;
+      /**
+       * Name
+       * @description Accepted and ignored: a connection is named after its kind and the host in its address.
+       */
+      name?: string;
     };
     /** MediaManagerConnectionDeleteIn */
     MediaManagerConnectionDeleteIn: {
@@ -3709,7 +3721,10 @@ export interface components {
       last_test_detail?: string | null;
       /** Last Test Ok */
       last_test_ok?: boolean | null;
-      /** Name */
+      /**
+       * Name
+       * @description The connection's name: its kind and the host in its address, set by Weir.
+       */
       name: string;
       /**
        * Unsigned Webhook Warning
@@ -3764,7 +3779,10 @@ export interface components {
       downloaded_scan_enabled?: boolean | null;
       /** Enabled */
       enabled?: boolean | null;
-      /** Name */
+      /**
+       * Name
+       * @description Accepted and ignored: a connection is named after its kind and the host in its address.
+       */
       name?: string | null;
     };
     /** MediaManagerSearchLaneIn */
@@ -4062,6 +4080,16 @@ export interface components {
     };
     /** ReadinessResponse */
     ReadinessResponse: {
+      /**
+       * Machine Name
+       * @description The name of the machine Weir runs on. Weir is named after it.
+       */
+      machine_name: string;
+      /**
+       * Machine Name Looks Generated
+       * @description True when the machine name looks like a container's generated one, so the compose file has no hostname.
+       */
+      machine_name_looks_generated: boolean;
       /** Ready */
       ready: boolean;
       /** Startup Seconds */
@@ -7056,11 +7084,6 @@ export interface components {
        */
       log_retention_days: number;
       /**
-       * Product Display Name
-       * @description Shown in the sidebar and settings.
-       */
-      product_display_name: string;
-      /**
        * Setup Wizard State
        * @description First-run wizard state: pending, skipped, or completed.
        */
@@ -7106,8 +7129,6 @@ export interface components {
       csrf_token: string;
       /** Log Retention Days */
       log_retention_days: number;
-      /** Product Display Name */
-      product_display_name: string;
       /** Setup Wizard State */
       setup_wizard_state?: string | null;
       /** Signed In Home Notice */
@@ -8183,7 +8204,13 @@ export interface operations {
         };
         content: {
           "application/json": {
-            [key: string]: string[];
+            /** Capabilities */
+            capabilities: string[];
+            /**
+             * Machine Name
+             * @description The name of the machine Weir runs on, for a media manager to name its connection to Weir.
+             */
+            machine_name: string;
           };
         };
       };

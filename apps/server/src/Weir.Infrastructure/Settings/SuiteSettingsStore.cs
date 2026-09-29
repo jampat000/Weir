@@ -9,7 +9,7 @@ namespace Weir.Infrastructure.Settings;
 public sealed class SuiteSettingsStore
 {
     private const string Columns =
-        "product_display_name, signed_in_home_notice, setup_wizard_state, app_timezone, log_retention_days, activity_retention_days, " +
+        "signed_in_home_notice, setup_wizard_state, app_timezone, log_retention_days, activity_retention_days, " +
         "direct_play_devices, configuration_backup_enabled, configuration_backup_interval_hours, configuration_backup_preferred_time, " +
         "configuration_backup_last_run_at, processing_paused, processing_paused_until, scan_while_paused, " +
         "metadata_provider, metadata_provider_base_url, metadata_provider_key_ciphertext, updated_at";
@@ -38,9 +38,9 @@ public sealed class SuiteSettingsStore
 
         var users = await _users.CountUsersAsync(uow).ConfigureAwait(false);
         await uow.ExecuteAsync(
-            "INSERT INTO suite_settings (id, product_display_name, signed_in_home_notice, setup_wizard_state, app_timezone, log_retention_days, " +
+            "INSERT INTO suite_settings (id, signed_in_home_notice, setup_wizard_state, app_timezone, log_retention_days, " +
             "activity_retention_days, configuration_backup_enabled, configuration_backup_interval_hours, configuration_backup_preferred_time, " +
-            "configuration_backup_last_run_at) VALUES (1, 'Weir', NULL, $wizard, 'UTC', 30, 90, 0, 24, '02:00', NULL)",
+            "configuration_backup_last_run_at) VALUES (1, NULL, $wizard, 'UTC', 30, 90, 0, 24, '02:00', NULL)",
             ("$wizard", SuiteSettingsRules.DefaultSetupWizardState(users))).ConfigureAwait(false);
         return await GetAsync(uow).ConfigureAwait(false) ?? throw new InvalidOperationException("suite_settings row was not created.");
     }
@@ -65,7 +65,6 @@ public sealed class SuiteSettingsStore
             }
         }
 
-        Compare("product_display_name", before.ProductDisplayName, after.ProductDisplayName, v => v);
         Compare("signed_in_home_notice", before.SignedInHomeNotice, after.SignedInHomeNotice, v => v);
         Compare("setup_wizard_state", before.SetupWizardState, after.SetupWizardState, v => v);
         Compare("app_timezone", before.AppTimezone, after.AppTimezone, v => v);
@@ -93,23 +92,22 @@ public sealed class SuiteSettingsStore
 
     private static SuiteSettingsRecord Read(SqliteDataReader reader) => new()
     {
-        ProductDisplayName = SqliteValues.GetString(reader, 0),
-        SignedInHomeNotice = SqliteValues.GetStringOrNull(reader, 1),
-        SetupWizardState = SqliteValues.GetString(reader, 2),
-        AppTimezone = SqliteValues.GetString(reader, 3),
-        LogRetentionDays = SqliteValues.GetInt64(reader, 4),
-        ActivityRetentionDays = SqliteValues.GetInt64(reader, 5),
-        DirectPlayDevices = SqliteValues.GetString(reader, 6),
-        ConfigurationBackupEnabled = SqliteValues.GetBool(reader, 7),
-        ConfigurationBackupIntervalHours = SqliteValues.GetInt64(reader, 8),
-        ConfigurationBackupPreferredTime = SqliteValues.GetString(reader, 9),
-        ConfigurationBackupLastRunAt = SqliteValues.GetDateTimeOrNull(reader, 10),
-        ProcessingPaused = SqliteValues.GetBool(reader, 11),
-        ProcessingPausedUntil = SqliteValues.GetDateTimeOrNull(reader, 12),
-        ScanWhilePaused = SqliteValues.GetBool(reader, 13),
-        MetadataProvider = SqliteValues.GetString(reader, 14),
-        MetadataProviderBaseUrl = SqliteValues.GetString(reader, 15),
-        MetadataProviderKeyCiphertext = SqliteValues.GetString(reader, 16),
-        UpdatedAt = SqliteValues.GetDateTime(reader, 17),
+        SignedInHomeNotice = SqliteValues.GetStringOrNull(reader, 0),
+        SetupWizardState = SqliteValues.GetString(reader, 1),
+        AppTimezone = SqliteValues.GetString(reader, 2),
+        LogRetentionDays = SqliteValues.GetInt64(reader, 3),
+        ActivityRetentionDays = SqliteValues.GetInt64(reader, 4),
+        DirectPlayDevices = SqliteValues.GetString(reader, 5),
+        ConfigurationBackupEnabled = SqliteValues.GetBool(reader, 6),
+        ConfigurationBackupIntervalHours = SqliteValues.GetInt64(reader, 7),
+        ConfigurationBackupPreferredTime = SqliteValues.GetString(reader, 8),
+        ConfigurationBackupLastRunAt = SqliteValues.GetDateTimeOrNull(reader, 9),
+        ProcessingPaused = SqliteValues.GetBool(reader, 10),
+        ProcessingPausedUntil = SqliteValues.GetDateTimeOrNull(reader, 11),
+        ScanWhilePaused = SqliteValues.GetBool(reader, 12),
+        MetadataProvider = SqliteValues.GetString(reader, 13),
+        MetadataProviderBaseUrl = SqliteValues.GetString(reader, 14),
+        MetadataProviderKeyCiphertext = SqliteValues.GetString(reader, 15),
+        UpdatedAt = SqliteValues.GetDateTime(reader, 16),
     };
 }

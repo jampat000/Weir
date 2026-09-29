@@ -80,7 +80,7 @@ public sealed class RemuxPassHandlerDownloadedScanTests : IDisposable
 
     private async Task<long> ArrConnectionAsync(long libraryId, bool downloadedScanEnabled)
     {
-        var connectionId = await _fixture.AddConnectionAsync("radarr", "Radarr", "http://192.0.2.60:8989", "key");
+        var connectionId = await _fixture.AddConnectionAsync("radarr", "http://192.0.2.60:8989", "key");
         if (downloadedScanEnabled)
         {
             await _fixture.Store.Execute($"UPDATE media_manager_connections SET downloaded_scan_enabled = 1 WHERE id = {connectionId}");

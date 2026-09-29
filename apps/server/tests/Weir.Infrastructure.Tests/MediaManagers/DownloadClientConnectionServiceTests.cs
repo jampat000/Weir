@@ -16,7 +16,7 @@ public sealed class DownloadClientConnectionServiceTests
     public async Task A_saved_api_key_is_never_returned_but_decrypts_for_an_outbound_call()
     {
         using var fixture = new DownloadClientFixture();
-        var id = await fixture.AddConnectionAsync("sabnzbd", "My SABnzbd", apiKey: "plain-api-key");
+        var id = await fixture.AddConnectionAsync("sabnzbd", apiKey: "plain-api-key");
 
         var row = await fixture.Db(uow => fixture.ConnectionStore.GetAsync(uow, id));
         Assert.NotNull(row);
@@ -33,7 +33,7 @@ public sealed class DownloadClientConnectionServiceTests
     public async Task A_password_only_deluge_connection_needs_no_username_to_resolve()
     {
         using var fixture = new DownloadClientFixture();
-        var id = await fixture.AddConnectionAsync("deluge", "Deluge", password: "deluge-secret");
+        var id = await fixture.AddConnectionAsync("deluge", password: "deluge-secret");
 
         var row = await fixture.Db(uow => fixture.ConnectionStore.GetAsync(uow, id));
         var resolved = fixture.Connections.ConnectionFromRow(row!);
@@ -46,7 +46,7 @@ public sealed class DownloadClientConnectionServiceTests
     public async Task An_open_transmission_connection_with_no_credential_still_resolves()
     {
         using var fixture = new DownloadClientFixture();
-        var id = await fixture.AddConnectionAsync("transmission", "Transmission");
+        var id = await fixture.AddConnectionAsync("transmission");
 
         var row = await fixture.Db(uow => fixture.ConnectionStore.GetAsync(uow, id));
         var resolved = fixture.Connections.ConnectionFromRow(row!);
@@ -62,7 +62,7 @@ public sealed class DownloadClientConnectionServiceTests
         using var fixture = new DownloadClientFixture();
 
         var thrown = await Assert.ThrowsAsync<DownloadClientConnectionException>(
-            () => fixture.AddConnectionAsync("sabnzbd", "No Key"));
+            () => fixture.AddConnectionAsync("sabnzbd"));
 
         Assert.Contains("API key", thrown.Message, StringComparison.Ordinal);
     }
@@ -73,7 +73,7 @@ public sealed class DownloadClientConnectionServiceTests
         using var fixture = new DownloadClientFixture();
 
         var thrown = await Assert.ThrowsAsync<DownloadClientConnectionException>(
-            () => fixture.AddConnectionAsync("deluge", "No Password"));
+            () => fixture.AddConnectionAsync("deluge"));
 
         Assert.Contains("password", thrown.Message, StringComparison.Ordinal);
     }
@@ -86,7 +86,7 @@ public sealed class DownloadClientConnectionServiceTests
     {
         using var fixture = new DownloadClientFixture();
 
-        var id = await fixture.AddConnectionAsync(kind, "No Credential " + kind);
+        var id = await fixture.AddConnectionAsync(kind);
 
         Assert.True(id > 0);
     }
@@ -95,7 +95,7 @@ public sealed class DownloadClientConnectionServiceTests
     public async Task Clearing_a_sabnzbd_connections_api_key_on_update_is_refused()
     {
         using var fixture = new DownloadClientFixture();
-        var id = await fixture.AddConnectionAsync("sabnzbd", "SABnzbd", apiKey: "key");
+        var id = await fixture.AddConnectionAsync("sabnzbd", apiKey: "key");
         var row = await fixture.Db(uow => fixture.ConnectionStore.GetAsync(uow, id));
 
         var thrown = await Assert.ThrowsAsync<DownloadClientConnectionException>(
@@ -112,7 +112,7 @@ public sealed class DownloadClientConnectionServiceTests
     public async Task Clearing_a_deluges_password_on_update_is_refused()
     {
         using var fixture = new DownloadClientFixture();
-        var id = await fixture.AddConnectionAsync("deluge", "Deluge", password: "secret");
+        var id = await fixture.AddConnectionAsync("deluge", password: "secret");
         var row = await fixture.Db(uow => fixture.ConnectionStore.GetAsync(uow, id));
 
         var thrown = await Assert.ThrowsAsync<DownloadClientConnectionException>(
@@ -129,17 +129,17 @@ public sealed class DownloadClientConnectionServiceTests
     public async Task Leaving_a_sabnzbd_connections_api_key_untouched_on_update_does_not_re_validate_it()
     {
         using var fixture = new DownloadClientFixture();
-        var id = await fixture.AddConnectionAsync("sabnzbd", "SABnzbd", apiKey: "key");
+        var id = await fixture.AddConnectionAsync("sabnzbd", apiKey: "key");
         var row = await fixture.Db(uow => fixture.ConnectionStore.GetAsync(uow, id));
 
         await fixture.Db(async uow =>
         {
-            await fixture.Connections.UpdateAsync(uow, row!, name: "SABnzbd 2").ConfigureAwait(false);
+            await fixture.Connections.UpdateAsync(uow, row!, baseUrl: "http://192.0.2.9:8080").ConfigureAwait(false);
             return 0;
         });
 
-        var renamed = await fixture.Db(uow => fixture.ConnectionStore.GetAsync(uow, id));
-        Assert.Equal("SABnzbd 2", renamed!.Name);
+        var moved = await fixture.Db(uow => fixture.ConnectionStore.GetAsync(uow, id));
+        Assert.Equal("http://192.0.2.9:8080", moved!.BaseUrl);
     }
 
     [Fact]
@@ -150,7 +150,7 @@ public sealed class DownloadClientConnectionServiceTests
         var service = new DownloadClientConnectionService(noSecretCipher, fixture.ConnectionStore);
 
         var thrown = await Assert.ThrowsAsync<DownloadClientConnectionException>(
-            () => fixture.Db(uow => service.CreateAsync(uow, "sabnzbd", "No Secret", "http://192.0.2.20:8080", apiKey: "some-key")));
+            () => fixture.Db(uow => service.CreateAsync(uow, "sabnzbd", "http://192.0.2.20:8080", apiKey: "some-key")));
 
         Assert.Contains("WEIR_CREDENTIALS_SECRET", thrown.Message, StringComparison.Ordinal);
     }
@@ -163,15 +163,15 @@ public sealed class DownloadClientConnectionServiceTests
             .Route(HttpMethod.Post, "/api/v2/auth/login", _ => FakeManagerHttp.Response(HttpStatusCode.OK, "Ok.", ("Set-Cookie", "SID=abc")))
             .Json(HttpMethod.Get, "/api/v2/torrents/categories", """{"tv-sonarr":{"name":"tv-sonarr","savePath":"/downloads/complete/tv"}}""")
             .Json(HttpMethod.Get, "/api/v2/app/preferences", """{"save_path":"/downloads/complete"}""");
-        var id = await fixture.AddConnectionAsync("qbittorrent", "My qBittorrent", username: "admin", password: "adminadmin");
+        var id = await fixture.AddConnectionAsync("qbittorrent", username: "admin", password: "adminadmin");
 
         var suggestions = await fixture.Db(uow => fixture.Suggestions.SuggestAsync(uow), commit: false);
 
         var entry = Assert.Single(suggestions);
         Assert.Equal((BigInteger)id, ((WireInteger)entry["connection_id"]).Value);
         Assert.Equal("qbittorrent", ((WireString)entry["kind"]).Value);
-        Assert.Equal("My qBittorrent", ((WireString)entry["name"]).Value);
-        Assert.Equal("qBittorrent (My qBittorrent)", ((WireString)entry["label"]).Value);
+        Assert.Equal("qBittorrent on client.local", ((WireString)entry["name"]).Value);
+        Assert.Equal("qBittorrent on client.local", ((WireString)entry["label"]).Value);
         Assert.Equal("download_client", ((WireString)entry["flow"]).Value);
         Assert.True(((WireBool)entry["ready"]).Value);
         Assert.Equal("/downloads/complete", ((WireString)entry["suggested_watched_folder"]).Value);
@@ -188,7 +188,7 @@ public sealed class DownloadClientConnectionServiceTests
     {
         using var fixture = new DownloadClientFixture();
         fixture.Http.Throw(HttpMethod.Get, "/api", new HttpRequestException("refused"));
-        await fixture.AddConnectionAsync("sabnzbd", "Unreachable SABnzbd", apiKey: "key");
+        await fixture.AddConnectionAsync("sabnzbd", apiKey: "key");
 
         var suggestions = await fixture.Db(uow => fixture.Suggestions.SuggestAsync(uow), commit: false);
 
@@ -200,7 +200,7 @@ public sealed class DownloadClientConnectionServiceTests
     {
         using var fixture = new DownloadClientFixture();
         fixture.Http.Json(HttpMethod.Post, "/transmission/rpc", """{"arguments":{"download-dir":"/downloads/complete"},"result":"success"}""");
-        await fixture.AddConnectionAsync("transmission", "Off", enabled: false);
+        await fixture.AddConnectionAsync("transmission", enabled: false);
 
         var suggestions = await fixture.Db(uow => fixture.Suggestions.SuggestAsync(uow), commit: false);
 

@@ -156,7 +156,7 @@ public sealed class HistoryFileRemovalServiceTests : IDisposable
         var library = await LibraryAsync();
         var source = _folders.Source("Film/film.mkv");
         var file = await FileRowAsync(library, "Film/film.mkv", source);
-        var connection = await _fixture.AddConnectionAsync("radarr", "Radarr", "http://10.0.0.5:7878", "k");
+        var connection = await _fixture.AddConnectionAsync("radarr", "http://10.0.0.5:7878", "k");
         await LinkAsync(library, connection);
         var outputPath = Path.GetFullPath(source).Replace('\\', '/');
         _fixture.Http.Json(HttpMethod.Get, "/api/v3/queue", $$"""{"records":[{"id":55,"outputPath":"{{outputPath}}","downloadId":"dl1"}]}""");
@@ -164,7 +164,7 @@ public sealed class HistoryFileRemovalServiceTests : IDisposable
 
         var options = await _fixture.Db(uow => Service().EvaluateAsync(uow, file, CancellationToken.None));
         Assert.True(options.DeleteHandledByManager);
-        Assert.Equal("Radarr", options.ManagerLabel);
+        Assert.Equal("Radarr on 10.0.0.5", options.ManagerLabel);
 
         var outcome = await _fixture.Db(uow => Service().DeleteAsync(uow, file, null, CancellationToken.None));
 
@@ -184,7 +184,7 @@ public sealed class HistoryFileRemovalServiceTests : IDisposable
         var library = await LibraryAsync();
         var source = _folders.Source("Film/film.mkv");
         var file = await FileRowAsync(library, "Film/film.mkv", source);
-        var connection = await _fixture.AddConnectionAsync("radarr", "Radarr", "http://10.0.0.5:7878", "k");
+        var connection = await _fixture.AddConnectionAsync("radarr", "http://10.0.0.5:7878", "k");
         await LinkAsync(library, connection);
         _fixture.Http.Json(HttpMethod.Get, "/api/v3/queue", """{"records":[]}""");
 
@@ -207,7 +207,7 @@ public sealed class HistoryFileRemovalServiceTests : IDisposable
         var library = await LibraryAsync();
         var source = _folders.Source("Film/film.mkv");
         var file = await FileRowAsync(library, "Film/film.mkv", source);
-        var connection = await _fixture.AddConnectionAsync("deluno", "Deluno", "http://192.0.2.30:5099", "k1");
+        var connection = await _fixture.AddConnectionAsync("deluno", "http://192.0.2.30:5099", "k1");
         await LinkAsync(library, connection);
         await GiveHandoffOriginAsync(library, "Film/film.mkv", "h1");
         _fixture.Http.Json(HttpMethod.Get, ManifestPath, """{"capabilities":["processor-reject-regrab"],"libraries":[]}""");
@@ -215,7 +215,7 @@ public sealed class HistoryFileRemovalServiceTests : IDisposable
 
         var options = await _fixture.Db(uow => Service().EvaluateAsync(uow, file, CancellationToken.None));
         Assert.True(options.DeleteHandledByManager);
-        Assert.Equal("Deluno", options.ManagerLabel);
+        Assert.Equal("Deluno on 192.0.2.30", options.ManagerLabel);
 
         var outcome = await _fixture.Db(uow => Service().DeleteAsync(uow, file, null, CancellationToken.None));
 
@@ -233,7 +233,7 @@ public sealed class HistoryFileRemovalServiceTests : IDisposable
         var library = await LibraryAsync();
         var source = _folders.Source("Film/film.mkv");
         var file = await FileRowAsync(library, "Film/film.mkv", source);
-        var connection = await _fixture.AddConnectionAsync("deluno", "Deluno", "http://192.0.2.30:5099", "k1");
+        var connection = await _fixture.AddConnectionAsync("deluno", "http://192.0.2.30:5099", "k1");
         await LinkAsync(library, connection);
         await GiveHandoffOriginAsync(library, "Film/film.mkv", "h2");
         // No reject-regrab capability advertised: the handoff target cannot take the rejection, but it is still the
@@ -256,7 +256,7 @@ public sealed class HistoryFileRemovalServiceTests : IDisposable
         var library = await LibraryAsync();
         var source = _folders.Source("Film/film.mkv");
         var file = await FileRowAsync(library, "Film/film.mkv", source);
-        var connection = await _fixture.AddConnectionAsync("deluno", "Deluno", "http://192.0.2.30:5099", "k1");
+        var connection = await _fixture.AddConnectionAsync("deluno", "http://192.0.2.30:5099", "k1");
         await LinkAsync(library, connection);
         await GiveHandoffOriginAsync(library, "Film/film.mkv", "h3");
         _fixture.Http.Json(HttpMethod.Get, ManifestPath, """{"capabilities":["processor-reject-regrab"],"libraries":[]}""");
@@ -264,7 +264,7 @@ public sealed class HistoryFileRemovalServiceTests : IDisposable
 
         var options = await _fixture.Db(uow => Service().EvaluateAsync(uow, file, CancellationToken.None));
         Assert.True(options.KeepNotifiesManager);
-        Assert.Equal("Deluno", options.ManagerLabel);
+        Assert.Equal("Deluno on 192.0.2.30", options.ManagerLabel);
 
         var outcome = await _fixture.Db(uow => Service().KeepAsync(uow, file, null, CancellationToken.None));
 
@@ -285,7 +285,7 @@ public sealed class HistoryFileRemovalServiceTests : IDisposable
         var library = await LibraryAsync();
         var source = _folders.Source("Film/film.mkv");
         var file = await FileRowAsync(library, "Film/film.mkv", source);
-        var connection = await _fixture.AddConnectionAsync("deluno", "Deluno", "http://192.0.2.30:5099", "k1");
+        var connection = await _fixture.AddConnectionAsync("deluno", "http://192.0.2.30:5099", "k1");
         await LinkAsync(library, connection);
         await GiveHandoffOriginAsync(library, "Film/film.mkv", "h4");
         _fixture.Http.Json(HttpMethod.Get, ManifestPath, """{"capabilities":["processor-reject-regrab"],"libraries":[]}""");
