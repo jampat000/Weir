@@ -265,9 +265,15 @@ async function renderSettingsWithSupportConfig(
 describe("SystemPage", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    // Only the queries a test seeds have an answer; every other one fails as if the server were down.
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockRejectedValue(new TypeError("Failed to fetch")),
+    );
   });
 
   afterEach(() => {
+    vi.unstubAllGlobals();
     vi.doUnmock("../../lib/support");
     vi.resetModules();
   });

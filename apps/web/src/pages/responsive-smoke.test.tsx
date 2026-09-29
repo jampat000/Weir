@@ -46,6 +46,14 @@ vi.mock("../lib/auth/queries", async (importOriginal) => {
   };
 });
 
+vi.mock("../lib/pause/pause-queries", () => ({
+  usePauseQuery: vi.fn(() => ({ data: { paused: false } })),
+}));
+
+vi.mock("../lib/settings/queries", () => ({
+  useAppSettingsQuery: vi.fn(() => ({ data: undefined })),
+}));
+
 function withProviders(ui: ReactNode) {
   const client = new QueryClient();
   return (

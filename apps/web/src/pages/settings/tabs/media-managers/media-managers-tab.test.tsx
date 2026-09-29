@@ -1,12 +1,13 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
+import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import * as downloadClientsApi from "../../../../lib/download-clients/download-clients-api";
 import * as api from "../../../../lib/media-managers/media-managers-api";
 import type { MediaManagerConnection } from "../../../../lib/media-managers/media-managers-api";
 import { MediaManagersTab } from "./media-managers-tab";
+import { stubMediaManagersTabNeighbours } from "./stub-media-managers-tab-neighbours";
 
 function connection(
   over: Partial<MediaManagerConnection> = {},
@@ -34,17 +35,14 @@ function wrapper({ children }: { children: ReactNode }) {
   const qc = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
-  return <QueryClientProvider client={qc}>{children}</QueryClientProvider>;
+  return (
+    <MemoryRouter>
+      <QueryClientProvider client={qc}>{children}</QueryClientProvider>
+    </MemoryRouter>
+  );
 }
 
-beforeEach(() => {
-  // These tests are about the media-manager list; the download-clients section below it loads
-  // independently and is covered by its own tests (download-clients-section.test.tsx).
-  vi.spyOn(
-    downloadClientsApi,
-    "fetchDownloadClientConnections",
-  ).mockResolvedValue([]);
-});
+beforeEach(stubMediaManagersTabNeighbours);
 
 afterEach(() => {
   vi.restoreAllMocks();

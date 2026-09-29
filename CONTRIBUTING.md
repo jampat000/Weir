@@ -31,6 +31,8 @@ cd ../..
 node scripts/check-dead-code.mjs
 ```
 
+Web tests never reach the network: `apps/web/src/test/setup.ts` refuses every `fetch` that a test has not stubbed and fails the test that made it. Stub the api function the component calls (`vi.spyOn(someApi, "fetchThing")`), or the query hook, in the test. Where a component waits on a debounce, move the clock with fake timers instead of waiting for it.
+
 The contract suite and the E2E smoke are Python test runners that judge a running .NET server from outside. Install their locked dependencies once (Python 3.13+):
 
 ```powershell

@@ -107,6 +107,9 @@ vi.mock("../../lib/auth/queries", () => ({
 vi.mock("../../lib/pause/pause-queries", () => ({
   usePauseQuery: () => ({ data: { paused: false } }),
 }));
+vi.mock("../../lib/settings/queries", () => ({
+  useAppSettingsQuery: () => ({ data: undefined }),
+}));
 vi.mock("../../components/shell/page-header", () => ({
   PageHeader: ({ title }: { title: ReactNode }) => <h1>{title}</h1>,
 }));

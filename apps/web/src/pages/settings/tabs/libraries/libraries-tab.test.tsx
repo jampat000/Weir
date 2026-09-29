@@ -3,10 +3,14 @@ import { afterEach, expect, it, vi } from "vitest";
 
 import * as api from "../../../../lib/processing/libraries-api";
 import * as managersApi from "../../../../lib/processing/library-managers-api";
-import * as authQueries from "../../../../lib/auth/queries";
 import * as managerApi from "../../../../lib/media-managers/media-managers-api";
 import { LibrariesTab } from "./libraries-tab";
-import { asOperator, library, wrapper } from "./library-test-fixtures";
+import {
+  asOperator,
+  asViewer,
+  library,
+  wrapper,
+} from "./library-test-fixtures";
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -171,9 +175,7 @@ it("says the libraries could not be loaded instead of showing none", async () =>
 });
 
 it("does not offer editing to a viewer", async () => {
-  vi.spyOn(authQueries, "useMeQuery").mockReturnValue({
-    data: { role: "viewer" },
-  } as ReturnType<typeof authQueries.useMeQuery>);
+  asViewer();
   vi.spyOn(api, "fetchProcessingLibraries").mockResolvedValue([library()]);
 
   render(<LibrariesTab />, { wrapper });

@@ -74,7 +74,10 @@ it("lists each device with its note and source, and saves the chosen ids", async
     screen.queryByTestId("processing-direct-play-customised"),
   ).not.toBeInTheDocument();
 
-  expect(screen.getByRole("checkbox", { name: "Apple TV 4K" })).toBeChecked();
+  // The ticks follow the saved selection a render after the list appears.
+  expect(
+    await screen.findByRole("checkbox", { name: "Apple TV 4K", checked: true }),
+  ).toBeInTheDocument();
   const iphone = screen.getByRole("checkbox", { name: "iPhone" });
   expect(iphone).not.toBeChecked();
   fireEvent.click(iphone);

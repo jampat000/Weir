@@ -72,6 +72,16 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+/**
+ * Renders the section and waits until its form shows the loaded settings. It first appears with
+ * the defaults it starts on and takes the loaded values a render later, so a test that reads the
+ * form as soon as it appears can catch it in between.
+ */
+async function renderLoadedSection() {
+  render(<ProcessSettingsSection />, { wrapper });
+  await screen.findByRole("button", { name: "2", pressed: true });
+}
+
 function mockSignedIn() {
   vi.spyOn(authQueries, "useMeQuery").mockReturnValue({
     data: { role: "operator" },
@@ -88,9 +98,9 @@ it("saves Files at once up to ten, and the budget and checks with it", async () 
     .spyOn(api, "putProcessingOperatorSettings")
     .mockResolvedValue({ ...settings, max_concurrent_files: 10 });
 
-  render(<ProcessSettingsSection />, { wrapper });
+  await renderLoadedSection();
 
-  const choices = await screen.findByRole("group", { name: "Files at once" });
+  const choices = screen.getByRole("group", { name: "Files at once" });
   expect(
     screen.getByText("Nothing changes until you press Save."),
   ).toBeInTheDocument();
@@ -141,9 +151,9 @@ it("formats an ugly free-space decimal sensibly, and is not dirty on load", asyn
     minimum_free_disk_space_mb: 5000,
   });
 
-  render(<ProcessSettingsSection />, { wrapper });
+  await renderLoadedSection();
 
-  const field = await screen.findByLabelText("Keep free on the output drive");
+  const field = screen.getByLabelText("Keep free on the output drive");
   expect(field).toHaveValue(4.88);
   expect(
     screen.getByRole("button", { name: "No changes to save" }),
@@ -173,7 +183,7 @@ it("says what waiting files are waiting for, and hides the resolution budget unt
     .spyOn(api, "putProcessingOperatorSettings")
     .mockResolvedValue({ ...settings, runner_budget_enabled: true });
 
-  render(<ProcessSettingsSection />, { wrapper });
+  await renderLoadedSection();
 
   expect(
     await screen.findByTestId("processing-files-at-once-readout"),
