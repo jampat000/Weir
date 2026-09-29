@@ -4,12 +4,12 @@ import type { ReactNode } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
-import * as downloadClientsApi from "../../../../lib/download-clients/download-clients-api";
 import * as api from "../../../../lib/media-managers/media-managers-api";
 import type { MediaManagerConnection } from "../../../../lib/media-managers/media-managers-api";
 import * as librariesApi from "../../../../lib/processing/libraries-api";
 import type { ProcessingLibrary } from "../../../../lib/processing/libraries-api";
 import { MediaManagersTab } from "./media-managers-tab";
+import { stubMediaManagersTabNeighbours } from "./stub-media-managers-tab-neighbours";
 
 function connection(
   over: Partial<MediaManagerConnection>,
@@ -56,10 +56,7 @@ function wrapper({ children }: { children: ReactNode }) {
 }
 
 beforeEach(() => {
-  vi.spyOn(
-    downloadClientsApi,
-    "fetchDownloadClientConnections",
-  ).mockResolvedValue([]);
+  stubMediaManagersTabNeighbours();
   vi.spyOn(api, "fetchMediaManagerConnections").mockResolvedValue([
     connection({}),
     connection({ id: 2, kind: "native", name: "Home script" }),

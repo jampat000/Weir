@@ -13,6 +13,7 @@ import * as authQueries from "../../../../lib/auth/queries";
 import type { MaintenanceState } from "../../../../lib/processing/maintenance-api";
 import * as maintenanceQueries from "../../../../lib/processing/maintenance-queries";
 import * as processingQueries from "../../../../lib/processing/queries";
+import * as settingsQueries from "../../../../lib/settings/queries";
 import { CleanupTab } from "./cleanup-tab";
 
 const mutate = vi.fn();
@@ -66,6 +67,9 @@ function setup(
   vi.spyOn(authQueries, "useMeQuery").mockReturnValue({
     data: { role },
   } as ReturnType<typeof authQueries.useMeQuery>);
+  vi.spyOn(settingsQueries, "useAppSettingsQuery").mockReturnValue({
+    data: undefined,
+  } as ReturnType<typeof settingsQueries.useAppSettingsQuery>);
   vi.spyOn(maintenanceQueries, "useProcessingMaintenanceQuery").mockReturnValue(
     {
       data,
