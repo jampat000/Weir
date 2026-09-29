@@ -278,7 +278,8 @@ public sealed partial class LibraryStore
         }
     }
 
-    private async Task<List<OtherLibraryFolders>> OtherFoldersAsync(UnitOfWork uow, long? excludeId)
+    /// <summary>The watched and output folders of every library but <paramref name="excludeId"/>, for the overlap check.</summary>
+    public async Task<List<OtherLibraryFolders>> OtherFoldersAsync(UnitOfWork uow, long? excludeId)
     {
         var rows = await ListAsync(uow).ConfigureAwait(false);
         return [.. rows.Where(r => r.Id != excludeId).Select(r => new OtherLibraryFolders(r.Id, r.Name, r.WatchedFolder, r.OutputFolder))];

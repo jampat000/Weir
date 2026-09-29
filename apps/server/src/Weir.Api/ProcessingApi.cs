@@ -31,6 +31,9 @@ public static class ProcessingApi
         // The folder-chain check composes ManagerSetupCheck (already registered by AddWeirMediaManagerServices)
         // with Weir's own watched/work/output folder rules.
         services.TryAddSingleton<LibraryFolderChainCheck>();
+        // First-run setup offers libraries from what is connected, and checks the ones a person confirms.
+        services.TryAddSingleton<LibrarySuggestions>();
+        services.TryAddSingleton<ProposedLibraryCheck>();
 
         // Processing's own stores (#745 part 5): stateless SQL access over the caller's UnitOfWork, so a
         // singleton is as cheap as a static class was and lets endpoints and handlers take them by constructor.
@@ -63,6 +66,7 @@ public static class ProcessingApi
         services.AddSingleton<ProcessingLibraryEndpointHandlers>();
         services.AddSingleton<ProcessingLibraryCleansEndpointHandlers>();
         services.AddSingleton<ProcessingLibraryDiscoveryEndpointHandlers>();
+        services.AddSingleton<ProcessingLibrarySetupEndpointHandlers>();
         services.AddSingleton<ProcessingMetadataProviderEndpointHandlers>();
         services.AddSingleton<ProcessingOperatorSettingsEndpointHandlers>();
         services.AddSingleton<ProcessingOverviewMaintenanceEndpointHandlers>();
@@ -100,6 +104,7 @@ public static class ProcessingApi
     {
         endpoints.MapProcessingLibraryEndpoints();
         endpoints.MapProcessingLibraryDiscoveryEndpoints();
+        endpoints.MapProcessingLibrarySetupEndpoints();
         endpoints.MapProcessingRuleSetsEndpoints();
         endpoints.MapProcessingFilesEndpoints();
         endpoints.MapProcessingFileLogEndpoints();

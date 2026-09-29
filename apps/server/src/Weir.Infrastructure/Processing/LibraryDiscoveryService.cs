@@ -144,7 +144,7 @@ public sealed class LibraryDiscoveryService
     }
 
     /// <summary><paramref name="wanted"/>, or the first numbered variant of it not already in <paramref name="existing"/>.</summary>
-    private static string UniqueName(HashSet<string> existing, string wanted)
+    internal static string UniqueName(HashSet<string> existing, string wanted)
     {
         if (!existing.Contains(wanted))
         {

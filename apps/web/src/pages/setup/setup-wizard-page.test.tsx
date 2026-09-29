@@ -92,6 +92,12 @@ function wrap(ui: ReactNode, client: QueryClient) {
   );
 }
 
+function chooseNeither() {
+  fireEvent.click(
+    screen.getByRole("radio", { name: "Neither – I'll pick folders myself" }),
+  );
+}
+
 function renderWizard() {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false, staleTime: Infinity } },
@@ -123,8 +129,46 @@ describe("SetupWizardPage", () => {
     updateLibraryMock.mockResolvedValue({});
   });
 
+  it("asks how downloads reach Weir first, and will not finish without an answer", async () => {
+    renderWizard();
+
+    expect(
+      screen
+        .getAllByRole("radio")
+        .map((radio) => radio.parentElement?.textContent),
+    ).toEqual([
+      "Deluno",
+      "Sonarr / Radarr",
+      "A download client (SABnzbd, qBittorrent, …)",
+      "Neither – I'll pick folders myself",
+    ]);
+    expect(
+      screen.queryByRole("textbox", { name: "Movies watched folder" }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Finish setup" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Choose how your downloads reach Weir first.",
+    );
+    expect(settingsMutateAsyncMock).not.toHaveBeenCalled();
+  });
+
+  it("starts on typing the folders when folders are already set up", () => {
+    librariesState.data = [existingLibrary({})];
+    renderWizard();
+
+    expect(
+      screen.getByRole("radio", { name: "Neither – I'll pick folders myself" }),
+    ).toBeChecked();
+    expect(
+      screen.getByRole("textbox", { name: "Movies watched folder" }),
+    ).toHaveValue("C:\\Old\\Movies");
+  });
+
   it("ends on What's next, with a way into Weir and no start page to choose (#459)", async () => {
     renderWizard();
+    chooseNeither();
 
     expect(
       screen.queryByRole("radiogroup", { name: "Open first" }),
@@ -152,6 +196,7 @@ describe("SetupWizardPage", () => {
 
   it("skips without saving the edited draft, only the wizard's own state", async () => {
     renderWizard();
+    chooseNeither();
 
     fireEvent.change(screen.getByDisplayValue("02:00"), {
       target: { value: "03:30" },
@@ -192,6 +237,7 @@ describe("SetupWizardPage", () => {
 
   it("completes and saves backup plus library starter settings", async () => {
     renderWizard();
+    chooseNeither();
 
     fireEvent.change(screen.getByDisplayValue("02:00"), {
       target: { value: "03:30" },
@@ -236,6 +282,7 @@ describe("SetupWizardPage", () => {
   it("does not mark the wizard complete when a library save fails first", async () => {
     createLibraryMock.mockRejectedValueOnce(new Error("boom"));
     renderWizard();
+    chooseNeither();
 
     fireEvent.change(
       screen.getByRole("textbox", { name: "Movies watched folder" }),
@@ -258,6 +305,7 @@ describe("SetupWizardPage", () => {
 
   it("creates a library for each media type that has folders and none yet", async () => {
     renderWizard();
+    chooseNeither();
 
     fireEvent.change(
       screen.getByRole("textbox", { name: "TV watched folder" }),

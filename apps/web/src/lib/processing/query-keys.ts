@@ -3,6 +3,7 @@ import type { LibraryCleansQuery } from "./library-cleans-api";
 import type { ProcessingJobsInspectionFilter } from "./jobs-inspection/queries";
 import type { ProcessingMediaType } from "./libraries-api";
 import type { LibraryFileFilters } from "./library-mode-api";
+import type { ProposedFoldersByType } from "./library-setup-api";
 
 /**
  * Every Processing query key. Each panel still reads its own key and loads on its own; sharing the
@@ -44,6 +45,10 @@ export const processingKeys = {
   directPlayDevices: ["processing", "direct-play-devices"] as const,
   libraries: ["processing", "libraries"] as const,
   ruleSets: ["processing", "rule-sets"] as const,
+  librarySuggestions: (answeringConnections: string[]) =>
+    ["processing", "library-suggestions", ...answeringConnections] as const,
+  proposedLibraryCheck: (folders: ProposedFoldersByType) =>
+    ["processing", "proposed-library-check", folders] as const,
   rejectSupport: (connectionIds: number[]) =>
     ["processing", "reject-support", ...connectionIds] as const,
   managerSetup: (
