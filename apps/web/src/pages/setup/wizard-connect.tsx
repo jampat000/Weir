@@ -159,7 +159,8 @@ export function WizardConnect({
           connection={connection}
         />
       ))}
-      {justCreated ? (
+      {justCreated &&
+      connections.answering.includes(`manager:${justCreated.id}`) ? (
         <NewConnectionSecretPrompt
           connection={justCreated}
           onDismiss={() => setJustCreated(null)}

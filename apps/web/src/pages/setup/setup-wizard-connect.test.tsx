@@ -404,7 +404,7 @@ describe("first run: connect Deluno first", () => {
     choose("Deluno");
 
     expect(
-      await screen.findByText("Weir could not reach Deluno."),
+      await screen.findByText("Weir could not connect to Deluno."),
     ).toBeInTheDocument();
     expect(
       screen.getByText("Nothing answered at that address."),
@@ -417,7 +417,7 @@ describe("first run: connect Deluno first", () => {
       screen.getByRole("textbox", { name: "Movies watched folder" }),
     ).toHaveValue("");
     expect(
-      screen.queryByText("Weir could not reach Deluno."),
+      screen.queryByText("Weir could not connect to Deluno."),
     ).not.toBeInTheDocument();
   });
 

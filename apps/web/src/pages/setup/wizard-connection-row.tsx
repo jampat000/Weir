@@ -53,7 +53,7 @@ export function WizardConnectionRow({
       ) : answering === false ? (
         <div className="space-y-1 text-sm" role="alert">
           <p className="mm-status-text--failed font-medium">
-            Weir could not reach {name}.
+            Weir could not connect to {name}.
           </p>
           {detail ? <p className="text-mm-text2">{detail}</p> : null}
           <p className="text-mm-text2">
