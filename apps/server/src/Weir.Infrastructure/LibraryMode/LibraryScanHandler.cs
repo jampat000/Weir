@@ -365,7 +365,7 @@ public sealed class LibraryScanHandler : IJobHandler
             }
             catch (Exception exception) when (exception is MediaManagerHttpException or MediaManagerUnreachableException)
             {
-                notes.Add($"Weir couldn't ask {connection.Label} which titles it manages: {exception.Message}");
+                notes.Add(ManagerDialectRules.Unreachable(connection, exception, "which titles it manages"));
                 continue;
             }
 

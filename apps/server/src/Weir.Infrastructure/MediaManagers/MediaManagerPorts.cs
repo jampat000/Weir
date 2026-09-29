@@ -1,4 +1,6 @@
 using System.Globalization;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Weir.Core.Configuration;
 using Weir.Core.Json;
 using Weir.Core.MediaManagers;
@@ -15,14 +17,16 @@ public interface IMediaManagerPorts
 public sealed class HttpMediaManagerPorts : IMediaManagerPorts
 {
     private readonly IManagerHttpHandlerFactory _handlers;
+    private readonly ILogger _logger;
 
-    public HttpMediaManagerPorts(IManagerHttpHandlerFactory handlers)
+    public HttpMediaManagerPorts(IManagerHttpHandlerFactory handlers, ILogger<HttpMediaManagerPorts>? logger = null)
     {
         _handlers = handlers ?? throw new ArgumentNullException(nameof(handlers));
+        _logger = logger ?? NullLogger<HttpMediaManagerPorts>.Instance;
     }
 
     public IMediaManagerPort? PortForKind(string? kind) =>
-        ManagerKindProfiles.ForKind(kind) is { } profile ? new HttpMediaManagerPort(profile, _handlers) : null;
+        ManagerKindProfiles.ForKind(kind) is { } profile ? new HttpMediaManagerPort(profile, _handlers, _logger) : null;
 
     /// <summary>
     /// A connection from the <c>WEIR_ARR_*</c> credentials that predate the connections table, or null when unset.
@@ -40,16 +44,28 @@ public sealed class HttpMediaManagerPorts : IMediaManagerPorts
 }
 
 /// <summary>One manager over HTTP; the kind's profile chooses the Sonarr/Radarr v3 dialect or the external-integration one.</summary>
-public sealed class HttpMediaManagerPort : IMediaManagerPort
+public sealed partial class HttpMediaManagerPort : IMediaManagerPort
 {
     private readonly ManagerKindProfile _profile;
     private readonly IManagerHttpHandlerFactory _handlers;
+    private readonly ILogger _logger;
 
-    public HttpMediaManagerPort(ManagerKindProfile profile, IManagerHttpHandlerFactory handlers)
+    public HttpMediaManagerPort(ManagerKindProfile profile, IManagerHttpHandlerFactory handlers, ILogger? logger = null)
     {
         _profile = profile ?? throw new ArgumentNullException(nameof(profile));
         _handlers = handlers ?? throw new ArgumentNullException(nameof(handlers));
+        _logger = logger ?? NullLogger.Instance;
     }
+
+    /// <summary>The plain sentence for a manager that did not answer; the technical reason goes to the log only.</summary>
+    private string UnreachableText(ManagerConnection connection, Exception exception, string what)
+    {
+        LogManagerDidNotAnswer(_logger, exception, connection.Label, what);
+        return ManagerDialectRules.Unreachable(connection, exception, what);
+    }
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "{Label} did not answer when Weir asked {What}.")]
+    private static partial void LogManagerDidNotAnswer(ILogger logger, Exception error, string label, string what);
 
     public string Kind => _profile.Kind;
 
@@ -73,7 +89,7 @@ public sealed class HttpMediaManagerPort : IMediaManagerPort
                 capabilities,
                 [],
                 [],
-                ManagerDialectRules.Unreachable(connection, exception, _profile.IsArr ? "which folders it manages" : "what it manages"),
+                UnreachableText(connection, exception, _profile.IsArr ? "which folders it manages" : "what it manages"),
                 new SortedSet<string>(StringComparer.Ordinal));
         }
 
@@ -99,7 +115,7 @@ public sealed class HttpMediaManagerPort : IMediaManagerPort
         }
         catch (Exception exception) when (exception is MediaManagerHttpException or MediaManagerUnreachableException)
         {
-            return new ManagerQueueSignal(connection, SignalStatus.Unreachable, [], ManagerDialectRules.Unreachable(connection, exception, "what it is importing"));
+            return new ManagerQueueSignal(connection, SignalStatus.Unreachable, [], UnreachableText(connection, exception, "what it is importing"));
         }
 
         if (_profile.IsArr)
@@ -159,7 +175,7 @@ public sealed class HttpMediaManagerPort : IMediaManagerPort
         }
         catch (Exception exception) when (exception is MediaManagerHttpException or MediaManagerUnreachableException)
         {
-            return new ManagerLibraryTruth(connection, SignalStatus.Unreachable, [], ManagerDialectRules.Unreachable(connection, exception, "which files it still keeps"));
+            return new ManagerLibraryTruth(connection, SignalStatus.Unreachable, [], UnreachableText(connection, exception, "which files it still keeps"));
         }
 
         return new ManagerLibraryTruth(connection, SignalStatus.Reported, ManagerDialectRules.ArrLibraryFilePaths(payload, _profile.ArrFileKey));
@@ -213,7 +229,7 @@ public sealed class HttpMediaManagerPort : IMediaManagerPort
         }
         catch (Exception exception) when (exception is MediaManagerHttpException or MediaManagerUnreachableException)
         {
-            return new ManagerLibraryFilesSignal(connection, SignalStatus.Unreachable, [], ManagerDialectRules.Unreachable(connection, exception, "which files it keeps and their titles"));
+            return new ManagerLibraryFilesSignal(connection, SignalStatus.Unreachable, [], UnreachableText(connection, exception, "which files it keeps and their titles"));
         }
     }
 

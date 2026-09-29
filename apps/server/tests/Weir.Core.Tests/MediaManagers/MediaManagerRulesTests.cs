@@ -175,6 +175,45 @@ public sealed class MediaManagerRulesTests
     }
 
     [Fact]
+    public void A_manager_that_cannot_be_reached_is_told_with_the_address_and_no_transport_text()
+    {
+        var connection = new ManagerConnection("deluno", "Main", "http://127.0.0.1:7879", "k");
+        const string expected = "Weir could not reach Deluno (Main) at http://127.0.0.1:7879. " +
+                                "Check the address is right, and that the app is running and reachable from this machine.";
+
+        Assert.Equal(expected, ManagerDialectRules.Unreachable(connection, new MediaManagerUnreachableException("The connection failed: couldn't connect."), "what it manages"));
+        Assert.Equal(expected, ManagerDialectRules.Unreachable(connection, new InvalidOperationException("<urlopen error couldn't connect>"), "what it manages"));
+        Assert.Equal(
+            expected,
+            ManagerDialectRules.Unreachable(connection, new MediaManagerHttpException("Only http and https addresses are allowed.", new WireValueException("bad address")), "what it manages"));
+    }
+
+    [Fact]
+    public void A_download_client_that_cannot_be_reached_is_told_with_the_same_sentence()
+    {
+        var client = new DownloadClientConnection("transmission", "Main", "http://127.0.0.1:9091", null, null, null);
+
+        Assert.Equal(
+            $"Weir could not reach {client.Label} at http://127.0.0.1:9091. Check the address is right, and that the app is running and reachable from this machine.",
+            DownloadClientDialectRules.Unreachable(client));
+    }
+
+    [Theory]
+    [InlineData("HTTP 500")]
+    [InlineData("unexpected HTTP 204")]
+    [InlineData("HTTP 200: the response was not valid JSON. This does not look like a Sonarr, Radarr or Deluno API at this address.")]
+    public void A_manager_that_answers_oddly_is_told_without_the_status_or_the_raw_detail(string detail)
+    {
+        var connection = new ManagerConnection("radarr", "4K", "http://m", "k");
+
+        var sentence = ManagerDialectRules.Unreachable(connection, new MediaManagerHttpException(detail), "what it is importing");
+
+        Assert.StartsWith("Radarr (4K) did not give Weir the answer it expected when asked what it is importing.", sentence, StringComparison.Ordinal);
+        Assert.DoesNotContain("HTTP", sentence, StringComparison.Ordinal);
+        Assert.DoesNotContain("JSON", sentence, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Filtering_rows_to_the_asked_scope_leaves_a_silent_manager_silent()
     {
         var connection = new ManagerConnection("deluno", "Main", "http://m", "k");

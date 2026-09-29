@@ -117,7 +117,6 @@ public static class DownloadClientDialectRules
     public static string Unreachable(DownloadClientConnection connection)
     {
         ArgumentNullException.ThrowIfNull(connection);
-        return $"Weir could not reach {connection.Label} at {connection.BaseUrl}. " +
-               "Check the address is right, and that the app is running and reachable from this machine.";
+        return ConnectionUnreachableText.For(connection.Label, connection.BaseUrl);
     }
 }

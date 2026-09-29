@@ -51,7 +51,7 @@ public static class ManagerHealthProbe
         }
         catch (MediaManagerUnreachableException)
         {
-            return (false, $"Weir could not reach {name} at {baseUrl}. Check the address is right, and that the app is running and reachable from this machine.");
+            return (false, ConnectionUnreachableText.For(name, baseUrl));
         }
 
         return (true, $"Connected. Weir can reach {name}.");

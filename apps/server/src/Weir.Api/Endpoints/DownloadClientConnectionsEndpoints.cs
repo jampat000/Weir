@@ -220,10 +220,10 @@ internal sealed class DownloadClientConnectionsEndpointHandlers
     }
 
     /// <summary>
-    /// <c>GET /api/v1/download-clients/suggestions?media_type=movie|tv</c>: one entry per enabled connection, shaped
-    /// for the same suggestion list Sonarr/Radarr/Deluno feed (see <see cref="ProcessingLibraryEndpoints.MapProcessingLibraryEndpoints"/>'s
-    /// <c>manager-setup</c> route for the sibling shape). <c>media_type</c> is accepted for route consistency with
-    /// that endpoint but not used to filter: a download client's completed folder is what it is regardless of
+    /// <c>GET /api/v1/download-clients/suggestions?media_type=movie|tv</c>: one entry per enabled connection with the
+    /// folder it saves to, to offer as a workflow's watched folder. An entry gives no verdict on whether that folder
+    /// suits a workflow; the workflow's folder chain says so. <c>media_type</c> is accepted for route consistency with
+    /// the manager setup route but not used to filter: a download client's completed folder is what it is regardless of
     /// media type, since none of the five dialects can reliably say which category is "the TV one".
     /// </summary>
     public async Task<ApiResult> GetSuggestionsAsync(ApiRequest request)

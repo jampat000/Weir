@@ -57,7 +57,10 @@ public static class ManagerDialectRules
         };
     }
 
-    /// <summary>One sentence an operator can act on, with the connection named.</summary>
+    /// <summary>
+    /// One sentence an operator can act on, with the connection named. It never quotes the exception, an HTTP status or
+    /// a transport reason: those stay on the exception for the logs.
+    /// </summary>
     public static string Unreachable(ManagerConnection connection, Exception exception, string what)
     {
         ArgumentNullException.ThrowIfNull(connection);
@@ -73,6 +76,8 @@ public static class ManagerDialectRules
                        "Weir backed off rather than retrying straight away.";
             case MediaManagerRedirectedException redirected:
                 return $"{connection.Label} {redirected.Message}";
+            case MediaManagerHttpException { InnerException: WireValueException }:
+                return ConnectionUnreachableText.For(connection.Label, connection.BaseUrl);
             case MediaManagerHttpException http:
                 var detail = http.Message;
                 if (detail.Contains("HTTP 401", StringComparison.Ordinal) || detail.Contains("HTTP 403", StringComparison.Ordinal))
@@ -81,10 +86,10 @@ public static class ManagerDialectRules
                            "Check the key on the Media managers settings page and save it again.";
                 }
 
-                return $"{connection.Label} did not give Weir the answer it expected when asked {what} ({detail}).";
+                return $"{connection.Label} did not give Weir the answer it expected when asked {what}. " +
+                       $"Check the address points at {connection.Label} itself, not a page inside it, and that {connection.Label} is running normally.";
             default:
-                return $"Weir could not reach {connection.Label} to ask {what} ({exception.Message}). " +
-                       "Check the address is right and that the app is running.";
+                return ConnectionUnreachableText.For(connection.Label, connection.BaseUrl);
         }
     }
 

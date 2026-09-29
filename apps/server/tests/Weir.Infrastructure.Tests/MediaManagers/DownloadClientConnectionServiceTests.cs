@@ -156,7 +156,7 @@ public sealed class DownloadClientConnectionServiceTests
     }
 
     [Fact]
-    public async Task Suggestions_carry_the_shape_the_library_editor_expects()
+    public async Task Suggestions_carry_the_folders_and_no_verdict_on_them()
     {
         using var fixture = new DownloadClientFixture();
         fixture.Http
@@ -172,15 +172,13 @@ public sealed class DownloadClientConnectionServiceTests
         Assert.Equal("qbittorrent", ((WireString)entry["kind"]).Value);
         Assert.Equal("qBittorrent on client.local", ((WireString)entry["name"]).Value);
         Assert.Equal("qBittorrent on client.local", ((WireString)entry["label"]).Value);
-        Assert.Equal("download_client", ((WireString)entry["flow"]).Value);
-        Assert.True(((WireBool)entry["ready"]).Value);
+        Assert.False(entry.TryGetValue("ready", out _));
+        Assert.False(entry.TryGetValue("lines", out _));
         Assert.Equal("/downloads/complete", ((WireString)entry["suggested_watched_folder"]).Value);
         var categoryFolders = (WireArray)entry["category_folders"];
         var category = (WireObject)categoryFolders.Items[0];
         Assert.Equal("tv-sonarr", ((WireString)category["category"]).Value);
         Assert.Equal("/downloads/complete/tv", ((WireString)category["folder"]).Value);
-        var lines = (WireArray)entry["lines"];
-        Assert.Contains(lines.Items, line => ((WireString)((WireObject)line)["state"]).Value == "ok");
     }
 
     [Fact]
