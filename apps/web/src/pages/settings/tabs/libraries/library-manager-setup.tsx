@@ -184,13 +184,13 @@ function DelunoHandoff({
     (output !== null && output !== outputFolder.trim());
   return (
     <>
-      {watched !== null || output !== null ? (
+      {differs ? (
         <p className="text-sm text-mm-text2">
           {item.label} reports downloads in{" "}
           <code className="break-all">{watched ?? "(not set)"}</code> and picks
           up cleaned files from{" "}
           <code className="break-all">{output ?? "(not set)"}</code>.{" "}
-          {differs && editable ? (
+          {editable ? (
             <button
               type="button"
               className="mm-quiet-link"

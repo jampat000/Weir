@@ -16,8 +16,9 @@ export function WeirOnlyWorkflows() {
       <span className="font-medium text-mm-text">
         {weirOnly.map((library) => library.name).join(", ")}
       </span>
-      . Weir watches their folders and writes cleaned files to their output
-      folders by itself.
+      . Weir watches {weirOnly.length === 1 ? "its folder" : "their folders"}{" "}
+      and writes cleaned files to {weirOnly.length === 1 ? "its" : "their"}{" "}
+      output {weirOnly.length === 1 ? "folder" : "folders"} by itself.
     </p>
   );
 }

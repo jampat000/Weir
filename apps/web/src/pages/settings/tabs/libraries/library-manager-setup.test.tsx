@@ -266,6 +266,10 @@ it("does not offer Deluno's folders once the workflow already uses them", async 
   );
 
   const block = await screen.findByRole("region", { name: "Deluno" });
+  // The story already says where the files come from and go to; it is not said again.
+  expect(
+    within(block).queryByText(/Deluno reports downloads in/),
+  ).not.toBeInTheDocument();
   expect(
     within(block).queryByRole("button", { name: "Use Deluno's folders" }),
   ).not.toBeInTheDocument();

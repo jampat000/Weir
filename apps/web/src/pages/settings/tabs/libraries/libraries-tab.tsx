@@ -169,10 +169,6 @@ export function LibrariesTab() {
         }}
       />
 
-      {editable && managers.length > 0 ? (
-        <LibraryImportSection connections={managers} onNotice={setNotice} />
-      ) : null}
-
       {editing.kind === "choosing" ? (
         <AddWorkflowChoice
           connections={managers}
@@ -191,6 +187,10 @@ export function LibrariesTab() {
             )
           }
         />
+      ) : null}
+
+      {editable && managers.length > 0 ? (
+        <LibraryImportSection connections={managers} onNotice={setNotice} />
       ) : null}
 
       {editing.kind === "adding" || editing.kind === "editing" ? (

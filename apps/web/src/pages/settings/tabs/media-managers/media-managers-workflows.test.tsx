@@ -105,6 +105,19 @@ it("names the Weir only workflows, so a connection's list is not read as all of 
   );
 });
 
+it("says its for a single Weir only workflow", async () => {
+  vi.spyOn(librariesApi, "fetchProcessingLibraries").mockResolvedValue([
+    workflow(1, "Movies from Deluno", [1]),
+    workflow(2, "Kids", []),
+  ]);
+
+  render(<MediaManagersTab />, { wrapper });
+
+  expect(await screen.findByTestId("weir-only-workflows")).toHaveTextContent(
+    "Weir only, with no media manager involved: Kids. Weir watches its folder and writes cleaned files to its output folder by itself.",
+  );
+});
+
 it("says nothing about Weir only workflows when every workflow is linked", async () => {
   vi.spyOn(librariesApi, "fetchProcessingLibraries").mockResolvedValue([
     workflow(1, "Movies from Deluno", [1]),
