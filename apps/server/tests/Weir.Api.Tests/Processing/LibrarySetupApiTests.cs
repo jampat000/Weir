@@ -54,13 +54,12 @@ public sealed class LibrarySetupApiTests
         return (server, client, manager);
     }
 
-    private static async Task<long> ConnectAsync(ApiTestClient client, string route, string kind, string name, string baseUrl)
+    private static async Task<long> ConnectAsync(ApiTestClient client, string route, string kind, string baseUrl)
     {
         using var response = await client.PostAsync($"/api/v1/{route}/connections", new Dictionary<string, object?>
         {
             ["csrf_token"] = await client.CsrfAsync(),
             ["kind"] = kind,
-            ["name"] = name,
             ["base_url"] = baseUrl,
             ["api_key"] = "key",
         });
@@ -68,11 +67,11 @@ public sealed class LibrarySetupApiTests
         return (await Json(response))!["id"]!.GetValue<long>();
     }
 
-    private static Task<long> ConnectManagerAsync(ApiTestClient client, string kind, string name, string baseUrl) =>
-        ConnectAsync(client, "media-managers", kind, name, baseUrl);
+    private static Task<long> ConnectManagerAsync(ApiTestClient client, string kind, string baseUrl) =>
+        ConnectAsync(client, "media-managers", kind, baseUrl);
 
-    private static Task<long> ConnectDownloadClientAsync(ApiTestClient client, string kind, string name, string baseUrl) =>
-        ConnectAsync(client, "download-clients", kind, name, baseUrl);
+    private static Task<long> ConnectDownloadClientAsync(ApiTestClient client, string kind, string baseUrl) =>
+        ConnectAsync(client, "download-clients", kind, baseUrl);
 
     private static async Task<JsonNode> SuggestedAsync(ApiTestClient client)
     {
@@ -138,7 +137,7 @@ public sealed class LibrarySetupApiTests
     {
         var (server, client, manager) = await StartAsync();
         await using var _server = server;
-        var delunoId = await ConnectManagerAsync(client, "deluno", "Deluno", "http://192.0.2.10:5099");
+        var delunoId = await ConnectManagerAsync(client, "deluno", "http://192.0.2.10:5099");
         manager.Json(HttpMethod.Get, "/api/integrations/external/manifest", DelunoManifest);
 
         var suggested = await SuggestedAsync(client);
@@ -147,7 +146,7 @@ public sealed class LibrarySetupApiTests
         Assert.Equal("Movies", movies["name"]!.GetValue<string>());
         Assert.Equal("/media/downloads/complete/movies", movies["watched_folder"]!.GetValue<string>());
         Assert.Equal("/media/downloads/weir/movies", movies["output_folder"]!.GetValue<string>());
-        Assert.Equal("Deluno", movies["source_label"]!.GetValue<string>());
+        Assert.Equal("Deluno on 192.0.2.10", movies["source_label"]!.GetValue<string>());
         Assert.Equal([delunoId], movies["manager_connection_ids"]!.AsArray().Select(id => id!.GetValue<long>()));
         var tv = LibraryFor(suggested, "tv");
         Assert.Equal("/media/downloads/complete/tv", tv["watched_folder"]!.GetValue<string>());
@@ -160,8 +159,8 @@ public sealed class LibrarySetupApiTests
     {
         var (server, client, manager) = await StartAsync();
         await using var _server = server;
-        var sonarrId = await ConnectManagerAsync(client, "sonarr", "Sonarr", "http://192.0.2.60:8989");
-        var radarrId = await ConnectManagerAsync(client, "radarr", "Radarr", "http://192.0.2.61:7878");
+        var sonarrId = await ConnectManagerAsync(client, "sonarr", "http://192.0.2.60:8989");
+        var radarrId = await ConnectManagerAsync(client, "radarr", "http://192.0.2.61:7878");
         manager.Route(HttpMethod.Get, "/api/v3/downloadclient", request => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
         {
             Content = new StringContent(request.RequestUri!.Host == "192.0.2.60"
@@ -174,7 +173,7 @@ public sealed class LibrarySetupApiTests
         var movies = LibraryFor(suggested, "movie");
         Assert.Equal("/downloads/movies", movies["watched_folder"]!.GetValue<string>());
         Assert.Equal("/downloads/Weir Ready/Movies", movies["output_folder"]!.GetValue<string>());
-        Assert.Equal("Radarr", movies["source_label"]!.GetValue<string>());
+        Assert.Equal("Radarr on 192.0.2.61", movies["source_label"]!.GetValue<string>());
         Assert.Equal([radarrId], movies["manager_connection_ids"]!.AsArray().Select(id => id!.GetValue<long>()));
         var tv = LibraryFor(suggested, "tv");
         Assert.Equal("/downloads/tv", tv["watched_folder"]!.GetValue<string>());
@@ -186,22 +185,22 @@ public sealed class LibrarySetupApiTests
     {
         var (server, client, manager) = await StartAsync();
         await using var _server = server;
-        var radarrId = await ConnectManagerAsync(client, "radarr", "Radarr", "http://192.0.2.61:7878");
+        var radarrId = await ConnectManagerAsync(client, "radarr", "http://192.0.2.61:7878");
         manager.Json(HttpMethod.Get, "/api/v3/downloadclient", ArrClientsWithoutDirectory);
 
         var alone = await SuggestedAsync(client);
 
         Assert.Empty(alone["libraries"]!.AsArray());
-        Assert.Equal(["Radarr does not say where its downloads are saved."], alone["notes"]!.AsArray().Select(note => note!.GetValue<string>()));
+        Assert.Equal(["Radarr on 192.0.2.61 does not say where its downloads are saved."], alone["notes"]!.AsArray().Select(note => note!.GetValue<string>()));
 
-        await ConnectDownloadClientAsync(client, "sabnzbd", "SABnzbd", "http://192.0.2.40:8080");
+        await ConnectDownloadClientAsync(client, "sabnzbd", "http://192.0.2.40:8080");
         manager.Json(HttpMethod.Get, "/api", """{"config":{"misc":{"complete_dir":"/downloads/complete"},"categories":[{"name":"movies","dir":"movies"}]}}""");
 
         var together = await SuggestedAsync(client);
 
         var movies = LibraryFor(together, "movie");
         Assert.Equal("/downloads/complete/movies", movies["watched_folder"]!.GetValue<string>());
-        Assert.Equal("SABnzbd", movies["source_label"]!.GetValue<string>());
+        Assert.Equal("SABnzbd on 192.0.2.40", movies["source_label"]!.GetValue<string>());
         Assert.Equal([radarrId], movies["manager_connection_ids"]!.AsArray().Select(id => id!.GetValue<long>()));
     }
 
@@ -210,7 +209,7 @@ public sealed class LibrarySetupApiTests
     {
         var (server, client, manager) = await StartAsync();
         await using var _server = server;
-        await ConnectDownloadClientAsync(client, "sabnzbd", "SABnzbd", "http://192.0.2.40:8080");
+        await ConnectDownloadClientAsync(client, "sabnzbd", "http://192.0.2.40:8080");
         manager.Json(
             HttpMethod.Get,
             "/api",
@@ -228,7 +227,7 @@ public sealed class LibrarySetupApiTests
     {
         var (server, client, manager) = await StartAsync();
         await using var _server = server;
-        await ConnectDownloadClientAsync(client, "sabnzbd", "SABnzbd", "http://192.0.2.40:8080");
+        await ConnectDownloadClientAsync(client, "sabnzbd", "http://192.0.2.40:8080");
         manager.Json(HttpMethod.Get, "/api", """{"config":{"misc":{"complete_dir":"/downloads/complete"},"categories":[]}}""");
 
         var suggested = await SuggestedAsync(client);
@@ -242,7 +241,7 @@ public sealed class LibrarySetupApiTests
     {
         var (server, client, _) = await StartAsync();
         await using var _server = server;
-        await ConnectManagerAsync(client, "sonarr", "Sonarr", "http://192.0.2.60:8989");
+        await ConnectManagerAsync(client, "sonarr", "http://192.0.2.60:8989");
 
         var suggested = await SuggestedAsync(client);
 
@@ -255,7 +254,7 @@ public sealed class LibrarySetupApiTests
     {
         var (server, client, manager) = await StartAsync();
         await using var _server = server;
-        await ConnectManagerAsync(client, "deluno", "Deluno", "http://192.0.2.10:5099");
+        await ConnectManagerAsync(client, "deluno", "http://192.0.2.10:5099");
         manager.Json(HttpMethod.Get, "/api/integrations/external/manifest", DelunoManifest);
 
         var suggested = await SuggestedAsync(client);
@@ -270,7 +269,7 @@ public sealed class LibrarySetupApiTests
         var (server, client, manager) = await StartAsync();
         await using var _server = server;
         using var folders = TempFolders.Create();
-        await ConnectManagerAsync(client, "deluno", "Deluno", "http://192.0.2.10:5099");
+        await ConnectManagerAsync(client, "deluno", "http://192.0.2.10:5099");
         manager.Json(HttpMethod.Get, "/api/integrations/external/manifest", DelunoManifest);
         using (var updated = await client.PutAsync($"/api/v1/processing/libraries/{await SavedLibraryIdAsync(client, "Movies")}", new Dictionary<string, object?>
         {
