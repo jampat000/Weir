@@ -13,6 +13,9 @@ public sealed record AudioRejection(string Summary, string Sentence);
 /// </summary>
 public static class AudioRejectionExplanation
 {
+    /// <summary>How every explanation sentence opens, so a heading that already says "Rejected" can drop it.</summary>
+    public const string Lead = "Rejected: ";
+
     private const string AudioChoiceSetting = "\"How to choose audio\"";
     private const string RulesScreen = "Settings › Rules";
     private const string UndeterminedLanguage = "und";
@@ -30,7 +33,7 @@ public static class AudioRejectionExplanation
         {
             return new AudioRejection(
                 "it has no audio tracks",
-                "Rejected: this file has no audio tracks, so there would be nothing to keep.");
+                Lead + "this file has no audio tracks, so there would be nothing to keep.");
         }
 
         var kept = audio.Where(stream => !(config.RemoveCommentary && TrackFlagsReader.Detect(stream).Commentary.Value)).ToList();
@@ -38,7 +41,7 @@ public static class AudioRejectionExplanation
         {
             return new AudioRejection(
                 $"every audio track is commentary and {rules} remove commentary",
-                $"Rejected: every audio track in this file is commentary, and {rules} remove commentary, so no audio would be left. " +
+                $"{Lead}every audio track in this file is commentary, and {rules} remove commentary, so no audio would be left. " +
                 $"Turn off \"Remove commentary tracks\" in {RulesScreen} to keep files like this.");
         }
 
@@ -46,7 +49,7 @@ public static class AudioRejectionExplanation
         {
             return new AudioRejection(
                 $"{rules} leave no audio to keep",
-                $"Rejected: {rules} leave no audio track to keep. Check the audio settings in {RulesScreen}.");
+                $"{Lead}{rules} leave no audio track to keep. Check the audio settings in {RulesScreen}.");
         }
 
         var wanted = RemuxRules.OrderedPreferenceLangs(config);
@@ -54,14 +57,14 @@ public static class AudioRejectionExplanation
         {
             return new AudioRejection(
                 $"no first-choice audio language is set for {rules}",
-                $"Rejected: {rules} keep only your preferred audio languages, but no first-choice language is set, so no track can be kept. " +
+                $"{Lead}{rules} keep only your preferred audio languages, but no first-choice language is set, so no track can be kept. " +
                 $"Choose a first-choice language, or change {AudioChoiceSetting}, in {RulesScreen}.");
         }
 
         var language = LanguageName(wanted[0]);
         return new AudioRejection(
             $"no {language} audio for {rules}",
-            $"Rejected: none of its audio tracks are in {language}, and {rules} keep only {language} audio, so there would be nothing to keep. " +
+            $"{Lead}none of its audio tracks are in {language}, and {rules} keep only {language} audio, so there would be nothing to keep. " +
             $"{FoundSentence(kept)} To accept files like this, change the first-choice language or {AudioChoiceSetting} in {RulesScreen}.");
     }
 

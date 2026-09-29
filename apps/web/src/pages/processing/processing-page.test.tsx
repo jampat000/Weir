@@ -582,6 +582,43 @@ describe("ProcessingPage", () => {
     expect(screen.getByTestId("live-done-today")).toHaveTextContent("38");
   });
 
+  it("says Rejected, with the reason, for a file the rules rejected, and keeps Could not be finished for a real failure", () => {
+    const passEvent = (id: number, path: string, detail: object) => ({
+      id,
+      created_at: "2026-08-18T09:58:00",
+      event_type: "processing.file_remux_pass_completed",
+      title: "x",
+      library_id: 1,
+      relative_path: path,
+      detail: JSON.stringify({
+        relative_media_path: path,
+        ok: false,
+        ...detail,
+      }),
+    });
+    activity["processing.file_remux_pass_completed"] = {
+      items: [
+        passEvent(801, "Heat.mkv", {
+          outcome: "failed_before_execution",
+          rejected_without_manager: true,
+          reason: "Rejected: it has no audio tracks, so nothing would be kept.",
+          rejected_cleanup_detail: "The file was left where it is.",
+        }),
+        passEvent(802, "Ronin.mkv", { outcome: "failed_during_execution" }),
+      ],
+    };
+    renderLive();
+
+    const [rejected, failed] = screen.getAllByTestId("live-finished");
+    expect(rejected).toHaveTextContent(
+      "Rejected: it has no audio tracks, so nothing would be kept. The file was left where it is.",
+    );
+    expect(rejected).not.toHaveTextContent("Could not be finished");
+    expect(failed).toHaveTextContent(
+      "Could not be finished · the original is untouched",
+    );
+  });
+
   it("announces a newly finished file to a screen reader, but not the ones already on screen at load", () => {
     const { rerender } = renderLive();
     expect(screen.getByTestId("live-finished-announcement")).toHaveTextContent(

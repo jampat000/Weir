@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import { FileName } from "../../components/shared/file-name";
 import { ConfirmDialog } from "../../components/ui/confirm-dialog";
@@ -65,7 +65,9 @@ function choices(
  * this — finished, or its file already gone — keeps the plain confirm in {@link HistoryFileActions} instead of
  * this dialog. When `options.fingerprint_recorded` is false (a title that failed or was rejected before Weir
  * started recording one, #786 follow-up), the file Weir means is shown plainly so the owner can check it before
- * choosing delete or keep — "remove" needs no such check, since it never touches the file.
+ * choosing delete or keep — "remove" needs no such check, since it never touches the file. Nothing is chosen when
+ * the dialog opens, Remove stays disabled until something is, and focus starts on the first choice, so nothing
+ * happens to the file unless the person picks what should (#838).
  */
 export function HistoryRemoveDialog({
   fileName,
@@ -82,7 +84,8 @@ export function HistoryRemoveDialog({
   onCancel: () => void;
   onConfirm: (resolution: HistoryRemoveChoice) => void;
 }) {
-  const [choice, setChoice] = useState<HistoryRemoveChoice>("delete");
+  const [choice, setChoice] = useState<HistoryRemoveChoice | null>(null);
+  const firstChoice = useRef<HTMLInputElement>(null);
   const formatDate = useAppDateFormatter();
 
   return (
@@ -93,9 +96,13 @@ export function HistoryRemoveDialog({
       cancelLabel="Cancel"
       busy={busy}
       busyLabel="Removing…"
+      confirmDisabled={choice === null}
+      initialFocus={firstChoice}
       error={error}
       onCancel={onCancel}
-      onConfirm={() => onConfirm(choice)}
+      onConfirm={() => {
+        if (choice) onConfirm(choice);
+      }}
       description={
         <fieldset>
           <legend className="mb-2">
@@ -120,13 +127,14 @@ export function HistoryRemoveDialog({
               </p>
             </div>
           ) : null}
-          {choices(options).map((opt) => (
+          {choices(options).map((opt, index) => (
             <label
               key={opt.value}
               data-testid={`history-remove-dialog-choice-${opt.value}`}
               className={`mm-dialog-choice${choice === opt.value ? " mm-dialog-choice--chosen" : ""}`}
             >
               <input
+                ref={index === 0 ? firstChoice : undefined}
                 type="radio"
                 name="history-remove-resolution"
                 value={opt.value}

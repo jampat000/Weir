@@ -73,7 +73,7 @@ export function RemuxPassDetail({ detail }: { detail: string }) {
   const summaryTiles = [
     {
       label: "Outcome",
-      value: outcomeLabel(parsed.outcome, parsed.pass_through_unchanged),
+      value: outcomeLabel(parsed),
     },
     { label: "Original size", value: sourceSize },
     { label: "Final size", value: outputSize },
