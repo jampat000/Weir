@@ -142,6 +142,16 @@ static class Program
             {
                 return 1;
             }
+
+            // Before the port is asked for and before any server runs: an update left waiting is installed while
+            // nothing is running that the install could interrupt (#857).
+            var updateService = new UpdateService(TrayLog.Write);
+            var updateSettings = UpdateSettings.Load(runtimeHome);
+            if (UpdateOnStart.TryApply(updateService, updateSettings.Mode, runtimeHome, StopOrphanedServers))
+            {
+                return 0;
+            }
+
             var port = ResolvePort(args, runtimeHome);
             if (port is null)
             {
@@ -149,7 +159,7 @@ static class Program
             }
             var listenScope = LanAccessStartup.Resolve(runtimeHome, InstallProcesses.Root(), () => new ComFirewallPolicy(), TrayLog.Write);
 
-            using var app = new TrayApp(port.Value, listenScope, openBrowserOnReady: OpensBrowser(args));
+            using var app = new TrayApp(port.Value, listenScope, openBrowserOnReady: OpensBrowser(args), updateService, updateSettings);
             return app.Run();
         }
         catch (Exception ex)

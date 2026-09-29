@@ -34,6 +34,10 @@ Use the Velopack setup exe from the release being validated.
 23. Quit Weir from the tray icon, and confirm `tray-host.log` in `C:\ProgramData\Weir` says the server host `stopped cleanly` within a few seconds, not `killing it`. Do the same after switching LAN access on or off from the tray menu.
 24. Relaunch Weir and confirm the existing user, settings, and wizard completion state persist.
 25. Install the next version over the current version and confirm Velopack applies a delta update cleanly.
+    - With **Auto** update mode and Weir left running, let it download the update and confirm `tray-host.log` says `Update downloaded successfully.` and no `Scheduling update` or Velopack `Running: Update.exe` line follows. Wait two minutes and confirm the version and the server process id have not changed, and `velopack_Weir.log` has no `Killing process`.
+    - Quit from the tray icon and confirm the log shows the server `stopped cleanly`, then `Applying update ... and exiting`, and that Weir is on the new version at its next start.
+    - Repeat with **Restart to update** (tray menu, then System › About › **Restart to apply**) and confirm the server `stopped cleanly` before `Applying update ... and restarting`, and that Weir comes back on the new version with no browser window.
+    - Download an update, then end the tray with `taskkill /PID <tray pid> /F` (the same as a Windows sign-out that does not run Quit). Start Weir and confirm the log shows `Installing it before the server starts` and the new version is running.
 26. Uninstall and reinstall only when intentionally testing clean-install behavior.
 27. Confirm the automated packaged smoke reports that Processing placed a byte-identical
     pass-through file in the processed tree before removing its watched source.

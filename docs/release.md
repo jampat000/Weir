@@ -155,7 +155,15 @@ After installing:
 5. Application binaries install under `%LocalAppData%\Weir` (per-user, no admin required).
 6. The local runtime root is created under `C:\ProgramData\Weir`.
 
-Updates are handled automatically by the .NET tray app via Velopack. Delta updates keep downloads small and rollback is automatic on failure. No separate updater service is needed.
+Updates are handled by the .NET tray app via Velopack. Delta updates keep downloads small and rollback is automatic on failure. No separate updater service is needed.
+
+Downloading an update never installs it, and the tray never leaves Velopack's installer waiting while Weir keeps running: that installer stops Weir and its server after about 60 s (#857). A downloaded update installs in exactly these cases, and each one stops the server cleanly first (the stop above, `stopped cleanly` in `tray-host.log`), so the installer only ever finds a tray that is about to end:
+
+- **Quit** from the tray icon stops the server, then installs the update and does not start Weir again.
+- **Restart to update** (the tray menu item, the balloon, or **Restart to apply** on System › About) stops the server, installs the update and starts Weir again without opening the browser.
+- **The next start.** When Windows ends the session or the tray is killed, so Quit never runs, the downloaded package stays on disk. The next tray start installs it before the port is chosen and before the server starts, silently, then Weir starts again on the new version. Each update is tried once this way (`update-start-attempt` in the data folder holds the version), so an install that fails cannot loop, and a person who chose **Notify only** never gets one.
+
+The Auto and Download only modes differ only in the notice: both download in the background and install in the cases above. A `--silent` start shows no notice and installs the same ways.
 
 If an operator runs a manually staged copy without Velopack install metadata, the
 tray keeps `Check for updates` visible and sends it to the browser-based release check
