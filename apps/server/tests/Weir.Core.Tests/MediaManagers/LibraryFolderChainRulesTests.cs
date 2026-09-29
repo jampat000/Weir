@@ -14,12 +14,19 @@ public sealed class LibraryFolderChainRulesTests
         public HashSet<string> Unreadable { get; } = [];
         public HashSet<string> Unwritable { get; } = [];
         public bool? SameFilesystemAnswer { get; set; } = true;
+        public List<string> WriteProbed { get; } = [];
 
         public bool Exists(string path) => Existing.Contains(path);
 
         public bool CanRead(string path) => !Unreadable.Contains(path);
 
-        public bool CanWrite(string path) => !Unwritable.Contains(path);
+        public bool CanWrite(string path)
+        {
+            WriteProbed.Add(path);
+            return !Unwritable.Contains(path);
+        }
+
+        public string? ResolveFinalPath(string path) => null;
 
         public bool? SameFilesystem(string first, string second) => SameFilesystemAnswer;
     }
@@ -43,8 +50,8 @@ public sealed class LibraryFolderChainRulesTests
 
         Assert.All(lines, line => Assert.Equal(SetupCheckLine.Ok, line.State));
         Assert.Contains(lines, line => line.Text.Contains("can read the watched folder", StringComparison.Ordinal));
-        Assert.Contains(lines, line => line.Text.Contains("can use the work folder", StringComparison.Ordinal));
-        Assert.Contains(lines, line => line.Text.Contains("can write to the output folder", StringComparison.Ordinal));
+        Assert.Contains(lines, line => line.Text.Contains("can read the work folder", StringComparison.Ordinal));
+        Assert.Contains(lines, line => line.Text.Contains("can read and write the output folder", StringComparison.Ordinal));
         Assert.Contains(lines, line => line.Text.Contains("moved into place instantly", StringComparison.Ordinal));
     }
 
@@ -86,7 +93,7 @@ public sealed class LibraryFolderChainRulesTests
     }
 
     [Fact]
-    public void An_output_folder_weir_cannot_write_to_is_a_problem()
+    public void An_output_folder_weir_cannot_write_to_is_a_problem_that_says_how_to_fix_it()
     {
         var probe = AllFoldersExist();
         probe.Unwritable.Add(Output);
@@ -94,7 +101,60 @@ public sealed class LibraryFolderChainRulesTests
         var lines = Check(probe);
 
         var problem = Assert.Single(lines, line => line.State == SetupCheckLine.Problem);
-        Assert.Contains("cannot write", problem.Text, StringComparison.Ordinal);
+        Assert.Equal(
+            "Weir cannot write to the output folder /media/output. Check its permissions, or point this workflow at a folder Weir can write to.",
+            problem.Text);
+    }
+
+    [Fact]
+    public void An_output_folder_weir_cannot_read_is_a_problem_that_says_how_to_fix_it()
+    {
+        var probe = AllFoldersExist();
+        probe.Unreadable.Add(Output);
+
+        var lines = Check(probe);
+
+        var problem = Assert.Single(lines, line => line.State == SetupCheckLine.Problem);
+        Assert.Equal(
+            "Weir cannot read the output folder /media/output. Check its permissions, or point this workflow at a folder Weir can read.",
+            problem.Text);
+    }
+
+    [Fact]
+    public void An_output_folder_that_cannot_be_read_is_not_probed_for_a_write_and_is_never_shown_as_fine()
+    {
+        var probe = AllFoldersExist();
+        probe.Unreadable.Add(Output);
+
+        var lines = Check(probe);
+
+        Assert.Empty(probe.WriteProbed);
+        Assert.DoesNotContain(lines, line => line.State == SetupCheckLine.Ok && line.Text.Contains("the output folder", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void A_readable_output_folder_is_probed_for_a_write_exactly_once()
+    {
+        var probe = AllFoldersExist();
+
+        Check(probe);
+
+        Assert.Equal([Output], probe.WriteProbed);
+    }
+
+    [Fact]
+    public void A_work_folder_weir_cannot_read_is_a_problem_that_says_how_to_fix_it()
+    {
+        var probe = AllFoldersExist();
+        probe.Unreadable.Add(Work);
+
+        var lines = Check(probe);
+
+        var problem = Assert.Single(lines, line => line.State == SetupCheckLine.Problem);
+        Assert.Equal(
+            "Weir cannot read the work folder /media/work. Check its permissions, or point this workflow's work folder at one Weir can read.",
+            problem.Text);
+        Assert.DoesNotContain(Work, probe.WriteProbed);
     }
 
     [Fact]
