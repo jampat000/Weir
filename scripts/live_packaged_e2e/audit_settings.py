@@ -163,6 +163,10 @@ class AuditSettingsMixin:
         self.visible(
             self.page.get_by_test_id("setup-wizard-skip"), "re-entered setup wizard"
         )
+        self.visible(
+            self.page.get_by_text("How do your downloads reach Weir?"),
+            "re-entered setup wizard asks how downloads reach Weir",
+        )
         self.require(
             not self.page.get_by_text("Display density", exact=False).count(),
             "Display density is back in the setup wizard",
