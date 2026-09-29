@@ -100,6 +100,7 @@ export function AddDownloadClientForm({
           >
             <input
               data-testid="download-client-base-url"
+              autoComplete="url"
               className="mm-input"
               value={form.base_url}
               placeholder="http://192.0.2.10:8080"
@@ -116,6 +117,7 @@ export function AddDownloadClientForm({
               <input
                 data-testid="download-client-api-key"
                 type="password"
+                autoComplete="new-password"
                 className="mm-input"
                 value={form.api_key}
                 onChange={(e) => change("api_key", e.target.value)}
@@ -128,6 +130,7 @@ export function AddDownloadClientForm({
               <Field label="Username" width="medium">
                 <input
                   data-testid="download-client-username"
+                  autoComplete="off"
                   className="mm-input"
                   value={form.username}
                   onChange={(e) => change("username", e.target.value)}
@@ -141,6 +144,7 @@ export function AddDownloadClientForm({
                 <input
                   data-testid="download-client-password"
                   type="password"
+                  autoComplete="new-password"
                   className="mm-input"
                   value={form.password}
                   onChange={(e) => change("password", e.target.value)}
@@ -158,6 +162,7 @@ export function AddDownloadClientForm({
               <input
                 data-testid="download-client-password"
                 type="password"
+                autoComplete="new-password"
                 className="mm-input"
                 value={form.password}
                 onChange={(e) => change("password", e.target.value)}
