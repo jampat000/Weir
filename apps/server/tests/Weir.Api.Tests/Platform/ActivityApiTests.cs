@@ -453,10 +453,11 @@ public sealed class ActivityApiTests
         var dataA = JsonNode.Parse(blockA[1]["data: ".Length..])!;
         Assert.Equal("Film/Film.mkv", dataA["files"]![0]!["relative_path"]!.GetValue<string>());
         Assert.Equal(42.0, dataA["files"]![0]!["percent"]!.GetValue<double>());
+        Assert.Equal("writing", dataA["files"]![0]!["stage"]!.GetValue<string>());
         Assert.Equal(blockA[1], blockB[1]);
     }
 
-    private static LiveProgress Progress(double percent) => new(percent, "Weir is writing the cleaned-up file.", 30.0, "processing", "120x", 5.0, [], []);
+    private static LiveProgress Progress(double percent) => new(percent, "Weir is writing the cleaned-up file.", 30.0, "processing", "120x", 5.0, [], [], "writing");
 
     private static async Task<StreamReader> OpenStreamAsync(WeirTestServer server, ApiTestClient client)
     {

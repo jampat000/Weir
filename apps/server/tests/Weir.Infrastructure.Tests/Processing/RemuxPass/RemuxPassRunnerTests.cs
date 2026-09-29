@@ -247,7 +247,8 @@ public sealed class RemuxPassRunnerTests : IDisposable
         long minimumFreeMb = 0,
         RemuxPassRunner? runner = null,
         Weir.Core.Processing.ManualPlanChoice? manualPlan = null,
-        SourceFingerprint? manualPlanFingerprint = null) =>
+        SourceFingerprint? manualPlanFingerprint = null,
+        HandoffOrigin? origin = null) =>
         (runner ?? Runner()).RunAsync(new RemuxPassRequest
         {
             Runtime = runtime ?? _folders.Runtime(),
@@ -262,6 +263,7 @@ public sealed class RemuxPassRunnerTests : IDisposable
             ProgressReporter = _progress.Add,
             ManualPlan = manualPlan,
             ManualPlanFingerprint = manualPlanFingerprint,
+            Origin = origin,
         });
 
     private static string Str(WireObject result, string key) => WireConvert.Str(result[key]);
@@ -501,13 +503,91 @@ public sealed class RemuxPassRunnerTests : IDisposable
         Assert.False(File.Exists(source));
         Assert.True(Bool(result, "source_deleted_after_success"));
         Assert.True(Bool(result, "source_folder_deleted"));
-        Assert.Equal(["processing", "processing", "processing", "finishing", "finished"], _progress.Select(update => Str(update, "status")));
-        Assert.Equal(25.0, ((WireNumber)_progress[1]["percent"]).Value);
+        Assert.Equal(["processing", "processing", "processing", "processing", "processing", "finishing", "finishing", "finished"], _progress.Select(update => Str(update, "status")));
+        Assert.Equal(25.0, ((WireNumber)_progress[3]["percent"]).Value);
         Assert.Equal(100.0, ((WireNumber)_progress[^1]["percent"]).Value);
         Assert.Single(((WireArray)result["removed_audio"]).Items);
         Assert.Contains("audio out: #1 eng", Str(result, "plan_summary"), StringComparison.Ordinal);
         Assert.Empty(Directory.EnumerateFiles(_folders.Work));
         Assert.Equal(["ok", "outcome", "relative_media_path", "inspected_source_path", "processing_watched_folder_resolved", "stream_counts"], result.Keys.Take(6));
+    }
+
+    /// <summary>The stage each report named, in order, with repeats folded (a write reports many times) and unnamed reports left out.</summary>
+    private IEnumerable<string> StagesInOrder()
+    {
+        string? previous = null;
+        foreach (var update in _progress)
+        {
+            if (update.Get("stage") is not WireString { Value: var stage } || stage == previous)
+            {
+                continue;
+            }
+
+            previous = stage;
+            yield return stage;
+        }
+    }
+
+    [Fact]
+    public async Task A_remux_reports_each_stage_in_order_from_checking_to_handing_back()
+    {
+        _folders.Source("stages.mkv");
+        _media.Probes["stages.mkv"] = FakeMediaRunner.EnglishAndJapanese;
+        _media.DefaultProbe = FakeMediaRunner.EnglishOnly;
+
+        var result = await Run("stages.mkv");
+
+        Assert.True(Bool(result, "ok"));
+        Assert.Equal(["checking", "planning", "writing", "verifying", "handing_back"], StagesInOrder());
+    }
+
+    [Fact]
+    public async Task A_remux_for_a_hand_off_still_ends_on_handing_back_before_it_is_reported_finished()
+    {
+        _folders.Source("stages-handoff.mkv");
+        _media.Probes["stages-handoff.mkv"] = FakeMediaRunner.EnglishAndJapanese;
+        _media.DefaultProbe = FakeMediaRunner.EnglishOnly;
+
+        await Run("stages-handoff.mkv", origin: new HandoffOrigin("deluno", "h1", "/api/integrations/processors/events", "Film.2001"));
+
+        Assert.Equal("handing_back", _progress.Where(update => update.ContainsKey("stage")).Select(update => Str(update, "stage")).Last());
+        Assert.Equal("finished", Str(_progress[^1], "status"));
+    }
+
+    [Fact]
+    public async Task An_unchanged_file_reports_each_stage_in_order_too()
+    {
+        _folders.Source("unchanged-stages.mkv", 4400);
+        _media.DefaultProbe = FakeMediaRunner.EnglishOnly;
+
+        var result = await Run("unchanged-stages.mkv", passThrough: true);
+
+        Assert.True(Bool(result, "ok"));
+        Assert.Equal(["checking", "planning", "writing", "verifying", "handing_back"], StagesInOrder());
+    }
+
+    [Fact]
+    public async Task A_file_with_no_video_reports_only_the_checking_it_reached()
+    {
+        _folders.Source("no-video-stages.mpg");
+        _media.DefaultProbe = """{"streams":[{"index":0,"codec_type":"audio","codec_name":"ac3","channels":2}]}""";
+
+        await Run("no-video-stages.mpg");
+
+        Assert.Equal(["checking"], StagesInOrder());
+    }
+
+    [Fact]
+    public async Task Every_report_before_the_write_is_live_status_processing_so_the_file_stays_under_Working()
+    {
+        _folders.Source("before-write.mkv");
+        _media.Probes["before-write.mkv"] = FakeMediaRunner.EnglishAndJapanese;
+        _media.DefaultProbe = FakeMediaRunner.EnglishOnly;
+
+        await Run("before-write.mkv");
+
+        var beforeWriting = _progress.TakeWhile(update => Str(update, "stage") != "writing");
+        Assert.All(beforeWriting, update => Assert.Equal("processing", Str(update, "status")));
     }
 
     [Fact]

@@ -4387,6 +4387,11 @@ export interface components {
        */
       progress_speed?: string | null;
       /**
+       * Progress Stage
+       * @description The step the running pass is on: checking, planning, writing, verifying or handing_back. Null when nothing is in flight or the pass names none.
+       */
+      progress_stage?: string | null;
+      /**
        * Progress Status
        * @description processing while the file is written; finishing during the final checks and hand-back. Null when nothing is in flight.
        */

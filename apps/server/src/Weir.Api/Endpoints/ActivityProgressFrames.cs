@@ -70,6 +70,7 @@ public sealed class ActivityProgressFrames
         var entries = files.Select(pair => (WireValue)new WireObject()
             .Set("relative_path", pair.Key)
             .Set("status", pair.Value.Status)
+            .Set("stage", pair.Value.Stage)
             .Set("percent", pair.Value.Percent is { } percent ? WireValue.Of(percent) : WireValue.Null)
             .Set("eta_seconds", pair.Value.EtaSeconds is { } eta ? WireValue.Of(eta) : WireValue.Null)
             .Set("message", pair.Value.Message)
