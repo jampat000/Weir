@@ -1,6 +1,7 @@
 using System.Net;
 using Microsoft.Extensions.DependencyInjection;
 using Weir.Core.Activity;
+using Weir.Infrastructure.Processing;
 using Weir.Infrastructure.Processing.RemuxPass;
 
 namespace Weir.Api.Tests.Platform;
@@ -90,6 +91,28 @@ public sealed class ProcessingFilesApiTests
         var body = await ApiTestClient.Json(response);
         var statuses = body!["files"]!.AsArray().Select(file => file!["status"]!.GetValue<string>()).Order(StringComparer.Ordinal);
         Assert.Equal(["processing", "unprocessed"], statuses);
+    }
+
+    [Fact]
+    public async Task A_file_being_worked_on_carries_the_stage_its_pass_is_on_and_others_carry_none()
+    {
+        await using var server = await ApiTestClient.StartServerAsync();
+        await TestDatabase.SeedAdminAsync(server);
+        var client = new ApiTestClient(server);
+        await client.SignInAsync();
+        var libraryId = await SeedLibraryAsync(server);
+        await SeedFileAsync(server, libraryId, "Film/running.mkv", "processing");
+        await SeedFileAsync(server, libraryId, "Film/waiting.mkv", "unprocessed");
+        server.Services.GetRequiredService<LiveProgressStore>().Update(
+            "Film/running.mkv",
+            new LiveProgress(null, "Weir is working out which tracks to keep.", null, "processing", null, null, [], [], PassStages.Planning));
+
+        using var response = await client.GetAsync("/api/v1/processing/files");
+
+        var body = await ApiTestClient.Json(response);
+        var files = body!["files"]!.AsArray().ToDictionary(file => file!["relative_path"]!.GetValue<string>());
+        Assert.Equal("planning", files["Film/running.mkv"]!["progress_stage"]!.GetValue<string>());
+        Assert.Null(files["Film/waiting.mkv"]!["progress_stage"]);
     }
 
     [Fact]

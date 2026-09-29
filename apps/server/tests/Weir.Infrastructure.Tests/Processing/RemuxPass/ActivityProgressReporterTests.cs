@@ -165,4 +165,41 @@ public sealed class ActivityProgressReporterTests
 
         Assert.False(_liveProgress.Snapshot().ContainsKey("Film/Film.mkv"));
     }
+
+    [Theory]
+    [InlineData("checking")]
+    [InlineData("planning")]
+    public void A_report_from_before_the_write_reaches_the_live_store_but_is_never_saved(string stage)
+    {
+        var reporter = Reporter();
+
+        reporter.Report(new WireObject().Set("status", "processing").Set("stage", stage));
+
+        Assert.Equal(stage, _liveProgress.Snapshot()["Film/Film.mkv"].Stage);
+        Assert.False(_saved.Reader.TryRead(out _));
+    }
+
+    [Fact]
+    public async Task The_first_report_of_the_write_is_still_the_first_one_saved_after_the_stages_before_it()
+    {
+        var reporter = Reporter();
+        reporter.Report(new WireObject().Set("status", "processing").Set("stage", "checking"));
+        reporter.Report(new WireObject().Set("status", "processing").Set("stage", "planning"));
+
+        reporter.Report(Writing(0).Set("stage", "writing"));
+
+        var saved = await _saved.Reader.ReadAsync();
+        Assert.Equal("writing", ((WireString)saved.Get("stage")!).Value);
+    }
+
+    [Fact]
+    public async Task A_pass_that_ends_while_still_checking_leaves_the_live_store()
+    {
+        var reporter = Reporter();
+        reporter.Report(new WireObject().Set("status", "processing").Set("stage", "checking"));
+
+        await reporter.CompleteAsync();
+
+        Assert.Empty(_liveProgress.Snapshot());
+    }
 }

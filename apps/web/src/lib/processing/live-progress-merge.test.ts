@@ -48,6 +48,7 @@ function progress(overrides: Partial<LiveProgressEntry>): LiveProgressEntry {
   return {
     relativePath: "Film/Film.mkv",
     status: "processing",
+    stage: "writing",
     percent: 42.5,
     etaSeconds: 30,
     message: "Weir is writing the cleaned-up file.",

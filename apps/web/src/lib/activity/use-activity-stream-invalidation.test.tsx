@@ -436,6 +436,7 @@ describe("useLiveProgress", () => {
             {
               relative_path: "Film/Film.mkv",
               status: "processing",
+              stage: "writing",
               percent: 42.5,
               eta_seconds: 12,
               message: "Weir is writing the cleaned-up file.",
@@ -452,6 +453,7 @@ describe("useLiveProgress", () => {
     expect(result.current["Film/Film.mkv"]).toEqual({
       relativePath: "Film/Film.mkv",
       status: "processing",
+      stage: "writing",
       percent: 42.5,
       etaSeconds: 12,
       message: "Weir is writing the cleaned-up file.",

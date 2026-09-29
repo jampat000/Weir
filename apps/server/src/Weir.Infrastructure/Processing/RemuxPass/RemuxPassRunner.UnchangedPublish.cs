@@ -91,6 +91,7 @@ public sealed partial class RemuxPassRunner
             var remaining = Math.Max(0, total - copied);
             report(new WireObject()
                 .Set("status", "processing")
+                .Set("stage", PassStages.Writing)
                 .Set("percent", percent)
                 .Set("eta_seconds", bytesPerSecond > 0 ? WireValue.Of(remaining / bytesPerSecond) : WireNull.Instance)
                 .Set("elapsed_seconds", elapsed)
@@ -186,7 +187,9 @@ public sealed partial class RemuxPassRunner
             return output;
         }
 
+        ReportStage(report, relativeMediaPath, "finishing", PassStages.Verifying, "The file was placed. Weir is doing final safety checks.");
         await RunScopeOutputCleanupAsync(context, output, finalSkip, cancellationToken).ConfigureAwait(false);
+        ReportStage(report, relativeMediaPath, "finishing", PassStages.HandingBack, "Weir is handing the finished file back.");
         return output;
     }
 
