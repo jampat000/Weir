@@ -117,6 +117,8 @@ export default defineConfig(({ mode }) => {
         },
       },
       setupFiles: "./src/test/setup.ts",
+      // A test that reads a stylesheet's own text (`?raw`) gets it; every other stylesheet stays empty.
+      css: { include: /\.css\?raw$/ },
       globals: true,
     },
   };

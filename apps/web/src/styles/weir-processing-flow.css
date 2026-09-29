@@ -1,0 +1,215 @@
+/* A file's stages as one connected path: a node per step, a thin line between neighbours. Each step is
+   one equal column, so a line runs from the middle of the step before to the middle of its own step,
+   stopping short of both nodes. Finished steps are ticked in the brand colour, the current one pulses,
+   the rest are muted. */
+.mm-flow {
+  margin-top: 14px;
+}
+
+.mm-flow__steps {
+  display: flex;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.mm-flow__step {
+  position: relative;
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  align-items: center;
+  min-width: 0;
+  text-align: center;
+}
+
+.mm-flow__label {
+  margin-top: 6px;
+  padding: 0 2px;
+  font-size: var(--mm-type-eyebrow);
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+  color: var(--mm-text3);
+  transition: color 0.3s ease-out;
+}
+
+.mm-flow__step--done .mm-flow__label {
+  color: var(--mm-text2);
+}
+
+.mm-flow__step--now .mm-flow__label {
+  color: var(--mm-text1);
+  font-weight: 600;
+}
+
+.mm-flow__step--failed .mm-flow__label {
+  color: var(--mm-status-failed-text);
+  font-weight: 600;
+}
+
+.mm-flow__node {
+  position: relative;
+  display: grid;
+  place-items: center;
+  box-sizing: border-box;
+  width: var(--mm-flow-node);
+  height: var(--mm-flow-node);
+  border: 2px solid color-mix(in srgb, var(--mm-text1) 22%, transparent);
+  border-radius: 50%;
+  background: var(--mm-surface1);
+  transition:
+    background-color 0.3s ease-out,
+    border-color 0.3s ease-out;
+}
+
+.mm-flow__step--done .mm-flow__node {
+  border-color: var(--mm-accent);
+  background: var(--mm-accent);
+}
+
+.mm-flow__step--now .mm-flow__node {
+  border-color: var(--mm-accent);
+}
+
+.mm-flow__step--failed .mm-flow__node {
+  border-color: var(--mm-status-failed-text);
+}
+
+.mm-flow__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--mm-accent);
+}
+
+/* A ring that leaves the current node and fades, on a loop: the same layer-only motion as the sidebar's
+   working dot (#719). */
+.mm-flow__step--now .mm-flow__node::after {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border: 2px solid var(--mm-accent);
+  border-radius: 50%;
+  animation: mm-live-pulse 1.8s ease-out infinite;
+}
+
+.mm-flow__glyph {
+  width: 10px;
+  height: 10px;
+  fill: none;
+  stroke: var(--mm-on-accent);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.mm-flow__step--failed .mm-flow__glyph {
+  stroke: var(--mm-status-failed-text);
+}
+
+/* A tick is drawn once, the moment its step finishes. */
+.mm-flow__step--done .mm-flow__glyph path {
+  stroke-dasharray: 14;
+  animation: mm-flow-tick 0.35s ease-out;
+}
+
+.mm-flow__link {
+  position: absolute;
+  top: calc(var(--mm-flow-node) / 2 - 1.5px);
+  left: calc(-50% + var(--mm-flow-node) / 2 + 4px);
+  width: calc(100% - var(--mm-flow-node) - 8px);
+  height: 3px;
+  overflow: hidden;
+  border-radius: var(--mm-radius-pill);
+  background: color-mix(in srgb, var(--mm-text1) 12%, transparent);
+}
+
+/* Scaled from the left rather than widened, so a progress update moves a layer, not the line's layout (#719). */
+.mm-flow__fill {
+  position: absolute;
+  inset: 0;
+  background: var(--mm-accent);
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition:
+    transform 0.5s ease-out,
+    background-color 0.4s ease-out;
+}
+
+.mm-flow__link--full .mm-flow__fill {
+  transform: scaleX(1);
+}
+
+/* During Write the line is the pass's own percent, which the live stream refreshes about once a second (#750);
+   a transition almost as long as that gap reads as steady movement rather than a dart and a pause. */
+.mm-flow__link--live .mm-flow__fill {
+  transform: scaleX(calc(var(--mm-live-fill) / 100));
+  transition: transform 0.9s linear;
+}
+
+.mm-flow__link--live .mm-flow__fill::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  width: 45%;
+  background-image: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, white 55%, transparent),
+    transparent
+  );
+  animation: mm-live-shimmer 1.5s linear infinite;
+}
+
+/* A step with no percentage to show: a band sweeps the line instead of a fill frozen at an arbitrary width. */
+.mm-flow__link--busy .mm-flow__fill {
+  background: transparent;
+  transform: scaleX(1);
+}
+
+.mm-flow__link--busy .mm-flow__fill::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  width: 35%;
+  border-radius: inherit;
+  background: var(--mm-accent);
+  animation: mm-live-sweep 1.6s ease-in-out infinite;
+}
+
+.mm-flow__reason {
+  margin: 8px 0 0;
+  font-size: var(--mm-type-caption);
+  line-height: 1.4;
+  color: var(--mm-status-failed-text);
+}
+
+@keyframes mm-flow-tick {
+  from {
+    stroke-dashoffset: 14;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* Every state stays readable without motion: the current node keeps its dot, the line keeps its fill. */
+@media (prefers-reduced-motion: reduce) {
+  .mm-flow__step--now .mm-flow__node::after,
+  .mm-flow__step--done .mm-flow__glyph path,
+  .mm-flow__link--live .mm-flow__fill::after,
+  .mm-flow__link--busy .mm-flow__fill::before {
+    animation: none;
+  }
+
+  .mm-flow__node,
+  .mm-flow__label,
+  .mm-flow__fill {
+    transition: none;
+  }
+
+  .mm-flow__link--busy .mm-flow__fill::before {
+    width: 100%;
+    opacity: 0.35;
+  }
+}

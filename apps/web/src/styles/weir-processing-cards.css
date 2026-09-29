@@ -220,8 +220,8 @@
   background: color-mix(in srgb, var(--mm-text1) 8%, transparent);
 }
 
-/* Scaled from the left rather than widened, so a progress update moves a layer instead of the track's
-   own layout — cheaper to animate, same look (#719). */
+/* Cleaning in place has no percentage to show, so a band sweeps the full, dimmed track instead of a fill
+   frozen at an arbitrary width (#698, #719). A download's progress is the stage flow's line, not this. */
 .mm-live-bar__fill {
   position: relative;
   display: block;
@@ -237,40 +237,10 @@
     var(--mm-accent) 60%,
     var(--mm-gold-dim) 100%
   );
-  transform: scaleX(calc(var(--mm-live-fill) / 100));
-  transform-origin: left center;
-  /* The live-progress stream sends a fresh value about once a second (#750); a transition almost as
-     long as that gap reads as steady movement rather than a dart followed by a pause. */
-  transition: transform 0.9s linear;
-}
-
-/* A band of light crossing the fill, moved instead of the gradient's own position (#719). */
-.mm-live-bar__fill::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  width: 45%;
-  background-image: linear-gradient(
-    90deg,
-    transparent,
-    color-mix(in srgb, white 55%, transparent),
-    transparent
-  );
-  animation: mm-live-shimmer 1.5s linear infinite;
-}
-
-/* Checking or cleaning in place: no percentage to show, so a band sweeps the full, dimmed track instead
-   of a fill frozen at an arbitrary width (#698, #719). */
-.mm-live-bar--busy .mm-live-bar__fill {
-  transform: scaleX(1);
   opacity: 0.35;
 }
 
-.mm-live-bar--busy .mm-live-bar__fill::after {
-  content: none;
-}
-
-.mm-live-bar--busy .mm-live-bar__fill::before {
+.mm-live-bar__fill::before {
   content: "";
   position: absolute;
   inset: 0;
@@ -278,44 +248,6 @@
   border-radius: inherit;
   background: var(--mm-accent);
   animation: mm-live-sweep 1.6s ease-in-out infinite;
-}
-
-/* Five steps on one row at every width seen so far: each pill is as wide as its word, and a done step
-   says so by its colour (and to a screen reader in words), not a tick that cost the room. */
-.mm-live-steps {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  margin: 12px 0 0;
-  padding: 0;
-  list-style: none;
-}
-
-.mm-live-step {
-  flex: 0 0 auto;
-  padding: 3px 7px;
-  border-radius: var(--mm-radius-pill);
-  border: 1px solid color-mix(in srgb, var(--mm-text1) 12%, transparent);
-  font-size: var(--mm-type-eyebrow);
-  white-space: nowrap;
-  color: var(--mm-text3);
-}
-
-.mm-live-step--done {
-  border-color: color-mix(
-    in srgb,
-    var(--mm-status-healthy-text) 35%,
-    transparent
-  );
-  background: var(--mm-status-healthy-bg);
-  color: var(--mm-status-healthy-text);
-}
-
-.mm-live-step--now {
-  border-color: var(--mm-accent);
-  background: var(--mm-accent);
-  color: var(--mm-on-accent);
-  font-weight: 600;
 }
 
 .mm-live-work__facts {
