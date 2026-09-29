@@ -17,15 +17,15 @@ Use the Velopack setup exe from the release being validated.
 9. Confirm the setup wizard (**Set up Weir**) opens after the first user is created.
 10. Confirm `Skip for now` leaves the wizard and lands on Processing.
 11. Confirm the wizard can be reopened from System › About › Setup wizard › `Open setup wizard`.
-12. Confirm `Finish setup` saves the time zone, the watched and output folders for the first Movies and TV libraries, and the automatic backup schedule.
+12. Confirm `Finish setup` saves the time zone, the watched and output folders for the first Movies and TV workflows, and the automatic backup schedule.
 13. Confirm the navigation shows Processing, History, Library, Settings and System, and that Processing is the first screen.
-14. Confirm Settings shows the tabs Libraries, Rules, Media managers, Performance, Cleanup, Schedule and Alerts.
+14. Confirm Settings shows the tabs Workflows, Rules, Media managers, Performance, Cleanup, Schedule and Alerts.
 15. Confirm System shows the tabs About, Backups, Security and Logs.
 16. In System › Backups, use **Export or restore now** to download a configuration backup.
 17. Restore that backup and confirm the app remains usable.
 18. Confirm System › About › Updates shows a meaningful status, even when no update is available.
 19. Right-click the tray icon and confirm `Check for updates` is present and reaches the current release status.
-20. In Settings › Libraries, open a library's editor and use `Browse` on a folder field to pick a local folder.
+20. In Settings › Workflows, open a workflow's editor and use `Browse` on a folder field to pick a local folder.
 21. Enter a UNC path (`\\server\share\folder`) manually and confirm it saves; a missing folder is a warning, not a save blocker.
 22. Open Library, pick the library from the title and confirm `Check again` runs.
 23. Quit Weir from the tray icon.

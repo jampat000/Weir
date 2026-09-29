@@ -68,17 +68,18 @@ your browser on the same PC, so it never asks for this.
 The setup wizard has three parts:
 
 - **Basics**: your time zone.
-- **Libraries**: a **Watched folder** and an **Output folder** for Movies, and the same for TV.
+- **Workflows**: a **Watched folder** and an **Output folder** for Movies, and the same for TV. Each
+  pair is one workflow.
   - **Watched folder**: where your downloads finish. Weir cleans whatever lands here.
   - **Output folder**: where Weir puts each cleaned file.
 - **Automatic backups**: whether Weir keeps a rolling copy of its configuration, and how often.
 
-You can skip the wizard and set these later: libraries under **Settings › Libraries**, backups
+You can skip the wizard and set these later: workflows under **Settings › Workflows**, backups
 under **System › Backups**.
 
 ## 4. Choose what to keep
 
-Under **Settings › Rules**, set the audio and subtitle rules your libraries use. For example, keep
+Under **Settings › Rules**, set the audio and subtitle rules your workflows use. For example, keep
 English and Japanese audio, keep English subtitles, and drop commentary tracks.
 
 ## 5. Try it with a real file
@@ -90,7 +91,7 @@ of relying on filesystem notifications.
 - The file shows up on **Processing** while Weir works on it.
 - Once it's done, it shows up in **History**, and the cleaned copy is in the output folder.
 
-Already have a library you want to clean up? In **Settings › Libraries**, edit the library and add
+Already have a library you want to clean up? In **Settings › Workflows**, edit the workflow and add
 its folders under **Files already in your library**. Then open **Library**, pick the library from
 the title and press **Check again**. Weir shows you what it would remove and how much space that
 frees before it changes anything.

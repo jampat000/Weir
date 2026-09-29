@@ -112,7 +112,7 @@ then restart.
 
 The recovery command above still needs Weir's own process to run, so it is no help when Weir
 itself will not start. As a last resort, with Weir stopped, you can clear the accounts directly
-and use first-run setup again. Everything else — libraries, connections and settings — lives in
+and use first-run setup again. Everything else — workflows, connections and settings — lives in
 other tables and survives.
 
 The database is at `$WEIR_HOME/data/weir.sqlite3` — `/data/weir/data/weir.sqlite3` inside

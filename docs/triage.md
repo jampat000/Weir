@@ -7,7 +7,7 @@ Weir issues should stay practical and reproducible. Every issue needs a clear us
 - `type: bug` - something is broken or behaves incorrectly.
 - `type: enhancement` - a new feature or workflow improvement.
 - `type: docs` - documentation, screenshots, release notes, or support text.
-- `area: processing` - libraries, rules, the remux pipeline, jobs, History and Library.
+- `area: processing` - workflows, rules, the remux pipeline, jobs, History and Library.
 - `area: settings` - settings, security, logs, backup, and support screens.
 - `area: logs` - runtime logs, diagnostics, retention, and observability.
 - `area: web` - shared web shell, responsive layout, accessibility, and frontend delivery.

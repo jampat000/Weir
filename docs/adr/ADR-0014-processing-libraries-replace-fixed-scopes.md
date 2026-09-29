@@ -5,6 +5,9 @@
 Accepted — applies to every Processing path, rule, guardrail, schedule and job payload
 that partitioned on `media_scope`.
 
+> **Naming.** Weir's Settings now call this row a **workflow**, because in Deluno, Radarr and Sonarr
+> a "library" is where media ends up. The API, the database and this record keep the word "library".
+
 ## Context
 
 Processing is configured by exactly **two scopes**, `movie` and `tv`, and they are not

@@ -37,9 +37,11 @@ Weir uses cookie-based sessions with CSRF protection:
 
 ### Processing
 
+The API still says "library" for what the app calls a workflow, so existing integrations keep working.
+
 | Prefix | Description |
 |--------|-------------|
-| `/api/v1/processing/libraries` | Libraries and their order, rule previews, and the files already in each library: scan, clean, leave alone, schedule |
+| `/api/v1/processing/libraries` | Workflows and their order, rule previews, and the files already in each workflow's library folders: scan, clean, leave alone, schedule |
 | `/api/v1/processing/files` | Files Weir has picked up: tracks, logs, requeue, move to top, why a file is held |
 | `/api/v1/processing/rule-sets` | Audio and subtitle rules |
 | `/api/v1/processing/jobs` | Queue and inspect background jobs |

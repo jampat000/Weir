@@ -45,7 +45,7 @@ Movie and TV files often come with a dozen audio tracks and subtitles in languag
 Weir removes them, so every file ends up with just the tracks you chose.
 
 - **You set the rules once.** For example: keep English and Japanese audio, keep English subtitles, drop commentary.
-- **New downloads are cleaned automatically.** Weir watches a folder, cleans each file that lands there, and puts the result in an output folder.
+- **New downloads are cleaned automatically.** A **workflow** watches a folder, cleans each file that lands there, and puts the result in an output folder. You can have as many workflows as you like, each with its own rules.
 - **Your existing library can be cleaned too.** Weir scans it, shows you what it would remove and how much space that saves, and only removes anything once you confirm.
 - **It never re-encodes.** Tracks are copied as they are, so there's no quality loss and it's fast.
 - **Nothing is lost if something goes wrong.** Weir works on a copy and only replaces a file once the new one checks out.
@@ -54,7 +54,7 @@ Beyond the cleaning itself:
 
 - **History** keeps a record of every file Weir handled: which tracks it kept and removed, and why a file was held or skipped.
 - **Library** lists the files already on your storage, library by library. You can open any file and choose its tracks yourself when the rules don't fit it.
-- **Schedules** set the hours each library may start work, so cleaning a large library can wait for the night.
+- **Schedules** set the hours each workflow may start work, so cleaning a large library can wait for the night.
 - **Alerts** go to Discord or any webhook when a file finishes or fails.
 - **Media managers** work alongside Weir. Deluno hands files over and imports them once they're clean. Sonarr and Radarr import from Weir's output folder, and Weir checks their queues before it touches a file.
 
@@ -240,8 +240,8 @@ More in the [Windows guide](https://jampat000.github.io/Weir/docs/deployment/win
    - **Watched folder**: where your downloads finish. Weir cleans whatever lands here.
    - **Output folder**: where Weir puts each cleaned file.
 
-   You can skip the wizard and add libraries later under **Settings › Libraries**.
-3. **Choose what to keep.** Under **Settings › Rules**, set the audio and subtitle languages each library keeps.
+   Each pair is a **workflow**. You can skip the wizard and add workflows later under **Settings › Workflows**.
+3. **Choose what to keep.** Under **Settings › Rules**, set the audio and subtitle languages each workflow keeps.
 4. **Try it.** Put a file in a watched folder. Weir usually notices within seconds. On network shares
    and in Docker it can take up to five minutes, because Weir falls back to checking on a timer.
    The file shows up on **Processing** while it's being worked on, and in **History** once it's done.
@@ -249,6 +249,26 @@ More in the [Windows guide](https://jampat000.github.io/Weir/docs/deployment/win
 To clean a library you already have, open **Library**, pick the library from the title and press
 **Check again**. Weir shows you what it would remove and how much space that frees before it changes
 anything.
+
+### Workflows
+
+A **workflow** is one route a file takes through Weir: a **watched folder** where files arrive, a
+private **work folder** where Weir cleans them, an **output folder** for the cleaned copy, and the
+rules and schedule that apply to it. You manage them under **Settings › Workflows**.
+
+There are two kinds, and both can run side by side:
+
+- **Weir only (local folders).** Weir watches a folder you choose and writes the cleaned file to
+  another. No other app is involved. It suits a folder of home videos or a kids' collection.
+- **Linked to a media manager or download client.** The watched folder is where your download client
+  finishes files, and the output folder is where the manager imports from. Weir describes the link
+  in the manager's own words: for Deluno, its download client category and the Deluno library the
+  file is imported into; for Radarr and Sonarr, the download client category and the root folder.
+
+**Library** is a separate thing: it cleans files that are already in place in your media library.
+A workflow is the path new files take; **Library** works on what has already arrived.
+
+The Weir API still says "library" for what the app calls a workflow, so existing integrations keep working.
 
 ### Connecting other apps
 
@@ -267,14 +287,14 @@ folder, and Sonarr or Radarr import from there. You connect them with a **remote
 tells Sonarr "when the download client says a file is in the downloads folder, look in Weir's output
 folder instead." Sonarr then only ever sees cleaned files.
 
-1. **In Weir**, open **Settings › Libraries** and edit the library.
+1. **In Weir**, open **Settings › Workflows** and edit the workflow.
    - **Watched folder**: where your download client finishes files, e.g. `/media/downloads/complete/tv`
    - **Output folder**: where Weir puts cleaned files, e.g. `/media/weir/tv`
    - Using torrents? Turn **After cleaning, remove the original download** off, so the torrent keeps
      seeding. Your download client or Sonarr removes it later, as they normally would.
 2. **Connect Sonarr** under **Settings › Media managers**, with its address and API key
    (Sonarr shows its API key on its **General** settings page).
-3. Back in the library, the **Media manager** section shows the exact mapping to add, with copy buttons.
+3. Back in the workflow, the **Media manager** section shows the exact mapping to add, with copy buttons.
 4. **In Sonarr**, go to **Settings › Download Clients › Remote Path Mappings** and press **+**:
    - **Host**: exactly what's in your download client's **Host** field on that same screen, e.g. `qbittorrent`
    - **Remote Path**: Weir's watched folder, e.g. `/media/downloads/complete/tv/`
@@ -282,7 +302,7 @@ folder instead." Sonarr then only ever sees cleaned files.
 
    The output folder has to exist before Sonarr will save the mapping.
 5. Keep **Completed Download Handling** switched on in Sonarr. This setup relies on it.
-6. Back in Weir, press **Check again** in the library's **Media manager** section. It reads Sonarr's
+6. Back in Weir, press **Check again** in the workflow's **Media manager** section. It reads Sonarr's
    settings (it never changes them) and shows ✓, or tells you exactly what to fix.
 
 Radarr works the same way, with its own movies folders. After a download finishes, Sonarr shows
