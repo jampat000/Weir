@@ -48,7 +48,7 @@ function FoundLibraryProblems({ row }: { row: SuggestedRow }) {
       <SetupCheckLines label={row.name} lines={lines} />
       <p className="text-xs text-mm-text3">
         You can finish setup now and sort these out afterwards in Settings ›
-        Libraries.
+        Workflows.
       </p>
     </div>
   );
@@ -168,7 +168,7 @@ export function WizardFoundLibraries({
       ))}
       {rows.length === 0 ? (
         <p className="mm-quiet-note">
-          Weir could not find a folder to start a library from.{" "}
+          Weir could not find a folder to start a workflow from.{" "}
           <button type="button" className="mm-quiet-link" onClick={onNeither}>
             Pick the folders yourself
           </button>
@@ -177,7 +177,7 @@ export function WizardFoundLibraries({
       ) : (
         <>
           <h3 className="text-sm font-semibold text-mm-text1">
-            Libraries Weir found
+            Workflows Weir found
           </h3>
           <div className="mm-wizard-libraries">
             {rows.map((row) => (

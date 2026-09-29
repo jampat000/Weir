@@ -55,7 +55,7 @@ public sealed class FileLogStore
         lines.Add($"Weir — processing record for {first.RelativePath}");
         if (first.LibraryName.Length > 0)
         {
-            lines.Add($"Library: {first.LibraryName}");
+            lines.Add($"Workflow: {first.LibraryName}");
         }
 
         lines.Add($"Records retained: {rows.Count} (newest first)");

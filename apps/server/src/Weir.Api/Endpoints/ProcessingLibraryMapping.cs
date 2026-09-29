@@ -325,7 +325,7 @@ internal static class ProcessingLibraryMapping
         if (!support.Available)
         {
             await uow.RollbackAsync().ConfigureAwait(false);
-            throw new ApiException(StatusCodes.Status400BadRequest, $"This library cannot use Reject yet. {support.Reason}");
+            throw new ApiException(StatusCodes.Status400BadRequest, $"This workflow cannot use Reject yet. {support.Reason}");
         }
     }
 }

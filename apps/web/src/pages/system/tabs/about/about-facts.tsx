@@ -61,7 +61,7 @@ export function AboutFacts() {
             {mkvmerge && mkvmerge !== "not installed"
               ? "mkvmerge for MKV files, FFmpeg for the rest."
               : "FFmpeg. With mkvmerge installed, Weir would write MKV files with it."}{" "}
-            A library can be set to FFmpeg only in Settings › Libraries.
+            A workflow can be set to FFmpeg only in Settings › Workflows.
           </dd>
         </div>
         <div>

@@ -87,7 +87,7 @@ function NoLibrary() {
         lead="The files already on your storage, and what Weir would do to each."
       />
       <p className="mm-library-empty">
-        No library is set up yet. Add one in Settings › Libraries, give it the
+        No workflow is set up yet. Add one in Settings › Workflows, give it the
         folders your media sits in, and Weir will check what is there.
       </p>
     </div>
@@ -171,7 +171,7 @@ export function LibraryPage(): React.ReactElement {
   }, []);
 
   if (libraries.isPending) {
-    return <PageLoading label="Loading your libraries" />;
+    return <PageLoading label="Loading your workflows" />;
   }
   if (libraries.isError) {
     return (
@@ -258,14 +258,14 @@ export function LibraryPage(): React.ReactElement {
 
       <div ref={tableTop} className="mm-library-results">
         {files.isPending ? (
-          <PageLoading label="Reading this library" />
+          <PageLoading label="Reading this workflow" />
         ) : files.isError ? (
           <ApiEntryError error={files.error} />
         ) : groups.length === 0 ? (
           <p className="mm-library-empty" data-testid="library-empty">
             {totals && totals.files > 0
               ? "Nothing here matches what you asked for. Clear the filters to see the whole library."
-              : "This library has not been scanned yet, or its folders hold nothing Weir reads. Check again, or set its folders in Settings › Libraries."}
+              : "This workflow has not been scanned yet, or its folders hold nothing Weir reads. Check again, or set its folders in Settings › Workflows."}
           </p>
         ) : (
           <LibraryTable

@@ -57,21 +57,21 @@ function LibrariesSection({
   };
 
   return (
-    <QuietSection headingId={headingId} heading="Libraries">
+    <QuietSection headingId={headingId} heading="Workflows">
       <p className="mm-quiet-note">
-        When each library may start work. A file already being processed when
+        When each workflow may start work. A file already being processed when
         its hours end is finished, not stopped.
       </p>
       {ordered.length === 0 ? (
         <p className="mt-4 text-sm text-mm-text3">
-          Add a library under Libraries to schedule it here.
+          Add a workflow under Workflows to schedule it here.
         </p>
       ) : (
         <div className="mm-quiet-table-wrap mt-4">
           <table className="mm-quiet-table mm-schedule-table">
             <thead>
               <tr>
-                <th scope="col">Library</th>
+                <th scope="col">Workflow</th>
                 <th scope="col">Week (Mon to Sun, midnight to midnight)</th>
                 <th scope="col">Right now</th>
                 <th scope="col">Looks for new files</th>

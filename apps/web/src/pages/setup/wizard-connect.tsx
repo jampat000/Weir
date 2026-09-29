@@ -25,10 +25,10 @@ const TEST_FAILURE = "The connection could not be tested.";
 
 const SOURCE_INTRO: Record<ConnectedSource, string> = {
   deluno:
-    "Weir asks Deluno where its downloads arrive and where it picks cleaned files up from, and fills the libraries in from that.",
-  arr: "Weir asks Sonarr and Radarr where their download client saves files, and fills the libraries in from that. Connect one or both.",
+    "Weir asks Deluno where its downloads arrive and where it picks cleaned files up from, and fills the workflows in from that.",
+  arr: "Weir asks Sonarr and Radarr where their download client saves files, and fills the workflows in from that. Connect one or both.",
   client:
-    "Weir reads where your download client saves finished downloads, and fills the libraries in from that. It only reads: nothing in the client is changed.",
+    "Weir reads where your download client saves finished downloads, and fills the workflows in from that. It only reads: nothing in the client is changed.",
 };
 
 function ManagerConnectionRow({

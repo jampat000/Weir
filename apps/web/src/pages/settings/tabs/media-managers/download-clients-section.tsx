@@ -49,7 +49,7 @@ export function DownloadClientsSection() {
       {justCreated ? (
         <p className="mm-quiet-note" data-testid="download-client-created-note">
           {justCreated.name} is connected. Weir will offer its folder as a
-          suggestion in the library editor — nothing is applied on its own.
+          suggestion in the workflow editor — nothing is applied on its own.
         </p>
       ) : null}
 

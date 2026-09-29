@@ -6,7 +6,7 @@ import { useNarrowDetailFocus } from "./use-narrow-detail-focus";
 /** How a library clean's outcome reads as a heading. */
 const OUTCOME_LEAD: Record<LibraryClean["outcome"], string> = {
   cleaned: "Cleaned in place.",
-  skipped: "Already matched the library's rules.",
+  skipped: "Already matched the workflow's rules.",
   failed: "The clean failed.",
 };
 

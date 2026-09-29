@@ -137,7 +137,7 @@ public sealed partial class RemuxPassRunner
         {
             return FailBefore(
                 relativeMediaPath,
-                "Weir could not find this file under the saved watched folder. Check the library path or restore the file, then try again.",
+                "Weir could not find this file under the saved watched folder. Check the workflow's folder or restore the file, then try again.",
                 inspected);
         }
 
@@ -154,7 +154,7 @@ public sealed partial class RemuxPassRunner
             return FailBefore(
                 relativeMediaPath,
                 $"Weir does not process {(suffix.Length > 0 ? suffix : "this")} files in this pass. " +
-                "Use a supported media file or update the library's media types, then try again.",
+                "Use a supported media file or update the workflow's media types, then try again.",
                 inspected);
         }
 

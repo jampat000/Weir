@@ -236,7 +236,7 @@ describe("SetupWizardPage", () => {
     expect(navigateMock).not.toHaveBeenCalled();
   });
 
-  it("completes and saves backup plus library starter settings", async () => {
+  it("completes and saves backup plus workflow starter settings", async () => {
     renderWizard();
     chooseNeither();
 
@@ -280,7 +280,7 @@ describe("SetupWizardPage", () => {
     });
   });
 
-  it("does not mark the wizard complete when a library save fails first", async () => {
+  it("does not mark the wizard complete when a workflow save fails first", async () => {
     createLibraryMock.mockRejectedValueOnce(new Error("boom"));
     renderWizard();
     chooseNeither();
@@ -304,7 +304,7 @@ describe("SetupWizardPage", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("creates a library for each media type that has folders and none yet", async () => {
+  it("creates a workflow for each media type that has folders and none yet", async () => {
     renderWizard();
     chooseNeither();
 
@@ -346,7 +346,7 @@ describe("SetupWizardPage", () => {
     expect(updateLibraryMock).not.toHaveBeenCalled();
   });
 
-  it("updates the first existing library of a media type instead of adding another", async () => {
+  it("updates the first existing workflow of a media type instead of adding another", async () => {
     librariesState.data = [
       existingLibrary({ id: 9, name: "4K films", display_order: 1 }),
       existingLibrary({ id: 7, name: "Films", display_order: 0 }),

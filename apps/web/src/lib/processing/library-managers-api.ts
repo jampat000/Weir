@@ -63,7 +63,7 @@ export async function fetchProcessingLibraryDrift(
   await requireOk(
     path,
     response,
-    "Could not compare libraries with that media manager",
+    "Could not compare workflows with that media manager",
   );
   return readJson<ProcessingLibraryDrift[]>(response);
 }
@@ -76,7 +76,7 @@ export async function unlinkDiscoveredProcessingLibrary(
     path,
     "POST",
     {},
-    "Could not unlink that library",
+    "Could not unlink that workflow",
   );
   return readJson<ProcessingLibrary>(response);
 }

@@ -211,7 +211,7 @@ public static partial class LibraryRules
             if (a is not null && b is not null && FoldersOverlap(a, b))
             {
                 throw new ProcessingLibraryException(
-                    $"This library's {labelA} folder and {labelB} folder overlap. Use separate folders, neither inside the other.");
+                    $"This workflow's {labelA} folder and {labelB} folder overlap. Use separate folders, neither inside the other.");
             }
         }
 
@@ -225,8 +225,8 @@ public static partial class LibraryRules
                     if (a is not null && b is not null && FoldersOverlap(a, b))
                     {
                         throw new ProcessingLibraryException(
-                            $"This library's {labelA} folder overlaps the {labelB} folder of '{other.Name}'. " +
-                            "Each library needs its own folders, neither inside another's.");
+                            $"This workflow's {labelA} folder overlaps the {labelB} folder of '{other.Name}'. " +
+                            "Each workflow needs its own folders, neither inside another's.");
                     }
                 }
             }

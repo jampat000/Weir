@@ -162,7 +162,7 @@ public static class HardwareAcceleration
             return new AccelerationDecision
             {
                 ArgvFlags = strictFlags,
-                Reason = "Hardware decoding is switched off for this library, so Weir decoded in software.",
+                Reason = "Hardware decoding is switched off for this workflow, so Weir decoded in software.",
             };
         }
 
@@ -187,7 +187,7 @@ public static class HardwareAcceleration
                 {
                     ArgvFlags = strictFlags,
                     FellBackToSoftware = true,
-                    Reason = "Weir fell back to software decoding because this library is set to use a named "
+                    Reason = "Weir fell back to software decoding because this workflow is set to use a named "
                         + "device but no device name was given.",
                 };
             }
@@ -210,7 +210,7 @@ public static class HardwareAcceleration
                     ArgvFlags = strictFlags,
                     FellBackToSoftware = true,
                     Reason = $"Weir fell back to software decoding because '{wanted}' belongs to a vendor this "
-                        + "library has switched off.",
+                        + "workflow has switched off.",
                 };
             }
 
@@ -218,7 +218,7 @@ public static class HardwareAcceleration
             {
                 Method = wanted,
                 ArgvFlags = ["-hwaccel", wanted, .. strictFlags],
-                Reason = $"Decoding with '{wanted}', as configured for this library.",
+                Reason = $"Decoding with '{wanted}', as configured for this workflow.",
             };
         }
 
@@ -240,7 +240,7 @@ public static class HardwareAcceleration
             ArgvFlags = strictFlags,
             FellBackToSoftware = true,
             Reason = "Weir fell back to software decoding because every acceleration method this ffmpeg build "
-                + "offers belongs to a vendor this library has switched off.",
+                + "offers belongs to a vendor this workflow has switched off.",
         };
     }
 

@@ -82,7 +82,7 @@ public sealed class WatcherStateStore
         var reports = Reports();
         if (reports.Count == 0)
         {
-            return (true, "No libraries are being watched for filesystem events.");
+            return (true, "No workflows are being watched for filesystem events.");
         }
 
         var degraded = reports.Where(r => r.Degraded).ToList();

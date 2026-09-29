@@ -48,7 +48,7 @@ public sealed class LibrarySuggestions
 
             if (libraries.FirstOrDefault(library => SameFolder(library.WatchedFolder, source.Watched)) is { } sharing)
             {
-                notes.Add($"{source.Label} saves {sharing.Name} and {LibraryFolderSuggestionRules.LibraryName(scope)} downloads to the same folder, so Weir suggests one library for them. Add another in Settings › Libraries once they are kept apart.");
+                notes.Add($"{source.Label} saves {sharing.Name} and {LibraryFolderSuggestionRules.LibraryName(scope)} downloads to the same folder, so Weir suggests one workflow for them. Add another in Settings › Workflows once they are kept apart.");
                 continue;
             }
 

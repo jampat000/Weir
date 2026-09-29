@@ -38,7 +38,7 @@ public sealed partial class RemuxPassRunner
 
     /// <summary>Why the source is still in the watched folder after a successful pass, when the library asks for that.</summary>
     public const string KeptOriginalReason =
-        "This library keeps the original download after cleaning, so Weir left it in the watched folder for your download client.";
+        "This workflow keeps the original download after cleaning, so Weir left it in the watched folder for your download client.";
 
     private static void InitFolderCleanupFields(WireObject output)
     {

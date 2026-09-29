@@ -80,7 +80,7 @@ public sealed partial class ProcessingRejectHandler : IJobHandler
         var libraryId = FollowUpJobPayload.LibraryId(payload);
         if (relativePath.Length == 0 || libraryId is null)
         {
-            throw new InvalidOperationException("A reject job needs a file and a library.");
+            throw new InvalidOperationException("A reject job needs a file and a workflow.");
         }
 
         var originRaw = FollowUpJobPayload.Origin(payload);
@@ -102,7 +102,7 @@ public sealed partial class ProcessingRejectHandler : IJobHandler
                 var library = await RemuxPassHandler.ResolveLibraryAsync(uow, _libraries, libraryId, null).ConfigureAwait(false);
                 if (library is null)
                 {
-                    throw new InvalidOperationException($"Library {libraryId} no longer exists.");
+                    throw new InvalidOperationException($"Workflow {libraryId} no longer exists.");
                 }
 
                 watchedRoot = RemuxPassPaths.Resolve(library.WatchedFolder);

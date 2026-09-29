@@ -48,7 +48,7 @@ export async function fetchLibraryFolderChain(
   await requireOk(
     path,
     response,
-    "Could not check this library's folder chain",
+    "Could not check this workflow's folder chain",
   );
   return readJson<LibraryFolderChain>(response);
 }
@@ -61,7 +61,7 @@ export async function fetchConnectionFolderChain(
   await requireOk(
     path,
     response,
-    "Could not check the folder chain of the libraries linked to it",
+    "Could not check the folder chain of the workflows linked to it",
   );
   return readJson<LibraryFolderChain[]>(response);
 }

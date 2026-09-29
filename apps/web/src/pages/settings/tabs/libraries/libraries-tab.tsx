@@ -77,8 +77,8 @@ export function LibrariesTab() {
     onOpen: openDeepLink,
   });
 
-  if (libraries.isPending) return <PageLoading label="Loading libraries" />;
-  if (libraries.isError) return <SettingsLoadError what="libraries" />;
+  if (libraries.isPending) return <PageLoading label="Loading workflows" />;
+  if (libraries.isError) return <SettingsLoadError what="workflows" />;
 
   const rows = [...libraries.data].sort(
     (a, b) => a.display_order - b.display_order,
@@ -107,7 +107,7 @@ export function LibrariesTab() {
     [swapped[index], swapped[target]] = [swapped[target], swapped[index]];
     attempt(
       reorder.mutateAsync(swapped.map((r) => r.id)),
-      "Libraries could not be reordered.",
+      "Workflows could not be reordered.",
     );
   };
 
@@ -143,7 +143,7 @@ export function LibrariesTab() {
                   enabled: !library.enabled,
                 },
               }),
-              "That library could not be changed.",
+              "That workflow could not be changed.",
             ),
           onMove: move,
           onEdit: (library) => {
@@ -156,10 +156,10 @@ export function LibrariesTab() {
                 .mutateAsync(library.id)
                 .then(() =>
                   setNotice(
-                    `${library.name} is now a manual library. Its folders and settings were not changed.`,
+                    `${library.name} is now a Weir-only workflow. Its folders and settings were not changed.`,
                   ),
                 ),
-              "That library could not be unlinked.",
+              "That workflow could not be unlinked.",
             ),
           onRemove: (library) => {
             remove.reset();

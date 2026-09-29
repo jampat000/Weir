@@ -32,9 +32,9 @@ export function MediaManagersTab() {
       <p className="mm-quiet-note">
         The media managers that send files to Weir. Weir asks each one when a
         download is really finished, hands cleaned files back to it, and can ask
-        it for a different release when one is bad. Libraries imported from a
-        media manager are linked to it; link a library you made yourself in its
-        editor under Libraries. Weir checks every media manager each minute and
+        it for a different release when one is bad. Workflows imported from a
+        media manager are linked to it; link a workflow you made yourself in its
+        editor under Workflows. Weir checks every media manager each minute and
         says here when one stops answering.
       </p>
 
