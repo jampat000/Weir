@@ -19,8 +19,8 @@ There are two kinds, and both can run side by side in one Weir:
 
 - **Weir only (local folders).** Weir watches a folder you choose and writes the cleaned file to
   another. No manager or download client is involved.
-- **Linked to a media manager or download client.** The workflow's watched folder is where the
-  download client finishes files, and its output folder is where the manager imports from. Weir
+- **Linked to a media manager (Deluno, Sonarr or Radarr).** The workflow's watched folder is where
+  the download client finishes files, and its output folder is where the manager imports from. Weir
   describes the link in the source's own words:
   - **Deluno:** the download client **category** the file comes from, and the Deluno **library**
     (with its **Library folder**) it is imported into.
@@ -31,6 +31,14 @@ For example, a linked workflow reads like this: comes from Deluno's download cli
 **movies** → Weir works in its work folder → cleaned into the output folder → Deluno imports it
 into its library **Movies**. A local one reads: watches `D:\Kids\Incoming` → works in its work
 folder → cleaned into `D:\Kids\Ready`.
+
+Each row in **Settings › Workflows** carries a badge, **Weir only** or **Linked to Deluno** (or Sonarr,
+or Radarr). **Add workflow** asks which kind first: **Local folders**, or **From a media manager**,
+which asks the manager for its folders and opens the editor filled in and linked. In an existing
+workflow's **Media manager** section, **Link to a media manager** and **Unlink** change the kind; the
+change applies when you save. A bare download client on its own only suggests a watched folder, so it
+never makes a workflow linked. Under **Settings › Media managers**, each connection lists the
+workflows it feeds and offers **Add a workflow from** it.
 
 Weir's **Library** menu is a separate thing. It cleans files that are already in place in your
 media library, and it keeps its name. A workflow is the path new files take.
@@ -60,8 +68,9 @@ A download client's completed folder for a category should be the same folder We
 that workflow. Weir's output folder is the one the manager reads cleaned files back from — either
 directly (Sonarr/Radarr's remote path mapping) or through Deluno's hand-off.
 
-This is what **Settings › Workflows**' compact **Folder chain** section checks for every workflow,
-and what **Settings › Media managers** checks per connection: whether the watched folder exists and
+This is what **Settings › Workflows**' compact **Folder chain** section checks for every workflow
+(only against the managers that workflow is linked to), and what **Settings › Media managers** checks per
+connection: whether the watched folder exists and
 is readable, whether the work folder is set and on the same drive as the output folder, whether the
 output folder exists and is writable, and — with a manager connected — whether its download-client
 or category folders map onto the folder Weir watches. A workflow with no manager connected is shown
@@ -118,11 +127,13 @@ Open **Settings › Workflows** and edit the workflow:
 ### 2. Connect Sonarr (or Radarr) to Weir
 
 Under **Settings › Media managers**, add Sonarr with its address and API key. You'll find the key in
-Sonarr on its **General** settings page.
+Sonarr on its **General** settings page. Then link the workflow to it: in the workflow's editor, choose
+Sonarr in the **Media manager** section, press **Link to a media manager** and save. (**Add workflow ›
+From a media manager** does this for you.)
 
 ### 3. Add the remote path mapping in Sonarr
 
-The workflow's **Media manager** section in Weir shows the exact values, with copy buttons. In Sonarr, go
+The workflow's **What your media manager needs** section in Weir shows the exact values, with copy buttons. In Sonarr, go
 to **Settings › Download Clients › Remote Path Mappings** and press **+**:
 
 | Field | Value |
@@ -144,7 +155,7 @@ Sonarr reports one, and it's never applied without you pressing it.
 
 ### 4. Check it
 
-In Weir, press **Check again** in the workflow's **Media manager** section. Weir reads Sonarr's remote path
+In Weir, press **Check again** in the workflow's **Folder chain** section. Weir reads Sonarr's remote path
 mappings, download clients and queue — it never changes Sonarr's settings — and shows ✓, or a plain
 explanation of what to fix.
 

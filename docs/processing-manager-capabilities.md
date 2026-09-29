@@ -8,7 +8,7 @@ Weir's Settings call each route a file takes (watched folder, work folder, outpu
 its rules) a **workflow**. There are two kinds, and both can run side by side:
 
 - **Weir only (local folders)**: no manager or download client is involved.
-- **Linked to a media manager or download client**: the workflow is described in the source's own
+- **Linked to a media manager** (Deluno, Sonarr or Radarr): the workflow is described in the source's own
   words. For Deluno that is its download client **category** and the Deluno **library** the file is
   imported into (its **Library folder**). For Radarr and Sonarr it is the download client
   **category** and the **root folder**.
