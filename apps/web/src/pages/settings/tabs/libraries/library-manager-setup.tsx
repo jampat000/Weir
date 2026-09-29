@@ -11,11 +11,9 @@ import { QuietFieldGroup } from "../../../../components/shared/quiet-section";
 import { type ProcessingMediaType } from "../../../../lib/processing/libraries-api";
 import { type ProcessingManagerSetupItem } from "../../../../lib/processing/library-managers-api";
 import { useProcessingManagerSetupQuery } from "../../../../lib/processing/libraries-queries";
-import { useDebouncedValue } from "../../../../lib/ui/use-debounced-value";
 import { workflowStory } from "../../../../lib/processing/workflow-story";
-
-/** The folders as the user types them settle for a moment before each check. */
-const SETTLE_MS = 700;
+import { useDebouncedValue } from "../../../../lib/ui/use-debounced-value";
+import { FOLDER_CHECK_SETTLE_MS } from "./folder-check-settle";
 
 function CopyLink({ value, label }: { value: string; label: string }) {
   const [copied, setCopied] = useState(false);
@@ -228,7 +226,7 @@ export function LibraryManagerSetup({
 }) {
   const settled = useDebouncedValue(
     { mediaType, watched: watchedFolder.trim(), output: outputFolder.trim() },
-    SETTLE_MS,
+    FOLDER_CHECK_SETTLE_MS,
   );
   const setup = useProcessingManagerSetupQuery(
     settled.mediaType,
