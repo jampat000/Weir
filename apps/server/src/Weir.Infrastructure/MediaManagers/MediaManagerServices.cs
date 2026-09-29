@@ -30,6 +30,7 @@ public static class MediaManagerServices
         // Every minute, each manager's connection test, so Weir knows within a minute when one goes quiet.
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IPeriodicTask, ManagerHeartbeatTask>());
         services.TryAddSingleton<LibraryDiscoveryService>();
+        services.TryAddSingleton<IFolderProbe, FilesystemFolderProbe>();
         services.TryAddSingleton<ManagerSetupCheck>();
         services.TryAddSingleton<HandoffLedgerStore>();
         services.AddWeirJobStore();

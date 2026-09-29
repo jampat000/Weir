@@ -21,14 +21,20 @@ public sealed partial class ManagerSetupCheck
     private readonly MediaManagerConnectionService _connections;
     private readonly MediaManagerConnectionStore _connectionStore;
     private readonly IManagerHttpHandlerFactory _handlers;
+    private readonly IFolderProbe _folders;
     private readonly ILogger<ManagerSetupCheck> _logger;
 
     public ManagerSetupCheck(
-        MediaManagerConnectionService connections, MediaManagerConnectionStore connectionStore, IManagerHttpHandlerFactory handlers, ILogger<ManagerSetupCheck> logger)
+        MediaManagerConnectionService connections,
+        MediaManagerConnectionStore connectionStore,
+        IManagerHttpHandlerFactory handlers,
+        IFolderProbe folders,
+        ILogger<ManagerSetupCheck> logger)
     {
         _connections = connections ?? throw new ArgumentNullException(nameof(connections));
         _connectionStore = connectionStore ?? throw new ArgumentNullException(nameof(connectionStore));
         _handlers = handlers ?? throw new ArgumentNullException(nameof(handlers));
+        _folders = folders ?? throw new ArgumentNullException(nameof(folders));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -263,7 +269,7 @@ public sealed partial class ManagerSetupCheck
         var description = await port.DescribeAsync(connection, cancellationToken).ConfigureAwait(false);
         return description.Status != SignalStatus.Reported
             ? (new DelunoSetupResult(null, null, [new SetupCheckLine(SetupCheckLine.Problem, description.Detail ?? $"{label} did not answer.")]), ManagerSourceFacts.None)
-            : (ManagerSetupRules.EvaluateDeluno(label, mediaScope, watchedFolder, outputFolder, description.Libraries, description.DownloadClients),
+            : (ManagerSetupRules.EvaluateDeluno(label, mediaScope, watchedFolder, outputFolder, description.Libraries, description.DownloadClients, _folders),
                 ManagerSourceFactsRules.ForDeluno(mediaScope, description.Libraries, description.DownloadClients));
     }
 }
