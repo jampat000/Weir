@@ -73,8 +73,8 @@ public sealed class RemuxPassHandlerTests : IDisposable
         await _fixture.Store.Execute("DELETE FROM libraries");
         return Convert.ToInt64(await _fixture.Db(uow => uow.ExecuteScalarWriteAsync(
             "INSERT INTO libraries (name, media_type, watched_folder, output_folder, work_folder, failure_policy, max_attempts, " +
-            "rejected_file_action, retry_backoff_seconds, min_file_age_seconds, display_order) " +
-            "VALUES ('Movies', $type, $w, $o, $k, $policy, $max, $action, 60, 0, 1) RETURNING id",
+            "rejected_file_action, retry_backoff_seconds, display_order) " +
+            "VALUES ('Movies', $type, $w, $o, $k, $policy, $max, $action, 60, 1) RETURNING id",
             ("$type", mediaType),
             ("$w", _folders.Watched),
             ("$o", _folders.Output),

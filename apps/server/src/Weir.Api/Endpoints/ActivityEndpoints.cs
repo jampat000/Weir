@@ -25,6 +25,12 @@ public static class ActivityEndpoints
     /// <summary>The reconnect delay the stream sends as its <c>retry:</c> hint.</summary>
     public const int StreamRetryMilliseconds = 5000;
 
+    /// <summary>
+    /// The event id a frame carries while no Activity exists yet. A change no Activity row records (#816) still has to reach
+    /// the screens on an install that has recorded nothing.
+    /// </summary>
+    private const long NoActivityYetId = 0;
+
     /// <summary>How long the stream stays quiet before it sends a keepalive comment.</summary>
     public static readonly TimeSpan StreamKeepalive = TimeSpan.FromSeconds(16);
 
@@ -79,10 +85,7 @@ public static class ActivityEndpoints
 
             lastSeenVersion = changed.Version;
             lastSentId = lastSentId is { } sent && changed.LatestId is { } heard ? Math.Max(sent, heard) : lastSentId ?? changed.LatestId;
-            if (lastSentId is { } latest)
-            {
-                yield return ActivityHistory.LatestEventFrame(latest, lastSeenVersion);
-            }
+            yield return ActivityHistory.LatestEventFrame(lastSentId ?? NoActivityYetId, lastSeenVersion);
         }
     }
 

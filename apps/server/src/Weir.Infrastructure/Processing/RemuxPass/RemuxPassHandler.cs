@@ -4,6 +4,7 @@ using Weir.Core.Configuration;
 using Weir.Core.Jobs;
 using Weir.Core.Json;
 using Weir.Core.MediaManagers;
+using Weir.Core.Processing;
 using Weir.Core.Processing.RemuxPass;
 using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.MediaManagers;
@@ -155,6 +156,8 @@ public sealed partial class RemuxPassHandler : IJobHandler
         }
 
         var progress = new ActivityProgressReporter(_database, context.Id, provenance, _logger, _time, _liveProgress);
+        var performance = claim.Operator!;
+        var limits = IntakeLimits.Resolve(claim.Library, performance);
         var request = new RemuxPassRequest
         {
             Runtime = claim.Runtime!,
@@ -162,10 +165,10 @@ public sealed partial class RemuxPassHandler : IJobHandler
             LibraryId = claim.Library?.Id ?? libraryId,
             RulesConfig = claim.Rules,
             RulesProfileName = claim.RulesProfileName,
-            MinFileAgeSeconds = claim.Operator!.MinFileAgeSeconds,
-            MinInputFileSizeMb = Math.Max(claim.Operator.ProcessingMinInputFileSizeMb, claim.Library?.MinFileSizeMb ?? 0),
-            MinimumFreeDiskSpaceMb = claim.Operator.MinimumFreeDiskSpaceMb,
-            KeepFailedWorkFiles = claim.Operator.KeepFailedWorkFiles,
+            MinFileAgeSeconds = limits.MinFileAgeSeconds,
+            MinInputFileSizeMb = limits.MinFileSizeMb,
+            MinimumFreeDiskSpaceMb = performance.MinimumFreeDiskSpaceMb,
+            KeepFailedWorkFiles = performance.KeepFailedWorkFiles,
             MediaScope = mediaScope,
             CurrentJobId = context.Id,
             ProgressReporter = progress.Report,

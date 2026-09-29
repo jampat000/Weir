@@ -1,6 +1,7 @@
 using Microsoft.Data.Sqlite;
 using Weir.Core.Processing;
 using Weir.Core.Time;
+using Weir.Infrastructure.Activity;
 using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Infrastructure.Processing;
@@ -20,7 +21,11 @@ public sealed record ScannedFileWrite(
     string? ResetStatus,
     FileStateVerdict? Verdict,
     long SizeBytes,
-    DateTimeOffset? SizeChangedAt);
+    DateTimeOffset? SizeChangedAt)
+{
+    /// <summary>Whether the write adds the file or moves it to another status: what Processing sorts its lists by.</summary>
+    public bool ChangesStatus => RowId is null || (Verdict?.Status ?? ResetStatus ?? ExpectedStatus) != ExpectedStatus;
+}
 
 /// <summary>SQLite access for <c>files</c>: read, list and forget, plus the upsert and mark-status writes the
 /// watched-folder scan performs.</summary>
@@ -186,6 +191,18 @@ public sealed class FileStateStore
     {
         ArgumentNullException.ThrowIfNull(uow);
         ArgumentNullException.ThrowIfNull(write);
+        var applied = await WriteScannedStateAsync(uow, libraryId, write, seenAt).ConfigureAwait(false);
+        if (applied && write.ChangesStatus)
+        {
+            // A scan records no Activity row for a file it finds or holds, so nothing else would tell an open Processing page.
+            ActivityNotifications.TrackFileListChange(uow);
+        }
+
+        return applied;
+    }
+
+    private static async Task<bool> WriteScannedStateAsync(UnitOfWork uow, long libraryId, ScannedFileWrite write, DateTimeOffset seenAt)
+    {
         var seen = Timestamp.FromDateTimeOffset(seenAt);
         if (write.RowId is not { } id)
         {

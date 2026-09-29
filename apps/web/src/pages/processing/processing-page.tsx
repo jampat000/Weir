@@ -115,7 +115,7 @@ function useLanes() {
       mergeLiveProgress(allFiles, liveProgress),
       activeJobs.data?.jobs ?? [],
       new Map(all.map((l) => [l.id, l.name])),
-      new Map(all.map((l) => [l.id, l.min_file_age_seconds])),
+      new Map(all.map((l) => [l.id, l.effective_min_file_age_seconds])),
       nextLooks,
     );
   }, [

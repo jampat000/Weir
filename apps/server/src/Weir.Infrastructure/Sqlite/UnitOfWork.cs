@@ -314,12 +314,15 @@ public static class SqliteValues
 
     public static string GetString(SqliteDataReader reader, int ordinal) => GetStringOrNull(reader, ordinal) ?? string.Empty;
 
-    public static long GetInt64(SqliteDataReader reader, int ordinal)
+    public static long GetInt64(SqliteDataReader reader, int ordinal) => GetInt64OrNull(reader, ordinal) ?? 0;
+
+    /// <summary>A stored integer, or null for NULL. Other stored types read as they do in <see cref="GetInt64"/>.</summary>
+    public static long? GetInt64OrNull(SqliteDataReader reader, int ordinal)
     {
         ArgumentNullException.ThrowIfNull(reader);
         if (reader.IsDBNull(ordinal))
         {
-            return 0;
+            return null;
         }
 
         return reader.GetValue(ordinal) switch
