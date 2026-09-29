@@ -92,8 +92,8 @@ automatic setup: Deluno tells Weir about a new file, Weir cleans it, and Deluno 
 cleaned copy is ready to import. You don't move anything by hand.
 
 The Weir workflow still needs a watched folder: Weir only accepts a hand-off for a file inside one.
-Point it at the folder Deluno downloads into. A hand-off names its file by the path Deluno sees, so either use
-that path, reach the same folder through a junction, symbolic link or mount, or add a path mapping in Deluno
+Point it at the folder Deluno downloads into. A hand-off names its file by the path Deluno sees, and Weir accepts it
+only when that path is inside the watched folder. So either use that path, or add a path mapping in Deluno
 (Settings › Media Management › Processing Workflow › Weir › Path mappings) from its path to Weir's.
 
 ## Sonarr and Radarr: checking before Weir touches a file
@@ -168,7 +168,8 @@ read from them, so it stays not verified until you connect that client to Weir d
 each library's downloads folder and each client's category, but not where its clients really save, so a
 Deluno line reads "Deluno says its Movies library downloads to …" and stays not verified. When the folder
 Deluno reports is the watched folder reached through a junction, symbolic link or mount, Weir follows the link
-and treats it as the one folder. When it is somewhere else, Weir cannot tell a mistake from a path mapping on
+and does not report the two paths as different folders (the line still stays not verified, and a hand-off is
+still accepted only by the path Deluno sends). When it is somewhere else, Weir cannot tell a mistake from a path mapping on
 Deluno's side (Deluno does not publish those), so the line stays not verified and names both fixes: add a path
 mapping in Deluno (Settings › Media Management › Processing Workflow › Weir › Path mappings) from the part of
 Deluno's path that differs to Weir's, or set the workflow's folder to the path Deluno reports. A download client
