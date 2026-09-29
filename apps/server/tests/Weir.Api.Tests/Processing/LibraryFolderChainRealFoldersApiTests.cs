@@ -50,7 +50,7 @@ public sealed class LibraryFolderChainRealFoldersApiTests
 
         var deluno = Assert.Single(chain["managers"]!.AsArray())!;
         Assert.True(deluno["ready"]!.GetValue<bool>());
-        Assert.Contains(Lines(deluno), line => line.State == "unverified" && line.Text == $"Deluno says its TV library downloads to {folders.Watched} (inside Weir's watched folder). Weir can't see where each download client really saves.");
+        Assert.Contains(Lines(deluno), line => line.State == "unverified" && line.Text == $"Deluno on 192.0.2.10 says its TV library downloads to {folders.Watched} (inside Weir's watched folder). Weir can't see where each download client really saves.");
         Assert.DoesNotContain(Lines(deluno), line => line.State == "ok" && line.Text.Contains("downloads", StringComparison.Ordinal));
         Assert.Equal(2, Lines(deluno).Count(line => line.State == "unverified" && line.Text.Contains("files this workflow's downloads under the category \"deluno-tv\"", StringComparison.Ordinal)));
         var transmission = Assert.Single(chain["download_clients"]!.AsArray())!;

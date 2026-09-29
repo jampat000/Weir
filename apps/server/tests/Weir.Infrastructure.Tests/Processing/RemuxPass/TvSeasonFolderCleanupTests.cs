@@ -93,7 +93,7 @@ public sealed class TvSeasonFolderCleanupTests : IDisposable
     {
         var (store, cleanup, http, connections, _) = await BuildAsync();
         using var _1 = store;
-        await store.WithUnitOfWork(uow => connections.CreateAsync(uow, "sonarr", "Main", "http://sonarr.local", "key"));
+        await store.WithUnitOfWork(uow => connections.CreateAsync(uow, "sonarr", "http://sonarr.local", "key"));
         http.Throw(HttpMethod.Get, "/api/v3/queue", new HttpRequestException("Connection refused."));
 
         var ep = _folders.Source("Serie/S01/e.mkv", 500);
@@ -104,7 +104,7 @@ public sealed class TvSeasonFolderCleanupTests : IDisposable
 
         Assert.True(Bool(output, "tv_manager_queue_unavailable"));
         Assert.False(Bool(output, "tv_season_folder_deleted"));
-        Assert.Contains("Sonarr (Main)", Str(output, "tv_season_folder_skip_reason"), StringComparison.Ordinal);
+        Assert.Contains("Sonarr on sonarr.local", Str(output, "tv_season_folder_skip_reason"), StringComparison.Ordinal);
         Assert.True(Directory.Exists(Path.GetDirectoryName(ep)));
     }
 
@@ -113,7 +113,7 @@ public sealed class TvSeasonFolderCleanupTests : IDisposable
     {
         var (store, cleanup, http, connections, _) = await BuildAsync();
         using var _1 = store;
-        await store.WithUnitOfWork(uow => connections.CreateAsync(uow, "sonarr", "Main", "http://sonarr.local", "key"));
+        await store.WithUnitOfWork(uow => connections.CreateAsync(uow, "sonarr", "http://sonarr.local", "key"));
 
         var ep = _folders.Source("Serie/S01/e.mkv", 500);
         var queued = _folders.Source("Serie/S01/queued.mkv", 500);
@@ -136,7 +136,7 @@ public sealed class TvSeasonFolderCleanupTests : IDisposable
     {
         var (store, cleanup, http, connections, jobs) = await BuildAsync();
         using var _1 = store;
-        await store.WithUnitOfWork(uow => connections.CreateAsync(uow, "sonarr", "Main", "http://sonarr.local", "key"));
+        await store.WithUnitOfWork(uow => connections.CreateAsync(uow, "sonarr", "http://sonarr.local", "key"));
         RouteSonarrQueue(http, "[]");
 
         var ep = _folders.Source("Serie/S01/e.mkv", 500);
@@ -157,7 +157,7 @@ public sealed class TvSeasonFolderCleanupTests : IDisposable
     {
         var (store, cleanup, http, connections, jobs) = await BuildAsync();
         using var _1 = store;
-        await store.WithUnitOfWork(uow => connections.CreateAsync(uow, "sonarr", "Main", "http://sonarr.local", "key"));
+        await store.WithUnitOfWork(uow => connections.CreateAsync(uow, "sonarr", "http://sonarr.local", "key"));
         RouteSonarrQueue(http, "[]");
 
         var ep = _folders.Source("Serie/S01/e.mkv", 500);
@@ -179,7 +179,7 @@ public sealed class TvSeasonFolderCleanupTests : IDisposable
     {
         var (store, cleanup, http, connections, _) = await BuildAsync();
         using var _1 = store;
-        await store.WithUnitOfWork(uow => connections.CreateAsync(uow, "sonarr", "Main", "http://sonarr.local", "key"));
+        await store.WithUnitOfWork(uow => connections.CreateAsync(uow, "sonarr", "http://sonarr.local", "key"));
         RouteSonarrQueue(http, "[]");
 
         var ep = _folders.Source("e.mkv", 400);
@@ -194,7 +194,7 @@ public sealed class TvSeasonFolderCleanupTests : IDisposable
     {
         var (store, cleanup, http, connections, _) = await BuildAsync();
         using var _1 = store;
-        await store.WithUnitOfWork(uow => connections.CreateAsync(uow, "sonarr", "Main", "http://sonarr.local", "key"));
+        await store.WithUnitOfWork(uow => connections.CreateAsync(uow, "sonarr", "http://sonarr.local", "key"));
         RouteSonarrQueue(http, "[]");
 
         var ep = _folders.Source("Serie/S01/e.mkv", 500);
@@ -215,7 +215,7 @@ public sealed class TvSeasonFolderCleanupTests : IDisposable
     {
         var (store, cleanup, http, connections, _) = await BuildAsync();
         using var _1 = store;
-        await store.WithUnitOfWork(uow => connections.CreateAsync(uow, "sonarr", "Main", "http://sonarr.local", "key"));
+        await store.WithUnitOfWork(uow => connections.CreateAsync(uow, "sonarr", "http://sonarr.local", "key"));
         RouteSonarrQueue(http, "[]");
 
         var ep = _folders.Source("Serie/S01/e.mkv", 500);
@@ -236,7 +236,7 @@ public sealed class TvSeasonFolderCleanupTests : IDisposable
     {
         var (store, cleanup, http, connections, _) = await BuildAsync();
         using var _1 = store;
-        await store.WithUnitOfWork(uow => connections.CreateAsync(uow, "sonarr", "Main", "http://sonarr.local", "key"));
+        await store.WithUnitOfWork(uow => connections.CreateAsync(uow, "sonarr", "http://sonarr.local", "key"));
         RouteSonarrQueue(http, "[]");
 
         var ep = _folders.Source("Serie/S01/e.mkv", 500);
@@ -265,7 +265,7 @@ public sealed class TvSeasonFolderCleanupTests : IDisposable
     {
         var (store, cleanup, http, connections, _) = await BuildAsync();
         using var _1 = store;
-        await store.WithUnitOfWork(uow => connections.CreateAsync(uow, "sonarr", "Main", "http://sonarr.local", "key"));
+        await store.WithUnitOfWork(uow => connections.CreateAsync(uow, "sonarr", "http://sonarr.local", "key"));
         RouteSonarrQueue(http, "[]");
 
         var ep = _folders.Source("Serie/S01/e.mkv", 500);

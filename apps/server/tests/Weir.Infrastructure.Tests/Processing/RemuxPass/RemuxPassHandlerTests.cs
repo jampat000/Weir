@@ -172,7 +172,7 @@ public sealed class RemuxPassHandlerTests : IDisposable
         await _fixture.Store.Execute("UPDATE operator_settings SET min_file_age_seconds = 60");
         var source = _folders.Source(Path.Join("Film", "film.mkv"));
         await FileRowAsync(library, "Film/film.mkv");
-        await _fixture.AddConnectionAsync("native", "Manager", "http://192.0.2.30:5099", "k1");
+        await _fixture.AddConnectionAsync("native", "http://192.0.2.30:5099", "k1");
         await _fixture.Db(async uow => { await _fixture.Ledger.RecordReceivedAsync(uow, "native", "h632", library, "Film/film.mkv"); return 0; });
         var handoff = $$$"""{"relative_media_path":"Film/film.mkv","media_scope":"movie","trigger":"webhook","library_id":{{{library}}},"origin":{"source_key":"native","handoff_id":"h632","callback_path":"{{{EventsPath}}}","release_name":"Film.2001"}}""";
         var first = await EnqueueAsync(handoff, "remux:h632");
@@ -359,7 +359,7 @@ public sealed class RemuxPassHandlerTests : IDisposable
         _folders.Source("Film/film.mkv");
         _media.DefaultProbe = FakeMediaRunner.JapaneseOnly;
         await FileRowAsync(library, "Film/film.mkv");
-        await _fixture.AddConnectionAsync("deluno", "Deluno", "http://192.0.2.30:5099", "k1");
+        await _fixture.AddConnectionAsync("deluno", "http://192.0.2.30:5099", "k1");
         await _fixture.Db(async uow => { await _fixture.Ledger.RecordReceivedAsync(uow, "deluno", "h31", library, "Film/film.mkv"); return 0; });
         var handoff = $$$"""{"relative_media_path":"Film/film.mkv","media_scope":"movie","trigger":"webhook","library_id":{{{library}}},"origin":{"source_key":"deluno","handoff_id":"h31","callback_path":"{{{EventsPath}}}","release_name":"Film.2001"}}""";
 
@@ -377,7 +377,7 @@ public sealed class RemuxPassHandlerTests : IDisposable
         _media.DefaultProbe = FakeMediaRunner.EnglishAndJapanese;
         _media.RemuxError = "Conversion failed";
         await FileRowAsync(library, "Film/film.mkv");
-        await _fixture.AddConnectionAsync("deluno", "Deluno", "http://192.0.2.30:5099", "k1");
+        await _fixture.AddConnectionAsync("deluno", "http://192.0.2.30:5099", "k1");
         await _fixture.Db(async uow => { await _fixture.Ledger.RecordReceivedAsync(uow, "deluno", "h1", library, "Film/film.mkv"); return 0; });
         var handoff = $$$"""{"relative_media_path":"Film/film.mkv","media_scope":"movie","trigger":"webhook","library_id":{{{library}}},"origin":{"source_key":"deluno","handoff_id":"h1","callback_path":"{{{EventsPath}}}","release_name":"Film.2001"}}""";
         var first = await EnqueueAsync(handoff, "remux:h1");
@@ -456,7 +456,7 @@ public sealed class RemuxPassHandlerTests : IDisposable
         var library = await LibraryAsync();
         _folders.Source(Path.Join("Film", "film.mkv"));
         await FileRowAsync(library, "Film/film.mkv", "processing_failed");
-        await _fixture.AddConnectionAsync("deluno", "Deluno", "http://192.0.2.30:5099", "k1");
+        await _fixture.AddConnectionAsync("deluno", "http://192.0.2.30:5099", "k1");
         await _fixture.Db(async uow => { await _fixture.Ledger.RecordReceivedAsync(uow, "deluno", "h2", library, "Film/film.mkv"); return 0; });
         await EnqueueAsync($$$"""{"relative_media_path":"Film/film.mkv","library_id":{{{library}}},"origin":{"source_key":"deluno","handoff_id":"h2","callback_path":"{{{EventsPath}}}"}}""", "remux:h2");
         var retryPayload = $$"""{"relative_media_path":"Film/film.mkv","media_scope":"movie","library_id":{{library}},"trigger":"scheduled"}""";

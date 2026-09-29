@@ -27,6 +27,7 @@ public static class WeirPlatformServices
         ArgumentNullException.ThrowIfNull(options);
         services.TryAddSingleton(options);
         services.TryAddSingleton(TimeProvider.System);
+        services.TryAddSingleton(MachineIdentity.Current());
         services.TryAddSingleton(sp => new SqliteDatabase(options.DbPath, logger: sp.GetService<ILogger<SqliteDatabase>>()));
         services.TryAddSingleton<WorkerHeartbeats>();
         services.TryAddSingleton<WatcherStateStore>();

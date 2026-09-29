@@ -28,6 +28,8 @@ public sealed record ReadinessWorkerResponse(
 public sealed record ReadinessResponse(
     [property: JsonPropertyName("ready")] bool Ready,
     [property: JsonPropertyName("version")] string Version,
+    [property: JsonPropertyName("machine_name")] string MachineName,
+    [property: JsonPropertyName("machine_name_looks_generated")] bool MachineNameLooksGenerated,
     [property: JsonPropertyName("status")] string Status,
     [property: JsonPropertyName("startup_seconds")] double StartupSeconds,
     [property: JsonPropertyName("steps")] IReadOnlyList<ReadinessStepResponse> Steps,

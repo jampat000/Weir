@@ -1,6 +1,7 @@
 using Weir.Core.Json;
 using Weir.Core.Time;
 using Weir.Infrastructure.Auth;
+using Weir.Infrastructure.MediaManagers;
 using Weir.Infrastructure.Notifications;
 using Weir.Infrastructure.Settings;
 using Weir.Infrastructure.Tests.Platform;
@@ -13,8 +14,13 @@ public sealed class ConfigurationBundleConnectionsTests : IDisposable
     private readonly StoreFixture _source = new();
     private readonly StoreFixture _target = new();
     private readonly ITimeZoneResolver _zones = new IanaTimeZoneResolver();
-    private readonly ConfigurationBundleStore _bundle =
-        new(new SuiteSettingsStore(new AuthStore()), new ConfigurationBundleConnections(new NotificationChannelStore(), new Weir.Infrastructure.MediaManagers.MediaManagerConnectionStore()));
+    private readonly MediaManagerConnectionStore _managers = new();
+    private readonly ConfigurationBundleStore _bundle;
+
+    public ConfigurationBundleConnectionsTests()
+    {
+        _bundle = new(new SuiteSettingsStore(new AuthStore()), new ConfigurationBundleConnections(new NotificationChannelStore(), _managers));
+    }
 
     public void Dispose()
     {
@@ -31,6 +37,22 @@ public sealed class ConfigurationBundleConnectionsTests : IDisposable
         store.Execute(
             "INSERT INTO notification_channels (label, provider, url, events_json, enabled) " +
             "VALUES ('Failures', 'discord', 'https://discord.com/api/webhooks/1/token', '[\"job_failed\"]', 1)");
+
+    private Task<long> InstallManagerAsync(string kind, string baseUrl) =>
+        _target.WithUnitOfWork(uow => _managers.InsertAsync(uow, kind, enabled: true, baseUrl, apiKeyCiphertext: "target-key-ciphertext"));
+
+    private static WireObject BundledManager(string kind, string? name, string baseUrl)
+    {
+        var manager = new WireObject().Set("kind", kind).Set("base_url", baseUrl);
+        return name is null ? manager : manager.Set("name", name);
+    }
+
+    private async Task<WireObject> BundleOfManagersAsync(params WireObject[] managers)
+    {
+        var bundle = await ExportAsync();
+        bundle.Set("media_manager_connections", new WireArray([.. managers]));
+        return bundle;
+    }
 
     private Task<WireObject> ExportAsync() => _source.WithUnitOfWork(_bundle.BuildAsync, commit: false);
 
@@ -75,7 +97,7 @@ public sealed class ConfigurationBundleConnectionsTests : IDisposable
         await RestoreAsync(bundle);
 
         Assert.Equal(1, await _target.Scalar(
-            "SELECT count(*) FROM media_manager_connections WHERE name = 'Sonarr' AND kind = 'sonarr' AND base_url = 'http://sonarr:8989' " +
+            "SELECT count(*) FROM media_manager_connections WHERE name = 'Sonarr on sonarr' AND kind = 'sonarr' AND base_url = 'http://sonarr:8989' " +
             "AND enabled = 0 AND api_key_ciphertext IS NULL AND webhook_secret_ciphertext IS NULL"));
     }
 
@@ -88,8 +110,9 @@ public sealed class ConfigurationBundleConnectionsTests : IDisposable
 
         await RestoreAsync(bundle);
 
+        Assert.Equal(1, await _target.Scalar("SELECT count(*) FROM media_manager_connections"));
         Assert.Equal(1, await _target.Scalar(
-            "SELECT count(*) FROM media_manager_connections WHERE name = 'Sonarr' AND enabled = 1 AND api_key_ciphertext = 'target-key-ciphertext'"));
+            "SELECT count(*) FROM media_manager_connections WHERE enabled = 1 AND api_key_ciphertext = 'target-key-ciphertext'"));
     }
 
     [Fact]
@@ -116,7 +139,7 @@ public sealed class ConfigurationBundleConnectionsTests : IDisposable
 
         Assert.Equal(1, await _target.Scalar(
             "SELECT count(*) FROM libraries JOIN media_manager_connections ON media_manager_connections.id = libraries.discovered_from_connection_id " +
-            "WHERE libraries.name = 'TV' AND media_manager_connections.name = 'Sonarr'"));
+            "WHERE libraries.name = 'TV' AND media_manager_connections.name = 'Sonarr on sonarr'"));
     }
 
     [Fact]
@@ -147,17 +170,61 @@ public sealed class ConfigurationBundleConnectionsTests : IDisposable
     }
 
     [Fact]
-    public async Task A_backup_with_a_media_manager_name_over_two_hundred_characters_is_refused()
+    public async Task A_backup_saved_under_a_typed_name_matches_the_connection_with_the_same_kind_and_address()
     {
-        var bundle = await ExportAsync();
-        bundle.Set(
-            "media_manager_connections",
-            new WireArray([new WireObject().Set("kind", "sonarr").Set("name", new string('a', 201))]));
+        await InstallManagerAsync("sonarr", "http://sonarr:8989");
+        var bundle = await BundleOfManagersAsync(BundledManager("sonarr", "Living room TV", "http://sonarr:8989"));
 
-        var refused = await Assert.ThrowsAsync<WireValueException>(() => RestoreAsync(bundle));
+        await RestoreAsync(bundle);
 
-        Assert.Contains("too long", refused.Message, StringComparison.Ordinal);
-        Assert.Equal(0, await _target.Scalar("SELECT count(*) FROM media_manager_connections"));
+        Assert.Equal(1, await _target.Scalar("SELECT count(*) FROM media_manager_connections"));
+    }
+
+    [Fact]
+    public async Task A_backup_connection_matches_the_same_address_written_in_another_case()
+    {
+        await InstallManagerAsync("radarr", "http://NAS:7878");
+        var bundle = await BundleOfManagersAsync(BundledManager("radarr", "Movies", "http://nas:7878"));
+
+        await RestoreAsync(bundle);
+
+        Assert.Equal(1, await _target.Scalar("SELECT count(*) FROM media_manager_connections"));
+    }
+
+    [Fact]
+    public async Task A_backup_connection_with_another_address_or_kind_is_added_and_named_after_it()
+    {
+        await InstallManagerAsync("radarr", "http://nas:7878");
+        var bundle = await BundleOfManagersAsync(
+            BundledManager("radarr", "Movies 4K", "http://nas:7879"),
+            BundledManager("sonarr", "Movies", "http://nas:7878"));
+
+        await RestoreAsync(bundle);
+
+        Assert.Equal(
+            ["Radarr on nas (7878)", "Radarr on nas (7879)", "Sonarr on nas"],
+            await _target.WithUnitOfWork(async uow => (await _managers.ListAsync(uow)).Select(row => row.Name).Order().ToList(), commit: false));
+    }
+
+    [Fact]
+    public async Task A_backup_connection_with_no_address_matches_by_its_saved_name()
+    {
+        await _target.WithUnitOfWork(uow => _managers.InsertAsync(uow, "native", enabled: true, baseUrl: string.Empty, apiKeyCiphertext: null));
+        var bundle = await BundleOfManagersAsync(BundledManager("native", "Media manager", string.Empty), BundledManager("native", "Home", string.Empty));
+
+        await RestoreAsync(bundle);
+
+        Assert.Equal(2, await _target.Scalar("SELECT count(*) FROM media_manager_connections"));
+    }
+
+    [Fact]
+    public async Task A_backup_connection_without_a_saved_name_is_restored()
+    {
+        var bundle = await BundleOfManagersAsync(BundledManager("sonarr", null, "http://sonarr:8989"));
+
+        await RestoreAsync(bundle);
+
+        Assert.Equal(1, await _target.Scalar("SELECT count(*) FROM media_manager_connections WHERE name = 'Sonarr on sonarr'"));
     }
 
     [Fact]

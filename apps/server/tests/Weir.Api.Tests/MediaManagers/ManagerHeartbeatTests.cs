@@ -25,7 +25,7 @@ public sealed class ManagerHeartbeatTests
 
         using var created = await client.PostAsync(
             "/api/v1/media-managers/connections",
-            new { csrf_token = await client.CsrfAsync(), kind = "sonarr", name = "Sonarr", base_url = "http://192.0.2.10:8989", api_key = "k" });
+            new { csrf_token = await client.CsrfAsync(), kind = "sonarr", base_url = "http://192.0.2.10:8989", api_key = "k" });
         Assert.Equal(HttpStatusCode.Created, created.StatusCode);
         var id = (await ApiTestClient.Json(created))["id"]!.GetValue<long>();
         var heartbeat = server.Services.GetServices<IPeriodicTask>().OfType<ManagerHeartbeatTask>().Single();
@@ -34,14 +34,14 @@ public sealed class ManagerHeartbeatTests
         await heartbeat.RunOnceAsync(CancellationToken.None);
         var quiet = await ConnectionAsync(client, id);
         Assert.False(quiet["last_test_ok"]!.GetValue<bool>());
-        Assert.Contains("could not reach Sonarr", quiet["last_test_detail"]!.GetValue<string>(), StringComparison.Ordinal);
+        Assert.Contains("could not reach Sonarr on 192.0.2.10", quiet["last_test_detail"]!.GetValue<string>(), StringComparison.Ordinal);
 
         // It comes back, and the next beat says so.
         manager.Json(HttpMethod.Get, "/api/v3/system/status", "{\"version\": \"4.0.9\"}");
         await heartbeat.RunOnceAsync(CancellationToken.None);
         var back = await ConnectionAsync(client, id);
         Assert.True(back["last_test_ok"]!.GetValue<bool>());
-        Assert.Equal("Connected. Weir can reach Sonarr.", back["last_test_detail"]!.GetValue<string>());
+        Assert.Equal("Connected. Weir can reach Sonarr on 192.0.2.10.", back["last_test_detail"]!.GetValue<string>());
     }
 
     private static async Task<System.Text.Json.Nodes.JsonNode> ConnectionAsync(ApiTestClient client, long id)

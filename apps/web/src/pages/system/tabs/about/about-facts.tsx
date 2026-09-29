@@ -4,6 +4,7 @@ import {
   toolVersion,
   useMediaToolsQuery,
 } from "../../../../lib/system/media-tools";
+import { useSystemReadinessQuery } from "../../../../lib/system/readiness-queries";
 
 /**
  * System › About's first column: what this Weir is and what it works with, as facts, one per line. They come
@@ -12,6 +13,7 @@ import {
 export function AboutFacts() {
   const runtime = useProcessingRuntimeSettingsQuery();
   const tools = useMediaToolsQuery();
+  const machine = useSystemReadinessQuery().data;
   const ffmpeg = tools.data?.ffmpeg;
   const mkvmerge = tools.data?.mkvmerge;
   const ffmpegMissing = ffmpeg === "not installed";
@@ -28,6 +30,24 @@ export function AboutFacts() {
         </h2>
       </div>
       <dl className="mm-kv">
+        {machine ? (
+          <div data-testid="about-machine-name">
+            <dt>Name</dt>
+            <dd>
+              Weir on {machine.machine_name}. Weir takes its name from the
+              computer it runs on.
+              {machine.machine_name_looks_generated ? (
+                <span
+                  className="mm-status-text--warning block"
+                  data-testid="about-hostname-tip"
+                >
+                  Set <code>hostname:</code> in your compose file so Weir shows
+                  your server&apos;s name.
+                </span>
+              ) : null}
+            </dd>
+          </div>
+        ) : null}
         <div>
           <dt>FFmpeg</dt>
           <dd

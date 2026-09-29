@@ -9,6 +9,7 @@ using Weir.Core.Metrics;
 using Weir.Infrastructure.Auth;
 using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.Logging;
+using Weir.Infrastructure.MediaManagers;
 using Weir.Infrastructure.Runtime;
 using Weir.Infrastructure.Sqlite;
 
@@ -216,6 +217,28 @@ public static class WeirServer
         catch (Exception exception) when (exception is SqliteException or FormatException or InvalidOperationException)
         {
             logger.LogError(exception, "Weir startup step failed but startup will continue step={Step}", "inactive_session_cleanup");
+        }
+
+        try
+        {
+            var mediaManagers = app.Services.GetRequiredService<MediaManagerConnectionStore>();
+            var downloadClients = app.Services.GetRequiredService<DownloadClientConnectionStore>();
+            var uow = UnitOfWork.OpenAsync(database).GetAwaiter().GetResult();
+            try
+            {
+                // Connections are named after their kind and address; this names the ones saved with a typed name.
+                mediaManagers.RefreshNamesAsync(uow).GetAwaiter().GetResult();
+                downloadClients.RefreshNamesAsync(uow).GetAwaiter().GetResult();
+                uow.CommitAsync().GetAwaiter().GetResult();
+            }
+            finally
+            {
+                uow.DisposeAsync().AsTask().GetAwaiter().GetResult();
+            }
+        }
+        catch (SqliteException exception)
+        {
+            logger.LogError(exception, "Weir startup step failed but startup will continue step={Step}", "connection_names");
         }
 
         try

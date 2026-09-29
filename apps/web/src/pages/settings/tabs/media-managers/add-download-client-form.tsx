@@ -25,7 +25,6 @@ const KINDS: DownloadClientKind[] = [
 
 type FormState = {
   kind: DownloadClientKind;
-  name: string;
   base_url: string;
   username: string;
   password: string;
@@ -34,7 +33,6 @@ type FormState = {
 
 const EMPTY_FORM: FormState = {
   kind: "sabnzbd",
-  name: "",
   base_url: "",
   username: "",
   password: "",
@@ -65,7 +63,6 @@ export function AddDownloadClientForm({
         create.mutate(
           {
             kind: form.kind,
-            name: form.name,
             base_url: form.base_url,
             username: form.username,
             password: form.password,
@@ -94,15 +91,6 @@ export function AddDownloadClientForm({
                   </option>
                 ))}
               </select>
-            </Field>
-            <Field label="Name" width="medium">
-              <input
-                data-testid="download-client-name"
-                className="mm-input"
-                value={form.name}
-                placeholder="Living room qBittorrent"
-                onChange={(e) => change("name", e.target.value)}
-              />
             </Field>
           </div>
           <Field
@@ -191,7 +179,6 @@ export function AddDownloadClientForm({
             className={mmActionButtonClass({ variant: "primary" })}
             disabled={
               create.isPending ||
-              !form.name.trim() ||
               !form.base_url.trim() ||
               missingRequiredCredential
             }
