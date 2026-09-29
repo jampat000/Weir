@@ -45,6 +45,7 @@ export function WizardDownloadsSection({
       {isConnectedSource(source) && connections.answering.length > 0 ? (
         <WizardFoundLibraries
           found={found}
+          managers={connections.managers}
           disabled={disabled}
           onNeither={() => onSource("neither")}
         />

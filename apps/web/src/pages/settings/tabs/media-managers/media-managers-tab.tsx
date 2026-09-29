@@ -11,6 +11,7 @@ import { AddConnectionForm } from "./add-connection-form";
 import { ConnectionCard } from "./connection-card";
 import { DownloadClientsSection } from "./download-clients-section";
 import { NewConnectionSecretPrompt } from "./new-connection-secret-prompt";
+import { WeirOnlyWorkflows } from "./weir-only-workflows";
 
 /** Settings: the media managers that send files to Weir. */
 export function MediaManagersTab() {
@@ -47,6 +48,8 @@ export function MediaManagersTab() {
       {connections.data.map((connection) => (
         <ConnectionCard key={connection.id} connection={connection} fmt={fmt} />
       ))}
+
+      <WeirOnlyWorkflows />
 
       {justCreated ? (
         <NewConnectionSecretPrompt

@@ -101,8 +101,9 @@ export async function fetchProcessingRejectSupport(
 }
 
 /**
- * What each connected Sonarr, Radarr or Deluno needs for a library with these folders, and whether it
- * already has it. Read only on the manager's side: Weir only ever sends it GET requests.
+ * What each Sonarr, Radarr or Deluno the workflow is linked to needs for these folders, and whether it already has
+ * it (every one that covers the media type when no links are given). Read only on the manager's side: Weir only
+ * ever sends it GET requests.
  */
 export type ProcessingManagerSetup = Schema<"ManagerSetupOut">;
 export type ProcessingManagerSetupItem = Schema<"ManagerSetupItemOut">;
@@ -112,6 +113,7 @@ export async function fetchProcessingManagerSetup(
   watchedFolder: string,
   outputFolder: string,
   removeOriginal = true,
+  linkedConnectionIds?: number[],
 ): Promise<ProcessingManagerSetup> {
   const query = new URLSearchParams({
     media_type: mediaType,
@@ -119,6 +121,9 @@ export async function fetchProcessingManagerSetup(
     output_folder: outputFolder,
     remove_original_after_success: removeOriginal ? "true" : "false",
   });
+  for (const id of linkedConnectionIds ?? []) {
+    query.append("connection_ids", String(id));
+  }
   const path = `/api/v1/processing/manager-setup?${query.toString()}`;
   const response = await apiFetch(path);
   await requireOk(path, response, "Could not check your media managers");

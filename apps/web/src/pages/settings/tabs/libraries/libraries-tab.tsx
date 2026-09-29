@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 
 import { PageLoading } from "../../../../components/shared/page-loading";
 import { errorMessage } from "../../../../lib/api/error-message";
@@ -16,6 +17,7 @@ import {
 } from "../../../../lib/processing/libraries-queries";
 import { SaveModelNote } from "../../save-model-note";
 import { SettingsLoadError } from "../../settings-load-error";
+import { AddWorkflowChoice, type WorkflowStart } from "./add-workflow-choice";
 import { LibraryEditor } from "./library-editor";
 import {
   EMPTY_LIBRARY_FORM,
@@ -27,10 +29,18 @@ import { LibraryImportSection } from "./library-import-section";
 import { LibraryListSection } from "./library-list-section";
 import { RemoveLibraryDialog } from "./remove-library-dialog";
 
+const ADD_FROM_PARAM = "addFrom";
+
 type Editing =
   | { kind: "closed" }
-  | { kind: "adding" }
-  | { kind: "editing"; library: ProcessingLibrary };
+  | { kind: "choosing"; fromConnectionId?: number }
+  | { kind: "adding"; preset: Partial<LibraryForm> }
+  | {
+      kind: "editing";
+      library: ProcessingLibrary;
+      /** Values a suggestion fills in over the saved ones. */
+      preset?: Partial<LibraryForm>;
+    };
 
 /**
  * Settings › Libraries: add, edit, reorder, switch on and off, and remove the libraries Weir
@@ -51,6 +61,24 @@ export function LibrariesTab() {
   const [editing, setEditing] = useState<Editing>({ kind: "closed" });
   const [removing, setRemoving] = useState<ProcessingLibrary | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [params, setParams] = useSearchParams();
+  const addFrom = Number(params.get(ADD_FROM_PARAM));
+  const connectionsLoaded = connections.data !== undefined;
+
+  // Arriving from a media manager's "Add a workflow from ..." opens the add choice already on that manager.
+  useEffect(() => {
+    if (!Number.isInteger(addFrom) || addFrom <= 0 || !connectionsLoaded)
+      return;
+    setEditing({ kind: "choosing", fromConnectionId: addFrom });
+    setParams(
+      (current) => {
+        const next = new URLSearchParams(current);
+        next.delete(ADD_FROM_PARAM);
+        return next;
+      },
+      { replace: true },
+    );
+  }, [addFrom, connectionsLoaded, setParams]);
 
   if (libraries.isPending) return <PageLoading label="Loading libraries" />;
   if (libraries.isError) return <SettingsLoadError what="libraries" />;
@@ -106,7 +134,7 @@ export function LibrariesTab() {
         editable={editable}
         onAdd={() => {
           setNotice(null);
-          setEditing({ kind: "adding" });
+          setEditing({ kind: "choosing" });
         }}
         actions={{
           onToggle: (library) =>
@@ -148,14 +176,34 @@ export function LibrariesTab() {
         <LibraryImportSection connections={managers} onNotice={setNotice} />
       ) : null}
 
-      {editing.kind !== "closed" ? (
+      {editing.kind === "choosing" ? (
+        <AddWorkflowChoice
+          connections={managers}
+          workflows={rows}
+          initialConnectionId={editing.fromConnectionId}
+          onCancel={() => setEditing({ kind: "closed" })}
+          onStart={(start: WorkflowStart) =>
+            setEditing(
+              start.fills
+                ? {
+                    kind: "editing",
+                    library: start.fills,
+                    preset: start.preset,
+                  }
+                : { kind: "adding", preset: start.preset },
+            )
+          }
+        />
+      ) : null}
+
+      {editing.kind === "adding" || editing.kind === "editing" ? (
         <LibraryEditor
           key={editing.kind === "editing" ? editing.library.id : "new"}
           library={editing.kind === "editing" ? editing.library : undefined}
           initial={
             editing.kind === "editing"
-              ? formFrom(editing.library)
-              : EMPTY_LIBRARY_FORM
+              ? { ...formFrom(editing.library), ...editing.preset }
+              : { ...EMPTY_LIBRARY_FORM, ...editing.preset }
           }
           editable={editable}
           ruleSets={ruleSets.data ?? []}

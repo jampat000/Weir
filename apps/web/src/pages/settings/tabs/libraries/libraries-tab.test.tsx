@@ -167,7 +167,7 @@ it("says the libraries could not be loaded instead of showing none", async () =>
   expect(await screen.findByTestId("settings-load-error")).toHaveTextContent(
     "Weir couldn’t load your libraries. Reload the page to try again.",
   );
-  expect(screen.queryByText(/No libraries yet/)).not.toBeInTheDocument();
+  expect(screen.queryByText(/No workflows yet/)).not.toBeInTheDocument();
 });
 
 it("does not offer editing to a viewer", async () => {
@@ -190,5 +190,5 @@ it("says so plainly when nothing is configured yet", async () => {
 
   render(<LibrariesTab />, { wrapper });
 
-  expect(await screen.findByText(/No libraries yet/)).toBeInTheDocument();
+  expect(await screen.findByText(/No workflows yet/)).toBeInTheDocument();
 });

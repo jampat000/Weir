@@ -20,12 +20,17 @@ import { useLibraryCleaningDraft } from "./library-cleaning-draft";
 import { LibraryCleaningSettings } from "./library-cleaning-settings";
 import { LibraryFolderChain } from "./library-folder-chain";
 import { LibraryFoldersGroup } from "./library-folders-group";
-import { sameLibraryForm, type LibraryForm } from "./library-form";
+import {
+  linkedConnectionIds,
+  sameLibraryForm,
+  type LibraryForm,
+} from "./library-form";
 import { LibraryHardwareFold } from "./library-hardware-fold";
 import {
   LibraryIntakeGroup,
   LibraryReadinessGroup,
 } from "./library-intake-groups";
+import { LibraryLinkSection } from "./library-link-section";
 import { LibraryManagerSetup } from "./library-manager-setup";
 import {
   LibraryCapacityGroup,
@@ -80,6 +85,7 @@ export function LibraryEditor({
     },
     onSuccess: onClose,
   });
+  const linkedIds = linkedConnectionIds(form, library);
   const dirty = !sameLibraryForm(form, initial) || cleaning.dirty;
   const thing = library ? library.name : "the new library";
   useUnsavedChanges(dirty ? thing : null);
@@ -95,36 +101,44 @@ export function LibraryEditor({
     <>
       <SidePanel
         open
-        title={library ? "Edit library" : "Add library"}
-        eyebrow="Settings · Libraries"
+        title={library ? "Edit workflow" : "Add workflow"}
+        eyebrow="Settings · Workflows"
         subtitle={
           library
             ? "Changes take effect on the next scan; nothing already running is disturbed."
-            : "A library is a watched folder, a work area and an output folder."
+            : "A workflow is a watched folder, a work area and an output folder."
         }
         onClose={close}
         dataTestId="processing-library-form"
       >
         <div className="mm-quiet-stack">
           <SaveModelNote model="explicit" />
-          <LibraryFoldersGroup
-            binding={binding}
-            ruleSets={ruleSets}
+          <LibraryFoldersGroup binding={binding} ruleSets={ruleSets} />
+          <LibraryLinkSection
+            linkedIds={linkedIds}
             connections={connections}
-          />
-          <LibraryManagerSetup
-            mediaType={form.media_type}
-            watchedFolder={form.watched_folder}
-            outputFolder={form.output_folder}
-            removeOriginal={form.remove_original_after_success}
             editable={editable}
-            onUseFolders={(watched, output) =>
-              binding.update({
-                watched_folder: watched ?? form.watched_folder,
-                output_folder: output ?? form.output_folder,
-              })
+            onLink={(connectionId) =>
+              binding.update({ manager_connection_id: String(connectionId) })
             }
+            onUnlink={() => binding.update({ manager_connection_id: "" })}
           />
+          {linkedIds.length > 0 ? (
+            <LibraryManagerSetup
+              mediaType={form.media_type}
+              watchedFolder={form.watched_folder}
+              outputFolder={form.output_folder}
+              removeOriginal={form.remove_original_after_success}
+              linkedConnectionIds={linkedIds}
+              editable={editable}
+              onUseFolders={(watched, output) =>
+                binding.update({
+                  watched_folder: watched ?? form.watched_folder,
+                  output_folder: output ?? form.output_folder,
+                })
+              }
+            />
+          ) : null}
           <LibraryFolderChain
             libraryId={library?.id}
             watchedFolder={form.watched_folder}

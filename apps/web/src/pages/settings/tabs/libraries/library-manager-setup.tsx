@@ -271,6 +271,7 @@ export function LibraryManagerSetup({
   watchedFolder,
   outputFolder,
   removeOriginal = true,
+  linkedConnectionIds,
   editable,
   onUseFolders,
 }: {
@@ -279,6 +280,8 @@ export function LibraryManagerSetup({
   outputFolder: string;
   /** The library's "After cleaning, remove the original download": a torrent client makes that a problem. */
   removeOriginal?: boolean;
+  /** The media managers this workflow is linked to: only these are checked. */
+  linkedConnectionIds: number[];
   editable: boolean;
   onUseFolders: (watched: string | null, output: string | null) => void;
 }) {
@@ -291,6 +294,7 @@ export function LibraryManagerSetup({
     settled.watched,
     settled.output,
     removeOriginal,
+    linkedConnectionIds,
     true,
   );
   const downloadClients = useDownloadClientSuggestionsQuery(mediaType);
