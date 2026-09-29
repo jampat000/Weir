@@ -310,7 +310,7 @@ public sealed class MediaManagerHttpClient
         (exception is TaskCanceledException && !cancellationToken.IsCancellationRequested);
 
     internal static MediaManagerUnreachableException Unreachable(Exception exception) =>
-        new($"<urlopen error {ClassifyTransportFailure(exception)}>", exception);
+        new($"The connection failed: {ClassifyTransportFailure(exception)}.", exception);
 
     /// <summary>
     /// A plain word for why the connection failed, never the framework's own exception text: that text can carry

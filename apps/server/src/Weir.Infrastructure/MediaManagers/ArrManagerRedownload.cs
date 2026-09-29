@@ -130,8 +130,8 @@ public sealed class ArrManagerRedownload : IManagerRedownload
                 RedownloadOutcome.DeletedButSearchFailed,
                 DeletedExistingFile: true,
                 existingFileSizeBytes,
-                $"{connection.Label} deleted the existing file, but Weir could not ask it to search for a replacement " +
-                $"({exception.Message}). This title now has no file until one is searched for again — try Download " +
+                $"{connection.Label} deleted the existing file, but Weir could not ask it to search for a replacement. " +
+                "This title now has no file until one is searched for again: try Download " +
                 $"again, or search for it manually in {connection.Label}.",
                 exception.Message);
         }
