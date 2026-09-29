@@ -14,6 +14,7 @@ import type { CurrentSession, UserPublic } from "../../lib/api/types";
 import { authKeys } from "../../lib/auth/query-keys";
 import * as settingsApi from "../../lib/settings/settings-api";
 import { settingsKeys } from "../../lib/settings/query-keys";
+import { systemKeys } from "../../lib/system/query-keys";
 import type {
   ServerLogs,
   ServerMetrics,
@@ -37,7 +38,6 @@ const viewerMe: UserPublic = {
 };
 
 const minimalAppSettings: AppSettings = {
-  product_display_name: "Weir",
   signed_in_home_notice: null,
   setup_wizard_state: "pending",
   app_timezone: "UTC",
@@ -133,6 +133,17 @@ const minimalMetrics: ServerMetrics = {
   busiest_routes: [],
 };
 
+const readiness = {
+  ready: true,
+  version: "1.0.0",
+  machine_name: "RIG",
+  machine_name_looks_generated: false,
+  status: "ready",
+  startup_seconds: 1,
+  steps: [],
+  worker_health: [],
+};
+
 function wrap(ui: ReactNode, client: QueryClient) {
   const router = createMemoryRouter([{ path: "*", element: ui }]);
   return (
@@ -146,6 +157,7 @@ function renderSettings(
   me: UserPublic,
   overrides?: {
     updateStatus?: UpdateStatus;
+    machineNameLooksGenerated?: boolean;
     initialEntries?: string[];
     backupItems?: {
       id: number;
@@ -159,6 +171,10 @@ function renderSettings(
     defaultOptions: { queries: { retry: false, staleTime: Infinity } },
   });
   qc.setQueryData(settingsKeys.app, minimalAppSettings);
+  qc.setQueryData(systemKeys.readiness, {
+    ...readiness,
+    machine_name_looks_generated: overrides?.machineNameLooksGenerated ?? false,
+  });
   qc.setQueryData(settingsKeys.securityOverview, minimalSecurity);
   qc.setQueryData(authKeys.me, me);
   qc.setQueryData(authKeys.session, minimalCurrentSession);
@@ -543,6 +559,23 @@ describe("SystemPage", () => {
     expect(
       screen.queryByTestId("suite-settings-backup-restore"),
     ).not.toBeInTheDocument();
+  });
+
+  it("says on About that Weir is named after the computer, with no field to change it", () => {
+    renderSettings(operatorMe);
+
+    const name = screen.getByTestId("about-machine-name");
+    expect(name).toHaveTextContent("Weir on RIG");
+    expect(within(name).queryByRole("textbox")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("about-hostname-tip")).not.toBeInTheDocument();
+  });
+
+  it("tells a Docker install with a generated host name to set one in its compose file", () => {
+    renderSettings(operatorMe, { machineNameLooksGenerated: true });
+
+    expect(screen.getByTestId("about-hostname-tip")).toHaveTextContent(
+      "Set hostname: in your compose file so Weir shows your server's name.",
+    );
   });
 
   it("opens on About, and each tab holds one job", () => {

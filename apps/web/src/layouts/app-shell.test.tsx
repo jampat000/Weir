@@ -34,6 +34,7 @@ vi.mock("../lib/system/readiness-queries", () => ({
   useSystemReadinessQuery: () => ({
     data: {
       version: "2.1.2",
+      machine_name: "RIG",
     },
   }),
 }));
@@ -42,14 +43,6 @@ vi.mock("../lib/system/readiness-queries", () => ({
 const workingLane = { count: 0 };
 vi.mock("../pages/processing/working-count", () => ({
   useWorkingCount: () => workingLane.count,
-}));
-
-vi.mock("../lib/settings/queries", () => ({
-  useAppSettingsQuery: () => ({
-    data: {
-      product_display_name: "Weir",
-    },
-  }),
 }));
 
 describe("AppShell", () => {
@@ -218,6 +211,23 @@ describe("AppShell", () => {
     expect(sidebar).not.toHaveClass("mm-sidebar--collapsed");
   });
 
+  it("names Weir after the machine in the browser tab and the sidebar", () => {
+    render(
+      <MemoryRouter initialEntries={["/"]}>
+        <Routes>
+          <Route path="/" element={<AppShell />}>
+            <Route index element={<div>Main</div>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(document.title).toBe("Weir · RIG");
+    expect(
+      within(screen.getByRole("complementary")).getAllByText("Weir · RIG"),
+    ).not.toHaveLength(0);
+  });
+
   it("names the sidebar landmark after the product", () => {
     render(
       <MemoryRouter initialEntries={["/"]}>
@@ -229,9 +239,8 @@ describe("AppShell", () => {
       </MemoryRouter>,
     );
 
-    // It was "Product", left over from the suite this stopped being.
     expect(
-      screen.getByRole("complementary", { name: "Weir" }),
+      screen.getByRole("complementary", { name: "Weir · RIG" }),
     ).toBeInTheDocument();
     expect(
       screen.queryByRole("complementary", { name: "Product" }),

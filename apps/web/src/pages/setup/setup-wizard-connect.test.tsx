@@ -170,7 +170,6 @@ function renderWizard() {
   });
   client.setQueryData(authKeys.me, { id: 1, username: "admin", role: "admin" });
   client.setQueryData(settingsKeys.app, {
-    product_display_name: "Weir",
     signed_in_home_notice: null,
     setup_wizard_state: "pending",
     app_timezone: "UTC",
@@ -262,10 +261,7 @@ describe("first run: connect Deluno first", () => {
     renderWizard();
 
     choose("Deluno");
-    fireEvent.change(await screen.findByTestId("media-manager-name"), {
-      target: { value: "Deluno" },
-    });
-    fireEvent.change(screen.getByTestId("media-manager-base-url"), {
+    fireEvent.change(await screen.findByTestId("media-manager-base-url"), {
       target: { value: "http://10.1.1.51:5000" },
     });
     fireEvent.change(screen.getByTestId("media-manager-api-key"), {
@@ -277,7 +273,6 @@ describe("first run: connect Deluno first", () => {
     expect(create).toHaveBeenCalledWith(
       expect.objectContaining({
         kind: "deluno",
-        name: "Deluno",
         base_url: "http://10.1.1.51:5000",
       }),
     );
@@ -297,7 +292,9 @@ describe("first run: connect Deluno first", () => {
 
     choose("Deluno");
 
-    expect(await screen.findByTestId("media-manager-name")).toBeInTheDocument();
+    expect(
+      await screen.findByTestId("media-manager-base-url"),
+    ).toBeInTheDocument();
     expect(screen.queryByTestId("media-manager-kind")).not.toBeInTheDocument();
   });
 
@@ -705,10 +702,7 @@ describe("first run: connect a download client first", () => {
     renderWizard();
 
     choose(/A download client/);
-    fireEvent.change(await screen.findByTestId("download-client-name"), {
-      target: { value: "SABnzbd" },
-    });
-    fireEvent.change(screen.getByTestId("download-client-base-url"), {
+    fireEvent.change(await screen.findByTestId("download-client-base-url"), {
       target: { value: "http://10.1.1.60:8080" },
     });
     fireEvent.change(screen.getByTestId("download-client-api-key"), {

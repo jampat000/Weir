@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Text;
 using Microsoft.Extensions.Logging.Abstractions;
+using Weir.Core.Configuration;
 using Weir.Infrastructure.Http;
 using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.Notifications;
@@ -26,7 +27,7 @@ public sealed class WebhookJobNotificationsTests : IDisposable
 
     public WebhookJobNotificationsTests()
     {
-        _dispatcher = new NotificationDispatcher(_poster, _store.Clock, _channels);
+        _dispatcher = new NotificationDispatcher(_poster, _store.Clock, _channels, MachineIdentity.From("RIG"));
         _notifications = new WebhookJobNotifications(_store.Database, _dispatcher, NullLogger<WebhookJobNotifications>.Instance);
     }
 
@@ -65,6 +66,19 @@ public sealed class WebhookJobNotificationsTests : IDisposable
         var posts = await PostsAsync();
         Assert.Equal(["https://alerts.example.com/any", "https://alerts.example.com/files"], posts.Select(p => p.Url).Order());
         Assert.All(posts, p => Assert.Contains("\"processing_job_completed\"", p.Body, StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task An_alert_says_which_machine_it_came_from()
+    {
+        await ChannelAsync("files", "processing_job_completed");
+        var job = await JobAsync(RemuxPass, "completed");
+
+        _notifications.Dispatch("processing", "completed", job, RemuxPass);
+
+        var post = Assert.Single(await PostsAsync());
+        Assert.Contains("\"title\": \"Weir on RIG job completed\"", post.Body, StringComparison.Ordinal);
+        Assert.Contains("\"machine_name\": \"RIG\"", post.Body, StringComparison.Ordinal);
     }
 
     [Fact]

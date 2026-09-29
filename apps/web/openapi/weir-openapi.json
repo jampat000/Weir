@@ -877,8 +877,8 @@
             "type": "string"
           },
           "name": {
+            "description": "Accepted and ignored: a connection is named after its kind and the host in its address.",
             "maxLength": 200,
-            "minLength": 1,
             "title": "Name",
             "type": "string"
           },
@@ -899,8 +899,7 @@
         },
         "required": [
           "csrf_token",
-          "kind",
-          "name"
+          "kind"
         ],
         "title": "DownloadClientConnectionCreateIn",
         "type": "object"
@@ -939,6 +938,7 @@
             "type": "string"
           },
           "name": {
+            "description": "The connection's name: its kind and the host in its address, set by Weir.",
             "title": "Name",
             "type": "string"
           },
@@ -1109,13 +1109,13 @@
             "anyOf": [
               {
                 "maxLength": 200,
-                "minLength": 1,
                 "type": "string"
               },
               {
                 "type": "null"
               }
             ],
+            "description": "Accepted and ignored: a connection is named after its kind and the host in its address.",
             "title": "Name"
           },
           "password": {
@@ -3333,16 +3333,15 @@
             "type": "string"
           },
           "name": {
+            "description": "Accepted and ignored: a connection is named after its kind and the host in its address.",
             "maxLength": 200,
-            "minLength": 1,
             "title": "Name",
             "type": "string"
           }
         },
         "required": [
           "csrf_token",
-          "kind",
-          "name"
+          "kind"
         ],
         "title": "MediaManagerConnectionCreateIn",
         "type": "object"
@@ -3439,6 +3438,7 @@
             "title": "Last Test Ok"
           },
           "name": {
+            "description": "The connection's name: its kind and the host in its address, set by Weir.",
             "title": "Name",
             "type": "string"
           },
@@ -3583,13 +3583,13 @@
             "anyOf": [
               {
                 "maxLength": 200,
-                "minLength": 1,
                 "type": "string"
               },
               {
                 "type": "null"
               }
             ],
+            "description": "Accepted and ignored: a connection is named after its kind and the host in its address.",
             "title": "Name"
           }
         },
@@ -4203,6 +4203,16 @@
       },
       "ReadinessResponse": {
         "properties": {
+          "machine_name": {
+            "description": "The name of the machine Weir runs on. Weir is named after it.",
+            "title": "Machine Name",
+            "type": "string"
+          },
+          "machine_name_looks_generated": {
+            "description": "True when the machine name looks like a container's generated one, so the compose file has no hostname.",
+            "title": "Machine Name Looks Generated",
+            "type": "boolean"
+          },
           "ready": {
             "title": "Ready",
             "type": "boolean"
@@ -4238,6 +4248,8 @@
         "required": [
           "ready",
           "version",
+          "machine_name",
+          "machine_name_looks_generated",
           "status",
           "startup_seconds",
           "steps"
@@ -10057,12 +10069,6 @@
             "title": "Log Retention Days",
             "type": "integer"
           },
-          "product_display_name": {
-            "description": "Shown in the sidebar and settings.",
-            "maxLength": 120,
-            "title": "Product Display Name",
-            "type": "string"
-          },
           "setup_wizard_state": {
             "description": "First-run wizard state: pending, skipped, or completed.",
             "maxLength": 32,
@@ -10090,7 +10096,6 @@
           }
         },
         "required": [
-          "product_display_name",
           "setup_wizard_state",
           "app_timezone",
           "log_retention_days",
@@ -10176,12 +10181,6 @@
             "title": "Log Retention Days",
             "type": "integer"
           },
-          "product_display_name": {
-            "maxLength": 120,
-            "minLength": 1,
-            "title": "Product Display Name",
-            "type": "string"
-          },
           "setup_wizard_state": {
             "anyOf": [
               {
@@ -10210,7 +10209,6 @@
         },
         "required": [
           "csrf_token",
-          "product_display_name",
           "app_timezone",
           "log_retention_days"
         ],
@@ -12250,12 +12248,24 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": {
-                    "items": {
-                      "type": "string"
+                  "properties": {
+                    "capabilities": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "title": "Capabilities",
+                      "type": "array"
                     },
-                    "type": "array"
+                    "machine_name": {
+                      "description": "The name of the machine Weir runs on, for a media manager to name its connection to Weir.",
+                      "title": "Machine Name",
+                      "type": "string"
+                    }
                   },
+                  "required": [
+                    "capabilities",
+                    "machine_name"
+                  ],
                   "title": "Response Get Intake Capabilities Api V1 Intake Capabilities Get",
                   "type": "object"
                 }

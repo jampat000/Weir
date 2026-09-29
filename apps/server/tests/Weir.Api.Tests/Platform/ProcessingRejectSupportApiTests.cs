@@ -100,7 +100,7 @@ public sealed class ProcessingRejectSupportApiTests
     {
         using var response = await client.PostAsync(
             "/api/v1/media-managers/connections",
-            new { csrf_token = await client.CsrfAsync(), kind = "radarr", name = "Radarr", base_url = "http://10.0.0.5:7878", api_key = "k" });
+            new { csrf_token = await client.CsrfAsync(), kind = "radarr", base_url = "http://10.0.0.5:7878", api_key = "k" });
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         var body = await ApiTestClient.Json(response);
         return body!["id"]!.GetValue<long>();

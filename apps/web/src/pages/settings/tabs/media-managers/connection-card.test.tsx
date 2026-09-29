@@ -129,7 +129,7 @@ describe("the unsigned webhook warning", () => {
 });
 
 describe("editing a media manager in place", () => {
-  it("opens with the current name, address and a blank api key", async () => {
+  it("opens with the current address and a blank api key, and no field for a name", async () => {
     vi.spyOn(api, "fetchMediaManagerConnections").mockResolvedValue([
       connection({ name: "Deluno", base_url: "http://192.0.2.10:5099" }),
     ]);
@@ -137,7 +137,9 @@ describe("editing a media manager in place", () => {
 
     fireEvent.click(await screen.findByTestId("media-manager-edit"));
 
-    expect(screen.getByTestId("media-manager-edit-name")).toHaveValue("Deluno");
+    expect(
+      screen.queryByTestId("media-manager-edit-name"),
+    ).not.toBeInTheDocument();
     expect(screen.getByTestId("media-manager-edit-base-url")).toHaveValue(
       "http://192.0.2.10:5099",
     );
@@ -150,19 +152,18 @@ describe("editing a media manager in place", () => {
     ]);
     const update = vi
       .spyOn(api, "updateMediaManagerConnection")
-      .mockResolvedValue(connection({ name: "Deluno HQ" }));
+      .mockResolvedValue(connection({ name: "Deluno on 192.0.2.11" }));
 
     render(<MediaManagersTab />, { wrapper });
     fireEvent.click(await screen.findByTestId("media-manager-edit"));
-    fireEvent.change(screen.getByTestId("media-manager-edit-name"), {
-      target: { value: "Deluno HQ" },
+    fireEvent.change(screen.getByTestId("media-manager-edit-base-url"), {
+      target: { value: "http://192.0.2.11:5099" },
     });
     fireEvent.click(screen.getByTestId("media-manager-edit-save"));
 
     await waitFor(() =>
       expect(update).toHaveBeenCalledWith(1, {
-        name: "Deluno HQ",
-        base_url: "http://192.0.2.10:5099",
+        base_url: "http://192.0.2.11:5099",
       }),
     );
     await waitFor(() =>

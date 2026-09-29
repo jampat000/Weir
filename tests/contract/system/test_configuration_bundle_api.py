@@ -35,7 +35,7 @@ def test_the_retired_bundle_url_aliases_are_not_served(admin) -> None:
         assert admin.get(path).status_code == 404, path
 
 
-def test_configuration_bundle_round_trip_suite_name(admin) -> None:
+def test_configuration_bundle_round_trip_ignores_the_product_name(admin) -> None:
     r0 = admin.get(BUNDLE)
     assert r0.status_code == 200, r0.text
     bundle = r0.json()
@@ -49,13 +49,11 @@ def test_configuration_bundle_round_trip_suite_name(admin) -> None:
 
     r_put = admin.put_csrf(BUNDLE, {"bundle": b2})
     assert r_put.status_code == 200, r_put.text
-    assert r_put.json()["suite_settings"]["product_display_name"] == "Bundle Restore Test"
+    # Weir is named after its machine, so a backup's product name is read and dropped.
+    assert r_put.json()["suite_settings"]["product_display_name"] == bundle["suite_settings"]["product_display_name"]
 
     r_restore = admin.put_csrf(BUNDLE, {"bundle": bundle})
     assert r_restore.status_code == 200, r_restore.text
-    assert (
-        r_restore.json()["suite_settings"]["product_display_name"] == bundle["suite_settings"]["product_display_name"]
-    )
 
 
 def test_configuration_bundle_no_longer_carries_pruner_and_ignores_it_on_restore(admin) -> None:
@@ -74,7 +72,7 @@ def test_configuration_bundle_no_longer_carries_pruner_and_ignores_it_on_restore
 
     r_put = admin.put_csrf(BUNDLE, {"bundle": older})
     assert r_put.status_code == 200, r_put.text
-    assert r_put.json()["suite_settings"]["product_display_name"] == "Restored From Older Backup"
+    assert r_put.json()["suite_settings"]["product_display_name"] == bundle["suite_settings"]["product_display_name"]
 
     r_restore = admin.put_csrf(BUNDLE, {"bundle": bundle})
     assert r_restore.status_code == 200, r_restore.text

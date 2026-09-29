@@ -63,7 +63,7 @@ public sealed class HandoffScanSingleProcessingTests : IDisposable
             ("$w", _folders.Watched),
             ("$o", _folders.Output),
             ("$k", _folders.Work))), CultureInfo.InvariantCulture);
-        await _fixture.AddConnectionAsync("deluno", "Deluno", "http://192.0.2.30:5099", "k1");
+        await _fixture.AddConnectionAsync("deluno", "http://192.0.2.30:5099", "k1");
         _folders.Source(Path.Join("Film", "film.mkv"));
         _media.Probes["film.mkv"] = FakeMediaRunner.EnglishAndJapanese;
         _media.DefaultProbe = FakeMediaRunner.EnglishOnly;

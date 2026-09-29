@@ -28,19 +28,30 @@ public static class MediaManagerKinds
         ["native"] = "Media manager",
     };
 
-    /// <summary>A connection's label, e.g. <c>"Deluno (Main)"</c>; a connection named after its product is not repeated.</summary>
-    public static string LabelForConnection(string? kind, string? name)
+    /// <summary>The product a kind is, as people know it: "Radarr", "Deluno"; "Media manager" for one Weir has no name for.</summary>
+    public static string ProductLabel(string? kind) =>
+        KindLabels.GetValueOrDefault(WireStrings.Strip(kind ?? string.Empty).ToLowerInvariant(), "Media manager");
+
+    /// <summary>A connection's label; see <see cref="ConnectionLabels.For"/>.</summary>
+    public static string LabelForConnection(string? kind, string? name) => ConnectionLabels.For(ProductLabel(kind), name);
+}
+
+/// <summary>How a connection is written in a sentence, shared by media managers and download clients.</summary>
+public static class ConnectionLabels
+{
+    /// <summary>
+    /// The connection's name, led by its product unless the name already starts with it: "Deluno on RIG" stays
+    /// as it is, and a name of "Main" reads "Deluno (Main)". No name reads as the product alone.
+    /// </summary>
+    public static string For(string product, string? name)
     {
-        var product = KindLabels.GetValueOrDefault(WireStrings.Strip(kind ?? string.Empty).ToLowerInvariant(), "Media manager");
         var label = WireStrings.Strip(name ?? string.Empty);
         if (label.Length == 0)
         {
             return product;
         }
 
-        return string.Equals(label.ToUpperInvariant().ToLowerInvariant(), product.ToUpperInvariant().ToLowerInvariant(), StringComparison.Ordinal)
-            ? label
-            : $"{product} ({label})";
+        return label.StartsWith(product, StringComparison.OrdinalIgnoreCase) ? label : $"{product} ({label})";
     }
 }
 

@@ -35,8 +35,6 @@ public sealed record ResolvedCallbackTarget(string BaseUrl, string? ApiKey);
 /// </summary>
 public sealed class MediaManagerConnectionService
 {
-    private const string NeedsNameMessage = "Give the connection a name so you can tell it apart later.";
-
     private readonly WeirOptions _options;
     private readonly CredentialCipher _cipher;
     private readonly IMediaManagerPorts _ports;
@@ -54,56 +52,29 @@ public sealed class MediaManagerConnectionService
 
     public IMediaManagerPorts Ports => _ports;
 
-    /// <summary>Create a connection. Throws <see cref="MediaManagerConnectionException"/> for an operator mistake.</summary>
+    /// <summary>
+    /// Create a connection, named after its kind and address (<see cref="ConnectionNaming"/>). Throws
+    /// <see cref="MediaManagerConnectionException"/> for an operator mistake.
+    /// </summary>
     public async Task<long> CreateAsync(
-        UnitOfWork uow, string kind, string name, string baseUrl = "", string? apiKey = null, bool enabled = true, bool downloadedScanEnabled = false)
+        UnitOfWork uow, string kind, string baseUrl = "", string? apiKey = null, bool enabled = true, bool downloadedScanEnabled = false)
     {
         ArgumentNullException.ThrowIfNull(uow);
-        var label = WireStrings.Strip(name ?? string.Empty);
-        if (label.Length == 0)
-        {
-            throw new MediaManagerConnectionException(NeedsNameMessage);
-        }
-
-        if (await _store.NameExistsAsync(uow, label).ConfigureAwait(false))
-        {
-            throw new MediaManagerConnectionException($"A connection named {WireStrings.Repr(label)} already exists.");
-        }
-
         var key = WireStrings.Strip(apiKey ?? string.Empty);
         var validKind = ValidateKind(kind);
         var validUrl = ValidateBaseUrl(baseUrl);
         var ciphertext = key.Length > 0 ? EncryptApiKey(key) : null;
-        return await _store.InsertAsync(uow, validKind, label, enabled, validUrl, ciphertext, downloadedScanEnabled).ConfigureAwait(false);
+        return await _store.InsertAsync(uow, validKind, enabled, validUrl, ciphertext, downloadedScanEnabled).ConfigureAwait(false);
     }
 
     /// <summary>Update a connection: <see langword="null"/> leaves a field alone; an empty <paramref name="apiKey"/> clears the key.</summary>
     public async Task UpdateAsync(
-        UnitOfWork uow, MediaManagerConnectionRecord row, string? name = null, string? baseUrl = null, string? apiKey = null, bool? enabled = null,
+        UnitOfWork uow, MediaManagerConnectionRecord row, string? baseUrl = null, string? apiKey = null, bool? enabled = null,
         bool? downloadedScanEnabled = null)
     {
         ArgumentNullException.ThrowIfNull(uow);
         ArgumentNullException.ThrowIfNull(row);
         var changes = new List<(string Column, object? Value)>();
-        if (name is not null)
-        {
-            var label = WireStrings.Strip(name);
-            if (label.Length == 0)
-            {
-                throw new MediaManagerConnectionException(NeedsNameMessage);
-            }
-
-            if (await _store.NameExistsAsync(uow, label, row.Id).ConfigureAwait(false))
-            {
-                throw new MediaManagerConnectionException($"A connection named {WireStrings.Repr(label)} already exists.");
-            }
-
-            if (label != row.Name)
-            {
-                changes.Add(("name", label));
-            }
-        }
-
         string? validatedBaseUrl = null;
         if (baseUrl is not null)
         {

@@ -19,7 +19,7 @@ public sealed class LibraryFileChangeNotifierTests
     public async Task A_batch_of_ten_episodes_produces_one_rescan_series_call()
     {
         using var fixture = new MediaManagerFixture();
-        await fixture.AddConnectionAsync("sonarr", "Main");
+        await fixture.AddConnectionAsync("sonarr");
         var episodePaths = Enumerable.Range(1, 10).Select(i => $"/tv/Show/S01/e{i:00}.mkv").ToArray();
         fixture.Http
             .Json(HttpMethod.Get, "/api/v3/rootfolder", "[]")
@@ -41,7 +41,7 @@ public sealed class LibraryFileChangeNotifierTests
     public async Task A_second_batch_after_the_coalesce_window_rescans_again()
     {
         using var fixture = new MediaManagerFixture();
-        await fixture.AddConnectionAsync("sonarr", "Main");
+        await fixture.AddConnectionAsync("sonarr");
         fixture.Http
             .Json(HttpMethod.Get, "/api/v3/rootfolder", "[]")
             .Json(HttpMethod.Get, "/api/v3/series", """[{"id":12,"title":"Show"}]""")
@@ -60,7 +60,7 @@ public sealed class LibraryFileChangeNotifierTests
     public async Task A_notify_failure_is_retried_then_recorded_as_a_warning_and_the_call_still_completes()
     {
         using var fixture = new MediaManagerFixture();
-        await fixture.AddConnectionAsync("radarr", "4K");
+        await fixture.AddConnectionAsync("radarr");
         fixture.Http
             .Json(HttpMethod.Get, "/api/v3/rootfolder", "[]")
             .Json(HttpMethod.Get, "/api/v3/movie", """[{"id":7,"title":"Solaris","movieFile":{"path":"/media/Solaris/f.mkv"}}]""")
@@ -74,7 +74,7 @@ public sealed class LibraryFileChangeNotifierTests
         Assert.Equal(2, delays);
         Assert.Equal(
             1,
-            await fixture.Store.Scalar("SELECT count(*) FROM activity_events WHERE event_type = 'library.file_change_notify_warning' AND title = 'Weir could not tell Radarr (4K) that f.mkv changed'"));
+            await fixture.Store.Scalar("SELECT count(*) FROM activity_events WHERE event_type = 'library.file_change_notify_warning' AND title = 'Weir could not tell Radarr on manager.local that f.mkv changed'"));
         Assert.Equal(1, await fixture.Store.Scalar("SELECT count(*) FROM activity_events WHERE result = 'warning'"));
     }
 
@@ -82,7 +82,7 @@ public sealed class LibraryFileChangeNotifierTests
     public async Task Deluno_without_the_capability_is_skipped_with_a_note_and_makes_no_call()
     {
         using var fixture = new MediaManagerFixture();
-        await fixture.AddConnectionAsync("deluno", "Main");
+        await fixture.AddConnectionAsync("deluno");
         fixture.Http.Json(HttpMethod.Get, "/api/integrations/external/manifest", """{"libraries":[],"capabilities":["movies","tv"]}""");
 
         var notifier = Notifier(fixture);
@@ -96,7 +96,7 @@ public sealed class LibraryFileChangeNotifierTests
     public async Task Deluno_with_the_capability_is_told_directly_by_path()
     {
         using var fixture = new MediaManagerFixture();
-        await fixture.AddConnectionAsync("deluno", "Main");
+        await fixture.AddConnectionAsync("deluno");
         fixture.Http
             .Json(HttpMethod.Get, "/api/integrations/external/manifest", """{"libraries":[],"capabilities":["movies","tv","external-file-changed"]}""")
             .Json(HttpMethod.Post, "/api/integrations/external/file-changed", """{"path":"/media/f.mkv","coalesced":false,"titles":[]}""", HttpStatusCode.Accepted);
@@ -113,7 +113,7 @@ public sealed class LibraryFileChangeNotifierTests
     public async Task A_manager_that_does_not_hold_the_file_is_left_alone()
     {
         using var fixture = new MediaManagerFixture();
-        await fixture.AddConnectionAsync("radarr", "4K");
+        await fixture.AddConnectionAsync("radarr");
         fixture.Http
             .Json(HttpMethod.Get, "/api/v3/rootfolder", "[]")
             .Json(HttpMethod.Get, "/api/v3/movie", """[{"id":7,"title":"Solaris","movieFile":{"path":"/media/Solaris/f.mkv"}}]""");
@@ -129,7 +129,7 @@ public sealed class LibraryFileChangeNotifierTests
     public async Task A_local_library_root_is_translated_to_the_managers_own_root_before_matching()
     {
         using var fixture = new MediaManagerFixture();
-        await fixture.AddConnectionAsync("radarr", "4K");
+        await fixture.AddConnectionAsync("radarr");
         fixture.Http
             .Json(HttpMethod.Get, "/api/v3/rootfolder", """[{"id":1,"path":"/mnt/movies"}]""")
             .Json(HttpMethod.Get, "/api/v3/movie", """[{"id":7,"title":"Solaris","movieFile":{"path":"/mnt/movies/Solaris/f.mkv"}}]""")

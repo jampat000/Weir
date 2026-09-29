@@ -35,6 +35,20 @@ code** — get it with `docker logs weir`, or from the `setup-code` file in `./w
 
 `./weir-data` holds Weir's database, settings, logs and backups. Keep it and you keep everything.
 
+## What Weir calls itself
+
+Weir is named after the machine it runs on: the browser tab, the sidebar, System › About and its
+alerts say "Weir on my-server". There is nothing to type. In Docker, the machine is the container,
+and Docker gives a container a random name unless you set one, so add `hostname:`:
+
+```yaml
+services:
+  weir:
+    hostname: my-server   # what Weir calls itself
+```
+
+Without it, System › About shows a reminder to set one.
+
 ## With your media folders
 
 Weir can only clean files it can see, so give it your media folders. This is the setup most

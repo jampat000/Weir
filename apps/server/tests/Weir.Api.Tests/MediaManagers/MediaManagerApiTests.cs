@@ -68,11 +68,72 @@ public sealed class MediaManagerApiTests
         return (server, client, manager);
     }
 
-    private static async Task<JsonNode> CreateAsync(ApiTestClient client, string kind = "deluno", string name = "Deluno", string baseUrl = "http://192.0.2.10:5099", string apiKey = "deluno_secret_key")
+    private static async Task<JsonNode> CreateAsync(ApiTestClient client, string kind = "deluno", string baseUrl = "http://192.0.2.10:5099", string apiKey = "deluno_secret_key")
     {
-        using var response = await client.PostAsync(Connections, new { csrf_token = await client.CsrfAsync(), kind, name, base_url = baseUrl, api_key = apiKey });
+        using var response = await client.PostAsync(Connections, new { csrf_token = await client.CsrfAsync(), kind, base_url = baseUrl, api_key = apiKey });
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         return await Json(response);
+    }
+
+    [Fact]
+    public async Task Delunos_own_create_request_is_accepted_and_the_name_it_sends_is_ignored()
+    {
+        var (server, client, _) = await StartAsync();
+        await using var _server = server;
+
+        using var created = await client.PostAsync(
+            Connections,
+            new { csrf_token = await client.CsrfAsync(), kind = "deluno", name = "Deluno", base_url = "http://192.0.2.10:5099", api_key = "deluno_secret_key", enabled = true });
+
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        Assert.Equal("Deluno on 192.0.2.10", (await Json(created))["name"]!.GetValue<string>());
+    }
+
+    [Fact]
+    public async Task A_name_sent_when_editing_a_connection_is_ignored()
+    {
+        var (server, client, _) = await StartAsync();
+        await using var _server = server;
+        await CreateAsync(client);
+
+        using var edited = await client.PutAsync($"{Connections}/1", new { csrf_token = await client.CsrfAsync(), name = "Something else", enabled = false });
+
+        Assert.Equal(HttpStatusCode.OK, edited.StatusCode);
+        var body = await Json(edited);
+        Assert.Equal(("Deluno on 192.0.2.10", false), (body["name"]!.GetValue<string>(), body["enabled"]!.GetValue<bool>()));
+    }
+
+    [Fact]
+    public async Task Connections_of_one_kind_on_the_same_host_are_told_apart_by_port()
+    {
+        var (server, client, _) = await StartAsync();
+        await using var _server = server;
+        await CreateAsync(client, "radarr", "http://nas:7878");
+        await CreateAsync(client, "radarr", "http://nas:7879");
+        await CreateAsync(client, "sonarr", "http://nas:8989");
+
+        using var listed = await client.GetAsync(Connections);
+
+        Assert.Equal(
+            ["Radarr on nas (7878)", "Radarr on nas (7879)", "Sonarr on nas"],
+            (await Json(listed)).AsArray().Select(row => row!["name"]!.GetValue<string>()));
+    }
+
+    [Fact]
+    public async Task A_connection_is_renamed_after_the_address_it_is_moved_to_and_after_a_neighbour_is_removed()
+    {
+        var (server, client, _) = await StartAsync();
+        await using var _server = server;
+        await CreateAsync(client, "radarr", "http://nas:7878");
+        await CreateAsync(client, "radarr", "http://nas:7879");
+
+        using (var removed = await client.SendAsync(HttpMethod.Delete, $"{Connections}/1", new { csrf_token = await client.CsrfAsync() }))
+        {
+            Assert.Equal(HttpStatusCode.NoContent, removed.StatusCode);
+        }
+
+        using var remaining = await client.GetAsync($"{Connections}/2");
+        Assert.Equal("Radarr on nas", (await Json(remaining))["name"]!.GetValue<string>());
     }
 
     [Fact]
@@ -82,19 +143,14 @@ public sealed class MediaManagerApiTests
         await using var _server = server;
         var row = await CreateAsync(client);
         Assert.Equal(
-            """{"id":1,"kind":"deluno","name":"Deluno","enabled":true,"base_url":"http://192.0.2.10:5099","api_key_is_saved":true,"webhook_secret_is_set":false,"webhook_url_path":"/api/v1/intake/webhook/deluno","unsigned_webhook_warning":"This connection accepts webhooks without a secret. Create a secret and add it to Deluno.","last_test_ok":null,"last_test_at":null,"last_test_detail":null,"downloaded_scan_enabled":false,"lanes":[{"lane":"missing","enabled":false,"max_items_per_run":50,"retry_delay_minutes":1440,"schedule_enabled":false,"schedule_days":"","schedule_start":"00:00","schedule_end":"23:59","schedule_interval_seconds":3600},{"lane":"upgrade","enabled":false,"max_items_per_run":50,"retry_delay_minutes":1440,"schedule_enabled":false,"schedule_days":"","schedule_start":"00:00","schedule_end":"23:59","schedule_interval_seconds":3600}]}""",
+            """{"id":1,"kind":"deluno","name":"Deluno on 192.0.2.10","enabled":true,"base_url":"http://192.0.2.10:5099","api_key_is_saved":true,"webhook_secret_is_set":false,"webhook_url_path":"/api/v1/intake/webhook/deluno","unsigned_webhook_warning":"This connection accepts webhooks without a secret. Create a secret and add it to Deluno on 192.0.2.10.","last_test_ok":null,"last_test_at":null,"last_test_detail":null,"downloaded_scan_enabled":false,"lanes":[{"lane":"missing","enabled":false,"max_items_per_run":50,"retry_delay_minutes":1440,"schedule_enabled":false,"schedule_days":"","schedule_start":"00:00","schedule_end":"23:59","schedule_interval_seconds":3600},{"lane":"upgrade","enabled":false,"max_items_per_run":50,"retry_delay_minutes":1440,"schedule_enabled":false,"schedule_days":"","schedule_start":"00:00","schedule_end":"23:59","schedule_interval_seconds":3600}]}""",
             row.ToJsonString());
-        await CreateAsync(client, "radarr", "Radarr", "http://192.0.2.20:7878");
+        await CreateAsync(client, "radarr", "http://192.0.2.20:7878");
 
         using (var unknown = await client.PostAsync(Connections, new { csrf_token = await client.CsrfAsync(), kind = "plex", name = "P" }))
         {
             Assert.Equal(HttpStatusCode.UnprocessableEntity, unknown.StatusCode);
             Assert.Equal("literal_error", (await Json(unknown))["detail"]![0]!["type"]!.GetValue<string>());
-        }
-
-        using (var duplicate = await client.PostAsync(Connections, new { csrf_token = await client.CsrfAsync(), kind = "radarr", name = "Deluno" }))
-        {
-            Assert.Equal((HttpStatusCode.BadRequest, "A connection named 'Deluno' already exists."), (duplicate.StatusCode, await Detail(duplicate)));
         }
 
         using (var badUrl = await client.PostAsync(Connections, new { csrf_token = await client.CsrfAsync(), kind = "radarr", name = "X", base_url = "not-a-url" }))
@@ -115,10 +171,10 @@ public sealed class MediaManagerApiTests
         using var listed = await client.GetAsync(Connections);
         Assert.Equal(["deluno", "radarr"], (await Json(listed)).AsArray().Select(r => r!["kind"]!.GetValue<string>()));
 
-        using (var renamed = await client.PutAsync($"{Connections}/1", new { csrf_token = await client.CsrfAsync(), name = "Deluno renamed" }))
+        using (var moved = await client.PutAsync($"{Connections}/1", new { csrf_token = await client.CsrfAsync(), base_url = "http://192.0.2.11:5099" }))
         {
-            var body = await Json(renamed);
-            Assert.Equal(("Deluno renamed", true), (body["name"]!.GetValue<string>(), body["api_key_is_saved"]!.GetValue<bool>()));
+            var body = await Json(moved);
+            Assert.Equal(("Deluno on 192.0.2.11", true), (body["name"]!.GetValue<string>(), body["api_key_is_saved"]!.GetValue<bool>()));
         }
 
         using (var cleared = await client.PutAsync($"{Connections}/1", new { csrf_token = await client.CsrfAsync(), api_key = "" }))
@@ -232,7 +288,7 @@ public sealed class MediaManagerApiTests
         var (server, client, _) = await StartAsync();
         await using var _server = server;
         await CreateAsync(client);
-        await CreateAsync(client, "radarr", "Radarr", "http://192.0.2.20:7878");
+        await CreateAsync(client, "radarr", "http://192.0.2.20:7878");
         using var generated = await client.PostAsync($"{Connections}/1/webhook-secret", new { csrf_token = await client.CsrfAsync() });
         var body = await Json(generated);
         var secret = body["webhook_secret"]!.GetValue<string>();
@@ -264,7 +320,7 @@ public sealed class MediaManagerApiTests
         {
             var body = await Json(unreachable);
             Assert.False(body["ok"]!.GetValue<bool>());
-            Assert.Equal("Weir could not reach Deluno at http://127.0.0.1:1. Check the address is right, and that the app is running and reachable from this machine.", body["detail"]!.GetValue<string>());
+            Assert.Equal("Weir could not reach Deluno on 127.0.0.1 at http://127.0.0.1:1. Check the address is right, and that the app is running and reachable from this machine.", body["detail"]!.GetValue<string>());
             Assert.EndsWith("Z", body["checked_at"]!.GetValue<string>(), StringComparison.Ordinal);
         }
 
@@ -278,7 +334,7 @@ public sealed class MediaManagerApiTests
         manager.Json(HttpMethod.Get, "/api/integrations/external/health", "{}", HttpStatusCode.Forbidden);
         using (var refused = await client.PostAsync($"{Connections}/1/test", new { csrf_token = await client.CsrfAsync() }))
         {
-            Assert.Equal("Weir reached Deluno, but the API key was refused. Check the key and save it again.", (await Json(refused))["detail"]!.GetValue<string>());
+            Assert.Equal("Weir reached Deluno on 127.0.0.1, but the API key was refused. Check the key and save it again.", (await Json(refused))["detail"]!.GetValue<string>());
         }
 
         manager.Route(HttpMethod.Get, "/api/integrations/external/health", async _ =>
@@ -300,14 +356,14 @@ public sealed class MediaManagerApiTests
     {
         var (server, client, manager) = await StartAsync();
         await using var _server = server;
-        await CreateAsync(client, "radarr", "Radarr", "http://192.0.2.20:7878");
+        await CreateAsync(client, "radarr", "http://192.0.2.20:7878");
         manager.Json(HttpMethod.Get, "/api/v3/system/status", "<html>this is a login page, not Radarr</html>");
         using var tested = await client.PostAsync($"{Connections}/1/test", new { csrf_token = await client.CsrfAsync() });
         Assert.Equal(HttpStatusCode.OK, tested.StatusCode);
         var body = await Json(tested);
         Assert.False(body["ok"]!.GetValue<bool>());
         Assert.Equal(
-            "Weir reached Radarr but did not get the answer it expected. Check the address points at the app itself, not a page inside it.",
+            "Weir reached Radarr on 192.0.2.20 but did not get the answer it expected. Check the address points at the app itself, not a page inside it.",
             body["detail"]!.GetValue<string>());
     }
 
@@ -317,11 +373,11 @@ public sealed class MediaManagerApiTests
         var (server, client, manager) = await StartAsync();
         await using var _server = server;
         manager.Json(HttpMethod.Get, "/api/integrations/external/manifest", """{"libraries":[{"id":"lib-movies","name":"Movies","mediaType":"movies","path":"/media/movies"},{"id":"lib-tv","name":"TV","mediaType":"tv","path":"/media/tv"}]}""");
-        await CreateAsync(client, name: "Main");
-        await CreateAsync(client, name: "No key", apiKey: "");
+        await CreateAsync(client);
+        await CreateAsync(client, baseUrl: "http://192.0.2.11:5099", apiKey: "");
         using var response = await client.GetAsync("/api/v1/media-managers/capabilities");
         Assert.Equal(
-            """[{"connection_id":1,"kind":"deluno","name":"Main","label":"Deluno (Main)","media_scopes":["movie","tv"],"reports_import_queue":true,"reports_library_truth":false,"reachable":true,"library_roots":["/media/movies","/media/tv"],"summary":"Looks after Movies and TV episodes. Weir can ask it what is mid-import, but not which files it still keeps, so folder cleanup stays off unless another manager can answer that.","detail":null}]""",
+            """[{"connection_id":1,"kind":"deluno","name":"Deluno on 192.0.2.10","label":"Deluno on 192.0.2.10","media_scopes":["movie","tv"],"reports_import_queue":true,"reports_library_truth":false,"reachable":true,"library_roots":["/media/movies","/media/tv"],"summary":"Looks after Movies and TV episodes. Weir can ask it what is mid-import, but not which files it still keeps, so folder cleanup stays off unless another manager can answer that.","detail":null}]""",
             await response.Content.ReadAsStringAsync());
         Assert.Equal("deluno_secret_key", Assert.Single(manager.Requests).Headers.GetValues("X-Api-Key").Single());
     }
@@ -331,8 +387,8 @@ public sealed class MediaManagerApiTests
     {
         var (server, admin, _) = await StartAsync();
         await using var _server = server;
-        await CreateAsync(admin, "sonarr", "Sonarr", "http://192.0.2.30:8989");
-        await CreateAsync(admin, "radarr", "Radarr", "http://192.0.2.20:7878");
+        await CreateAsync(admin, "sonarr", "http://192.0.2.30:8989");
+        await CreateAsync(admin, "radarr", "http://192.0.2.20:7878");
         var client = new ApiTestClient(server);
         using (var grab = await client.PostAsync("/api/v1/intake/webhook/sonarr", new { eventType = "Grab", episodes = new[] { new { id = 1 } } }))
         {
@@ -369,7 +425,7 @@ public sealed class MediaManagerApiTests
         {
             var (server, admin, _) = await StartAsync(("WEIR_SUBBER_WEBHOOK_SECRET", "s3cret"));
             await using var _server = server;
-            await CreateAsync(admin, "radarr", "Radarr", "http://192.0.2.20:7878");
+            await CreateAsync(admin, "radarr", "http://192.0.2.20:7878");
             var client = new ApiTestClient(server);
             Assert.Equal(HttpStatusCode.OK, (await client.PostAsync("/api/v1/intake/webhook/radarr", new { eventType = "Grab" })).StatusCode);
         }
@@ -391,7 +447,7 @@ public sealed class MediaManagerApiTests
         }
 
         Assert.Equal(
-            """{"capabilities":["handoff-status","handoff-cancel","handoff-outcome","handoff-outcome-codes","library-folders"]}""",
+            $$"""{"capabilities":["handoff-status","handoff-cancel","handoff-outcome","handoff-outcome-codes","library-folders"],"machine_name":"{{Environment.MachineName}}"}""",
             await (await manager.GetAsync("/api/v1/intake/capabilities", secret)).Content.ReadAsStringAsync());
         Assert.Equal(HttpStatusCode.NotFound, (await manager.GetAsync("/api/v1/intake/handoffs/deluno/h1", secret)).StatusCode);
         Assert.Equal("Unknown media manager source 'plex'.", await Detail(await manager.GetAsync("/api/v1/intake/handoffs/plex/h1", secret)));
@@ -499,8 +555,8 @@ public sealed class MediaManagerApiTests
         await using var _server = server;
         await TestDatabase.ExecuteAsync(server, "UPDATE libraries SET watched_folder = $w WHERE media_type = 'movie'", ("$w", watched));
 
-        var connectionA = await CreateAsync(client, "native", "A", baseUrl: "", apiKey: "");
-        var connectionB = await CreateAsync(client, "native", "B", baseUrl: "", apiKey: "");
+        var connectionA = await CreateAsync(client, "native", baseUrl: "", apiKey: "");
+        var connectionB = await CreateAsync(client, "native", baseUrl: "", apiKey: "");
         var secretA = await RotateWebhookSecretAsync(client, connectionA["id"]!.GetValue<int>());
         var secretB = await RotateWebhookSecretAsync(client, connectionB["id"]!.GetValue<int>());
         var headersA = new Dictionary<string, string> { ["X-Webhook-Secret"] = secretA };

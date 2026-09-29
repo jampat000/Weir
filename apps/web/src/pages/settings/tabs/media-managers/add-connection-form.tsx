@@ -31,13 +31,12 @@ const KIND_BLURBS: Record<MediaManagerKind, string> = {
 
 type FormState = {
   kind: MediaManagerKind;
-  name: string;
   base_url: string;
   api_key: string;
 };
 
 function emptyForm(kind: MediaManagerKind): FormState {
-  return { kind, name: "", base_url: "", api_key: "" };
+  return { kind, base_url: "", api_key: "" };
 }
 
 export function AddConnectionForm({
@@ -93,15 +92,6 @@ export function AddConnectionForm({
                 </select>
               </Field>
             ) : null}
-            <Field label="Name" width="medium">
-              <input
-                data-testid="media-manager-name"
-                className="mm-input"
-                value={form.name}
-                placeholder="Deluno"
-                onChange={(e) => change("name", e.target.value)}
-              />
-            </Field>
           </div>
           <Field
             label="Where to find it"
@@ -142,7 +132,7 @@ export function AddConnectionForm({
             type="submit"
             data-testid="media-manager-save"
             className={mmActionButtonClass({ variant: "primary" })}
-            disabled={create.isPending || !form.name.trim()}
+            disabled={create.isPending || !form.base_url.trim()}
           >
             {create.isPending ? "Adding…" : "Add"}
           </button>

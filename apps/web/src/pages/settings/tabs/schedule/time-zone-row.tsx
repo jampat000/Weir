@@ -70,7 +70,6 @@ export function TimeZoneRow({
           data-testid="schedule-save-timezone"
           onClick={() =>
             save.mutate({
-              product_display_name: settings.product_display_name,
               signed_in_home_notice: settings.signed_in_home_notice,
               setup_wizard_state: settings.setup_wizard_state,
               app_timezone: zone,

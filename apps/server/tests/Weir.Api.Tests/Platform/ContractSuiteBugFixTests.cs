@@ -154,9 +154,9 @@ public sealed class ContractSuiteBugFixTests
         Assert.Equal(HttpStatusCode.OK, logs.StatusCode);
         Assert.Equal("bad byte � here", (await Json(logs))["items"]![0]!["message"]!.GetValue<string>());
 
-        using var put = await client.PutAsync("/api/v1/suite/settings", new { csrf_token = await client.CsrfAsync(), product_display_name = "Still Saves", app_timezone = "UTC", log_retention_days = 7 });
+        using var put = await client.PutAsync("/api/v1/suite/settings", new { csrf_token = await client.CsrfAsync(), app_timezone = "UTC", log_retention_days = 7 });
         Assert.Equal(HttpStatusCode.OK, put.StatusCode);
-        Assert.Equal("Still Saves", (await Json(put))["product_display_name"]!.GetValue<string>());
+        Assert.Equal(7, (await Json(put))["log_retention_days"]!.GetValue<int>());
         Assert.Equal(7, await TestDatabase.ScalarAsync(server, "SELECT log_retention_days FROM suite_settings WHERE id = 1"));
     }
 }

@@ -43,6 +43,20 @@ Open `http://localhost:9347/` and create your account.
 No `.env` file or secrets are required to get started — Weir generates its own session secret on
 first start and keeps it in that same volume.
 
+## What Weir calls itself
+
+Weir is named after the machine it runs on: the browser tab, the sidebar, System › About and its
+alerts say "Weir on my-server". There is nothing to type. In Docker, the machine is the container,
+and Docker gives a container a random name unless you set one, so add `hostname:`:
+
+```yaml
+services:
+  weir:
+    hostname: my-server   # what Weir calls itself
+```
+
+Without it, System › About shows a reminder to set one.
+
 ## With your media folders
 
 Weir can only clean files it can see, so give it your media folders. This is the setup most

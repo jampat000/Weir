@@ -165,5 +165,5 @@ def seed_notifications_and_connections(conn: sqlite3.Connection) -> None:
         "INSERT INTO media_manager_connections (kind, name, enabled, base_url, last_connection_test_ok, "
         "last_connection_test_at, last_connection_test_detail) "
         "VALUES (?, ?, ?, ?, ?, datetime('now', '-14 minutes'), ?)",
-        ("sonarr", "Sonarr (main)", 1, "http://127.0.0.1:8989", 1, "Reachable, 214 series"),
+        ("sonarr", "Sonarr on 127.0.0.1", 1, "http://127.0.0.1:8989", 1, "Reachable, 214 series"),
     )

@@ -31,7 +31,6 @@ public sealed class DownloadClientConnectionException : Exception
 /// </summary>
 public sealed class DownloadClientConnectionService
 {
-    private const string NeedsNameMessage = "Give the connection a name so you can tell it apart later.";
     private const string NeedsApiKeyMessage = "SABnzbd needs an API key. Find it in SABnzbd under Config → General.";
     private const string NeedsPasswordMessage = "Deluge needs its Web UI password.";
 
@@ -48,20 +47,9 @@ public sealed class DownloadClientConnectionService
 
     /// <summary>Create a connection. Throws <see cref="DownloadClientConnectionException"/> for an operator mistake.</summary>
     public async Task<long> CreateAsync(
-        UnitOfWork uow, string kind, string name, string baseUrl = "", string? username = null, string? password = null, string? apiKey = null, bool enabled = true)
+        UnitOfWork uow, string kind, string baseUrl = "", string? username = null, string? password = null, string? apiKey = null, bool enabled = true)
     {
         ArgumentNullException.ThrowIfNull(uow);
-        var label = WireStrings.Strip(name ?? string.Empty);
-        if (label.Length == 0)
-        {
-            throw new DownloadClientConnectionException(NeedsNameMessage);
-        }
-
-        if (await _store.NameExistsAsync(uow, label).ConfigureAwait(false))
-        {
-            throw new DownloadClientConnectionException($"A connection named {WireStrings.Repr(label)} already exists.");
-        }
-
         var validKind = ValidateKind(kind);
         ValidateRequiredCredentialPresence(validKind, WireStrings.Strip(apiKey ?? string.Empty).Length > 0, WireStrings.Strip(password ?? string.Empty).Length > 0);
         var validUrl = ValidateBaseUrl(baseUrl);
@@ -69,7 +57,6 @@ public sealed class DownloadClientConnectionService
         return await _store.InsertAsync(
             uow,
             validKind,
-            label,
             enabled,
             validUrl,
             trimmedUsername.Length > 0 ? trimmedUsername : null,
@@ -81,7 +68,6 @@ public sealed class DownloadClientConnectionService
     public async Task UpdateAsync(
         UnitOfWork uow,
         DownloadClientConnectionRecord row,
-        string? name = null,
         string? baseUrl = null,
         string? username = null,
         string? password = null,
@@ -101,25 +87,6 @@ public sealed class DownloadClientConnectionService
         }
 
         var changes = new List<(string Column, object? Value)>();
-        if (name is not null)
-        {
-            var label = WireStrings.Strip(name);
-            if (label.Length == 0)
-            {
-                throw new DownloadClientConnectionException(NeedsNameMessage);
-            }
-
-            if (await _store.NameExistsAsync(uow, label, row.Id).ConfigureAwait(false))
-            {
-                throw new DownloadClientConnectionException($"A connection named {WireStrings.Repr(label)} already exists.");
-            }
-
-            if (label != row.Name)
-            {
-                changes.Add(("name", label));
-            }
-        }
-
         string? validatedBaseUrl = null;
         if (baseUrl is not null)
         {

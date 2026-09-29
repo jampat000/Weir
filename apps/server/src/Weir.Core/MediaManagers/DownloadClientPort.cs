@@ -27,18 +27,12 @@ public static class DownloadClientKinds
         [Transmission] = "Transmission",
     };
 
-    /// <summary>A connection's label, e.g. <c>"qBittorrent (Living room)"</c>; a connection named after its product is not repeated.</summary>
-    public static string LabelForConnection(string? kind, string? name)
-    {
-        var product = KindLabels.GetValueOrDefault(WireStrings.Strip(kind ?? string.Empty).ToLowerInvariant(), "Download client");
-        var label = WireStrings.Strip(name ?? string.Empty);
-        if (label.Length == 0)
-        {
-            return product;
-        }
+    /// <summary>The product a kind is, as people know it: "SABnzbd", "qBittorrent".</summary>
+    public static string ProductLabel(string? kind) =>
+        KindLabels.GetValueOrDefault(WireStrings.Strip(kind ?? string.Empty).ToLowerInvariant(), "Download client");
 
-        return string.Equals(label, product, StringComparison.OrdinalIgnoreCase) ? label : $"{product} ({label})";
-    }
+    /// <summary>A connection's label; see <see cref="ConnectionLabels.For"/>.</summary>
+    public static string LabelForConnection(string? kind, string? name) => ConnectionLabels.For(ProductLabel(kind), name);
 }
 
 /// <summary>
