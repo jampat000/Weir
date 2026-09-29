@@ -40,6 +40,9 @@ public interface IManagerHttpHandlerFactory
 /// handler resolves its target host and connects only to an address <see cref="ManagerAddressPolicy"/> allows,
 /// pinning the connection to that address so the check cannot be defeated by the name resolving differently a
 /// moment later (DNS rebinding) — the same defence <see cref="ExternalJsonPoster"/> uses for outbound notifications.
+/// Handlers keep no cookies: they are shared by every connection, and a cookie jar keyed by host would hand one
+/// connection's session to another on the same host and to its own next login (#856). A dialect that needs a
+/// session cookie reads Set-Cookie and sends the Cookie header itself.
 /// </summary>
 public sealed class SocketsManagerHttpHandlerFactory : IManagerHttpHandlerFactory, IDisposable
 {
@@ -73,6 +76,7 @@ public sealed class SocketsManagerHttpHandlerFactory : IManagerHttpHandlerFactor
         Func<NetAddress, bool> isAllowed = policy == ManagerAddressPolicy.Public ? OutboundAddressGuard.IsPublic : OutboundAddressGuard.IsLocalServiceAddress;
         return new SocketsHttpHandler
         {
+            UseCookies = false,
             AllowAutoRedirect = followRedirects,
             MaxAutomaticRedirections = followRedirects ? 10 : 1,
             PooledConnectionLifetime = TimeSpan.FromMinutes(2),
