@@ -1,9 +1,10 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { afterEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
 import * as authQueries from "../../../../lib/auth/queries";
+import * as librariesApi from "../../../../lib/processing/libraries-api";
 import * as ruleSetsApi from "../../../../lib/processing/rule-sets-api";
 import type { ProcessingRuleSet } from "../../../../lib/processing/rule-sets-api";
 import * as providerApi from "../../../../lib/processing/metadata-provider-api";
@@ -64,42 +65,30 @@ function wrapper({ children }: { children: ReactNode }) {
   return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
 }
 
+// The tab lists the libraries using each profile; unstubbed, that is a real request to the test host.
+beforeEach(() => {
+  vi.spyOn(librariesApi, "fetchProcessingLibraries").mockResolvedValue([]);
+});
+
 afterEach(() => {
   vi.restoreAllMocks();
 });
 
-it("edits ordered rules, original-language behavior, metadata cleanup, and the provider", async () => {
+function stubEditableProfile() {
   vi.spyOn(authQueries, "useMeQuery").mockReturnValue({
     data: { role: "operator" },
   } as ReturnType<typeof authQueries.useMeQuery>);
   vi.spyOn(ruleSetsApi, "fetchProcessingRuleSets").mockResolvedValue([ruleSet]);
-  const update = vi
-    .spyOn(ruleSetsApi, "updateProcessingRuleSet")
-    .mockResolvedValue({
-      ...ruleSet,
-      keep_original_language: true,
-      remove_images: true,
-    });
   vi.spyOn(providerApi, "fetchProcessingMetadataProvider").mockResolvedValue({
     provider: "",
     base_url: "https://api.themoviedb.org/3",
     key_configured: false,
     known_providers: ["tmdb"],
   });
-  const saveProvider = vi
-    .spyOn(providerApi, "putProcessingMetadataProvider")
-    .mockResolvedValue({
-      provider: "tmdb",
-      base_url: "https://api.themoviedb.org/3",
-      key_configured: true,
-      known_providers: ["tmdb"],
-    });
-  const testProvider = vi
-    .spyOn(providerApi, "testProcessingMetadataProvider")
-    .mockResolvedValue({
-      status: "matched",
-      detail: "TMDb answered successfully.",
-    });
+}
+
+it("lays the profile out as audio, subtitles, original language and cleanup, with track ordering on request", async () => {
+  stubEditableProfile();
 
   render(<RulesTab />, { wrapper });
 
@@ -131,6 +120,21 @@ it("edits ordered rules, original-language behavior, metadata cleanup, and the p
   expect(screen.getByText("Audio order")).toBeInTheDocument();
   expect(screen.getByText("Subtitle order")).toBeInTheDocument();
   expect(screen.getByDisplayValue(">=5.1")).toBeInTheDocument();
+});
+
+it("saves every edited rule with the profile", async () => {
+  stubEditableProfile();
+  const update = vi
+    .spyOn(ruleSetsApi, "updateProcessingRuleSet")
+    .mockResolvedValue({
+      ...ruleSet,
+      keep_original_language: true,
+      remove_images: true,
+    });
+
+  render(<RulesTab />, { wrapper });
+
+  await screen.findByRole("heading", { name: "Audio" });
 
   fireEvent.click(
     screen.getByRole("checkbox", { name: /Keep the original language/ }),
@@ -214,8 +218,28 @@ it("edits ordered rules, original-language behavior, metadata cleanup, and the p
   expect(sentRuleSet).not.toHaveProperty("id");
   expect(sentRuleSet).not.toHaveProperty("used_by_library_count");
   expect(sentRuleSet).not.toHaveProperty("updated_at");
+});
 
-  fireEvent.click(screen.getByRole("button", { name: "Configure →" }));
+it("saves the metadata provider and reports whether it answered", async () => {
+  stubEditableProfile();
+  const saveProvider = vi
+    .spyOn(providerApi, "putProcessingMetadataProvider")
+    .mockResolvedValue({
+      provider: "tmdb",
+      base_url: "https://api.themoviedb.org/3",
+      key_configured: true,
+      known_providers: ["tmdb"],
+    });
+  const testProvider = vi
+    .spyOn(providerApi, "testProcessingMetadataProvider")
+    .mockResolvedValue({
+      status: "matched",
+      detail: "TMDb answered successfully.",
+    });
+
+  render(<RulesTab />, { wrapper });
+
+  fireEvent.click(await screen.findByRole("button", { name: "Configure →" }));
   fireEvent.change(screen.getByRole("combobox", { name: "Provider" }), {
     target: { value: "tmdb" },
   });
