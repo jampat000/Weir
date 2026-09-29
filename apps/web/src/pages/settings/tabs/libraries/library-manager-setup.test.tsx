@@ -42,14 +42,14 @@ const deluno: ProcessingManagerSetupItem = {
   name: "Deluno",
   label: "Deluno",
   flow: "handoff",
-  ready: false,
+  ready: true,
   mapping: null,
   suggested_watched_folder: "/media/downloads/complete/tv",
   suggested_output_folder: "/media/downloads/weir/tv",
   lines: [
     {
-      state: "problem",
-      text: "TV's downloads arrive in /media/downloads/complete/tv, which is not inside the watched folder, so Weir would refuse its hand-offs. Use Deluno's folders.",
+      state: "unverified",
+      text: "Deluno reports TV's downloads in /media/downloads/complete/tv, which isn't inside this workflow's watched folder /media/tv as Weir sees it. If Deluno has a path mapping from /media/downloads/complete to /media (Settings › Media Management › Processing Workflow › Weir › Path mappings), this is fine. Otherwise set the watched folder to /media/downloads/complete/tv.",
     },
   ],
 };
@@ -224,7 +224,7 @@ it("does not suggest a Sonarr download client folder that is already the watched
   ).not.toBeInTheDocument();
 });
 
-it("tells a Deluno workflow there is nothing to map and offers Deluno's own folders", async () => {
+it("offers a linked Deluno workflow Deluno's own folders, with no mapping table", async () => {
   setup([deluno]);
   const onUseFolders = vi.fn();
 
