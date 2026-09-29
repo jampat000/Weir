@@ -16,6 +16,12 @@ public interface IFolderProbe
     bool CanWrite(string path);
 
     /// <summary>
+    /// The folder's location once every junction, symbolic link and mount alias on the way is followed, or null when
+    /// Weir cannot tell from this machine (the folder is not visible here, or a link is broken).
+    /// </summary>
+    string? ResolveFinalPath(string path);
+
+    /// <summary>
     /// True or false when Weir can tell whether the two folders share a filesystem — the condition for a finished file to
     /// be moved into place rather than copied — and null when it cannot tell.
     /// </summary>
@@ -33,8 +39,9 @@ public static class LibraryFolderChainRules
 {
     /// <summary>
     /// Checks the watched, work and output folders in order. A blank folder produces one combined line rather than one
-    /// per missing folder (the library is still being set up); otherwise each folder gets its own existence/access line,
-    /// and the work and output folders also get a line about whether a finished file can move between them.
+    /// per missing folder (the library is still being set up); otherwise each folder gets its own existence/access line
+    /// (Weir lists and reads the watched and work folders, and lists, reads and writes the output folder), and the work
+    /// and output folders also get a line about whether a finished file can move between them.
     /// </summary>
     public static IReadOnlyList<SetupCheckLine> CheckLocalFolders(
         string watchedFolder, string workFolder, bool workFolderIsDefault, string outputFolder, IFolderProbe probe)
@@ -51,8 +58,8 @@ public static class LibraryFolderChainRules
 
         var lines = new List<SetupCheckLine>();
         lines.Add(FolderReadLine("watched", watched, probe));
-        lines.Add(WorkFolderExistsLine(work, workFolderIsDefault, probe));
-        lines.Add(FolderWriteLine("output", output, probe));
+        lines.Add(WorkFolderLine(work, workFolderIsDefault, probe));
+        lines.AddRange(OutputFolderLines(output, probe));
         lines.Add(SameFilesystemLine(work, output, probe));
         return lines;
     }
@@ -91,27 +98,35 @@ public static class LibraryFolderChainRules
             : new SetupCheckLine(SetupCheckLine.Problem, $"Weir cannot read the {label} folder {folder}. Check its permissions, or point this workflow at a folder Weir can read.");
     }
 
-    private static SetupCheckLine FolderWriteLine(string label, string folder, IFolderProbe probe)
+    /// <summary>
+    /// The output folder must exist, be listable and readable (a media manager imports from it) and take a write. A folder
+    /// Weir cannot list is not probed for writing: the probe file could be left behind, unremovable.
+    /// </summary>
+    private static IEnumerable<SetupCheckLine> OutputFolderLines(string folder, IFolderProbe probe)
     {
-        if (!probe.Exists(folder))
+        var readable = FolderReadLine("output", folder, probe);
+        if (readable.State != SetupCheckLine.Ok)
         {
-            return new SetupCheckLine(SetupCheckLine.Problem, $"The {label} folder {folder} does not exist. Create it, or point this workflow at a folder that does.");
+            yield return readable;
+            yield break;
         }
 
-        return probe.CanWrite(folder)
-            ? new SetupCheckLine(SetupCheckLine.Ok, $"Weir can write to the {label} folder {folder}.")
-            : new SetupCheckLine(SetupCheckLine.Problem, $"Weir cannot write to the {label} folder {folder}. Check its permissions, or point this workflow at a folder Weir can write to.");
+        yield return probe.CanWrite(folder)
+            ? new SetupCheckLine(SetupCheckLine.Ok, $"Weir can read and write the output folder {folder}.")
+            : new SetupCheckLine(SetupCheckLine.Problem, $"Weir cannot write to the output folder {folder}. Check its permissions, or point this workflow at a folder Weir can write to.");
     }
 
     /// <summary>
-    /// The work folder's own existence line: a custom work folder must exist like any other, but the default one (under
+    /// The work folder's line: a custom work folder must exist and be readable like any other, but the default one (under
     /// Weir's home) is created the first time it is needed, so it not existing yet is not a problem.
     /// </summary>
-    private static SetupCheckLine WorkFolderExistsLine(string work, bool workFolderIsDefault, IFolderProbe probe)
+    private static SetupCheckLine WorkFolderLine(string work, bool workFolderIsDefault, IFolderProbe probe)
     {
         if (probe.Exists(work))
         {
-            return new SetupCheckLine(SetupCheckLine.Ok, $"Weir can use the work folder {work}.");
+            return probe.CanRead(work)
+                ? new SetupCheckLine(SetupCheckLine.Ok, $"Weir can read the work folder {work}.")
+                : new SetupCheckLine(SetupCheckLine.Problem, $"Weir cannot read the work folder {work}. Check its permissions, or point this workflow's work folder at one Weir can read.");
         }
 
         return workFolderIsDefault
