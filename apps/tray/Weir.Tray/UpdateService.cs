@@ -4,7 +4,7 @@ using Velopack.Sources;
 namespace Weir.Tray;
 
 /// <summary>Checks for, downloads and applies Weir updates from the GitHub releases, through Velopack.</summary>
-sealed class UpdateService
+sealed class UpdateService : IUpdateService
 {
     internal const string GitHubRepo = "https://github.com/jampat000/Weir";
 
@@ -14,10 +14,10 @@ sealed class UpdateService
     private volatile bool _downloaded;
     private volatile int _downloadProgress;
 
-    internal bool HasPendingUpdate => _pendingUpdate is not null;
-    internal bool IsDownloaded => _downloaded;
+    public bool HasPendingUpdate => _pendingUpdate is not null;
+    public bool IsDownloaded => _downloaded;
     internal int DownloadProgress => _downloadProgress;
-    internal string? PendingVersion => _pendingUpdate?.TargetFullRelease?.Version?.ToString();
+    public string? PendingVersion => _pendingUpdate?.TargetFullRelease?.Version?.ToString();
 
     internal UpdateService(Action<string> log)
     {
@@ -26,11 +26,11 @@ sealed class UpdateService
         _mgr = new UpdateManager(source);
     }
 
-    internal bool IsInstalled => _mgr.IsInstalled;
+    public bool IsInstalled => _mgr.IsInstalled;
 
     // Velopack reports every failure (network, GitHub, disk) as an exception; each one means "no update this time"
     // and is logged, so these return false rather than throw.
-    internal async Task<bool> CheckForUpdateAsync()
+    public async Task<bool> CheckForUpdateAsync()
     {
         try
         {
@@ -56,7 +56,7 @@ sealed class UpdateService
         }
     }
 
-    internal async Task<bool> DownloadUpdateAsync()
+    public async Task<bool> DownloadUpdateAsync()
     {
         var pending = _pendingUpdate;
         if (pending is null)
@@ -85,7 +85,35 @@ sealed class UpdateService
     /// </summary>
     internal static string[] RestartArguments() => [Program.NoBrowserArgument];
 
-    internal void ApplyAndRestart()
+    public string? FindUpdateLeftWaiting()
+    {
+        if (!IsInstalled)
+        {
+            return null;
+        }
+        try
+        {
+            return _mgr.UpdatePendingRestart?.Version?.ToString();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            _log($"Could not look for an update left waiting: {ex.Message}");
+            return null;
+        }
+    }
+
+    public void ApplyAndExit()
+    {
+        var pending = _pendingUpdate;
+        if (!_downloaded || pending is null)
+        {
+            return;
+        }
+        _log($"Applying update v{pending.TargetFullRelease.Version} and exiting...");
+        _mgr.ApplyUpdatesAndExit(pending.TargetFullRelease);
+    }
+
+    public void ApplyAndRestart()
     {
         var pending = _pendingUpdate;
         if (!_downloaded || pending is null)
@@ -96,14 +124,14 @@ sealed class UpdateService
         _mgr.ApplyUpdatesAndRestart(pending.TargetFullRelease, RestartArguments());
     }
 
-    internal void ApplyOnExit()
+    public void ApplyLeftWaitingUpdateAndRestart()
     {
-        var pending = _pendingUpdate;
-        if (!_downloaded || pending is null)
+        var waiting = _mgr.UpdatePendingRestart;
+        if (waiting is null)
         {
             return;
         }
-        _log($"Scheduling update v{pending.TargetFullRelease.Version} to apply on exit...");
-        _mgr.WaitExitThenApplyUpdates(pending.TargetFullRelease, silent: true, restart: true, RestartArguments());
+        _log($"Applying update v{waiting.Version} left waiting, and restarting...");
+        _mgr.WaitExitThenApplyUpdates(waiting, silent: true, restart: true, RestartArguments());
     }
 }
