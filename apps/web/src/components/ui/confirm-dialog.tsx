@@ -1,10 +1,10 @@
 /**
  * The confirmation in front of an action that cannot be undone (#599). Focus lands on the cancel
- * button, so Enter on a freshly opened dialog keeps things as they are; Escape cancels, except
- * mid-request. `title` names the thing acted on: "Remove this connection?" is useless with three
- * on screen.
+ * button, or on `initialFocus` when the dialog first asks for a choice, so Enter on a freshly opened
+ * dialog keeps things as they are; Escape cancels, except mid-request. `title` names the thing acted
+ * on: "Remove this connection?" is useless with three on screen.
  */
-import { useId, useRef, type ReactNode } from "react";
+import { useId, useRef, type ReactNode, type RefObject } from "react";
 
 import { mmActionButtonClass } from "../../lib/ui/mm-control-roles";
 import { ModalDialog } from "./modal-dialog";
@@ -16,6 +16,8 @@ export function ConfirmDialog({
   cancelLabel = "Keep it",
   busy = false,
   busyLabel = "Removing…",
+  confirmDisabled = false,
+  initialFocus,
   error = null,
   testId,
   onCancel,
@@ -29,6 +31,10 @@ export function ConfirmDialog({
   cancelLabel?: string;
   busy?: boolean;
   busyLabel?: string;
+  /** True while the person still has to choose something before the action makes sense. */
+  confirmDisabled?: boolean;
+  /** A safe control to focus instead of the cancel button, such as the first choice being asked for. */
+  initialFocus?: RefObject<HTMLElement | null>;
   error?: string | null;
   testId: string;
   onCancel: () => void;
@@ -44,7 +50,7 @@ export function ConfirmDialog({
       onClose={onCancel}
       busy={busy}
       describedBy={description ? descriptionId : undefined}
-      initialFocus={cancelRef}
+      initialFocus={initialFocus ?? cancelRef}
     >
       {description ? (
         <div id={descriptionId} className="mm-modal__body space-y-2">
@@ -71,7 +77,7 @@ export function ConfirmDialog({
           type="button"
           data-testid={`${testId}-confirm`}
           className={mmActionButtonClass({ variant: "primary" })}
-          disabled={busy}
+          disabled={busy || confirmDisabled}
           onClick={onConfirm}
         >
           {busy ? busyLabel : confirmLabel}
