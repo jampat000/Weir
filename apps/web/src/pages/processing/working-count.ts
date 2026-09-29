@@ -19,7 +19,7 @@ const COUNT_REFRESH_MS = 10_000;
 /**
  * How many files the Working lane is showing, for the sidebar. It reads the lane's own two lists and
  * counts them the way the lane does, so the two can never disagree; the server's count of jobs holding a
- * slot also includes scans and passes on a file that is still held back, which the lane does not show.
+ * slot covers every kind of job and every file state, which the lane does not show.
  * The lists share the page's cache, so on Processing this costs no extra request until the next refresh.
  */
 export function useWorkingCount(): number {
