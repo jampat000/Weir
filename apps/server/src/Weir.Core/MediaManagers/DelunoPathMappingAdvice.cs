@@ -2,8 +2,8 @@ namespace Weir.Core.MediaManagers;
 
 /// <summary>
 /// The fix text for a folder Deluno reports that is not the one Weir uses: either Deluno maps its path to Weir's, or Weir
-/// takes Deluno's path. Deluno applies its own path mappings on its side of a hand-off and does not publish them, so Weir
-/// cannot tell a mapped setup from a mistaken one and names both ways out.
+/// takes Deluno's path. <see cref="For"/> is for a Deluno that does not publish its path mappings, where Weir cannot tell a
+/// mapped setup from a mistaken one and names both ways out; the other members are for one that does.
 /// </summary>
 internal static class DelunoPathMappingAdvice
 {
@@ -21,6 +21,27 @@ internal static class DelunoPathMappingAdvice
     {
         var (from, to) = DifferingPrefixes(delunoPath, weirPath) ?? (delunoPath, weirPath);
         return $"If {managerLabel} has a path mapping from {from} to {to} ({MappingsMenu}), this is fine. Otherwise set {weirFolderRole} to {delunoPath}.";
+    }
+
+    /// <summary>
+    /// The fix for a folder that Deluno's own mapping translates, but not into the folder Weir uses: use the folder
+    /// Weir already receives, or correct the Weir side of the mapping.
+    /// </summary>
+    public static string WhenMappedElsewhere(string managerLabel, MappedPath folder, string weirFolderRole) =>
+        $"Set {weirFolderRole} to {folder.Path}, or correct the Weir folder of that path mapping in {managerLabel} ({MappingsMenu}).";
+
+    /// <summary>
+    /// The fix for a folder none of Deluno's mappings covers, naming the mappings it does have (or that it has none):
+    /// add the mapping, or use Deluno's folder.
+    /// </summary>
+    public static string WhenNoMappingCovers(
+        string managerLabel, IReadOnlyList<DelunoPathMapping> mappings, string delunoPath, string weirPath, string weirFolderRole)
+    {
+        var (from, to) = DifferingPrefixes(delunoPath, weirPath) ?? (delunoPath, weirPath);
+        var existing = mappings.Count == 0
+            ? $"{managerLabel} has no path mappings for Weir."
+            : $"None of {managerLabel}'s path mappings for Weir covers it ({string.Join("; ", mappings.Select(mapping => $"{mapping.DelunoPath} to {mapping.ProcessorPath}"))}).";
+        return $"{existing} Add a path mapping from {from} to {to} in {managerLabel} ({MappingsMenu}), or set {weirFolderRole} to {delunoPath}.";
     }
 
     /// <summary>

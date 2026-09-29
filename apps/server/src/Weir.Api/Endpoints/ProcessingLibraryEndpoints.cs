@@ -181,7 +181,7 @@ internal sealed class ProcessingLibraryEndpointHandlers
 
         var uow = await request.DbAsync().ConfigureAwait(false);
         var managers = await _managerSetupCheck
-            .CheckAsync(uow, mediaType, watchedFolder, outputFolder, linkedConnectionIds, removesOriginals, request.Context.RequestAborted)
+            .CheckAsync(uow, mediaType, watchedFolder, outputFolder, linkedConnectionIds, removesOriginals, cancellationToken: request.Context.RequestAborted)
             .ConfigureAwait(false);
         return ApiRoutes.Ok(new WireObject().Set("media_type", mediaType).Set("managers", new WireArray(managers.Select(item => (WireValue)item))));
     }
