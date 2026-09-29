@@ -37,7 +37,7 @@ import { FinishedLane } from "./finished-lane";
 import { EmptyLane, Lane, More } from "./lane";
 import { ArrivingCard, HandingCard, WaitingCard } from "./lane-cards";
 import { LeavingCard } from "./leaving-card";
-import { useLeavingCards } from "./leaving-cards";
+import { drawnIn, useLeavingCards } from "./leaving-cards";
 import {
   arrivingDeadline,
   buildLanes,
@@ -75,17 +75,18 @@ const HANDING_SHOWN = 4;
 
 // A running pass rewrites its progress row several times a second and every write reaches the
 // stream, so the lanes follow it closely and the totals, which only change when a file finishes,
-// follow it at a gentler pace.
+// follow it at a gentler pace. Just finished is read from the Activity entry a pass writes as it ends, so it
+// refreshes with the lanes: a file leaves them and lands there in the same step (#852).
 const LANE_KEYS = [
   processingKeys.fileList(FILES_QUERY),
   processingKeys.fileList(WORKING_FILES_QUERY),
   processingKeys.jobsInspectionList("active", ACTIVE_JOBS_LIMIT),
+  activityKeys.recent,
 ] as const;
 const TOTAL_KEYS = [
   processingKeys.overviewStats(TODAY_DAYS),
   processingKeys.filesAtOnce,
   processingKeys.jobsInspectionList("failed", FAILED_JOBS_LIMIT, true),
-  activityKeys.recent,
 ] as const;
 const LANE_THROTTLE_MS = 750;
 const TOTAL_THROTTLE_MS = 3_000;
@@ -175,6 +176,7 @@ export function ProcessingPage(): React.ReactElement {
   const [filter, setFilter] = useState<Filter>("all");
   // From the unfiltered lanes, so narrowing the page to one kind of file is never taken for a file leaving.
   const leaving = useLeavingCards(
+    lanes.waiting,
     lanes.working,
     lanes.handing,
     files.data?.files ?? NO_FILES,
@@ -225,7 +227,7 @@ export function ProcessingPage(): React.ReactElement {
   const working = lanes.working.filter(shows);
   const handing = lanes.handing.filter(shows);
   const leavingIn = (lane: "working" | "handing") =>
-    leaving.filter((card) => card.lane === lane && shows(card));
+    leaving.filter((card) => drawnIn(card) === lane && shows(card));
   const leavingWorking = leavingIn("working");
   const leavingHanding = leavingIn("handing");
   const lanesAtOnce = filesAtOnce.data?.effective_files_at_once ?? null;

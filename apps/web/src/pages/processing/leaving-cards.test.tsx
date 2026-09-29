@@ -13,7 +13,7 @@ import {
   useLeavingCards,
   type ShownCard,
 } from "./leaving-cards";
-import type { WorkingItem } from "./processing-model";
+import type { WaitingItem, WorkingItem } from "./processing-model";
 
 const START = 1_000_000;
 
@@ -198,6 +198,64 @@ describe("advance", () => {
     expect(state.departures).toHaveLength(0);
   });
 
+  describe("a card that leaves Waiting", () => {
+    const fromWaiting = advance(
+      NO_LEAVING_CARDS,
+      [shown(1, { lane: "waiting", step: "checking" })],
+      [file(1, "unprocessed")],
+      START,
+    );
+
+    it("ends with every step ticked when the file went straight to processed", () => {
+      const state = advance(
+        fromWaiting,
+        [],
+        [file(1, "processed")],
+        START + 500,
+      );
+
+      expect(endedCards(state)).toMatchObject([
+        { lane: "waiting", outcome: { kind: "done" } },
+      ]);
+    });
+
+    it("ends at the first step when the file failed without ever being seen working", () => {
+      const state = advance(
+        fromWaiting,
+        [],
+        [file(1, "processing_failed", { status_reason: "It would not open." })],
+        START + 500,
+      );
+
+      expect(endedCards(state)).toMatchObject([
+        {
+          outcome: {
+            kind: "failed",
+            at: "checking",
+            reason: "It would not open.",
+          },
+        },
+      ]);
+    });
+
+    it("shows nothing when the file went on hold", () => {
+      const state = advance(fromWaiting, [], [file(1, "on_hold")], START + 500);
+
+      expect(state.departures).toHaveLength(0);
+    });
+
+    it("shows nothing when the file simply moved on to Working", () => {
+      const state = advance(
+        fromWaiting,
+        [shown(1)],
+        [file(1, "processing")],
+        START + 500,
+      );
+
+      expect(state.departures).toHaveLength(0);
+    });
+  });
+
   it("shows nothing for a card that only moved from Working to Handing back", () => {
     const state = advance(
       before,
@@ -258,10 +316,28 @@ describe("shownCards", () => {
     } as WorkingItem;
     const clean = { ...working, key: "job-9", file: null } as WorkingItem;
 
-    const cards = shownCards([working, clean], []);
+    const cards = shownCards([], [working, clean], []);
 
     expect(cards.map((card) => [card.key, card.lane])).toEqual([
       ["file-1", "working"],
+    ]);
+  });
+
+  it("follows a waiting file from the first step, and not a waiting library clean", () => {
+    const waiting = {
+      key: "file-2",
+      source: "download",
+      name: "Two",
+      path: "two.mkv",
+      libraryName: "TV",
+      file: file(2, "unprocessed"),
+    } as WaitingItem;
+    const clean = { ...waiting, key: "job-9", file: null } as WaitingItem;
+
+    const cards = shownCards([waiting, clean], [], []);
+
+    expect(cards.map((card) => [card.key, card.lane, card.step])).toEqual([
+      ["file-2", "waiting", "checking"],
     ]);
   });
 });
@@ -283,7 +359,7 @@ describe("useLeavingCards", () => {
   it("keeps a finished card for about two and a half seconds, then lets it drop", () => {
     const one = working(1);
     const { result, rerender } = renderHook(
-      ({ items, files }) => useLeavingCards(items, [], files),
+      ({ items, files }) => useLeavingCards([], items, [], files),
       {
         initialProps: {
           items: [one],
@@ -307,7 +383,7 @@ describe("useLeavingCards", () => {
   it("shows a failure at the step it failed on", () => {
     const one = working(1);
     const { result, rerender } = renderHook(
-      ({ items, files }) => useLeavingCards(items, [], files),
+      ({ items, files }) => useLeavingCards([], items, [], files),
       { initialProps: { items: [one], files: [file(1, "processing")] } },
     );
 

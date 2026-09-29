@@ -9,7 +9,7 @@ import { FLOW_DONE } from "./stage-flow-model";
 const DONE_NOTE = "Done. It moves to Just finished.";
 
 /**
- * A card for the moment after its file has left Working or Handing back: the same names, with the flow drawn
+ * A card for the moment after its file has left Waiting, Working or Handing back: the same names, with the flow drawn
  * at its end. A finished file has every step ticked; a failed or rejected one marks the step it stopped at
  * and says why. It stays only a few seconds, while the file appears in Just finished or Needs you.
  */
