@@ -12,6 +12,11 @@ import {
   type ProcessingFileLogEntry,
 } from "../../lib/processing/files-api";
 import { useProcessingFileLogQuery } from "../../lib/processing/files-queries";
+import { useProcessingLibrariesQuery } from "../../lib/processing/libraries-queries";
+import {
+  workflowKindName,
+  type WorkflowKind,
+} from "../../lib/processing/workflow-kind";
 import { historyGroupOf } from "./history-entries";
 import { HistoryFileActions } from "./history-file-actions";
 import { SizeFigures, WorkingFigures } from "./history-figures";
@@ -25,10 +30,21 @@ import {
 import { PassRecord } from "./history-pass";
 import { useNarrowDetailFocus } from "./use-narrow-detail-focus";
 
+/** The kind of workflow the file belongs to; null until the workflows are known, so nothing is said wrongly meanwhile. */
+function useWorkflowKindOf(file: ProcessingFile): WorkflowKind["kind"] | null {
+  const libraries = useProcessingLibrariesQuery();
+  if (!libraries.data) return null;
+  const library = libraries.data.find((item) => item.id === file.library_id);
+  return library ? workflowKindName(library) : "linked";
+}
+
 function Guidance({ file, now }: { file: ProcessingFile; now: number }) {
   const pause = usePauseQuery();
+  const workflowKind = useWorkflowKindOf(file);
   const guidance = fileGuidance(file, pause.data?.paused === true);
-  const handedBack = handbackStory(file.handback, now);
+  const handedBack = workflowKind
+    ? handbackStory(file.handback, now, workflowKind)
+    : null;
   return (
     <>
       {guidance.title ? (

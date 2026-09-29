@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { MemoryRouter } from "react-router-dom";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   ProcessingFile,
   ProcessingFileLog,
@@ -74,10 +74,11 @@ vi.mock("../../lib/processing/files-queries", async (importOriginal) => {
     useSubmitProcessingManualPlan: () => mutation(),
   };
 });
+const libraries = [
+  { id: 1, name: "TV", media_type: "tv", manager_connection_ids: [1] },
+];
 vi.mock("../../lib/processing/libraries-queries", () => ({
-  useProcessingLibrariesQuery: () => ({
-    data: [{ id: 1, name: "TV", media_type: "tv" }],
-  }),
+  useProcessingLibrariesQuery: () => ({ data: libraries }),
 }));
 vi.mock("../../lib/processing/kept-files-queries", () => ({
   useKeptFilesQuery: () => ({
@@ -278,6 +279,55 @@ describe("HistoryPage", () => {
     expect(within(detail).getByText("Spanish")).toBeInTheDocument();
     expect(within(detail).getByText("477 MB")).toBeInTheDocument();
     expect(within(detail).getByText("Handed back")).toBeInTheDocument();
+  });
+
+  describe("the copy Weir handed back", () => {
+    const handback = {
+      output_path: "/ready/tv/Northbound.S08E09.mkv",
+      written_at: "2026-08-19T04:00:00",
+      outcome: null,
+      outcome_by: null,
+      outcome_at: null,
+      imported_path: null,
+      outcome_reason: null,
+      released_at: null,
+      settled_at: null,
+      release_note: null,
+    };
+    const originalLinks = libraries[0].manager_connection_ids;
+
+    beforeEach(() => {
+      fetchLog.mockResolvedValue({
+        file_id: 1,
+        relative_path: "",
+        retention_days: 90,
+        entries: [],
+      });
+      files.files = [file({ id: 1, handback })];
+    });
+    afterEach(() => {
+      libraries[0].manager_connection_ids = originalLinks;
+    });
+
+    it("says a linked workflow's copy is waiting for its media manager to import it", async () => {
+      renderPage("/history?file=1");
+
+      expect(await screen.findByTestId("history-handback")).toHaveTextContent(
+        "for your media manager to import",
+      );
+    });
+
+    it("says a Weir-only workflow's copy is in the output folder, with nothing left to wait for", async () => {
+      libraries[0].manager_connection_ids = [];
+      renderPage("/history?file=1");
+
+      const story = await screen.findByTestId("history-handback");
+      expect(story).toHaveTextContent("Cleaned copy");
+      expect(story).toHaveTextContent(
+        "The cleaned copy is in the output folder, at /ready/tv/Northbound.S08E09.mkv.",
+      );
+      expect(story).not.toHaveTextContent(/import|media manager|yet/i);
+    });
   });
 
   it("says a file's record could not load, through the shared load-error wording", async () => {

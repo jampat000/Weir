@@ -5,6 +5,7 @@ using Weir.Core.Jobs;
 using Weir.Core.Json;
 using Weir.Core.Processing;
 using Weir.Core.Processing.RemuxPass;
+using Weir.Infrastructure.Activity;
 using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.Media;
 using Weir.Infrastructure.MediaManagers;
@@ -122,6 +123,26 @@ public sealed class RemuxPassHandlerTests : IDisposable
         Assert.Equal("processed|Finished processing this file.", await ScalarText("SELECT status || '|' || status_reason FROM files"));
         Assert.Equal(1, await _fixture.Store.Scalar("SELECT count(*) FROM file_logs WHERE outcome = 'live_output_written' AND library_name = 'Movies' AND file_id IS NOT NULL"));
         Assert.Equal(1, await _fixture.Store.Scalar("SELECT count(*) FROM files WHERE video_codec = 'h264' AND audio_track_count = 2 AND output_collision_action = 'write'"));
+    }
+
+    [Fact]
+    public async Task Claiming_a_file_tells_open_pages_before_any_work_on_it_begins()
+    {
+        // Checking and planning write no Activity row, so the claim is the only thing that can tell a Processing page the file
+        // has left Waiting until the write starts.
+        var library = await LibraryAsync();
+        _folders.Source(Path.Join("Movie", "file.mkv"));
+        _media.Probes["file.mkv"] = FakeMediaRunner.EnglishAndJapanese;
+        await FileRowAsync(library, "Movie/file.mkv", "unprocessed");
+        var payload = $$$"""{"relative_media_path":"Movie/file.mkv","media_scope":"movie","library_id":{{{library}}}}""";
+        var notifier = ActivityNotifications.For(_fixture.Store.Database);
+        var versionBefore = notifier.Snapshot().Version;
+        long? versionAtFirstWork = null;
+        _media.OnCall = () => versionAtFirstWork ??= notifier.Snapshot().Version;
+
+        await Handler().HandleAsync(Context(124, payload), CancellationToken.None);
+
+        Assert.True(versionAtFirstWork > versionBefore);
     }
 
     [Fact]
