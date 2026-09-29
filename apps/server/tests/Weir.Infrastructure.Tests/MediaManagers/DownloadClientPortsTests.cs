@@ -117,7 +117,49 @@ public sealed class DownloadClientPortsTests
         Assert.Equal("/downloads/complete", folders.CompletedFolder);
         Assert.Equal([new DownloadClientCategoryFolder("tv-sonarr", "/downloads/complete/tv")], folders.CategoryFolders);
         var categoriesRequest = http.RequestsTo(HttpMethod.Get, "/api/v2/torrents/categories").Single();
-        Assert.Equal("SID=abc123; HttpOnly", categoriesRequest.Headers["Cookie"]);
+        Assert.Equal("SID=abc123", categoriesRequest.Headers["Cookie"]);
+    }
+
+    [Fact]
+    public async Task QBittorrent_5_accepts_a_204_login_and_sends_its_QBT_SID_cookie_on_later_calls()
+    {
+        var http = new FakeManagerHttp()
+            .Route(HttpMethod.Post, "/api/v2/auth/login", _ => FakeManagerHttp.Response(HttpStatusCode.NoContent, null, ("Set-Cookie", "QBT_SID_8081=xyz789; HttpOnly; SameSite=Strict; path=/")))
+            .Json(HttpMethod.Get, "/api/v2/torrents/categories", """{"tv-sonarr":{"name":"tv-sonarr","savePath":"/downloads/complete/tv"}}""")
+            .Json(HttpMethod.Get, "/api/v2/app/preferences", """{"save_path":"/downloads/complete"}""");
+        var port = new QBittorrentPort(http);
+
+        var (ok, _) = await port.TestAsync(Connection(DownloadClientKinds.QBittorrent, username: "deluno", password: "right"));
+        var folders = await port.ReadFoldersAsync(Connection(DownloadClientKinds.QBittorrent, username: "deluno", password: "right"));
+
+        Assert.True(ok);
+        Assert.Equal("/downloads/complete", folders.CompletedFolder);
+        var laterRequests = http.Requests.Where(request => request.Uri.AbsolutePath != "/api/v2/auth/login").ToList();
+        Assert.Equal(3, laterRequests.Count);
+        Assert.All(laterRequests, request => Assert.Equal("QBT_SID_8081=xyz789", request.Headers["Cookie"]));
+    }
+
+    [Fact]
+    public async Task QBittorrent_refuses_a_login_answered_401()
+    {
+        var http = new FakeManagerHttp().Route(HttpMethod.Post, "/api/v2/auth/login", _ => FakeManagerHttp.Response(HttpStatusCode.Unauthorized));
+        var port = new QBittorrentPort(http);
+
+        var (ok, detail) = await port.TestAsync(Connection(DownloadClientKinds.QBittorrent, username: "admin", password: "wrong"));
+
+        Assert.False(ok);
+        Assert.Contains("username or password was refused", detail, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task QBittorrent_refuses_a_204_login_that_sets_no_session_cookie()
+    {
+        var http = new FakeManagerHttp().Route(HttpMethod.Post, "/api/v2/auth/login", _ => FakeManagerHttp.Response(HttpStatusCode.NoContent));
+        var port = new QBittorrentPort(http);
+
+        var (ok, _) = await port.TestAsync(Connection(DownloadClientKinds.QBittorrent, username: "admin", password: "wrong"));
+
+        Assert.False(ok);
     }
 
     [Fact]
