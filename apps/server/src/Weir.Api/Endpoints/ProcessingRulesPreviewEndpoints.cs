@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Weir.Core.Auth;
 using Weir.Core.Json;
 using Weir.Core.Media;
@@ -48,6 +49,8 @@ internal sealed class ProcessingRulesPreviewEndpointHandlers
         _originalLanguageLookup = originalLanguageLookup ?? throw new ArgumentNullException(nameof(originalLanguageLookup));
         _libraries = libraries ?? throw new ArgumentNullException(nameof(libraries));
     }
+
+    private static ILogger PreviewLogger(ApiRequest request) => request.LoggerFactory.CreateLogger("weir.processing.rules_preview");
 
     public async Task<ApiResult> PostPreviewAsync(ApiRequest request)
     {
@@ -194,7 +197,8 @@ internal sealed class ProcessingRulesPreviewEndpointHandlers
         catch (Exception exception) when (exception is not OperationCanceledException)
 #pragma warning restore CA1031
         {
-            throw new ApiException(StatusCodes.Status400BadRequest, $"ffprobe failed: {exception.Message}");
+            PreviewLogger(request).LogWarning(exception, "Reading {Path} with ffprobe failed for a rules preview.", resolvedPath);
+            throw new ApiException(StatusCodes.Status400BadRequest, "Weir could not read this file with ffprobe. Check it is a complete media file that Weir can open.");
         }
 
         var probe = new ProbeResult(probeJson);
@@ -289,7 +293,8 @@ internal sealed class ProcessingRulesPreviewEndpointHandlers
         catch (Exception exception) when (exception is not OperationCanceledException)
 #pragma warning restore CA1031
         {
-            lookup = new LookupResult { Status = LookupResult.StatusUnreachable, Detail = $"The metadata lookup failed ({exception.Message})." };
+            PreviewLogger(request).LogWarning(exception, "The original-language lookup failed for a rules preview.");
+            lookup = new LookupResult { Status = LookupResult.StatusUnreachable, Detail = "Weir could not look up the original language just now." };
         }
 
         var tracks = audio

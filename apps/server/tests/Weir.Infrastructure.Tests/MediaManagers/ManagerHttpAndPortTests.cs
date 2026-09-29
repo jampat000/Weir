@@ -121,7 +121,7 @@ public sealed class ManagerHttpAndPortTests
         var radarr = new HttpMediaManagerPorts(http).PortForKind("radarr")!;
         var down = await radarr.QueueRowsAsync(Connection(name: "4K"));
         Assert.Equal(SignalStatus.Unreachable, down.Status);
-        Assert.StartsWith("Weir could not reach Radarr (4K) to ask what it is importing (", down.Detail, StringComparison.Ordinal);
+        Assert.Equal("Weir could not reach Radarr (4K) at http://manager.local. Check the address is right, and that the app is running and reachable from this machine.", down.Detail);
 
         var refused = await radarr.DescribeAsync(Connection(name: "4K"));
         Assert.Equal(SignalStatus.Unreachable, refused.Status);

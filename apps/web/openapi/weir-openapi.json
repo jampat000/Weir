@@ -1151,7 +1151,7 @@
         "type": "object"
       },
       "DownloadClientSuggestionOut": {
-        "description": "One enabled download-client connection's suggested watched folder, shaped like the manager-based suggestions (see ManagerSetupItemOut) so both feed the same suggestion list in the library editor.",
+        "description": "One enabled download-client connection and the folder it saves finished downloads to, offered as a workflow's watched folder. It carries no verdict on whether that folder suits a workflow: the workflow's folder chain says so.",
         "properties": {
           "connection_id": {
             "title": "Connection Id",
@@ -1175,24 +1175,6 @@
           "label": {
             "title": "Label",
             "type": "string"
-          },
-          "flow": {
-            "enum": [
-              "download_client"
-            ],
-            "title": "Flow",
-            "type": "string"
-          },
-          "ready": {
-            "title": "Ready",
-            "type": "boolean"
-          },
-          "lines": {
-            "items": {
-              "$ref": "#/components/schemas/ManagerSetupLineOut"
-            },
-            "title": "Lines",
-            "type": "array"
           },
           "suggested_watched_folder": {
             "anyOf": [
@@ -1218,9 +1200,6 @@
           "kind",
           "name",
           "label",
-          "flow",
-          "ready",
-          "lines",
           "category_folders"
         ],
         "title": "DownloadClientSuggestionOut",

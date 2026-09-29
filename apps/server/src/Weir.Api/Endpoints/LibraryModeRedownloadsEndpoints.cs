@@ -166,7 +166,7 @@ internal sealed class LibraryModeRedownloadsEndpointHandlers
             return ApiRoutes.Ok(new WireObject()
                 .Set("path", path)
                 .Set("outcome", "failed")
-                .Set("message", $"Weir could not ask {connection.Label} to download this again: {exception.Message}"));
+                .Set("message", ManagerDialectRules.Unreachable(connection, exception, "whether it can download this again")));
         }
 
         var outcome = result.Outcome switch

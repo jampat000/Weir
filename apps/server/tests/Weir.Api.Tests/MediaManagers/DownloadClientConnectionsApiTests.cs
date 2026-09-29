@@ -142,8 +142,9 @@ public sealed class DownloadClientConnectionsApiTests
         using var response = await client.GetAsync($"{Suggestions}?media_type=movie");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var entry = Assert.Single((await Json(response))!.AsArray())!;
-        Assert.Equal("download_client", entry["flow"]!.GetValue<string>());
         Assert.Equal("/downloads/complete", entry["suggested_watched_folder"]!.GetValue<string>());
+        Assert.Null(entry["ready"]);
+        Assert.Null(entry["lines"]);
     }
 
     [Fact]
