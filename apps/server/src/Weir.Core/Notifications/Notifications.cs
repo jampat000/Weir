@@ -94,7 +94,8 @@ public static class NotificationRules
         .Set("supported_providers", new WireArray(SupportedProviders.Select(p => (WireValue)new WireString(p))));
 
     /// <summary>The JSON body posted to a generic webhook.</summary>
-    public static byte[] WebhookPayload(string jobEvent, string module, long jobId, string jobKind, string title, string detail, Timestamp now) =>
+    public static byte[] WebhookPayload(
+        string jobEvent, string module, long jobId, string jobKind, string title, string detail, Timestamp now, string machineName) =>
         WireJsonWriter.DumpsUtf8(
             new WireObject()
                 .Set("event", jobEvent)
@@ -104,11 +105,12 @@ public static class NotificationRules
                 .Set("title", title)
                 .Set("detail", detail)
                 .Set("timestamp", now.IsoFormat())
-                .Set("app", "Weir"),
+                .Set("app", "Weir")
+                .Set("machine_name", machineName),
             WireJsonFormat.Default);
 
     /// <summary>The JSON body posted to a Discord webhook: one embed, green for completed, red otherwise.</summary>
-    public static byte[] DiscordPayload(string title, string detail, string jobEvent, string module, long jobId, Timestamp now)
+    public static byte[] DiscordPayload(string title, string detail, string jobEvent, string module, long jobId, Timestamp now, string appName)
     {
         var color = jobEvent.Contains("completed", StringComparison.Ordinal) ? 0x2ECC71 : 0xE74C3C;
         var embed = new WireObject()
@@ -120,20 +122,16 @@ public static class NotificationRules
                 new WireObject().Set("name", "Module").Set("value", module).Set("inline", true),
                 new WireObject().Set("name", "Job ID").Set("value", jobId.ToString(CultureInfo.InvariantCulture)).Set("inline", true),
             ]))
-            .Set("footer", new WireObject().Set("text", "Weir"))
+            .Set("footer", new WireObject().Set("text", appName))
             .Set("timestamp", now.IsoFormat());
         return WireJsonWriter.DumpsUtf8(new WireObject().Set("embeds", new WireArray([embed])), WireJsonFormat.Default);
     }
 
     /// <summary>
-    /// Display names for module keys whose plain capitalization would not read as a person expects. The
-    /// "processing" module key stays as it is (it feeds the stored <c>{module}_job_{eventKind}</c> event name),
-    /// but operators know the app that runs it as Weir.
+    /// The module whose jobs are named after the app. Its key stays as it is (it feeds the stored
+    /// <c>{module}_job_{eventKind}</c> event name), but operators know the app that runs it as "Weir on RIG".
     /// </summary>
-    private static readonly Dictionary<string, string> ModuleDisplayNames = new(StringComparer.OrdinalIgnoreCase)
-    {
-        ["processing"] = "Weir",
-    };
+    private const string AppModule = "processing";
 
     /// <summary>
     /// The event name, title and detail of a job notification. <paramref name="willRetry"/> is
@@ -144,11 +142,13 @@ public static class NotificationRules
     /// instead of claiming retries are exhausted (#540), so the text is right even without the
     /// permanently-failed check the dispatcher applies.
     /// </remarks>
-    public static (string Event, string Title, string Detail) JobNotification(string module, string eventKind, long jobId, string jobKind, bool willRetry = false)
+    public static (string Event, string Title, string Detail) JobNotification(
+        string module, string eventKind, long jobId, string jobKind, string appName, bool willRetry = false)
     {
         ArgumentNullException.ThrowIfNull(module);
-        var capitalized = ModuleDisplayNames.TryGetValue(module, out var displayName)
-            ? displayName
+        ArgumentNullException.ThrowIfNull(appName);
+        var capitalized = string.Equals(module, AppModule, StringComparison.OrdinalIgnoreCase)
+            ? appName
             : module.Length == 0 ? module : char.ToUpperInvariant(module[0]) + module[1..].ToLowerInvariant();
         if (eventKind == "completed")
         {
@@ -166,7 +166,10 @@ public static class NotificationRules
 public sealed record SplitUrl(string Scheme, string Netloc, string Path, string Query, string Fragment)
 {
     /// <summary>The host: lower-cased, brackets removed, <see langword="null"/> when empty.</summary>
-    public string? Hostname
+    public string? Hostname => HostAsWritten?.ToLowerInvariant();
+
+    /// <summary>The host in the case it was typed, brackets removed, <see langword="null"/> when empty.</summary>
+    public string? HostAsWritten
     {
         get
         {
@@ -184,7 +187,7 @@ public sealed record SplitUrl(string Scheme, string Netloc, string Path, string 
                 host = colon < 0 ? hostinfo : hostinfo[..colon];
             }
 
-            return host.Length == 0 ? null : host.ToLowerInvariant();
+            return host.Length == 0 ? null : host;
         }
     }
 

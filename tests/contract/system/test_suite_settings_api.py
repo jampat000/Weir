@@ -29,14 +29,15 @@ def test_suite_settings_get_ok_for_viewer(server, client_factory) -> None:
     viewer = h.signed_in_viewer(server, client_factory)
     r = viewer.get(SETTINGS)
     assert r.status_code == 200, r.text
-    assert r.json()["product_display_name"] == "Weir"
+    assert "product_display_name" not in r.json()
 
 
 def test_suite_settings_get_default_shape(admin) -> None:
     r = admin.get(SETTINGS)
     assert r.status_code == 200, r.text
     body = r.json()
-    assert body["product_display_name"] == "Weir"
+    # Weir is named after the machine it runs on, so there is no name setting to read.
+    assert "product_display_name" not in body
     assert body["signed_in_home_notice"] is None
     # This module's install gained its users by seeding after first start, so the wizard
     # stayed at its first-run value.
@@ -93,7 +94,7 @@ def test_suite_settings_put_persists(server_factory, client_factory) -> None:
     r = admin.put_csrf(
         SETTINGS,
         {
-            "product_display_name": "House Library",
+            "product_display_name": "House Library",  # sent by an older client: accepted, not stored
             "signed_in_home_notice": "Welcome back.",
             "setup_wizard_state": "skipped",
             "app_timezone": "UTC",
@@ -104,7 +105,7 @@ def test_suite_settings_put_persists(server_factory, client_factory) -> None:
         },
     )
     assert r.status_code == 200, r.text
-    assert r.json()["product_display_name"] == "House Library"
+    assert "product_display_name" not in r.json()
     assert r.json()["signed_in_home_notice"] == "Welcome back."
     assert r.json()["setup_wizard_state"] == "skipped"
     assert r.json()["log_retention_days"] == 45
@@ -114,13 +115,13 @@ def test_suite_settings_put_persists(server_factory, client_factory) -> None:
 
     r2 = admin.get(SETTINGS)
     assert r2.status_code == 200
-    assert r2.json()["product_display_name"] == "House Library"
+    assert r2.json()["signed_in_home_notice"] == "Welcome back."
 
     with seed.stopped(sut, restart=False) as conn:
         rows = seed.rows(conn, "SELECT * FROM suite_settings WHERE id = 1")
     assert len(rows) == 1
     row = rows[0]
-    assert row["product_display_name"] == "House Library"
+    assert row["product_display_name"] == "Weir"
     assert row["setup_wizard_state"] == "skipped"
     assert row["log_retention_days"] == 45
     assert bool(row["configuration_backup_enabled"]) is True
@@ -133,7 +134,6 @@ def test_suite_settings_put_viewer_forbidden(server, client_factory) -> None:
     r = viewer.put_csrf(
         SETTINGS,
         {
-            "product_display_name": "X",
             "signed_in_home_notice": None,
             "app_timezone": "UTC",
             "log_retention_days": 30,
@@ -142,25 +142,10 @@ def test_suite_settings_put_viewer_forbidden(server, client_factory) -> None:
     assert r.status_code == 403
 
 
-def test_apply_suite_settings_put_rejects_blank_name(admin) -> None:
-    r = admin.put_csrf(
-        SETTINGS,
-        {
-            "product_display_name": "   ",
-            "signed_in_home_notice": None,
-            "app_timezone": "UTC",
-            "log_retention_days": 30,
-        },
-    )
-    assert r.status_code == 400, r.text
-    assert "empty" in r.json()["detail"].lower()
-
-
 def test_apply_suite_settings_put_rejects_invalid_timezone(admin) -> None:
     r = admin.put_csrf(
         SETTINGS,
         {
-            "product_display_name": "Weir",
             "signed_in_home_notice": None,
             "app_timezone": "Not/A_Real_Zone",
             "log_retention_days": 30,
@@ -173,7 +158,6 @@ def test_apply_suite_settings_put_rejects_invalid_timezone(admin) -> None:
 def test_log_retention_does_not_prune_activity_history(server_factory, client_factory) -> None:
     sut = server_factory()
     body = {
-        "product_display_name": "Weir",
         "signed_in_home_notice": None,
         "app_timezone": "UTC",
         "log_retention_days": 30,
@@ -210,7 +194,6 @@ def test_suite_configuration_backup_tick_creates_snapshot(server_factory, client
     r = admin.put_csrf(
         SETTINGS,
         {
-            "product_display_name": "Weir",
             "signed_in_home_notice": None,
             "setup_wizard_state": "completed",
             "app_timezone": "UTC",

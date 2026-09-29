@@ -38,8 +38,8 @@ internal sealed class DownloadClientFixture : IDisposable
     public Task<T> Db<T>(Func<UnitOfWork, Task<T>> work, bool commit = true) => Store.WithUnitOfWork(work, commit);
 
     public Task<long> AddConnectionAsync(
-        string kind, string name, string baseUrl = "http://client.local", string? username = null, string? password = null, string? apiKey = null, bool enabled = true) =>
-        Db(uow => Connections.CreateAsync(uow, kind, name, baseUrl, username, password, apiKey, enabled));
+        string kind, string baseUrl = "http://client.local", string? username = null, string? password = null, string? apiKey = null, bool enabled = true) =>
+        Db(uow => Connections.CreateAsync(uow, kind, baseUrl, username, password, apiKey, enabled));
 
     public void Dispose() => Store.Dispose();
 }

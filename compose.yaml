@@ -19,6 +19,9 @@ services:
     # onto an untested release without you choosing to.
     image: ${WEIR_DOCKER_IMAGE:-ghcr.io/jampat000/weir:latest}
     pull_policy: always
+    # Weir is named after this hostname ("Weir on my-server"), so set it to your server's name.
+    # Without one, Docker names the container with twelve random characters.
+    # hostname: my-server
     ports:
       - "9347:9347"
       # Bind loopback-only instead, and put a reverse proxy in front for LAN/internet access:

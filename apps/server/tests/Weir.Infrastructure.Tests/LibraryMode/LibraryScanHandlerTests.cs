@@ -229,7 +229,7 @@ public sealed class LibraryScanHandlerTests : IDisposable
     {
         var library = await LibraryAsync();
         await _fixture.Db(async uow => { await _librarySettings.SetAsync(uow, library, new LibrarySettings([_libraryFolder.Path], false)); return true; });
-        await _fixture.AddConnectionAsync("radarr", "Radarr");
+        await _fixture.AddConnectionAsync("radarr");
 
         var path = _libraryFolder.Join("english-and-japanese.mkv");
         await File.WriteAllBytesAsync(path, [4, 5, 6]);
@@ -262,7 +262,7 @@ public sealed class LibraryScanHandlerTests : IDisposable
     {
         var library = await LibraryAsync();
         await _fixture.Db(async uow => { await _librarySettings.SetAsync(uow, library, new LibrarySettings([_libraryFolder.Path], false)); return true; });
-        await _fixture.AddConnectionAsync("radarr", "Radarr");
+        await _fixture.AddConnectionAsync("radarr");
 
         var path = _libraryFolder.Join("english-and-japanese.mkv");
         await File.WriteAllBytesAsync(path, [4, 5, 6]);
@@ -304,7 +304,7 @@ public sealed class LibraryScanHandlerTests : IDisposable
     {
         var library = await LibraryAsync();
         await _fixture.Db(async uow => { await _librarySettings.SetAsync(uow, library, new LibrarySettings([_libraryFolder.Path], false)); return true; });
-        await _fixture.AddConnectionAsync("radarr", "Radarr");
+        await _fixture.AddConnectionAsync("radarr");
 
         Directory.CreateDirectory(_libraryFolder.Join("Blade Runner 2049 (2017)"));
         var path = _libraryFolder.Join("Blade Runner 2049 (2017)", "movie.mkv");
@@ -332,7 +332,7 @@ public sealed class LibraryScanHandlerTests : IDisposable
     {
         var library = await LibraryAsync();
         await _fixture.Db(async uow => { await _librarySettings.SetAsync(uow, library, new LibrarySettings([_libraryFolder.Path], false)); return true; });
-        await _fixture.AddConnectionAsync("radarr", "Radarr");
+        await _fixture.AddConnectionAsync("radarr");
         // No /api/v3/movie route is scripted: the fake HTTP client refuses the connection, which the manager
         // adapter reports as SignalStatus.Unreachable rather than throwing out of ListLibraryFilesAsync.
 

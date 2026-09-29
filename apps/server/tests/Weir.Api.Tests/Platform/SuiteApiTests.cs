@@ -37,8 +37,8 @@ public sealed class SuiteApiTests
         var viewer = new ApiTestClient(server);
         await viewer.SignInAsync("bob", ViewerPassword);
         using var read = await viewer.GetAsync("/api/v1/suite/settings");
-        Assert.Equal("Weir", (await Json(read))["product_display_name"]!.GetValue<string>());
-        using var write = await viewer.PutAsync("/api/v1/suite/settings", new { csrf_token = await viewer.CsrfAsync(), product_display_name = "X", signed_in_home_notice = (string?)null, app_timezone = "UTC", log_retention_days = 30 });
+        Assert.Equal(HttpStatusCode.OK, read.StatusCode);
+        using var write = await viewer.PutAsync("/api/v1/suite/settings", new { csrf_token = await viewer.CsrfAsync(), signed_in_home_notice = (string?)null, app_timezone = "UTC", log_retention_days = 30 });
         Assert.Equal(HttpStatusCode.Forbidden, write.StatusCode);
     }
 
@@ -50,6 +50,7 @@ public sealed class SuiteApiTests
         using var initial = await client.GetAsync("/api/v1/suite/settings");
         var body = await Json(initial);
         Assert.Null(body["signed_in_home_notice"]);
+        Assert.False(body.AsObject().ContainsKey("product_display_name"));
         Assert.Equal("pending", body["setup_wizard_state"]!.GetValue<string>());
         Assert.Equal(30, body["log_retention_days"]!.GetValue<int>());
         Assert.False(body["configuration_backup_enabled"]!.GetValue<bool>());
@@ -72,18 +73,16 @@ public sealed class SuiteApiTests
         });
         Assert.Equal(HttpStatusCode.OK, put.StatusCode);
         var saved = await Json(put);
-        Assert.Equal("House Library", saved["product_display_name"]!.GetValue<string>());
+        Assert.False(saved.AsObject().ContainsKey("product_display_name"));
         Assert.Equal("03:30", saved["configuration_backup_preferred_time"]!.GetValue<string>());
-        Assert.Equal("House Library", (await Json(await client.GetAsync("/api/v1/suite/settings")))["product_display_name"]!.GetValue<string>());
+        Assert.Equal("Welcome back.", (await Json(await client.GetAsync("/api/v1/suite/settings")))["signed_in_home_notice"]!.GetValue<string>());
+        Assert.Equal("Weir", await TestDatabase.ScalarStringAsync(server, "SELECT product_display_name FROM suite_settings WHERE id = 1"));
         Assert.Equal(45, await TestDatabase.ScalarAsync(server, "SELECT log_retention_days FROM suite_settings WHERE id = 1"));
         Assert.Equal(1, await TestDatabase.ScalarAsync(server, "SELECT configuration_backup_enabled FROM suite_settings WHERE id = 1"));
 
-        using var badZone = await client.PutAsync("/api/v1/suite/settings", new { csrf_token = await client.CsrfAsync(), product_display_name = "Weir", app_timezone = "Not/A_Real_Zone", log_retention_days = 30 });
+        using var badZone = await client.PutAsync("/api/v1/suite/settings", new { csrf_token = await client.CsrfAsync(), app_timezone = "Not/A_Real_Zone", log_retention_days = 30 });
         Assert.Equal(HttpStatusCode.BadRequest, badZone.StatusCode);
         Assert.Contains("timezone", (await Detail(badZone)).ToLowerInvariant(), StringComparison.Ordinal);
-        using var blank = await client.PutAsync("/api/v1/suite/settings", new { csrf_token = await client.CsrfAsync(), product_display_name = "   ", app_timezone = "UTC", log_retention_days = 30 });
-        Assert.Equal(HttpStatusCode.BadRequest, blank.StatusCode);
-        Assert.Contains("empty", (await Detail(blank)).ToLowerInvariant(), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -227,10 +226,10 @@ public sealed class SuiteApiTests
         older["pruner_server_instances"] = new JsonArray(new JsonObject { ["id"] = 1, ["provider"] = "plex" });
         using var put = await client.PutAsync("/api/v1/suite/configuration-bundle", new { csrf_token = await client.CsrfAsync(), bundle = older });
         Assert.Equal(HttpStatusCode.OK, put.StatusCode);
-        Assert.Equal("Restored From Older Backup", (await Json(put))["suite_settings"]!["product_display_name"]!.GetValue<string>());
+        Assert.Equal("Weir", await TestDatabase.ScalarStringAsync(server, "SELECT product_display_name FROM suite_settings WHERE id = 1"));
 
         using var restore = await client.PutAsync("/api/v1/suite/configuration-bundle", new { csrf_token = await client.CsrfAsync(), bundle });
-        Assert.Equal("Weir", (await Json(restore))["suite_settings"]!["product_display_name"]!.GetValue<string>());
+        Assert.Equal(HttpStatusCode.OK, restore.StatusCode);
 
         var bad = bundle.DeepClone().AsObject();
         bad["format_version"] = 999;
@@ -239,7 +238,7 @@ public sealed class SuiteApiTests
         var olderFormat = JsonNode.Parse(await File.ReadAllTextAsync(Path.Join(AppContext.BaseDirectory, "Fixtures", "bundle-v4.json")));
         using var fromOlder = await client.PutAsync("/api/v1/suite/configuration-bundle", new { csrf_token = await client.CsrfAsync(), bundle = olderFormat });
         Assert.Equal(HttpStatusCode.OK, fromOlder.StatusCode);
-        Assert.Equal("Exported By An Older Weir", (await Json(fromOlder))["suite_settings"]!["product_display_name"]!.GetValue<string>());
+        Assert.Equal("Weir", await TestDatabase.ScalarStringAsync(server, "SELECT product_display_name FROM suite_settings WHERE id = 1"));
     }
 
     /// <summary>
@@ -441,7 +440,7 @@ public sealed class SuiteApiTests
 
         using var createConnection = await operatorClient.PostAsync(
             "/api/v1/media-managers/connections",
-            new { csrf_token = await operatorClient.CsrfAsync(), kind = "sonarr", name = "Sonarr", base_url = "https://sonarr.example", api_key = "key" });
+            new { csrf_token = await operatorClient.CsrfAsync(), kind = "sonarr", base_url = "https://sonarr.example", api_key = "key" });
         Assert.Equal(HttpStatusCode.Forbidden, createConnection.StatusCode);
 
         using var adminStillWorks = await admin.GetAsync("/api/v1/system/directories");

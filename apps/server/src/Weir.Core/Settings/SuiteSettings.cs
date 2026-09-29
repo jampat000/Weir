@@ -9,7 +9,6 @@ namespace Weir.Core.Settings;
 /// <summary>The <c>suite_settings</c> singleton row (id = 1).</summary>
 public sealed record SuiteSettingsRecord
 {
-    public string ProductDisplayName { get; init; } = "Weir";
     public string? SignedInHomeNotice { get; init; }
     public string SetupWizardState { get; init; } = "pending";
     public string AppTimezone { get; init; } = "UTC";
@@ -36,7 +35,6 @@ public sealed record SuiteSettingsRecord
 
 /// <summary>A validated <c>PUT /suite/settings</c> (or bundle restore) request.</summary>
 public sealed record SuiteSettingsUpdate(
-    string ProductDisplayName,
     string? SignedInHomeNotice,
     string AppTimezone,
     long LogRetentionDays,
@@ -62,17 +60,6 @@ public static class SuiteSettingsRules
     {
         ArgumentNullException.ThrowIfNull(update);
         ArgumentNullException.ThrowIfNull(zones);
-        var name = (update.ProductDisplayName ?? string.Empty).Trim();
-        if (name.Length == 0)
-        {
-            throw new WireValueException("Product name cannot be empty.");
-        }
-
-        if (CodePoints(name) > 120)
-        {
-            throw new WireValueException("Product name is too long (120 characters maximum).");
-        }
-
         var notice = (update.SignedInHomeNotice ?? string.Empty).Trim();
         string? normalizedNotice = notice.Length == 0 ? null : notice;
         if (normalizedNotice is not null && CodePoints(normalizedNotice) > 4000)
@@ -122,7 +109,6 @@ public static class SuiteSettingsRules
 
         return update with
         {
-            ProductDisplayName = name,
             SignedInHomeNotice = normalizedNotice,
             AppTimezone = tz,
             SetupWizardState = wizard,
@@ -137,7 +123,6 @@ public static class SuiteSettingsRules
         ArgumentNullException.ThrowIfNull(normalized);
         return row with
         {
-            ProductDisplayName = normalized.ProductDisplayName,
             SignedInHomeNotice = normalized.SignedInHomeNotice,
             SetupWizardState = normalized.SetupWizardState ?? row.SetupWizardState,
             AppTimezone = normalized.AppTimezone,
@@ -195,11 +180,9 @@ public static class SuiteSettingsRules
             wizard = "pending";
         }
 
-        var name = (row.ProductDisplayName ?? "Weir").Trim();
         var tz = (row.AppTimezone ?? "UTC").Trim();
         var interval = row.ConfigurationBackupIntervalHours == 0 ? 24 : row.ConfigurationBackupIntervalHours;
         return new WireObject()
-            .Set("product_display_name", name.Length == 0 ? "Weir" : name)
             .Set("signed_in_home_notice", row.SignedInHomeNotice)
             .Set("setup_wizard_state", wizard)
             .Set("app_timezone", tz.Length == 0 ? "UTC" : tz)

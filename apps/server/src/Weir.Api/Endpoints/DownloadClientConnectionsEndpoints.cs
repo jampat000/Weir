@@ -75,7 +75,7 @@ internal sealed class DownloadClientConnectionsEndpointHandlers
         var model = new BodyModel(body, issues);
         var csrfToken = model.Str("csrf_token", minLength: 1);
         var kind = model.Literal("kind", DownloadClientKinds.All);
-        var name = model.Str("name", minLength: 1, maxLength: 200);
+        MediaManagerConnectionsEndpoints.AcceptIgnoredName(model);
         var enabled = model.Bool("enabled", defaultValue: true);
         var baseUrl = StrWithDefault(model, body, "base_url", string.Empty, 2000);
         var username = StrWithDefault(model, body, "username", string.Empty, 200);
@@ -90,7 +90,7 @@ internal sealed class DownloadClientConnectionsEndpointHandlers
         try
         {
             id = await _connections.CreateAsync(
-                uow, kind, name, baseUrl, username.Length > 0 ? username : null, password.Length > 0 ? password : null, apiKey.Length > 0 ? apiKey : null, enabled)
+                uow, kind, baseUrl, username.Length > 0 ? username : null, password.Length > 0 ? password : null, apiKey.Length > 0 ? apiKey : null, enabled)
                 .ConfigureAwait(false);
         }
         catch (DownloadClientConnectionException exception)
@@ -121,7 +121,7 @@ internal sealed class DownloadClientConnectionsEndpointHandlers
         var connectionId = ConnectionId(request, issues);
         var model = new BodyModel(body, issues);
         var csrfToken = model.Str("csrf_token", minLength: 1);
-        var name = model.OptionalStr("name", minLength: 1, maxLength: 200);
+        MediaManagerConnectionsEndpoints.AcceptIgnoredName(model);
         var enabled = model.OptionalBool("enabled");
         var baseUrl = model.OptionalStr("base_url", maxLength: 2000);
         var username = model.OptionalStr("username", maxLength: 200);
@@ -135,7 +135,7 @@ internal sealed class DownloadClientConnectionsEndpointHandlers
         var row = await RequireConnectionAsync(uow, connectionId).ConfigureAwait(false);
         try
         {
-            await _connections.UpdateAsync(uow, row, name, baseUrl, username, password, apiKey, enabled).ConfigureAwait(false);
+            await _connections.UpdateAsync(uow, row, baseUrl, username, password, apiKey, enabled).ConfigureAwait(false);
         }
         catch (DownloadClientConnectionException exception)
         {

@@ -28,11 +28,17 @@ NO_WEBHOOK_SECRET = {"WEIR_MEDIA_MANAGER_WEBHOOK_SECRET": ""}
 
 
 def create_connection(client: WeirClient, **overrides: Any) -> httpx.Response:
+    """POST a connection with the body Deluno itself sends when it wires up its connection to Weir.
+
+    The name is sent and ignored: a connection is named after its kind and the host in its address.
+    """
+
     body: dict[str, Any] = {
         "kind": "deluno",
         "name": "Deluno",
         "base_url": "http://192.0.2.10:5099",
         "api_key": "deluno_secret_key",
+        "enabled": True,
     }
     body.update(overrides)
     return client.post_csrf(f"{API}/media-managers/connections", body)

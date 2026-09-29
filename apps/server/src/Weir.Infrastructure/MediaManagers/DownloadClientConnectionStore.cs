@@ -1,5 +1,6 @@
 using Microsoft.Data.Sqlite;
 using Weir.Core.Json;
+using Weir.Core.MediaManagers;
 using Weir.Core.Time;
 using Weir.Infrastructure.Sqlite;
 
@@ -62,16 +63,16 @@ public sealed class DownloadClientConnectionStore
         return uow.QuerySingleAsync($"SELECT {Columns} FROM download_client_connections WHERE id = $id", ReadRow, ("$id", connectionId));
     }
 
-    public async Task<bool> NameExistsAsync(UnitOfWork uow, string name, long? exceptId = null)
-    {
-        ArgumentNullException.ThrowIfNull(uow);
-        var id = await uow.ScalarAsync("SELECT id FROM download_client_connections WHERE name = $name LIMIT 1", ("$name", name)).ConfigureAwait(false);
-        return id is not null and not DBNull && (exceptId is null || Convert.ToInt64(id, System.Globalization.CultureInfo.InvariantCulture) != exceptId);
-    }
+    /// <summary>
+    /// Give every connection the name derived from its kind and address (<see cref="ConnectionNaming"/>). Every write
+    /// that can change a derived name does this itself; startup calls it to bring names stored before they were derived in line.
+    /// </summary>
+    public Task RefreshNamesAsync(UnitOfWork uow) =>
+        ConnectionNameColumn.RefreshAsync(uow, "download_client_connections", DownloadClientKinds.ProductLabel);
 
     /// <summary>Insert a connection; returns the new id.</summary>
     public async Task<long> InsertAsync(
-        UnitOfWork uow, string kind, string name, bool enabled, string baseUrl, string? username, string? passwordCiphertext, string? apiKeyCiphertext)
+        UnitOfWork uow, string kind, bool enabled, string baseUrl, string? username, string? passwordCiphertext, string? apiKeyCiphertext)
     {
         ArgumentNullException.ThrowIfNull(uow);
         var id = await uow.ExecuteScalarWriteAsync(
@@ -79,12 +80,13 @@ public sealed class DownloadClientConnectionStore
             "last_connection_test_ok, last_connection_test_at, last_connection_test_detail) " +
             "VALUES ($kind, $name, $enabled, $base_url, $username, $password, $key, NULL, NULL, NULL) RETURNING id",
             ("$kind", kind),
-            ("$name", name),
+            ("$name", ConnectionNameColumn.NewPlaceholder()),
             ("$enabled", enabled ? 1 : 0),
             ("$base_url", baseUrl),
             ("$username", username),
             ("$password", passwordCiphertext),
             ("$key", apiKeyCiphertext)).ConfigureAwait(false);
+        await RefreshNamesAsync(uow).ConfigureAwait(false);
         return Convert.ToInt64(id, System.Globalization.CultureInfo.InvariantCulture);
     }
 
@@ -103,12 +105,17 @@ public sealed class DownloadClientConnectionStore
         await uow.ExecuteAsync(
             $"UPDATE download_client_connections SET {string.Join(", ", sets)}, updated_at = CURRENT_TIMESTAMP WHERE id = $id",
             parameters).ConfigureAwait(false);
+        if (changes.Any(change => change.Column == "base_url"))
+        {
+            await RefreshNamesAsync(uow).ConfigureAwait(false);
+        }
     }
 
-    public Task DeleteAsync(UnitOfWork uow, long connectionId)
+    public async Task DeleteAsync(UnitOfWork uow, long connectionId)
     {
         ArgumentNullException.ThrowIfNull(uow);
-        return uow.ExecuteAsync("DELETE FROM download_client_connections WHERE id = $id", ("$id", connectionId));
+        await uow.ExecuteAsync("DELETE FROM download_client_connections WHERE id = $id", ("$id", connectionId)).ConfigureAwait(false);
+        await RefreshNamesAsync(uow).ConfigureAwait(false);
     }
 
     /// <summary>The conditional test-result write: 0 when the connection was removed meanwhile.</summary>

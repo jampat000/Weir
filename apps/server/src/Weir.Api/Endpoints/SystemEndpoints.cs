@@ -61,7 +61,7 @@ public static class SystemEndpoints
             await ApiJson.WriteAsync(
                 context,
                 report.Ready ? StatusCodes.Status200OK : StatusCodes.Status503ServiceUnavailable,
-                ToResponse(report),
+                ToResponse(report, context.RequestServices.GetRequiredService<MachineIdentity>()),
                 ApiJsonContext.Default.ReadinessResponse).ConfigureAwait(false);
         }).WithMetadata(new RouteLabel("/api/v1/system/readiness"));
 
@@ -116,9 +116,11 @@ public static class SystemEndpoints
         return connected;
     }
 
-    private static ReadinessResponse ToResponse(ReadinessReport report) => new(
+    private static ReadinessResponse ToResponse(ReadinessReport report, MachineIdentity machine) => new(
         report.Ready,
         report.Version,
+        machine.Name,
+        machine.LooksGenerated,
         report.Status,
         report.StartupSeconds,
         [.. report.Steps.Select(step => new ReadinessStepResponse(step.Name, step.Status, step.Detail))],

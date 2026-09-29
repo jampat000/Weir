@@ -5,6 +5,7 @@ using System.Net.Security;
 using System.Net.Sockets;
 using System.Security.Authentication;
 using Microsoft.Data.Sqlite;
+using Weir.Core.Configuration;
 using Weir.Core.Json;
 using Weir.Core.Notifications;
 using Weir.Core.Updates;
@@ -201,20 +202,19 @@ public sealed class ExternalJsonPoster : IExternalJsonPoster
 /// <summary>Delivers notifications to Discord and webhook channels.</summary>
 public sealed class NotificationDispatcher
 {
-    public const string TestTitle = "Weir test notification";
-    public const string TestDetail = "This is a test notification from Weir.";
-
     private static readonly TimeSpan DispatchTimeout = TimeSpan.FromSeconds(10);
     private readonly IExternalJsonPoster _poster;
     private readonly TimeProvider _time;
     private readonly NotificationChannelStore _channels;
+    private readonly MachineIdentity _machine;
     private readonly ConcurrentDictionary<Task, byte> _inFlight = new();
 
-    public NotificationDispatcher(IExternalJsonPoster poster, TimeProvider time, NotificationChannelStore channels)
+    public NotificationDispatcher(IExternalJsonPoster poster, TimeProvider time, NotificationChannelStore channels, MachineIdentity machine)
     {
         _poster = poster;
         _time = time;
         _channels = channels ?? throw new ArgumentNullException(nameof(channels));
+        _machine = machine ?? throw new ArgumentNullException(nameof(machine));
     }
 
     /// <summary>Posts one notification to one channel, in the channel's payload shape; returns the HTTP status.</summary>
@@ -223,8 +223,8 @@ public sealed class NotificationDispatcher
         ArgumentNullException.ThrowIfNull(channel);
         var now = Core.Time.Timestamp.UtcNow(_time);
         var body = channel.Provider == "discord"
-            ? NotificationRules.DiscordPayload(title, detail, jobEvent, module, jobId, now)
-            : NotificationRules.WebhookPayload(jobEvent, module, jobId, jobKind, title, detail, now);
+            ? NotificationRules.DiscordPayload(title, detail, jobEvent, module, jobId, now, _machine.AppName)
+            : NotificationRules.WebhookPayload(jobEvent, module, jobId, jobKind, title, detail, now, _machine.Name);
         return _poster.PostJsonAsync(channel.Url, body, new Dictionary<string, string>(StringComparer.Ordinal) { ["User-Agent"] = "Weir/1.0" }, DispatchTimeout, cancellationToken);
     }
 
@@ -233,7 +233,9 @@ public sealed class NotificationDispatcher
     {
         try
         {
-            await PostOneAsync(channel, TestTitle, TestDetail, "job_completed", "processing", 0, "test", cancellationToken).ConfigureAwait(false);
+            await PostOneAsync(
+                channel, $"{_machine.AppName} test notification", $"This is a test notification from {_machine.AppName}.", "job_completed", "processing", 0, "test", cancellationToken)
+                .ConfigureAwait(false);
             return null;
         }
         catch (ExternalEndpointException exception)
@@ -268,7 +270,7 @@ public sealed class NotificationDispatcher
     {
         ArgumentNullException.ThrowIfNull(database);
         ArgumentNullException.ThrowIfNull(warn);
-        var (jobEvent, title, detail) = NotificationRules.JobNotification(module, eventKind, jobId, jobKind, willRetry);
+        var (jobEvent, title, detail) = NotificationRules.JobNotification(module, eventKind, jobId, jobKind, _machine.AppName, willRetry);
         Track(Task.Run(async () =>
         {
             List<NotificationChannelRecord> channels;
