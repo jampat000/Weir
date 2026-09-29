@@ -7,15 +7,17 @@ This is the top-level map for agents and contributors. Deeper decisions live in 
 Weir is a self-hosted media operations app:
 
 - **Processing** remuxes watched media into cleaner outputs. It is configured as any number
-  of **libraries** — each a row carrying its own paths, admission rules, schedule,
+  of **workflows** — each a row carrying its own paths, admission rules, schedule,
   guardrails and media manager connections — rather than one fixed movie scope and one
-  fixed TV scope. A library's `media_type` (Movies or TV; named `media_scope` until #460)
-  is a property of the library, not what the module partitions on. It still decides the
-  cleanup shape, which manager queue is asked when a library links none, and which library a
-  job belongs to when its payload names none. A hand-off from a manager lands in the library
-  whose watched folder holds the file. Adding a library is a POST. See
+  fixed TV scope. The API and database still call a workflow a "library"; Settings calls it a
+  workflow because in Deluno, Radarr and Sonarr a library is where media ends up. A workflow's
+  `media_type` (Movies or TV; named `media_scope` until #460)
+  is a property of the workflow, not what the module partitions on. It still decides the
+  cleanup shape, which manager queue is asked when a workflow links none, and which workflow a
+  job belongs to when its payload names none. A hand-off from a manager lands in the workflow
+  whose watched folder holds the file. Adding a workflow is a POST. See
   [ADR-0014](docs/adr/ADR-0014-processing-libraries-replace-fixed-scopes.md). The singleton
-  settings rows that libraries replaced were dropped in `0025`, and the scope-shaped
+  settings rows that workflows replaced were dropped in `0025`, and the scope-shaped
   `path-settings` and `remux-rules-settings` routes that outlived them were removed in #460.
 - **Media managers** are the products Weir accepts work from and reports back to.
   A connection carries a *kind* (Radarr, Sonarr, Deluno, or anything posting Weir's
