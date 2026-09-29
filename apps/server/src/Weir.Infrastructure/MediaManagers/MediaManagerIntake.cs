@@ -210,6 +210,11 @@ public sealed class MediaManagerIntake
             return (chosen.Library, chosen.Resolved);
         }
 
+        if (HandoffThroughLinks.ChooseLibrary(libraries, importEvent) is { } viaLinks)
+        {
+            return (viaLinks.Library, viaLinks.Resolved);
+        }
+
         var scope = ProcessingMediaScopes.Normalize(importEvent.MediaScope);
         var fallback = libraries.FirstOrDefault(library => library.MediaType == scope);
         return (fallback, HandoffPaths.RelativeMediaPathForHandoff(fallback?.WatchedFolder ?? string.Empty, importEvent.FilePath));

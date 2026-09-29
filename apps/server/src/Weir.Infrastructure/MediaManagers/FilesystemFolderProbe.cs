@@ -9,7 +9,8 @@ namespace Weir.Infrastructure.MediaManagers;
 /// chain check never creates one as a side effect, unlike <c>WatchedFolderScanOps.OutputFolderProblem</c>, which is
 /// called only once a pass is actually about to write there. Reading is a directory listing; writing is a probe file,
 /// created and removed through the same <see cref="FileLifecycle.BestEffortDelete"/> cleanup the remux pass uses for its
-/// own temp files. Same-filesystem reuses <see cref="FilesystemBoundaries.SameFilesystem"/> (#716) rather than
+/// own temp files. The final path follows links without touching what they lead to (<see cref="FinalPaths"/>).
+/// Same-filesystem reuses <see cref="FilesystemBoundaries.SameFilesystem"/> (#716) rather than
 /// re-deriving a drive comparison here.
 /// </summary>
 public sealed class FilesystemFolderProbe : IFolderProbe
@@ -47,6 +48,8 @@ public sealed class FilesystemFolderProbe : IFolderProbe
             FileLifecycle.BestEffortDelete(probe);
         }
     }
+
+    public string? ResolveFinalPath(string path) => FinalPaths.Resolve(path);
 
     public bool? SameFilesystem(string first, string second) => FilesystemBoundaries.SameFilesystem(first, second);
 }

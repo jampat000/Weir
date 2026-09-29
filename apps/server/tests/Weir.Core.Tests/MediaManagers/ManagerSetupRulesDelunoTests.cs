@@ -17,12 +17,152 @@ public sealed class ManagerSetupRulesDelunoTests
 
         Assert.Equal(("/media/downloads/complete/tv", "/media/downloads/weir/tv"), (right.WatchedFolder, right.OutputFolder));
         Assert.DoesNotContain(right.Lines, line => line.State == SetupCheckLine.Problem);
+        Assert.Equal(("/media/downloads/complete/tv", "/media/downloads/weir/tv"), (wrong.WatchedFolder, wrong.OutputFolder));
+    }
+
+    private sealed class LinkedFolders(Dictionary<string, string> finalPaths) : IFolderProbe
+    {
+        public bool Exists(string path) => true;
+
+        public bool CanRead(string path) => true;
+
+        public bool CanWrite(string path) => true;
+
+        public string? ResolveFinalPath(string path) => finalPaths.GetValueOrDefault(path);
+
+        public bool? SameFilesystem(string first, string second) => true;
+    }
+
+    private const string Mappings = "Settings › Media Management › Processing Workflow › Weir › Path mappings";
+
+    private static readonly ManagerLibraryDescriptor RefiningMovies =
+        new("movies-1", "Movies", MediaManagerKinds.Movie, "C:\\Media\\Movies", "C:\\Weir\\Ready\\Movies", true, "C:\\NasMount\\Completed\\Movies");
+
+    private static SetupCheckLine LineAbout(DelunoSetupResult result, string text) =>
+        Assert.Single(result.Lines, line => line.Text.Contains(text, StringComparison.Ordinal));
+
+    [Fact]
+    public void A_downloads_folder_outside_the_watched_folder_is_unverified_and_names_both_ways_to_fix_it()
+    {
+        var result = ManagerSetupRules.EvaluateDeluno(
+            "Deluno", MediaManagerKinds.Movie, "C:\\Downloads\\Completed\\Movies", "C:\\Weir\\Ready\\Movies", [RefiningMovies]);
+
+        var line = LineAbout(result, "reports Movies");
+        Assert.Equal(SetupCheckLine.Unverified, line.State);
         Assert.Equal(
-            [
-                "TV's downloads arrive in /media/downloads/complete/tv, which is not inside the watched folder, so Weir would refuse its hand-offs. Use Deluno's folders.",
-                "Deluno picks up cleaned files from /media/downloads/weir/tv, but this workflow writes to /elsewhere. Unless both are the same folder seen from two machines, use the same folder.",
-            ],
-            wrong.Lines.Select(line => line.Text));
+            "Deluno reports Movies's downloads in C:\\NasMount\\Completed\\Movies, which isn't inside this workflow's watched folder C:\\Downloads\\Completed\\Movies as Weir sees it. " +
+            $"If Deluno has a path mapping from C:\\NasMount to C:\\Downloads ({Mappings}), this is fine. " +
+            "Otherwise set the watched folder to C:\\NasMount\\Completed\\Movies.",
+            line.Text);
+    }
+
+    [Fact]
+    public void Paths_that_share_no_trailing_folder_are_named_whole_in_the_suggested_mapping()
+    {
+        var result = ManagerSetupRules.EvaluateDeluno("Deluno", MediaManagerKinds.Tv, "/media/films", "/media/downloads/weir/tv", [RefiningTv]);
+
+        Assert.Equal(
+            "Deluno reports TV's downloads in /media/downloads/complete/tv, which isn't inside this workflow's watched folder /media/films as Weir sees it. " +
+            $"If Deluno has a path mapping from /media/downloads/complete/tv to /media/films ({Mappings}), this is fine. " +
+            "Otherwise set the watched folder to /media/downloads/complete/tv.",
+            LineAbout(result, "reports TV").Text);
+    }
+
+    [Fact]
+    public void A_downloads_folder_that_is_the_watched_folder_reached_through_a_link_is_not_flagged()
+    {
+        var links = new LinkedFolders(new()
+        {
+            ["C:\\NasMount\\Completed\\Movies"] = "C:\\Downloads\\Completed\\Movies",
+            ["C:\\Downloads\\Completed\\Movies"] = "C:\\Downloads\\Completed\\Movies",
+        });
+
+        var result = ManagerSetupRules.EvaluateDeluno(
+            "Deluno", MediaManagerKinds.Movie, "C:\\Downloads\\Completed\\Movies", "C:\\Weir\\Ready\\Movies", [RefiningMovies], probe: links);
+
+        var line = LineAbout(result, "downloads to");
+        Assert.Equal(SetupCheckLine.Unverified, line.State);
+        Assert.Equal(
+            "Deluno says its Movies library downloads to C:\\NasMount\\Completed\\Movies, which leads into Weir's watched folder C:\\Downloads\\Completed\\Movies. Weir can't see where each download client really saves.",
+            line.Text);
+        Assert.DoesNotContain(result.Lines, other => other.Text.Contains("isn't inside", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void A_downloads_folder_that_cannot_be_resolved_falls_back_to_the_folders_as_typed()
+    {
+        var onlyWatchedResolves = new LinkedFolders(new() { ["C:\\Downloads\\Completed\\Movies"] = "C:\\Downloads\\Completed\\Movies" });
+
+        var result = ManagerSetupRules.EvaluateDeluno(
+            "Deluno", MediaManagerKinds.Movie, "C:\\Downloads\\Completed\\Movies", "C:\\Weir\\Ready\\Movies", [RefiningMovies], probe: onlyWatchedResolves);
+
+        Assert.Equal(SetupCheckLine.Unverified, LineAbout(result, "isn't inside this workflow's watched folder").State);
+    }
+
+    [Fact]
+    public void Two_folders_that_resolve_to_different_places_stay_different()
+    {
+        var links = new LinkedFolders(new()
+        {
+            ["C:\\NasMount\\Completed\\Movies"] = "D:\\Elsewhere",
+            ["C:\\Downloads\\Completed\\Movies"] = "C:\\Downloads\\Completed\\Movies",
+        });
+
+        var result = ManagerSetupRules.EvaluateDeluno(
+            "Deluno", MediaManagerKinds.Movie, "C:\\Downloads\\Completed\\Movies", "C:\\Weir\\Ready\\Movies", [RefiningMovies], probe: links);
+
+        LineAbout(result, "isn't inside this workflow's watched folder");
+    }
+
+    [Fact]
+    public void A_downloads_folder_with_no_watched_folder_to_compare_is_a_problem_naming_the_folder_to_set()
+    {
+        var result = ManagerSetupRules.EvaluateDeluno("Deluno", MediaManagerKinds.Tv, string.Empty, "/media/downloads/weir/tv", [RefiningTv]);
+
+        var line = Assert.Single(result.Lines, line => line.State == SetupCheckLine.Problem);
+        Assert.Equal(
+            "Deluno reports TV's downloads in /media/downloads/complete/tv, but this workflow has no watched folder. Set the watched folder to /media/downloads/complete/tv.",
+            line.Text);
+    }
+
+    [Fact]
+    public void A_different_output_folder_is_unverified_and_names_both_ways_to_fix_it()
+    {
+        var result = ManagerSetupRules.EvaluateDeluno("Deluno", MediaManagerKinds.Tv, "/media/downloads/complete", "/elsewhere/tv", [RefiningTv]);
+
+        var line = LineAbout(result, "picks up cleaned files");
+        Assert.Equal(SetupCheckLine.Unverified, line.State);
+        Assert.Equal(
+            "Deluno picks up cleaned files from /media/downloads/weir/tv, which isn't this workflow's output folder /elsewhere/tv as Weir sees it. " +
+            $"If Deluno has a path mapping from /media/downloads/weir to /elsewhere ({Mappings}), this is fine. " +
+            "Otherwise set the output folder to /media/downloads/weir/tv.",
+            line.Text);
+    }
+
+    [Fact]
+    public void An_output_folder_that_is_the_same_folder_reached_through_a_link_is_fine()
+    {
+        var links = new LinkedFolders(new()
+        {
+            ["C:\\NasMount\\Ready"] = "C:\\Weir\\Ready",
+            ["C:\\Weir\\Ready"] = "C:\\Weir\\Ready",
+        });
+
+        var result = ManagerSetupRules.EvaluateDeluno(
+            "Deluno", MediaManagerKinds.Movie, "C:\\NasMount\\Completed\\Movies", "C:\\Weir\\Ready", [RefiningMovies with { OutputPath = "C:\\NasMount\\Ready" }], probe: links);
+
+        Assert.Equal(SetupCheckLine.Ok, LineAbout(result, "picks up cleaned files").State);
+    }
+
+    [Fact]
+    public void A_deluno_output_folder_with_no_output_folder_to_compare_is_a_problem_naming_the_folder_to_set()
+    {
+        var result = ManagerSetupRules.EvaluateDeluno("Deluno", MediaManagerKinds.Tv, "/media/downloads/complete", string.Empty, [RefiningTv]);
+
+        var line = Assert.Single(result.Lines, line => line.State == SetupCheckLine.Problem);
+        Assert.Equal(
+            "Deluno picks up cleaned files from /media/downloads/weir/tv, but this workflow has no output folder. Set the output folder to /media/downloads/weir/tv.",
+            line.Text);
     }
 
     [Fact]
@@ -70,12 +210,13 @@ public sealed class ManagerSetupRulesDelunoTests
     }
 
     [Fact]
-    public void A_declared_downloads_folder_outside_the_watched_folder_stays_a_problem_whatever_its_clients_say()
+    public void A_declared_downloads_folder_outside_the_watched_folder_is_never_a_pass_whatever_its_clients_say()
     {
         var result = ManagerSetupRules.EvaluateDeluno(
             "Deluno", MediaManagerKinds.Tv, "/media/tv", "/media/downloads/weir/tv", [RefiningTv], [new("Transmission", true, null, "deluno-tv")]);
 
-        Assert.Single(result.Lines, line => line.State == SetupCheckLine.Problem && line.Text.Contains("not inside the watched folder", StringComparison.Ordinal));
+        Assert.Equal(SetupCheckLine.Unverified, LineAbout(result, "isn't inside this workflow's watched folder").State);
+        Assert.DoesNotContain(result.Lines, line => line.State == SetupCheckLine.Problem);
     }
 
     [Fact]
