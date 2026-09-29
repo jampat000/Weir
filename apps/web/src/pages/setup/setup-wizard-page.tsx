@@ -17,24 +17,24 @@ import { mmActionButtonClass } from "../../lib/ui/mm-control-roles";
 import {
   BackupFields,
   DEFAULT_BACKUP_TIME,
-  FolderInput,
   WizardLoadFailed,
   WizardSection,
   WizardWhatsNext,
 } from "./setup-wizard-parts";
+import { useSuggestedLibraries } from "./use-suggested-libraries";
+import { useWizardConnections } from "./use-wizard-connections";
 import {
   firstLibraryOfType,
   useWizardSave,
+  type LibraryChoice,
   type LibraryFolders,
   type WizardDraft,
 } from "./use-wizard-save";
+import { WizardDownloadsSection } from "./wizard-downloads-section";
+import { isConnectedSource, type DownloadSource } from "./wizard-source";
 
 const FALLBACK_ZONE = "UTC";
 const DEFAULT_BACKUP_HOURS = 24;
-const LIBRARY_GROUPS = [
-  { key: "movie", heading: "Movies" },
-  { key: "tv", heading: "TV" },
-] as const;
 
 function wizardStateOf(settings: AppSettings | undefined): string {
   return (settings?.setup_wizard_state || "pending").trim().toLowerCase();
@@ -70,6 +70,17 @@ function initialDraft(
   };
 }
 
+/** Someone with folders already set up is editing them; a new install has to answer the question first. */
+function initialSource(
+  libraries: ProcessingLibrary[] | undefined,
+): DownloadSource | null {
+  return (libraries ?? []).some(
+    (library) => library.watched_folder || library.output_folder,
+  )
+    ? "neither"
+    : null;
+}
+
 /** Leaving before the first run is finished or skipped asks the browser to confirm. */
 function useLeaveWarning(active: boolean) {
   useEffect(() => {
@@ -78,6 +89,25 @@ function useLeaveWarning(active: boolean) {
     window.addEventListener("beforeunload", handler);
     return () => window.removeEventListener("beforeunload", handler);
   }, [active]);
+}
+
+/** Why setup cannot be finished as it stands, or null when it can. */
+function finishBlocker(
+  source: DownloadSource | null,
+  answeringConnections: number,
+  found: ReturnType<typeof useSuggestedLibraries>,
+): string | null {
+  if (source === null) {
+    return "Choose how your downloads reach Weir first. “Neither” lets you pick the folders yourself.";
+  }
+  if (source === "neither") return null;
+  if (answeringConnections === 0) {
+    return "Connect and test it first, or choose “Neither” and pick the folders yourself.";
+  }
+  if (found.status.isLoading) {
+    return "Weir is still asking what you connected for its folders. Try again in a moment.";
+  }
+  return found.blockedReason;
 }
 
 function WizardForm({
@@ -90,6 +120,13 @@ function WizardForm({
   const [draft, setDraft] = useState(() => initialDraft(settings, libraries));
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [finished, setFinished] = useState(false);
+  const [source, setSource] = useState<DownloadSource | null>(() =>
+    initialSource(libraries),
+  );
+  const connections = useWizardConnections(
+    isConnectedSource(source) ? source : null,
+  );
+  const found = useSuggestedLibraries(connections.answering);
   const { finish, skip, pending } = useWizardSave({
     settings,
     libraries,
@@ -107,8 +144,16 @@ function WizardForm({
   const setFolders = (key: "movie" | "tv", folders: LibraryFolders) =>
     setDraft((current) => ({ ...current, [key]: folders }));
 
+  const choice: LibraryChoice =
+    source === "neither"
+      ? { kind: "typed" }
+      : { kind: "offered", plan: found.plan };
+  const blocker = finishBlocker(source, connections.answering.length, found);
+  const connectedInSetup =
+    isConnectedSource(source) && connections.answering.length > 0;
+
   if (finished) {
-    return <WizardWhatsNext />;
+    return <WizardWhatsNext connected={connectedInSetup ? source : null} />;
   }
 
   return (
@@ -124,6 +169,22 @@ function WizardForm({
           </p>
 
           <div className="mm-quiet-stack mt-5">
+            <WizardSection
+              headingId="setup-wizard-libraries-heading"
+              title="Downloads and libraries"
+              description="Weir connects to whatever delivers your downloads, then starts your libraries from the folders it reports. Nothing is created until you finish."
+            >
+              <WizardDownloadsSection
+                source={source}
+                onSource={setSource}
+                connections={connections}
+                found={found}
+                draft={draft}
+                onFolders={setFolders}
+                disabled={pending}
+              />
+            </WizardSection>
+
             <WizardSection
               headingId="setup-wizard-basics-heading"
               title="Basics"
@@ -145,44 +206,6 @@ function WizardForm({
                     }
                   />
                 </div>
-              </div>
-            </WizardSection>
-
-            <WizardSection
-              headingId="setup-wizard-libraries-heading"
-              title="Libraries"
-              description="Where your downloader finishes files, and where Weir puts them once cleaned for your media manager to import. This fills in your first Movies and TV library. Add more libraries in Settings › Libraries, and choose which tracks to keep in Settings › Rules."
-            >
-              <div className="mm-wizard-libraries">
-                {LIBRARY_GROUPS.map((group) => (
-                  <fieldset key={group.key} className="mm-wizard-library">
-                    <legend className="mm-wizard-library__title">
-                      {group.heading}
-                    </legend>
-                    <FolderInput
-                      id={`setup-wizard-${group.key}-watched`}
-                      label={`${group.heading} watched folder`}
-                      visibleLabel="Watched folder"
-                      hint="Where finished downloads land"
-                      value={draft[group.key].watched}
-                      disabled={pending}
-                      onChange={(watched) =>
-                        setFolders(group.key, { ...draft[group.key], watched })
-                      }
-                    />
-                    <FolderInput
-                      id={`setup-wizard-${group.key}-output`}
-                      label={`${group.heading} output folder`}
-                      visibleLabel="Output folder"
-                      hint="Where cleaned files go"
-                      value={draft[group.key].output}
-                      disabled={pending}
-                      onChange={(output) =>
-                        setFolders(group.key, { ...draft[group.key], output })
-                      }
-                    />
-                  </fieldset>
-                ))}
               </div>
             </WizardSection>
 
@@ -214,7 +237,13 @@ function WizardForm({
             <button
               type="button"
               className="mm-auth-submit"
-              onClick={() => void finish(draft)}
+              onClick={() => {
+                if (blocker) {
+                  setStatusMessage(blocker);
+                  return;
+                }
+                void finish(draft, choice);
+              }}
               disabled={pending}
             >
               {pending
