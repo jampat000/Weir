@@ -3,6 +3,7 @@ using Weir.Core.Json;
 using Weir.Core.Processing;
 using Weir.Core.Processing.RemuxPass;
 using Weir.Core.Rules;
+using Weir.Infrastructure.Activity;
 using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Infrastructure.Processing.RemuxPass;
@@ -55,8 +56,13 @@ public sealed partial class RemuxPassHandler
 
                 if (library is not null)
                 {
-                    await RemuxPassFileState.MarkFileStatusAsync(uow, library.Id, rel, ProcessingFileStatuses.Processing, "Weir has claimed this file and is checking it now.", _time.GetUtcNow())
-                        .ConfigureAwait(false);
+                    if (await RemuxPassFileState.MarkFileStatusAsync(uow, library.Id, rel, ProcessingFileStatuses.Processing, "Weir has claimed this file and is checking it now.", _time.GetUtcNow())
+                        .ConfigureAwait(false))
+                    {
+                        // Checking and planning write no Activity row, so without this an open Processing page keeps showing the
+                        // file as Waiting until the write starts.
+                        ActivityNotifications.TrackFileListChange(uow);
+                    }
                 }
 
                 return new Claim(null, operatorSettings, library, rules, runtime, rulesProfileName);

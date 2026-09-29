@@ -18,6 +18,16 @@ public enum StoryTone
 /// <summary>One plain-language step in what happened to a file.</summary>
 public sealed record StoryStep(string Heading, string Sentence, StoryTone Tone = StoryTone.Neutral);
 
+/// <summary>Where a finished file goes next, which decides how its last step is told.</summary>
+public enum HandBackTarget
+{
+    /// <summary>The workflow is linked to a media manager, which imports the cleaned copy.</summary>
+    MediaManager,
+
+    /// <summary>The workflow has no media manager: the cleaned copy stays in its output folder.</summary>
+    OutputFolder,
+}
+
 /// <summary>
 /// Tell the story of what happened to a file, in plain language (#468).
 /// Narrated at read time from the stored <c>file_logs.detail_json</c> payload; never raises on a
@@ -28,7 +38,7 @@ public static class FileStory
     private static readonly HashSet<string> EmptyTrackLines = new(StringComparer.Ordinal) { "", "—", "-", "none", "None" };
 
     /// <summary>The steps of one pass, in the order they happened.</summary>
-    public static IReadOnlyList<StoryStep> NarratePass(WireObject? detail, string libraryName = "")
+    public static IReadOnlyList<StoryStep> NarratePass(WireObject? detail, string libraryName = "", HandBackTarget target = HandBackTarget.MediaManager)
     {
         if (detail is null)
         {
@@ -50,7 +60,7 @@ public static class FileStory
             candidates.Add(Worked(detail));
             candidates.Add(Verified(detail));
             candidates.Add(Collision(detail));
-            candidates.Add(HandedBack(detail, ok: true));
+            candidates.Add(HandedBack(detail, ok: true, target));
         }
         else
         {
@@ -367,7 +377,7 @@ public static class FileStory
         return new StoryStep("An output already existed", reason, action == "skip" ? StoryTone.Warn : StoryTone.Neutral);
     }
 
-    private static StoryStep? HandedBack(WireObject detail, bool ok)
+    private static StoryStep? HandedBack(WireObject detail, bool ok, HandBackTarget target)
     {
         if (!ok)
         {
@@ -375,8 +385,13 @@ public static class FileStory
         }
 
         var destination = Text(detail.TryGetValue("output_file", out var d) ? d : null);
-        return destination.Length == 0
-            ? null
+        if (destination.Length == 0)
+        {
+            return null;
+        }
+
+        return target == HandBackTarget.OutputFolder
+            ? new StoryStep("Cleaned copy", $"The cleaned copy is in the output folder, at {destination}.", StoryTone.Good)
             : new StoryStep("Handed back", $"The result was written to {destination} for your media manager to import.", StoryTone.Good);
     }
 
