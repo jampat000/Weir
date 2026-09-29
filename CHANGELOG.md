@@ -9,6 +9,7 @@ list first.
 
 ## 3.x
 
+- **3.2.11** (2026-09-29). Weir on Windows is reachable only from this PC until you allow other devices on your network. [notes](docs/release-notes/v3.2.11.md) · [release](https://github.com/jampat000/Weir/releases/tag/v3.2.11)
 - **3.2.10** (2026-09-28). Other devices on your network can reach Weir on Windows, a smaller Windows download, and updates that download only what changed. [notes](docs/release-notes/v3.2.10.md) · [release](https://github.com/jampat000/Weir/releases/tag/v3.2.10)
 - **3.2.9** (2026-09-27). Weir reports its database as unavailable once the file has gone, instead of carrying on with a copy that no longer exists on disk. [notes](docs/release-notes/v3.2.9.md) · [release](https://github.com/jampat000/Weir/releases/tag/v3.2.9)
 - **3.2.8** (2026-09-27). Your light or dark choice is saved with your account and follows you to every browser, address and open tab. [notes](docs/release-notes/v3.2.8.md) · [release](https://github.com/jampat000/Weir/releases/tag/v3.2.8)
