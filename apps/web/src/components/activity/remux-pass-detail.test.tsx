@@ -41,6 +41,19 @@ describe("RemuxPassDetail", () => {
     expect(screen.getByText(/ffmpeg command line/i)).toBeInTheDocument();
   });
 
+  it("labels a rules rejection Rejected, not as a failure", () => {
+    const detail = JSON.stringify({
+      outcome: "failed_before_execution",
+      ok: false,
+      rejected_without_manager: true,
+      relative_media_path: "movies/a.mkv",
+      reason: "Rejected: it has no audio tracks.",
+    });
+    render(<RemuxPassDetail detail={detail} />);
+    expect(screen.getByText("Rejected")).toBeInTheDocument();
+    expect(screen.queryByText("Could not check file")).not.toBeInTheDocument();
+  });
+
   it("falls back to raw string when detail is not JSON", () => {
     render(<RemuxPassDetail detail="not-json" />);
     expect(

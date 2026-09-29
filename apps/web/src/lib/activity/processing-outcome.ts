@@ -4,13 +4,21 @@
  * reads these. Every number comes from the entry itself; nothing is estimated here.
  */
 import type { ActivityEventItem } from "../api/types";
-import { asNumber, asString, parseActivityDetail } from "./detail";
+import { processingFileLead, REJECTED_BY_RULES } from "../processing/files-api";
+import {
+  asNumber,
+  asString,
+  parseActivityDetail,
+  type ActivityDetail,
+} from "./detail";
 import {
   LIBRARY_FILE_CLEANED_EVENT,
   REMUX_PASS_COMPLETED_EVENT,
 } from "./event-types";
+import { isRejectedByRules } from "./pass-detail";
 
-export type FinishedKind = "cleaned" | "already" | "passed" | "failed";
+export type FinishedKind =
+  "cleaned" | "already" | "passed" | "rejected" | "failed";
 
 export type FinishedFile = {
   id: number;
@@ -28,6 +36,37 @@ export type FinishedFile = {
   finishedAt: string;
 };
 
+/**
+ * A rejection worded as History words it: "Rejected: <why> <what became of the file>". The reason and what became
+ * of the file are the ones the pass recorded, so this reads the same as the file's entry in History.
+ */
+function rejectionSentence(detail: ActivityDetail): string {
+  const reason = [
+    asString(detail.reason),
+    asString(detail.rejected_cleanup_detail),
+  ]
+    .filter(Boolean)
+    .join(" ");
+  return processingFileLead({
+    status: "rejected",
+    failure_class: REJECTED_BY_RULES,
+    status_reason: reason,
+  });
+}
+
+/** What became of a finished pass, most telling first: a rejection is a decision, so it never reads as a failure. */
+function finishedKind(outcome: {
+  passed: boolean;
+  rejected: boolean;
+  failed: boolean;
+  already: boolean;
+}): FinishedKind {
+  if (outcome.passed) return "passed";
+  if (outcome.rejected) return "rejected";
+  if (outcome.failed) return "failed";
+  return outcome.already ? "already" : "cleaned";
+}
+
 function count(value: unknown): number {
   return Array.isArray(value) ? value.length : 0;
 }
@@ -40,6 +79,7 @@ export function finishedFileFromEvent(
   if (ev.event_type === REMUX_PASS_COMPLETED_EVENT) {
     const outcome = asString(detail?.outcome) ?? "";
     const passed = detail?.pass_through_unchanged === true;
+    const rejected = isRejectedByRules(detail);
     const failed = outcome.startsWith("failed") || detail?.ok === false;
     const already =
       outcome === "live_skipped_not_required" ||
@@ -49,13 +89,7 @@ export function finishedFileFromEvent(
     return {
       id: ev.id,
       source: "download",
-      kind: passed
-        ? "passed"
-        : failed
-          ? "failed"
-          : already
-            ? "already"
-            : "cleaned",
+      kind: finishedKind({ passed, rejected, failed, already }),
       relativePath:
         asString(detail?.relative_media_path) ??
         ev.relative_path ??
@@ -67,7 +101,7 @@ export function finishedFileFromEvent(
           : null,
       removedAudio: count(detail?.removed_audio),
       removedSubtitles: count(detail?.removed_subtitles),
-      sentence: null,
+      sentence: rejected && detail ? rejectionSentence(detail) : null,
       finishedAt: ev.created_at,
     };
   }
