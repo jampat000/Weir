@@ -5,9 +5,8 @@ namespace Weir.Tray.Firewall;
 /// <summary>
 /// The real Windows Firewall, through its COM policy object (<c>HNetCfg.FwPolicy2</c> / <c>INetFwPolicy2</c>).
 ///
-/// COM is used instead of shelling out to <c>netsh advfirewall</c>: reading every rule and the active network
-/// profile needs no process launch or text parsing, writing a rule is one call instead of assembling and
-/// re-parsing a command line, and a failure comes back as an HRESULT .NET turns into a <see cref="COMException"/>
+/// COM is used instead of shelling out to <c>netsh advfirewall</c>: reading every rule needs no process
+/// launch or text parsing, writing a rule is one call instead of assembling and re-parsing a command line, and a failure comes back as an HRESULT .NET turns into a <see cref="COMException"/>
 /// rather than an exit code and stderr text to interpret. No NetFwTypeLib interop assembly is referenced, so every
 /// member is late-bound through <c>dynamic</c>, including enumerating <c>Rules</c>: the C# compiler resolves
 /// <c>foreach</c> over a <c>dynamic</c> COM collection through its <c>_NewEnum</c>/<c>IEnumVARIANT</c> enumerator,
@@ -50,8 +49,6 @@ sealed class ComFirewallPolicy : IFirewallPolicy
             return rules;
         }
     }
-
-    public FirewallProfiles CurrentProfiles => (FirewallProfiles)(int)_policy.CurrentProfileTypes;
 
     public void AddOrUpdateRule(FirewallRule rule)
     {

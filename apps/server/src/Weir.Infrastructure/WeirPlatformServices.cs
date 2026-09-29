@@ -76,10 +76,14 @@ public static class WeirPlatformServices
         });
         services.TryAddSingleton<IOutputOwnership, OutputOwnership>();
 
-        // Reading Weir's own firewall rule for System › About (docs/security-hardening.md#windows-firewall): the
-        // Windows package only, gated the same way as the ownership tools above.
-        services.TryAddSingleton<INetworkAccessReader>(_ =>
-            OperatingSystem.IsWindows() ? new WindowsNetworkAccessReader() : new UnsupportedNetworkAccessReader());
+        // Where Weir listens and its own firewall rules, for System › About (docs/security-hardening.md#windows-firewall):
+        // the Windows package only, gated the same way as the ownership tools above. A host that never registered
+        // its listen address listens the way the server does by default.
+        services.TryAddSingleton<INetworkAccessReader>(sp =>
+            OperatingSystem.IsWindows()
+                ? new WindowsNetworkAccessReader(
+                    sp.GetService<ServerListenOptions>() ?? new ServerListenOptions(ServerListenOptions.DefaultHost, ServerListenOptions.DefaultPort))
+                : new UnsupportedNetworkAccessReader());
         return services;
     }
 

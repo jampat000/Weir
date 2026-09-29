@@ -6883,7 +6883,7 @@ export interface components {
     SuiteNetworkAccessOut: {
       /**
        * State
-       * @description allowed, blocked, not_configured, or not_applicable
+       * @description this_pc_only, allowed, blocked, or not_applicable
        */
       state: string;
       /** Summary */

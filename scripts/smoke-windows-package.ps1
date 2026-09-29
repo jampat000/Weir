@@ -455,11 +455,75 @@ function Wait-ForPipeEndOfFile {
   }
 }
 
+# The addresses something is listening on for a TCP port, straight from the Windows TCP table (Get-NetTCPConnection),
+# independently of anything Weir reports about itself: "127.0.0.1" and "::1" are this PC only, "::" and "0.0.0.0"
+# are every network interface.
+function Get-ListenAddresses {
+  param([Parameter(Mandatory)] [int]$ListenPort)
+  @(Get-NetTCPConnection -LocalPort $ListenPort -State Listen -ErrorAction SilentlyContinue |
+    ForEach-Object { $_.LocalAddress } |
+    Sort-Object -Unique)
+}
+
+function Test-ListensOnThisPcOnly {
+  param([string[]]$Addresses)
+  $loopback = @("127.0.0.1", "::1")
+  $strangers = @($Addresses | Where-Object { $loopback -notcontains $_ })
+  # Both loopback addresses are expected wherever the runner has IPv6 at all.
+  $ipv6Missing = [System.Net.Sockets.Socket]::OSSupportsIPv6 -and ($Addresses -notcontains "::1")
+  ($Addresses -contains "127.0.0.1") -and $strangers.Count -eq 0 -and -not $ipv6Missing
+}
+
+function Test-ListensOnEveryInterface {
+  param([string[]]$Addresses)
+  ($Addresses -contains "::") -or ($Addresses -contains "0.0.0.0")
+}
+
+# Polls the listen addresses until $Test accepts them, so a restart in progress is waited out and a wrong answer is
+# reported with what was actually seen.
+function Wait-ForListenAddresses {
+  param(
+    [Parameter(Mandatory)] [int]$ListenPort,
+    [Parameter(Mandatory)] [scriptblock]$Test,
+    [Parameter(Mandatory)] [int]$TimeoutSeconds,
+    [Parameter(Mandatory)] [string]$Expected
+  )
+  $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+  do {
+    $addresses = Get-ListenAddresses -ListenPort $ListenPort
+    if (& $Test $addresses) { return $addresses }
+    Start-Sleep -Milliseconds 500
+  } while ((Get-Date) -lt $deadline)
+  throw "Expected the server to listen $Expected on port $ListenPort within $TimeoutSeconds s, but it listens on: $($addresses -join ', ')."
+}
+
+function Assert-WeirFirewallRule {
+  param([Parameter(Mandatory)] [string]$ServerExe, [Parameter(Mandatory)] [string]$Because)
+  $rule = Get-NetFirewallRule -DisplayName "Weir" -ErrorAction SilentlyContinue
+  if (-not $rule) {
+    throw "$Because did not create a firewall rule named 'Weir'."
+  }
+  if ($rule.Direction -ne "Inbound" -or $rule.Action -ne "Allow" -or $rule.Enabled -ne "True") {
+    throw "The Weir firewall rule is not an enabled inbound allow rule (Direction=$($rule.Direction), Action=$($rule.Action), Enabled=$($rule.Enabled))."
+  }
+  $ruleProfile = [string]$rule.Profile
+  if ($ruleProfile -notmatch "Private" -or $ruleProfile -notmatch "Domain" -or $ruleProfile -match "Public") {
+    throw "The Weir firewall rule's profile is '$ruleProfile'; expected exactly Private and Domain, never Public."
+  }
+  $ruleProgram = (Get-NetFirewallApplicationFilter -AssociatedNetFirewallRule $rule).Program
+  if ($ruleProgram -ne $ServerExe) {
+    throw "The Weir firewall rule's program is '$ruleProgram', expected '$ServerExe'."
+  }
+  Write-Host "Weir firewall rule verified after ${Because}: inbound allow, profile '$ruleProfile', scoped to $ruleProgram."
+}
+
 $setupTimeoutSeconds = 120
 $weirHandleTimeoutSeconds = 30
 $installedHealthTimeoutSeconds = 90
+$lanAccessTimeoutSeconds = 90
 $localAppData = [Environment]::GetFolderPath("LocalApplicationData")
 $installedTrayExe = Join-Path $localAppData "Weir\current\Weir.exe"
+$installedServerExe = Join-Path (Split-Path -Parent $installedTrayExe) "server\WeirServer.exe"
 $updateExe = Join-Path $localAppData "Weir\Update.exe"
 $defaultRuntimeHome = "C:\ProgramData\Weir"
 
@@ -542,6 +606,27 @@ try {
       throw "The installed Weir did not answer $healthUrl within $installedHealthTimeoutSeconds s."
     }
     Write-Host "Installed Weir answered $healthUrl."
+
+    # Nobody has allowed LAN access yet, so the server must listen on this PC only (#808): the TCP table's view of
+    # WeirServer.exe, not just what Weir says about itself.
+    $beforeAllowLan = Wait-ForListenAddresses -ListenPort $Port -Test { param($a) Test-ListensOnThisPcOnly $a } -TimeoutSeconds 10 -Expected "on this PC only (127.0.0.1 and ::1)"
+    Write-Host "Before --allow-lan, the installed server listens only on this PC: $($beforeAllowLan -join ', ')."
+
+    # --allow-lan (#779, #808): the runner is elevated, so it turns LAN access on and creates the firewall rule. The
+    # running tray notices the saved choice and restarts the server for other devices.
+    Write-Host "Running the installed Weir.exe --allow-lan..."
+    $allowLanProc = Start-Process -FilePath $installedTrayExe -ArgumentList @("--allow-lan") -PassThru -Wait -WindowStyle Hidden
+    if ($allowLanProc.ExitCode -ne 0) {
+      throw "Weir.exe --allow-lan exited with code $($allowLanProc.ExitCode)."
+    }
+    Assert-WeirFirewallRule -ServerExe $installedServerExe -Because "--allow-lan"
+    $afterAllowLan = Wait-ForListenAddresses -ListenPort $Port -Test { param($a) Test-ListensOnEveryInterface $a } -TimeoutSeconds $lanAccessTimeoutSeconds -Expected "on every interface"
+    Write-Host "After --allow-lan, the installed server listens on every interface: $($afterAllowLan -join ', ')."
+    Invoke-RestMethod -Uri $healthUrl -Method Get -TimeoutSec 5 | Out-Null
+    Write-Host "Installed Weir still answers $healthUrl after the restart."
+    Get-Content -LiteralPath (Join-Path $defaultRuntimeHome "tray-host.log") |
+      Where-Object { $_ -match "LAN access" } |
+      ForEach-Object { Write-Host "tray-host.log: $_" }
   } finally {
     if ($weirProc -and -not $weirProc.HasExited) {
       & taskkill.exe /PID $weirProc.Id /T /F | Out-Null
@@ -549,33 +634,25 @@ try {
     }
   }
 
-  # --configure-firewall (#801): the elevated helper mode that creates Weir's one inbound LAN-access rule. The
-  # CI runner is elevated and disposable, so this proves the rule against the real installed package and the
-  # real Windows Firewall, independently of Weir's own code, with the NetSecurity PowerShell module. The
-  # matching --remove-firewall proof is below: the Velopack uninstaller runs it, since this runner is elevated.
+  # --remove-firewall and --configure-firewall (#801): the elevated helper modes behind the tray menu and the
+  # first-run prompt. --allow-lan above already created the rule, so it is removed first and the helper has to put
+  # it back. The CI runner is elevated and disposable, so this proves the rule against the real installed package
+  # and the real Windows Firewall, independently of Weir's own code, with the NetSecurity PowerShell module. The
+  # uninstall below proves the before-uninstall hook removes it too, since this runner is elevated.
+  Write-Host "Running the installed Weir.exe --remove-firewall..."
+  $removeProc = Start-Process -FilePath $installedTrayExe -ArgumentList @("--remove-firewall") -PassThru -Wait -WindowStyle Hidden
+  if ($removeProc.ExitCode -ne 0) {
+    throw "Weir.exe --remove-firewall exited with code $($removeProc.ExitCode)."
+  }
+  if (Get-NetFirewallRule -DisplayName "Weir" -ErrorAction SilentlyContinue) {
+    throw "--remove-firewall left the firewall rule named 'Weir' in place."
+  }
   Write-Host "Running the installed Weir.exe --configure-firewall..."
-  $installedServerExe = Join-Path (Split-Path -Parent $installedTrayExe) "server\WeirServer.exe"
   $firewallProc = Start-Process -FilePath $installedTrayExe -ArgumentList @("--configure-firewall") -PassThru -Wait -WindowStyle Hidden
   if ($firewallProc.ExitCode -ne 0) {
     throw "Weir.exe --configure-firewall exited with code $($firewallProc.ExitCode)."
   }
-
-  $weirFirewallRule = Get-NetFirewallRule -DisplayName "Weir" -ErrorAction SilentlyContinue
-  if (-not $weirFirewallRule) {
-    throw "--configure-firewall did not create a firewall rule named 'Weir'."
-  }
-  if ($weirFirewallRule.Direction -ne "Inbound" -or $weirFirewallRule.Action -ne "Allow" -or $weirFirewallRule.Enabled -ne "True") {
-    throw "The Weir firewall rule is not an enabled inbound allow rule (Direction=$($weirFirewallRule.Direction), Action=$($weirFirewallRule.Action), Enabled=$($weirFirewallRule.Enabled))."
-  }
-  $weirFirewallProfile = [string]$weirFirewallRule.Profile
-  if ($weirFirewallProfile -notmatch "Private" -or $weirFirewallProfile -notmatch "Domain" -or $weirFirewallProfile -match "Public") {
-    throw "The Weir firewall rule's profile is '$weirFirewallProfile'; expected exactly Private and Domain, never Public."
-  }
-  $weirFirewallProgram = (Get-NetFirewallApplicationFilter -AssociatedNetFirewallRule $weirFirewallRule).Program
-  if ($weirFirewallProgram -ne $installedServerExe) {
-    throw "The Weir firewall rule's program is '$weirFirewallProgram', expected '$installedServerExe'."
-  }
-  Write-Host "Weir firewall rule verified: inbound allow, profile '$weirFirewallProfile', scoped to $weirFirewallProgram."
+  Assert-WeirFirewallRule -ServerExe $installedServerExe -Because "--configure-firewall"
 
   Write-Host "Uninstalling with the Velopack uninstaller..."
   if (-not (Test-Path -LiteralPath $updateExe)) {
@@ -588,7 +665,7 @@ try {
   Write-Host "Uninstalled cleanly (exit code 0)."
 
   # Uninstall's before-uninstall hook removes the firewall rule itself when already elevated (this runner is);
-  # see Weir.Tray/Program.cs RemoveFirewallRuleIfElevated. A rule surviving uninstall would point at a program
+  # see Weir.Tray/Firewall/FirewallInstallHooks.cs RemoveRuleIfElevated. A rule surviving uninstall would point at a program
   # that no longer exists.
   $weirFirewallRuleAfterUninstall = Get-NetFirewallRule -DisplayName "Weir" -ErrorAction SilentlyContinue
   if ($weirFirewallRuleAfterUninstall) {
