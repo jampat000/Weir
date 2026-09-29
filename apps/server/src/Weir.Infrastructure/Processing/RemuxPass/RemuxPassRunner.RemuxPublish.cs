@@ -57,6 +57,7 @@ public sealed partial class RemuxPassRunner
 
             report?.Invoke(new WireObject()
                 .Set("status", "processing")
+                .Set("stage", PassStages.Writing)
                 .Set("percent", 0.0)
                 .Set("eta_seconds", WireNull.Instance)
                 .Set("elapsed_seconds", 0L)
@@ -85,6 +86,7 @@ public sealed partial class RemuxPassRunner
                     : update => report(ProgressWithUpdate(
                         new WireObject()
                             .Set("status", "processing")
+                            .Set("stage", PassStages.Writing)
                             .Set("relative_media_path", relativeMediaPath)
                             .Set("inspected_source_path", context.Inspected)
                             .Set("media_scope", context.Scope)
@@ -227,6 +229,7 @@ public sealed partial class RemuxPassRunner
 
         report?.Invoke(new WireObject()
             .Set("status", "finishing")
+            .Set("stage", PassStages.Verifying)
             .Set("percent", 100.0)
             .Set("eta_seconds", 0L)
             .Set("relative_media_path", relativeMediaPath)
@@ -239,6 +242,7 @@ public sealed partial class RemuxPassRunner
         await MigrateSidecarsBeforeCleanupAsync(src, final, sidecarPatterns, request.Runtime.PreserveOriginalTimestamps, output).ConfigureAwait(false);
         await HandleCleanupAfterSuccessAsync(context, output, final, cancellationToken).ConfigureAwait(false);
         await RunScopeOutputCleanupAsync(context, output, final, cancellationToken).ConfigureAwait(false);
+        ReportStage(report, relativeMediaPath, "finishing", PassStages.HandingBack, "Weir is handing the finished file back.");
         report?.Invoke(new WireObject()
             .Set("status", "finished")
             .Set("percent", 100.0)
