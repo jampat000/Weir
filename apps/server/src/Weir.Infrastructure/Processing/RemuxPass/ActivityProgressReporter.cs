@@ -109,8 +109,14 @@ public sealed class ActivityProgressReporter
                 return;
             }
 
-            _latest = body;
             _relativeMediaPath ??= relativeMediaPath;
+            if (PassStages.IsPreparation(LiveProgress.Text(body, "stage")))
+            {
+                // Checking and planning are only worth showing live; the Activity row starts when the write does.
+                return;
+            }
+
+            _latest = body;
             var isFirstReport = _savedStatus is null;
             if (!isFirstReport && status == _savedStatus)
             {

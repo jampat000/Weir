@@ -38,10 +38,10 @@ vi.mock("../lib/system/readiness-queries", () => ({
   }),
 }));
 
-// The Processing entry says how many files are being written right now.
-const filesAtOnce = { running: 0 };
-vi.mock("../lib/processing/queries", () => ({
-  useProcessingFilesAtOnceQuery: () => ({ data: filesAtOnce }),
+// The Processing entry says how many cards the Working lane is showing.
+const workingLane = { count: 0 };
+vi.mock("../pages/processing/working-count", () => ({
+  useWorkingCount: () => workingLane.count,
 }));
 
 vi.mock("../lib/settings/queries", () => ({
@@ -166,8 +166,8 @@ describe("AppShell", () => {
     expect(current()).toEqual([]);
   });
 
-  it("shows how many files are being written beside Processing, and nothing when none are", () => {
-    filesAtOnce.running = 2;
+  it("shows how many files the Working lane holds beside Processing, and nothing when none are", () => {
+    workingLane.count = 2;
     const view = render(
       <MemoryRouter initialEntries={["/library"]}>
         <Routes>
@@ -182,7 +182,7 @@ describe("AppShell", () => {
       within(live).getByTestId("nav-processing-working"),
     ).toHaveTextContent("2 working");
 
-    filesAtOnce.running = 0;
+    workingLane.count = 0;
     view.rerender(
       <MemoryRouter initialEntries={["/library"]}>
         <Routes>

@@ -4765,6 +4765,18 @@
             "description": "The running pass's speed as ffmpeg reports it, for example 148x.",
             "title": "Progress Speed"
           },
+          "progress_stage": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The step the running pass is on: checking, planning, writing, verifying or handing_back. Null when nothing is in flight or the pass names none.",
+            "title": "Progress Stage"
+          },
           "progress_status": {
             "anyOf": [
               {
