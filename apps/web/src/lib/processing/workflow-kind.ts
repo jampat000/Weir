@@ -1,7 +1,4 @@
-import type {
-  MediaManagerConnection,
-  MediaManagerKind,
-} from "../media-managers/media-managers-api";
+import type { MediaManagerConnection } from "../media-managers/media-managers-api";
 import type { ProcessingLibrary } from "./libraries-api";
 
 /**
@@ -13,7 +10,7 @@ import type { ProcessingLibrary } from "./libraries-api";
 export type WorkflowManager = {
   id: number;
   name: string;
-  kind: MediaManagerKind | null;
+  kind: string | null;
 };
 
 export type WorkflowKind =

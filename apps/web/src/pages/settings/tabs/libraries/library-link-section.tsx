@@ -6,6 +6,10 @@ import { QuietFieldGroup } from "../../../../components/shared/quiet-section";
 import { WorkflowKindSummary } from "../../../../components/shared/workflow-kind";
 import type { MediaManagerConnection } from "../../../../lib/media-managers/media-managers-api";
 import { workflowKindOf } from "../../../../lib/processing/workflow-kind";
+import {
+  workflowStory,
+  type WorkflowPath,
+} from "../../../../lib/processing/workflow-story";
 import { mmActionButtonClass } from "../../../../lib/ui/mm-control-roles";
 
 /**
@@ -15,6 +19,7 @@ import { mmActionButtonClass } from "../../../../lib/ui/mm-control-roles";
  */
 export function LibraryLinkSection({
   linkedIds,
+  path,
   connections,
   editable,
   onLink,
@@ -22,6 +27,8 @@ export function LibraryLinkSection({
 }: {
   /** The media managers the workflow is linked to, as it is being edited. */
   linkedIds: number[];
+  /** The folders as they are being edited, for the Weir only story. */
+  path: WorkflowPath;
   connections: MediaManagerConnection[];
   editable: boolean;
   onLink: (connectionId: number) => void;
@@ -42,6 +49,11 @@ export function LibraryLinkSection({
         <p>
           <WorkflowKindSummary kind={kind} />
         </p>
+        {kind.kind === "weir_only" ? (
+          <p className="mm-quiet-note" data-testid="workflow-story">
+            {workflowStory(path, null, null)}
+          </p>
+        ) : null}
         {kind.kind === "weir_only" ? (
           <WeirOnlyOptions
             connections={connections}

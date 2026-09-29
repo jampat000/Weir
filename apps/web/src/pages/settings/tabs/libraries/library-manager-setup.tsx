@@ -12,6 +12,7 @@ import { type ProcessingMediaType } from "../../../../lib/processing/libraries-a
 import { type ProcessingManagerSetupItem } from "../../../../lib/processing/library-managers-api";
 import { useProcessingManagerSetupQuery } from "../../../../lib/processing/libraries-queries";
 import { useDebouncedValue } from "../../../../lib/ui/use-debounced-value";
+import { workflowStory } from "../../../../lib/processing/workflow-story";
 
 /** The folders as the user types them settle for a moment before each check. */
 const SETTLE_MS = 700;
@@ -208,6 +209,7 @@ export function LibraryManagerSetup({
   mediaType,
   watchedFolder,
   outputFolder,
+  workFolder,
   removeOriginal = true,
   linkedConnectionIds,
   editable,
@@ -216,6 +218,7 @@ export function LibraryManagerSetup({
   mediaType: ProcessingMediaType;
   watchedFolder: string;
   outputFolder: string;
+  workFolder: string;
   /** The workflow's "After cleaning, remove the original download": a torrent client makes that a problem. */
   removeOriginal?: boolean;
   /** The media managers this workflow is linked to: only these are read. */
@@ -258,6 +261,21 @@ export function LibraryManagerSetup({
               className="space-y-3"
             >
               <p className="text-sm font-medium text-mm-text1">{item.label}</p>
+              <p className="mm-quiet-note" data-testid="workflow-story">
+                {workflowStory(
+                  {
+                    watched: watchedFolder.trim(),
+                    work: workFolder.trim(),
+                    output: outputFolder.trim(),
+                  },
+                  { id: item.connection_id, name: item.label, kind: item.kind },
+                  {
+                    category: item.story?.source_category ?? null,
+                    managerLibrary: item.story?.manager_library ?? null,
+                    rootFolder: item.story?.root_folder ?? null,
+                  },
+                )}
+              </p>
               {item.flow === "handoff" ? (
                 <DelunoHandoff
                   item={item}

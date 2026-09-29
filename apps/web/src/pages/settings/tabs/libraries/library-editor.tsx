@@ -11,6 +11,7 @@ import { errorMessage } from "../../../../lib/api/error-message";
 import type { MediaManagerConnection } from "../../../../lib/media-managers/media-managers-api";
 import type { ProcessingLibrary } from "../../../../lib/processing/libraries-api";
 import type { ProcessingRuleSet } from "../../../../lib/processing/rule-sets-api";
+import type { WorkflowPath } from "../../../../lib/processing/workflow-story";
 import { useProcessingRejectSupportQuery } from "../../../../lib/processing/libraries-queries";
 import { mmActionButtonClass } from "../../../../lib/ui/mm-control-roles";
 import { SaveModelNote } from "../../save-model-note";
@@ -87,8 +88,13 @@ export function LibraryEditor({
     onSuccess: onClose,
   });
   const linkedIds = linkedConnectionIds(form, library);
+  const workflowPath: WorkflowPath = {
+    watched: form.watched_folder.trim(),
+    work: form.work_folder.trim(),
+    output: form.output_folder.trim(),
+  };
   const dirty = !sameLibraryForm(form, initial) || cleaning.dirty;
-  const thing = library ? library.name : "the new library";
+  const thing = library ? library.name : "the new workflow";
   useUnsavedChanges(dirty ? thing : null);
   const { confirmLeave, dialog } = useLeaveConfirmation();
   const close = () => confirmLeave(dirty ? thing : null, onClose);
@@ -117,6 +123,7 @@ export function LibraryEditor({
           <LibraryFoldersGroup binding={binding} ruleSets={ruleSets} />
           <LibraryLinkSection
             linkedIds={linkedIds}
+            path={workflowPath}
             connections={connections}
             editable={editable}
             onLink={(connectionId) =>
@@ -137,6 +144,7 @@ export function LibraryEditor({
               mediaType={form.media_type}
               watchedFolder={form.watched_folder}
               outputFolder={form.output_folder}
+              workFolder={form.work_folder}
               removeOriginal={form.remove_original_after_success}
               linkedConnectionIds={linkedIds}
               editable={editable}
@@ -172,13 +180,13 @@ export function LibraryEditor({
               />
             ) : (
               <p className="mm-quiet-note">
-                Save the library first, then add the folders its existing files
+                Save the workflow first, then add the folders its existing files
                 sit in.
               </p>
             )}
           </QuietFieldGroup>
           {/* The hours are drawn in Settings › Schedule beside every other library's week, so the two never disagree. */}
-          <QuietFieldGroup title="When this library may run">
+          <QuietFieldGroup title="When this workflow may run">
             <p className="mm-quiet-note" data-testid="processing-library-hours">
               {runHoursText(library)}
               <Link className="mm-schedule-link" to="/settings?tab=schedule">
@@ -192,7 +200,7 @@ export function LibraryEditor({
               role="alert"
               data-testid="processing-library-save-error"
             >
-              {errorMessage(saveAll.error, "That library could not be saved.")}
+              {errorMessage(saveAll.error, "That workflow could not be saved.")}
             </p>
           ) : null}
           <div className={quietActionRowClass}>

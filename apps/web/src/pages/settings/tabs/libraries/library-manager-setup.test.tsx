@@ -73,6 +73,7 @@ it("shows Sonarr exactly what to enter, with copy buttons, and leaves what is st
       mediaType="tv"
       watchedFolder="/media/downloads/complete"
       outputFolder="/media/downloads/weir"
+      workFolder=""
       linkedConnectionIds={[3]}
       editable
       onUseFolders={() => {}}
@@ -110,6 +111,57 @@ it("shows Sonarr exactly what to enter, with copy buttons, and leaves what is st
   );
 });
 
+it("tells the workflow as the path a file takes, in the manager's own words", async () => {
+  setup([
+    {
+      ...sonarr,
+      story: {
+        source_category: "tv-sonarr",
+        manager_library: null,
+        root_folder: "Z:\\TV",
+      },
+    },
+  ]);
+
+  render(
+    <LibraryManagerSetup
+      mediaType="tv"
+      watchedFolder="/media/downloads/complete"
+      outputFolder="/media/downloads/weir"
+      workFolder="/tmp/tv"
+      linkedConnectionIds={[3]}
+      editable
+      onUseFolders={() => {}}
+    />,
+    { wrapper },
+  );
+
+  expect(await screen.findByTestId("workflow-story")).toHaveTextContent(
+    "Comes from Sonarr's download client, category tv-sonarr (/media/downloads/complete) → Weir works in /tmp/tv → cleaned into /media/downloads/weir → Sonarr imports it into root folder Z:\\TV.",
+  );
+});
+
+it("leaves a name out of the story when the manager did not report it", async () => {
+  setup([sonarr]);
+
+  render(
+    <LibraryManagerSetup
+      mediaType="tv"
+      watchedFolder="/media/downloads/complete"
+      outputFolder="/media/downloads/weir"
+      workFolder=""
+      linkedConnectionIds={[3]}
+      editable
+      onUseFolders={() => {}}
+    />,
+    { wrapper },
+  );
+
+  expect(await screen.findByTestId("workflow-story")).toHaveTextContent(
+    "Comes from Sonarr's download client (/media/downloads/complete) → Weir works in its own work area → cleaned into /media/downloads/weir → Sonarr imports it.",
+  );
+});
+
 it("offers a Sonarr download client's own folder as a suggested watched folder", async () => {
   const onUseFolders = vi.fn();
   setup([{ ...sonarr, suggested_watched_folder: "/downloads/tv-sonarr" }]);
@@ -119,6 +171,7 @@ it("offers a Sonarr download client's own folder as a suggested watched folder",
       mediaType="tv"
       watchedFolder="/media/downloads/complete"
       outputFolder="/media/downloads/weir"
+      workFolder=""
       linkedConnectionIds={[3]}
       editable
       onUseFolders={onUseFolders}
@@ -145,6 +198,7 @@ it("does not suggest a Sonarr download client folder that is already the watched
       mediaType="tv"
       watchedFolder="/media/downloads/complete"
       outputFolder="/media/downloads/weir"
+      workFolder=""
       linkedConnectionIds={[3]}
       editable
       onUseFolders={() => {}}
@@ -169,6 +223,7 @@ it("tells a Deluno workflow there is nothing to map and offers Deluno's own fold
       mediaType="tv"
       watchedFolder="/media/tv"
       outputFolder=""
+      workFolder=""
       linkedConnectionIds={[5]}
       editable
       onUseFolders={onUseFolders}
@@ -202,6 +257,7 @@ it("does not offer Deluno's folders once the workflow already uses them", async 
       mediaType="tv"
       watchedFolder="/media/downloads/complete/tv"
       outputFolder="/media/downloads/weir/tv"
+      workFolder=""
       linkedConnectionIds={[5]}
       editable
       onUseFolders={() => {}}
@@ -223,6 +279,7 @@ it("reads nothing while the workflow is linked to no media manager", async () =>
       mediaType="movie"
       watchedFolder="/in"
       outputFolder="/out"
+      workFolder=""
       linkedConnectionIds={[]}
       editable
       onUseFolders={() => {}}
