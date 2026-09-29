@@ -5,10 +5,11 @@ using Weir.Infrastructure.Sqlite;
 namespace Weir.Infrastructure.MediaManagers;
 
 /// <summary>
-/// "What folder could this bare download client be pointed at" for every enabled connection — read only,
-/// the same shape as <see cref="ManagerSetupCheck"/> for media managers: Weir never writes a download client's
-/// settings, only suggests. A connection whose client did not answer contributes nothing, rather than an entry
-/// with no folder or failing the whole list.
+/// "What folder could this bare download client be pointed at" for every enabled connection — read only: Weir never
+/// writes a download client's settings, only suggests. A suggestion says where the client saves and nothing about
+/// whether that suits a workflow: it is not compared with any watched folder here, so it carries no ready or fine
+/// verdict. <see cref="LibraryFolderChainRules.CheckDownloadClientFolders"/> owns that comparison. A connection whose
+/// client did not answer contributes nothing, rather than an entry with no folder or failing the whole list.
 /// </summary>
 public sealed class DownloadClientSuggestions
 {
@@ -55,26 +56,11 @@ public sealed class DownloadClientSuggestions
 
     private static WireObject Entry(DownloadClientConnectionRecord row, DownloadClientFolders folders)
     {
-        var label = DownloadClientKinds.LabelForConnection(row.Kind, row.Name);
-        var lines = new List<SetupCheckLine>();
-        if (!string.IsNullOrEmpty(folders.CompletedFolder))
-        {
-            lines.Add(new SetupCheckLine(SetupCheckLine.Ok, $"{label}'s default completed-downloads folder is {folders.CompletedFolder}."));
-        }
-
-        foreach (var category in folders.CategoryFolders.Where(category => category.Folder != folders.CompletedFolder))
-        {
-            lines.Add(new SetupCheckLine(SetupCheckLine.Note, $"{label} saves the \"{category.Category}\" category to {category.Folder}."));
-        }
-
         return new WireObject()
             .Set("connection_id", row.Id)
             .Set("kind", row.Kind)
             .Set("name", row.Name)
-            .Set("label", label)
-            .Set("flow", "download_client")
-            .Set("ready", !string.IsNullOrEmpty(folders.CompletedFolder))
-            .Set("lines", new WireArray(lines.Select(line => (WireValue)line.ToOut())))
+            .Set("label", DownloadClientKinds.LabelForConnection(row.Kind, row.Name))
             .Set("suggested_watched_folder", folders.CompletedFolder)
             .Set("category_folders", new WireArray(folders.CategoryFolders.Select(category =>
                 (WireValue)new WireObject().Set("category", category.Category).Set("folder", category.Folder))));

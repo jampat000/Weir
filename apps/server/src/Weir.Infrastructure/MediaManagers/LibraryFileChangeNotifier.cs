@@ -126,7 +126,7 @@ public sealed class LibraryFileChangeNotifier : ILibraryFileChangeNotifier
         }
 
         _logger.LogWarning(lastFailure, "Could not tell {Label} that a library file changed.", connection.Label);
-        await RecordWarningAsync(connection, change, lastFailure).ConfigureAwait(false);
+        await RecordWarningAsync(connection, change).ConfigureAwait(false);
     }
 
     /// <summary>Resolve, de-dupe and call once. Throws <see cref="MediaManagerHttpException"/>/<see cref="MediaManagerUnreachableException"/> on a transient failure worth retrying.</summary>
@@ -254,14 +254,14 @@ public sealed class LibraryFileChangeNotifier : ILibraryFileChangeNotifier
             $"{connection.Label} was not told that {FileName(change)} changed",
             note: $"{connection.Label} does not advertise the {ManagerDialectRules.ExternalFileChangedCapability} capability, so Weir made no call; it will pick up the change on its own schedule.");
 
-    private Task<long> RecordWarningAsync(ManagerConnection connection, LibraryFileChange change, Exception? lastFailure) =>
+    private Task<long> RecordWarningAsync(ManagerConnection connection, LibraryFileChange change) =>
         Record(
             LibraryFileChangeRules.NotifyWarningEventType,
             connection,
             change,
             "warning",
             $"Weir could not tell {connection.Label} that {FileName(change)} changed",
-            note: LibraryFileChangeRules.CouldNotTellWarning(connection) + (lastFailure is null ? string.Empty : $" ({lastFailure.Message})"));
+            note: LibraryFileChangeRules.CouldNotTellWarning(connection));
 
     private Task<long> Record(string eventType, ManagerConnection connection, LibraryFileChange change, string result, string title, string? note)
     {
