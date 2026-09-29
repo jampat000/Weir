@@ -37,6 +37,15 @@ public sealed record ArrSetupResult(IReadOnlyList<string> Hosts, IReadOnlyList<S
 /// </summary>
 public sealed record ManagerDownloadClientDescriptor(string Name, bool Enabled, string? MoviesCategory, string? TvCategory);
 
+/// <summary>The Deluno library (<see cref="LibraryKey"/>, its id in Deluno) on connection <see cref="ConnectionId"/> that a workflow was created from.</summary>
+public sealed record DelunoLibraryLink(long ConnectionId, string LibraryKey);
+
+/// <summary>
+/// The Deluno library a workflow is checked against, or null with the <see cref="Lines"/> that explain why there is none.
+/// Lines are also set alongside a library when there is something to say about the choice.
+/// </summary>
+public sealed record DelunoLibraryChoice(ManagerLibraryDescriptor? Library, IReadOnlyList<SetupCheckLine> Lines);
+
 /// <summary>What a Deluno check found: the folders it reports for this media type, and the lines to show.</summary>
 public sealed record DelunoSetupResult(string? WatchedFolder, string? OutputFolder, IReadOnlyList<SetupCheckLine> Lines);
 

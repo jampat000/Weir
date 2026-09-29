@@ -256,7 +256,7 @@ public sealed class MediaManagerHttpClient
                             RetryAfterSeconds(response.Headers.TryGetValues("Retry-After", out var values) ? values.First() : null));
                     }
 
-                    throw new MediaManagerHttpException($"HTTP {status.ToString(CultureInfo.InvariantCulture)}");
+                    throw new MediaManagerHttpException($"HTTP {status.ToString(CultureInfo.InvariantCulture)}", status);
                 }
 
                 if (raw.Length == 0 && allowEmpty)

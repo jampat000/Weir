@@ -5,17 +5,58 @@ namespace Weir.Core.MediaManagers;
 public static partial class ManagerSetupRules
 {
     /// <summary>
-    /// Deluno hands each finished download to Weir over its API and imports the result itself, translating paths with its
-    /// own path mappings on its side. What Weir can read reliably from its manifest (<c>GET /api/integrations/external/manifest</c>)
-    /// is each library's workflow, its <c>downloadsPath</c> ("downloads arrive in") and its <c>processorOutputPath</c>;
-    /// the mappings are not in it. A hand-off's file has to sit inside the watched folder
+    /// The Deluno library a workflow is checked against. <paramref name="preferredKey"/> is the library the workflow was
+    /// created from, when it was, and is used whenever Deluno still has it; otherwise the first library for the media type
+    /// that is set to Refine before import. With no such library <see cref="DelunoLibraryChoice.Library"/> is null and
+    /// <see cref="DelunoLibraryChoice.Lines"/> says why.
+    /// </summary>
+    public static DelunoLibraryChoice ChooseDelunoLibrary(
+        string managerLabel, string mediaScope, IReadOnlyList<ManagerLibraryDescriptor> libraries, string? preferredKey = null)
+    {
+        ArgumentNullException.ThrowIfNull(libraries);
+        var scopeWord = mediaScope == MediaManagerKinds.Tv ? "TV" : "movie";
+        if (preferredKey is not null && libraries.All(library => library.Key != preferredKey))
+        {
+            return new DelunoLibraryChoice(null, [new SetupCheckLine(SetupCheckLine.Unverified, DelunoDestinationNotices.LibraryGone(managerLabel))]);
+        }
+
+        var preferred = libraries.FirstOrDefault(library => library.Key == preferredKey && library.MediaScope == mediaScope);
+        if (preferred is { ProcessesBeforeImport: false })
+        {
+            return new DelunoLibraryChoice(null, [new SetupCheckLine(
+                SetupCheckLine.Problem,
+                $"{managerLabel}'s {preferred.Name} library is no longer set to Refine before import, so {managerLabel} will not hand {scopeWord} downloads to Weir. " +
+                $"Choose Refine before import for that library in {managerLabel}.")]);
+        }
+
+        var refining = libraries.Where(library => library.MediaScope == mediaScope && library.ProcessesBeforeImport).ToList();
+        if (refining.Count == 0)
+        {
+            return new DelunoLibraryChoice(null, [new SetupCheckLine(
+                SetupCheckLine.Problem,
+                $"No {managerLabel} {scopeWord} library is set to Refine before import, so {managerLabel} will not hand {scopeWord} downloads to Weir. " +
+                $"Choose Refine before import for that library in {managerLabel}.")]);
+        }
+
+        var chosen = preferred ?? refining[0];
+        return refining.Count > 1 && preferred is null
+            ? new DelunoLibraryChoice(chosen, [new SetupCheckLine(
+                SetupCheckLine.Note,
+                $"{managerLabel} has {refining.Count} {scopeWord} libraries set to Refine before import; the folders below are {chosen.Name}'s. " +
+                "Give each its own Weir workflow.")])
+            : new DelunoLibraryChoice(chosen, []);
+    }
+
+    /// <summary>
+    /// What Deluno's manifest (<c>GET /api/integrations/external/manifest</c>) alone can say. It carries each library's
+    /// workflow, its <c>downloadsPath</c> ("downloads arrive in") and its <c>processorOutputPath</c>, but not Deluno's path
+    /// mappings and not where a download client saves. A hand-off's file has to sit inside the watched folder
     /// (<see cref="HandoffPaths.RelativeMediaPathForHandoff"/>), compared the same case- and separator-insensitive way
     /// here and, when <paramref name="probe"/> is given, after following any junction or link, so one folder reached two
     /// ways is one folder. A reported folder that is still not Weir's cannot be told apart from one Deluno maps, so it is
-    /// <see cref="SetupCheckLine.Unverified"/> with both ways to fix it, never a pass and never a failure. The manifest
-    /// publishes no download client's save folder, only the library's declared <c>downloadsPath</c> and each client's
-    /// category, so a declared path inside the watched folder is reported as <see cref="SetupCheckLine.Unverified"/>,
-    /// never as a pass, and each enabled client gets its own line saying the same.
+    /// <see cref="SetupCheckLine.Unverified"/> with both ways to fix it, never a pass and never a failure, and each enabled
+    /// client gets its own <see cref="SetupCheckLine.Unverified"/> line. A Deluno that publishes its download destinations
+    /// is judged by <see cref="EvaluateDelunoWithDestinations"/>.
     /// </summary>
     public static DelunoSetupResult EvaluateDeluno(
         string managerLabel,
@@ -26,28 +67,26 @@ public static partial class ManagerSetupRules
         IReadOnlyList<ManagerDownloadClientDescriptor>? downloadClients = null,
         IFolderProbe? probe = null)
     {
-        ArgumentNullException.ThrowIfNull(libraries);
-        var scopeWord = mediaScope == MediaManagerKinds.Tv ? "TV" : "movie";
-        var lines = new List<SetupCheckLine>();
-        var refining = libraries.Where(library => library.MediaScope == mediaScope && library.ProcessesBeforeImport).ToList();
-        if (refining.Count == 0)
+        var choice = ChooseDelunoLibrary(managerLabel, mediaScope, libraries);
+        return EvaluateDelunoManifest(managerLabel, mediaScope, watchedFolder, outputFolder, choice, downloadClients, probe);
+    }
+
+    /// <summary><see cref="EvaluateDeluno(string, string, string, string, IReadOnlyList{ManagerLibraryDescriptor}, IReadOnlyList{ManagerDownloadClientDescriptor}?, IFolderProbe?)"/> for a library already chosen.</summary>
+    internal static DelunoSetupResult EvaluateDelunoManifest(
+        string managerLabel,
+        string mediaScope,
+        string watchedFolder,
+        string outputFolder,
+        DelunoLibraryChoice choice,
+        IReadOnlyList<ManagerDownloadClientDescriptor>? downloadClients,
+        IFolderProbe? probe)
+    {
+        if (choice.Library is not { } library)
         {
-            lines.Add(new SetupCheckLine(
-                SetupCheckLine.Problem,
-                $"No {managerLabel} {scopeWord} library is set to Refine before import, so {managerLabel} will not hand {scopeWord} downloads to Weir. " +
-                $"Choose Refine before import for that library in {managerLabel}."));
-            return new DelunoSetupResult(null, null, lines);
+            return new DelunoSetupResult(null, null, choice.Lines);
         }
 
-        var library = refining[0];
-        if (refining.Count > 1)
-        {
-            lines.Add(new SetupCheckLine(
-                SetupCheckLine.Note,
-                $"{managerLabel} has {refining.Count} {scopeWord} libraries set to Refine before import; the folders below are {library.Name}'s. " +
-                "Give each its own Weir workflow."));
-        }
-
+        var lines = new List<SetupCheckLine>(choice.Lines);
         var downloads = WireStrings.Strip(library.DownloadsPath ?? string.Empty);
         var watched = WireStrings.Strip(watchedFolder ?? string.Empty);
         lines.Add(DownloadsLine(managerLabel, library.Name, downloads, watched, probe));
