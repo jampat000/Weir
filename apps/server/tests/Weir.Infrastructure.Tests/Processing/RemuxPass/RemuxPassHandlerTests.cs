@@ -302,6 +302,37 @@ public sealed class RemuxPassHandlerTests : IDisposable
             await ScalarText("SELECT title FROM activity_events WHERE event_type = 'processing.file_remux_pass_completed'"));
     }
 
+    private async Task<StoryStep> RecordedStoryEndAsync()
+    {
+        var detail = (WireObject)WireJsonParser.Parse(await ScalarText("SELECT detail_json FROM file_logs ORDER BY id LIMIT 1"));
+        return FileStory.NarratePass(detail)[^1];
+    }
+
+    [Fact]
+    public async Task A_rules_rejection_with_no_media_manager_is_told_in_the_file_timeline_as_rejected_with_what_became_of_the_file()
+    {
+        await RejectedForeignFileAsync();
+
+        var step = await RecordedStoryEndAsync();
+
+        Assert.Equal("Rejected", step.Heading);
+        Assert.Equal(
+            "None of its audio tracks are in English, and the \"English only\" rules keep only English audio, so there would be nothing to keep. " +
+            "It has Japanese audio. To accept files like this, change the first-choice language or \"How to choose audio\" in Settings › Rules. " +
+            WeirOnlyRejection.LeftInPlace,
+            step.Sentence);
+    }
+
+    [Fact]
+    public async Task Under_the_reject_policy_the_file_timeline_keeps_saying_the_pass_could_not_finish()
+    {
+        await RejectedForeignFileAsync(failurePolicy: "reject");
+
+        var step = await RecordedStoryEndAsync();
+
+        Assert.Equal("Could not finish", step.Heading);
+    }
+
     [Fact]
     public async Task A_rules_rejection_with_no_media_manager_offers_the_remove_dialog_and_deletes_only_the_file_it_recorded()
     {

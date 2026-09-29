@@ -6,6 +6,7 @@ import type { ActivityEventItem } from "../api/types";
 import { baseName } from "../format/path";
 import { asBoolean, asNumber, asString, parseActivityDetail } from "./detail";
 import { FILE_PROGRESS_EVENT, REMUX_PASS_COMPLETED_EVENT } from "./event-types";
+import { isRejectedByRules } from "./pass-detail";
 
 export type ActivityTone = "info" | "success" | "warning" | "error";
 
@@ -112,6 +113,7 @@ function passDisplay(ev: ActivityEventItem): ActivityDisplay {
   const passedThrough = asBoolean(parsed?.pass_through_unchanged) === true;
   const noChanges = outcome === "live_skipped_not_required";
   const failed = outcome?.startsWith("failed") ?? false;
+  const rejected = isRejectedByRules(parsed);
   const fileName =
     baseName(asString(parsed?.relative_media_path) ?? "") ||
     baseName(asString(parsed?.inspected_source_path) ?? "") ||
@@ -119,29 +121,39 @@ function passDisplay(ev: ActivityEventItem): ActivityDisplay {
   return {
     title: passedThrough
       ? `${fileName} was passed through unchanged`
-      : noChanges
-        ? `No changes needed for ${fileName}`
-        : failed
-          ? `${fileName} could not be processed`
-          : `${fileName} was processed successfully`,
+      : rejected
+        ? `Rejected ${fileName}`
+        : noChanges
+          ? `No changes needed for ${fileName}`
+          : failed
+            ? `${fileName} could not be processed`
+            : `${fileName} was processed successfully`,
     summary: passedThrough
       ? "Handed back without applying your rules"
-      : noChanges
-        ? "No changes were needed"
-        : failed
-          ? "Weir could not finish this file"
-          : remuxNeeded === false
-            ? "The file already fits your rules"
-            : "Cleaned-up file written",
+      : rejected
+        ? (asString(parsed?.reason) ?? "Weir rejected this file")
+        : noChanges
+          ? "No changes were needed"
+          : failed
+            ? "Weir could not finish this file"
+            : remuxNeeded === false
+              ? "The file already fits your rules"
+              : "Cleaned-up file written",
     detail: ev.detail ?? null,
     chip: passedThrough
       ? "Passed through"
-      : noChanges
-        ? "No changes needed"
-        : failed
-          ? "Processing failed"
-          : "File processed",
-    tone: ev.detail?.includes('"ok":false') ? "error" : "success",
+      : rejected
+        ? "Rejected"
+        : noChanges
+          ? "No changes needed"
+          : failed
+            ? "Processing failed"
+            : "File processed",
+    tone: rejected
+      ? "warning"
+      : ev.detail?.includes('"ok":false')
+        ? "error"
+        : "success",
     compact: false,
   };
 }

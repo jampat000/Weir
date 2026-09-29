@@ -1,5 +1,7 @@
 using System.Globalization;
 using Weir.Core.Json;
+using Weir.Core.Processing.RemuxPass;
+using Weir.Core.Rules;
 using Weir.Core.Text;
 
 namespace Weir.Core.Processing;
@@ -386,6 +388,23 @@ public static class FileStory
             reason = Text(detail.TryGetValue("preflight_reason", out var pr) ? pr : null);
         }
 
+        if (RemuxPassVisibility.Truthy(detail.Get(RejectionResultKeys.WithoutManager)))
+        {
+            return Rejected(detail, reason);
+        }
+
         return new StoryStep("Could not finish", reason.Length > 0 ? reason : "Weir could not process this file, and the record does not say why.", StoryTone.Bad);
+    }
+
+    /// <summary>A rejection by the rules is a decision, not a failure: it says why, then what became of the file.</summary>
+    private static StoryStep Rejected(WireObject detail, string reason)
+    {
+        var why = reason.StartsWith(AudioRejectionExplanation.Lead, StringComparison.Ordinal)
+            ? reason[AudioRejectionExplanation.Lead.Length..]
+            : reason;
+        why = why.Length > 0 ? char.ToUpperInvariant(why[0]) + why[1..] : "Weir rejected this file.";
+        why = why.EndsWith('.') ? why : $"{why}.";
+        var next = Text(detail.Get("rejected_cleanup_detail"));
+        return new StoryStep("Rejected", next.Length > 0 ? $"{why} {next}" : why, StoryTone.Warn);
     }
 }
