@@ -169,42 +169,80 @@ public sealed class LibraryFolderChainRulesTests
         Assert.Contains("watched, work and output folders", line.Text, StringComparison.Ordinal);
     }
 
+
+    private static IReadOnlyList<SetupCheckLine> CheckClient(string label, string watched, string? completed, params (string Category, string Folder)[] categories) =>
+        LibraryFolderChainRules.CheckDownloadClientFolders(
+            label, watched, new DownloadClientFolders(completed, [.. categories.Select(item => new DownloadClientCategoryFolder(item.Category, item.Folder))]));
+
     [Fact]
     public void A_download_clients_completed_folder_matching_the_watched_folder_is_ok()
     {
-        var line = LibraryFolderChainRules.CheckDownloadClientFolder("qBittorrent", Watched, new DownloadClientFolders(Watched, []));
+        var line = Assert.Single(CheckClient("qBittorrent", Watched, Watched));
 
         Assert.Equal(SetupCheckLine.Ok, line.State);
-        Assert.Contains("completed-downloads folder", line.Text, StringComparison.Ordinal);
+        Assert.Equal("qBittorrent's default completed-downloads folder is /media/watched, inside this library's watched folder.", line.Text);
     }
 
     [Fact]
-    public void A_download_clients_category_folder_matching_the_watched_folder_is_ok()
+    public void A_download_client_saving_to_a_folder_inside_the_watched_folder_is_ok()
     {
-        var folders = new DownloadClientFolders("/downloads/complete", [new DownloadClientCategoryFolder("tv-sonarr", Watched)]);
-
-        var line = LibraryFolderChainRules.CheckDownloadClientFolder("SABnzbd", Watched, folders);
+        var line = Assert.Single(CheckClient("SABnzbd", Watched, null, ("movies", Watched + "/Blade Runner")));
 
         Assert.Equal(SetupCheckLine.Ok, line.State);
-        Assert.Contains("tv-sonarr", line.Text, StringComparison.Ordinal);
+        Assert.Contains("\"movies\" category folder is /media/watched/Blade Runner", line.Text, StringComparison.Ordinal);
     }
 
     [Fact]
-    public void No_matching_download_client_folder_is_a_problem()
+    public void A_download_client_saving_above_the_watched_folder_is_a_problem_naming_both_folders()
     {
-        var folders = new DownloadClientFolders("/downloads/complete", [new DownloadClientCategoryFolder("movies", "/downloads/complete/movies")]);
-
-        var line = LibraryFolderChainRules.CheckDownloadClientFolder("NZBGet", Watched, folders);
+        var line = Assert.Single(CheckClient("Transmission", @"C:\Downloads\Completed\Movies", @"C:\Downloads\Completed"));
 
         Assert.Equal(SetupCheckLine.Problem, line.State);
+        Assert.Equal(
+            @"Transmission saves to: default completed-downloads folder C:\Downloads\Completed. " +
+            @"None of that is inside this library's watched folder C:\Downloads\Completed\Movies, so Weir would never see the downloads. " +
+            "Point the client's folder at it, or use the suggested folder in the library editor.",
+            line.Text);
+    }
+
+    [Fact]
+    public void A_download_client_with_no_folder_inside_the_watched_folder_is_one_problem_naming_every_folder_it_saves_to()
+    {
+        var line = Assert.Single(CheckClient("NZBGet", Watched, "/downloads/complete", ("movies", "/downloads/complete/movies"), ("tv", "/downloads/complete/tv")));
+
+        Assert.Equal(SetupCheckLine.Problem, line.State);
+        Assert.Contains("default completed-downloads folder /downloads/complete", line.Text, StringComparison.Ordinal);
+        Assert.Contains("\"movies\" category folder /downloads/complete/movies", line.Text, StringComparison.Ordinal);
+        Assert.Contains("\"tv\" category folder /downloads/complete/tv", line.Text, StringComparison.Ordinal);
         Assert.Contains(Watched, line.Text, StringComparison.Ordinal);
     }
 
     [Fact]
-    public void An_unset_watched_folder_is_a_note_not_a_problem()
+    public void Each_folder_of_a_download_client_gets_its_own_line_and_one_folder_inside_is_enough()
     {
-        var line = LibraryFolderChainRules.CheckDownloadClientFolder("Deluge", "", new DownloadClientFolders(null, []));
+        var lines = CheckClient("SABnzbd", Watched, "/downloads/complete", ("tv-sonarr", Watched), ("movies", "/downloads/complete/movies"));
 
-        Assert.Equal(SetupCheckLine.Note, line.State);
+        Assert.Equal(
+            [SetupCheckLine.Note, SetupCheckLine.Ok, SetupCheckLine.Note],
+            lines.Select(line => line.State));
+        Assert.Contains("\"tv-sonarr\" category folder is /media/watched, inside", lines[1].Text, StringComparison.Ordinal);
+        Assert.Contains("outside this library's watched folder", lines[0].Text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_download_client_that_reported_no_folder_is_unverified_not_ok()
+    {
+        var line = Assert.Single(LibraryFolderChainRules.CheckDownloadClientFolders("Deluge", Watched, DownloadClientFolders.Empty));
+
+        Assert.Equal(SetupCheckLine.Unverified, line.State);
+        Assert.Contains("did not say where it saves", line.Text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void An_unset_watched_folder_leaves_a_download_client_unverified()
+    {
+        var line = Assert.Single(CheckClient("Deluge", "", null));
+
+        Assert.Equal(SetupCheckLine.Unverified, line.State);
     }
 }

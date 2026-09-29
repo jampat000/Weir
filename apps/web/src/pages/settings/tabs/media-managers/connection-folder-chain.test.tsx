@@ -119,3 +119,45 @@ it("lists each linked library by name with its readiness, expandable to its line
     ),
   ).toBeInTheDocument();
 });
+
+it("shows a library as not verified, never ready, when one of its lines is only a declaration", async () => {
+  vi.spyOn(chainApi, "fetchConnectionFolderChain").mockResolvedValue([
+    {
+      library_id: 12,
+      local: {
+        ready: true,
+        lines: [
+          { state: "ok", text: "Weir can read the watched folder /media/in." },
+        ],
+      },
+      managers: [
+        {
+          connection_id: 3,
+          kind: "deluno",
+          name: "Deluno",
+          label: "Deluno",
+          flow: "handoff",
+          ready: true,
+          mapping: null,
+          lines: [
+            {
+              state: "unverified",
+              text: "Deluno says its TV library downloads to /media/in (inside Weir's watched folder). Weir can't see where each download client really saves.",
+            },
+          ],
+        },
+      ],
+      download_clients: [],
+      ready: true,
+    },
+  ]);
+  vi.spyOn(librariesApi, "fetchProcessingLibraries").mockResolvedValue([
+    library(),
+  ]);
+
+  render(<ConnectionFolderChain connectionId={3} />, { wrapper });
+
+  const details = (await screen.findByText("TV")).closest("details")!;
+  expect(within(details).getByText("Not verified")).toBeInTheDocument();
+  expect(within(details).queryByText("Ready")).not.toBeInTheDocument();
+});

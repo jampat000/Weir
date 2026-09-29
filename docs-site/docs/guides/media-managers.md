@@ -114,6 +114,15 @@ In Weir, press **Check again** in the library's **Media manager** section. Weir 
 mappings, download clients and queue — it never changes Sonarr's settings — and shows ✓, or a plain
 explanation of what to fix.
 
+A ✓ means Weir read the fact itself. Where it can only take someone's word for it, the line says so and
+shows a **?** and **Not verified** instead of a tick. Sonarr and Radarr tell Weir a download client's own
+folder only when the client has one set; a client that files downloads by category has no folder Weir can
+read from them, so it stays not verified until you connect that client to Weir directly. Deluno publishes
+each library's downloads folder and each client's category, but not where its clients really save, so a
+Deluno line reads "Deluno says its Movies library downloads to …" and stays not verified. A download client
+you connect to Weir directly is read for itself: each folder it saves to is checked against the watched
+folder, and a client saving outside it is a problem naming both folders.
+
 ### What you'll see
 
 When a download finishes, Sonarr shows **"No files found are eligible for import"** until Weir is done.

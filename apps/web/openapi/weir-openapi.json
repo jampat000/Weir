@@ -10409,11 +10409,12 @@
         "description": "One line of a setup check.",
         "properties": {
           "state": {
-            "description": "``ok``, ``problem`` (with its fix in the sentence) or ``note``.",
+            "description": "``ok`` (Weir read it for itself), ``problem`` (with its fix in the sentence), ``note``, or ``unverified`` (Weir can only take someone's word for it).",
             "enum": [
               "ok",
               "problem",
-              "note"
+              "note",
+              "unverified"
             ],
             "title": "State",
             "type": "string"
