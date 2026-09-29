@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
+using Weir.Core.Configuration;
 
 namespace Weir.Infrastructure.Runtime;
 
@@ -9,20 +10,20 @@ public enum NetworkAccessState
     /// <summary>Not the Windows package: Docker and a bare source install manage their own network exposure.</summary>
     NotApplicable,
 
-    /// <summary>No rule and no block: nobody has answered the first-run "Allow Weir on your network?" prompt yet.</summary>
-    NotConfigured,
+    /// <summary>The server only accepts connections from this PC, so the firewall is not consulted.</summary>
+    ThisPcOnly,
 
-    /// <summary>Weir's allow rule covers the network this machine is on, and nothing blocks it.</summary>
+    /// <summary>The server accepts other devices, and Windows Firewall has an allow rule that covers the network this PC is on.</summary>
     Allowed,
 
-    /// <summary>Either a block rule targets Weir's server, or its allow rule does not cover the current network.</summary>
+    /// <summary>The server accepts other devices, but Windows Firewall does not let them through.</summary>
     Blocked,
 }
 
 /// <summary>
 /// Reads whether Weir can be reached from the network, for System › About. Registered by
-/// <c>WeirPlatformServices.AddWeirPlatform</c>: the Windows build reads the real firewall state, every other
-/// platform reports <see cref="NetworkAccessState.NotApplicable"/>.
+/// <c>WeirPlatformServices.AddWeirPlatform</c>: the Windows build reads its own bind address and the real firewall
+/// state, every other platform reports <see cref="NetworkAccessState.NotApplicable"/>.
 /// </summary>
 public interface INetworkAccessReader
 {
@@ -35,19 +36,46 @@ public sealed class UnsupportedNetworkAccessReader : INetworkAccessReader
     public NetworkAccessState ReadState() => NetworkAccessState.NotApplicable;
 }
 
+/// <summary>An inbound firewall rule for Weir's own server program, as much of it as the state decision needs.</summary>
+internal readonly record struct ServerFirewallRule(bool IsAllow, bool Enabled, int Profiles);
+
 /// <summary>
-/// The Windows package's read of Weir's own firewall rule, through the same COM policy object the tray writes to
+/// What System › About says, worked out from where the server listens and the firewall rules for its program.
+/// Pure, so the Windows-only COM read stays out of it.
+/// </summary>
+internal static class NetworkAccessDecision
+{
+    /// <summary>
+    /// Other devices get in when an enabled allow rule covers a network this PC is on and no enabled block rule
+    /// does: a block wins, as in Windows Firewall itself. Weir's own "Weir" rule and one Windows made when someone
+    /// clicked Allow on its prompt count the same.
+    /// </summary>
+    internal static NetworkAccessState Decide(bool listensOnThisPcOnly, IReadOnlyList<ServerFirewallRule> rules, int currentProfiles)
+    {
+        ArgumentNullException.ThrowIfNull(rules);
+        if (listensOnThisPcOnly)
+        {
+            return NetworkAccessState.ThisPcOnly;
+        }
+
+        var enabled = rules.Where(rule => rule.Enabled && (rule.Profiles & currentProfiles) != 0).ToList();
+        var allowed = enabled.Any(rule => rule.IsAllow) && !enabled.Any(rule => !rule.IsAllow);
+        return allowed ? NetworkAccessState.Allowed : NetworkAccessState.Blocked;
+    }
+}
+
+/// <summary>
+/// The Windows package's read of Weir's own firewall rules, through the same COM policy object the tray writes to
 /// (<c>HNetCfg.FwPolicy2</c> / <c>INetFwPolicy2</c> — see <c>apps/tray/Weir.Tray/Firewall/ComFirewallPolicy.cs</c>).
 /// Reading a rule and the active network profile needs no administrator rights.
 ///
 /// This does not share code with the tray's writer: <c>apps/server</c> and <c>apps/tray</c> are separate
-/// solutions with no shared project reference, and only the tray ever creates or removes the rule. Keep the rule
-/// name and program path in step with <c>WeirFirewallRule</c> there if either changes.
+/// solutions with no shared project reference, and only the tray ever creates or removes the rule. Keep the
+/// program path in step with <c>WeirFirewallRule</c> there if it changes.
 /// </summary>
 [SupportedOSPlatform("windows")]
 public sealed class WindowsNetworkAccessReader : INetworkAccessReader
 {
-    private const string RuleName = "Weir";
     private const string ServerExeName = "WeirServer.exe";
 
     // NET_FW_RULE_DIRECTION_IN.
@@ -56,11 +84,23 @@ public sealed class WindowsNetworkAccessReader : INetworkAccessReader
     // NET_FW_ACTION_.
     private const int ActionAllow = 1;
 
+    private readonly ServerListenOptions _listen;
+
+    public WindowsNetworkAccessReader(ServerListenOptions listen)
+    {
+        _listen = listen ?? throw new ArgumentNullException(nameof(listen));
+    }
+
     public NetworkAccessState ReadState()
     {
         if (!OperatingSystem.IsWindows())
         {
             throw new PlatformNotSupportedException($"{nameof(WindowsNetworkAccessReader)} is Windows-only.");
+        }
+
+        if (_listen.IsThisPcOnly)
+        {
+            return NetworkAccessState.ThisPcOnly;
         }
 
         try
@@ -70,8 +110,9 @@ public sealed class WindowsNetworkAccessReader : INetworkAccessReader
         catch (Exception ex) when (ex is COMException or InvalidOperationException)
         {
             // The COM policy object could not be reached (a locked-down machine, a firewall service that is not
-            // running): read as "not configured" rather than surfacing a COM failure as an operator-facing state.
-            return NetworkAccessState.NotConfigured;
+            // running): the firewall's answer is unknown, so this reports what Weir can prove, that no allow rule
+            // was seen.
+            return NetworkAccessState.Blocked;
         }
     }
 
@@ -81,41 +122,19 @@ public sealed class WindowsNetworkAccessReader : INetworkAccessReader
         dynamic policy = CreateComObject("HNetCfg.FwPolicy2");
         var currentProfiles = (int)policy.CurrentProfileTypes;
 
-        var hasOwnBlockRule = false;
-        FirewallRuleMatch? allowRule = null;
+        var rules = new List<ServerFirewallRule>();
         foreach (dynamic comRule in policy.Rules)
         {
-            var match = TryMatch(comRule, programPath);
-            if (match is null)
+            if (TryRead(comRule, programPath) is { } rule)
             {
-                continue;
-            }
-            if (!match.Value.IsAllow)
-            {
-                hasOwnBlockRule = true;
-                continue;
-            }
-            if (string.Equals(match.Value.Name, RuleName, StringComparison.Ordinal))
-            {
-                allowRule = match.Value;
+                rules.Add(rule);
             }
         }
-
-        if (hasOwnBlockRule)
-        {
-            return NetworkAccessState.Blocked;
-        }
-        if (allowRule is not { } configuredRule)
-        {
-            return NetworkAccessState.NotConfigured;
-        }
-
-        var coversCurrentNetwork = (configuredRule.Profiles & currentProfiles) != 0;
-        return configuredRule.Enabled && coversCurrentNetwork ? NetworkAccessState.Allowed : NetworkAccessState.Blocked;
+        return NetworkAccessDecision.Decide(listensOnThisPcOnly: false, rules, currentProfiles);
     }
 
     // Only inbound rules for Weir's own server exe are meaningful here; everything else reads as null.
-    private static FirewallRuleMatch? TryMatch(dynamic comRule, string programPath)
+    private static ServerFirewallRule? TryRead(dynamic comRule, string programPath)
     {
         try
         {
@@ -128,7 +147,7 @@ public sealed class WindowsNetworkAccessReader : INetworkAccessReader
             {
                 return null;
             }
-            return new FirewallRuleMatch((string)comRule.Name, (int)comRule.Action == ActionAllow, (bool)comRule.Enabled, (int)comRule.Profiles);
+            return new ServerFirewallRule((int)comRule.Action == ActionAllow, (bool)comRule.Enabled, (int)comRule.Profiles);
         }
         catch (COMException)
         {
@@ -143,6 +162,4 @@ public sealed class WindowsNetworkAccessReader : INetworkAccessReader
         return Activator.CreateInstance(type)
             ?? throw new InvalidOperationException($"Could not create Windows Firewall's COM object '{progId}'.");
     }
-
-    private readonly record struct FirewallRuleMatch(string Name, bool IsAllow, bool Enabled, int Profiles);
 }

@@ -222,6 +222,9 @@ folder, change the port, check for updates or quit.
 
 - Weir is installed to `%LocalAppData%\Weir`. Your data (database, logs, backups) is kept in `C:\ProgramData\Weir`.
 - Weir runs as you, not as a Windows service, so it can reach your mapped network drives and NAS shares.
+- Weir listens on this PC only until you allow other devices on your network: right-click the tray icon and choose
+  **Allow other devices on your network...**. **Only allow this PC** turns it off again. See
+  [Firewall and LAN access](https://jampat000.github.io/Weir/docs/deployment/windows#firewall-and-lan-access).
 - Installing from a script or another program, with no one at a screen? Use
   `Weir-win-Setup.exe --silent`, then start Weir yourself with `Weir.exe --port 9347 --silent` — see
   [Installing Weir from another program](https://jampat000.github.io/Weir/docs/deployment/windows#installing-weir-from-another-program).

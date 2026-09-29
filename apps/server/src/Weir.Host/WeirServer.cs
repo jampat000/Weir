@@ -97,6 +97,7 @@ public static class WeirServer
         builder.Services.AddSingleton(metrics);
         builder.Logging.AddProvider(new MetricsLoggerProvider(metrics, minimumLevel));
 
+        builder.Services.AddSingleton(listen);
         builder.Services.AddWeirApi(options);
         builder.Services.AddWeirJobs(options, runtime);
         configureBuilder?.Invoke(builder);

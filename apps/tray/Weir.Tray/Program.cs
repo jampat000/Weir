@@ -2,10 +2,10 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
 using System.Reflection;
-using System.Runtime.InteropServices;
 using System.Security.AccessControl;
 using Velopack;
 using Weir.Tray.Firewall;
+using Weir.Tray.LanAccess;
 
 namespace Weir.Tray;
 
@@ -82,7 +82,7 @@ static class Program
                 TrayLog.Write($"Velopack: before uninstall v{v}");
                 KillRunningProcesses($"Velopack before uninstall v{v}");
                 StartupRegistration.Deregister();
-                RemoveFirewallRuleIfElevated();
+                FirewallInstallHooks.RemoveRuleIfElevated();
             })
             .OnBeforeUpdateFastCallback((v) =>
             {
@@ -97,65 +97,10 @@ static class Program
             // allowed to show UI (docs.velopack.io) — the one place Weir asks its one Windows admin (UAC) prompt
             // for LAN access, per the owner's decision. --silent Setup skips Velopack's post-install app launch
             // entirely (docs/release.md, #779), so this should never run during a silent install either way;
-            // PromptForFirewallAccess checks IsSilent and the interactive desktop itself too, rather than relying
+            // AskOnFirstRun checks IsSilent and the interactive desktop itself too, rather than relying
             // only on that.
-            .OnFirstRun((v) => PromptForFirewallAccess(args))
+            .OnFirstRun((v) => FirewallInstallHooks.AskOnFirstRun(args))
             .Run();
-
-    // A FastCallback hook has a 30-second budget and must show nothing (Velopack.VelopackApp docs), so this never
-    // asks for elevation — it only acts when the uninstaller already happens to be running elevated. Left in place
-    // otherwise, the rule is harmless: it names a program that will not exist once uninstall finishes.
-    private static void RemoveFirewallRuleIfElevated()
-    {
-        if (!FirewallCommand.IsElevated())
-        {
-            TrayLog.Write("Uninstall: leaving the Weir firewall rule in place (not running elevated).");
-            return;
-        }
-        try
-        {
-            WeirFirewallRule.Remove(new ComFirewallPolicy());
-            TrayLog.Write("Uninstall: removed the Weir firewall rule.");
-        }
-        catch (Exception ex) when (ex is COMException or InvalidOperationException or UnauthorizedAccessException)
-        {
-            TrayLog.Write($"Uninstall: could not remove the Weir firewall rule: {ex.Message}");
-        }
-    }
-
-    // The one Windows admin (UAC) prompt Weir ever asks for on its own, and only once: FirewallPromptFile records
-    // the answer, even a decline, so a person who said no is never asked again at every start. "Allow other
-    // devices on your network..." in the tray menu is how they revisit it later.
-    private static void PromptForFirewallAccess(string[] args)
-    {
-        if (!ShouldPromptForFirewallAccess(args, PortChoice.HasInteractiveDesktop))
-        {
-            TrayLog.Write("First-run firewall prompt skipped: silent start or no interactive desktop.");
-            return;
-        }
-
-        var runtimeHome = RuntimeHome();
-        try
-        {
-            if (FirewallPromptFile.AlreadyAsked(runtimeHome))
-            {
-                return;
-            }
-
-            var allow = MessageBox.Show(
-                "Other devices on your network, such as Deluno, need Weir allowed through Windows Firewall to reach it. Allow Weir on your network?",
-                "Weir",
-                MessageBoxButtons.YesNo,
-                MessageBoxIcon.Question) == DialogResult.Yes;
-
-            var outcome = allow ? FirewallElevation.ConfigureElevated(TrayLog.Write) : FirewallElevation.Outcome.Declined;
-            FirewallPromptFile.MarkAsked(runtimeHome, outcome);
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            TrayLog.Write($"First-run firewall prompt could not record its answer: {ex.Message}");
-        }
-    }
 
     // --configure-firewall, --remove-firewall and --allow-lan have no window to report to, so their outcome goes
     // to whatever console launched them (a script watching the exit code still wants a reason for it) as well as
@@ -202,8 +147,9 @@ static class Program
             {
                 return 1;
             }
+            var listenScope = LanAccessStartup.Resolve(runtimeHome, InstallProcesses.Root(), () => new ComFirewallPolicy(), TrayLog.Write);
 
-            using var app = new TrayApp(port.Value, openBrowserOnReady: OpensBrowser(args));
+            using var app = new TrayApp(port.Value, listenScope, openBrowserOnReady: OpensBrowser(args));
             return app.Run();
         }
         catch (Exception ex)
@@ -383,7 +329,7 @@ static class Program
     internal static bool HasInteractiveDesktop(IEnumerable<string> args, Func<bool> desktopCheck) => !IsSilent(args) && desktopCheck();
 
     /// <summary>
-    /// Whether the first-run firewall prompt (<see cref="PromptForFirewallAccess"/>) may show anything at all.
+    /// Whether the first-run firewall prompt (<see cref="FirewallInstallHooks.AskOnFirstRun"/>) may show anything at all.
     /// Belt and suspenders alongside Setup's own <c>--silent</c> skipping the post-install app launch entirely
     /// (docs/release.md, #779): this never shows the prompt during a silent start or without an interactive
     /// desktop to show it on, whatever else changes about how this process was started.

@@ -50,17 +50,34 @@ This checklist defines the current practical hardening baseline for Weir.
 
 ## Windows Firewall
 
+- The Windows package's server listens on this PC only (`127.0.0.1` and `[::1]`) until LAN access is allowed, so
+  nothing on the network can connect to a fresh or silently installed Weir, whatever the firewall says. LAN access
+  is one saved choice (`lan-access` in the data folder). It turns on when the person says yes at the install
+  prompt and the rule is created, when the tray's "Allow other devices on your network..." item succeeds, or when
+  `--allow-lan` runs. The tray's "Only allow this PC" item turns it off again. Any change restarts the server with
+  the new bind address. A saved choice that cannot be read or understood counts as off. Docker and a bare source
+  install are unchanged: the server binds every interface there, and the operator publishes the port.
+- An install that predates the setting keeps its reach: the first start with no saved choice turns LAN access on
+  only if Windows already allows Weir's server in (Weir's own rule, or any enabled inbound allow rule for
+  `WeirServer.exe` that no enabled block rule cancels), and off otherwise, then saves the answer.
 - The Windows package can create exactly one inbound firewall rule, named `Weir`, scoped to the installed
   server's program path (`server\WeirServer.exe` under Velopack's stable `current` folder) — never a port-wide
   rule, and the program path is fixed by the installer, never taken from user input.
 - The rule's profiles are Private and Domain only. Public is never included, at install, from the tray's
   "Allow other devices on your network..." menu item, or from `--allow-lan`.
 - Creating or removing it needs a Windows admin (UAC) elevation; Weir asks for that once, at first run, with a
-  plain explanation, and never asks again automatically if declined.
-- `--allow-lan` (for a program driving Weir unattended) never elevates itself and never prompts: it acts only when
-  already elevated, and otherwise logs and exits non-zero.
+  plain explanation, and never asks again automatically if declined. Turning LAN access off leaves the rule in
+  place: with nothing listening for the network it lets nothing in.
+- `--allow-lan` (for a program driving Weir unattended) never elevates itself and never prompts. It always turns
+  LAN access on, because that is what the caller asked for; it creates the rule only when already elevated, and
+  otherwise logs that the rule was not created and still exits zero. The bind address, not the rule, is what
+  keeps a Weir local-only, so an unelevated `--allow-lan` leaves the decision to Windows Firewall.
+- The bootstrap setup code and the `Host` allow-list do not depend on any of this: they apply to whichever
+  addresses the server listens on. While Weir is local-only, first-run setup from another device is not
+  possible, because that device cannot connect at all.
 - Reading the current state (for System › About) needs no admin rights and touches nothing; only the Windows
-  build does this, gated by OS — Docker and a bare source install report nothing.
+  build does this, gated by OS — Docker and a bare source install report nothing. It reports "only this PC" from
+  the server's own bind address, and consults the firewall only when the server listens for the network.
 - Weir never modifies a firewall rule it did not create: removing block rules is limited to inbound rules whose
   program path matches Weir's own server exe exactly.
 

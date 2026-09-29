@@ -45,20 +45,20 @@ internal static class NetworkAccessStatusWire
 
     private static string WireState(NetworkAccessState state) => state switch
     {
+        NetworkAccessState.ThisPcOnly => "this_pc_only",
         NetworkAccessState.Allowed => "allowed",
         NetworkAccessState.Blocked => "blocked",
-        NetworkAccessState.NotConfigured => "not_configured",
         _ => "not_applicable",
     };
 
     private static string Summary(NetworkAccessState state) => state switch
     {
+        NetworkAccessState.ThisPcOnly =>
+            "Only this PC can reach Weir. To let other devices on your network in, use the Weir tray icon → Allow other devices on your network.",
         NetworkAccessState.Allowed =>
-            "Other devices on your network can reach Weir.",
+            "Other devices on your network can reach Weir. To limit Weir to this PC, use the Weir tray icon → Only allow this PC.",
         NetworkAccessState.Blocked =>
-            "Windows Firewall is blocking other devices. Use the Weir tray icon → Allow other devices… to fix it.",
-        NetworkAccessState.NotConfigured =>
-            "Not set up. Use the Weir tray icon → Allow other devices… to let other devices on your network reach Weir.",
+            "Windows Firewall is blocking other devices. Use the Weir tray icon → Allow other devices on your network to fix it, or Only allow this PC.",
         _ => "",
     };
 }
