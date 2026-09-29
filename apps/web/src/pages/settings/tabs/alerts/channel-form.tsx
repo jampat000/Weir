@@ -92,6 +92,7 @@ export function ChannelForm({
       <Field label="Webhook URL" width="wide">
         <input
           type="url"
+          autoComplete="off"
           className="mm-input"
           value={draft.url}
           onChange={(e) => change("url", e.target.value)}

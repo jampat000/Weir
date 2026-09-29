@@ -103,6 +103,7 @@ export function ConnectionEditForm({
         <Field label="Address" width="wide">
           <input
             data-testid="media-manager-edit-base-url"
+            autoComplete="url"
             className={mmEditableTextFieldClass}
             value={form.base_url}
             onChange={(e) => change("base_url", e.target.value)}
@@ -117,6 +118,7 @@ export function ConnectionEditForm({
         <input
           data-testid="media-manager-edit-api-key"
           type="password"
+          autoComplete="new-password"
           className={mmEditableTextFieldClass}
           value={form.api_key}
           onChange={(e) => change("api_key", e.target.value)}
