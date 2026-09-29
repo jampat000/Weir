@@ -17,9 +17,6 @@ const sabnzbd: DownloadClientSuggestion = {
   kind: "sabnzbd",
   name: "SABnzbd",
   label: "SABnzbd",
-  flow: "download_client",
-  ready: true,
-  lines: [],
   suggested_watched_folder: "/downloads/complete",
   category_folders: [],
 };
@@ -50,6 +47,31 @@ it("offers a download client's own folder as a watched folder, to a workflow lin
     screen.getByRole("button", { name: "Use this as the watched folder" }),
   );
   expect(onUseFolder).toHaveBeenCalledWith("/downloads/complete");
+});
+
+it("offers a folder that is not the watched folder without calling it Ready or Fine", async () => {
+  vi.spyOn(
+    downloadClientsApi,
+    "fetchDownloadClientSuggestions",
+  ).mockResolvedValue([sabnzbd]);
+
+  render(
+    <LibraryDownloadClientSuggestions
+      mediaType="movie"
+      watchedFolder="/media/movies"
+      editable
+      onUseFolder={() => {}}
+    />,
+    { wrapper },
+  );
+
+  const offer = await screen.findByTestId(
+    "library-download-client-suggestions",
+  );
+  expect(offer).toHaveTextContent(
+    "SABnzbd's completed-downloads folder is /downloads/complete.",
+  );
+  expect(offer).not.toHaveTextContent(/ready|fine|✓/i);
 });
 
 it("offers nothing once the watched folder already is the client's folder", async () => {

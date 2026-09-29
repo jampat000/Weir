@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using Weir.Core.Json;
 using Weir.Core.MediaManagers;
 using Weir.Infrastructure.Sqlite;
@@ -15,20 +16,37 @@ namespace Weir.Infrastructure.MediaManagers;
 /// <see cref="IMediaManagerPort.DescribeAsync"/>. Weir never changes a
 /// manager's settings; the user makes the mapping, and this says whether it is right.
 /// </remarks>
-public sealed class ManagerSetupCheck
+public sealed partial class ManagerSetupCheck
 {
     private readonly MediaManagerConnectionService _connections;
     private readonly MediaManagerConnectionStore _connectionStore;
     private readonly IManagerHttpHandlerFactory _handlers;
     private readonly IFolderProbe _folders;
+    private readonly ILogger<ManagerSetupCheck> _logger;
 
-    public ManagerSetupCheck(MediaManagerConnectionService connections, MediaManagerConnectionStore connectionStore, IManagerHttpHandlerFactory handlers, IFolderProbe folders)
+    public ManagerSetupCheck(
+        MediaManagerConnectionService connections,
+        MediaManagerConnectionStore connectionStore,
+        IManagerHttpHandlerFactory handlers,
+        IFolderProbe folders,
+        ILogger<ManagerSetupCheck> logger)
     {
         _connections = connections ?? throw new ArgumentNullException(nameof(connections));
         _connectionStore = connectionStore ?? throw new ArgumentNullException(nameof(connectionStore));
         _handlers = handlers ?? throw new ArgumentNullException(nameof(handlers));
         _folders = folders ?? throw new ArgumentNullException(nameof(folders));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
+
+    /// <summary>The plain sentence for a manager that did not answer a check; the technical reason goes to the log only.</summary>
+    private string UnreachableText(ManagerConnection connection, Exception exception, string what)
+    {
+        LogManagerDidNotAnswer(_logger, exception, connection.Label, what);
+        return ManagerDialectRules.Unreachable(connection, exception, what);
+    }
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "{Label} did not answer when Weir checked {What}.")]
+    private static partial void LogManagerDidNotAnswer(ILogger logger, Exception error, string label, string what);
 
     /// <summary>
     /// One entry per enabled connection that covers <paramref name="mediaScope"/>, in connection order. A workflow only
@@ -145,7 +163,7 @@ public sealed class ManagerSetupCheck
         catch (Exception exception) when (exception is MediaManagerHttpException or MediaManagerUnreachableException)
         {
             return new ManagerFolderSuggestion(
-                connectionId, connection.Label, null, null, ManagerDialectRules.Unreachable(connection, exception, "where its downloads are saved"));
+                connectionId, connection.Label, null, null, UnreachableText(connection, exception, "where its downloads are saved"));
         }
 
         var folder = WatchFolderSuggestionRules.SuggestArrWatchedFolder(ManagerSetupRules.ParseDownloadClients(clients, mediaScope));
@@ -179,7 +197,7 @@ public sealed class ManagerSetupCheck
         }
         catch (Exception exception) when (exception is MediaManagerHttpException or MediaManagerUnreachableException)
         {
-            return ([], [new SetupCheckLine(SetupCheckLine.Problem, ManagerDialectRules.Unreachable(connection, exception, "its remote path mappings"))], null, ManagerSourceFacts.None);
+            return ([], [new SetupCheckLine(SetupCheckLine.Problem, UnreachableText(connection, exception, "its remote path mappings"))], null, ManagerSourceFacts.None);
         }
 
         var parsedClients = ManagerSetupRules.ParseDownloadClients(clients, mediaScope);
