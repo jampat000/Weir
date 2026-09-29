@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Net;
 using System.Text.Json.Nodes;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
 using Weir.Api.Endpoints;
@@ -285,6 +286,28 @@ public sealed class ActivityApiTests
         while (!block[1].Contains($"\"latest_event_id\":{newest}", StringComparison.Ordinal));
 
         Assert.True(Revision(block) > Revision(first));
+    }
+
+    [Fact]
+    public async Task An_open_stream_ends_when_the_server_starts_stopping()
+    {
+        // A browser keeps its stream open for as long as Weir is on screen; a stream that outlived the stop would hold
+        // the shutdown up until the host gave up waiting for it.
+        await using var server = await SeededServerAsync();
+        var client = await AdminAsync(server);
+        using var reader = await OpenStreamAsync(server, client);
+        await NextBlockAsync(reader); // "retry: ..."
+
+        server.Services.GetRequiredService<IHostApplicationLifetime>().StopApplication();
+
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+        string? line;
+        do
+        {
+            line = await reader.ReadLineAsync(timeout.Token);
+        }
+        while (line is not null);
+        Assert.Null(line);
     }
 
     [Fact]

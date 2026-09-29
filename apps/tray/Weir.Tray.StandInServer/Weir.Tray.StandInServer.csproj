@@ -9,4 +9,9 @@
     <Description>Test-only stand-in for WeirServer.exe</Description>
   </PropertyGroup>
 
+  <ItemGroup>
+    <!-- The tray's own stop request, so the stand-in listens on exactly the event the tray sets. -->
+    <Compile Include="..\Weir.Tray\ServerStopRequest.cs" Link="ServerStopRequest.cs" />
+  </ItemGroup>
+
 </Project>
