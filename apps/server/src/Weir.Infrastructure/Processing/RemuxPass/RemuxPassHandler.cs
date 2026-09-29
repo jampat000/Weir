@@ -156,16 +156,18 @@ public sealed partial class RemuxPassHandler : IJobHandler
         }
 
         var progress = new ActivityProgressReporter(_database, context.Id, provenance, _logger, _time, _liveProgress);
+        var performance = claim.Operator!;
+        var limits = IntakeLimits.Resolve(claim.Library, performance);
         var request = new RemuxPassRequest
         {
             Runtime = claim.Runtime!,
             RelativeMediaPath = rel,
             LibraryId = claim.Library?.Id ?? libraryId,
             RulesConfig = claim.Rules,
-            MinFileAgeSeconds = claim.Operator!.MinFileAgeSeconds,
-            MinInputFileSizeMb = Math.Max(claim.Operator.ProcessingMinInputFileSizeMb, claim.Library?.MinFileSizeMb ?? 0),
-            MinimumFreeDiskSpaceMb = claim.Operator.MinimumFreeDiskSpaceMb,
-            KeepFailedWorkFiles = claim.Operator.KeepFailedWorkFiles,
+            MinFileAgeSeconds = limits.MinFileAgeSeconds,
+            MinInputFileSizeMb = limits.MinFileSizeMb,
+            MinimumFreeDiskSpaceMb = performance.MinimumFreeDiskSpaceMb,
+            KeepFailedWorkFiles = performance.KeepFailedWorkFiles,
             MediaScope = mediaScope,
             CurrentJobId = context.Id,
             ProgressReporter = progress.Report,

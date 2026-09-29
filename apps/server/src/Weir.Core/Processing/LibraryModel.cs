@@ -152,10 +152,14 @@ public sealed record ProcessingLibraryRecord
     public string ExcludeMarkersCsv { get; init; } = string.Empty;
     public string IncludePatternsCsv { get; init; } = string.Empty;
     public string ExcludePatternsCsv { get; init; } = string.Empty;
-    public long MinFileSizeMb { get; init; }
+
+    /// <summary>The smallest file this library takes; null follows Settings › Performance (see <see cref="IntakeLimits"/>).</summary>
+    public long? MinFileSizeMb { get; init; }
     public long MaxFileSizeMb { get; init; }
     public string RejectedFileAction { get; init; } = "leave";
-    public long MinFileAgeSeconds { get; init; } = 60;
+
+    /// <summary>How long a file must be left alone before Weir starts on it; null follows Settings › Performance.</summary>
+    public long? MinFileAgeSeconds { get; init; }
     public Timestamp? CreatedAfter { get; init; }
     public Timestamp? CreatedBefore { get; init; }
     public Timestamp? ModifiedAfter { get; init; }
