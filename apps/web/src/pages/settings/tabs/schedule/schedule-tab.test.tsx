@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, expect, it, vi } from "vitest";
@@ -143,11 +143,14 @@ it("asks before an unsaved library's hours are replaced by another library's", a
 
   render(<ScheduleTab />, { wrapper });
 
+  // Each row is asked for its own button: a role query over the whole page would also have to name
+  // the open editor's 168 hour cells, slow enough to starve the test when the machine is busy.
+  const [movies, tv] = await screen.findAllByTestId("schedule-library-row");
   fireEvent.click(
-    (await screen.findAllByRole("button", { name: "Change hours" }))[0],
+    within(movies!).getByRole("button", { name: "Change hours" }),
   );
   fireEvent.pointerDown(screen.getByTestId("schedule-cell-0-9"));
-  fireEvent.click(screen.getAllByRole("button", { name: "Change hours" })[1]);
+  fireEvent.click(within(tv!).getByRole("button", { name: "Change hours" }));
 
   expect(screen.getByTestId("settings-unsaved-changes")).toHaveTextContent(
     "You have unsaved changes to Movies's hours. Leave without saving?",
