@@ -152,6 +152,7 @@ export function MetadataProviderSection({
             </Field>
             <Field label="Provider or gateway URL" width="wide">
               <input
+                autoComplete="url"
                 className="mm-input"
                 value={draft.baseUrl}
                 disabled={!editable || draft.name === ""}
@@ -161,6 +162,7 @@ export function MetadataProviderSection({
             <Field label="API key" width="medium">
               <input
                 type="password"
+                autoComplete="new-password"
                 className="mm-input"
                 value={draft.key}
                 disabled={!editable || draft.name === "" || draft.clearKey}
