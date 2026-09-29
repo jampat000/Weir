@@ -21,6 +21,13 @@ public static class RemuxPassOutcomes
     public const string FailedDuringExecution = "failed_during_execution";
 }
 
+/// <summary>Result keys that mark a rejection no media manager is involved in, and say why in a few words.</summary>
+public static class RejectionResultKeys
+{
+    public const string WithoutManager = "rejected_without_manager";
+    public const string Summary = "rejection_summary";
+}
+
 /// <summary>Operator-facing strings for a pass.</summary>
 public static class RemuxPassVisibility
 {
@@ -84,6 +91,13 @@ public static class RemuxPassVisibility
             return $"{name} was passed through unchanged";
         }
 
+        if (Truthy(payload.Get(RejectionResultKeys.WithoutManager)))
+        {
+            return payload.Get(RejectionResultKeys.Summary) is WireString { Value.Length: > 0 } summary
+                ? $"Rejected {name}: {summary.Value}"
+                : $"Rejected {name}";
+        }
+
         return outcome switch
         {
             RemuxPassOutcomes.LiveOutputWritten => $"{name} was processed successfully",
@@ -130,7 +144,9 @@ public static class RemuxPassVisibility
         if (result == "failed" && !(Truthy(output.Get("pass_through_queued")) || Truthy(output.Get("reject_queued"))))
         {
             // The reason stays in the detail; an action is something the operator can do.
-            nextAction = "Open this file on the History screen for what went wrong, fix the cause, then use Try again there.";
+            nextAction = Truthy(output.Get(RejectionResultKeys.WithoutManager))
+                ? "Open this file on the History screen to delete it, keep it, or process it again after changing the rule."
+                : "Open this file on the History screen for what went wrong, fix the cause, then use Try again there.";
         }
 
         var envelope = OperatorMessages.ActivityDetailEnvelope(

@@ -6,8 +6,8 @@ import { PanelLoading } from "../../components/shared/page-loading";
 import { baseName } from "../../lib/format/path";
 import { usePauseQuery } from "../../lib/pause/pause-queries";
 import {
-  PROCESSING_FILE_STATUS_LABELS,
   processingFileLogDownloadPath,
+  processingFileLead,
   type ProcessingFile,
   type ProcessingFileLogEntry,
 } from "../../lib/processing/files-api";
@@ -118,8 +118,7 @@ export function HistoryDetail({
         {baseName(file.relative_path)}
       </h2>
       <p className="mm-history-detail__lead">
-        {PROCESSING_FILE_STATUS_LABELS[file.status] ?? file.status}
-        {file.status_reason ? `. ${file.status_reason}` : ""}
+        {processingFileLead(file)}
         {took && !working ? ` Took ${took}.` : ""}
       </p>
 

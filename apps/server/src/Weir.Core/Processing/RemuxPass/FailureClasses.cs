@@ -18,6 +18,9 @@ public static class ProcessingFailureClasses
     /// <summary>A guardrail deliberately stopped the file. Never retried automatically.</summary>
     public const string Guardrail = "guardrail";
 
+    /// <summary>The rules themselves left nothing to keep, and no media manager was asked about it. Terminal.</summary>
+    public const string Rules = "rules";
+
     /// <summary>Something Weir could not attribute. Terminal.</summary>
     public const string Unknown = "unknown";
 

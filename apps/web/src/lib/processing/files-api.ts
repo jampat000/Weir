@@ -6,10 +6,7 @@ import type { RequestBody, Schema } from "../api/types";
 export type ProcessingFileStatus = Schema<"ProcessingFileOut">["status"];
 
 /** Plain words for each state. The reason string carries the detail. */
-export const PROCESSING_FILE_STATUS_LABELS: Record<
-  ProcessingFileStatus,
-  string
-> = {
+const PROCESSING_FILE_STATUS_LABELS: Record<ProcessingFileStatus, string> = {
   unprocessed: "Waiting",
   processing: "Processing",
   processed: "Done",
@@ -23,6 +20,30 @@ export const PROCESSING_FILE_STATUS_LABELS: Record<
   rejected: "Rejected for a replacement",
   cancelled: "Cancelled",
 };
+
+/** How the server marks a rejection by the rules themselves, where no media manager was asked for another copy. */
+const REJECTED_BY_RULES = "rules";
+
+/** The plain word for a file's state. A rejection no media manager was asked about is just "Rejected". */
+export function processingFileStatusLabel(
+  file: Pick<ProcessingFile, "status" | "failure_class">,
+): string {
+  if (file.status === "rejected" && file.failure_class === REJECTED_BY_RULES) {
+    return "Rejected";
+  }
+  return PROCESSING_FILE_STATUS_LABELS[file.status] ?? file.status;
+}
+
+/** The state and its reason as one lead. A reason that already opens with the state's word ("Rejected: …") stands alone. */
+export function processingFileLead(
+  file: Pick<ProcessingFile, "status" | "failure_class" | "status_reason">,
+): string {
+  const label = processingFileStatusLabel(file);
+  if (!file.status_reason) return label;
+  return file.status_reason.startsWith(`${label}:`)
+    ? file.status_reason
+    : `${label}. ${file.status_reason}`;
+}
 
 /** Whether one device the operator owns will play the file without the media server converting it. */
 export type ProcessingDirectPlayVerdict = "yes" | "no" | "maybe" | "unknown";
