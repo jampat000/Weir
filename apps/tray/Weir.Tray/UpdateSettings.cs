@@ -45,28 +45,8 @@ sealed class UpdateSettings
         }
     }
 
-    internal void Save(string runtimeHome)
-    {
-        var path = Path.Combine(runtimeHome, FileName);
-        Directory.CreateDirectory(runtimeHome);
-        // Written whole and then renamed. WriteAllText truncates first, so a crash mid-write
-        // leaves exactly the half-file Load has to guess its way around; the point of that
-        // fallback is to stay unreachable in practice.
-        //
-        // The scratch name is unique per write. The server writes this same file when the Settings page saves,
-        // and a shared scratch name would let one writer rename the other's file into place: an operator told
-        // their choice was saved while the file holds a different one. Same directory, so the rename stays
-        // atomic; leading dot so a half-written file is not mistaken for real settings.
-        var tmp = Path.Combine(runtimeHome, $".update-settings.{Guid.NewGuid():n}.tmp");
-        try
-        {
-            File.WriteAllText(tmp, JsonSerializer.Serialize(this, JsonOptions));
-            File.Move(tmp, path, overwrite: true);
-        }
-        finally
-        {
-            // Only still there when the write or the rename failed.
-            File.Delete(tmp);
-        }
-    }
+    // The server writes this same file when the Settings page saves; AtomicFile keeps the two writers from
+    // renaming each other's scratch file into place, and keeps Load's damaged-file fallback unreachable in practice.
+    internal void Save(string runtimeHome) =>
+        AtomicFile.WriteAllText(runtimeHome, FileName, JsonSerializer.Serialize(this, JsonOptions));
 }

@@ -10,4 +10,7 @@ static class FirewallExitCode
 
     /// <summary>The Windows Firewall COM API rejected the read or write.</summary>
     internal const int FirewallApiError = 1;
+
+    /// <summary><c>--allow-lan</c> could not write the LAN access choice to Weir's data folder.</summary>
+    internal const int LanAccessNotSaved = 2;
 }

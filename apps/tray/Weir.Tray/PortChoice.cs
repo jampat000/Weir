@@ -226,24 +226,10 @@ static class PortChoice
         }
     }
 
-    internal static void Save(string runtimeHome, int port)
-    {
-        Directory.CreateDirectory(runtimeHome);
-        var path = Path.Combine(runtimeHome, SavedPortFileName);
-        // Whole-then-rename, as UpdateSettings.Save does: a torn write would read as "never
-        // chosen" and put the first-run dialog in front of someone who already answered it.
-        var tmp = Path.Combine(runtimeHome, $".port.{Guid.NewGuid():n}.tmp");
-        try
-        {
-            File.WriteAllText(tmp, port.ToString(CultureInfo.InvariantCulture));
-            File.Move(tmp, path, overwrite: true);
-        }
-        finally
-        {
-            // Only still there when the write or the rename failed.
-            File.Delete(tmp);
-        }
-    }
+    // Written whole (AtomicFile): a torn write would read as "never chosen" and put the first-run dialog in
+    // front of someone who already answered it.
+    internal static void Save(string runtimeHome, int port) =>
+        AtomicFile.WriteAllText(runtimeHome, SavedPortFileName, port.ToString(CultureInfo.InvariantCulture));
 
     // -- The machine ----------------------------------------------------------
 
@@ -268,9 +254,9 @@ static class PortChoice
     }
 
     /// <summary>
-    /// Whether another program already holds <paramref name="port"/>. The server binds every
-    /// interface, so this checks the listener table and then tries an exclusive bind on
-    /// 0.0.0.0 — a port Windows has reserved (Hyper-V and WSL reserve ranges) fails that too.
+    /// Whether another program already holds <paramref name="port"/>. The server can be moved between this PC only
+    /// and every interface without changing its port, so this checks the listener table and then tries an exclusive
+    /// bind on 0.0.0.0 — a port Windows has reserved (Hyper-V and WSL reserve ranges) fails that too.
     /// </summary>
     internal static bool IsInUse(int port)
     {

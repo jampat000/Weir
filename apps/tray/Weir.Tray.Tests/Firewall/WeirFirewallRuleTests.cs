@@ -5,7 +5,7 @@ namespace Weir.Tray.Tests.Firewall;
 
 /// <summary>
 /// The rule Weir asks Windows Firewall for, and the decisions around it: what it looks like, which of the
-/// firewall's other rules count as blocking Weir specifically, and what state that adds up to for System › About.
+/// firewall's other rules count as blocking Weir specifically, and whether Windows already lets other devices in.
 /// </summary>
 public sealed class WeirFirewallRuleTests
 {
@@ -157,47 +157,84 @@ public sealed class WeirFirewallRuleTests
         Assert.Null(exception);
     }
 
-    // -- Reading state for System › About ------------------------------------
+    // -- Whether Windows already lets other devices in -----------------------
+
+    private static FirewallRule InboundRule(string name, FirewallRuleAction action, FirewallProfiles profiles, bool enabled = true, string? program = null) =>
+        new(name, program ?? ExpectedProgramPath, action, FirewallRuleDirection.Inbound, profiles, enabled);
 
     [Fact]
-    public void State_is_not_configured_when_there_is_no_rule_at_all()
+    public void Nothing_is_allowed_when_there_is_no_rule_at_all()
     {
-        var policy = new FakeFirewallPolicy { CurrentProfiles = FirewallProfiles.Private };
-
-        Assert.Equal(NetworkAccessState.NotConfigured, WeirFirewallRule.ReadState(policy, InstallRoot));
+        Assert.False(WeirFirewallRule.AllowsServerInbound(new FakeFirewallPolicy(), InstallRoot));
     }
 
     [Fact]
-    public void State_is_allowed_when_the_rule_is_enabled_and_covers_the_current_network()
+    public void Weirs_own_rule_allows_the_server_inbound()
     {
-        var policy = new FakeFirewallPolicy(WeirFirewallRule.DesiredRule(InstallRoot)) { CurrentProfiles = FirewallProfiles.Private };
+        var policy = new FakeFirewallPolicy(WeirFirewallRule.DesiredRule(InstallRoot));
 
-        Assert.Equal(NetworkAccessState.Allowed, WeirFirewallRule.ReadState(policy, InstallRoot));
+        Assert.True(WeirFirewallRule.AllowsServerInbound(policy, InstallRoot));
     }
 
     [Fact]
-    public void State_is_blocked_when_the_rule_is_disabled()
+    public void A_rule_windows_made_when_someone_clicked_allow_counts_too()
     {
-        var disabled = WeirFirewallRule.DesiredRule(InstallRoot) with { Enabled = false };
-        var policy = new FakeFirewallPolicy(disabled) { CurrentProfiles = FirewallProfiles.Private };
+        var policy = new FakeFirewallPolicy(InboundRule("WeirServer.exe", FirewallRuleAction.Allow, FirewallProfiles.Private));
 
-        Assert.Equal(NetworkAccessState.Blocked, WeirFirewallRule.ReadState(policy, InstallRoot));
+        Assert.True(WeirFirewallRule.AllowsServerInbound(policy, InstallRoot));
     }
 
     [Fact]
-    public void State_is_blocked_when_the_current_network_is_public_and_the_rule_never_covers_it()
+    public void An_allow_rule_for_another_program_does_not_count()
     {
-        var policy = new FakeFirewallPolicy(WeirFirewallRule.DesiredRule(InstallRoot)) { CurrentProfiles = FirewallProfiles.Public };
+        var policy = new FakeFirewallPolicy(InboundRule("Other", FirewallRuleAction.Allow, FirewallProfiles.Private, program: @"C:otherOther.exe"));
 
-        Assert.Equal(NetworkAccessState.Blocked, WeirFirewallRule.ReadState(policy, InstallRoot));
+        Assert.False(WeirFirewallRule.AllowsServerInbound(policy, InstallRoot));
     }
 
     [Fact]
-    public void State_is_blocked_when_a_block_rule_targets_weirs_own_exe_even_alongside_an_allow_rule()
+    public void A_disabled_allow_rule_does_not_count()
     {
-        var blocked = new FirewallRule("Blocked WeirServer.exe", ExpectedProgramPath, FirewallRuleAction.Block, FirewallRuleDirection.Inbound, FirewallProfiles.Public, Enabled: true);
-        var policy = new FakeFirewallPolicy(WeirFirewallRule.DesiredRule(InstallRoot), blocked) { CurrentProfiles = FirewallProfiles.Private };
+        var policy = new FakeFirewallPolicy(InboundRule("Weir", FirewallRuleAction.Allow, FirewallProfiles.Private, enabled: false));
 
-        Assert.Equal(NetworkAccessState.Blocked, WeirFirewallRule.ReadState(policy, InstallRoot));
+        Assert.False(WeirFirewallRule.AllowsServerInbound(policy, InstallRoot));
+    }
+
+    [Fact]
+    public void An_outbound_allow_rule_does_not_count()
+    {
+        var outbound = new FirewallRule("Weir", ExpectedProgramPath, FirewallRuleAction.Allow, FirewallRuleDirection.Outbound, FirewallProfiles.Private, Enabled: true);
+
+        Assert.False(WeirFirewallRule.AllowsServerInbound(new FakeFirewallPolicy(outbound), InstallRoot));
+    }
+
+    [Fact]
+    public void A_block_rule_on_the_same_network_wins_over_the_allow_rule()
+    {
+        var policy = new FakeFirewallPolicy(
+            InboundRule("Weir", FirewallRuleAction.Allow, FirewallProfiles.Private),
+            InboundRule("Blocked WeirServer.exe", FirewallRuleAction.Block, FirewallProfiles.Private));
+
+        Assert.False(WeirFirewallRule.AllowsServerInbound(policy, InstallRoot));
+    }
+
+    [Fact]
+    public void A_block_rule_on_another_network_leaves_the_allowed_network_open()
+    {
+        var policy = new FakeFirewallPolicy(
+            InboundRule("Weir", FirewallRuleAction.Allow, FirewallProfiles.Private),
+            InboundRule("Blocked WeirServer.exe", FirewallRuleAction.Block, FirewallProfiles.Public));
+
+        Assert.True(WeirFirewallRule.AllowsServerInbound(policy, InstallRoot));
+    }
+
+    [Fact]
+    public void A_disabled_block_rule_blocks_nothing()
+    {
+        var policy = new FakeFirewallPolicy(
+            InboundRule("Weir", FirewallRuleAction.Allow, FirewallProfiles.Private),
+            InboundRule("Blocked WeirServer.exe", FirewallRuleAction.Block, FirewallProfiles.Private, enabled: false));
+
+        Assert.True(WeirFirewallRule.AllowsServerInbound(policy, InstallRoot));
     }
 }

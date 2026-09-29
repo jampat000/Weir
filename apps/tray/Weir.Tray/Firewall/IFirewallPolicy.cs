@@ -10,9 +10,6 @@ interface IFirewallPolicy
     /// <summary>Every rule the firewall currently has, both Weir's own and everyone else's. Read-only; no admin rights needed.</summary>
     IReadOnlyList<FirewallRule> Rules { get; }
 
-    /// <summary>The network profile(s) active on this machine right now. Read-only; no admin rights needed.</summary>
-    FirewallProfiles CurrentProfiles { get; }
-
     /// <summary>
     /// Creates <paramref name="rule"/>, or overwrites the existing rule with the same <see cref="FirewallRule.Name"/>
     /// so there is never more than one. Requires administrator rights.
