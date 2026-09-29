@@ -83,7 +83,7 @@ export function HistoryKeptList({
       <thead>
         <tr>
           <th scope="col">File</th>
-          <th scope="col">Library</th>
+          <th scope="col">Workflow</th>
           <th scope="col">Size</th>
           <th scope="col">
             <span className="sr-only">Actions</span>

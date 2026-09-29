@@ -116,7 +116,7 @@ export function LibraryCapacityGroup({
   return (
     <QuietFieldGroup
       title="Capacity and recovery"
-      detail="Priority is relative: higher-numbered libraries are offered work first."
+      detail="Priority is relative: higher-numbered workflows are offered work first."
     >
       <div className="mm-field-row">
         <SelectSetting
@@ -124,7 +124,7 @@ export function LibraryCapacityGroup({
           name="max_concurrent_files"
           label="Files at once"
           options={FILES_AT_ONCE_OPTIONS}
-          hint="Only to hold this library below Files at once in Performance, so it cannot take every slot."
+          hint="Only to hold this workflow below Files at once in Performance, so it cannot take every slot."
         />
         <TextSetting
           binding={binding}

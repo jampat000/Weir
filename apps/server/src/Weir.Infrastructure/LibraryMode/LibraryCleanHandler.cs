@@ -98,7 +98,7 @@ public sealed partial class LibraryCleanHandler : IJobHandler
             library = libraryId > 0 ? await _libraries.GetAsync(uow, libraryId).ConfigureAwait(false) : null;
             if (library is null)
             {
-                await RecordAsync(libraryId, path, trigger, LibraryActivityEventTypes.FileFailed, "This library no longer exists.").ConfigureAwait(false);
+                await RecordAsync(libraryId, path, trigger, LibraryActivityEventTypes.FileFailed, "This workflow no longer exists.").ConfigureAwait(false);
                 await uow.CommitAsync().ConfigureAwait(false);
                 return;
             }
@@ -184,7 +184,7 @@ public sealed partial class LibraryCleanHandler : IJobHandler
 
         if (plan.Classification == LibraryFileClassification.Matches)
         {
-            await RecordAsync(libraryId, path, trigger, LibraryActivityEventTypes.FileSkipped, "This file already matches the library's rules; nothing to clean.").ConfigureAwait(false);
+            await RecordAsync(libraryId, path, trigger, LibraryActivityEventTypes.FileSkipped, "This file already matches the workflow's rules; nothing to clean.").ConfigureAwait(false);
             return;
         }
 

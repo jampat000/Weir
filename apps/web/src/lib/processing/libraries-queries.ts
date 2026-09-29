@@ -56,6 +56,7 @@ export function useProcessingManagerSetupQuery(
   watchedFolder: string,
   outputFolder: string,
   removeOriginal: boolean,
+  linkedConnectionIds: number[],
   enabled: boolean,
 ) {
   return useQuery({
@@ -64,6 +65,7 @@ export function useProcessingManagerSetupQuery(
       watchedFolder,
       outputFolder,
       removeOriginal,
+      linkedConnectionIds,
     ),
     queryFn: () =>
       fetchProcessingManagerSetup(
@@ -71,6 +73,7 @@ export function useProcessingManagerSetupQuery(
         watchedFolder,
         outputFolder,
         removeOriginal,
+        linkedConnectionIds,
       ),
     enabled,
     staleTime: 30_000,

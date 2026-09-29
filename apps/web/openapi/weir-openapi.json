@@ -10665,6 +10665,54 @@
         "title": "ManagerSetupMappingOut",
         "type": "object"
       },
+      "ManagerSourceFactsOut": {
+        "description": "What a media manager calls the places a workflow's files come from and go to, in its own words.",
+        "properties": {
+          "source_category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The category the manager files this media type's downloads under in its download client.",
+            "title": "Source Category"
+          },
+          "manager_library": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Deluno: its library that imports the cleaned file.",
+            "title": "Manager Library"
+          },
+          "root_folder": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Sonarr and Radarr: the root folder the cleaned file is imported into.",
+            "title": "Root Folder"
+          }
+        },
+        "required": [
+          "source_category",
+          "manager_library",
+          "root_folder"
+        ],
+        "title": "ManagerSourceFactsOut",
+        "type": "object"
+      },
       "ManagerSetupItemOut": {
         "description": "One connection's setup: what it needs and whether it has it.",
         "properties": {
@@ -10715,6 +10763,10 @@
               }
             ],
             "description": "Sonarr and Radarr only."
+          },
+          "story": {
+            "$ref": "#/components/schemas/ManagerSourceFactsOut",
+            "description": "What the manager calls where this workflow's files come from and go to. Any of it is null when the manager did not report it."
           },
           "suggested_watched_folder": {
             "anyOf": [
@@ -15834,6 +15886,19 @@
               "default": true,
               "title": "Remove Original After Success",
               "type": "boolean"
+            }
+          },
+          {
+            "description": "The media managers the workflow is linked to; only these are checked. Leave it out to check every manager that covers the media type; send it empty for a Weir-only workflow.",
+            "in": "query",
+            "name": "connection_ids",
+            "required": false,
+            "schema": {
+              "items": {
+                "type": "integer"
+              },
+              "title": "Connection Ids",
+              "type": "array"
             }
           }
         ],

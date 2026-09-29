@@ -141,6 +141,63 @@ public sealed class ManagerSetupApiTests
     }
 
     [Fact]
+    public async Task Deluno_names_its_own_library_and_the_category_its_download_client_files_downloads_under()
+    {
+        var (server, client, manager) = await StartAsync();
+        await using var _server = server;
+        await ConnectAsync(client, "deluno", "http://192.0.2.10:5099");
+        manager.Json(
+            HttpMethod.Get,
+            "/api/integrations/external/manifest",
+            DelunoManifest.Replace("\"downloadClients\":[]", "\"downloadClients\":[{\"name\":\"qBittorrent\",\"isEnabled\":true,\"moviesCategory\":\"deluno-movies\",\"tvCategory\":\"deluno-tv\"}]", StringComparison.Ordinal));
+
+        var deluno = Assert.Single(await ManagersAsync(client, "tv", "/media/downloads/complete", "/media/downloads/weir/tv"))!;
+
+        var story = deluno["story"]!;
+        Assert.Equal("deluno-tv", story["source_category"]!.GetValue<string>());
+        Assert.Equal("TV", story["manager_library"]!.GetValue<string>());
+        Assert.Null(story["root_folder"]);
+    }
+
+    [Fact]
+    public async Task Sonarr_names_the_category_its_download_client_uses_and_the_root_folder_it_imports_into()
+    {
+        var (server, client, manager) = await StartAsync();
+        await using var _server = server;
+        await ConnectAsync(client, "sonarr", "http://192.0.2.60:8989");
+        manager.Json(HttpMethod.Get, "/api/v3/remotepathmapping", "[]")
+            .Json(HttpMethod.Get, "/api/v3/downloadclient", SonarrClients)
+            .Json(HttpMethod.Get, "/api/v3/rootfolder", """[{"path":"Z:\\TV","id":1}]""")
+            .Json(HttpMethod.Get, "/api/v3/config/downloadclient", """{"enableCompletedDownloadHandling":true,"id":1}""")
+            .Json(HttpMethod.Get, "/api/v3/queue", """{"page":1,"pageSize":1000,"totalRecords":0,"records":[]}""");
+
+        var sonarr = Assert.Single(await ManagersAsync(client, "tv", "/media/downloads/complete", "/media/downloads/weir"))!;
+
+        var story = sonarr["story"]!;
+        Assert.Equal("tv-sonarr", story["source_category"]!.GetValue<string>());
+        Assert.Equal("Z:\\TV", story["root_folder"]!.GetValue<string>());
+        Assert.Null(story["manager_library"]);
+    }
+
+    [Fact]
+    public async Task A_name_the_manager_does_not_report_is_null_rather_than_guessed()
+    {
+        var (server, client, manager) = await StartAsync();
+        await using var _server = server;
+        await ConnectAsync(client, "sonarr", "http://192.0.2.60:8989");
+        manager.Json(HttpMethod.Get, "/api/v3/remotepathmapping", "[]")
+            .Json(HttpMethod.Get, "/api/v3/downloadclient", "[]")
+            .Json(HttpMethod.Get, "/api/v3/config/downloadclient", """{"enableCompletedDownloadHandling":true,"id":1}""");
+
+        var sonarr = Assert.Single(await ManagersAsync(client, "tv", "/a", "/b"))!;
+
+        var story = sonarr["story"]!;
+        Assert.Null(story["source_category"]);
+        Assert.Null(story["root_folder"]);
+        Assert.Null(story["manager_library"]);
+    }
+
+    [Fact]
     public async Task A_library_removes_originals_unless_told_to_keep_them_and_says_which()
     {
         var (server, client, _) = await StartAsync();

@@ -41,7 +41,7 @@ public static partial class ManagerSetupRules
             lines.Add(new SetupCheckLine(
                 SetupCheckLine.Note,
                 $"{managerLabel} has {refining.Count} {scopeWord} libraries set to Refine before import; the folders below are {library.Name}'s. " +
-                "Give each its own Weir library."));
+                "Give each its own Weir workflow."));
         }
 
         var downloads = WireStrings.Strip(library.DownloadsPath ?? string.Empty);
@@ -50,7 +50,7 @@ public static partial class ManagerSetupRules
         {
             lines.Add(new SetupCheckLine(
                 SetupCheckLine.Unverified,
-                $"{managerLabel} does not say where {library.Name}'s downloads arrive, so Weir cannot verify that its hand-offs sit inside this library's watched folder."));
+                $"{managerLabel} does not say where {library.Name}'s downloads arrive, so Weir cannot verify that its hand-offs sit inside this workflow's watched folder."));
         }
         else if (watched.Length > 0 && Inside(downloads, watched))
         {
@@ -74,10 +74,10 @@ public static partial class ManagerSetupRules
         if (processed.Length > 0)
         {
             lines.Add(output.Length > 0 && Inside(processed, output) && Inside(output, processed)
-                ? new SetupCheckLine(SetupCheckLine.Ok, $"{managerLabel} picks up cleaned files from {processed}, the folder this library writes to.")
+                ? new SetupCheckLine(SetupCheckLine.Ok, $"{managerLabel} picks up cleaned files from {processed}, the folder this workflow writes to.")
                 : new SetupCheckLine(
                     SetupCheckLine.Problem,
-                    $"{managerLabel} picks up cleaned files from {processed}, but this library writes to {(output.Length > 0 ? output : "no output folder")}. " +
+                    $"{managerLabel} picks up cleaned files from {processed}, but this workflow writes to {(output.Length > 0 ? output : "no output folder")}. " +
                     "Unless both are the same folder seen from two machines, use the same folder."));
         }
 
@@ -94,7 +94,7 @@ public static partial class ManagerSetupRules
             var filedUnder = category is null ? "its downloads" : $"the category \"{category}\"";
             yield return new SetupCheckLine(
                 SetupCheckLine.Unverified,
-                $"{managerLabel}'s {client.Name} files this library's downloads under {filedUnder}, but {managerLabel} does not publish where it saves them. " +
+                $"{managerLabel}'s {client.Name} files this workflow's downloads under {filedUnder}, but {managerLabel} does not publish where it saves them. " +
                 "Weir cannot verify they land inside the watched folder.");
         }
     }

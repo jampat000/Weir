@@ -191,7 +191,7 @@ internal sealed class ProcessingJobsEndpointHandlers
         var file = await _files.GetAsync(uow, id).ConfigureAwait(false)
             ?? throw new ApiException(StatusCodes.Status404NotFound, "Weir has no record of that file.");
         var library = await _libraries.GetAsync(uow, file.LibraryId).ConfigureAwait(false)
-            ?? throw new ApiException(StatusCodes.Status404NotFound, "The library this file belonged to no longer exists.");
+            ?? throw new ApiException(StatusCodes.Status404NotFound, "The workflow this file belonged to no longer exists.");
 
         var outcome = await _holdDiagnostic.EvaluateAsync(uow, file, library, _connections, request.Context.RequestAborted).ConfigureAwait(false);
         var verdict = outcome.Verdict switch

@@ -166,7 +166,7 @@ const libraryPath = (id: number) => `${processingLibrariesPath()}/${id}`;
 export async function fetchProcessingLibraries(): Promise<ProcessingLibrary[]> {
   const path = processingLibrariesPath();
   const r = await apiFetch(path);
-  await requireOk(path, r, "Could not load libraries");
+  await requireOk(path, r, "Could not load workflows");
   return readJson<ProcessingLibrary[]>(r);
 }
 
@@ -174,7 +174,7 @@ export async function createProcessingLibrary(
   data: ProcessingLibraryCreate,
 ): Promise<ProcessingLibrary> {
   const path = processingLibrariesPath();
-  const r = await sendJson(path, "POST", data, "Could not add that library");
+  const r = await sendJson(path, "POST", data, "Could not add that workflow");
   return readJson<ProcessingLibrary>(r);
 }
 
@@ -183,7 +183,7 @@ export async function updateProcessingLibrary(
   data: ProcessingLibraryWrite,
 ): Promise<ProcessingLibrary> {
   const path = libraryPath(id);
-  const r = await sendJson(path, "PUT", data, "Could not save that library");
+  const r = await sendJson(path, "PUT", data, "Could not save that workflow");
   return readJson<ProcessingLibrary>(r);
 }
 
@@ -193,7 +193,7 @@ export async function deleteProcessingLibrary(id: number): Promise<void> {
     libraryPath(id),
     "DELETE",
     {},
-    "Could not remove that library",
+    "Could not remove that workflow",
   );
 }
 
@@ -205,7 +205,7 @@ export async function reorderProcessingLibraries(
     path,
     "POST",
     { library_ids_in_order },
-    "Could not reorder libraries",
+    "Could not reorder workflows",
   );
   return readJson<ProcessingLibrary[]>(r);
 }

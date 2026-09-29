@@ -160,7 +160,7 @@ internal sealed class ProcessingFilesEndpointHandlers
         var files = new List<WireValue>();
         foreach (var row in rows)
         {
-            var libraryName = libraryNames.GetValueOrDefault(row.LibraryId, "Unknown library");
+            var libraryName = libraryNames.GetValueOrDefault(row.LibraryId, "Unknown workflow");
             var directPlay = DirectPlayService.ForRow(row, devices);
             progressByPath.TryGetValue(row.RelativePath, out var progress);
             // #652: the copy Weir handed back, and what a media manager said about it, for History.

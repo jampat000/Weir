@@ -93,7 +93,7 @@ public sealed partial class LibraryModeScheduleTask : IPeriodicTask
 
     public TimeSpan? FailureCooldown => null;
 
-    public string FailureMessage => "Library mode's scheduled scan and clean failed to check its libraries.";
+    public string FailureMessage => "Library mode's scheduled scan and clean failed to check its workflows.";
 
     public async Task RunOnceAsync(CancellationToken cancellationToken)
     {

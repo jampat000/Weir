@@ -118,7 +118,7 @@ public sealed partial class OutputFolderCleanup
         {
             Skip(output, Prefix, "tv_output_season_folder_skip_reason",
                 "Another TV video pass is already waiting or running for an episode whose output maps to this same " +
-                "season folder under your TV output library, so TV output-folder cleanup was skipped to avoid racing another remux.");
+                "season folder under your TV output folder, so TV output-folder cleanup was skipped to avoid racing another remux.");
             return;
         }
 

@@ -216,7 +216,7 @@ export function BackupSettingsSection({
       heading="Backup and restore"
     >
       <p className="mm-quiet-note">
-        A backup holds your libraries, rules, schedule and time zone, plus your
+        A backup holds your workflows, rules, schedule and time zone, plus your
         media managers and alerts. Media managers and alerts come back without
         their API keys and webhook addresses; enter those again after restoring.
         It does not include your sign-in or file history.

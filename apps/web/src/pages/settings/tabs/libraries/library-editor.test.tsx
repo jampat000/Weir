@@ -29,6 +29,7 @@ it("shows Saving… while a library saves, and a failure inside the editor", asy
 
   render(<LibrariesTab />, { wrapper });
   fireEvent.click(await screen.findByTestId("processing-library-add"));
+  fireEvent.click(await screen.findByTestId("add-workflow-continue"));
   fireEvent.change(screen.getByPlaceholderText("Movies 4K"), {
     target: { value: "Kids" },
   });
@@ -129,6 +130,7 @@ it("adds a library through the API", async () => {
 
   render(<LibrariesTab />, { wrapper });
   fireEvent.click(await screen.findByTestId("processing-library-add"));
+  fireEvent.click(await screen.findByTestId("add-workflow-continue"));
   fireEvent.change(screen.getByPlaceholderText("Movies 4K"), {
     target: { value: "Kids" },
   });
@@ -150,6 +152,7 @@ it("starts a new library on the same files-at-once as Performance, and lets it b
 
   render(<LibrariesTab />, { wrapper });
   fireEvent.click(await screen.findByTestId("processing-library-add"));
+  fireEvent.click(await screen.findByTestId("add-workflow-continue"));
   fireEvent.change(screen.getByPlaceholderText("Movies 4K"), {
     target: { value: "Kids" },
   });
@@ -303,7 +306,11 @@ it("lets an operator choose Reject when a linked manager supports it", async () 
 
 it("keeps the original download when told to, saves it, and asks the check about seeding with it", async () => {
   asOperator();
-  const existing = library({ media_type: "tv", name: "TV" });
+  const existing = library({
+    media_type: "tv",
+    name: "TV",
+    manager_connection_ids: [10],
+  });
   vi.spyOn(api, "fetchProcessingLibraries").mockResolvedValue([existing]);
   const check = vi
     .spyOn(managersApi, "fetchProcessingManagerSetup")
@@ -331,6 +338,7 @@ it("keeps the original download when told to, saves it, and asks the check about
       "/srv/movies/in",
       "/srv/movies/out",
       false,
+      [10],
     ),
   );
   fireEvent.click(screen.getByTestId("processing-library-save"));
@@ -350,6 +358,7 @@ it("fills a library's folders from what Deluno reports, then saves them", async 
     name: "TV",
     watched_folder: "/media/tv",
     output_folder: "",
+    manager_connection_ids: [5],
   });
   vi.spyOn(api, "fetchProcessingLibraries").mockResolvedValue([existing]);
   vi.spyOn(managersApi, "fetchProcessingManagerSetup").mockResolvedValue({

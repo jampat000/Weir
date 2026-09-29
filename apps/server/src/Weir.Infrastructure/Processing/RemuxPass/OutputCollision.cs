@@ -64,7 +64,7 @@ public static class OutputCollision
             case Skip:
                 return new CollisionDecision(
                     chosen, "skip", final, false,
-                    $"An output already exists at {name} and this library is set to leave existing outputs " +
+                    $"An output already exists at {name} and this workflow is set to leave existing outputs " +
                     "alone, so Weir kept the one that was already there.");
             case KeepBoth:
             {
@@ -112,7 +112,7 @@ public static class OutputCollision
             default:
                 return new CollisionDecision(
                     Replace, "write", final, true,
-                    $"An existing output at {name} was replaced, which is this library's collision policy.");
+                    $"An existing output at {name} was replaced, which is this workflow's collision policy.");
         }
     }
 

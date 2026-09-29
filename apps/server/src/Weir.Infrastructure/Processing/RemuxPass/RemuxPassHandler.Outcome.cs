@@ -106,7 +106,7 @@ public sealed partial class RemuxPassHandler
                             : "Finished processing this file.";
                     if (result.Get("source_kept_by_library_setting") is WireBool { Value: true })
                     {
-                        processedReason += " The original download was kept in the watched folder, as this library asks.";
+                        processedReason += " The original download was kept in the watched folder, as this workflow asks.";
                     }
 
                     if (await RemuxPassFileState.MarkFileStatusAsync(uow, library.Id, rel, ProcessingFileStatuses.Processed, processedReason, now).ConfigureAwait(false))

@@ -23,7 +23,7 @@ public sealed class RejectSupportEvaluator
         {
             return new RejectSupportResult(
                 false,
-                "Link a media manager to this library first. Rejecting needs a manager that can find a different release.");
+                "Link a media manager to this workflow first. Rejecting needs a manager that can find a different release.");
         }
 
         var reasons = new List<string>();

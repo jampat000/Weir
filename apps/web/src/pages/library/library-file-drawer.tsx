@@ -205,7 +205,7 @@ export function LibraryFileDrawer({
                 "Your choice, for this file only."
               ) : (
                 <>
-                  {"Decided by this library’s rules. "}
+                  {"Decided by this workflow’s rules. "}
                   <Link to={`/settings?tab=rules&library=${libraryId}`}>
                     Edit the rules →
                   </Link>
@@ -236,7 +236,7 @@ export function LibraryFileDrawer({
             disabled={tracks.length === 0}
             onClick={() => setKeep(choosing ? null : new Set(kept))}
           >
-            {choosing ? "Use this library’s rules" : "Choose tracks"}
+            {choosing ? "Use this workflow’s rules" : "Choose tracks"}
           </button>
           <button
             type="button"

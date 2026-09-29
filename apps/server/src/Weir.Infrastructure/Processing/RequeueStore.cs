@@ -25,7 +25,7 @@ public sealed class RequeueStore(ProcessingJobStore jobStore, LibraryStore libra
         var library = await libraries.GetAsync(uow, row.LibraryId).ConfigureAwait(false);
         if (library is null)
         {
-            return new RequeueResult(0, 1, "The library this file belonged to no longer exists, so there is nowhere to queue it.");
+            return new RequeueResult(0, 1, "The workflow this file belonged to no longer exists, so there is nowhere to queue it.");
         }
 
         // A queued pass on a missing original only fails later with a confusing reason, so a file Weir is done with
@@ -91,8 +91,8 @@ public sealed class RequeueStore(ProcessingJobStore jobStore, LibraryStore libra
     internal static string BulkDetail(int requeued, int skipped) => (requeued, skipped) switch
     {
         (> 0, 0) => $"Queued {Plural.Of(requeued, "file")} again. {(requeued == 1 ? "It starts" : "They start")} as capacity frees up.",
-        (> 0, _) => $"Queued {Plural.Of(requeued, "file")} again. {skipped} could not be queued because {(skipped == 1 ? "its" : "their")} library or original is gone.",
-        (0, > 0) => $"Nothing was queued: {Plural.Of(skipped, "file")} {Plural.Noun(skipped, "has", "have")} lost {(skipped == 1 ? "its" : "their")} library or original.",
+        (> 0, _) => $"Queued {Plural.Of(requeued, "file")} again. {skipped} could not be queued because {(skipped == 1 ? "its" : "their")} workflow or original is gone.",
+        (0, > 0) => $"Nothing was queued: {Plural.Of(skipped, "file")} {Plural.Noun(skipped, "has", "have")} lost {(skipped == 1 ? "its" : "their")} workflow or original.",
         _ => "Nothing matched, so nothing was queued.",
     };
 

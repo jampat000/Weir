@@ -238,7 +238,7 @@ async function foundLibraries() {
 }
 
 describe("first run: connect Deluno first", () => {
-  it("connects Deluno, tests it, and offers the libraries it reports", async () => {
+  it("connects Deluno, tests it, and offers the workflows it reports", async () => {
     const create = vi
       .spyOn(managersApi, "createMediaManagerConnection")
       .mockImplementation(async () => {
@@ -298,7 +298,7 @@ describe("first run: connect Deluno first", () => {
     expect(screen.queryByTestId("media-manager-kind")).not.toBeInTheDocument();
   });
 
-  it("saves the offered libraries into the empty ones, linked to Deluno, and drops the connect step from What's next", async () => {
+  it("saves the offered workflows into the empty ones, linked to Deluno, and drops the connect step from What's next", async () => {
     scenario.managers = [managerConnection({})];
     renderWizard();
 
@@ -337,7 +337,7 @@ describe("first run: connect Deluno first", () => {
     );
   });
 
-  it("creates a new library when the first one of its type is already in use", async () => {
+  it("creates a new workflow when the first one of its type is already in use", async () => {
     scenario.managers = [managerConnection({})];
     scenario.suggestions = {
       libraries: [
@@ -366,7 +366,7 @@ describe("first run: connect Deluno first", () => {
     expect(updateLibrary).not.toHaveBeenCalled();
   });
 
-  it("creates nothing for a library that is unticked, and saves the folders as edited", async () => {
+  it("creates nothing for a workflow that is unticked, and saves the folders as edited", async () => {
     scenario.managers = [managerConnection({})];
     renderWizard();
 
@@ -418,7 +418,7 @@ describe("first run: connect Deluno first", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("shows a check problem under the library it belongs to and will not finish until it is fixed", async () => {
+  it("shows a check problem under the workflow it belongs to and will not finish until it is fixed", async () => {
     scenario.managers = [managerConnection({})];
     scenario.checks = {
       ...passingCheck(),
@@ -449,7 +449,7 @@ describe("first run: connect Deluno first", () => {
     expect(saveSettingsMock).not.toHaveBeenCalled();
   });
 
-  it("lists what still needs fixing in a library's folder chain, without stopping Finish", async () => {
+  it("lists what still needs fixing in a workflow's folder chain, without stopping Finish", async () => {
     scenario.managers = [managerConnection({})];
     scenario.checks = {
       ...passingCheck(),
@@ -462,7 +462,7 @@ describe("first run: connect Deluno first", () => {
             lines: [
               {
                 state: "problem",
-                text: "The watched folder C:\\Downloads\\Completed\\TV does not exist. Create it, or point this library at a folder that does.",
+                text: "The watched folder C:\\Downloads\\Completed\\TV does not exist. Create it, or point this workflow at a folder that does.",
               },
             ],
           },
@@ -568,7 +568,7 @@ describe("first run: connect Sonarr and Radarr first", () => {
     scenario.suggestions = SONARR_RADARR;
   });
 
-  it("shows both connections and links each library only to the manager that covers it", async () => {
+  it("shows both connections and links each workflow only to the manager that covers it", async () => {
     renderWizard();
 
     choose("Sonarr / Radarr");
@@ -639,13 +639,13 @@ describe("first run: connect Sonarr and Radarr first", () => {
       ),
     ).toBeInTheDocument();
     expect(
-      screen.getByText(/Weir could not find a folder to start a library from/),
+      screen.getByText(/Weir could not find a folder to start a workflow from/),
     ).toBeInTheDocument();
   });
 });
 
 describe("first run: connect a download client first", () => {
-  it("offers libraries from the client's folders and links them to no media manager", async () => {
+  it("offers workflows from the client's folders and links them to no media manager", async () => {
     scenario.clients = [clientConnection({})];
     scenario.suggestions = {
       libraries: [

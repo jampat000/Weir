@@ -101,7 +101,7 @@ public sealed class SystemEndpointsTests
         Assert.Equal(
             "[{\"name\":\"database\",\"status\":\"ready\",\"detail\":\"Local database is connected and migrations are complete.\"}," +
             "{\"name\":\"workers\",\"status\":\"ready\",\"detail\":\"Background workers and schedules are ready.\"}," +
-            "{\"name\":\"filesystem_watcher\",\"status\":\"ready\",\"detail\":\"No libraries are being watched for filesystem events.\"}]",
+            "{\"name\":\"filesystem_watcher\",\"status\":\"ready\",\"detail\":\"No workflows are being watched for filesystem events.\"}]",
             root.GetProperty("steps").GetRawText());
         Assert.Equal(
             "[{\"module\":\"processing\",\"expected_workers\":10,\"active_workers\":10,\"stale_workers\":0,\"stopped_workers\":0,\"status\":\"healthy\"," +

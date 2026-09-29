@@ -89,7 +89,7 @@ public static partial class ManagerSetupRules
 
         if (!watched.IsRooted || !output.IsRooted)
         {
-            lines.Add(new SetupCheckLine(SetupCheckLine.Problem, "Set this library's watched and output folders first; the mapping is built from them."));
+            lines.Add(new SetupCheckLine(SetupCheckLine.Problem, "Set this workflow's watched and output folders first; the mapping is built from them."));
             return new ArrSetupResult(hosts, lines);
         }
 

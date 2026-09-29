@@ -15,7 +15,7 @@ import { ConnectionFolderChain } from "./connection-folder-chain";
 import { ConnectionSetup } from "./connection-setup";
 import {
   ConnectionStatusPanel,
-  LinkedLibraries,
+  FedWorkflows,
   UnsignedWebhookWarning,
 } from "./connection-status";
 
@@ -100,7 +100,7 @@ export function ConnectionCard({
       <div className="mm-quiet-section__body">
         <ConnectionStatusPanel connection={connection} fmt={fmt} />
         <UnsignedWebhookWarning connection={connection} />
-        <LinkedLibraries connectionId={connection.id} />
+        <FedWorkflows connection={connection} />
 
         <div className="mt-3 flex flex-wrap gap-2">
           <button

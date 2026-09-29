@@ -78,12 +78,12 @@ internal sealed class ProcessingKeptFilesEndpointHandlers
         // same reason RequeueStore.RequeueFileAsync commits before its own enqueue call).
         await request.CommitAsync().ConfigureAwait(false);
 
-        var detail = "Weir will look at this file the next time it scans its library.";
+        var detail = "Weir will look at this file the next time it scans its workflow.";
         if (library is not null)
         {
             await ProcessingWatchedFolderScanDispatchEnqueue.EnqueueScanDispatchJobAsync(
                 uow, _jobs, enqueueRemuxJobs: true, "manual", library.MediaType, library.Id).ConfigureAwait(false);
-            detail = "Weir is checking this file's library now and will queue it once it is ready.";
+            detail = "Weir is checking this file's workflow now and will queue it once it is ready.";
         }
 
         return ApiRoutes.Ok(new WireObject().Set("detail", detail));

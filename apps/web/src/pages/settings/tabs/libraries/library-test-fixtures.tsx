@@ -68,7 +68,7 @@ export function library(
     manager_connection_ids: [],
     manager_coverage: "no_upstream_signal",
     manager_coverage_detail:
-      "No media manager has been tested for this library.",
+      "No media manager has been tested for this workflow.",
     discovered_from_connection_id: null,
     discovered_library_key: null,
     active_job_count: 0,
