@@ -85,6 +85,40 @@ describe("mergeLiveProgress", () => {
     });
   });
 
+  it("shows a Waiting file as processing once the stream has progress for it", () => {
+    const files = [
+      file({ id: 1, status: "unprocessed", progress_percent: null }),
+      file({
+        id: 2,
+        status: "out_of_schedule",
+        relative_path: "Other/Other.mkv",
+        progress_percent: null,
+      }),
+    ];
+
+    const merged = mergeLiveProgress(files, {
+      "Film/Film.mkv": progress({}),
+      "Other/Other.mkv": progress({ relativePath: "Other/Other.mkv" }),
+    });
+
+    expect(merged.map((f) => f.status)).toEqual(["processing", "processing"]);
+    expect(merged[0].progress_percent).toBe(42.5);
+  });
+
+  it("does not move a file that has already ended back to processing because a frame lingers", () => {
+    const files = [
+      file({ id: 1, status: "processed" }),
+      file({ id: 2, status: "on_hold", relative_path: "Other/Other.mkv" }),
+    ];
+
+    const merged = mergeLiveProgress(files, {
+      "Film/Film.mkv": progress({}),
+      "Other/Other.mkv": progress({ relativePath: "Other/Other.mkv" }),
+    });
+
+    expect(merged.map((f) => f.status)).toEqual(["processed", "on_hold"]);
+  });
+
   it("leaves a file the stream says nothing about untouched", () => {
     const files = [file({ relative_path: "Other/Other.mkv" })];
 

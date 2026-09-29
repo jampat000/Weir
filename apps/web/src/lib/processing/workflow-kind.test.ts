@@ -4,6 +4,7 @@ import type { MediaManagerConnection } from "../media-managers/media-managers-ap
 import {
   workflowBadgeLabel,
   workflowKindCounts,
+  workflowKindName,
   workflowKindNote,
   workflowKindOf,
 } from "./workflow-kind";
@@ -24,6 +25,12 @@ const CONNECTIONS = [
 ];
 
 describe("a workflow's kind", () => {
+  it("is named by the same rule everywhere: linked only when a media manager is linked", () => {
+    expect(workflowKindName({ manager_connection_ids: [] })).toBe("weir_only");
+    expect(workflowKindName({ manager_connection_ids: [1] })).toBe("linked");
+    expect(workflowKindName({ manager_connection_ids: [99] })).toBe("linked");
+  });
+
   it("is Weir only when no media manager is linked", () => {
     const kind = workflowKindOf({ manager_connection_ids: [] }, CONNECTIONS);
 

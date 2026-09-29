@@ -62,6 +62,9 @@ internal sealed class FakeMediaRunner : IProcessRunner
 
     public IEnumerable<IReadOnlyList<string>> Remuxes => Calls.Where(argv => argv[0] == "ffmpeg" && argv.Contains("-map") && !argv.Contains("null"));
 
+    /// <summary>Runs on every call before it is answered, for a test that needs to see what the world looks like at that moment.</summary>
+    public Action? OnCall { get; set; }
+
     public Task<ProcessResult> RunAsync(ProcessRequest request, CancellationToken cancellationToken = default)
     {
         var argv = request.Argv;
@@ -69,6 +72,8 @@ internal sealed class FakeMediaRunner : IProcessRunner
         {
             Calls.Add(argv);
         }
+
+        OnCall?.Invoke();
 
         if (argv[0] == "ffprobe")
         {
