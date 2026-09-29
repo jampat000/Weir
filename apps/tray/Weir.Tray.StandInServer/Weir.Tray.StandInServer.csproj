@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Target framework, analyzers and warnings as errors come from ../Directory.Build.props. -->
+  <PropertyGroup>
+    <!-- The Windows subsystem: Windows never gives this program a console, so no terminal window can open for it (#821). -->
+    <OutputType>WinExe</OutputType>
+    <UseWindowsForms>false</UseWindowsForms>
+    <IsPackable>false</IsPackable>
+    <Description>Test-only stand-in for WeirServer.exe</Description>
+  </PropertyGroup>
+
+</Project>

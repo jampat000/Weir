@@ -10,6 +10,15 @@ namespace Weir.Tray.Tests;
 /// </summary>
 public sealed class InstallProcessesTests : IDisposable
 {
+    private const string StandInServerName = "Weir.Tray.StandInServer";
+
+    /// <summary>
+    /// A Windows-subsystem program (Weir.Tray.StandInServer), so unlike a system console program it can never
+    /// open a console window (#821). Its apphost looks for the assembly and runtime config beside itself, so a
+    /// renamed copy needs all three.
+    /// </summary>
+    private static readonly string[] StandInServerFiles = [StandInServerName + ".exe", StandInServerName + ".dll", StandInServerName + ".runtimeconfig.json"];
+
     private readonly TempDirectory _root = TempDirectory.Create();
     private readonly List<Process> _started = [];
 
@@ -51,8 +60,8 @@ public sealed class InstallProcessesTests : IDisposable
 
     /// <summary>
     /// A real process named WeirServer inside the install root, and another outside it. Only the
-    /// one inside is stopped. (ping.exe, copied and renamed, stands in for the server: it stays
-    /// alive long enough and needs nothing else.)
+    /// one inside is stopped. (The stand-in server, copied and renamed, stands in for the real one:
+    /// it stays alive until killed and needs nothing else.)
     /// </summary>
     [Fact]
     public void Stops_this_installs_server_and_leaves_another_weir_running()
@@ -75,14 +84,13 @@ public sealed class InstallProcessesTests : IDisposable
     private Process StartFakeServer(string directory)
     {
         Directory.CreateDirectory(directory);
-        var exe = Path.Combine(directory, "WeirServer.exe");
-        File.Copy(Path.Combine(Environment.SystemDirectory, "PING.EXE"), exe);
-        var p = Process.Start(new ProcessStartInfo(exe, "-n 120 127.0.0.1")
+        foreach (var file in StandInServerFiles)
         {
-            UseShellExecute = false,
-            CreateNoWindow = true,
-            RedirectStandardOutput = true,
-        })!;
+            File.Copy(Path.Combine(AppContext.BaseDirectory, file), Path.Combine(directory, file));
+        }
+        var exe = Path.Combine(directory, "WeirServer.exe");
+        File.Move(Path.Combine(directory, StandInServerName + ".exe"), exe);
+        var p = Process.Start(new ProcessStartInfo(exe) { UseShellExecute = false })!;
         _started.Add(p);
         Assert.False(p.WaitForExit(500), "the stand-in server exited immediately");
         return p;

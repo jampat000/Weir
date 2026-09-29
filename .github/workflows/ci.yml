@@ -177,6 +177,11 @@ jobs:
       - name: Dockerfile node major matches .node-version
         run: node scripts/check-node-docker-version.mjs
 
+      - name: No test starts a system console program
+        run: |
+          node scripts/check-test-console-programs.mjs
+          node --test scripts/check-test-console-programs.test.mjs
+
       - name: Release and CI gate rules
         run: |
           node scripts/check-release-workflow-gates.mjs
