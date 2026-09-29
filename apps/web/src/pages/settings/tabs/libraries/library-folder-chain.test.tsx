@@ -49,7 +49,7 @@ it("asks the library to save first when it has no id yet", () => {
   );
 
   expect(
-    screen.getByText("Save this library first to check its folder chain."),
+    screen.getByText("Save this workflow first to check its folder chain."),
   ).toBeInTheDocument();
 });
 
@@ -135,7 +135,7 @@ it("surfaces a bare download client's own lines and readiness", async () => {
           lines: [
             {
               state: "problem",
-              text: "None of SABnzbd's folders match this library's watched folder /media/in.",
+              text: "None of SABnzbd's folders match this workflow's watched folder /media/in.",
             },
           ],
         },
@@ -158,7 +158,7 @@ it("surfaces a bare download client's own lines and readiness", async () => {
   expect(within(block).getByText("Needs attention")).toBeInTheDocument();
   expect(
     within(block).getByText(
-      "None of SABnzbd's folders match this library's watched folder /media/in.",
+      "None of SABnzbd's folders match this workflow's watched folder /media/in.",
     ),
   ).toBeInTheDocument();
 });
@@ -220,7 +220,7 @@ it("says when it could not check just now", async () => {
 
   expect(
     await screen.findByText(
-      /Weir could not check this library's folder chain just now/,
+      /Weir could not check this workflow's folder chain just now/,
     ),
   ).toBeInTheDocument();
 });

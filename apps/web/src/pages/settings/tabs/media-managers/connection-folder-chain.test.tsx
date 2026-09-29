@@ -1,12 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import {
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-  within,
-} from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import type { ReactNode } from "react";
+import { MemoryRouter } from "react-router-dom";
 import { afterEach, expect, it, vi } from "vitest";
 
 import * as chainApi from "../../../../lib/processing/library-folder-chain-api";
@@ -18,7 +13,11 @@ function wrapper({ children }: { children: ReactNode }) {
   const qc = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
-  return <QueryClientProvider client={qc}>{children}</QueryClientProvider>;
+  return (
+    <MemoryRouter>
+      <QueryClientProvider client={qc}>{children}</QueryClientProvider>
+    </MemoryRouter>
+  );
 }
 
 function library(over: Partial<ProcessingLibrary> = {}): ProcessingLibrary {
@@ -71,7 +70,7 @@ it("shows nothing when no library is linked", async () => {
   ).toBeNull();
 });
 
-it("lists each linked library by name with its readiness, expandable to its lines", async () => {
+it("lists each workflow it feeds with its readiness, and opens its folder chain instead of repeating the lines", async () => {
   vi.spyOn(chainApi, "fetchConnectionFolderChain").mockResolvedValue([
     {
       library_id: 12,
@@ -108,19 +107,18 @@ it("lists each linked library by name with its readiness, expandable to its line
 
   render(<ConnectionFolderChain connectionId={3} />, { wrapper });
 
-  const summary = await screen.findByText("TV");
-  const details = summary.closest("details")!;
-  expect(within(details).getByText("Needs attention")).toBeInTheDocument();
-
-  fireEvent.click(summary);
+  const row = (await screen.findByText("TV")).closest("p")!;
+  expect(within(row).getByText("Needs attention")).toBeInTheDocument();
   expect(
-    within(details).getByText(
-      "Sonarr has no enabled download client, so it has no downloads to import.",
-    ),
-  ).toBeInTheDocument();
+    within(row).getByRole("link", { name: "See its folder chain" }),
+  ).toHaveAttribute("href", "/settings?tab=libraries&edit=12");
+  // The lines live once, in the workflow editor's Folder chain.
+  expect(
+    screen.queryByText(/Sonarr has no enabled download client/),
+  ).not.toBeInTheDocument();
 });
 
-it("shows a library as not verified, never ready, when one of its lines is only a declaration", async () => {
+it("shows a workflow as not verified, never ready, when one of its lines is only a declaration", async () => {
   vi.spyOn(chainApi, "fetchConnectionFolderChain").mockResolvedValue([
     {
       library_id: 12,
@@ -157,7 +155,7 @@ it("shows a library as not verified, never ready, when one of its lines is only 
 
   render(<ConnectionFolderChain connectionId={3} />, { wrapper });
 
-  const details = (await screen.findByText("TV")).closest("details")!;
-  expect(within(details).getByText("Not verified")).toBeInTheDocument();
-  expect(within(details).queryByText("Ready")).not.toBeInTheDocument();
+  const row = (await screen.findByText("TV")).closest("p")!;
+  expect(within(row).getByText("Not verified")).toBeInTheDocument();
+  expect(within(row).queryByText("Ready")).not.toBeInTheDocument();
 });

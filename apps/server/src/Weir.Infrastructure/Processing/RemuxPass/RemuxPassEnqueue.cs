@@ -50,7 +50,7 @@ public static class RemuxPassEnqueue
         var library = await RemuxPassHandler.ResolveLibraryAsync(uow, libraries, libraryId, mediaScope).ConfigureAwait(false);
         if (libraryId is not null && (library is null || library.Id != libraryId))
         {
-            throw new RemuxPassEnqueueException(404, "The selected library no longer exists. Refresh Libraries and try again.");
+            throw new RemuxPassEnqueueException(404, "The selected workflow no longer exists. Refresh Workflows and try again.");
         }
 
         if (library is null || WireStrings.Strip(library.WatchedFolder ?? string.Empty).Length == 0)

@@ -19,9 +19,9 @@ function setupNeed(libraries: ProcessingLibrary[] | undefined): Need | null {
   if (!libraries || watching) return null;
   return {
     key: "setup",
-    text: "Nothing to watch yet. Weir picks files up from a library's watched folder — add one, or turn an existing library on.",
+    text: "Nothing to watch yet. Weir picks files up from a workflow's watched folder — add one, or turn an existing workflow on.",
     to: "/settings?tab=libraries",
-    action: "Set up a library",
+    action: "Set up a workflow",
   };
 }
 

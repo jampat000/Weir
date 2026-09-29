@@ -120,7 +120,7 @@ public static class HandbackRules
         "Weir's copy has changed since Weir wrote it, so Weir left it alone.";
 
     public const string OutsideNote =
-        "Weir's copy is not inside this library's output folder any more, so Weir left it alone.";
+        "Weir's copy is not inside this workflow's output folder any more, so Weir left it alone.";
 
     public const string UnrecordedNote =
         "Weir kept its copy, because it has no record of exactly which file it wrote.";

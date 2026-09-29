@@ -23,7 +23,7 @@ export function SetupWizardSection({ settings }: { settings: AppSettings }) {
     <div data-testid="suite-settings-global" className="mm-quiet-stack">
       <QuietDisclosure title="Setup wizard" summaryWhenClosed="Run once">
         <p className="mm-quiet-note">
-          Go through the first-run steps again: time zone, backups and library
+          Go through the first-run steps again: time zone, backups and workflow
           folders. You can leave at any point.
         </p>
         <p className="mm-caption-note mt-3 block">

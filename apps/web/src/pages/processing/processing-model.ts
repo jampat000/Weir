@@ -198,7 +198,7 @@ export function buildLanes(
     const name = prettyName(file.relative_path);
     const facts = fileFacts(file);
     const libraryName =
-      file.library_name || libraryNames.get(file.library_id) || "Library";
+      file.library_name || libraryNames.get(file.library_id) || "Workflow";
     const key = `file-${file.id}`;
     switch (file.status) {
       case "on_hold": {
@@ -308,7 +308,7 @@ export function buildLanes(
     if (row.job_kind !== LIBRARY_CLEAN_JOB_KIND) continue;
     const { path, libraryId } = libraryJobParts(row);
     const libraryName =
-      (libraryId != null && libraryNames.get(libraryId)) || "Library";
+      (libraryId != null && libraryNames.get(libraryId)) || "Workflow";
     const item = {
       key: `job-${row.id}`,
       source: "library" as const,

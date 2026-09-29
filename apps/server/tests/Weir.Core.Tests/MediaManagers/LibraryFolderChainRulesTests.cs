@@ -180,7 +180,7 @@ public sealed class LibraryFolderChainRulesTests
         var line = Assert.Single(CheckClient("qBittorrent", Watched, Watched));
 
         Assert.Equal(SetupCheckLine.Ok, line.State);
-        Assert.Equal("qBittorrent's default completed-downloads folder is /media/watched, inside this library's watched folder.", line.Text);
+        Assert.Equal("qBittorrent's default completed-downloads folder is /media/watched, inside this workflow's watched folder.", line.Text);
     }
 
     [Fact]
@@ -200,8 +200,8 @@ public sealed class LibraryFolderChainRulesTests
         Assert.Equal(SetupCheckLine.Problem, line.State);
         Assert.Equal(
             @"Transmission saves to: default completed-downloads folder C:\Downloads\Completed. " +
-            @"None of that is inside this library's watched folder C:\Downloads\Completed\Movies, so Weir would never see the downloads. " +
-            "Point the client's folder at it, or use the suggested folder in the library editor.",
+            @"None of that is inside this workflow's watched folder C:\Downloads\Completed\Movies, so Weir would never see the downloads. " +
+            "Point the client's folder at it, or use the suggested folder in the workflow editor.",
             line.Text);
     }
 
@@ -226,7 +226,7 @@ public sealed class LibraryFolderChainRulesTests
             [SetupCheckLine.Note, SetupCheckLine.Ok, SetupCheckLine.Note],
             lines.Select(line => line.State));
         Assert.Contains("\"tv-sonarr\" category folder is /media/watched, inside", lines[1].Text, StringComparison.Ordinal);
-        Assert.Contains("outside this library's watched folder", lines[0].Text, StringComparison.Ordinal);
+        Assert.Contains("outside this workflow's watched folder", lines[0].Text, StringComparison.Ordinal);
     }
 
     [Fact]

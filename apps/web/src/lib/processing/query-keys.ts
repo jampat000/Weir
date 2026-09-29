@@ -56,6 +56,7 @@ export const processingKeys = {
     watchedFolder: string,
     outputFolder: string,
     removeOriginal: boolean,
+    linkedConnectionIds: number[],
   ) =>
     [
       "processing",
@@ -64,6 +65,7 @@ export const processingKeys = {
       watchedFolder,
       outputFolder,
       removeOriginal,
+      linkedConnectionIds,
     ] as const,
   librarySettings: (libraryId: number) =>
     ["processing", "library-settings", libraryId] as const,

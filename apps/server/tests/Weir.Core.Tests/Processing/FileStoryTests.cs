@@ -16,7 +16,7 @@ public sealed class FileStoryTests
         // _picked_up runs regardless of "ok" and needs only a library name or a media scope to say something.
         var step = Assert.Single(FileStory.NarratePass(new WireObject(), "Movies"));
         Assert.Equal("Picked up", step.Heading);
-        Assert.Equal("Weir took this file in the Movies library.", step.Sentence);
+        Assert.Equal("Weir took this file in the Movies workflow.", step.Sentence);
     }
 
     [Fact]

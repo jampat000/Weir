@@ -76,7 +76,7 @@ function ProfileActions({
             onClick={onRemove}
             title={
               inUse > 0
-                ? "Detach this profile from every library before removing it."
+                ? "Detach this profile from every workflow before removing it."
                 : "Remove this unused profile."
             }
           >
@@ -85,7 +85,7 @@ function ProfileActions({
         ) : null}
         {inUse > 0 ? (
           <span className="text-xs text-mm-text3">
-            Used by {plural(inUse, "library", "libraries")}; removal is locked.
+            Used by {plural(inUse, "workflow", "workflows")}; removal is locked.
           </span>
         ) : null}
       </div>
@@ -255,7 +255,7 @@ export function RulesTab() {
           <div className="mt-5">
             <p className="text-sm font-medium text-mm-text1">No profiles yet</p>
             <p className="mm-quiet-note mt-1">
-              Create one, then assign it under Libraries.
+              Create one, then assign it under Workflows.
             </p>
           </div>
         ) : (

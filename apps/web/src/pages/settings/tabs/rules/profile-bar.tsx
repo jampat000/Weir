@@ -34,7 +34,7 @@ export function ProfileBar({
             {ruleSets.map((row) => (
               <option key={row.id} value={row.id}>
                 {row.name} ·{" "}
-                {plural(row.used_by_library_count, "library", "libraries")}
+                {plural(row.used_by_library_count, "workflow", "workflows")}
               </option>
             ))}
           </select>
@@ -54,13 +54,14 @@ export function ProfileBar({
       ) : null}
       {creating ? (
         <p className="mm-profile-bar__used">
-          A new profile. Choose it in a library&rsquo;s editor once it is saved.
+          A new profile. Choose it in a workflow&rsquo;s editor once it is
+          saved.
         </p>
       ) : binding ? (
         <p className="mm-profile-bar__used" data-testid="rule-set-used-by">
           {usedBy.length > 0
             ? `Used by ${usedBy.join(", ")}`
-            : "No library uses it yet. Choose it in a library's editor."}
+            : "No workflow uses it yet. Choose it in a workflow's editor."}
         </p>
       ) : null}
     </div>

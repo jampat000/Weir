@@ -58,7 +58,7 @@ public sealed class ProcessingPassThroughHandler : IJobHandler
         var libraryId = FollowUpJobPayload.LibraryId(payload);
         if (relativePath.Length == 0 || libraryId is null)
         {
-            throw new InvalidOperationException("A pass-through job needs a file and a library.");
+            throw new InvalidOperationException("A pass-through job needs a file and a workflow.");
         }
 
         // 1. Read what the delivery needs, then close the unit of work before touching any file.
@@ -69,7 +69,7 @@ public sealed class ProcessingPassThroughHandler : IJobHandler
                 var library = await RemuxPassHandler.ResolveLibraryAsync(uow, _libraries, libraryId, null).ConfigureAwait(false);
                 if (library is null)
                 {
-                    throw new InvalidOperationException($"Library {libraryId} no longer exists, so there is nowhere to hand the file back to.");
+                    throw new InvalidOperationException($"Workflow {libraryId} no longer exists, so there is nowhere to hand the file back to.");
                 }
 
                 return new PassThroughDeliverySettings(library.Id, library.WatchedFolder, library.OutputFolder, library.OutputCollisionPolicy);

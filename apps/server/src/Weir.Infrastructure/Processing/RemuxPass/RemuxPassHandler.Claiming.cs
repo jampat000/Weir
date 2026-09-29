@@ -35,7 +35,7 @@ public sealed partial class RemuxPassHandler
                 if (library is null)
                 {
                     var label = mediaScope == "tv" ? "TV" : "Movies";
-                    (runtime, problem) = (null, $"No library covers {label}. Add one on Processing → Libraries, then queue this work again.");
+                    (runtime, problem) = (null, $"No workflow covers {label}. Add one in Settings › Workflows, then queue this work again.");
                 }
                 else
                 {

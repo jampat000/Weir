@@ -48,7 +48,7 @@ public static class ManualPlanSupport
         var file = await files.GetAsync(uow, fileId).ConfigureAwait(false)
             ?? throw new ManualPlanEnqueueException(404, "Weir has no record of that file.");
         var library = await libraries.GetAsync(uow, file.LibraryId).ConfigureAwait(false)
-            ?? throw new ManualPlanEnqueueException(404, "The library for this file no longer exists.");
+            ?? throw new ManualPlanEnqueueException(404, "The workflow for this file no longer exists.");
 
         var (runtime, problem) = RemuxPassPaths.RuntimeForLibrary(library, options.WeirHome);
         if (runtime is null)

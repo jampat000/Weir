@@ -70,11 +70,11 @@ export function HistoryFilters({
       <div className="mm-history-scope">
         <select
           className="mm-input"
-          aria-label="Library"
+          aria-label="Workflow"
           value={libraryId ?? ""}
           onChange={(event) => setParam("library", event.target.value)}
         >
-          <option value="">All libraries</option>
+          <option value="">All workflows</option>
           {libraries.map((library) => (
             <option key={library.id} value={library.id}>
               {library.name}

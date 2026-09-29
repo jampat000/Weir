@@ -106,5 +106,5 @@ public sealed partial class ConfigurationBundleStore
     private static string? RestoreLibraryString(WireObject row, string key) => row.Get(key) is WireString text ? text.Value : null;
 
     private static string RestoreLibraryLabel(ProcessingLibraryInput input, int index) =>
-        string.IsNullOrWhiteSpace(input.Name) ? $"Library #{index + 1} in the backup" : $"Library '{input.Name.Trim()}'";
+        string.IsNullOrWhiteSpace(input.Name) ? $"Workflow #{index + 1} in the backup" : $"Workflow '{input.Name.Trim()}'";
 }

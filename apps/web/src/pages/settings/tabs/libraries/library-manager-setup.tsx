@@ -1,27 +1,18 @@
 /**
- * How the connected media manager picks up what a library writes, inside the library editor. Deluno only
- * needs the right folders, which Weir reads from it and offers to fill in. Sonarr and Radarr need a remote
- * path mapping from the watched folder to the output folder; this shows what to type and checks it. The
- * check only ever sends GET requests and never changes a manager's settings.
+ * What the media managers a workflow is linked to need to pick up what it writes, inside the workflow editor.
+ * Deluno only needs the right folders, which Weir reads from it and offers to fill in. Sonarr and Radarr need a
+ * remote path mapping from the watched folder to the output folder; this shows what to type. Whether it is
+ * right is the folder chain's to say, once, in its own section. Reading only ever sends GET requests and never
+ * changes a manager's settings.
  */
 
 import { useState } from "react";
 import { QuietFieldGroup } from "../../../../components/shared/quiet-section";
-import { SetupCheckLines } from "../../../../components/shared/setup-check-lines";
-import { type DownloadClientSuggestion } from "../../../../lib/download-clients/download-clients-api";
-import { useDownloadClientSuggestionsQuery } from "../../../../lib/download-clients/queries";
-import {
-  PROCESSING_MEDIA_TYPE_LABELS,
-  type ProcessingMediaType,
-} from "../../../../lib/processing/libraries-api";
-import {
-  READINESS_CLASSES,
-  READINESS_LABELS,
-  readinessOf,
-} from "../../../../lib/processing/library-folder-chain-api";
+import { type ProcessingMediaType } from "../../../../lib/processing/libraries-api";
 import { type ProcessingManagerSetupItem } from "../../../../lib/processing/library-managers-api";
 import { useProcessingManagerSetupQuery } from "../../../../lib/processing/libraries-queries";
 import { useDebouncedValue } from "../../../../lib/ui/use-debounced-value";
+import { workflowStory } from "../../../../lib/processing/workflow-story";
 
 /** The folders as the user types them settle for a moment before each check. */
 const SETTLE_MS = 700;
@@ -80,51 +71,6 @@ function ArrSuggestedFolder({
   );
 }
 
-function DownloadClientSuggestionSection({
-  item,
-  watchedFolder,
-  editable,
-  onUseFolders,
-}: {
-  item: DownloadClientSuggestion;
-  watchedFolder: string;
-  editable: boolean;
-  onUseFolders: (watched: string | null, output: string | null) => void;
-}) {
-  const suggested = item.suggested_watched_folder ?? null;
-  const differs = suggested !== null && suggested !== watchedFolder.trim();
-  return (
-    <section aria-label={item.label} className="space-y-3">
-      <p className="text-sm font-medium text-mm-text1">
-        {item.label}
-        <span
-          className={`ml-2 text-xs ${
-            item.ready ? "mm-status-text--healthy" : "mm-status-text--warning"
-          }`}
-        >
-          {item.ready ? "Ready" : "Needs attention"}
-        </span>
-      </p>
-      {differs ? (
-        <p className="text-sm text-mm-text2">
-          {item.label}&apos;s completed-downloads folder is{" "}
-          <code className="break-all">{suggested}</code>.{" "}
-          {editable ? (
-            <button
-              type="button"
-              className="mm-quiet-link"
-              onClick={() => onUseFolders(suggested, null)}
-            >
-              Use this as the watched folder
-            </button>
-          ) : null}
-        </p>
-      ) : null}
-      <SetupCheckLines label={item.label} lines={item.lines} />
-    </section>
-  );
-}
-
 function ArrMapping({
   item,
   watchedFolder,
@@ -150,12 +96,12 @@ function ArrMapping({
     {
       field: "Remote Path",
       value: mapping.remote_path,
-      shown: mapping.remote_path || "this library's watched folder",
+      shown: mapping.remote_path || "this workflow's watched folder",
     },
     {
       field: "Local Path",
       value: mapping.local_path,
-      shown: mapping.local_path || "this library's output folder",
+      shown: mapping.local_path || "this workflow's output folder",
     },
   ];
   return (
@@ -238,20 +184,13 @@ function DelunoHandoff({
     (output !== null && output !== outputFolder.trim());
   return (
     <>
-      <p className="mm-quiet-note">
-        {item.label} hands each finished download to Weir and imports the
-        cleaned file back by itself, so there is nothing to map. This library
-        needs the folder {item.label}&apos;s downloads arrive in as its watched
-        folder, and the folder {item.label} picks cleaned files up from as its
-        output folder.
-      </p>
-      {watched !== null || output !== null ? (
+      {differs ? (
         <p className="text-sm text-mm-text2">
           {item.label} reports downloads in{" "}
           <code className="break-all">{watched ?? "(not set)"}</code> and picks
           up cleaned files from{" "}
           <code className="break-all">{output ?? "(not set)"}</code>.{" "}
-          {differs && editable ? (
+          {editable ? (
             <button
               type="button"
               className="mm-quiet-link"
@@ -270,15 +209,20 @@ export function LibraryManagerSetup({
   mediaType,
   watchedFolder,
   outputFolder,
+  workFolder,
   removeOriginal = true,
+  linkedConnectionIds,
   editable,
   onUseFolders,
 }: {
   mediaType: ProcessingMediaType;
   watchedFolder: string;
   outputFolder: string;
-  /** The library's "After cleaning, remove the original download": a torrent client makes that a problem. */
+  workFolder: string;
+  /** The workflow's "After cleaning, remove the original download": a torrent client makes that a problem. */
   removeOriginal?: boolean;
+  /** The media managers this workflow is linked to: only these are read. */
+  linkedConnectionIds: number[];
   editable: boolean;
   onUseFolders: (watched: string | null, output: string | null) => void;
 }) {
@@ -291,91 +235,65 @@ export function LibraryManagerSetup({
     settled.watched,
     settled.output,
     removeOriginal,
-    true,
+    linkedConnectionIds,
+    linkedConnectionIds.length > 0,
   );
-  const downloadClients = useDownloadClientSuggestionsQuery(mediaType);
-  const scope = PROCESSING_MEDIA_TYPE_LABELS[mediaType];
   const managers = setup.data?.managers ?? [];
-  const downloadClientItems = downloadClients.data ?? [];
-  const nothingCovers =
-    managers.length === 0 && downloadClientItems.length === 0;
 
   return (
     <QuietFieldGroup
-      title="Media manager"
-      detail="How your media manager picks up the files this library writes."
-      aside={
-        managers.length > 0 ? (
-          <button
-            type="button"
-            className="mm-quiet-link"
-            onClick={() => void setup.refetch()}
-            disabled={setup.isFetching}
-          >
-            {setup.isFetching ? "Checking…" : "Check again"}
-          </button>
-        ) : null
-      }
+      title="What your media manager needs"
+      detail="The folders and settings the media manager this workflow is linked to has to hold, to pick up what Weir writes."
     >
       <div data-testid="library-manager-setup" className="space-y-6">
         {setup.isLoading ? (
-          <p className="mm-quiet-note">Checking your media managers…</p>
+          <p className="mm-quiet-note">Reading your media managers…</p>
         ) : setup.isError ? (
           <p className="mm-quiet-note mm-status-text--warning" role="alert">
-            Weir could not check your media managers just now. Try Check again
+            Weir could not read your media managers just now. Reopen this editor
             in a moment.
           </p>
-        ) : nothingCovers ? (
-          <p className="mm-quiet-note">
-            No Sonarr, Radarr or Deluno connection covers {scope}. Connect one
-            under Settings → Media managers and this shows exactly how to hand
-            it the files this library writes.
-          </p>
         ) : (
-          <>
-            {managers.map((item) => (
-              <section
-                key={item.connection_id}
-                aria-label={item.label}
-                className="space-y-3"
-              >
-                <p className="text-sm font-medium text-mm-text1">
-                  {item.label}
-                  <span
-                    className={`ml-2 text-xs ${READINESS_CLASSES[readinessOf(item.ready, item.lines)]}`}
-                  >
-                    {READINESS_LABELS[readinessOf(item.ready, item.lines)]}
-                  </span>
-                </p>
-                {item.flow === "handoff" ? (
-                  <DelunoHandoff
-                    item={item}
-                    watchedFolder={watchedFolder}
-                    outputFolder={outputFolder}
-                    editable={editable}
-                    onUseFolders={onUseFolders}
-                  />
-                ) : (
-                  <ArrMapping
-                    item={item}
-                    watchedFolder={watchedFolder}
-                    editable={editable}
-                    onUseFolders={onUseFolders}
-                  />
+          managers.map((item) => (
+            <section
+              key={item.connection_id}
+              aria-label={item.label}
+              className="space-y-3"
+            >
+              <p className="text-sm font-medium text-mm-text1">{item.label}</p>
+              <p className="mm-quiet-note" data-testid="workflow-story">
+                {workflowStory(
+                  {
+                    watched: watchedFolder.trim(),
+                    work: workFolder.trim(),
+                    output: outputFolder.trim(),
+                  },
+                  { id: item.connection_id, name: item.label, kind: item.kind },
+                  {
+                    category: item.story?.source_category ?? null,
+                    managerLibrary: item.story?.manager_library ?? null,
+                    rootFolder: item.story?.root_folder ?? null,
+                  },
                 )}
-                <SetupCheckLines label={item.label} lines={item.lines} />
-              </section>
-            ))}
-            {downloadClientItems.map((item) => (
-              <DownloadClientSuggestionSection
-                key={item.connection_id}
-                item={item}
-                watchedFolder={watchedFolder}
-                editable={editable}
-                onUseFolders={onUseFolders}
-              />
-            ))}
-          </>
+              </p>
+              {item.flow === "handoff" ? (
+                <DelunoHandoff
+                  item={item}
+                  watchedFolder={watchedFolder}
+                  outputFolder={outputFolder}
+                  editable={editable}
+                  onUseFolders={onUseFolders}
+                />
+              ) : (
+                <ArrMapping
+                  item={item}
+                  watchedFolder={watchedFolder}
+                  editable={editable}
+                  onUseFolders={onUseFolders}
+                />
+              )}
+            </section>
+          ))
         )}
       </div>
     </QuietFieldGroup>

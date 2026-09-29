@@ -111,13 +111,13 @@ public static class LibraryFilePlanner
         }
         catch (RulesInputException exception)
         {
-            return LibraryFilePlanResult.CannotProcess($"Weir could not plan this file against the library's rules: {exception.Message}");
+            return LibraryFilePlanResult.CannotProcess($"Weir could not plan this file against the workflow's rules: {exception.Message}");
         }
 
         if (plan is null)
         {
             return LibraryFilePlanResult.CannotProcess(
-                "No audio track would remain after applying this library's rules, so Weir will not touch this file.",
+                "No audio track would remain after applying this workflow's rules, so Weir will not touch this file.",
                 LibraryProblemKind.NoAudioLeft);
         }
 

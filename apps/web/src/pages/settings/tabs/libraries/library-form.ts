@@ -237,6 +237,22 @@ export function formFrom(library: ProcessingLibrary): LibraryForm {
   return form;
 }
 
+/**
+ * The media managers a workflow is linked to as it is being edited: the one chosen here, and any others it keeps
+ * (#651). One manager per workflow from the editor; a workflow linked to more than one through the API keeps the
+ * others, so saving here never drops a link nobody chose to remove.
+ */
+export function linkedConnectionIds(
+  form: LibraryForm,
+  library?: ProcessingLibrary,
+): number[] {
+  if (!form.manager_connection_id) return [];
+  return [
+    Number(form.manager_connection_id),
+    ...(library?.manager_connection_ids ?? []).slice(1),
+  ].filter((id, index, all) => all.indexOf(id) === index);
+}
+
 /** What the API is sent for these values; a saved library keeps the settings this editor does not show. */
 export function writeFrom(
   form: LibraryForm,
@@ -296,12 +312,7 @@ export function writeFrom(
     rule_set_id: form.rule_set_id ? Number(form.rule_set_id) : null,
     // One manager per library from the editor (#651); a library linked to more than one through the API keeps
     // the others, so saving here never drops a link nobody chose to remove.
-    manager_connection_ids: form.manager_connection_id
-      ? [
-          Number(form.manager_connection_id),
-          ...(library?.manager_connection_ids ?? []).slice(1),
-        ].filter((id, i, all) => all.indexOf(id) === i)
-      : [],
+    manager_connection_ids: linkedConnectionIds(form, library),
     remux_writer: form.remux_writer,
   };
 }

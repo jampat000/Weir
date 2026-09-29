@@ -22,8 +22,8 @@ const BY_STATUS: Partial<Record<ProcessingFile["status"], Guidance>> = {
     next: "Fix the reason and use Try again, or use Pass through unchanged when this is an intentional edge case you want delivered without your rules.",
   },
   skipped: {
-    title: "This file does not match the library rules.",
-    next: "Change the named library rule and use Check again, or pass this one file through unchanged when it is a legitimate exception.",
+    title: "This file does not match the workflow rules.",
+    next: "Change the named workflow rule and use Check again, or pass this one file through unchanged when it is a legitimate exception.",
   },
   on_hold: {
     title: "Waiting for the file to settle.",
@@ -34,12 +34,12 @@ const BY_STATUS: Partial<Record<ProcessingFile["status"], Guidance>> = {
     next: "Use Why is this held? for the manager's answer right now, or Check again after the import finishes.",
   },
   out_of_schedule: {
-    title: "This library is outside its hours.",
+    title: "This workflow is outside its hours.",
     next: "It is picked up when its hours start; use Check again if you changed them.",
   },
   disabled: {
-    title: "This library is switched off.",
-    next: "Turn the library on in Settings › Libraries before processing its files.",
+    title: "This workflow is switched off.",
+    next: "Turn the workflow on in Settings › Workflows before processing its files.",
   },
   cancelled: {
     title: "Its queued work was cancelled.",
@@ -56,7 +56,7 @@ export function fileGuidance(
     return processingPaused
       ? {
           title: "Processing is paused.",
-          next: "Resume it at the top of the page when you want queued work to continue. Check again is only needed after changing this file or its library.",
+          next: "Resume it at the top of the page when you want queued work to continue. Check again is only needed after changing this file or its workflow.",
         }
       : {
           title: "Refresh this file's status.",

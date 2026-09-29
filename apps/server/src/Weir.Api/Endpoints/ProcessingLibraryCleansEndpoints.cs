@@ -71,7 +71,7 @@ internal sealed class ProcessingLibraryCleansEndpointHandlers
             .Set("kind", HistoryEntryKinds.LibraryClean)
             .Set("id", row.Id)
             .Set("library_id", row.LibraryId is { } id ? WireValue.Of(id) : WireValue.Null)
-            .Set("library_name", row.LibraryId is { } known ? libraryNames.GetValueOrDefault(known, "Unknown library") : "Unknown library")
+            .Set("library_name", row.LibraryId is { } known ? libraryNames.GetValueOrDefault(known, "Unknown workflow") : "Unknown workflow")
             .Set("relative_path", row.RelativePath)
             .Set("outcome", row.Outcome)
             .Set("detail", row.Detail)
