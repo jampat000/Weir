@@ -20,7 +20,7 @@ export const PROCESSING_FILE_STATUS_LABELS: Record<
   out_of_schedule: "Waiting for library hours",
   blocked_upstream: "Waiting for your media manager",
   passed_through: "Passed through unchanged",
-  rejected: "Rejected for a replacement",
+  rejected: "Rejected",
   cancelled: "Cancelled",
 };
 

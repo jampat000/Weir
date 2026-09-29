@@ -396,6 +396,27 @@ describe("HistoryPage", () => {
     ).toBeInTheDocument();
   });
 
+  it("lists a file the rules rejected under Failed, as rejected rather than skipped", () => {
+    files.files = [
+      file({
+        id: 1,
+        status: "rejected",
+        status_reason:
+          "Rejected: none of its audio tracks are in English, and your rules keep only English audio, so there would be nothing to keep. The file was left where it is.",
+      }),
+    ];
+    renderPage();
+
+    const chips = screen.getByRole("group", { name: "Show" });
+    expect(
+      within(chips).getByRole("button", { name: /Failed\s*1/ }),
+    ).toBeInTheDocument();
+    expect(
+      within(chips).getByRole("button", { name: /Skipped\s*0/ }),
+    ).toBeInTheDocument();
+    expect(screen.getAllByText("Rejected").length).toBeGreaterThan(0);
+  });
+
   it("lists a library clean alongside downloads, as its own kind of entry", () => {
     files.files = [];
     cleans.cleans = [
