@@ -33,13 +33,13 @@ Relative paths below are inside the application folder.
 
 Weir runs in the user session, not as a Windows service. This avoids common NAS or external-drive access issues that affect Windows services.
 
-The tray app (`Weir.exe`) starts the Weir server (`server\WeirServer.exe`, a self-contained .NET program) as a child process with `--port <port>`. It watches the server and restarts it if it stops unexpectedly. The server creates or updates its SQLite database itself when it starts.
+The tray app (`Weir.exe`) starts the Weir server (`server\WeirServer.exe`, a self-contained .NET program) as a child process with `--port <port>`, listening for this PC only unless [LAN access](#firewall-and-lan-access) is on. It watches the server and restarts it if it stops unexpectedly. The server creates or updates its SQLite database itself when it starts.
 
 The tray icon provides:
 - **Open Weir** — opens the web UI in your browser (so does clicking the icon)
 - **Open Data Folder** — opens the runtime data directory
 - **Change port** — moves Weir to a different port and restarts it (the current port is shown in the menu)
-- **Allow other devices on your network...** — see [Firewall and LAN access](#firewall-and-lan-access)
+- **Allow other devices on your network...** and **Only allow this PC** — see [Firewall and LAN access](#firewall-and-lan-access)
 - **Check for updates** — checks GitHub for a newer release; once one is found the item becomes **Download update**, then **Restart to update**
 - **Quit** — stops Weir, and applies an update that has already downloaded
 
@@ -55,48 +55,65 @@ The tray app installs updates itself, using Velopack:
 
 ## Firewall and LAN access
 
-Weir listens on every network interface (`0.0.0.0`), so other devices on your network — a phone, another
-computer, Deluno on a different machine — can reach it at `http://<computer-name>:9347/`. Windows Firewall
-decides whether they actually can.
+Out of the box, Weir listens on this PC only (`127.0.0.1` and `[::1]`). Nothing else on your network can even
+connect until you allow it. To let other devices on your network — a phone, another computer, Deluno on a
+different machine — reach it at `http://<computer-name>:9347/`, turn **LAN access** on. Windows Firewall still has
+the last word on whether they get through.
 
-The first time Weir starts after installing (not on a `--silent` install, which skips this — see below), it asks
-once, with a single Windows admin (UAC) prompt: **"Allow Weir on your network?"**
+LAN access is one saved choice, kept in the data folder (`C:\ProgramData\Weir\lan-access`). It turns on when:
 
-- **Allow** creates one inbound firewall rule named **Weir**, scoped to the installed server
-  (`server\WeirServer.exe`) and only the **Private** and **Domain** network profiles — never **Public**. It also
-  removes any block rule Windows itself created earlier for that program, for example one left behind if its own
-  "blocked some features" prompt was cancelled or never seen.
-- **Decline** leaves nothing changed, and Weir does not ask again automatically.
+- you say yes to the question Weir asks once, the first time it starts after installing (not on a `--silent`
+  install, which skips it — see below): **"Allow Weir on your network?"**, with a single Windows admin (UAC) prompt;
+- you choose **Allow other devices on your network...** from the tray icon and approve the same admin prompt;
+- a program runs `Weir.exe --allow-lan` (see [Unattended installs](#unattended-installs)).
 
-Either way, you can revisit it later from the tray icon's **Allow other devices on your network...** item, which
-asks for the same one-time admin prompt and applies the same rule. **System › About** also shows the current
-state plainly:
+Saying yes creates one inbound firewall rule named **Weir**, scoped to the installed server
+(`server\WeirServer.exe`) and only the **Private** and **Domain** network profiles — never **Public**. It also
+removes any block rule Windows itself created earlier for that program, for example one left behind if its own
+"blocked some features" prompt was cancelled or never seen. Declining leaves nothing changed, and Weir does not
+ask again automatically.
+
+Changing LAN access restarts Weir, and the tray says so when it is done. **Only allow this PC** in the tray menu
+turns LAN access off again: Weir restarts listening for this PC only. It leaves the firewall rule where it is,
+because with nothing listening for the network the rule lets nothing in, and removing it would need another admin
+prompt. Uninstalling Weir removes the rule when the uninstaller runs as administrator.
+
+**Updating from an earlier version.** The first time a version with this setting starts, it keeps things as they
+were: if Windows already allows Weir's server in (Weir's own **Weir** rule, or an allow rule Windows made when
+someone clicked Allow on its own prompt), LAN access starts on, so devices that reach Weir today still do.
+Otherwise it starts off. Weir saves that answer and does not work it out again.
+
+**System › About** shows the current state plainly:
 
 | What it says | What it means |
 |---|---|
-| Other devices on your network can reach Weir | The rule is in place and covers the network you're on now. |
-| Windows Firewall is blocking other devices | A block rule exists, the allow rule is disabled, or it does not cover a Public network. Use the tray menu to fix it. |
-| Not set up | Nobody has answered the prompt yet. |
+| Only this PC can reach Weir | LAN access is off. Use the tray item **Allow other devices on your network...** to change it. |
+| Other devices on your network can reach Weir | LAN access is on and Windows Firewall lets the network you are on through. Use **Only allow this PC** to turn it off. |
+| Windows Firewall is blocking other devices | LAN access is on, but a block rule exists, or the allow rule is missing, disabled, or does not cover the network you are on (Public is never covered). **Allow other devices on your network...** fixes the rule. |
 
 This only appears on the Windows package: Docker and a bare source install manage their own network exposure and
-say nothing here.
+say nothing here. Docker and Linux are unchanged: the server listens on every interface inside the container or
+host, and you publish the port as usual.
 
 ### Unattended installs
 
-A silent install (`Weir-win-Setup.exe --silent`, see below) never shows the admin prompt, so a program driving
-Weir unattended that also wants LAN access should pass `--allow-lan` to the installed `Weir.exe` once it is
-already running elevated:
+A silent install (`Weir-win-Setup.exe --silent`, see below) never shows the admin prompt, and the Weir it starts
+listens on this PC only. A program driving Weir unattended that also wants LAN access should pass `--allow-lan` to
+the installed `Weir.exe`:
 
 ```
 "%LocalAppData%\Weir\current\Weir.exe" --allow-lan
 ```
 
-`--allow-lan` configures the same rule with no prompt of any kind, but only when the process calling it is
-already elevated — it never tries to elevate itself, because a caller driving Weir unattended must never be
-handed a UAC prompt nobody is there to answer. If the process is not elevated, it logs why and exits non-zero
-immediately, without hanging. `Weir.exe --configure-firewall` and `--remove-firewall` do the same underlying work
-(add/update, and remove) and are what the tray menu and the first-run prompt run themselves, after they already
-have an elevated process through their own UAC prompt.
+`--allow-lan` means "reachable on the LAN". It always turns LAN access on, with no prompt of any kind, and a Weir
+that is already running restarts within a few seconds to listen for the network. When the process calling it is
+already elevated it also creates the firewall rule. It never tries to elevate itself, because a caller driving Weir
+unattended must never be handed a UAC prompt nobody is there to answer. If the process is not elevated, LAN access
+is still turned on and the exit code is still 0, and `tray-host.log` says the rule was not created: until it
+exists, Windows Firewall decides whether other devices get through, and **System › About** shows "Windows Firewall
+is blocking other devices". `Weir.exe --configure-firewall` and `--remove-firewall` do only the rule (add/update,
+and remove). They need an already-elevated process, they are what the tray menu and the first-run prompt run
+themselves after their own UAC prompt, and they do not change LAN access.
 
 ## Choosing the port
 
@@ -107,7 +124,7 @@ typical media stack uses it.
 
 | Service | Default port | Scope |
 |---------|--------------|-------|
-| Main server | 9347 | LAN (0.0.0.0) |
+| Main server | 9347 | This PC only until LAN access is on, then every interface (0.0.0.0) |
 
 ### On a desktop: Weir asks once
 
@@ -169,9 +186,11 @@ setx WEIR_PORT 9400
 if another program has it at that moment; the server then fails to start and says why in the log,
 rather than Weir quietly picking another.
 
-A silent install never shows the [firewall admin prompt](#firewall-and-lan-access) either. If other devices on
-the network need to reach this Weir, run the installed `Weir.exe --allow-lan` afterward from a process that is
-already elevated (see above); it never prompts and never elevates itself.
+A silent install never shows the [firewall admin prompt](#firewall-and-lan-access) either, and without
+`--allow-lan` the Weir it starts is local-only: it listens on this PC (`127.0.0.1` and `[::1]`) and nothing else.
+If other devices on the network need to reach this Weir, run the installed `Weir.exe --allow-lan` afterward (see
+above). It turns LAN access on without prompting, and also creates the firewall rule when the caller is already
+elevated; it never elevates itself.
 
 Poll `GET http://127.0.0.1:<port>/ready` until it answers `{"ready": true}`; a healthy start
 typically answers within a few seconds, so a 60-second timeout is generous. If `Weir.exe` exits
