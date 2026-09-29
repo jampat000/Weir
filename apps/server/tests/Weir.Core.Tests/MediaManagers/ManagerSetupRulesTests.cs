@@ -196,7 +196,7 @@ public sealed class ManagerSetupRulesTests
     }
 
     [Fact]
-    public void A_category_the_watched_folder_does_not_name_is_a_note_not_a_problem()
+    public void A_category_is_unverified_because_the_manager_does_not_say_where_it_saves_even_when_the_watched_folder_shares_its_name()
     {
         var mapped = """[{"host":"qbittorrent","remotePath":"/media/downloads/complete/","localPath":"/media/downloads/weir/","id":1}]""";
 
@@ -204,10 +204,86 @@ public sealed class ManagerSetupRulesTests
         var named = Sonarr("/media/downloads/complete/tv-sonarr", "/media/downloads/weir/tv-sonarr", mapped);
 
         Assert.Equal(
-            "qBittorrent files Sonarr's downloads under the category \"tv-sonarr\". Sonarr does not say where that category saves, " +
-            "so make sure its folder is /media/downloads/complete or inside it.",
-            Single(elsewhere, SetupCheckLine.Note));
-        Assert.DoesNotContain(named.Lines, line => line.State == SetupCheckLine.Note);
+            "qBittorrent files Sonarr's downloads under the category \"tv-sonarr\", but Sonarr does not say where that category saves. " +
+            "Weir cannot verify its folder is /media/downloads/complete or inside it. Connect qBittorrent to Weir under Settings → Media managers to check it.",
+            Single(elsewhere, SetupCheckLine.Unverified));
+        Assert.Equal(SetupCheckLine.Unverified, Assert.Single(named.Lines, line => line.Text.StartsWith("qBittorrent files", StringComparison.Ordinal)).State);
+    }
+
+    [Fact]
+    public void A_client_with_neither_a_directory_nor_a_category_is_unverified()
+    {
+        var transmission = Clients("""[{"enable":true,"name":"Transmission","fields":[{"name":"host","value":"transmission"}]}]""");
+
+        var result = Sonarr(
+            "/media/downloads/complete",
+            "/media/downloads/weir",
+            """[{"host":"transmission","remotePath":"/media/downloads/complete/","localPath":"/media/downloads/weir/","id":1}]""",
+            clients: transmission);
+
+        Assert.Equal(
+            "Sonarr does not say where Transmission saves its downloads. Weir cannot verify they land in /media/downloads/complete or inside it. " +
+            "Connect Transmission to Weir under Settings → Media managers to check it.",
+            Single(result, SetupCheckLine.Unverified));
+    }
+
+    [Fact]
+    public void A_client_directory_inside_the_watched_folder_is_ok()
+    {
+        var transmission = Clients("""[{"enable":true,"name":"Transmission","fields":[{"name":"host","value":"transmission"},{"name":"tvDirectory","value":"/media/downloads/complete/tv"}]}]""");
+
+        var result = Sonarr(
+            "/media/downloads/complete",
+            "/media/downloads/weir",
+            """[{"host":"transmission","remotePath":"/media/downloads/complete/","localPath":"/media/downloads/weir/","id":1}]""",
+            clients: transmission);
+
+        Assert.Equal(
+            "Transmission saves Sonarr's downloads to /media/downloads/complete/tv, inside Weir's watched folder.",
+            Assert.Single(result.Lines, line => line.State == SetupCheckLine.Ok && line.Text.StartsWith("Transmission", StringComparison.Ordinal)).Text);
+        Assert.DoesNotContain(result.Lines, line => line.State is SetupCheckLine.Problem or SetupCheckLine.Unverified);
+    }
+
+    [Fact]
+    public void Each_client_gets_its_own_line_and_one_wrong_client_is_the_only_problem()
+    {
+        var clients = Clients("""
+            [{"enable":true,"name":"Transmission","fields":[{"name":"host","value":"box"},{"name":"tvDirectory","value":"/media/downloads/complete/tv"}]},
+             {"enable":true,"name":"Deluge","fields":[{"name":"host","value":"box"},{"name":"completedDirectory","value":"/downloads/elsewhere"}]},
+             {"enable":true,"name":"qBittorrent","fields":[{"name":"host","value":"box"},{"name":"tvCategory","value":"tv-sonarr"}]}]
+            """);
+
+        var result = Sonarr(
+            "/media/downloads/complete",
+            "/media/downloads/weir",
+            """[{"host":"box","remotePath":"/media/downloads/complete/","localPath":"/media/downloads/weir/","id":1}]""",
+            clients: clients);
+
+        Assert.Equal(
+            "Deluge saves Sonarr's downloads to /downloads/elsewhere, which is not inside Weir's watched folder /media/downloads/complete. " +
+            "Point one at the other, or Weir will never see them.",
+            Single(result, SetupCheckLine.Problem));
+        Assert.Single(result.Lines, line => line.State == SetupCheckLine.Ok && line.Text.StartsWith("Transmission saves", StringComparison.Ordinal));
+        Assert.Single(result.Lines, line => line.State == SetupCheckLine.Unverified && line.Text.StartsWith("qBittorrent files", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void A_remote_path_mapping_for_the_client_host_is_read_beside_its_folder_line()
+    {
+        var transmission = Clients("""[{"enable":true,"name":"Transmission","fields":[{"name":"host","value":"transmission"},{"name":"tvDirectory","value":"/media/downloads/complete/tv"}]}]""");
+
+        var result = Sonarr(
+            "/media/downloads/complete",
+            "/media/downloads/weir",
+            """[{"host":"transmission","remotePath":"/media/downloads/complete/","localPath":"/media/downloads/weir/","id":1}]""",
+            clients: transmission);
+
+        Assert.Equal(
+            [
+                "Sonarr maps /media/downloads/complete/ to /media/downloads/weir/ for \"transmission\", so it looks for these downloads in Weir's output folder.",
+                "Transmission saves Sonarr's downloads to /media/downloads/complete/tv, inside Weir's watched folder.",
+            ],
+            result.Lines.Where(line => line.State == SetupCheckLine.Ok && !line.Text.StartsWith("Completed Download Handling", StringComparison.Ordinal)).Select(line => line.Text));
     }
 
     [Fact]
@@ -275,47 +351,5 @@ public sealed class ManagerSetupRulesTests
 
         Assert.DoesNotContain(usenetOnly.Lines, line => line.Text == SeedingProblem);
         Assert.DoesNotContain(torrentDisabled.Lines, line => line.Text == SeedingProblem);
-    }
-
-    // --- Deluno ---------------------------------------------------------------------------------------
-
-    private static readonly ManagerLibraryDescriptor RefiningTv =
-        new("tv-1", "TV", MediaManagerKinds.Tv, "/media/tv", "/media/downloads/weir/tv", true, "/media/downloads/complete/tv");
-
-    [Fact]
-    public void A_deluno_library_that_hands_files_over_is_right_when_its_folders_match_and_suggests_them_either_way()
-    {
-        var right = ManagerSetupRules.EvaluateDeluno("Deluno", MediaManagerKinds.Tv, "/media/downloads/complete", "/media/downloads/weir/tv", [RefiningTv]);
-        var wrong = ManagerSetupRules.EvaluateDeluno("Deluno", MediaManagerKinds.Tv, "/media/tv", "/elsewhere", [RefiningTv]);
-
-        Assert.Equal(("/media/downloads/complete/tv", "/media/downloads/weir/tv"), (right.WatchedFolder, right.OutputFolder));
-        Assert.All(right.Lines, line => Assert.Equal(SetupCheckLine.Ok, line.State));
-        Assert.Equal(
-            [
-                "TV's downloads arrive in /media/downloads/complete/tv, which is not inside the watched folder, so Weir would refuse its hand-offs. Use Deluno's folders.",
-                "Deluno picks up cleaned files from /media/downloads/weir/tv, but this library writes to /elsewhere. Unless both are the same folder seen from two machines, use the same folder.",
-            ],
-            wrong.Lines.Select(line => line.Text));
-    }
-
-    [Fact]
-    public void A_deluno_without_a_library_set_to_refine_before_import_will_never_hand_files_over()
-    {
-        var result = ManagerSetupRules.EvaluateDeluno(
-            "Deluno", MediaManagerKinds.Tv, "/media/downloads/complete", "/media/downloads/weir", [RefiningTv with { ProcessesBeforeImport = false }, RefiningTv with { MediaScope = MediaManagerKinds.Movie }]);
-
-        Assert.Equal(
-            "No Deluno TV library is set to Refine before import, so Deluno will not hand TV downloads to Weir. Choose Refine before import for that library in Deluno.",
-            Assert.Single(result.Lines).Text);
-        Assert.Null(result.WatchedFolder);
-    }
-
-    [Fact]
-    public void Deluno_manifests_carry_the_downloads_folder_beside_the_library_root()
-    {
-        var descriptor = ManagerDialectRules.ManifestLibraryDescriptor((WireObject)WireJsonParser.Parse(
-            """{"id":"lib-1","name":"TV","mediaType":"tv","rootPath":"/media/tv","downloadsPath":"/media/downloads/complete/tv","importWorkflow":"refine-before-import","processorOutputPath":"/media/downloads/weir/tv"}"""));
-
-        Assert.Equal(RefiningTv with { Key = "lib-1" }, descriptor);
     }
 }

@@ -229,6 +229,21 @@ public static class ManagerDialectRules
         return ManagerValues.Dicts(payload);
     }
 
+    /// <summary>
+    /// The manifest's <c>downloadClients</c>: each client's name, whether it is enabled and the category it files each media type
+    /// under (Deluno's <c>ExternalDownloadClientManifest</c>). It carries no save folder.
+    /// </summary>
+    public static List<ManagerDownloadClientDescriptor> ManifestDownloadClients(WireValue? payload) =>
+        payload is WireObject mapping
+            ? [.. ManagerValues.Dicts(mapping.Get("downloadClients"))
+                .Where(client => ManagerValues.FirstText(client, "name") is not null)
+                .Select(client => new ManagerDownloadClientDescriptor(
+                    ManagerValues.FirstText(client, "name")!,
+                    client.Get("isEnabled") is not WireBool { Value: false },
+                    ManagerValues.FirstText(client, "moviesCategory"),
+                    ManagerValues.FirstText(client, "tvCategory")))]
+            : [];
+
     /// <summary>The manifest's capability strings, lower-cased.</summary>
     public static IReadOnlySet<string> ManifestCapabilities(WireValue? payload)
     {
@@ -301,7 +316,8 @@ public static class ManagerDialectRules
             capabilities,
             roots,
             [.. libraries.Where(library => !string.IsNullOrEmpty(ManifestLibraryKey(library))).Select(ManifestLibraryDescriptor)],
-            AdvertisedCapabilities: ManifestCapabilities(payload));
+            AdvertisedCapabilities: ManifestCapabilities(payload),
+            DownloadClients: ManifestDownloadClients(payload));
     }
 
     /// <summary>Every queue row, whichever container the manager wrapped it in.</summary>

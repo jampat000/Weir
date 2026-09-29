@@ -44,8 +44,8 @@ public sealed class LibraryFolderChainCheck
     /// <c>managers</c> is exactly what <see cref="ManagerSetupCheck.CheckAsync"/> already returns for this library's
     /// watched/output folders and media type, reused as-is. <c>download_clients</c> is one entry per enabled bare
     /// download-client connection, checking whether any of its folders is this library's watched folder
-    /// (<see cref="LibraryFolderChainRules.CheckDownloadClientFolder"/>) — with none connected, an empty list never
-    /// makes the library not ready, the same as with no manager connected.
+    /// (<see cref="LibraryFolderChainRules.CheckDownloadClientFolders"/>), one line per folder it saves to — with none
+    /// connected, an empty list never makes the library not ready, the same as with no manager connected.
     /// </summary>
     public async Task<WireObject> CheckForLibraryAsync(UnitOfWork uow, ProcessingLibraryRecord library, CancellationToken cancellationToken)
     {
@@ -82,14 +82,14 @@ public sealed class LibraryFolderChainCheck
         return [.. connections.Select(item =>
         {
             var label = DownloadClientKinds.LabelForConnection(item.Row.Kind, item.Row.Name);
-            var line = LibraryFolderChainRules.CheckDownloadClientFolder(label, watchedFolder, item.Folders);
+            var lines = LibraryFolderChainRules.CheckDownloadClientFolders(label, watchedFolder, item.Folders);
             return new WireObject()
                 .Set("connection_id", item.Row.Id)
                 .Set("kind", item.Row.Kind)
                 .Set("name", item.Row.Name)
                 .Set("label", label)
-                .Set("ready", line.State != SetupCheckLine.Problem)
-                .Set("lines", new WireArray([(WireValue)line.ToOut()]));
+                .Set("ready", lines.All(line => line.State != SetupCheckLine.Problem))
+                .Set("lines", new WireArray(lines.Select(line => (WireValue)line.ToOut())));
         })];
     }
 
