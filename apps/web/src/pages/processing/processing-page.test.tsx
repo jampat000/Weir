@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { LiveProgressEntry } from "../../lib/activity/use-activity-stream-invalidation";
 import type { ProcessingFile } from "../../lib/processing/files-api";
 import { LEAVING_CARD_MS } from "./leaving-cards";
 import { LIBRARY_CLEAN_JOB_KIND } from "./processing-model";
@@ -35,6 +36,7 @@ const libraries = [
     name: "TV",
     enabled: true,
     watched_folder: "D:/downloads/tv",
+    manager_connection_ids: [1],
     min_file_age_seconds: 60,
     effective_min_file_age_seconds: 60,
   },
@@ -43,6 +45,7 @@ const libraries = [
     name: "Movies",
     enabled: true,
     watched_folder: "D:/downloads/movies",
+    manager_connection_ids: [1],
     min_file_age_seconds: 60,
     effective_min_file_age_seconds: 60,
   },
@@ -54,9 +57,11 @@ const stats = { files_processed: 38, net_space_saved_bytes: 44_236_078_284 };
 const refetchFiles = vi.fn();
 const refetchLibraries = vi.fn();
 
+const liveProgress: Record<string, LiveProgressEntry> = {};
+
 vi.mock("../../lib/activity/use-activity-stream-invalidation", () => ({
   useActivityStreamInvalidations: () => undefined,
-  useLiveProgress: () => ({}),
+  useLiveProgress: () => liveProgress,
 }));
 vi.mock("../../lib/processing/files-queries", () => ({
   useProcessingFilesQuery: () => ({
@@ -171,6 +176,7 @@ describe("ProcessingPage", () => {
     vi.setSystemTime(new Date("2026-08-18T10:00:00Z"));
     files.files = [];
     files.status_counts = {};
+    for (const path of Object.keys(liveProgress)) delete liveProgress[path];
     jobs.active = { jobs: [] };
     jobs.failed = { jobs: [] };
     activity["processing.file_remux_pass_completed"] = { items: [] };
@@ -619,6 +625,34 @@ describe("ProcessingPage", () => {
     );
   });
 
+  it("moves a finished file's time on while the page stays open", () => {
+    activity["processing.file_remux_pass_completed"] = {
+      items: [
+        {
+          id: 502,
+          created_at: "2026-08-18T09:58:00",
+          event_type: "processing.file_remux_pass_completed",
+          title: "x",
+          library_id: 1,
+          relative_path: "The.Quiet.Harbour.S01E06.mkv",
+          detail: JSON.stringify({
+            outcome: "live_output_written",
+            ok: true,
+            relative_media_path: "The.Quiet.Harbour.S01E06.mkv",
+          }),
+        },
+      ],
+    };
+    renderLive();
+    expect(screen.getByTestId("live-finished")).toHaveTextContent("2 min ago");
+
+    act(() => {
+      vi.advanceTimersByTime(5 * 60 * 1000);
+    });
+
+    expect(screen.getByTestId("live-finished")).toHaveTextContent("7 min ago");
+  });
+
   it("announces a newly finished file to a screen reader, but not the ones already on screen at load", () => {
     const { rerender } = renderLive();
     expect(screen.getByTestId("live-finished-announcement")).toHaveTextContent(
@@ -795,5 +829,108 @@ describe("ProcessingPage", () => {
         "Weir couldn't load what happened to this file. Reload the page to try again.",
       ),
     ).toBeInTheDocument();
+  });
+
+  describe("a pass that has started before the file list says so", () => {
+    const path = "The.Quiet.Harbour.S01E03.1080p.WEB-DL.mkv";
+    const frame: LiveProgressEntry = {
+      relativePath: path,
+      status: "processing",
+      stage: "writing",
+      percent: 12,
+      etaSeconds: 30,
+      message: "Weir is writing the cleaned-up file.",
+      speed: "148x",
+      elapsedSeconds: 2,
+      removedAudio: [],
+      removedSubtitles: [],
+    };
+
+    it("moves the file from Waiting to Working as soon as a progress frame arrives for it", () => {
+      files.files = [file({ id: 1, status: "unprocessed" })];
+      const { rerender } = renderLive();
+      expect(screen.getByTestId("live-lane-waiting")).toHaveTextContent(
+        "The Quiet Harbour S01E03",
+      );
+
+      liveProgress[path] = frame;
+      rerender(
+        <MemoryRouter>
+          <ProcessingPage />
+        </MemoryRouter>,
+      );
+
+      expect(screen.getByTestId("live-lane-working")).toHaveTextContent(
+        "The Quiet Harbour S01E03",
+      );
+      expect(screen.getByTestId("live-lane-waiting")).not.toHaveTextContent(
+        "The Quiet Harbour S01E03",
+      );
+    });
+
+    it("still shows its ended card when the pass finishes before the list stops calling the file Waiting", () => {
+      files.files = [file({ id: 1, status: "unprocessed" })];
+      liveProgress[path] = frame;
+      const { rerender } = renderLive();
+      expect(screen.getByTestId("live-lane-working")).toHaveTextContent(
+        "The Quiet Harbour S01E03",
+      );
+
+      delete liveProgress[path];
+      rerender(
+        <MemoryRouter>
+          <ProcessingPage />
+        </MemoryRouter>,
+      );
+      files.files = [file({ id: 1, status: "processed" })];
+      rerender(
+        <MemoryRouter>
+          <ProcessingPage />
+        </MemoryRouter>,
+      );
+
+      const ended = screen.getByTestId("live-leaving");
+      expect(ended).toHaveAttribute("data-outcome", "done");
+      expect(ended).toHaveTextContent("The Quiet Harbour S01E03");
+    });
+  });
+
+  describe("the Handing back lane's subtitle", () => {
+    const original = libraries.map((library) => library.manager_connection_ids);
+    afterEach(() => {
+      libraries.forEach((library, index) => {
+        library.manager_connection_ids = original[index];
+      });
+    });
+
+    it("sends files back to the media manager when every workflow is linked", () => {
+      renderLive();
+
+      expect(screen.getByTestId("live-lane-handing")).toHaveTextContent(
+        "Final checks, then back to your media manager",
+      );
+    });
+
+    it("names the output folder when every workflow is Weir only", () => {
+      libraries.forEach((library) => {
+        library.manager_connection_ids = [];
+      });
+      renderLive();
+
+      const lane = screen.getByTestId("live-lane-handing");
+      expect(lane).toHaveTextContent(
+        "Final checks, then into the output folder",
+      );
+      expect(lane).not.toHaveTextContent("media manager");
+    });
+
+    it("covers both when Weir-only and linked workflows are mixed", () => {
+      libraries[0].manager_connection_ids = [];
+      renderLive();
+
+      expect(screen.getByTestId("live-lane-handing")).toHaveTextContent(
+        "Final checks, then into the output folder or back to your media manager",
+      );
+    });
   });
 });
