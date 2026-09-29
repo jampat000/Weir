@@ -7,6 +7,7 @@
 
 import { useState } from "react";
 import { QuietFieldGroup } from "../../../../components/shared/quiet-section";
+import { SetupCheckLines } from "../../../../components/shared/setup-check-lines";
 import { type DownloadClientSuggestion } from "../../../../lib/download-clients/download-clients-api";
 import { useDownloadClientSuggestionsQuery } from "../../../../lib/download-clients/queries";
 import {
@@ -46,59 +47,6 @@ function CopyLink({ value, label }: { value: string; label: string }) {
     >
       {copied ? "Copied" : "Copy"}
     </button>
-  );
-}
-
-function CheckLines({
-  label,
-  lines,
-}: {
-  label: string;
-  lines: ProcessingManagerSetupItem["lines"];
-}) {
-  return (
-    <ul className="space-y-1.5 text-sm leading-5" aria-label={`${label} check`}>
-      {lines.map((line, index) => (
-        <li key={index} className="flex gap-2">
-          <span
-            aria-hidden="true"
-            className={
-              line.state === "ok"
-                ? "mm-status-text--healthy"
-                : line.state === "problem"
-                  ? "mm-status-text--warning"
-                  : "text-mm-text3"
-            }
-          >
-            {line.state === "ok"
-              ? "✓"
-              : line.state === "problem"
-                ? "✗"
-                : line.state === "unverified"
-                  ? "?"
-                  : "·"}
-          </span>
-          <span
-            className={
-              line.state === "problem"
-                ? "mm-status-text--warning"
-                : "text-mm-text2"
-            }
-          >
-            <span className="sr-only">
-              {line.state === "ok"
-                ? "Fine: "
-                : line.state === "problem"
-                  ? "Needs a fix: "
-                  : line.state === "unverified"
-                    ? "Not verified: "
-                    : "Note: "}
-            </span>
-            {line.text}
-          </span>
-        </li>
-      ))}
-    </ul>
   );
 }
 
@@ -172,7 +120,7 @@ function DownloadClientSuggestionSection({
           ) : null}
         </p>
       ) : null}
-      <CheckLines label={item.label} lines={item.lines} />
+      <SetupCheckLines label={item.label} lines={item.lines} />
     </section>
   );
 }
@@ -415,7 +363,7 @@ export function LibraryManagerSetup({
                     onUseFolders={onUseFolders}
                   />
                 )}
-                <CheckLines label={item.label} lines={item.lines} />
+                <SetupCheckLines label={item.label} lines={item.lines} />
               </section>
             ))}
             {downloadClientItems.map((item) => (

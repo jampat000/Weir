@@ -22,7 +22,7 @@ import {
 const TEST_FAILURE = "The media manager could not be tested.";
 const TOGGLE_FAILURE = "This media manager could not be turned on or off.";
 
-function RemoveConnectionDialog({
+export function RemoveConnectionDialog({
   connection,
   remove,
   onClose,
