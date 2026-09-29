@@ -99,6 +99,9 @@
           "Velopack": "[1.2.158, )"
         }
       },
+      "weir.tray.standinserver": {
+        "type": "Project"
+      },
       "Velopack": {
         "type": "CentralTransitive",
         "requested": "[1.2.158, )",
