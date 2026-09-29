@@ -868,6 +868,26 @@ describe("ProcessingPage", () => {
       );
     });
 
+    it("shows a file the server has just claimed in Working on its Checking step, before it has reported any progress", () => {
+      files.files = [
+        file({
+          id: 1,
+          status: "processing",
+          status_reason: "Weir has claimed this file and is checking it now.",
+        }),
+      ];
+      renderLive();
+
+      const card = within(screen.getByTestId("live-lane-working")).getByTestId(
+        "live-working",
+      );
+      expect(card).toHaveTextContent("The Quiet Harbour S01E03");
+      expect(card).toHaveTextContent("Checking (in progress)");
+      expect(screen.getByTestId("live-lane-waiting")).not.toHaveTextContent(
+        "The Quiet Harbour S01E03",
+      );
+    });
+
     it("still shows its ended card when the pass finishes before the list stops calling the file Waiting", () => {
       files.files = [file({ id: 1, status: "unprocessed" })];
       liveProgress[path] = frame;
@@ -895,7 +915,7 @@ describe("ProcessingPage", () => {
     });
   });
 
-  describe("the Handing back lane's subtitle", () => {
+  describe("where the page says a file ends up", () => {
     const original = libraries.map((library) => library.manager_connection_ids);
     afterEach(() => {
       libraries.forEach((library, index) => {
@@ -908,6 +928,9 @@ describe("ProcessingPage", () => {
 
       expect(screen.getByTestId("live-lane-handing")).toHaveTextContent(
         "Final checks, then back to your media manager",
+      );
+      expect(screen.getByTestId("processing-page")).toHaveTextContent(
+        "to the moment your media manager has it back.",
       );
     });
 
@@ -922,6 +945,11 @@ describe("ProcessingPage", () => {
         "Final checks, then into the output folder",
       );
       expect(lane).not.toHaveTextContent("media manager");
+      const page = screen.getByTestId("processing-page");
+      expect(page).toHaveTextContent(
+        "to the moment its cleaned copy is in the output folder.",
+      );
+      expect(page).not.toHaveTextContent("moment your media manager");
     });
 
     it("covers both when Weir-only and linked workflows are mixed", () => {
@@ -930,6 +958,9 @@ describe("ProcessingPage", () => {
 
       expect(screen.getByTestId("live-lane-handing")).toHaveTextContent(
         "Final checks, then into the output folder or back to your media manager",
+      );
+      expect(screen.getByTestId("processing-page")).toHaveTextContent(
+        "its cleaned copy is in the output folder or your media manager has it back.",
       );
     });
   });

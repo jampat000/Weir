@@ -31,7 +31,6 @@ import { useProcessingLibrariesQuery } from "../../lib/processing/libraries-quer
 import { mergeLiveProgress } from "../../lib/processing/live-progress-merge";
 import { useProcessingFilesAtOnceQuery } from "../../lib/processing/queries";
 import { processingKeys } from "../../lib/processing/query-keys";
-import { workflowKindName } from "../../lib/processing/workflow-kind";
 import { parseAppTime } from "../../lib/ui/mm-format-date";
 import { useNow } from "../../lib/ui/use-now";
 import { FinishedLane } from "./finished-lane";
@@ -51,7 +50,11 @@ import {
   TODAY_DAYS,
   type Filter,
 } from "./processing-toolbar";
-import { handingLaneHint } from "./processing-words";
+import {
+  enabledWorkflowKinds,
+  handingLaneHint,
+  processingLead,
+} from "./processing-words";
 import { WorkingCard } from "./working-card";
 import { ACTIVE_JOBS_LIMIT, WORKING_FILES_QUERY } from "./working-count";
 
@@ -161,11 +164,6 @@ export function ProcessingPage(): React.ReactElement {
   const board = useLanes();
   useRefetchOverdueLooks(board, now);
   const { files, libraries, lanes } = board;
-  const handingHint = handingLaneHint(
-    (libraries.data ?? [])
-      .filter((library) => library.enabled)
-      .map(workflowKindName),
-  );
   const filesAtOnce = useProcessingFilesAtOnceQuery();
   const pause = usePauseQuery();
   const fileLog = useProcessingFileLog();
@@ -231,13 +229,11 @@ export function ProcessingPage(): React.ReactElement {
   const leavingWorking = leavingIn("working");
   const leavingHanding = leavingIn("handing");
   const lanesAtOnce = filesAtOnce.data?.effective_files_at_once ?? null;
+  const workflowKinds = enabledWorkflowKinds(libraries.data ?? []);
 
   return (
     <div className="mm-page mm-live" data-testid="processing-page">
-      <PageHeader
-        title="Processing"
-        lead="Every file Weir is working on, from the moment it lands to the moment your media manager has it back."
-      />
+      <PageHeader title="Processing" lead={processingLead(workflowKinds)} />
 
       <ProcessingToolbar filter={filter} onFilter={setFilter} now={now} />
 
@@ -343,7 +339,7 @@ export function ProcessingPage(): React.ReactElement {
               active={handing.length > 0}
               label="Handing back"
               count={handing.length}
-              hint={handingHint}
+              hint={handingLaneHint(workflowKinds)}
             >
               {handing.length || leavingHanding.length ? (
                 <ul className="mm-live-lane__body">
