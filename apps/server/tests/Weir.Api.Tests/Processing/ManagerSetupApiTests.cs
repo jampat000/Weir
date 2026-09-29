@@ -145,7 +145,7 @@ public sealed class ManagerSetupApiTests
     {
         var (server, client, manager) = await StartAsync();
         await using var _server = server;
-        await ConnectAsync(client, "deluno", "Deluno", "http://192.0.2.10:5099");
+        await ConnectAsync(client, "deluno", "http://192.0.2.10:5099");
         manager.Json(
             HttpMethod.Get,
             "/api/integrations/external/manifest",
@@ -164,7 +164,7 @@ public sealed class ManagerSetupApiTests
     {
         var (server, client, manager) = await StartAsync();
         await using var _server = server;
-        await ConnectAsync(client, "sonarr", "Sonarr", "http://192.0.2.60:8989");
+        await ConnectAsync(client, "sonarr", "http://192.0.2.60:8989");
         manager.Json(HttpMethod.Get, "/api/v3/remotepathmapping", "[]")
             .Json(HttpMethod.Get, "/api/v3/downloadclient", SonarrClients)
             .Json(HttpMethod.Get, "/api/v3/rootfolder", """[{"path":"Z:\\TV","id":1}]""")
@@ -184,7 +184,7 @@ public sealed class ManagerSetupApiTests
     {
         var (server, client, manager) = await StartAsync();
         await using var _server = server;
-        await ConnectAsync(client, "sonarr", "Sonarr", "http://192.0.2.60:8989");
+        await ConnectAsync(client, "sonarr", "http://192.0.2.60:8989");
         manager.Json(HttpMethod.Get, "/api/v3/remotepathmapping", "[]")
             .Json(HttpMethod.Get, "/api/v3/downloadclient", "[]")
             .Json(HttpMethod.Get, "/api/v3/config/downloadclient", """{"enableCompletedDownloadHandling":true,"id":1}""");
