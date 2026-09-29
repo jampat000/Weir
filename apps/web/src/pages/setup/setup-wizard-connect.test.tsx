@@ -298,6 +298,20 @@ describe("first run: connect Deluno first", () => {
     expect(screen.queryByTestId("media-manager-kind")).not.toBeInTheDocument();
   });
 
+  it("badges each offered workflow with the Deluno it is linked to", async () => {
+    scenario.managers = [managerConnection({ name: "Deluno on SPARE-PC" })];
+    renderWizard();
+
+    choose("Deluno");
+    const found = await foundLibraries();
+
+    expect(
+      found
+        .getAllByTestId("workflow-kind-badge")
+        .map((badge) => badge.textContent),
+    ).toEqual(["Linked to Deluno on SPARE-PC", "Linked to Deluno on SPARE-PC"]);
+  });
+
   it("saves the offered workflows into the empty ones, linked to Deluno, and drops the connect step from What's next", async () => {
     scenario.managers = [managerConnection({})];
     renderWizard();
@@ -577,6 +591,11 @@ describe("first run: connect Sonarr and Radarr first", () => {
     expect(screen.getAllByTestId("setup-wizard-connection")).toHaveLength(2);
     expect(found.getByText(/folders from Radarr/)).toBeInTheDocument();
     expect(found.getByText(/folders from Sonarr/)).toBeInTheDocument();
+    expect(
+      found
+        .getAllByTestId("workflow-kind-badge")
+        .map((badge) => badge.textContent),
+    ).toEqual(["Linked to Radarr", "Linked to Sonarr"]);
 
     fireEvent.click(screen.getByRole("button", { name: "Finish setup" }));
 
@@ -676,6 +695,55 @@ describe("first run: connect a download client first", () => {
         manager_connection_ids: [],
       }),
     );
+  });
+
+  describe("the badge on each offered workflow", () => {
+    function suggestionLinkedTo(
+      managerConnectionIds: number[],
+    ): LibrarySuggestions {
+      return {
+        libraries: [
+          {
+            library_id: 1,
+            name: "Movies",
+            media_type: "movie",
+            watched_folder: "/downloads/complete/movies",
+            output_folder: "/downloads/complete/Weir Ready/Movies",
+            source_label: "qBittorrent",
+            manager_connection_ids: managerConnectionIds,
+          },
+        ],
+        notes: [],
+      };
+    }
+
+    it("names the connected Deluno a suggestion links to, though a download client was chosen", async () => {
+      scenario.clients = [clientConnection({})];
+      scenario.managers = [managerConnection({ name: "Deluno on SPARE-PC" })];
+      scenario.suggestions = suggestionLinkedTo([5]);
+      renderWizard();
+
+      choose(/A download client/);
+      const found = await foundLibraries();
+
+      expect(found.getByTestId("workflow-kind-badge")).toHaveTextContent(
+        "Linked to Deluno on SPARE-PC",
+      );
+    });
+
+    it("says a media manager was removed only when the linked connection no longer exists", async () => {
+      scenario.clients = [clientConnection({})];
+      scenario.managers = [managerConnection({ name: "Deluno on SPARE-PC" })];
+      scenario.suggestions = suggestionLinkedTo([99]);
+      renderWizard();
+
+      choose(/A download client/);
+      const found = await foundLibraries();
+
+      expect(found.getByTestId("workflow-kind-badge")).toHaveTextContent(
+        "Linked to a removed media manager",
+      );
+    });
   });
 
   it("connects a download client with the form Settings uses", async () => {
