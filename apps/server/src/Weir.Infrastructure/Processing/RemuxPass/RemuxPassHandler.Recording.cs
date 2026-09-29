@@ -2,6 +2,7 @@ using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
 using Weir.Core.Activity;
 using Weir.Core.Json;
+using Weir.Core.Processing;
 using Weir.Core.Processing.RemuxPass;
 using Weir.Infrastructure.Activity;
 
@@ -59,9 +60,9 @@ public sealed partial class RemuxPassHandler
     }
 
     /// <summary>Applies an opt-in rejection deletion, after the rejection was recorded.</summary>
-    private async Task FinishRejectedInputCleanupAsync(WireObject result, long? libraryId, string mediaScope)
+    private async Task FinishRejectedInputCleanupAsync(WireObject result, ProcessingLibraryRecord? library, long? libraryId, string mediaScope, WireObject? origin)
     {
-        if (result.Get("rejection_kind") is not { IsTruthy: true } || result.Get("rejected_file_action") is not WireString { Value: "delete_file" })
+        if (library is null || result.Get("rejection_kind") is not { IsTruthy: true } || result.Get("rejected_file_action") is not WireString { Value: RejectedFileActions.DeleteFile })
         {
             return;
         }
@@ -75,10 +76,10 @@ public sealed partial class RemuxPassHandler
         {
             var cleanup = RemuxPassPaths.CleanupRejectedFile(watched.Value, inspected.Value, "delete_file");
             result.Set("rejected_cleanup_status", cleanup.Deleted ? "deleted" : "not_deleted");
-            result.Set("rejected_cleanup_detail", cleanup.Detail);
+            result.Set("rejected_cleanup_detail", cleanup.Deleted && WeirOnlyRejection.Applies(library, origin) ? WeirOnlyRejection.Deleted : cleanup.Detail);
         }
 
-        await ApplyFileOutcomeStateAsync(result, libraryId, mediaScope, null).ConfigureAwait(false);
+        await ApplyFileOutcomeStateAsync(result, libraryId, mediaScope, origin).ConfigureAwait(false);
         if (result.Get("relative_media_path") is not WireString rel || WireStrings.Strip(rel.Value).Length == 0)
         {
             return;
