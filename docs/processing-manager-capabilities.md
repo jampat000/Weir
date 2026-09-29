@@ -50,11 +50,21 @@ manager link.
   both from Deluno's manifest and offers to fill them in. Where Deluno reaches a
   folder by another path (a NAS mount), a path mapping in Deluno (Settings ›
   Media Management › Processing Workflow › Weir › Path mappings) translates it.
-  Deluno does not publish its mappings, so Weir shows such a folder as not
-  verified rather than as a fault; its check follows a junction or symbolic link,
-  so the same folder reached two ways is not reported as a difference. A hand-off
-  is still accepted only when its path, as Deluno sends it, is inside the watched
-  folder.
+  Deluno publishes where each download client saves and its path mappings for
+  Weir (`GET /api/integrations/processors/download-destinations`, Deluno
+  1.0.0-rc.23 or later), so Weir asks once per check for the workflow's own
+  library and translates every folder it names through those mappings (the
+  longest matching Deluno folder is replaced by its Weir folder) before comparing
+  it with the workflow's folders. Each download client, the downloads folder and
+  the processed-output folder then read as fine or needing a fix, and a client
+  Deluno could not get an answer from stays not verified. Weir follows a junction
+  or symbolic link after mapping, so the same folder reached two ways is not
+  reported as a difference. The route needs a Deluno API key with the Imports
+  permission (Deluno: System › API Access, the Media automation access). On a
+  Deluno older than rc.23 Weir keeps showing the folders as not verified and says
+  which release lets it check; with a key that lacks the permission it says how to
+  fix that. A hand-off is still accepted only when its path, as Deluno sends it,
+  is inside the watched folder.
 - **Sonarr and Radarr** are set up by hand, the way FileFlows documents it: the
   download client finishes into Weir's watched folder, and a remote path mapping
   in Sonarr/Radarr (Settings › Download Clients › Remote Path Mappings) maps that
