@@ -130,7 +130,7 @@ export function WizardFoundLibraries({
   onNeither,
 }: {
   found: Found;
-  /** The media managers connected in this setup, to name what each library is linked to. */
+  /** Every media manager connection, to name what each library is linked to. */
   managers: MediaManagerConnection[];
   disabled: boolean;
   /** Gives up on connecting and goes to typing the folders. */
