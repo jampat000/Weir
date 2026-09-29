@@ -18,6 +18,7 @@ work, not rewritten for its own sake. Scripts are named in kebab-case.
 | `ci-passed.mjs` | CI's single verdict: every job due for the change passed, every other job was skipped (`ci-passed.test.mjs`). |
 | `check-agent-docs.mjs` | Checks that the agent documentation map (`AGENTS.md` and its links) is valid. |
 | `check-github-action-pins.mjs` | Fails when a workflow uses an action that is not pinned to a full commit SHA. |
+| `check-test-console-programs.mjs` | Fails when a test source under `apps/` starts a system console program (`ping`, `timeout`, ...) as a stand-in, because that can pop a console window on a desktop (#806, #821) (`check-test-console-programs.test.mjs`). |
 | `check-node-docker-version.mjs` | Fails when the Dockerfile's node image major does not match the root `.node-version`. |
 | `check-release-workflow-gates.mjs` | Checks the shape of `release.yml` and `ci.yml`: only `publish` publishes, `latest` moves last, `ci-passed` judges every job. |
 | `check-release-version.mjs` | Fails a release whose tag is not a well-formed `X.Y.Z` version (`check-release-version.test.mjs`). No file carries the release version; every build that ships takes it from the tag instead (#804). |
