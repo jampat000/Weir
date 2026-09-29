@@ -114,6 +114,7 @@ it("starts a new library on the Performance setting", async () => {
 
   render(<LibrariesTab />, { wrapper });
   fireEvent.click(await screen.findByTestId("processing-library-add"));
+  fireEvent.click(await screen.findByTestId("add-workflow-continue"));
   fireEvent.change(screen.getByPlaceholderText("Movies 4K"), {
     target: { value: "Kids" },
   });
