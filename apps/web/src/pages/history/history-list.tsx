@@ -1,7 +1,7 @@
 import { FileName } from "../../components/shared/file-name";
 import { formatBytes } from "../../lib/format/bytes";
 import {
-  PROCESSING_FILE_STATUS_LABELS,
+  processingFileStatusLabel,
   type ProcessingFile,
 } from "../../lib/processing/files-api";
 import type { LibraryClean } from "../../lib/processing/library-cleans-api";
@@ -21,11 +21,7 @@ function whatWeirDid(file: ProcessingFile): string {
       : "Working on it";
   }
   if (file.quarantined) return "Held after repeated failures";
-  return (
-    importedLabel(file) ??
-    PROCESSING_FILE_STATUS_LABELS[file.status] ??
-    file.status
-  );
+  return importedLabel(file) ?? processingFileStatusLabel(file);
 }
 
 const CLEAN_OUTCOME_WORDS: Record<LibraryClean["outcome"], string> = {

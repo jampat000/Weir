@@ -46,7 +46,11 @@ public sealed partial class RemuxPassHandler
                         }
 
                         var reason = $"{rejectionReason} {cleanupDetail}";
-                        if (await RemuxPassFileState.MarkFileStatusAsync(uow, library.Id, rel, ProcessingFileStatuses.Skipped, reason, now).ConfigureAwait(false))
+                        if (WeirOnlyRejection.Applies(library, origin))
+                        {
+                            await RecordWeirOnlyRejectionAsync(uow, library, rel, reason, result).ConfigureAwait(false);
+                        }
+                        else if (await RemuxPassFileState.MarkFileStatusAsync(uow, library.Id, rel, ProcessingFileStatuses.Skipped, reason, now).ConfigureAwait(false))
                         {
                             await RemuxPassFileState.ClearFailureFieldsAsync(uow, library.Id, rel).ConfigureAwait(false);
                         }
