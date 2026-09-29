@@ -76,7 +76,7 @@ public sealed class FolderHandoffCompletionTests
     {
         using var fixture = new MediaManagerFixture();
         fixture.Http.Json(HttpMethod.Post, ReportPath, "{}", HttpStatusCode.Accepted);
-        await fixture.AddConnectionAsync("deluno", "Deluno", "http://192.0.2.30:5099", "k1");
+        await fixture.AddConnectionAsync("deluno", "http://192.0.2.30:5099", "k1");
         var watched = fixture.Store.Home.Join("tv");
         const string folder = "Show.S01";
         Directory.CreateDirectory(Path.Join(watched, folder));
@@ -114,7 +114,7 @@ public sealed class FolderHandoffCompletionTests
             commit: false);
         await MarkDeliveredInWeirAsync(fixture, last.Id, lastRelative);
 
-        Assert.Equal("reported completed to Deluno", finalStatus);
+        Assert.Equal("reported completed to Deluno on 192.0.2.30", finalStatus);
         var post = Assert.Single(fixture.Http.RequestsTo(HttpMethod.Post, ReportPath));
         var body = (WireObject)post.Json!;
         Assert.Equal("completed", ((WireString)body["status"]).Value);
@@ -133,7 +133,7 @@ public sealed class FolderHandoffCompletionTests
     {
         using var fixture = new MediaManagerFixture();
         fixture.Http.Json(HttpMethod.Post, ReportPath, "{}", HttpStatusCode.Accepted);
-        await fixture.AddConnectionAsync("deluno", "Deluno", "http://192.0.2.30:5099", "k1");
+        await fixture.AddConnectionAsync("deluno", "http://192.0.2.30:5099", "k1");
         var watched = fixture.Store.Home.Join("tv");
         const string folder = "Show.S02";
         Directory.CreateDirectory(Path.Join(watched, folder));
@@ -162,7 +162,7 @@ public sealed class FolderHandoffCompletionTests
         var finalStatus = await fixture.Db(
             uow => fixture.Reporter.ReportHandoffCompletionAsync(uow, failedJob.PayloadJson, FinalFailure(failedRelative, "ffmpeg died")), commit: false);
 
-        Assert.Equal("reported failed to Deluno", finalStatus);
+        Assert.Equal("reported failed to Deluno on 192.0.2.30", finalStatus);
         var post = Assert.Single(fixture.Http.RequestsTo(HttpMethod.Post, ReportPath));
         var body = (WireObject)post.Json!;
         Assert.Equal("failed", ((WireString)body["status"]).Value);
@@ -177,7 +177,7 @@ public sealed class FolderHandoffCompletionTests
     {
         using var fixture = new MediaManagerFixture();
         fixture.Http.Json(HttpMethod.Post, ReportPath, "{}", HttpStatusCode.Accepted);
-        await fixture.AddConnectionAsync("deluno", "Deluno", "http://192.0.2.30:5099", "k1");
+        await fixture.AddConnectionAsync("deluno", "http://192.0.2.30:5099", "k1");
         var watched = fixture.Store.Home.Join("tv");
         const string folder = "Show.S03";
         Directory.CreateDirectory(Path.Join(watched, folder));
@@ -202,7 +202,7 @@ public sealed class FolderHandoffCompletionTests
         }));
 
         Assert.Single(fixture.Http.RequestsTo(HttpMethod.Post, ReportPath));
-        Assert.Single(results, status => status == "reported completed to Deluno");
+        Assert.Single(results, status => status == "reported completed to Deluno on 192.0.2.30");
         Assert.Single(results, status => status.StartsWith("skipped:", StringComparison.Ordinal));
     }
 
@@ -211,7 +211,7 @@ public sealed class FolderHandoffCompletionTests
     {
         using var fixture = new MediaManagerFixture();
         fixture.Http.Json(HttpMethod.Post, ReportPath, "{}", HttpStatusCode.Accepted);
-        await fixture.AddConnectionAsync("deluno", "Deluno", "http://192.0.2.30:5099", "k1");
+        await fixture.AddConnectionAsync("deluno", "http://192.0.2.30:5099", "k1");
         var watched = fixture.Store.Home.Join("tv");
         const string folder = "Show.S04";
         Directory.CreateDirectory(Path.Join(watched, folder));
@@ -253,7 +253,7 @@ public sealed class FolderHandoffCompletionTests
     {
         using var fixture = new MediaManagerFixture();
         fixture.Http.Json(HttpMethod.Post, ReportPath, "{}", HttpStatusCode.Accepted);
-        await fixture.AddConnectionAsync("deluno", "Deluno", "http://192.0.2.30:5099", "k1");
+        await fixture.AddConnectionAsync("deluno", "http://192.0.2.30:5099", "k1");
         var watched = fixture.Store.Home.Join("tv");
         const string folder = "Show.S06";
         Directory.CreateDirectory(Path.Join(watched, folder));
@@ -278,7 +278,7 @@ public sealed class FolderHandoffCompletionTests
             uow => fixture.Reporter.ReportHandoffCompletionAsync(uow, goingOnJob.PayloadJson, Delivered(relative, OutputFileFor(localFolder, relative), localFolder)),
             commit: false);
 
-        Assert.Equal("reported completed to Deluno", finalStatus);
+        Assert.Equal("reported completed to Deluno on 192.0.2.30", finalStatus);
         var post = Assert.Single(fixture.Http.RequestsTo(HttpMethod.Post, ReportPath));
         var body = (WireObject)post.Json!;
         Assert.Equal("completed", ((WireString)body["status"]).Value);
@@ -296,7 +296,7 @@ public sealed class FolderHandoffCompletionTests
     {
         using var fixture = new MediaManagerFixture();
         fixture.Http.Throw(HttpMethod.Post, ReportPath, new NotSupportedException("simulated crash during delivery"));
-        await fixture.AddConnectionAsync("deluno", "Deluno", "http://192.0.2.30:5099", "k1");
+        await fixture.AddConnectionAsync("deluno", "http://192.0.2.30:5099", "k1");
         var watched = fixture.Store.Home.Join("movies");
         Directory.CreateDirectory(Path.Join(watched, "Film"));
         await File.WriteAllTextAsync(Path.Join(watched, "Film", "film.mkv"), "x");
@@ -329,7 +329,7 @@ public sealed class FolderHandoffCompletionTests
     {
         using var fixture = new MediaManagerFixture();
         fixture.Http.Json(HttpMethod.Post, ReportPath, "{}", HttpStatusCode.Accepted);
-        await fixture.AddConnectionAsync("deluno", "Deluno", "http://192.0.2.30:5099", "k1");
+        await fixture.AddConnectionAsync("deluno", "http://192.0.2.30:5099", "k1");
         var watched = fixture.Store.Home.Join("tv");
         const string folder = "Show.S07";
         Directory.CreateDirectory(Path.Join(watched, folder));
@@ -374,7 +374,7 @@ public sealed class FolderHandoffCompletionTests
     {
         using var fixture = new MediaManagerFixture();
         fixture.Http.Json(HttpMethod.Post, ReportPath, "{}", HttpStatusCode.Accepted);
-        await fixture.AddConnectionAsync("deluno", "Deluno", "http://192.0.2.30:5099", "k1");
+        await fixture.AddConnectionAsync("deluno", "http://192.0.2.30:5099", "k1");
         var watched = fixture.Store.Home.Join("tv");
         const string folder = "Show.S08";
         Directory.CreateDirectory(Path.Join(watched, folder));

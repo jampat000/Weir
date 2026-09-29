@@ -119,8 +119,8 @@ public sealed partial class ConfigurationBundleStore
 
     private async Task ApplySuiteSettingsAsync(UnitOfWork uow, WireValue section, ITimeZoneResolver zones)
     {
+        // product_display_name in a backup is not read: Weir is named after its machine (#826).
         var ss = section as WireObject ?? throw new WireTypeException($"The backup's {SuiteTable} section must be an object.");
-        var name = WireConvert.Str(Required(ss, "product_display_name"));
         var noticeValue = ss.Get("signed_in_home_notice");
         var timezone = WireConvert.Str(Required(ss, "app_timezone"));
         var logRetention = WireConvert.ToInt(Required(ss, "log_retention_days"));
@@ -135,8 +135,8 @@ public sealed partial class ConfigurationBundleStore
         var hoursValue = ss.Get("configuration_backup_interval_hours");
 
         // Validated in the same order as a suite settings save, so the same error is reported first:
-        // name, notice, timezone, log retention, then activity and interval.
-        var normalized = SuiteSettingsRules.Normalize(new SuiteSettingsUpdate(name, notice, timezone, Saturate(logRetention)), zones);
+        // notice, timezone, log retention, then activity and interval.
+        var normalized = SuiteSettingsRules.Normalize(new SuiteSettingsUpdate(notice, timezone, Saturate(logRetention)), zones);
         long? activity = null;
         if (ss.Get("activity_retention_days") is { } activityValue and not WireNull)
         {

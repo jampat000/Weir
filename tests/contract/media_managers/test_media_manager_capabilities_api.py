@@ -22,7 +22,6 @@ def operator(admin: WeirClient) -> WeirClient:
 
 
 def _create(client: WeirClient, **overrides: Any) -> dict[str, Any]:
-    overrides.setdefault("name", "Main")
     response = create_connection(client, **overrides)
     assert response.status_code == 201, response.text
     return response.json()
@@ -47,7 +46,7 @@ def test_capabilities_reports_what_a_reachable_manager_manages(operator: WeirCli
     assert len(rows) == 1
     row = rows[0]
     assert row["connection_id"] == created["id"]
-    assert row["label"] == "Deluno (Main)"
+    assert row["label"] == "Deluno on 127.0.0.1"
     assert row["media_scopes"] == ["movie", "tv"]
     assert row["reports_import_queue"] is True
     # The honest part: Deluno cannot clear a folder for deletion, and says so up front.
@@ -67,7 +66,7 @@ def test_capabilities_says_when_a_manager_did_not_answer(operator: WeirClient, f
 
     row = operator.get(f"{API}/media-managers/capabilities").json()[0]
     assert row["reachable"] is False
-    assert row["detail"].startswith("Weir could not reach Deluno (Main)")
+    assert row["detail"].startswith("Weir could not reach Deluno on 127.0.0.1")
     # The static profile still stands, so the page can say what this manager is for.
     assert row["media_scopes"] == ["movie", "tv"]
 

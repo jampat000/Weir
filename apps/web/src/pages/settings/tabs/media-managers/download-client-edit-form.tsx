@@ -18,7 +18,6 @@ import { useLeaveConfirmation, useUnsavedChanges } from "../../unsaved-changes";
 const SAVE_FAILURE = "This download client could not be saved.";
 
 type EditForm = {
-  name: string;
   base_url: string;
   username: string;
   password: string;
@@ -27,7 +26,6 @@ type EditForm = {
 
 function formFrom(connection: DownloadClientConnection): EditForm {
   return {
-    name: connection.name,
     base_url: connection.base_url,
     username: connection.username ?? "",
     password: "",
@@ -37,7 +35,6 @@ function formFrom(connection: DownloadClientConnection): EditForm {
 
 function sameForm(a: EditForm, b: EditForm): boolean {
   return (
-    a.name === b.name &&
     a.base_url === b.base_url &&
     a.username === b.username &&
     a.password === b.password &&
@@ -51,7 +48,6 @@ function changesFrom(
   initial: EditForm,
 ): DownloadClientConnectionUpdate {
   const changes: DownloadClientConnectionUpdate = {
-    name: form.name.trim(),
     base_url: form.base_url.trim(),
   };
   if (form.username !== initial.username)
@@ -62,7 +58,7 @@ function changesFrom(
 }
 
 /**
- * Name, address and credentials, edited in place. Nothing is sent until Save; Cancel asks first
+ * Address and credentials, edited in place. Nothing is sent until Save; Cancel asks first
  * when anything changed, through the same guard every Settings panel with a Save/Cancel pair uses.
  */
 export function DownloadClientEditForm({
@@ -96,14 +92,6 @@ export function DownloadClientEditForm({
       data-testid="download-client-edit-form"
     >
       <div className="mm-field-row">
-        <Field label="Name" width="medium">
-          <input
-            data-testid="download-client-edit-name"
-            className={mmEditableTextFieldClass}
-            value={form.name}
-            onChange={(e) => change("name", e.target.value)}
-          />
-        </Field>
         <Field label="Address" width="wide">
           <input
             data-testid="download-client-edit-base-url"
@@ -183,9 +171,7 @@ export function DownloadClientEditForm({
           type="button"
           data-testid="download-client-edit-save"
           className={mmActionButtonClass({ variant: "primary" })}
-          disabled={
-            update.isPending || !form.name.trim() || !form.base_url.trim()
-          }
+          disabled={update.isPending || !form.base_url.trim()}
           onClick={save}
         >
           {update.isPending ? "Saving…" : "Save"}

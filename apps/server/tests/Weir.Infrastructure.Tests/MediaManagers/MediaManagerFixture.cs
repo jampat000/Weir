@@ -69,8 +69,8 @@ internal sealed class MediaManagerFixture : IDisposable
 
     public Task<T> Db<T>(Func<UnitOfWork, Task<T>> work, bool commit = true) => Store.WithUnitOfWork(work, commit);
 
-    public async Task<long> AddConnectionAsync(string kind, string name, string baseUrl = "http://manager.local", string? apiKey = "key", bool enabled = true) =>
-        await Db(uow => Connections.CreateAsync(uow, kind, name, baseUrl, apiKey, enabled));
+    public async Task<long> AddConnectionAsync(string kind, string baseUrl = "http://manager.local", string? apiKey = "key", bool enabled = true) =>
+        await Db(uow => Connections.CreateAsync(uow, kind, baseUrl, apiKey, enabled));
 
     /// <summary>Point the seeded library of <paramref name="mediaType"/> at a folder, or add one.</summary>
     public async Task<long> LibraryAsync(string mediaType, string watchedFolder, string? name = null)

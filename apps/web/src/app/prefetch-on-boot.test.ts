@@ -13,7 +13,7 @@ const SIGNED_IN: UserPublic = {
   username: "user1",
   app_theme: null,
 };
-const SETTINGS = { product_display_name: "Weir" };
+const SETTINGS = { app_timezone: "UTC" };
 
 vi.mock("../lib/api/auth-api", () => ({
   fetchMe: vi.fn(),

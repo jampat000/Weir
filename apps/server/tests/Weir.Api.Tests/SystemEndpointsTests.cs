@@ -90,9 +90,12 @@ public sealed class SystemEndpointsTests
 
         using var body = JsonDocument.Parse(responseText);
         var root = body.RootElement;
-        Assert.Equal(["ready", "version", "status", "startup_seconds", "steps", "worker_health"], root.EnumerateObject().Select(p => p.Name));
+        Assert.Equal(
+            ["ready", "version", "machine_name", "machine_name_looks_generated", "status", "startup_seconds", "steps", "worker_health"],
+            root.EnumerateObject().Select(p => p.Name));
         Assert.True(root.GetProperty("ready").GetBoolean());
         Assert.Equal("7.8.9", root.GetProperty("version").GetString());
+        Assert.Equal(Environment.MachineName, root.GetProperty("machine_name").GetString());
         Assert.Equal("ready", root.GetProperty("status").GetString());
         Assert.True(root.GetProperty("startup_seconds").GetDouble() >= 0);
         Assert.Equal(
