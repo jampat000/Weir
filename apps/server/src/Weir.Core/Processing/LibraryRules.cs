@@ -25,10 +25,14 @@ public sealed record ProcessingLibraryInput
     public string ExcludeMarkersCsv { get; init; } = string.Empty;
     public string IncludePatternsCsv { get; init; } = string.Empty;
     public string ExcludePatternsCsv { get; init; } = string.Empty;
-    public long MinFileSizeMb { get; init; }
+
+    /// <summary>Null follows Settings › Performance; see <see cref="ProcessingLibraryRecord.MinFileSizeMb"/>.</summary>
+    public long? MinFileSizeMb { get; init; }
     public long MaxFileSizeMb { get; init; }
     public string RejectedFileAction { get; init; } = "leave";
-    public long MinFileAgeSeconds { get; init; } = 60;
+
+    /// <summary>Null follows Settings › Performance; see <see cref="ProcessingLibraryRecord.MinFileAgeSeconds"/>.</summary>
+    public long? MinFileAgeSeconds { get; init; }
     public Time.Timestamp? CreatedAfter { get; init; }
     public Time.Timestamp? CreatedBefore { get; init; }
     public Time.Timestamp? ModifiedAfter { get; init; }

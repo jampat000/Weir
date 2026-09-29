@@ -27,10 +27,16 @@ export interface ProcessingLibrary {
   exclude_markers_csv: string;
   include_patterns_csv: string;
   exclude_patterns_csv: string;
-  min_file_size_mb: number;
+  /** The library's own minimum size, or null when it uses the Performance setting. */
+  min_file_size_mb: number | null;
+  /** What the library is held to now: its own value, or Performance's. */
+  effective_min_file_size_mb: number;
   max_file_size_mb: number;
   rejected_file_action: "leave" | "delete_file";
-  min_file_age_seconds: number;
+  /** The library's own wait after a file last changes, or null when it uses the Performance setting. */
+  min_file_age_seconds: number | null;
+  /** What the library waits now: its own value, or Performance's. */
+  effective_min_file_age_seconds: number;
   created_after: string | null;
   created_before: string | null;
   modified_after: string | null;
@@ -98,10 +104,12 @@ export interface ProcessingLibraryWrite {
   exclude_markers_csv: string;
   include_patterns_csv: string;
   exclude_patterns_csv: string;
-  min_file_size_mb: number;
+  /** Null uses the Performance setting. */
+  min_file_size_mb: number | null;
   max_file_size_mb: number;
   rejected_file_action: "leave" | "delete_file";
-  min_file_age_seconds: number;
+  /** Null uses the Performance setting. */
+  min_file_age_seconds: number | null;
   created_after: string | null;
   created_before: string | null;
   modified_after: string | null;

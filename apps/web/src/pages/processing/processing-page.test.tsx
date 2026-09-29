@@ -36,6 +36,7 @@ const libraries = [
     enabled: true,
     watched_folder: "D:/downloads/tv",
     min_file_age_seconds: 60,
+    effective_min_file_age_seconds: 60,
   },
   {
     id: 2,
@@ -43,6 +44,7 @@ const libraries = [
     enabled: true,
     watched_folder: "D:/downloads/movies",
     min_file_age_seconds: 60,
+    effective_min_file_age_seconds: 60,
   },
 ];
 const readiness = {
@@ -197,6 +199,28 @@ describe("ProcessingPage", () => {
     );
     expect(refetchFiles).toHaveBeenCalled();
     expect(refetchLibraries).toHaveBeenCalled();
+  });
+
+  it("names the wait every library is held to now, whether it is the library's own or Performance's", () => {
+    const before = libraries.map(
+      (library) => library.effective_min_file_age_seconds,
+    );
+    libraries.forEach((library) => {
+      library.effective_min_file_age_seconds = 10;
+    });
+    try {
+      renderLive();
+
+      expect(
+        screen.getByText(
+          /new downloads wait 10 seconds after they stop changing/,
+        ),
+      ).toBeInTheDocument();
+    } finally {
+      libraries.forEach((library, index) => {
+        library.effective_min_file_age_seconds = before[index];
+      });
+    }
   });
 
   it("counts a file waiting on its manager down to Weir's next look", () => {

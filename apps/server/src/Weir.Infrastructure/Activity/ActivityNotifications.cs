@@ -15,6 +15,9 @@ public static class ActivityNotifications
     /// <summary>The unit-of-work key under which pending Activity ids wait for commit.</summary>
     private const string PendingKey = "weir_activity_pending_latest_ids";
 
+    /// <summary>The unit-of-work key marking that its commit already carries a file-list notification.</summary>
+    private const string FileListChangedKey = "weir_activity_file_list_changed";
+
     private static readonly ConditionalWeakTable<SqliteDatabase, ActivityLatestNotifier> Notifiers = [];
     private static readonly ConditionalWeakTable<SqliteTransaction, PendingIds> PendingByTransaction = [];
 
@@ -40,6 +43,22 @@ public static class ActivityNotifications
         uow.Items[PendingKey] = pending;
         var notifier = For(uow.Database);
         uow.OnCommitted(() => notifier.Notify(pending.Max));
+    }
+
+    /// <summary>
+    /// After <paramref name="uow"/> commits, tell live listeners that the files Processing lists changed in a way no Activity
+    /// row records (#816). Any number of calls in one unit of work send one notification, so a scan writing hundreds of files
+    /// makes each open screen refetch once.
+    /// </summary>
+    public static void TrackFileListChange(UnitOfWork uow)
+    {
+        ArgumentNullException.ThrowIfNull(uow);
+        if (!uow.Items.TryAdd(FileListChangedKey, true))
+        {
+            return;
+        }
+
+        uow.OnCommitted(For(uow.Database).NotifyChanged);
     }
 
     /// <summary>Remember <paramref name="id"/> until <see cref="TransactionCommitted"/> reports <paramref name="transaction"/> committed.</summary>

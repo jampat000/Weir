@@ -295,3 +295,46 @@ def test_reject_support_explains_itself(operator) -> None:
 
 def test_reject_support_needs_a_session(client) -> None:
     assert client.get(f"{API}/processing/reject-support").status_code == 401
+
+
+# --- the minimum size and wait follow Settings > Performance (#815) -------------------------------
+
+
+def test_a_library_with_no_minimum_size_or_wait_follows_the_performance_settings(operator) -> None:
+    """Performance holds the defaults; a library reports what they come to for it, and a value of its own wins."""
+
+    settings = f"{API}/processing/operator-settings"
+    before = operator.get(settings).json()
+    saved = operator.put_csrf(settings, {"min_file_age_seconds": 15, "min_input_file_size_mb": 7})
+    assert saved.status_code == 200, saved.text
+    try:
+        following = _create(operator).json()
+        assert following["min_file_size_mb"] is None
+        assert following["min_file_age_seconds"] is None
+        assert following["effective_min_file_size_mb"] == 7
+        assert following["effective_min_file_age_seconds"] == 15
+
+        own = _create(
+            operator,
+            name="Movies own",
+            watched_folder="/srv/own/in",
+            output_folder="/srv/own/out",
+            min_file_size_mb=0,
+            min_file_age_seconds=0,
+        ).json()
+        assert own["min_file_size_mb"] == 0
+        assert own["effective_min_file_size_mb"] == 0
+        assert own["effective_min_file_age_seconds"] == 0
+
+        changed = operator.put_csrf(settings, {"min_file_age_seconds": 40, "min_input_file_size_mb": 9})
+        assert changed.status_code == 200, changed.text
+        assert operator.get(f"{LIBRARIES}/{following['id']}").json()["effective_min_file_age_seconds"] == 40
+        assert operator.get(f"{LIBRARIES}/{own['id']}").json()["effective_min_file_age_seconds"] == 0
+    finally:
+        operator.put_csrf(
+            settings,
+            {
+                "min_file_age_seconds": before["min_file_age_seconds"],
+                "min_input_file_size_mb": before["min_input_file_size_mb"],
+            },
+        )

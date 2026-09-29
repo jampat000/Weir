@@ -208,6 +208,34 @@ public sealed class ProcessingLibraryDiscoveryApiTests
     }
 
     [Fact]
+    public async Task An_imported_library_follows_the_Performance_settings_for_its_minimum_size_and_wait()
+    {
+        var (server, client, manager) = await StartAsync();
+        await using var _server = server;
+        var connectionId = await CreateConnectionAsync(client);
+        var root = Directory.CreateTempSubdirectory().FullName;
+        try
+        {
+            SetManifest(manager, ManifestJson(new ManifestLibrary("7", "Films", "movies", root)));
+            using var saved = await client.PutAsync(
+                "/api/v1/processing/operator-settings",
+                new { csrf_token = await client.CsrfAsync(), min_file_age_seconds = 15, min_input_file_size_mb = 7 });
+            Assert.Equal(HttpStatusCode.OK, saved.StatusCode);
+
+            var imported = (await ImportAsync(client, connectionId, "7")).AsArray().Single()!;
+
+            Assert.Null(imported["min_file_size_mb"]);
+            Assert.Null(imported["min_file_age_seconds"]);
+            Assert.Equal(7, imported["effective_min_file_size_mb"]!.GetValue<long>());
+            Assert.Equal(15, imported["effective_min_file_age_seconds"]!.GetValue<long>());
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task A_root_weir_cannot_see_imports_without_a_watched_folder()
     {
         var (server, client, manager) = await StartAsync();

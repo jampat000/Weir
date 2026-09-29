@@ -67,6 +67,12 @@ export type LibraryTextField = KeysOf<string>;
 /** The fields that are a checkbox. */
 export type LibraryToggleField = KeysOf<boolean>;
 
+/**
+ * A minimum size or wait left blank in the editor: the library has no value of its own and uses the one in
+ * Settings › Performance.
+ */
+export const USES_PERFORMANCE_SETTING = "";
+
 /** A new library's values; the numbers are the server's own defaults. */
 export const EMPTY_LIBRARY_FORM: LibraryForm = {
   name: "",
@@ -79,10 +85,10 @@ export const EMPTY_LIBRARY_FORM: LibraryForm = {
     ".sabnzbd,__admin__,_failed_,_unpack_,_repair_,incomplete",
   include_patterns_csv: "",
   exclude_patterns_csv: "",
-  min_file_size_mb: "0",
+  min_file_size_mb: USES_PERFORMANCE_SETTING,
   max_file_size_mb: "0",
   rejected_file_action: "leave",
-  min_file_age_seconds: "60",
+  min_file_age_seconds: USES_PERFORMANCE_SETTING,
   created_after: "",
   created_before: "",
   modified_after: "",
@@ -150,10 +156,19 @@ function wholeNumber(raw: string, fallback: number): number {
   return Number.isFinite(n) ? n : fallback;
 }
 
-const NUMBER_FIELDS = [
+/** A whole number, or null when the field is blank: the library then uses the Performance setting. */
+function optionalWholeNumber(raw: string): number | null {
+  const n = Number.parseInt(raw, 10);
+  return Number.isFinite(n) ? n : null;
+}
+
+const INHERITABLE_FIELDS = [
   "min_file_size_mb",
-  "max_file_size_mb",
   "min_file_age_seconds",
+] as const satisfies readonly (keyof ProcessingLibrary & LibraryTextField)[];
+
+const NUMBER_FIELDS = [
+  "max_file_size_mb",
   "scan_interval_seconds",
   "hold_minutes",
   "file_detection_interval_seconds",
@@ -215,6 +230,9 @@ export function formFrom(library: ProcessingLibrary): LibraryForm {
   };
   for (const key of TEXT_FIELDS) form[key] = library[key];
   for (const key of NUMBER_FIELDS) form[key] = String(library[key]);
+  for (const key of INHERITABLE_FIELDS) {
+    form[key] = String(library[key] ?? USES_PERFORMANCE_SETTING);
+  }
   for (const key of DATE_FIELDS) form[key] = localDateTimeValue(library[key]);
   return form;
 }
@@ -235,10 +253,10 @@ export function writeFrom(
     exclude_markers_csv: form.exclude_markers_csv.trim(),
     include_patterns_csv: form.include_patterns_csv.trim(),
     exclude_patterns_csv: form.exclude_patterns_csv.trim(),
-    min_file_size_mb: wholeNumber(form.min_file_size_mb, 0),
+    min_file_size_mb: optionalWholeNumber(form.min_file_size_mb),
     max_file_size_mb: wholeNumber(form.max_file_size_mb, 0),
     rejected_file_action: form.rejected_file_action,
-    min_file_age_seconds: wholeNumber(form.min_file_age_seconds, 60),
+    min_file_age_seconds: optionalWholeNumber(form.min_file_age_seconds),
     created_after: utcDateTimeValue(form.created_after),
     created_before: utcDateTimeValue(form.created_before),
     modified_after: utcDateTimeValue(form.modified_after),

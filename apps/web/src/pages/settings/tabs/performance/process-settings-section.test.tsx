@@ -101,7 +101,7 @@ it("saves Files at once up to ten, and the budget and checks with it", async () 
   expect(choices.querySelectorAll("button")).toHaveLength(10);
   expect(screen.getByLabelText("Budget")).toHaveValue(6);
   expect(screen.getByLabelText("A 1080p file costs")).toHaveValue(2);
-  expect(screen.getByLabelText("Wait until it stops changing for")).toHaveValue(
+  expect(screen.getByLabelText("Wait after a file last changes")).toHaveValue(
     60,
   );
 

@@ -5000,14 +5000,14 @@ export interface components {
       media_type: "movie" | "tv";
       /**
        * Min File Age Seconds
-       * @default 60
+       * @description Seconds a file must go unchanged. Null uses the Performance setting.
        */
-      min_file_age_seconds: number;
+      min_file_age_seconds?: number | null;
       /**
        * Min File Size Mb
-       * @default 0
+       * @description Smallest file the library takes. Null uses the Performance setting.
        */
-      min_file_size_mb: number;
+      min_file_size_mb?: number | null;
       /**
        * Modified After
        * @description Only admit files whose last-modified time is on or after this instant.
@@ -5185,6 +5185,16 @@ export interface components {
       discovered_library_key?: string | null;
       /** Display Order */
       display_order: number;
+      /**
+       * Effective Min File Age Seconds
+       * @description Seconds a file must go unchanged now: the library's own value, or the Performance setting.
+       */
+      effective_min_file_age_seconds: number;
+      /**
+       * Effective Min File Size Mb
+       * @description Smallest file the library takes now: its own value, or the Performance setting.
+       */
+      effective_min_file_size_mb: number;
       /** Enabled */
       enabled: boolean;
       /** Exclude Hidden */
@@ -5247,10 +5257,16 @@ export interface components {
        * @enum {string}
        */
       media_type: "movie" | "tv";
-      /** Min File Age Seconds */
-      min_file_age_seconds: number;
-      /** Min File Size Mb */
-      min_file_size_mb: number;
+      /**
+       * Min File Age Seconds
+       * @description Seconds a file must go unchanged. Null means the library uses the Performance setting.
+       */
+      min_file_age_seconds: number | null;
+      /**
+       * Min File Size Mb
+       * @description Smallest file the library takes. Null means the library uses the Performance setting.
+       */
+      min_file_size_mb: number | null;
       /** Modified After */
       modified_after: string | null;
       /** Modified Before */
@@ -5471,14 +5487,14 @@ export interface components {
       media_type: "movie" | "tv";
       /**
        * Min File Age Seconds
-       * @default 60
+       * @description Seconds a file must go unchanged. Null uses the Performance setting.
        */
-      min_file_age_seconds: number;
+      min_file_age_seconds?: number | null;
       /**
        * Min File Size Mb
-       * @default 0
+       * @description Smallest file the library takes. Null uses the Performance setting.
        */
-      min_file_size_mb: number;
+      min_file_size_mb?: number | null;
       /**
        * Modified After
        * @description Only admit files whose last-modified time is on or after this instant.

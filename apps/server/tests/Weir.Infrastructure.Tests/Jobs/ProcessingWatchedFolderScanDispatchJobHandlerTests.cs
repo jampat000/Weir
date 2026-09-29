@@ -26,7 +26,7 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandlerTests
     private static readonly FileStateStore Files = new();
     private static readonly FileSkipMarkerStore SkipMarkers = new();
 
-    private static async Task<(StoreFixture Store, ProcessingJobStore Jobs, ProcessingWatchedFolderScanDispatchJobHandler Handler)> BuildAsync()
+    internal static async Task<(StoreFixture Store, ProcessingJobStore Jobs, ProcessingWatchedFolderScanDispatchJobHandler Handler)> BuildAsync()
     {
         var store = new StoreFixture(("WEIR_CREDENTIALS_SECRET", "handler-tests-credentials-secret"));
         var cipher = new CredentialCipher(store.Options.CredentialsSecret, store.Options.SessionSecret, store.Options.PreviousCredentialsSecrets, store.Clock);
@@ -43,9 +43,9 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandlerTests
         return (store, jobs, handler);
     }
 
-    private static async Task<long> CreateLibraryAsync(
-        StoreFixture store, string watched, string output, bool enqueuePeriodicRemux = true, long minFileAgeSeconds = 0, long fileDetectionIntervalSeconds = 0,
-        string rejectedFileAction = "leave", string excludePatternsCsv = "", bool removeOriginalAfterSuccess = true)
+    internal static async Task<long> CreateLibraryAsync(
+        StoreFixture store, string watched, string output, bool enqueuePeriodicRemux = true, long? minFileAgeSeconds = 0, long fileDetectionIntervalSeconds = 0,
+        string rejectedFileAction = "leave", string excludePatternsCsv = "", bool removeOriginalAfterSuccess = true, long? minFileSizeMb = null)
     {
         await using var uow = await UnitOfWork.OpenAsync(store.Database);
         var created = await Libraries.CreateAsync(uow, new ProcessingLibraryInput
@@ -55,6 +55,7 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandlerTests
             WatchedFolder = watched,
             OutputFolder = output,
             MinFileAgeSeconds = minFileAgeSeconds,
+            MinFileSizeMb = minFileSizeMb,
             FileDetectionIntervalSeconds = fileDetectionIntervalSeconds,
             RejectedFileAction = rejectedFileAction,
             ExcludePatternsCsv = excludePatternsCsv,
@@ -64,7 +65,7 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandlerTests
         return created.Id;
     }
 
-    private static async Task RunScanAsync(ProcessingWatchedFolderScanDispatchJobHandler handler, ProcessingJobStore jobs, long libraryId, bool enqueueRemuxJobs)
+    internal static async Task RunScanAsync(ProcessingWatchedFolderScanDispatchJobHandler handler, ProcessingJobStore jobs, long libraryId, bool enqueueRemuxJobs)
     {
         var payload = new WireObject().Set("enqueue_remux_jobs", enqueueRemuxJobs).Set("scan_trigger", "manual").Set("media_scope", "movie").Set("library_id", libraryId);
         var job = await jobs.EnqueueOrGetAsync(

@@ -24,13 +24,22 @@ public sealed class ActivityLatestNotifier
     }
 
     /// <summary>Records <paramref name="latestId"/>, bumps the version and wakes every waiter.</summary>
-    public void Notify(long latestId)
+    public void Notify(long latestId) => Publish(latestId);
+
+    /// <summary>
+    /// Bumps the version and wakes every waiter without a new Activity id, for a change the live screens show that no Activity
+    /// row records, such as a scan finding a file (#816). The version moves, so an open stream sends a frame and each screen
+    /// refetches.
+    /// </summary>
+    public void NotifyChanged() => Publish(latestId: null);
+
+    private void Publish(long? latestId)
     {
         TaskCompletionSource<ActivityLatest>[] waiters;
         ActivityLatest latest;
         lock (_lock)
         {
-            _latestId = latestId;
+            _latestId = latestId ?? _latestId;
             _version++;
             latest = new ActivityLatest(_latestId, _version);
             waiters = [.. _waiters];

@@ -34,7 +34,7 @@ function settingsNote(
   const ages = new Set(
     libraries
       .filter((library) => library.enabled)
-      .map((library) => library.min_file_age_seconds),
+      .map((library) => library.effective_min_file_age_seconds),
   );
   const [age] = ages;
   return [
