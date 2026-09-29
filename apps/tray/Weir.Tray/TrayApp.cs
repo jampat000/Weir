@@ -18,6 +18,8 @@ sealed class TrayApp : IDisposable
     private readonly ServerHost _server;
     private readonly LanAccessSync _lanAccess;
     private readonly UpdateSettings _updateSettings;
+    private readonly IUpdateService _updateService;
+    private readonly TrayShutdown _shutdown;
     private readonly CancellationTokenSource _cts = new();
     private readonly Lock _browserLock = new();
 
@@ -31,14 +33,16 @@ sealed class TrayApp : IDisposable
     private Action? _balloonClick;
     private int _exitCode;
 
-    public TrayApp(int port, ListenScope listenScope, bool openBrowserOnReady)
+    public TrayApp(int port, ListenScope listenScope, bool openBrowserOnReady, IUpdateService updateService, UpdateSettings updateSettings)
     {
         var installRoot = AppContext.BaseDirectory;
         _runtimeHome = Program.RuntimeHome();
         _openBrowserOnReady = openBrowserOnReady;
         _server = new ServerHost(_runtimeHome, installRoot, port, listenScope);
         _lanAccess = new LanAccessSync(_runtimeHome, _server, TimeProvider.System);
-        _updateSettings = UpdateSettings.Load(_runtimeHome);
+        _updateSettings = updateSettings;
+        _updateService = updateService;
+        _shutdown = new TrayShutdown(StopServerAsync, updateService);
 
         TrayLog.Write($"Starting tray host. installRoot={installRoot} runtimeHome={_runtimeHome}");
     }
@@ -98,6 +102,7 @@ sealed class TrayApp : IDisposable
             _cts.Token);
 
         _updates = new TrayUpdates(
+            _updateService,
             _runtimeHome,
             _updateSettings,
             OnUi,
@@ -120,14 +125,17 @@ sealed class TrayApp : IDisposable
         switch (mode)
         {
             case UpdateMode.Auto:
-                TrayLog.Write($"Notifying user: update v{version} will apply on next restart.");
-                ShowBalloon("Weir Update Ready", $"Version {version} has been downloaded and will be applied automatically on next restart.", ToolTipIcon.Info);
+                TrayLog.Write($"Notifying user: update v{version} downloaded; it installs when Weir next quits or starts.");
+                ShowBalloon(
+                    "Weir Update Ready",
+                    $"Version {version} has been downloaded. It installs the next time Weir quits or starts.",
+                    ToolTipIcon.Info);
                 break;
             case UpdateMode.DownloadOnly:
                 TrayLog.Write($"Notifying user: update v{version} downloaded and ready to install.");
                 ShowBalloon(
                     "Weir Update Ready",
-                    $"Version {version} has been downloaded. Click here to restart and update.",
+                    $"Version {version} has been downloaded. Click here to restart and install it, or it installs the next time Weir quits or starts.",
                     ToolTipIcon.Info,
                     () => BackgroundWork.Observe("Apply update", ApplyUpdateAndRestartAsync()));
                 break;
@@ -182,10 +190,16 @@ sealed class TrayApp : IDisposable
             return;
         }
         TrayLog.Write("User requested update apply and restart.");
+        await _shutdown.RestartToUpdateAsync();
+    }
+
+    // The server is stopped through ServerProcessStop before anything else happens, so nothing that follows, an
+    // update install included, can cut a job short (#857).
+    private async Task StopServerAsync()
+    {
         await _cts.CancelAsync();
         await _server.StopAsync();
         _notifyIcon!.Visible = false;
-        _updates.ApplyAndRestart();
     }
 
     // -- Tray icon ----------------------------------------------------------
@@ -278,14 +292,7 @@ sealed class TrayApp : IDisposable
     private async Task QuitAsync()
     {
         TrayLog.Write("Quit requested from tray icon");
-        if (_updates is { IsDownloaded: true })
-        {
-            _updates.ApplyOnExit();
-            TrayLog.Write("Update will be applied after exit.");
-        }
-        await _cts.CancelAsync();
-        await _server.StopAsync();
-        _notifyIcon!.Visible = false;
+        await _shutdown.QuitAsync();
         Application.Exit();
     }
 
