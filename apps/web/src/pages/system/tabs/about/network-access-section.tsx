@@ -18,8 +18,8 @@ function stateLabel(state: NetworkAccessState): string {
       return "Reachable";
     case "blocked":
       return "Blocked";
-    case "not_configured":
-      return "Not set up";
+    case "this_pc_only":
+      return "This PC only";
     default:
       return state;
   }

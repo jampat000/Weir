@@ -197,10 +197,13 @@ this against the real `Weir-win-Setup.exe` and the real installed `Weir.exe`, bo
 capturing caller would.
 
 A silent install never shows the one-time Windows admin (UAC) prompt Weir otherwise asks to create its firewall
-rule for LAN access, so other devices on the network cannot reach a silently-installed Weir until that rule
-exists. A program that needs that can run the installed `Weir.exe --allow-lan` from a process that is already
-elevated: it configures the rule with no prompt of any kind and never tries to elevate itself, so an unelevated
-caller gets a non-zero exit and a log line explaining why instead of a UAC prompt nobody can answer. Full detail:
+rule for LAN access, and without `--allow-lan` Weir is local-only: the server listens on `127.0.0.1` and `[::1]`
+and nothing else, so no other device on the network can connect. A program that needs LAN access runs the
+installed `Weir.exe --allow-lan`: it always turns LAN access on (a Weir that is already running restarts within a
+few seconds to listen for the network), with no prompt of any kind. From a process that is already elevated it
+also creates the firewall rule; it never tries to elevate itself. An unelevated caller still gets LAN access
+turned on and a zero exit code, plus a log line saying the rule was not created, so Windows Firewall decides
+whether other devices get through. Full detail:
 [Windows Installer → Firewall and LAN access](https://github.com/jampat000/Weir/blob/main/docs-site/docs/deployment/windows.md#firewall-and-lan-access).
 
 Full detail, including `WEIR_PORT` as an alternative to `--port`: [Windows Installer → Installing

@@ -16,52 +16,63 @@ describe("NetworkAccessSection", () => {
     vi.restoreAllMocks();
   });
 
-  it("says other devices can reach Weir when the rule is allowed", () => {
+  it("says other devices can reach Weir, and how to limit it, when they are allowed in", () => {
     mocks.useNetworkAccessQuery.mockReturnValue({
       isLoading: false,
       data: {
         state: "allowed",
-        summary: "Other devices on your network can reach Weir.",
+        summary:
+          "Other devices on your network can reach Weir. To limit Weir to this PC, use the Weir tray icon → Only allow this PC.",
       },
     });
 
     render(<NetworkAccessSection />);
 
-    expect(
-      screen.getByText("Other devices on your network can reach Weir."),
-    ).toBeInTheDocument();
     expect(screen.getByText("Reachable")).toBeInTheDocument();
+    expect(
+      screen.getByText(/Other devices on your network can reach Weir./),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/Only allow this PC/)).toBeInTheDocument();
   });
 
-  it("tells the operator to use the tray menu when Windows Firewall is blocking it", () => {
+  it("says only this PC can reach Weir, and how to change that, before LAN access is allowed", () => {
+    mocks.useNetworkAccessQuery.mockReturnValue({
+      isLoading: false,
+      data: {
+        state: "this_pc_only",
+        summary:
+          "Only this PC can reach Weir. To let other devices on your network in, use the Weir tray icon → Allow other devices on your network.",
+      },
+    });
+
+    render(<NetworkAccessSection />);
+
+    expect(screen.getByText("This PC only")).toBeInTheDocument();
+    expect(
+      screen.getByText(/Only this PC can reach Weir./),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/Allow other devices on your network/),
+    ).toBeInTheDocument();
+  });
+
+  it("tells the operator to use the tray menu when Windows Firewall is blocking other devices", () => {
     mocks.useNetworkAccessQuery.mockReturnValue({
       isLoading: false,
       data: {
         state: "blocked",
         summary:
-          "Windows Firewall is blocking other devices. Use the Weir tray icon → Allow other devices… to fix it.",
+          "Windows Firewall is blocking other devices. Use the Weir tray icon → Allow other devices on your network to fix it, or Only allow this PC.",
       },
     });
 
     render(<NetworkAccessSection />);
 
     expect(screen.getByText("Blocked")).toBeInTheDocument();
+    expect(
+      screen.getByText(/Windows Firewall is blocking other devices./),
+    ).toBeInTheDocument();
     expect(screen.getByText(/Use the Weir tray icon/)).toBeInTheDocument();
-  });
-
-  it("says not set up when nobody has answered the prompt yet", () => {
-    mocks.useNetworkAccessQuery.mockReturnValue({
-      isLoading: false,
-      data: {
-        state: "not_configured",
-        summary:
-          "Not set up. Use the Weir tray icon to let other devices on your network reach Weir.",
-      },
-    });
-
-    render(<NetworkAccessSection />);
-
-    expect(screen.getByText("Not set up")).toBeInTheDocument();
   });
 
   it("renders nothing on a build that does not manage its own firewall (Docker, source)", () => {

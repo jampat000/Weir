@@ -2,13 +2,15 @@
 
 ## Installed Weir
 
-Weir listens on **9347** by default, on every interface
-(`ServerListenOptions.DefaultPort` in `apps/server/src/Weir.Core/Configuration/ServerListenOptions.cs`).
+Weir listens on **9347** by default (`ServerListenOptions.DefaultPort` in
+`apps/server/src/Weir.Core/Configuration/ServerListenOptions.cs`), on every interface in Docker and on Linux. The
+Windows tray starts the server on this PC only (`--host localhost`) until LAN access is allowed, then on every
+interface; see [Windows Installer](../docs-site/docs/deployment/windows.md#firewall-and-lan-access).
 The web app and the API share that one port: the API is `/api/v1` on the same origin.
 
 | Install | How the port is chosen | Change it |
 |---------|------------------------|-----------|
-| Windows (tray) | The tray starts the server with `--port`. It uses 9347, or asks for another port when 9347 is taken. Without a desktop to ask, it takes the first free port above 9347. | Tray menu › `Change port` |
+| Windows (tray) | The tray starts the server with `--port` and `--host`. It uses 9347, or asks for another port when 9347 is taken. Without a desktop to ask, it takes the first free port above 9347. | Tray menu › `Change port` |
 | Docker | The entrypoint passes `PORT`, default 9347. The image `EXPOSE`s 9347 and its health check calls `/health` on that port. | Set `PORT`, or map a different host port (`-p 8080:9347`) |
 
 Behind a reverse proxy, clients use the proxy's normal HTTPS port (443) and the proxy forwards to

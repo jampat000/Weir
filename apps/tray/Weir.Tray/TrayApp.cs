@@ -1,6 +1,6 @@
 using System.ComponentModel;
 using System.Diagnostics;
-using Weir.Tray.Firewall;
+using Weir.Tray.LanAccess;
 
 namespace Weir.Tray;
 
@@ -16,6 +16,7 @@ sealed class TrayApp : IDisposable
     private readonly string _runtimeHome;
     private readonly bool _openBrowserOnReady;
     private readonly ServerHost _server;
+    private readonly LanAccessSync _lanAccess;
     private readonly UpdateSettings _updateSettings;
     private readonly CancellationTokenSource _cts = new();
     private readonly Lock _browserLock = new();
@@ -25,16 +26,18 @@ sealed class TrayApp : IDisposable
     private ToolStripMenuItem? _updateMenuItem;
     private ToolStripMenuItem? _portMenuItem;
     private TrayUpdates? _updates;
+    private LanAccessMenu? _lanAccessMenu;
     private long _lastBrowserOpenTicks = long.MinValue / 2;
     private Action? _balloonClick;
     private int _exitCode;
 
-    public TrayApp(int port, bool openBrowserOnReady)
+    public TrayApp(int port, ListenScope listenScope, bool openBrowserOnReady)
     {
         var installRoot = AppContext.BaseDirectory;
         _runtimeHome = Program.RuntimeHome();
         _openBrowserOnReady = openBrowserOnReady;
-        _server = new ServerHost(_runtimeHome, installRoot, port);
+        _server = new ServerHost(_runtimeHome, installRoot, port, listenScope);
+        _lanAccess = new LanAccessSync(_runtimeHome, _server, TimeProvider.System);
         _updateSettings = UpdateSettings.Load(_runtimeHome);
 
         TrayLog.Write($"Starting tray host. installRoot={installRoot} runtimeHome={_runtimeHome}");
@@ -87,6 +90,12 @@ sealed class TrayApp : IDisposable
         }
 
         _server.Watch(() => OnUi(() => ShowBalloon("Weir", "Weir server failed repeatedly. Please restart Weir.", ToolTipIcon.Error)), _cts.Token);
+
+        _lanAccessMenu = new LanAccessMenu(_lanAccess, _server, ShowLanAccessNotice, _cts.Token);
+        _ = BackgroundWork.RunLoop(
+            "LAN access watcher",
+            ct => _lanAccess.WatchAsync((scope, change) => OnUi(() => _lanAccessMenu?.OnChangedElsewhere(scope, change)), ct),
+            _cts.Token);
 
         _updates = new TrayUpdates(
             _runtimeHome,
@@ -195,8 +204,7 @@ sealed class TrayApp : IDisposable
         _portMenuItem.Click += (_, _) => BackgroundWork.Observe("Change port", ChangePortAsync());
         menu.Items.Add(_portMenuItem);
 
-        menu.Items.Add("Allow other devices on your network...").Click +=
-            (_, _) => BackgroundWork.Observe("Allow other devices on your network", AllowLanAsync());
+        _lanAccessMenu!.AddTo(menu.Items);
 
         menu.Items.Add(new ToolStripSeparator());
 
@@ -281,32 +289,10 @@ sealed class TrayApp : IDisposable
         Application.Exit();
     }
 
-    // -- Firewall -----------------------------------------------------------
+    // -- LAN access ---------------------------------------------------------
 
-    // Runs on the thread pool: FirewallElevation blocks on the elevated child process (and the UAC prompt the
-    // person answers), which must never freeze the tray's message loop.
-    private async Task AllowLanAsync()
-    {
-        TrayLog.Write("Allow other devices on your network: requested from the tray menu.");
-        var outcome = await Task.Run(() => FirewallElevation.ConfigureElevated(TrayLog.Write)).ConfigureAwait(false);
-        OnUi(() => ShowFirewallOutcome(outcome));
-    }
-
-    private void ShowFirewallOutcome(FirewallElevation.Outcome outcome)
-    {
-        switch (outcome)
-        {
-            case FirewallElevation.Outcome.Configured:
-                ShowBalloon("Weir", "Other devices on your network can now reach Weir.", ToolTipIcon.Info);
-                break;
-            case FirewallElevation.Outcome.Declined:
-                ShowBalloon("Weir", "Windows admin access was not granted, so other devices still cannot reach Weir.", ToolTipIcon.Warning);
-                break;
-            default:
-                ShowBalloon("Weir", "Could not allow other devices on your network. See tray-host.log in the data folder.", ToolTipIcon.Warning);
-                break;
-        }
-    }
+    private void ShowLanAccessNotice(LanAccessNotice notice) =>
+        ShowBalloon("Weir", notice.Text, notice.IsWarning ? ToolTipIcon.Warning : ToolTipIcon.Info);
 
     // -- Port -------------------------------------------------------------
 
@@ -378,6 +364,8 @@ sealed class TrayApp : IDisposable
         _cts.Cancel();
         _server.Dispose();
         _notifyIcon?.Dispose();
+        _lanAccessMenu?.Dispose();
+        _lanAccess.Dispose();
         _cts.Dispose();
     }
 }

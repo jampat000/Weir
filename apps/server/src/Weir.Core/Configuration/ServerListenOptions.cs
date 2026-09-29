@@ -1,4 +1,5 @@
 using System.Globalization;
+using Weir.Core.Net;
 
 namespace Weir.Core.Configuration;
 
@@ -6,9 +7,10 @@ namespace Weir.Core.Configuration;
 /// Where the HTTP server listens. There is no <c>WEIR_*</c> setting for this; the launchers pass it
 /// in, and this keeps each launcher's contract:
 /// <list type="bullet">
-/// <item>the Windows tray starts the server with <c>--port &lt;port&gt;</c>;</item>
-/// <item>the Docker entrypoint reads <c>PORT</c>;</item>
-/// <item>both bind every interface, on port 9347 by default.</item>
+/// <item>the Windows tray starts the server with <c>--port &lt;port&gt;</c> and <c>--host localhost</c>, or
+/// <c>--host 0.0.0.0</c> once LAN access is allowed;</item>
+/// <item>the Docker entrypoint reads <c>PORT</c> and binds every interface;</item>
+/// <item>with no <c>--host</c>, the server binds every interface, on port 9347 by default.</item>
 /// </list>
 /// <c>--host</c> narrows the bind address (local development uses 127.0.0.1).
 /// </summary>
@@ -16,6 +18,14 @@ public sealed record ServerListenOptions(string Host, int Port)
 {
     public const int DefaultPort = 9347;
     public const string DefaultHost = "0.0.0.0";
+
+    /// <summary>
+    /// <see langword="true"/> when only this PC can connect: <c>localhost</c> (both loopback addresses) or a
+    /// loopback IP address.
+    /// </summary>
+    public bool IsThisPcOnly =>
+        string.Equals(Host, "localhost", StringComparison.OrdinalIgnoreCase)
+        || (NetAddress.TryParse(Host, out var address) && address.IsLoopback);
 
     public static ServerListenOptions Parse(IReadOnlyList<string> args, RuntimeEnvironment runtime)
     {

@@ -1,15 +1,16 @@
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
+using Weir.Tray.LanAccess;
 
 namespace Weir.Tray;
 
 /// <summary>
 /// The bundled server process: starting it, waiting for it to be ready, restarting it when it exits unexpectedly,
-/// moving it to another port, and stopping it. Nothing here touches the UI; the tray is told
-/// about outcomes and shows them itself.
+/// moving it to another port or to another set of devices that may connect, and stopping it. Nothing here touches
+/// the UI; the tray is told about outcomes and shows them itself.
 /// </summary>
-sealed class ServerHost : IDisposable
+sealed class ServerHost : IServerListenScope, IDisposable
 {
     /// <summary>
     /// The port the server listens on at the moment, for a second launch that opens the running Weir
@@ -21,8 +22,6 @@ sealed class ServerHost : IDisposable
     private const int MaxRestarts = 5;
 
     private static readonly TimeSpan HealthTimeout = TimeSpan.FromSeconds(60);
-    private static readonly TimeSpan StopTimeout = TimeSpan.FromSeconds(10);
-    private static readonly TimeSpan KillWait = TimeSpan.FromSeconds(5);
     private static readonly TimeSpan WatchInterval = TimeSpan.FromSeconds(3);
 
     /// <summary>How long a stop waits for a restart or port change in progress to let go of the server.</summary>
@@ -47,18 +46,22 @@ sealed class ServerHost : IDisposable
 
     private volatile Process? _process;
     private volatile int _port;
+    private volatile ListenScope _scope;
     private Task? _watchdog;
     private Action? _onGaveUp;
     private CancellationToken _watchdogToken;
 
-    internal ServerHost(string runtimeHome, string installRoot, int port)
+    internal ServerHost(string runtimeHome, string installRoot, int port, ListenScope scope)
     {
         _runtimeHome = runtimeHome;
         _installRoot = installRoot;
         _port = port;
+        _scope = scope;
     }
 
     internal int Port => _port;
+
+    public ListenScope Scope => _scope;
 
     /// <summary>Sets what every server process is started with (ServerEnvironment).</summary>
     internal void PrepareEnvironment() => ServerEnvironment.Apply(_runtimeHome, FindServerExeDirectory());
@@ -208,7 +211,7 @@ sealed class ServerHost : IDisposable
         try
         {
             TrayLog.Write($"Change port: restarting the server on port {to} (was {from}).");
-            if (await TryStartOnAsync(to, cancellationToken).ConfigureAwait(false))
+            if (await TryStartOnAsync(to, _scope, cancellationToken).ConfigureAwait(false))
             {
                 PortChoice.Save(_runtimeHome, to);
                 WritePortFile();
@@ -216,7 +219,7 @@ sealed class ServerHost : IDisposable
                 return true;
             }
             TrayLog.Write($"Change port: going back to port {from}.");
-            if (await TryStartOnAsync(from, cancellationToken).ConfigureAwait(false))
+            if (await TryStartOnAsync(from, _scope, cancellationToken).ConfigureAwait(false))
             {
                 WritePortFile();
             }
@@ -229,11 +232,42 @@ sealed class ServerHost : IDisposable
         }
     }
 
-    // Replaces the running server with one on this port. Called with the gate held.
-    private async Task<bool> TryStartOnAsync(int port, CancellationToken cancellationToken)
+    /// <summary>
+    /// Restarts the server for <paramref name="to"/> on the same port. If it does not come up, goes back to the
+    /// scope it had. Saving the choice is the caller's job (LanAccessSync).
+    /// </summary>
+    public async Task<ScopeChange> MoveToScopeAsync(ListenScope to, CancellationToken cancellationToken)
+    {
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        var from = _scope;
+        try
+        {
+            if (from == to)
+            {
+                return ScopeChange.Unchanged;
+            }
+            TrayLog.Write($"LAN access: restarting the server so that {to.Describe()} (it was: {from.Describe()}).");
+            if (await TryStartOnAsync(_port, to, cancellationToken).ConfigureAwait(false))
+            {
+                return ScopeChange.Applied;
+            }
+            TrayLog.Write($"LAN access: the server did not start that way, so it goes back to how it was: {from.Describe()}.");
+            await TryStartOnAsync(_port, from, cancellationToken).ConfigureAwait(false);
+            return ScopeChange.Failed;
+        }
+        finally
+        {
+            _gate.Release();
+            RestartWatchdogIfStopped();
+        }
+    }
+
+    // Replaces the running server with one on this port for this scope. Called with the gate held.
+    private async Task<bool> TryStartOnAsync(int port, ListenScope scope, CancellationToken cancellationToken)
     {
         await StopProcessAsync().ConfigureAwait(false);
         _port = port;
+        _scope = scope;
         try
         {
             StartProcess();
@@ -242,7 +276,7 @@ sealed class ServerHost : IDisposable
         }
         catch (Exception ex) when (ex is InvalidOperationException or TimeoutException or Win32Exception or FileNotFoundException)
         {
-            TrayLog.Write($"The server did not start on port {port}: {ex.Message}");
+            TrayLog.Write($"The server did not start on port {port} ({scope.Describe()}): {ex.Message}");
             return false;
         }
     }
@@ -274,40 +308,7 @@ sealed class ServerHost : IDisposable
         _process = null;
         using (process)
         {
-            if (process.HasExited)
-            {
-                return;
-            }
-            TrayLog.Write($"Stopping bundled server host pid={process.Id}");
-            process.CloseMainWindow();
-            if (await ExitsWithinAsync(process, StopTimeout).ConfigureAwait(false))
-            {
-                return;
-            }
-            TrayLog.Write($"Bundled server host pid={process.Id} did not exit in time; killing it");
-            try
-            {
-                process.Kill(entireProcessTree: true);
-                await ExitsWithinAsync(process, KillWait).ConfigureAwait(false);
-            }
-            catch (Exception ex) when (ex is InvalidOperationException or Win32Exception or NotSupportedException or AggregateException)
-            {
-                TrayLog.Write($"Could not kill the server process pid={process.Id}: {ex.Message}");
-            }
-        }
-    }
-
-    private static async Task<bool> ExitsWithinAsync(Process process, TimeSpan timeout)
-    {
-        using var deadline = new CancellationTokenSource(timeout);
-        try
-        {
-            await process.WaitForExitAsync(deadline.Token).ConfigureAwait(false);
-            return true;
-        }
-        catch (OperationCanceledException)
-        {
-            return false;
+            await ServerProcessStop.StopAsync(process).ConfigureAwait(false);
         }
     }
 
@@ -319,7 +320,7 @@ sealed class ServerHost : IDisposable
         var process = Process.Start(new ProcessStartInfo
         {
             FileName = serverExe,
-            Arguments = string.Create(CultureInfo.InvariantCulture, $"--port {_port}"),
+            Arguments = ServerListenArguments.For(_port, _scope),
             WorkingDirectory = Path.GetDirectoryName(serverExe),
             UseShellExecute = false,
             CreateNoWindow = true,

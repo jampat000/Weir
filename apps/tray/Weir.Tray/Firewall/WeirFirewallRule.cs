@@ -2,8 +2,8 @@ namespace Weir.Tray.Firewall;
 
 /// <summary>
 /// The one firewall rule Weir manages, and the decisions around it: what it looks like, which of the firewall's
-/// other rules count as blocking it, and what state that adds up to. Pure logic over <see cref="IFirewallPolicy"/>,
-/// so it is testable without the real Windows Firewall.
+/// other rules count as blocking it, and whether Windows already lets other devices in. Pure logic over
+/// <see cref="IFirewallPolicy"/>, so it is testable without the real Windows Firewall.
 /// </summary>
 static class WeirFirewallRule
 {
@@ -77,36 +77,28 @@ static class WeirFirewallRule
             && string.Equals(rule.ProgramPath, programPath, StringComparison.OrdinalIgnoreCase));
 
     /// <summary>
-    /// What System › About or System › Status should tell the operator, worked out from the same read-only data
-    /// <see cref="IFirewallPolicy"/> exposes without admin rights: Weir's own rule, and the network(s) this
-    /// machine is on right now.
+    /// Whether Windows already lets other devices reach Weir's server on at least one kind of network: an enabled
+    /// inbound allow rule for its program, whether Weir's own <see cref="RuleName"/> rule or one Windows made when
+    /// someone clicked Allow on its prompt, on a profile no enabled block rule for it covers (a block wins). The
+    /// PC's current network is deliberately not consulted: the answer is whether this PC has been open to other
+    /// devices, so the same devices stay reachable when it moves to another network. Read-only; needs no
+    /// administrator rights.
     /// </summary>
-    internal static NetworkAccessState ReadState(IFirewallPolicy policy, string installRoot)
+    internal static bool AllowsServerInbound(IFirewallPolicy policy, string installRoot)
     {
         ArgumentNullException.ThrowIfNull(policy);
         var programPath = ServerProgramPath(installRoot);
 
-        if (OwnBlockRules(policy, programPath).Any())
-        {
-            return NetworkAccessState.Blocked;
-        }
-
-        var allowRule = policy.Rules.FirstOrDefault(rule =>
-            string.Equals(rule.Name, RuleName, StringComparison.Ordinal)
-            && rule.Direction == FirewallRuleDirection.Inbound
+        var blocked = ProfilesOf(OwnBlockRules(policy, programPath));
+        var allowed = ProfilesOf(policy.Rules.Where(rule =>
+            rule.Direction == FirewallRuleDirection.Inbound
             && rule.Action == FirewallRuleAction.Allow
-            && string.Equals(rule.ProgramPath, programPath, StringComparison.OrdinalIgnoreCase));
-
-        if (allowRule is null)
-        {
-            return NetworkAccessState.NotConfigured;
-        }
-
-        // A rule that exists but is disabled, or does not cover the network this machine is on right now (for
-        // example Public, which Weir never requests), reaches nobody: that reads as blocked, not configured.
-        var coversCurrentNetwork = (allowRule.Profiles & policy.CurrentProfiles) != FirewallProfiles.None;
-        return allowRule.Enabled && coversCurrentNetwork ? NetworkAccessState.Allowed : NetworkAccessState.Blocked;
+            && string.Equals(rule.ProgramPath, programPath, StringComparison.OrdinalIgnoreCase)));
+        return (allowed & ~blocked) != FirewallProfiles.None;
     }
+
+    private static FirewallProfiles ProfilesOf(IEnumerable<FirewallRule> rules) =>
+        rules.Where(rule => rule.Enabled).Aggregate(FirewallProfiles.None, (all, rule) => all | rule.Profiles);
 }
 
 /// <summary>What <see cref="WeirFirewallRule.Configure"/> did, for logging and exit-code decisions.</summary>
