@@ -12,6 +12,13 @@ enum ListenScope
     OtherDevices,
 }
 
+/// <summary>How a <see cref="ListenScope"/> reads in the log.</summary>
+static class ListenScopeText
+{
+    internal static string Describe(this ListenScope scope) =>
+        scope == ListenScope.OtherDevices ? "other devices on the network can connect" : "only this PC can connect";
+}
+
 /// <summary>The command-line arguments that make the server listen the way a <see cref="ListenScope"/> says.</summary>
 static class ServerListenArguments
 {

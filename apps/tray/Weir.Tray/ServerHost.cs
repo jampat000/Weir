@@ -246,12 +246,12 @@ sealed class ServerHost : IServerListenScope, IDisposable
             {
                 return ScopeChange.Unchanged;
             }
-            TrayLog.Write($"LAN access: restarting the server so that {LanAccessStartup.Describe(to)} (it was: {LanAccessStartup.Describe(from)}).");
+            TrayLog.Write($"LAN access: restarting the server so that {to.Describe()} (it was: {from.Describe()}).");
             if (await TryStartOnAsync(_port, to, cancellationToken).ConfigureAwait(false))
             {
                 return ScopeChange.Applied;
             }
-            TrayLog.Write($"LAN access: the server did not start that way, so it goes back to how it was: {LanAccessStartup.Describe(from)}.");
+            TrayLog.Write($"LAN access: the server did not start that way, so it goes back to how it was: {from.Describe()}.");
             await TryStartOnAsync(_port, from, cancellationToken).ConfigureAwait(false);
             return ScopeChange.Failed;
         }
@@ -276,7 +276,7 @@ sealed class ServerHost : IServerListenScope, IDisposable
         }
         catch (Exception ex) when (ex is InvalidOperationException or TimeoutException or Win32Exception or FileNotFoundException)
         {
-            TrayLog.Write($"The server did not start on port {port} ({LanAccessStartup.Describe(scope)}): {ex.Message}");
+            TrayLog.Write($"The server did not start on port {port} ({scope.Describe()}): {ex.Message}");
             return false;
         }
     }

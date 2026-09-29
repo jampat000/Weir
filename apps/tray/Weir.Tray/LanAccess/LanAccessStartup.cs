@@ -15,7 +15,7 @@ static class LanAccessStartup
     {
         if (LanAccessSetting.Read(runtimeHome, log) is { } saved)
         {
-            log($"LAN access: {Describe(saved)} (saved choice).");
+            log($"LAN access: {saved.Describe()} (saved choice).");
             return saved;
         }
 
@@ -32,7 +32,7 @@ static class LanAccessStartup
         }
 
         var scope = allowedByWindows ? ListenScope.OtherDevices : ListenScope.ThisPcOnly;
-        log($"LAN access: {Describe(scope)}; {(allowedByWindows ? "Windows Firewall already allows Weir's server in" : "Windows Firewall has no rule allowing Weir's server in")}. Saving that choice.");
+        log($"LAN access: {scope.Describe()}; {(allowedByWindows ? "Windows Firewall already allows Weir's server in" : "Windows Firewall has no rule allowing Weir's server in")}. Saving that choice.");
         try
         {
             LanAccessSetting.Write(runtimeHome, scope);
@@ -43,7 +43,4 @@ static class LanAccessStartup
         }
         return scope;
     }
-
-    internal static string Describe(ListenScope scope) =>
-        scope == ListenScope.OtherDevices ? "other devices on the network can connect" : "only this PC can connect";
 }
