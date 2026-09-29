@@ -68,6 +68,37 @@ it("tells the story in plain steps", () => {
   expect(screen.getByText(/copied, not re-encoded/)).toBeInTheDocument();
 });
 
+it("shows a rejection as a Rejected step with its reason, not as Could not finish", () => {
+  mount({
+    log: log({
+      entries: [
+        {
+          id: 2,
+          recorded_at: "2026-08-16T14:02:00Z",
+          outcome: "failed_before_execution",
+          title: "Rejected Arrival.mkv",
+          library_name: "Films 4K",
+          detail: {},
+          story: [
+            {
+              heading: "Rejected",
+              sentence:
+                "This file has no audio tracks, so there would be nothing to keep. The file was left where it is.",
+              tone: "warn",
+            },
+          ],
+        },
+      ],
+    }),
+  });
+
+  expect(screen.getByText("Rejected")).toBeInTheDocument();
+  expect(
+    screen.getByText(/The file was left where it is\./),
+  ).toBeInTheDocument();
+  expect(screen.queryByText("Could not finish")).not.toBeInTheDocument();
+});
+
 it("keeps the technical detail behind a disclosure, never leading", () => {
   mount();
   const summary = screen.getByText("Show the technical detail");

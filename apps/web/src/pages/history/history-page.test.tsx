@@ -446,6 +446,51 @@ describe("HistoryPage", () => {
     expect(lead.textContent).toBe(reason);
   });
 
+  it("tells a rules rejection's timeline step as Rejected, with its reason", async () => {
+    files.files = [
+      file({
+        id: 1,
+        status: "rejected",
+        failure_class: "rules",
+        status_reason: "Rejected: it has no audio tracks.",
+      }),
+    ];
+    fetchLog.mockResolvedValue({
+      file_id: 1,
+      relative_path: "",
+      retention_days: 90,
+      entries: [
+        {
+          id: 3,
+          recorded_at: "2026-08-19T04:00:00",
+          outcome: "failed_before_execution",
+          title: "Rejected film.mkv",
+          library_name: "Movies",
+          detail: {
+            outcome: "failed_before_execution",
+            rejected_without_manager: true,
+          },
+          story: [
+            {
+              heading: "Rejected",
+              sentence:
+                "This file has no audio tracks, so there would be nothing to keep. The file was left where it is.",
+              tone: "warn",
+            },
+          ],
+        },
+      ],
+    });
+    renderPage("/history?file=1");
+
+    const story = await screen.findByRole("list", { name: "What happened" });
+    expect(within(story).getByText("Rejected")).toBeInTheDocument();
+    expect(
+      within(story).getByText(/The file was left where it is\./),
+    ).toBeInTheDocument();
+    expect(within(story).queryByText("Could not finish")).toBeNull();
+  });
+
   it("opens a manager rejection's detail with its label, then its reason", () => {
     files.files = [
       file({
