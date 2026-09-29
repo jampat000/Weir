@@ -276,6 +276,7 @@ public sealed partial class RemuxPassRunner
                 inspected,
                 new WireObject()
                     .Set("rejection_kind", "no_retainable_audio")
+                    .Set("rejection_explanation", AudioRejectionExplanation.Explain(config, audio, request.RulesProfileName))
                     .Set("media_scope", scope)
                     .Set("processing_watched_folder_resolved", watchedRoot));
         }
