@@ -128,27 +128,13 @@ jobs:
           restore-keys: |
             mkvtoolnix-vendor-${{ runner.os }}-
 
-      # The FFmpeg and MKVToolNix *source* archives fetch-bundled-tool-sources.ps1 attaches to the
-      # release for licence compliance, cached against the same pins as the binaries above (both live
-      # in the one file), so a release only ever downloads them once per pin.
-      - name: Cache bundled tool source archives
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
-        with:
-          path: packaging/windows/vendor/tool-sources
-          key: tool-sources-vendor-${{ runner.os }}-${{ hashFiles('packaging/windows/build-velopack-vendored-media-tools.ps1') }}
-
-      # The previous release's full nupkg (#804): `vpk pack` needs it on disk to build a delta, but it
-      # is otherwise unchanged from release to release, so this is keyed strictly on that release's own
-      # version - never a prefix or restore-key fallback, so a stale package can never be served.
-      - name: Cache previous release nupkg
-        if: steps.previous.outputs.version != ''
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
-        with:
-          path: packaging/windows/vendor/previous-release
-          key: weir-prev-nupkg-${{ steps.previous.outputs.version }}
+      # Not cached: the bundled tools' source archives and the previous release's full nupkg would only
+      # ever be saved under this tag's own ref, and GitHub never lets another tag's run restore a cache
+      # saved there, so a cache could only ever miss. Both are downloaded fresh, with the progress bar
+      # off, which is what made the downloads slow.
 
       # Builds the web app, publishes the .NET server (win-x64 single file) and the tray, vendors FFmpeg and
-      # MKVToolNix, installs the pinned vpk CLI, fetches the previous release to diff against (cached above),
+      # MKVToolNix, installs the pinned vpk CLI, fetches the previous release to diff against,
       # packs, and prunes that previous release's own package back out of the output (#804).
       - name: Build Weir Windows package (Velopack)
         env:
