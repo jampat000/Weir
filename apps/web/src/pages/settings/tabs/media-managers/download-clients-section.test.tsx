@@ -1,10 +1,11 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import * as api from "../../../../lib/download-clients/download-clients-api";
 import type { DownloadClientConnection } from "../../../../lib/download-clients/download-clients-api";
+import * as settingsQueries from "../../../../lib/settings/queries";
 import { DownloadClientsSection } from "./download-clients-section";
 
 function connection(
@@ -32,6 +33,13 @@ function wrapper({ children }: { children: ReactNode }) {
   });
   return <QueryClientProvider client={qc}>{children}</QueryClientProvider>;
 }
+
+// Each card formats its last test time in the app timezone, which is read from the settings.
+beforeEach(() => {
+  vi.spyOn(settingsQueries, "useAppSettingsQuery").mockReturnValue({
+    data: undefined,
+  } as ReturnType<typeof settingsQueries.useAppSettingsQuery>);
+});
 
 afterEach(() => {
   vi.restoreAllMocks();

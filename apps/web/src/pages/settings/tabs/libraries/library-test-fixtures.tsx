@@ -1,11 +1,18 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { act } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { vi } from "vitest";
 
+import { FOLDER_CHECK_SETTLE_MS } from "./folder-check-settle";
 import * as authQueries from "../../../../lib/auth/queries";
+import * as downloadClientsApi from "../../../../lib/download-clients/download-clients-api";
 import * as managerApi from "../../../../lib/media-managers/media-managers-api";
 import type { ProcessingLibrary } from "../../../../lib/processing/libraries-api";
+import * as chainApi from "../../../../lib/processing/library-folder-chain-api";
+import * as managersApi from "../../../../lib/processing/library-managers-api";
+import * as modeApi from "../../../../lib/processing/library-mode-api";
+import * as operatorApi from "../../../../lib/processing/operator-settings-api";
 import * as ruleSetsApi from "../../../../lib/processing/rule-sets-api";
 
 /** What the Libraries tab's tests share: a saved library, the providers, and an operator's session. */
@@ -88,10 +95,53 @@ export function wrapper({ children }: { children: ReactNode }) {
   );
 }
 
-export function asOperator() {
+function asRole(role: "operator" | "viewer") {
   vi.spyOn(authQueries, "useMeQuery").mockReturnValue({
-    data: { role: "operator" },
+    data: { role },
   } as ReturnType<typeof authQueries.useMeQuery>);
   vi.spyOn(managerApi, "fetchMediaManagerConnections").mockResolvedValue([]);
   vi.spyOn(ruleSetsApi, "fetchProcessingRuleSets").mockResolvedValue([]);
+  answerEditorChecksAsUnavailable();
+}
+
+export function asOperator() {
+  asRole("operator");
+}
+
+export function asViewer() {
+  asRole("viewer");
+}
+
+/**
+ * The library editor also asks about folders, managers and performance settings. A test that is
+ * not about one of those gets "unavailable" for it, and one that is stubs it after this.
+ */
+function answerEditorChecksAsUnavailable() {
+  const unavailable = () =>
+    Promise.reject(new Error("Not stubbed by this test."));
+  vi.spyOn(chainApi, "fetchLibraryFolderChain").mockImplementation(unavailable);
+  vi.spyOn(managersApi, "fetchProcessingManagerSetup").mockImplementation(
+    unavailable,
+  );
+  vi.spyOn(managersApi, "fetchProcessingRejectSupport").mockImplementation(
+    unavailable,
+  );
+  vi.spyOn(
+    downloadClientsApi,
+    "fetchDownloadClientSuggestions",
+  ).mockImplementation(unavailable);
+  vi.spyOn(modeApi, "fetchLibrarySettings").mockImplementation(unavailable);
+  vi.spyOn(operatorApi, "fetchProcessingOperatorSettings").mockImplementation(
+    unavailable,
+  );
+}
+
+/**
+ * Lets the folders a test rendered settle so their check starts, without waiting for it in real
+ * time. The test must have installed fake timers with `vi.useFakeTimers({ shouldAdvanceTime: true })`.
+ */
+export async function settleFolderChecks() {
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(FOLDER_CHECK_SETTLE_MS);
+  });
 }

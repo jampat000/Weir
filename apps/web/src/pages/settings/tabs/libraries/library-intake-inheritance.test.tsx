@@ -14,7 +14,9 @@ afterEach(() => {
 const WAIT = "Wait after a file last changes (seconds)";
 const SIZE = "Minimum file size (MB)";
 
+/** An operator whose Performance settings are these; it must come before any stub the test adds. */
 function performanceIs(minFileAgeSeconds: number, minInputFileSizeMb: number) {
+  asOperator();
   vi.spyOn(operatorApi, "fetchProcessingOperatorSettings").mockResolvedValue({
     min_file_age_seconds: minFileAgeSeconds,
     min_input_file_size_mb: minInputFileSizeMb,
@@ -22,7 +24,6 @@ function performanceIs(minFileAgeSeconds: number, minInputFileSizeMb: number) {
 }
 
 async function openEditor(saved = library()) {
-  asOperator();
   vi.spyOn(api, "fetchProcessingLibraries").mockResolvedValue([saved]);
   render(<LibrariesTab />, { wrapper });
   fireEvent.click(await screen.findByRole("button", { name: "Edit" }));
@@ -106,7 +107,6 @@ it("shows a library's own value with a way back to the Performance setting", asy
 
 it("starts a new library on the Performance setting", async () => {
   performanceIs(60, 50);
-  asOperator();
   vi.spyOn(api, "fetchProcessingLibraries").mockResolvedValue([library()]);
   const create = vi
     .spyOn(api, "createProcessingLibrary")
