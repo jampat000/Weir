@@ -239,7 +239,7 @@ that can already write to them.
 
 ## Work folder placement
 
-A library's work folder defaults to a private folder under `WEIR_HOME` (`/data/weir`), which is
+A workflow's work folder defaults to a private folder under `WEIR_HOME` (`/data/weir`), which is
 usually a different volume from your media in Docker. Weir still finishes files that way, but each
 one is copied from the work folder to the output folder rather than moved, roughly doubling the
 time the clean's last step takes on a large file. Put the work folder on the same volume as the
@@ -249,7 +249,7 @@ that copy becomes an instant move instead:
 ```yaml
 volumes:
   - ./weir-data:/data/weir
-  - /srv/media:/media   # set the library's work_folder and output_folder both under here
+  - /srv/media:/media   # set the workflow's work_folder and output_folder both under here
 ```
 
 ## Health
@@ -289,12 +289,12 @@ services:
             - capabilities: ["gpu"]
 ```
 
-Without passthrough, a library configured to use a device **falls back to software and records
+Without passthrough, a workflow configured to use a device **falls back to software and records
 why on the file** — it does not fail. That is the intended behaviour, so a misconfigured device
 costs you speed rather than a failed pass. The reason is on the file's record and in its
 processing log.
 
-Per-vendor disables exist on each library for the case where auto-detection picks a device that is
+Per-vendor disables exist on each workflow for the case where auto-detection picks a device that is
 present but wrong.
 
 ## Filesystem events on bind mounts
@@ -313,9 +313,9 @@ This is expected and handled. When the watcher cannot start, Weir:
 That step stays `ready`. Falling back is slower, not broken, and failing readiness would take a
 working instance out of a load balancer over a delay.
 
-If you would rather not be told about it for a given library, switch off **Watch this folder for
-changes** in that library's editor under **Settings › Libraries**. To turn the watcher off for every
-library, set `WEIR_PROCESSING_WATCHER_ENABLED=0`.
+If you would rather not be told about it for a given workflow, switch off **Watch this folder for
+changes** in that workflow's editor under **Settings › Workflows**. To turn the watcher off for every
+workflow, set `WEIR_PROCESSING_WATCHER_ENABLED=0`.
 
 When events *do* work, `WEIR_PROCESSING_WATCHER_DEBOUNCE_SECONDS` (default 3) controls how long
 the tree must be quiet before a burst of writes becomes one scan.

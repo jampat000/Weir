@@ -17,15 +17,18 @@ Use the Velopack setup exe from the release being validated.
 9. Confirm the setup wizard (**Set up Weir**) opens after the first user is created.
 10. Confirm `Skip for now` leaves the wizard and lands on Processing.
 11. Confirm the wizard can be reopened from System › About › Setup wizard › `Open setup wizard`.
-12. Confirm `Finish setup` saves the time zone, the watched and output folders for the first Movies and TV libraries, and the automatic backup schedule.
+12. Confirm the wizard first asks how downloads reach Weir (Deluno, Sonarr / Radarr, a download client, or Neither), and that Neither shows the typed watched and output folders for Movies and TV.
+    - Choose Deluno, Sonarr / Radarr or a download client, connect it, and confirm it tests as connected and the Movies and TV workflows are offered with folders filled in, each with its kind badge.
+    - Confirm an unreachable address says so and leaves Neither available.
+    - Confirm `Finish setup` saves the time zone, the ticked workflows (linked to the media manager when there is one) and the automatic backup schedule, and that What's next no longer offers to connect a media manager.
 13. Confirm the navigation shows Processing, History, Library, Settings and System, and that Processing is the first screen.
-14. Confirm Settings shows the tabs Libraries, Rules, Media managers, Performance, Cleanup, Schedule and Alerts.
+14. Confirm Settings shows the tabs Workflows, Rules, Media managers, Performance, Cleanup, Schedule and Alerts.
 15. Confirm System shows the tabs About, Backups, Security and Logs.
 16. In System › Backups, use **Export or restore now** to download a configuration backup.
 17. Restore that backup and confirm the app remains usable.
 18. Confirm System › About › Updates shows a meaningful status, even when no update is available.
 19. Right-click the tray icon and confirm `Check for updates` is present and reaches the current release status.
-20. In Settings › Libraries, open a library's editor and use `Browse` on a folder field to pick a local folder.
+20. In Settings › Workflows, open a workflow's editor and use `Browse` on a folder field to pick a local folder. Confirm each row shows its kind (Weir only, or Linked to a media manager), and that `Add workflow` asks which kind first.
 21. Enter a UNC path (`\\server\share\folder`) manually and confirm it saves; a missing folder is a warning, not a save blocker.
 22. Open Library, pick the library from the title and confirm `Check again` runs.
 23. Quit Weir from the tray icon, and confirm `tray-host.log` in `C:\ProgramData\Weir` says the server host `stopped cleanly` within a few seconds, not `killing it`. Do the same after switching LAN access on or off from the tray menu.

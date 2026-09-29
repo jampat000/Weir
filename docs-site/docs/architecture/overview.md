@@ -7,9 +7,11 @@ title: Overview
 
 Weir is a self-hosted media processing stage: it cleans new downloads, and files already in your
 library. Processing is the application — it remuxes media into cleaner outputs, either as files
-arrive in a library's watched folder or as a pass over a library you already have. mkvmerge writes
-Matroska and ffmpeg writes everything else, and each library can be set to use ffmpeg for
-everything instead. Around it, the platform provides history, logs, backups, updates and
+arrive in a workflow's watched folder or as a pass over a library you already have. mkvmerge writes
+Matroska and ffmpeg writes everything else, and each workflow can be set to use ffmpeg for
+everything instead. A workflow is one route a file takes: a watched folder, a work folder, an
+output folder and the rules that apply. The API still calls a workflow a "library", so existing
+integrations keep working. Around it, the platform provides history, logs, backups, updates and
 security. The first screen, **Processing**, shows every file Weir is working on right now, from
 the moment it arrives until its media manager has it back. **History**, **Library**, **Settings**
 and **System** sit beside it.
@@ -78,12 +80,12 @@ flowchart LR
 
 New files are noticed two ways, and both end at the same job.
 
-- **Straight away.** Each enabled library with a watched folder and "watch for changes" turned on gets
+- **Straight away.** Each enabled workflow with a watched folder and "watch for changes" turned on gets
   its own recursive filesystem watcher. Events are debounced (`WEIR_PROCESSING_WATCHER_DEBOUNCE_SECONDS`,
   3 seconds by default) and then queue the ordinary watched-folder scan. Creating, editing or deleting a
-  library takes effect without a restart, and if the operating system reports lost events the library is
+  workflow takes effect without a restart, and if the operating system reports lost events the workflow is
   scanned in full and its watcher replaced. `WEIR_PROCESSING_WATCHER_ENABLED=0` turns the watchers off.
-- **As a backstop.** Every library is scanned on its own timer anyway (`scan_interval_seconds`, five
+- **As a backstop.** Every workflow is scanned on its own timer anyway (`scan_interval_seconds`, five
   minutes by default), so a folder a watcher cannot see — a network share, a container mount that does
   not forward events — still gets picked up.
 
