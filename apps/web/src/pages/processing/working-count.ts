@@ -1,0 +1,41 @@
+import { useEffect } from "react";
+
+import { useProcessingFilesQuery } from "../../lib/processing/files-queries";
+import { useProcessingJobsInspectionQuery } from "../../lib/processing/jobs-inspection/queries";
+import { WORKING_FILE_STATUS, countWorking } from "./processing-model";
+
+// The Working lane's own fetch, separate from the general page: every currently-processing file, with no
+// paging risk of losing one that is still running (#781). 1000 is the endpoint's own ceiling, not a real
+// expectation — files-at-once tops out far below it.
+export const WORKING_FILES_QUERY = {
+  file_status: WORKING_FILE_STATUS,
+  limit: 1000,
+} as const;
+export const ACTIVE_JOBS_LIMIT = 50;
+
+/** Outside the Processing page nothing else refreshes these, so the count follows them at this pace. */
+const COUNT_REFRESH_MS = 10_000;
+
+/**
+ * How many files the Working lane is showing, for the sidebar. It reads the lane's own two lists and
+ * counts them the way the lane does, so the two can never disagree; the server's count of jobs holding a
+ * slot also includes scans and passes on a file that is still held back, which the lane does not show.
+ * The lists share the page's cache, so on Processing this costs no extra request until the next refresh.
+ */
+export function useWorkingCount(): number {
+  const files = useProcessingFilesQuery(WORKING_FILES_QUERY);
+  const jobs = useProcessingJobsInspectionQuery("active", ACTIVE_JOBS_LIMIT);
+  const { refetch: refetchFiles } = files;
+  const { refetch: refetchJobs } = jobs;
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === "hidden") return;
+      void refetchFiles();
+      void refetchJobs();
+    }, COUNT_REFRESH_MS);
+    return () => window.clearInterval(timer);
+  }, [refetchFiles, refetchJobs]);
+
+  return countWorking(files.data?.files ?? [], jobs.data?.jobs ?? []);
+}

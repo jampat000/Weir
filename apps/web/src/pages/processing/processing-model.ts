@@ -329,3 +329,11 @@ export function buildLanes(
   );
   return lanes;
 }
+
+/** How many cards the Working lane holds for these files and jobs, before the page's own filter. */
+export function countWorking(
+  files: ProcessingFile[],
+  libraryJobs: ProcessingJobInspectionRow[],
+): number {
+  return buildLanes(files, libraryJobs, new Map(), new Map()).working.length;
+}

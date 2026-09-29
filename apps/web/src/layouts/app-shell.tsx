@@ -13,10 +13,10 @@ import {
   NavIconSignOut,
 } from "../components/shell/nav-icons";
 import { useLogoutMutation } from "../lib/auth/queries";
-import { useProcessingFilesAtOnceQuery } from "../lib/processing/queries";
 import { useAppSettingsQuery } from "../lib/settings/queries";
 import { useSystemReadinessQuery } from "../lib/system/readiness-queries";
 import { useModalFocus } from "../lib/ui/use-modal-focus";
+import { useWorkingCount } from "../pages/processing/working-count";
 
 // Between phone width (a drawer below 921px) and 1100px the side menu shrinks to icons by itself, so
 // the Processing lanes keep their room; a click on Collapse or Expand overrides it until a reload.
@@ -60,8 +60,8 @@ export function AppShell() {
   const [collapsedChoice, setCollapsedChoice] = useState<boolean | null>(null);
   const laptop = useMediaQuery(LAPTOP_WIDTH);
   const sidebarCollapsed = collapsedChoice ?? laptop;
-  // How many files are being written right now, beside Processing wherever you are in the app.
-  const working = useProcessingFilesAtOnceQuery().data?.running ?? 0;
+  // How many cards Processing's Working lane shows, beside Processing wherever you are in the app.
+  const working = useWorkingCount();
   const productTitle =
     (suite.data?.product_display_name ?? "Weir").trim() || "Weir";
   const appVersion = readiness.data?.version;

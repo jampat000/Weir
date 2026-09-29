@@ -37,7 +37,6 @@ import { FinishedLane } from "./finished-lane";
 import { EmptyLane, Lane, More } from "./lane";
 import { ArrivingCard, HandingCard, WaitingCard } from "./lane-cards";
 import {
-  WORKING_FILE_STATUS,
   arrivingDeadline,
   buildLanes,
   mergeWorkingFiles,
@@ -50,16 +49,9 @@ import {
   type Filter,
 } from "./processing-toolbar";
 import { WorkingCard } from "./working-card";
+import { ACTIVE_JOBS_LIMIT, WORKING_FILES_QUERY } from "./working-count";
 
 const FILES_QUERY = { limit: 200 } as const;
-// The Working lane's own fetch, separate from the general page: every currently-processing file, with no
-// paging risk of losing one that is still running (#781). 1000 is the endpoint's own ceiling, not a real
-// expectation — files-at-once tops out far below it.
-const WORKING_FILES_QUERY = {
-  file_status: WORKING_FILE_STATUS,
-  limit: 1000,
-} as const;
-const ACTIVE_JOBS_LIMIT = 50;
 /** Once a second, so countdowns and "min ago" move between server updates. */
 const TICK_MS = 1000;
 /** Arriving counts down to each library's next look, which moves with every scan. */
