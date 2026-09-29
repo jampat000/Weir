@@ -490,6 +490,52 @@ describe("first run: connect Deluno first", () => {
     fireEvent.click(screen.getByRole("button", { name: "Finish setup" }));
     await waitFor(() => expect(updateLibrary).toHaveBeenCalledTimes(2));
   });
+
+  it("shows a line Weir could not verify as not verified, not as fine and not as a problem", async () => {
+    scenario.managers = [managerConnection({})];
+    scenario.checks = {
+      ...passingCheck(),
+      movie: {
+        problem: null,
+        chain: {
+          library_id: 0,
+          local: { ready: true, lines: [] },
+          managers: [
+            {
+              connection_id: 5,
+              kind: "deluno",
+              name: "Deluno",
+              label: "Deluno",
+              flow: "handoff",
+              ready: true,
+              lines: [
+                {
+                  state: "unverified",
+                  text: "Deluno says its Movies library downloads here. Weir can't see where each download client really saves.",
+                },
+              ],
+            },
+          ],
+          download_clients: [],
+          ready: true,
+        },
+      },
+    };
+    renderWizard();
+
+    choose("Deluno");
+    await foundLibraries();
+
+    expect(
+      await screen.findByText(
+        /Weir can't see where each download client/,
+        {},
+        { timeout: 3000 },
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Not verified:")).toBeInTheDocument();
+    expect(screen.queryByText("Fine:")).not.toBeInTheDocument();
+  });
 });
 
 describe("first run: connect Sonarr and Radarr first", () => {

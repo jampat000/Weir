@@ -9,15 +9,15 @@ import { FolderInput } from "./setup-wizard-parts";
 
 type Found = ReturnType<typeof useSuggestedLibraries>;
 
-/** Every finding that needs a fix, from Weir's own folders, the managers and the download clients. */
-function problemLines(check: ProposedLibraryCheck) {
+/** Every finding that needs a fix or could not be verified, from Weir's own folders, the managers and the download clients. */
+function attentionLines(check: ProposedLibraryCheck) {
   const chain = check.chain;
   if (!chain) return [];
   return [
     ...chain.local.lines,
     ...chain.managers.flatMap((manager) => manager.lines),
     ...chain.download_clients.flatMap((client) => client.lines),
-  ].filter((line) => line.state === "problem");
+  ].filter((line) => line.state === "problem" || line.state === "unverified");
 }
 
 function FoundLibraryProblems({ row }: { row: SuggestedRow }) {
@@ -32,7 +32,7 @@ function FoundLibraryProblems({ row }: { row: SuggestedRow }) {
       </p>
     );
   }
-  const lines = problemLines(row.check);
+  const lines = attentionLines(row.check);
   if (lines.length === 0) {
     return (
       <p className="mm-status-text--healthy text-sm">
