@@ -72,6 +72,19 @@ public sealed class ValueParsingAndListenTests
         Assert.Equal(new ServerListenOptions("0.0.0.0", 9347), ServerListenOptions.Parse([], TestRuntime.With()));
     }
 
+    [Theory]
+    [InlineData("localhost", true)]
+    [InlineData("LOCALHOST", true)]
+    [InlineData("127.0.0.1", true)]
+    [InlineData("::1", true)]
+    [InlineData("0.0.0.0", false)]
+    [InlineData("192.168.1.20", false)]
+    [InlineData("*", false)]
+    public void Listen_says_whether_only_this_pc_can_connect(string host, bool thisPcOnly)
+    {
+        Assert.Equal(thisPcOnly, new ServerListenOptions(host, 9347).IsThisPcOnly);
+    }
+
     [Fact]
     public void Listen_prefers_the_tray_argument_over_the_docker_variable()
     {

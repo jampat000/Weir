@@ -9563,7 +9563,7 @@
         "description": "Whether another device on the network can currently reach Weir.",
         "properties": {
           "state": {
-            "description": "allowed, blocked, not_configured, or not_applicable",
+            "description": "this_pc_only, allowed, blocked, or not_applicable",
             "minLength": 1,
             "title": "State",
             "type": "string"
