@@ -11,7 +11,6 @@ public sealed record LibraryAdmissionRules(
     long MinFileSizeMb,
     long MaxFileSizeMb,
     string RejectedFileAction,
-    long MinFileAgeSeconds,
     DateTimeOffset? CreatedAfter,
     DateTimeOffset? CreatedBefore,
     DateTimeOffset? ModifiedAfter,
@@ -24,8 +23,8 @@ public sealed record LibraryAdmissionRules(
             ? []
             : [.. csv.Split(',').Select(v => v.Trim()).Where(v => v.Length > 0)];
 
-    /// <summary>Read the rules off a library row, clamping sizes and ages to zero or more.</summary>
-    public static LibraryAdmissionRules For(ProcessingLibraryRecord library)
+    /// <summary>Read the rules off a library row; the minimum size is the one <paramref name="limits"/> resolved for it.</summary>
+    public static LibraryAdmissionRules For(ProcessingLibraryRecord library, IntakeLimits limits)
     {
         ArgumentNullException.ThrowIfNull(library);
         return new LibraryAdmissionRules(
@@ -33,10 +32,9 @@ public sealed record LibraryAdmissionRules(
             ExcludeMarkers: CsvValues(library.ExcludeMarkersCsv).Select(v => v.ToLowerInvariant()).ToHashSet(StringComparer.Ordinal),
             IncludePatterns: CsvValues(library.IncludePatternsCsv),
             ExcludePatterns: CsvValues(library.ExcludePatternsCsv),
-            MinFileSizeMb: Math.Max(0, library.MinFileSizeMb),
+            MinFileSizeMb: limits.MinFileSizeMb,
             MaxFileSizeMb: Math.Max(0, library.MaxFileSizeMb),
             RejectedFileAction: string.Equals((library.RejectedFileAction ?? string.Empty).Trim(), "delete_file", StringComparison.OrdinalIgnoreCase) ? "delete_file" : "leave",
-            MinFileAgeSeconds: Math.Max(0, library.MinFileAgeSeconds),
             CreatedAfter: library.CreatedAfter?.AsUtc,
             CreatedBefore: library.CreatedBefore?.AsUtc,
             ModifiedAfter: library.ModifiedAfter?.AsUtc,
@@ -68,7 +66,7 @@ public static class LibraryAdmission
         if (rules.MinFileSizeMb > 0 && facts.SizeBytes < rules.MinFileSizeMb * 1024 * 1024)
         {
             return new LibraryAdmissionRejection(
-                $"Skipped because this file is {sizeMb.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)} MB and the {rules.MinFileSizeMb} MB library minimum is not met.",
+                $"Skipped because this file is {sizeMb.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)} MB, under the {rules.MinFileSizeMb} MB minimum.",
                 "skipped_below_minimum_file_size");
         }
 

@@ -116,6 +116,7 @@ public sealed class SchemaMigrator
         new(24, "0059_file_skip_markers", "Weir.Infrastructure.Migrations.0024_file_skip_markers.sql"),
         new(25, "0060_file_content_fingerprint", "Weir.Infrastructure.Migrations.0025_file_content_fingerprint.sql"),
         new(26, "0061_user_app_theme", "Weir.Infrastructure.Migrations.0026_user_app_theme.sql"),
+        new(27, "0062_library_intake_follows_performance", "Weir.Infrastructure.Migrations.0027_library_intake_follows_performance.sql"),
     ];
 
     /// <summary>

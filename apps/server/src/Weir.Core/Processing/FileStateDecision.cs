@@ -22,7 +22,7 @@ public static class FileStateDecision
         DateTimeOffset? settlingStableAt,
         string? accessProblem,
         string? blockedByConnection,
-        long? minimumAgeSeconds,
+        long minimumAgeSeconds,
         DateTimeOffset now)
     {
         ArgumentNullException.ThrowIfNull(library);
@@ -46,8 +46,7 @@ public static class FileStateDecision
                 HoldUntil: windowReopensAt);
         }
 
-        var configuredAge = minimumAgeSeconds ?? library.MinFileAgeSeconds;
-        var holdSeconds = Math.Max(0, configuredAge) + (Math.Max(0, library.HoldMinutes) * 60);
+        var holdSeconds = Math.Max(0, minimumAgeSeconds) + (Math.Max(0, library.HoldMinutes) * 60);
         if (sizeIsSettling)
         {
             return new FileStateVerdict(

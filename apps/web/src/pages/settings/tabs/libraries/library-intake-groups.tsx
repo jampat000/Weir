@@ -1,4 +1,5 @@
 import { QuietFieldGroup } from "../../../../components/shared/quiet-section";
+import { InheritedNumberSetting } from "./library-inherited-setting";
 import { REJECTED_FILE_OPTIONS } from "./library-options";
 import {
   DateTimeSetting,
@@ -51,12 +52,12 @@ export function LibraryIntakeGroup({
           placeholder="*sample*,*trailer*"
           hint="Optional comma-separated wildcards."
         />
-        <TextSetting
+        <InheritedNumberSetting
           binding={binding}
           name="min_file_size_mb"
           label="Minimum file size (MB)"
-          width="short"
-          placeholder="0"
+          unit="MB"
+          performanceField="min_input_file_size_mb"
         />
         <TextSetting
           binding={binding}
@@ -136,11 +137,13 @@ export function LibraryReadinessGroup({
       detail="These checks prevent Weir from starting while a downloader, recorder, or media manager still owns the file."
     >
       <div className="mm-field-row">
-        <TextSetting
+        <InheritedNumberSetting
           binding={binding}
           name="min_file_age_seconds"
-          label="Minimum unchanged age (seconds)"
-          width="short"
+          label="Wait after a file last changes (seconds)"
+          unit="seconds"
+          performanceField="min_file_age_seconds"
+          hint="Goes by the file's last-changed time."
         />
         <TextSetting
           binding={binding}
@@ -151,8 +154,9 @@ export function LibraryReadinessGroup({
         <TextSetting
           binding={binding}
           name="file_detection_interval_seconds"
-          label="Size must stay stable (seconds)"
+          label="Wait for the size to stop growing (seconds)"
           width="short"
+          hint="Weir checks the file's size on each look. A separate check from the wait after a change."
         />
         <TextSetting
           binding={binding}
