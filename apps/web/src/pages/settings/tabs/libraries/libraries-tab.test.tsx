@@ -68,14 +68,14 @@ it("discovers and imports selected manager libraries", async () => {
   fireEvent.change(await screen.findByLabelText("Media manager"), {
     target: { value: "7" },
   });
-  fireEvent.click(screen.getByRole("button", { name: "Discover libraries" }));
+  fireEvent.click(screen.getByRole("button", { name: "Discover workflows" }));
   fireEvent.click(await screen.findByLabelText(/Movies 4K/));
   fireEvent.click(screen.getByRole("button", { name: "Import selected" }));
 
   await waitFor(() => {
     expect(imported).toHaveBeenCalledWith(7, ["movies-4k"]);
     expect(screen.getByTestId("processing-library-notice")).toHaveTextContent(
-      /1 library was imported/,
+      /1 workflow was imported/,
     );
   });
 });
@@ -106,7 +106,7 @@ it("asks before removing a library, naming it and its folder", async () => {
   );
   expect(
     screen.getByTestId("processing-library-remove-confirm-confirm"),
-  ).toHaveTextContent("Remove library");
+  ).toHaveTextContent("Remove workflow");
   expect(remove).not.toHaveBeenCalled();
 });
 
@@ -165,9 +165,9 @@ it("says the libraries could not be loaded instead of showing none", async () =>
   render(<LibrariesTab />, { wrapper });
 
   expect(await screen.findByTestId("settings-load-error")).toHaveTextContent(
-    "Weir couldn’t load your libraries. Reload the page to try again.",
+    "Weir couldn’t load your workflows. Reload the page to try again.",
   );
-  expect(screen.queryByText(/No libraries yet/)).not.toBeInTheDocument();
+  expect(screen.queryByText(/No workflows yet/)).not.toBeInTheDocument();
 });
 
 it("does not offer editing to a viewer", async () => {
@@ -190,5 +190,5 @@ it("says so plainly when nothing is configured yet", async () => {
 
   render(<LibrariesTab />, { wrapper });
 
-  expect(await screen.findByText(/No libraries yet/)).toBeInTheDocument();
+  expect(await screen.findByText(/No workflows yet/)).toBeInTheDocument();
 });

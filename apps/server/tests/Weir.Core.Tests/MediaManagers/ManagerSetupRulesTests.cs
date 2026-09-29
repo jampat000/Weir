@@ -192,7 +192,7 @@ public sealed class ManagerSetupRulesTests
     {
         var result = Sonarr("", "/media/downloads/weir", "[]");
 
-        Assert.Equal("Set this library's watched and output folders first; the mapping is built from them.", Assert.Single(result.Lines).Text);
+        Assert.Equal("Set this workflow's watched and output folders first; the mapping is built from them.", Assert.Single(result.Lines).Text);
     }
 
     [Fact]

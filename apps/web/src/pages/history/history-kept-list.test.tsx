@@ -53,7 +53,7 @@ it("does not offer Process again to someone who cannot edit", () => {
 it("processing a kept file again reports the server's own message", async () => {
   const processAgain = vi.spyOn(api, "processKeptFileAgain").mockResolvedValue({
     detail:
-      "Weir is checking this file's library now and will queue it once it is ready.",
+      "Weir is checking this file's workflow now and will queue it once it is ready.",
   });
   const onProcessed = vi.fn();
   render(
@@ -65,7 +65,7 @@ it("processing a kept file again reports the server's own message", async () => 
 
   await waitFor(() =>
     expect(onProcessed).toHaveBeenCalledWith(
-      "Weir is checking this file's library now and will queue it once it is ready.",
+      "Weir is checking this file's workflow now and will queue it once it is ready.",
     ),
   );
   expect(processAgain).toHaveBeenCalledWith(7);

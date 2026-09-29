@@ -74,7 +74,7 @@ export async function fetchLibrarySettings(
   await requireOk(
     path,
     r,
-    "Could not load this library's library-mode settings",
+    "Could not load this workflow's library-mode settings",
   );
   return readJson<LibrarySettings>(r);
 }
@@ -86,7 +86,7 @@ export const DEFAULT_ORIGINALS_FOLDER_NAME = ".weir-originals";
 export function originalsFolderLabel(originalsFolder: string): string {
   return originalsFolder.trim().length > 0
     ? originalsFolder
-    : `a ${DEFAULT_ORIGINALS_FOLDER_NAME} folder inside each library folder`;
+    : `a ${DEFAULT_ORIGINALS_FOLDER_NAME} folder inside each workflow folder`;
 }
 
 /**
@@ -110,7 +110,7 @@ export async function saveLibrarySettings(
     path,
     "PUT",
     updates,
-    "Could not save this library's settings",
+    "Could not save this workflow's settings",
   );
   return readJson<LibrarySettings>(r);
 }
@@ -153,7 +153,7 @@ export async function fetchLibraryFiles(
   const suffix = libraryFileFiltersToParams(filters).toString();
   const path = `/api/v1/processing/libraries/${libraryId}/library-files${suffix ? `?${suffix}` : ""}`;
   const r = await apiFetch(path);
-  await requireOk(path, r, "Could not load this library's files");
+  await requireOk(path, r, "Could not load this workflow's files");
   return readJson<LibraryFilesResult>(r);
 }
 
@@ -163,7 +163,7 @@ export async function fetchLibraryOverview(
 ): Promise<LibraryOverview> {
   const path = `/api/v1/processing/libraries/${libraryId}/library-overview`;
   const r = await apiFetch(path);
-  await requireOk(path, r, "Could not load this library's overview");
+  await requireOk(path, r, "Could not load this workflow's overview");
   return readJson<LibraryOverview>(r);
 }
 
@@ -259,6 +259,6 @@ export async function setLibrarySchedule(
   return readConfirmationOr<LibrarySettings>(
     path,
     r,
-    "Could not change the library schedule",
+    "Could not change the workflow schedule",
   );
 }

@@ -28,14 +28,14 @@ public sealed partial class RemuxPassHandler
             result.Set("rejected_cleanup_status", "pending");
             result.Set(
                 "rejected_cleanup_detail",
-                weirOnly ? WeirOnlyRejection.DeleteQueued : "This library is set to delete rejected files. Weir recorded the rejection and will now remove only this file.");
+                weirOnly ? WeirOnlyRejection.DeleteQueued : "This workflow is set to delete rejected files. Weir recorded the rejection and will now remove only this file.");
         }
         else
         {
             result.Set("rejected_cleanup_status", "left_in_place");
             result.Set(
                 "rejected_cleanup_detail",
-                weirOnly ? WeirOnlyRejection.LeftInPlace : "Weir left the rejected file in place because this library's cleanup action is Leave in place.");
+                weirOnly ? WeirOnlyRejection.LeftInPlace : "Weir left the rejected file in place because this workflow's cleanup action is Leave in place.");
         }
     }
 

@@ -148,7 +148,7 @@ internal sealed class ProcessingRulesPreviewEndpointHandlers
 
         throw new ApiException(
             StatusCodes.Status400BadRequest,
-            "That path is not an existing file inside this library's watched or output folder.");
+            "That path is not an existing file inside this workflow's watched or output folder.");
     }
 
     /// <summary><c>absolute_path</c> goes through the same allow-list the local file picker (<c>GET

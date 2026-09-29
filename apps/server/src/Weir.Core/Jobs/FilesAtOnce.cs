@@ -107,14 +107,14 @@ public static class FilesAtOnceRules
                 return Result(
                     LibraryLimit,
                     $"{files} {verb} waiting: {atLimit.Name} runs {cap.ToString(CultureInfo.InvariantCulture)} at once, and {Count(runningPerLibrary.GetValueOrDefault(atLimit.Id), "file")} of its own " +
-                    $"{(runningPerLibrary.GetValueOrDefault(atLimit.Id) == 1 ? "is" : "are")} running. Change that in the library's own settings.");
+                    $"{(runningPerLibrary.GetValueOrDefault(atLimit.Id) == 1 ? "is" : "are")} running. Change that in the workflow's own settings.");
             }
 
             var closed = held.FirstOrDefault();
             return Result(
                 LibraryClosed,
                 closed is null
-                    ? $"{files} {verb} waiting for a library that is switched off or outside its schedule."
+                    ? $"{files} {verb} waiting for a workflow that is switched off or outside its schedule."
                     : closed.Enabled
                         ? $"{files} {verb} waiting for {closed.Name}'s schedule to open."
                         : $"{files} {verb} waiting because {closed.Name} is switched off.");

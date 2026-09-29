@@ -121,13 +121,13 @@ public sealed class JobsStartupRecoveryService : IHostedService
                 await uow.CommitAsync().ConfigureAwait(false);
                 if (given > 0)
                 {
-                    _logger.LogInformation("Gave {Count} libraries the profile they were already using.", given);
+                    _logger.LogInformation("Gave {Count} workflows the profile they were already using.", given);
                 }
             }
         }
         catch (Exception exception) when (exception is SqliteException or InvalidOperationException)
         {
-            _logger.LogWarning(exception, "Could not give every library a profile; this is tried again at the next start.");
+            _logger.LogWarning(exception, "Could not give every workflow a profile; this is tried again at the next start.");
         }
     }
 
@@ -155,7 +155,7 @@ public sealed class JobsStartupRecoveryService : IHostedService
                         catch (ProcessingLibraryException exception)
                         {
                             _logger.LogWarning(
-                                "Library {LibraryName}'s {Label} folder no longer meets Weir's folder rules: {Reason} It keeps working until the library is next saved.",
+                                "Workflow {LibraryName}'s {Label} folder no longer meets Weir's folder rules: {Reason} It keeps working until the workflow is next saved.",
                                 library.Name,
                                 label,
                                 exception.Message);
@@ -166,7 +166,7 @@ public sealed class JobsStartupRecoveryService : IHostedService
         }
         catch (Exception exception) when (exception is SqliteException or InvalidOperationException)
         {
-            _logger.LogWarning(exception, "Could not check existing libraries against the folder rules; this is tried again at the next start.");
+            _logger.LogWarning(exception, "Could not check existing workflows against the folder rules; this is tried again at the next start.");
         }
     }
 

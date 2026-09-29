@@ -163,7 +163,7 @@ export function RulesPreviewPanel({
 
       <div className="mm-rules-preview__choices">
         <label className="mm-rules-preview__field">
-          <span className="mm-rules-preview__label">Library</span>
+          <span className="mm-rules-preview__label">Workflow</span>
           <select
             className={mmSelectFieldClass}
             value={libraryId}
@@ -192,7 +192,7 @@ export function RulesPreviewPanel({
             }
           >
             <option value="library">
-              Inside the library&apos;s watched or output folder
+              Inside the workflow&apos;s watched or output folder
             </option>
             <option value="anywhere">Anywhere on this machine</option>
           </select>

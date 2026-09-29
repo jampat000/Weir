@@ -467,13 +467,13 @@ public sealed class RemuxPassPathsTests : IDisposable
         var output = Directory.CreateDirectory(_root.Join("output")).FullName;
 
         Assert.Contains("has no watched folder set", RemuxPassPaths.RuntimeForLibrary(Library(string.Empty, output), _root.Path).Problem, StringComparison.Ordinal);
-        Assert.Equal("The Movies library's watched folder must be an existing directory.", RemuxPassPaths.RuntimeForLibrary(Library(_root.Join("gone"), output), _root.Path).Problem);
+        Assert.Equal("The Movies workflow's watched folder must be an existing directory.", RemuxPassPaths.RuntimeForLibrary(Library(_root.Join("gone"), output), _root.Path).Problem);
         Assert.Contains("has no output folder set", RemuxPassPaths.RuntimeForLibrary(Library(watched, string.Empty), _root.Path).Problem, StringComparison.Ordinal);
         Assert.Equal(
             "The watched folder and output folder must be separate (no overlap or containment).",
             RemuxPassPaths.RuntimeForLibrary(Library(watched, watched), _root.Path).Problem);
         Assert.Equal(
-            "The Movies library's work/temp folder must be an existing directory when set to a custom path.",
+            "The Movies workflow's work/temp folder must be an existing directory when set to a custom path.",
             RemuxPassPaths.RuntimeForLibrary(Library(watched, output, _root.Join("work-gone")), _root.Path).Problem);
 
         var (runtime, problem) = RemuxPassPaths.RuntimeForLibrary(Library(watched, output), _root.Path);

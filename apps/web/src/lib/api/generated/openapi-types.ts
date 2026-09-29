@@ -7474,6 +7474,27 @@ export interface components {
       local_path: string;
     };
     /**
+     * ManagerSourceFactsOut
+     * @description What a media manager calls the places a workflow's files come from and go to, in its own words.
+     */
+    ManagerSourceFactsOut: {
+      /**
+       * Source Category
+       * @description The category the manager files this media type's downloads under in its download client.
+       */
+      source_category: string | null;
+      /**
+       * Manager Library
+       * @description Deluno: its library that imports the cleaned file.
+       */
+      manager_library: string | null;
+      /**
+       * Root Folder
+       * @description Sonarr and Radarr: the root folder the cleaned file is imported into.
+       */
+      root_folder: string | null;
+    };
+    /**
      * ManagerSetupItemOut
      * @description One connection's setup: what it needs and whether it has it.
      */
@@ -7501,6 +7522,8 @@ export interface components {
       lines: components["schemas"]["ManagerSetupLineOut"][];
       /** @description Sonarr and Radarr only. */
       mapping?: components["schemas"]["ManagerSetupMappingOut"] | null;
+      /** @description What the manager calls where this workflow's files come from and go to. Any of it is null when the manager did not report it. */
+      story?: components["schemas"]["ManagerSourceFactsOut"];
       /**
        * Suggested Watched Folder
        * @description Deluno: where this media type's downloads arrive, as Deluno reports it. Sonarr/Radarr: the first enabled download client's own directory, when one is set.
@@ -10591,6 +10614,8 @@ export interface operations {
         watched_folder?: string;
         output_folder?: string;
         remove_original_after_success?: boolean;
+        /** @description The media managers the workflow is linked to; only these are checked. Leave it out to check every manager that covers the media type; send it empty for a Weir-only workflow. */
+        connection_ids?: number[];
       };
       header?: never;
       path?: never;

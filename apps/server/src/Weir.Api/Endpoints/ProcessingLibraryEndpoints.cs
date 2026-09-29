@@ -132,6 +132,21 @@ internal sealed class ProcessingLibraryEndpointHandlers
     }
 
     /// <summary>
+    /// The connections a workflow is linked to, from the repeated <c>connection_ids</c> query parameter; null when it is
+    /// absent (every connection that covers the media type), an empty set when it is present but names none.
+    /// </summary>
+    private static HashSet<long>? LinkedConnectionIds(ApiRequest request)
+    {
+        var raw = request.Context.Request.Query["connection_ids"];
+        if (raw.Count == 0)
+        {
+            return null;
+        }
+
+        return [.. raw.Select(value => long.TryParse(value, out var id) ? id : (long?)null).OfType<long>()];
+    }
+
+    /// <summary>
     /// <c>GET /api/v1/processing/manager-setup</c>: for a library's media type and folders (saved or still being typed),
     /// what each enabled Sonarr, Radarr or Deluno connection needs, and whether it already has it — the remote path
     /// mapping Sonarr/Radarr must hold, or the folders Deluno reports. Read only: Weir never writes a manager's settings.
@@ -161,11 +176,12 @@ internal sealed class ProcessingLibraryEndpointHandlers
             }
         }
 
+        var linkedConnectionIds = LinkedConnectionIds(request);
         issues.ThrowIfAny();
 
         var uow = await request.DbAsync().ConfigureAwait(false);
         var managers = await _managerSetupCheck
-            .CheckAsync(uow, mediaType, watchedFolder, outputFolder, removesOriginals, request.Context.RequestAborted)
+            .CheckAsync(uow, mediaType, watchedFolder, outputFolder, linkedConnectionIds, removesOriginals, request.Context.RequestAborted)
             .ConfigureAwait(false);
         return ApiRoutes.Ok(new WireObject().Set("media_type", mediaType).Set("managers", new WireArray(managers.Select(item => (WireValue)item))));
     }

@@ -11,6 +11,7 @@ import { errorMessage } from "../../../../lib/api/error-message";
 import type { MediaManagerConnection } from "../../../../lib/media-managers/media-managers-api";
 import type { ProcessingLibrary } from "../../../../lib/processing/libraries-api";
 import type { ProcessingRuleSet } from "../../../../lib/processing/rule-sets-api";
+import type { WorkflowPath } from "../../../../lib/processing/workflow-story";
 import { useProcessingRejectSupportQuery } from "../../../../lib/processing/libraries-queries";
 import { mmActionButtonClass } from "../../../../lib/ui/mm-control-roles";
 import { SaveModelNote } from "../../save-model-note";
@@ -20,12 +21,18 @@ import { useLibraryCleaningDraft } from "./library-cleaning-draft";
 import { LibraryCleaningSettings } from "./library-cleaning-settings";
 import { LibraryFolderChain } from "./library-folder-chain";
 import { LibraryFoldersGroup } from "./library-folders-group";
-import { sameLibraryForm, type LibraryForm } from "./library-form";
+import {
+  linkedConnectionIds,
+  sameLibraryForm,
+  type LibraryForm,
+} from "./library-form";
 import { LibraryHardwareFold } from "./library-hardware-fold";
 import {
   LibraryIntakeGroup,
   LibraryReadinessGroup,
 } from "./library-intake-groups";
+import { LibraryDownloadClientSuggestions } from "./library-download-client-suggestions";
+import { LibraryLinkSection } from "./library-link-section";
 import { LibraryManagerSetup } from "./library-manager-setup";
 import {
   LibraryCapacityGroup,
@@ -80,8 +87,14 @@ export function LibraryEditor({
     },
     onSuccess: onClose,
   });
+  const linkedIds = linkedConnectionIds(form, library);
+  const workflowPath: WorkflowPath = {
+    watched: form.watched_folder.trim(),
+    work: form.work_folder.trim(),
+    output: form.output_folder.trim(),
+  };
   const dirty = !sameLibraryForm(form, initial) || cleaning.dirty;
-  const thing = library ? library.name : "the new library";
+  const thing = library ? library.name : "the new workflow";
   useUnsavedChanges(dirty ? thing : null);
   const { confirmLeave, dialog } = useLeaveConfirmation();
   const close = () => confirmLeave(dirty ? thing : null, onClose);
@@ -95,36 +108,54 @@ export function LibraryEditor({
     <>
       <SidePanel
         open
-        title={library ? "Edit library" : "Add library"}
-        eyebrow="Settings · Libraries"
+        title={library ? "Edit workflow" : "Add workflow"}
+        eyebrow="Settings · Workflows"
         subtitle={
           library
             ? "Changes take effect on the next scan; nothing already running is disturbed."
-            : "A library is a watched folder, a work area and an output folder."
+            : "A workflow is a watched folder, a work area and an output folder."
         }
         onClose={close}
         dataTestId="processing-library-form"
       >
         <div className="mm-quiet-stack">
           <SaveModelNote model="explicit" />
-          <LibraryFoldersGroup
-            binding={binding}
-            ruleSets={ruleSets}
+          <LibraryFoldersGroup binding={binding} ruleSets={ruleSets} />
+          <LibraryLinkSection
+            linkedIds={linkedIds}
+            path={workflowPath}
             connections={connections}
+            editable={editable}
+            onLink={(connectionId) =>
+              binding.update({ manager_connection_id: String(connectionId) })
+            }
+            onUnlink={() => binding.update({ manager_connection_id: "" })}
           />
-          <LibraryManagerSetup
+          <LibraryDownloadClientSuggestions
             mediaType={form.media_type}
             watchedFolder={form.watched_folder}
-            outputFolder={form.output_folder}
-            removeOriginal={form.remove_original_after_success}
             editable={editable}
-            onUseFolders={(watched, output) =>
-              binding.update({
-                watched_folder: watched ?? form.watched_folder,
-                output_folder: output ?? form.output_folder,
-              })
+            onUseFolder={(watched) =>
+              binding.update({ watched_folder: watched })
             }
           />
+          {linkedIds.length > 0 ? (
+            <LibraryManagerSetup
+              mediaType={form.media_type}
+              watchedFolder={form.watched_folder}
+              outputFolder={form.output_folder}
+              workFolder={form.work_folder}
+              removeOriginal={form.remove_original_after_success}
+              linkedConnectionIds={linkedIds}
+              editable={editable}
+              onUseFolders={(watched, output) =>
+                binding.update({
+                  watched_folder: watched ?? form.watched_folder,
+                  output_folder: output ?? form.output_folder,
+                })
+              }
+            />
+          ) : null}
           <LibraryFolderChain
             libraryId={library?.id}
             watchedFolder={form.watched_folder}
@@ -149,13 +180,13 @@ export function LibraryEditor({
               />
             ) : (
               <p className="mm-quiet-note">
-                Save the library first, then add the folders its existing files
+                Save the workflow first, then add the folders its existing files
                 sit in.
               </p>
             )}
           </QuietFieldGroup>
           {/* The hours are drawn in Settings › Schedule beside every other library's week, so the two never disagree. */}
-          <QuietFieldGroup title="When this library may run">
+          <QuietFieldGroup title="When this workflow may run">
             <p className="mm-quiet-note" data-testid="processing-library-hours">
               {runHoursText(library)}
               <Link className="mm-schedule-link" to="/settings?tab=schedule">
@@ -169,7 +200,7 @@ export function LibraryEditor({
               role="alert"
               data-testid="processing-library-save-error"
             >
-              {errorMessage(saveAll.error, "That library could not be saved.")}
+              {errorMessage(saveAll.error, "That workflow could not be saved.")}
             </p>
           ) : null}
           <div className={quietActionRowClass}>

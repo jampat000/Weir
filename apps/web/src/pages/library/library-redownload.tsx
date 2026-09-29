@@ -75,8 +75,8 @@ export function LibraryRedownload({
       {title ? (
         <p className="mm-drawer__note">
           A past clean removed {missingTracks(title)} from this file, and this
-          library’s rules would keep {them} now. The only way to get {them} back
-          is to download the title again.
+          workflow’s rules would keep {them} now. The only way to get {them}{" "}
+          back is to download the title again.
         </p>
       ) : null}
       {title?.can_redownload && !asked ? (

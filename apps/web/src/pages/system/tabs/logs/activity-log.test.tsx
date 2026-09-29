@@ -176,13 +176,13 @@ describe("ActivityLog", () => {
     ).toBeGreaterThan(0);
   });
 
-  it("asks only for Weir's own events, with no library or file filter", () => {
+  it("asks only for Weir's own events, with no workflow or file filter", () => {
     mocks.useActivityRecentQuery.mockReturnValue(recentResult([]));
 
     renderLog();
 
     expect(lastQueryFilters()).toMatchObject({ about: "weir" });
-    expect(screen.queryByDisplayValue("All libraries")).not.toBeInTheDocument();
+    expect(screen.queryByDisplayValue("All workflows")).not.toBeInTheDocument();
     expect(
       screen.queryByPlaceholderText("Part of a file path"),
     ).not.toBeInTheDocument();

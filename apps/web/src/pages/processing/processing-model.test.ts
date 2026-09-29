@@ -187,7 +187,7 @@ describe("buildLanes", () => {
         file({
           id: 2,
           status: "out_of_schedule",
-          status_reason: "Outside the TV library's hours. It starts at 01:00.",
+          status_reason: "Outside the TV workflow's hours. It starts at 01:00.",
         }),
       ],
       [],
@@ -195,7 +195,7 @@ describe("buildLanes", () => {
       AGES,
     );
     expect(lanes.waiting.map((item) => item.key)).toEqual(["file-1", "file-2"]);
-    expect(lanes.waiting[1].note).toBe("Outside the TV library's hours.");
+    expect(lanes.waiting[1].note).toBe("Outside the TV workflow's hours.");
   });
 
   it("splits running files into Working and Handing back by the pass's own status", () => {
@@ -632,7 +632,7 @@ describe("an arriving file's ring", () => {
     expect(ringState(null)).toBe("unknown");
   });
 
-  it("counts a wait with no clock of its own down to Weir's next look at the library", () => {
+  it("counts a wait with no clock of its own down to Weir's next look at the workflow", () => {
     const at = Date.parse("2026-08-18T10:03:12Z");
     const lanes = buildLanes(
       [

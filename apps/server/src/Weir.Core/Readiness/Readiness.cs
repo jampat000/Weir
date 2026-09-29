@@ -47,7 +47,7 @@ public static class ReadinessBuilder
 {
     /// <summary>What the watcher reports when no library is being watched.</summary>
     public static readonly (bool Ok, string Detail) NoWatchedLibraries =
-        (true, "No libraries are being watched for filesystem events.");
+        (true, "No workflows are being watched for filesystem events.");
 
     public static ReadinessReport Build(ReadinessInputs inputs, string version)
     {

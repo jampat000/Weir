@@ -66,7 +66,7 @@ public static class LibraryFolderChainRules
         var missingCount = (watchedMissing ? 1 : 0) + (workMissing ? 1 : 0) + (outputMissing ? 1 : 0);
         if (missingCount > 1)
         {
-            return "Set this library's watched, work and output folders so Weir can check its folder chain.";
+            return "Set this workflow's watched, work and output folders so Weir can check its folder chain.";
         }
 
         if (watchedMissing)
@@ -83,24 +83,24 @@ public static class LibraryFolderChainRules
     {
         if (!probe.Exists(folder))
         {
-            return new SetupCheckLine(SetupCheckLine.Problem, $"The {label} folder {folder} does not exist. Create it, or point this library at a folder that does.");
+            return new SetupCheckLine(SetupCheckLine.Problem, $"The {label} folder {folder} does not exist. Create it, or point this workflow at a folder that does.");
         }
 
         return probe.CanRead(folder)
             ? new SetupCheckLine(SetupCheckLine.Ok, $"Weir can read the {label} folder {folder}.")
-            : new SetupCheckLine(SetupCheckLine.Problem, $"Weir cannot read the {label} folder {folder}. Check its permissions, or point this library at a folder Weir can read.");
+            : new SetupCheckLine(SetupCheckLine.Problem, $"Weir cannot read the {label} folder {folder}. Check its permissions, or point this workflow at a folder Weir can read.");
     }
 
     private static SetupCheckLine FolderWriteLine(string label, string folder, IFolderProbe probe)
     {
         if (!probe.Exists(folder))
         {
-            return new SetupCheckLine(SetupCheckLine.Problem, $"The {label} folder {folder} does not exist. Create it, or point this library at a folder that does.");
+            return new SetupCheckLine(SetupCheckLine.Problem, $"The {label} folder {folder} does not exist. Create it, or point this workflow at a folder that does.");
         }
 
         return probe.CanWrite(folder)
             ? new SetupCheckLine(SetupCheckLine.Ok, $"Weir can write to the {label} folder {folder}.")
-            : new SetupCheckLine(SetupCheckLine.Problem, $"Weir cannot write to the {label} folder {folder}. Check its permissions, or point this library at a folder Weir can write to.");
+            : new SetupCheckLine(SetupCheckLine.Problem, $"Weir cannot write to the {label} folder {folder}. Check its permissions, or point this workflow at a folder Weir can write to.");
     }
 
     /// <summary>
@@ -115,8 +115,8 @@ public static class LibraryFolderChainRules
         }
 
         return workFolderIsDefault
-            ? new SetupCheckLine(SetupCheckLine.Note, $"Weir will create the work folder {work} the first time it processes a file for this library.")
-            : new SetupCheckLine(SetupCheckLine.Problem, $"The work folder {work} does not exist. Create it, or point this library's work folder at one that does.");
+            ? new SetupCheckLine(SetupCheckLine.Note, $"Weir will create the work folder {work} the first time it processes a file for this workflow.")
+            : new SetupCheckLine(SetupCheckLine.Problem, $"The work folder {work} does not exist. Create it, or point this workflow's work folder at one that does.");
     }
 
     /// <summary>
@@ -133,7 +133,7 @@ public static class LibraryFolderChainRules
         var watched = new ArrOsPath((watchedFolder ?? string.Empty).Trim());
         if (!watched.IsRooted)
         {
-            return [new SetupCheckLine(SetupCheckLine.Unverified, $"Set this library's watched folder to check it against {clientLabel}.")];
+            return [new SetupCheckLine(SetupCheckLine.Unverified, $"Set this workflow's watched folder to check it against {clientLabel}.")];
         }
 
         var saveFolders = SaveFolders(folders);
@@ -150,13 +150,13 @@ public static class LibraryFolderChainRules
             var actual = string.Join("; ", saveFolders.Select(saveFolder => $"{saveFolder.Name} {saveFolder.Folder}"));
             return [new SetupCheckLine(
                 SetupCheckLine.Problem,
-                $"{clientLabel} saves to: {actual}. None of that is inside this library's watched folder {watched}, so Weir would never see the downloads. " +
-                "Point the client's folder at it, or use the suggested folder in the library editor.")];
+                $"{clientLabel} saves to: {actual}. None of that is inside this workflow's watched folder {watched}, so Weir would never see the downloads. " +
+                "Point the client's folder at it, or use the suggested folder in the workflow editor.")];
         }
 
         return [.. saveFolders.Select((saveFolder, index) => isInside[index]
-            ? new SetupCheckLine(SetupCheckLine.Ok, $"{clientLabel}'s {saveFolder.Name} is {saveFolder.Folder}, inside this library's watched folder.")
-            : new SetupCheckLine(SetupCheckLine.Note, $"{clientLabel}'s {saveFolder.Name} is {saveFolder.Folder}, outside this library's watched folder. That is fine when it belongs to another library."))];
+            ? new SetupCheckLine(SetupCheckLine.Ok, $"{clientLabel}'s {saveFolder.Name} is {saveFolder.Folder}, inside this workflow's watched folder.")
+            : new SetupCheckLine(SetupCheckLine.Note, $"{clientLabel}'s {saveFolder.Name} is {saveFolder.Folder}, outside this workflow's watched folder. That is fine when it belongs to another workflow."))];
     }
 
     /// <summary>The client's default folder, then each category's own.</summary>

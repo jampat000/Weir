@@ -20,7 +20,7 @@ public sealed class ManagerSetupRulesDelunoTests
         Assert.Equal(
             [
                 "TV's downloads arrive in /media/downloads/complete/tv, which is not inside the watched folder, so Weir would refuse its hand-offs. Use Deluno's folders.",
-                "Deluno picks up cleaned files from /media/downloads/weir/tv, but this library writes to /elsewhere. Unless both are the same folder seen from two machines, use the same folder.",
+                "Deluno picks up cleaned files from /media/downloads/weir/tv, but this workflow writes to /elsewhere. Unless both are the same folder seen from two machines, use the same folder.",
             ],
             wrong.Lines.Select(line => line.Text));
     }
@@ -43,7 +43,7 @@ public sealed class ManagerSetupRulesDelunoTests
             "Deluno", MediaManagerKinds.Tv, "/media/downloads/complete", "/media/downloads/weir/tv", [RefiningTv with { DownloadsPath = null }]);
 
         Assert.Equal(
-            "Deluno does not say where TV's downloads arrive, so Weir cannot verify that its hand-offs sit inside this library's watched folder.",
+            "Deluno does not say where TV's downloads arrive, so Weir cannot verify that its hand-offs sit inside this workflow's watched folder.",
             Assert.Single(result.Lines, line => line.State == SetupCheckLine.Unverified).Text);
     }
 
@@ -62,11 +62,11 @@ public sealed class ManagerSetupRulesDelunoTests
 
         Assert.Equal(
             [
-                "Deluno's Transmission files this library's downloads under the category \"deluno-tv\", but Deluno does not publish where it saves them. Weir cannot verify they land inside the watched folder.",
-                "Deluno's qBittorrent files this library's downloads under the category \"deluno-tv\", but Deluno does not publish where it saves them. Weir cannot verify they land inside the watched folder.",
+                "Deluno's Transmission files this workflow's downloads under the category \"deluno-tv\", but Deluno does not publish where it saves them. Weir cannot verify they land inside the watched folder.",
+                "Deluno's qBittorrent files this workflow's downloads under the category \"deluno-tv\", but Deluno does not publish where it saves them. Weir cannot verify they land inside the watched folder.",
             ],
-            result.Lines.Where(line => line.Text.Contains("files this library's downloads", StringComparison.Ordinal)).Select(line => line.Text));
-        Assert.DoesNotContain(result.Lines, line => line.State == SetupCheckLine.Ok && line.Text.Contains("files this library's downloads", StringComparison.Ordinal));
+            result.Lines.Where(line => line.Text.Contains("files this workflow's downloads", StringComparison.Ordinal)).Select(line => line.Text));
+        Assert.DoesNotContain(result.Lines, line => line.State == SetupCheckLine.Ok && line.Text.Contains("files this workflow's downloads", StringComparison.Ordinal));
     }
 
     [Fact]

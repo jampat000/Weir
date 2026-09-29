@@ -253,7 +253,7 @@ public static class LibraryFolderRules
             if (otherNormalized is not null && LibraryRules.FoldersOverlap(normalized, otherNormalized))
             {
                 throw new LibraryModeException(
-                    $"{subject} '{folder}' overlaps this library's {otherLabel} folder. Library folders must be separate from the folders the download pipeline uses.");
+                    $"{subject} '{folder}' overlaps this workflow's {otherLabel} folder. Library folders must be separate from the folders the download pipeline uses.");
             }
         }
     }

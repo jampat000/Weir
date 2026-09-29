@@ -177,15 +177,15 @@ public static class RemuxPassPaths
         if (watchedRaw.Length == 0)
         {
             return (null,
-                $"The {label} library has no watched folder set. " +
+                $"The {label} workflow has no watched folder set. " +
                 "Manual remux and folder-scan jobs need a watched folder to resolve relative paths. " +
-                "Set it on Processing → Libraries before enqueueing or running those jobs.");
+                "Set it in Settings › Workflows before enqueueing or running those jobs.");
         }
 
         var watched = Resolve(watchedRaw);
         if (!Directory.Exists(watched))
         {
-            return (null, $"The {label} library's watched folder must be an existing directory.");
+            return (null, $"The {label} workflow's watched folder must be an existing directory.");
         }
 
         var (workRaw, workIsDefault) = EffectiveWorkFolder(library, weirHome);
@@ -194,14 +194,14 @@ public static class RemuxPassPaths
         if (outputRaw.Length == 0)
         {
             return (null,
-                $"The {label} library has no output folder set. " +
-                "Set it on Processing → Libraries before running a live remux pass.");
+                $"The {label} workflow has no output folder set. " +
+                "Set it in Settings › Workflows before running a live remux pass.");
         }
 
         var output = Resolve(outputRaw);
         if (!Directory.Exists(output))
         {
-            return (null, $"The {label} library's output folder must be an existing directory.");
+            return (null, $"The {label} workflow's output folder must be an existing directory.");
         }
 
         if (SameOrNested(work, output))
@@ -221,7 +221,7 @@ public static class RemuxPassPaths
 
         if (!workIsDefault && !Directory.Exists(work))
         {
-            return (null, $"The {label} library's work/temp folder must be an existing directory when set to a custom path.");
+            return (null, $"The {label} workflow's work/temp folder must be an existing directory when set to a custom path.");
         }
 
         return (new ProcessingPathRuntime
@@ -300,7 +300,7 @@ public static class RemuxPassPaths
     {
         if (!string.Equals(WireStrings.Strip(action ?? "leave"), "delete_file", StringComparison.OrdinalIgnoreCase))
         {
-            return new RejectedFileCleanupResult(false, "Weir left the rejected file in place because this library's cleanup action is Leave in place.");
+            return new RejectedFileCleanupResult(false, "Weir left the rejected file in place because this workflow's cleanup action is Leave in place.");
         }
 
         string root;
@@ -367,6 +367,6 @@ public static class RemuxPassPaths
             parent = Path.GetDirectoryName(parent);
         }
 
-        return new RejectedFileCleanupResult(true, "Weir deleted the rejected file because this library's cleanup action is Delete rejected file.");
+        return new RejectedFileCleanupResult(true, "Weir deleted the rejected file because this workflow's cleanup action is Delete rejected file.");
     }
 }

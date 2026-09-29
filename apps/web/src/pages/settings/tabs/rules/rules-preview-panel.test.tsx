@@ -128,7 +128,7 @@ it("stays collapsed until the operator opens it", () => {
   expect(
     screen.getByRole("button", { name: "Try on a file" }),
   ).toBeInTheDocument();
-  expect(screen.queryByLabelText("Library")).not.toBeInTheDocument();
+  expect(screen.queryByLabelText("Workflow")).not.toBeInTheDocument();
 });
 
 it("previews a file and renders the per-track plan, notes, and estimate", async () => {
@@ -171,7 +171,7 @@ it("shows the server's error message when the preview is refused", async () => {
   stubLibraries();
   vi.spyOn(rulesPreviewApi, "previewProcessingRules").mockRejectedValue(
     new Error(
-      "That path is not an existing file inside this library's watched or output folder.",
+      "That path is not an existing file inside this workflow's watched or output folder.",
     ),
   );
 
@@ -185,7 +185,7 @@ it("shows the server's error message when the preview is refused", async () => {
 
   expect(
     await screen.findByText(
-      "That path is not an existing file inside this library's watched or output folder.",
+      "That path is not an existing file inside this workflow's watched or output folder.",
     ),
   ).toBeInTheDocument();
 });

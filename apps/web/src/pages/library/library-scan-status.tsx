@@ -27,7 +27,7 @@ export function LibraryScanStatus({
       {scan?.running ? (
         <>
           <i className="mm-live-pulse" aria-hidden="true" />
-          <span>Checking this library now</span>
+          <span>Checking this workflow now</span>
         </>
       ) : (
         <>

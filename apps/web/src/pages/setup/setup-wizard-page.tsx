@@ -171,8 +171,8 @@ function WizardForm({
           <div className="mm-quiet-stack mt-5">
             <WizardSection
               headingId="setup-wizard-libraries-heading"
-              title="Downloads and libraries"
-              description="Weir connects to whatever delivers your downloads, then starts your libraries from the folders it reports. Nothing is created until you finish."
+              title="Downloads and workflows"
+              description="Weir connects to whatever delivers your downloads, then starts your workflows from the folders it reports. Nothing is created until you finish."
             >
               <WizardDownloadsSection
                 source={source}

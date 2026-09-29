@@ -108,7 +108,7 @@ public sealed class LibraryScanHandler : IJobHandler
             library = libraryId > 0 ? await _libraries.GetAsync(uow, libraryId).ConfigureAwait(false) : null;
             if (library is null)
             {
-                await _scans.RecordResultAsync(uow, context.Id, new LibraryScanOutcome(_time.GetUtcNow(), []), false, "This library no longer exists.")
+                await _scans.RecordResultAsync(uow, context.Id, new LibraryScanOutcome(_time.GetUtcNow(), []), false, "This workflow no longer exists.")
                     .ConfigureAwait(false);
                 await uow.CommitAsync().ConfigureAwait(false);
                 await LibraryFileIndexWriter.ReplaceAsync(_database, libraryId, [], cancellationToken).ConfigureAwait(false);
@@ -120,7 +120,7 @@ public sealed class LibraryScanHandler : IJobHandler
             {
                 await _scans.RecordResultAsync(
                         uow, context.Id, new LibraryScanOutcome(_time.GetUtcNow(), []), false,
-                        "No library folders are configured for this library yet. Add one in Library settings, then scan again.")
+                        "No library folders are configured for this workflow yet. Add one in Library settings, then scan again.")
                     .ConfigureAwait(false);
                 await uow.CommitAsync().ConfigureAwait(false);
                 await LibraryFileIndexWriter.ReplaceAsync(_database, libraryId, [], cancellationToken).ConfigureAwait(false);

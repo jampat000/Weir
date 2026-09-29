@@ -208,7 +208,7 @@ public sealed class FailureClassesTests
         var decision = RetryPolicy.DecideForRecordedFailure(Library(maxAttempts: 2), "execution", 1, "preflight", Now);
 
         Assert.False(decision.WillRetry);
-        Assert.Contains("tried this file 2 times and stopped, because the Movies library allows 2", decision.Reason, StringComparison.Ordinal);
+        Assert.Contains("tried this file 2 times and stopped, because the Movies workflow allows 2", decision.Reason, StringComparison.Ordinal);
     }
 
     [Fact]

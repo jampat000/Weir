@@ -234,7 +234,7 @@ export function ProcessSettingsSection() {
           >
             <SettingRow
               label="Wait after a file last changes"
-              hint="Every library uses this unless it sets its own."
+              hint="Every workflow uses this unless it sets its own."
               htmlFor={`${ids}-age`}
             >
               <NumberWithUnit
@@ -248,7 +248,7 @@ export function ProcessSettingsSection() {
             </SettingRow>
             <SettingRow
               label="Skip files smaller than"
-              hint="Samples and extras. Every library uses this unless it sets its own."
+              hint="Samples and extras. Every workflow uses this unless it sets its own."
               htmlFor={`${ids}-size`}
             >
               <NumberWithUnit

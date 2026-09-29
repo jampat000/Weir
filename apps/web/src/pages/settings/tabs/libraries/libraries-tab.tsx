@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 
 import { PageLoading } from "../../../../components/shared/page-loading";
 import { errorMessage } from "../../../../lib/api/error-message";
@@ -16,6 +16,7 @@ import {
 } from "../../../../lib/processing/libraries-queries";
 import { SaveModelNote } from "../../save-model-note";
 import { SettingsLoadError } from "../../settings-load-error";
+import { AddWorkflowChoice, type WorkflowStart } from "./add-workflow-choice";
 import { LibraryEditor } from "./library-editor";
 import {
   EMPTY_LIBRARY_FORM,
@@ -26,11 +27,21 @@ import {
 import { LibraryImportSection } from "./library-import-section";
 import { LibraryListSection } from "./library-list-section";
 import { RemoveLibraryDialog } from "./remove-library-dialog";
+import {
+  useWorkflowDeepLinks,
+  type WorkflowDeepLink,
+} from "./use-workflow-deep-links";
 
 type Editing =
   | { kind: "closed" }
-  | { kind: "adding" }
-  | { kind: "editing"; library: ProcessingLibrary };
+  | { kind: "choosing"; fromConnectionId?: number }
+  | { kind: "adding"; preset: Partial<LibraryForm> }
+  | {
+      kind: "editing";
+      library: ProcessingLibrary;
+      /** Values a suggestion fills in over the saved ones. */
+      preset?: Partial<LibraryForm>;
+    };
 
 /**
  * Settings › Libraries: add, edit, reorder, switch on and off, and remove the libraries Weir
@@ -51,9 +62,23 @@ export function LibrariesTab() {
   const [editing, setEditing] = useState<Editing>({ kind: "closed" });
   const [removing, setRemoving] = useState<ProcessingLibrary | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const openDeepLink = useCallback(
+    (link: WorkflowDeepLink) =>
+      setEditing(
+        link.kind === "add-from"
+          ? { kind: "choosing", fromConnectionId: link.connectionId }
+          : { kind: "editing", library: link.library },
+      ),
+    [],
+  );
+  useWorkflowDeepLinks({
+    libraries: libraries.data,
+    connectionsLoaded: connections.data !== undefined,
+    onOpen: openDeepLink,
+  });
 
-  if (libraries.isPending) return <PageLoading label="Loading libraries" />;
-  if (libraries.isError) return <SettingsLoadError what="libraries" />;
+  if (libraries.isPending) return <PageLoading label="Loading workflows" />;
+  if (libraries.isError) return <SettingsLoadError what="workflows" />;
 
   const rows = [...libraries.data].sort(
     (a, b) => a.display_order - b.display_order,
@@ -82,7 +107,7 @@ export function LibrariesTab() {
     [swapped[index], swapped[target]] = [swapped[target], swapped[index]];
     attempt(
       reorder.mutateAsync(swapped.map((r) => r.id)),
-      "Libraries could not be reordered.",
+      "Workflows could not be reordered.",
     );
   };
 
@@ -106,7 +131,7 @@ export function LibrariesTab() {
         editable={editable}
         onAdd={() => {
           setNotice(null);
-          setEditing({ kind: "adding" });
+          setEditing({ kind: "choosing" });
         }}
         actions={{
           onToggle: (library) =>
@@ -118,7 +143,7 @@ export function LibrariesTab() {
                   enabled: !library.enabled,
                 },
               }),
-              "That library could not be changed.",
+              "That workflow could not be changed.",
             ),
           onMove: move,
           onEdit: (library) => {
@@ -131,10 +156,10 @@ export function LibrariesTab() {
                 .mutateAsync(library.id)
                 .then(() =>
                   setNotice(
-                    `${library.name} is now a manual library. Its folders and settings were not changed.`,
+                    `${library.name} is now a Weir-only workflow. Its folders and settings were not changed.`,
                   ),
                 ),
-              "That library could not be unlinked.",
+              "That workflow could not be unlinked.",
             ),
           onRemove: (library) => {
             remove.reset();
@@ -144,18 +169,38 @@ export function LibrariesTab() {
         }}
       />
 
+      {editing.kind === "choosing" ? (
+        <AddWorkflowChoice
+          connections={managers}
+          workflows={rows}
+          initialConnectionId={editing.fromConnectionId}
+          onCancel={() => setEditing({ kind: "closed" })}
+          onStart={(start: WorkflowStart) =>
+            setEditing(
+              start.fills
+                ? {
+                    kind: "editing",
+                    library: start.fills,
+                    preset: start.preset,
+                  }
+                : { kind: "adding", preset: start.preset },
+            )
+          }
+        />
+      ) : null}
+
       {editable && managers.length > 0 ? (
         <LibraryImportSection connections={managers} onNotice={setNotice} />
       ) : null}
 
-      {editing.kind !== "closed" ? (
+      {editing.kind === "adding" || editing.kind === "editing" ? (
         <LibraryEditor
           key={editing.kind === "editing" ? editing.library.id : "new"}
           library={editing.kind === "editing" ? editing.library : undefined}
           initial={
             editing.kind === "editing"
-              ? formFrom(editing.library)
-              : EMPTY_LIBRARY_FORM
+              ? { ...formFrom(editing.library), ...editing.preset }
+              : { ...EMPTY_LIBRARY_FORM, ...editing.preset }
           }
           editable={editable}
           ruleSets={ruleSets.data ?? []}

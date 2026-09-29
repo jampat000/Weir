@@ -81,7 +81,7 @@ export function headerLead(
   dailyClean: boolean,
 ): string {
   const when = dailyClean
-    ? "cleans what would change once a day, on this library’s schedule."
+    ? "cleans what would change once a day, on this workflow’s schedule."
     : "only changes one when you ask.";
   return totals
     ? `${totals.files.toLocaleString()} files, ${formatBytes(totals.size_bytes)} on your storage. Weir reads them where they are and ${when}`
@@ -99,7 +99,7 @@ export function nextScheduled(
 ): string | null {
   if (!schedule?.enabled) return null;
   if (!schedule.next_run_at) {
-    return "scheduled check and clean cannot run: no library folders, or a schedule window that never opens";
+    return "scheduled check and clean cannot run: no workflow folders, or a schedule window that never opens";
   }
   return parseAppDate(schedule.next_run_at).getTime() <= now
     ? "scheduled check and clean starting now"

@@ -1,4 +1,7 @@
 import { SetupCheckLines } from "../../components/shared/setup-check-lines";
+import { WorkflowKindBadge } from "../../components/shared/workflow-kind";
+import type { MediaManagerConnection } from "../../lib/media-managers/media-managers-api";
+import { workflowKindOf } from "../../lib/processing/workflow-kind";
 import type { ProposedLibraryCheck } from "../../lib/processing/library-setup-api";
 import { mmActionButtonClass } from "../../lib/ui/mm-control-roles";
 import type {
@@ -45,7 +48,7 @@ function FoundLibraryProblems({ row }: { row: SuggestedRow }) {
       <SetupCheckLines label={row.name} lines={lines} />
       <p className="text-xs text-mm-text3">
         You can finish setup now and sort these out afterwards in Settings ›
-        Libraries.
+        Workflows.
       </p>
     </div>
   );
@@ -53,10 +56,12 @@ function FoundLibraryProblems({ row }: { row: SuggestedRow }) {
 
 function FoundLibrary({
   row,
+  managers,
   disabled,
   onChange,
 }: {
   row: SuggestedRow;
+  managers: MediaManagerConnection[];
   disabled: boolean;
   onChange: Found["edit"];
 }) {
@@ -78,7 +83,15 @@ function FoundLibrary({
         />
         <span>
           {row.name}
-          <span className="ml-2 font-normal text-mm-text2">
+          <span className="ml-2">
+            <WorkflowKindBadge
+              kind={workflowKindOf(
+                { manager_connection_ids: row.managerConnectionIds },
+                managers,
+              )}
+            />
+          </span>
+          <span className="font-normal text-mm-text2">
             folders from {row.sourceLabel}
           </span>
         </span>
@@ -112,10 +125,13 @@ function FoundLibrary({
  */
 export function WizardFoundLibraries({
   found,
+  managers,
   disabled,
   onNeither,
 }: {
   found: Found;
+  /** The media managers connected in this setup, to name what each library is linked to. */
+  managers: MediaManagerConnection[];
   disabled: boolean;
   /** Gives up on connecting and goes to typing the folders. */
   onNeither: () => void;
@@ -152,7 +168,7 @@ export function WizardFoundLibraries({
       ))}
       {rows.length === 0 ? (
         <p className="mm-quiet-note">
-          Weir could not find a folder to start a library from.{" "}
+          Weir could not find a folder to start a workflow from.{" "}
           <button type="button" className="mm-quiet-link" onClick={onNeither}>
             Pick the folders yourself
           </button>
@@ -161,13 +177,14 @@ export function WizardFoundLibraries({
       ) : (
         <>
           <h3 className="text-sm font-semibold text-mm-text1">
-            Libraries Weir found
+            Workflows Weir found
           </h3>
           <div className="mm-wizard-libraries">
             {rows.map((row) => (
               <FoundLibrary
                 key={row.mediaType}
                 row={row}
+                managers={managers}
                 disabled={disabled}
                 onChange={found.edit}
               />
