@@ -4,7 +4,6 @@ using Weir.Core.Configuration;
 using Weir.Core.Jobs;
 using Weir.Core.Json;
 using Weir.Core.MediaManagers;
-using Weir.Core.Processing;
 using Weir.Core.Processing.RemuxPass;
 using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.MediaManagers;
@@ -162,6 +161,7 @@ public sealed partial class RemuxPassHandler : IJobHandler
             RelativeMediaPath = rel,
             LibraryId = claim.Library?.Id ?? libraryId,
             RulesConfig = claim.Rules,
+            RulesProfileName = claim.RulesProfileName,
             MinFileAgeSeconds = claim.Operator!.MinFileAgeSeconds,
             MinInputFileSizeMb = Math.Max(claim.Operator.ProcessingMinInputFileSizeMb, claim.Library?.MinFileSizeMb ?? 0),
             MinimumFreeDiskSpaceMb = claim.Operator.MinimumFreeDiskSpaceMb,
@@ -197,22 +197,7 @@ public sealed partial class RemuxPassHandler : IJobHandler
         result.Set("library_id", claim.Library?.Id ?? libraryId);
         if (result.Get("rejection_kind") is { IsTruthy: true } && claim.Library is { } library)
         {
-            var action = string.Equals(WireStrings.Strip(library.RejectedFileAction ?? string.Empty), "delete_file", StringComparison.OrdinalIgnoreCase)
-                         // Under reject, the reject job removes the download, and only after the manager accepts.
-                         && ProcessingFailurePolicies.Normalize(library.FailurePolicy) != ProcessingFailurePolicies.Reject
-                ? "delete_file"
-                : "leave";
-            result.Set("rejected_file_action", action);
-            if (action == "delete_file")
-            {
-                result.Set("rejected_cleanup_status", "pending");
-                result.Set("rejected_cleanup_detail", "This library is set to delete rejected files. Weir recorded the rejection and will now remove only this file.");
-            }
-            else
-            {
-                result.Set("rejected_cleanup_status", "left_in_place");
-                result.Set("rejected_cleanup_detail", "Weir left the rejected file in place because this library's cleanup action is Leave in place.");
-            }
+            ApplyRejectedFileAction(result, library, origin);
         }
 
         await SettleUnreadableSourceAsync(context.Id, data, origin, result, cancellationToken).ConfigureAwait(false);
@@ -220,7 +205,7 @@ public sealed partial class RemuxPassHandler : IJobHandler
         await ApplyFileOutcomeStateAsync(result, libraryId, mediaScope, origin).ConfigureAwait(false);
         await DeferUntilOldEnoughAsync(context.Id, data, origin, result, cancellationToken).ConfigureAwait(false);
         await RecordAsync(result, progress.ActivityId).ConfigureAwait(false);
-        await FinishRejectedInputCleanupAsync(result, libraryId, mediaScope).ConfigureAwait(false);
+        await FinishRejectedInputCleanupAsync(result, claim.Library, libraryId, mediaScope, origin).ConfigureAwait(false);
         await ReportBackAsync(payloadJson, result).ConfigureAwait(false);
         await DownloadedScanAsync(result, mediaScope, origin).ConfigureAwait(false);
     }

@@ -15,6 +15,10 @@ public sealed record RemuxPassRequest
     public long? LibraryId { get; init; }
 
     public ProcessingRulesConfig? RulesConfig { get; init; }
+
+    /// <summary>The name of the rules profile <see cref="RulesConfig"/> came from, so a rejection can say which rules decided.</summary>
+    public string? RulesProfileName { get; init; }
+
     public long? MinFileAgeSeconds { get; init; }
     public string? MediaScope { get; init; } = "movie";
     public long? CurrentJobId { get; init; }
