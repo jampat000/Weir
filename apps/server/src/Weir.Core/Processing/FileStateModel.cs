@@ -24,7 +24,8 @@ public static class ProcessingFileStatuses
     /// back unmodified rather than keep it (#465).</summary>
     public const string PassedThrough = "passed_through";
 
-    /// <summary>Terminal: under the opt-in <c>reject</c> policy, the manager accepted that the release is bad.</summary>
+    /// <summary>Terminal: the file was rejected, and stays put until a person decides. Under the opt-in <c>reject</c> policy the
+    /// manager accepted that the release is bad. With no manager involved, the rules themselves left nothing to keep.</summary>
     public const string Rejected = "rejected";
 
     /// <summary>Terminal: someone cancelled the file's queued pass before Weir started on it, from the Jobs screen or through

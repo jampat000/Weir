@@ -200,3 +200,33 @@ def test_content_rejection_under_reject_policy_removes_and_blocklists_the_radarr
     rejected = h.activity(admin, "processing.file_rejected")
     assert len(rejected) == 1
     assert "blocklisted the release" in rejected[0]["detail"]
+
+
+def test_a_rules_rejection_with_no_media_manager_is_a_rejected_file_the_remove_dialog_can_act_on(
+    server_factory, client_factory, fake_ffmpeg, tmp_path: Path
+) -> None:
+    _server, admin = _signed_in_working_server(server_factory, client_factory, fake_ffmpeg)
+    folders = h.Folders.make(tmp_path)
+    h.relax_operator_guards(admin)
+    library = h.create_library(admin, folders, failure_policy="pass_through")
+    release = folders.watched / "No.Audio.2023"
+    release.mkdir()
+    source = release / "film.mkv"
+    source.write_bytes(fake_media_bytes(probe(audio_languages=())))
+    rel = "No.Audio.2023/film.mkv"
+
+    r = admin.post_csrf(
+        "/api/v1/processing/jobs/file-remux-pass/enqueue", {"relative_media_path": rel, "library_id": library["id"]}
+    )
+    assert r.status_code == 200, r.text
+
+    row = h.wait_for_file_status(admin, library["id"], rel, "rejected", timeout_s=30)
+    assert row["status_reason"] == (
+        "Rejected: this file has no audio tracks, so there would be nothing to keep. The file was left where it is."
+    )
+    assert source.is_file()
+    assert h.jobs(admin, kind=h.REJECT_KIND) == []
+    options = admin.get(f"{h.API}/processing/files/{row['id']}/remove-options")
+    assert options.status_code == 200, options.text
+    assert options.json()["requires_choice"] is True
+    assert options.json()["delete_handled_by_manager"] is False
