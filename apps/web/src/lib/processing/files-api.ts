@@ -34,6 +34,17 @@ export function processingFileStatusLabel(
   return PROCESSING_FILE_STATUS_LABELS[file.status] ?? file.status;
 }
 
+/** The state and its reason as one lead. A reason that already opens with the state's word ("Rejected: …") stands alone. */
+export function processingFileLead(
+  file: Pick<ProcessingFile, "status" | "failure_class" | "status_reason">,
+): string {
+  const label = processingFileStatusLabel(file);
+  if (!file.status_reason) return label;
+  return file.status_reason.startsWith(`${label}:`)
+    ? file.status_reason
+    : `${label}. ${file.status_reason}`;
+}
+
 /** Whether one device the operator owns will play the file without the media server converting it. */
 export type ProcessingDirectPlayVerdict = "yes" | "no" | "maybe" | "unknown";
 

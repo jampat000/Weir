@@ -418,6 +418,56 @@ describe("HistoryPage", () => {
     expect(screen.getAllByText("Rejected").length).toBeGreaterThan(0);
   });
 
+  it("opens a rules rejection's detail with its reason once, not after a second 'Rejected'", () => {
+    const reason =
+      'Rejected: none of its audio tracks are in English, and the "Movies" rules keep only English audio, so there would be nothing to keep. The file was left where it is.';
+    files.files = [
+      file({
+        id: 1,
+        status: "rejected",
+        failure_class: "rules",
+        status_reason: reason,
+      }),
+    ];
+    fetchLog.mockResolvedValue({
+      file_id: 1,
+      relative_path: "",
+      retention_days: 90,
+      entries: [],
+    });
+    renderPage("/history?file=1");
+
+    const lead = within(screen.getByTestId("history-detail")).getByText(
+      (_, element) => element?.className === "mm-history-detail__lead",
+    );
+    expect(lead.textContent).toBe(reason);
+  });
+
+  it("opens a manager rejection's detail with its label, then its reason", () => {
+    files.files = [
+      file({
+        id: 1,
+        status: "rejected",
+        failure_class: "preflight",
+        status_reason: "Deluno removed the download.",
+      }),
+    ];
+    fetchLog.mockResolvedValue({
+      file_id: 1,
+      relative_path: "",
+      retention_days: 90,
+      entries: [],
+    });
+    renderPage("/history?file=1");
+
+    const lead = within(screen.getByTestId("history-detail")).getByText(
+      (_, element) => element?.className === "mm-history-detail__lead",
+    );
+    expect(lead.textContent).toBe(
+      "Rejected for a replacement. Deluno removed the download.",
+    );
+  });
+
   it("says a file was rejected for a replacement when a media manager was asked for another copy", () => {
     files.files = [
       file({ id: 1, status: "rejected", failure_class: "preflight" }),

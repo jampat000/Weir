@@ -7,7 +7,7 @@ import { baseName } from "../../lib/format/path";
 import { usePauseQuery } from "../../lib/pause/pause-queries";
 import {
   processingFileLogDownloadPath,
-  processingFileStatusLabel,
+  processingFileLead,
   type ProcessingFile,
   type ProcessingFileLogEntry,
 } from "../../lib/processing/files-api";
@@ -118,8 +118,7 @@ export function HistoryDetail({
         {baseName(file.relative_path)}
       </h2>
       <p className="mm-history-detail__lead">
-        {processingFileStatusLabel(file)}
-        {file.status_reason ? `. ${file.status_reason}` : ""}
+        {processingFileLead(file)}
         {took && !working ? ` Took ${took}.` : ""}
       </p>
 
