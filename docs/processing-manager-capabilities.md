@@ -47,7 +47,14 @@ manager link.
   cleaned file itself. A workflow only needs Deluno's folders: the one its
   downloads arrive in as the watched folder (a hand-off must sit inside it), and
   its processed-output folder as the output folder. The workflow editor reads
-  both from Deluno's manifest and offers to fill them in.
+  both from Deluno's manifest and offers to fill them in. Where Deluno reaches a
+  folder by another path (a NAS mount), a path mapping in Deluno (Settings ›
+  Media Management › Processing Workflow › Weir › Path mappings) translates it.
+  Deluno does not publish its mappings, so Weir shows such a folder as not
+  verified rather than as a fault; its check follows a junction or symbolic link,
+  so the same folder reached two ways is not reported as a difference. A hand-off
+  is still accepted only when its path, as Deluno sends it, is inside the watched
+  folder.
 - **Sonarr and Radarr** are set up by hand, the way FileFlows documents it: the
   download client finishes into Weir's watched folder, and a remote path mapping
   in Sonarr/Radarr (Settings › Download Clients › Remote Path Mappings) maps that
