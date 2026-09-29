@@ -17,9 +17,7 @@ import {
 import type { ProcessingManagerSetupItem } from "../../../../lib/processing/library-managers-api";
 import { useLibraryFolderChainQuery } from "../../../../lib/processing/libraries-queries";
 import { useDebouncedValue } from "../../../../lib/ui/use-debounced-value";
-
-/** The folders as the user types them settle for a moment before each check, same as the media-manager check above. */
-const SETTLE_MS = 700;
+import { FOLDER_CHECK_SETTLE_MS } from "./folder-check-settle";
 
 function ChainLines({ lines }: { lines: FolderChainLine[] }) {
   return (
@@ -132,7 +130,7 @@ export function LibraryFolderChain({
       output: outputFolder.trim(),
       mediaType,
     },
-    SETTLE_MS,
+    FOLDER_CHECK_SETTLE_MS,
   );
   const chain = useLibraryFolderChainQuery(
     libraryId,

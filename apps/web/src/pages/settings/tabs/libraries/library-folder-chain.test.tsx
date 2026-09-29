@@ -1,11 +1,12 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, within } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { afterEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
 import * as chainApi from "../../../../lib/processing/library-folder-chain-api";
 import type { LibraryFolderChain as LibraryFolderChainData } from "../../../../lib/processing/library-folder-chain-api";
 import { LibraryFolderChain } from "./library-folder-chain";
+import { settleFolderChecks } from "./library-test-fixtures";
 
 function wrapper({ children }: { children: ReactNode }) {
   const qc = new QueryClient({
@@ -32,7 +33,13 @@ function chain(
   };
 }
 
+// The folders settle after a debounce; the tests move the clock instead of waiting for it.
+beforeEach(() => {
+  vi.useFakeTimers({ shouldAdvanceTime: true });
+});
+
 afterEach(() => {
+  vi.useRealTimers();
   vi.restoreAllMocks();
 });
 
@@ -66,6 +73,7 @@ it("shows Weir's own folder lines are ready, with no manager section and no abse
     />,
     { wrapper },
   );
+  await settleFolderChecks();
 
   const block = await screen.findByRole("region", {
     name: "Weir's own folders",
@@ -111,6 +119,7 @@ it("surfaces a connected manager's own lines and readiness", async () => {
     />,
     { wrapper },
   );
+  await settleFolderChecks();
 
   const block = await screen.findByRole("region", { name: "Sonarr" });
   expect(within(block).getByText("Needs attention")).toBeInTheDocument();
@@ -153,6 +162,7 @@ it("surfaces a bare download client's own lines and readiness", async () => {
     />,
     { wrapper },
   );
+  await settleFolderChecks();
 
   const block = await screen.findByRole("region", { name: "SABnzbd" });
   expect(within(block).getByText("Needs attention")).toBeInTheDocument();
@@ -196,6 +206,7 @@ it("does not show a green Ready for a manager whose folders Weir could only read
     />,
     { wrapper },
   );
+  await settleFolderChecks();
 
   const block = await screen.findByRole("region", { name: "Deluno" });
   expect(within(block).getByText("Not verified")).toBeInTheDocument();
@@ -217,6 +228,7 @@ it("says when it could not check just now", async () => {
     />,
     { wrapper },
   );
+  await settleFolderChecks();
 
   expect(
     await screen.findByText(

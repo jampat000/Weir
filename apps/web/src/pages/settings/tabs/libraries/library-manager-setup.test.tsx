@@ -1,13 +1,14 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { afterEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
 import * as downloadClientsApi from "../../../../lib/download-clients/download-clients-api";
 import type { DownloadClientSuggestion } from "../../../../lib/download-clients/download-clients-api";
 import * as managersApi from "../../../../lib/processing/library-managers-api";
 import type { ProcessingManagerSetupItem } from "../../../../lib/processing/library-managers-api";
 import { LibraryManagerSetup } from "./library-manager-setup";
+import { settleFolderChecks } from "./library-test-fixtures";
 
 function wrapper({ children }: { children: ReactNode }) {
   const qc = new QueryClient({
@@ -68,7 +69,13 @@ function setup(
     .mockResolvedValue({ media_type: "tv", managers });
 }
 
+// The folders settle after a debounce; the tests move the clock instead of waiting for it.
+beforeEach(() => {
+  vi.useFakeTimers({ shouldAdvanceTime: true });
+});
+
 afterEach(() => {
+  vi.useRealTimers();
   vi.restoreAllMocks();
 });
 
@@ -87,6 +94,7 @@ it("shows Sonarr exactly what to enter, with copy buttons, and what is still wro
     />,
     { wrapper },
   );
+  await settleFolderChecks();
 
   const block = await screen.findByRole("region", { name: "Sonarr" });
   expect(
@@ -134,6 +142,7 @@ it("offers a Sonarr download client's own folder as a suggested watched folder",
     />,
     { wrapper },
   );
+  await settleFolderChecks();
 
   const block = await screen.findByRole("region", { name: "Sonarr" });
   expect(within(block).getByText("/downloads/tv-sonarr")).toBeInTheDocument();
@@ -159,6 +168,7 @@ it("does not suggest a Sonarr download client folder that is already the watched
     />,
     { wrapper },
   );
+  await settleFolderChecks();
 
   const block = await screen.findByRole("region", { name: "Sonarr" });
   expect(
@@ -182,6 +192,7 @@ it("tells a Deluno library there is nothing to map and offers Deluno's own folde
     />,
     { wrapper },
   );
+  await settleFolderChecks();
 
   const block = await screen.findByRole("region", { name: "Deluno" });
   expect(
@@ -214,6 +225,7 @@ it("does not offer Deluno's folders once the library already uses them", async (
     />,
     { wrapper },
   );
+  await settleFolderChecks();
 
   const block = await screen.findByRole("region", { name: "Deluno" });
   expect(within(block).getByText("Ready")).toBeInTheDocument();
@@ -235,6 +247,7 @@ it("says how to get help when no media manager covers the library", async () => 
     />,
     { wrapper },
   );
+  await settleFolderChecks();
 
   expect(
     await screen.findByText(
@@ -273,6 +286,7 @@ it("offers a bare download client's own folder as a suggested watched folder, wi
     />,
     { wrapper },
   );
+  await settleFolderChecks();
 
   expect(
     screen.queryByText(/No Sonarr, Radarr or Deluno connection covers/),
