@@ -4,7 +4,12 @@
  * around. Each library's own detail is the same lines `LibraryFolderChain` shows in the library editor.
  */
 
-import type { LibraryFolderChain } from "../../../../lib/processing/library-folder-chain-api";
+import {
+  READINESS_CLASSES,
+  READINESS_LABELS,
+  readinessOf,
+  type LibraryFolderChain,
+} from "../../../../lib/processing/library-folder-chain-api";
 import {
   useConnectionFolderChainQuery,
   useProcessingLibrariesQuery,
@@ -20,12 +25,16 @@ function libraryName(
   );
 }
 
-function ChainDetail({ chain }: { chain: LibraryFolderChain }) {
-  const lines = [
+function chainLines(chain: LibraryFolderChain) {
+  return [
     ...chain.local.lines,
     ...chain.managers.flatMap((manager) => manager.lines),
     ...chain.download_clients.flatMap((client) => client.lines),
   ];
+}
+
+function ChainDetail({ chain }: { chain: LibraryFolderChain }) {
+  const lines = chainLines(chain);
   return (
     <ul className="mt-1 space-y-1 pl-4">
       {lines.map((line, index) => (
@@ -83,12 +92,10 @@ export function ConnectionFolderChain({
             {libraryName(libraries.data, entry.library_id)}{" "}
             <span
               className={
-                entry.ready
-                  ? "mm-status-text--healthy"
-                  : "mm-status-text--warning"
+                READINESS_CLASSES[readinessOf(entry.ready, chainLines(entry))]
               }
             >
-              {entry.ready ? "Ready" : "Needs attention"}
+              {READINESS_LABELS[readinessOf(entry.ready, chainLines(entry))]}
             </span>
           </summary>
           <ChainDetail chain={entry} />

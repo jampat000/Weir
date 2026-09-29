@@ -26,7 +26,7 @@ public sealed class LibraryFolderChainApiTests
          "indexers":[],"downloadClients":[],"connections":[]}
         """;
 
-    private static async Task<(WeirTestServer Server, ApiTestClient Client, ScriptedManager Manager)> StartAsync()
+    internal static async Task<(WeirTestServer Server, ApiTestClient Client, ScriptedManager Manager)> StartAsync()
     {
         var manager = new ScriptedManager();
         var server = await WeirTestServer.StartAsync(
@@ -38,7 +38,7 @@ public sealed class LibraryFolderChainApiTests
         return (server, client, manager);
     }
 
-    private static async Task<long> ConnectAsync(ApiTestClient client, string kind, string name, string baseUrl)
+    internal static async Task<long> ConnectAsync(ApiTestClient client, string kind, string name, string baseUrl)
     {
         using var response = await client.PostAsync("/api/v1/media-managers/connections", new Dictionary<string, object?>
         {
@@ -52,7 +52,7 @@ public sealed class LibraryFolderChainApiTests
         return (await Json(response))!["id"]!.GetValue<long>();
     }
 
-    private static async Task<long> CreateLibraryAsync(
+    internal static async Task<long> CreateLibraryAsync(
         ApiTestClient client, string name, TempFolders folders, IReadOnlyList<long>? connectionIds = null, string mediaType = "tv")
     {
         using var response = await client.PostAsync("/api/v1/processing/libraries", new Dictionary<string, object?>
@@ -69,14 +69,14 @@ public sealed class LibraryFolderChainApiTests
         return (await Json(response))!["id"]!.GetValue<long>();
     }
 
-    private static async Task<JsonNode> FolderChainAsync(ApiTestClient client, long libraryId)
+    internal static async Task<JsonNode> FolderChainAsync(ApiTestClient client, long libraryId)
     {
         using var response = await client.GetAsync($"/api/v1/processing/libraries/{libraryId}/folder-chain");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         return (await Json(response))!;
     }
 
-    private sealed record TempFolders(string Watched, string Work, string Output) : IDisposable
+    internal sealed record TempFolders(string Watched, string Work, string Output) : IDisposable
     {
         public static TempFolders Create()
         {
@@ -295,7 +295,7 @@ public sealed class LibraryFolderChainApiTests
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
-    private static async Task<long> ConnectDownloadClientAsync(ApiTestClient client, string kind, string name, string baseUrl)
+    internal static async Task<long> ConnectDownloadClientAsync(ApiTestClient client, string kind, string name, string baseUrl)
     {
         using var response = await client.PostAsync("/api/v1/download-clients/connections", new Dictionary<string, object?>
         {
