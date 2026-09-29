@@ -266,9 +266,6 @@ describe("SettingsMediaManagersTab", () => {
     render(<MediaManagersTab />, { wrapper });
     fireEvent.click(await screen.findByTestId("media-manager-add"));
 
-    fireEvent.change(screen.getByTestId("media-manager-name"), {
-      target: { value: "Deluno" },
-    });
     fireEvent.change(screen.getByTestId("media-manager-base-url"), {
       target: { value: "http://192.0.2.10:5099" },
     });
@@ -278,14 +275,23 @@ describe("SettingsMediaManagersTab", () => {
       expect(create).toHaveBeenCalledWith(
         expect.objectContaining({
           kind: "deluno",
-          name: "Deluno",
           base_url: "http://192.0.2.10:5099",
         }),
       ),
     );
+    expect(create.mock.calls[0]?.[0]).not.toHaveProperty("name");
   });
 
-  it("will not submit a manager with no name", async () => {
+  it("asks for no name: the connection is named after its address", async () => {
+    vi.spyOn(api, "fetchMediaManagerConnections").mockResolvedValue([]);
+    render(<MediaManagersTab />, { wrapper });
+    fireEvent.click(await screen.findByTestId("media-manager-add"));
+
+    expect(screen.queryByTestId("media-manager-name")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Name")).not.toBeInTheDocument();
+  });
+
+  it("will not submit a manager with no address", async () => {
     vi.spyOn(api, "fetchMediaManagerConnections").mockResolvedValue([]);
     render(<MediaManagersTab />, { wrapper });
     fireEvent.click(await screen.findByTestId("media-manager-add"));
@@ -490,10 +496,7 @@ describe("SettingsMediaManagersTab", () => {
   });
 
   describe("after adding a media manager", () => {
-    function fillAndSubmit(name: string) {
-      fireEvent.change(screen.getByTestId("media-manager-name"), {
-        target: { value: name },
-      });
+    function fillAndSubmit() {
       fireEvent.change(screen.getByTestId("media-manager-base-url"), {
         target: { value: "http://192.0.2.10:5099" },
       });
@@ -516,7 +519,7 @@ describe("SettingsMediaManagersTab", () => {
 
       render(<MediaManagersTab />, { wrapper });
       fireEvent.click(await screen.findByTestId("media-manager-add"));
-      fillAndSubmit("New One");
+      fillAndSubmit();
 
       expect(
         await screen.findByText("Create a secret for New One now?"),
@@ -538,7 +541,7 @@ describe("SettingsMediaManagersTab", () => {
 
       render(<MediaManagersTab />, { wrapper });
       fireEvent.click(await screen.findByTestId("media-manager-add"));
-      fillAndSubmit("New One");
+      fillAndSubmit();
 
       fireEvent.click(
         await screen.findByTestId("media-manager-new-secret-dismiss"),

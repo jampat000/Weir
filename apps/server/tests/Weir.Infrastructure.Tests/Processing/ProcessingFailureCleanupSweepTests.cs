@@ -68,7 +68,7 @@ public sealed class ProcessingFailureCleanupSweepTests : IDisposable
         var notes = Path.Combine(mwork, "Film.processing.notes.txt");
         File.WriteAllBytes(notes, "d"u8.ToArray());
         await AddFailedJobAsync(rel, "movie");
-        var connection = await _fixture.AddConnectionAsync("radarr", "Radarr", "http://10.0.0.5:7878", "k");
+        var connection = await _fixture.AddConnectionAsync("radarr", "http://10.0.0.5:7878", "k");
         _fixture.Http.Json(HttpMethod.Get, "/api/v3/queue", """{"records":[]}""");
         await LinkAllLibrariesAsync(connection);
 
@@ -102,7 +102,7 @@ public sealed class ProcessingFailureCleanupSweepTests : IDisposable
         File.WriteAllBytes(sibling, "b"u8.ToArray());
         File.WriteAllBytes(siblingOutput, "c"u8.ToArray());
         await AddFailedJobAsync("Pack/Broken.mkv", "movie");
-        var connection = await _fixture.AddConnectionAsync("radarr", "Radarr", "http://10.0.0.5:7878", "k");
+        var connection = await _fixture.AddConnectionAsync("radarr", "http://10.0.0.5:7878", "k");
         _fixture.Http.Json(HttpMethod.Get, "/api/v3/queue", """{"records":[]}""");
         await LinkAllLibrariesAsync(connection);
 
@@ -125,7 +125,7 @@ public sealed class ProcessingFailureCleanupSweepTests : IDisposable
         var victim = Path.Combine(outside, "Film.mkv");
         File.WriteAllBytes(victim, "a"u8.ToArray());
         await AddFailedJobAsync("../elsewhere/Title/Film.mkv", "movie");
-        var connection = await _fixture.AddConnectionAsync("radarr", "Radarr", "http://10.0.0.5:7878", "k");
+        var connection = await _fixture.AddConnectionAsync("radarr", "http://10.0.0.5:7878", "k");
         _fixture.Http.Json(HttpMethod.Get, "/api/v3/queue", """{"records":[]}""");
         await LinkAllLibrariesAsync(connection);
 
@@ -146,7 +146,7 @@ public sealed class ProcessingFailureCleanupSweepTests : IDisposable
         var source = Path.Combine(mw, "Title", "Film.mkv");
         File.WriteAllBytes(source, "a"u8.ToArray());
         await AddFailedJobAsync(rel, "movie");
-        var connection = await _fixture.AddConnectionAsync("radarr", "Radarr", "http://10.0.0.5:7878", "k");
+        var connection = await _fixture.AddConnectionAsync("radarr", "http://10.0.0.5:7878", "k");
         _fixture.Http.Json(HttpMethod.Get, "/api/v3/queue", $$"""{"records":[{"id":1,"outputPath":"{{Path.GetFullPath(source).Replace('\\', '/')}}"}]}""");
         await LinkAllLibrariesAsync(connection);
 
@@ -182,7 +182,7 @@ public sealed class ProcessingFailureCleanupSweepTests : IDisposable
         File.WriteAllBytes(ep1, "1"u8.ToArray());
         File.WriteAllBytes(ep2, "2"u8.ToArray());
         await AddFailedJobAsync("Show/Season 1/S01E01.mkv", "tv");
-        var connection = await _fixture.AddConnectionAsync("sonarr", "Sonarr", "http://10.0.0.5:8989", "k");
+        var connection = await _fixture.AddConnectionAsync("sonarr", "http://10.0.0.5:8989", "k");
         _fixture.Http.Json(HttpMethod.Get, "/api/v3/episodefile", "[]");
         _fixture.Http.Json(HttpMethod.Get, "/api/v3/queue", $$"""{"records":[{"id":1,"outputPath":"{{Path.GetFullPath(ep2).Replace('\\', '/')}}"}]}""");
         await LinkAllLibrariesAsync(connection);
@@ -206,7 +206,7 @@ public sealed class ProcessingFailureCleanupSweepTests : IDisposable
         await AddFailedJobAsync("Show/Season 1/S01E01.mkv", "tv");
         await AddFailedJobAsync("Show/Season 1/S01E02.mkv", "tv");
         await AddPendingJobAsync("Show/Season 1/S01E02.mkv", "tv");
-        var connection = await _fixture.AddConnectionAsync("sonarr", "Sonarr", "http://10.0.0.5:8989", "k");
+        var connection = await _fixture.AddConnectionAsync("sonarr", "http://10.0.0.5:8989", "k");
         _fixture.Http.Json(HttpMethod.Get, "/api/v3/episodefile", "[]");
         _fixture.Http.Json(HttpMethod.Get, "/api/v3/queue", """{"records":[]}""");
         await LinkAllLibrariesAsync(connection);
@@ -266,7 +266,7 @@ public sealed class ProcessingFailureCleanupSweepTests : IDisposable
         File.WriteAllBytes(Path.Combine(mw, "Film.mkv"), "x"u8.ToArray());
         File.WriteAllBytes(Path.Combine(mo, "Film.mkv"), "y"u8.ToArray());
         await AddFailedJobAsync("Film.mkv", "movie");
-        var connection = await _fixture.AddConnectionAsync("radarr", "Radarr", "http://10.0.0.5:7878", "k");
+        var connection = await _fixture.AddConnectionAsync("radarr", "http://10.0.0.5:7878", "k");
         _fixture.Http.Json(HttpMethod.Get, "/api/v3/queue", """{"records":[]}""");
         await LinkAllLibrariesAsync(connection);
 

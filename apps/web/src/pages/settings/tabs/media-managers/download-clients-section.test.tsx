@@ -13,7 +13,7 @@ function connection(
   return {
     id: 1,
     kind: "qbittorrent",
-    name: "Living room qBittorrent",
+    name: "qBittorrent on 192.0.2.10",
     enabled: true,
     base_url: "http://192.0.2.10:8080",
     username: "admin",
@@ -60,7 +60,7 @@ describe("listing download client connections", () => {
     render(<DownloadClientsSection />, { wrapper });
 
     expect(
-      await screen.findByText("Living room qBittorrent"),
+      await screen.findByText("qBittorrent on 192.0.2.10"),
     ).toBeInTheDocument();
     expect(screen.getByText("My SABnzbd")).toBeInTheDocument();
     expect(screen.getAllByTestId("download-client-card")).toHaveLength(2);
@@ -138,7 +138,7 @@ describe("adding a download client", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("will not submit with no name or address", async () => {
+  it("will not submit with no address", async () => {
     vi.spyOn(api, "fetchDownloadClientConnections").mockResolvedValue([]);
     render(<DownloadClientsSection />, { wrapper });
     fireEvent.click(await screen.findByTestId("download-client-add"));
@@ -146,13 +146,21 @@ describe("adding a download client", () => {
     expect(screen.getByTestId("download-client-save")).toBeDisabled();
   });
 
+  it("asks for no name: the connection is named after its address", async () => {
+    vi.spyOn(api, "fetchDownloadClientConnections").mockResolvedValue([]);
+    render(<DownloadClientsSection />, { wrapper });
+    fireEvent.click(await screen.findByTestId("download-client-add"));
+
+    expect(
+      screen.queryByTestId("download-client-name"),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Name")).not.toBeInTheDocument();
+  });
+
   it("will not submit a SABnzbd connection with no API key, or a Deluge one with no password", async () => {
     vi.spyOn(api, "fetchDownloadClientConnections").mockResolvedValue([]);
     render(<DownloadClientsSection />, { wrapper });
     fireEvent.click(await screen.findByTestId("download-client-add"));
-    fireEvent.change(screen.getByTestId("download-client-name"), {
-      target: { value: "New Client" },
-    });
     fireEvent.change(screen.getByTestId("download-client-base-url"), {
       target: { value: "http://192.0.2.20:8080" },
     });
@@ -184,13 +192,10 @@ describe("adding a download client", () => {
     vi.spyOn(api, "fetchDownloadClientConnections").mockResolvedValue([]);
     const create = vi
       .spyOn(api, "createDownloadClientConnection")
-      .mockResolvedValue(connection({ name: "New Client" }));
+      .mockResolvedValue(connection({ name: "SABnzbd on 192.0.2.20" }));
 
     render(<DownloadClientsSection />, { wrapper });
     fireEvent.click(await screen.findByTestId("download-client-add"));
-    fireEvent.change(screen.getByTestId("download-client-name"), {
-      target: { value: "New Client" },
-    });
     fireEvent.change(screen.getByTestId("download-client-base-url"), {
       target: { value: "http://192.0.2.20:8080" },
     });
@@ -203,12 +208,12 @@ describe("adding a download client", () => {
       expect(create).toHaveBeenCalledWith(
         expect.objectContaining({
           kind: "sabnzbd",
-          name: "New Client",
           base_url: "http://192.0.2.20:8080",
           api_key: "some-key",
         }),
       ),
     );
+    expect(create.mock.calls[0]?.[0]).not.toHaveProperty("name");
     expect(
       await screen.findByTestId("download-client-created-note"),
     ).toHaveTextContent("nothing is applied on its own");
@@ -222,9 +227,6 @@ describe("adding a download client", () => {
 
     render(<DownloadClientsSection />, { wrapper });
     fireEvent.click(await screen.findByTestId("download-client-add"));
-    fireEvent.change(screen.getByTestId("download-client-name"), {
-      target: { value: "New Client" },
-    });
     fireEvent.change(screen.getByTestId("download-client-base-url"), {
       target: { value: "http://192.0.2.20:8080" },
     });
@@ -260,8 +262,7 @@ describe("testing a connection", () => {
     finishTest({
       connection_id: 1,
       ok: true,
-      detail:
-        "Connected. Weir can reach qBittorrent (Living room qBittorrent).",
+      detail: "Connected. Weir can reach qBittorrent on 192.0.2.10.",
       checked_at: "2026-09-24T10:00:00Z",
     });
     await waitFor(() =>
@@ -313,15 +314,18 @@ describe("testing a connection", () => {
 });
 
 describe("editing a connection in place", () => {
-  it("opens with the current name, address and username, and blank secrets", async () => {
+  it("opens with the current address and username, blank secrets, and no field for a name", async () => {
     vi.spyOn(api, "fetchDownloadClientConnections").mockResolvedValue([
       connection(),
     ]);
     render(<DownloadClientsSection />, { wrapper });
     fireEvent.click(await screen.findByTestId("download-client-edit"));
 
-    expect(screen.getByTestId("download-client-edit-name")).toHaveValue(
-      "Living room qBittorrent",
+    expect(
+      screen.queryByTestId("download-client-edit-name"),
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId("download-client-edit-base-url")).toHaveValue(
+      "http://192.0.2.10:8080",
     );
     expect(screen.getByTestId("download-client-edit-username")).toHaveValue(
       "admin",
@@ -335,19 +339,18 @@ describe("editing a connection in place", () => {
     ]);
     const update = vi
       .spyOn(api, "updateDownloadClientConnection")
-      .mockResolvedValue(connection({ name: "Renamed" }));
+      .mockResolvedValue(connection({ name: "qBittorrent on 192.0.2.11" }));
 
     render(<DownloadClientsSection />, { wrapper });
     fireEvent.click(await screen.findByTestId("download-client-edit"));
-    fireEvent.change(screen.getByTestId("download-client-edit-name"), {
-      target: { value: "Renamed" },
+    fireEvent.change(screen.getByTestId("download-client-edit-base-url"), {
+      target: { value: "http://192.0.2.11:8080" },
     });
     fireEvent.click(screen.getByTestId("download-client-edit-save"));
 
     await waitFor(() =>
       expect(update).toHaveBeenCalledWith(1, {
-        name: "Renamed",
-        base_url: "http://192.0.2.10:8080",
+        base_url: "http://192.0.2.11:8080",
       }),
     );
     await waitFor(() =>
@@ -374,7 +377,7 @@ describe("removing a connection", () => {
       await screen.findByTestId("download-client-remove-confirm"),
     ).toBeInTheDocument();
     expect(del).not.toHaveBeenCalled();
-    expect(screen.getByText("Living room qBittorrent")).toBeInTheDocument();
+    expect(screen.getByText("qBittorrent on 192.0.2.10")).toBeInTheDocument();
   });
 
   it("names the connection it is about to remove", async () => {
@@ -386,7 +389,7 @@ describe("removing a connection", () => {
 
     expect(
       screen.getByTestId("download-client-remove-confirm"),
-    ).toHaveTextContent("Remove Living room qBittorrent?");
+    ).toHaveTextContent("Remove qBittorrent on 192.0.2.10?");
   });
 
   it("removes only after the dialog is confirmed", async () => {

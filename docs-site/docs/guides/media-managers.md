@@ -11,6 +11,10 @@ library, so cleaning happens automatically instead of you moving files around by
 There are four kinds of connection: **Deluno**, **Sonarr**, **Radarr**, and **Something else** for
 anything that can send Weir a message directly.
 
+You don't name a connection. Weir names it after the kind and the host in its address: "Deluno on
+RIG", "Radarr on nas", "qBittorrent on 10.0.0.51". Two of one kind on the same host also show their
+port, like "Radarr on nas (7879)". Change the address and the name follows.
+
 ## How the folders fit together
 
 However your setup is arranged, three things own three different folders, and every install works
@@ -41,6 +45,9 @@ retyping them by hand (advertised as the `library-folders` capability at `/api/v
 can read a connected manager's or download client's own configuration and offer its folders as a
 one-click suggestion in the library editor. Weir never changes a folder on its own — a suggestion is
 only ever applied when you press the button, and a folder you typed yourself always stays.
+
+The same `/api/v1/intake/capabilities` answer carries `machine_name`, the name of the machine Weir
+runs on, so a manager can call its connection to Weir "Weir on RIG".
 
 ## Deluno: automatic hand-off
 

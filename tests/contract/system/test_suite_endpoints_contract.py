@@ -235,8 +235,19 @@ def test_system_readiness_shape(admin, viewer) -> None:
         r = c.get(READINESS)
         assert r.status_code == 200, r.text
         body = r.json()
-        assert set(body) == {"ready", "version", "status", "startup_seconds", "steps", "worker_health"}
+        assert set(body) == {
+            "ready",
+            "version",
+            "machine_name",
+            "machine_name_looks_generated",
+            "status",
+            "startup_seconds",
+            "steps",
+            "worker_health",
+        }
         assert body["ready"] is True
+        assert body["machine_name"]
+        assert isinstance(body["machine_name_looks_generated"], bool)
         assert body["status"] == "ready"
         assert body["version"]
         assert body["startup_seconds"] >= 0

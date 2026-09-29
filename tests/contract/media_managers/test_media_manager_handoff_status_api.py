@@ -7,6 +7,7 @@ from ``conftest.py`` and helpers from ``_handoff_status_helpers.py``.
 
 from __future__ import annotations
 
+import socket
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -52,15 +53,23 @@ def test_a_wrong_or_missing_secret_is_refused(server: ServerUnderTest) -> None:
 def test_capabilities_name_every_ability(server: ServerUnderTest) -> None:
     response = httpx.get(f"{server.base_url}{API}/intake/capabilities", headers=SECRET, timeout=30)
     assert response.status_code == 200
-    assert response.json() == {
-        "capabilities": [
-            "handoff-status",
-            "handoff-cancel",
-            "handoff-outcome",
-            "handoff-outcome-codes",
-            "library-folders",
-        ]
-    }
+    body = response.json()
+    assert body.pop("capabilities") == [
+        "handoff-status",
+        "handoff-cancel",
+        "handoff-outcome",
+        "handoff-outcome-codes",
+        "library-folders",
+    ]
+    assert list(body) == ["machine_name"]
+
+
+def test_capabilities_publish_the_machine_name_for_a_manager_to_name_its_connection(server: ServerUnderTest) -> None:
+    response = httpx.get(f"{server.base_url}{API}/intake/capabilities", headers=SECRET, timeout=30)
+    machine_name = response.json()["machine_name"]
+    # Windows truncates a long name to fifteen characters, so the machine's own name may be longer.
+    assert machine_name
+    assert socket.gethostname().casefold().startswith(machine_name.casefold())
 
 
 # --- status ------------------------------------------------------------------------------------

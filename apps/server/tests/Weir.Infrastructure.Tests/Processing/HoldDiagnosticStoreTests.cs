@@ -57,7 +57,7 @@ public sealed class HoldDiagnosticStoreTests
     {
         var (store, http, connections) = await BuildAsync();
         using var _ = store;
-        var connectionId = await store.WithUnitOfWork(uow => connections.CreateAsync(uow, "radarr", "4K", "http://radarr.local", "key"));
+        var connectionId = await store.WithUnitOfWork(uow => connections.CreateAsync(uow, "radarr", "http://radarr.local", "key"));
         var (libraryId, fileId) = await SeedFileAsync(store, "Solaris (1972)/Solaris.mkv", [connectionId]);
         RouteQueue(http, "[{\"status\":\"downloading\",\"outputPath\":\"Solaris (1972)/Solaris.mkv\",\"movie\":{\"title\":\"Solaris\",\"year\":1972}}]");
 
@@ -69,8 +69,8 @@ public sealed class HoldDiagnosticStoreTests
         Assert.Equal(CandidateGateVerdict.WaitUpstream, outcome.Verdict);
         Assert.True(outcome.Owned);
         Assert.True(outcome.BlockedUpstream);
-        Assert.Equal("Radarr (4K)", outcome.BlockedByConnection);
-        Assert.Contains("Radarr (4K) is still importing this file", outcome.Reasons[0], StringComparison.Ordinal);
+        Assert.Equal("Radarr on radarr.local", outcome.BlockedByConnection);
+        Assert.Contains("Radarr on radarr.local is still importing this file", outcome.Reasons[0], StringComparison.Ordinal);
     }
 
     [Fact]
@@ -78,7 +78,7 @@ public sealed class HoldDiagnosticStoreTests
     {
         var (store, http, connections) = await BuildAsync();
         using var _ = store;
-        var connectionId = await store.WithUnitOfWork(uow => connections.CreateAsync(uow, "radarr", "Main", "http://radarr.local", "key"));
+        var connectionId = await store.WithUnitOfWork(uow => connections.CreateAsync(uow, "radarr", "http://radarr.local", "key"));
         var (libraryId, fileId) = await SeedFileAsync(store, "Clear (2000)/Clear.mkv", [connectionId]);
         RouteQueue(http, "[]");
 
@@ -115,7 +115,7 @@ public sealed class HoldDiagnosticStoreTests
     {
         var (store, http, connections) = await BuildAsync();
         using var _ = store;
-        var connectionId = await store.WithUnitOfWork(uow => connections.CreateAsync(uow, "radarr", "Main", "http://radarr.local", "key"));
+        var connectionId = await store.WithUnitOfWork(uow => connections.CreateAsync(uow, "radarr", "http://radarr.local", "key"));
         var (libraryId, fileId) = await SeedFileAsync(store, "Stalled (2000)/Stalled.mkv", [connectionId]);
         http.Throw(HttpMethod.Get, "/api/v3/queue", new HttpRequestException("Connection refused."));
 
@@ -126,6 +126,6 @@ public sealed class HoldDiagnosticStoreTests
 
         Assert.Equal(CandidateGateVerdict.NoUpstreamSignal, outcome.Verdict);
         Assert.Equal(0, outcome.ManagersReporting);
-        Assert.Equal(["Radarr (Main)"], outcome.ManagersWithoutQueueSignal);
+        Assert.Equal(["Radarr on radarr.local"], outcome.ManagersWithoutQueueSignal);
     }
 }

@@ -28,13 +28,12 @@ public sealed class DownloadClientConnectionsApiTests
         return (server, client, manager);
     }
 
-    private static async Task<JsonNode> CreateAsync(ApiTestClient client, string kind = "sabnzbd", string name = "SABnzbd", string apiKey = "key")
+    private static async Task<JsonNode> CreateAsync(ApiTestClient client, string kind = "sabnzbd", string apiKey = "key")
     {
         using var response = await client.PostAsync(Connections, new Dictionary<string, object?>
         {
             ["csrf_token"] = await client.CsrfAsync(),
             ["kind"] = kind,
-            ["name"] = name,
             ["base_url"] = "http://192.0.2.30:8080",
             ["api_key"] = apiKey,
         });
@@ -50,7 +49,7 @@ public sealed class DownloadClientConnectionsApiTests
 
         var created = await CreateAsync(client);
         var id = created["id"]!.GetValue<long>();
-        Assert.Equal("sabnzbd", created["kind"]!.GetValue<string>());
+        Assert.Equal(("sabnzbd", "SABnzbd on 192.0.2.30"), (created["kind"]!.GetValue<string>(), created["name"]!.GetValue<string>()));
         Assert.True(created["api_key_is_saved"]!.GetValue<bool>());
         Assert.False(created["password_is_saved"]!.GetValue<bool>());
         Assert.Null(created["last_test_ok"]);
@@ -63,11 +62,11 @@ public sealed class DownloadClientConnectionsApiTests
         using (var update = await client.PutAsync($"{Connections}/{id}", new Dictionary<string, object?>
         {
             ["csrf_token"] = await client.CsrfAsync(),
-            ["name"] = "SABnzbd Main",
+            ["base_url"] = "http://192.0.2.31:8080",
         }))
         {
             Assert.Equal(HttpStatusCode.OK, update.StatusCode);
-            Assert.Equal("SABnzbd Main", (await Json(update))!["name"]!.GetValue<string>());
+            Assert.Equal("SABnzbd on 192.0.2.31", (await Json(update))!["name"]!.GetValue<string>());
         }
 
         // The api key is unchanged by an update that does not mention it.
@@ -79,6 +78,32 @@ public sealed class DownloadClientConnectionsApiTests
         });
         Assert.Equal(HttpStatusCode.NoContent, deleted.StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync($"{Connections}/{id}")).StatusCode);
+    }
+
+    [Fact]
+    public async Task A_name_sent_when_creating_or_editing_a_connection_is_accepted_and_ignored()
+    {
+        var (server, client, _) = await StartAsync();
+        await using var _server = server;
+
+        using var created = await client.PostAsync(Connections, new Dictionary<string, object?>
+        {
+            ["csrf_token"] = await client.CsrfAsync(),
+            ["kind"] = "qbittorrent",
+            ["name"] = "Living room",
+            ["base_url"] = "http://10.0.0.51:8080",
+        });
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        var id = (await Json(created))!["id"]!.GetValue<long>();
+
+        using var edited = await client.PutAsync($"{Connections}/{id}", new Dictionary<string, object?>
+        {
+            ["csrf_token"] = await client.CsrfAsync(),
+            ["name"] = "Somewhere else",
+        });
+
+        Assert.Equal(HttpStatusCode.OK, edited.StatusCode);
+        Assert.Equal("qBittorrent on 10.0.0.51", (await Json(edited))!["name"]!.GetValue<string>());
     }
 
     [Fact]
