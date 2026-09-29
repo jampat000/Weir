@@ -3,6 +3,8 @@ import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { LiveProgressEntry } from "../../lib/activity/use-activity-stream-invalidation";
 import type { ProcessingFile } from "../../lib/processing/files-api";
+import { activityKeys } from "../../lib/activity/query-keys";
+import { processingKeys } from "../../lib/processing/query-keys";
 import { LEAVING_CARD_MS } from "./leaving-cards";
 import { LIBRARY_CLEAN_JOB_KIND } from "./processing-model";
 import { ProcessingPage } from "./processing-page";
@@ -58,9 +60,13 @@ const refetchFiles = vi.fn();
 const refetchLibraries = vi.fn();
 
 const liveProgress: Record<string, LiveProgressEntry> = {};
+/** The query keys each call to useActivityStreamInvalidations asked to refresh on activity. */
+const invalidations: (readonly unknown[])[] = [];
 
 vi.mock("../../lib/activity/use-activity-stream-invalidation", () => ({
-  useActivityStreamInvalidations: () => undefined,
+  useActivityStreamInvalidations: (keys: readonly unknown[]) => {
+    invalidations.push(keys);
+  },
   useLiveProgress: () => liveProgress,
 }));
 vi.mock("../../lib/processing/files-queries", () => ({
@@ -185,6 +191,7 @@ describe("ProcessingPage", () => {
     readiness.worker_health = [];
     refetchFiles.mockClear();
     refetchLibraries.mockClear();
+    invalidations.length = 0;
     fileLogState.isError = false;
     fileLogState.error = null;
   });
@@ -912,6 +919,156 @@ describe("ProcessingPage", () => {
       const ended = screen.getByTestId("live-leaving");
       expect(ended).toHaveAttribute("data-outcome", "done");
       expect(ended).toHaveTextContent("The Quiet Harbour S01E03");
+    });
+  });
+
+  describe("a pass that ends before the page sees it in Working", () => {
+    const WAITING = {
+      id: 1,
+      relative_path: "Glass.Orchard.S01E04.2160p.WEB-DL.mkv",
+    };
+
+    function rerenderLive(view: ReturnType<typeof renderLive>) {
+      view.rerender(
+        <MemoryRouter>
+          <ProcessingPage />
+        </MemoryRouter>,
+      );
+    }
+
+    function startWaiting() {
+      files.files = [file({ ...WAITING, status: "unprocessed" })];
+      const view = renderLive();
+      expect(screen.getByTestId("live-waiting")).toBeInTheDocument();
+      return view;
+    }
+
+    it("draws an ended card with every step ticked when the file goes from Waiting to processed, then leaves it to Just finished", () => {
+      const view = startWaiting();
+
+      files.files = [file({ ...WAITING, status: "processed" })];
+      activity["processing.file_remux_pass_completed"] = {
+        items: [
+          {
+            id: 501,
+            created_at: "2026-08-18T09:59:59",
+            event_type: "processing.file_remux_pass_completed",
+            title: "x",
+            library_id: 1,
+            relative_path: WAITING.relative_path,
+            detail: JSON.stringify({
+              outcome: "live_output_written",
+              ok: true,
+              relative_media_path: WAITING.relative_path,
+              source_size_bytes: 2_000_000_000,
+              output_size_bytes: 1_800_000_000,
+              removed_audio: [],
+              removed_subtitles: [],
+            }),
+          },
+        ],
+      };
+      rerenderLive(view);
+
+      const ended = within(screen.getByTestId("live-lane-working")).getByTestId(
+        "live-leaving",
+      );
+      expect(ended).toHaveAttribute("data-outcome", "done");
+      expect(ended).toHaveTextContent("Glass Orchard S01E04");
+      expect(within(ended).getAllByText(/(done)/)).toHaveLength(5);
+      expect(screen.queryByTestId("live-waiting")).toBeNull();
+
+      act(() => {
+        vi.advanceTimersByTime(LEAVING_CARD_MS);
+      });
+      expect(screen.queryByTestId("live-leaving")).toBeNull();
+      expect(screen.getByTestId("live-finished")).toHaveTextContent(
+        "Glass Orchard S01E04",
+      );
+    });
+
+    it("marks the step it stopped at and says why when the file goes from Waiting to failed", () => {
+      const view = startWaiting();
+
+      files.files = [
+        file({
+          ...WAITING,
+          status: "processing_failed",
+          status_reason: "The file could not be read. Nothing was changed.",
+        }),
+      ];
+      rerenderLive(view);
+
+      const ended = screen.getByTestId("live-leaving");
+      expect(ended).toHaveAttribute("data-outcome", "failed");
+      expect(ended).toHaveTextContent("Checking (failed)");
+      expect(ended).toHaveTextContent("The file could not be read.");
+    });
+
+    it("shows a rejection with its reason when the file goes from Waiting to rejected", () => {
+      const view = startWaiting();
+
+      files.files = [
+        file({
+          ...WAITING,
+          status: "rejected",
+          status_reason: "Nothing in this file needs changing.",
+        }),
+      ];
+      rerenderLive(view);
+
+      const ended = screen.getByTestId("live-leaving");
+      expect(ended).toHaveAttribute("data-outcome", "rejected");
+      expect(ended).toHaveTextContent("Nothing in this file needs changing.");
+    });
+
+    it("shows nothing when the file goes from Waiting to on hold", () => {
+      const view = startWaiting();
+
+      files.files = [file({ ...WAITING, status: "on_hold" })];
+      rerenderLive(view);
+
+      expect(screen.queryByTestId("live-leaving")).toBeNull();
+      expect(screen.getByTestId("live-arriving")).toBeInTheDocument();
+    });
+
+    it("shows nothing when the file stays waiting and only its position changes", () => {
+      const view = startWaiting();
+
+      files.files = [
+        file({ ...WAITING, status: "unprocessed" }),
+        file({
+          id: 2,
+          relative_path: "Other.S01E01.mkv",
+          status: "unprocessed",
+        }),
+      ];
+      rerenderLive(view);
+
+      expect(screen.queryByTestId("live-leaving")).toBeNull();
+    });
+
+    it("does not treat narrowing the page to another kind of file as a file leaving Waiting", () => {
+      startWaiting();
+
+      fireEvent.click(screen.getByRole("button", { name: "Library cleaning" }));
+      fireEvent.click(screen.getByRole("button", { name: "Everything" }));
+
+      expect(screen.queryByTestId("live-leaving")).toBeNull();
+      expect(screen.getByTestId("live-waiting")).toBeInTheDocument();
+    });
+
+    it("refreshes Just finished in the same step as the file list", () => {
+      renderLive();
+
+      const withFiles = invalidations.find((keys) =>
+        keys.some(
+          (key) =>
+            JSON.stringify(key) ===
+            JSON.stringify(processingKeys.fileList({ limit: 200 })),
+        ),
+      );
+      expect(withFiles).toContain(activityKeys.recent);
     });
   });
 

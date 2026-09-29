@@ -1,9 +1,10 @@
 /**
- * What a card looks like for a moment after its file leaves Working or Handing back. A file that finishes,
- * fails or is rejected disappears from those lanes in the same refresh that puts it in Just finished or
- * Needs you, so the card is kept a little longer, drawn with its end state: every step ticked, or the step
- * it stopped at and why. This works from two consecutive states of the lists, so it needs nothing from the
- * server beyond what the file list already says.
+ * What a card looks like for a moment after its file leaves Waiting, Working or Handing back. A file that
+ * finishes, fails or is rejected disappears from those lanes in the same refresh that puts it in Just
+ * finished or Needs you, so the card is kept a little longer, drawn with its end state: every step ticked,
+ * or the step it stopped at and why. A pass short enough to end before the page ever saw the file in
+ * Working goes straight from Waiting to its end, and gets the same card (#852). This works from two
+ * consecutive states of the lists, so it needs nothing from the server beyond what the file list already says.
  */
 import { useEffect, useMemo, useState } from "react";
 
@@ -11,6 +12,7 @@ import type { ProcessingFile } from "../../lib/processing/files-api";
 import {
   firstSentence,
   type HandingItem,
+  type WaitingItem,
   type WorkingItem,
   type WorkSource,
 } from "./processing-model";
@@ -21,7 +23,11 @@ export const LEAVING_CARD_MS = 2500;
 /** How long to wait for the file list to say what became of a card that has left, before letting it go unshown. */
 export const OUTCOME_WAIT_MS = 6000;
 
-export type LeavingLane = "working" | "handing";
+/** Where a card was last on screen. */
+export type LeavingLane = "waiting" | "working" | "handing";
+
+/** A file that has not started has shown no step, so its card starts at the first one. */
+const WAITING_STEP: FlowStepId = "checking";
 
 export type LeavingOutcome =
   | { kind: "done" }
@@ -110,12 +116,28 @@ function failed(file: ProcessingFile, step: FlowStepId): LeavingOutcome {
   };
 }
 
-/** The cards on screen in Working and Handing back, one per file. Library cleans have no file to follow. */
+/** The lane an ended card is drawn in: a file that ended from Waiting takes the place its pass would have had. */
+export function drawnIn(card: ShownCard): "working" | "handing" {
+  return card.lane === "handing" ? "handing" : "working";
+}
+
+/** The cards on screen in Waiting, Working and Handing back, one per file. Library cleans have no file to follow. */
 export function shownCards(
+  waiting: readonly WaitingItem[],
   working: readonly WorkingItem[],
   handing: readonly HandingItem[],
 ): ShownCard[] {
   const cards: ShownCard[] = [];
+  for (const item of waiting) {
+    if (item.file) {
+      cards.push({
+        ...item,
+        lane: "waiting",
+        step: WAITING_STEP,
+        file: item.file,
+      });
+    }
+  }
   for (const [lane, items] of [
     ["working", working],
     ["handing", handing],
@@ -210,15 +232,19 @@ export function endedCards(state: LeavingState): LeavingCard[] {
 }
 
 /**
- * The ended cards to draw now. `working` and `handing` are the lanes before any filter, so narrowing the
- * page to one kind of file is never mistaken for a file leaving.
+ * The ended cards to draw now. `waiting`, `working` and `handing` are the lanes before any filter, so
+ * narrowing the page to one kind of file is never mistaken for a file leaving.
  */
 export function useLeavingCards(
+  waiting: readonly WaitingItem[],
   working: readonly WorkingItem[],
   handing: readonly HandingItem[],
   files: readonly ProcessingFile[],
 ): LeavingCard[] {
-  const cards = useMemo(() => shownCards(working, handing), [working, handing]);
+  const cards = useMemo(
+    () => shownCards(waiting, working, handing),
+    [waiting, working, handing],
+  );
   const [state, setState] = useState(NO_LEAVING_CARDS);
 
   useEffect(() => {
