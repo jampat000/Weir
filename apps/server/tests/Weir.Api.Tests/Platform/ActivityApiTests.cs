@@ -349,6 +349,37 @@ public sealed class ActivityApiTests
             frames);
     }
 
+    [Theory]
+    [InlineData(10L, 10L)]
+    [InlineData(null, 0L)]
+    public async Task A_change_no_activity_row_records_still_reaches_the_stream(long? newestEventId, long expectedFrameId)
+    {
+        var notifier = new ActivityLatestNotifier();
+        var frames = new List<string>();
+        // The retry hint, the opening frame when there is an event to name, then the frame the change sends.
+        var framesInAll = newestEventId is null ? 2 : 3;
+
+        await foreach (var frame in ActivityEndpoints.LatestFramesAsync(
+            _ =>
+            {
+                // A change landing while the stream opens still reaches it.
+                notifier.NotifyChanged();
+                return Task.FromResult(newestEventId);
+            },
+            notifier, TimeProvider.System, TimeSpan.FromMinutes(1), NullLogger.Instance, CancellationToken.None))
+        {
+            frames.Add(frame);
+            if (frames.Count == framesInAll)
+            {
+                break;
+            }
+        }
+
+        Assert.Equal(
+            $"event: activity.latest\ndata: {{\"latest_event_id\":{expectedFrameId},\"activity_revision\":1}}\n\n",
+            frames.Last());
+    }
+
     [Fact]
     public async Task The_stream_reads_the_database_once_and_then_follows_the_shared_notifier()
     {
