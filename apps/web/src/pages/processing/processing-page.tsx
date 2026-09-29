@@ -36,6 +36,8 @@ import { useNow } from "../../lib/ui/use-now";
 import { FinishedLane } from "./finished-lane";
 import { EmptyLane, Lane, More } from "./lane";
 import { ArrivingCard, HandingCard, WaitingCard } from "./lane-cards";
+import { LeavingCard } from "./leaving-card";
+import { useLeavingCards } from "./leaving-cards";
 import {
   arrivingDeadline,
   buildLanes,
@@ -52,6 +54,7 @@ import { WorkingCard } from "./working-card";
 import { ACTIVE_JOBS_LIMIT, WORKING_FILES_QUERY } from "./working-count";
 
 const FILES_QUERY = { limit: 200 } as const;
+const NO_FILES: ProcessingFile[] = [];
 /** Once a second, so countdowns and "min ago" move between server updates. */
 const TICK_MS = 1000;
 /** Arriving counts down to each library's next look, which moves with every scan. */
@@ -165,6 +168,12 @@ export function ProcessingPage(): React.ReactElement {
     name: string;
   } | null>(null);
   const [filter, setFilter] = useState<Filter>("all");
+  // From the unfiltered lanes, so narrowing the page to one kind of file is never taken for a file leaving.
+  const leaving = useLeavingCards(
+    lanes.working,
+    lanes.handing,
+    files.data?.files ?? NO_FILES,
+  );
 
   const openFile = useCallback(
     (file: ProcessingFile) => {
@@ -210,6 +219,10 @@ export function ProcessingPage(): React.ReactElement {
   const waiting = lanes.waiting.filter(shows);
   const working = lanes.working.filter(shows);
   const handing = lanes.handing.filter(shows);
+  const leavingIn = (lane: "working" | "handing") =>
+    leaving.filter((card) => card.lane === lane && shows(card));
+  const leavingWorking = leavingIn("working");
+  const leavingHanding = leavingIn("handing");
   const lanesAtOnce = filesAtOnce.data?.effective_files_at_once ?? null;
 
   return (
@@ -298,10 +311,13 @@ export function ProcessingPage(): React.ReactElement {
             {/* The cards measure this, not the lane: a lane that is a size container cannot also
                 share the board's rows (subgrid), and sharing them is what lines the lanes up. */}
             <div className="mm-live-work-area">
-              {working.length ? (
+              {working.length || leavingWorking.length ? (
                 <ul className="mm-live-lane__body mm-live-lane__body--work">
                   {working.map((item) => (
                     <WorkingCard key={item.key} item={item} onOpen={openFile} />
+                  ))}
+                  {leavingWorking.map((card) => (
+                    <LeavingCard key={card.key} card={card} onOpen={openFile} />
                   ))}
                 </ul>
               ) : (
@@ -322,10 +338,13 @@ export function ProcessingPage(): React.ReactElement {
               count={handing.length}
               hint="Final checks, then back to your media manager"
             >
-              {handing.length ? (
+              {handing.length || leavingHanding.length ? (
                 <ul className="mm-live-lane__body">
                   {handing.slice(0, HANDING_SHOWN).map((item) => (
                     <HandingCard key={item.key} item={item} />
+                  ))}
+                  {leavingHanding.map((card) => (
+                    <LeavingCard key={card.key} card={card} onOpen={openFile} />
                   ))}
                   <More
                     count={handing.length - HANDING_SHOWN}

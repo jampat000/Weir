@@ -93,6 +93,8 @@ export interface ProcessingFile {
   progress_eta_seconds: number | null;
   /** `processing` while the file is written, `finishing` during the final checks. What the Processing lanes key on. */
   progress_status?: string | null;
+  /** The step the running pass is on: checking, planning, writing, verifying or handing_back. Null from an older server. */
+  progress_stage?: string | null;
   /** ffmpeg's speed as it reports it, for example "148x". */
   progress_speed?: string | null;
   progress_elapsed_seconds?: number | null;

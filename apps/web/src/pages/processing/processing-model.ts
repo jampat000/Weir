@@ -8,6 +8,7 @@ import type { ProcessingFile } from "../../lib/processing/files-api";
 import type { ProcessingJobInspectionRow } from "../../lib/processing/jobs-inspection/types";
 import { baseName } from "../../lib/format/path";
 import { parseAppTime } from "../../lib/ui/mm-format-date";
+import { stepForStage, type FlowStepId } from "./stage-flow-model";
 
 export const LIBRARY_CLEAN_JOB_KIND = "processing.library.clean.v1";
 
@@ -62,6 +63,8 @@ export type WorkingItem = {
   path: string;
   facts: string;
   libraryName: string;
+  /** The step of its stages the pass is on. */
+  step: FlowStepId;
   percent: number | null;
   etaSeconds: number | null;
   speed: string | null;
@@ -77,6 +80,8 @@ export type HandingItem = {
   /** The file's path, so its full name can be shown under the friendly title. */
   path: string;
   libraryName: string;
+  /** The step of its stages the pass is on. */
+  step: FlowStepId;
   file: ProcessingFile | null;
 };
 
@@ -266,6 +271,7 @@ export function buildLanes(
             name,
             path: file.relative_path,
             libraryName,
+            step: stepForStage(file.progress_stage, "verify"),
             file,
           });
           break;
@@ -277,6 +283,10 @@ export function buildLanes(
           path: file.relative_path,
           facts,
           libraryName,
+          step: stepForStage(
+            file.progress_stage,
+            file.progress_percent == null ? "checking" : "write",
+          ),
           percent: file.progress_percent,
           etaSeconds: file.progress_eta_seconds,
           speed: file.progress_speed ?? null,
@@ -311,6 +321,7 @@ export function buildLanes(
     if (row.status === "leased") {
       lanes.working.push({
         ...item,
+        step: "write",
         percent: null,
         etaSeconds: null,
         speed: null,

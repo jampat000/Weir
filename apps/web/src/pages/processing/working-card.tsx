@@ -105,10 +105,7 @@ export function WorkingCard({
         </div>
       </div>
       {item.source === "download" ? (
-        <StageFlow
-          position={writing ? "write" : "checking"}
-          percent={item.percent}
-        />
+        <StageFlow position={item.step} percent={item.percent} />
       ) : (
         <CleaningBar name={item.name} />
       )}

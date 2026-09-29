@@ -187,9 +187,9 @@ describe("StageFlow's reduced-motion styles", () => {
     expect(reduced).not.toBe("");
   });
 
-  it("stops the pulse, the tick's drawing, the shimmer and the sweep", () => {
+  it("stops the pulse, the tick's drawing, the shimmer, the sweep and the ended card's fade", () => {
     expect(reduced).toMatch(
-      /\.mm-flow__step--now \.mm-flow__node::after,[^{]*\.mm-flow__step--done \.mm-flow__glyph path,[^{]*\.mm-flow__link--live \.mm-flow__fill::after,[^{]*\.mm-flow__link--busy \.mm-flow__fill::before \{\s*animation: none;/,
+      /\.mm-flow__step--now \.mm-flow__node::after,[^{]*\.mm-flow__step--done \.mm-flow__glyph path,[^{]*\.mm-flow__link--live \.mm-flow__fill::after,[^{]*\.mm-flow__link--busy \.mm-flow__fill::before,\s*\.mm-live-card--leaving \{\s*animation: none;/,
     );
   });
 

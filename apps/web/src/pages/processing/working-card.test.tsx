@@ -11,6 +11,7 @@ function item(overrides: Partial<WorkingItem>): WorkingItem {
     path: "Film (2024)/Film.mkv",
     facts: "1080p · H264 · 2.27 GB",
     libraryName: "Movies",
+    step: "write",
     percent: 42,
     etaSeconds: 30,
     speed: "148x",
@@ -50,7 +51,12 @@ describe("WorkingCard", () => {
   });
 
   it("is on Checking, with no progress line, before the pass reports a percent", () => {
-    render(<WorkingCard item={item({ percent: null })} onOpen={vi.fn()} />);
+    render(
+      <WorkingCard
+        item={item({ percent: null, step: "checking" })}
+        onOpen={vi.fn()}
+      />,
+    );
 
     const current = screen
       .getAllByRole("listitem")
@@ -59,6 +65,21 @@ describe("WorkingCard", () => {
     expect(
       screen.queryByRole("progressbar", { name: "Write progress" }),
     ).toBeNull();
+  });
+
+  it("is on the step the server names, even before a percent, with the line into it sweeping", () => {
+    render(
+      <WorkingCard
+        item={item({ percent: null, step: "plan" })}
+        onOpen={vi.fn()}
+      />,
+    );
+
+    const current = screen
+      .getAllByRole("listitem")
+      .find((step) => step.getAttribute("aria-current") === "step");
+    expect(current).toHaveTextContent("Plan");
+    expect(current?.querySelector(".mm-flow__link--busy")).not.toBeNull();
   });
 
   it("has no separate progress bar beside the flow for a download", () => {

@@ -154,7 +154,7 @@ export function HandingCard({ item }: { item: HandingItem }) {
       <SourceTag source={item.source} libraryName={item.libraryName} />
       <span className="mm-live-card__title">{item.name}</span>
       <FileName path={item.path} className="mm-live-card__file" />
-      {item.source === "download" ? <StageFlow position="verify" /> : null}
+      {item.source === "download" ? <StageFlow position={item.step} /> : null}
       <p className="mm-live-card__note mm-live-card__note--busy">
         <span className="mm-live-spin" aria-hidden="true" />
         {item.source === "library"

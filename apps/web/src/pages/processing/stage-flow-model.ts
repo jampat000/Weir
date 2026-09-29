@@ -25,6 +25,26 @@ export type StepState = "done" | "now" | "next" | "failed";
 /** How the line joining a step to the one before it looks. */
 export type LinkState = "full" | "empty" | "busy" | "live";
 
+/** The names the server gives each stage in its live progress (`progress_stage`). */
+const STEP_BY_STAGE: Record<string, FlowStepId> = {
+  checking: "checking",
+  planning: "plan",
+  writing: "write",
+  verifying: "verify",
+  handing_back: "hand-back",
+};
+
+/**
+ * The step a pass is on: the one the server names, or `inferred` when it names none (a server that predates
+ * `progress_stage`, or a report from before the pass has said anything).
+ */
+export function stepForStage(
+  stage: string | null | undefined,
+  inferred: FlowStepId,
+): FlowStepId {
+  return (stage ? STEP_BY_STAGE[stage] : undefined) ?? inferred;
+}
+
 export function stepIndex(id: FlowStepId): number {
   return FLOW_STEPS.findIndex((step) => step.id === id);
 }

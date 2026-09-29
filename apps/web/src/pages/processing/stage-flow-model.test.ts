@@ -1,5 +1,26 @@
 import { describe, expect, it } from "vitest";
-import { FLOW_DONE, linkState, stepStates } from "./stage-flow-model";
+import {
+  FLOW_DONE,
+  linkState,
+  stepForStage,
+  stepStates,
+} from "./stage-flow-model";
+
+describe("stepForStage", () => {
+  it("maps each stage the server names to its step", () => {
+    expect(
+      ["checking", "planning", "writing", "verifying", "handing_back"].map(
+        (stage) => stepForStage(stage, "checking"),
+      ),
+    ).toEqual(["checking", "plan", "write", "verify", "hand-back"]);
+  });
+
+  it("uses the inferred step when there is no stage or it is not one Weir knows", () => {
+    expect(stepForStage(null, "write")).toBe("write");
+    expect(stepForStage(undefined, "verify")).toBe("verify");
+    expect(stepForStage("polishing", "plan")).toBe("plan");
+  });
+});
 
 describe("stepStates", () => {
   it("has the first step in progress and the rest up next when a file is being checked", () => {

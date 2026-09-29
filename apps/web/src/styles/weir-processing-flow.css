@@ -184,6 +184,18 @@
   color: var(--mm-status-failed-text);
 }
 
+/* A card kept after its file left Working or Handing back (LEAVING_CARD_MS in leaving-cards.ts). It fades over
+   the last 0.4s of the 2.5s it stays, so it does not just vanish. */
+.mm-live-card--leaving {
+  animation: mm-flow-leave 0.4s ease-in 2.1s forwards;
+}
+
+@keyframes mm-flow-leave {
+  to {
+    opacity: 0;
+  }
+}
+
 @keyframes mm-flow-tick {
   from {
     stroke-dashoffset: 14;
@@ -198,7 +210,8 @@
   .mm-flow__step--now .mm-flow__node::after,
   .mm-flow__step--done .mm-flow__glyph path,
   .mm-flow__link--live .mm-flow__fill::after,
-  .mm-flow__link--busy .mm-flow__fill::before {
+  .mm-flow__link--busy .mm-flow__fill::before,
+  .mm-live-card--leaving {
     animation: none;
   }
 
