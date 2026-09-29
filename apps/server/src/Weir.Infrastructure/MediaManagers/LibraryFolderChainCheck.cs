@@ -64,7 +64,7 @@ public sealed class LibraryFolderChainCheck
             ? null
             : (IReadOnlySet<long>)(await _libraries.ManagerConnectionIdsAsync(uow, library.Id).ConfigureAwait(false)).ToHashSet();
         var managers = await _managerSetupCheck
-            .CheckAsync(uow, library.MediaType, library.WatchedFolder, library.OutputFolder, linked, library.RemoveOriginalAfterSuccess, cancellationToken)
+            .CheckAsync(uow, library.MediaType, library.WatchedFolder, library.OutputFolder, linked, library.RemoveOriginalAfterSuccess, DelunoLinkOf(library), cancellationToken)
             .ConfigureAwait(false);
         var managersReady = managers.All(entry => entry.Get("ready") is WireBool { Value: true });
 
@@ -80,6 +80,12 @@ public sealed class LibraryFolderChainCheck
             .Set("download_clients", new WireArray(downloadClients.Select(entry => (WireValue)entry)))
             .Set("ready", localReady && managersReady && downloadClientsReady);
     }
+
+    /// <summary>The Deluno library the workflow was created from, when it was created from one.</summary>
+    private static DelunoLibraryLink? DelunoLinkOf(ProcessingLibraryRecord library) =>
+        library.DiscoveredFromConnectionId is { } connectionId && !string.IsNullOrEmpty(library.DiscoveredLibraryKey)
+            ? new DelunoLibraryLink(connectionId, library.DiscoveredLibraryKey)
+            : null;
 
     private async Task<List<WireObject>> DownloadClientEntriesAsync(UnitOfWork uow, string watchedFolder, CancellationToken cancellationToken)
     {
