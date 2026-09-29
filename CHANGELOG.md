@@ -9,6 +9,7 @@ list first.
 
 ## 3.x
 
+- **3.2.15** (2026-09-30). With Deluno 1.0.0-rc.23 or later, Weir checks where each download client really saves, using Deluno's path mappings, and says what to change when a folder does not line up. [notes](docs/release-notes/v3.2.15.md) · [release](https://github.com/jampat000/Weir/releases/tag/v3.2.15)
 - **3.2.14** (2026-09-30). qBittorrent 5.x stays connected, and a downloaded update installs when you quit or restart instead of interrupting Weir. [notes](docs/release-notes/v3.2.14.md) · [release](https://github.com/jampat000/Weir/releases/tag/v3.2.14)
 - **3.2.13** (2026-09-30). First run connects your media manager first, Settings libraries become Weir-only or linked workflows, Weir is named after its computer, and the folder checks say when things are in sync and exactly what to change when they are not. [notes](docs/release-notes/v3.2.13.md) · [release](https://github.com/jampat000/Weir/releases/tag/v3.2.13)
 - **3.2.12** (2026-09-29). A maintenance release built with the quicker release process; nothing changes in how Weir works. [notes](docs/release-notes/v3.2.12.md) · [release](https://github.com/jampat000/Weir/releases/tag/v3.2.12)
