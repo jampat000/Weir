@@ -1,8 +1,25 @@
 /** The words and numbers on the Processing cards: times, speeds and how a finished file turned out. */
 import type { FinishedFile } from "../../lib/activity/processing-outcome";
 import { formatBytes } from "../../lib/format/bytes";
+import type { WorkflowKind } from "../../lib/processing/workflow-kind";
 import { parseAppTime } from "../../lib/ui/mm-format-date";
 import { plural } from "../../lib/ui/mm-plural";
+
+const HANDING_TO_OUTPUT_FOLDER = "into the output folder";
+const HANDING_TO_MEDIA_MANAGER = "back to your media manager";
+
+/** Where the Handing back lane says a file goes next, in the words of the workflows that exist. */
+export function handingLaneHint(
+  workflowKinds: readonly WorkflowKind["kind"][],
+): string {
+  const destinations = [
+    workflowKinds.includes("weir_only") ? HANDING_TO_OUTPUT_FOLDER : null,
+    workflowKinds.includes("linked") || workflowKinds.length === 0
+      ? HANDING_TO_MEDIA_MANAGER
+      : null,
+  ].filter((destination): destination is string => destination !== null);
+  return `Final checks, then ${destinations.join(" or ")}`;
+}
 
 /** "Saved 318 MB · removed 4 audio, 6 subtitles", in the words each outcome deserves. */
 export function finishedLine(item: FinishedFile): string {

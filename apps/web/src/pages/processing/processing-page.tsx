@@ -31,6 +31,7 @@ import { useProcessingLibrariesQuery } from "../../lib/processing/libraries-quer
 import { mergeLiveProgress } from "../../lib/processing/live-progress-merge";
 import { useProcessingFilesAtOnceQuery } from "../../lib/processing/queries";
 import { processingKeys } from "../../lib/processing/query-keys";
+import { workflowKindName } from "../../lib/processing/workflow-kind";
 import { parseAppTime } from "../../lib/ui/mm-format-date";
 import { useNow } from "../../lib/ui/use-now";
 import { FinishedLane } from "./finished-lane";
@@ -50,6 +51,7 @@ import {
   TODAY_DAYS,
   type Filter,
 } from "./processing-toolbar";
+import { handingLaneHint } from "./processing-words";
 import { WorkingCard } from "./working-card";
 import { ACTIVE_JOBS_LIMIT, WORKING_FILES_QUERY } from "./working-count";
 
@@ -158,7 +160,12 @@ export function ProcessingPage(): React.ReactElement {
   const now = useNow(TICK_MS);
   const board = useLanes();
   useRefetchOverdueLooks(board, now);
-  const { files, lanes } = board;
+  const { files, libraries, lanes } = board;
+  const handingHint = handingLaneHint(
+    (libraries.data ?? [])
+      .filter((library) => library.enabled)
+      .map(workflowKindName),
+  );
   const filesAtOnce = useProcessingFilesAtOnceQuery();
   const pause = usePauseQuery();
   const fileLog = useProcessingFileLog();
@@ -336,7 +343,7 @@ export function ProcessingPage(): React.ReactElement {
               active={handing.length > 0}
               label="Handing back"
               count={handing.length}
-              hint="Final checks, then back to your media manager"
+              hint={handingHint}
             >
               {handing.length || leavingHanding.length ? (
                 <ul className="mm-live-lane__body">

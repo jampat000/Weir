@@ -3,6 +3,7 @@ import type {
   ProcessingFileHandback,
   ProcessingFileLogEntry,
 } from "../../lib/processing/files-api";
+import type { WorkflowKind } from "../../lib/processing/workflow-kind";
 import {
   audioCodecName,
   channelLayout,
@@ -208,11 +209,13 @@ export type HandbackStory = {
 
 /**
  * What became of the copy Weir handed back (#652): "Imported by Sonarr", "Deluno will not import it", or still
- * waiting for a media manager, with what Weir did with its copy. Null when Weir wrote no copy.
+ * waiting for a media manager, with what Weir did with its copy. A Weir-only workflow has no manager to wait
+ * for, so its copy is simply in the output folder. Null when Weir wrote no copy.
  */
 export function handbackStory(
   handback: ProcessingFileHandback | null | undefined,
   now: number,
+  workflowKind: WorkflowKind["kind"],
 ): HandbackStory | null {
   if (!handback) return null;
   const by = handback.outcome_by ?? "Your media manager";
@@ -242,9 +245,18 @@ export function handbackStory(
   if (handback.settled_at && note) {
     return { heading: "Handed back", sentence: note, tone: "neutral" };
   }
-  const when = handback.written_at
-    ? ` ${agoWords(handback.written_at, now)}`
-    : "";
+  const written = handback.written_at
+    ? agoWords(handback.written_at, now)
+    : null;
+  if (workflowKind === "weir_only") {
+    const writtenNote = written ? ` It was written ${written}.` : "";
+    return {
+      heading: "Cleaned copy",
+      sentence: `The cleaned copy is in the output folder, at ${handback.output_path}.${writtenNote}`,
+      tone: "neutral",
+    };
+  }
+  const when = written ? ` ${written}` : "";
   return {
     heading: "Handed back",
     sentence: `Weir put the cleaned copy at ${handback.output_path}${when} for your media manager to import. No media manager has said it imported it yet.`,
