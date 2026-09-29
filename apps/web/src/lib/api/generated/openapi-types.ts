@@ -10564,6 +10564,8 @@ export interface operations {
         watched_folder?: string;
         output_folder?: string;
         remove_original_after_success?: boolean;
+        /** @description The media managers the workflow is linked to; only these are checked. Leave it out to check every manager that covers the media type; send it empty for a Weir-only workflow. */
+        connection_ids?: number[];
       };
       header?: never;
       path?: never;

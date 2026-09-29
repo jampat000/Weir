@@ -15825,6 +15825,19 @@
               "title": "Remove Original After Success",
               "type": "boolean"
             }
+          },
+          {
+            "description": "The media managers the workflow is linked to; only these are checked. Leave it out to check every manager that covers the media type; send it empty for a Weir-only workflow.",
+            "in": "query",
+            "name": "connection_ids",
+            "required": false,
+            "schema": {
+              "items": {
+                "type": "integer"
+              },
+              "title": "Connection Ids",
+              "type": "array"
+            }
           }
         ],
         "responses": {

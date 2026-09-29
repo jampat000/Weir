@@ -28,16 +28,26 @@ public sealed class ManagerSetupCheck
         _handlers = handlers ?? throw new ArgumentNullException(nameof(handlers));
     }
 
-    /// <summary>One entry per enabled connection that covers <paramref name="mediaScope"/>, in connection order.</summary>
+    /// <summary>
+    /// One entry per enabled connection that covers <paramref name="mediaScope"/>, in connection order. A workflow only
+    /// depends on the managers it is linked to, so <paramref name="linkedConnectionIds"/> narrows the answer to those; null
+    /// means every connection that covers the media type, as for folders not yet saved.
+    /// </summary>
     public async Task<List<WireObject>> CheckAsync(
-        UnitOfWork uow, string mediaScope, string watchedFolder, string outputFolder, bool removesOriginals = true, CancellationToken cancellationToken = default)
+        UnitOfWork uow,
+        string mediaScope,
+        string watchedFolder,
+        string outputFolder,
+        IReadOnlySet<long>? linkedConnectionIds,
+        bool removesOriginals = true,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(uow);
         var results = new List<WireObject>();
         foreach (var row in await _connectionStore.ListEnabledAsync(uow).ConfigureAwait(false))
         {
             var isArr = IsArrFor(row, mediaScope);
-            if (!isArr && !IsDeluno(row))
+            if ((!isArr && !IsDeluno(row)) || (linkedConnectionIds is not null && !linkedConnectionIds.Contains(row.Id)))
             {
                 continue;
             }
