@@ -633,20 +633,20 @@ public sealed class RemuxPassRunnerTests : IDisposable
         Assert.DoesNotContain(_media.Calls, argv => argv.Contains("-hwaccels"));
     }
 
-    [Fact]
-    public async Task With_hardware_decoding_on_ffmpeg_is_asked_once_for_every_pass()
+    [Theory]
+    [InlineData(HardwareAcceleration.ModeAuto)]
+    [InlineData(HardwareAcceleration.ModeDevice)]
+    public async Task A_saved_hardware_decoding_choice_is_not_applied_while_the_feature_is_unavailable(string savedMode)
     {
         _folders.Source("one.mkv");
-        _folders.Source("two.mkv");
         _media.Probes["one.mkv"] = FakeMediaRunner.EnglishAndJapanese;
-        _media.Probes["two.mkv"] = FakeMediaRunner.EnglishAndJapanese;
-        var runner = Runner();
-        var runtime = _folders.Runtime() with { HardwareDecodeMode = HardwareAcceleration.ModeAuto };
+        var runtime = _folders.Runtime() with { HardwareDecodeMode = savedMode, HardwareDevice = "cuda" };
 
-        await Run("one.mkv", runtime, runner: runner);
-        await Run("two.mkv", runtime, runner: runner);
+        var result = await Run("one.mkv", runtime);
 
-        Assert.Single(_media.Calls, argv => argv.Contains("-hwaccels"));
+        Assert.DoesNotContain(_media.Calls, argv => argv.Contains("-hwaccels"));
+        Assert.DoesNotContain(_media.Remuxes, argv => argv.Contains("-hwaccel"));
+        Assert.False(Bool(result, "hardware_fell_back_to_software"));
     }
 
     [Fact]

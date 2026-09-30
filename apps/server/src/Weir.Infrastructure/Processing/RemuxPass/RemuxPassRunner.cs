@@ -300,7 +300,7 @@ public sealed partial class RemuxPassRunner
             var (_, ffmpeg) = _resolver.Resolve();
             var hardwareSettings = new HardwareSettings
             {
-                Mode = HardwareAcceleration.NormalizeDecodeMode(runtime.HardwareDecodeMode),
+                Mode = HardwareAcceleration.EffectiveDecodeMode(runtime.HardwareDecodeMode),
                 Device = runtime.HardwareDevice ?? string.Empty,
                 DisabledVendors = HardwareAcceleration.ParseDisabledVendors(runtime.HardwareDisabledVendorsCsv),
                 Strictness = HardwareAcceleration.NormalizeStrictness(runtime.FfmpegStrictness),
