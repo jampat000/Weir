@@ -44,8 +44,30 @@ public sealed class QBittorrentLoginRulesTests
         Assert.Null(login.SessionCookie);
     }
 
+    [Fact]
+    public void A_200_with_an_empty_body_and_a_session_cookie_is_accepted()
+    {
+        var login = QBittorrentLoginRules.Read(200, string.Empty, "QBT_SID_8081=xyz789; HttpOnly; path=/");
+
+        Assert.True(login.Accepted);
+        Assert.Equal("QBT_SID_8081=xyz789", login.SessionCookie);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("SID=; path=/")]
+    public void A_200_with_an_empty_body_and_no_session_cookie_is_refused(string? setCookie)
+    {
+        var login = QBittorrentLoginRules.Read(200, string.Empty, setCookie);
+
+        Assert.False(login.Accepted);
+        Assert.Null(login.SessionCookie);
+    }
+
     [Theory]
     [InlineData(200, "Fails.", "SID=abc123")]
+    [InlineData(200, "Fails.", null)]
     [InlineData(200, "<html>a login page</html>", "SID=abc123")]
     [InlineData(401, "", "SID=abc123")]
     [InlineData(403, "Ok.", "SID=abc123")]
