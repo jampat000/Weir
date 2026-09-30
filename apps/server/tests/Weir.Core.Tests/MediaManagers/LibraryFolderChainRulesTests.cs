@@ -26,7 +26,7 @@ public sealed class LibraryFolderChainRulesTests
             return !Unwritable.Contains(path);
         }
 
-        public string? ResolveFinalPath(string path) => null;
+        public string? ResolveFinalPath(string path) => Existing.Contains(path) ? path : null;
 
         public bool? SameFilesystem(string first, string second) => SameFilesystemAnswer;
     }
@@ -230,9 +230,20 @@ public sealed class LibraryFolderChainRulesTests
     }
 
 
-    private static IReadOnlyList<SetupCheckLine> CheckClient(string label, string watched, string? completed, params (string Category, string Folder)[] categories) =>
-        LibraryFolderChainRules.CheckDownloadClientFolders(
-            label, watched, new DownloadClientFolders(completed, [.. categories.Select(item => new DownloadClientCategoryFolder(item.Category, item.Folder))]));
+    private static DownloadClientFolders ClientFolders(string? completed, IEnumerable<(string Category, string Folder)> categories) =>
+        new(completed, [.. categories.Select(item => new DownloadClientCategoryFolder(item.Category, item.Folder))]);
+
+    /// <summary>A client whose every folder exists on this machine.</summary>
+    private static IReadOnlyList<SetupCheckLine> CheckClient(string label, string watched, string? completed, params (string Category, string Folder)[] categories)
+    {
+        var probe = new FakeFolderProbe();
+        probe.Existing.UnionWith(categories.Select(item => item.Folder).Append(completed).OfType<string>());
+        return LibraryFolderChainRules.CheckDownloadClientFolders(label, watched, ClientFolders(completed, categories), probe);
+    }
+
+    /// <summary>A client whose folders none of exist on this machine.</summary>
+    private static IReadOnlyList<SetupCheckLine> CheckClientSeeingNothing(string label, string watched, string? completed, params (string Category, string Folder)[] categories) =>
+        LibraryFolderChainRules.CheckDownloadClientFolders(label, watched, ClientFolders(completed, categories), new FakeFolderProbe());
 
     [Fact]
     public void A_download_clients_completed_folder_matching_the_watched_folder_is_ok()
@@ -292,7 +303,7 @@ public sealed class LibraryFolderChainRulesTests
     [Fact]
     public void A_download_client_that_reported_no_folder_is_unverified_not_ok()
     {
-        var line = Assert.Single(LibraryFolderChainRules.CheckDownloadClientFolders("Deluge", Watched, DownloadClientFolders.Empty));
+        var line = Assert.Single(LibraryFolderChainRules.CheckDownloadClientFolders("Deluge", Watched, DownloadClientFolders.Empty, new FakeFolderProbe()));
 
         Assert.Equal(SetupCheckLine.Unverified, line.State);
         Assert.Contains("did not say where it saves", line.Text, StringComparison.Ordinal);
@@ -304,5 +315,47 @@ public sealed class LibraryFolderChainRulesTests
         var line = Assert.Single(CheckClient("Deluge", "", null));
 
         Assert.Equal(SetupCheckLine.Unverified, line.State);
+    }
+
+    [Fact]
+    public void A_container_path_weir_cannot_see_is_not_verified_rather_than_a_problem()
+    {
+        var line = Assert.Single(CheckClientSeeingNothing("qBittorrent", @"D:\dl\tv", "/downloads/tv"));
+
+        Assert.Equal(SetupCheckLine.Unverified, line.State);
+        Assert.Equal(
+            @"qBittorrent saves to: default completed-downloads folder /downloads/tv. Weir cannot see all of that from this computer, so it cannot tell whether downloads land in this workflow's watched folder D:\dl\tv. " +
+            "That is expected when qBittorrent runs on another machine or in a container that names its folders differently.",
+            line.Text);
+    }
+
+    [Fact]
+    public void A_drive_or_share_that_does_not_exist_here_is_not_verified_rather_than_a_problem()
+    {
+        var line = Assert.Single(CheckClientSeeingNothing("Transmission", @"C:\Downloads\Completed\Movies", @"Z:\Torrents", ("movies", @"\\seedbox\complete\movies")));
+
+        Assert.Equal(SetupCheckLine.Unverified, line.State);
+        Assert.Contains(@"Z:\Torrents", line.Text, StringComparison.Ordinal);
+        Assert.Contains(@"\\seedbox\complete\movies", line.Text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void One_folder_weir_cannot_see_among_visible_ones_leaves_the_verdict_not_verified()
+    {
+        var probe = new FakeFolderProbe();
+        probe.Existing.Add("/downloads/complete");
+
+        var lines = LibraryFolderChainRules.CheckDownloadClientFolders(
+            "SABnzbd", Watched, ClientFolders("/downloads/complete", [("tv", "/remote/tv")]), probe);
+
+        Assert.Equal(SetupCheckLine.Unverified, Assert.Single(lines).State);
+    }
+
+    [Fact]
+    public void A_folder_inside_the_watched_folder_is_ok_even_when_it_is_not_a_folder_here_yet()
+    {
+        var line = Assert.Single(CheckClientSeeingNothing("qBittorrent", Watched, Watched + "/Blade Runner"));
+
+        Assert.Equal(SetupCheckLine.Ok, line.State);
     }
 }

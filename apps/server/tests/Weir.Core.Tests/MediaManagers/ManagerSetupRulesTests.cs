@@ -70,10 +70,23 @@ public sealed class ManagerSetupRulesTests
     {
         var clients = Clients();
 
-        Assert.Equal(new ArrDownloadClientEntry("qBittorrent", "QBittorrent", true, "qbittorrent", "tv-sonarr", null, "torrent"), clients[0]);
+        Assert.Equal(new ArrDownloadClientEntry("qBittorrent", "QBittorrent", true, "qbittorrent", "tv-sonarr", null, "torrent", 8080), clients[0]);
         Assert.Equal(new ArrDownloadClientEntry("SABnzbd", "Sabnzbd", false, "sabnzbd", "tv", null, "usenet"), clients[1]);
         Assert.Equal("movies-radarr", Clients("""[{"enable":true,"name":"q","fields":[{"name":"host","value":"q"},{"name":"movieCategory","value":"movies-radarr"}]}]""", MediaManagerKinds.Movie)[0].Category);
         Assert.Equal("/downloads/tv", Clients("""[{"enable":true,"name":"t","fields":[{"name":"host","value":"t"},{"name":"tvDirectory","value":"/downloads/tv"}]}]""")[0].Directory);
+    }
+
+    [Theory]
+    [InlineData("8080", 8080)]
+    [InlineData("0", null)]
+    [InlineData("65536", null)]
+    [InlineData("\"8080\"", null)]
+    [InlineData("null", null)]
+    public void A_download_clients_port_is_read_only_when_it_is_a_real_port_number(string value, int? expected)
+    {
+        var clients = Clients($$"""[{"enable":true,"name":"q","implementation":"QBittorrent","fields":[{"name":"host","value":"q"},{"name":"port","value":{{value}} }]}]""");
+
+        Assert.Equal(expected, Assert.Single(clients).Port);
     }
 
     // --- Sonarr/Radarr ------------------------------------------------------------------------------

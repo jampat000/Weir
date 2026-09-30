@@ -7,7 +7,7 @@ public sealed record RemotePathMappingEntry(string Host, string RemotePath, stri
 
 /// <summary>One download client the manager uses (<c>GET /api/v3/downloadclient</c>), reduced to what the check reads.</summary>
 public sealed record ArrDownloadClientEntry(
-    string Name, string Implementation, bool Enabled, string? Host, string? Category, string? Directory, string? Protocol = null)
+    string Name, string Implementation, bool Enabled, string? Host, string? Category, string? Directory, string? Protocol = null, int? Port = null)
 {
     /// <summary><c>protocol</c> is the camelCased <c>DownloadProtocol</c>: <c>torrent</c> or <c>usenet</c>.</summary>
     public bool IsTorrent => string.Equals(Protocol, "torrent", StringComparison.OrdinalIgnoreCase);

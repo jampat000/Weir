@@ -22,9 +22,12 @@ public sealed class ManagerSectionTruthApiTests
         var (server, client, manager) = await LibraryFolderChainApiTests.StartAsync();
         await using var _server = server;
         using var folders = LibraryFolderChainApiTests.TempFolders.Create();
+        var radarrId = await LibraryFolderChainApiTests.ConnectAsync(client, "radarr", "Radarr", "http://192.0.2.61:7878");
         await LibraryFolderChainApiTests.ConnectDownloadClientAsync(client, "sabnzbd", "SABnzbd", "http://192.0.2.40:8080");
-        manager.Json(HttpMethod.Get, "/api", """{"config":{"misc":{"complete_dir":"/somewhere/else"}}}""");
-        var libraryId = await LibraryFolderChainApiTests.CreateLibraryAsync(client, "Movies with a mismatched SABnzbd", folders, mediaType: "movie");
+        LibraryFolderChainApiTests.ScriptManagerClients(
+            manager, new Dictionary<string, string[]> { ["192.0.2.61"] = [LibraryFolderChainApiTests.ManagerClientJson("Sabnzbd", "192.0.2.40", 8080)] });
+        manager.Json(HttpMethod.Get, "/api", System.Text.Json.JsonSerializer.Serialize(new { config = new { misc = new { complete_dir = folders.Output } } }));
+        var libraryId = await LibraryFolderChainApiTests.CreateLibraryAsync(client, "Movies with a mismatched SABnzbd", folders, [radarrId], mediaType: "movie");
 
         var chain = await LibraryFolderChainApiTests.FolderChainAsync(client, libraryId);
         using var suggestionsResponse = await client.GetAsync(SuggestionsPath);
@@ -35,7 +38,7 @@ public sealed class ManagerSectionTruthApiTests
         Assert.DoesNotContain(Lines(chained), line => line["state"]!.GetValue<string>() == "ok");
         Assert.Contains(Lines(chained), line => line["state"]!.GetValue<string>() == "problem");
         Assert.False(chain["ready"]!.GetValue<bool>());
-        Assert.Equal("/somewhere/else", suggestion["suggested_watched_folder"]!.GetValue<string>());
+        Assert.Equal(folders.Output, suggestion["suggested_watched_folder"]!.GetValue<string>());
         Assert.Null(suggestion["ready"]);
         Assert.Null(suggestion["lines"]);
     }

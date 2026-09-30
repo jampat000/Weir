@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Weir.Api.Tests.MediaManagers;
 using static Weir.Api.Tests.Processing.LibraryFolderChainApiTests;
 
 namespace Weir.Api.Tests.Processing;
@@ -33,17 +34,24 @@ public sealed class LibraryFolderChainRealFoldersApiTests
     private static IEnumerable<(string State, string Text)> Lines(JsonNode entry) =>
         entry["lines"]!.AsArray().Select(line => (line!["state"]!.GetValue<string>(), line["text"]!.GetValue<string>()));
 
+    private const string TransmissionAddress = "http://192.0.2.41:9091";
+
+    private const string SonarrAddress = "http://192.0.2.60:8989";
+
+    /// <summary>Scripts Sonarr (reached at 192.0.2.60) to say it uses Transmission at <see cref="TransmissionAddress"/>.</summary>
+    private static void SonarrUsesTransmission(ScriptedManager manager) =>
+        ScriptManagerClients(manager, new Dictionary<string, string[]> { ["192.0.2.60"] = [ManagerClientJson("Transmission", "192.0.2.41", 9091)] });
+
     [Fact]
-    public async Task A_client_saving_outside_the_watched_folder_is_a_problem_even_when_deluno_declares_a_path_inside_it()
+    public async Task A_deluno_linked_workflow_is_not_judged_against_a_client_that_does_not_save_into_its_watched_folder()
     {
         var (server, client, manager) = await StartAsync();
         await using var _server = server;
         using var folders = TempFolders.Create();
-        var completedRoot = Path.GetDirectoryName(folders.Watched)!;
         var delunoId = await ConnectAsync(client, "deluno", "Deluno", "http://192.0.2.10:5099");
         manager.Json(HttpMethod.Get, "/api/integrations/external/manifest", DelunoManifest(folders, folders.Watched));
-        await ConnectDownloadClientAsync(client, "transmission", "Transmission", "http://192.0.2.41:9091");
-        manager.Json(HttpMethod.Post, "/transmission/rpc", TransmissionSavingTo(completedRoot));
+        await ConnectDownloadClientAsync(client, "transmission", "Transmission", TransmissionAddress);
+        manager.Json(HttpMethod.Post, "/transmission/rpc", TransmissionSavingTo(Path.GetDirectoryName(folders.Watched)!));
         var libraryId = await CreateLibraryAsync(client, "Deluno and a Transmission", folders, [delunoId]);
 
         var chain = await FolderChainAsync(client, libraryId);
@@ -53,6 +61,25 @@ public sealed class LibraryFolderChainRealFoldersApiTests
         Assert.Contains(Lines(deluno), line => line.State == "unverified" && line.Text == $"Deluno on 192.0.2.10 says its TV library downloads to {folders.Watched} (inside Weir's watched folder). Weir can't see where each download client really saves.");
         Assert.DoesNotContain(Lines(deluno), line => line.State == "ok" && line.Text.Contains("downloads", StringComparison.Ordinal));
         Assert.Equal(2, Lines(deluno).Count(line => line.State == "unverified" && line.Text.Contains("files this workflow's downloads under the category \"deluno-tv\"", StringComparison.Ordinal)));
+        Assert.Empty(chain["download_clients"]!.AsArray());
+        Assert.True(chain["ready"]!.GetValue<bool>());
+    }
+
+    [Fact]
+    public async Task A_client_the_linked_sonarr_uses_that_saves_above_the_watched_folder_is_a_problem_naming_both_folders()
+    {
+        var (server, client, manager) = await StartAsync();
+        await using var _server = server;
+        using var folders = TempFolders.Create();
+        var completedRoot = Path.GetDirectoryName(folders.Watched)!;
+        var sonarrId = await ConnectAsync(client, "sonarr", "Sonarr", SonarrAddress);
+        await ConnectDownloadClientAsync(client, "transmission", "Transmission", TransmissionAddress);
+        SonarrUsesTransmission(manager);
+        manager.Json(HttpMethod.Post, "/transmission/rpc", TransmissionSavingTo(completedRoot));
+        var libraryId = await CreateLibraryAsync(client, "Sonarr and a Transmission", folders, [sonarrId]);
+
+        var chain = await FolderChainAsync(client, libraryId);
+
         var transmission = Assert.Single(chain["download_clients"]!.AsArray())!;
         Assert.False(transmission["ready"]!.GetValue<bool>());
         var problem = Assert.Single(Lines(transmission), line => line.State == "problem");
@@ -62,37 +89,97 @@ public sealed class LibraryFolderChainRealFoldersApiTests
     }
 
     [Fact]
-    public async Task With_several_download_clients_each_has_its_own_entry_and_only_the_wrong_one_is_a_problem()
+    public async Task A_weir_only_workflow_is_not_told_about_a_connected_download_client_that_saves_elsewhere()
+    {
+        var (server, client, manager) = await StartAsync();
+        await using var _server = server;
+        using var folders = TempFolders.Create();
+        await ConnectDownloadClientAsync(client, "transmission", "Transmission", TransmissionAddress);
+        manager.Json(HttpMethod.Post, "/transmission/rpc", TransmissionSavingTo(Path.GetDirectoryName(folders.Watched)!));
+        var libraryId = await CreateLibraryAsync(client, "Manual inbox", folders);
+
+        var chain = await FolderChainAsync(client, libraryId);
+
+        Assert.Empty(chain["download_clients"]!.AsArray());
+        Assert.True(chain["ready"]!.GetValue<bool>());
+    }
+
+    [Fact]
+    public async Task A_client_saving_into_the_watched_folder_is_listed_for_a_weir_only_workflow_and_others_are_not()
     {
         var (server, client, manager) = await StartAsync();
         await using var _server = server;
         using var folders = TempFolders.Create();
         await ConnectDownloadClientAsync(client, "sabnzbd", "SABnzbd", "http://192.0.2.40:8080");
-        await ConnectDownloadClientAsync(client, "transmission", "Transmission", "http://192.0.2.41:9091");
+        await ConnectDownloadClientAsync(client, "transmission", "Transmission", TransmissionAddress);
         manager.Json(HttpMethod.Get, "/api", "{\"config\":{\"misc\":{\"complete_dir\":" + JsonSerializer.Serialize(folders.Watched) + "}}}")
             .Json(HttpMethod.Post, "/transmission/rpc", TransmissionSavingTo(Path.GetDirectoryName(folders.Watched)!));
-        var libraryId = await CreateLibraryAsync(client, "Two download clients", folders);
+        var libraryId = await CreateLibraryAsync(client, "Downloads from SABnzbd", folders);
 
         var chain = await FolderChainAsync(client, libraryId);
 
-        var clients = chain["download_clients"]!.AsArray();
-        Assert.Equal(2, clients.Count);
-        var sabnzbd = Assert.Single(clients, entry => entry!["kind"]!.GetValue<string>() == "sabnzbd")!;
-        var transmission = Assert.Single(clients, entry => entry!["kind"]!.GetValue<string>() == "transmission")!;
+        var sabnzbd = Assert.Single(chain["download_clients"]!.AsArray())!;
+        Assert.Equal("sabnzbd", sabnzbd["kind"]!.GetValue<string>());
         Assert.True(sabnzbd["ready"]!.GetValue<bool>());
         Assert.Equal("ok", Assert.Single(Lines(sabnzbd)).State);
-        Assert.False(transmission["ready"]!.GetValue<bool>());
-        Assert.Equal("problem", Assert.Single(Lines(transmission)).State);
     }
 
     [Fact]
-    public async Task A_download_client_that_does_not_answer_is_not_verified_rather_than_left_out_or_passed()
+    public async Task A_workflow_is_only_judged_against_the_clients_its_own_manager_uses()
     {
-        var (server, client, _) = await StartAsync();
+        var (server, client, manager) = await StartAsync();
         await using var _server = server;
         using var folders = TempFolders.Create();
-        await ConnectDownloadClientAsync(client, "transmission", "Transmission", "http://192.0.2.41:9091");
-        var libraryId = await CreateLibraryAsync(client, "Silent download client", folders);
+        var sonarrId = await ConnectAsync(client, "sonarr", "Sonarr", SonarrAddress);
+        await ConnectAsync(client, "radarr", "Radarr", "http://192.0.2.61:7878");
+        await ConnectDownloadClientAsync(client, "sabnzbd", "SABnzbd", "http://192.0.2.40:8080");
+        await ConnectDownloadClientAsync(client, "transmission", "Transmission", TransmissionAddress);
+        ScriptManagerClients(manager, new Dictionary<string, string[]>
+        {
+            ["192.0.2.60"] = [ManagerClientJson("Transmission", "192.0.2.41", 9091)],
+            ["192.0.2.61"] = [ManagerClientJson("Sabnzbd", "192.0.2.40", 8080)],
+        });
+        manager.Json(HttpMethod.Get, "/api", JsonSerializer.Serialize(new { config = new { misc = new { complete_dir = folders.Output } } }))
+            .Json(HttpMethod.Post, "/transmission/rpc", TransmissionSavingTo(folders.Work));
+        var libraryId = await CreateLibraryAsync(client, "TV from Sonarr", folders, [sonarrId], mediaType: "tv");
+
+        var chain = await FolderChainAsync(client, libraryId);
+
+        var listed = Assert.Single(chain["download_clients"]!.AsArray())!;
+        Assert.Equal("transmission", listed["kind"]!.GetValue<string>());
+    }
+
+    [Fact]
+    public async Task A_client_path_weir_cannot_see_is_not_verified_and_never_a_problem()
+    {
+        var (server, client, manager) = await StartAsync();
+        await using var _server = server;
+        using var folders = TempFolders.Create();
+        var sonarrId = await ConnectAsync(client, "sonarr", "Sonarr", SonarrAddress);
+        await ConnectDownloadClientAsync(client, "transmission", "Transmission", TransmissionAddress);
+        SonarrUsesTransmission(manager);
+        manager.Json(HttpMethod.Post, "/transmission/rpc", TransmissionSavingTo("/downloads/tv"));
+        var libraryId = await CreateLibraryAsync(client, "Sonarr and a containerised Transmission", folders, [sonarrId]);
+
+        var chain = await FolderChainAsync(client, libraryId);
+
+        var transmission = Assert.Single(chain["download_clients"]!.AsArray())!;
+        Assert.True(transmission["ready"]!.GetValue<bool>());
+        var line = Assert.Single(Lines(transmission));
+        Assert.Equal("unverified", line.State);
+        Assert.Contains("Weir cannot see all of that from this computer", line.Text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_client_that_does_not_answer_is_not_verified_rather_than_left_out_or_passed()
+    {
+        var (server, client, manager) = await StartAsync();
+        await using var _server = server;
+        using var folders = TempFolders.Create();
+        var sonarrId = await ConnectAsync(client, "sonarr", "Sonarr", SonarrAddress);
+        await ConnectDownloadClientAsync(client, "transmission", "Transmission", TransmissionAddress);
+        SonarrUsesTransmission(manager);
+        var libraryId = await CreateLibraryAsync(client, "Sonarr and a silent Transmission", folders, [sonarrId]);
 
         var chain = await FolderChainAsync(client, libraryId);
 

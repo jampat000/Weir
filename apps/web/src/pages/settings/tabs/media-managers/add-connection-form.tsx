@@ -8,6 +8,8 @@ import {
 import { errorMessage } from "../../../../lib/api/error-message";
 import {
   MEDIA_MANAGER_KIND_LABELS,
+  OPTIONAL_ADDRESS_HINT,
+  connectionNeedsAddress,
   type MediaManagerConnection,
   type MediaManagerKind,
 } from "../../../../lib/media-managers/media-managers-api";
@@ -28,6 +30,8 @@ const KIND_BLURBS: Record<MediaManagerKind, string> = {
   deluno: "Hands a file to Weir to work on, and waits to be told it is ready.",
   native: "Anything else that can send Weir a message.",
 };
+
+const ADDRESS_HINT = "The address you use to open it in a browser.";
 
 type FormState = {
   kind: MediaManagerKind;
@@ -54,6 +58,7 @@ export function AddConnectionForm({
     emptyForm(kinds.includes(PREFERRED_KIND) ? PREFERRED_KIND : kinds[0]),
   );
   const create = useCreateMediaManagerConnection();
+  const needsAddress = connectionNeedsAddress(form.kind);
   const change = <K extends keyof FormState>(key: K, value: FormState[K]) =>
     setForm((current) => ({ ...current, [key]: value }));
 
@@ -95,7 +100,7 @@ export function AddConnectionForm({
           </div>
           <Field
             label="Where to find it"
-            hint="The address you use to open it in a browser."
+            hint={needsAddress ? ADDRESS_HINT : OPTIONAL_ADDRESS_HINT}
             width="wide"
           >
             <input
@@ -134,7 +139,9 @@ export function AddConnectionForm({
             type="submit"
             data-testid="media-manager-save"
             className={mmActionButtonClass({ variant: "primary" })}
-            disabled={create.isPending || !form.base_url.trim()}
+            disabled={
+              create.isPending || (needsAddress && !form.base_url.trim())
+            }
           >
             {create.isPending ? "Adding…" : "Add"}
           </button>

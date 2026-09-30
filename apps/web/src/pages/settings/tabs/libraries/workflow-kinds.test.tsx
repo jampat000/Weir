@@ -1,4 +1,5 @@
 import {
+  cleanup,
   fireEvent,
   render,
   screen,
@@ -10,10 +11,16 @@ import type { ReactNode } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, expect, it, vi } from "vitest";
 
+import * as downloadClientsApi from "../../../../lib/download-clients/download-clients-api";
 import * as managerApi from "../../../../lib/media-managers/media-managers-api";
 import type { MediaManagerConnection } from "../../../../lib/media-managers/media-managers-api";
 import * as api from "../../../../lib/processing/libraries-api";
+import * as chainApi from "../../../../lib/processing/library-folder-chain-api";
+import * as managersApi from "../../../../lib/processing/library-managers-api";
+import * as modeApi from "../../../../lib/processing/library-mode-api";
 import * as setupApi from "../../../../lib/processing/library-setup-api";
+import * as operatorApi from "../../../../lib/processing/operator-settings-api";
+import type { ProcessingOperatorSettingsOut } from "../../../../lib/processing/types";
 import { LibrariesTab } from "./libraries-tab";
 import { asOperator, library, wrapper } from "./library-test-fixtures";
 
@@ -39,7 +46,10 @@ function connection(
   };
 }
 
+// The editor keeps loading for a moment after it appears. Unmount it before the stubs are removed, or a
+// load that starts in between reaches the network.
 afterEach(() => {
+  cleanup();
   vi.restoreAllMocks();
 });
 
@@ -377,8 +387,44 @@ function wrapperAt(url: string) {
   };
 }
 
+/** What the editor asks for as it opens, answered with nothing to report. */
+function answerEditorLoadsWithNothingToReport() {
+  vi.spyOn(chainApi, "fetchLibraryFolderChain").mockResolvedValue({
+    library_id: 4,
+    local: { ready: true, lines: [] },
+    managers: [],
+    download_clients: [],
+    ready: true,
+  });
+  vi.spyOn(managersApi, "fetchProcessingManagerSetup").mockResolvedValue({
+    media_type: "movie",
+    managers: [],
+  });
+  vi.spyOn(managersApi, "fetchProcessingRejectSupport").mockResolvedValue({
+    available: false,
+    reason: "No linked media manager supports it.",
+  });
+  vi.spyOn(
+    downloadClientsApi,
+    "fetchDownloadClientSuggestions",
+  ).mockResolvedValue([]);
+  vi.spyOn(modeApi, "fetchLibrarySettings").mockResolvedValue({
+    library_folders: [],
+    library_schedule_enabled: false,
+    clean_hardlinked_files: false,
+    skip_if_manager_would_redownload: true,
+    keep_original_after_clean: false,
+    originals_folder: "",
+  });
+  vi.spyOn(operatorApi, "fetchProcessingOperatorSettings").mockResolvedValue({
+    min_file_age_seconds: 60,
+    min_input_file_size_mb: 50,
+  } as ProcessingOperatorSettingsOut);
+}
+
 it("opens a workflow's editor from a link on another page", async () => {
   withConnections(connection({}));
+  answerEditorLoadsWithNothingToReport();
   vi.spyOn(api, "fetchProcessingLibraries").mockResolvedValue([
     library({ id: 4, name: "Kids" }),
   ]);
