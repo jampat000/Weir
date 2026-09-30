@@ -151,16 +151,6 @@ public static class WeirOptionsLoader
             ProcessingWorkTempStaleSweepTvScheduleIntervalSeconds = SweepInterval("WEIR_PROCESSING_WORK_TEMP_STALE_SWEEP_TV_SCHEDULE_INTERVAL_SECONDS"),
             ProcessingWorkTempStaleSweepMinStaleAgeSeconds = Clamp(
                 EnvInt(runtime, "WEIR_PROCESSING_WORK_TEMP_STALE_SWEEP_MIN_STALE_AGE_SECONDS", 86_400), 60, ThirtyDaysSeconds),
-            ProcessingMovieFailureCleanupScheduleEnabled = EnvBool(runtime, "WEIR_PROCESSING_MOVIE_FAILURE_CLEANUP_SCHEDULE_ENABLED", false),
-            ProcessingMovieFailureCleanupScheduleIntervalSeconds = ClampProcessingScheduleIntervalSeconds(
-                EnvInt(runtime, "WEIR_PROCESSING_MOVIE_FAILURE_CLEANUP_SCHEDULE_INTERVAL_SECONDS", 3600)),
-            ProcessingTvFailureCleanupScheduleEnabled = EnvBool(runtime, "WEIR_PROCESSING_TV_FAILURE_CLEANUP_SCHEDULE_ENABLED", false),
-            ProcessingTvFailureCleanupScheduleIntervalSeconds = ClampProcessingScheduleIntervalSeconds(
-                EnvInt(runtime, "WEIR_PROCESSING_TV_FAILURE_CLEANUP_SCHEDULE_INTERVAL_SECONDS", 3600)),
-            ProcessingMovieFailureCleanupGracePeriodSeconds = Clamp(
-                EnvInt(runtime, "WEIR_PROCESSING_MOVIE_FAILURE_CLEANUP_GRACE_PERIOD_SECONDS", 1800), 300, 604800),
-            ProcessingTvFailureCleanupGracePeriodSeconds = Clamp(
-                EnvInt(runtime, "WEIR_PROCESSING_TV_FAILURE_CLEANUP_GRACE_PERIOD_SECONDS", 1800), 300, 604800),
             JobRowsRetentionDays = Clamp(EnvInt(runtime, "WEIR_JOB_ROWS_RETENTION_DAYS", 90), 1, 365),
             JobRowsRetentionScheduleIntervalSeconds = Clamp(
                 EnvInt(runtime, "WEIR_JOB_ROWS_RETENTION_SCHEDULE_INTERVAL_SECONDS", 3600), 60, 86400),

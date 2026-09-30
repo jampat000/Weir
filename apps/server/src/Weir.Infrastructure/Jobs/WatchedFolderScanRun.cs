@@ -54,8 +54,10 @@ internal sealed class WatchedFolderScanRun
             cancellationToken.ThrowIfCancellationRequested();
             var rel = WatchedFolderScanOps.RelativePosixPathUnderWatched(_scan.Paths.WatchedFolder, entry.FullPath);
             var previous = _lookups.Rows.GetValueOrDefault(rel);
-            if (_decider.Settled(entry, rel, previous) is { TouchRowId: { } settledRow, Enqueue: false })
+            var settled = _decider.Settled(entry, rel, previous);
+            if (settled is { TouchRowId: { } settledRow, Enqueue: false })
             {
+                NoteHoldEnds(settled);
                 _batch.Touch(settledRow);
             }
             else if (WatchedMediaFile.Stat(entry.FullPath) is { } file)
@@ -94,12 +96,17 @@ internal sealed class WatchedFolderScanRun
         }
     }
 
-    private async Task ApplyAsync(WatchedFileDecision decision, WatchedMediaFile file, CancellationToken cancellationToken)
+    private void NoteHoldEnds(WatchedFileDecision decision)
     {
         if (decision.HoldEnds is { } holdEnds && (EarliestHoldEnds is null || holdEnds < EarliestHoldEnds))
         {
             EarliestHoldEnds = holdEnds;
         }
+    }
+
+    private async Task ApplyAsync(WatchedFileDecision decision, WatchedMediaFile file, CancellationToken cancellationToken)
+    {
+        NoteHoldEnds(decision);
 
         if (decision.FinishMovieRemoval && await NoPassOwnsAsync(decision.RelativePath).ConfigureAwait(false))
         {

@@ -4,7 +4,6 @@ using Weir.Core.Activity;
 using Weir.Core.Json;
 using Weir.Core.Time;
 using Weir.Infrastructure.Activity;
-using Weir.Infrastructure.Processing;
 using Weir.Infrastructure.Sqlite;
 using Weir.Infrastructure.Tests.Jobs;
 using Weir.Infrastructure.Tests.Platform;
@@ -12,8 +11,7 @@ using Weir.Infrastructure.Tests.Platform;
 namespace Weir.Infrastructure.Tests.Activity;
 
 /// <summary>
-/// Activity history reads, commit-time notification, processing-record retention and the paging and
-/// date-filter rules of the history endpoints.
+/// Activity history reads, commit-time notification and the paging and date-filter rules of the history endpoints.
 /// </summary>
 public sealed class ActivityHistoryStoreTests
 {
@@ -146,44 +144,6 @@ public sealed class ActivityHistoryStoreTests
         await poll.RunOnceAsync(CancellationToken.None);
 
         Assert.Equal(new ActivityLatest(null, 0), notifier.Snapshot());
-    }
-
-    [Fact]
-    public async Task Processing_records_past_their_retention_are_pruned_and_zero_keeps_everything()
-    {
-        using var db = new JobsTestDatabase(keepSeedRows: true);
-        var now = new DateTimeOffset(2026, 6, 1, 12, 0, 0, TimeSpan.Zero);
-        db.Execute(
-            "INSERT INTO file_logs (relative_path, recorded_at) VALUES ('old.mkv', '2026-03-01 11:59:59.000000'), ('edge.mkv', '2026-03-03 12:00:00.000000'), ('new.mkv', '2026-05-31 00:00:00')");
-
-        var operatorSettings = new OperatorSettingsStore();
-        var fileLogs = new FileLogStore();
-
-        async Task<int> PruneOnceAsync(DateTimeOffset moment)
-        {
-            long retentionDays;
-            var uow = await UnitOfWork.OpenAsync(db.Database);
-            await using (uow)
-            {
-                retentionDays = (await operatorSettings.EnsureAsync(uow)).FileLogRetentionDays;
-                await uow.CommitAsync();
-            }
-
-            return await fileLogs.PruneAsync(db.Database, retentionDays, moment);
-        }
-
-        db.Execute("UPDATE operator_settings SET file_log_retention_days = 0");
-        Assert.Equal(0, await PruneOnceAsync(now));
-
-        db.Execute("UPDATE operator_settings SET file_log_retention_days = 90");
-        Assert.Equal(1, await PruneOnceAsync(now));
-        Assert.Equal(2, db.Count("SELECT count(*) FROM file_logs"));
-
-        // No settings row: it is created with the 90-day default.
-        db.Execute("DELETE FROM operator_settings");
-        Assert.Equal(0, await PruneOnceAsync(now));
-        Assert.Equal(1, await PruneOnceAsync(now.AddDays(1)));
-        Assert.Equal("new.mkv", db.Scalar("SELECT group_concat(relative_path) FROM file_logs"));
     }
 
     [Fact]

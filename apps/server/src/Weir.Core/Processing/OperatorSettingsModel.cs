@@ -20,13 +20,9 @@ public sealed record ProcessingOperatorSettingsRecord
     /// </summary>
     public bool RunnerBudgetEnabled { get; init; }
     public bool WorkTempStaleSweepEnabled { get; init; } = true;
-    public bool FailureCleanupEnabled { get; init; }
 
     /// <summary>How often the leftover-work-file sweep runs, set in Settings › Cleanup; null keeps the environment's interval.</summary>
     public long? WorkTempStaleSweepIntervalSeconds { get; init; }
-
-    /// <summary>How often the failed-download cleanup runs, set in Settings › Cleanup; null keeps the environment's interval.</summary>
-    public long? FailureCleanupIntervalSeconds { get; init; }
 
     /// <summary>
     /// Whether the Cleanup job removes Weir's own hand-back copies nobody claimed (#652). Off until an operator switches

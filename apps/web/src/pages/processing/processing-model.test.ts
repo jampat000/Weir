@@ -155,9 +155,9 @@ describe("buildLanes", () => {
     expect(lanes.arriving[0].upstream).toBe(false);
   });
 
-  it("counts a file on hold after repeated failures as stuck, not arriving", () => {
+  it("counts a file Weir gave up on as stuck, not arriving", () => {
     const lanes = buildLanes(
-      [file({ status: "on_hold", quarantined: true, failure_attempts: 3 })],
+      [file({ status: "processing_failed", failure_attempts: 3 })],
       [],
       NAMES,
       AGES,

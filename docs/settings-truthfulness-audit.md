@@ -41,6 +41,14 @@ says where a setting lives and what actually happens when it is saved.
   "rewrite with FFmpeg" fields are still accepted; the values are ignored and not reported.
 - Your playback devices (Settings › Rules): information only. It drives the "can play directly"
   badge on files and changes nothing about how a file is processed.
+- When a file fails (a workflow's own section): "Maximum automatic attempts" is the whole number of tries, the
+  first one included, so 3 means the first try and two retries; nothing else caps it. Each retry
+  waits twice as long as the one before (the first delay, then double, up to an hour), and the workflow's
+  folder is looked at again shortly after the wait ends, not only at the next periodic scan. A file
+  Weir gives up on, because it ran out of attempts or the failure is not one the workflow retries, is
+  one state: Failed, with the reason. What happens next is "When retries run out": hand the original
+  back, keep it until someone acts, or reject the release. History's remove dialog and "Try again"
+  work on a failed file the same way whichever it was.
 - Rules: audio and subtitle handling is a named rule set a workflow points at, so two workflows can
   share one. Deleting a rule set a workflow still uses is refused rather than silently stripping that
   handling.
@@ -76,8 +84,15 @@ says where a setting lives and what actually happens when it is saved.
   looked at again 10, then 30, then every 60 minutes, and is never recorded as done or failed. An
   upgrade gives every workflow the value Settings › Performance had; Performance still accepts the
   old field and ignores it.
-  "Keep the half-written copy" keeps a failed copy in the work folder until it is a day old, at which
-  point the Cleanup sweep removes it; a restart removes it no sooner.
+- Cleanup: holds the leftover-work-file sweep, "Keep a failed file's half-written copy for a day" (a failed
+  copy stays in the work folder until it is a day old, at which point the sweep removes it; a restart
+  removes it no sooner) and the cleaned-copies-nobody-picked-up job. There is no cleanup of the
+  downloads of failed files: a failed download is handled from History's remove dialog and by the
+  workflow's "When retries run out".
+- History: "Keep a file's history for N days after it's gone" (0 keeps it for ever) is saved to the database
+  and enforced by an hourly job. A file's history is kept for as long as Weir still knows the file, then
+  for N days from the hour Weir first finds the file gone or forgotten; a file that comes back before then
+  keeps it. The System › Logs retention settings are separate and unchanged.
 - Schedule: the time zone is saved to the database and every time on that tab is read in it. Each
   workflow's hours are saved per workflow and applied without a restart. `Scan now` queues a one-off
   scan of that workflow.
@@ -94,10 +109,9 @@ says where a setting lives and what actually happens when it is saved.
   workflow, whatever that workflow's own schedule says. A manual scan is unaffected.
 - The Cleanup timers' environment switches each govern their own media type:
   `WEIR_PROCESSING_WORK_TEMP_STALE_SWEEP_MOVIE_SCHEDULE_ENABLED` and `..._TV_SCHEDULE_ENABLED` for the
-  leftover work file sweep, `WEIR_PROCESSING_MOVIE_FAILURE_CLEANUP_SCHEDULE_ENABLED` and
-  `WEIR_PROCESSING_TV_FAILURE_CLEANUP_SCHEDULE_ENABLED` for the failed-download cleanup. An explicit 0
-  stops that timer for that media type whatever is saved in Settings › Cleanup; the variables cannot
-  switch a timer on.
+  leftover work file sweep. An explicit 0 stops that timer for that media type whatever is saved in
+  Settings › Cleanup; the variables cannot switch a timer on. The `..._FAILURE_CLEANUP_...` variables of
+  the removed failed-download cleanup are accepted and ignored.
 - `WEIR_PROCESSING_WATCHED_FOLDER_MIN_FILE_AGE_SECONDS` is retired. Setting it changes nothing: the wait
   for a new file is the workflow's own.
 

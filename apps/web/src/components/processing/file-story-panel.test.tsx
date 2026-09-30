@@ -105,10 +105,12 @@ it("keeps the technical detail behind a disclosure, never leading", () => {
   expect(summary.closest("details")).not.toHaveAttribute("open");
 });
 
-it("says how long records are kept", () => {
+it("says how long a file's history is kept once the file is gone", () => {
   mount();
   expect(
-    screen.getByText("Weir keeps these records for 90 days."),
+    screen.getByText(
+      "Weir keeps this history while it still knows the file, then for 90 days after the file is gone.",
+    ),
   ).toBeInTheDocument();
 });
 

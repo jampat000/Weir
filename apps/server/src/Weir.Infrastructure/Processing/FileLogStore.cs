@@ -14,6 +14,14 @@ public sealed class FileLogStore
 
     private const string Columns = "id, file_id, library_id, relative_path, library_name, outcome, title, detail_json, recorded_at";
 
+    /// <summary>
+    /// Whether a history row still has its file: a <c>files</c> row exists in the row's workflow, or anywhere once the
+    /// workflow is gone (its history rows keep the path and lose the workflow).
+    /// </summary>
+    private const string FileStillKnown =
+        "EXISTS (SELECT 1 FROM files f WHERE f.relative_path = file_logs.relative_path " +
+        "AND (file_logs.library_id IS NULL OR f.library_id = file_logs.library_id))";
+
     /// <summary>Every retained pass over this file, newest first, matched by path.</summary>
     public Task<List<ProcessingFileLogRecord>> LogsForFileAsync(UnitOfWork uow, string relativePath, int limit) =>
         uow.QueryAsync(
@@ -95,18 +103,40 @@ public sealed class FileLogStore
         _ => string.Empty,
     };
 
-    /// <summary>Deletes records older than the retention window, a batch per transaction. 0 keeps everything.</summary>
-    public Task<int> PruneAsync(SqliteDatabase database, long retentionDays, DateTimeOffset now, CancellationToken cancellationToken = default)
+    /// <summary>
+    /// Keeps a file's history for as long as Weir still knows the file, then for <paramref name="retentionDays"/> days after
+    /// it is gone or forgotten. The days count from when a history row was first seen without its file (<c>orphaned_at</c>),
+    /// so a file that is forgotten long after it was processed still keeps its history for the full period. Returns how
+    /// many rows were removed; 0 days keeps every row.
+    /// </summary>
+    public async Task<int> PruneAsync(SqliteDatabase database, long retentionDays, DateTimeOffset now, CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(database);
+        await WriteLockTurns.TakeAsync(() => MarkOrphansAsync(database, now, cancellationToken), cancellationToken).ConfigureAwait(false);
         if (retentionDays <= 0)
         {
-            return Task.FromResult(0);
+            return 0;
         }
 
         var cutoff = now.AddDays(-retentionDays);
-        return BatchedDeletes.DeleteAsync(
-            database, "file_logs", "recorded_at < @cutoff", [("@cutoff", SqliteValues.ToSqlite(Timestamp.FromUtc(cutoff.UtcDateTime)))], cancellationToken);
+        return await BatchedDeletes.DeleteAsync(
+            database, "file_logs", "orphaned_at IS NOT NULL AND orphaned_at < @cutoff", [("@cutoff", ToStored(cutoff))], cancellationToken).ConfigureAwait(false);
     }
+
+    /// <summary>Stamps the rows whose file has just gone, and clears the stamp on rows whose file is known again.</summary>
+    private static async Task MarkOrphansAsync(SqliteDatabase database, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        var uow = await UnitOfWork.OpenAsync(database, cancellationToken).ConfigureAwait(false);
+        await using (uow.ConfigureAwait(false))
+        {
+            await uow.ExecuteAsync(
+                $"UPDATE file_logs SET orphaned_at = @now WHERE orphaned_at IS NULL AND NOT {FileStillKnown}", ("@now", ToStored(now))).ConfigureAwait(false);
+            await uow.ExecuteAsync($"UPDATE file_logs SET orphaned_at = NULL WHERE orphaned_at IS NOT NULL AND {FileStillKnown}").ConfigureAwait(false);
+            await uow.CommitAsync().ConfigureAwait(false);
+        }
+    }
+
+    private static object? ToStored(DateTimeOffset moment) => SqliteValues.ToSqlite(Timestamp.FromUtc(moment.UtcDateTime));
 
     private static ProcessingFileLogRecord Read(SqliteDataReader reader) => new()
     {

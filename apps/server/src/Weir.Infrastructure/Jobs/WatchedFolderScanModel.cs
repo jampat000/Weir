@@ -73,6 +73,6 @@ internal sealed record WatchedFileDecision
 
     public RejectedFileRemoval? Removal { get; init; }
 
-    /// <summary>When the hold this scan put on the file ends.</summary>
+    /// <summary>When the scan next needs to look at this file: when a hold it put on the file ends, or when a failed file's retry falls due.</summary>
     public DateTimeOffset? HoldEnds { get; init; }
 }

@@ -239,10 +239,6 @@ public sealed class WeirOptionsParsingTests
             ("WEIR_PROCESSING_MOVIE_OUTPUT_CLEANUP_MIN_AGE_SECONDS", "1"),
             ("WEIR_PROCESSING_TV_OUTPUT_CLEANUP_MIN_AGE_SECONDS", "1"),
             ("WEIR_PROCESSING_WORK_TEMP_STALE_SWEEP_MIN_STALE_AGE_SECONDS", "1"),
-            ("WEIR_PROCESSING_MOVIE_FAILURE_CLEANUP_SCHEDULE_INTERVAL_SECONDS", "1"),
-            ("WEIR_PROCESSING_TV_FAILURE_CLEANUP_SCHEDULE_INTERVAL_SECONDS", "1"),
-            ("WEIR_PROCESSING_MOVIE_FAILURE_CLEANUP_GRACE_PERIOD_SECONDS", "1"),
-            ("WEIR_PROCESSING_TV_FAILURE_CLEANUP_GRACE_PERIOD_SECONDS", "1"),
             ("WEIR_JOB_ROWS_RETENTION_DAYS", "0"),
             ("WEIR_JOB_ROWS_RETENTION_SCHEDULE_INTERVAL_SECONDS", "1"));
         Assert.Equal(1, low.ProcessingProbeSizeMb);
@@ -250,10 +246,6 @@ public sealed class WeirOptionsParsingTests
         Assert.Equal(3600, low.ProcessingMovieOutputCleanupMinAgeSeconds);
         Assert.Equal(3600, low.ProcessingTvOutputCleanupMinAgeSeconds);
         Assert.Equal(60, low.ProcessingWorkTempStaleSweepMinStaleAgeSeconds);
-        Assert.Equal(60, low.ProcessingMovieFailureCleanupScheduleIntervalSeconds);
-        Assert.Equal(60, low.ProcessingTvFailureCleanupScheduleIntervalSeconds);
-        Assert.Equal(300, low.ProcessingMovieFailureCleanupGracePeriodSeconds);
-        Assert.Equal(300, low.ProcessingTvFailureCleanupGracePeriodSeconds);
         Assert.Equal(1, low.JobRowsRetentionDays);
         Assert.Equal(60, low.JobRowsRetentionScheduleIntervalSeconds);
 
@@ -263,10 +255,6 @@ public sealed class WeirOptionsParsingTests
             ("WEIR_PROCESSING_MOVIE_OUTPUT_CLEANUP_MIN_AGE_SECONDS", "99999999"),
             ("WEIR_PROCESSING_TV_OUTPUT_CLEANUP_MIN_AGE_SECONDS", "99999999"),
             ("WEIR_PROCESSING_WORK_TEMP_STALE_SWEEP_MIN_STALE_AGE_SECONDS", "99999999"),
-            ("WEIR_PROCESSING_MOVIE_FAILURE_CLEANUP_SCHEDULE_INTERVAL_SECONDS", "99999999"),
-            ("WEIR_PROCESSING_TV_FAILURE_CLEANUP_SCHEDULE_INTERVAL_SECONDS", "99999999"),
-            ("WEIR_PROCESSING_MOVIE_FAILURE_CLEANUP_GRACE_PERIOD_SECONDS", "99999999"),
-            ("WEIR_PROCESSING_TV_FAILURE_CLEANUP_GRACE_PERIOD_SECONDS", "99999999"),
             ("WEIR_JOB_ROWS_RETENTION_DAYS", "99999"),
             ("WEIR_JOB_ROWS_RETENTION_SCHEDULE_INTERVAL_SECONDS", "99999999"));
         Assert.Equal(1024, high.ProcessingProbeSizeMb);
@@ -274,10 +262,6 @@ public sealed class WeirOptionsParsingTests
         Assert.Equal(30 * 24 * 3600, high.ProcessingMovieOutputCleanupMinAgeSeconds);
         Assert.Equal(30 * 24 * 3600, high.ProcessingTvOutputCleanupMinAgeSeconds);
         Assert.Equal(30 * 24 * 3600, high.ProcessingWorkTempStaleSweepMinStaleAgeSeconds);
-        Assert.Equal(7 * 24 * 3600, high.ProcessingMovieFailureCleanupScheduleIntervalSeconds);
-        Assert.Equal(7 * 24 * 3600, high.ProcessingTvFailureCleanupScheduleIntervalSeconds);
-        Assert.Equal(604800, high.ProcessingMovieFailureCleanupGracePeriodSeconds);
-        Assert.Equal(604800, high.ProcessingTvFailureCleanupGracePeriodSeconds);
         Assert.Equal(365, high.JobRowsRetentionDays);
         Assert.Equal(86400, high.JobRowsRetentionScheduleIntervalSeconds);
     }
@@ -287,13 +271,23 @@ public sealed class WeirOptionsParsingTests
     {
         var options = TestRuntime.Load(
             ("WEIR_PROCESSING_WATCHED_FOLDER_REMUX_SCAN_DISPATCH_SCHEDULE_ENABLED", "false"),
-            ("WEIR_PROCESSING_WATCHED_FOLDER_REMUX_SCAN_DISPATCH_PERIODIC_ENQUEUE_REMUX_JOBS", "false"),
-            ("WEIR_PROCESSING_MOVIE_FAILURE_CLEANUP_SCHEDULE_ENABLED", "true"),
-            ("WEIR_PROCESSING_TV_FAILURE_CLEANUP_SCHEDULE_ENABLED", "1"));
+            ("WEIR_PROCESSING_WATCHED_FOLDER_REMUX_SCAN_DISPATCH_PERIODIC_ENQUEUE_REMUX_JOBS", "false"));
         Assert.False(options.ProcessingWatchedFolderRemuxScanDispatchScheduleEnabled);
         Assert.False(options.ProcessingWatchedFolderRemuxScanDispatchPeriodicEnqueueRemuxJobs);
-        Assert.True(options.ProcessingMovieFailureCleanupScheduleEnabled);
-        Assert.True(options.ProcessingTvFailureCleanupScheduleEnabled);
+    }
+
+    [Fact]
+    public void The_variables_of_the_removed_failed_download_cleanup_are_accepted_and_change_nothing()
+    {
+        var withRetired = TestRuntime.Load(
+            ("WEIR_PROCESSING_MOVIE_FAILURE_CLEANUP_SCHEDULE_ENABLED", "true"),
+            ("WEIR_PROCESSING_MOVIE_FAILURE_CLEANUP_SCHEDULE_INTERVAL_SECONDS", "120"),
+            ("WEIR_PROCESSING_TV_FAILURE_CLEANUP_SCHEDULE_ENABLED", "1"),
+            ("WEIR_PROCESSING_TV_FAILURE_CLEANUP_SCHEDULE_INTERVAL_SECONDS", "120"),
+            ("WEIR_PROCESSING_MOVIE_FAILURE_CLEANUP_GRACE_PERIOD_SECONDS", "600"),
+            ("WEIR_PROCESSING_TV_FAILURE_CLEANUP_GRACE_PERIOD_SECONDS", "600"));
+
+        Assert.Equivalent(TestRuntime.Load(), withRetired);
     }
 
     [Fact]

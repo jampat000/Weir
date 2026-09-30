@@ -3694,8 +3694,7 @@ export interface components {
        * Family
        * @enum {string}
        */
-      family:
-        "work_temp_stale_sweep" | "failure_cleanup" | "unclaimed_handbacks";
+      family: "work_temp_stale_sweep" | "unclaimed_handbacks";
       /**
        * Window Days
        * @description Unclaimed hand-backs only: how many days a copy waits before the job may remove it.
@@ -3744,8 +3743,7 @@ export interface components {
        * Family
        * @enum {string}
        */
-      family:
-        "work_temp_stale_sweep" | "failure_cleanup" | "unclaimed_handbacks";
+      family: "work_temp_stale_sweep" | "unclaimed_handbacks";
       /**
        * Media Scope
        * @default movie
@@ -4483,7 +4481,7 @@ export interface components {
       relative_path: string;
       /**
        * Retention Days
-       * @description How long these records are kept. 0 means they are kept forever.
+       * @description How many days a file's history is kept after the file is gone or forgotten. While Weir still knows the file its history is kept. 0 keeps it forever.
        */
       retention_days: number;
     };
@@ -4626,12 +4624,6 @@ export interface components {
        * @description processing while the file is written; finishing during the final checks and hand-back. Null when nothing is in flight.
        */
       progress_status?: string | null;
-      /**
-       * Quarantined
-       * @description True when repeated failures placed this file on hold until an operator requeues it.
-       * @default false
-       */
-      quarantined: boolean;
       /** Relative Path */
       relative_path: string;
       /** Size Bytes */
@@ -5173,7 +5165,7 @@ export interface components {
       manager_connection_ids?: number[];
       /**
        * Max Attempts
-       * @description How many times Weir tries a file on its own before stopping.
+       * @description How many times Weir tries a file on its own before it gives up. The first try counts, so 3 means the first try and two retries.
        * @default 3
        */
       max_attempts: number;
@@ -5259,7 +5251,7 @@ export interface components {
       rejected_file_action: "leave" | "delete_file";
       /**
        * Retry Backoff Seconds
-       * @description The first wait before a retry. It doubles each attempt, capped at an hour.
+       * @description The first wait before a retry. It doubles each attempt, capped at an hour. Weir looks again shortly after the wait ends.
        * @default 300
        */
       retry_backoff_seconds: number;
@@ -5628,7 +5620,7 @@ export interface components {
       manager_connection_ids?: number[];
       /**
        * Max Attempts
-       * @description How many times Weir tries a file on its own before stopping.
+       * @description How many times Weir tries a file on its own before it gives up. The first try counts, so 3 means the first try and two retries.
        * @default 3
        */
       max_attempts: number;
@@ -5714,7 +5706,7 @@ export interface components {
       rejected_file_action: "leave" | "delete_file";
       /**
        * Retry Backoff Seconds
-       * @description The first wait before a retry. It doubles each attempt, capped at an hour.
+       * @description The first wait before a retry. It doubles each attempt, capped at an hour. Weir looks again shortly after the wait ends.
        * @default 300
        */
       retry_backoff_seconds: number;
@@ -5861,23 +5853,13 @@ export interface components {
     /** ProcessingOperatorSettingsOut */
     ProcessingOperatorSettingsOut: {
       /**
-       * Failure Cleanup Enabled
-       * @description Delete the source release folder after a file fails terminally. Off by default: this removes the original, so it stays off until you choose it.
-       */
-      failure_cleanup_enabled: boolean;
-      /**
-       * Failure Cleanup Interval Seconds
-       * @description How often the failed-download cleanup runs, set in Settings › Cleanup. Null keeps the environment's interval.
-       */
-      failure_cleanup_interval_seconds?: number | null;
-      /**
        * File Log Retention Days
-       * @description How long to keep the per-file processing record. 0 keeps it forever.
+       * @description How many days a file's history is kept after the file is gone or forgotten. While Weir still knows the file its history is kept. 0 keeps it forever.
        */
       file_log_retention_days: number;
       /**
        * Keep Failed Work Files
-       * @description Keep a failed run's working files so they can be inspected instead of swept.
+       * @description Keep a failed file's half-written copy for a day, so it can be looked at. It is removed once it is a day old.
        */
       keep_failed_work_files: boolean;
       /** Max Concurrent Files */
@@ -5963,10 +5945,6 @@ export interface components {
     ProcessingOperatorSettingsPutIn: {
       /** Csrf Token */
       csrf_token: string;
-      /** Failure Cleanup Enabled */
-      failure_cleanup_enabled?: boolean | null;
-      /** Failure Cleanup Interval Seconds */
-      failure_cleanup_interval_seconds?: number | null;
       /** File Log Retention Days */
       file_log_retention_days?: number | null;
       /** Keep Failed Work Files */
@@ -6636,11 +6614,6 @@ export interface components {
        */
       configuration_note: string;
       /**
-       * Failure Cleanup Configuration Note
-       * @description How operators change Pass 4 failure-cleanup timers/grace (restart required).
-       */
-      failure_cleanup_configuration_note: string;
-      /**
        * In Process Processing Worker Count
        * @description Mirrors WEIR_PROCESSING_WORKER_COUNT after clamping — the processing lane only.
        */
@@ -6671,21 +6644,6 @@ export interface components {
        */
       processing_media_extensions: string[];
       /**
-       * Processing Movie Failure Cleanup Grace Period Seconds
-       * @description Failed remux age gate for Movies failure cleanup (uses jobs.updated_at).
-       */
-      processing_movie_failure_cleanup_grace_period_seconds: number;
-      /**
-       * Processing Movie Failure Cleanup Schedule Enabled
-       * @description ``WEIR_PROCESSING_MOVIE_FAILURE_CLEANUP_SCHEDULE_ENABLED`` at process start.
-       */
-      processing_movie_failure_cleanup_schedule_enabled: boolean;
-      /**
-       * Processing Movie Failure Cleanup Schedule Interval Seconds
-       * @description Seconds between Movies-only periodic failed-remux cleanup enqueue ticks.
-       */
-      processing_movie_failure_cleanup_schedule_interval_seconds: number;
-      /**
        * Processing Movie Output Cleanup Min Age Seconds
        * @description Minimum age (newest file mtime under the folder) before Pass 3a may delete a Movies output folder (1h..30d; default 48h).
        */
@@ -6695,21 +6653,6 @@ export interface components {
        * @description ffprobe probe size in MB for preflight analysis.
        */
       processing_probe_size_mb: number;
-      /**
-       * Processing Tv Failure Cleanup Grace Period Seconds
-       * @description Failed remux age gate for TV failure cleanup (uses jobs.updated_at).
-       */
-      processing_tv_failure_cleanup_grace_period_seconds: number;
-      /**
-       * Processing Tv Failure Cleanup Schedule Enabled
-       * @description ``WEIR_PROCESSING_TV_FAILURE_CLEANUP_SCHEDULE_ENABLED`` at process start.
-       */
-      processing_tv_failure_cleanup_schedule_enabled: boolean;
-      /**
-       * Processing Tv Failure Cleanup Schedule Interval Seconds
-       * @description Seconds between TV-only periodic failed-remux cleanup enqueue ticks.
-       */
-      processing_tv_failure_cleanup_schedule_interval_seconds: number;
       /**
        * Processing Tv Output Cleanup Min Age Seconds
        * @description Minimum age (direct-child episode media newest mtime) before Pass 3b may delete a TV season output folder (1h..30d; default 48h).

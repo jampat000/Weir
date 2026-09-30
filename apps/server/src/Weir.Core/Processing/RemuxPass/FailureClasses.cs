@@ -60,16 +60,16 @@ public static class ProcessingFailureClasses
 }
 
 /// <summary>Whether this failure will be retried, and the sentence explaining it.</summary>
-public sealed record RetryDecision(bool WillRetry, DateTimeOffset? NextRetryAt, string Reason, bool Quarantined = false);
+public sealed record RetryDecision(bool WillRetry, DateTimeOffset? NextRetryAt, string Reason);
 
 /// <summary>The library's automatic retry policy applied to one failure.</summary>
 public static class RetryPolicy
 {
-    /// <summary>Consecutive failures of the same class after which a file is held rather than retried.</summary>
-    public const int QuarantineAfterFailures = 3;
-
-    /// <summary>Retry or stop, based on the failure class and the library's attempt limit.</summary>
-    public static RetryDecision DecideRetry(ProcessingLibraryRecord library, string failureClass, long attemptsSoFar, DateTimeOffset now)
+    /// <summary>
+    /// Retry or give up, based on the failure class and the workflow's attempt limit. <paramref name="attemptsMade"/> counts
+    /// the attempt that just failed, so a limit of N allows exactly N attempts in all.
+    /// </summary>
+    public static RetryDecision DecideRetry(ProcessingLibraryRecord library, string failureClass, long attemptsMade, DateTimeOffset now)
     {
         ArgumentNullException.ThrowIfNull(library);
         var value = WireStrings.Strip(failureClass ?? string.Empty).ToLowerInvariant();
@@ -79,46 +79,22 @@ public static class RetryPolicy
         }
 
         var maxAttempts = Math.Max(1, library.MaxAttempts);
-        if (attemptsSoFar >= maxAttempts)
+        if (attemptsMade >= maxAttempts)
         {
             return new RetryDecision(
                 false,
                 null,
-                $"Weir tried this file {attemptsSoFar.ToString(CultureInfo.InvariantCulture)} times and stopped, because the {library.Name} " +
+                $"Weir tried this file {attemptsMade.ToString(CultureInfo.InvariantCulture)} times and stopped, because the {library.Name} " +
                 $"workflow allows {maxAttempts.ToString(CultureInfo.InvariantCulture)}. You can still start it again by hand.");
         }
 
-        // Indexed by failures so far, not by the attempt about to happen.
-        var delay = ProcessingFailureClasses.BackoffSecondsForAttempt(attemptsSoFar, library.RetryBackoffSeconds);
+        var delay = ProcessingFailureClasses.BackoffSecondsForAttempt(attemptsMade, library.RetryBackoffSeconds);
         var minutes = delay / 60;
         return new RetryDecision(
             true,
             now + TimeSpan.FromSeconds(delay),
             $"This failed and Weir will try again in about {Plural.Of(minutes == 0 ? 1 : minutes, "minute")} " +
-            $"(attempt {(attemptsSoFar + 1).ToString(CultureInfo.InvariantCulture)} of {maxAttempts.ToString(CultureInfo.InvariantCulture)}).");
-    }
-
-    /// <summary>
-    /// The decision for a failure being recorded against a known file row, with a quarantine after repeated failures of
-    /// the same class.
-    /// </summary>
-    public static RetryDecision DecideForRecordedFailure(ProcessingLibraryRecord library, string failureClass, long previousAttempts, string? previousFailureClass, DateTimeOffset now)
-    {
-        var value = WireStrings.Strip(failureClass ?? string.Empty).ToLowerInvariant();
-        var attempts = previousAttempts + 1;
-        var decision = DecideRetry(library, value, attempts, now);
-        var consecutive = previousFailureClass == value ? attempts : 1;
-        if (consecutive >= QuarantineAfterFailures)
-        {
-            decision = new RetryDecision(
-                false,
-                null,
-                $"Weir held this file after {consecutive.ToString(CultureInfo.InvariantCulture)} repeated {value} failures. " +
-                "Review the failure detail and use Start again after fixing the cause.",
-                Quarantined: true);
-        }
-
-        return decision;
+            $"(attempt {(attemptsMade + 1).ToString(CultureInfo.InvariantCulture)} of {maxAttempts.ToString(CultureInfo.InvariantCulture)}).");
     }
 
     private static string NotRetryableReason(string failureClass, ProcessingLibraryRecord library) => failureClass switch

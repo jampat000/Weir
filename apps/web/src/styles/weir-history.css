@@ -292,3 +292,24 @@
   font-size: 0.8125rem;
   color: var(--mm-text2);
 }
+
+.mm-history-retention {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 28px;
+  padding-top: 16px;
+  border-top: 1px solid var(--mm-border);
+}
+
+.mm-history-retention__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.875rem;
+}
+
+.mm-history-retention__days {
+  width: 96px;
+}

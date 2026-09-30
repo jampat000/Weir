@@ -101,8 +101,6 @@ export function outcomeFor(
       };
     case "processing_failed":
       return failed(file, step);
-    case "on_hold":
-      return file.quarantined ? failed(file, step) : null;
     default:
       return null;
   }

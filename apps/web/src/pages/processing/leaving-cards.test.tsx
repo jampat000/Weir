@@ -29,7 +29,6 @@ function file(
     library_name: "TV",
     relative_path: `Show.S01E0${id}.mkv`,
     status_reason: "",
-    quarantined: false,
     ...overrides,
   } as ProcessingFile;
 }
@@ -76,10 +75,7 @@ describe("outcomeFor", () => {
     });
   });
 
-  it("treats a file held after repeated failures as failed, and a plain hold as no end", () => {
-    expect(
-      outcomeFor(file(1, "on_hold", { quarantined: true }), "write"),
-    ).toMatchObject({ kind: "failed" });
+  it("treats a hold as no end", () => {
     expect(outcomeFor(file(1, "on_hold"), "write")).toBeNull();
   });
 

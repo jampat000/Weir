@@ -119,7 +119,8 @@ public static class RemuxPassServices
             sp.GetRequiredService<DownloadedScanNotifier>(),
             sp.GetService<HandoffCompletionReporter>(),
             sp.GetService<ProcessingJobStore>(),
-            sp.GetRequiredService<LiveProgressStore>()));
+            sp.GetRequiredService<LiveProgressStore>(),
+            sp.GetService<ScanWakeups>()));
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IJobHandler, RemuxPassHandler>(sp => sp.GetRequiredService<RemuxPassHandler>()));
         // Replaces the jobs module's no-op recorder, whichever registration runs first.
         services.Replace(ServiceDescriptor.Singleton<IUnhandledJobFailureRecorder, RemuxPassFailureRecorder>());

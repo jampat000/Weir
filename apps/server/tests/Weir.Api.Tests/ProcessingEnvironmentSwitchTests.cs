@@ -2,7 +2,6 @@ using System.Net;
 using Microsoft.Extensions.DependencyInjection;
 using Weir.Api.Tests.Platform;
 using Weir.Infrastructure.Jobs;
-using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Api.Tests;
 
@@ -14,25 +13,8 @@ public sealed class ProcessingEnvironmentSwitchTests
 {
     private const string MovieSweep = "WEIR_PROCESSING_WORK_TEMP_STALE_SWEEP_MOVIE_SCHEDULE_ENABLED";
     private const string TvSweep = "WEIR_PROCESSING_WORK_TEMP_STALE_SWEEP_TV_SCHEDULE_ENABLED";
-    private const string MovieCleanup = "WEIR_PROCESSING_MOVIE_FAILURE_CLEANUP_SCHEDULE_ENABLED";
-    private const string TvCleanup = "WEIR_PROCESSING_TV_FAILURE_CLEANUP_SCHEDULE_ENABLED";
-
-    /// <summary>A home whose saved Cleanup settings switch the failure cleanup on, so only the environment can stop it.</summary>
-    private static void SaveFailureCleanupOn(string home)
-    {
-        var databasePath = Path.Join(home, "data", "weir.sqlite3");
-        Directory.CreateDirectory(Path.GetDirectoryName(databasePath)!);
-        var database = new SqliteDatabase(databasePath);
-        new SchemaMigrator(database).EnsureAtHead();
-        using (var connection = database.Open())
-        using (var command = connection.CreateCommand())
-        {
-            command.CommandText = "UPDATE operator_settings SET failure_cleanup_enabled = 1";
-            command.ExecuteNonQuery();
-        }
-
-        database.ClearPool();
-    }
+    private const string RetiredMovieCleanup = "WEIR_PROCESSING_MOVIE_FAILURE_CLEANUP_SCHEDULE_ENABLED";
+    private const string RetiredTvCleanup = "WEIR_PROCESSING_TV_FAILURE_CLEANUP_SCHEDULE_ENABLED";
 
     private static async Task<bool> RunsAsync(WeirTestServer server, string timerName)
     {
@@ -59,21 +41,13 @@ public sealed class ProcessingEnvironmentSwitchTests
     }
 
     [Fact]
-    public async Task Switching_off_the_Movies_failure_cleanup_leaves_the_TV_cleanup_running()
+    public async Task The_removed_failed_download_cleanup_has_no_timer_whatever_the_environment_says()
     {
-        await using var server = await WeirTestServer.StartAsync([(MovieCleanup, "0")], prepareHome: SaveFailureCleanupOn);
+        await using var server = await WeirTestServer.StartAsync([(RetiredMovieCleanup, "1"), (RetiredTvCleanup, "1")]);
 
-        Assert.False(await RunsAsync(server, "failure cleanup sweep (movie)"));
-        Assert.True(await RunsAsync(server, "failure cleanup sweep (tv)"));
-    }
+        var timers = server.Services.GetServices<IPeriodicEnqueuer>().Select(enqueuer => enqueuer.Name).ToList();
 
-    [Fact]
-    public async Task Switching_off_the_TV_failure_cleanup_leaves_the_Movies_cleanup_running()
-    {
-        await using var server = await WeirTestServer.StartAsync([(TvCleanup, "0")], prepareHome: SaveFailureCleanupOn);
-
-        Assert.True(await RunsAsync(server, "failure cleanup sweep (movie)"));
-        Assert.False(await RunsAsync(server, "failure cleanup sweep (tv)"));
+        Assert.DoesNotContain(timers, name => name.Contains("failure cleanup", StringComparison.Ordinal));
     }
 
     [Fact]

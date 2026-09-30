@@ -28,7 +28,7 @@ public sealed record InterruptedJob(long Id, string JobKind, string? PayloadJson
 /// where Weir writes them.
 /// </para>
 /// <para>
-/// A failed copy kept on request ("Keep the half-written copy") is one of those files too. While that setting is on, the
+/// A failed copy kept on request ("Keep a failed file's half-written copy for a day") is one of those files too. While that setting is on, the
 /// second sweep leaves any file younger than the work file sweep's stale age, so a restart never shortens the day the copy
 /// is kept for.
 /// </para>
@@ -36,7 +36,7 @@ public sealed record InterruptedJob(long Id, string JobKind, string? PayloadJson
 public static class StartupRecovery
 {
     /// <summary>
-    /// Recovers the jobs and folders the last run left behind. While "Keep the half-written copy" is on, a leftover work file
+    /// Recovers the jobs and folders the last run left behind. While "Keep a failed file's half-written copy for a day" is on, a leftover work file
     /// is removed only once it is older than <paramref name="keptCopyMinAge"/>, so a copy kept on purpose lasts as long as the
     /// work file sweep would let it.
     /// </summary>

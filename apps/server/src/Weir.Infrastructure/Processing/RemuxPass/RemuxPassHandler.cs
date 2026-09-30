@@ -35,6 +35,7 @@ public sealed partial class RemuxPassHandler : IJobHandler
     private readonly TimeProvider _time;
     private readonly ILogger<RemuxPassHandler> _logger;
     private readonly LiveProgressStore _liveProgress;
+    private readonly ScanWakeups? _scanWakeups;
 
     public RemuxPassHandler(
         SqliteDatabase database,
@@ -49,7 +50,8 @@ public sealed partial class RemuxPassHandler : IJobHandler
         DownloadedScanNotifier downloadedScan,
         HandoffCompletionReporter? reporter = null,
         ProcessingJobStore? jobs = null,
-        LiveProgressStore? liveProgress = null)
+        LiveProgressStore? liveProgress = null,
+        ScanWakeups? scanWakeups = null)
     {
         _database = database ?? throw new ArgumentNullException(nameof(database));
         _options = options ?? throw new ArgumentNullException(nameof(options));
@@ -64,6 +66,7 @@ public sealed partial class RemuxPassHandler : IJobHandler
         _reporter = reporter;
         _jobs = jobs;
         _liveProgress = liveProgress ?? new LiveProgressStore();
+        _scanWakeups = scanWakeups;
     }
 
     /// <summary>

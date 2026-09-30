@@ -57,7 +57,7 @@ def test_maintenance_state_shape(viewer) -> None:
     r = viewer.get(MAINTENANCE)
     assert r.status_code == 200, r.text
     families = r.json()["families"]
-    assert [f["family"] for f in families] == ["work_temp_stale_sweep", "failure_cleanup", "unclaimed_handbacks"]
+    assert [f["family"] for f in families] == ["work_temp_stale_sweep", "unclaimed_handbacks"]
     for family in families:
         assert set(family) >= {
             "family",
@@ -79,20 +79,26 @@ def test_maintenance_run_needs_an_operator(viewer, client_factory, server) -> No
     assert viewer.post_csrf(f"{MAINTENANCE}/run", body).status_code == 403
 
 
-def test_maintenance_failure_cleanup_is_queued_once(admin) -> None:
-    first = admin.post_csrf(f"{MAINTENANCE}/run", {"family": "failure_cleanup", "media_scope": "tv"})
-    assert first.status_code == 200, first.text
-    assert first.json()["queued"] is True
-    assert isinstance(first.json()["job_id"], int)
-    assert first.json()["detail"]
+def test_maintenance_unclaimed_handback_cleanup_can_be_run_by_hand(admin) -> None:
+    r = admin.post_csrf(f"{MAINTENANCE}/run", {"family": "unclaimed_handbacks", "media_scope": "tv"})
+    assert r.status_code == 200, r.text
+    assert r.json()["queued"] is True
+    assert r.json()["detail"]
 
-    second = admin.post_csrf(f"{MAINTENANCE}/run", {"family": "failure_cleanup", "media_scope": "tv"})
-    assert second.status_code == 200, second.text
-    assert second.json()["queued"] is False
-    assert second.json()["job_id"] == first.json()["job_id"]
 
-    state = {f["family"]: f for f in admin.get(MAINTENANCE).json()["families"]}
-    assert state["failure_cleanup"]["pending"] >= 1
+def test_maintenance_has_no_failed_download_cleanup_any_more(admin) -> None:
+    r = admin.post_csrf(f"{MAINTENANCE}/run", {"family": "failure_cleanup", "media_scope": "tv"})
+    assert r.status_code == 422, r.text
+
+
+def test_the_failed_download_cleanup_settings_are_accepted_ignored_and_no_longer_reported(admin) -> None:
+    r = admin.put_csrf(
+        f"{API}/processing/operator-settings",
+        json={"failure_cleanup_enabled": True, "failure_cleanup_interval_seconds": 3600},
+    )
+    assert r.status_code == 200, r.text
+    assert "failure_cleanup_enabled" not in r.json()
+    assert "failure_cleanup_interval_seconds" not in r.json()
 
 
 def test_maintenance_run_rejects_an_unknown_scope(admin) -> None:

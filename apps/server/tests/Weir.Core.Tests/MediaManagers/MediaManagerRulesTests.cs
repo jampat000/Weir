@@ -305,23 +305,22 @@ public sealed class MediaManagerRulesTests
     [InlineData("blocked_upstream", "queued")]
     [InlineData("unprocessed", "queued")]
     public void File_states_map_to_the_agreed_vocabulary(string status, string state) =>
-        Assert.Equal(state, HandoffLedgerRules.FileState(status, null, 0).State);
+        Assert.Equal(state, HandoffLedgerRules.FileState(status, null).State);
 
     [Fact]
-    public void A_file_held_after_repeated_failures_is_failed_and_one_held_briefly_is_queued()
+    public void A_file_on_hold_is_queued_because_a_file_that_failed_is_never_held()
     {
-        Assert.Equal("failed", HandoffLedgerRules.FileState("on_hold", null, 3).State);
-        Assert.Equal("queued", HandoffLedgerRules.FileState("on_hold", null, 2).State);
+        Assert.Equal("queued", HandoffLedgerRules.FileState("on_hold", null).State);
     }
 
     [Fact]
     public void A_failure_with_a_retry_owed_is_scheduled_even_after_the_backoff_ends()
     {
         var future = new DateTimeOffset(2026, 9, 17, 12, 0, 0, TimeSpan.Zero);
-        Assert.Equal(("scheduled", future), HandoffLedgerRules.FileState("processing_failed", future, 1));
+        Assert.Equal(("scheduled", future), HandoffLedgerRules.FileState("processing_failed", future));
         var past = future.AddHours(-3);
-        Assert.Equal(("scheduled", past), HandoffLedgerRules.FileState("processing_failed", past, 2));
-        Assert.Equal(("failed", (DateTimeOffset?)null), HandoffLedgerRules.FileState("processing_failed", null, 2));
+        Assert.Equal(("scheduled", past), HandoffLedgerRules.FileState("processing_failed", past));
+        Assert.Equal(("failed", (DateTimeOffset?)null), HandoffLedgerRules.FileState("processing_failed", null));
     }
 
     [Fact]
@@ -337,7 +336,7 @@ public sealed class MediaManagerRulesTests
     [Fact]
     public void A_cancelled_file_ends_its_hand_off_only_when_nothing_else_was_delivered()
     {
-        Assert.Equal(("cancelled", (DateTimeOffset?)null), HandoffLedgerRules.FileState("cancelled", null, 0));
+        Assert.Equal(("cancelled", (DateTimeOffset?)null), HandoffLedgerRules.FileState("cancelled", null));
         Assert.Equal("cancelled", HandoffLedgerRules.Combine(["cancelled"]));
         Assert.Equal("cancelled", HandoffLedgerRules.Combine(["cancelled", "cancelled"]));
         // A pack with the rest cleaned is completed, so the manager still imports what Weir wrote.

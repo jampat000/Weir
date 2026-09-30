@@ -48,10 +48,8 @@ internal sealed class ProcessingOperatorSettingsEndpointHandlers
         .Set("runner_cost_4k", OperatorSettingsRules.ClampRunnerCost(row.RunnerCost4K))
         .Set("runner_budget_enabled", row.RunnerBudgetEnabled)
         .Set("work_temp_stale_sweep_enabled", row.WorkTempStaleSweepEnabled)
-        .Set("failure_cleanup_enabled", row.FailureCleanupEnabled)
         // Null: the interval the environment gives. Settings › Cleanup shows the one in force from /processing/maintenance.
         .Set("work_temp_stale_sweep_interval_seconds", row.WorkTempStaleSweepIntervalSeconds is { } sweepEvery ? WireValue.Of(sweepEvery) : WireValue.Null)
-        .Set("failure_cleanup_interval_seconds", row.FailureCleanupIntervalSeconds is { } cleanupEvery ? WireValue.Of(cleanupEvery) : WireValue.Null)
         // #652: Settings › Cleanup › Unclaimed hand-backs. Off until a person switches it on; a null interval is six hours.
         .Set("unclaimed_handback_cleanup_enabled", row.UnclaimedHandbackCleanupEnabled)
         .Set("unclaimed_handback_window_days", OperatorSettingsRules.ClampUnclaimedHandbackWindowDays(row.UnclaimedHandbackWindowDays))
@@ -82,13 +80,14 @@ internal sealed class ProcessingOperatorSettingsEndpointHandlers
 
     /// <summary>
     /// Settings Performance no longer holds: the wait for a new file, the minimum size and the space to keep free now belong to
-    /// each workflow, the cost of an unknown resolution is a 1080p file's, and nothing acts on verbose detection records. An older
-    /// client or backup may still send them, so they are accepted and their values are never looked at.
+    /// each workflow, the cost of an unknown resolution is a 1080p file's, and nothing acts on verbose detection records or on the
+    /// failed-download cleanup, which is gone. An older client or backup may still send them, so they are accepted and their
+    /// values are never looked at.
     /// </summary>
     private static readonly string[] RetiredSettings =
     [
         "verbose_detection_logging", "min_file_age_seconds", "min_input_file_size_mb", "minimum_free_disk_space_mb",
-        "runner_cost_undetermined",
+        "runner_cost_undetermined", "failure_cleanup_enabled", "failure_cleanup_interval_seconds",
     ];
 
     public async Task<ApiResult> PutOperatorSettingsAsync(ApiRequest request)
@@ -106,11 +105,8 @@ internal sealed class ProcessingOperatorSettingsEndpointHandlers
         var runnerCost4K = model.OptionalInt("runner_cost_4k", ge: 0, le: 64);
         var runnerBudgetEnabled = model.OptionalBool("runner_budget_enabled");
         var workTempStaleSweepEnabled = model.OptionalBool("work_temp_stale_sweep_enabled");
-        var failureCleanupEnabled = model.OptionalBool("failure_cleanup_enabled");
         var workTempStaleSweepIntervalSeconds = model.OptionalInt(
             "work_temp_stale_sweep_interval_seconds", ge: OperatorSettingsRules.MinCleanupIntervalSeconds, le: OperatorSettingsRules.MaxCleanupIntervalSeconds);
-        var failureCleanupIntervalSeconds = model.OptionalInt(
-            "failure_cleanup_interval_seconds", ge: OperatorSettingsRules.MinCleanupIntervalSeconds, le: OperatorSettingsRules.MaxCleanupIntervalSeconds);
         var unclaimedHandbackCleanupEnabled = model.OptionalBool("unclaimed_handback_cleanup_enabled");
         var unclaimedHandbackWindowDays = model.OptionalInt(
             "unclaimed_handback_window_days", ge: HandbackRules.MinUnclaimedWindowDays, le: HandbackRules.MaxUnclaimedWindowDays);
@@ -146,8 +142,8 @@ internal sealed class ProcessingOperatorSettingsEndpointHandlers
 
         var hasProcessField = maxConcurrentFiles is not null || runnerCapacity is not null || runnerCostSd is not null ||
                                runnerCost720P is not null || runnerCost1080P is not null || runnerCost4K is not null ||
-                               runnerBudgetEnabled is not null || workTempStaleSweepEnabled is not null || failureCleanupEnabled is not null ||
-                               workTempStaleSweepIntervalSeconds is not null || failureCleanupIntervalSeconds is not null ||
+                               runnerBudgetEnabled is not null || workTempStaleSweepEnabled is not null ||
+                               workTempStaleSweepIntervalSeconds is not null ||
                                unclaimedHandbackCleanupEnabled is not null || unclaimedHandbackWindowDays is not null ||
                                unclaimedHandbackCleanupIntervalSeconds is not null ||
                                keepFailedWorkFiles is not null || fileLogRetentionDays is not null || RetiredSettings.Any(model.Has);
@@ -209,19 +205,9 @@ internal sealed class ProcessingOperatorSettingsEndpointHandlers
             after = after with { WorkTempStaleSweepEnabled = wt };
         }
 
-        if (failureCleanupEnabled is { } fc)
-        {
-            after = after with { FailureCleanupEnabled = fc };
-        }
-
         if (workTempStaleSweepIntervalSeconds is { } sweepEvery)
         {
             after = after with { WorkTempStaleSweepIntervalSeconds = sweepEvery };
-        }
-
-        if (failureCleanupIntervalSeconds is { } cleanupEvery)
-        {
-            after = after with { FailureCleanupIntervalSeconds = cleanupEvery };
         }
 
         if (unclaimedHandbackCleanupEnabled is { } unclaimedOn)

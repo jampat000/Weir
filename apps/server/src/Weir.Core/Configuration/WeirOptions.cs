@@ -103,12 +103,6 @@ public sealed record WeirOptions
     public required bool ProcessingWorkTempStaleSweepTvScheduleEnabled { get; init; }
     public required int ProcessingWorkTempStaleSweepTvScheduleIntervalSeconds { get; init; }
     public required int ProcessingWorkTempStaleSweepMinStaleAgeSeconds { get; init; }
-    public required bool ProcessingMovieFailureCleanupScheduleEnabled { get; init; }
-    public required int ProcessingMovieFailureCleanupScheduleIntervalSeconds { get; init; }
-    public required bool ProcessingTvFailureCleanupScheduleEnabled { get; init; }
-    public required int ProcessingTvFailureCleanupScheduleIntervalSeconds { get; init; }
-    public required int ProcessingMovieFailureCleanupGracePeriodSeconds { get; init; }
-    public required int ProcessingTvFailureCleanupGracePeriodSeconds { get; init; }
 
     public required int JobRowsRetentionDays { get; init; }
     public required int JobRowsRetentionScheduleIntervalSeconds { get; init; }

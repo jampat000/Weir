@@ -22,8 +22,7 @@ import { SettingsLoadError } from "../../settings-load-error";
 const FILES_AT_ONCE = Array.from({ length: 10 }, (_, i) => i + 1);
 
 /**
- * Settings › Performance: how hard Weir works, and what it keeps when a file fails. The cleanup switches are on
- * Cleanup, each beside its own timer.
+ * Settings › Performance: how hard Weir works. The cleanup switches are on Cleanup, each beside its own timer.
  */
 export function ProcessSettingsSection() {
   const me = useMeQuery();
@@ -40,7 +39,6 @@ export function ProcessSettingsSection() {
   const [runnerCost1080p, setRunnerCost1080p] = useState("2");
   const [runnerCost4k, setRunnerCost4k] = useState("4");
   const [runnerBudgetEnabled, setRunnerBudgetEnabled] = useState(false);
-  const [keepFailedWorkFiles, setKeepFailedWorkFiles] = useState(false);
 
   useEffect(() => {
     if (!q.data) return;
@@ -51,7 +49,6 @@ export function ProcessSettingsSection() {
     setRunnerCost1080p(String(q.data.runner_cost_1080p));
     setRunnerCost4k(String(q.data.runner_cost_4k));
     setRunnerBudgetEnabled(q.data.runner_budget_enabled);
-    setKeepFailedWorkFiles(q.data.keep_failed_work_files);
   }, [q.data]);
 
   if (q.isPending || me.isPending) {
@@ -84,8 +81,7 @@ export function ProcessSettingsSection() {
     runnerCost720p !== String(q.data.runner_cost_720p) ||
     runnerCost1080p !== String(q.data.runner_cost_1080p) ||
     runnerCost4k !== String(q.data.runner_cost_4k) ||
-    runnerBudgetEnabled !== q.data.runner_budget_enabled ||
-    keepFailedWorkFiles !== q.data.keep_failed_work_files;
+    runnerBudgetEnabled !== q.data.runner_budget_enabled;
   const locked = !editable || save.isPending;
 
   const cost = (label: string, value: string, set: (v: string) => void) => (
@@ -106,8 +102,7 @@ export function ProcessSettingsSection() {
     <div data-testid="processing-process-settings">
       <SaveModelNote model="explicit" />
       <p className="mm-quiet-note">
-        How hard Weir works, and what it keeps when a file fails. The defaults
-        suit most machines.
+        How hard Weir works. The defaults suit most machines.
       </p>
       <div className="mm-setgroups mm-setgroups--columns">
         <div>
@@ -187,27 +182,6 @@ export function ProcessSettingsSection() {
             ) : null}
           </SettingsGroup>
         </div>
-
-        <div>
-          <SettingsGroup
-            title="When a file fails"
-            detail="What Weir leaves behind for you to look at. Deleting the download of a failed file is a Cleanup job."
-          >
-            <SettingRow
-              label="Keep the half-written copy"
-              hint="Left in the work folder so you can look at it. Cleanup's leftover-work-file sweep removes it once it is a day old."
-            >
-              <MmOnOffSwitch
-                id={`${ids}-keep-failed`}
-                label="Keep the half-written copy"
-                enabled={keepFailedWorkFiles}
-                disabled={locked}
-                onChange={setKeepFailedWorkFiles}
-                layout="control"
-              />
-            </SettingRow>
-          </SettingsGroup>
-        </div>
       </div>
 
       {save.isError ? (
@@ -229,7 +203,6 @@ export function ProcessSettingsSection() {
               runner_cost_1080p: costs[3],
               runner_cost_4k: costs[4],
               runner_budget_enabled: runnerBudgetEnabled,
-              keep_failed_work_files: keepFailedWorkFiles,
             })
           }
         >

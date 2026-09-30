@@ -3061,7 +3061,6 @@
           "family": {
             "enum": [
               "work_temp_stale_sweep",
-              "failure_cleanup",
               "unclaimed_handbacks"
             ],
             "title": "Family",
@@ -3174,7 +3173,6 @@
           "family": {
             "enum": [
               "work_temp_stale_sweep",
-              "failure_cleanup",
               "unclaimed_handbacks"
             ],
             "title": "Family",
@@ -4740,7 +4738,7 @@
             "type": "string"
           },
           "retention_days": {
-            "description": "How long these records are kept. 0 means they are kept forever.",
+            "description": "How many days a file's history is kept after the file is gone or forgotten. While Weir still knows the file its history is kept. 0 keeps it forever.",
             "title": "Retention Days",
             "type": "integer"
           }
@@ -5074,12 +5072,6 @@
             ],
             "description": "processing while the file is written; finishing during the final checks and hand-back. Null when nothing is in flight.",
             "title": "Progress Status"
-          },
-          "quarantined": {
-            "default": false,
-            "description": "True when repeated failures placed this file on hold until an operator requeues it.",
-            "title": "Quarantined",
-            "type": "boolean"
           },
           "relative_path": {
             "title": "Relative Path",
@@ -6192,7 +6184,7 @@
           },
           "max_attempts": {
             "default": 3,
-            "description": "How many times Weir tries a file on its own before stopping.",
+            "description": "How many times Weir tries a file on its own before it gives up. The first try counts, so 3 means the first try and two retries.",
             "maximum": 20.0,
             "minimum": 1.0,
             "title": "Max Attempts",
@@ -6319,7 +6311,7 @@
           },
           "retry_backoff_seconds": {
             "default": 300,
-            "description": "The first wait before a retry. It doubles each attempt, capped at an hour.",
+            "description": "The first wait before a retry. It doubles each attempt, capped at an hour. Weir looks again shortly after the wait ends.",
             "maximum": 3600.0,
             "minimum": 1.0,
             "title": "Retry Backoff Seconds",
@@ -7026,7 +7018,7 @@
           },
           "max_attempts": {
             "default": 3,
-            "description": "How many times Weir tries a file on its own before stopping.",
+            "description": "How many times Weir tries a file on its own before it gives up. The first try counts, so 3 means the first try and two retries.",
             "maximum": 20.0,
             "minimum": 1.0,
             "title": "Max Attempts",
@@ -7153,7 +7145,7 @@
           },
           "retry_backoff_seconds": {
             "default": 300,
-            "description": "The first wait before a retry. It doubles each attempt, capped at an hour.",
+            "description": "The first wait before a retry. It doubles each attempt, capped at an hour. Weir looks again shortly after the wait ends.",
             "maximum": 3600.0,
             "minimum": 1.0,
             "title": "Retry Backoff Seconds",
@@ -7375,32 +7367,15 @@
       "ProcessingOperatorSettingsOut": {
         "additionalProperties": false,
         "properties": {
-          "failure_cleanup_enabled": {
-            "description": "Delete the source release folder after a file fails terminally. Off by default: this removes the original, so it stays off until you choose it.",
-            "title": "Failure Cleanup Enabled",
-            "type": "boolean"
-          },
-          "failure_cleanup_interval_seconds": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "How often the failed-download cleanup runs, set in Settings › Cleanup. Null keeps the environment's interval.",
-            "title": "Failure Cleanup Interval Seconds"
-          },
           "file_log_retention_days": {
-            "description": "How long to keep the per-file processing record. 0 keeps it forever.",
+            "description": "How many days a file's history is kept after the file is gone or forgotten. While Weir still knows the file its history is kept. 0 keeps it forever.",
             "maximum": 3650.0,
             "minimum": 0.0,
             "title": "File Log Retention Days",
             "type": "integer"
           },
           "keep_failed_work_files": {
-            "description": "Keep a failed run's working files so they can be inspected instead of swept.",
+            "description": "Keep a failed file's half-written copy for a day, so it can be looked at. It is removed once it is a day old.",
             "title": "Keep Failed Work Files",
             "type": "boolean"
           },
@@ -7553,7 +7528,6 @@
           "runner_cost_4k",
           "runner_budget_enabled",
           "work_temp_stale_sweep_enabled",
-          "failure_cleanup_enabled",
           "unclaimed_handback_cleanup_enabled",
           "unclaimed_handback_window_days",
           "keep_failed_work_files",
@@ -7582,30 +7556,6 @@
             "minLength": 1,
             "title": "Csrf Token",
             "type": "string"
-          },
-          "failure_cleanup_enabled": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Failure Cleanup Enabled"
-          },
-          "failure_cleanup_interval_seconds": {
-            "anyOf": [
-              {
-                "maximum": 2592000,
-                "minimum": 900,
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Failure Cleanup Interval Seconds"
           },
           "file_log_retention_days": {
             "anyOf": [
@@ -8927,11 +8877,6 @@
             "title": "Configuration Note",
             "type": "string"
           },
-          "failure_cleanup_configuration_note": {
-            "description": "How operators change Pass 4 failure-cleanup timers/grace (restart required).",
-            "title": "Failure Cleanup Configuration Note",
-            "type": "string"
-          },
           "in_process_processing_worker_count": {
             "description": "Mirrors WEIR_PROCESSING_WORKER_COUNT after clamping — the processing lane only.",
             "maximum": 8.0,
@@ -8969,24 +8914,6 @@
             "title": "Processing Media Extensions",
             "type": "array"
           },
-          "processing_movie_failure_cleanup_grace_period_seconds": {
-            "description": "Failed remux age gate for Movies failure cleanup (uses jobs.updated_at).",
-            "maximum": 604800.0,
-            "minimum": 300.0,
-            "title": "Processing Movie Failure Cleanup Grace Period Seconds",
-            "type": "integer"
-          },
-          "processing_movie_failure_cleanup_schedule_enabled": {
-            "description": "``WEIR_PROCESSING_MOVIE_FAILURE_CLEANUP_SCHEDULE_ENABLED`` at process start.",
-            "title": "Processing Movie Failure Cleanup Schedule Enabled",
-            "type": "boolean"
-          },
-          "processing_movie_failure_cleanup_schedule_interval_seconds": {
-            "description": "Seconds between Movies-only periodic failed-remux cleanup enqueue ticks.",
-            "minimum": 60.0,
-            "title": "Processing Movie Failure Cleanup Schedule Interval Seconds",
-            "type": "integer"
-          },
           "processing_movie_output_cleanup_min_age_seconds": {
             "description": "Minimum age (newest file mtime under the folder) before Pass 3a may delete a Movies output folder (1h..30d; default 48h).",
             "minimum": 3600.0,
@@ -8998,24 +8925,6 @@
             "maximum": 1024.0,
             "minimum": 1.0,
             "title": "Processing Probe Size Mb",
-            "type": "integer"
-          },
-          "processing_tv_failure_cleanup_grace_period_seconds": {
-            "description": "Failed remux age gate for TV failure cleanup (uses jobs.updated_at).",
-            "maximum": 604800.0,
-            "minimum": 300.0,
-            "title": "Processing Tv Failure Cleanup Grace Period Seconds",
-            "type": "integer"
-          },
-          "processing_tv_failure_cleanup_schedule_enabled": {
-            "description": "``WEIR_PROCESSING_TV_FAILURE_CLEANUP_SCHEDULE_ENABLED`` at process start.",
-            "title": "Processing Tv Failure Cleanup Schedule Enabled",
-            "type": "boolean"
-          },
-          "processing_tv_failure_cleanup_schedule_interval_seconds": {
-            "description": "Seconds between TV-only periodic failed-remux cleanup enqueue ticks.",
-            "minimum": 60.0,
-            "title": "Processing Tv Failure Cleanup Schedule Interval Seconds",
             "type": "integer"
           },
           "processing_tv_output_cleanup_min_age_seconds": {
@@ -9110,13 +9019,6 @@
           "processing_work_temp_stale_sweep_tv_schedule_enabled",
           "processing_work_temp_stale_sweep_tv_schedule_interval_seconds",
           "processing_work_temp_stale_sweep_min_stale_age_seconds",
-          "processing_movie_failure_cleanup_schedule_enabled",
-          "processing_movie_failure_cleanup_schedule_interval_seconds",
-          "processing_tv_failure_cleanup_schedule_enabled",
-          "processing_tv_failure_cleanup_schedule_interval_seconds",
-          "processing_movie_failure_cleanup_grace_period_seconds",
-          "processing_tv_failure_cleanup_grace_period_seconds",
-          "failure_cleanup_configuration_note",
           "work_temp_stale_sweep_periodic_configuration_note"
         ],
         "title": "ProcessingRuntimeSettingsOut",

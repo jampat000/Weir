@@ -6,21 +6,22 @@ namespace Weir.Infrastructure.Processing;
 
 /// <summary>The singleton <c>operator_settings</c> row.</summary>
 /// <remarks>
-/// <c>verbose_detection_logging</c>, <c>runner_cost_undetermined</c> and <c>minimum_free_disk_space_mb</c> are columns that nothing
-/// reads or writes any more: nothing acted on the first, a file of unknown resolution costs what 1080p does, and free space to
-/// keep is each workflow's own. Dropping them would buy nothing and cost a migration, so they keep their defaults on a new row; a
-/// configuration backup carries them and restores them like any other column, which is how an older backup's free-space value
-/// reaches its workflows.
+/// <c>verbose_detection_logging</c>, <c>runner_cost_undetermined</c>, <c>minimum_free_disk_space_mb</c>, <c>failure_cleanup_enabled</c>
+/// and <c>failure_cleanup_interval_seconds</c> are columns that nothing reads or writes any more: nothing acted on the first and
+/// the last two, a file of unknown resolution costs what 1080p does, and free space to keep is each workflow's own. Dropping them
+/// would buy nothing and cost a migration, so they keep their defaults on a new row; a configuration backup carries them and
+/// restores them like any other column, which is how an older backup still restores, and how its free-space value reaches its
+/// workflows.
 /// </remarks>
 public sealed class OperatorSettingsStore
 {
     private const string Columns =
         "max_concurrent_files, runner_capacity, runner_cost_sd, runner_cost_720p, runner_cost_1080p, runner_cost_4k, " +
-        "work_temp_stale_sweep_enabled, failure_cleanup_enabled, keep_failed_work_files, file_log_retention_days, " +
+        "work_temp_stale_sweep_enabled, keep_failed_work_files, file_log_retention_days, " +
         "movie_schedule_enabled, movie_schedule_hours_limited, movie_schedule_days, " +
         "movie_schedule_start, movie_schedule_end, tv_schedule_enabled, tv_schedule_hours_limited, tv_schedule_days, " +
         "tv_schedule_start, tv_schedule_end, updated_at, runner_budget_enabled, work_temp_stale_sweep_interval_seconds, " +
-        "failure_cleanup_interval_seconds, unclaimed_handback_cleanup_enabled, unclaimed_handback_window_days, " +
+        "unclaimed_handback_cleanup_enabled, unclaimed_handback_window_days, " +
         "unclaimed_handback_cleanup_interval_seconds";
 
     public Task<ProcessingOperatorSettingsRecord?> GetAsync(UnitOfWork uow) =>
@@ -37,10 +38,10 @@ public sealed class OperatorSettingsStore
 
         await uow.ExecuteAsync(
             "INSERT INTO operator_settings (id, max_concurrent_files, runner_capacity, runner_cost_sd, runner_cost_720p, " +
-            "runner_cost_1080p, runner_cost_4k, work_temp_stale_sweep_enabled, failure_cleanup_enabled, " +
+            "runner_cost_1080p, runner_cost_4k, work_temp_stale_sweep_enabled, " +
             "keep_failed_work_files, file_log_retention_days, movie_schedule_enabled, movie_schedule_hours_limited, " +
             "movie_schedule_days, movie_schedule_start, movie_schedule_end, tv_schedule_enabled, tv_schedule_hours_limited, " +
-            "tv_schedule_days, tv_schedule_start, tv_schedule_end) VALUES (1, 1, 4, 0, 0, 1, 1, 1, 0, 0, 90, " +
+            "tv_schedule_days, tv_schedule_start, tv_schedule_end) VALUES (1, 1, 4, 0, 0, 1, 1, 1, 0, 90, " +
             "1, 0, '', '00:00', '23:59', 1, 0, '', '00:00', '23:59')").ConfigureAwait(false);
         return await GetAsync(uow).ConfigureAwait(false) ?? throw new InvalidOperationException("operator_settings row was not created.");
     }
@@ -66,9 +67,7 @@ public sealed class OperatorSettingsStore
         Compare("runner_cost_4k", before.RunnerCost4K, after.RunnerCost4K, v => v);
         Compare("runner_budget_enabled", before.RunnerBudgetEnabled, after.RunnerBudgetEnabled, v => v ? 1 : 0);
         Compare("work_temp_stale_sweep_enabled", before.WorkTempStaleSweepEnabled, after.WorkTempStaleSweepEnabled, v => v ? 1 : 0);
-        Compare("failure_cleanup_enabled", before.FailureCleanupEnabled, after.FailureCleanupEnabled, v => v ? 1 : 0);
         Compare("work_temp_stale_sweep_interval_seconds", before.WorkTempStaleSweepIntervalSeconds, after.WorkTempStaleSweepIntervalSeconds, v => v);
-        Compare("failure_cleanup_interval_seconds", before.FailureCleanupIntervalSeconds, after.FailureCleanupIntervalSeconds, v => v);
         Compare("unclaimed_handback_cleanup_enabled", before.UnclaimedHandbackCleanupEnabled, after.UnclaimedHandbackCleanupEnabled, v => v ? 1 : 0);
         Compare("unclaimed_handback_window_days", before.UnclaimedHandbackWindowDays, after.UnclaimedHandbackWindowDays, v => v);
         Compare("unclaimed_handback_cleanup_interval_seconds", before.UnclaimedHandbackCleanupIntervalSeconds, after.UnclaimedHandbackCleanupIntervalSeconds, v => v);
@@ -102,25 +101,23 @@ public sealed class OperatorSettingsStore
         RunnerCost1080P = SqliteValues.GetInt64(reader, 4),
         RunnerCost4K = SqliteValues.GetInt64(reader, 5),
         WorkTempStaleSweepEnabled = SqliteValues.GetBool(reader, 6),
-        FailureCleanupEnabled = SqliteValues.GetBool(reader, 7),
-        KeepFailedWorkFiles = SqliteValues.GetBool(reader, 8),
-        FileLogRetentionDays = SqliteValues.GetInt64(reader, 9),
-        MovieScheduleEnabled = SqliteValues.GetBool(reader, 10),
-        MovieScheduleHoursLimited = SqliteValues.GetBool(reader, 11),
-        MovieScheduleDays = SqliteValues.GetString(reader, 12),
-        MovieScheduleStart = SqliteValues.GetString(reader, 13),
-        MovieScheduleEnd = SqliteValues.GetString(reader, 14),
-        TvScheduleEnabled = SqliteValues.GetBool(reader, 15),
-        TvScheduleHoursLimited = SqliteValues.GetBool(reader, 16),
-        TvScheduleDays = SqliteValues.GetString(reader, 17),
-        TvScheduleStart = SqliteValues.GetString(reader, 18),
-        TvScheduleEnd = SqliteValues.GetString(reader, 19),
-        UpdatedAt = SqliteValues.GetDateTime(reader, 20),
-        RunnerBudgetEnabled = SqliteValues.GetBool(reader, 21),
-        WorkTempStaleSweepIntervalSeconds = reader.IsDBNull(22) ? null : reader.GetInt64(22),
-        FailureCleanupIntervalSeconds = reader.IsDBNull(23) ? null : reader.GetInt64(23),
-        UnclaimedHandbackCleanupEnabled = SqliteValues.GetBool(reader, 24),
-        UnclaimedHandbackWindowDays = SqliteValues.GetInt64(reader, 25),
-        UnclaimedHandbackCleanupIntervalSeconds = reader.IsDBNull(26) ? null : reader.GetInt64(26),
+        KeepFailedWorkFiles = SqliteValues.GetBool(reader, 7),
+        FileLogRetentionDays = SqliteValues.GetInt64(reader, 8),
+        MovieScheduleEnabled = SqliteValues.GetBool(reader, 9),
+        MovieScheduleHoursLimited = SqliteValues.GetBool(reader, 10),
+        MovieScheduleDays = SqliteValues.GetString(reader, 11),
+        MovieScheduleStart = SqliteValues.GetString(reader, 12),
+        MovieScheduleEnd = SqliteValues.GetString(reader, 13),
+        TvScheduleEnabled = SqliteValues.GetBool(reader, 14),
+        TvScheduleHoursLimited = SqliteValues.GetBool(reader, 15),
+        TvScheduleDays = SqliteValues.GetString(reader, 16),
+        TvScheduleStart = SqliteValues.GetString(reader, 17),
+        TvScheduleEnd = SqliteValues.GetString(reader, 18),
+        UpdatedAt = SqliteValues.GetDateTime(reader, 19),
+        RunnerBudgetEnabled = SqliteValues.GetBool(reader, 20),
+        WorkTempStaleSweepIntervalSeconds = reader.IsDBNull(21) ? null : reader.GetInt64(21),
+        UnclaimedHandbackCleanupEnabled = SqliteValues.GetBool(reader, 22),
+        UnclaimedHandbackWindowDays = SqliteValues.GetInt64(reader, 23),
+        UnclaimedHandbackCleanupIntervalSeconds = reader.IsDBNull(24) ? null : reader.GetInt64(24),
     };
 }
