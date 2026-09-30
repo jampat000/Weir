@@ -57,6 +57,17 @@ public sealed class FileStateStore
         return uow.QueryAsync(sql, Read, parameters);
     }
 
+    /// <summary>Every rejected file, oldest first, in one workflow or in all of them. Never paged, because a bulk
+    /// action on "all" must not silently stop short.</summary>
+    public Task<List<ProcessingFileRecord>> ListRejectedAsync(UnitOfWork uow, long? libraryId)
+    {
+        var inLibrary = libraryId is null ? string.Empty : " AND library_id = @library_id";
+        var sql = $"SELECT {Columns} FROM files WHERE status = @status{inLibrary} ORDER BY id";
+        return libraryId is { } id
+            ? uow.QueryAsync(sql, Read, ("@status", ProcessingFileStatuses.Rejected), ("@library_id", id))
+            : uow.QueryAsync(sql, Read, ("@status", ProcessingFileStatuses.Rejected));
+    }
+
     internal static (string Sql, (string Name, object? Value)[] Parameters) ListQuery(ProcessingFileListFilter filter)
     {
         ArgumentNullException.ThrowIfNull(filter);

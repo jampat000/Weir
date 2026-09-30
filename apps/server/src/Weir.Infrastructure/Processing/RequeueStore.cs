@@ -19,20 +19,17 @@ public sealed class RequeueStore(ProcessingJobStore jobStore, LibraryStore libra
     /// <see cref="RemuxPass.RemuxPassHandler"/>.</summary>
     public const string RemuxPassJobKind = "processing.file.remux_pass.v1";
 
+    /// <summary>Whether <see cref="RequeueFileAsync"/> would queue this file rather than refuse it.</summary>
+    public async Task<bool> CanRequeueAsync(UnitOfWork uow, ProcessingFileRecord row) =>
+        (await CheckAsync(uow, row).ConfigureAwait(false)).Refusal is null;
+
     /// <summary>Manual reset: attempt count cleared, backoff ignored.</summary>
     public async Task<RequeueResult> RequeueFileAsync(UnitOfWork uow, ProcessingFileRecord row)
     {
-        var library = await libraries.GetAsync(uow, row.LibraryId).ConfigureAwait(false);
-        if (library is null)
+        var (library, refusal) = await CheckAsync(uow, row).ConfigureAwait(false);
+        if (library is null || refusal is not null)
         {
-            return new RequeueResult(0, 1, "The workflow this file belonged to no longer exists, so there is nowhere to queue it.");
-        }
-
-        // A queued pass on a missing original only fails later with a confusing reason, so a file Weir is done with
-        // is refused here while its original is gone.
-        if (ProcessingFileStatuses.Concluded.Contains(row.Status) && !OriginalIsInWatchedFolder(library, row.RelativePath))
-        {
-            return new RequeueResult(0, 1, OriginalGoneDetail);
+            return new RequeueResult(0, 1, refusal ?? WorkflowGoneDetail);
         }
 
         var payload = new WireObject()
@@ -98,6 +95,25 @@ public sealed class RequeueStore(ProcessingJobStore jobStore, LibraryStore libra
 
     internal const string OriginalGoneDetail =
         "The original of this file is no longer in the watched folder, so Weir has nothing to process again.";
+
+    private const string WorkflowGoneDetail =
+        "The workflow this file belonged to no longer exists, so there is nowhere to queue it.";
+
+    /// <summary>
+    /// The file's workflow and why it cannot be queued, if it cannot. A queued pass on a missing original only fails
+    /// later with a confusing reason, so a file Weir is done with is refused while its original is gone.
+    /// </summary>
+    private async Task<(ProcessingLibraryRecord? Library, string? Refusal)> CheckAsync(UnitOfWork uow, ProcessingFileRecord row)
+    {
+        var library = await libraries.GetAsync(uow, row.LibraryId).ConfigureAwait(false);
+        if (library is null)
+        {
+            return (null, WorkflowGoneDetail);
+        }
+
+        var originalGone = ProcessingFileStatuses.Concluded.Contains(row.Status) && !OriginalIsInWatchedFolder(library, row.RelativePath);
+        return (library, originalGone ? OriginalGoneDetail : null);
+    }
 
     /// <summary>
     /// Whether the file's original is still where the pass would read it. A watched folder that is gone, or a path that

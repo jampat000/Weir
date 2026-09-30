@@ -789,6 +789,46 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/processing/files/rejected/process-again": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Post Processing Rejected Files Process Again
+     * @description Queues every rejected file whose original is still in its watched folder to be processed again with the current rules. Covers the whole rejected set, or one workflow's when library_id is given; files whose original is gone are skipped and counted.
+     */
+    post: operations["post_processing_rejected_files_process_again_api_v1_processing_files_rejected_process_again_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/processing/files/rejected/summary": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Processing Rejected Files Summary
+     * @description How many files are rejected, and how many of those could be processed again right now.
+     */
+    get: operations["get_processing_rejected_files_summary_api_v1_processing_files_rejected_summary_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/processing/files/{file_id}/remove-options": {
     parameters: {
       query?: never;
@@ -6079,6 +6119,29 @@ export interface components {
        */
       window_days: number;
     };
+    /** ProcessingRejectedFilesProcessAgainIn */
+    ProcessingRejectedFilesProcessAgainIn: {
+      /** Csrf Token */
+      csrf_token: string;
+      /**
+       * Library Id
+       * @description Only this workflow's rejected files. Leave out for every workflow's.
+       */
+      library_id?: number | null;
+    };
+    /** ProcessingRejectedFilesSummaryOut */
+    ProcessingRejectedFilesSummaryOut: {
+      /**
+       * Ready
+       * @description How many of them still have their original in the watched folder, so can be processed again.
+       */
+      ready: number;
+      /**
+       * Rejected
+       * @description How many files are rejected.
+       */
+      rejected: number;
+    };
     /** ProcessingRequeueOut */
     ProcessingRequeueOut: {
       /** Detail */
@@ -9074,6 +9137,70 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["ProcessingRequeueOut"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  post_processing_rejected_files_process_again_api_v1_processing_files_rejected_process_again_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ProcessingRejectedFilesProcessAgainIn"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ProcessingRequeueOut"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_processing_rejected_files_summary_api_v1_processing_files_rejected_summary_get: {
+    parameters: {
+      query?: {
+        library_id?: number | null;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ProcessingRejectedFilesSummaryOut"];
         };
       };
       /** @description Validation Error */

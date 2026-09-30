@@ -18,6 +18,7 @@ import { HistoryCleanDetail } from "./history-clean-detail";
 import { HistoryDetail } from "./history-detail";
 import {
   HISTORY_GROUPS,
+  hasRejectedFiles,
   historyEntries,
   inGroup,
   retryableFailures,
@@ -32,6 +33,7 @@ import {
 } from "./history-filters";
 import { HistoryKeptList } from "./history-kept-list";
 import { HistoryList } from "./history-list";
+import { ProcessRejectedAgain } from "./history-rejected-again";
 
 /** "min ago" moves on its own between refreshes. */
 const TICK_MS = 15_000;
@@ -172,6 +174,13 @@ export function HistoryPage() {
 
       {group === "failed" && editable ? (
         <RetryFailed failed={retryableFailures(shown)} />
+      ) : null}
+
+      {group === "failed" && editable && hasRejectedFiles(shown) ? (
+        <ProcessRejectedAgain
+          libraryId={libraryId}
+          libraryName={libraries.data?.find((l) => l.id === libraryId)?.name}
+        />
       ) : null}
 
       {cappedAtLimit ? (
