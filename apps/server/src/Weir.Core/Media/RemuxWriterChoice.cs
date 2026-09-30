@@ -1,9 +1,8 @@
 namespace Weir.Core.Media;
 
 /// <summary>
-/// #548: which tool writes a library's output. Kept as text like the other mode settings
-/// (<see cref="HardwareAcceleration.ModeOff"/> and friends) so it round-trips through SQLite and JSON
-/// unchanged.
+/// #548: which tool writes a workflow's output, for new downloads and for cleaning files already in the
+/// library. Kept as text like the other mode settings so it round-trips through SQLite and JSON unchanged.
 /// <para>
 /// There are deliberately <b>two</b> values, not the three the issue first sketched
 /// (<c>auto</c>/<c>ffmpeg</c>/<c>mkvmerge</c>). "mkvmerge" and "auto" would do the identical thing: mkvmerge
@@ -18,11 +17,11 @@ public static class RemuxWriterChoice
     /// else. The default.
     /// <para>
     /// This is the default rather than <see cref="Ffmpeg"/> because it cannot be worse. A write that fails to
-    /// run, or whose output fails #500's validation, is rewritten by ffmpeg and validated again
-    /// (<c>RewriteWithFfmpeg</c>), so the result matches or beats what ffmpeg alone would have produced. On
-    /// Matroska it beats it: mkvmerge keeps attachments and disposition flags by default, drops stale
-    /// per-track statistics tags, and can author editions and ordered chapters, none of which ffmpeg's CLI
-    /// does without help — see docs/engineering/503-mkvmerge-vs-ffmpeg.md.
+    /// run, or whose output fails #500's validation, is rewritten by ffmpeg and validated again, so the result
+    /// matches or beats what ffmpeg alone would have produced. On Matroska it beats it: mkvmerge keeps
+    /// attachments and disposition flags by default, drops stale per-track statistics tags, and can author
+    /// editions and ordered chapters, none of which ffmpeg's CLI does without help — see
+    /// docs/engineering/503-mkvmerge-vs-ffmpeg.md.
     /// </para>
     /// </summary>
     public const string Best = "best";

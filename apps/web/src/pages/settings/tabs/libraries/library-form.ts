@@ -35,9 +35,6 @@ export type LibraryForm = {
   priority: string;
   sidecar_patterns_csv: string;
   output_collision_policy: string;
-  hardware_decode_mode: string;
-  hardware_device: string;
-  hardware_disabled_vendors_csv: string;
   ffmpeg_strictness: string;
   max_attempts: string;
   retry_backoff_seconds: string;
@@ -100,9 +97,6 @@ export const EMPTY_LIBRARY_FORM: LibraryForm = {
   priority: "0",
   sidecar_patterns_csv: ".srt,.ass,.ssa,.sub,.idx,.vtt,.nfo,.jpg,.png",
   output_collision_policy: "replace",
-  hardware_decode_mode: "off",
-  hardware_device: "",
-  hardware_disabled_vendors_csv: "",
   ffmpeg_strictness: "normal",
   max_attempts: "3",
   retry_backoff_seconds: "300",
@@ -195,8 +189,6 @@ const TEXT_FIELDS = [
   "include_patterns_csv",
   "exclude_patterns_csv",
   "sidecar_patterns_csv",
-  "hardware_device",
-  "hardware_disabled_vendors_csv",
 ] as const satisfies readonly (keyof ProcessingLibrary & LibraryTextField)[];
 
 /** The editor's values for a saved library. */
@@ -206,7 +198,6 @@ export function formFrom(library: ProcessingLibrary): LibraryForm {
     media_type: library.media_type,
     rejected_file_action: library.rejected_file_action,
     output_collision_policy: library.output_collision_policy,
-    hardware_decode_mode: library.hardware_decode_mode,
     ffmpeg_strictness: library.ffmpeg_strictness,
     exclude_hidden: library.exclude_hidden,
     top_level_only: library.top_level_only,
@@ -289,9 +280,6 @@ export function writeFrom(
     preserve_original_timestamps: form.preserve_original_timestamps,
     remove_original_after_success: form.remove_original_after_success,
     output_collision_policy: form.output_collision_policy,
-    hardware_decode_mode: form.hardware_decode_mode,
-    hardware_device: form.hardware_device.trim(),
-    hardware_disabled_vendors_csv: form.hardware_disabled_vendors_csv.trim(),
     ffmpeg_strictness: form.ffmpeg_strictness,
     max_attempts: wholeNumber(form.max_attempts, 3),
     retry_backoff_seconds: wholeNumber(form.retry_backoff_seconds, 300),
@@ -314,7 +302,5 @@ export function writeFrom(
     // the others, so saving here never drops a link nobody chose to remove.
     manager_connection_ids: linkedConnectionIds(form, library),
     remux_writer: form.remux_writer,
-    // The editor has no control for this: a saved workflow keeps its value and a new one takes the server default.
-    rewrite_with_ffmpeg: library?.rewrite_with_ffmpeg ?? true,
   };
 }

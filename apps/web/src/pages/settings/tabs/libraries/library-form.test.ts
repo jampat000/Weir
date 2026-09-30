@@ -56,16 +56,17 @@ describe("writeFrom", () => {
     expect(write.manager_connection_ids).toEqual([4, 9]);
   });
 
-  it("keeps the rewrite choice a saved workflow has, since the editor has no control for it", () => {
-    const stored = library({ rewrite_with_ffmpeg: false });
+  it("no longer sends settings that have no effect", () => {
+    const write = writeFrom(formFrom(library()), library());
 
-    const write = writeFrom(formFrom(stored), stored);
-
-    expect(write.rewrite_with_ffmpeg).toBe(false);
-  });
-
-  it("starts a new workflow with the server's default rewrite choice", () => {
-    expect(writeFrom(EMPTY_LIBRARY_FORM).rewrite_with_ffmpeg).toBe(true);
+    for (const removed of [
+      "rewrite_with_ffmpeg",
+      "hardware_decode_mode",
+      "hardware_device",
+      "hardware_disabled_vendors_csv",
+    ]) {
+      expect(write, removed).not.toHaveProperty(removed);
+    }
   });
 });
 

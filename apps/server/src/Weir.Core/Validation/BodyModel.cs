@@ -101,6 +101,16 @@ public sealed class BodyModel
             return (ok, v ?? default);
         });
 
+    /// <summary>
+    /// Declares keys the server no longer reads, so a client or a backup that still sends them keeps working
+    /// instead of being refused as carrying extra inputs. Their values are never looked at.
+    /// </summary>
+    public void AcceptAndIgnore(IEnumerable<string> names)
+    {
+        ArgumentNullException.ThrowIfNull(names);
+        _declared.UnionWith(names);
+    }
+
     /// <summary>Report undeclared keys when the model forbids them.</summary>
     public void Finish(ExtraFields extra)
     {

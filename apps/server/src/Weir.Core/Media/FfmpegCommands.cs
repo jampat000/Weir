@@ -217,8 +217,8 @@ public static class FfmpegCommands
     ];
 
     /// <summary>
-    /// The remux command. <paramref name="inputFlags"/> (hardware acceleration and strictness) go
-    /// before <c>-i</c>, because <c>-hwaccel</c> applies to the input that follows it.
+    /// The remux command. <paramref name="inputFlags"/> (ffmpeg's strictness) go
+    /// before <c>-i</c>, because input options apply to the input that follows them.
     /// </summary>
     public static IReadOnlyList<string> BuildRemuxArgv(string ffmpegBin, string src, string dst, RemuxPlan plan, IReadOnlyList<string>? inputFlags = null)
     {

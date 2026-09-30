@@ -26,7 +26,7 @@ import {
   sameLibraryForm,
   type LibraryForm,
 } from "./library-form";
-import { LibraryHardwareFold } from "./library-hardware-fold";
+import { LibraryFfmpegFold } from "./library-ffmpeg-fold";
 import {
   LibraryIntakeGroup,
   LibraryReadinessGroup,
@@ -170,7 +170,7 @@ export function LibraryEditor({
             binding={binding}
             rejectSupport={rejectSupport}
           />
-          <LibraryHardwareFold binding={binding} />
+          <LibraryFfmpegFold binding={binding} />
           <QuietFieldGroup title="Files already in your library">
             {library ? (
               <LibraryCleaningSettings

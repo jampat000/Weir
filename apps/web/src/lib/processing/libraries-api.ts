@@ -51,16 +51,10 @@ export interface ProcessingLibrary {
   preserve_original_timestamps: boolean;
   /** Off keeps the original download in the watched folder after cleaning, so a torrent keeps seeding. */
   remove_original_after_success: boolean;
-  /** Which tool writes the output: mkvmerge for MKV when installed and FFmpeg otherwise (best), or FFmpeg only. */
+  /** Which tool writes the output, for new downloads and library cleaning: mkvmerge for MKV when installed and FFmpeg otherwise or when mkvmerge fails (best), or FFmpeg only. */
   remux_writer: RemuxWriter;
-  /** When mkvmerge's write fails its checks, whether FFmpeg writes the file again instead of failing it. */
-  rewrite_with_ffmpeg: boolean;
   /** What to do when an output already exists at the same path. "replace" is the long-standing behaviour. */
   output_collision_policy: string;
-  /** Hardware decoding. A choice that cannot work falls back to software and records why. */
-  hardware_decode_mode: string;
-  hardware_device: string;
-  hardware_disabled_vendors_csv: string;
   ffmpeg_strictness: string;
   file_detection_interval_seconds: number;
   ignore_size_changes: boolean;
@@ -126,12 +120,7 @@ export interface ProcessingLibraryWrite {
   remove_original_after_success: boolean;
   /** Which tool writes the output: mkvmerge for MKV when installed and FFmpeg otherwise (best), or FFmpeg only. */
   remux_writer: RemuxWriter;
-  /** When mkvmerge's write fails its checks, whether FFmpeg writes the file again instead of failing it. */
-  rewrite_with_ffmpeg: boolean;
   output_collision_policy: string;
-  hardware_decode_mode: string;
-  hardware_device: string;
-  hardware_disabled_vendors_csv: string;
   ffmpeg_strictness: string;
   file_detection_interval_seconds: number;
   ignore_size_changes: boolean;
@@ -244,11 +233,7 @@ export function writeFromProcessingLibrary(
     preserve_original_timestamps: library.preserve_original_timestamps,
     remove_original_after_success: library.remove_original_after_success,
     remux_writer: library.remux_writer,
-    rewrite_with_ffmpeg: library.rewrite_with_ffmpeg,
     output_collision_policy: library.output_collision_policy,
-    hardware_decode_mode: library.hardware_decode_mode,
-    hardware_device: library.hardware_device,
-    hardware_disabled_vendors_csv: library.hardware_disabled_vendors_csv,
     ffmpeg_strictness: library.ffmpeg_strictness,
     file_detection_interval_seconds: library.file_detection_interval_seconds,
     ignore_size_changes: library.ignore_size_changes,

@@ -30,8 +30,17 @@ says where a setting lives and what actually happens when it is saved.
   the workflow's own size, date or path settings turn away and to a file its rules find nothing in to
   keep. A minimum size the workflow takes from Performance never deletes a file; the file is skipped and
   left where it is.
-- Hardware decoding (workflow editor): shown as not available, and ignored by the server while it is.
-  The saved values are kept.
+- Writes files with (workflow editor, Workflows): "The best tool for each file" writes Matroska with
+  mkvmerge when it is installed and everything else with FFmpeg, and writes a file again with FFmpeg
+  when mkvmerge cannot write it or its copy fails Weir's checks. It applies to new downloads and to
+  cleaning files already in the library; when FFmpeg had to step in for a library file, that file's
+  story says so. "FFmpeg only" uses FFmpeg for everything. FFmpeg compatibility (advanced) applies to
+  both as well.
+- Hardware decoding: there is no setting. Weir copies video and audio without decoding them, so a
+  graphics card has nothing to do. Older saves and backups that carry the old hardware decoding or
+  "rewrite with FFmpeg" fields are still accepted; the values are ignored and not reported.
+- Your playback devices (Settings › Rules): information only. It drives the "can play directly"
+  badge on files and changes nothing about how a file is processed.
 - Rules: audio and subtitle handling is a named rule set a workflow points at, so two workflows can
   share one. Deleting a rule set a workflow still uses is refused rather than silently stripping that
   handling.
@@ -65,3 +74,15 @@ says where a setting lives and what actually happens when it is saved.
   switch a timer on.
 - `WEIR_PROCESSING_WATCHED_FOLDER_MIN_FILE_AGE_SECONDS` is retired. Setting it changes nothing: the wait
   after a file last changes is the workflow's own, or Settings › Performance's.
+
+## Planned: video conversion
+
+When Weir gains video conversion (the direction towards what FileFlows does), the settings land in
+these places so each one keeps a single meaning:
+
+- **Hardware** (use the graphics card, which method, which vendors to avoid) goes on Settings ›
+  Performance and is machine-wide. It is about speed, so it belongs beside "Files at once". The
+  detection behind it already exists as `GET /api/v1/processing/hardware`.
+- **Convert video** (codec and format) goes on Settings › Rules, per profile, next to the rules that
+  decide what a file keeps. "Your playback devices" is the list a rule such as "convert so my TV can
+  play it directly" will aim at.

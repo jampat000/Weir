@@ -25,7 +25,6 @@ describe("writeFromProcessingLibrary", () => {
   it("sends back every setting the server reported, so a save of one part never resets another", () => {
     const stored = library({
       remux_writer: "ffmpeg",
-      rewrite_with_ffmpeg: false,
       min_file_size_mb: 12,
       rejected_file_action: "delete_file",
       failure_policy: "hold",
@@ -46,12 +45,11 @@ describe("writeFromProcessingLibrary", () => {
     }
   });
 
-  it("carries which tool writes the output and whether FFmpeg rewrites a file mkvmerge failed", () => {
+  it("carries which tool writes the output", () => {
     const write = writeFromProcessingLibrary(
-      library({ remux_writer: "ffmpeg", rewrite_with_ffmpeg: false }),
+      library({ remux_writer: "ffmpeg" }),
     );
 
     expect(write.remux_writer).toBe("ffmpeg");
-    expect(write.rewrite_with_ffmpeg).toBe(false);
   });
 });

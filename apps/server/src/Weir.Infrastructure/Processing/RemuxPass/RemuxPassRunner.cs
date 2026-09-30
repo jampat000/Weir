@@ -18,7 +18,7 @@ namespace Weir.Infrastructure.Processing.RemuxPass;
 /// <list type="bullet">
 /// <item>The full-read integrity check runs on every platform, with the probed duration so a truncated Matroska file is
 /// caught (#539).</item>
-/// <item>The acceleration flags decided here reach the executed ffmpeg command, not only the recorded argv (#539).</item>
+/// <item>The ffmpeg options decided here reach the executed ffmpeg command, not only the recorded argv (#539).</item>
 /// <item>When the rule set keeps the original language, the metadata lookup decides the preferred audio (#537).</item>
 /// </list>
 /// </remarks>
@@ -298,25 +298,12 @@ public sealed partial class RemuxPassRunner
         var subsAfter = RemuxDisplay.SubtitleAfterLineFromPlan(plan, !passThrough && config.SubtitleMode == RemuxRuleValues.SubtitleModeRemoveAll);
 
         var workDir = runtime.WorkFolderEffective;
-        AccelerationDecision? hardware = null;
+        var ffmpegInputFlags = FfmpegStrictnessLevels.InputFlags(runtime.FfmpegStrictness);
         IReadOnlyList<string> argv = [];
         if (!passThrough)
         {
             var (_, ffmpeg) = _resolver.Resolve();
-            var hardwareSettings = new HardwareSettings
-            {
-                Mode = HardwareAcceleration.EffectiveDecodeMode(runtime.HardwareDecodeMode),
-                Device = runtime.HardwareDevice ?? string.Empty,
-                DisabledVendors = HardwareAcceleration.ParseDisabledVendors(runtime.HardwareDisabledVendorsCsv),
-                Strictness = HardwareAcceleration.NormalizeStrictness(runtime.FfmpegStrictness),
-            };
-            // Decided before the argv is built, because the flags go into it; a device that is busy or absent falls back (#345).
-            hardware = HardwareAcceleration.Decide(
-                hardwareSettings,
-                hardwareSettings.WantsHardware
-                    ? await _tools.KnownAccelerationAsync(ffmpeg, cancellationToken).ConfigureAwait(false)
-                    : HardwareAcceleration.NotAsked);
-            argv = FfmpegCommands.BuildRemuxArgv(ffmpeg, src, Path.Join(workDir, PlaceholderName), plan, hardware.ArgvFlags);
+            argv = FfmpegCommands.BuildRemuxArgv(ffmpeg, src, Path.Join(workDir, PlaceholderName), plan, ffmpegInputFlags);
         }
 
         var output = new WireObject()
@@ -382,7 +369,7 @@ public sealed partial class RemuxPassRunner
                 .ConfigureAwait(false);
         }
 
-        return await RemuxAndPublishAsync(context, output, plan, argv, hardware!, audioBefore, audioAfter, subsBefore, subsAfter, relative, collisionPolicy, sidecarPatterns, cancellationToken)
+        return await RemuxAndPublishAsync(context, output, plan, argv, ffmpegInputFlags, audioBefore, audioAfter, subsBefore, subsAfter, relative, collisionPolicy, sidecarPatterns, cancellationToken)
             .ConfigureAwait(false);
     }
 

@@ -97,7 +97,6 @@ public sealed partial class ConfigurationBundleStore
         OutputFolder = RestoreLibraryString(row, "output_folder") ?? string.Empty,
         RejectedFileAction = RestoreLibraryString(row, "rejected_file_action") ?? RejectedFileActions.Leave,
         OutputCollisionPolicy = RestoreLibraryString(row, "output_collision_policy") ?? OutputCollisionPolicies.Replace,
-        HardwareDecodeMode = RestoreLibraryString(row, "hardware_decode_mode") ?? HardwareDecodeModes.Off,
         FfmpegStrictness = RestoreLibraryString(row, "ffmpeg_strictness") ?? FfmpegStrictnessLevels.Normal,
         RemuxWriter = RestoreLibraryString(row, "remux_writer") ?? RemuxWriterChoice.Best,
         FailurePolicy = RestoreLibraryString(row, "failure_policy") ?? ProcessingFailurePolicies.PassThrough,

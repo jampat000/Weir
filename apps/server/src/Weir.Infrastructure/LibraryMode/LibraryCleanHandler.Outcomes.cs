@@ -5,11 +5,13 @@ using Weir.Core.Jobs;
 using Weir.Core.Json;
 using Weir.Core.Library;
 using Weir.Core.LibraryMode;
+using Weir.Core.Media;
 using Weir.Core.MediaManagers;
 using Weir.Core.Processing;
 using Weir.Core.Text;
 using Weir.Infrastructure.Activity;
 using Weir.Infrastructure.Jobs;
+using Weir.Infrastructure.Media;
 using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Infrastructure.LibraryMode;
@@ -21,7 +23,7 @@ namespace Weir.Infrastructure.LibraryMode;
 /// </summary>
 public sealed partial class LibraryCleanHandler
 {
-    private async Task OnCommittedAsync(ProcessingLibraryRecord library, string path, LibraryFilePlanResult plan, SwapResult result, CancellationToken cancellationToken)
+    private async Task OnCommittedAsync(ProcessingLibraryRecord library, string path, LibraryFilePlanResult plan, SwapResult result, string? writerNote, CancellationToken cancellationToken)
     {
         // #509 step 1: record what this clean removed for good, keyed the same way library mode identifies the
         // file everywhere else (library id + this path). A future rule change can then ask #509's diff whether
@@ -73,6 +75,7 @@ public sealed partial class LibraryCleanHandler
         // #735: says where the original was kept, so Activity and History both carry it (History reads this same detail).
         var keptNote = result.KeptOriginalPath is { } keptPath ? $" The original was kept at {keptPath}." : string.Empty;
         var detail = $"Cleaned {Path.GetFileName(path)}: {RemovedTracks(plan.RemovedAudioCount, plan.RemovedSubtitleCount)}." +
+                     (writerNote is null ? string.Empty : " " + writerNote) +
                      keptNote + (warnings.Count > 0 ? " " + string.Join(" ", warnings) : string.Empty);
         await RecordAsync(library.Id, path, null, LibraryActivityEventTypes.FileCleaned, detail, "success", result.KeptOriginalPath).ConfigureAwait(false);
     }
@@ -138,6 +141,16 @@ public sealed partial class LibraryCleanHandler
             _logger.LogWarning(exception, "Library mode could not record its activity entry; the outcome remains only in the job row.");
         }
     }
+
+    /// <summary>
+    /// The sentence for a file's story when the workflow prefers mkvmerge ("Best") but ffmpeg wrote the file,
+    /// because mkvmerge cannot write that container or could not write or validate that file. Null when the
+    /// tool the workflow asked for did the writing.
+    /// </summary>
+    internal static string? FfmpegFallbackNote(string? writerChoice, StagedRemux staged) =>
+        RemuxWriterChoice.PrefersBestTool(writerChoice) && staged.Writer is FfmpegRemuxWriter
+            ? "Weir wrote it with ffmpeg because mkvmerge could not."
+            : null;
 
     /// <summary>"removed 1 audio track and 2 subtitle tracks", naming only the kinds that lost a track.</summary>
     internal static string RemovedTracks(int audio, int subtitles)

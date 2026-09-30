@@ -1,16 +1,12 @@
-using System.Collections.Concurrent;
 using System.ComponentModel;
 using Weir.Core.Media;
 using Weir.Infrastructure.Processes;
 
 namespace Weir.Infrastructure.Media;
 
-/// <summary>Hardware acceleration detection: what <c>ffmpeg -hwaccels</c> reports, cached per ffmpeg binary.</summary>
+/// <summary>Hardware acceleration detection: what <c>ffmpeg -hwaccels</c> reports.</summary>
 public sealed partial class MediaTools
 {
-    /// <summary>What each ffmpeg answered to <c>-hwaccels</c>, by its path; see <see cref="KnownAccelerationAsync"/>.</summary>
-    private readonly ConcurrentDictionary<string, AccelerationReport> _accelerationByFfmpeg = new(StringComparer.Ordinal);
-
     /// <summary>
     /// The hardware acceleration methods ffmpeg was built with. Never throws for a missing, failing or slow ffmpeg;
     /// the report says why nothing was found.
@@ -58,27 +54,6 @@ public sealed partial class MediaTools
             return HardwareAcceleration.ReportForRunError(ProbeOutput.TimeoutMessage(argv, timeout.TotalSeconds));
         }
 
-        var report = HardwareAcceleration.ReportFromHwaccels(result.ExitCode, ProbeOutput.CapturedText(result.Stdout));
-        if (report.Detected)
-        {
-            _accelerationByFfmpeg[ffmpegBin] = report;
-        }
-
-        return report;
-    }
-
-    /// <summary>
-    /// <see cref="DetectAccelerationAsync(string, CancellationToken)"/>, asked once per ffmpeg rather than once per
-    /// file (#716): the methods an ffmpeg build was compiled with do not change while it is installed. An answer
-    /// that could not be read is not kept, so the next pass asks again, and every
-    /// <see cref="DetectAccelerationAsync(string, CancellationToken)"/> (the Settings check) replaces the kept
-    /// answer with a fresh one.
-    /// </summary>
-    public Task<AccelerationReport> KnownAccelerationAsync(string ffmpegBin, CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(ffmpegBin);
-        return _accelerationByFfmpeg.TryGetValue(ffmpegBin, out var known)
-            ? Task.FromResult(known)
-            : DetectAccelerationAsync(ffmpegBin, cancellationToken);
+        return HardwareAcceleration.ReportFromHwaccels(result.ExitCode, ProbeOutput.CapturedText(result.Stdout));
     }
 }

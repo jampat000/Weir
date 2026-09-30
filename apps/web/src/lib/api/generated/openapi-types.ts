@@ -5136,7 +5136,7 @@ export interface components {
       failure_policy: "pass_through" | "hold" | "reject";
       /**
        * Ffmpeg Strictness
-       * @description ffmpeg's -strict level. 'normal' is its own default and passes no flag.
+       * @description ffmpeg's -strict level, for new downloads and for cleaning files already in the library. 'normal' is its own default and passes no flag.
        * @default normal
        * @enum {string}
        */
@@ -5154,25 +5154,6 @@ export interface components {
        * @default true
        */
       file_system_events_enabled: boolean;
-      /**
-       * Hardware Decode Mode
-       * @description Hardware decoding. 'off' is what Weir has always done. A choice that cannot work falls back to software and records why — it never fails a file.
-       * @default off
-       * @enum {string}
-       */
-      hardware_decode_mode: "off" | "auto" | "device";
-      /**
-       * Hardware Device
-       * @description The ffmpeg method to use when the mode is 'device' — cuda, qsv, vaapi.
-       * @default
-       */
-      hardware_device: string;
-      /**
-       * Hardware Disabled Vendors Csv
-       * @description Vendors to never use, comma separated: nvidia, intel, amd, vaapi, apple.
-       * @default
-       */
-      hardware_disabled_vendors_csv: string;
       /**
        * Hold Minutes
        * @default 0
@@ -5366,17 +5347,11 @@ export interface components {
       remove_original_after_success: boolean;
       /**
        * Remux Writer
-       * @description Which tool writes the library's output (#548). best: mkvmerge for Matroska when it is installed, ffmpeg for everything else, and ffmpeg again when mkvmerge's write fails its checks. ffmpeg: ffmpeg writes every file.
+       * @description Which tool writes the workflow's output, for new downloads and for cleaning files already in the library. best: mkvmerge for Matroska when it is installed, ffmpeg for everything else, and ffmpeg again when mkvmerge's write fails its checks. ffmpeg: ffmpeg writes every file.
        * @default best
        * @enum {string}
        */
       remux_writer: "best" | "ffmpeg";
-      /**
-       * Rewrite With Ffmpeg
-       * @description With remux_writer best: when mkvmerge's write fails its checks, ffmpeg writes the file again instead of the file failing. Off fails the file at once.
-       * @default true
-       */
-      rewrite_with_ffmpeg: boolean;
     };
     /** ProcessingLibraryDeleteIn */
     ProcessingLibraryDeleteIn: {
@@ -5437,12 +5412,6 @@ export interface components {
       file_detection_interval_seconds: number;
       /** File System Events Enabled */
       file_system_events_enabled: boolean;
-      /** Hardware Decode Mode */
-      hardware_decode_mode: string;
-      /** Hardware Device */
-      hardware_device: string;
-      /** Hardware Disabled Vendors Csv */
-      hardware_disabled_vendors_csv: string;
       /** Hold Minutes */
       hold_minutes: number;
       /** Id */
@@ -5570,17 +5539,11 @@ export interface components {
       remove_original_after_success: boolean;
       /**
        * Remux Writer
-       * @description Which tool writes the library's output (#548). best: mkvmerge for Matroska when it is installed, ffmpeg for everything else, and ffmpeg again when mkvmerge's write fails its checks. ffmpeg: ffmpeg writes every file.
+       * @description Which tool writes the workflow's output, for new downloads and for cleaning files already in the library. best: mkvmerge for Matroska when it is installed, ffmpeg for everything else, and ffmpeg again when mkvmerge's write fails its checks. ffmpeg: ffmpeg writes every file.
        * @default best
        * @enum {string}
        */
       remux_writer: "best" | "ffmpeg";
-      /**
-       * Rewrite With Ffmpeg
-       * @description With remux_writer best: when mkvmerge's write fails its checks, ffmpeg writes the file again instead of the file failing. Off fails the file at once.
-       * @default true
-       */
-      rewrite_with_ffmpeg: boolean;
     };
     /** ProcessingLibraryReorderIn */
     ProcessingLibraryReorderIn: {
@@ -5635,7 +5598,7 @@ export interface components {
       failure_policy: "pass_through" | "hold" | "reject";
       /**
        * Ffmpeg Strictness
-       * @description ffmpeg's -strict level. 'normal' is its own default and passes no flag.
+       * @description ffmpeg's -strict level, for new downloads and for cleaning files already in the library. 'normal' is its own default and passes no flag.
        * @default normal
        * @enum {string}
        */
@@ -5653,25 +5616,6 @@ export interface components {
        * @default true
        */
       file_system_events_enabled: boolean;
-      /**
-       * Hardware Decode Mode
-       * @description Hardware decoding. 'off' is what Weir has always done. A choice that cannot work falls back to software and records why — it never fails a file.
-       * @default off
-       * @enum {string}
-       */
-      hardware_decode_mode: "off" | "auto" | "device";
-      /**
-       * Hardware Device
-       * @description The ffmpeg method to use when the mode is 'device' — cuda, qsv, vaapi.
-       * @default
-       */
-      hardware_device: string;
-      /**
-       * Hardware Disabled Vendors Csv
-       * @description Vendors to never use, comma separated: nvidia, intel, amd, vaapi, apple.
-       * @default
-       */
-      hardware_disabled_vendors_csv: string;
       /**
        * Hold Minutes
        * @default 0
@@ -5865,17 +5809,11 @@ export interface components {
       remove_original_after_success: boolean;
       /**
        * Remux Writer
-       * @description Which tool writes the library's output (#548). best: mkvmerge for Matroska when it is installed, ffmpeg for everything else, and ffmpeg again when mkvmerge's write fails its checks. ffmpeg: ffmpeg writes every file.
+       * @description Which tool writes the workflow's output, for new downloads and for cleaning files already in the library. best: mkvmerge for Matroska when it is installed, ffmpeg for everything else, and ffmpeg again when mkvmerge's write fails its checks. ffmpeg: ffmpeg writes every file.
        * @default best
        * @enum {string}
        */
       remux_writer: "best" | "ffmpeg";
-      /**
-       * Rewrite With Ffmpeg
-       * @description With remux_writer best: when mkvmerge's write fails its checks, ffmpeg writes the file again instead of the file failing. Off fails the file at once.
-       * @default true
-       */
-      rewrite_with_ffmpeg: boolean;
     };
     /**
      * ProcessingManualPlanIn

@@ -111,7 +111,7 @@ internal sealed class ProcessingRuntimeEndpointHandlers
                 .Set("available_methods", new WireArray([]))
                 .Set("vendors", new WireArray([]))
                 .Set("selectable_vendors", new WireArray(HardwareAcceleration.VendorMethods.Select(v => v.Key).Order(StringComparer.Ordinal).Select(k => (WireValue)WireValue.Of(k))))
-                .Set("strictness_levels", new WireArray(HardwareAcceleration.StrictnessLevels.Select(l => (WireValue)WireValue.Of(l))))
+                .Set("strictness_levels", new WireArray(FfmpegStrictnessLevels.All.Select(l => (WireValue)WireValue.Of(l))))
                 .Set("detail", $"Weir could not find ffmpeg, so it cannot report acceleration methods. {exception.Message}"));
         }
 
@@ -121,7 +121,7 @@ internal sealed class ProcessingRuntimeEndpointHandlers
             .Set("available_methods", new WireArray(report.AvailableMethods.Select(m => (WireValue)WireValue.Of(m))))
             .Set("vendors", new WireArray(report.Vendors.Select(v => (WireValue)WireValue.Of(v))))
             .Set("selectable_vendors", new WireArray(HardwareAcceleration.VendorMethods.Select(v => v.Key).Order(StringComparer.Ordinal).Select(k => (WireValue)WireValue.Of(k))))
-            .Set("strictness_levels", new WireArray(HardwareAcceleration.StrictnessLevels.Select(l => (WireValue)WireValue.Of(l))))
+            .Set("strictness_levels", new WireArray(FfmpegStrictnessLevels.All.Select(l => (WireValue)WireValue.Of(l))))
             .Set("detail", report.Detail));
     }
 }
