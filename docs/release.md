@@ -161,9 +161,23 @@ Downloading an update never installs it, and the tray never leaves Velopack's in
 
 - **Quit** from the tray icon stops the server, then installs the update and does not start Weir again.
 - **Restart to update** (the tray menu item, the balloon, or **Restart to apply** on System › About) stops the server, installs the update and starts Weir again without opening the browser.
+- **Weir has been idle for 5 minutes**, in **Auto** mode only (#875). It is the same restart as **Restart to update**, started by the tray when nobody is there to press it, so a Weir left running for weeks still updates. See [Installing when idle](#installing-when-idle).
 - **The next start.** When Windows ends the session or the tray is killed, so Quit never runs, the downloaded package stays on disk. The next tray start installs it before the port is chosen and before the server starts, silently, then Weir starts again on the new version. Each update is tried once this way (`update-start-attempt` in the data folder holds the version), so an install that fails cannot loop, and a person who chose **Notify only** never gets one. The log line `Update vX was left waiting to install. Installing it before the server starts.` marks it. This is the only install at start-up: the tray turns off Velopack's own start-up auto-apply (`SetAutoApplyOnStartup(false)`), which would otherwise install the package first and skip all of those checks (#865).
 
-The Auto and Download only modes differ only in the notice: both download in the background and install in the cases above. A `--silent` start shows no notice and installs the same ways.
+**Download only** downloads in the background and shows a notice you can click to restart and install. It installs when you do that, on **Restart to apply**, or on the next quit or start, and never by itself while Weir runs. **Notify only** downloads nothing. A `--silent` start shows no notice and installs the same ways.
+
+### Installing when idle
+
+Once an update is downloaded in **Auto** mode the tray waits for Weir to be idle: no file pass running, none being handed back, and none queued that could start, for 5 minutes in a row. Work starting during the wait starts the 5 minutes again. Queued work that cannot start, because its workflow is switched off, outside its schedule window or paused, does not count as busy; queued work whose schedule window is open does, and so does a pass that is running when its window closes. Scans and clean-up sweeps are not file work. Then the tray restarts Weir exactly as **Restart to update** does: a clean stop of the server, a silent install, and a start with `--no-browser` on the saved port.
+
+`tray-host.log` follows it:
+
+- `Update vX downloaded; installing once Weir has been idle for 5 minutes.`
+- `Weir is idle. ...`, `Weir has work to do. ...` or `Weir has not said whether it is idle. ...`, each time the answer changes.
+- `Weir has been idle for 5 minutes; installing update vX now.`
+- `Update vX is waiting, but the update mode is now DownloadOnly, so Weir does not install it by itself.` The choice is read again just before installing, so switching away from **Auto** while an update waits stops the install.
+
+How the tray learns Weir is idle: while `update-state.json` says an update is downloaded, the server rewrites `work-state.json` in the data folder every 15 seconds with `busy` and the time it looked (`checkedAt`). Nothing is written when no update is waiting, so a Docker install never writes it. The tray installs only on a fresh answer of idle; a missing, unreadable or over-a-minute-old file (the server stopped, restarting or stuck) counts as not idle and restarts the 5 minutes. It is a file and not an HTTP route on purpose: the tray has no signed-in session, an unauthenticated route would be reachable from other devices whenever LAN access is on, and the data folder is readable only by the account running Weir. What counts as file work is decided by the same rules the worker slots use to lease a job (`ProcessingJobStore.HasFileWorkAsync`), so "could start" and "would start" cannot differ.
 
 If an operator runs a manually staged copy without Velopack install metadata, the
 tray keeps `Check for updates` visible and sends it to the browser-based release check
