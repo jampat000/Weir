@@ -69,8 +69,15 @@ static class Program
 
     // Velopack runs Weir.exe with its own arguments to install, update and uninstall; these hooks run then and
     // exit, and a normal start falls through.
-    private static void RunInstallerHooks(string[] args) =>
+    private static void RunInstallerHooks(string[] args) => BuildInstallerHooks(args).Run();
+
+    // Velopack installs a downloaded update by itself as the process starts, unless told not to. That would run
+    // before UpdateOnStart, so the person's Notify-only choice, the stop of a server left running, and the
+    // one-attempt-per-version record would all be skipped (#865). Turned off, UpdateOnStart is the only start-up
+    // path that installs a waiting update.
+    internal static VelopackApp BuildInstallerHooks(string[] args) =>
         VelopackApp.Build()
+            .SetAutoApplyOnStartup(false)
             .OnAfterInstallFastCallback((v) =>
             {
                 TrayLog.Write($"Velopack: after install v{v}");
@@ -99,8 +106,7 @@ static class Program
             // entirely (docs/release.md, #779), so this should never run during a silent install either way;
             // AskOnFirstRun checks IsSilent and the interactive desktop itself too, rather than relying
             // only on that.
-            .OnFirstRun((v) => FirewallInstallHooks.AskOnFirstRun(args))
-            .Run();
+            .OnFirstRun((v) => FirewallInstallHooks.AskOnFirstRun(args));
 
     // --configure-firewall, --remove-firewall and --allow-lan have no window to report to, so their outcome goes
     // to whatever console launched them (a script watching the exit code still wants a reason for it) as well as
