@@ -5,7 +5,8 @@ namespace Weir.Infrastructure.LibraryMode;
 
 /// <summary>
 /// Per-library #505 settings (<see cref="LibrarySettings"/>): real columns on <c>libraries</c>
-/// (<c>library_schedule_enabled</c>, <c>clean_hardlinked_files</c>, <c>skip_if_manager_would_redownload</c>)
+/// (<c>library_schedule_enabled</c>, <c>clean_hardlinked_files</c>, <c>skip_if_manager_would_redownload</c>,
+/// <c>library_rule_set_id</c>)
 /// plus the <c>library_folders</c> table, rather than a <c>jobs</c> row that job-row retention could prune
 /// (#557, migration 0038_library_mode_settings).
 /// </summary>
@@ -26,13 +27,14 @@ public sealed class LibrarySettingsStore
         ArgumentNullException.ThrowIfNull(uow);
         var rows = await uow.QueryAsync(
             "SELECT library_schedule_enabled, clean_hardlinked_files, skip_if_manager_would_redownload, " +
-            "keep_original_after_clean, originals_folder FROM libraries WHERE id = @id",
+            "keep_original_after_clean, originals_folder, library_rule_set_id FROM libraries WHERE id = @id",
             reader => (
                 ScheduleEnabled: SqliteValues.GetBool(reader, 0),
                 CleanHardlinkedFiles: SqliteValues.GetBool(reader, 1),
                 SkipIfManagerWouldRedownload: SqliteValues.GetBool(reader, 2),
                 KeepOriginalAfterClean: SqliteValues.GetBool(reader, 3),
-                OriginalsFolder: SqliteValues.GetString(reader, 4)),
+                OriginalsFolder: SqliteValues.GetString(reader, 4),
+                RuleSetId: reader.IsDBNull(5) ? (long?)null : reader.GetInt64(5)),
             ("@id", libraryId)).ConfigureAwait(false);
         if (rows.Count == 0)
         {
@@ -43,7 +45,7 @@ public sealed class LibrarySettingsStore
         var folders = await FoldersForAsync(uow, libraryId).ConfigureAwait(false);
         return new LibrarySettings(
             folders, row.ScheduleEnabled, row.CleanHardlinkedFiles, row.SkipIfManagerWouldRedownload,
-            row.KeepOriginalAfterClean, row.OriginalsFolder);
+            row.KeepOriginalAfterClean, row.OriginalsFolder, row.RuleSetId);
     }
 
     public async Task SetAsync(UnitOfWork uow, long libraryId, LibrarySettings settings)
@@ -53,12 +55,13 @@ public sealed class LibrarySettingsStore
         await uow.ExecuteAsync(
             "UPDATE libraries SET library_schedule_enabled = @schedule, clean_hardlinked_files = @clean_hardlinked, " +
             "skip_if_manager_would_redownload = @skip_redownload, keep_original_after_clean = @keep_original, " +
-            "originals_folder = @originals_folder, updated_at = CURRENT_TIMESTAMP WHERE id = @id",
+            "originals_folder = @originals_folder, library_rule_set_id = @rule_set_id, updated_at = CURRENT_TIMESTAMP WHERE id = @id",
             ("@schedule", settings.ScheduleEnabled ? 1 : 0),
             ("@clean_hardlinked", settings.CleanHardlinkedFiles ? 1 : 0),
             ("@skip_redownload", settings.SkipIfManagerWouldRedownload ? 1 : 0),
             ("@keep_original", settings.KeepOriginalAfterClean ? 1 : 0),
             ("@originals_folder", settings.OriginalsFolder),
+            ("@rule_set_id", settings.RuleSetId),
             ("@id", libraryId)).ConfigureAwait(false);
 
         await uow.ExecuteAsync("DELETE FROM library_folders WHERE library_id = @id", ("@id", libraryId)).ConfigureAwait(false);

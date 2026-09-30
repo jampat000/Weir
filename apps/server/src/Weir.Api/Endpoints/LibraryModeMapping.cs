@@ -4,12 +4,8 @@ using Weir.Api.Http;
 using Weir.Core.Json;
 using Weir.Core.LibraryMode;
 using Weir.Core.MediaManagers;
-using Weir.Core.Processing;
-using Weir.Core.Rules;
 using Weir.Infrastructure.LibraryMode;
 using Weir.Infrastructure.MediaManagers;
-using Weir.Infrastructure.Processing;
-using Weir.Infrastructure.Processing.RemuxPass;
 using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Api.Endpoints;
@@ -32,7 +28,8 @@ internal static class LibraryModeMapping
         .Set("clean_hardlinked_files", settings.CleanHardlinkedFiles)
         .Set("skip_if_manager_would_redownload", settings.SkipIfManagerWouldRedownload)
         .Set("keep_original_after_clean", settings.KeepOriginalAfterClean)
-        .Set("originals_folder", settings.OriginalsFolder);
+        .Set("originals_folder", settings.OriginalsFolder)
+        .Set("library_rule_set_id", settings.RuleSetId);
 
     /// <summary>
     /// The scan's own state for the header: which job, what it is doing, when it last finished and anything it
@@ -70,13 +67,6 @@ internal static class LibraryModeMapping
         .Set("total_removed_subtitle_tracks", totals.RemovedSubtitleTracks)
         .Set("cleaned", totals.Cleaned)
         .Set("left_alone", totals.LeftAlone);
-
-    /// <summary>The library's rules, exactly as the scan and clean handlers resolve them (no rule set = the defaults).</summary>
-    internal static async Task<ProcessingRulesConfig> RulesForAsync(UnitOfWork uow, LibraryStore libraries, ProcessingLibraryRecord library)
-    {
-        var ruleSet = library.RuleSetId is { } ruleSetId ? await libraries.GetRuleSetAsync(uow, ruleSetId).ConfigureAwait(false) : null;
-        return ruleSet is not null ? RemuxPassPaths.RulesConfigFor(ruleSet) : RuleSetConversion.ToRulesConfig(null);
-    }
 
     /// <summary>The final-removal confirmation numbers for a set of files (#505 point 5), shared by Clean and the schedule toggle.</summary>
     internal static (int Files, int Tracks, long BytesSaved) RemovalTotals(IEnumerable<LibraryScanFileEntry> files)

@@ -272,7 +272,7 @@ internal sealed class LibraryModeFilesEndpointHandlers
         }
 
         var settings = await _librarySettings.GetAsync(uow, libraryId).ConfigureAwait(false);
-        var rules = await LibraryModeMapping.RulesForAsync(uow, _libraries, library).ConfigureAwait(false);
+        var rules = await LibraryModeRules.ForAsync(uow, _libraries, library, settings).ConfigureAwait(false);
         var connectionsById = await LibraryModeMapping.ConnectionsForFilesAsync(uow, _connections, selected).ConfigureAwait(false);
         var preflightResults = await LibraryCleanPreflightRunner.RunAsync(
                 selected, settings, rules, library.MediaType, _hardlinkInspector,

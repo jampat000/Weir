@@ -103,9 +103,8 @@ public sealed partial class LibraryCleanHandler : IJobHandler
                 return;
             }
 
-            var ruleSet = library.RuleSetId is { } ruleSetId ? await _libraries.GetRuleSetAsync(uow, ruleSetId).ConfigureAwait(false) : null;
-            rules = ruleSet is not null ? RemuxPassPaths.RulesConfigFor(ruleSet) : RuleSetConversion.ToRulesConfig(null);
             settings = await _librarySettings.GetAsync(uow, libraryId).ConfigureAwait(false);
+            rules = await LibraryModeRules.ForAsync(uow, _libraries, library, settings).ConfigureAwait(false);
             leftAlone = await _fileMarks.IsLeftAloneAsync(uow, libraryId, path).ConfigureAwait(false);
             await uow.CommitAsync().ConfigureAwait(false);
         }

@@ -39,15 +39,22 @@ internal sealed class LibraryModeRedownloadsEndpointHandlers
     private readonly MediaManagerConnectionService _connections;
     private readonly IManagerRedownload _redownload;
     private readonly LibraryStore _libraries;
+    private readonly LibrarySettingsStore _librarySettings;
 
     public LibraryModeRedownloadsEndpointHandlers(
-        LibraryScanStore scans, IRemovedTrackStore removedTrackStore, MediaManagerConnectionService connections, IManagerRedownload redownload, LibraryStore libraries)
+        LibraryScanStore scans,
+        IRemovedTrackStore removedTrackStore,
+        MediaManagerConnectionService connections,
+        IManagerRedownload redownload,
+        LibraryStore libraries,
+        LibrarySettingsStore librarySettings)
     {
         _scans = scans ?? throw new ArgumentNullException(nameof(scans));
         _removedTrackStore = removedTrackStore ?? throw new ArgumentNullException(nameof(removedTrackStore));
         _connections = connections ?? throw new ArgumentNullException(nameof(connections));
         _redownload = redownload ?? throw new ArgumentNullException(nameof(redownload));
         _libraries = libraries ?? throw new ArgumentNullException(nameof(libraries));
+        _librarySettings = librarySettings ?? throw new ArgumentNullException(nameof(librarySettings));
     }
 
     private static WireObject RemovedTrackOut(RemovedTrackRecord track) => new WireObject()
@@ -73,7 +80,8 @@ internal sealed class LibraryModeRedownloadsEndpointHandlers
 
         var uow = await request.DbAsync().ConfigureAwait(false);
         var library = await RequireLibraryAsync(uow, _libraries, libraryId, LibraryModeMapping.NoLibraryWithThatId).ConfigureAwait(false);
-        var rules = await LibraryModeMapping.RulesForAsync(uow, _libraries, library).ConfigureAwait(false);
+        var settings = await _librarySettings.GetAsync(uow, libraryId).ConfigureAwait(false);
+        var rules = await LibraryModeRules.ForAsync(uow, _libraries, library, settings).ConfigureAwait(false);
 
         var allRemoved = await _removedTrackStore.GetAllAsync().ConfigureAwait(false);
         var forLibrary = allRemoved.Where(kv => kv.Key.LibraryId == libraryId).ToDictionary(kv => kv.Key, kv => kv.Value);
