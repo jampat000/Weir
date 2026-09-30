@@ -35,17 +35,17 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandlerTests
         var jobs = new ProcessingJobStore(store.Database, store.Clock);
         var handler = new ProcessingWatchedFolderScanDispatchJobHandler(
             store.Database, store.Clock, store.Options, jobs, connections, new SuiteSettingsStore(new AuthStore()), new OperatorSettingsStore(), Libraries, Files, SkipMarkers);
-        // Zero out the operator-wide minimum age/size so these tests assert scan
-        // dispatch itself, not the settling/hold-timer gates a freshly written test file would otherwise trip.
+        // Libraries these tests create wait for nothing and take any size (see CreateLibraryAsync), so they assert scan dispatch
+        // itself, not the settling and hold-timer gates a freshly written test file would otherwise trip.
         await store.Execute(
-            "INSERT INTO operator_settings (id, min_file_age_seconds, min_input_file_size_mb, minimum_free_disk_space_mb) " +
-            "VALUES (1, 0, 0, 0) ON CONFLICT(id) DO UPDATE SET min_file_age_seconds = 0, min_input_file_size_mb = 0, minimum_free_disk_space_mb = 0");
+            "INSERT INTO operator_settings (id, minimum_free_disk_space_mb) " +
+            "VALUES (1, 0) ON CONFLICT(id) DO UPDATE SET minimum_free_disk_space_mb = 0");
         return (store, jobs, handler);
     }
 
     internal static async Task<long> CreateLibraryAsync(
-        StoreFixture store, string watched, string output, bool enqueuePeriodicRemux = true, long? minFileAgeSeconds = 0, long fileDetectionIntervalSeconds = 0,
-        string rejectedFileAction = "leave", string excludePatternsCsv = "", bool removeOriginalAfterSuccess = true, long? minFileSizeMb = null)
+        StoreFixture store, string watched, string output, bool enqueuePeriodicRemux = true, long readyAfterSeconds = 0,
+        string rejectedFileAction = "leave", string excludePatternsCsv = "", bool removeOriginalAfterSuccess = true, long minFileSizeMb = 0)
     {
         await using var uow = await UnitOfWork.OpenAsync(store.Database);
         var created = await Libraries.CreateAsync(uow, new ProcessingLibraryInput
@@ -54,9 +54,8 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandlerTests
             MediaType = ProcessingMediaScopes.Movie,
             WatchedFolder = watched,
             OutputFolder = output,
-            MinFileAgeSeconds = minFileAgeSeconds,
+            ReadyAfterSeconds = readyAfterSeconds,
             MinFileSizeMb = minFileSizeMb,
-            FileDetectionIntervalSeconds = fileDetectionIntervalSeconds,
             RejectedFileAction = rejectedFileAction,
             ExcludePatternsCsv = excludePatternsCsv,
             RemoveOriginalAfterSuccess = removeOriginalAfterSuccess,

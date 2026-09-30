@@ -205,8 +205,7 @@ public sealed class TvSeasonFolderCleanupTests : IDisposable
         var output = await RunAsync(cleanup, ep, minFileAgeSeconds: 86_400, currentJobId: 1, remuxContext: LiveOkContext("Serie/S01/e.mkv"), finalOutputFile: _folders.Out("Serie/S01/e.mkv"));
 
         Assert.False(Bool(output, "tv_season_folder_deleted"));
-        var skip = Str(output, "tv_season_folder_skip_reason").ToLowerInvariant();
-        Assert.True(skip.Contains("minimum", StringComparison.Ordinal) || skip.Contains("age", StringComparison.Ordinal));
+        Assert.Contains("this workflow's wait (86400s)", Str(output, "tv_season_folder_skip_reason"), StringComparison.Ordinal);
         Assert.True(Directory.Exists(Path.GetDirectoryName(ep)));
     }
 

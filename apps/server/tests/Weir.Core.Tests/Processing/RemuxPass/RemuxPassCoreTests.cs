@@ -237,7 +237,7 @@ public sealed class FileSettlingTests
     private static readonly DateTimeOffset Now = new(2026, 8, 29, 12, 0, 0, TimeSpan.Zero);
 
     private static ProcessingLibraryRecord Library(long interval = 30, bool ignore = false) =>
-        new() { Name = "Movies", FileDetectionIntervalSeconds = interval, IgnoreSizeChanges = ignore };
+        new() { Name = "Movies", ReadyAfterSeconds = interval, IgnoreSizeChanges = ignore };
 
     [Fact]
     public void A_file_seen_for_the_first_time_is_treated_as_still_settling()

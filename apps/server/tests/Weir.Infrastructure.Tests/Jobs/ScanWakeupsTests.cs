@@ -67,8 +67,8 @@ public sealed class ScanWakeupsTests
         var handler = new ProcessingWatchedFolderScanDispatchJobHandler(
             store.Database, store.Clock, store.Options, jobs, connections, new SuiteSettingsStore(new AuthStore()), new OperatorSettingsStore(), Libraries, Files, new FileSkipMarkerStore(), wakeups);
         await store.Execute(
-            "INSERT INTO operator_settings (id, min_file_age_seconds, min_input_file_size_mb, minimum_free_disk_space_mb) " +
-            "VALUES (1, 0, 0, 0) ON CONFLICT(id) DO UPDATE SET min_file_age_seconds = 0, min_input_file_size_mb = 0, minimum_free_disk_space_mb = 0");
+            "INSERT INTO operator_settings (id, minimum_free_disk_space_mb) " +
+            "VALUES (1, 0) ON CONFLICT(id) DO UPDATE SET minimum_free_disk_space_mb = 0");
         var watched = store.Home.Join("watch");
         var output = store.Home.Join("out");
         Directory.CreateDirectory(watched);
@@ -84,7 +84,8 @@ public sealed class ScanWakeupsTests
                 MediaType = ProcessingMediaScopes.Movie,
                 WatchedFolder = watched,
                 OutputFolder = output,
-                MinFileAgeSeconds = 60,
+                ReadyAfterSeconds = 60,
+                MinFileSizeMb = 0,
             })).Id;
             await uow.CommitAsync();
         }
@@ -93,7 +94,7 @@ public sealed class ScanWakeupsTests
         var job = await jobs.EnqueueOrGetAsync("scan-wakeup", ProcessingWatchedFolderScanDispatchJobKinds.ScanDispatch, WireJsonWriter.Dumps(payload, WireJsonFormat.Compact));
         await handler.HandleAsync(new JobWorkContext(job.Id, job.JobKind, job.PayloadJson, "test"), CancellationToken.None);
 
-        // Too new to touch, so it is on hold until a known time (first while its size settles, then its minimum age), and
+        // Too new to touch, so it is on hold until a known time (first while its size settles, then its last-changed age), and
         // the next look is booked a second after that hold ends.
         Assert.Equal("on_hold", await StatusAsync(store, "Fresh Download 2026.mkv"));
         var holdUntil = await HoldUntilAsync(store, "Fresh Download 2026.mkv");

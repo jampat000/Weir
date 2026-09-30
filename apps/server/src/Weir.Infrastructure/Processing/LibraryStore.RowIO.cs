@@ -12,20 +12,20 @@ public sealed partial class LibraryStore
         await uow.ExecuteAsync(
             "INSERT INTO libraries (name, enabled, media_type, display_order, watched_folder, work_folder, output_folder, " +
             "media_extensions_csv, exclude_markers_csv, include_patterns_csv, exclude_patterns_csv, min_file_size_mb, max_file_size_mb, " +
-            "rejected_file_action, min_file_age_seconds, created_after, created_before, modified_after, modified_before, " +
+            "rejected_file_action, ready_after_seconds, created_after, created_before, modified_after, modified_before, " +
             "exclude_hidden, top_level_only, sidecar_patterns_csv, preserve_original_timestamps, output_collision_policy, " +
             "hardware_decode_mode, hardware_device, hardware_disabled_vendors_csv, ffmpeg_strictness, scan_interval_seconds, " +
-            "hold_minutes, file_detection_interval_seconds, ignore_size_changes, file_system_events_enabled, skip_access_tests, " +
+            "ignore_size_changes, file_system_events_enabled, skip_access_tests, " +
             "schedule_enabled, schedule_hours_limited, schedule_days, schedule_grid, schedule_start, schedule_end, max_attempts, " +
             "retry_backoff_seconds, retry_execution_failures, retry_preflight_failures, failure_policy, max_concurrent_files, " +
             "priority, rule_set_id, discovered_from_connection_id, discovered_library_key, remux_writer, rewrite_with_ffmpeg, remove_original_after_success) " +
             "VALUES (@name, @enabled, @media_type, " +
             "@display_order, @watched_folder, @work_folder, @output_folder, " +
             "@media_extensions_csv, @exclude_markers_csv, @include_patterns_csv, @exclude_patterns_csv, @min_file_size_mb, @max_file_size_mb, " +
-            "@rejected_file_action, @min_file_age_seconds, @created_after, @created_before, @modified_after, @modified_before, " +
+            "@rejected_file_action, @ready_after_seconds, @created_after, @created_before, @modified_after, @modified_before, " +
             "@exclude_hidden, @top_level_only, @sidecar_patterns_csv, @preserve_original_timestamps, @output_collision_policy, " +
             "@hardware_decode_mode, @hardware_device, @hardware_disabled_vendors_csv, @ffmpeg_strictness, @scan_interval_seconds, " +
-            "@hold_minutes, @file_detection_interval_seconds, @ignore_size_changes, @file_system_events_enabled, @skip_access_tests, " +
+            "@ignore_size_changes, @file_system_events_enabled, @skip_access_tests, " +
             "@schedule_enabled, @schedule_hours_limited, @schedule_days, @schedule_grid, @schedule_start, @schedule_end, @max_attempts, " +
             "@retry_backoff_seconds, @retry_execution_failures, @retry_preflight_failures, @failure_policy, @max_concurrent_files, " +
             "@priority, @rule_set_id, @discovered_from_connection_id, @discovered_library_key, @remux_writer, @rewrite_with_ffmpeg, @remove_original_after_success)",
@@ -39,12 +39,12 @@ public sealed partial class LibraryStore
             "work_folder=@work_folder, output_folder=@output_folder, media_extensions_csv=@media_extensions_csv, " +
             "exclude_markers_csv=@exclude_markers_csv, include_patterns_csv=@include_patterns_csv, exclude_patterns_csv=@exclude_patterns_csv, " +
             "min_file_size_mb=@min_file_size_mb, max_file_size_mb=@max_file_size_mb, rejected_file_action=@rejected_file_action, " +
-            "min_file_age_seconds=@min_file_age_seconds, created_after=@created_after, created_before=@created_before, " +
+            "ready_after_seconds=@ready_after_seconds, created_after=@created_after, created_before=@created_before, " +
             "modified_after=@modified_after, modified_before=@modified_before, exclude_hidden=@exclude_hidden, top_level_only=@top_level_only, " +
             "sidecar_patterns_csv=@sidecar_patterns_csv, preserve_original_timestamps=@preserve_original_timestamps, " +
             "output_collision_policy=@output_collision_policy, hardware_decode_mode=@hardware_decode_mode, hardware_device=@hardware_device, " +
             "hardware_disabled_vendors_csv=@hardware_disabled_vendors_csv, ffmpeg_strictness=@ffmpeg_strictness, " +
-            "scan_interval_seconds=@scan_interval_seconds, hold_minutes=@hold_minutes, file_detection_interval_seconds=@file_detection_interval_seconds, " +
+            "scan_interval_seconds=@scan_interval_seconds, " +
             "ignore_size_changes=@ignore_size_changes, file_system_events_enabled=@file_system_events_enabled, skip_access_tests=@skip_access_tests, " +
             "schedule_enabled=@schedule_enabled, schedule_hours_limited=@schedule_hours_limited, schedule_days=@schedule_days, " +
             "schedule_grid=@schedule_grid, schedule_start=@schedule_start, schedule_end=@schedule_end, max_attempts=@max_attempts, " +
@@ -72,7 +72,7 @@ public sealed partial class LibraryStore
         ("@min_file_size_mb", row.MinFileSizeMb),
         ("@max_file_size_mb", row.MaxFileSizeMb),
         ("@rejected_file_action", row.RejectedFileAction),
-        ("@min_file_age_seconds", row.MinFileAgeSeconds),
+        ("@ready_after_seconds", row.ReadyAfterSeconds),
         ("@created_after", SqliteValues.ToSqlite(row.CreatedAfter)),
         ("@created_before", SqliteValues.ToSqlite(row.CreatedBefore)),
         ("@modified_after", SqliteValues.ToSqlite(row.ModifiedAfter)),
@@ -90,8 +90,6 @@ public sealed partial class LibraryStore
         ("@rewrite_with_ffmpeg", row.RewriteWithFfmpeg ? 1 : 0),
         ("@remove_original_after_success", row.RemoveOriginalAfterSuccess ? 1 : 0),
         ("@scan_interval_seconds", row.ScanIntervalSeconds),
-        ("@hold_minutes", row.HoldMinutes),
-        ("@file_detection_interval_seconds", row.FileDetectionIntervalSeconds),
         ("@ignore_size_changes", row.IgnoreSizeChanges ? 1 : 0),
         ("@file_system_events_enabled", row.FileSystemEventsEnabled ? 1 : 0),
         ("@skip_access_tests", row.SkipAccessTests ? 1 : 0),
@@ -127,10 +125,10 @@ public sealed partial class LibraryStore
         ExcludeMarkersCsv = SqliteValues.GetString(reader, 9),
         IncludePatternsCsv = SqliteValues.GetString(reader, 10),
         ExcludePatternsCsv = SqliteValues.GetString(reader, 11),
-        MinFileSizeMb = SqliteValues.GetInt64OrNull(reader, 12),
+        MinFileSizeMb = SqliteValues.GetInt64(reader, 12),
         MaxFileSizeMb = SqliteValues.GetInt64(reader, 13),
         RejectedFileAction = SqliteValues.GetString(reader, 14),
-        MinFileAgeSeconds = SqliteValues.GetInt64OrNull(reader, 15),
+        ReadyAfterSeconds = SqliteValues.GetInt64(reader, 15),
         CreatedAfter = SqliteValues.GetDateTimeOrNull(reader, 16),
         CreatedBefore = SqliteValues.GetDateTimeOrNull(reader, 17),
         ModifiedAfter = SqliteValues.GetDateTimeOrNull(reader, 18),
@@ -145,31 +143,29 @@ public sealed partial class LibraryStore
         HardwareDisabledVendorsCsv = SqliteValues.GetString(reader, 27),
         FfmpegStrictness = SqliteValues.GetString(reader, 28),
         ScanIntervalSeconds = SqliteValues.GetInt64(reader, 29),
-        HoldMinutes = SqliteValues.GetInt64(reader, 30),
-        FileDetectionIntervalSeconds = SqliteValues.GetInt64(reader, 31),
-        IgnoreSizeChanges = SqliteValues.GetBool(reader, 32),
-        FileSystemEventsEnabled = SqliteValues.GetBool(reader, 33),
-        SkipAccessTests = SqliteValues.GetBool(reader, 34),
-        ScheduleEnabled = SqliteValues.GetBool(reader, 35),
-        ScheduleHoursLimited = SqliteValues.GetBool(reader, 36),
-        ScheduleDays = SqliteValues.GetString(reader, 37),
-        ScheduleGrid = SqliteValues.GetString(reader, 38),
-        ScheduleStart = SqliteValues.GetString(reader, 39),
-        ScheduleEnd = SqliteValues.GetString(reader, 40),
-        MaxAttempts = SqliteValues.GetInt64(reader, 41),
-        RetryBackoffSeconds = SqliteValues.GetInt64(reader, 42),
-        RetryExecutionFailures = SqliteValues.GetBool(reader, 43),
-        RetryPreflightFailures = SqliteValues.GetBool(reader, 44),
-        FailurePolicy = SqliteValues.GetString(reader, 45),
-        MaxConcurrentFiles = SqliteValues.GetInt64(reader, 46),
-        Priority = SqliteValues.GetInt64(reader, 47),
-        RuleSetId = reader.IsDBNull(48) ? null : reader.GetInt64(48),
-        DiscoveredFromConnectionId = reader.IsDBNull(49) ? null : reader.GetInt64(49),
-        DiscoveredLibraryKey = SqliteValues.GetStringOrNull(reader, 50),
-        CreatedAt = SqliteValues.GetDateTime(reader, 51),
-        UpdatedAt = SqliteValues.GetDateTime(reader, 52),
-        RemuxWriter = SqliteValues.GetString(reader, 53),
-        RewriteWithFfmpeg = SqliteValues.GetBool(reader, 54),
-        RemoveOriginalAfterSuccess = SqliteValues.GetBool(reader, 55),
+        IgnoreSizeChanges = SqliteValues.GetBool(reader, 30),
+        FileSystemEventsEnabled = SqliteValues.GetBool(reader, 31),
+        SkipAccessTests = SqliteValues.GetBool(reader, 32),
+        ScheduleEnabled = SqliteValues.GetBool(reader, 33),
+        ScheduleHoursLimited = SqliteValues.GetBool(reader, 34),
+        ScheduleDays = SqliteValues.GetString(reader, 35),
+        ScheduleGrid = SqliteValues.GetString(reader, 36),
+        ScheduleStart = SqliteValues.GetString(reader, 37),
+        ScheduleEnd = SqliteValues.GetString(reader, 38),
+        MaxAttempts = SqliteValues.GetInt64(reader, 39),
+        RetryBackoffSeconds = SqliteValues.GetInt64(reader, 40),
+        RetryExecutionFailures = SqliteValues.GetBool(reader, 41),
+        RetryPreflightFailures = SqliteValues.GetBool(reader, 42),
+        FailurePolicy = SqliteValues.GetString(reader, 43),
+        MaxConcurrentFiles = SqliteValues.GetInt64(reader, 44),
+        Priority = SqliteValues.GetInt64(reader, 45),
+        RuleSetId = reader.IsDBNull(46) ? null : reader.GetInt64(46),
+        DiscoveredFromConnectionId = reader.IsDBNull(47) ? null : reader.GetInt64(47),
+        DiscoveredLibraryKey = SqliteValues.GetStringOrNull(reader, 48),
+        CreatedAt = SqliteValues.GetDateTime(reader, 49),
+        UpdatedAt = SqliteValues.GetDateTime(reader, 50),
+        RemuxWriter = SqliteValues.GetString(reader, 51),
+        RewriteWithFfmpeg = SqliteValues.GetBool(reader, 52),
+        RemoveOriginalAfterSuccess = SqliteValues.GetBool(reader, 53),
     };
 }

@@ -6,8 +6,7 @@ using Weir.Infrastructure.Tests.Platform;
 namespace Weir.Infrastructure.Tests.Jobs;
 
 /// <summary>
-/// A workflow set to delete rejected files deletes only for a rule the workflow itself holds. A minimum size it follows from
-/// Settings › Performance is not one: the file is skipped and left where it is.
+/// A workflow set to delete rejected files deletes a file under the minimum size the workflow shows, and no other.
 /// </summary>
 public sealed class ScanRejectedFileDeletionTests
 {
@@ -31,24 +30,7 @@ public sealed class ScanRejectedFileDeletionTests
     }
 
     [Fact]
-    public async Task A_file_under_the_minimum_size_the_workflow_follows_from_Performance_is_skipped_not_deleted()
-    {
-        var (store, jobs, handler) = await ProcessingWatchedFolderScanDispatchJobHandlerTests.BuildAsync();
-        using var _ = store;
-        await store.Execute("UPDATE operator_settings SET min_input_file_size_mb = 100");
-        var (watched, output, sample) = await FoldersWithSampleAsync(store);
-        var libraryId = await ProcessingWatchedFolderScanDispatchJobHandlerTests.CreateLibraryAsync(store, watched, output, rejectedFileAction: "delete_file");
-
-        await ProcessingWatchedFolderScanDispatchJobHandlerTests.RunScanAsync(handler, jobs, libraryId, enqueueRemuxJobs: true);
-
-        Assert.True(File.Exists(sample));
-        var recorded = await RecordedAsync(store, libraryId, "Film.2024.mkv");
-        Assert.Equal(ProcessingFileStatuses.Skipped, recorded!.Status);
-        Assert.DoesNotContain("delete", recorded.StatusReason, StringComparison.OrdinalIgnoreCase);
-    }
-
-    [Fact]
-    public async Task A_file_under_the_minimum_size_the_workflow_sets_itself_is_deleted()
+    public async Task A_file_under_the_workflows_minimum_size_is_deleted()
     {
         var (store, jobs, handler) = await ProcessingWatchedFolderScanDispatchJobHandlerTests.BuildAsync();
         using var _ = store;
@@ -61,5 +43,19 @@ public sealed class ScanRejectedFileDeletionTests
         Assert.False(File.Exists(sample));
         var recorded = await RecordedAsync(store, libraryId, "Film.2024.mkv");
         Assert.Equal(ProcessingFileStatuses.Skipped, recorded!.Status);
+    }
+
+    [Fact]
+    public async Task A_file_the_workflows_minimum_size_does_not_refuse_is_left_alone()
+    {
+        var (store, jobs, handler) = await ProcessingWatchedFolderScanDispatchJobHandlerTests.BuildAsync();
+        using var _ = store;
+        var (watched, output, sample) = await FoldersWithSampleAsync(store);
+        var libraryId = await ProcessingWatchedFolderScanDispatchJobHandlerTests.CreateLibraryAsync(
+            store, watched, output, rejectedFileAction: "delete_file", minFileSizeMb: 0);
+
+        await ProcessingWatchedFolderScanDispatchJobHandlerTests.RunScanAsync(handler, jobs, libraryId, enqueueRemuxJobs: true);
+
+        Assert.True(File.Exists(sample));
     }
 }

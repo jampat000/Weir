@@ -14,7 +14,9 @@ public sealed partial class ConfigurationBundleStore
     /// </summary>
     /// <remarks>
     /// Rows are inserted as they are, with no renaming (such as <c>media_scope</c> to <c>media_type</c>, #557):
-    /// a version 4 bundle always carries both sections in the current shape. Every library row is validated
+    /// a version 4 bundle always carries both sections in the current shape, except that a workflow's three waits and
+    /// its empty minimum size are first turned into the one wait and the minimum size a workflow holds
+    /// (<see cref="ConfigurationBundleIntakeUpgrade"/>). Every library row is validated
     /// before any row is written (see <see cref="ValidateRestoredLibraries"/>), the same checks
     /// <c>POST /processing/libraries</c> runs: a bad row refuses the whole restore rather than leaving the
     /// table partly replaced.
@@ -30,6 +32,9 @@ public sealed partial class ConfigurationBundleStore
         var libraryRows = Iterate(bundle[LibrariesTable])
             .Select(row => row as WireObject ?? throw new WireTypeException($"Each row in the backup's {LibrariesTable} section must be an object."))
             .ToList();
+        ConfigurationBundleIntakeUpgrade.Apply(
+            bundle[ProcessingOperatorTable] as WireObject ?? throw new WireTypeException($"The backup's {ProcessingOperatorTable} section must be an object."),
+            libraryRows);
         ValidateRestoredLibraries(libraryRows, weirHome);
 
         await uow.ExecuteAsync("DELETE FROM libraries").ConfigureAwait(false);

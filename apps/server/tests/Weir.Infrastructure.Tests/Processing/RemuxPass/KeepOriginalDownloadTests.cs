@@ -34,7 +34,7 @@ public sealed class KeepOriginalDownloadTests : IDisposable
     {
         _fixture.Store.Clock.Set(DateTimeOffset.UtcNow);
         _fixture.Store.Execute(
-            "UPDATE operator_settings SET min_file_age_seconds = 0, min_input_file_size_mb = 0, minimum_free_disk_space_mb = 0")
+            "UPDATE operator_settings SET minimum_free_disk_space_mb = 0")
             .GetAwaiter().GetResult();
     }
 
@@ -49,7 +49,7 @@ public sealed class KeepOriginalDownloadTests : IDisposable
         await _fixture.Store.Execute("DELETE FROM libraries");
         _libraryId = Convert.ToInt64(await _fixture.Db(uow => uow.ExecuteScalarWriteAsync(
             "INSERT INTO libraries (name, media_type, watched_folder, output_folder, work_folder, failure_policy, max_attempts, " +
-            "rejected_file_action, retry_backoff_seconds, min_file_age_seconds, file_detection_interval_seconds, display_order, " +
+            "rejected_file_action, retry_backoff_seconds, ready_after_seconds, min_file_size_mb, display_order, " +
             "sidecar_patterns_csv, remove_original_after_success) " +
             "VALUES ('Library', $t, $w, $o, $k, 'pass_through', 3, 'leave', 60, 0, 0, 1, '.srt', $remove) RETURNING id",
             ("$t", mediaType),
