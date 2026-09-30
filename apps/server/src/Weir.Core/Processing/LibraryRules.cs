@@ -218,6 +218,7 @@ public static partial class LibraryRules
             PreserveOriginalTimestamps = body.PreserveOriginalTimestamps,
             OutputCollisionPolicy = body.OutputCollisionPolicy,
             FfmpegStrictness = body.FfmpegStrictness,
+            RemuxWriter = body.RemuxWriter,
             IgnoreSizeChanges = body.IgnoreSizeChanges,
             SkipAccessTests = body.SkipAccessTests,
             FileSystemEventsEnabled = body.FileSystemEventsEnabled,

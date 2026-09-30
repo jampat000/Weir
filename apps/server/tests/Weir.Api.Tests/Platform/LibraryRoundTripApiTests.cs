@@ -48,6 +48,10 @@ public sealed class LibraryRoundTripApiTests
             });
         Assert.Equal(HttpStatusCode.Created, created.StatusCode);
         var stored = await ApiTestClient.Json(created);
+        Assert.Equal("ffmpeg", stored["remux_writer"]!.GetValue<string>());
+        Assert.Equal(7, stored["min_file_size_mb"]!.GetValue<long>());
+        Assert.Equal("delete_file", stored["rejected_file_action"]!.GetValue<string>());
+        Assert.False(stored["remove_original_after_success"]!.GetValue<bool>());
         var path = $"{Libraries}/{stored["id"]!.GetValue<long>()}";
 
         var body = stored.AsObject().DeepClone().AsObject();

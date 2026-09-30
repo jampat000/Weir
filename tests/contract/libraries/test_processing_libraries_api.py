@@ -347,6 +347,26 @@ def test_an_older_client_sending_the_three_waits_is_answered_and_they_are_ignore
     assert created["ready_after_seconds"] == 60
 
 
+# --- which tool writes the file is the workflow's own ----------------------------------------------
+
+
+def test_a_workflow_keeps_the_writer_it_was_given(operator) -> None:
+    default = _create(operator).json()
+    assert default["remux_writer"] == "best"
+
+    own = _create(
+        operator,
+        name="Movies ffmpeg",
+        watched_folder="/srv/ff/in",
+        output_folder="/srv/ff/out",
+        remux_writer="ffmpeg",
+    )
+
+    assert own.status_code == 201, own.text
+    assert own.json()["remux_writer"] == "ffmpeg"
+    assert operator.get(f"{LIBRARIES}/{own.json()['id']}").json()["remux_writer"] == "ffmpeg"
+
+
 # --- the space to keep free, and the most files at once, belong to each workflow ------------------
 
 
