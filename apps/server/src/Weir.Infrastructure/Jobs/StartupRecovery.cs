@@ -27,28 +27,39 @@ public sealed record InterruptedJob(long Id, string JobKind, string? PayloadJson
 /// creates (<see cref="WeirTempFiles"/>), never other files, and only at the top of the work folder,
 /// where Weir writes them.
 /// </para>
+/// <para>
+/// A failed copy kept on request ("Keep the half-written copy") is one of those files too. While that setting is on, the
+/// second sweep leaves any file younger than the work file sweep's stale age, so a restart never shortens the day the copy
+/// is kept for.
+/// </para>
 /// </remarks>
 public static class StartupRecovery
 {
+    /// <summary>
+    /// Recovers the jobs and folders the last run left behind. While "Keep the half-written copy" is on, a leftover work file
+    /// is removed only once it is older than <paramref name="keptCopyMinAge"/>, so a copy kept on purpose lasts as long as the
+    /// work file sweep would let it.
+    /// </summary>
     public static async Task<StartupRecoveryReport> RunAsync(
         ProcessingJobStore queue,
         string weirHome,
         DateTimeOffset now,
+        TimeSpan keptCopyMinAge,
         ILogger logger,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(queue);
         ArgumentNullException.ThrowIfNull(logger);
-        var (result, interrupted, libraries) = await queue.InTransactionAsync(
+        var (result, interrupted, libraries, keepsFailedCopies) = await queue.InTransactionAsync(
             (connection, transaction) =>
             {
                 var (jobs, rows) = RecoverIncompleteJobs(connection, transaction, now);
-                return (jobs, rows, ProcessingLibraryFolders.List(connection, transaction));
+                return (jobs, rows, ProcessingLibraryFolders.List(connection, transaction), KeepsFailedWorkFiles(connection, transaction));
             },
             cancellationToken).ConfigureAwait(false);
 
         var tempRemoved = RemoveInterruptedRemuxTempFiles(interrupted, libraries, weirHome, logger);
-        tempRemoved += SweepWorkFolderTempFiles(libraries, weirHome, logger);
+        tempRemoved += SweepWorkFolderTempFiles(libraries, weirHome, keepsFailedCopies ? now.UtcDateTime - keptCopyMinAge : null, logger);
         var partialRemoved = CleanupPartialOutputFiles(libraries, weirHome);
 
         if (result.TotalRecovered > 0 || partialRemoved > 0 || tempRemoved > 0)
@@ -136,19 +147,28 @@ public static class StartupRecovery
                     ? ProcessingLibraryFolders.DefaultTvWorkFolder(weirHome)
                     : ProcessingLibraryFolders.DefaultMovieWorkFolder(weirHome);
             var pattern = WeirTempFiles.RemuxTempNameFor(relative);
-            removed += DeleteMatching(workFolder, pattern.IsMatch, logger, job.Id);
+            removed += DeleteMatching(workFolder, pattern.IsMatch, notNewerThanUtc: null, logger, job.Id);
         }
 
         return removed;
     }
 
-    /// <summary>#534: remove remux temp output left at the top of every library work folder and the default ones.</summary>
-    public static int SweepWorkFolderTempFiles(IReadOnlyList<ProcessingLibraryFolderRow> libraries, string weirHome, ILogger logger)
+    /// <summary>
+    /// #534: remove remux temp output left at the top of every library work folder and the default ones. With a
+    /// <paramref name="notNewerThanUtc"/>, a file written after that moment is left: it may be a failed copy someone asked
+    /// Weir to keep.
+    /// </summary>
+    public static int SweepWorkFolderTempFiles(IReadOnlyList<ProcessingLibraryFolderRow> libraries, string weirHome, DateTime? notNewerThanUtc, ILogger logger)
     {
         ArgumentNullException.ThrowIfNull(libraries);
         var roots = WorkRoots(libraries, weirHome);
-        return roots.Sum(root => DeleteMatching(root, WeirTempFiles.IsRemuxTempName, logger, jobId: null));
+        return roots.Sum(root => DeleteMatching(root, WeirTempFiles.IsRemuxTempName, notNewerThanUtc, logger, jobId: null));
     }
+
+    private static bool KeepsFailedWorkFiles(SqliteConnection connection, SqliteTransaction transaction) =>
+        ProcessingJobStore.Scalar(connection, transaction, "SELECT keep_failed_work_files FROM operator_settings WHERE id = 1") is { } value
+        && value is not DBNull
+        && WorkAdmissionReader.Bool(value);
 
     /// <summary>
     /// Remove hidden <c>*.partial</c> files under every library output
@@ -233,7 +253,7 @@ public static class StartupRecovery
         return roots;
     }
 
-    private static int DeleteMatching(string folder, Func<string, bool> isWeirTempName, ILogger logger, long? jobId)
+    private static int DeleteMatching(string folder, Func<string, bool> isWeirTempName, DateTime? notNewerThanUtc, ILogger logger, long? jobId)
     {
         string root;
         try
@@ -271,6 +291,11 @@ public static class StartupRecovery
 
             try
             {
+                if (notNewerThanUtc is { } cutoff && File.GetLastWriteTimeUtc(path) > cutoff)
+                {
+                    continue;
+                }
+
                 File.Delete(path);
                 removed++;
                 logger.LogInformation(

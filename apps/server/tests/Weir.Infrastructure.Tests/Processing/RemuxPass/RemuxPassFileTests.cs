@@ -702,13 +702,13 @@ public sealed class FileLifecycleTests : IDisposable
     }
 
     [Fact]
-    public void The_disk_space_guardrail_can_be_off_and_explains_a_shortfall()
+    public void The_disk_space_guardrail_can_be_off_and_reports_a_shortfall()
     {
-        Assert.Equal("Disk-space guardrail disabled.", FileLifecycle.CheckMinimumFreeDiskSpace(_root.Join("x", "y.mkv"), 0).Message);
+        Assert.True(FileLifecycle.CheckMinimumFreeDiskSpace(_root.Join("x", "y.mkv"), 0).Ok);
 
         var low = FileLifecycle.CheckMinimumFreeDiskSpace(_root.Join("x", "y.mkv"), 5120, _ => 100L * 1024 * 1024);
         Assert.False(low.Ok);
         Assert.Equal(_root.Path, low.CheckedPath);
-        Assert.Equal("Skipped: insufficient disk space on target drive (0.1 GB < 5.0 GB required).", low.Message);
+        Assert.Equal((100.0, 5120), (low.FreeMb, low.RequiredMb));
     }
 }

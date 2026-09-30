@@ -55,6 +55,18 @@ describe("writeFrom", () => {
 
     expect(write.manager_connection_ids).toEqual([4, 9]);
   });
+
+  it("keeps the rewrite choice a saved workflow has, since the editor has no control for it", () => {
+    const stored = library({ rewrite_with_ffmpeg: false });
+
+    const write = writeFrom(formFrom(stored), stored);
+
+    expect(write.rewrite_with_ffmpeg).toBe(false);
+  });
+
+  it("starts a new workflow with the server's default rewrite choice", () => {
+    expect(writeFrom(EMPTY_LIBRARY_FORM).rewrite_with_ffmpeg).toBe(true);
+  });
 });
 
 describe("formFrom", () => {

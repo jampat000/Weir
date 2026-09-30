@@ -6,7 +6,7 @@ namespace Weir.Infrastructure.Jobs;
 /// <summary>
 /// The work file sweep on a timer: one row per scope, deduped per scope.
 /// Enabled by <c>operator_settings.work_temp_stale_sweep_enabled</c>; an explicit
-/// <c>WEIR_PROCESSING_WORK_TEMP_STALE_SWEEP_MOVIE_SCHEDULE_ENABLED=0</c> is a kill switch.
+/// <c>WEIR_PROCESSING_WORK_TEMP_STALE_SWEEP_MOVIE_SCHEDULE_ENABLED=0</c> (or the <c>_TV_</c> one, for TV) is a kill switch for its own media type.
 /// </summary>
 public sealed class WorkTempStaleSweepEnqueuer : IPeriodicEnqueuer
 {

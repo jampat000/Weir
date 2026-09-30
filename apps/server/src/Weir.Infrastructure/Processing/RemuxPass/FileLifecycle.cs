@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using Weir.Infrastructure.MediaManagers;
@@ -6,7 +5,7 @@ using Weir.Infrastructure.MediaManagers;
 namespace Weir.Infrastructure.Processing.RemuxPass;
 
 /// <summary>A free-space check before a write-heavy step.</summary>
-public sealed record DiskSpaceCheck(bool Ok, string CheckedPath, double FreeMb, long RequiredMb, string Message);
+public sealed record DiskSpaceCheck(bool Ok, string CheckedPath, double FreeMb, long RequiredMb);
 
 /// <summary>
 /// Recoverable file writes and moves for media mutations: nothing partial is ever exposed at a final path.
@@ -45,15 +44,11 @@ public static partial class FileLifecycle
         var checkedPath = NearestExistingParent(targetPath);
         if (required <= 0)
         {
-            return new DiskSpaceCheck(true, checkedPath, 0.0, 0, "Disk-space guardrail disabled.");
+            return new DiskSpaceCheck(true, checkedPath, 0.0, 0);
         }
 
         var free = BytesToMb((freeBytes ?? AvailableFreeBytes)(checkedPath));
-        var ok = free >= required;
-        var message = ok
-            ? $"Target drive has enough free space ({free.ToString("F1", CultureInfo.InvariantCulture)} MB >= {required.ToString(CultureInfo.InvariantCulture)} MB required)."
-            : $"Skipped: insufficient disk space on target drive ({(free / 1024).ToString("F1", CultureInfo.InvariantCulture)} GB < {(required / 1024.0).ToString("F1", CultureInfo.InvariantCulture)} GB required).";
-        return new DiskSpaceCheck(ok, checkedPath, free, required, message);
+        return new DiskSpaceCheck(free >= required, checkedPath, free, required);
     }
 
     private static long AvailableFreeBytes(string path) => new DriveInfo(Path.GetFullPath(path)).AvailableFreeSpace;

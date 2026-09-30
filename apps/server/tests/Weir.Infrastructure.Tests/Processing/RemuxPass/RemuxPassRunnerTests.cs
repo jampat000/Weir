@@ -233,7 +233,7 @@ public sealed class RemuxPassRunnerTests : IDisposable
             _cleanup,
             new SkippedTvSeasonFolderCleanup(),
             _language,
-            new RemuxPassSettings { WatchedFolderMinFileAgeSeconds = 0, MovieOutputCleanupMinAgeSeconds = 0, TvOutputCleanupMinAgeSeconds = 0 },
+            new RemuxPassSettings { MovieOutputCleanupMinAgeSeconds = 0, TvOutputCleanupMinAgeSeconds = 0 },
             TimeProvider.System,
             NullLogger<RemuxPassRunner>.Instance)
         {
@@ -633,20 +633,20 @@ public sealed class RemuxPassRunnerTests : IDisposable
         Assert.DoesNotContain(_media.Calls, argv => argv.Contains("-hwaccels"));
     }
 
-    [Fact]
-    public async Task With_hardware_decoding_on_ffmpeg_is_asked_once_for_every_pass()
+    [Theory]
+    [InlineData(HardwareAcceleration.ModeAuto)]
+    [InlineData(HardwareAcceleration.ModeDevice)]
+    public async Task A_saved_hardware_decoding_choice_is_not_applied_while_the_feature_is_unavailable(string savedMode)
     {
         _folders.Source("one.mkv");
-        _folders.Source("two.mkv");
         _media.Probes["one.mkv"] = FakeMediaRunner.EnglishAndJapanese;
-        _media.Probes["two.mkv"] = FakeMediaRunner.EnglishAndJapanese;
-        var runner = Runner();
-        var runtime = _folders.Runtime() with { HardwareDecodeMode = HardwareAcceleration.ModeAuto };
+        var runtime = _folders.Runtime() with { HardwareDecodeMode = savedMode, HardwareDevice = "cuda" };
 
-        await Run("one.mkv", runtime, runner: runner);
-        await Run("two.mkv", runtime, runner: runner);
+        var result = await Run("one.mkv", runtime);
 
-        Assert.Single(_media.Calls, argv => argv.Contains("-hwaccels"));
+        Assert.DoesNotContain(_media.Calls, argv => argv.Contains("-hwaccels"));
+        Assert.DoesNotContain(_media.Remuxes, argv => argv.Contains("-hwaccel"));
+        Assert.False(Bool(result, "hardware_fell_back_to_software"));
     }
 
     [Fact]
@@ -829,8 +829,7 @@ public sealed class RemuxPassRunnerTests : IDisposable
         Assert.True(Bool(skipped, "ok"));
         Assert.Equal(RemuxPassOutcomes.SkippedGuardrail, Str(skipped, "outcome"));
         Assert.Equal("skipped", Str(skipped, "preflight_status"));
-        Assert.Contains("file below minimum size", Str(skipped, "reason"), StringComparison.Ordinal);
-        Assert.Equal("Skipped: file below minimum size (0.0 MB < 1 MB).", Str(skipped, "reason"));
+        Assert.Equal("Skipped because this file is 0.0 MB, under the 1 MB minimum.", Str(skipped, "reason"));
         Assert.True(File.Exists(tiny));
         Assert.Empty(_media.Probed);
 
@@ -841,18 +840,52 @@ public sealed class RemuxPassRunnerTests : IDisposable
     }
 
     [Fact]
-    public async Task Low_output_disk_space_skips_before_the_unchanged_copy()
+    public async Task Low_output_disk_space_waits_before_the_file_is_read_or_copied()
     {
         var source = _folders.Source("copy.mkv", 1024 * 1024);
 
         var result = await Run("copy.mkv", minimumFreeMb: 5120, runner: Runner(freeBytes: _ => 100L * 1024 * 1024));
 
-        Assert.True(Bool(result, "ok"));
-        Assert.Equal(RemuxPassOutcomes.SkippedGuardrail, Str(result, "outcome"));
+        Assert.False(Bool(result, "ok"));
+        Assert.True(Bool(result, "retryable_wait"));
+        Assert.Equal(RemuxPassOutcomes.SourceNotReady, Str(result, "outcome"));
+        Assert.Equal(RemuxPassRunner.DiskSpaceWait, Str(result, "not_ready_kind"));
         Assert.Equal("minimum_free_disk_space", Str(result, "guardrail"));
-        Assert.Contains("insufficient disk space", Str(result, "reason"), StringComparison.Ordinal);
+        Assert.StartsWith("Waiting: the output drive has less than 5.0 GB free (0.1 GB free now).", Str(result, "reason"), StringComparison.Ordinal);
         Assert.True(File.Exists(source));
         Assert.False(File.Exists(_folders.Out("copy.mkv")));
+        Assert.Empty(_media.Calls);
+    }
+
+    [Fact]
+    public async Task A_full_work_folder_drive_waits_before_anything_is_written()
+    {
+        _folders.Source("two.mkv");
+        _media.Probes["two.mkv"] = FakeMediaRunner.EnglishAndJapanese;
+        var runner = Runner(freeBytes: path => path.StartsWith(_folders.Work, StringComparison.Ordinal) ? 100L * 1024 * 1024 : long.MaxValue);
+
+        var result = await Run("two.mkv", minimumFreeMb: 5120, runner: runner);
+
+        Assert.Equal(RemuxPassOutcomes.SourceNotReady, Str(result, "outcome"));
+        Assert.StartsWith("Waiting: the work folder's drive has less than 5.0 GB free", Str(result, "reason"), StringComparison.Ordinal);
+        Assert.Empty(_media.Remuxes);
+        Assert.False(File.Exists(_folders.Out("two.mkv")));
+    }
+
+    [Fact]
+    public async Task An_output_drive_that_fills_while_the_file_is_written_waits_and_leaves_no_staged_copy()
+    {
+        _folders.Source("two.mkv");
+        _media.Probes["two.mkv"] = FakeMediaRunner.EnglishAndJapanese;
+        var outputChecks = 0;
+        var runner = Runner(freeBytes: path => path.StartsWith(_folders.Output, StringComparison.Ordinal) && ++outputChecks > 1 ? 100L * 1024 * 1024 : long.MaxValue);
+
+        var result = await Run("two.mkv", minimumFreeMb: 5120, runner: runner);
+
+        Assert.Equal(RemuxPassOutcomes.SourceNotReady, Str(result, "outcome"));
+        Assert.StartsWith("Waiting: the output drive has less than 5.0 GB free", Str(result, "reason"), StringComparison.Ordinal);
+        Assert.Empty(Directory.GetFiles(_folders.Work));
+        Assert.False(File.Exists(_folders.Out("two.mkv")));
     }
 
     [Fact]

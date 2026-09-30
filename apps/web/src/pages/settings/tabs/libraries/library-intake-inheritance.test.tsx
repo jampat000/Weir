@@ -144,3 +144,15 @@ it("names the wait after a change and the size check as two different things", a
     screen.getByLabelText("Wait for the size to stop growing (seconds)"),
   ).toHaveValue("30");
 });
+
+it("says a minimum size taken from Performance never deletes a rejected file", async () => {
+  performanceIs(60, 50);
+
+  await openEditor();
+
+  expect(
+    await screen.findByText(
+      /A minimum size taken from Performance never deletes anything/,
+    ),
+  ).toBeInTheDocument();
+});

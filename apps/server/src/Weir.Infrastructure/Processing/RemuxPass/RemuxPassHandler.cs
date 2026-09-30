@@ -204,6 +204,7 @@ public sealed partial class RemuxPassHandler : IJobHandler
         }
 
         await SettleUnreadableSourceAsync(context.Id, data, origin, result, cancellationToken).ConfigureAwait(false);
+        await DeferUntilDiskSpaceAsync(context.Id, data, origin, result, cancellationToken).ConfigureAwait(false);
         Merge(result, provenance);
         await ApplyFileOutcomeStateAsync(result, libraryId, mediaScope, origin).ConfigureAwait(false);
         await DeferUntilOldEnoughAsync(context.Id, data, origin, result, cancellationToken).ConfigureAwait(false);
