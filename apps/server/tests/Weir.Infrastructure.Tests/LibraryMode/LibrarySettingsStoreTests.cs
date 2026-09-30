@@ -44,6 +44,39 @@ public sealed class LibrarySettingsStoreTests : IDisposable
     }
 
     [Fact]
+    public async Task A_library_follows_its_workflows_profile_until_it_chooses_its_own()
+    {
+        var libraryId = _db.AddLibrary();
+        await using var uow = await UnitOfWork.OpenAsync(_db.Database);
+
+        var settings = await _store.GetAsync(uow, libraryId);
+
+        Assert.Null(settings.RuleSetId);
+    }
+
+    [Fact]
+    public async Task The_rules_profile_a_library_chooses_round_trips_and_can_be_cleared()
+    {
+        var libraryId = _db.AddLibrary();
+        var profileId = _db.AddRuleSet("Cleaning");
+        await using (var uow = await UnitOfWork.OpenAsync(_db.Database))
+        {
+            await _store.SetAsync(uow, libraryId, new LibrarySettings(["/srv/in"], ScheduleEnabled: false, RuleSetId: profileId));
+            await uow.CommitAsync();
+        }
+
+        await using (var read = await UnitOfWork.OpenAsync(_db.Database))
+        {
+            Assert.Equal(profileId, (await _store.GetAsync(read, libraryId)).RuleSetId);
+            await _store.SetAsync(read, libraryId, (await _store.GetAsync(read, libraryId)) with { RuleSetId = null });
+            await read.CommitAsync();
+        }
+
+        await using var cleared = await UnitOfWork.OpenAsync(_db.Database);
+        Assert.Null((await _store.GetAsync(cleared, libraryId)).RuleSetId);
+    }
+
+    [Fact]
     public async Task Switching_the_setting_off_clears_nothing_else()
     {
         var libraryId = _db.AddLibrary();

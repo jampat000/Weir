@@ -10,10 +10,16 @@ public sealed class PassThroughIntegrityException : Exception
 }
 
 /// <summary>The library values a delivery needs, copied out so no unit of work is open during the copy.</summary>
-public sealed record PassThroughDeliverySettings(long LibraryId, string WatchedFolder, string OutputFolder, string? OutputCollisionPolicy);
+public sealed record PassThroughDeliverySettings(
+    long LibraryId, string WatchedFolder, string OutputFolder, string? OutputCollisionPolicy, long MinimumFreeDiskSpaceMb);
 
-/// <summary>Whether a pass-through copy was delivered, where, the collision decision, and the sentence describing it.</summary>
-public sealed record PassThroughDeliveryResult(bool Delivered, string Destination, CollisionDecision Collision, string Sentence);
+/// <summary>
+/// Whether a pass-through copy was delivered, where, the collision decision, and the sentence describing it.
+/// <paramref name="WaitingForSpace"/> is set when nothing was copied because the output drive is short of the space the
+/// workflow keeps free; <paramref name="Sentence"/> is then the reason the file is on hold.
+/// </summary>
+public sealed record PassThroughDeliveryResult(
+    bool Delivered, string Destination, CollisionDecision Collision, string Sentence, DiskSpaceCheck? WaitingForSpace = null);
 
 /// <summary>
 /// Hands the original back to the output folder unmodified when Weir could not process it (#465).
@@ -23,7 +29,8 @@ public sealed record PassThroughDeliveryResult(bool Delivered, string Destinatio
 /// </summary>
 public static class PassThroughDelivery
 {
-    public static async Task<PassThroughDeliveryResult> DeliverUnchangedAsync(PassThroughDeliverySettings settings, string relativePath, IOutputOwnership? ownership = null)
+    public static async Task<PassThroughDeliveryResult> DeliverUnchangedAsync(
+        PassThroughDeliverySettings settings, string relativePath, IOutputOwnership? ownership = null, Func<string, long>? freeBytes = null)
     {
         ArgumentNullException.ThrowIfNull(settings);
         var watchedRoot = RemuxPassPaths.Resolve(settings.WatchedFolder);
@@ -48,6 +55,13 @@ public static class PassThroughDelivery
         string sentence;
         if (decision.Wrote)
         {
+            var disk = FileLifecycle.CheckMinimumFreeDiskSpace(decision.Destination, settings.MinimumFreeDiskSpaceMb, freeBytes);
+            if (!disk.Ok)
+            {
+                return new PassThroughDeliveryResult(
+                    false, decision.Destination, decision, DiskSpaceWaits.Reason("output drive", disk.RequiredMb, disk.FreeMb), disk);
+            }
+
             var before = Fingerprint(source);
             Task ValidateStagedAsync(string staged)
             {

@@ -310,7 +310,7 @@ folder instead." Sonarr then only ever sees cleaned files.
 1. **In Weir**, open **Settings › Workflows** and edit the workflow (or add one).
    - **Watched folder**: where your download client finishes files, e.g. `/media/downloads/complete/tv`
    - **Output folder**: where Weir puts cleaned files, e.g. `/media/weir/tv`
-   - Using torrents? Turn **After cleaning, remove the original download** off, so the torrent keeps
+   - Using torrents? Turn **New downloads: after cleaning, delete the original download** off, so the torrent keeps
      seeding. Your download client or Sonarr removes it later, as they normally would.
 2. **Connect Sonarr** under **Settings › Media managers**, with its address and API key
    (Sonarr shows its API key on its **General** settings page).

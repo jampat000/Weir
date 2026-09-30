@@ -11,6 +11,7 @@ import {
   type ProcessingFile,
   type ProcessingFileLogEntry,
 } from "../../lib/processing/files-api";
+import { fileHistoryRetentionNote } from "../../lib/processing/file-history-retention";
 import { useProcessingFileLogQuery } from "../../lib/processing/files-queries";
 import { useProcessingLibrariesQuery } from "../../lib/processing/libraries-queries";
 import {
@@ -170,6 +171,14 @@ export function HistoryDetail({
           Download its record →
         </a>
       </div>
+      {record.data ? (
+        <p
+          className="mm-history-record-meta"
+          data-testid="history-retention-note"
+        >
+          {fileHistoryRetentionNote(record.data.retention_days)}
+        </p>
+      ) : null}
     </section>
   );
 }

@@ -89,8 +89,8 @@ New files are noticed two ways, and both end at the same job.
   minutes by default), so a folder a watcher cannot see — a network share, a container mount that does
   not forward events — still gets picked up.
 
-The watcher decides nothing about a file itself: extension checks, exclusions, size limits, the hold
-timer and settling all stay in the scan handler that already owns them.
+The watcher decides nothing about a file itself: extension checks, exclusions, size limits, the
+workflow's wait for a file to stop changing and settling all stay in the scan handler that already owns them.
 
 ## Deployment model
 

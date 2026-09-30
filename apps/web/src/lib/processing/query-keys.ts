@@ -76,8 +76,12 @@ export const processingKeys = {
     ["processing", "library-files", libraryId, filters] as const,
   libraryOverview: (libraryId: number) =>
     ["processing", "library-overview", libraryId] as const,
-  libraryFilePreview: (libraryId: number, path: string) =>
-    ["processing", "library-file-preview", libraryId, path] as const,
+  libraryFilePreview: (
+    libraryId: number,
+    path: string,
+    ruleSetId: number | null,
+  ) =>
+    ["processing", "library-file-preview", libraryId, path, ruleSetId] as const,
   libraryRedownloads: (libraryId: number) =>
     ["processing", "library-redownloads", libraryId] as const,
   /** Files kept without processing again from History's remove dialog (#785). */

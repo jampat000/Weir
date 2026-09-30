@@ -212,9 +212,9 @@ public sealed class TvSeasonFolderCleanup : ITvSeasonFolderCleanup
                 if (minAge > 0 && ageSeconds < minAge)
                 {
                     output.Set("tv_season_folder_skip_reason",
-                        $"Episode {name} was never finished in TV mode and is newer than the minimum age " +
+                        $"Episode {name} was never finished in TV mode and changed more recently than this workflow's wait " +
                         $"({minAge.ToString(CultureInfo.InvariantCulture)}s), so the season folder was left in place.");
-                    lineParts.Add($"Never-processed check failed — file is not old enough yet (minimum {minAge.ToString(CultureInfo.InvariantCulture)}s since last change).");
+                    lineParts.Add($"Never-processed check failed — file is not old enough yet (this workflow waits {minAge.ToString(CultureInfo.InvariantCulture)}s after the last change).");
                     AddSummary(string.Join(" ", lineParts));
                     return;
                 }
@@ -222,7 +222,7 @@ public sealed class TvSeasonFolderCleanup : ITvSeasonFolderCleanup
                 completeness.Set(name, "skipped");
                 lineParts.Add(
                     "Never-processed check passed — Weir has no successful live TV pass on record for this file, " +
-                    "no connected media manager still lists it, and the file is old enough under your minimum-age setting.");
+                    "no connected media manager still lists it, and the file has been left alone for the workflow's wait.");
             }
 
             AddSummary(string.Join(" ", lineParts));

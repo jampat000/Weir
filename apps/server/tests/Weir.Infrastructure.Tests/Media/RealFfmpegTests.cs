@@ -236,7 +236,8 @@ public sealed class RealFfmpegTests : IDisposable
         var updates = new List<FfmpegProgressUpdate>();
         var workDir = Path.Combine(_root, "work");
 
-        var output = await tools.RemuxToTempFileAsync(fixture, workDir, plan, probe, [], updates.Add, ProbeOutput.DurationSeconds(probe));
+        var staged = await tools.RemuxToTempFileAsync(fixture, workDir, plan, probe, [], updates.Add, ProbeOutput.DurationSeconds(probe));
+        var output = staged.Path;
 
         Assert.StartsWith(Path.Combine(Path.GetFullPath(workDir), "fixture.processing."), output, StringComparison.Ordinal);
         var outputProbe = await tools.FfprobeJsonAsync(output);
@@ -271,7 +272,8 @@ public sealed class RealFfmpegTests : IDisposable
 
         // RemuxToTempFileAsync's internal call to ValidateStagedOutputAsync (#500) not throwing is the assertion:
         // a correctly-remuxed output that keeps the planned subtitle, disposition and language passes.
-        var output = await tools.RemuxToTempFileAsync(fixture, workDir, plan, probe, sourceWarnings, durationSeconds: ProbeOutput.DurationSeconds(probe));
+        var staged = await tools.RemuxToTempFileAsync(fixture, workDir, plan, probe, sourceWarnings, durationSeconds: ProbeOutput.DurationSeconds(probe));
+        var output = staged.Path;
 
         var outputProbe = await tools.FfprobeJsonAsync(output);
         Assert.Single(Streams(outputProbe, "subtitle"));
@@ -337,7 +339,8 @@ public sealed class RealFfmpegTests : IDisposable
         var sourceWarnings = await tools.ProbeWarningLinesAsync(fixture);
         var workDir = Path.Combine(_root, "work");
 
-        var output = await tools.RemuxToTempFileAsync(fixture, workDir, plan, probe, sourceWarnings, durationSeconds: ProbeOutput.DurationSeconds(probe));
+        var staged = await tools.RemuxToTempFileAsync(fixture, workDir, plan, probe, sourceWarnings, durationSeconds: ProbeOutput.DurationSeconds(probe));
+        var output = staged.Path;
 
         var outputProbeJson = await tools.FfprobeJsonAsync(output);
         var audio = Assert.Single(Streams(outputProbeJson, "audio"));
@@ -404,7 +407,8 @@ public sealed class RealFfmpegTests : IDisposable
         // RemuxToTempFileAsync also runs ValidateRemuxOutputAsync on the result, proving the output validator
         // (audio-stream count and duration) is not confused by the new attachment stream in the output.
         var sourceWarnings = await tools.ProbeWarningLinesAsync(fixture);
-        var output = await tools.RemuxToTempFileAsync(fixture, workDir, plan, probe, sourceWarnings, durationSeconds: ProbeOutput.DurationSeconds(probe));
+        var staged = await tools.RemuxToTempFileAsync(fixture, workDir, plan, probe, sourceWarnings, durationSeconds: ProbeOutput.DurationSeconds(probe));
+        var output = staged.Path;
 
         var outputProbe = await tools.FfprobeJsonAsync(output);
         var outputAttachment = Assert.Single(Streams(outputProbe, "attachment"));
@@ -477,7 +481,8 @@ public sealed class RealFfmpegTests : IDisposable
         var workDir = Path.Combine(_root, "work-commentary");
 
         var sourceWarnings = await tools.ProbeWarningLinesAsync(fixture);
-        var output = await tools.RemuxToTempFileAsync(fixture, workDir, plan, probe, sourceWarnings);
+        var staged = await tools.RemuxToTempFileAsync(fixture, workDir, plan, probe, sourceWarnings);
+        var output = staged.Path;
 
         var outputProbe = await tools.FfprobeJsonAsync(output);
         var outputAudio = Assert.Single(Streams(outputProbe, "audio"));
@@ -523,7 +528,8 @@ public sealed class RealFfmpegTests : IDisposable
         var workDir = Path.Combine(_root, "work-stale-tags");
 
         var sourceWarnings = await tools.ProbeWarningLinesAsync(fixture);
-        var output = await tools.RemuxToTempFileAsync(fixture, workDir, plan, probe, sourceWarnings);
+        var staged = await tools.RemuxToTempFileAsync(fixture, workDir, plan, probe, sourceWarnings);
+        var output = staged.Path;
 
         var outputProbe = await tools.FfprobeJsonAsync(output);
         var outputAudio = Assert.Single(Streams(outputProbe, "audio"));

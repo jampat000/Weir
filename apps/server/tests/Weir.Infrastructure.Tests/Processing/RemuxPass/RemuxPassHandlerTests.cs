@@ -30,7 +30,7 @@ public sealed partial class RemuxPassHandlerTests : IDisposable
     public RemuxPassHandlerTests()
     {
         _fixture.Store.Execute(
-            "UPDATE operator_settings SET min_file_age_seconds = 0, min_input_file_size_mb = 0, minimum_free_disk_space_mb = 0")
+            "UPDATE operator_settings SET minimum_free_disk_space_mb = 0")
             .GetAwaiter().GetResult();
         _fixture.Http.Json(HttpMethod.Post, EventsPath, "{}", HttpStatusCode.Accepted);
     }
@@ -41,7 +41,7 @@ public sealed partial class RemuxPassHandlerTests : IDisposable
         _fixture.Dispose();
     }
 
-    private RemuxPassHandler Handler(IFailurePolicy? policy = null, Func<string, long>? freeBytes = null)
+    private RemuxPassHandler Handler(IFailurePolicy? policy = null, Func<string, long>? freeBytes = null, ScanWakeups? wakeups = null)
     {
         var data = new SqliteRemuxPassData(_fixture.Store.Database, _fixture.Connections, NullLogger<SqliteRemuxPassData>.Instance);
         var runner = new RemuxPassRunner(
@@ -69,23 +69,25 @@ public sealed partial class RemuxPassHandlerTests : IDisposable
             NullLogger<RemuxPassHandler>.Instance,
             new DownloadedScanNotifier(_fixture.Connections, _fixture.ConnectionStore, _fixture.Libraries, _fixture.Http, NullLogger<DownloadedScanNotifier>.Instance),
             _fixture.Reporter,
-            _fixture.Jobs);
+            scanWakeups: wakeups,
+            jobs: _fixture.Jobs);
     }
 
-    private async Task<long> LibraryAsync(string failurePolicy = "pass_through", long maxAttempts = 3, string rejectedFileAction = "leave", string mediaType = "movie")
+    private async Task<long> LibraryAsync(string failurePolicy = "pass_through", long maxAttempts = 3, string rejectedFileAction = "leave", string mediaType = "movie", long readyAfterSeconds = 0)
     {
         await _fixture.Store.Execute("DELETE FROM libraries");
         return Convert.ToInt64(await _fixture.Db(uow => uow.ExecuteScalarWriteAsync(
             "INSERT INTO libraries (name, media_type, watched_folder, output_folder, work_folder, failure_policy, max_attempts, " +
-            "rejected_file_action, retry_backoff_seconds, display_order) " +
-            "VALUES ('Movies', $type, $w, $o, $k, $policy, $max, $action, 60, 1) RETURNING id",
+            "rejected_file_action, retry_backoff_seconds, display_order, min_file_size_mb, ready_after_seconds) " +
+            "VALUES ('Movies', $type, $w, $o, $k, $policy, $max, $action, 60, 1, 0, $ready) RETURNING id",
             ("$type", mediaType),
             ("$w", _folders.Watched),
             ("$o", _folders.Output),
             ("$k", _folders.Work),
             ("$policy", failurePolicy),
             ("$max", maxAttempts),
-            ("$action", rejectedFileAction))), CultureInfo.InvariantCulture);
+            ("$action", rejectedFileAction),
+            ("$ready", readyAfterSeconds))), CultureInfo.InvariantCulture);
     }
 
     private Task FileRowAsync(long libraryId, string relativePath, string status = "processing") =>
@@ -183,17 +185,16 @@ public sealed partial class RemuxPassHandlerTests : IDisposable
         await Handler().ApplyFileOutcomeStateAsync(result, library, "movie", null);
 
         Assert.Equal("on_hold|0||", await ScalarText("SELECT status || '|' || failure_attempts || '|' || coalesce(failure_class, '') || '|' || coalesce(next_retry_at, '') FROM files"));
-        Assert.Equal((false, false), (((WireBool)result["quarantined"]).Value, ((WireBool)result["retry_scheduled"]).Value));
+        Assert.False(((WireBool)result["retry_scheduled"]).Value);
     }
 
     [Fact]
     public async Task A_handed_off_file_that_is_too_young_is_looked_at_again_instead_of_failing()
     {
-        // A media manager hands a file over within seconds of the download finishing, inside the minimum file age.
+        // A media manager hands a file over within seconds of the download finishing, inside the workflow's wait.
         // Failing the pre-check there would skip the retry and run the failure policy: every such file would be passed
         // through unprocessed, and under "reject" a good release would be reported bad.
-        var library = await LibraryAsync(failurePolicy: "reject");
-        await _fixture.Store.Execute("UPDATE operator_settings SET min_file_age_seconds = 60");
+        var library = await LibraryAsync(failurePolicy: "reject", readyAfterSeconds: 60);
         var source = _folders.Source(Path.Join("Film", "film.mkv"));
         await FileRowAsync(library, "Film/film.mkv");
         await _fixture.AddConnectionAsync("native", "http://192.0.2.30:5099", "k1");
@@ -232,8 +233,7 @@ public sealed partial class RemuxPassHandlerTests : IDisposable
     [Fact]
     public async Task A_file_that_never_stops_changing_is_not_looked_at_forever()
     {
-        var library = await LibraryAsync();
-        await _fixture.Store.Execute("UPDATE operator_settings SET min_file_age_seconds = 60");
+        var library = await LibraryAsync(readyAfterSeconds: 60);
         _folders.Source(Path.Join("Film", "film.mkv"));
         await FileRowAsync(library, "Film/film.mkv");
         var payload = $$$"""{"relative_media_path":"Film/film.mkv","media_scope":"movie","library_id":{{{library}}},"minimum_age_waits":{{{RemuxPassHandler.MaxMinimumAgeWaits}}}}""";
@@ -558,6 +558,66 @@ public sealed partial class RemuxPassHandlerTests : IDisposable
         Assert.Equal((true, "failed"), (((WireBool)detail["reject_queued"]).Value, WireConvert.Str(detail["result"])));
         Assert.False(detail.ContainsKey("next_action"));
     }
+
+    [Fact]
+    public async Task A_workflow_that_allows_five_attempts_retries_four_times_and_gives_up_on_the_fifth_failure()
+    {
+        var library = await LibraryAsync(failurePolicy: "hold", maxAttempts: 5);
+        _folders.Source("one.mkv");
+        _media.DefaultProbe = FakeMediaRunner.EnglishAndJapanese;
+        _media.RemuxError = "boom";
+        await FileRowAsync(library, "one.mkv");
+        var payload = $$$"""{"relative_media_path":"one.mkv","library_id":{{{library}}}}""";
+
+        for (var attempt = 1; attempt <= 4; attempt++)
+        {
+            await Handler().HandleAsync(Context(100 + attempt, payload), CancellationToken.None);
+
+            Assert.Equal($"processing_failed|{attempt}|retry owed", await RetryStateAsync());
+        }
+
+        await Handler().HandleAsync(Context(105, payload), CancellationToken.None);
+
+        Assert.Equal("processing_failed|5|no retry", await RetryStateAsync());
+        Assert.Contains("tried this file 5 times and stopped, because the Movies workflow allows 5", await ScalarText("SELECT status_reason FROM files"), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_failed_attempt_books_a_look_at_the_folder_for_when_its_retry_falls_due()
+    {
+        var wakeups = new ScanWakeups();
+        var library = await LibraryAsync(maxAttempts: 3);
+        _folders.Source("one.mkv");
+        _media.DefaultProbe = FakeMediaRunner.EnglishAndJapanese;
+        _media.RemuxError = "boom";
+        await FileRowAsync(library, "one.mkv");
+
+        await Handler(wakeups: wakeups).HandleAsync(Context(11, $$$"""{"relative_media_path":"one.mkv","library_id":{{{library}}}}"""), CancellationToken.None);
+
+        var retryAt = TimestampColumns.Parse(await ScalarText("SELECT next_retry_at FROM files"));
+        var booked = wakeups.BookedFor(library);
+        Assert.NotNull(retryAt);
+        Assert.NotNull(booked);
+        Assert.InRange((booked.Value - retryAt.Value).TotalSeconds, 0.99, 1.01);
+    }
+
+    [Fact]
+    public async Task A_failure_with_no_retry_owed_books_no_look()
+    {
+        var wakeups = new ScanWakeups();
+        var library = await LibraryAsync(maxAttempts: 1);
+        _folders.Source("one.mkv");
+        _media.DefaultProbe = FakeMediaRunner.EnglishAndJapanese;
+        _media.RemuxError = "boom";
+        await FileRowAsync(library, "one.mkv");
+
+        await Handler(wakeups: wakeups).HandleAsync(Context(11, $$$"""{"relative_media_path":"one.mkv","library_id":{{{library}}}}"""), CancellationToken.None);
+
+        Assert.Null(wakeups.BookedFor(library));
+    }
+
+    private Task<string> RetryStateAsync() =>
+        ScalarText("SELECT status || '|' || failure_attempts || '|' || CASE WHEN next_retry_at IS NULL THEN 'no retry' ELSE 'retry owed' END FROM files");
 
     [Fact]
     public async Task The_hold_policy_queues_no_follow_up_and_the_holding_seam_never_does()

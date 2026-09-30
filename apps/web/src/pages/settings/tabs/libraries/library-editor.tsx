@@ -17,8 +17,6 @@ import { mmActionButtonClass } from "../../../../lib/ui/mm-control-roles";
 import { SaveModelNote } from "../../save-model-note";
 import { useLeaveConfirmation, useUnsavedChanges } from "../../unsaved-changes";
 import { effectiveGrid, windowNow } from "../schedule/schedule-model";
-import { useLibraryCleaningDraft } from "./library-cleaning-draft";
-import { LibraryCleaningSettings } from "./library-cleaning-settings";
 import { LibraryFolderChain } from "./library-folder-chain";
 import { LibraryFoldersGroup } from "./library-folders-group";
 import {
@@ -26,7 +24,7 @@ import {
   sameLibraryForm,
   type LibraryForm,
 } from "./library-form";
-import { LibraryHardwareFold } from "./library-hardware-fold";
+import { LibraryFfmpegFold } from "./library-ffmpeg-fold";
 import {
   LibraryIntakeGroup,
   LibraryReadinessGroup,
@@ -34,6 +32,7 @@ import {
 import { LibraryDownloadClientSuggestions } from "./library-download-client-suggestions";
 import { LibraryLinkSection } from "./library-link-section";
 import { LibraryManagerSetup } from "./library-manager-setup";
+import { LibraryFailureGroup } from "./library-failure-group";
 import {
   LibraryCapacityGroup,
   LibraryOutputGroup,
@@ -49,10 +48,9 @@ function runHoursText(library: ProcessingLibrary | undefined): string {
 }
 
 /**
- * The library editor, as a slide-over: every setting of one library in groups, the rarely changed
- * ones folded away. Nothing in it is saved until Save, including the existing-files settings, and
- * closing it with edits asks first. A new library has no id yet, so its existing-files settings wait
- * for the first save.
+ * The library editor, as a slide-over: every setting of one workflow's new downloads in groups, the
+ * rarely changed ones folded away. Nothing in it is saved until Save, and closing it with edits asks
+ * first. The files a library already holds are set up on the Library page.
  */
 export function LibraryEditor({
   library,
@@ -69,7 +67,7 @@ export function LibraryEditor({
   editable: boolean;
   ruleSets: ProcessingRuleSet[];
   connections: MediaManagerConnection[];
-  /** Saves the library's own fields; the editor saves the rest after it. */
+  /** Saves the workflow's fields. */
   onSave: (form: LibraryForm) => Promise<unknown>;
   onClose: () => void;
 }) {
@@ -79,12 +77,8 @@ export function LibraryEditor({
     update: (patch) => setForm((current) => ({ ...current, ...patch })),
     editable,
   };
-  const cleaning = useLibraryCleaningDraft(library?.id);
   const saveAll = useMutation({
-    mutationFn: async () => {
-      await onSave(form);
-      await cleaning.save();
-    },
+    mutationFn: () => onSave(form),
     onSuccess: onClose,
   });
   const linkedIds = linkedConnectionIds(form, library);
@@ -93,7 +87,7 @@ export function LibraryEditor({
     work: form.work_folder.trim(),
     output: form.output_folder.trim(),
   };
-  const dirty = !sameLibraryForm(form, initial) || cleaning.dirty;
+  const dirty = !sameLibraryForm(form, initial);
   const thing = library ? library.name : "the new workflow";
   useUnsavedChanges(dirty ? thing : null);
   const { confirmLeave, dialog } = useLeaveConfirmation();
@@ -166,25 +160,27 @@ export function LibraryEditor({
           <LibraryIntakeGroup binding={binding} />
           <LibraryReadinessGroup binding={binding} />
           <LibraryOutputGroup binding={binding} />
-          <LibraryCapacityGroup
+          <LibraryCapacityGroup binding={binding} />
+          <LibraryFailureGroup
             binding={binding}
             rejectSupport={rejectSupport}
           />
-          <LibraryHardwareFold binding={binding} />
-          <QuietFieldGroup title="Files already in your library">
-            {library ? (
-              <LibraryCleaningSettings
-                libraryId={library.id}
-                cleaning={cleaning}
-                editable={editable}
-              />
-            ) : (
-              <p className="mm-quiet-note">
-                Save the workflow first, then add the folders its existing files
-                sit in.
-              </p>
-            )}
-          </QuietFieldGroup>
+          <LibraryFfmpegFold binding={binding} />
+          {library ? (
+            <p
+              className="mm-quiet-note"
+              data-testid="processing-library-cleaning-link"
+            >
+              Cleaning files already in your library is on the{" "}
+              <Link
+                className="mm-schedule-link"
+                to={`/library?library=${library.id}`}
+              >
+                Library page
+              </Link>
+              .
+            </p>
+          ) : null}
           {/* The hours are drawn in Settings › Schedule beside every other library's week, so the two never disagree. */}
           <QuietFieldGroup title="When this workflow may run">
             <p className="mm-quiet-note" data-testid="processing-library-hours">

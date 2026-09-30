@@ -13,7 +13,6 @@ public sealed record ProcessingOperatorSettingsRecord
     public long RunnerCost720P { get; init; }
     public long RunnerCost1080P { get; init; } = 1;
     public long RunnerCost4K { get; init; } = 1;
-    public long RunnerCostUndetermined { get; init; }
 
     /// <summary>
     /// Whether the resolution budget (runner capacity and per-resolution costs) also limits what starts (#633). Off, a
@@ -21,13 +20,9 @@ public sealed record ProcessingOperatorSettingsRecord
     /// </summary>
     public bool RunnerBudgetEnabled { get; init; }
     public bool WorkTempStaleSweepEnabled { get; init; } = true;
-    public bool FailureCleanupEnabled { get; init; }
 
     /// <summary>How often the leftover-work-file sweep runs, set in Settings › Cleanup; null keeps the environment's interval.</summary>
     public long? WorkTempStaleSweepIntervalSeconds { get; init; }
-
-    /// <summary>How often the failed-download cleanup runs, set in Settings › Cleanup; null keeps the environment's interval.</summary>
-    public long? FailureCleanupIntervalSeconds { get; init; }
 
     /// <summary>
     /// Whether the Cleanup job removes Weir's own hand-back copies nobody claimed (#652). Off until an operator switches
@@ -42,9 +37,6 @@ public sealed record ProcessingOperatorSettingsRecord
     public long? UnclaimedHandbackCleanupIntervalSeconds { get; init; }
     public bool KeepFailedWorkFiles { get; init; }
     public long FileLogRetentionDays { get; init; } = 90;
-    public long MinFileAgeSeconds { get; init; } = 60;
-    public long ProcessingMinInputFileSizeMb { get; init; } = 50;
-    public long MinimumFreeDiskSpaceMb { get; init; } = 5120;
     public bool MovieScheduleEnabled { get; init; } = true;
     public bool MovieScheduleHoursLimited { get; init; }
     public string MovieScheduleDays { get; init; } = string.Empty;
@@ -180,8 +172,6 @@ public static class OperatorSettingsRules
         var global = (int)ClampMaxConcurrentFiles(filesAtOnce);
         return libraryLimit <= LibraryFollowsFilesAtOnce ? global : (int)Math.Min(global, ClampLibraryMaxConcurrentFiles(libraryLimit));
     }
-
-    public static long ClampMinFileAgeSeconds(long raw) => Math.Clamp(raw, 0, 7 * 24 * 3600);
 
     public static long ClampSizeMb(long raw) => Math.Clamp(raw, 0, 1024 * 1024);
 

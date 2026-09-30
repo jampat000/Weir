@@ -71,13 +71,18 @@ public static class LibraryModePriority
 /// Where a kept original goes; blank (the default) means the <see cref="Weir.Core.LibraryMode.OriginalsPathPlanner.DefaultFolderName"/>
 /// folder inside whichever library folder held the file. Ignored while <see cref="KeepOriginalAfterClean"/> is off.
 /// </param>
+/// <param name="RuleSetId">
+/// The rules profile that cleans this library's existing files; null (the default) means the same profile as the
+/// workflow. See <c>Weir.Infrastructure.LibraryMode.LibraryModeRules</c>.
+/// </param>
 public sealed record LibrarySettings(
     IReadOnlyList<string> Folders,
     bool ScheduleEnabled,
     bool CleanHardlinkedFiles = false,
     bool SkipIfManagerWouldRedownload = true,
     bool KeepOriginalAfterClean = false,
-    string OriginalsFolder = "")
+    string OriginalsFolder = "",
+    long? RuleSetId = null)
 {
     public static LibrarySettings Empty { get; } = new([], false);
 
@@ -88,7 +93,8 @@ public sealed record LibrarySettings(
         .Set("clean_hardlinked_files", CleanHardlinkedFiles)
         .Set("skip_if_manager_would_redownload", SkipIfManagerWouldRedownload)
         .Set("keep_original_after_clean", KeepOriginalAfterClean)
-        .Set("originals_folder", OriginalsFolder);
+        .Set("originals_folder", OriginalsFolder)
+        .Set("library_rule_set_id", RuleSetId);
 
     public static LibrarySettings FromPayload(WireObject? payload)
     {
@@ -107,8 +113,9 @@ public sealed record LibrarySettings(
         // Absent on a settings row written before #735: off, and the default originals folder.
         var keepOriginalAfterClean = payload.Get("keep_original_after_clean") is WireBool { Value: true };
         var originalsFolder = payload.Get("originals_folder") is WireString originalsFolderValue ? originalsFolderValue.Value : "";
+        var ruleSetId = payload.Get("library_rule_set_id") is WireInteger ruleSetValue ? (long?)ruleSetValue.Value : null;
         return new LibrarySettings(
-            folders, scheduleEnabled, cleanHardlinkedFiles, skipIfManagerWouldRedownload, keepOriginalAfterClean, originalsFolder);
+            folders, scheduleEnabled, cleanHardlinkedFiles, skipIfManagerWouldRedownload, keepOriginalAfterClean, originalsFolder, ruleSetId);
     }
 }
 

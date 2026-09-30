@@ -96,13 +96,20 @@ Put a video file in a watched folder. Weir usually notices within seconds. On ne
 in Docker it can take up to five minutes, because Weir falls back to checking on a timer instead
 of relying on filesystem notifications.
 
+Weir does not touch a new file straight away. It waits until the file has not changed for 60 seconds, by
+size or by last-changed time, so a download that is still arriving is left alone. Each workflow has its own
+wait under **Settings › Workflows › File readiness**, and its own **Minimum file size** (50 MB for a new
+workflow) under **Intake rules**: smaller files, such as samples, are skipped.
+
 - The file shows up on **Processing** while Weir works on it.
 - Once it's done, it shows up in **History**, and the cleaned copy is in the output folder.
 
-Already have a library you want to clean up? In **Settings › Workflows**, edit the workflow and add
-its folders under **Files already in your library**. Then open **Library**, pick the library from
-the title and press **Check again**. Weir shows you what it would remove and how much space that
-frees before it changes anything.
+Already have a library you want to clean up? Open **Library** and pick the workflow from the title.
+A library with no folders yet shows **Set up this library**: add the folders your files sit in and
+choose the rules profile that cleans them (it starts out as the workflow's). Then press **Check
+again**. Weir shows you what it would remove and how much space that frees before it changes
+anything. **Library setup** in the page header changes those choices later, along with the daily
+clean and what happens to the original file after a clean.
 
 ## If nothing happens
 

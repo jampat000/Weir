@@ -7,7 +7,8 @@ namespace Weir.Infrastructure.Jobs;
 public sealed partial class ProcessingJobStore
 {
     /// <summary>
-    /// Insert a pending job, or return the row already holding <paramref name="dedupeKey"/>.
+    /// Insert a pending job, or return the row already holding <paramref name="dedupeKey"/>. A null <paramref name="runnerCost"/>
+    /// costs the job against the resolution budget as <see cref="RunnerCosts"/> says.
     /// </summary>
     /// <exception cref="ArgumentException">The job kind is retired or not a <c>processing.*</c> kind.</exception>
     public Task<ProcessingJob> EnqueueOrGetAsync(
@@ -15,7 +16,7 @@ public sealed partial class ProcessingJobStore
         string jobKind,
         string? payloadJson = null,
         int maxAttempts = JobQueueRules.DefaultMaxAttempts,
-        int runnerCost = 0,
+        int? runnerCost = null,
         int priority = 0,
         DateTimeOffset? notBefore = null,
         CancellationToken cancellationToken = default)
@@ -34,7 +35,7 @@ public sealed partial class ProcessingJobStore
         string jobKind,
         string? payloadJson,
         int maxAttempts,
-        int runnerCost,
+        int? runnerCost,
         int priority,
         DateTimeOffset? notBefore = null)
     {
@@ -58,7 +59,7 @@ public sealed partial class ProcessingJobStore
             ("@payload", payloadJson),
             ("@status", ProcessingJobStatus.Pending),
             ("@max_attempts", Math.Max(1, maxAttempts)),
-            ("@runner_cost", Math.Max(0, runnerCost)),
+            ("@runner_cost", Math.Max(0, runnerCost ?? RunnerCosts.ForJob(connection, transaction, jobKind, payloadJson))),
             ("@priority", priority),
             ("@not_before", notBefore is { } when ? TimestampColumns.Orm(when) : null));
         if (inserted is not null and not DBNull)

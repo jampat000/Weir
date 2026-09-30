@@ -142,6 +142,53 @@ public sealed class ProcessingRulesPreviewApiTests
     }
 
     [Fact]
+    public async Task A_preview_can_run_a_saved_profile_other_than_the_workflows()
+    {
+        var (server, runner) = await StartAsync();
+        await using var _ = server;
+        runner.ProbeJson = TwoAudioTracksProbe;
+        await TestDatabase.SeedAdminAsync(server);
+        var client = new ApiTestClient(server);
+        await client.SignInAsync();
+        var (watched, output) = MakeLibraryFolders();
+        var (libraryId, _) = await SeedLibraryWithRuleSetAsync(client, watched, output, primaryAudioLang: "jpn");
+        await File.WriteAllBytesAsync(Path.Join(watched, "movie.mkv"), new byte[16]);
+        using var created = await client.PostAsync(
+            "/api/v1/processing/rule-sets",
+            new { csrf_token = await client.CsrfAsync(), name = "English profile", primary_audio_lang = "eng" });
+        var englishProfileId = (await ApiTestClient.Json(created))["id"]!.GetValue<long>();
+
+        using var response = await client.PostAsync(
+            $"/api/v1/processing/libraries/{libraryId}/preview",
+            new { csrf_token = await client.CsrfAsync(), relative_path = "movie.mkv", rule_set_id = englishProfileId });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var tracks = (await ApiTestClient.Json(response))["tracks"]!.AsArray();
+        var kept = tracks.Single(t => t!["type"]!.GetValue<string>() == "audio" && t["action"]!.GetValue<string>() == "keep");
+        Assert.Equal("eng", kept!["language"]!.GetValue<string>());
+    }
+
+    [Fact]
+    public async Task A_preview_with_a_profile_that_does_not_exist_is_refused_with_400()
+    {
+        var (server, runner) = await StartAsync();
+        await using var _ = server;
+        runner.ProbeJson = TwoAudioTracksProbe;
+        await TestDatabase.SeedAdminAsync(server);
+        var client = new ApiTestClient(server);
+        await client.SignInAsync();
+        var (watched, output) = MakeLibraryFolders();
+        var (libraryId, _) = await SeedLibraryWithRuleSetAsync(client, watched, output, primaryAudioLang: "jpn");
+        await File.WriteAllBytesAsync(Path.Join(watched, "movie.mkv"), new byte[16]);
+
+        using var response = await client.PostAsync(
+            $"/api/v1/processing/libraries/{libraryId}/preview",
+            new { csrf_token = await client.CsrfAsync(), relative_path = "movie.mkv", rule_set_id = 987654 });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
     public async Task A_relative_path_outside_the_watched_and_output_folders_is_refused_with_400()
     {
         var (server, _) = await StartAsync();

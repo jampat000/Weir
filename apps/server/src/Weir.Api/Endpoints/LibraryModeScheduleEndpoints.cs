@@ -77,7 +77,7 @@ internal sealed class LibraryModeScheduleEndpointHandlers
             var (removingFiles, removingTracks, bytesSaved) = LibraryModeMapping.RemovalTotals(files);
             if (removingFiles > 0 && !confirmed)
             {
-                var rules = await LibraryModeMapping.RulesForAsync(uow, _libraries, library).ConfigureAwait(false);
+                var rules = await LibraryModeRules.ForAsync(uow, _libraries, library, settings).ConfigureAwait(false);
                 var connectionsById = await LibraryModeMapping.ConnectionsForFilesAsync(uow, _connections, files).ConfigureAwait(false);
                 var preflight = await LibraryCleanPreflightRunner.RunAsync(
                         files, settings, rules, library.MediaType, _hardlinkInspector,

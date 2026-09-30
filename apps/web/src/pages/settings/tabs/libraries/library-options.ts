@@ -19,8 +19,9 @@ export const WRITER_OPTIONS: SettingOption[] = [
 ];
 
 export const WRITER_HINTS: Record<RemuxWriter, string> = {
-  best: "mkvmerge writes MKV files when it is installed, FFmpeg writes the rest, and FFmpeg writes again if mkvmerge's copy fails Weir's checks.",
-  ffmpeg: "FFmpeg writes every file, as every Weir before 3.0 did.",
+  best: "mkvmerge writes MKV files when it is installed, FFmpeg writes the rest, and FFmpeg writes again if mkvmerge's copy fails Weir's checks. This also applies when cleaning files already in your library.",
+  ffmpeg:
+    "FFmpeg writes every file, both new downloads and files already in your library.",
 };
 
 export const REJECTED_FILE_OPTIONS: SettingOption[] = [
@@ -34,23 +35,6 @@ export const COLLISION_OPTIONS: SettingOption[] = [
   { value: "keep_both", label: "Keep both" },
   { value: "replace_if_larger", label: "Replace only if new output is larger" },
   { value: "replace_if_newer", label: "Replace only if source is newer" },
-];
-
-/** The most files one library can be held to at once from its editor. */
-const MOST_FILES_AT_ONCE = 10;
-
-export const FILES_AT_ONCE_OPTIONS: SettingOption[] = [
-  { value: "0", label: "Same as Performance" },
-  ...Array.from({ length: MOST_FILES_AT_ONCE }, (_, i) => ({
-    value: String(i + 1),
-    label: i === 0 ? "At most 1 file" : `At most ${i + 1} files`,
-  })),
-];
-
-export const HARDWARE_DECODE_OPTIONS: SettingOption[] = [
-  { value: "off", label: "Off" },
-  { value: "auto", label: "Detect automatically" },
-  { value: "device", label: "Use a specific method" },
 ];
 
 export const STRICTNESS_OPTIONS: SettingOption[] = [

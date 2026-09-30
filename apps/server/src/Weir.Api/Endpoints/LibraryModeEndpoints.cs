@@ -5,10 +5,12 @@ using Weir.Api.Http;
 using Weir.Core.Auth;
 using Weir.Core.Json;
 using Weir.Core.LibraryMode;
+using Weir.Core.Processing;
 using Weir.Core.Validation;
 using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.LibraryMode;
 using Weir.Infrastructure.Processing;
+using Weir.Infrastructure.Sqlite;
 using static Weir.Api.Endpoints.EndpointLookups;
 
 namespace Weir.Api.Endpoints;
@@ -72,6 +74,8 @@ internal sealed class LibraryModeEndpointHandlers
         var skipIfManagerWouldRedownload = model.OptionalBool("skip_if_manager_would_redownload");
         var keepOriginalAfterClean = model.OptionalBool("keep_original_after_clean");
         var originalsFolder = model.OptionalStr("originals_folder", maxLength: 4000);
+        var ruleSetGiven = model.Has("library_rule_set_id");
+        var ruleSetId = model.OptionalInt("library_rule_set_id", ge: 1);
         var csrfToken = model.Str("csrf_token", minLength: 1);
         model.Finish(ExtraFields.Forbid);
         issues.ThrowIfAny();
@@ -96,6 +100,11 @@ internal sealed class LibraryModeEndpointHandlers
             throw new ApiException(StatusCodes.Status400BadRequest, exception.Message);
         }
 
+        if (ruleSetGiven && ruleSetId is { } wanted)
+        {
+            await RequireRuleSetAsync(uow, wanted).ConfigureAwait(false);
+        }
+
         var existing = await _librarySettings.GetAsync(uow, libraryId).ConfigureAwait(false);
         var updated = existing with
         {
@@ -104,10 +113,35 @@ internal sealed class LibraryModeEndpointHandlers
             SkipIfManagerWouldRedownload = skipIfManagerWouldRedownload ?? existing.SkipIfManagerWouldRedownload,
             KeepOriginalAfterClean = keepOriginalAfterClean ?? existing.KeepOriginalAfterClean,
             OriginalsFolder = validatedOriginalsFolder ?? existing.OriginalsFolder,
+            RuleSetId = ruleSetGiven ? ruleSetId : existing.RuleSetId,
         };
         await _librarySettings.SetAsync(uow, libraryId, updated).ConfigureAwait(false);
+        await ReplanIfRulesChangedAsync(uow, library, existing, updated).ConfigureAwait(false);
         await request.CommitAsync().ConfigureAwait(false);
         return ApiRoutes.Ok(LibraryModeMapping.SettingsOut(updated));
+    }
+
+    private async Task RequireRuleSetAsync(UnitOfWork uow, long ruleSetId)
+    {
+        if (await _libraries.GetRuleSetAsync(uow, ruleSetId).ConfigureAwait(false) is null)
+        {
+            throw new ApiException(StatusCodes.Status400BadRequest, "That rules profile no longer exists. Choose another one.");
+        }
+    }
+
+    /// <summary>
+    /// A different profile changes what every file in the index would do, so the library is checked again in the background
+    /// (a normal scan, trigger "rule_change", like saving the profile's own rules). Nothing is cleaned by it.
+    /// </summary>
+    private async Task ReplanIfRulesChangedAsync(UnitOfWork uow, ProcessingLibraryRecord library, LibrarySettings before, LibrarySettings after)
+    {
+        if (after.Folders.Count == 0
+            || LibraryModeRules.EffectiveRuleSetId(library, before) == LibraryModeRules.EffectiveRuleSetId(library, after))
+        {
+            return;
+        }
+
+        await _scans.RequestScanAsync(uow, _jobs, library.Id, "rule_change").ConfigureAwait(false);
     }
 
     public async Task<ApiResult> PostScanAsync(ApiRequest request)

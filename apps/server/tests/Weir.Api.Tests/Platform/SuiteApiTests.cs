@@ -241,6 +241,38 @@ public sealed class SuiteApiTests
         Assert.Equal("Weir", await TestDatabase.ScalarStringAsync(server, "SELECT product_display_name FROM suite_settings WHERE id = 1"));
     }
 
+    [Fact]
+    public async Task A_backup_made_when_performance_kept_the_free_space_gives_it_to_every_workflow()
+    {
+        var (server, client) = await SignedInAdminAsync();
+        await using var _ = server;
+        var olderFormat = JsonNode.Parse(await File.ReadAllTextAsync(Path.Join(AppContext.BaseDirectory, "Fixtures", "bundle-v4.json")))!.AsObject();
+        olderFormat["operator_settings"]!["minimum_free_disk_space_mb"] = 8192;
+
+        using var restored = await client.PutAsync("/api/v1/suite/configuration-bundle", new { csrf_token = await client.CsrfAsync(), bundle = olderFormat });
+
+        Assert.Equal(HttpStatusCode.OK, restored.StatusCode);
+        Assert.Equal(2, await TestDatabase.ScalarAsync(server, "SELECT count(*) FROM libraries WHERE minimum_free_disk_space_mb = 8192"));
+    }
+
+    [Fact]
+    public async Task A_backup_keeps_the_space_each_workflow_keeps_free()
+    {
+        var (server, client) = await SignedInAdminAsync();
+        await using var _ = server;
+        using var created = await client.PostAsync(
+            "/api/v1/processing/libraries",
+            new { csrf_token = await client.CsrfAsync(), name = "Anime", media_type = "tv", watched_folder = @"c:\anime-in", output_folder = @"c:\anime-out", minimum_free_disk_space_mb = 2048 });
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        var bundle = (await Json(await client.GetAsync("/api/v1/suite/configuration-bundle"))).AsObject();
+        await TestDatabase.ExecuteAsync(server, "UPDATE libraries SET minimum_free_disk_space_mb = 5120");
+
+        using var restored = await client.PutAsync("/api/v1/suite/configuration-bundle", new { csrf_token = await client.CsrfAsync(), bundle });
+
+        Assert.Equal(HttpStatusCode.OK, restored.StatusCode);
+        Assert.Equal(2048, await TestDatabase.ScalarAsync(server, "SELECT minimum_free_disk_space_mb FROM libraries WHERE name = 'Anime'"));
+    }
+
     /// <summary>
     /// Each of these is a retired second address for a handler that already has one. The server serves one
     /// address per handler; this is here so an alias cannot quietly reappear.

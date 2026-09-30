@@ -2825,6 +2825,18 @@
             "title": "Library Folders",
             "type": "array"
           },
+          "library_rule_set_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The rules profile that cleans this library's existing files. Null means the same profile as the workflow.",
+            "title": "Library Rule Set Id"
+          },
           "library_schedule_enabled": {
             "title": "Library Schedule Enabled",
             "type": "boolean"
@@ -2846,7 +2858,8 @@
           "clean_hardlinked_files",
           "skip_if_manager_would_redownload",
           "keep_original_after_clean",
-          "originals_folder"
+          "originals_folder",
+          "library_rule_set_id"
         ],
         "title": "LibrarySettingsOut",
         "type": "object"
@@ -2876,6 +2889,19 @@
             },
             "title": "Library Folders",
             "type": "array"
+          },
+          "library_rule_set_id": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Left out to keep the saved value. Null goes back to the workflow's profile. Changing the profile checks the library again in the background.",
+            "title": "Library Rule Set Id"
           },
           "originals_folder": {
             "description": "Left out to keep the saved value. Blank resets it to the default.",
@@ -3035,7 +3061,6 @@
           "family": {
             "enum": [
               "work_temp_stale_sweep",
-              "failure_cleanup",
               "unclaimed_handbacks"
             ],
             "title": "Family",
@@ -3148,7 +3173,6 @@
           "family": {
             "enum": [
               "work_temp_stale_sweep",
-              "failure_cleanup",
               "unclaimed_handbacks"
             ],
             "title": "Family",
@@ -4714,7 +4738,7 @@
             "type": "string"
           },
           "retention_days": {
-            "description": "How long these records are kept. 0 means they are kept forever.",
+            "description": "How many days a file's history is kept after the file is gone or forgotten. While Weir still knows the file its history is kept. 0 keeps it forever.",
             "title": "Retention Days",
             "type": "integer"
           }
@@ -5048,12 +5072,6 @@
             ],
             "description": "processing while the file is written; finishing during the final checks and hand-back. Null when nothing is in flight.",
             "title": "Progress Status"
-          },
-          "quarantined": {
-            "default": false,
-            "description": "True when repeated failures placed this file on hold until an operator requeues it.",
-            "title": "Quarantined",
-            "type": "boolean"
           },
           "relative_path": {
             "title": "Relative Path",
@@ -6128,7 +6146,7 @@
           },
           "ffmpeg_strictness": {
             "default": "normal",
-            "description": "ffmpeg's -strict level. 'normal' is its own default and passes no flag.",
+            "description": "ffmpeg's -strict level, for new downloads and for cleaning files already in the library. 'normal' is its own default and passes no flag.",
             "enum": [
               "very",
               "strict",
@@ -6139,51 +6157,11 @@
             "title": "Ffmpeg Strictness",
             "type": "string"
           },
-          "file_detection_interval_seconds": {
-            "default": 30,
-            "description": "How long this file's size must stay unchanged before Weir treats it as finished being written. 0 turns size settling off.",
-            "maximum": 3600.0,
-            "minimum": 0.0,
-            "title": "File Detection Interval Seconds",
-            "type": "integer"
-          },
           "file_system_events_enabled": {
             "default": true,
             "description": "Watch this folder for changes so new files are picked up within seconds. The periodic scan runs regardless, so switching this off makes Weir slower to notice a file, never blind to it.",
             "title": "File System Events Enabled",
             "type": "boolean"
-          },
-          "hardware_decode_mode": {
-            "default": "off",
-            "description": "Hardware decoding. 'off' is what Weir has always done. A choice that cannot work falls back to software and records why — it never fails a file.",
-            "enum": [
-              "off",
-              "auto",
-              "device"
-            ],
-            "title": "Hardware Decode Mode",
-            "type": "string"
-          },
-          "hardware_device": {
-            "default": "",
-            "description": "The ffmpeg method to use when the mode is 'device' — cuda, qsv, vaapi.",
-            "maxLength": 32,
-            "title": "Hardware Device",
-            "type": "string"
-          },
-          "hardware_disabled_vendors_csv": {
-            "default": "",
-            "description": "Vendors to never use, comma separated: nvidia, intel, amd, vaapi, apple.",
-            "maxLength": 200,
-            "title": "Hardware Disabled Vendors Csv",
-            "type": "string"
-          },
-          "hold_minutes": {
-            "default": 0,
-            "maximum": 10080.0,
-            "minimum": 0.0,
-            "title": "Hold Minutes",
-            "type": "integer"
           },
           "ignore_size_changes": {
             "default": false,
@@ -6206,7 +6184,7 @@
           },
           "max_attempts": {
             "default": 3,
-            "description": "How many times Weir tries a file on its own before stopping.",
+            "description": "How many times Weir tries a file on its own before it gives up. The first try counts, so 3 means the first try and two retries.",
             "maximum": 20.0,
             "minimum": 1.0,
             "title": "Max Attempts",
@@ -6218,7 +6196,7 @@
             "minimum": 0.0,
             "title": "Max Concurrent Files",
             "type": "integer",
-            "description": "This library's own limit on files at once. 0 means the same as \"Files at once\" in Process settings."
+            "description": "The most files this workflow runs at once, as a share of \"Files at once\" in Settings › Performance. 0 means no limit of its own. It cannot be more than Performance's Files at once: a save that asks for more is refused."
           },
           "max_file_size_mb": {
             "default": 0,
@@ -6241,33 +6219,13 @@
             "title": "Media Type",
             "type": "string"
           },
-          "min_file_age_seconds": {
-            "anyOf": [
-              {
-                "maximum": 604800.0,
-                "minimum": 0.0,
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "Seconds a file must go unchanged. Null uses the Performance setting.",
-            "title": "Min File Age Seconds"
-          },
           "min_file_size_mb": {
-            "anyOf": [
-              {
-                "maximum": 1000000.0,
-                "minimum": 0.0,
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "Smallest file the library takes. Null uses the Performance setting.",
-            "title": "Min File Size Mb"
+            "default": 50,
+            "description": "The smallest file this workflow takes, in MB. 0 takes any size.",
+            "maximum": 1000000.0,
+            "minimum": 0.0,
+            "title": "Min File Size Mb",
+            "type": "integer"
           },
           "modified_after": {
             "anyOf": [
@@ -6333,6 +6291,14 @@
             "title": "Priority",
             "type": "integer"
           },
+          "ready_after_seconds": {
+            "default": 60,
+            "description": "A new file is ready once neither its size nor its last-changed time has moved for this many seconds. 0 needs no wait.",
+            "maximum": 1209600.0,
+            "minimum": 0.0,
+            "title": "Ready After Seconds",
+            "type": "integer"
+          },
           "rejected_file_action": {
             "default": "leave",
             "description": "What to do with a settled file rejected by size/path rules or because it contains no video. delete_file removes only that file and then empty parent folders; it never removes a folder containing other files.",
@@ -6345,7 +6311,7 @@
           },
           "retry_backoff_seconds": {
             "default": 300,
-            "description": "The first wait before a retry. It doubles each attempt, capped at an hour.",
+            "description": "The first wait before a retry. It doubles each attempt, capped at an hour. Weir looks again shortly after the wait ends.",
             "maximum": 3600.0,
             "minimum": 1.0,
             "title": "Retry Backoff Seconds",
@@ -6450,21 +6416,23 @@
             "title": "Remove Original After Success",
             "type": "boolean"
           },
+          "minimum_free_disk_space_mb": {
+            "default": 5120,
+            "description": "Weir keeps at least this much free on the drive this workflow writes to. A file that would leave less is put on hold and tried again when there is room. 0 turns the check off.",
+            "maximum": 1048576,
+            "minimum": 0,
+            "title": "Minimum Free Disk Space Mb",
+            "type": "integer"
+          },
           "remux_writer": {
             "default": "best",
-            "description": "Which tool writes the library's output (#548). best: mkvmerge for Matroska when it is installed, ffmpeg for everything else, and ffmpeg again when mkvmerge's write fails its checks. ffmpeg: ffmpeg writes every file.",
+            "description": "Which tool writes the workflow's output, for new downloads and for cleaning files already in the library. best: mkvmerge for Matroska when it is installed, ffmpeg for everything else, and ffmpeg again when mkvmerge's write fails its checks. ffmpeg: ffmpeg writes every file.",
             "enum": [
               "best",
               "ffmpeg"
             ],
             "title": "Remux Writer",
             "type": "string"
-          },
-          "rewrite_with_ffmpeg": {
-            "default": true,
-            "description": "With remux_writer best: when mkvmerge's write fails its checks, ffmpeg writes the file again instead of the file failing. Off fails the file at once.",
-            "title": "Rewrite With Ffmpeg",
-            "type": "boolean"
           }
         },
         "required": [
@@ -6573,16 +6541,6 @@
             "title": "Display Order",
             "type": "integer"
           },
-          "effective_min_file_age_seconds": {
-            "description": "Seconds a file must go unchanged now: the library's own value, or the Performance setting.",
-            "title": "Effective Min File Age Seconds",
-            "type": "integer"
-          },
-          "effective_min_file_size_mb": {
-            "description": "Smallest file the library takes now: its own value, or the Performance setting.",
-            "title": "Effective Min File Size Mb",
-            "type": "integer"
-          },
           "enabled": {
             "title": "Enabled",
             "type": "boolean"
@@ -6607,29 +6565,9 @@
             "title": "Ffmpeg Strictness",
             "type": "string"
           },
-          "file_detection_interval_seconds": {
-            "title": "File Detection Interval Seconds",
-            "type": "integer"
-          },
           "file_system_events_enabled": {
             "title": "File System Events Enabled",
             "type": "boolean"
-          },
-          "hardware_decode_mode": {
-            "title": "Hardware Decode Mode",
-            "type": "string"
-          },
-          "hardware_device": {
-            "title": "Hardware Device",
-            "type": "string"
-          },
-          "hardware_disabled_vendors_csv": {
-            "title": "Hardware Disabled Vendors Csv",
-            "type": "string"
-          },
-          "hold_minutes": {
-            "title": "Hold Minutes",
-            "type": "integer"
           },
           "id": {
             "title": "Id",
@@ -6669,7 +6607,7 @@
           "max_concurrent_files": {
             "title": "Max Concurrent Files",
             "type": "integer",
-            "description": "This library's own limit on files at once. 0 means the same as \"Files at once\" in Process settings."
+            "description": "The most files this workflow runs at once. 0 means no limit of its own."
           },
           "max_file_size_mb": {
             "title": "Max File Size Mb",
@@ -6687,29 +6625,12 @@
             "title": "Media Type",
             "type": "string"
           },
-          "min_file_age_seconds": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "Seconds a file must go unchanged. Null means the library uses the Performance setting.",
-            "title": "Min File Age Seconds"
-          },
           "min_file_size_mb": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "Smallest file the library takes. Null means the library uses the Performance setting.",
-            "title": "Min File Size Mb"
+            "description": "The smallest file this workflow takes, in MB. 0 takes any size.",
+            "maximum": 1000000.0,
+            "minimum": 0.0,
+            "title": "Min File Size Mb",
+            "type": "integer"
           },
           "modified_after": {
             "anyOf": [
@@ -6792,6 +6713,13 @@
           },
           "priority": {
             "title": "Priority",
+            "type": "integer"
+          },
+          "ready_after_seconds": {
+            "description": "A new file is ready once neither its size nor its last-changed time has moved for this many seconds. 0 needs no wait.",
+            "maximum": 1209600.0,
+            "minimum": 0.0,
+            "title": "Ready After Seconds",
             "type": "integer"
           },
           "rejected_file_action": {
@@ -6887,21 +6815,25 @@
             "title": "Remove Original After Success",
             "type": "boolean"
           },
+          "minimum_free_disk_space_mb": {
+            "description": "Weir keeps at least this much free on the drive this workflow writes to. A file that would leave less is put on hold and tried again when there is room. 0 turns the check off.",
+            "title": "Minimum Free Disk Space Mb",
+            "type": "integer"
+          },
+          "effective_max_concurrent_files": {
+            "description": "The most files this workflow is held to now: its own limit, and never more than Files at once in Settings › Performance, even if that was lowered after this was set.",
+            "title": "Effective Max Concurrent Files",
+            "type": "integer"
+          },
           "remux_writer": {
             "default": "best",
-            "description": "Which tool writes the library's output (#548). best: mkvmerge for Matroska when it is installed, ffmpeg for everything else, and ffmpeg again when mkvmerge's write fails its checks. ffmpeg: ffmpeg writes every file.",
+            "description": "Which tool writes the workflow's output, for new downloads and for cleaning files already in the library. best: mkvmerge for Matroska when it is installed, ffmpeg for everything else, and ffmpeg again when mkvmerge's write fails its checks. ffmpeg: ffmpeg writes every file.",
             "enum": [
               "best",
               "ffmpeg"
             ],
             "title": "Remux Writer",
             "type": "string"
-          },
-          "rewrite_with_ffmpeg": {
-            "default": true,
-            "description": "With remux_writer best: when mkvmerge's write fails its checks, ffmpeg writes the file again instead of the file failing. Off fails the file at once.",
-            "title": "Rewrite With Ffmpeg",
-            "type": "boolean"
           }
         },
         "required": [
@@ -6918,11 +6850,9 @@
           "include_patterns_csv",
           "exclude_patterns_csv",
           "min_file_size_mb",
-          "effective_min_file_size_mb",
+          "ready_after_seconds",
           "max_file_size_mb",
           "rejected_file_action",
-          "min_file_age_seconds",
-          "effective_min_file_age_seconds",
           "created_after",
           "created_before",
           "modified_after",
@@ -6930,15 +6860,10 @@
           "exclude_hidden",
           "top_level_only",
           "scan_interval_seconds",
-          "hold_minutes",
           "sidecar_patterns_csv",
           "preserve_original_timestamps",
           "output_collision_policy",
-          "hardware_decode_mode",
-          "hardware_device",
-          "hardware_disabled_vendors_csv",
           "ffmpeg_strictness",
-          "file_detection_interval_seconds",
           "ignore_size_changes",
           "skip_access_tests",
           "file_system_events_enabled",
@@ -6954,6 +6879,8 @@
           "schedule_start",
           "schedule_end",
           "max_concurrent_files",
+          "effective_max_concurrent_files",
+          "minimum_free_disk_space_mb",
           "priority"
         ],
         "title": "ProcessingLibraryOut",
@@ -7053,7 +6980,7 @@
           },
           "ffmpeg_strictness": {
             "default": "normal",
-            "description": "ffmpeg's -strict level. 'normal' is its own default and passes no flag.",
+            "description": "ffmpeg's -strict level, for new downloads and for cleaning files already in the library. 'normal' is its own default and passes no flag.",
             "enum": [
               "very",
               "strict",
@@ -7064,51 +6991,11 @@
             "title": "Ffmpeg Strictness",
             "type": "string"
           },
-          "file_detection_interval_seconds": {
-            "default": 30,
-            "description": "How long this file's size must stay unchanged before Weir treats it as finished being written. 0 turns size settling off.",
-            "maximum": 3600.0,
-            "minimum": 0.0,
-            "title": "File Detection Interval Seconds",
-            "type": "integer"
-          },
           "file_system_events_enabled": {
             "default": true,
             "description": "Watch this folder for changes so new files are picked up within seconds. The periodic scan runs regardless, so switching this off makes Weir slower to notice a file, never blind to it.",
             "title": "File System Events Enabled",
             "type": "boolean"
-          },
-          "hardware_decode_mode": {
-            "default": "off",
-            "description": "Hardware decoding. 'off' is what Weir has always done. A choice that cannot work falls back to software and records why — it never fails a file.",
-            "enum": [
-              "off",
-              "auto",
-              "device"
-            ],
-            "title": "Hardware Decode Mode",
-            "type": "string"
-          },
-          "hardware_device": {
-            "default": "",
-            "description": "The ffmpeg method to use when the mode is 'device' — cuda, qsv, vaapi.",
-            "maxLength": 32,
-            "title": "Hardware Device",
-            "type": "string"
-          },
-          "hardware_disabled_vendors_csv": {
-            "default": "",
-            "description": "Vendors to never use, comma separated: nvidia, intel, amd, vaapi, apple.",
-            "maxLength": 200,
-            "title": "Hardware Disabled Vendors Csv",
-            "type": "string"
-          },
-          "hold_minutes": {
-            "default": 0,
-            "maximum": 10080.0,
-            "minimum": 0.0,
-            "title": "Hold Minutes",
-            "type": "integer"
           },
           "ignore_size_changes": {
             "default": false,
@@ -7131,7 +7018,7 @@
           },
           "max_attempts": {
             "default": 3,
-            "description": "How many times Weir tries a file on its own before stopping.",
+            "description": "How many times Weir tries a file on its own before it gives up. The first try counts, so 3 means the first try and two retries.",
             "maximum": 20.0,
             "minimum": 1.0,
             "title": "Max Attempts",
@@ -7143,7 +7030,7 @@
             "minimum": 0.0,
             "title": "Max Concurrent Files",
             "type": "integer",
-            "description": "This library's own limit on files at once. 0 means the same as \"Files at once\" in Process settings."
+            "description": "The most files this workflow runs at once, as a share of \"Files at once\" in Settings › Performance. 0 means no limit of its own. It cannot be more than Performance's Files at once: a save that asks for more is refused."
           },
           "max_file_size_mb": {
             "default": 0,
@@ -7166,33 +7053,13 @@
             "title": "Media Type",
             "type": "string"
           },
-          "min_file_age_seconds": {
-            "anyOf": [
-              {
-                "maximum": 604800.0,
-                "minimum": 0.0,
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "Seconds a file must go unchanged. Null uses the Performance setting.",
-            "title": "Min File Age Seconds"
-          },
           "min_file_size_mb": {
-            "anyOf": [
-              {
-                "maximum": 1000000.0,
-                "minimum": 0.0,
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "Smallest file the library takes. Null uses the Performance setting.",
-            "title": "Min File Size Mb"
+            "default": 50,
+            "description": "The smallest file this workflow takes, in MB. 0 takes any size.",
+            "maximum": 1000000.0,
+            "minimum": 0.0,
+            "title": "Min File Size Mb",
+            "type": "integer"
           },
           "modified_after": {
             "anyOf": [
@@ -7258,6 +7125,14 @@
             "title": "Priority",
             "type": "integer"
           },
+          "ready_after_seconds": {
+            "default": 60,
+            "description": "A new file is ready once neither its size nor its last-changed time has moved for this many seconds. 0 needs no wait.",
+            "maximum": 1209600.0,
+            "minimum": 0.0,
+            "title": "Ready After Seconds",
+            "type": "integer"
+          },
           "rejected_file_action": {
             "default": "leave",
             "description": "What to do with a settled file rejected by size/path rules or because it contains no video. delete_file removes only that file and then empty parent folders; it never removes a folder containing other files.",
@@ -7270,7 +7145,7 @@
           },
           "retry_backoff_seconds": {
             "default": 300,
-            "description": "The first wait before a retry. It doubles each attempt, capped at an hour.",
+            "description": "The first wait before a retry. It doubles each attempt, capped at an hour. Weir looks again shortly after the wait ends.",
             "maximum": 3600.0,
             "minimum": 1.0,
             "title": "Retry Backoff Seconds",
@@ -7375,21 +7250,23 @@
             "title": "Remove Original After Success",
             "type": "boolean"
           },
+          "minimum_free_disk_space_mb": {
+            "default": 5120,
+            "description": "Weir keeps at least this much free on the drive this workflow writes to. A file that would leave less is put on hold and tried again when there is room. 0 turns the check off.",
+            "maximum": 1048576,
+            "minimum": 0,
+            "title": "Minimum Free Disk Space Mb",
+            "type": "integer"
+          },
           "remux_writer": {
             "default": "best",
-            "description": "Which tool writes the library's output (#548). best: mkvmerge for Matroska when it is installed, ffmpeg for everything else, and ffmpeg again when mkvmerge's write fails its checks. ffmpeg: ffmpeg writes every file.",
+            "description": "Which tool writes the workflow's output, for new downloads and for cleaning files already in the library. best: mkvmerge for Matroska when it is installed, ffmpeg for everything else, and ffmpeg again when mkvmerge's write fails its checks. ffmpeg: ffmpeg writes every file.",
             "enum": [
               "best",
               "ffmpeg"
             ],
             "title": "Remux Writer",
             "type": "string"
-          },
-          "rewrite_with_ffmpeg": {
-            "default": true,
-            "description": "With remux_writer best: when mkvmerge's write fails its checks, ffmpeg writes the file again instead of the file failing. Off fails the file at once.",
-            "title": "Rewrite With Ffmpeg",
-            "type": "boolean"
           }
         },
         "required": [
@@ -7490,32 +7367,15 @@
       "ProcessingOperatorSettingsOut": {
         "additionalProperties": false,
         "properties": {
-          "failure_cleanup_enabled": {
-            "description": "Delete the source release folder after a file fails terminally. Off by default: this removes the original, so it stays off until you choose it.",
-            "title": "Failure Cleanup Enabled",
-            "type": "boolean"
-          },
-          "failure_cleanup_interval_seconds": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "How often the failed-download cleanup runs, set in Settings › Cleanup. Null keeps the environment's interval.",
-            "title": "Failure Cleanup Interval Seconds"
-          },
           "file_log_retention_days": {
-            "description": "How long to keep the per-file processing record. 0 keeps it forever.",
+            "description": "How many days a file's history is kept after the file is gone or forgotten. While Weir still knows the file its history is kept. 0 keeps it forever.",
             "maximum": 3650.0,
             "minimum": 0.0,
             "title": "File Log Retention Days",
             "type": "integer"
           },
           "keep_failed_work_files": {
-            "description": "Keep a failed run's working files so they can be inspected instead of swept.",
+            "description": "Keep a failed file's half-written copy for a day, so it can be looked at. It is removed once it is a day old.",
             "title": "Keep Failed Work Files",
             "type": "boolean"
           },
@@ -7523,19 +7383,6 @@
             "maximum": 10.0,
             "minimum": 1.0,
             "title": "Max Concurrent Files",
-            "type": "integer"
-          },
-          "min_file_age_seconds": {
-            "maximum": 604800.0,
-            "minimum": 0.0,
-            "title": "Min File Age Seconds",
-            "type": "integer"
-          },
-          "minimum_free_disk_space_mb": {
-            "description": "Processing skips before writes when the target drive has less free space than this.",
-            "maximum": 1048576.0,
-            "minimum": 0.0,
-            "title": "Minimum Free Disk Space Mb",
             "type": "integer"
           },
           "movie_schedule_days": {
@@ -7561,13 +7408,6 @@
             "maxLength": 5,
             "title": "Movie Schedule Start",
             "type": "string"
-          },
-          "min_input_file_size_mb": {
-            "description": "Files smaller than this are skipped before Weir probes or writes them.",
-            "maximum": 1048576.0,
-            "minimum": 0.0,
-            "title": "Processing Min Input File Size Mb",
-            "type": "integer"
           },
           "runner_capacity": {
             "description": "Total processing capacity. Active files consume it according to their cost, and new work waits once it is fully occupied.",
@@ -7603,13 +7443,6 @@
             "maximum": 64.0,
             "minimum": 0.0,
             "title": "Runner Cost Sd",
-            "type": "integer"
-          },
-          "runner_cost_undetermined": {
-            "description": "What a file Weir has not measured yet costs. Zero admits it rather than stalling on the unknown.",
-            "maximum": 64.0,
-            "minimum": 0.0,
-            "title": "Runner Cost Undetermined",
             "type": "integer"
           },
           "schedule_timezone": {
@@ -7695,15 +7528,10 @@
           "runner_cost_4k",
           "runner_budget_enabled",
           "work_temp_stale_sweep_enabled",
-          "failure_cleanup_enabled",
           "unclaimed_handback_cleanup_enabled",
           "unclaimed_handback_window_days",
           "keep_failed_work_files",
           "file_log_retention_days",
-          "runner_cost_undetermined",
-          "min_file_age_seconds",
-          "min_input_file_size_mb",
-          "minimum_free_disk_space_mb",
           "movie_schedule_enabled",
           "movie_schedule_hours_limited",
           "movie_schedule_days",
@@ -7728,30 +7556,6 @@
             "minLength": 1,
             "title": "Csrf Token",
             "type": "string"
-          },
-          "failure_cleanup_enabled": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Failure Cleanup Enabled"
-          },
-          "failure_cleanup_interval_seconds": {
-            "anyOf": [
-              {
-                "maximum": 2592000,
-                "minimum": 900,
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Failure Cleanup Interval Seconds"
           },
           "file_log_retention_days": {
             "anyOf": [
@@ -7789,32 +7593,6 @@
               }
             ],
             "title": "Max Concurrent Files"
-          },
-          "min_file_age_seconds": {
-            "anyOf": [
-              {
-                "maximum": 604800.0,
-                "minimum": 0.0,
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Min File Age Seconds"
-          },
-          "minimum_free_disk_space_mb": {
-            "anyOf": [
-              {
-                "maximum": 1048576.0,
-                "minimum": 0.0,
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Minimum Free Disk Space Mb"
           },
           "movie_schedule_days": {
             "anyOf": [
@@ -7873,19 +7651,6 @@
               }
             ],
             "title": "Movie Schedule Start"
-          },
-          "min_input_file_size_mb": {
-            "anyOf": [
-              {
-                "maximum": 1048576.0,
-                "minimum": 0.0,
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Processing Min Input File Size Mb"
           },
           "runner_capacity": {
             "anyOf": [
@@ -7963,19 +7728,6 @@
             ],
             "title": "Runner Cost Sd"
           },
-          "runner_cost_undetermined": {
-            "anyOf": [
-              {
-                "maximum": 64.0,
-                "minimum": 0.0,
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Runner Cost Undetermined"
-          },
           "tv_schedule_days": {
             "anyOf": [
               {
@@ -8033,19 +7785,6 @@
               }
             ],
             "title": "Tv Schedule Start"
-          },
-          "verbose_detection_logging": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "deprecated": true,
-            "description": "Removed. Accepted and ignored, so an older client that still sends it is not refused.",
-            "title": "Verbose Detection Logging"
           },
           "work_temp_stale_sweep_enabled": {
             "anyOf": [
@@ -8699,6 +8438,19 @@
             "maxLength": 4000,
             "title": "Relative Path"
           },
+          "rule_set_id": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A saved rules profile to preview with instead of the workflow's. Ignored when rules is given.",
+            "title": "Rule Set Id"
+          },
           "rules": {
             "anyOf": [
               {
@@ -9125,11 +8877,6 @@
             "title": "Configuration Note",
             "type": "string"
           },
-          "failure_cleanup_configuration_note": {
-            "description": "How operators change Pass 4 failure-cleanup timers/grace (restart required).",
-            "title": "Failure Cleanup Configuration Note",
-            "type": "string"
-          },
           "in_process_processing_worker_count": {
             "description": "Mirrors WEIR_PROCESSING_WORKER_COUNT after clamping — the processing lane only.",
             "maximum": 8.0,
@@ -9167,24 +8914,6 @@
             "title": "Processing Media Extensions",
             "type": "array"
           },
-          "processing_movie_failure_cleanup_grace_period_seconds": {
-            "description": "Failed remux age gate for Movies failure cleanup (uses jobs.updated_at).",
-            "maximum": 604800.0,
-            "minimum": 300.0,
-            "title": "Processing Movie Failure Cleanup Grace Period Seconds",
-            "type": "integer"
-          },
-          "processing_movie_failure_cleanup_schedule_enabled": {
-            "description": "``WEIR_PROCESSING_MOVIE_FAILURE_CLEANUP_SCHEDULE_ENABLED`` at process start.",
-            "title": "Processing Movie Failure Cleanup Schedule Enabled",
-            "type": "boolean"
-          },
-          "processing_movie_failure_cleanup_schedule_interval_seconds": {
-            "description": "Seconds between Movies-only periodic failed-remux cleanup enqueue ticks.",
-            "minimum": 60.0,
-            "title": "Processing Movie Failure Cleanup Schedule Interval Seconds",
-            "type": "integer"
-          },
           "processing_movie_output_cleanup_min_age_seconds": {
             "description": "Minimum age (newest file mtime under the folder) before Pass 3a may delete a Movies output folder (1h..30d; default 48h).",
             "minimum": 3600.0,
@@ -9196,24 +8925,6 @@
             "maximum": 1024.0,
             "minimum": 1.0,
             "title": "Processing Probe Size Mb",
-            "type": "integer"
-          },
-          "processing_tv_failure_cleanup_grace_period_seconds": {
-            "description": "Failed remux age gate for TV failure cleanup (uses jobs.updated_at).",
-            "maximum": 604800.0,
-            "minimum": 300.0,
-            "title": "Processing Tv Failure Cleanup Grace Period Seconds",
-            "type": "integer"
-          },
-          "processing_tv_failure_cleanup_schedule_enabled": {
-            "description": "``WEIR_PROCESSING_TV_FAILURE_CLEANUP_SCHEDULE_ENABLED`` at process start.",
-            "title": "Processing Tv Failure Cleanup Schedule Enabled",
-            "type": "boolean"
-          },
-          "processing_tv_failure_cleanup_schedule_interval_seconds": {
-            "description": "Seconds between TV-only periodic failed-remux cleanup enqueue ticks.",
-            "minimum": 60.0,
-            "title": "Processing Tv Failure Cleanup Schedule Interval Seconds",
             "type": "integer"
           },
           "processing_tv_output_cleanup_min_age_seconds": {
@@ -9308,13 +9019,6 @@
           "processing_work_temp_stale_sweep_tv_schedule_enabled",
           "processing_work_temp_stale_sweep_tv_schedule_interval_seconds",
           "processing_work_temp_stale_sweep_min_stale_age_seconds",
-          "processing_movie_failure_cleanup_schedule_enabled",
-          "processing_movie_failure_cleanup_schedule_interval_seconds",
-          "processing_tv_failure_cleanup_schedule_enabled",
-          "processing_tv_failure_cleanup_schedule_interval_seconds",
-          "processing_movie_failure_cleanup_grace_period_seconds",
-          "processing_tv_failure_cleanup_grace_period_seconds",
-          "failure_cleanup_configuration_note",
           "work_temp_stale_sweep_periodic_configuration_note"
         ],
         "title": "ProcessingRuntimeSettingsOut",

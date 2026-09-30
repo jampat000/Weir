@@ -14,15 +14,14 @@ public sealed partial class LibraryStore
     private const string LibraryColumns =
         "id, name, enabled, media_type, display_order, watched_folder, work_folder, output_folder, " +
         "media_extensions_csv, exclude_markers_csv, include_patterns_csv, exclude_patterns_csv, min_file_size_mb, max_file_size_mb, " +
-        "rejected_file_action, min_file_age_seconds, created_after, created_before, modified_after, modified_before, " +
+        "rejected_file_action, ready_after_seconds, created_after, created_before, modified_after, modified_before, " +
         "exclude_hidden, top_level_only, sidecar_patterns_csv, preserve_original_timestamps, output_collision_policy, " +
-        "hardware_decode_mode, hardware_device, hardware_disabled_vendors_csv, ffmpeg_strictness, scan_interval_seconds, " +
-        "hold_minutes, file_detection_interval_seconds, ignore_size_changes, file_system_events_enabled, skip_access_tests, " +
+        "ffmpeg_strictness, scan_interval_seconds, ignore_size_changes, file_system_events_enabled, skip_access_tests, " +
         "schedule_enabled, schedule_hours_limited, schedule_days, schedule_grid, schedule_start, schedule_end, max_attempts, " +
         "retry_backoff_seconds, retry_execution_failures, retry_preflight_failures, failure_policy, max_concurrent_files, " +
         "priority, rule_set_id, discovered_from_connection_id, discovered_library_key, created_at, updated_at, " +
         // #548: appended, not inserted - ReadLibrary reads by position.
-        "remux_writer, rewrite_with_ffmpeg, remove_original_after_success";
+        "remux_writer, remove_original_after_success, minimum_free_disk_space_mb";
 
     public async Task<List<ProcessingLibraryRecord>> ListAsync(UnitOfWork uow, bool enabledOnly = false)
     {
@@ -140,6 +139,12 @@ public sealed partial class LibraryStore
         return count;
     }
 
+    /// <summary>Settings › Performance's "Files at once"; one when the settings row does not exist yet.</summary>
+    private async Task<long> FilesAtOnceAsync(UnitOfWork uow) =>
+        await uow.ScalarAsync("SELECT max_concurrent_files FROM operator_settings WHERE id = 1").ConfigureAwait(false) is { } total and not DBNull
+            ? Convert.ToInt64(total, System.Globalization.CultureInfo.InvariantCulture)
+            : 1;
+
     public async Task<ProcessingLibraryRecord> CreateAsync(UnitOfWork uow, ProcessingLibraryInput body, string? weirHome = null)
     {
         var existingNames = (await ListAsync(uow).ConfigureAwait(false)).Select(l => l.Name).ToHashSet(StringComparer.Ordinal);
@@ -148,6 +153,7 @@ public sealed partial class LibraryStore
         var highestOrder = await uow.ScalarAsync("SELECT MAX(display_order) FROM libraries").ConfigureAwait(false);
         var displayOrder = (highestOrder is null or DBNull ? 0 : Convert.ToInt64(highestOrder, System.Globalization.CultureInfo.InvariantCulture)) + 1;
 
+        LibraryRules.ValidateMaxConcurrentFiles(body.MaxConcurrentFiles, await FilesAtOnceAsync(uow).ConfigureAwait(false));
         var ruleSetExists = body.RuleSetId is { } wantedRuleSet && await GetRuleSetAsync(uow, wantedRuleSet).ConfigureAwait(false) is not null;
         var others = await OtherFoldersAsync(uow, excludeId: null).ConfigureAwait(false);
         var row = LibraryRules.ApplyFields(new ProcessingLibraryRecord { Name = name, MediaType = scope, DisplayOrder = displayOrder }, body, ruleSetExists);
@@ -171,6 +177,13 @@ public sealed partial class LibraryStore
             .Where(l => l.Id != existing.Id).Select(l => l.Name).ToHashSet(StringComparer.Ordinal);
         var name = LibraryRules.ValidateName(body.Name, existingNames);
         var scope = LibraryRules.ValidateScope(body.MediaType);
+        // Only a number someone is changing is held to the total: a workflow already above it, because Files at once was
+        // lowered, still saves its other settings, and shows that it is limited.
+        if (body.MaxConcurrentFiles != existing.MaxConcurrentFiles)
+        {
+            LibraryRules.ValidateMaxConcurrentFiles(body.MaxConcurrentFiles, await FilesAtOnceAsync(uow).ConfigureAwait(false));
+        }
+
         var ruleSetExists = body.RuleSetId is { } wantedRuleSet && await GetRuleSetAsync(uow, wantedRuleSet).ConfigureAwait(false) is not null;
         var others = await OtherFoldersAsync(uow, excludeId: existing.Id).ConfigureAwait(false);
         var row = LibraryRules.ApplyFields(existing with { Name = name, MediaType = scope }, body, ruleSetExists);

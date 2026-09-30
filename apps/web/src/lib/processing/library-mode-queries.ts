@@ -16,6 +16,7 @@ import {
   triggerLibraryScan,
   type LibraryFileFilters,
   type LibraryManualPlan,
+  type LibrarySettingsUpdate,
 } from "./library-mode-api";
 import {
   fetchLibraryRedownloads,
@@ -32,30 +33,7 @@ export function useLibrarySettingsQuery(libraryId: number, enabled = true) {
   });
 }
 
-/** #508 and #735: the library's cleaning checkboxes and originals folder, saved together with its current folders (see saveLibrarySettings). */
-export function useSaveLibraryPreflightSettings(libraryId: number) {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (updates: {
-      library_folders: string[];
-      clean_hardlinked_files?: boolean;
-      skip_if_manager_would_redownload?: boolean;
-      keep_original_after_clean?: boolean;
-      originals_folder?: string;
-    }) => saveLibrarySettings(libraryId, updates),
-    onSuccess: () => {
-      void qc.invalidateQueries({
-        queryKey: processingKeys.librarySettings(libraryId),
-      });
-      // clean_hardlinked_files decides whether seeding counts as a problem at all (#568).
-      void qc.invalidateQueries({
-        queryKey: processingKeys.libraryOverview(libraryId),
-      });
-    },
-  });
-}
-
-/** Everything the Library view reads about one library, invalidated together after a scan or a clean. */
+/** Everything the Library view reads about one library, invalidated together after a scan, a clean or a change of setup. */
 function invalidateLibraryViews(
   qc: ReturnType<typeof useQueryClient>,
   libraryId: number,
@@ -66,6 +44,24 @@ function invalidateLibraryViews(
   ]) {
     void qc.invalidateQueries({ queryKey: key });
   }
+}
+
+/**
+ * Saves the library's setup (see LibrarySettingsUpdate). Its checks decide whether seeding counts as a problem at
+ * all (#568), and a new rules profile changes what every file would do, so the views are read again.
+ */
+export function useSaveLibrarySettings(libraryId: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (updates: LibrarySettingsUpdate) =>
+      saveLibrarySettings(libraryId, updates),
+    onSuccess: () => {
+      void qc.invalidateQueries({
+        queryKey: processingKeys.librarySettings(libraryId),
+      });
+      invalidateLibraryViews(qc, libraryId);
+    },
+  });
 }
 
 export function useTriggerLibraryScan(libraryId: number) {
@@ -112,12 +108,23 @@ export function useLibraryOverviewQuery(libraryId: number, enabled = true) {
 export function useLibraryFilePreviewQuery(
   libraryId: number,
   path: string | null,
+  /** The profile the library cleans by when it has chosen its own; null means its workflow's. */
+  ruleSetId: number | null,
+  enabled: boolean,
 ) {
   return useQuery({
-    queryKey: processingKeys.libraryFilePreview(libraryId, path ?? ""),
+    queryKey: processingKeys.libraryFilePreview(
+      libraryId,
+      path ?? "",
+      ruleSetId,
+    ),
     queryFn: () =>
-      previewProcessingRules({ libraryId, absolutePath: path ?? "" }),
-    enabled: path !== null,
+      previewProcessingRules({
+        libraryId,
+        absolutePath: path ?? "",
+        ruleSetId: ruleSetId ?? undefined,
+      }),
+    enabled: enabled && path !== null,
     staleTime: 5 * 60 * 1000,
     retry: false,
   });
@@ -190,6 +197,7 @@ export function useSetLibrarySchedule(libraryId: number) {
         void qc.invalidateQueries({
           queryKey: processingKeys.librarySettings(libraryId),
         });
+        invalidateLibraryViews(qc, libraryId);
       }
     },
   });

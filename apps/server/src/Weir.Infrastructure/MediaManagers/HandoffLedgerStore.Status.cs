@@ -31,16 +31,15 @@ public sealed partial class HandoffLedgerStore
 
         var path = row.RelativePath.TrimEnd('/');
         var rows = await uow.QueryAsync(
-            "SELECT id, relative_path, status, status_reason, failure_attempts, next_retry_at, updated_at FROM files " +
+            "SELECT id, relative_path, status, status_reason, next_retry_at, updated_at FROM files " +
             "WHERE library_id = $library",
             reader => new HandoffFileRow(
                 SqliteValues.GetInt64(reader, 0),
                 SqliteValues.GetString(reader, 1),
                 SqliteValues.GetString(reader, 2),
                 SqliteValues.GetString(reader, 3),
-                SqliteValues.GetInt64(reader, 4),
-                TimestampColumns.Parse(reader.GetValue(5)),
-                TimestampColumns.Parse(reader.GetValue(6))),
+                TimestampColumns.Parse(reader.GetValue(4)),
+                TimestampColumns.Parse(reader.GetValue(5))),
             ("$library", libraryId)).ConfigureAwait(false);
 
         var comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
@@ -221,7 +220,7 @@ public sealed partial class HandoffLedgerStore
                     continue;
                 }
 
-                var (state, when) = HandoffLedgerRules.FileState(file.Status, file.NextRetryAt, file.FailureAttempts);
+                var (state, when) = HandoffLedgerRules.FileState(file.Status, file.NextRetryAt);
 
                 // The same for a file row: a failure recorded before this hand-off arrived, and not touched since, is
                 // what became of an earlier hand-off of the path. A success from before still counts.

@@ -13,6 +13,7 @@ import type {
   LibraryFile,
   LibraryFilesResult,
   LibraryOverview,
+  LibrarySettings,
 } from "../../lib/processing/library-mode-api";
 import { LibraryPage } from "./library-page";
 
@@ -37,11 +38,10 @@ const setAside = vi.fn();
 const rescan = vi.fn();
 let filesResult: LibraryFilesResult;
 let overviewResult: LibraryOverview;
-let librarySettingsResult: {
-  keep_original_after_clean: boolean;
-  originals_folder: string;
-};
+let librarySettingsResult: LibrarySettings;
+let signedInRole: "operator" | undefined;
 const lastFilters: Record<string, unknown>[] = [];
+const previewRequests: Record<string, unknown>[] = [];
 
 vi.mock("../../lib/processing/libraries-queries", () => ({
   useProcessingLibrariesQuery: () => ({
@@ -49,6 +49,7 @@ vi.mock("../../lib/processing/libraries-queries", () => ({
     isPending: false,
     isError: false,
   }),
+  useProcessingRuleSetsQuery: () => ({ data: [] }),
 }));
 vi.mock(
   "../../lib/processing/library-mode-queries",
@@ -80,8 +81,9 @@ vi.mock(
   }),
 );
 vi.mock("../../lib/processing/rules-preview-api", () => ({
-  previewProcessingRules: () =>
-    Promise.resolve({
+  previewProcessingRules: (request: Record<string, unknown>) => {
+    previewRequests.push(request);
+    return Promise.resolve({
       tracks: [
         {
           index: 1,
@@ -117,14 +119,17 @@ vi.mock("../../lib/processing/rules-preview-api", () => ({
       library_id: 1,
       media_scope: "tv",
       inspected_path: "x",
-    }),
+    });
+  },
 }));
 vi.mock("../../lib/settings/queries", () => ({
   useAppSettingsQuery: () => ({ data: { app_timezone: "UTC" } }),
 }));
 vi.mock("../../lib/auth/queries", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../lib/auth/queries")>()),
-  useMeQuery: () => ({ data: undefined }),
+  useMeQuery: () => ({
+    data: signedInRole ? { role: signedInRole } : undefined,
+  }),
 }));
 vi.mock("../../lib/pause/pause-queries", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../lib/pause/pause-queries")>()),
@@ -188,16 +193,28 @@ function renderLibrary() {
   );
 }
 
+function settings(over: Partial<LibrarySettings>): LibrarySettings {
+  return {
+    library_folders: ["D:/tv"],
+    library_schedule_enabled: false,
+    clean_hardlinked_files: false,
+    skip_if_manager_would_redownload: true,
+    keep_original_after_clean: false,
+    originals_folder: "",
+    library_rule_set_id: null,
+    ...over,
+  };
+}
+
 describe("LibraryPage", () => {
   beforeEach(() => {
     clean.mockReset();
     setAside.mockReset();
     rescan.mockReset();
     lastFilters.length = 0;
-    librarySettingsResult = {
-      keep_original_after_clean: false,
-      originals_folder: "",
-    };
+    previewRequests.length = 0;
+    signedInRole = undefined;
+    librarySettingsResult = settings({});
     overviewResult = {
       library_id: 1,
       folders_configured: 1,
@@ -471,6 +488,27 @@ describe("LibraryPage", () => {
     ).toBeEnabled();
   });
 
+  it("previews a file with the profile the library cleans by, or its workflow's until it has one", async () => {
+    librarySettingsResult = settings({ library_rule_set_id: 7 });
+    const { unmount } = renderLibrary();
+    fireEvent.click(
+      screen.getByRole("button", { name: "The.Quiet.Harbour.S01E01.mkv" }),
+    );
+    await waitFor(() =>
+      expect(previewRequests.at(-1)).toMatchObject({ ruleSetId: 7 }),
+    );
+    unmount();
+
+    librarySettingsResult = settings({ library_rule_set_id: null });
+    renderLibrary();
+    fireEvent.click(
+      screen.getByRole("button", { name: "The.Quiet.Harbour.S01E01.mkv" }),
+    );
+    await waitFor(() =>
+      expect(previewRequests.at(-1)).toMatchObject({ ruleSetId: undefined }),
+    );
+  });
+
   it("says removed tracks are gone for good, or recoverable when the library keeps originals", async () => {
     renderLibrary();
     fireEvent.click(
@@ -480,10 +518,10 @@ describe("LibraryPage", () => {
     expect(drawer).toHaveTextContent("Removed tracks are gone for good");
 
     fireEvent.click(within(drawer).getByRole("button", { name: "Close" }));
-    librarySettingsResult = {
+    librarySettingsResult = settings({
       keep_original_after_clean: true,
       originals_folder: "D:\\Media\\Movies\\.weir-originals",
-    };
+    });
     fireEvent.click(
       screen.getByRole("button", { name: "The.Quiet.Harbour.S01E01.mkv" }),
     );
@@ -650,6 +688,47 @@ describe("LibraryPage", () => {
     fireEvent.click(cleaned);
 
     expect(lastFilters.at(-1)).toMatchObject({ state: "cleaned" });
+  });
+
+  it("shows a library with no folders a step to set it up, not a link back to Settings", () => {
+    signedInRole = "operator";
+    librarySettingsResult = settings({ library_folders: [] });
+
+    renderLibrary();
+
+    const prompt = screen.getByTestId("library-setup-prompt");
+    expect(prompt).toHaveTextContent("Set up this library");
+    expect(screen.queryByTestId("library-empty")).not.toBeInTheDocument();
+    expect(screen.queryByRole("link")).not.toBeInTheDocument();
+
+    fireEvent.click(
+      within(prompt).getByRole("button", { name: "Set up this library" }),
+    );
+    expect(screen.getByTestId("library-setup-panel")).toBeInTheDocument();
+    expect(screen.getByLabelText("Folder to add")).toBeInTheDocument();
+  });
+
+  it("tells a viewer that an operator or admin sets a library up", () => {
+    librarySettingsResult = settings({ library_folders: [] });
+
+    renderLibrary();
+
+    expect(screen.getByTestId("library-setup-prompt")).toHaveTextContent(
+      "An operator or an admin can set this library up.",
+    );
+    expect(
+      screen.queryByRole("button", { name: "Set up this library" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("opens the setup from the header once a library has folders", () => {
+    signedInRole = "operator";
+
+    renderLibrary();
+    fireEvent.click(screen.getByRole("button", { name: "Library setup" }));
+
+    const panel = screen.getByTestId("library-setup-panel");
+    expect(within(panel).getByText("D:/tv")).toBeInTheDocument();
   });
 
   it("switches library from the title", () => {

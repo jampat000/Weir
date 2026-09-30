@@ -13,12 +13,12 @@ namespace Weir.Infrastructure.Processing.RemuxPass;
 /// </summary>
 public static class RemuxPassFileState
 {
-    private sealed record FileRow(long Id, string StatusReason, string? FailureClass, long FailureAttempts);
+    private sealed record FileRow(long Id, string StatusReason, long FailureAttempts);
 
     private static Task<FileRow?> FindAsync(UnitOfWork uow, long libraryId, string relativePath) =>
         uow.QuerySingleAsync(
-            "SELECT id, status_reason, failure_class, failure_attempts FROM files WHERE library_id = $library AND relative_path = $path LIMIT 1",
-            reader => new FileRow(reader.GetInt64(0), SqliteValues.GetString(reader, 1), SqliteValues.GetStringOrNull(reader, 2), SqliteValues.GetInt64(reader, 3)),
+            "SELECT id, status_reason, failure_attempts FROM files WHERE library_id = $library AND relative_path = $path LIMIT 1",
+            reader => new FileRow(reader.GetInt64(0), SqliteValues.GetString(reader, 1), SqliteValues.GetInt64(reader, 2)),
             ("$library", libraryId),
             ("$path", relativePath));
 
@@ -55,6 +55,17 @@ public static class RemuxPassFileState
             ("$now", TimestampColumns.Orm(now)),
             ("$id", row.Id)).ConfigureAwait(false);
         return true;
+    }
+
+    /// <summary>Keeps an on-hold file from being picked up again by a scan before <paramref name="lookAgainAt"/>, when its own next look is booked.</summary>
+    public static Task HoldUntilAsync(UnitOfWork uow, long libraryId, string relativePath, DateTimeOffset lookAgainAt)
+    {
+        ArgumentNullException.ThrowIfNull(uow);
+        return uow.ExecuteAsync(
+            "UPDATE files SET hold_until = $hold WHERE library_id = $library AND relative_path = $path",
+            ("$hold", TimestampColumns.Orm(lookAgainAt)),
+            ("$library", libraryId),
+            ("$path", relativePath));
     }
 
     /// <summary>
@@ -118,26 +129,22 @@ public static class RemuxPassFileState
         }
 
         var value = WireStrings.Strip(failureClass).ToLowerInvariant();
-        var decision = RetryPolicy.DecideForRecordedFailure(library, value, row.FailureAttempts, row.FailureClass, now);
-        var status = decision.Quarantined ? ProcessingFileStatuses.OnHold : ProcessingFileStatuses.ProcessingFailed;
+        var attempts = row.FailureAttempts + 1;
+        var decision = RetryPolicy.DecideRetry(library, value, attempts, now);
         await uow.ExecuteAsync(
             "UPDATE files SET status = $status, status_reason = $reason, failure_class = $class, failure_attempts = $attempts, " +
             "next_retry_at = $next, last_attempt_at = $now, updated_at = CURRENT_TIMESTAMP WHERE id = $id",
-            ("$status", status),
+            ("$status", ProcessingFileStatuses.ProcessingFailed),
             ("$reason", WireStrings.Slice(WireStrings.Strip($"{reason} {decision.Reason}"), 10000)),
             ("$class", value),
-            ("$attempts", row.FailureAttempts + 1),
+            ("$attempts", attempts),
             ("$next", decision.NextRetryAt is { } next ? TimestampColumns.Orm(next) : null),
             ("$now", TimestampColumns.Orm(now)),
             ("$id", row.Id)).ConfigureAwait(false);
 
         // #785: the file's identity the moment it became failed, so History's remove dialog can tell a later,
-        // different release at the same path from the one that actually failed. Only for the terminal status a
-        // person can act on from that dialog; a quarantined (on_hold) file is not one of them.
-        if (status == ProcessingFileStatuses.ProcessingFailed)
-        {
-            await RecordCurrentFingerprintAsync(uow, library, relativePath).ConfigureAwait(false);
-        }
+        // different release at the same path from the one that actually failed.
+        await RecordCurrentFingerprintAsync(uow, library, relativePath).ConfigureAwait(false);
 
         return decision;
     }

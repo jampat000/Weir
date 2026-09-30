@@ -258,8 +258,9 @@ The image exposes `GET /health` and includes a Docker `HEALTHCHECK`.
 
 ## Hardware acceleration and device passthrough
 
-Weir stream-copies, so hardware decoding is rarely on the critical path today. It is switched
-**off** by default and nothing here is needed to run Processing.
+Weir copies video and audio without decoding them, so a graphics card does nothing for it today and
+there is no setting to switch one on. Nothing here is needed to run Processing. The passthrough
+below is for when video conversion arrives and uses the card.
 
 `GET /api/v1/processing/hardware` reports what the ffmpeg inside the container was compiled with.
 That is not the same as what your host offers — a method being listed does not prove a device is
@@ -288,14 +289,6 @@ services:
           devices:
             - capabilities: ["gpu"]
 ```
-
-Without passthrough, a workflow configured to use a device **falls back to software and records
-why on the file** — it does not fail. That is the intended behaviour, so a misconfigured device
-costs you speed rather than a failed pass. The reason is on the file's record and in its
-processing log.
-
-Per-vendor disables exist on each workflow for the case where auto-detection picks a device that is
-present but wrong.
 
 ## Filesystem events on bind mounts
 

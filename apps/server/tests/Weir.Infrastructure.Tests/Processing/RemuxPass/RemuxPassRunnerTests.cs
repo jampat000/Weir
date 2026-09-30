@@ -1,7 +1,6 @@
 using System.Text;
 using Microsoft.Extensions.Logging.Abstractions;
 using Weir.Core.Json;
-using Weir.Core.Media;
 using Weir.Core.MediaManagers;
 using Weir.Core.Processing;
 using Weir.Core.Processing.RemuxPass;
@@ -596,7 +595,7 @@ public sealed class RemuxPassRunnerTests : IDisposable
     }
 
     [Fact]
-    public async Task Hardware_flags_decided_for_the_pass_reach_the_executed_ffmpeg()
+    public async Task Ffmpeg_compatibility_chosen_for_the_workflow_reaches_the_executed_ffmpeg()
     {
         _folders.Source("one.mkv");
         _media.DefaultProbe = FakeMediaRunner.EnglishAndJapanese;
@@ -609,6 +608,7 @@ public sealed class RemuxPassRunnerTests : IDisposable
         var executed = Assert.Single(_media.Remuxes);
         var recorded = ((WireArray)result["ffmpeg_argv"]).Items.Select(WireConvert.Str).ToList();
         Assert.Equal(recorded.TakeWhile(arg => arg != "-i"), executed.TakeWhile(arg => arg != "-i"));
+        Assert.Contains("experimental", executed.TakeWhile(arg => arg != "-i"));
     }
 
     [Fact]
@@ -620,33 +620,6 @@ public sealed class RemuxPassRunnerTests : IDisposable
         await Run("one.mkv");
 
         Assert.Single(_media.Probed, argv => argv[^1] == source);
-    }
-
-    [Fact]
-    public async Task With_hardware_decoding_off_ffmpeg_is_not_asked_what_it_can_accelerate()
-    {
-        _folders.Source("one.mkv");
-        _media.Probes["one.mkv"] = FakeMediaRunner.EnglishAndJapanese;
-
-        await Run("one.mkv", _folders.Runtime() with { HardwareDecodeMode = HardwareAcceleration.ModeOff });
-
-        Assert.DoesNotContain(_media.Calls, argv => argv.Contains("-hwaccels"));
-    }
-
-    [Theory]
-    [InlineData(HardwareAcceleration.ModeAuto)]
-    [InlineData(HardwareAcceleration.ModeDevice)]
-    public async Task A_saved_hardware_decoding_choice_is_not_applied_while_the_feature_is_unavailable(string savedMode)
-    {
-        _folders.Source("one.mkv");
-        _media.Probes["one.mkv"] = FakeMediaRunner.EnglishAndJapanese;
-        var runtime = _folders.Runtime() with { HardwareDecodeMode = savedMode, HardwareDevice = "cuda" };
-
-        var result = await Run("one.mkv", runtime);
-
-        Assert.DoesNotContain(_media.Calls, argv => argv.Contains("-hwaccels"));
-        Assert.DoesNotContain(_media.Remuxes, argv => argv.Contains("-hwaccel"));
-        Assert.False(Bool(result, "hardware_fell_back_to_software"));
     }
 
     [Fact]

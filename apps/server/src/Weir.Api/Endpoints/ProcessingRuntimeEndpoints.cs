@@ -86,13 +86,6 @@ internal sealed class ProcessingRuntimeEndpointHandlers
             .Set("processing_work_temp_stale_sweep_tv_schedule_enabled", settings.ProcessingWorkTempStaleSweepTvScheduleEnabled)
             .Set("processing_work_temp_stale_sweep_tv_schedule_interval_seconds", settings.ProcessingWorkTempStaleSweepTvScheduleIntervalSeconds)
             .Set("processing_work_temp_stale_sweep_min_stale_age_seconds", settings.ProcessingWorkTempStaleSweepMinStaleAgeSeconds)
-            .Set("processing_movie_failure_cleanup_schedule_enabled", settings.ProcessingMovieFailureCleanupScheduleEnabled)
-            .Set("processing_movie_failure_cleanup_schedule_interval_seconds", settings.ProcessingMovieFailureCleanupScheduleIntervalSeconds)
-            .Set("processing_tv_failure_cleanup_schedule_enabled", settings.ProcessingTvFailureCleanupScheduleEnabled)
-            .Set("processing_tv_failure_cleanup_schedule_interval_seconds", settings.ProcessingTvFailureCleanupScheduleIntervalSeconds)
-            .Set("processing_movie_failure_cleanup_grace_period_seconds", settings.ProcessingMovieFailureCleanupGracePeriodSeconds)
-            .Set("processing_tv_failure_cleanup_grace_period_seconds", settings.ProcessingTvFailureCleanupGracePeriodSeconds)
-            .Set("failure_cleanup_configuration_note", settings.FailureCleanupConfigurationNote)
             .Set("work_temp_stale_sweep_periodic_configuration_note", settings.WorkTempStaleSweepPeriodicConfigurationNote));
     }
 
@@ -111,7 +104,7 @@ internal sealed class ProcessingRuntimeEndpointHandlers
                 .Set("available_methods", new WireArray([]))
                 .Set("vendors", new WireArray([]))
                 .Set("selectable_vendors", new WireArray(HardwareAcceleration.VendorMethods.Select(v => v.Key).Order(StringComparer.Ordinal).Select(k => (WireValue)WireValue.Of(k))))
-                .Set("strictness_levels", new WireArray(HardwareAcceleration.StrictnessLevels.Select(l => (WireValue)WireValue.Of(l))))
+                .Set("strictness_levels", new WireArray(FfmpegStrictnessLevels.All.Select(l => (WireValue)WireValue.Of(l))))
                 .Set("detail", $"Weir could not find ffmpeg, so it cannot report acceleration methods. {exception.Message}"));
         }
 
@@ -121,7 +114,7 @@ internal sealed class ProcessingRuntimeEndpointHandlers
             .Set("available_methods", new WireArray(report.AvailableMethods.Select(m => (WireValue)WireValue.Of(m))))
             .Set("vendors", new WireArray(report.Vendors.Select(v => (WireValue)WireValue.Of(v))))
             .Set("selectable_vendors", new WireArray(HardwareAcceleration.VendorMethods.Select(v => v.Key).Order(StringComparer.Ordinal).Select(k => (WireValue)WireValue.Of(k))))
-            .Set("strictness_levels", new WireArray(HardwareAcceleration.StrictnessLevels.Select(l => (WireValue)WireValue.Of(l))))
+            .Set("strictness_levels", new WireArray(FfmpegStrictnessLevels.All.Select(l => (WireValue)WireValue.Of(l))))
             .Set("detail", report.Detail));
     }
 }

@@ -53,6 +53,7 @@ public sealed class ProcessingFilesAtOnceApiTests
     {
         var (server, client) = await SignedInAsync();
         await using var disposeServer = server;
+        await SetFilesAtOnceAsync(client, 3);
 
         using var created = await client.PostAsync(
             "/api/v1/processing/libraries",
@@ -69,6 +70,54 @@ public sealed class ProcessingFilesAtOnceApiTests
             "/api/v1/processing/libraries",
             new { csrf_token = await client.CsrfAsync(), name = "More", media_type = "movie", watched_folder = @"c:\more-in", output_folder = @"c:\more-out", max_concurrent_files = 11 });
         Assert.Equal(HttpStatusCode.UnprocessableEntity, tooMany.StatusCode);
+    }
+
+    [Fact]
+    public async Task A_workflow_cannot_ask_for_more_at_once_than_the_total()
+    {
+        var (server, client) = await SignedInAsync();
+        await using var disposeServer = server;
+        await SetFilesAtOnceAsync(client, 3);
+
+        using var tooMany = await client.PostAsync(
+            "/api/v1/processing/libraries",
+            new { csrf_token = await client.CsrfAsync(), name = "Kids", media_type = "movie", watched_folder = @"c:\kids-in", output_folder = @"c:\kids-out", max_concurrent_files = 4 });
+
+        Assert.Equal(HttpStatusCode.BadRequest, tooMany.StatusCode);
+        Assert.Contains("cannot be more than the 3 Weir runs in total", await ApiTestClient.Detail(tooMany), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_workflow_above_a_lowered_total_reports_the_limit_it_gets_and_still_saves_its_other_settings()
+    {
+        var (server, client) = await SignedInAsync();
+        await using var disposeServer = server;
+        await SetFilesAtOnceAsync(client, 4);
+        using var created = await client.PostAsync(
+            "/api/v1/processing/libraries",
+            new { csrf_token = await client.CsrfAsync(), name = "Kids", media_type = "movie", watched_folder = @"c:\kids-in", output_folder = @"c:\kids-out", max_concurrent_files = 3 });
+        var stored = await ApiTestClient.Json(created);
+        await SetFilesAtOnceAsync(client, 2);
+
+        using var listed = await client.GetAsync("/api/v1/processing/libraries");
+        var reported = (await ApiTestClient.Json(listed)).AsArray().Single(library => library!["name"]!.GetValue<string>() == "Kids")!;
+        Assert.Equal((3, 2), (reported["max_concurrent_files"]!.GetValue<int>(), reported["effective_max_concurrent_files"]!.GetValue<int>()));
+
+        using var resaved = await client.PutAsync(
+            $"/api/v1/processing/libraries/{stored["id"]!.GetValue<long>()}",
+            new { csrf_token = await client.CsrfAsync(), name = "Kids", media_type = "movie", watched_folder = @"c:\kids-in", output_folder = @"c:\kids-out", max_concurrent_files = 3, priority = 5 });
+        Assert.Equal(HttpStatusCode.OK, resaved.StatusCode);
+
+        using var raised = await client.PutAsync(
+            $"/api/v1/processing/libraries/{stored["id"]!.GetValue<long>()}",
+            new { csrf_token = await client.CsrfAsync(), name = "Kids", media_type = "movie", watched_folder = @"c:\kids-in", output_folder = @"c:\kids-out", max_concurrent_files = 4 });
+        Assert.Equal(HttpStatusCode.BadRequest, raised.StatusCode);
+    }
+
+    private static async Task SetFilesAtOnceAsync(ApiTestClient client, int filesAtOnce)
+    {
+        using var saved = await client.PutAsync("/api/v1/processing/operator-settings", new { csrf_token = await client.CsrfAsync(), max_concurrent_files = filesAtOnce });
+        Assert.Equal(HttpStatusCode.OK, saved.StatusCode);
     }
 
     [Fact]

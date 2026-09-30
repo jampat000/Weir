@@ -1,8 +1,7 @@
 import { sendJson } from "../api/send-json";
 import { apiFetch, readJson, requireOk } from "../api/client";
 
-export type MaintenanceFamily =
-  "work_temp_stale_sweep" | "failure_cleanup" | "unclaimed_handbacks";
+export type MaintenanceFamily = "work_temp_stale_sweep" | "unclaimed_handbacks";
 
 export interface MaintenanceFamilyState {
   family: MaintenanceFamily;

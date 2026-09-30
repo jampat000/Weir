@@ -51,6 +51,9 @@ public sealed class BodyModel
     /// <summary>A body was sent (even if it is not an object).</summary>
     public bool IsPresent { get; }
 
+    /// <summary>The body has this key, even when its value is null: what tells "clear it" from "leave it".</summary>
+    public bool Has(string name) => _dict is not null && _dict.ContainsKey(name);
+
     /// <summary>Every field read so far validated.</summary>
     public bool IsValid => _valid;
 
@@ -100,6 +103,16 @@ public sealed class BodyModel
             var ok = FieldRules.TryDateTime(input, Loc(name), _issues, out var v);
             return (ok, v ?? default);
         });
+
+    /// <summary>
+    /// Declares keys the server ignores, so a client or a backup that still sends them keeps working
+    /// instead of being refused as carrying extra inputs. Their values are never looked at.
+    /// </summary>
+    public void AcceptAndIgnore(IEnumerable<string> names)
+    {
+        ArgumentNullException.ThrowIfNull(names);
+        _declared.UnionWith(names);
+    }
 
     /// <summary>Report undeclared keys when the model forbids them.</summary>
     public void Finish(ExtraFields extra)

@@ -106,6 +106,13 @@ vi.mock("../../lib/processing/kept-files-queries", () => ({
 vi.mock("../../lib/auth/queries", () => ({
   useMeQuery: () => ({ data: me }),
 }));
+vi.mock("./history-retention", () => ({
+  HistoryRetentionSetting: ({ editable }: { editable: boolean }) => (
+    <div data-testid="history-retention">
+      {editable ? "can edit" : "read only"}
+    </div>
+  ),
+}));
 vi.mock("./history-rejected-again", () => ({
   ProcessRejectedAgain: ({
     libraryId,
@@ -225,6 +232,51 @@ describe("HistoryPage", () => {
         "Weir couldn't load your file history. Reload the page to try again.",
       ),
     ).toBeInTheDocument();
+  });
+
+  it("puts the file history setting on the page, editable for an admin and read only for a viewer", () => {
+    renderPage();
+    expect(screen.getByTestId("history-retention")).toHaveTextContent(
+      "can edit",
+    );
+  });
+
+  it("gives a viewer the file history setting to read, not change", () => {
+    me.role = "viewer";
+    renderPage();
+    expect(screen.getByTestId("history-retention")).toHaveTextContent(
+      "read only",
+    );
+  });
+
+  it("tells, under a file, how long its history is kept once the file is gone", async () => {
+    fetchLog.mockResolvedValue({
+      file_id: 1,
+      relative_path: "",
+      retention_days: 45,
+      entries: [],
+    });
+    renderPage("/history?file=1");
+
+    expect(
+      await screen.findByTestId("history-retention-note"),
+    ).toHaveTextContent(
+      "Weir keeps this history while it still knows the file, then for 45 days after the file is gone.",
+    );
+  });
+
+  it("says a file's history is kept until it is removed when the days are 0", async () => {
+    fetchLog.mockResolvedValue({
+      file_id: 1,
+      relative_path: "",
+      retention_days: 0,
+      entries: [],
+    });
+    renderPage("/history?file=1");
+
+    expect(
+      await screen.findByTestId("history-retention-note"),
+    ).toHaveTextContent("Weir keeps this history until you remove it.");
   });
 
   it("counts every file under the chip it belongs to", () => {
@@ -368,13 +420,40 @@ describe("HistoryPage", () => {
     renderPage("/history?file=2");
     const detail = screen.getByTestId("history-detail");
     expect(
-      within(detail).getByText("This attempt failed."),
+      within(detail).getByText("Weir gave up on this file."),
     ).toBeInTheDocument();
     fireEvent.click(within(detail).getByRole("button", { name: "Try again" }));
     expect(
       await within(detail).findByText("Queued again."),
     ).toBeInTheDocument();
     expect(requeue).toHaveBeenCalledWith(2);
+  });
+
+  it("says Weir will try a failed file again when a retry is owed, and that it gave up when none is", async () => {
+    fetchLog.mockResolvedValue({
+      file_id: 2,
+      relative_path: "",
+      retention_days: 90,
+      entries: [],
+    });
+    files.files = [
+      file({
+        id: 2,
+        status: "processing_failed",
+        status_reason: "The download ended early.",
+        failure_attempts: 1,
+        next_retry_at: "2026-08-19T04:05:00",
+      }),
+    ];
+    renderPage("/history?file=2");
+
+    const detail = screen.getByTestId("history-detail");
+    expect(
+      within(detail).getByText("This attempt failed, and Weir will try again."),
+    ).toBeInTheDocument();
+    expect(
+      within(detail).queryByText("Weir gave up on this file."),
+    ).not.toBeInTheDocument();
   });
 
   it("asks before passing a file through unchanged, and does nothing when told not now", async () => {

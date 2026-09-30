@@ -6,6 +6,7 @@ using Weir.Core.Media;
 using Weir.Core.MediaManagers;
 using Weir.Core.Processing;
 using Weir.Infrastructure.Activity;
+using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.MediaManagers;
 using Weir.Infrastructure.Sqlite;
 
@@ -27,6 +28,7 @@ public sealed class ProcessingPassThroughHandler : IJobHandler
     private readonly ILogger<ProcessingPassThroughHandler> _logger;
     private readonly HandbackStore _handback;
     private readonly LibraryStore _libraries;
+    private readonly ProcessingJobStore _jobs;
     private readonly HandoffCompletionReporter? _reporter;
     private readonly IOutputOwnership? _ownership;
 
@@ -36,6 +38,7 @@ public sealed class ProcessingPassThroughHandler : IJobHandler
         ILogger<ProcessingPassThroughHandler> logger,
         HandbackStore handback,
         LibraryStore libraries,
+        ProcessingJobStore jobs,
         HandoffCompletionReporter? reporter = null,
         IOutputOwnership? ownership = null)
     {
@@ -44,6 +47,7 @@ public sealed class ProcessingPassThroughHandler : IJobHandler
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _handback = handback ?? throw new ArgumentNullException(nameof(handback));
         _libraries = libraries ?? throw new ArgumentNullException(nameof(libraries));
+        _jobs = jobs ?? throw new ArgumentNullException(nameof(jobs));
         _reporter = reporter;
         _ownership = ownership;
     }
@@ -72,7 +76,8 @@ public sealed class ProcessingPassThroughHandler : IJobHandler
                     throw new InvalidOperationException($"Workflow {libraryId} no longer exists, so there is nowhere to hand the file back to.");
                 }
 
-                return new PassThroughDeliverySettings(library.Id, library.WatchedFolder, library.OutputFolder, library.OutputCollisionPolicy);
+                return new PassThroughDeliverySettings(
+                    library.Id, library.WatchedFolder, library.OutputFolder, library.OutputCollisionPolicy, library.MinimumFreeDiskSpaceMb);
             },
             _logger,
             "pass-through claim",
@@ -113,6 +118,13 @@ public sealed class ProcessingPassThroughHandler : IJobHandler
             throw new AlreadyRecordedFailureException(exception.Message, exception);
         }
 
+        // A drive short of room holds the file rather than fail it: nothing was copied, and it is looked at again later.
+        if (result.WaitingForSpace is not null)
+        {
+            await HoldForSpaceAsync(context, payload, delivery, relativePath, result, cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
         // 3. Brief bookkeeping.
         var now = _time.GetUtcNow();
         await LockedWrites.RunAsync(
@@ -145,6 +157,36 @@ public sealed class ProcessingPassThroughHandler : IJobHandler
 
             _logger.LogInformation("Pass-through hand-off report: {Status}", status);
         }
+    }
+
+    /// <summary>
+    /// Puts the file on hold with the reason and books this same hand-back for later, so it is never recorded as handed back
+    /// while the copy has not been made. The hold ends when the next look is due.
+    /// </summary>
+    private async Task HoldForSpaceAsync(
+        JobWorkContext context, WireObject payload, PassThroughDeliverySettings delivery, string relativePath, PassThroughDeliveryResult result, CancellationToken cancellationToken)
+    {
+        var looks = payload.Get("disk_space_looks") is WireInteger counted ? (long)counted.Value : 0;
+        var lookAgainAt = _time.GetUtcNow() + DiskSpaceWaits.LookAfter(looks);
+        await LockedWrites.RunAsync(
+            _database,
+            async uow =>
+            {
+                if (await RemuxPassFileState.MarkFileStatusAsync(uow, delivery.LibraryId, relativePath, ProcessingFileStatuses.OnHold, result.Sentence, _time.GetUtcNow()).ConfigureAwait(false))
+                {
+                    await RemuxPassFileState.HoldUntilAsync(uow, delivery.LibraryId, relativePath, lookAgainAt).ConfigureAwait(false);
+                }
+            },
+            _logger,
+            "pass-through space hold",
+            cancellationToken).ConfigureAwait(false);
+        await _jobs.EnqueueOrGetAsync(
+            $"{IntakeRules.PassThroughJobKind}:disk-space-wait:{context.Id}",
+            IntakeRules.PassThroughJobKind,
+            WireJsonWriter.Dumps(payload.Copy().Set("disk_space_looks", looks + 1), WireJsonFormat.Compact),
+            notBefore: lookAgainAt,
+            cancellationToken: cancellationToken).ConfigureAwait(false);
+        _logger.LogInformation("Pass-through of {Path} is waiting for room on the output drive.", relativePath);
     }
 
     /// <summary>The short bookkeeping transaction after a delivery.</summary>

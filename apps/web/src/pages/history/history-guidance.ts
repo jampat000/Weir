@@ -18,7 +18,7 @@ const BY_STATUS: Partial<Record<ProcessingFile["status"], Guidance>> = {
     next: "Start it now or move it to the front of the queue.",
   },
   processing_failed: {
-    title: "This attempt failed.",
+    title: "Weir gave up on this file.",
     next: "Fix the reason and use Try again, or use Pass through unchanged when this is an intentional edge case you want delivered without your rules.",
   },
   skipped: {
@@ -47,6 +47,12 @@ const BY_STATUS: Partial<Record<ProcessingFile["status"], Guidance>> = {
   },
 };
 
+/** A failed file with a retry still owed: Weir looks again by itself once the wait is over. */
+const RETRY_OWED: Guidance = {
+  title: "This attempt failed, and Weir will try again.",
+  next: "It looks again shortly after the wait ends. Use Try again to run it now.",
+};
+
 /** What a person can do about a file, in the words of the buttons beside it. */
 export function fileGuidance(
   file: ProcessingFile,
@@ -62,6 +68,9 @@ export function fileGuidance(
           title: "Refresh this file's status.",
           next: "Use Check again. Weir will apply the current schedule, readiness, size, and path rules without deleting the original file.",
         };
+  }
+  if (file.status === "processing_failed" && file.next_retry_at) {
+    return RETRY_OWED;
   }
   return BY_STATUS[file.status] ?? NO_GUIDANCE;
 }

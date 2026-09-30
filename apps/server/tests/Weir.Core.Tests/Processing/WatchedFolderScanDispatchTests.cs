@@ -11,7 +11,7 @@ public sealed class WatchedFolderScanDispatchTests
         bool enabled = true,
         string mediaType = ProcessingMediaScopes.Movie,
         bool scheduleEnabled = true,
-        long holdMinutes = 0) =>
+        long readyAfterSeconds = 0) =>
         new()
         {
             Id = 1,
@@ -19,7 +19,7 @@ public sealed class WatchedFolderScanDispatchTests
             MediaType = mediaType,
             Enabled = enabled,
             ScheduleEnabled = scheduleEnabled,
-            HoldMinutes = holdMinutes,
+            ReadyAfterSeconds = readyAfterSeconds,
         };
 
     // --- #533: the gate the scheduler actually consults -----------------------------------------------
@@ -98,7 +98,7 @@ public sealed class WatchedFolderScanDispatchTests
     public void A_first_observation_is_always_settling()
     {
         var now = DateTimeOffset.UtcNow;
-        var result = FileSettling.ObserveSizeSettling(Library(), null, null, 100, now);
+        var result = FileSettling.ObserveSizeSettling(Library(readyAfterSeconds: 30), null, null, 100, now);
         Assert.True(result.IsSettling);
     }
 
@@ -106,15 +106,15 @@ public sealed class WatchedFolderScanDispatchTests
     public void A_size_that_changed_since_the_last_scan_is_settling()
     {
         var now = DateTimeOffset.UtcNow;
-        var result = FileSettling.ObserveSizeSettling(Library(), previousSizeBytes: 50, previousSizeChangedAt: now.AddSeconds(-5), currentSizeBytes: 100, now);
+        var result = FileSettling.ObserveSizeSettling(Library(readyAfterSeconds: 30), previousSizeBytes: 50, previousSizeChangedAt: now.AddSeconds(-5), currentSizeBytes: 100, now);
         Assert.True(result.IsSettling);
     }
 
     [Fact]
-    public void A_size_unchanged_past_the_interval_is_stable()
+    public void A_size_unchanged_for_the_workflows_wait_is_stable()
     {
         var now = DateTimeOffset.UtcNow;
-        var result = FileSettling.ObserveSizeSettling(Library(), previousSizeBytes: 100, previousSizeChangedAt: now.AddSeconds(-31), currentSizeBytes: 100, now);
+        var result = FileSettling.ObserveSizeSettling(Library(readyAfterSeconds: 30), previousSizeBytes: 100, previousSizeChangedAt: now.AddSeconds(-31), currentSizeBytes: 100, now);
         Assert.False(result.IsSettling);
     }
 
@@ -122,7 +122,7 @@ public sealed class WatchedFolderScanDispatchTests
     public void Ignoring_size_changes_never_settles()
     {
         var now = DateTimeOffset.UtcNow;
-        var result = FileSettling.ObserveSizeSettling(Library() with { IgnoreSizeChanges = true }, null, null, 100, now);
+        var result = FileSettling.ObserveSizeSettling(Library(readyAfterSeconds: 30) with { IgnoreSizeChanges = true }, null, null, 100, now);
         Assert.False(result.IsSettling);
     }
 
@@ -134,7 +134,7 @@ public sealed class WatchedFolderScanDispatchTests
         var verdict = FileStateDecision.DecideFileState(
             Library(enabled: false), inScheduleWindow: false, fileAgeSeconds: 0, pausedReason: "paused", pausedUntil: null,
             windowReopensAt: null, sizeIsSettling: true, settlingReason: null, settlingStableAt: null, accessProblem: "locked",
-            blockedByConnection: "Radarr", minimumAgeSeconds: 0, now: DateTimeOffset.UtcNow);
+            blockedByConnection: "Radarr", now: DateTimeOffset.UtcNow);
         Assert.Equal(ProcessingFileStatuses.Disabled, verdict.Status);
     }
 
@@ -145,7 +145,7 @@ public sealed class WatchedFolderScanDispatchTests
         var verdict = FileStateDecision.DecideFileState(
             Library(), inScheduleWindow: true, fileAgeSeconds: 1000, pausedReason: "Processing is paused.", pausedUntil: now.AddHours(1),
             windowReopensAt: null, sizeIsSettling: false, settlingReason: null, settlingStableAt: null, accessProblem: null,
-            blockedByConnection: null, minimumAgeSeconds: 0, now: now);
+            blockedByConnection: null, now: now);
         Assert.Equal(ProcessingFileStatuses.OutOfSchedule, verdict.Status);
         Assert.Equal("Processing is paused.", verdict.Reason);
     }
@@ -156,7 +156,7 @@ public sealed class WatchedFolderScanDispatchTests
         var verdict = FileStateDecision.DecideFileState(
             Library(scheduleEnabled: true), inScheduleWindow: false, fileAgeSeconds: 1000, pausedReason: null, pausedUntil: null,
             windowReopensAt: null, sizeIsSettling: false, settlingReason: null, settlingStableAt: null, accessProblem: null,
-            blockedByConnection: null, minimumAgeSeconds: 0, now: DateTimeOffset.UtcNow);
+            blockedByConnection: null, now: DateTimeOffset.UtcNow);
         Assert.Equal(ProcessingFileStatuses.OutOfSchedule, verdict.Status);
     }
 
@@ -166,19 +166,47 @@ public sealed class WatchedFolderScanDispatchTests
         var verdict = FileStateDecision.DecideFileState(
             Library(), inScheduleWindow: true, fileAgeSeconds: 1000, pausedReason: null, pausedUntil: null,
             windowReopensAt: null, sizeIsSettling: true, settlingReason: "still growing", settlingStableAt: null, accessProblem: "locked",
-            blockedByConnection: null, minimumAgeSeconds: 0, now: DateTimeOffset.UtcNow);
+            blockedByConnection: null, now: DateTimeOffset.UtcNow);
         Assert.Equal(ProcessingFileStatuses.OnHold, verdict.Status);
         Assert.Equal("still growing", verdict.Reason);
     }
 
     [Fact]
-    public void A_file_younger_than_the_minimum_age_is_on_hold()
+    public void A_file_that_changed_more_recently_than_the_workflow_waits_is_on_hold()
     {
         var verdict = FileStateDecision.DecideFileState(
-            Library(), inScheduleWindow: true, fileAgeSeconds: 5, pausedReason: null, pausedUntil: null,
+            Library(readyAfterSeconds: 60), inScheduleWindow: true, fileAgeSeconds: 5, pausedReason: null, pausedUntil: null,
             windowReopensAt: null, sizeIsSettling: false, settlingReason: null, settlingStableAt: null, accessProblem: null,
-            blockedByConnection: null, minimumAgeSeconds: 60, now: DateTimeOffset.UtcNow);
+            blockedByConnection: null, now: DateTimeOffset.UtcNow);
         Assert.Equal(ProcessingFileStatuses.OnHold, verdict.Status);
+    }
+
+    [Fact]
+    public void A_file_on_hold_for_its_last_change_is_due_when_the_workflows_wait_ends()
+    {
+        var now = new DateTimeOffset(2026, 9, 30, 12, 0, 0, TimeSpan.Zero);
+
+        var verdict = FileStateDecision.DecideFileState(
+            Library(readyAfterSeconds: 60), inScheduleWindow: true, fileAgeSeconds: 20, pausedReason: null, pausedUntil: null,
+            windowReopensAt: null, sizeIsSettling: false, settlingReason: null, settlingStableAt: null, accessProblem: null,
+            blockedByConnection: null, now: now);
+
+        Assert.Equal(now.AddSeconds(40), verdict.HoldUntil);
+        Assert.Contains("waits 60s", verdict.Reason, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(60, 60.0)]
+    [InlineData(60, 3600.0)]
+    [InlineData(0, 0.0)]
+    public void A_file_left_alone_for_the_workflows_wait_is_ready(long readyAfterSeconds, double fileAgeSeconds)
+    {
+        var verdict = FileStateDecision.DecideFileState(
+            Library(readyAfterSeconds: readyAfterSeconds), inScheduleWindow: true, fileAgeSeconds: fileAgeSeconds, pausedReason: null,
+            pausedUntil: null, windowReopensAt: null, sizeIsSettling: false, settlingReason: null, settlingStableAt: null,
+            accessProblem: null, blockedByConnection: null, now: DateTimeOffset.UtcNow);
+
+        Assert.True(verdict.Eligible);
     }
 
     [Fact]
@@ -187,7 +215,7 @@ public sealed class WatchedFolderScanDispatchTests
         var verdict = FileStateDecision.DecideFileState(
             Library(), inScheduleWindow: true, fileAgeSeconds: 1000, pausedReason: null, pausedUntil: null,
             windowReopensAt: null, sizeIsSettling: false, settlingReason: null, settlingStableAt: null, accessProblem: "still locked",
-            blockedByConnection: null, minimumAgeSeconds: 0, now: DateTimeOffset.UtcNow);
+            blockedByConnection: null, now: DateTimeOffset.UtcNow);
         Assert.Equal(ProcessingFileStatuses.OnHold, verdict.Status);
         Assert.Equal("still locked", verdict.Reason);
     }
@@ -198,7 +226,7 @@ public sealed class WatchedFolderScanDispatchTests
         var verdict = FileStateDecision.DecideFileState(
             Library(), inScheduleWindow: true, fileAgeSeconds: 1000, pausedReason: null, pausedUntil: null,
             windowReopensAt: null, sizeIsSettling: false, settlingReason: null, settlingStableAt: null, accessProblem: null,
-            blockedByConnection: "Radarr", minimumAgeSeconds: 0, now: DateTimeOffset.UtcNow);
+            blockedByConnection: "Radarr", now: DateTimeOffset.UtcNow);
         Assert.Equal(ProcessingFileStatuses.BlockedUpstream, verdict.Status);
         Assert.Equal("Radarr", verdict.BlockedByConnection);
     }
@@ -209,7 +237,7 @@ public sealed class WatchedFolderScanDispatchTests
         var verdict = FileStateDecision.DecideFileState(
             Library(), inScheduleWindow: true, fileAgeSeconds: 1000, pausedReason: null, pausedUntil: null,
             windowReopensAt: null, sizeIsSettling: false, settlingReason: null, settlingStableAt: null, accessProblem: null,
-            blockedByConnection: null, minimumAgeSeconds: 0, now: DateTimeOffset.UtcNow);
+            blockedByConnection: null, now: DateTimeOffset.UtcNow);
         Assert.Equal(ProcessingFileStatuses.Unprocessed, verdict.Status);
         Assert.True(verdict.Eligible);
     }
@@ -230,26 +258,28 @@ public sealed class WatchedFolderScanDispatchTests
         Assert.Equal("skipped_below_minimum_file_size", rejection!.Counter);
     }
 
-    [Theory]
-    [InlineData(true, true)]
-    [InlineData(false, false)]
-    public void A_file_below_the_minimum_size_may_be_removed_only_when_the_workflow_holds_that_minimum(bool setByWorkflow, bool mayRemove)
+    [Fact]
+    public void The_admission_rules_take_the_minimum_size_from_the_workflow()
     {
-        var rules = NoRules with { MinFileSizeMb = 100, MinFileSizeSetByWorkflow = setByWorkflow };
+        var rules = LibraryAdmissionRules.For(new ProcessingLibraryRecord { Name = "Movies", MinFileSizeMb = 200 });
 
-        var rejection = LibraryAdmission.Rejection("a.mkv", "a.mkv", new CandidateFileFacts(10 * 1024 * 1024, null, null), rules);
-
-        Assert.Equal(mayRemove, rejection!.MayRemoveFile);
+        Assert.Equal(200, rules.MinFileSizeMb);
     }
 
     [Fact]
-    public void A_file_refused_by_a_rule_the_workflow_holds_may_be_removed()
+    public void A_new_workflow_takes_files_of_fifty_megabytes_and_up()
     {
-        var rules = NoRules with { ExcludePatterns = ["*sample*"] };
+        var rules = LibraryAdmissionRules.For(new ProcessingLibraryRecord { Name = "Movies" });
 
-        var rejection = LibraryAdmission.Rejection("a.sample.mkv", "a.sample.mkv", new CandidateFileFacts(1024, null, null), rules);
+        Assert.Equal(50, rules.MinFileSizeMb);
+    }
 
-        Assert.True(rejection!.MayRemoveFile);
+    [Fact]
+    public void A_minimum_size_of_zero_takes_any_size()
+    {
+        var rules = LibraryAdmissionRules.For(new ProcessingLibraryRecord { Name = "Movies", MinFileSizeMb = 0 });
+
+        Assert.Null(LibraryAdmission.Rejection("a.mkv", "a.mkv", new CandidateFileFacts(1, null, null), rules));
     }
 
     [Fact]

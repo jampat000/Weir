@@ -15,6 +15,8 @@ export type ProcessingRulesPreviewRequest = {
   /** Exactly one of these two must be given. */
   relativePath?: string;
   absolutePath?: string;
+  /** A saved profile to preview with instead of the workflow's. */
+  ruleSetId?: number;
   /** Unsaved rule edits to try; omit to preview the library's saved rule set. */
   rules?: ProcessingRuleSetWrite;
 };
@@ -24,6 +26,7 @@ export async function previewProcessingRules({
   libraryId,
   relativePath,
   absolutePath,
+  ruleSetId,
   rules,
 }: ProcessingRulesPreviewRequest): Promise<ProcessingRulesPreviewResult> {
   const path = `/api/v1/processing/libraries/${libraryId}/preview`;
@@ -33,6 +36,7 @@ export async function previewProcessingRules({
     {
       ...(relativePath ? { relative_path: relativePath } : {}),
       ...(absolutePath ? { absolute_path: absolutePath } : {}),
+      ...(ruleSetId ? { rule_set_id: ruleSetId } : {}),
       ...(rules ? { rules } : {}),
     },
     "Could not preview these rules on that file",

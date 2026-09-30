@@ -114,7 +114,7 @@ public static class ManualPlanSupport
             RemuxPassOutcomes.JobKind,
             WireJsonWriter.Dumps(payload, WireJsonFormat.Compact),
             JobQueueRules.DefaultMaxAttempts,
-            0,
-            0);
+            runnerCost: null,
+            priority: 0);
     }
 }

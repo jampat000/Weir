@@ -26,13 +26,12 @@ public sealed record ProcessingLibraryInput
     public string IncludePatternsCsv { get; init; } = string.Empty;
     public string ExcludePatternsCsv { get; init; } = string.Empty;
 
-    /// <summary>Null follows Settings › Performance; see <see cref="ProcessingLibraryRecord.MinFileSizeMb"/>.</summary>
-    public long? MinFileSizeMb { get; init; }
+    public long MinFileSizeMb { get; init; } = LibraryIntake.DefaultMinFileSizeMb;
     public long MaxFileSizeMb { get; init; }
     public string RejectedFileAction { get; init; } = "leave";
 
-    /// <summary>Null follows Settings › Performance; see <see cref="ProcessingLibraryRecord.MinFileAgeSeconds"/>.</summary>
-    public long? MinFileAgeSeconds { get; init; }
+    /// <summary>See <see cref="ProcessingLibraryRecord.ReadyAfterSeconds"/>.</summary>
+    public long ReadyAfterSeconds { get; init; } = LibraryIntake.DefaultReadyAfterSeconds;
     public Time.Timestamp? CreatedAfter { get; init; }
     public Time.Timestamp? CreatedBefore { get; init; }
     public Time.Timestamp? ModifiedAfter { get; init; }
@@ -42,15 +41,9 @@ public sealed record ProcessingLibraryInput
     public string SidecarPatternsCsv { get; init; } = ".srt,.ass,.ssa,.sub,.idx,.vtt,.nfo,.jpg,.png";
     public bool PreserveOriginalTimestamps { get; init; }
     public string OutputCollisionPolicy { get; init; } = "replace";
-    public string HardwareDecodeMode { get; init; } = "off";
-    public string HardwareDevice { get; init; } = string.Empty;
-    public string HardwareDisabledVendorsCsv { get; init; } = string.Empty;
     public string FfmpegStrictness { get; init; } = "normal";
     public string RemuxWriter { get; init; } = RemuxWriterChoice.Best;
-    public bool RewriteWithFfmpeg { get; init; } = true;
     public long ScanIntervalSeconds { get; init; } = 300;
-    public long HoldMinutes { get; init; }
-    public long FileDetectionIntervalSeconds { get; init; } = 30;
     public bool IgnoreSizeChanges { get; init; }
     public bool SkipAccessTests { get; init; }
     public long MaxAttempts { get; init; } = 3;
@@ -72,6 +65,9 @@ public sealed record ProcessingLibraryInput
 
     /// <summary><c>remove_original_after_success</c>; see <see cref="ProcessingLibraryRecord.RemoveOriginalAfterSuccess"/>.</summary>
     public bool RemoveOriginalAfterSuccess { get; init; } = true;
+
+    /// <summary>Megabytes to keep free on the drive this workflow writes to; see <see cref="ProcessingLibraryRecord.MinimumFreeDiskSpaceMb"/>.</summary>
+    public long MinimumFreeDiskSpaceMb { get; init; } = ProcessingLibraryRecord.DefaultMinimumFreeDiskSpaceMb;
 }
 
 /// <summary>One other library's folders, for the overlap check.</summary>
@@ -122,7 +118,6 @@ public static partial class LibraryRules
     {
         RequireOneOf("rejected file action", body.RejectedFileAction, RejectedFileActions.All);
         RequireOneOf("output collision policy", body.OutputCollisionPolicy, OutputCollisionPolicies.All);
-        RequireOneOf("hardware decode mode", body.HardwareDecodeMode, HardwareDecodeModes.All);
         RequireOneOf("ffmpeg strictness level", body.FfmpegStrictness, FfmpegStrictnessLevels.All);
         RequireOneOf("remux writer", body.RemuxWriter, RemuxWriterChoice.All);
         RequireOneOf("failure policy", body.FailurePolicy, ProcessingFailurePolicies.All);
@@ -133,6 +128,21 @@ public static partial class LibraryRules
         if (!allowed.Contains(value, StringComparer.Ordinal))
         {
             throw new ProcessingLibraryException($"'{value}' is not a valid {label}. Use one of: {string.Join(", ", allowed)}.");
+        }
+    }
+
+    /// <summary>
+    /// A workflow's own limit is a share of Settings › Performance's "Files at once", so it cannot ask for more than that total.
+    /// Zero, the workflow following the total, always passes.
+    /// </summary>
+    public static void ValidateMaxConcurrentFiles(long requested, long filesAtOnce)
+    {
+        var total = OperatorSettingsRules.ClampMaxConcurrentFiles(filesAtOnce);
+        if (requested > total)
+        {
+            throw new ProcessingLibraryException(
+                $"The most files this workflow runs at once cannot be more than the {total} Weir runs in total. " +
+                "Choose a lower number, or raise Files at once in Settings › Performance first.");
         }
     }
 
@@ -196,7 +206,7 @@ public static partial class LibraryRules
             MinFileSizeMb = body.MinFileSizeMb,
             MaxFileSizeMb = body.MaxFileSizeMb,
             RejectedFileAction = body.RejectedFileAction,
-            MinFileAgeSeconds = body.MinFileAgeSeconds,
+            ReadyAfterSeconds = body.ReadyAfterSeconds,
             CreatedAfter = body.CreatedAfter,
             CreatedBefore = body.CreatedBefore,
             ModifiedAfter = body.ModifiedAfter,
@@ -204,15 +214,11 @@ public static partial class LibraryRules
             ExcludeHidden = body.ExcludeHidden,
             TopLevelOnly = body.TopLevelOnly,
             ScanIntervalSeconds = body.ScanIntervalSeconds,
-            HoldMinutes = body.HoldMinutes,
             SidecarPatternsCsv = body.SidecarPatternsCsv,
             PreserveOriginalTimestamps = body.PreserveOriginalTimestamps,
             OutputCollisionPolicy = body.OutputCollisionPolicy,
-            HardwareDecodeMode = body.HardwareDecodeMode,
-            HardwareDevice = body.HardwareDevice,
-            HardwareDisabledVendorsCsv = body.HardwareDisabledVendorsCsv,
             FfmpegStrictness = body.FfmpegStrictness,
-            FileDetectionIntervalSeconds = body.FileDetectionIntervalSeconds,
+            RemuxWriter = body.RemuxWriter,
             IgnoreSizeChanges = body.IgnoreSizeChanges,
             SkipAccessTests = body.SkipAccessTests,
             FileSystemEventsEnabled = body.FileSystemEventsEnabled,
@@ -231,6 +237,7 @@ public static partial class LibraryRules
             ScheduleGrid = grid,
             RuleSetId = ValidateRuleSet(body.RuleSetId, ruleSetExists),
             RemoveOriginalAfterSuccess = body.RemoveOriginalAfterSuccess,
+            MinimumFreeDiskSpaceMb = body.MinimumFreeDiskSpaceMb,
         };
     }
 

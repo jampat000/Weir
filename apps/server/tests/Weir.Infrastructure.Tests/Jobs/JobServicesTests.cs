@@ -203,13 +203,10 @@ public sealed class JobServicesTests : IDisposable
     {
         var sweep = new WorkTempStaleSweepEnqueuer(_db.Store, "movie", TimeSpan.FromMinutes(1), killSwitch: false);
         var killed = new WorkTempStaleSweepEnqueuer(_db.Store, "movie", TimeSpan.FromMinutes(1), killSwitch: true);
-        var cleanup = new FailureCleanupSweepEnqueuer(_db.Store, "movie", TimeSpan.FromMinutes(1), killSwitch: false);
 
         Assert.True(await sweep.IsEnabledAsync(CancellationToken.None));
         Assert.False(await killed.IsEnabledAsync(CancellationToken.None));
-        Assert.False(await cleanup.IsEnabledAsync(CancellationToken.None));
-        _db.Execute("UPDATE operator_settings SET failure_cleanup_enabled = 1, work_temp_stale_sweep_enabled = 0");
-        Assert.True(await cleanup.IsEnabledAsync(CancellationToken.None));
+        _db.Execute("UPDATE operator_settings SET work_temp_stale_sweep_enabled = 0");
         Assert.False(await sweep.IsEnabledAsync(CancellationToken.None));
     }
 
@@ -269,34 +266,11 @@ public sealed class JobServicesTests : IDisposable
     public async Task A_saved_interval_replaces_the_environments()
     {
         var sweep = new WorkTempStaleSweepEnqueuer(_db.Store, "movie", TimeSpan.FromHours(1), killSwitch: false);
-        var cleanup = new FailureCleanupSweepEnqueuer(_db.Store, "tv", TimeSpan.FromHours(1), killSwitch: false);
         Assert.Equal(TimeSpan.FromHours(1), await sweep.IntervalAsync(CancellationToken.None));
 
-        _db.Execute("UPDATE operator_settings SET work_temp_stale_sweep_interval_seconds = 900, failure_cleanup_interval_seconds = 86400");
+        _db.Execute("UPDATE operator_settings SET work_temp_stale_sweep_interval_seconds = 900");
 
         Assert.Equal(TimeSpan.FromMinutes(15), await sweep.IntervalAsync(CancellationToken.None));
-        Assert.Equal(TimeSpan.FromDays(1), await cleanup.IntervalAsync(CancellationToken.None));
-    }
-
-    [Fact]
-    public async Task A_failure_cleanup_sweep_still_queued_is_not_duplicated_and_says_so()
-    {
-        var enqueuer = new FailureCleanupSweepEnqueuer(_db.Store, "tv", TimeSpan.FromMinutes(1), killSwitch: false);
-
-        await enqueuer.EnqueueOnceAsync(CancellationToken.None);
-        await enqueuer.EnqueueOnceAsync(CancellationToken.None);
-
-        var job = Assert.Single(await _db.Store.ListAsync());
-        Assert.Equal(PeriodicJobKinds.TvFailureCleanupSweep, job.JobKind);
-        Assert.Matches("^processing\\.tv_failure_cleanup_sweep:v1:[0-9a-f]{32}$", job.DedupeKey);
-        Assert.Equal("{\"media_scope\":\"tv\",\"trigger\":\"scheduled\"}", job.PayloadJson);
-        var entry = Assert.Single(_db.ActivityEvents());
-        Assert.Equal(ActivityEventTypes.ProcessingFailureCleanupSweepCompleted, entry.EventType);
-        Assert.Equal("Cleanup skipped for TV", entry.Title);
-        Assert.Equal(
-            $"{{\"media_scope\":\"tv\",\"cleanup_run_status\":\"skipped\",\"reason\":\"Previous cleanup job is still queued or running.\",\"existing_job_id\":{job.Id},\"result\":\"skipped\",\"trigger\":\"scheduled\"}}",
-            entry.Detail);
-        Assert.Equal("skipped", entry.Result);
     }
 
     /// <summary>A periodic enqueuer's failed tick is retried after <see cref="PeriodicSchedule.FailureCooldown"/>.</summary>

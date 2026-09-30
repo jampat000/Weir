@@ -9,7 +9,6 @@ import { afterEach, expect, it, vi } from "vitest";
 
 import * as api from "../../../../lib/processing/libraries-api";
 import * as managersApi from "../../../../lib/processing/library-managers-api";
-import * as modeApi from "../../../../lib/processing/library-mode-api";
 import { LibrariesTab } from "./libraries-tab";
 import { asOperator, library, wrapper } from "./library-test-fixtures";
 
@@ -78,47 +77,41 @@ it("closes an unchanged editor without asking", async () => {
   ).not.toBeInTheDocument();
 });
 
-it("undoes an added existing-files folder when the editor is left without saving", async () => {
+it("leaves the files a library already holds to the Library page", async () => {
   asOperator();
-  vi.spyOn(api, "fetchProcessingLibraries").mockResolvedValue([library()]);
-  vi.spyOn(modeApi, "fetchLibrarySettings").mockResolvedValue({
-    library_folders: [],
-    library_schedule_enabled: false,
-    clean_hardlinked_files: false,
-    skip_if_manager_would_redownload: true,
-    keep_original_after_clean: false,
-    originals_folder: "",
-  });
-  const saveFolders = vi.spyOn(modeApi, "saveLibrarySettings");
+  vi.spyOn(api, "fetchProcessingLibraries").mockResolvedValue([
+    library({ id: 7 }),
+  ]);
 
   render(<LibrariesTab />, { wrapper });
   fireEvent.click(await screen.findByRole("button", { name: "Edit" }));
-  fireEvent.change(await screen.findByLabelText("Folder to add"), {
-    target: { value: "/media/movies" },
-  });
-  fireEvent.click(screen.getByRole("button", { name: "Add folder" }));
-  fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
-  fireEvent.click(screen.getByTestId("settings-unsaved-changes-confirm"));
 
+  const form = await screen.findByTestId("processing-library-form");
+  expect(within(form).queryByText("Files already in your library")).toBeNull();
+  expect(within(form).queryByLabelText("Folder to add")).toBeNull();
   expect(
-    screen.queryByTestId("processing-library-form"),
-  ).not.toBeInTheDocument();
-  expect(saveFolders).not.toHaveBeenCalled();
+    within(form).getByRole("link", { name: "Library page" }),
+  ).toHaveAttribute("href", "/library?library=7");
 });
 
-it("labels hardware decoding as not available, since Weir never decodes the video", async () => {
+it("keeps FFmpeg compatibility folded away and offers no hardware decoding", async () => {
   asOperator();
   vi.spyOn(api, "fetchProcessingLibraries").mockResolvedValue([library()]);
 
   render(<LibrariesTab />, { wrapper });
   fireEvent.click(await screen.findByRole("button", { name: "Edit" }));
 
-  expect(screen.getByTestId("library-hardware-unavailable")).toHaveTextContent(
-    "Not available in this version",
-  );
   expect(
-    screen.getByRole("combobox", { name: "Hardware decoding" }),
-  ).toBeDisabled();
+    screen.getByText("FFmpeg compatibility (advanced)"),
+  ).toBeInTheDocument();
+  expect(
+    screen.getByRole("combobox", { name: "FFmpeg compatibility" }),
+  ).toBeEnabled();
+  expect(
+    screen.getByRole("combobox", { name: "Writes files with" }),
+  ).toBeEnabled();
+  expect(screen.queryByText(/Hardware decoding/)).not.toBeInTheDocument();
+  expect(screen.queryByText("Hardware method")).not.toBeInTheDocument();
 });
 
 it("adds a library through the API", async () => {
@@ -143,7 +136,7 @@ it("adds a library through the API", async () => {
   });
 });
 
-it("starts a new library on the same files-at-once as Performance, and lets it be held lower (#633)", async () => {
+it("starts a new workflow with no limit of its own, and lets it be held to a share of the total (#633)", async () => {
   asOperator();
   vi.spyOn(api, "fetchProcessingLibraries").mockResolvedValue([library()]);
   const create = vi
@@ -156,10 +149,10 @@ it("starts a new library on the same files-at-once as Performance, and lets it b
   fireEvent.change(screen.getByPlaceholderText("Movies 4K"), {
     target: { value: "Kids" },
   });
-  const filesAtOnce = screen.getByRole("combobox", { name: /Files at once/ });
-  expect(filesAtOnce).toHaveValue("0");
-  expect(filesAtOnce).toHaveTextContent("Same as Performance");
-  expect(filesAtOnce).toHaveTextContent("At most 10 files");
+  const filesAtOnce = screen.getByRole("textbox", {
+    name: /Most files at once from this workflow/,
+  });
+  expect(filesAtOnce).toHaveValue("");
 
   fireEvent.change(filesAtOnce, { target: { value: "2" } });
   fireEvent.click(screen.getByTestId("processing-library-save"));
@@ -185,9 +178,6 @@ it("saves the complete library contract without resetting hidden or advanced val
     sidecar_patterns_csv: ".srt,.nfo,.jpg",
     preserve_original_timestamps: true,
     output_collision_policy: "keep_both",
-    hardware_decode_mode: "device",
-    hardware_device: "qsv",
-    hardware_disabled_vendors_csv: "nvidia",
     ffmpeg_strictness: "strict",
     max_attempts: 7,
     retry_backoff_seconds: 120,
@@ -225,9 +215,6 @@ it("saves the complete library contract without resetting hidden or advanced val
         sidecar_patterns_csv: ".srt,.nfo,.jpg",
         preserve_original_timestamps: true,
         output_collision_policy: "keep_both",
-        hardware_decode_mode: "device",
-        hardware_device: "qsv",
-        hardware_disabled_vendors_csv: "nvidia",
         ffmpeg_strictness: "strict",
         max_attempts: 7,
         retry_backoff_seconds: 120,
@@ -322,7 +309,7 @@ it("keeps the original download when told to, saves it, and asks the check about
   render(<LibrariesTab />, { wrapper });
   fireEvent.click(await screen.findByRole("button", { name: "Edit" }));
   const toggle = screen.getByRole("checkbox", {
-    name: /After cleaning, remove the original download/,
+    name: /New downloads: after cleaning, delete the original download/,
   });
   expect(toggle).toBeChecked();
   expect(

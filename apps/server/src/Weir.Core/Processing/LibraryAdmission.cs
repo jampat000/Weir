@@ -18,17 +18,13 @@ public sealed record LibraryAdmissionRules(
     bool ExcludeHidden,
     bool TopLevelOnly)
 {
-    /// <summary>Whether <see cref="MinFileSizeMb"/> is a value the workflow itself holds, as opposed to the Performance
-    /// setting it follows. Only a rule the workflow holds may go on to remove a file.</summary>
-    public bool MinFileSizeSetByWorkflow { get; init; }
-
     private static IReadOnlyList<string> CsvValues(string? csv) =>
         string.IsNullOrWhiteSpace(csv)
             ? []
             : [.. csv.Split(',').Select(v => v.Trim()).Where(v => v.Length > 0)];
 
-    /// <summary>Read the rules off a library row; the minimum size is the one <paramref name="limits"/> resolved for it.</summary>
-    public static LibraryAdmissionRules For(ProcessingLibraryRecord library, IntakeLimits limits)
+    /// <summary>Read the rules off a library row.</summary>
+    public static LibraryAdmissionRules For(ProcessingLibraryRecord library)
     {
         ArgumentNullException.ThrowIfNull(library);
         return new LibraryAdmissionRules(
@@ -36,7 +32,7 @@ public sealed record LibraryAdmissionRules(
             ExcludeMarkers: CsvValues(library.ExcludeMarkersCsv).Select(v => v.ToLowerInvariant()).ToHashSet(StringComparer.Ordinal),
             IncludePatterns: CsvValues(library.IncludePatternsCsv),
             ExcludePatterns: CsvValues(library.ExcludePatternsCsv),
-            MinFileSizeMb: limits.MinFileSizeMb,
+            MinFileSizeMb: Math.Max(0, library.MinFileSizeMb),
             MaxFileSizeMb: Math.Max(0, library.MaxFileSizeMb),
             RejectedFileAction: string.Equals((library.RejectedFileAction ?? string.Empty).Trim(), "delete_file", StringComparison.OrdinalIgnoreCase) ? "delete_file" : "leave",
             CreatedAfter: library.CreatedAfter?.AsUtc,
@@ -44,19 +40,14 @@ public sealed record LibraryAdmissionRules(
             ModifiedAfter: library.ModifiedAfter?.AsUtc,
             ModifiedBefore: library.ModifiedBefore?.AsUtc,
             ExcludeHidden: library.ExcludeHidden,
-            TopLevelOnly: library.TopLevelOnly)
-        {
-            MinFileSizeSetByWorkflow = library.MinFileSizeMb is not null,
-        };
+            TopLevelOnly: library.TopLevelOnly);
     }
 }
 
 /// <summary>A settled file the library rules refuse, and the counter it moves.</summary>
 /// <param name="Reason">The plain-language reason recorded for the file.</param>
 /// <param name="Counter">The summary counter this rejection moves.</param>
-/// <param name="MayRemoveFile">Whether a workflow set to delete rejected files may delete this file. False when the rule that
-/// refused it is not one the workflow holds itself.</param>
-public sealed record LibraryAdmissionRejection(string Reason, string Counter, bool MayRemoveFile = true);
+public sealed record LibraryAdmissionRejection(string Reason, string Counter);
 
 /// <summary>Facts about one candidate file needed by the admission rejection check, independent of how
 /// they were read from disk.</summary>
@@ -82,8 +73,7 @@ public static class LibraryAdmission
         {
             return new LibraryAdmissionRejection(
                 BelowMinimumSizeReason(sizeMb, rules.MinFileSizeMb),
-                "skipped_below_minimum_file_size",
-                MayRemoveFile: rules.MinFileSizeSetByWorkflow);
+                "skipped_below_minimum_file_size");
         }
 
         if (rules.MaxFileSizeMb > 0 && facts.SizeBytes > rules.MaxFileSizeMb * 1024 * 1024)

@@ -6,6 +6,7 @@
  * wants the technical detail, but it is never the first thing shown.
  */
 
+import { fileHistoryRetentionNote } from "../../lib/processing/file-history-retention";
 import { useAppDateFormatter } from "../../lib/ui/mm-format-date";
 import { DirectPlayLine } from "./direct-play-line";
 import { StoryPanelShell } from "./story-panel-shell";
@@ -55,12 +56,7 @@ export function FileStoryPanel({
 
   if (!open) return null;
 
-  const retention =
-    log && log.retention_days > 0
-      ? `Weir keeps these records for ${log.retention_days} days.`
-      : log
-        ? "Weir keeps these records until you remove them."
-        : null;
+  const retention = log ? fileHistoryRetentionNote(log.retention_days) : null;
 
   return (
     <StoryPanelShell
