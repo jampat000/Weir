@@ -3570,6 +3570,11 @@ export interface components {
       keep_original_after_clean: boolean;
       /** Library Folders */
       library_folders: string[];
+      /**
+       * Library Rule Set Id
+       * @description The rules profile that cleans this library's existing files. Null means the same profile as the workflow.
+       */
+      library_rule_set_id: number | null;
       /** Library Schedule Enabled */
       library_schedule_enabled: boolean;
       /**
@@ -3602,6 +3607,11 @@ export interface components {
       keep_original_after_clean?: boolean;
       /** Library Folders */
       library_folders: string[];
+      /**
+       * Library Rule Set Id
+       * @description Left out to keep the saved value. Null goes back to the workflow's profile. Changing the profile checks the library again in the background.
+       */
+      library_rule_set_id?: number | null;
       /**
        * Originals Folder
        * @description Left out to keep the saved value. Blank resets it to the default.
@@ -3684,8 +3694,7 @@ export interface components {
        * Family
        * @enum {string}
        */
-      family:
-        "work_temp_stale_sweep" | "failure_cleanup" | "unclaimed_handbacks";
+      family: "work_temp_stale_sweep" | "unclaimed_handbacks";
       /**
        * Window Days
        * @description Unclaimed hand-backs only: how many days a copy waits before the job may remove it.
@@ -3734,8 +3743,7 @@ export interface components {
        * Family
        * @enum {string}
        */
-      family:
-        "work_temp_stale_sweep" | "failure_cleanup" | "unclaimed_handbacks";
+      family: "work_temp_stale_sweep" | "unclaimed_handbacks";
       /**
        * Media Scope
        * @default movie
@@ -4473,7 +4481,7 @@ export interface components {
       relative_path: string;
       /**
        * Retention Days
-       * @description How long these records are kept. 0 means they are kept forever.
+       * @description How many days a file's history is kept after the file is gone or forgotten. While Weir still knows the file its history is kept. 0 keeps it forever.
        */
       retention_days: number;
     };
@@ -4616,12 +4624,6 @@ export interface components {
        * @description processing while the file is written; finishing during the final checks and hand-back. Null when nothing is in flight.
        */
       progress_status?: string | null;
-      /**
-       * Quarantined
-       * @description True when repeated failures placed this file on hold until an operator requeues it.
-       * @default false
-       */
-      quarantined: boolean;
       /** Relative Path */
       relative_path: string;
       /** Size Bytes */
@@ -5136,48 +5138,18 @@ export interface components {
       failure_policy: "pass_through" | "hold" | "reject";
       /**
        * Ffmpeg Strictness
-       * @description ffmpeg's -strict level. 'normal' is its own default and passes no flag.
+       * @description ffmpeg's -strict level, for new downloads and for cleaning files already in the library. 'normal' is its own default and passes no flag.
        * @default normal
        * @enum {string}
        */
       ffmpeg_strictness:
         "very" | "strict" | "normal" | "unofficial" | "experimental";
       /**
-       * File Detection Interval Seconds
-       * @description How long this file's size must stay unchanged before Weir treats it as finished being written. 0 turns size settling off.
-       * @default 30
-       */
-      file_detection_interval_seconds: number;
-      /**
        * File System Events Enabled
        * @description Watch this folder for changes so new files are picked up within seconds. The periodic scan runs regardless, so switching this off makes Weir slower to notice a file, never blind to it.
        * @default true
        */
       file_system_events_enabled: boolean;
-      /**
-       * Hardware Decode Mode
-       * @description Hardware decoding. 'off' is what Weir has always done. A choice that cannot work falls back to software and records why — it never fails a file.
-       * @default off
-       * @enum {string}
-       */
-      hardware_decode_mode: "off" | "auto" | "device";
-      /**
-       * Hardware Device
-       * @description The ffmpeg method to use when the mode is 'device' — cuda, qsv, vaapi.
-       * @default
-       */
-      hardware_device: string;
-      /**
-       * Hardware Disabled Vendors Csv
-       * @description Vendors to never use, comma separated: nvidia, intel, amd, vaapi, apple.
-       * @default
-       */
-      hardware_disabled_vendors_csv: string;
-      /**
-       * Hold Minutes
-       * @default 0
-       */
-      hold_minutes: number;
       /**
        * Ignore Size Changes
        * @description Skip size settling entirely for this library.
@@ -5193,13 +5165,13 @@ export interface components {
       manager_connection_ids?: number[];
       /**
        * Max Attempts
-       * @description How many times Weir tries a file on its own before stopping.
+       * @description How many times Weir tries a file on its own before it gives up. The first try counts, so 3 means the first try and two retries.
        * @default 3
        */
       max_attempts: number;
       /**
        * Max Concurrent Files
-       * @description This library's own limit on files at once. 0 means the same as "Files at once" in Process settings.
+       * @description The most files this workflow runs at once, as a share of "Files at once" in Settings › Performance. 0 means no limit of its own. It cannot be more than Performance's Files at once: a save that asks for more is refused.
        * @default 0
        */
       max_concurrent_files: number;
@@ -5219,15 +5191,11 @@ export interface components {
        */
       media_type: "movie" | "tv";
       /**
-       * Min File Age Seconds
-       * @description Seconds a file must go unchanged. Null uses the Performance setting.
-       */
-      min_file_age_seconds?: number | null;
-      /**
        * Min File Size Mb
-       * @description Smallest file the library takes. Null uses the Performance setting.
+       * @description The smallest file this workflow takes, in MB. 0 takes any size.
+       * @default 50
        */
-      min_file_size_mb?: number | null;
+      min_file_size_mb: number;
       /**
        * Modified After
        * @description Only admit files whose last-modified time is on or after this instant.
@@ -5269,6 +5237,12 @@ export interface components {
        */
       priority: number;
       /**
+       * Ready After Seconds
+       * @description A new file is ready once neither its size nor its last-changed time has moved for this many seconds. 0 needs no wait.
+       * @default 60
+       */
+      ready_after_seconds: number;
+      /**
        * Rejected File Action
        * @description What to do with a settled file rejected by size/path rules or because it contains no video. delete_file removes only that file and then empty parent folders; it never removes a folder containing other files.
        * @default leave
@@ -5277,7 +5251,7 @@ export interface components {
       rejected_file_action: "leave" | "delete_file";
       /**
        * Retry Backoff Seconds
-       * @description The first wait before a retry. It doubles each attempt, capped at an hour.
+       * @description The first wait before a retry. It doubles each attempt, capped at an hour. Weir looks again shortly after the wait ends.
        * @default 300
        */
       retry_backoff_seconds: number;
@@ -5365,18 +5339,18 @@ export interface components {
        */
       remove_original_after_success: boolean;
       /**
+       * Minimum Free Disk Space Mb
+       * @description Weir keeps at least this much free on the drive this workflow writes to. A file that would leave less is put on hold and tried again when there is room. 0 turns the check off.
+       * @default 5120
+       */
+      minimum_free_disk_space_mb: number;
+      /**
        * Remux Writer
-       * @description Which tool writes the library's output (#548). best: mkvmerge for Matroska when it is installed, ffmpeg for everything else, and ffmpeg again when mkvmerge's write fails its checks. ffmpeg: ffmpeg writes every file.
+       * @description Which tool writes the workflow's output, for new downloads and for cleaning files already in the library. best: mkvmerge for Matroska when it is installed, ffmpeg for everything else, and ffmpeg again when mkvmerge's write fails its checks. ffmpeg: ffmpeg writes every file.
        * @default best
        * @enum {string}
        */
       remux_writer: "best" | "ffmpeg";
-      /**
-       * Rewrite With Ffmpeg
-       * @description With remux_writer best: when mkvmerge's write fails its checks, ffmpeg writes the file again instead of the file failing. Off fails the file at once.
-       * @default true
-       */
-      rewrite_with_ffmpeg: boolean;
     };
     /** ProcessingLibraryDeleteIn */
     ProcessingLibraryDeleteIn: {
@@ -5411,16 +5385,6 @@ export interface components {
       discovered_library_key?: string | null;
       /** Display Order */
       display_order: number;
-      /**
-       * Effective Min File Age Seconds
-       * @description Seconds a file must go unchanged now: the library's own value, or the Performance setting.
-       */
-      effective_min_file_age_seconds: number;
-      /**
-       * Effective Min File Size Mb
-       * @description Smallest file the library takes now: its own value, or the Performance setting.
-       */
-      effective_min_file_size_mb: number;
       /** Enabled */
       enabled: boolean;
       /** Exclude Hidden */
@@ -5433,18 +5397,8 @@ export interface components {
       failure_policy: string;
       /** Ffmpeg Strictness */
       ffmpeg_strictness: string;
-      /** File Detection Interval Seconds */
-      file_detection_interval_seconds: number;
       /** File System Events Enabled */
       file_system_events_enabled: boolean;
-      /** Hardware Decode Mode */
-      hardware_decode_mode: string;
-      /** Hardware Device */
-      hardware_device: string;
-      /** Hardware Disabled Vendors Csv */
-      hardware_disabled_vendors_csv: string;
-      /** Hold Minutes */
-      hold_minutes: number;
       /** Id */
       id: number;
       /** Ignore Size Changes */
@@ -5471,7 +5425,7 @@ export interface components {
       max_attempts: number;
       /**
        * Max Concurrent Files
-       * @description This library's own limit on files at once. 0 means the same as "Files at once" in Process settings.
+       * @description The most files this workflow runs at once. 0 means no limit of its own.
        */
       max_concurrent_files: number;
       /** Max File Size Mb */
@@ -5484,15 +5438,10 @@ export interface components {
        */
       media_type: "movie" | "tv";
       /**
-       * Min File Age Seconds
-       * @description Seconds a file must go unchanged. Null means the library uses the Performance setting.
-       */
-      min_file_age_seconds: number | null;
-      /**
        * Min File Size Mb
-       * @description Smallest file the library takes. Null means the library uses the Performance setting.
+       * @description The smallest file this workflow takes, in MB. 0 takes any size.
        */
-      min_file_size_mb: number | null;
+      min_file_size_mb: number;
       /** Modified After */
       modified_after: string | null;
       /** Modified Before */
@@ -5526,6 +5475,11 @@ export interface components {
       preserve_original_timestamps: boolean;
       /** Priority */
       priority: number;
+      /**
+       * Ready After Seconds
+       * @description A new file is ready once neither its size nor its last-changed time has moved for this many seconds. 0 needs no wait.
+       */
+      ready_after_seconds: number;
       /** Rejected File Action */
       rejected_file_action: string;
       /** Retry Backoff Seconds */
@@ -5569,18 +5523,22 @@ export interface components {
        */
       remove_original_after_success: boolean;
       /**
+       * Minimum Free Disk Space Mb
+       * @description Weir keeps at least this much free on the drive this workflow writes to. A file that would leave less is put on hold and tried again when there is room. 0 turns the check off.
+       */
+      minimum_free_disk_space_mb: number;
+      /**
+       * Effective Max Concurrent Files
+       * @description The most files this workflow is held to now: its own limit, and never more than Files at once in Settings › Performance, even if that was lowered after this was set.
+       */
+      effective_max_concurrent_files: number;
+      /**
        * Remux Writer
-       * @description Which tool writes the library's output (#548). best: mkvmerge for Matroska when it is installed, ffmpeg for everything else, and ffmpeg again when mkvmerge's write fails its checks. ffmpeg: ffmpeg writes every file.
+       * @description Which tool writes the workflow's output, for new downloads and for cleaning files already in the library. best: mkvmerge for Matroska when it is installed, ffmpeg for everything else, and ffmpeg again when mkvmerge's write fails its checks. ffmpeg: ffmpeg writes every file.
        * @default best
        * @enum {string}
        */
       remux_writer: "best" | "ffmpeg";
-      /**
-       * Rewrite With Ffmpeg
-       * @description With remux_writer best: when mkvmerge's write fails its checks, ffmpeg writes the file again instead of the file failing. Off fails the file at once.
-       * @default true
-       */
-      rewrite_with_ffmpeg: boolean;
     };
     /** ProcessingLibraryReorderIn */
     ProcessingLibraryReorderIn: {
@@ -5635,48 +5593,18 @@ export interface components {
       failure_policy: "pass_through" | "hold" | "reject";
       /**
        * Ffmpeg Strictness
-       * @description ffmpeg's -strict level. 'normal' is its own default and passes no flag.
+       * @description ffmpeg's -strict level, for new downloads and for cleaning files already in the library. 'normal' is its own default and passes no flag.
        * @default normal
        * @enum {string}
        */
       ffmpeg_strictness:
         "very" | "strict" | "normal" | "unofficial" | "experimental";
       /**
-       * File Detection Interval Seconds
-       * @description How long this file's size must stay unchanged before Weir treats it as finished being written. 0 turns size settling off.
-       * @default 30
-       */
-      file_detection_interval_seconds: number;
-      /**
        * File System Events Enabled
        * @description Watch this folder for changes so new files are picked up within seconds. The periodic scan runs regardless, so switching this off makes Weir slower to notice a file, never blind to it.
        * @default true
        */
       file_system_events_enabled: boolean;
-      /**
-       * Hardware Decode Mode
-       * @description Hardware decoding. 'off' is what Weir has always done. A choice that cannot work falls back to software and records why — it never fails a file.
-       * @default off
-       * @enum {string}
-       */
-      hardware_decode_mode: "off" | "auto" | "device";
-      /**
-       * Hardware Device
-       * @description The ffmpeg method to use when the mode is 'device' — cuda, qsv, vaapi.
-       * @default
-       */
-      hardware_device: string;
-      /**
-       * Hardware Disabled Vendors Csv
-       * @description Vendors to never use, comma separated: nvidia, intel, amd, vaapi, apple.
-       * @default
-       */
-      hardware_disabled_vendors_csv: string;
-      /**
-       * Hold Minutes
-       * @default 0
-       */
-      hold_minutes: number;
       /**
        * Ignore Size Changes
        * @description Skip size settling entirely for this library.
@@ -5692,13 +5620,13 @@ export interface components {
       manager_connection_ids?: number[];
       /**
        * Max Attempts
-       * @description How many times Weir tries a file on its own before stopping.
+       * @description How many times Weir tries a file on its own before it gives up. The first try counts, so 3 means the first try and two retries.
        * @default 3
        */
       max_attempts: number;
       /**
        * Max Concurrent Files
-       * @description This library's own limit on files at once. 0 means the same as "Files at once" in Process settings.
+       * @description The most files this workflow runs at once, as a share of "Files at once" in Settings › Performance. 0 means no limit of its own. It cannot be more than Performance's Files at once: a save that asks for more is refused.
        * @default 0
        */
       max_concurrent_files: number;
@@ -5718,15 +5646,11 @@ export interface components {
        */
       media_type: "movie" | "tv";
       /**
-       * Min File Age Seconds
-       * @description Seconds a file must go unchanged. Null uses the Performance setting.
-       */
-      min_file_age_seconds?: number | null;
-      /**
        * Min File Size Mb
-       * @description Smallest file the library takes. Null uses the Performance setting.
+       * @description The smallest file this workflow takes, in MB. 0 takes any size.
+       * @default 50
        */
-      min_file_size_mb?: number | null;
+      min_file_size_mb: number;
       /**
        * Modified After
        * @description Only admit files whose last-modified time is on or after this instant.
@@ -5768,6 +5692,12 @@ export interface components {
        */
       priority: number;
       /**
+       * Ready After Seconds
+       * @description A new file is ready once neither its size nor its last-changed time has moved for this many seconds. 0 needs no wait.
+       * @default 60
+       */
+      ready_after_seconds: number;
+      /**
        * Rejected File Action
        * @description What to do with a settled file rejected by size/path rules or because it contains no video. delete_file removes only that file and then empty parent folders; it never removes a folder containing other files.
        * @default leave
@@ -5776,7 +5706,7 @@ export interface components {
       rejected_file_action: "leave" | "delete_file";
       /**
        * Retry Backoff Seconds
-       * @description The first wait before a retry. It doubles each attempt, capped at an hour.
+       * @description The first wait before a retry. It doubles each attempt, capped at an hour. Weir looks again shortly after the wait ends.
        * @default 300
        */
       retry_backoff_seconds: number;
@@ -5864,18 +5794,18 @@ export interface components {
        */
       remove_original_after_success: boolean;
       /**
+       * Minimum Free Disk Space Mb
+       * @description Weir keeps at least this much free on the drive this workflow writes to. A file that would leave less is put on hold and tried again when there is room. 0 turns the check off.
+       * @default 5120
+       */
+      minimum_free_disk_space_mb: number;
+      /**
        * Remux Writer
-       * @description Which tool writes the library's output (#548). best: mkvmerge for Matroska when it is installed, ffmpeg for everything else, and ffmpeg again when mkvmerge's write fails its checks. ffmpeg: ffmpeg writes every file.
+       * @description Which tool writes the workflow's output, for new downloads and for cleaning files already in the library. best: mkvmerge for Matroska when it is installed, ffmpeg for everything else, and ffmpeg again when mkvmerge's write fails its checks. ffmpeg: ffmpeg writes every file.
        * @default best
        * @enum {string}
        */
       remux_writer: "best" | "ffmpeg";
-      /**
-       * Rewrite With Ffmpeg
-       * @description With remux_writer best: when mkvmerge's write fails its checks, ffmpeg writes the file again instead of the file failing. Off fails the file at once.
-       * @default true
-       */
-      rewrite_with_ffmpeg: boolean;
     };
     /**
      * ProcessingManualPlanIn
@@ -5923,34 +5853,17 @@ export interface components {
     /** ProcessingOperatorSettingsOut */
     ProcessingOperatorSettingsOut: {
       /**
-       * Failure Cleanup Enabled
-       * @description Delete the source release folder after a file fails terminally. Off by default: this removes the original, so it stays off until you choose it.
-       */
-      failure_cleanup_enabled: boolean;
-      /**
-       * Failure Cleanup Interval Seconds
-       * @description How often the failed-download cleanup runs, set in Settings › Cleanup. Null keeps the environment's interval.
-       */
-      failure_cleanup_interval_seconds?: number | null;
-      /**
        * File Log Retention Days
-       * @description How long to keep the per-file processing record. 0 keeps it forever.
+       * @description How many days a file's history is kept after the file is gone or forgotten. While Weir still knows the file its history is kept. 0 keeps it forever.
        */
       file_log_retention_days: number;
       /**
        * Keep Failed Work Files
-       * @description Keep a failed run's working files so they can be inspected instead of swept.
+       * @description Keep a failed file's half-written copy for a day, so it can be looked at. It is removed once it is a day old.
        */
       keep_failed_work_files: boolean;
       /** Max Concurrent Files */
       max_concurrent_files: number;
-      /** Min File Age Seconds */
-      min_file_age_seconds: number;
-      /**
-       * Minimum Free Disk Space Mb
-       * @description Processing skips before writes when the target drive has less free space than this.
-       */
-      minimum_free_disk_space_mb: number;
       /** Movie Schedule Days */
       movie_schedule_days: string;
       /** Movie Schedule Enabled */
@@ -5964,11 +5877,6 @@ export interface components {
       movie_schedule_hours_limited: boolean;
       /** Movie Schedule Start */
       movie_schedule_start: string;
-      /**
-       * Processing Min Input File Size Mb
-       * @description Files smaller than this are skipped before Weir probes or writes them.
-       */
-      min_input_file_size_mb: number;
       /**
        * Runner Capacity
        * @description Total processing capacity. Active files consume it according to their cost, and new work waits once it is fully occupied.
@@ -5987,11 +5895,6 @@ export interface components {
       runner_cost_720p: number;
       /** Runner Cost Sd */
       runner_cost_sd: number;
-      /**
-       * Runner Cost Undetermined
-       * @description What a file Weir has not measured yet costs. Zero admits it rather than stalling on the unknown.
-       */
-      runner_cost_undetermined: number;
       /**
        * Schedule Timezone
        * @description IANA zone for schedule windows (suite settings).
@@ -6042,20 +5945,12 @@ export interface components {
     ProcessingOperatorSettingsPutIn: {
       /** Csrf Token */
       csrf_token: string;
-      /** Failure Cleanup Enabled */
-      failure_cleanup_enabled?: boolean | null;
-      /** Failure Cleanup Interval Seconds */
-      failure_cleanup_interval_seconds?: number | null;
       /** File Log Retention Days */
       file_log_retention_days?: number | null;
       /** Keep Failed Work Files */
       keep_failed_work_files?: boolean | null;
       /** Max Concurrent Files */
       max_concurrent_files?: number | null;
-      /** Min File Age Seconds */
-      min_file_age_seconds?: number | null;
-      /** Minimum Free Disk Space Mb */
-      minimum_free_disk_space_mb?: number | null;
       /** Movie Schedule Days */
       movie_schedule_days?: string | null;
       /** Movie Schedule Enabled */
@@ -6066,8 +5961,6 @@ export interface components {
       movie_schedule_hours_limited?: boolean | null;
       /** Movie Schedule Start */
       movie_schedule_start?: string | null;
-      /** Processing Min Input File Size Mb */
-      min_input_file_size_mb?: number | null;
       /** Runner Capacity */
       runner_capacity?: number | null;
       /** Runner Cost 1080P */
@@ -6080,8 +5973,6 @@ export interface components {
       runner_cost_720p?: number | null;
       /** Runner Cost Sd */
       runner_cost_sd?: number | null;
-      /** Runner Cost Undetermined */
-      runner_cost_undetermined?: number | null;
       /** Tv Schedule Days */
       tv_schedule_days?: string | null;
       /** Tv Schedule Enabled */
@@ -6092,12 +5983,6 @@ export interface components {
       tv_schedule_hours_limited?: boolean | null;
       /** Tv Schedule Start */
       tv_schedule_start?: string | null;
-      /**
-       * Verbose Detection Logging
-       * @deprecated
-       * @description Removed. Accepted and ignored, so an older client that still sends it is not refused.
-       */
-      verbose_detection_logging?: boolean | null;
       /** Work Temp Stale Sweep Enabled */
       work_temp_stale_sweep_enabled?: boolean | null;
       /** Work Temp Stale Sweep Interval Seconds */
@@ -6460,6 +6345,11 @@ export interface components {
        * @description Path relative to the library's watched or output folder. Mutually exclusive with absolute_path.
        */
       relative_path?: string | null;
+      /**
+       * Rule Set Id
+       * @description A saved rules profile to preview with instead of the workflow's. Ignored when rules is given.
+       */
+      rule_set_id?: number | null;
       /** @description Unsaved rule-set edits to try, in the same shape PUT /processing/rule-sets/{id} accepts (minus csrf_token). Omit to preview the library's saved rule set instead. */
       rules?: components["schemas"]["ProcessingRulesPreviewRulesIn"] | null;
     };
@@ -6724,11 +6614,6 @@ export interface components {
        */
       configuration_note: string;
       /**
-       * Failure Cleanup Configuration Note
-       * @description How operators change Pass 4 failure-cleanup timers/grace (restart required).
-       */
-      failure_cleanup_configuration_note: string;
-      /**
        * In Process Processing Worker Count
        * @description Mirrors WEIR_PROCESSING_WORKER_COUNT after clamping — the processing lane only.
        */
@@ -6759,21 +6644,6 @@ export interface components {
        */
       processing_media_extensions: string[];
       /**
-       * Processing Movie Failure Cleanup Grace Period Seconds
-       * @description Failed remux age gate for Movies failure cleanup (uses jobs.updated_at).
-       */
-      processing_movie_failure_cleanup_grace_period_seconds: number;
-      /**
-       * Processing Movie Failure Cleanup Schedule Enabled
-       * @description ``WEIR_PROCESSING_MOVIE_FAILURE_CLEANUP_SCHEDULE_ENABLED`` at process start.
-       */
-      processing_movie_failure_cleanup_schedule_enabled: boolean;
-      /**
-       * Processing Movie Failure Cleanup Schedule Interval Seconds
-       * @description Seconds between Movies-only periodic failed-remux cleanup enqueue ticks.
-       */
-      processing_movie_failure_cleanup_schedule_interval_seconds: number;
-      /**
        * Processing Movie Output Cleanup Min Age Seconds
        * @description Minimum age (newest file mtime under the folder) before Pass 3a may delete a Movies output folder (1h..30d; default 48h).
        */
@@ -6783,21 +6653,6 @@ export interface components {
        * @description ffprobe probe size in MB for preflight analysis.
        */
       processing_probe_size_mb: number;
-      /**
-       * Processing Tv Failure Cleanup Grace Period Seconds
-       * @description Failed remux age gate for TV failure cleanup (uses jobs.updated_at).
-       */
-      processing_tv_failure_cleanup_grace_period_seconds: number;
-      /**
-       * Processing Tv Failure Cleanup Schedule Enabled
-       * @description ``WEIR_PROCESSING_TV_FAILURE_CLEANUP_SCHEDULE_ENABLED`` at process start.
-       */
-      processing_tv_failure_cleanup_schedule_enabled: boolean;
-      /**
-       * Processing Tv Failure Cleanup Schedule Interval Seconds
-       * @description Seconds between TV-only periodic failed-remux cleanup enqueue ticks.
-       */
-      processing_tv_failure_cleanup_schedule_interval_seconds: number;
       /**
        * Processing Tv Output Cleanup Min Age Seconds
        * @description Minimum age (direct-child episode media newest mtime) before Pass 3b may delete a TV season output folder (1h..30d; default 48h).

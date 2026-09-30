@@ -24,6 +24,8 @@ namespace Weir.Infrastructure.LibraryMode;
 /// </summary>
 public sealed partial class LibraryCleanHandler : IJobHandler
 {
+    private const long BytesPerMib = 1024 * 1024;
+
     private readonly SqliteDatabase _database;
     private readonly MediaTools _tools;
     private readonly SafeSwap _swap;
@@ -103,9 +105,8 @@ public sealed partial class LibraryCleanHandler : IJobHandler
                 return;
             }
 
-            var ruleSet = library.RuleSetId is { } ruleSetId ? await _libraries.GetRuleSetAsync(uow, ruleSetId).ConfigureAwait(false) : null;
-            rules = ruleSet is not null ? RemuxPassPaths.RulesConfigFor(ruleSet) : RuleSetConversion.ToRulesConfig(null);
             settings = await _librarySettings.GetAsync(uow, libraryId).ConfigureAwait(false);
+            rules = await LibraryModeRules.ForAsync(uow, _libraries, library, settings).ConfigureAwait(false);
             leftAlone = await _fileMarks.IsLeftAloneAsync(uow, libraryId, path).ConfigureAwait(false);
             await uow.CommitAsync().ConfigureAwait(false);
         }
@@ -157,6 +158,7 @@ public sealed partial class LibraryCleanHandler : IJobHandler
             return;
         }
 
+        await RecordMeasuredCostAsync(context.Id, probe, cancellationToken).ConfigureAwait(false);
         LibraryFilePlanResult plan;
         if (ManualPlanJson.FromPyJson(payload.Get("manual_plan")) is { } choice)
         {
@@ -212,33 +214,46 @@ public sealed partial class LibraryCleanHandler : IJobHandler
         var keepOriginal = settings.KeepOriginalAfterClean
             ? new KeepOriginalOptions(settings.Folders, settings.OriginalsFolder)
             : null;
+        // The workflow's "Writes files with" and FFmpeg compatibility choices apply here exactly as they do to new downloads.
+        var writer = _tools.WriterFor(path, library.RemuxWriter);
+        var ffmpegInputFlags = FfmpegStrictnessLevels.InputFlags(library.FfmpegStrictness);
+        string? writerNote = null;
         var result = await _swap.RunAsync(
             context.Id,
             path,
             async (tempPath, ct) =>
             {
                 var workDir = Path.GetDirectoryName(tempPath) is { Length: > 0 } dir ? dir : ".";
-                var written = await _tools.RemuxToTempFileAsync(path, workDir, plan.Plan!, probe.Json, sourceWarnings, durationSeconds: durationSeconds, cancellationToken: ct).ConfigureAwait(false);
+                var staged = await _tools.RemuxToTempFileAsync(path, workDir, plan.Plan!, probe.Json, sourceWarnings, durationSeconds: durationSeconds, ffmpegInputFlags: ffmpegInputFlags, writer: writer, cancellationToken: ct).ConfigureAwait(false);
+                writerNote = FfmpegFallbackNote(library.RemuxWriter, staged);
                 try
                 {
-                    File.Move(written, tempPath, overwrite: false);
+                    File.Move(staged.Path, tempPath, overwrite: false);
                 }
                 catch
                 {
-                    TryDelete(written);
+                    TryDelete(staged.Path);
                     throw;
                 }
             },
-            SwapOptions.Default with { OriginalDurationSeconds = durationSeconds, KeepOriginal = keepOriginal },
+            SwapOptions.Default with
+            {
+                OriginalDurationSeconds = durationSeconds,
+                KeepOriginal = keepOriginal,
+                KeepFreeBytes = library.MinimumFreeDiskSpaceMb * BytesPerMib,
+            },
             cancellationToken).ConfigureAwait(false);
 
         switch (result.Outcome)
         {
             case SwapOutcome.Committed:
-                await OnCommittedAsync(library, path, plan, result, cancellationToken).ConfigureAwait(false);
+                await OnCommittedAsync(library, path, plan, result, writerNote, cancellationToken).ConfigureAwait(false);
                 return;
             case SwapOutcome.InUse:
                 await OnInUseAsync(context, payload, libraryId, path, trigger, inUseAttempts).ConfigureAwait(false);
+                return;
+            case SwapOutcome.InsufficientSpace:
+                await OnWaitingForSpaceAsync(context, payload, libraryId, path, trigger, result.Message).ConfigureAwait(false);
                 return;
             default:
                 await RecordAsync(libraryId, path, trigger, LibraryActivityEventTypes.FileFailed, result.Message).ConfigureAwait(false);

@@ -4,8 +4,8 @@ using System.Text.Json.Nodes;
 namespace Weir.Api.Tests.Platform;
 
 /// <summary>
-/// A library's minimum size and wait over real HTTP: left unset it follows Settings › Performance and reports what that comes
-/// to, and a value it sets itself is kept when Performance changes.
+/// A workflow's wait and minimum size over real HTTP: each is the workflow's own value, a new workflow starts at 60 seconds and
+/// 50 MB, and Settings › Performance holds neither.
 /// </summary>
 public sealed class LibraryIntakeLimitsApiTests
 {
@@ -21,7 +21,7 @@ public sealed class LibraryIntakeLimitsApiTests
         return (server, client);
     }
 
-    private static async Task<JsonNode> CreateLibraryAsync(ApiTestClient client, string name, long? minFileSizeMb = null, long? minFileAgeSeconds = null)
+    private static async Task<JsonNode> CreateLibraryAsync(ApiTestClient client, string name, JsonObject? extra = null)
     {
         var body = new JsonObject
         {
@@ -31,27 +31,14 @@ public sealed class LibraryIntakeLimitsApiTests
             ["watched_folder"] = @$"c:\{name}-in",
             ["output_folder"] = @$"c:\{name}-out",
         };
-        if (minFileSizeMb is { } size)
+        foreach (var (key, value) in extra ?? [])
         {
-            body["min_file_size_mb"] = size;
-        }
-
-        if (minFileAgeSeconds is { } wait)
-        {
-            body["min_file_age_seconds"] = wait;
+            body[key] = value?.DeepClone();
         }
 
         using var created = await client.PostAsync(Libraries, body);
         Assert.Equal(HttpStatusCode.Created, created.StatusCode);
         return await ApiTestClient.Json(created);
-    }
-
-    private static async Task SetPerformanceAsync(ApiTestClient client, long minFileAgeSeconds, long minInputFileSizeMb)
-    {
-        using var saved = await client.PutAsync(
-            OperatorSettings,
-            new { csrf_token = await client.CsrfAsync(), min_file_age_seconds = minFileAgeSeconds, min_input_file_size_mb = minInputFileSizeMb });
-        Assert.Equal(HttpStatusCode.OK, saved.StatusCode);
     }
 
     private static async Task<JsonNode> LibraryAsync(ApiTestClient client, long id)
@@ -61,90 +48,107 @@ public sealed class LibraryIntakeLimitsApiTests
     }
 
     [Fact]
-    public async Task A_library_created_without_a_minimum_size_or_wait_follows_Performance()
+    public async Task A_workflow_created_without_a_wait_or_minimum_size_starts_at_sixty_seconds_and_fifty_megabytes()
     {
         var (server, client) = await SignedInAsync();
         await using var disposeServer = server;
-        await SetPerformanceAsync(client, minFileAgeSeconds: 10, minInputFileSizeMb: 1);
 
         var library = await CreateLibraryAsync(client, "anime");
 
-        Assert.Null(library["min_file_size_mb"]);
-        Assert.Null(library["min_file_age_seconds"]);
-        Assert.Equal(1, library["effective_min_file_size_mb"]!.GetValue<long>());
-        Assert.Equal(10, library["effective_min_file_age_seconds"]!.GetValue<long>());
+        Assert.Equal(60, library["ready_after_seconds"]!.GetValue<long>());
+        Assert.Equal(50, library["min_file_size_mb"]!.GetValue<long>());
     }
 
     [Fact]
-    public async Task Changing_Performance_changes_what_a_library_that_follows_it_reports()
+    public async Task A_workflow_reports_no_inherited_or_retired_wait_fields()
     {
         var (server, client) = await SignedInAsync();
         await using var disposeServer = server;
-        var library = await CreateLibraryAsync(client, "anime");
 
-        await SetPerformanceAsync(client, minFileAgeSeconds: 120, minInputFileSizeMb: 200);
+        var library = (await CreateLibraryAsync(client, "anime")).AsObject();
 
-        var after = await LibraryAsync(client, library["id"]!.GetValue<long>());
-        Assert.Equal(200, after["effective_min_file_size_mb"]!.GetValue<long>());
-        Assert.Equal(120, after["effective_min_file_age_seconds"]!.GetValue<long>());
+        foreach (var removed in new[] { "effective_min_file_size_mb", "effective_min_file_age_seconds", "min_file_age_seconds", "hold_minutes", "file_detection_interval_seconds" })
+        {
+            Assert.False(library.ContainsKey(removed), removed);
+        }
     }
 
     [Fact]
-    public async Task A_library_that_sets_its_own_values_keeps_them_when_Performance_changes()
+    public async Task A_workflow_keeps_the_wait_and_minimum_size_it_was_given()
     {
         var (server, client) = await SignedInAsync();
         await using var disposeServer = server;
-        var library = await CreateLibraryAsync(client, "kids", minFileSizeMb: 5, minFileAgeSeconds: 0);
 
-        await SetPerformanceAsync(client, minFileAgeSeconds: 120, minInputFileSizeMb: 200);
+        var created = await CreateLibraryAsync(client, "kids", new JsonObject { ["ready_after_seconds"] = 0, ["min_file_size_mb"] = 5 });
 
-        var after = await LibraryAsync(client, library["id"]!.GetValue<long>());
-        Assert.Equal(5, after["min_file_size_mb"]!.GetValue<long>());
-        Assert.Equal(5, after["effective_min_file_size_mb"]!.GetValue<long>());
-        Assert.Equal(0, after["effective_min_file_age_seconds"]!.GetValue<long>());
+        var stored = await LibraryAsync(client, created["id"]!.GetValue<long>());
+        Assert.Equal(0, stored["ready_after_seconds"]!.GetValue<long>());
+        Assert.Equal(5, stored["min_file_size_mb"]!.GetValue<long>());
     }
 
     [Fact]
-    public async Task Saving_null_hands_a_library_back_to_Performance()
+    public async Task A_wait_longer_than_a_workflow_can_hold_is_refused()
     {
         var (server, client) = await SignedInAsync();
         await using var disposeServer = server;
-        var library = await CreateLibraryAsync(client, "kids", minFileSizeMb: 5, minFileAgeSeconds: 0);
-        await SetPerformanceAsync(client, minFileAgeSeconds: 120, minInputFileSizeMb: 200);
 
-        using var saved = await client.PutAsync(
-            $"{Libraries}/{library["id"]!.GetValue<long>()}",
+        using var refused = await client.PostAsync(
+            Libraries,
             new
             {
                 csrf_token = await client.CsrfAsync(),
-                name = "kids",
+                name = "slow",
                 media_type = "movie",
-                watched_folder = @"c:\kids-in",
-                output_folder = @"c:\kids-out",
-                min_file_size_mb = (long?)null,
-                min_file_age_seconds = (long?)null,
+                watched_folder = @"c:\slow-in",
+                output_folder = @"c:\slow-out",
+                ready_after_seconds = 1_209_601,
             });
 
-        Assert.Equal(HttpStatusCode.OK, saved.StatusCode);
-        var after = await ApiTestClient.Json(saved);
-        Assert.Null(after["min_file_size_mb"]);
-        Assert.Equal(200, after["effective_min_file_size_mb"]!.GetValue<long>());
-        Assert.Equal(120, after["effective_min_file_age_seconds"]!.GetValue<long>());
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, refused.StatusCode);
     }
 
     [Fact]
-    public async Task The_seeded_libraries_follow_Performance_on_a_new_install()
+    public async Task An_older_client_that_still_sends_the_three_waits_is_answered_and_they_are_ignored()
     {
         var (server, client) = await SignedInAsync();
         await using var disposeServer = server;
-        await SetPerformanceAsync(client, minFileAgeSeconds: 10, minInputFileSizeMb: 1);
+
+        var created = await CreateLibraryAsync(
+            client,
+            "older",
+            new JsonObject { ["min_file_age_seconds"] = 5, ["hold_minutes"] = 10, ["file_detection_interval_seconds"] = 999 });
+
+        Assert.Equal(60, created["ready_after_seconds"]!.GetValue<long>());
+    }
+
+    [Fact]
+    public async Task Changing_Performance_changes_nothing_about_a_workflow()
+    {
+        var (server, client) = await SignedInAsync();
+        await using var disposeServer = server;
+        var library = await CreateLibraryAsync(client, "anime");
+
+        using var saved = await client.PutAsync(
+            OperatorSettings, new { csrf_token = await client.CsrfAsync(), min_file_age_seconds = 120, min_input_file_size_mb = 200 });
+        Assert.Equal(HttpStatusCode.OK, saved.StatusCode);
+
+        var after = await LibraryAsync(client, library["id"]!.GetValue<long>());
+        Assert.Equal(60, after["ready_after_seconds"]!.GetValue<long>());
+        Assert.Equal(50, after["min_file_size_mb"]!.GetValue<long>());
+    }
+
+    [Fact]
+    public async Task The_seeded_workflows_hold_a_wait_and_minimum_size_of_their_own()
+    {
+        var (server, client) = await SignedInAsync();
+        await using var disposeServer = server;
 
         using var listed = await client.GetAsync(Libraries);
 
         foreach (var library in (await ApiTestClient.Json(listed)).AsArray())
         {
-            Assert.Null(library!["min_file_size_mb"]);
-            Assert.Equal(10, library["effective_min_file_age_seconds"]!.GetValue<long>());
+            Assert.Equal(60, library!["ready_after_seconds"]!.GetValue<long>());
+            Assert.Equal(50, library["min_file_size_mb"]!.GetValue<long>());
         }
     }
 }

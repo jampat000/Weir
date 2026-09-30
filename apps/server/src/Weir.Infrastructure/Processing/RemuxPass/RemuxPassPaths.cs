@@ -16,16 +16,10 @@ public sealed record ProcessingPathRuntime
     public string SidecarPatternsCsv { get; init; } = string.Empty;
     public bool PreserveOriginalTimestamps { get; init; }
     public string OutputCollisionPolicy { get; init; } = "replace";
-    public string HardwareDecodeMode { get; init; } = "off";
-    public string HardwareDevice { get; init; } = string.Empty;
-    public string HardwareDisabledVendorsCsv { get; init; } = string.Empty;
     public string FfmpegStrictness { get; init; } = "normal";
 
-    /// <summary>#548: which tool writes this library's output (<see cref="Weir.Core.Media.RemuxWriterChoice"/>).</summary>
+    /// <summary>Which tool writes this library's output (<see cref="Weir.Core.Media.RemuxWriterChoice"/>).</summary>
     public string RemuxWriter { get; init; } = RemuxWriterChoice.Best;
-
-    /// <summary>#548: rewrite with ffmpeg when the preferred writer cannot write or validate a file.</summary>
-    public bool RewriteWithFfmpeg { get; init; } = true;
 
     /// <summary>The library's <c>remove_original_after_success</c>: false leaves the source where it is after a successful pass.</summary>
     public bool RemoveOriginalAfterSuccess { get; init; } = true;
@@ -233,12 +227,8 @@ public static class RemuxPassPaths
             SidecarPatternsCsv = library.SidecarPatternsCsv ?? string.Empty,
             PreserveOriginalTimestamps = library.PreserveOriginalTimestamps,
             OutputCollisionPolicy = string.IsNullOrEmpty(library.OutputCollisionPolicy) ? "replace" : library.OutputCollisionPolicy,
-            HardwareDecodeMode = string.IsNullOrEmpty(library.HardwareDecodeMode) ? "off" : library.HardwareDecodeMode,
-            HardwareDevice = library.HardwareDevice ?? string.Empty,
-            HardwareDisabledVendorsCsv = library.HardwareDisabledVendorsCsv ?? string.Empty,
             FfmpegStrictness = string.IsNullOrEmpty(library.FfmpegStrictness) ? "normal" : library.FfmpegStrictness,
             RemuxWriter = RemuxWriterChoice.Normalize(library.RemuxWriter),
-            RewriteWithFfmpeg = library.RewriteWithFfmpeg,
             RemoveOriginalAfterSuccess = library.RemoveOriginalAfterSuccess,
             MediaExtensionsCsv = library.MediaExtensionsCsv ?? string.Empty,
         }, null);

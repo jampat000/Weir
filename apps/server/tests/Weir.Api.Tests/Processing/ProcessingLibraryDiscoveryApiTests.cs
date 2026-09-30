@@ -208,7 +208,7 @@ public sealed class ProcessingLibraryDiscoveryApiTests
     }
 
     [Fact]
-    public async Task An_imported_library_follows_the_Performance_settings_for_its_minimum_size_and_wait()
+    public async Task An_imported_library_starts_at_the_default_wait_and_minimum_size_whatever_Performance_says()
     {
         var (server, client, manager) = await StartAsync();
         await using var _server = server;
@@ -224,10 +224,8 @@ public sealed class ProcessingLibraryDiscoveryApiTests
 
             var imported = (await ImportAsync(client, connectionId, "7")).AsArray().Single()!;
 
-            Assert.Null(imported["min_file_size_mb"]);
-            Assert.Null(imported["min_file_age_seconds"]);
-            Assert.Equal(7, imported["effective_min_file_size_mb"]!.GetValue<long>());
-            Assert.Equal(15, imported["effective_min_file_age_seconds"]!.GetValue<long>());
+            Assert.Equal(50, imported["min_file_size_mb"]!.GetValue<long>());
+            Assert.Equal(60, imported["ready_after_seconds"]!.GetValue<long>());
         }
         finally
         {

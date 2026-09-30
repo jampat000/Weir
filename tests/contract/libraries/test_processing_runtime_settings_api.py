@@ -37,19 +37,13 @@ def test_processing_runtime_settings_operator_shape(admin) -> None:
         "processing_work_temp_stale_sweep_tv_schedule_enabled",
         "processing_work_temp_stale_sweep_tv_schedule_interval_seconds",
         "processing_work_temp_stale_sweep_min_stale_age_seconds",
-        "processing_movie_failure_cleanup_schedule_enabled",
-        "processing_movie_failure_cleanup_schedule_interval_seconds",
-        "processing_tv_failure_cleanup_schedule_enabled",
-        "processing_tv_failure_cleanup_schedule_interval_seconds",
-        "processing_movie_failure_cleanup_grace_period_seconds",
-        "processing_tv_failure_cleanup_grace_period_seconds",
-        "failure_cleanup_configuration_note",
         "work_temp_stale_sweep_periodic_configuration_note",
         "watched_folder_scan_periodic_configuration_note",
     ):
         assert key in body, key
     # Not reported (#329): the scheduler reads the per-scope database toggles, so these would
     # misdescribe the live configuration.
+    assert not [key for key in body if "failure_cleanup" in key]
     assert "processing_watched_folder_remux_scan_dispatch_schedule_enabled" not in body
     assert "processing_watched_folder_remux_scan_dispatch_schedule_interval_seconds" not in body
 

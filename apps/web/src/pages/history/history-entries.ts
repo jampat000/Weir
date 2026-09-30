@@ -65,12 +65,13 @@ const CLEAN_GROUPS: Record<LibraryClean["outcome"], HistoryGroup> = {
 };
 
 /**
- * Where a download belongs. A file held after repeated failures, on hold, or one its media manager still has waits on
- * a person, so it is "Needs you"; a skip is Weir deciding a file is not for it, which is not a failure. A library that
- * is off or a cancelled pass is neither working nor finished, so it only shows under All.
+ * Where a download belongs. A file on hold, or one its media manager still has, waits on a person, so it is
+ * "Needs you"; a file Weir has given up on is "Failed", with its reason; a skip is Weir deciding a file is not for it,
+ * which is not a failure. A library that is off or a cancelled pass is neither working nor finished, so it only shows
+ * under All.
  */
 export function historyGroupOf(file: ProcessingFile): HistoryGroup | null {
-  if (file.quarantined || NEEDS.includes(file.status)) return "needs";
+  if (NEEDS.includes(file.status)) return "needs";
   if (WORKING.includes(file.status)) return "working";
   if (FINISHED.includes(file.status)) return "finished";
   if (file.status === "skipped") return "skipped";

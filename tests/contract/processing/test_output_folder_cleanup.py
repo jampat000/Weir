@@ -63,7 +63,6 @@ def test_output_folder_is_kept_when_the_manager_has_not_imported_yet(
     folders = h.Folders.make(tmp_path)
     radarr = fake_managers("radarr", root_folders=[str(tmp_path / "library")])
     connection = h.create_connection(admin, radarr)
-    h.relax_operator_guards(admin)
     library = h.create_library(admin, folders, manager_connection_ids=[connection["id"]])
 
     release = folders.watched / "Contract.Movie.2024"
@@ -102,7 +101,6 @@ def test_output_folder_is_removed_once_the_manager_confirms_the_import(
     folders = h.Folders.make(tmp_path)
     radarr = fake_managers("radarr", root_folders=[str(tmp_path / "library")])
     connection = h.create_connection(admin, radarr)
-    h.relax_operator_guards(admin)
     library = h.create_library(admin, folders, manager_connection_ids=[connection["id"]])
 
     release = folders.watched / "Confirmed.Movie.2024"

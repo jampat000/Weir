@@ -41,7 +41,8 @@ never makes a workflow linked. Under **Settings › Media managers**, each conne
 workflows it feeds and offers **Add a workflow from** it.
 
 Weir's **Library** menu is a separate thing. It cleans files that are already in place in your
-media library, and it keeps its name. A workflow is the path new files take.
+media library, and it keeps its name; the folders, rules profile and daily clean for those files are
+set up there, not on the workflow. A workflow is the path new files take.
 
 The API still says "library" for what the app calls a workflow (for example the `library-folders`
 capability below), so existing integrations keep working.
@@ -154,7 +155,7 @@ Open **Settings › Workflows** and edit the workflow:
 
 - **Watched folder**: where your download client finishes files, e.g. `/media/downloads/complete/tv`.
 - **Output folder**: where Weir puts cleaned files, e.g. `/media/weir/tv`.
-- **After cleaning, remove the original download**: turn this **off** if you use torrents. The torrent
+- **New downloads: after cleaning, delete the original download**: turn this **off** if you use torrents. The torrent
   needs its files to keep seeding, and if they disappear, Sonarr stops treating the download as
   finished and never imports it. Your download client or Sonarr removes the original later, under
   your normal seeding rules. Weir remembers what it has already cleaned, so it won't clean the same
@@ -214,11 +215,11 @@ soon as it appears. Weir only ever publishes a finished file, so Sonarr can't im
 If Weir can't clean a file, what Sonarr sees depends on the workflow's **When retries run out** setting:
 
 - **Hand the original back unchanged** (the default): Sonarr imports the original, uncleaned.
-- **Keep it until someone acts**: Sonarr waits, and Weir shows the file on hold.
+- **Keep it until someone acts**: Sonarr waits, and Weir shows the file as Failed, with the reason.
 - **Reject the release so a different one is found**: Weir removes the download and blocklists it in Sonarr, so it searches again.
 
-Files below the workflow's minimum size are never cleaned, so Sonarr waits on them indefinitely. Keep
-the minimum size below your smallest real episode.
+Files below the workflow's minimum size (50 MB for a new workflow, under **Intake rules**) are never cleaned,
+so Sonarr waits on them indefinitely. Keep the minimum size below your smallest real episode.
 
 ### Optional: hand back with Downloaded Scan
 

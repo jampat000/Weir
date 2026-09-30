@@ -25,50 +25,9 @@ public sealed record AccelerationReport
             .ToList();
 }
 
-/// <summary>What the library asked for.</summary>
-public sealed record HardwareSettings
-{
-    /// <summary><c>off</c>, <c>auto</c> or <c>device</c>; kept as text because it is compared un-normalized.</summary>
-    public string Mode { get; init; } = HardwareAcceleration.ModeOff;
-
-    /// <summary>The named method when <see cref="Mode"/> is <c>device</c>: <c>cuda</c>, <c>qsv</c>, <c>vaapi</c>.</summary>
-    public string Device { get; init; } = string.Empty;
-
-    public IReadOnlyList<string> DisabledVendors { get; init; } = [];
-
-    public string Strictness { get; init; } = HardwareAcceleration.DefaultStrictness;
-
-    public bool WantsHardware => Mode is HardwareAcceleration.ModeAuto or HardwareAcceleration.ModeDevice;
-}
-
-/// <summary>What Weir will actually ask ffmpeg for, and why.</summary>
-public sealed record AccelerationDecision
-{
-    public string Method { get; init; } = string.Empty;
-
-    /// <summary>Flags that go before <c>-i</c>.</summary>
-    public IReadOnlyList<string> ArgvFlags { get; init; } = [];
-
-    public bool FellBackToSoftware { get; init; }
-
-    public string Reason { get; init; } = string.Empty;
-
-    public bool UsingHardware => Method.Length > 0;
-}
-
-/// <summary>
-/// Hardware acceleration: reading <c>ffmpeg -hwaccels</c>, and
-/// choosing a decode method that always degrades to software with a reason rather than failing a file.
-/// </summary>
+/// <summary>Reading what <c>ffmpeg -hwaccels</c> reports, for the machine-wide hardware check.</summary>
 public static class HardwareAcceleration
 {
-    public const string ModeOff = "off";
-    public const string ModeAuto = "auto";
-    public const string ModeDevice = "device";
-
-    /// <summary>ffmpeg's default strictness; passing it is the same as not passing the flag.</summary>
-    public const string DefaultStrictness = "normal";
-
     /// <summary>
     /// Vendors an operator can switch off, and the ffmpeg hwaccel names each covers. The order decides the
     /// vendor of a method two vendors share, such as <c>d3d11va</c>.
@@ -81,19 +40,6 @@ public static class HardwareAcceleration
         new("vaapi", ["vaapi"]),
         new("apple", ["videotoolbox"]),
     ];
-
-    /// <summary>ffmpeg's strictness values, narrowest first.</summary>
-    public static IReadOnlyList<string> StrictnessLevels { get; } = ["very", "strict", "normal", "unofficial", "experimental"];
-
-    /// <summary>Auto mode's preference order, so the same machine picks the same device every run.</summary>
-    public static IReadOnlyList<string> AutoPreference { get; } = ["cuda", "qsv", "vaapi", "videotoolbox", "d3d11va", "amf"];
-
-    /// <summary>The report when hardware decoding is off: ffmpeg is not asked, because the answer would not be used.</summary>
-    public static AccelerationReport NotAsked { get; } = new()
-    {
-        Detected = false,
-        Detail = "Hardware decoding is switched off, so Weir did not ask ffmpeg which acceleration methods it supports.",
-    };
 
     /// <summary>The report when ffmpeg could not be run at all.</summary>
     public static AccelerationReport ReportForRunError(string errorText) => new()
@@ -146,149 +92,5 @@ public static class HardwareAcceleration
             Detected = true,
             Detail = $"ffmpeg reports {Plural.Of(methods.Count, "acceleration method")}. Being listed does not prove a device is present.",
         };
-    }
-
-    /// <summary>Chooses the decode method; every path ends in a usable answer.</summary>
-    public static AccelerationDecision Decide(HardwareSettings settings, AccelerationReport report)
-    {
-        ArgumentNullException.ThrowIfNull(settings);
-        ArgumentNullException.ThrowIfNull(report);
-        IReadOnlyList<string> strictFlags = settings.Strictness.Length > 0 && settings.Strictness != DefaultStrictness
-            ? ["-strict", settings.Strictness]
-            : [];
-
-        if (!settings.WantsHardware)
-        {
-            return new AccelerationDecision
-            {
-                ArgvFlags = strictFlags,
-                Reason = "Hardware decoding is switched off for this workflow, so Weir decoded in software.",
-            };
-        }
-
-        if (!report.Detected || report.AvailableMethods.Count == 0)
-        {
-            return new AccelerationDecision
-            {
-                ArgvFlags = strictFlags,
-                FellBackToSoftware = true,
-                Reason = WireStrings.Strip(
-                    "Weir fell back to software decoding because this ffmpeg build reports no hardware "
-                    + $"acceleration. {report.Detail}"),
-            };
-        }
-
-        if (settings.Mode == ModeDevice)
-        {
-            var wanted = RulesJson.Lower(WireStrings.Strip(settings.Device));
-            if (wanted.Length == 0)
-            {
-                return new AccelerationDecision
-                {
-                    ArgvFlags = strictFlags,
-                    FellBackToSoftware = true,
-                    Reason = "Weir fell back to software decoding because this workflow is set to use a named "
-                        + "device but no device name was given.",
-                };
-            }
-
-            if (!report.AvailableMethods.Contains(wanted, StringComparer.Ordinal))
-            {
-                return new AccelerationDecision
-                {
-                    ArgvFlags = strictFlags,
-                    FellBackToSoftware = true,
-                    Reason = $"Weir fell back to software decoding because the configured device '{wanted}' is not "
-                        + $"one this ffmpeg build supports. It offers: {string.Join(", ", report.AvailableMethods)}.",
-                };
-            }
-
-            if (!Allowed(wanted, settings.DisabledVendors))
-            {
-                return new AccelerationDecision
-                {
-                    ArgvFlags = strictFlags,
-                    FellBackToSoftware = true,
-                    Reason = $"Weir fell back to software decoding because '{wanted}' belongs to a vendor this "
-                        + "workflow has switched off.",
-                };
-            }
-
-            return new AccelerationDecision
-            {
-                Method = wanted,
-                ArgvFlags = ["-hwaccel", wanted, .. strictFlags],
-                Reason = $"Decoding with '{wanted}', as configured for this workflow.",
-            };
-        }
-
-        foreach (var candidate in AutoPreference)
-        {
-            if (report.AvailableMethods.Contains(candidate, StringComparer.Ordinal) && Allowed(candidate, settings.DisabledVendors))
-            {
-                return new AccelerationDecision
-                {
-                    Method = candidate,
-                    ArgvFlags = ["-hwaccel", candidate, .. strictFlags],
-                    Reason = $"Chose '{candidate}' automatically from what this ffmpeg build offers.",
-                };
-            }
-        }
-
-        return new AccelerationDecision
-        {
-            ArgvFlags = strictFlags,
-            FellBackToSoftware = true,
-            Reason = "Weir fell back to software decoding because every acceleration method this ffmpeg build "
-                + "offers belongs to a vendor this workflow has switched off.",
-        };
-    }
-
-    /// <summary>Known vendors only, first occurrence kept.</summary>
-    public static IReadOnlyList<string> ParseDisabledVendors(string? csv)
-    {
-        var result = new List<string>();
-        foreach (var raw in (csv ?? string.Empty).Split(','))
-        {
-            var name = RulesJson.Lower(WireStrings.Strip(raw));
-            if (VendorMethods.Any(v => v.Key == name) && !result.Contains(name, StringComparer.Ordinal))
-            {
-                result.Add(name);
-            }
-        }
-
-        return result;
-    }
-
-    /// <summary>Unknown values mean ffmpeg's default.</summary>
-    public static string NormalizeStrictness(string? raw)
-    {
-        var value = RulesJson.Lower(WireStrings.Strip(raw ?? string.Empty));
-        return StrictnessLevels.Contains(value, StringComparer.Ordinal) ? value : DefaultStrictness;
-    }
-
-    /// <summary>
-    /// Whether a workflow's hardware decoding choice takes effect. Weir copies video and audio without decoding them, so a
-    /// hardware decoder has nothing to do and the workflow editor shows the choice as unavailable. Saved values are kept.
-    /// </summary>
-    public static bool DecodeIsAvailable => false;
-
-    /// <summary>The decode mode a pass uses for a workflow that saved <paramref name="saved"/>.</summary>
-    public static string EffectiveDecodeMode(string? saved) => DecodeIsAvailable ? NormalizeDecodeMode(saved) : ModeOff;
-
-    /// <summary>Unknown values mean off.</summary>
-    public static string NormalizeDecodeMode(string? raw)
-    {
-        var value = RulesJson.Lower(WireStrings.Strip(raw ?? string.Empty));
-        return value is ModeOff or ModeAuto or ModeDevice ? value : ModeOff;
-    }
-
-    private static string? VendorOf(string method) =>
-        VendorMethods.FirstOrDefault(v => v.Value.Contains(method, StringComparer.Ordinal)).Key;
-
-    private static bool Allowed(string method, IReadOnlyList<string> disabled)
-    {
-        var vendor = VendorOf(method);
-        return vendor is null || !disabled.Contains(vendor, StringComparer.Ordinal);
     }
 }

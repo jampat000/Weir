@@ -272,7 +272,7 @@ internal sealed class LibraryModeFilesEndpointHandlers
         }
 
         var settings = await _librarySettings.GetAsync(uow, libraryId).ConfigureAwait(false);
-        var rules = await LibraryModeMapping.RulesForAsync(uow, _libraries, library).ConfigureAwait(false);
+        var rules = await LibraryModeRules.ForAsync(uow, _libraries, library, settings).ConfigureAwait(false);
         var connectionsById = await LibraryModeMapping.ConnectionsForFilesAsync(uow, _connections, selected).ConfigureAwait(false);
         var preflightResults = await LibraryCleanPreflightRunner.RunAsync(
                 selected, settings, rules, library.MediaType, _hardlinkInspector,
@@ -325,7 +325,7 @@ internal sealed class LibraryModeFilesEndpointHandlers
             var fileConfirmed = (chosen is { } c ? c.Tracks == 0 : entry.RemovedAudioCount + entry.RemovedSubtitleCount == 0) || confirmed;
             var job = await _scans.EnqueueCleanAsync(
                     uow, _jobs, library.Id, entry.Path, "manual", fileConfirmed,
-                    manualPlan, manualPlan is null ? null : expectedSizeBytes ?? entry.SizeBytes)
+                    manualPlan, manualPlan is null ? null : expectedSizeBytes ?? entry.SizeBytes, entry.ProbeJson)
                 .ConfigureAwait(false);
             jobIds.Add(job.Id);
         }

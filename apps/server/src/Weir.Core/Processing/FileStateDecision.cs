@@ -22,7 +22,6 @@ public static class FileStateDecision
         DateTimeOffset? settlingStableAt,
         string? accessProblem,
         string? blockedByConnection,
-        long minimumAgeSeconds,
         DateTimeOffset now)
     {
         ArgumentNullException.ThrowIfNull(library);
@@ -46,7 +45,7 @@ public static class FileStateDecision
                 HoldUntil: windowReopensAt);
         }
 
-        var holdSeconds = Math.Max(0, minimumAgeSeconds) + (Math.Max(0, library.HoldMinutes) * 60);
+        var readyAfterSeconds = Math.Max(0, library.ReadyAfterSeconds);
         if (sizeIsSettling)
         {
             return new FileStateVerdict(
@@ -55,12 +54,12 @@ public static class FileStateDecision
                 HoldUntil: settlingStableAt);
         }
 
-        if (holdSeconds > 0 && fileAgeSeconds is { } age && age < holdSeconds)
+        if (readyAfterSeconds > 0 && fileAgeSeconds is { } age && age < readyAfterSeconds)
         {
-            var remaining = (long)(holdSeconds - age);
+            var remaining = (long)(readyAfterSeconds - age);
             return new FileStateVerdict(
                 ProcessingFileStatuses.OnHold,
-                $"This file changed too recently. Weir waits {holdSeconds}s after the last change before processing, so it has about {remaining}s to go.",
+                $"This file changed too recently. Weir waits {readyAfterSeconds}s after the last change before processing, so it has about {remaining}s to go.",
                 HoldUntil: now.AddSeconds(remaining));
         }
 

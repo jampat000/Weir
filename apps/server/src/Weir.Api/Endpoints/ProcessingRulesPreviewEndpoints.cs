@@ -62,6 +62,7 @@ internal sealed class ProcessingRulesPreviewEndpointHandlers
         var csrfToken = model.Str("csrf_token", minLength: 1);
         var relativePath = model.OptionalStr("relative_path", maxLength: 4000);
         var absolutePath = model.OptionalStr("absolute_path", maxLength: 4000);
+        var ruleSetId = model.OptionalInt("rule_set_id", ge: 1);
 
         // "rules" is optional and, when present, validated exactly like a rule-set save (the same field
         // readers as PUT /processing/rule-sets/{id}), just never written to the database. It is read by hand
@@ -112,7 +113,7 @@ internal sealed class ProcessingRulesPreviewEndpointHandlers
 
         try
         {
-            return await RunPreviewAsync(request, uow, library, resolvedPath, ruleSetInput).ConfigureAwait(false);
+            return await RunPreviewAsync(request, uow, library, resolvedPath, new RulesChoice(ruleSetInput, ruleSetId)).ConfigureAwait(false);
         }
         finally
         {
@@ -174,11 +175,11 @@ internal sealed class ProcessingRulesPreviewEndpointHandlers
         UnitOfWork uow,
         ProcessingLibraryRecord library,
         string resolvedPath,
-        LibraryRules.RuleSetInput? ruleSetInput)
+        RulesChoice choice)
     {
         var scope = string.Equals(library.MediaType, ProcessingMediaScopes.Tv, StringComparison.OrdinalIgnoreCase) ? ProcessingMediaScopes.Tv : ProcessingMediaScopes.Movie;
 
-        var config = await BuildConfigAsync(uow, library, ruleSetInput).ConfigureAwait(false);
+        var config = await BuildConfigAsync(uow, library, choice).ConfigureAwait(false);
 
         System.Text.Json.JsonElement probeJson;
         try
@@ -243,10 +244,14 @@ internal sealed class ProcessingRulesPreviewEndpointHandlers
         return ApiRoutes.Ok(result);
     }
 
-    /// <summary>Unsaved rules (validated exactly like a save) take priority; otherwise the library's saved
-    /// rule set; otherwise the shipped defaults — the same fallback order a live pass uses.</summary>
-    private async Task<ProcessingRulesConfig> BuildConfigAsync(UnitOfWork uow, ProcessingLibraryRecord library, LibraryRules.RuleSetInput? ruleSetInput)
+    /// <summary>
+    /// Unsaved rules (validated exactly like a save) take priority, then a saved profile the request names (the Library
+    /// page previews with the profile its library cleans by); otherwise the workflow's saved rule set, otherwise the shipped
+    /// defaults — the same fallback order a live pass uses.
+    /// </summary>
+    private async Task<ProcessingRulesConfig> BuildConfigAsync(UnitOfWork uow, ProcessingLibraryRecord library, RulesChoice choice)
     {
+        var ruleSetInput = choice.Unsaved;
         if (ruleSetInput is not null)
         {
             ProcessingRuleSetRecord previewRow;
@@ -263,6 +268,13 @@ internal sealed class ProcessingRulesPreviewEndpointHandlers
             return RemuxPassPaths.RulesConfigFor(previewRow);
         }
 
+        if (choice.SavedRuleSetId is { } requestedId)
+        {
+            var requested = await _libraries.GetRuleSetAsync(uow, requestedId).ConfigureAwait(false)
+                ?? throw new ApiException(StatusCodes.Status400BadRequest, "That rules profile no longer exists. Choose another one.");
+            return RemuxPassPaths.RulesConfigFor(requested);
+        }
+
         if (library.RuleSetId is { } ruleSetId && await _libraries.GetRuleSetAsync(uow, ruleSetId).ConfigureAwait(false) is { } savedRow)
         {
             return RemuxPassPaths.RulesConfigFor(savedRow);
@@ -270,6 +282,9 @@ internal sealed class ProcessingRulesPreviewEndpointHandlers
 
         return RemuxRules.DefaultConfig();
     }
+
+    /// <summary>Which rules a preview runs: edits not yet saved, or a saved profile by id; neither means the workflow's own.</summary>
+    private sealed record RulesChoice(LibraryRules.RuleSetInput? Unsaved, long? SavedRuleSetId);
 
     /// <summary>
     /// #537 item 4's lookup, run the same way a live pass runs it: declining (no provider, no match,

@@ -36,7 +36,7 @@ public sealed record HandoffLedgerRow(
     IReadOnlyList<string>? OutputFiles = null);
 
 /// <summary>The <c>files</c> columns the ledger reads.</summary>
-public sealed record HandoffFileRow(long Id, string RelativePath, string Status, string StatusReason, long FailureAttempts, DateTimeOffset? NextRetryAt, DateTimeOffset? UpdatedAt);
+public sealed record HandoffFileRow(long Id, string RelativePath, string Status, string StatusReason, DateTimeOffset? NextRetryAt, DateTimeOffset? UpdatedAt);
 
 /// <summary>
 /// The hand-off ledger: state is worked out live from the job queue and the Files rows

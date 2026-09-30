@@ -151,4 +151,59 @@ public sealed class ConfigurationBundleStoreTests : IDisposable
             commit: false);
         Assert.Equal(@"C:\media\movies-in", Assert.Single(watched));
     }
+
+    [Fact]
+    public async Task An_export_carries_the_workflows_one_wait_and_minimum_size_and_none_of_the_retired_settings()
+    {
+        var bundle = await BuildBundleAsync();
+
+        var workflow = LibraryAt(bundle, 0);
+        var performance = (WireObject)bundle["operator_settings"];
+        Assert.Equal((60, 50), (Number(workflow, "ready_after_seconds"), Number(workflow, "min_file_size_mb")));
+        foreach (var retired in new[] { "min_file_age_seconds", "hold_minutes", "file_detection_interval_seconds" })
+        {
+            Assert.False(workflow.ContainsKey(retired), retired);
+        }
+
+        Assert.False(performance.ContainsKey("min_file_age_seconds"));
+        Assert.False(performance.ContainsKey("min_input_file_size_mb"));
+    }
+
+    [Fact]
+    public async Task A_current_bundle_restores_each_workflows_wait_and_minimum_size_as_they_are()
+    {
+        var bundle = await BuildBundleAsync();
+        LibraryAt(bundle, 0).Set("ready_after_seconds", 5L).Set("min_file_size_mb", 0L);
+        LibraryAt(bundle, 1).Set("ready_after_seconds", 900L).Set("min_file_size_mb", 200L);
+
+        await ApplyAsync(bundle);
+
+        Assert.Equal(5, await _store.Scalar("SELECT ready_after_seconds FROM libraries WHERE name = 'Movies'"));
+        Assert.Equal(0, await _store.Scalar("SELECT min_file_size_mb FROM libraries WHERE name = 'Movies'"));
+        Assert.Equal(900, await _store.Scalar("SELECT ready_after_seconds FROM libraries WHERE name = 'TV'"));
+        Assert.Equal(200, await _store.Scalar("SELECT min_file_size_mb FROM libraries WHERE name = 'TV'"));
+    }
+
+    [Fact]
+    public async Task An_older_bundle_restores_each_workflow_with_the_longest_wait_it_had_and_the_minimum_size_it_used()
+    {
+        var bundle = await BuildBundleAsync();
+        ((WireObject)bundle["operator_settings"]).Set("min_file_age_seconds", 100L).Set("min_input_file_size_mb", 75L);
+        var followsPerformance = LibraryAt(bundle, 0);
+        followsPerformance.Remove("ready_after_seconds");
+        followsPerformance.Set("min_file_age_seconds", WireNull.Instance).Set("hold_minutes", 2L).Set("file_detection_interval_seconds", 30L)
+            .Set("min_file_size_mb", WireNull.Instance);
+        var ownValues = LibraryAt(bundle, 1);
+        ownValues.Remove("ready_after_seconds");
+        ownValues.Set("min_file_age_seconds", 10L).Set("hold_minutes", 0L).Set("file_detection_interval_seconds", 90L).Set("min_file_size_mb", 200L);
+
+        await ApplyAsync(bundle);
+
+        Assert.Equal(220, await _store.Scalar("SELECT ready_after_seconds FROM libraries WHERE name = 'Movies'"));
+        Assert.Equal(75, await _store.Scalar("SELECT min_file_size_mb FROM libraries WHERE name = 'Movies'"));
+        Assert.Equal(90, await _store.Scalar("SELECT ready_after_seconds FROM libraries WHERE name = 'TV'"));
+        Assert.Equal(200, await _store.Scalar("SELECT min_file_size_mb FROM libraries WHERE name = 'TV'"));
+    }
+
+    private static long Number(WireObject row, string key) => (long)((WireInteger)row[key]).Value;
 }

@@ -57,11 +57,9 @@ function library(over: Partial<ProcessingLibrary> = {}): ProcessingLibrary {
     include_patterns_csv: "",
     exclude_patterns_csv: "",
     min_file_size_mb: 0,
-    effective_min_file_size_mb: 0,
     max_file_size_mb: 0,
     rejected_file_action: "leave",
-    min_file_age_seconds: 60,
-    effective_min_file_age_seconds: 60,
+    ready_after_seconds: 60,
     created_after: null,
     created_before: null,
     modified_after: null,
@@ -69,18 +67,13 @@ function library(over: Partial<ProcessingLibrary> = {}): ProcessingLibrary {
     exclude_hidden: true,
     top_level_only: false,
     scan_interval_seconds: 300,
-    hold_minutes: 0,
     sidecar_patterns_csv: ".srt,.nfo",
     preserve_original_timestamps: false,
     remove_original_after_success: true,
+    minimum_free_disk_space_mb: 5120,
     remux_writer: "best",
-    rewrite_with_ffmpeg: true,
     output_collision_policy: "replace",
-    hardware_decode_mode: "off",
-    hardware_device: "",
-    hardware_disabled_vendors_csv: "",
     ffmpeg_strictness: "normal",
-    file_detection_interval_seconds: 30,
     ignore_size_changes: false,
     skip_access_tests: false,
     file_system_events_enabled: true,
@@ -96,6 +89,7 @@ function library(over: Partial<ProcessingLibrary> = {}): ProcessingLibrary {
     schedule_start: "00:00",
     schedule_end: "23:59",
     max_concurrent_files: 1,
+    effective_max_concurrent_files: 1,
     priority: 0,
     rule_set_id: null,
     manager_connection_ids: [],
@@ -171,7 +165,7 @@ it("asks before an unsaved library's hours are replaced by another library's", a
 it("keeps a workflow's other settings when its hours are saved", async () => {
   asOperator();
   vi.spyOn(librariesApi, "fetchProcessingLibraries").mockResolvedValue([
-    library({ remux_writer: "ffmpeg", rewrite_with_ffmpeg: false }),
+    library({ remux_writer: "ffmpeg" }),
   ]);
   const update = vi
     .spyOn(librariesApi, "updateProcessingLibrary")
@@ -188,6 +182,5 @@ it("keeps a workflow's other settings when its hours are saved", async () => {
   await waitFor(() => expect(update).toHaveBeenCalled());
   expect(update.mock.calls[0]![1]).toMatchObject({
     remux_writer: "ffmpeg",
-    rewrite_with_ffmpeg: false,
   });
 });

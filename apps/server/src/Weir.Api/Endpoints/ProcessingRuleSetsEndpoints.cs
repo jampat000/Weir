@@ -232,13 +232,8 @@ internal sealed class ProcessingRuleSetsEndpointHandlers
         var rescanJobIds = new List<long>();
         foreach (var library in await _libraries.ListAsync(uow).ConfigureAwait(false))
         {
-            if (library.RuleSetId != updated.Id)
-            {
-                continue;
-            }
-
             var settingsForLibrary = await _librarySettings.GetAsync(uow, library.Id).ConfigureAwait(false);
-            if (settingsForLibrary.Folders.Count == 0)
+            if (LibraryModeRules.EffectiveRuleSetId(library, settingsForLibrary) != updated.Id || settingsForLibrary.Folders.Count == 0)
             {
                 continue;
             }

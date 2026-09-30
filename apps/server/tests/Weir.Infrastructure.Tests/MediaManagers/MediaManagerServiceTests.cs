@@ -554,6 +554,38 @@ public sealed class MediaManagerServiceTests
     }
 
     [Fact]
+    public async Task A_hand_off_for_a_file_of_unknown_resolution_costs_what_a_1080p_file_does()
+    {
+        using var fixture = new MediaManagerFixture();
+        await fixture.Store.Execute("UPDATE operator_settings SET runner_cost_1080p = 3, runner_cost_4k = 7");
+        var watched = fixture.Store.Home.Join("movies");
+        Directory.CreateDirectory(Path.Join(watched, "Film"));
+        await File.WriteAllTextAsync(Path.Join(watched, "Film", "film.mkv"), "not a real film");
+        await fixture.LibraryAsync("movie", watched);
+
+        await fixture.Db(uow => fixture.Intake.EnqueueRefineAsync(uow, Handoff("h1", Path.Join(watched, "Film", "film.mkv"))));
+
+        Assert.Equal(3, (await fixture.Jobs.ListAsync()).Single().RunnerCost);
+    }
+
+    [Fact]
+    public async Task A_hand_off_for_a_file_already_measured_costs_its_own_resolution()
+    {
+        using var fixture = new MediaManagerFixture();
+        await fixture.Store.Execute("UPDATE operator_settings SET runner_cost_1080p = 3, runner_cost_4k = 7");
+        var watched = fixture.Store.Home.Join("movies");
+        Directory.CreateDirectory(Path.Join(watched, "Film"));
+        await File.WriteAllTextAsync(Path.Join(watched, "Film", "film.mkv"), "not a real film");
+        var libraryId = await fixture.LibraryAsync("movie", watched);
+        await fixture.Store.Execute(
+            $"INSERT INTO files (library_id, relative_path, video_width, video_height) VALUES ({libraryId}, 'Film/film.mkv', 3840, 2160)");
+
+        await fixture.Db(uow => fixture.Intake.EnqueueRefineAsync(uow, Handoff("h1", Path.Join(watched, "Film", "film.mkv"))));
+
+        Assert.Equal(7, (await fixture.Jobs.ListAsync()).Single().RunnerCost);
+    }
+
+    [Fact]
     public async Task Hand_offs_that_cannot_be_placed_are_refused_with_the_reason()
     {
         using var fixture = new MediaManagerFixture();

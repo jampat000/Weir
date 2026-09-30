@@ -2,7 +2,6 @@ using Weir.Core.Json;
 using Weir.Core.Media;
 using Weir.Core.Processing.RemuxPass;
 using Weir.Core.Rules;
-using Weir.Infrastructure.Media;
 
 namespace Weir.Infrastructure.Processing.RemuxPass;
 
@@ -13,7 +12,7 @@ public sealed partial class RemuxPassRunner
         WireObject output,
         RemuxPlan plan,
         IReadOnlyList<string> argv,
-        AccelerationDecision hardware,
+        IReadOnlyList<string> ffmpegInputFlags,
         string audioBefore,
         string audioAfter,
         string subsBefore,
@@ -54,12 +53,10 @@ public sealed partial class RemuxPassRunner
                 .Set("removed_audio", output["removed_audio"])
                 .Set("removed_subtitles", output["removed_subtitles"])
                 .Set("message", "Weir has started writing the cleaned-up file."));
-            // #548: the library's writer choice. The staged output keeps the source's own extension
-            // (RemuxToTempFileAsync), so the source path is what decides whether mkvmerge can take it.
-            var writer = new RemuxWriterSelector(
-                new FfmpegRemuxWriter(_tools),
-                new MkvmergeRemuxWriter(_tools, _resolver)).Select(src, request.Runtime.RemuxWriter);
-            var tmp = await _tools.RemuxToTempFileAsync(
+            // The staged output keeps the source's own extension (RemuxToTempFileAsync), so the source
+            // path is what decides whether mkvmerge can take it.
+            var writer = _tools.WriterFor(src, request.Runtime.RemuxWriter);
+            var staged = await _tools.RemuxToTempFileAsync(
                 src,
                 workDir,
                 plan,
@@ -81,11 +78,11 @@ public sealed partial class RemuxPassRunner
                             .Set("message", "Weir is writing the cleaned-up file."),
                         update)),
                 context.Duration,
-                hardware,
+                ffmpegInputFlags,
                 writer,
-                request.Runtime.RewriteWithFfmpeg,
                 request.KeepFailedWorkFiles,
                 cancellationToken).ConfigureAwait(false);
+            var tmp = staged.Path;
             try
             {
                 AssertSourceUnchanged(src, context.Expected);
@@ -166,9 +163,6 @@ public sealed partial class RemuxPassRunner
         output.Set("output_file", resolvedFinal);
         output.Set("output_replaced_existing", replacedExisting);
         output.Set("processing_output_folder_resolved", context.OutputDirectory);
-        output.Set("hardware_method", hardware.Method.Length > 0 ? hardware.Method : null);
-        output.Set("hardware_fell_back_to_software", hardware.FellBackToSoftware);
-        output.Set("hardware_reason", hardware.Reason);
         output.Set("output_collision_policy", collision.Policy);
         output.Set("output_collision_action", collision.Action);
         // For the person asking "why is there no new output for this file".

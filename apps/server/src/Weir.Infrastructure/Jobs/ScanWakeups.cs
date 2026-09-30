@@ -4,19 +4,32 @@ namespace Weir.Infrastructure.Jobs;
 
 /// <summary>
 /// When Weir next looks at each library's watched folder: its next periodic scan, and any look booked for the moment a
-/// file there stops being held. Processing counts an arriving file down to the real next look instead of guessing.
+/// file there stops being held or a failed file's retry falls due. Processing counts an arriving file down to the real
+/// next look instead of guessing.
 /// </summary>
 /// <remarks>
 /// A scan that holds a file until a known time — it is still being written, it changed too recently, the library's
-/// window reopens later — books the library's next look for then, and the scan timer honours the booking on its next
-/// tick. Before this a held file waited for the library's next periodic scan, five minutes by default, after its hold had
-/// already ended: Processing showed it "due now" in Arriving while a lane stood free. Only the earliest booking per
-/// library is kept, because the scan that runs then books the next one itself.
+/// window reopens later, a failed file waits out its retry delay — books the library's next look for then, and the scan
+/// timer honours the booking on its next tick. Without a booking a held file would wait for the library's next periodic
+/// scan, five minutes by default, after its hold had already ended: Processing showed it "due now" in Arriving while a
+/// lane stood free. Only the earliest booking per library is kept, because the scan that runs then books the next one itself.
 /// </remarks>
 public sealed class ScanWakeups
 {
+    /// <summary>How long after a retry falls due the look is booked, so the look finds it due rather than a moment short.</summary>
+    private static readonly TimeSpan RetryLookDelay = TimeSpan.FromSeconds(1);
+
     private readonly ConcurrentDictionary<long, DateTimeOffset> _at = new();
     private readonly ConcurrentDictionary<long, DateTimeOffset> _periodic = new();
+
+    /// <summary>Book a look at <paramref name="libraryId"/> for when a failed file's retry falls due; nothing when none is owed.</summary>
+    public void RequestForRetry(long libraryId, DateTimeOffset? retryAt)
+    {
+        if (retryAt is { } due)
+        {
+            Request(libraryId, due + RetryLookDelay);
+        }
+    }
 
     /// <summary>The scan timer's next periodic look at <paramref name="libraryId"/>.</summary>
     public void RecordNextPeriodic(long libraryId, DateTimeOffset at) => _periodic[libraryId] = at;

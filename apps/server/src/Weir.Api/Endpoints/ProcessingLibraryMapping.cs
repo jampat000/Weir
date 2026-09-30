@@ -31,7 +31,6 @@ internal static class ProcessingLibraryMapping
         var managerIds = await libraries.ManagerConnectionIdsAsync(uow, row.Id).ConfigureAwait(false);
         var activeJobs = await libraries.ActiveJobCountAsync(uow, row).ConfigureAwait(false);
         var performance = await operatorSettings.EnsureAsync(uow).ConfigureAwait(false);
-        var intake = IntakeLimits.Resolve(row, performance);
         var periodicScan = await PeriodicScanStatusAsync(request, uow, row, performance, suiteSettings, looks).ConfigureAwait(false);
 
         // manager_coverage: the linked connections' last saved connection-test result (no live call — a
@@ -82,13 +81,10 @@ internal static class ProcessingLibraryMapping
             .Set("exclude_markers_csv", row.ExcludeMarkersCsv)
             .Set("include_patterns_csv", row.IncludePatternsCsv)
             .Set("exclude_patterns_csv", row.ExcludePatternsCsv)
-            // Null is "uses the Performance setting"; the effective_ pair is what the library is held to right now.
             .Set("min_file_size_mb", row.MinFileSizeMb)
-            .Set("effective_min_file_size_mb", intake.MinFileSizeMb)
             .Set("max_file_size_mb", row.MaxFileSizeMb)
             .Set("rejected_file_action", row.RejectedFileAction.Length > 0 ? row.RejectedFileAction : "leave")
-            .Set("min_file_age_seconds", row.MinFileAgeSeconds)
-            .Set("effective_min_file_age_seconds", intake.MinFileAgeSeconds)
+            .Set("ready_after_seconds", row.ReadyAfterSeconds)
             .Set("created_after", row.CreatedAfter?.ToWireText())
             .Set("created_before", row.CreatedBefore?.ToWireText())
             .Set("modified_after", row.ModifiedAfter?.ToWireText())
@@ -96,17 +92,11 @@ internal static class ProcessingLibraryMapping
             .Set("exclude_hidden", row.ExcludeHidden)
             .Set("top_level_only", row.TopLevelOnly)
             .Set("scan_interval_seconds", row.ScanIntervalSeconds)
-            .Set("hold_minutes", row.HoldMinutes)
             .Set("sidecar_patterns_csv", row.SidecarPatternsCsv)
             .Set("preserve_original_timestamps", row.PreserveOriginalTimestamps)
             .Set("output_collision_policy", row.OutputCollisionPolicy.Length > 0 ? row.OutputCollisionPolicy : "replace")
-            .Set("hardware_decode_mode", row.HardwareDecodeMode.Length > 0 ? row.HardwareDecodeMode : "off")
-            .Set("hardware_device", row.HardwareDevice)
-            .Set("hardware_disabled_vendors_csv", row.HardwareDisabledVendorsCsv)
             .Set("ffmpeg_strictness", row.FfmpegStrictness.Length > 0 ? row.FfmpegStrictness : "normal")
             .Set("remux_writer", RemuxWriterChoice.Normalize(row.RemuxWriter))
-            .Set("rewrite_with_ffmpeg", row.RewriteWithFfmpeg)
-            .Set("file_detection_interval_seconds", row.FileDetectionIntervalSeconds)
             .Set("ignore_size_changes", row.IgnoreSizeChanges)
             .Set("skip_access_tests", row.SkipAccessTests)
             .Set("file_system_events_enabled", row.FileSystemEventsEnabled)
@@ -122,10 +112,13 @@ internal static class ProcessingLibraryMapping
             .Set("schedule_start", row.ScheduleStart)
             .Set("schedule_end", row.ScheduleEnd)
             .Set("max_concurrent_files", row.MaxConcurrentFiles)
+            // What the workflow is held to right now: never more than Settings › Performance's "Files at once", even if that was lowered after this was set.
+            .Set("effective_max_concurrent_files", OperatorSettingsRules.EffectiveLibraryLimit(row.MaxConcurrentFiles, performance.MaxConcurrentFiles))
             .Set("priority", row.Priority)
             .Set("rule_set_id", row.RuleSetId)
             .Set("manager_connection_ids", new WireArray(managerIds.Select(id => (WireValue)WireValue.Of(id))))
             .Set("remove_original_after_success", row.RemoveOriginalAfterSuccess)
+            .Set("minimum_free_disk_space_mb", OperatorSettingsRules.ClampSizeMb(row.MinimumFreeDiskSpaceMb))
             .Set("manager_coverage", coverage)
             .Set("manager_coverage_detail", coverageDetail)
             .Set("discovered_from_connection_id", row.DiscoveredFromConnectionId)
@@ -157,8 +150,19 @@ internal static class ProcessingLibraryMapping
             looks?.NextPeriodicFor(row.Id));
     }
 
+    /// <summary>
+    /// Retired workflow settings: the fallback rewrite (folded into the "best" writer), hardware decoding (Weir copies
+    /// video without decoding it) and the three waits that became <c>ready_after_seconds</c>. A save may still send them.
+    /// </summary>
+    private static readonly string[] RemovedSettings =
+    [
+        "rewrite_with_ffmpeg", "hardware_decode_mode", "hardware_device", "hardware_disabled_vendors_csv",
+        "min_file_age_seconds", "hold_minutes", "file_detection_interval_seconds",
+    ];
+
     internal static ProcessingLibraryInput ReadLibraryBody(BodyModel model)
     {
+        model.AcceptAndIgnore(RemovedSettings);
         var name = model.Str("name", minLength: 1, maxLength: 120);
         var mediaType = model.Literal("media_type", ProcessingMediaScopes.All);
         var enabled = model.Bool("enabled", defaultValue: true);
@@ -169,11 +173,10 @@ internal static class ProcessingLibraryMapping
         var excludeMarkersCsv = model.OptionalStr("exclude_markers_csv", defaultValue: "", maxLength: 1000) ?? "";
         var includePatternsCsv = model.OptionalStr("include_patterns_csv", defaultValue: "", maxLength: 1000) ?? "";
         var excludePatternsCsv = model.OptionalStr("exclude_patterns_csv", defaultValue: "", maxLength: 1000) ?? "";
-        // Left out or null, a library follows Settings › Performance for its minimum size and wait.
-        var minFileSizeMb = model.OptionalInt("min_file_size_mb", ge: 0, le: 1_000_000);
-        var maxFileSizeMb = model.Number("max_file_size_mb", 0, required: false, ge: 0, le: 1_000_000);
+        var minFileSizeMb = model.Number("min_file_size_mb", LibraryIntake.DefaultMinFileSizeMb, required: false, ge: 0, le: LibraryIntake.LargestSizeLimitMb);
+        var maxFileSizeMb = model.Number("max_file_size_mb", 0, required: false, ge: 0, le: LibraryIntake.LargestSizeLimitMb);
         var rejectedFileAction = model.Literal("rejected_file_action", [.. RejectedFileActions.All], defaultValue: RejectedFileActions.Leave);
-        var minFileAgeSeconds = model.OptionalInt("min_file_age_seconds", ge: 0, le: 604800);
+        var readyAfterSeconds = model.Number("ready_after_seconds", LibraryIntake.DefaultReadyAfterSeconds, required: false, ge: 0, le: LibraryIntake.MaxReadyAfterSeconds);
         var createdAfter = model.OptionalDateTime("created_after");
         var createdBefore = model.OptionalDateTime("created_before");
         var modifiedAfter = model.OptionalDateTime("modified_after");
@@ -183,16 +186,10 @@ internal static class ProcessingLibraryMapping
         var sidecarPatternsCsv = model.OptionalStr("sidecar_patterns_csv", defaultValue: ".srt,.ass,.ssa,.sub,.idx,.vtt,.nfo,.jpg,.png") ?? string.Empty;
         var preserveOriginalTimestamps = model.Bool("preserve_original_timestamps", defaultValue: false);
         var outputCollisionPolicy = model.Literal("output_collision_policy", [.. OutputCollisionPolicies.All], defaultValue: OutputCollisionPolicies.Replace);
-        var hardwareDecodeMode = model.Literal("hardware_decode_mode", [.. HardwareDecodeModes.All], defaultValue: HardwareDecodeModes.Off);
-        var hardwareDevice = model.OptionalStr("hardware_device", defaultValue: "", maxLength: 32) ?? string.Empty;
-        var hardwareDisabledVendorsCsv = model.OptionalStr("hardware_disabled_vendors_csv", defaultValue: "", maxLength: 200) ?? string.Empty;
         var ffmpegStrictness = model.Literal("ffmpeg_strictness", [.. FfmpegStrictnessLevels.All], defaultValue: FfmpegStrictnessLevels.Normal);
         // #548: two values, because "mkvmerge" and "auto" would behave identically - see RemuxWriterChoice.
         var remuxWriter = model.Literal("remux_writer", [.. RemuxWriterChoice.All], defaultValue: RemuxWriterChoice.Best);
-        var rewriteWithFfmpeg = model.Bool("rewrite_with_ffmpeg", defaultValue: true);
         var scanIntervalSeconds = model.Number("scan_interval_seconds", 300, required: false, ge: 10, le: 604800);
-        var holdMinutes = model.Number("hold_minutes", 0, required: false, ge: 0, le: 10080);
-        var fileDetectionIntervalSeconds = model.Number("file_detection_interval_seconds", 30, required: false, ge: 0, le: 3600);
         var ignoreSizeChanges = model.Bool("ignore_size_changes", defaultValue: false);
         var skipAccessTests = model.Bool("skip_access_tests", defaultValue: false);
         var maxAttempts = model.Number("max_attempts", 3, required: false, ge: 1, le: 20);
@@ -214,6 +211,8 @@ internal static class ProcessingLibraryMapping
         var ruleSetId = model.OptionalInt("rule_set_id");
         var managerConnectionIds = model.IntList("manager_connection_ids");
         var removeOriginalAfterSuccess = model.Bool("remove_original_after_success", defaultValue: true);
+        var minimumFreeDiskSpaceMb = model.Number(
+            "minimum_free_disk_space_mb", ProcessingLibraryRecord.DefaultMinimumFreeDiskSpaceMb, required: false, ge: 0, le: 1024 * 1024);
 
         return new ProcessingLibraryInput
         {
@@ -230,7 +229,7 @@ internal static class ProcessingLibraryMapping
             MinFileSizeMb = minFileSizeMb,
             MaxFileSizeMb = maxFileSizeMb,
             RejectedFileAction = rejectedFileAction,
-            MinFileAgeSeconds = minFileAgeSeconds,
+            ReadyAfterSeconds = readyAfterSeconds,
             CreatedAfter = createdAfter,
             CreatedBefore = createdBefore,
             ModifiedAfter = modifiedAfter,
@@ -240,15 +239,9 @@ internal static class ProcessingLibraryMapping
             SidecarPatternsCsv = sidecarPatternsCsv,
             PreserveOriginalTimestamps = preserveOriginalTimestamps,
             OutputCollisionPolicy = outputCollisionPolicy,
-            HardwareDecodeMode = hardwareDecodeMode,
-            HardwareDevice = hardwareDevice,
-            HardwareDisabledVendorsCsv = hardwareDisabledVendorsCsv,
             FfmpegStrictness = ffmpegStrictness,
             RemuxWriter = remuxWriter,
-            RewriteWithFfmpeg = rewriteWithFfmpeg,
             ScanIntervalSeconds = scanIntervalSeconds,
-            HoldMinutes = holdMinutes,
-            FileDetectionIntervalSeconds = fileDetectionIntervalSeconds,
             IgnoreSizeChanges = ignoreSizeChanges,
             SkipAccessTests = skipAccessTests,
             MaxAttempts = maxAttempts,
@@ -268,6 +261,7 @@ internal static class ProcessingLibraryMapping
             RuleSetId = ruleSetId,
             ManagerConnectionIds = managerConnectionIds,
             RemoveOriginalAfterSuccess = removeOriginalAfterSuccess,
+            MinimumFreeDiskSpaceMb = minimumFreeDiskSpaceMb,
         };
     }
 

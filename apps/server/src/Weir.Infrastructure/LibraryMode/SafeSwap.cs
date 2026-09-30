@@ -13,7 +13,7 @@ namespace Weir.Infrastructure.LibraryMode;
 /// <para>Steps, each of which may fail (the tests inject a failure, and a crash, at every one):</para>
 /// <list type="number">
 /// <item>Put right any leftovers of an earlier swap of this file (<see cref="SwapRecoverySweep.RecoverFile"/>).</item>
-/// <item>Preflight: present, not hardlinked (#508), free space for a copy plus 1 GiB, folder writable, not read-only, not in use; fingerprint.</item>
+/// <item>Preflight: present, not hardlinked (#508), free space for a copy plus what the workflow keeps free, folder writable, not read-only, not in use; fingerprint.</item>
 /// <item>Journal <c>writing</c>; write <c>&lt;name&gt;.weir-tmp&lt;ext&gt;</c> beside the original; validate it.</item>
 /// <item>Re-fingerprint the original: changed → discard the copy, "The file changed while Weir was working; nothing was replaced".</item>
 /// <item>Copy the original's permissions to the copy (best effort; never the mtime).</item>
@@ -80,7 +80,7 @@ public sealed partial class SafeSwap
             }
 
             var directory = DirectoryOf(originalPath);
-            var required = SafeSwapRules.RequiredFreeBytes(fingerprint.SizeBytes);
+            var required = SafeSwapRules.RequiredFreeBytes(fingerprint.SizeBytes, options.KeepFreeBytes);
             var available = _files.AvailableFreeBytes(directory);
             if (available is null)
             {
@@ -88,7 +88,7 @@ public sealed partial class SafeSwap
             }
             else if (available < required)
             {
-                return Refuse(SwapOutcome.InsufficientSpace, SafeSwapRules.InsufficientSpaceMessage(required, available.Value), fingerprint);
+                return Refuse(SwapOutcome.InsufficientSpace, SafeSwapRules.InsufficientSpaceMessage(required, available.Value, options.KeepFreeBytes), fingerprint);
             }
 
             try

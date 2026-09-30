@@ -14,7 +14,9 @@ public sealed partial class ConfigurationBundleStore
     /// </summary>
     /// <remarks>
     /// Rows are inserted as they are, with no renaming (such as <c>media_scope</c> to <c>media_type</c>, #557):
-    /// a version 4 bundle always carries both sections in the current shape. Every library row is validated
+    /// a version 4 bundle always carries both sections in the current shape, except that a workflow's three waits and
+    /// its empty minimum size are first turned into the one wait and the minimum size a workflow holds
+    /// (<see cref="ConfigurationBundleIntakeUpgrade"/>). Every library row is validated
     /// before any row is written (see <see cref="ValidateRestoredLibraries"/>), the same checks
     /// <c>POST /processing/libraries</c> runs: a bad row refuses the whole restore rather than leaving the
     /// table partly replaced.
@@ -30,7 +32,11 @@ public sealed partial class ConfigurationBundleStore
         var libraryRows = Iterate(bundle[LibrariesTable])
             .Select(row => row as WireObject ?? throw new WireTypeException($"Each row in the backup's {LibrariesTable} section must be an object."))
             .ToList();
+        ConfigurationBundleIntakeUpgrade.Apply(
+            bundle[ProcessingOperatorTable] as WireObject ?? throw new WireTypeException($"The backup's {ProcessingOperatorTable} section must be an object."),
+            libraryRows);
         ValidateRestoredLibraries(libraryRows, weirHome);
+        CarryPerformanceFreeSpaceToWorkflows(bundle, libraryRows);
 
         await uow.ExecuteAsync("DELETE FROM libraries").ConfigureAwait(false);
         await uow.ExecuteAsync("DELETE FROM rule_sets").ConfigureAwait(false);
@@ -50,6 +56,24 @@ public sealed partial class ConfigurationBundleStore
             }
 
             await InsertAsync(uow, LibrariesTable, libraryColumns, ToKwargs(libraryColumns, data)).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// A backup written when Settings › Performance held the space to keep free has no such value on its workflows. They take
+    /// that value, as an upgrade gives it to them, rather than the default.
+    /// </summary>
+    private static void CarryPerformanceFreeSpaceToWorkflows(WireObject bundle, IEnumerable<WireObject> libraryRows)
+    {
+        if (bundle.Get(ProcessingOperatorTable) is not WireObject performance ||
+            performance.Get(FreeSpaceColumn) is not { } kept || kept is WireNull)
+        {
+            return;
+        }
+
+        foreach (var row in libraryRows.Where(row => !row.ContainsKey(FreeSpaceColumn)))
+        {
+            row.Set(FreeSpaceColumn, kept);
         }
     }
 
@@ -97,7 +121,6 @@ public sealed partial class ConfigurationBundleStore
         OutputFolder = RestoreLibraryString(row, "output_folder") ?? string.Empty,
         RejectedFileAction = RestoreLibraryString(row, "rejected_file_action") ?? RejectedFileActions.Leave,
         OutputCollisionPolicy = RestoreLibraryString(row, "output_collision_policy") ?? OutputCollisionPolicies.Replace,
-        HardwareDecodeMode = RestoreLibraryString(row, "hardware_decode_mode") ?? HardwareDecodeModes.Off,
         FfmpegStrictness = RestoreLibraryString(row, "ffmpeg_strictness") ?? FfmpegStrictnessLevels.Normal,
         RemuxWriter = RestoreLibraryString(row, "remux_writer") ?? RemuxWriterChoice.Best,
         FailurePolicy = RestoreLibraryString(row, "failure_policy") ?? ProcessingFailurePolicies.PassThrough,

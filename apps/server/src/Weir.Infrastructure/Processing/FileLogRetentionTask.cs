@@ -5,9 +5,10 @@ using Weir.Infrastructure.Sqlite;
 namespace Weir.Infrastructure.Processing;
 
 /// <summary>
-/// Periodic pruning of the per-file processing record.
-/// Separate from the suite log's own retention: a suite log diagnoses the application, a per-file record
-/// diagnoses a file, and the two need different lifetimes.
+/// Periodic pruning of a file's history (its per-file processing record): kept while Weir still knows the file, then for the
+/// History page's number of days after the file is gone or forgotten.
+/// Separate from the suite log's own retention: a suite log diagnoses the application, a file's history
+/// tells what happened to a file, and the two need different lifetimes.
 /// </summary>
 public sealed class FileLogRetentionTask(
     SqliteDatabase database, OperatorSettingsStore operatorSettings, FileLogStore fileLogs, TimeProvider time, ILogger<FileLogRetentionTask> logger)

@@ -40,7 +40,12 @@ public sealed record KeepOriginalOptions(IReadOnlyList<string> LibraryFolders, s
 /// original is not probed a second time (#716).
 /// </param>
 /// <param name="KeepOriginal">#735: non-null moves the backup into an originals folder instead of deleting it.</param>
-public sealed record SwapOptions(bool AllowHardlinked = false, double? OriginalDurationSeconds = null, KeepOriginalOptions? KeepOriginal = null)
+/// <param name="KeepFreeBytes">The space the workflow keeps free on the file's drive, beyond room for the cleaned copy.</param>
+public sealed record SwapOptions(
+    bool AllowHardlinked = false,
+    double? OriginalDurationSeconds = null,
+    KeepOriginalOptions? KeepOriginal = null,
+    long KeepFreeBytes = SafeSwapRules.DefaultFreeSpaceMarginBytes)
 {
     public static SwapOptions Default { get; } = new();
 }

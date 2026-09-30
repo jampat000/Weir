@@ -1,7 +1,7 @@
 # Processing and media-manager coverage
 
 Processing's basic watched-folder remux is standalone. After a file has passed the
-local age, settling, access, schedule, and lifecycle checks, it can be processed
+wait for the file to stop changing (the workflow's own), settling, access, schedule, and lifecycle checks, it can be processed
 without Radarr, Sonarr, Deluno, or another manager.
 
 Weir's Settings call each route a file takes (watched folder, work folder, output folder and
@@ -71,7 +71,7 @@ manager link.
   folder to Weir's output folder, so Completed Download Handling only ever looks
   at cleaned files. Weir writes each output under the same relative path, name
   and extension as the download, and publishes it in one step. With a torrent
-  client, turn off the workflow's "After cleaning, remove the original download":
+  client, turn off the workflow's "New downloads: after cleaning, delete the original download":
   Sonarr/Radarr only import a download the client reports as completed, and a
   torrent whose files Weir removed reports missing files instead. Kept originals
   are recognised by size and modification time and never cleaned twice. The workflow editor

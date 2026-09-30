@@ -23,24 +23,21 @@ export type LibraryForm = {
   min_file_size_mb: string;
   max_file_size_mb: string;
   rejected_file_action: "leave" | "delete_file";
-  min_file_age_seconds: string;
+  ready_after_seconds: string;
   created_after: string;
   created_before: string;
   modified_after: string;
   modified_before: string;
   scan_interval_seconds: string;
-  hold_minutes: string;
-  file_detection_interval_seconds: string;
   max_concurrent_files: string;
   priority: string;
   sidecar_patterns_csv: string;
   output_collision_policy: string;
-  hardware_decode_mode: string;
-  hardware_device: string;
-  hardware_disabled_vendors_csv: string;
   ffmpeg_strictness: string;
   max_attempts: string;
   retry_backoff_seconds: string;
+  /** The space to keep free on the drive this workflow writes to, in gigabytes as a person types it. */
+  minimum_free_disk_space_gb: string;
   exclude_hidden: boolean;
   top_level_only: boolean;
   ignore_size_changes: boolean;
@@ -67,11 +64,9 @@ export type LibraryTextField = KeysOf<string>;
 /** The fields that are a checkbox. */
 export type LibraryToggleField = KeysOf<boolean>;
 
-/**
- * A minimum size or wait left blank in the editor: the library has no value of its own and uses the one in
- * Settings › Performance.
- */
-export const USES_PERFORMANCE_SETTING = "";
+/** What a new workflow starts with, the same as the server: ready after 60 s unchanged, files under 50 MB skipped. */
+const DEFAULT_READY_AFTER_SECONDS = 60;
+const DEFAULT_MIN_FILE_SIZE_MB = 50;
 
 /** A new library's values; the numbers are the server's own defaults. */
 export const EMPTY_LIBRARY_FORM: LibraryForm = {
@@ -85,27 +80,23 @@ export const EMPTY_LIBRARY_FORM: LibraryForm = {
     ".sabnzbd,__admin__,_failed_,_unpack_,_repair_,incomplete",
   include_patterns_csv: "",
   exclude_patterns_csv: "",
-  min_file_size_mb: USES_PERFORMANCE_SETTING,
+  min_file_size_mb: String(DEFAULT_MIN_FILE_SIZE_MB),
   max_file_size_mb: "0",
   rejected_file_action: "leave",
-  min_file_age_seconds: USES_PERFORMANCE_SETTING,
+  ready_after_seconds: String(DEFAULT_READY_AFTER_SECONDS),
   created_after: "",
   created_before: "",
   modified_after: "",
   modified_before: "",
   scan_interval_seconds: "300",
-  hold_minutes: "0",
-  file_detection_interval_seconds: "30",
   max_concurrent_files: "0",
   priority: "0",
   sidecar_patterns_csv: ".srt,.ass,.ssa,.sub,.idx,.vtt,.nfo,.jpg,.png",
   output_collision_policy: "replace",
-  hardware_decode_mode: "off",
-  hardware_device: "",
-  hardware_disabled_vendors_csv: "",
   ffmpeg_strictness: "normal",
   max_attempts: "3",
   retry_backoff_seconds: "300",
+  minimum_free_disk_space_gb: "5",
   exclude_hidden: true,
   top_level_only: false,
   ignore_size_changes: false,
@@ -151,27 +142,37 @@ function utcDateTimeValue(value: string): string | null {
   return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
 }
 
+const MB_PER_GB = 1024;
+/** What a new workflow keeps free: 5 GB, the server's own default. */
+const DEFAULT_FREE_SPACE_MB = 5 * MB_PER_GB;
+/** Gigabytes never need more precision than this to read sensibly. */
+const GB_DECIMALS = 2;
+
+/** Megabytes as the gigabytes a person reads and types, without a repeating decimal. */
+export function gigabytesText(megabytes: number): string {
+  return Math.max(0, megabytes / MB_PER_GB)
+    .toFixed(GB_DECIMALS)
+    .replace(/\.?0+$/, "");
+}
+
+/** Typed gigabytes as whole megabytes; a blank or unreadable value keeps the default. */
+function megabytesFromGigabytes(raw: string): number {
+  const gb = Number.parseFloat(raw);
+  return Number.isFinite(gb) && gb >= 0
+    ? Math.round(gb * MB_PER_GB)
+    : DEFAULT_FREE_SPACE_MB;
+}
+
 function wholeNumber(raw: string, fallback: number): number {
   const n = Number.parseInt(raw, 10);
   return Number.isFinite(n) ? n : fallback;
 }
 
-/** A whole number, or null when the field is blank: the library then uses the Performance setting. */
-function optionalWholeNumber(raw: string): number | null {
-  const n = Number.parseInt(raw, 10);
-  return Number.isFinite(n) ? n : null;
-}
-
-const INHERITABLE_FIELDS = [
-  "min_file_size_mb",
-  "min_file_age_seconds",
-] as const satisfies readonly (keyof ProcessingLibrary & LibraryTextField)[];
-
 const NUMBER_FIELDS = [
+  "min_file_size_mb",
   "max_file_size_mb",
+  "ready_after_seconds",
   "scan_interval_seconds",
-  "hold_minutes",
-  "file_detection_interval_seconds",
   "max_concurrent_files",
   "priority",
   "max_attempts",
@@ -195,8 +196,6 @@ const TEXT_FIELDS = [
   "include_patterns_csv",
   "exclude_patterns_csv",
   "sidecar_patterns_csv",
-  "hardware_device",
-  "hardware_disabled_vendors_csv",
 ] as const satisfies readonly (keyof ProcessingLibrary & LibraryTextField)[];
 
 /** The editor's values for a saved library. */
@@ -206,7 +205,6 @@ export function formFrom(library: ProcessingLibrary): LibraryForm {
     media_type: library.media_type,
     rejected_file_action: library.rejected_file_action,
     output_collision_policy: library.output_collision_policy,
-    hardware_decode_mode: library.hardware_decode_mode,
     ffmpeg_strictness: library.ffmpeg_strictness,
     exclude_hidden: library.exclude_hidden,
     top_level_only: library.top_level_only,
@@ -227,12 +225,12 @@ export function formFrom(library: ProcessingLibrary): LibraryForm {
         ? String(library.manager_connection_ids[0])
         : "",
     remux_writer: library.remux_writer,
+    minimum_free_disk_space_gb: gigabytesText(
+      library.minimum_free_disk_space_mb,
+    ),
   };
   for (const key of TEXT_FIELDS) form[key] = library[key];
   for (const key of NUMBER_FIELDS) form[key] = String(library[key]);
-  for (const key of INHERITABLE_FIELDS) {
-    form[key] = String(library[key] ?? USES_PERFORMANCE_SETTING);
-  }
   for (const key of DATE_FIELDS) form[key] = localDateTimeValue(library[key]);
   return form;
 }
@@ -269,29 +267,30 @@ export function writeFrom(
     exclude_markers_csv: form.exclude_markers_csv.trim(),
     include_patterns_csv: form.include_patterns_csv.trim(),
     exclude_patterns_csv: form.exclude_patterns_csv.trim(),
-    min_file_size_mb: optionalWholeNumber(form.min_file_size_mb),
+    min_file_size_mb: wholeNumber(
+      form.min_file_size_mb,
+      DEFAULT_MIN_FILE_SIZE_MB,
+    ),
     max_file_size_mb: wholeNumber(form.max_file_size_mb, 0),
     rejected_file_action: form.rejected_file_action,
-    min_file_age_seconds: optionalWholeNumber(form.min_file_age_seconds),
+    ready_after_seconds: wholeNumber(
+      form.ready_after_seconds,
+      DEFAULT_READY_AFTER_SECONDS,
+    ),
     created_after: utcDateTimeValue(form.created_after),
     created_before: utcDateTimeValue(form.created_before),
     modified_after: utcDateTimeValue(form.modified_after),
     modified_before: utcDateTimeValue(form.modified_before),
     scan_interval_seconds: wholeNumber(form.scan_interval_seconds, 300),
-    hold_minutes: wholeNumber(form.hold_minutes, 0),
-    file_detection_interval_seconds: wholeNumber(
-      form.file_detection_interval_seconds,
-      30,
-    ),
     max_concurrent_files: wholeNumber(form.max_concurrent_files, 0),
     priority: wholeNumber(form.priority, 0),
     sidecar_patterns_csv: form.sidecar_patterns_csv.trim(),
     preserve_original_timestamps: form.preserve_original_timestamps,
     remove_original_after_success: form.remove_original_after_success,
+    minimum_free_disk_space_mb: megabytesFromGigabytes(
+      form.minimum_free_disk_space_gb,
+    ),
     output_collision_policy: form.output_collision_policy,
-    hardware_decode_mode: form.hardware_decode_mode,
-    hardware_device: form.hardware_device.trim(),
-    hardware_disabled_vendors_csv: form.hardware_disabled_vendors_csv.trim(),
     ffmpeg_strictness: form.ffmpeg_strictness,
     max_attempts: wholeNumber(form.max_attempts, 3),
     retry_backoff_seconds: wholeNumber(form.retry_backoff_seconds, 300),
@@ -314,7 +313,5 @@ export function writeFrom(
     // the others, so saving here never drops a link nobody chose to remove.
     manager_connection_ids: linkedConnectionIds(form, library),
     remux_writer: form.remux_writer,
-    // The editor has no control for this: a saved workflow keeps its value and a new one takes the server default.
-    rewrite_with_ffmpeg: library?.rewrite_with_ffmpeg ?? true,
   };
 }

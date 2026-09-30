@@ -11,7 +11,6 @@ import * as managerApi from "../../../../lib/media-managers/media-managers-api";
 import type { ProcessingLibrary } from "../../../../lib/processing/libraries-api";
 import * as chainApi from "../../../../lib/processing/library-folder-chain-api";
 import * as managersApi from "../../../../lib/processing/library-managers-api";
-import * as modeApi from "../../../../lib/processing/library-mode-api";
 import * as operatorApi from "../../../../lib/processing/operator-settings-api";
 import * as ruleSetsApi from "../../../../lib/processing/rule-sets-api";
 
@@ -32,12 +31,10 @@ export function library(
     exclude_markers_csv: "__admin__",
     include_patterns_csv: "",
     exclude_patterns_csv: "",
-    min_file_size_mb: null,
-    effective_min_file_size_mb: 50,
+    min_file_size_mb: 50,
     max_file_size_mb: 0,
     rejected_file_action: "leave",
-    min_file_age_seconds: null,
-    effective_min_file_age_seconds: 60,
+    ready_after_seconds: 60,
     created_after: null,
     created_before: null,
     modified_after: null,
@@ -45,18 +42,13 @@ export function library(
     exclude_hidden: true,
     top_level_only: false,
     scan_interval_seconds: 300,
-    hold_minutes: 0,
     sidecar_patterns_csv: ".srt,.nfo",
     preserve_original_timestamps: false,
     remove_original_after_success: true,
+    minimum_free_disk_space_mb: 5120,
     remux_writer: "best",
-    rewrite_with_ffmpeg: true,
     output_collision_policy: "replace",
-    hardware_decode_mode: "off",
-    hardware_device: "",
-    hardware_disabled_vendors_csv: "",
     ffmpeg_strictness: "normal",
-    file_detection_interval_seconds: 30,
     ignore_size_changes: false,
     skip_access_tests: false,
     file_system_events_enabled: true,
@@ -72,6 +64,7 @@ export function library(
     schedule_start: "00:00",
     schedule_end: "23:59",
     max_concurrent_files: 1,
+    effective_max_concurrent_files: 1,
     priority: 0,
     rule_set_id: null,
     manager_connection_ids: [],
@@ -132,7 +125,6 @@ function answerEditorChecksAsUnavailable() {
     downloadClientsApi,
     "fetchDownloadClientSuggestions",
   ).mockImplementation(unavailable);
-  vi.spyOn(modeApi, "fetchLibrarySettings").mockImplementation(unavailable);
   vi.spyOn(operatorApi, "fetchProcessingOperatorSettings").mockImplementation(
     unavailable,
   );

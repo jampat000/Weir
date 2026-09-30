@@ -217,7 +217,7 @@ export function LibraryManagerSetup({
   watchedFolder: string;
   outputFolder: string;
   workFolder: string;
-  /** The workflow's "After cleaning, remove the original download": a torrent client makes that a problem. */
+  /** The workflow's "New downloads: after cleaning, delete the original download": a torrent client makes that a problem. */
   removeOriginal?: boolean;
   /** The media managers this workflow is linked to: only these are read. */
   linkedConnectionIds: number[];

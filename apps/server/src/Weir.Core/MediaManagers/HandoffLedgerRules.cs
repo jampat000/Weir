@@ -1,5 +1,4 @@
 using Weir.Core.Json;
-using Weir.Core.Processing.RemuxPass;
 using Weir.Core.Time;
 
 namespace Weir.Core.MediaManagers;
@@ -59,9 +58,6 @@ public static class HandoffLedgerRules
     /// <summary>What the manager hears when a person cancelled the hand-off's queued pass in Weir (#643).</summary>
     public const string CancelledInWeirMessage = "Someone cancelled this hand-off in Weir before Weir started on it.";
 
-    /// <summary>After this many consecutive failures a file is held for a person; the same limit the retry policy applies.</summary>
-    public const int QuarantineAfterFailures = RetryPolicy.QuarantineAfterFailures;
-
     /// <summary>
     /// One file's state in the manager's words, and when it would next run if known.
     /// </summary>
@@ -70,7 +66,7 @@ public static class HandoffLedgerRules
     /// the backoff ending and the next watched-folder scan (#531), because a manager takes <c>failed</c> as final.
     /// A retry is owed exactly when the failure recorded a <c>next_retry_at</c>; <c>failed</c> means no retry remains.
     /// </remarks>
-    public static (string State, DateTimeOffset? When) FileState(string status, DateTimeOffset? nextRetryAt, long failureAttempts)
+    public static (string State, DateTimeOffset? When) FileState(string status, DateTimeOffset? nextRetryAt)
     {
         return status switch
         {
@@ -82,7 +78,6 @@ public static class HandoffLedgerRules
             "processing_failed" => nextRetryAt is { } retryAt ? (Scheduled, retryAt) : (Failed, null),
             "skipped" => (Failed, null),
             "out_of_schedule" => (Scheduled, null),
-            "on_hold" when failureAttempts >= QuarantineAfterFailures => (Failed, null),
             _ => (Queued, null),
         };
     }

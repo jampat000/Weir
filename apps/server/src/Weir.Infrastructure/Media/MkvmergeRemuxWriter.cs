@@ -29,8 +29,8 @@ public sealed class FfmpegRemuxWriter(MediaTools tools) : IRemuxWriter
 /// the wrong tracks kept, and <see cref="RemuxWriterSelector"/> falls back to ffmpeg.
 /// </para>
 /// <para>
-/// Hardware acceleration has no counterpart here: it only ever affected ffmpeg's decode path, and a remux is a
-/// stream copy, so a plan carrying an <see cref="AccelerationDecision"/> is written identically either way.
+/// ffmpeg's input options (<see cref="RemuxWriteRequest.FfmpegInputFlags"/>) have no counterpart here: a remux
+/// is a stream copy, so mkvmerge needs none of them.
 /// </para>
 /// </summary>
 public sealed class MkvmergeRemuxWriter(MediaTools tools, IMediaToolResolver resolver) : IRemuxWriter

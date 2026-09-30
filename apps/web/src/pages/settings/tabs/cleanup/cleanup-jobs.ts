@@ -12,12 +12,9 @@ export const CLEANUP_JOBS: {
   family: MaintenanceFamily;
   name: string;
   enabledField:
-    | "work_temp_stale_sweep_enabled"
-    | "failure_cleanup_enabled"
-    | "unclaimed_handback_cleanup_enabled";
+    "work_temp_stale_sweep_enabled" | "unclaimed_handback_cleanup_enabled";
   intervalField:
     | "work_temp_stale_sweep_interval_seconds"
-    | "failure_cleanup_interval_seconds"
     | "unclaimed_handback_cleanup_interval_seconds";
   /** It deletes something a person cannot get back, so its description is painted in the warning colour. */
   destructive: boolean;
@@ -28,13 +25,6 @@ export const CLEANUP_JOBS: {
     enabledField: "work_temp_stale_sweep_enabled",
     intervalField: "work_temp_stale_sweep_interval_seconds",
     destructive: false,
-  },
-  {
-    family: "failure_cleanup",
-    name: "Downloads of failed files",
-    enabledField: "failure_cleanup_enabled",
-    intervalField: "failure_cleanup_interval_seconds",
-    destructive: true,
   },
   {
     // #652: Weir's own cleaned copies that no media manager imported in time. Off until a person switches it on.
