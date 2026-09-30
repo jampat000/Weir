@@ -22,7 +22,7 @@ namespace Weir.Infrastructure.Jobs;
 /// <remarks>
 /// Split across partial files by concern: this file holds construction, transactions and the shared SQL
 /// plumbing; <c>ProcessingJobStore.Enqueue.cs</c>, <c>.Claim.cs</c>, <c>.Completion.cs</c>,
-/// <c>.OperatorActions.cs</c> and <c>.Reads.cs</c> hold the operations themselves.
+/// <c>.OperatorActions.cs</c>, <c>.Reads.cs</c> and <c>.FileWork.cs</c> hold the operations themselves.
 /// </remarks>
 public sealed partial class ProcessingJobStore
 {
