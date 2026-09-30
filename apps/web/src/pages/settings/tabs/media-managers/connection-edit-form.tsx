@@ -5,6 +5,8 @@ import { quietActionRowClass } from "../../../../components/shared/quiet-section
 import { errorMessage } from "../../../../lib/api/error-message";
 import {
   MEDIA_MANAGER_KIND_LABELS,
+  OPTIONAL_ADDRESS_HINT,
+  connectionNeedsAddress,
   type MediaManagerConnection,
   type MediaManagerConnectionUpdate,
 } from "../../../../lib/media-managers/media-managers-api";
@@ -83,6 +85,7 @@ export function ConnectionEditForm({
   const change = <K extends keyof EditForm>(key: K, value: EditForm[K]) =>
     setForm((current) => ({ ...current, [key]: value }));
 
+  const needsAddress = connectionNeedsAddress(connection.kind);
   const dirty = !sameForm(form, initial);
   useUnsavedChanges(dirty ? connection.name : null);
   const { confirmLeave, dialog } = useLeaveConfirmation();
@@ -100,7 +103,11 @@ export function ConnectionEditForm({
       data-testid="media-manager-edit-form"
     >
       <div className="mm-field-row">
-        <Field label="Address" width="wide">
+        <Field
+          label="Address"
+          hint={needsAddress ? undefined : OPTIONAL_ADDRESS_HINT}
+          width="wide"
+        >
           <input
             data-testid="media-manager-edit-base-url"
             autoComplete="url"
@@ -160,7 +167,7 @@ export function ConnectionEditForm({
           type="button"
           data-testid="media-manager-edit-save"
           className={mmActionButtonClass({ variant: "primary" })}
-          disabled={update.isPending || !form.base_url.trim()}
+          disabled={update.isPending || (needsAddress && !form.base_url.trim())}
           onClick={save}
         >
           {update.isPending ? "Saving…" : "Save"}
