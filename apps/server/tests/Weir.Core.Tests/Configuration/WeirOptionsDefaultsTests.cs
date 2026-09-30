@@ -69,7 +69,6 @@ public sealed class WeirOptionsDefaultsTests
         Assert.True(Defaults.ProcessingWatchedFolderRemuxScanDispatchPeriodicEnqueueRemuxJobs);
         Assert.Equal(10, Defaults.ProcessingProbeSizeMb);
         Assert.Equal(10, Defaults.ProcessingAnalyzeDurationSeconds);
-        Assert.Equal(300, Defaults.ProcessingWatchedFolderMinFileAgeSeconds);
         Assert.Equal(48 * 3600, Defaults.ProcessingMovieOutputCleanupMinAgeSeconds);
         Assert.Equal(48 * 3600, Defaults.ProcessingTvOutputCleanupMinAgeSeconds);
         Assert.False(Defaults.ProcessingWorkTempStaleSweepMovieScheduleEnabled);

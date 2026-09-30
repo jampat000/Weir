@@ -76,7 +76,6 @@ internal sealed class ProcessingRuntimeEndpointHandlers
             .Set("processing_watched_folder_remux_scan_dispatch_periodic_enqueue_remux_jobs", settings.ProcessingWatchedFolderRemuxScanDispatchPeriodicEnqueueRemuxJobs)
             .Set("processing_probe_size_mb", settings.ProcessingProbeSizeMb)
             .Set("processing_analyze_duration_seconds", settings.ProcessingAnalyzeDurationSeconds)
-            .Set("processing_watched_folder_min_file_age_seconds", settings.ProcessingWatchedFolderMinFileAgeSeconds)
             .Set("processing_movie_output_cleanup_min_age_seconds", settings.ProcessingMovieOutputCleanupMinAgeSeconds)
             .Set("movie_output_cleanup_configuration_note", settings.MovieOutputCleanupConfigurationNote)
             .Set("processing_tv_output_cleanup_min_age_seconds", settings.ProcessingTvOutputCleanupMinAgeSeconds)

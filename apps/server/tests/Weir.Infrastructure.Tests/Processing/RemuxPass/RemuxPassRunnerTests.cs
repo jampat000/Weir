@@ -233,7 +233,7 @@ public sealed class RemuxPassRunnerTests : IDisposable
             _cleanup,
             new SkippedTvSeasonFolderCleanup(),
             _language,
-            new RemuxPassSettings { WatchedFolderMinFileAgeSeconds = 0, MovieOutputCleanupMinAgeSeconds = 0, TvOutputCleanupMinAgeSeconds = 0 },
+            new RemuxPassSettings { MovieOutputCleanupMinAgeSeconds = 0, TvOutputCleanupMinAgeSeconds = 0 },
             TimeProvider.System,
             NullLogger<RemuxPassRunner>.Instance)
         {

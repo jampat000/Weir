@@ -79,7 +79,7 @@ public sealed class HandoffScanSingleProcessingTests : IDisposable
             data,
             new SkippedTvSeasonFolderCleanup(),
             new FakeOriginalLanguage(),
-            new RemuxPassSettings { WatchedFolderMinFileAgeSeconds = 0 },
+            new RemuxPassSettings(),
             TimeProvider.System,
             NullLogger<RemuxPassRunner>.Instance);
         return new RemuxPassHandler(

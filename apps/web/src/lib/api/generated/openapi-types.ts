@@ -6711,11 +6711,6 @@ export interface components {
        */
       processing_tv_output_cleanup_min_age_seconds: number;
       /**
-       * Processing Watched Folder Min File Age Seconds
-       * @description Minimum file age before watched-folder scan or one-file pass touches media.
-       */
-      processing_watched_folder_min_file_age_seconds: number;
-      /**
        * Processing Watched Folder Remux Scan Dispatch Periodic Enqueue Remux Jobs
        * @description When true, periodic scans may enqueue ``processing.file.remux_pass.v1``.
        */

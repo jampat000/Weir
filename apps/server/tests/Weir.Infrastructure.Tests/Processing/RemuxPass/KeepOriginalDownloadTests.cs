@@ -72,7 +72,7 @@ public sealed class KeepOriginalDownloadTests : IDisposable
             data,
             new TvSeasonFolderCleanup(_fixture.Store.Database, _fixture.Connections, TimeProvider.System, NullLogger<TvSeasonFolderCleanup>.Instance),
             new FakeOriginalLanguage(),
-            new RemuxPassSettings { WatchedFolderMinFileAgeSeconds = 0 },
+            new RemuxPassSettings(),
             TimeProvider.System,
             NullLogger<RemuxPassRunner>.Instance);
         return new RemuxPassHandler(

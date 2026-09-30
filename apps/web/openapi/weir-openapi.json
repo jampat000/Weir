@@ -9098,12 +9098,6 @@
             "title": "Processing Tv Output Cleanup Min Age Seconds",
             "type": "integer"
           },
-          "processing_watched_folder_min_file_age_seconds": {
-            "description": "Minimum file age before watched-folder scan or one-file pass touches media.",
-            "minimum": 0.0,
-            "title": "Processing Watched Folder Min File Age Seconds",
-            "type": "integer"
-          },
           "processing_watched_folder_remux_scan_dispatch_periodic_enqueue_remux_jobs": {
             "description": "When true, periodic scans may enqueue ``processing.file.remux_pass.v1``.",
             "title": "Processing Watched Folder Remux Scan Dispatch Periodic Enqueue Remux Jobs",
@@ -9180,7 +9174,6 @@
           "processing_watched_folder_remux_scan_dispatch_periodic_enqueue_remux_jobs",
           "processing_probe_size_mb",
           "processing_analyze_duration_seconds",
-          "processing_watched_folder_min_file_age_seconds",
           "processing_movie_output_cleanup_min_age_seconds",
           "movie_output_cleanup_configuration_note",
           "processing_tv_output_cleanup_min_age_seconds",

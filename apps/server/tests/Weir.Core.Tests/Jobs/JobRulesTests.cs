@@ -212,7 +212,6 @@ public sealed class JobRulesTests
         Assert.Equal(10, WeirOptionsLoader.ClampProcessingWorkerCount(11));
         Assert.Equal(60, WeirOptionsLoader.ClampProcessingScheduleIntervalSeconds(5));
         Assert.Equal(604_800, WeirOptionsLoader.ClampProcessingScheduleIntervalSeconds(10_000_000));
-        Assert.Equal(0, WeirOptionsLoader.ClampProcessingMinFileAgeSeconds(-5));
     }
 
     [Fact]

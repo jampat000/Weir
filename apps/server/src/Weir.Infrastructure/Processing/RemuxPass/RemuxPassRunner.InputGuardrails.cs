@@ -47,7 +47,7 @@ public sealed partial class RemuxPassRunner
             }
         }
 
-        var minAge = Math.Max(0, request.MinFileAgeSeconds ?? _settings.WatchedFolderMinFileAgeSeconds);
+        var minAge = Math.Max(0, request.MinFileAgeSeconds ?? 0);
         if (minAge > 0)
         {
             double age;
