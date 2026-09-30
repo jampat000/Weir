@@ -154,7 +154,7 @@ Open **Settings › Workflows** and edit the workflow:
 
 - **Watched folder**: where your download client finishes files, e.g. `/media/downloads/complete/tv`.
 - **Output folder**: where Weir puts cleaned files, e.g. `/media/weir/tv`.
-- **After cleaning, remove the original download**: turn this **off** if you use torrents. The torrent
+- **New downloads: after cleaning, delete the original download**: turn this **off** if you use torrents. The torrent
   needs its files to keep seeding, and if they disappear, Sonarr stops treating the download as
   finished and never imports it. Your download client or Sonarr removes the original later, under
   your normal seeding rules. Weir remembers what it has already cleaned, so it won't clean the same

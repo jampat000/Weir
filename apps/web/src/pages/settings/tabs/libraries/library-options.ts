@@ -36,17 +36,6 @@ export const COLLISION_OPTIONS: SettingOption[] = [
   { value: "replace_if_newer", label: "Replace only if source is newer" },
 ];
 
-/** The most files one library can be held to at once from its editor. */
-const MOST_FILES_AT_ONCE = 10;
-
-export const FILES_AT_ONCE_OPTIONS: SettingOption[] = [
-  { value: "0", label: "Same as Performance" },
-  ...Array.from({ length: MOST_FILES_AT_ONCE }, (_, i) => ({
-    value: String(i + 1),
-    label: i === 0 ? "At most 1 file" : `At most ${i + 1} files`,
-  })),
-];
-
 export const HARDWARE_DECODE_OPTIONS: SettingOption[] = [
   { value: "off", label: "Off" },
   { value: "auto", label: "Detect automatically" },

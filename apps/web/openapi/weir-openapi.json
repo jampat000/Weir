@@ -6218,7 +6218,7 @@
             "minimum": 0.0,
             "title": "Max Concurrent Files",
             "type": "integer",
-            "description": "This library's own limit on files at once. 0 means the same as \"Files at once\" in Process settings."
+            "description": "The most files this workflow runs at once, as a share of \"Files at once\" in Settings › Performance. 0 means no limit of its own. It cannot be more than Performance's Files at once: a save that asks for more is refused."
           },
           "max_file_size_mb": {
             "default": 0,
@@ -6449,6 +6449,14 @@
             "description": "After a successful pass, remove the original download from the watched folder. Off keeps the file, its folder and its sidecars where the download client put them, so a torrent keeps seeding.",
             "title": "Remove Original After Success",
             "type": "boolean"
+          },
+          "minimum_free_disk_space_mb": {
+            "default": 5120,
+            "description": "Weir keeps at least this much free on the drive this workflow writes to. A file that would leave less is put on hold and tried again when there is room. 0 turns the check off.",
+            "maximum": 1048576,
+            "minimum": 0,
+            "title": "Minimum Free Disk Space Mb",
+            "type": "integer"
           },
           "remux_writer": {
             "default": "best",
@@ -6669,7 +6677,7 @@
           "max_concurrent_files": {
             "title": "Max Concurrent Files",
             "type": "integer",
-            "description": "This library's own limit on files at once. 0 means the same as \"Files at once\" in Process settings."
+            "description": "The most files this workflow runs at once. 0 means no limit of its own."
           },
           "max_file_size_mb": {
             "title": "Max File Size Mb",
@@ -6887,6 +6895,16 @@
             "title": "Remove Original After Success",
             "type": "boolean"
           },
+          "minimum_free_disk_space_mb": {
+            "description": "Weir keeps at least this much free on the drive this workflow writes to. A file that would leave less is put on hold and tried again when there is room. 0 turns the check off.",
+            "title": "Minimum Free Disk Space Mb",
+            "type": "integer"
+          },
+          "effective_max_concurrent_files": {
+            "description": "The most files this workflow is held to now: its own limit, and never more than Files at once in Settings › Performance, even if that was lowered after this was set.",
+            "title": "Effective Max Concurrent Files",
+            "type": "integer"
+          },
           "remux_writer": {
             "default": "best",
             "description": "Which tool writes the library's output (#548). best: mkvmerge for Matroska when it is installed, ffmpeg for everything else, and ffmpeg again when mkvmerge's write fails its checks. ffmpeg: ffmpeg writes every file.",
@@ -6954,6 +6972,8 @@
           "schedule_start",
           "schedule_end",
           "max_concurrent_files",
+          "effective_max_concurrent_files",
+          "minimum_free_disk_space_mb",
           "priority"
         ],
         "title": "ProcessingLibraryOut",
@@ -7143,7 +7163,7 @@
             "minimum": 0.0,
             "title": "Max Concurrent Files",
             "type": "integer",
-            "description": "This library's own limit on files at once. 0 means the same as \"Files at once\" in Process settings."
+            "description": "The most files this workflow runs at once, as a share of \"Files at once\" in Settings › Performance. 0 means no limit of its own. It cannot be more than Performance's Files at once: a save that asks for more is refused."
           },
           "max_file_size_mb": {
             "default": 0,
@@ -7375,6 +7395,14 @@
             "title": "Remove Original After Success",
             "type": "boolean"
           },
+          "minimum_free_disk_space_mb": {
+            "default": 5120,
+            "description": "Weir keeps at least this much free on the drive this workflow writes to. A file that would leave less is put on hold and tried again when there is room. 0 turns the check off.",
+            "maximum": 1048576,
+            "minimum": 0,
+            "title": "Minimum Free Disk Space Mb",
+            "type": "integer"
+          },
           "remux_writer": {
             "default": "best",
             "description": "Which tool writes the library's output (#548). best: mkvmerge for Matroska when it is installed, ffmpeg for everything else, and ffmpeg again when mkvmerge's write fails its checks. ffmpeg: ffmpeg writes every file.",
@@ -7531,13 +7559,6 @@
             "title": "Min File Age Seconds",
             "type": "integer"
           },
-          "minimum_free_disk_space_mb": {
-            "description": "Processing skips before writes when the target drive has less free space than this.",
-            "maximum": 1048576.0,
-            "minimum": 0.0,
-            "title": "Minimum Free Disk Space Mb",
-            "type": "integer"
-          },
           "movie_schedule_days": {
             "maxLength": 2000,
             "title": "Movie Schedule Days",
@@ -7603,13 +7624,6 @@
             "maximum": 64.0,
             "minimum": 0.0,
             "title": "Runner Cost Sd",
-            "type": "integer"
-          },
-          "runner_cost_undetermined": {
-            "description": "What a file Weir has not measured yet costs. Zero admits it rather than stalling on the unknown.",
-            "maximum": 64.0,
-            "minimum": 0.0,
-            "title": "Runner Cost Undetermined",
             "type": "integer"
           },
           "schedule_timezone": {
@@ -7700,10 +7714,8 @@
           "unclaimed_handback_window_days",
           "keep_failed_work_files",
           "file_log_retention_days",
-          "runner_cost_undetermined",
           "min_file_age_seconds",
           "min_input_file_size_mb",
-          "minimum_free_disk_space_mb",
           "movie_schedule_enabled",
           "movie_schedule_hours_limited",
           "movie_schedule_days",
@@ -7814,6 +7826,8 @@
                 "type": "null"
               }
             ],
+            "deprecated": true,
+            "description": "Removed: the space to keep free is set on each workflow. Accepted and ignored, so an older client that still sends it is not refused.",
             "title": "Minimum Free Disk Space Mb"
           },
           "movie_schedule_days": {
@@ -7974,6 +7988,8 @@
                 "type": "null"
               }
             ],
+            "deprecated": true,
+            "description": "Removed: a file of unknown resolution costs what a 1080p file does. Accepted and ignored, so an older client that still sends it is not refused.",
             "title": "Runner Cost Undetermined"
           },
           "tv_schedule_days": {

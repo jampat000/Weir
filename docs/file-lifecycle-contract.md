@@ -28,7 +28,7 @@ Remux pass publishing and pass-through delivery both go through these methods. F
 `SafeSwap` replaces a file inside a library with its cleaned copy so that a crash, power cut, locked file or concurrent change can never lose the file or overwrite a newer one:
 
 1. Leftovers of an earlier interrupted swap of the same file are put right first.
-2. Preflight refuses the swap when the file is missing, hardlinked (unless the workflow allows it), short of free space (file size plus 1 GiB), in a folder that is not writable, read-only, or in use.
+2. Preflight refuses the swap when the file is missing, hardlinked (unless the workflow allows it), short of free space (file size plus the space the workflow keeps free, 5 GiB unless set), in a folder that is not writable, read-only, or in use.
 3. The cleaned copy is written as `<name>.weir-tmp<ext>` beside the original and validated.
 4. The original is fingerprinted again. If it changed, the copy is discarded and nothing is replaced.
 5. The original is renamed to `<name>.weir-bak<ext>`, then the copy is renamed to the original name. That second rename is the commit.
@@ -43,6 +43,17 @@ Each step is journalled. A failure before the commit rolls back from the files o
 The originals folder is always excluded from the library scan (`LibraryFileWalker`), whether or not the setting is currently on — an upgrade note, since a library that already had a `.weir-originals` folder (from files placed there by hand, say) will see it disappear from the Library screen even with the setting off. A custom folder inside a library folder must be dot-prefixed, for the same reason a media manager watching that folder must not import it; outside a library folder it can be excluded from the media manager directly, or any name.
 
 A file held by another program is not a failure: the swap reports it as in use and the job is requeued.
+
+## Keeping space free
+
+Each workflow keeps at least a set amount free (5 GB unless set; 0 turns the check off) on the drive it writes to. Every write checks it before starting:
+
+- the remux pass, on the output drive before the source is read and again before the output is published, and on the work folder's drive before the new copy is written;
+- an unchanged publish, on the output drive;
+- a pass-through copy handed back after retries run out, on the output drive (`PassThroughDelivery`);
+- a library clean, in `SafeSwap` preflight: the file's size plus the space kept free must be free beside the file.
+
+A write that would leave less does not fail and is never recorded as done. The file is put on hold with a plain reason ("Waiting: the output drive has less than X free"), nothing is written, and Weir looks again after 10, 30, then every 60 minutes (`DiskSpaceWaits`), until there is room.
 
 ## Output ownership
 

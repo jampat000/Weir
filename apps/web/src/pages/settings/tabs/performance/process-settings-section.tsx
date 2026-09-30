@@ -21,19 +21,6 @@ import { SettingsLoadError } from "../../settings-load-error";
 /** Files at once goes from one to ten (#633). */
 const FILES_AT_ONCE = Array.from({ length: 10 }, (_, i) => i + 1);
 
-/** 1024 MB to a GB, for the free-space setting a person reads and types in GB. */
-const MB_PER_GB = 1024;
-/** Free-space GB never needs more precision than this to read sensibly. */
-const FREE_SPACE_GB_DECIMALS = 2;
-
-/** The minimum free disk space, in GB, rounded so it never reads as a repeating decimal. */
-function formatFreeSpaceGb(minimumFreeDiskSpaceMb: number): string {
-  const gb = Math.max(0, minimumFreeDiskSpaceMb / MB_PER_GB).toFixed(
-    FREE_SPACE_GB_DECIMALS,
-  );
-  return gb.replace(/\.?0+$/, "");
-}
-
 /**
  * Settings › Performance: how hard Weir works, what it checks before it starts a file, and what it keeps when
  * one fails. The cleanup switches are on Cleanup, each beside its own timer.
@@ -52,11 +39,9 @@ export function ProcessSettingsSection() {
   const [runnerCost720p, setRunnerCost720p] = useState("1");
   const [runnerCost1080p, setRunnerCost1080p] = useState("2");
   const [runnerCost4k, setRunnerCost4k] = useState("4");
-  const [runnerCostUndetermined, setRunnerCostUndetermined] = useState("0");
   const [runnerBudgetEnabled, setRunnerBudgetEnabled] = useState(false);
   const [minFileAgeSeconds, setMinFileAgeSeconds] = useState("60");
   const [minInputFileSizeMb, setMinInputFileSizeMb] = useState("50");
-  const [minimumFreeDiskSpaceGb, setMinimumFreeDiskSpaceGb] = useState("5");
   const [keepFailedWorkFiles, setKeepFailedWorkFiles] = useState(false);
 
   useEffect(() => {
@@ -67,13 +52,9 @@ export function ProcessSettingsSection() {
     setRunnerCost720p(String(q.data.runner_cost_720p));
     setRunnerCost1080p(String(q.data.runner_cost_1080p));
     setRunnerCost4k(String(q.data.runner_cost_4k));
-    setRunnerCostUndetermined(String(q.data.runner_cost_undetermined));
     setRunnerBudgetEnabled(q.data.runner_budget_enabled);
     setMinFileAgeSeconds(String(q.data.min_file_age_seconds));
     setMinInputFileSizeMb(String(q.data.min_input_file_size_mb));
-    setMinimumFreeDiskSpaceGb(
-      formatFreeSpaceGb(q.data.minimum_free_disk_space_mb),
-    );
     setKeepFailedWorkFiles(q.data.keep_failed_work_files);
   }, [q.data]);
 
@@ -92,11 +73,7 @@ export function ProcessSettingsSection() {
     int(runnerCost720p),
     int(runnerCost1080p),
     int(runnerCost4k),
-    int(runnerCostUndetermined),
   ];
-  const minimumFreeMb = Math.round(
-    Number.parseFloat(minimumFreeDiskSpaceGb) * 1024,
-  );
   const valid =
     maxConcurrentFiles >= 1 &&
     maxConcurrentFiles <= FILES_AT_ONCE.length &&
@@ -105,9 +82,7 @@ export function ProcessSettingsSection() {
         Number.isFinite(value) && value >= (index === 0 ? 1 : 0) && value <= 64,
     ) &&
     int(minFileAgeSeconds) >= 0 &&
-    int(minInputFileSizeMb) >= 0 &&
-    Number.isFinite(minimumFreeMb) &&
-    minimumFreeMb >= 0;
+    int(minInputFileSizeMb) >= 0;
   const dirty =
     maxConcurrentFiles !== q.data.max_concurrent_files ||
     runnerCapacity !== String(q.data.runner_capacity) ||
@@ -115,12 +90,9 @@ export function ProcessSettingsSection() {
     runnerCost720p !== String(q.data.runner_cost_720p) ||
     runnerCost1080p !== String(q.data.runner_cost_1080p) ||
     runnerCost4k !== String(q.data.runner_cost_4k) ||
-    runnerCostUndetermined !== String(q.data.runner_cost_undetermined) ||
     runnerBudgetEnabled !== q.data.runner_budget_enabled ||
     minFileAgeSeconds !== String(q.data.min_file_age_seconds) ||
     minInputFileSizeMb !== String(q.data.min_input_file_size_mb) ||
-    minimumFreeDiskSpaceGb !==
-      formatFreeSpaceGb(q.data.minimum_free_disk_space_mb) ||
     keepFailedWorkFiles !== q.data.keep_failed_work_files;
   const locked = !editable || save.isPending;
 
@@ -149,7 +121,7 @@ export function ProcessSettingsSection() {
         <div>
           <SettingsGroup
             title="How much at once"
-            detail="More at once finishes a queue sooner but works the disks harder. Past two or three, a slow disk gains little."
+            detail="More at once finishes a queue sooner but works the disks harder. Past two or three, a slow disk gains little. Each workflow can also be held to fewer, in its own settings."
           >
             <SettingRow
               label="Files at once"
@@ -198,7 +170,7 @@ export function ProcessSettingsSection() {
               <>
                 <SettingRow
                   label="Budget"
-                  hint="A file starts only while its cost fits in what is left."
+                  hint="A file starts only while its cost fits in what is left. Every file counts, however it arrives; one whose resolution is not known yet costs the same as a 1080p file."
                   htmlFor={`${ids}-capacity`}
                 >
                   <NumberWithUnit
@@ -219,11 +191,6 @@ export function ProcessSettingsSection() {
                   setRunnerCost1080p,
                 )}
                 {cost("A 4K file costs", runnerCost4k, setRunnerCost4k)}
-                {cost(
-                  "A file of unknown size costs",
-                  runnerCostUndetermined,
-                  setRunnerCostUndetermined,
-                )}
               </>
             ) : null}
           </SettingsGroup>
@@ -258,21 +225,6 @@ export function ProcessSettingsSection() {
                 min={0}
                 disabled={locked}
                 onChange={setMinInputFileSizeMb}
-              />
-            </SettingRow>
-            <SettingRow
-              label="Keep free on the output drive"
-              hint="No new file starts below this."
-              htmlFor={`${ids}-free`}
-            >
-              <NumberWithUnit
-                id={`${ids}-free`}
-                value={minimumFreeDiskSpaceGb}
-                unit="GB"
-                min={0}
-                step={0.1}
-                disabled={locked}
-                onChange={setMinimumFreeDiskSpaceGb}
               />
             </SettingRow>
           </SettingsGroup>
@@ -318,12 +270,10 @@ export function ProcessSettingsSection() {
               runner_cost_720p: costs[2],
               runner_cost_1080p: costs[3],
               runner_cost_4k: costs[4],
-              runner_cost_undetermined: costs[5],
               runner_budget_enabled: runnerBudgetEnabled,
               keep_failed_work_files: keepFailedWorkFiles,
               min_file_age_seconds: int(minFileAgeSeconds),
               min_input_file_size_mb: int(minInputFileSizeMb),
-              minimum_free_disk_space_mb: minimumFreeMb,
             })
           }
         >

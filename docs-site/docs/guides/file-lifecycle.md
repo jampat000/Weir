@@ -16,9 +16,12 @@ folder is only ever read, never modified, while this happens.
 
 - If your workflow doesn't set its own work folder, Weir uses a default one under its own data
   folder, separate for movies and TV.
-- Before it starts writing, Weir checks there's enough free disk space at both the work folder and
-  the output folder. If there isn't, it skips the file and tells you why, rather than starting a
-  write it can't finish.
+- Before it starts writing, Weir checks the drives it will write to still have the space your
+  workflow keeps free: **Keep at least this many GB free on the drive this workflow writes to**
+  (5 GB unless you change it, on each workflow's output settings). If they don't, the file is put
+  **On hold** with the reason, and Weir tries again when there is room. It is never marked done
+  and never started on a drive that can't finish it. The same check protects a file Weir hands
+  back unchanged, and a file cleaned in place in your library.
 
 ## Nothing "half-written" ever appears in your output folder
 

@@ -5199,7 +5199,7 @@ export interface components {
       max_attempts: number;
       /**
        * Max Concurrent Files
-       * @description This library's own limit on files at once. 0 means the same as "Files at once" in Process settings.
+       * @description The most files this workflow runs at once, as a share of "Files at once" in Settings › Performance. 0 means no limit of its own. It cannot be more than Performance's Files at once: a save that asks for more is refused.
        * @default 0
        */
       max_concurrent_files: number;
@@ -5365,6 +5365,12 @@ export interface components {
        */
       remove_original_after_success: boolean;
       /**
+       * Minimum Free Disk Space Mb
+       * @description Weir keeps at least this much free on the drive this workflow writes to. A file that would leave less is put on hold and tried again when there is room. 0 turns the check off.
+       * @default 5120
+       */
+      minimum_free_disk_space_mb: number;
+      /**
        * Remux Writer
        * @description Which tool writes the library's output (#548). best: mkvmerge for Matroska when it is installed, ffmpeg for everything else, and ffmpeg again when mkvmerge's write fails its checks. ffmpeg: ffmpeg writes every file.
        * @default best
@@ -5471,7 +5477,7 @@ export interface components {
       max_attempts: number;
       /**
        * Max Concurrent Files
-       * @description This library's own limit on files at once. 0 means the same as "Files at once" in Process settings.
+       * @description The most files this workflow runs at once. 0 means no limit of its own.
        */
       max_concurrent_files: number;
       /** Max File Size Mb */
@@ -5568,6 +5574,16 @@ export interface components {
        * @default true
        */
       remove_original_after_success: boolean;
+      /**
+       * Minimum Free Disk Space Mb
+       * @description Weir keeps at least this much free on the drive this workflow writes to. A file that would leave less is put on hold and tried again when there is room. 0 turns the check off.
+       */
+      minimum_free_disk_space_mb: number;
+      /**
+       * Effective Max Concurrent Files
+       * @description The most files this workflow is held to now: its own limit, and never more than Files at once in Settings › Performance, even if that was lowered after this was set.
+       */
+      effective_max_concurrent_files: number;
       /**
        * Remux Writer
        * @description Which tool writes the library's output (#548). best: mkvmerge for Matroska when it is installed, ffmpeg for everything else, and ffmpeg again when mkvmerge's write fails its checks. ffmpeg: ffmpeg writes every file.
@@ -5698,7 +5714,7 @@ export interface components {
       max_attempts: number;
       /**
        * Max Concurrent Files
-       * @description This library's own limit on files at once. 0 means the same as "Files at once" in Process settings.
+       * @description The most files this workflow runs at once, as a share of "Files at once" in Settings › Performance. 0 means no limit of its own. It cannot be more than Performance's Files at once: a save that asks for more is refused.
        * @default 0
        */
       max_concurrent_files: number;
@@ -5864,6 +5880,12 @@ export interface components {
        */
       remove_original_after_success: boolean;
       /**
+       * Minimum Free Disk Space Mb
+       * @description Weir keeps at least this much free on the drive this workflow writes to. A file that would leave less is put on hold and tried again when there is room. 0 turns the check off.
+       * @default 5120
+       */
+      minimum_free_disk_space_mb: number;
+      /**
        * Remux Writer
        * @description Which tool writes the library's output (#548). best: mkvmerge for Matroska when it is installed, ffmpeg for everything else, and ffmpeg again when mkvmerge's write fails its checks. ffmpeg: ffmpeg writes every file.
        * @default best
@@ -5946,11 +5968,6 @@ export interface components {
       max_concurrent_files: number;
       /** Min File Age Seconds */
       min_file_age_seconds: number;
-      /**
-       * Minimum Free Disk Space Mb
-       * @description Processing skips before writes when the target drive has less free space than this.
-       */
-      minimum_free_disk_space_mb: number;
       /** Movie Schedule Days */
       movie_schedule_days: string;
       /** Movie Schedule Enabled */
@@ -5987,11 +6004,6 @@ export interface components {
       runner_cost_720p: number;
       /** Runner Cost Sd */
       runner_cost_sd: number;
-      /**
-       * Runner Cost Undetermined
-       * @description What a file Weir has not measured yet costs. Zero admits it rather than stalling on the unknown.
-       */
-      runner_cost_undetermined: number;
       /**
        * Schedule Timezone
        * @description IANA zone for schedule windows (suite settings).
@@ -6054,7 +6066,11 @@ export interface components {
       max_concurrent_files?: number | null;
       /** Min File Age Seconds */
       min_file_age_seconds?: number | null;
-      /** Minimum Free Disk Space Mb */
+      /**
+       * Minimum Free Disk Space Mb
+       * @deprecated
+       * @description Removed: the space to keep free is set on each workflow. Accepted and ignored, so an older client that still sends it is not refused.
+       */
       minimum_free_disk_space_mb?: number | null;
       /** Movie Schedule Days */
       movie_schedule_days?: string | null;
@@ -6080,7 +6096,11 @@ export interface components {
       runner_cost_720p?: number | null;
       /** Runner Cost Sd */
       runner_cost_sd?: number | null;
-      /** Runner Cost Undetermined */
+      /**
+       * Runner Cost Undetermined
+       * @deprecated
+       * @description Removed: a file of unknown resolution costs what a 1080p file does. Accepted and ignored, so an older client that still sends it is not refused.
+       */
       runner_cost_undetermined?: number | null;
       /** Tv Schedule Days */
       tv_schedule_days?: string | null;

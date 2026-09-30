@@ -41,6 +41,8 @@ export type LibraryForm = {
   ffmpeg_strictness: string;
   max_attempts: string;
   retry_backoff_seconds: string;
+  /** The space to keep free on the drive this workflow writes to, in gigabytes as a person types it. */
+  minimum_free_disk_space_gb: string;
   exclude_hidden: boolean;
   top_level_only: boolean;
   ignore_size_changes: boolean;
@@ -106,6 +108,7 @@ export const EMPTY_LIBRARY_FORM: LibraryForm = {
   ffmpeg_strictness: "normal",
   max_attempts: "3",
   retry_backoff_seconds: "300",
+  minimum_free_disk_space_gb: "5",
   exclude_hidden: true,
   top_level_only: false,
   ignore_size_changes: false,
@@ -149,6 +152,27 @@ function utcDateTimeValue(value: string): string | null {
   if (!value.trim()) return null;
   const parsed = new Date(value);
   return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
+}
+
+const MB_PER_GB = 1024;
+/** What a new workflow keeps free: 5 GB, the server's own default. */
+const DEFAULT_FREE_SPACE_MB = 5 * MB_PER_GB;
+/** Gigabytes never need more precision than this to read sensibly. */
+const GB_DECIMALS = 2;
+
+/** Megabytes as the gigabytes a person reads and types, without a repeating decimal. */
+export function gigabytesText(megabytes: number): string {
+  return Math.max(0, megabytes / MB_PER_GB)
+    .toFixed(GB_DECIMALS)
+    .replace(/\.?0+$/, "");
+}
+
+/** Typed gigabytes as whole megabytes; a blank or unreadable value keeps the default. */
+function megabytesFromGigabytes(raw: string): number {
+  const gb = Number.parseFloat(raw);
+  return Number.isFinite(gb) && gb >= 0
+    ? Math.round(gb * MB_PER_GB)
+    : DEFAULT_FREE_SPACE_MB;
 }
 
 function wholeNumber(raw: string, fallback: number): number {
@@ -227,6 +251,9 @@ export function formFrom(library: ProcessingLibrary): LibraryForm {
         ? String(library.manager_connection_ids[0])
         : "",
     remux_writer: library.remux_writer,
+    minimum_free_disk_space_gb: gigabytesText(
+      library.minimum_free_disk_space_mb,
+    ),
   };
   for (const key of TEXT_FIELDS) form[key] = library[key];
   for (const key of NUMBER_FIELDS) form[key] = String(library[key]);
@@ -288,6 +315,9 @@ export function writeFrom(
     sidecar_patterns_csv: form.sidecar_patterns_csv.trim(),
     preserve_original_timestamps: form.preserve_original_timestamps,
     remove_original_after_success: form.remove_original_after_success,
+    minimum_free_disk_space_mb: megabytesFromGigabytes(
+      form.minimum_free_disk_space_gb,
+    ),
     output_collision_policy: form.output_collision_policy,
     hardware_decode_mode: form.hardware_decode_mode,
     hardware_device: form.hardware_device.trim(),

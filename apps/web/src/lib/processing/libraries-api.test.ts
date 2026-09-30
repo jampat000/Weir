@@ -12,6 +12,7 @@ const READ_ONLY_FIELDS: readonly (keyof ProcessingLibrary)[] = [
   "display_order",
   "effective_min_file_size_mb",
   "effective_min_file_age_seconds",
+  "effective_max_concurrent_files",
   "manager_coverage",
   "manager_coverage_detail",
   "discovered_from_connection_id",
