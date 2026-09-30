@@ -6064,12 +6064,17 @@
             "type": "string"
           },
           "file_detection_interval_seconds": {
-            "default": 30,
-            "description": "How long this file's size must stay unchanged before Weir treats it as finished being written. 0 turns size settling off.",
-            "maximum": 3600.0,
-            "minimum": 0.0,
-            "title": "File Detection Interval Seconds",
-            "type": "integer"
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "deprecated": true,
+            "description": "Removed. Accepted and ignored, so an older client that still sends it is not refused. A workflow's wait is ready_after_seconds.",
+            "title": "File Detection Interval Seconds"
           },
           "file_system_events_enabled": {
             "default": true,
@@ -6103,11 +6108,17 @@
             "type": "string"
           },
           "hold_minutes": {
-            "default": 0,
-            "maximum": 10080.0,
-            "minimum": 0.0,
-            "title": "Hold Minutes",
-            "type": "integer"
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "deprecated": true,
+            "description": "Removed. Accepted and ignored, so an older client that still sends it is not refused. A workflow's wait is ready_after_seconds.",
+            "title": "Hold Minutes"
           },
           "ignore_size_changes": {
             "default": false,
@@ -6168,30 +6179,23 @@
           "min_file_age_seconds": {
             "anyOf": [
               {
-                "maximum": 604800.0,
-                "minimum": 0.0,
                 "type": "integer"
               },
               {
                 "type": "null"
               }
             ],
-            "description": "Seconds a file must go unchanged. Null uses the Performance setting.",
+            "deprecated": true,
+            "description": "Removed. Accepted and ignored, so an older client that still sends it is not refused. A workflow's wait is ready_after_seconds.",
             "title": "Min File Age Seconds"
           },
           "min_file_size_mb": {
-            "anyOf": [
-              {
-                "maximum": 1000000.0,
-                "minimum": 0.0,
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "Smallest file the library takes. Null uses the Performance setting.",
-            "title": "Min File Size Mb"
+            "default": 50,
+            "description": "The smallest file this workflow takes, in MB. 0 takes any size.",
+            "maximum": 1000000.0,
+            "minimum": 0.0,
+            "title": "Min File Size Mb",
+            "type": "integer"
           },
           "modified_after": {
             "anyOf": [
@@ -6255,6 +6259,14 @@
             "maximum": 100.0,
             "minimum": -100.0,
             "title": "Priority",
+            "type": "integer"
+          },
+          "ready_after_seconds": {
+            "default": 60,
+            "description": "A new file is ready once neither its size nor its last-changed time has moved for this many seconds. 0 needs no wait.",
+            "maximum": 1209600.0,
+            "minimum": 0.0,
+            "title": "Ready After Seconds",
             "type": "integer"
           },
           "rejected_file_action": {
@@ -6497,16 +6509,6 @@
             "title": "Display Order",
             "type": "integer"
           },
-          "effective_min_file_age_seconds": {
-            "description": "Seconds a file must go unchanged now: the library's own value, or the Performance setting.",
-            "title": "Effective Min File Age Seconds",
-            "type": "integer"
-          },
-          "effective_min_file_size_mb": {
-            "description": "Smallest file the library takes now: its own value, or the Performance setting.",
-            "title": "Effective Min File Size Mb",
-            "type": "integer"
-          },
           "enabled": {
             "title": "Enabled",
             "type": "boolean"
@@ -6531,10 +6533,6 @@
             "title": "Ffmpeg Strictness",
             "type": "string"
           },
-          "file_detection_interval_seconds": {
-            "title": "File Detection Interval Seconds",
-            "type": "integer"
-          },
           "file_system_events_enabled": {
             "title": "File System Events Enabled",
             "type": "boolean"
@@ -6550,10 +6548,6 @@
           "hardware_disabled_vendors_csv": {
             "title": "Hardware Disabled Vendors Csv",
             "type": "string"
-          },
-          "hold_minutes": {
-            "title": "Hold Minutes",
-            "type": "integer"
           },
           "id": {
             "title": "Id",
@@ -6611,29 +6605,12 @@
             "title": "Media Type",
             "type": "string"
           },
-          "min_file_age_seconds": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "Seconds a file must go unchanged. Null means the library uses the Performance setting.",
-            "title": "Min File Age Seconds"
-          },
           "min_file_size_mb": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "Smallest file the library takes. Null means the library uses the Performance setting.",
-            "title": "Min File Size Mb"
+            "description": "The smallest file this workflow takes, in MB. 0 takes any size.",
+            "maximum": 1000000.0,
+            "minimum": 0.0,
+            "title": "Min File Size Mb",
+            "type": "integer"
           },
           "modified_after": {
             "anyOf": [
@@ -6716,6 +6693,13 @@
           },
           "priority": {
             "title": "Priority",
+            "type": "integer"
+          },
+          "ready_after_seconds": {
+            "description": "A new file is ready once neither its size nor its last-changed time has moved for this many seconds. 0 needs no wait.",
+            "maximum": 1209600.0,
+            "minimum": 0.0,
+            "title": "Ready After Seconds",
             "type": "integer"
           },
           "rejected_file_action": {
@@ -6842,11 +6826,9 @@
           "include_patterns_csv",
           "exclude_patterns_csv",
           "min_file_size_mb",
-          "effective_min_file_size_mb",
+          "ready_after_seconds",
           "max_file_size_mb",
           "rejected_file_action",
-          "min_file_age_seconds",
-          "effective_min_file_age_seconds",
           "created_after",
           "created_before",
           "modified_after",
@@ -6854,7 +6836,6 @@
           "exclude_hidden",
           "top_level_only",
           "scan_interval_seconds",
-          "hold_minutes",
           "sidecar_patterns_csv",
           "preserve_original_timestamps",
           "output_collision_policy",
@@ -6862,7 +6843,6 @@
           "hardware_device",
           "hardware_disabled_vendors_csv",
           "ffmpeg_strictness",
-          "file_detection_interval_seconds",
           "ignore_size_changes",
           "skip_access_tests",
           "file_system_events_enabled",
@@ -6989,12 +6969,17 @@
             "type": "string"
           },
           "file_detection_interval_seconds": {
-            "default": 30,
-            "description": "How long this file's size must stay unchanged before Weir treats it as finished being written. 0 turns size settling off.",
-            "maximum": 3600.0,
-            "minimum": 0.0,
-            "title": "File Detection Interval Seconds",
-            "type": "integer"
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "deprecated": true,
+            "description": "Removed. Accepted and ignored, so an older client that still sends it is not refused. A workflow's wait is ready_after_seconds.",
+            "title": "File Detection Interval Seconds"
           },
           "file_system_events_enabled": {
             "default": true,
@@ -7028,11 +7013,17 @@
             "type": "string"
           },
           "hold_minutes": {
-            "default": 0,
-            "maximum": 10080.0,
-            "minimum": 0.0,
-            "title": "Hold Minutes",
-            "type": "integer"
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "deprecated": true,
+            "description": "Removed. Accepted and ignored, so an older client that still sends it is not refused. A workflow's wait is ready_after_seconds.",
+            "title": "Hold Minutes"
           },
           "ignore_size_changes": {
             "default": false,
@@ -7093,30 +7084,23 @@
           "min_file_age_seconds": {
             "anyOf": [
               {
-                "maximum": 604800.0,
-                "minimum": 0.0,
                 "type": "integer"
               },
               {
                 "type": "null"
               }
             ],
-            "description": "Seconds a file must go unchanged. Null uses the Performance setting.",
+            "deprecated": true,
+            "description": "Removed. Accepted and ignored, so an older client that still sends it is not refused. A workflow's wait is ready_after_seconds.",
             "title": "Min File Age Seconds"
           },
           "min_file_size_mb": {
-            "anyOf": [
-              {
-                "maximum": 1000000.0,
-                "minimum": 0.0,
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "Smallest file the library takes. Null uses the Performance setting.",
-            "title": "Min File Size Mb"
+            "default": 50,
+            "description": "The smallest file this workflow takes, in MB. 0 takes any size.",
+            "maximum": 1000000.0,
+            "minimum": 0.0,
+            "title": "Min File Size Mb",
+            "type": "integer"
           },
           "modified_after": {
             "anyOf": [
@@ -7180,6 +7164,14 @@
             "maximum": 100.0,
             "minimum": -100.0,
             "title": "Priority",
+            "type": "integer"
+          },
+          "ready_after_seconds": {
+            "default": 60,
+            "description": "A new file is ready once neither its size nor its last-changed time has moved for this many seconds. 0 needs no wait.",
+            "maximum": 1209600.0,
+            "minimum": 0.0,
+            "title": "Ready After Seconds",
             "type": "integer"
           },
           "rejected_file_action": {
@@ -7449,12 +7441,6 @@
             "title": "Max Concurrent Files",
             "type": "integer"
           },
-          "min_file_age_seconds": {
-            "maximum": 604800.0,
-            "minimum": 0.0,
-            "title": "Min File Age Seconds",
-            "type": "integer"
-          },
           "minimum_free_disk_space_mb": {
             "description": "Processing skips before writes when the target drive has less free space than this.",
             "maximum": 1048576.0,
@@ -7485,13 +7471,6 @@
             "maxLength": 5,
             "title": "Movie Schedule Start",
             "type": "string"
-          },
-          "min_input_file_size_mb": {
-            "description": "Files smaller than this are skipped before Weir probes or writes them.",
-            "maximum": 1048576.0,
-            "minimum": 0.0,
-            "title": "Processing Min Input File Size Mb",
-            "type": "integer"
           },
           "runner_capacity": {
             "description": "Total processing capacity. Active files consume it according to their cost, and new work waits once it is fully occupied.",
@@ -7625,8 +7604,6 @@
           "keep_failed_work_files",
           "file_log_retention_days",
           "runner_cost_undetermined",
-          "min_file_age_seconds",
-          "min_input_file_size_mb",
           "minimum_free_disk_space_mb",
           "movie_schedule_enabled",
           "movie_schedule_hours_limited",
@@ -7717,14 +7694,14 @@
           "min_file_age_seconds": {
             "anyOf": [
               {
-                "maximum": 604800.0,
-                "minimum": 0.0,
                 "type": "integer"
               },
               {
                 "type": "null"
               }
             ],
+            "deprecated": true,
+            "description": "Removed. Accepted and ignored, so an older client that still sends it is not refused. This now belongs to each workflow.",
             "title": "Min File Age Seconds"
           },
           "minimum_free_disk_space_mb": {
@@ -7801,14 +7778,14 @@
           "min_input_file_size_mb": {
             "anyOf": [
               {
-                "maximum": 1048576.0,
-                "minimum": 0.0,
                 "type": "integer"
               },
               {
                 "type": "null"
               }
             ],
+            "deprecated": true,
+            "description": "Removed. Accepted and ignored, so an older client that still sends it is not refused. This now belongs to each workflow.",
             "title": "Processing Min Input File Size Mb"
           },
           "runner_capacity": {

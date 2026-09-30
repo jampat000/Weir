@@ -54,8 +54,6 @@ export function ProcessSettingsSection() {
   const [runnerCost4k, setRunnerCost4k] = useState("4");
   const [runnerCostUndetermined, setRunnerCostUndetermined] = useState("0");
   const [runnerBudgetEnabled, setRunnerBudgetEnabled] = useState(false);
-  const [minFileAgeSeconds, setMinFileAgeSeconds] = useState("60");
-  const [minInputFileSizeMb, setMinInputFileSizeMb] = useState("50");
   const [minimumFreeDiskSpaceGb, setMinimumFreeDiskSpaceGb] = useState("5");
   const [keepFailedWorkFiles, setKeepFailedWorkFiles] = useState(false);
 
@@ -69,8 +67,6 @@ export function ProcessSettingsSection() {
     setRunnerCost4k(String(q.data.runner_cost_4k));
     setRunnerCostUndetermined(String(q.data.runner_cost_undetermined));
     setRunnerBudgetEnabled(q.data.runner_budget_enabled);
-    setMinFileAgeSeconds(String(q.data.min_file_age_seconds));
-    setMinInputFileSizeMb(String(q.data.min_input_file_size_mb));
     setMinimumFreeDiskSpaceGb(
       formatFreeSpaceGb(q.data.minimum_free_disk_space_mb),
     );
@@ -104,8 +100,6 @@ export function ProcessSettingsSection() {
       (value, index) =>
         Number.isFinite(value) && value >= (index === 0 ? 1 : 0) && value <= 64,
     ) &&
-    int(minFileAgeSeconds) >= 0 &&
-    int(minInputFileSizeMb) >= 0 &&
     Number.isFinite(minimumFreeMb) &&
     minimumFreeMb >= 0;
   const dirty =
@@ -117,8 +111,6 @@ export function ProcessSettingsSection() {
     runnerCost4k !== String(q.data.runner_cost_4k) ||
     runnerCostUndetermined !== String(q.data.runner_cost_undetermined) ||
     runnerBudgetEnabled !== q.data.runner_budget_enabled ||
-    minFileAgeSeconds !== String(q.data.min_file_age_seconds) ||
-    minInputFileSizeMb !== String(q.data.min_input_file_size_mb) ||
     minimumFreeDiskSpaceGb !==
       formatFreeSpaceGb(q.data.minimum_free_disk_space_mb) ||
     keepFailedWorkFiles !== q.data.keep_failed_work_files;
@@ -230,36 +222,8 @@ export function ProcessSettingsSection() {
 
           <SettingsGroup
             title="Before a file starts"
-            detail="Checks that stop Weir touching a file that is not ready. Keep your downloader's own limits too."
+            detail="Weir checks the output drive before it starts writing a file."
           >
-            <SettingRow
-              label="Wait after a file last changes"
-              hint="Every workflow uses this unless it sets its own."
-              htmlFor={`${ids}-age`}
-            >
-              <NumberWithUnit
-                id={`${ids}-age`}
-                value={minFileAgeSeconds}
-                unit="seconds"
-                min={0}
-                disabled={locked}
-                onChange={setMinFileAgeSeconds}
-              />
-            </SettingRow>
-            <SettingRow
-              label="Skip files smaller than"
-              hint="Samples and extras. Every workflow uses this unless it sets its own."
-              htmlFor={`${ids}-size`}
-            >
-              <NumberWithUnit
-                id={`${ids}-size`}
-                value={minInputFileSizeMb}
-                unit="MB"
-                min={0}
-                disabled={locked}
-                onChange={setMinInputFileSizeMb}
-              />
-            </SettingRow>
             <SettingRow
               label="Keep free on the output drive"
               hint="No new file starts below this."
@@ -321,8 +285,6 @@ export function ProcessSettingsSection() {
               runner_cost_undetermined: costs[5],
               runner_budget_enabled: runnerBudgetEnabled,
               keep_failed_work_files: keepFailedWorkFiles,
-              min_file_age_seconds: int(minFileAgeSeconds),
-              min_input_file_size_mb: int(minInputFileSizeMb),
               minimum_free_disk_space_mb: minimumFreeMb,
             })
           }

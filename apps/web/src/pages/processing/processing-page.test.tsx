@@ -39,8 +39,7 @@ const libraries = [
     enabled: true,
     watched_folder: "D:/downloads/tv",
     manager_connection_ids: [1],
-    min_file_age_seconds: 60,
-    effective_min_file_age_seconds: 60,
+    ready_after_seconds: 60,
   },
   {
     id: 2,
@@ -48,8 +47,7 @@ const libraries = [
     enabled: true,
     watched_folder: "D:/downloads/movies",
     manager_connection_ids: [1],
-    min_file_age_seconds: 60,
-    effective_min_file_age_seconds: 60,
+    ready_after_seconds: 60,
   },
 ];
 const readiness = {
@@ -214,12 +212,10 @@ describe("ProcessingPage", () => {
     expect(refetchLibraries).toHaveBeenCalled();
   });
 
-  it("names the wait every library is held to now, whether it is the library's own or Performance's", () => {
-    const before = libraries.map(
-      (library) => library.effective_min_file_age_seconds,
-    );
+  it("names the wait every workflow holds a new download for", () => {
+    const before = libraries.map((library) => library.ready_after_seconds);
     libraries.forEach((library) => {
-      library.effective_min_file_age_seconds = 10;
+      library.ready_after_seconds = 10;
     });
     try {
       renderLive();
@@ -231,7 +227,7 @@ describe("ProcessingPage", () => {
       ).toBeInTheDocument();
     } finally {
       libraries.forEach((library, index) => {
-        library.effective_min_file_age_seconds = before[index];
+        library.ready_after_seconds = before[index];
       });
     }
   });

@@ -17,26 +17,34 @@ describe("writeFrom", () => {
     expect(write.retry_backoff_seconds).toBe(300);
   });
 
-  it("sends a blank minimum size or wait as using the Performance setting", () => {
+  it("sends a blank or unreadable minimum size or wait as the server's default", () => {
     const write = writeFrom({
       ...EMPTY_LIBRARY_FORM,
       min_file_size_mb: "",
-      min_file_age_seconds: "  ",
+      ready_after_seconds: "  ",
     });
 
-    expect(write.min_file_size_mb).toBeNull();
-    expect(write.min_file_age_seconds).toBeNull();
+    expect(write.min_file_size_mb).toBe(50);
+    expect(write.ready_after_seconds).toBe(60);
   });
 
-  it("sends a minimum size or wait of zero as the library's own choice", () => {
+  it("sends a minimum size or wait of zero as the workflow's own choice", () => {
     const write = writeFrom({
       ...EMPTY_LIBRARY_FORM,
       min_file_size_mb: "0",
-      min_file_age_seconds: "0",
+      ready_after_seconds: "0",
     });
 
     expect(write.min_file_size_mb).toBe(0);
-    expect(write.min_file_age_seconds).toBe(0);
+    expect(write.ready_after_seconds).toBe(0);
+  });
+
+  it("no longer sends the three waits the one wait replaced", () => {
+    const write: Record<string, unknown> = { ...writeFrom(EMPTY_LIBRARY_FORM) };
+
+    expect(write).not.toHaveProperty("min_file_age_seconds");
+    expect(write).not.toHaveProperty("hold_minutes");
+    expect(write).not.toHaveProperty("file_detection_interval_seconds");
   });
 
   it("sends a blank date window side as no limit", () => {
@@ -70,19 +78,17 @@ describe("writeFrom", () => {
 });
 
 describe("formFrom", () => {
-  it("leaves the minimum size and wait blank for a library that uses the Performance setting", () => {
-    const form = formFrom(library());
-
-    expect(form.min_file_size_mb).toBe("");
-    expect(form.min_file_age_seconds).toBe("");
+  it("shows a new workflow's wait and minimum size, filled in", () => {
+    expect(EMPTY_LIBRARY_FORM.ready_after_seconds).toBe("60");
+    expect(EMPTY_LIBRARY_FORM.min_file_size_mb).toBe("50");
   });
 
-  it("shows a library's own minimum size and wait, including zero", () => {
+  it("shows a workflow's own minimum size and wait, including zero", () => {
     const form = formFrom(
-      library({ min_file_size_mb: 200, min_file_age_seconds: 0 }),
+      library({ min_file_size_mb: 200, ready_after_seconds: 0 }),
     );
 
     expect(form.min_file_size_mb).toBe("200");
-    expect(form.min_file_age_seconds).toBe("0");
+    expect(form.ready_after_seconds).toBe("0");
   });
 });

@@ -10,8 +10,6 @@ import {
 const READ_ONLY_FIELDS: readonly (keyof ProcessingLibrary)[] = [
   "id",
   "display_order",
-  "effective_min_file_size_mb",
-  "effective_min_file_age_seconds",
   "manager_coverage",
   "manager_coverage_detail",
   "discovered_from_connection_id",
