@@ -45,24 +45,7 @@ public sealed partial class RemuxPassRunner
         var disk = FileLifecycle.CheckMinimumFreeDiskSpace(finalSkip, request.MinimumFreeDiskSpaceMb, FreeBytes);
         if (!disk.Ok)
         {
-            return SkipGuardrail(
-                relativeMediaPath,
-                disk.Message,
-                "minimum_free_disk_space",
-                context.Inspected,
-                new WireObject()
-                    .Set("disk_checked_path", disk.CheckedPath)
-                    .Set("disk_free_mb", Math.Round(disk.FreeMb, 1, MidpointRounding.ToEven))
-                    .Set("minimum_free_disk_space_mb", disk.RequiredMb)
-                    .Set("media_scope", context.Scope)
-                    .Set("processing_output_folder_resolved", context.OutputDirectory)
-                    .Set("stream_counts", output["stream_counts"])
-                    .Set("plan_summary", output["plan_summary"])
-                    .Set("audio_before", audioBefore)
-                    .Set("audio_after", audioAfter)
-                    .Set("subs_before", subsBefore)
-                    .Set("subs_after", subsAfter)
-                    .Set("remux_required", false));
+            return OutputDriveWait(disk, context, output);
         }
 
         // The unchanged-copy path collides exactly like the remux path does.

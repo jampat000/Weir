@@ -230,6 +230,28 @@ public sealed class WatchedFolderScanDispatchTests
         Assert.Equal("skipped_below_minimum_file_size", rejection!.Counter);
     }
 
+    [Theory]
+    [InlineData(true, true)]
+    [InlineData(false, false)]
+    public void A_file_below_the_minimum_size_may_be_removed_only_when_the_workflow_holds_that_minimum(bool setByWorkflow, bool mayRemove)
+    {
+        var rules = NoRules with { MinFileSizeMb = 100, MinFileSizeSetByWorkflow = setByWorkflow };
+
+        var rejection = LibraryAdmission.Rejection("a.mkv", "a.mkv", new CandidateFileFacts(10 * 1024 * 1024, null, null), rules);
+
+        Assert.Equal(mayRemove, rejection!.MayRemoveFile);
+    }
+
+    [Fact]
+    public void A_file_refused_by_a_rule_the_workflow_holds_may_be_removed()
+    {
+        var rules = NoRules with { ExcludePatterns = ["*sample*"] };
+
+        var rejection = LibraryAdmission.Rejection("a.sample.mkv", "a.sample.mkv", new CandidateFileFacts(1024, null, null), rules);
+
+        Assert.True(rejection!.MayRemoveFile);
+    }
+
     [Fact]
     public void A_file_above_the_maximum_size_is_rejected()
     {

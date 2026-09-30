@@ -226,7 +226,7 @@ export function formFrom(library: ProcessingLibrary): LibraryForm {
       library.manager_connection_ids.length > 0
         ? String(library.manager_connection_ids[0])
         : "",
-    remux_writer: library.remux_writer ?? "best",
+    remux_writer: library.remux_writer,
   };
   for (const key of TEXT_FIELDS) form[key] = library[key];
   for (const key of NUMBER_FIELDS) form[key] = String(library[key]);
@@ -314,5 +314,7 @@ export function writeFrom(
     // the others, so saving here never drops a link nobody chose to remove.
     manager_connection_ids: linkedConnectionIds(form, library),
     remux_writer: form.remux_writer,
+    // The editor has no control for this: a saved workflow keeps its value and a new one takes the server default.
+    rewrite_with_ffmpeg: library?.rewrite_with_ffmpeg ?? true,
   };
 }

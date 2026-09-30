@@ -5,6 +5,7 @@ using Weir.Core.Processing;
 using Weir.Core.Processing.RemuxPass;
 using Weir.Core.Time;
 using Weir.Infrastructure.Jobs;
+using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Infrastructure.Processing.RemuxPass;
 
@@ -81,6 +82,12 @@ public sealed partial class RemuxPassHandler
                         return;
                     }
 
+                    if (result.Get("outcome") is WireString { Value: RemuxPassOutcomes.SkippedGuardrail })
+                    {
+                        await RecordGuardrailSkipAsync(uow, library, rel, result, updates, now).ConfigureAwait(false);
+                        return;
+                    }
+
                     if (result.Get("ok") is WireBool { Value: false })
                     {
                         var failureClass = ProcessingFailureClasses.Classify(TextOr(result.Get("outcome"), string.Empty));
@@ -141,6 +148,21 @@ public sealed partial class RemuxPassHandler
             // The media pass remains the source of truth; a false failure over a completed file would be worse.
             _logger.LogWarning(exception, "Weir could not save the durable Files state; inspect the processing record.");
         }
+    }
+
+    /// <summary>
+    /// A pass a guardrail stopped before it wrote anything (a file under the minimum size) is skipped, never done: nothing was
+    /// written, and a scan looks at the file again once its size or the workflow's minimum changes.
+    /// </summary>
+    private static async Task RecordGuardrailSkipAsync(UnitOfWork uow, ProcessingLibraryRecord library, string relativePath, WireObject result, WireObject updates, DateTimeOffset now)
+    {
+        var reason = WireStrings.Slice(CollapseWhitespace(TextOr(result.Get("reason"), "Weir skipped this file.")), 1200);
+        if (await RemuxPassFileState.MarkFileStatusAsync(uow, library.Id, relativePath, ProcessingFileStatuses.Skipped, reason, now).ConfigureAwait(false))
+        {
+            await RemuxPassFileState.ClearFailureFieldsAsync(uow, library.Id, relativePath).ConfigureAwait(false);
+        }
+
+        updates.Set("retry_scheduled", false).Set("quarantined", false).Set("failure_next_retry_at", WireNull.Instance).Set("failure_operator_message", reason);
     }
 
     /// <summary>Records a preflight failure through the same Files/Activity contract as a run result.</summary>

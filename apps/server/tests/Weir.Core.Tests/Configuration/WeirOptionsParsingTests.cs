@@ -236,7 +236,6 @@ public sealed class WeirOptionsParsingTests
         var low = TestRuntime.Load(
             ("WEIR_PROCESSING_PROBE_SIZE_MB", "0"),
             ("WEIR_PROCESSING_ANALYZE_DURATION_SECONDS", "0"),
-            ("WEIR_PROCESSING_WATCHED_FOLDER_MIN_FILE_AGE_SECONDS", "-1"),
             ("WEIR_PROCESSING_MOVIE_OUTPUT_CLEANUP_MIN_AGE_SECONDS", "1"),
             ("WEIR_PROCESSING_TV_OUTPUT_CLEANUP_MIN_AGE_SECONDS", "1"),
             ("WEIR_PROCESSING_WORK_TEMP_STALE_SWEEP_MIN_STALE_AGE_SECONDS", "1"),
@@ -248,7 +247,6 @@ public sealed class WeirOptionsParsingTests
             ("WEIR_JOB_ROWS_RETENTION_SCHEDULE_INTERVAL_SECONDS", "1"));
         Assert.Equal(1, low.ProcessingProbeSizeMb);
         Assert.Equal(1, low.ProcessingAnalyzeDurationSeconds);
-        Assert.Equal(0, low.ProcessingWatchedFolderMinFileAgeSeconds);
         Assert.Equal(3600, low.ProcessingMovieOutputCleanupMinAgeSeconds);
         Assert.Equal(3600, low.ProcessingTvOutputCleanupMinAgeSeconds);
         Assert.Equal(60, low.ProcessingWorkTempStaleSweepMinStaleAgeSeconds);
@@ -262,7 +260,6 @@ public sealed class WeirOptionsParsingTests
         var high = TestRuntime.Load(
             ("WEIR_PROCESSING_PROBE_SIZE_MB", "99999"),
             ("WEIR_PROCESSING_ANALYZE_DURATION_SECONDS", "99999"),
-            ("WEIR_PROCESSING_WATCHED_FOLDER_MIN_FILE_AGE_SECONDS", "99999999"),
             ("WEIR_PROCESSING_MOVIE_OUTPUT_CLEANUP_MIN_AGE_SECONDS", "99999999"),
             ("WEIR_PROCESSING_TV_OUTPUT_CLEANUP_MIN_AGE_SECONDS", "99999999"),
             ("WEIR_PROCESSING_WORK_TEMP_STALE_SWEEP_MIN_STALE_AGE_SECONDS", "99999999"),
@@ -274,7 +271,6 @@ public sealed class WeirOptionsParsingTests
             ("WEIR_JOB_ROWS_RETENTION_SCHEDULE_INTERVAL_SECONDS", "99999999"));
         Assert.Equal(1024, high.ProcessingProbeSizeMb);
         Assert.Equal(300, high.ProcessingAnalyzeDurationSeconds);
-        Assert.Equal(7 * 24 * 3600, high.ProcessingWatchedFolderMinFileAgeSeconds);
         Assert.Equal(30 * 24 * 3600, high.ProcessingMovieOutputCleanupMinAgeSeconds);
         Assert.Equal(30 * 24 * 3600, high.ProcessingTvOutputCleanupMinAgeSeconds);
         Assert.Equal(30 * 24 * 3600, high.ProcessingWorkTempStaleSweepMinStaleAgeSeconds);

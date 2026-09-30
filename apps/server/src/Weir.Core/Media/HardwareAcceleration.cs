@@ -267,6 +267,15 @@ public static class HardwareAcceleration
         return StrictnessLevels.Contains(value, StringComparer.Ordinal) ? value : DefaultStrictness;
     }
 
+    /// <summary>
+    /// Whether a workflow's hardware decoding choice takes effect. Weir copies video and audio without decoding them, so a
+    /// hardware decoder has nothing to do and the workflow editor shows the choice as unavailable. Saved values are kept.
+    /// </summary>
+    public static bool DecodeIsAvailable => false;
+
+    /// <summary>The decode mode a pass uses for a workflow that saved <paramref name="saved"/>.</summary>
+    public static string EffectiveDecodeMode(string? saved) => DecodeIsAvailable ? NormalizeDecodeMode(saved) : ModeOff;
+
     /// <summary>Unknown values mean off.</summary>
     public static string NormalizeDecodeMode(string? raw)
     {

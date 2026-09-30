@@ -17,7 +17,6 @@ public sealed record ProcessingRuntimeSettings
     public required bool ProcessingWatchedFolderRemuxScanDispatchPeriodicEnqueueRemuxJobs { get; init; }
     public required int ProcessingProbeSizeMb { get; init; }
     public required int ProcessingAnalyzeDurationSeconds { get; init; }
-    public required int ProcessingWatchedFolderMinFileAgeSeconds { get; init; }
     public required int ProcessingMovieOutputCleanupMinAgeSeconds { get; init; }
     public required string MovieOutputCleanupConfigurationNote { get; init; }
     public required int ProcessingTvOutputCleanupMinAgeSeconds { get; init; }
@@ -107,7 +106,6 @@ public static class RuntimeVisibility
             ProcessingWatchedFolderRemuxScanDispatchPeriodicEnqueueRemuxJobs = options.ProcessingWatchedFolderRemuxScanDispatchPeriodicEnqueueRemuxJobs,
             ProcessingProbeSizeMb = options.ProcessingProbeSizeMb,
             ProcessingAnalyzeDurationSeconds = options.ProcessingAnalyzeDurationSeconds,
-            ProcessingWatchedFolderMinFileAgeSeconds = options.ProcessingWatchedFolderMinFileAgeSeconds,
             ProcessingMovieOutputCleanupMinAgeSeconds = options.ProcessingMovieOutputCleanupMinAgeSeconds,
             MovieOutputCleanupConfigurationNote = MovieOutputCleanupNote,
             ProcessingTvOutputCleanupMinAgeSeconds = options.ProcessingTvOutputCleanupMinAgeSeconds,

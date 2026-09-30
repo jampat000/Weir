@@ -78,7 +78,7 @@ public sealed class LeftInPlaceOriginalTests : IDisposable
             data,
             new TvSeasonFolderCleanup(_fixture.Store.Database, _fixture.Connections, _fixture.Store.Clock, NullLogger<TvSeasonFolderCleanup>.Instance),
             new FakeOriginalLanguage(),
-            new RemuxPassSettings { WatchedFolderMinFileAgeSeconds = 0 },
+            new RemuxPassSettings(),
             _fixture.Store.Clock,
             NullLogger<RemuxPassRunner>.Instance);
         return new RemuxPassHandler(

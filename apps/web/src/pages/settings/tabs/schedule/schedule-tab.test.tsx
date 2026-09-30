@@ -1,5 +1,11 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import type { ReactNode } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, expect, it, vi } from "vitest";
@@ -67,6 +73,8 @@ function library(over: Partial<ProcessingLibrary> = {}): ProcessingLibrary {
     sidecar_patterns_csv: ".srt,.nfo",
     preserve_original_timestamps: false,
     remove_original_after_success: true,
+    remux_writer: "best",
+    rewrite_with_ffmpeg: true,
     output_collision_policy: "replace",
     hardware_decode_mode: "off",
     hardware_device: "",
@@ -158,4 +166,28 @@ it("asks before an unsaved library's hours are replaced by another library's", a
   expect(screen.getByTestId("schedule-library-editor")).toHaveAccessibleName(
     "Movies hours",
   );
+});
+
+it("keeps a workflow's other settings when its hours are saved", async () => {
+  asOperator();
+  vi.spyOn(librariesApi, "fetchProcessingLibraries").mockResolvedValue([
+    library({ remux_writer: "ffmpeg", rewrite_with_ffmpeg: false }),
+  ]);
+  const update = vi
+    .spyOn(librariesApi, "updateProcessingLibrary")
+    .mockResolvedValue(library());
+
+  render(<ScheduleTab />, { wrapper });
+  const [movies] = await screen.findAllByTestId("schedule-library-row");
+  fireEvent.click(
+    within(movies!).getByRole("button", { name: "Change hours" }),
+  );
+  fireEvent.pointerDown(screen.getByTestId("schedule-cell-0-9"));
+  fireEvent.click(screen.getByTestId("schedule-library-save"));
+
+  await waitFor(() => expect(update).toHaveBeenCalled());
+  expect(update.mock.calls[0]![1]).toMatchObject({
+    remux_writer: "ffmpeg",
+    rewrite_with_ffmpeg: false,
+  });
 });

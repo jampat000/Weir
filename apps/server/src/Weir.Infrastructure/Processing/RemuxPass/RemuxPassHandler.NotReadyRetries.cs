@@ -70,6 +70,24 @@ public sealed partial class RemuxPassHandler
             payload.Set("unreadable_fingerprint", fingerprint);
         }
 
+        await BookAnotherLookAsync(
+            payload, origin, $"{RemuxPassOutcomes.JobKind}:unreadable-wait:{jobId}:{looks.ToString(CultureInfo.InvariantCulture)}", lookAgainAt, result, cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Queues another look at a file that is waiting, held back until <paramref name="lookAgainAt"/> the way a retry's backoff
+    /// is, and marks <paramref name="result"/> as retrying so nothing reports it as final. The look carries the hand-off's
+    /// origin, so its outcome is still reported to the media manager that sent it.
+    /// </summary>
+    private async Task BookAnotherLookAsync(
+        WireObject payload, WireObject? origin, string dedupeKey, DateTimeOffset lookAgainAt, WireObject result, CancellationToken cancellationToken)
+    {
+        if (_jobs is not { } jobs)
+        {
+            return;
+        }
+
         if (origin is { IsTruthy: true })
         {
             payload.Set("origin", origin);
@@ -77,8 +95,8 @@ public sealed partial class RemuxPassHandler
 
         try
         {
-            await _jobs.EnqueueOrGetAsync(
-                $"{RemuxPassOutcomes.JobKind}:unreadable-wait:{jobId}:{looks.ToString(CultureInfo.InvariantCulture)}",
+            await jobs.EnqueueOrGetAsync(
+                dedupeKey,
                 RemuxPassOutcomes.JobKind,
                 WireJsonWriter.Dumps(payload, WireJsonFormat.Compact),
                 cancellationToken: cancellationToken,
@@ -88,7 +106,7 @@ public sealed partial class RemuxPassHandler
         catch (Exception exception) when (exception is SqliteException or InvalidOperationException)
         {
             // The file stays on hold with its reason, which is true; it is only the next look that is missing.
-            _logger.LogWarning(exception, "Weir could not queue another look at a file that would not read to the end.");
+            _logger.LogWarning(exception, "Weir could not queue another look at a file that is waiting.");
         }
     }
 
@@ -142,26 +160,8 @@ public sealed partial class RemuxPassHandler
         var seconds = result.Get("not_ready_seconds") is WireInteger remaining ? Math.Max(1, (long)remaining.Value) : 60;
         // A little past the moment it is old enough, so the second look does not land a fraction of a second early.
         var lookAgainAt = _time.GetUtcNow().AddSeconds(seconds + 2);
-        var payload = data.Copy().Set("minimum_age_waits", waits + 1);
-        if (origin is { IsTruthy: true })
-        {
-            payload.Set("origin", origin);
-        }
-
-        try
-        {
-            await _jobs.EnqueueOrGetAsync(
-                $"{RemuxPassOutcomes.JobKind}:minimum-age-wait:{jobId}:{waits + 1}",
-                RemuxPassOutcomes.JobKind,
-                WireJsonWriter.Dumps(payload, WireJsonFormat.Compact),
-                cancellationToken: cancellationToken,
-                notBefore: lookAgainAt).ConfigureAwait(false);
-            result.Set("retry_scheduled", true).Set("failure_next_retry_at", Timestamp.FromDateTimeOffset(lookAgainAt).IsoFormat());
-        }
-        catch (Exception exception) when (exception is SqliteException or InvalidOperationException)
-        {
-            // The file stays on hold with its reason, which is true; it is only the second look that is missing.
-            _logger.LogWarning(exception, "Weir could not queue a second look at a file that is waiting out its minimum age.");
-        }
+        await BookAnotherLookAsync(
+            data.Copy().Set("minimum_age_waits", waits + 1), origin, $"{RemuxPassOutcomes.JobKind}:minimum-age-wait:{jobId}:{waits + 1}", lookAgainAt, result, cancellationToken)
+            .ConfigureAwait(false);
     }
 }

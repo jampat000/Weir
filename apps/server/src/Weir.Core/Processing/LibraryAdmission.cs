@@ -18,6 +18,10 @@ public sealed record LibraryAdmissionRules(
     bool ExcludeHidden,
     bool TopLevelOnly)
 {
+    /// <summary>Whether <see cref="MinFileSizeMb"/> is a value the workflow itself holds, as opposed to the Performance
+    /// setting it follows. Only a rule the workflow holds may go on to remove a file.</summary>
+    public bool MinFileSizeSetByWorkflow { get; init; }
+
     private static IReadOnlyList<string> CsvValues(string? csv) =>
         string.IsNullOrWhiteSpace(csv)
             ? []
@@ -40,12 +44,19 @@ public sealed record LibraryAdmissionRules(
             ModifiedAfter: library.ModifiedAfter?.AsUtc,
             ModifiedBefore: library.ModifiedBefore?.AsUtc,
             ExcludeHidden: library.ExcludeHidden,
-            TopLevelOnly: library.TopLevelOnly);
+            TopLevelOnly: library.TopLevelOnly)
+        {
+            MinFileSizeSetByWorkflow = library.MinFileSizeMb is not null,
+        };
     }
 }
 
 /// <summary>A settled file the library rules refuse, and the counter it moves.</summary>
-public sealed record LibraryAdmissionRejection(string Reason, string Counter);
+/// <param name="Reason">The plain-language reason recorded for the file.</param>
+/// <param name="Counter">The summary counter this rejection moves.</param>
+/// <param name="MayRemoveFile">Whether a workflow set to delete rejected files may delete this file. False when the rule that
+/// refused it is not one the workflow holds itself.</param>
+public sealed record LibraryAdmissionRejection(string Reason, string Counter, bool MayRemoveFile = true);
 
 /// <summary>Facts about one candidate file needed by the admission rejection check, independent of how
 /// they were read from disk.</summary>
@@ -53,6 +64,10 @@ public sealed record CandidateFileFacts(long SizeBytes, DateTimeOffset? CreatedA
 
 public static class LibraryAdmission
 {
+    /// <summary>The reason recorded for a file under the minimum size, wherever Weir notices it.</summary>
+    public static string BelowMinimumSizeReason(double sizeMb, long minimumMb) =>
+        $"Skipped because this file is {sizeMb.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)} MB, under the {minimumMb} MB minimum.";
+
     /// <summary>The plain-language reason and summary counter for a
     /// settled file the library's rules refuse, or <see langword="null"/> when it is admitted.</summary>
     public static LibraryAdmissionRejection? Rejection(
@@ -66,8 +81,9 @@ public static class LibraryAdmission
         if (rules.MinFileSizeMb > 0 && facts.SizeBytes < rules.MinFileSizeMb * 1024 * 1024)
         {
             return new LibraryAdmissionRejection(
-                $"Skipped because this file is {sizeMb.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)} MB, under the {rules.MinFileSizeMb} MB minimum.",
-                "skipped_below_minimum_file_size");
+                BelowMinimumSizeReason(sizeMb, rules.MinFileSizeMb),
+                "skipped_below_minimum_file_size",
+                MayRemoveFile: rules.MinFileSizeSetByWorkflow);
         }
 
         if (rules.MaxFileSizeMb > 0 && facts.SizeBytes > rules.MaxFileSizeMb * 1024 * 1024)
