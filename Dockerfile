@@ -112,7 +112,11 @@ FROM mcr.microsoft.com/dotnet/runtime-deps:10.0-noble@sha256:099f6f87ed745377dd2
 # whichever version an install actually has.
 # No curl: the HEALTHCHECK below runs the app's own --healthcheck switch instead, so the image
 # carries one fewer general-purpose HTTP client.
+# The base image is pinned by digest, so its own packages only move when that pin does. Installing the
+# distribution's pending security updates here keeps a fixed CVE in a base package (OpenSSL, libc) out of
+# the image between pin bumps; the release and pull-request scans fail on any HIGH/CRITICAL with a fix.
 RUN apt-get update \
+  && apt-get upgrade -y --no-install-recommends \
   && apt-get install -y --no-install-recommends \
     ca-certificates \
     ffmpeg \
