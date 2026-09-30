@@ -35,10 +35,11 @@ public sealed class SafeSwapRulesTests
     }
 
     [Fact]
-    public void Free_space_needs_the_file_size_plus_one_gibibyte()
+    public void Free_space_needs_the_file_size_plus_what_the_workflow_keeps_free()
     {
-        Assert.Equal(1L << 30, SafeSwapRules.RequiredFreeBytes(0));
-        Assert.Equal((5L << 30) + (1L << 30), SafeSwapRules.RequiredFreeBytes(5L << 30));
+        Assert.Equal(1L << 30, SafeSwapRules.RequiredFreeBytes(0, 1L << 30));
+        Assert.Equal((5L << 30) + (2L << 30), SafeSwapRules.RequiredFreeBytes(5L << 30, 2L << 30));
+        Assert.Equal(3, SafeSwapRules.RequiredFreeBytes(3, 0));
     }
 
     [Fact]

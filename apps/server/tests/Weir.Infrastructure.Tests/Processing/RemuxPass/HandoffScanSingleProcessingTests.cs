@@ -139,7 +139,7 @@ public sealed class HandoffScanSingleProcessingTests : IDisposable
     {
         var handler = new ProcessingWatchedFolderScanDispatchJobHandler(
             _fixture.Store.Database, _fixture.Store.Clock, _fixture.Store.Options, _fixture.Jobs, _fixture.Connections,
-            new SuiteSettingsStore(new AuthStore()), _fixture.OperatorSettings, _fixture.Libraries, _fixture.Files, new FileSkipMarkerStore());
+            new SuiteSettingsStore(new AuthStore()), _fixture.Libraries, _fixture.Files, new FileSkipMarkerStore());
         var payload = new WireObject()
             .Set("enqueue_remux_jobs", true)
             .Set("scan_trigger", "watcher")

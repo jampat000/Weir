@@ -14,8 +14,9 @@ public sealed class LibraryRoundTripApiTests
     /// <summary>What the response reports about a workflow that a save never takes: the server works these out itself.</summary>
     private static readonly string[] ReportedOnly =
     [
-        "id", "display_order", "manager_coverage", "manager_coverage_detail", "discovered_from_connection_id",
-        "discovered_library_key", "active_job_count", "next_look_at", "periodic_scan", "next_scan_at", "updated_at",
+        "id", "display_order", "effective_max_concurrent_files", "manager_coverage", "manager_coverage_detail",
+        "discovered_from_connection_id", "discovered_library_key", "active_job_count", "next_look_at", "periodic_scan",
+        "next_scan_at", "updated_at",
     ];
 
     /// <summary>Settings a workflow used to report. The server accepts them on a save and ignores them.</summary>

@@ -46,6 +46,8 @@ export interface ProcessingLibrary {
   preserve_original_timestamps: boolean;
   /** Off keeps the original download in the watched folder after cleaning, so a torrent keeps seeding. */
   remove_original_after_success: boolean;
+  /** Megabytes kept free on the drive this workflow writes to; a file that would leave less is held. 0 turns it off. */
+  minimum_free_disk_space_mb: number;
   /** Which tool writes the output, for new downloads and library cleaning: mkvmerge for MKV when installed and FFmpeg otherwise or when mkvmerge fails (best), or FFmpeg only. */
   remux_writer: RemuxWriter;
   /** What to do when an output already exists at the same path. "replace" is the long-standing behaviour. */
@@ -67,7 +69,10 @@ export interface ProcessingLibrary {
   schedule_start: string;
   schedule_end: string;
 
+  /** The most files this workflow runs at once, as a share of Files at once in Performance; 0 is no limit of its own. */
   max_concurrent_files: number;
+  /** What the workflow is held to now: its own limit, and never more than Files at once in Performance. */
+  effective_max_concurrent_files: number;
   priority: number;
 
   rule_set_id: number | null;
@@ -109,6 +114,8 @@ export interface ProcessingLibraryWrite {
   preserve_original_timestamps: boolean;
   /** Off keeps the original download in the watched folder after cleaning, so a torrent keeps seeding. */
   remove_original_after_success: boolean;
+  /** Megabytes to keep free on the drive this workflow writes to; 0 turns the check off. */
+  minimum_free_disk_space_mb: number;
   /** Which tool writes the output: mkvmerge for MKV when installed and FFmpeg otherwise (best), or FFmpeg only. */
   remux_writer: RemuxWriter;
   output_collision_policy: string;
@@ -221,6 +228,7 @@ export function writeFromProcessingLibrary(
     sidecar_patterns_csv: library.sidecar_patterns_csv,
     preserve_original_timestamps: library.preserve_original_timestamps,
     remove_original_after_success: library.remove_original_after_success,
+    minimum_free_disk_space_mb: library.minimum_free_disk_space_mb,
     remux_writer: library.remux_writer,
     output_collision_policy: library.output_collision_policy,
     ffmpeg_strictness: library.ffmpeg_strictness,

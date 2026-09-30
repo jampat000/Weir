@@ -58,8 +58,6 @@ internal sealed class ProcessingOperatorSettingsEndpointHandlers
         .Set("unclaimed_handback_cleanup_interval_seconds", row.UnclaimedHandbackCleanupIntervalSeconds is { } unclaimedEvery ? WireValue.Of(unclaimedEvery) : WireValue.Null)
         .Set("keep_failed_work_files", row.KeepFailedWorkFiles)
         .Set("file_log_retention_days", OperatorSettingsRules.ClampFileLogRetentionDays(row.FileLogRetentionDays))
-        .Set("runner_cost_undetermined", OperatorSettingsRules.ClampRunnerCost(row.RunnerCostUndetermined))
-        .Set("minimum_free_disk_space_mb", OperatorSettingsRules.ClampSizeMb(row.MinimumFreeDiskSpaceMb))
         .Set("movie_schedule_enabled", row.MovieScheduleEnabled)
         .Set("movie_schedule_hours_limited", row.MovieScheduleHoursLimited)
         .Set("movie_schedule_days", row.MovieScheduleDays)
@@ -82,11 +80,23 @@ internal sealed class ProcessingOperatorSettingsEndpointHandlers
         return ApiRoutes.Ok(OperatorSettingsOut(row, string.IsNullOrWhiteSpace(suite.AppTimezone) ? "UTC" : suite.AppTimezone.Trim()));
     }
 
+    /// <summary>
+    /// Settings Performance no longer holds: the wait for a new file, the minimum size and the space to keep free now belong to
+    /// each workflow, the cost of an unknown resolution is a 1080p file's, and nothing acts on verbose detection records. An older
+    /// client or backup may still send them, so they are accepted and their values are never looked at.
+    /// </summary>
+    private static readonly string[] RetiredSettings =
+    [
+        "verbose_detection_logging", "min_file_age_seconds", "min_input_file_size_mb", "minimum_free_disk_space_mb",
+        "runner_cost_undetermined",
+    ];
+
     public async Task<ApiResult> PutOperatorSettingsAsync(ApiRequest request)
     {
         var payload = await request.ReadBodyAsync().ConfigureAwait(false);
         var issues = new ValidationIssues();
         var model = new BodyModel(payload, issues);
+        model.AcceptAndIgnore(RetiredSettings);
         var csrfToken = model.Str("csrf_token", minLength: 1);
         var maxConcurrentFiles = model.OptionalInt("max_concurrent_files", ge: 1, le: OperatorSettingsRules.MaxFilesAtOnce);
         var runnerCapacity = model.OptionalInt("runner_capacity", ge: 1, le: 64);
@@ -94,7 +104,6 @@ internal sealed class ProcessingOperatorSettingsEndpointHandlers
         var runnerCost720P = model.OptionalInt("runner_cost_720p", ge: 0, le: 64);
         var runnerCost1080P = model.OptionalInt("runner_cost_1080p", ge: 0, le: 64);
         var runnerCost4K = model.OptionalInt("runner_cost_4k", ge: 0, le: 64);
-        var runnerCostUndetermined = model.OptionalInt("runner_cost_undetermined", ge: 0, le: 64);
         var runnerBudgetEnabled = model.OptionalBool("runner_budget_enabled");
         var workTempStaleSweepEnabled = model.OptionalBool("work_temp_stale_sweep_enabled");
         var failureCleanupEnabled = model.OptionalBool("failure_cleanup_enabled");
@@ -109,12 +118,6 @@ internal sealed class ProcessingOperatorSettingsEndpointHandlers
             "unclaimed_handback_cleanup_interval_seconds", ge: OperatorSettingsRules.MinCleanupIntervalSeconds, le: OperatorSettingsRules.MaxCleanupIntervalSeconds);
         var keepFailedWorkFiles = model.OptionalBool("keep_failed_work_files");
         var fileLogRetentionDays = model.OptionalInt("file_log_retention_days", ge: 0, le: 3650);
-        // Retired settings. Read and ignored so an older client that sends them is not refused: the body forbids fields it
-        // does not know. The wait and the minimum size now belong to each workflow alone.
-        var retiredVerboseDetectionLogging = model.OptionalBool("verbose_detection_logging");
-        var retiredMinFileAgeSeconds = model.OptionalInt("min_file_age_seconds");
-        var retiredMinInputFileSizeMb = model.OptionalInt("min_input_file_size_mb");
-        var minimumFreeDiskSpaceMb = model.OptionalInt("minimum_free_disk_space_mb", ge: 0, le: 1024 * 1024);
         var movieScheduleEnabled = model.OptionalBool("movie_schedule_enabled");
         var movieScheduleHoursLimited = model.OptionalBool("movie_schedule_hours_limited");
         var movieScheduleDays = model.OptionalStr("movie_schedule_days", maxLength: 2000);
@@ -143,12 +146,11 @@ internal sealed class ProcessingOperatorSettingsEndpointHandlers
 
         var hasProcessField = maxConcurrentFiles is not null || runnerCapacity is not null || runnerCostSd is not null ||
                                runnerCost720P is not null || runnerCost1080P is not null || runnerCost4K is not null ||
-                               runnerCostUndetermined is not null || runnerBudgetEnabled is not null || workTempStaleSweepEnabled is not null || failureCleanupEnabled is not null ||
+                               runnerBudgetEnabled is not null || workTempStaleSweepEnabled is not null || failureCleanupEnabled is not null ||
                                workTempStaleSweepIntervalSeconds is not null || failureCleanupIntervalSeconds is not null ||
                                unclaimedHandbackCleanupEnabled is not null || unclaimedHandbackWindowDays is not null ||
                                unclaimedHandbackCleanupIntervalSeconds is not null ||
-                               keepFailedWorkFiles is not null || fileLogRetentionDays is not null || retiredVerboseDetectionLogging is not null ||
-                               retiredMinFileAgeSeconds is not null || retiredMinInputFileSizeMb is not null || minimumFreeDiskSpaceMb is not null;
+                               keepFailedWorkFiles is not null || fileLogRetentionDays is not null || RetiredSettings.Any(model.Has);
         if (!hasProcessField && movieScheduleEnabled is null && tvScheduleEnabled is null)
         {
             issues.Add(new ValidationIssue("value_error", ["body"], "Value error, No operator settings fields to update.", WireValue.Null));
@@ -197,11 +199,6 @@ internal sealed class ProcessingOperatorSettingsEndpointHandlers
             after = after with { RunnerCost4K = Math.Clamp(v4, 0, 64) };
         }
 
-        if (runnerCostUndetermined is { } v5)
-        {
-            after = after with { RunnerCostUndetermined = Math.Clamp(v5, 0, 64) };
-        }
-
         if (fileLogRetentionDays is { } fl)
         {
             after = after with { FileLogRetentionDays = OperatorSettingsRules.ClampFileLogRetentionDays(fl) };
@@ -245,11 +242,6 @@ internal sealed class ProcessingOperatorSettingsEndpointHandlers
         if (keepFailedWorkFiles is { } kf)
         {
             after = after with { KeepFailedWorkFiles = kf };
-        }
-
-        if (minimumFreeDiskSpaceMb is { } mfd)
-        {
-            after = after with { MinimumFreeDiskSpaceMb = OperatorSettingsRules.ClampSizeMb(mfd) };
         }
 
         try

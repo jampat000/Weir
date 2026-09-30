@@ -57,11 +57,25 @@ says where a setting lives and what actually happens when it is saved.
   beside the maximum size. A media-manager hand-off still applies the minimum size and the video type,
   but skips the path, date and maximum-size rules, because the manager chose the file.
 - Performance: "Files at once" (1 to 10) decides how many files run together and needs no restart. A
-  workflow follows it unless the workflow is given its own lower number. The resolution budget (runner
-  capacity and per-resolution costs) only applies when "Also weigh files by resolution" is switched
-  on. When files are waiting, `GET /api/v1/processing/files-at-once` and the screens that use it name
-  the one limit they are waiting on. "Keep free on the output drive" is checked before a file is
-  read: below it the file waits (On hold) and is looked at again, and is never recorded as done.
+  workflow's "Most files at once from this workflow" is a share of it: blank or 0 is no limit of its
+  own, and a number above Files at once is refused when saved. A workflow already above a lowered
+  Files at once still saves its other settings, and its editor says it is limited by the total. The
+  resolution budget (runner capacity and per-resolution costs) only applies when "Also weigh files by
+  resolution" is switched on, and then counts every job that reads a whole video: a pass however it
+  arrived (a hand-off costs the resolution already recorded for its file, and is corrected to the
+  measured one once its pass has probed it) and a library clean (costed by the resolution its scan
+  probed). A file whose resolution is not known costs what a 1080p file does. When files are waiting,
+  `GET /api/v1/processing/files-at-once` and the screens that use it name the one limit they are
+  waiting on.
+- Keeping space free (a workflow's "Keep at least this many GB free on the drive this workflow writes
+  to", 5 GB unless set, 0 turns it off): checked before every write the workflow makes. A remux pass
+  and an unchanged publish check the output drive (and the work folder's drive) before the file is
+  read, and again before the output is published. A hand-back copy after retries run out checks the
+  output drive before copying. A library clean needs the file's size plus this much free beside the
+  file. Below it the file waits (On hold, "Waiting: the output drive has less than X free") and is
+  looked at again 10, then 30, then every 60 minutes, and is never recorded as done or failed. An
+  upgrade gives every workflow the value Settings › Performance had; Performance still accepts the
+  old field and ignores it.
   "Keep the half-written copy" keeps a failed copy in the work folder until it is a day old, at which
   point the Cleanup sweep removes it; a restart removes it no sooner.
 - Schedule: the time zone is saved to the database and every time on that tab is read in it. Each

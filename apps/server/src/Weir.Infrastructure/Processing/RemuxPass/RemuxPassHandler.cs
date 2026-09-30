@@ -166,7 +166,7 @@ public sealed partial class RemuxPassHandler : IJobHandler
             RulesProfileName = claim.RulesProfileName,
             MinFileAgeSeconds = workflow.ReadyAfterSeconds,
             MinInputFileSizeMb = workflow.MinFileSizeMb,
-            MinimumFreeDiskSpaceMb = performance.MinimumFreeDiskSpaceMb,
+            MinimumFreeDiskSpaceMb = workflow.MinimumFreeDiskSpaceMb,
             KeepFailedWorkFiles = performance.KeepFailedWorkFiles,
             MediaScope = mediaScope,
             CurrentJobId = context.Id,

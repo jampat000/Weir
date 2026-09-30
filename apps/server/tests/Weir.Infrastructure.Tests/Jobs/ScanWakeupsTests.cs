@@ -65,7 +65,7 @@ public sealed class ScanWakeupsTests
         var jobs = new ProcessingJobStore(store.Database, store.Clock);
         var wakeups = new ScanWakeups();
         var handler = new ProcessingWatchedFolderScanDispatchJobHandler(
-            store.Database, store.Clock, store.Options, jobs, connections, new SuiteSettingsStore(new AuthStore()), new OperatorSettingsStore(), Libraries, Files, new FileSkipMarkerStore(), wakeups);
+            store.Database, store.Clock, store.Options, jobs, connections, new SuiteSettingsStore(new AuthStore()), Libraries, Files, new FileSkipMarkerStore(), wakeups);
         await store.Execute(
             "INSERT INTO operator_settings (id, minimum_free_disk_space_mb) " +
             "VALUES (1, 0) ON CONFLICT(id) DO UPDATE SET minimum_free_disk_space_mb = 0");

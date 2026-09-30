@@ -26,7 +26,7 @@ public sealed partial class RemuxPassHandlerTests
     }
 
     private Task KeepFreeOnOutputDriveAsync() =>
-        _fixture.Store.Execute($"UPDATE operator_settings SET minimum_free_disk_space_mb = {KeepFreeMb}");
+        _fixture.Store.Execute($"UPDATE libraries SET minimum_free_disk_space_mb = {KeepFreeMb}");
 
     [Fact]
     public async Task A_file_waits_when_the_output_drive_has_less_than_the_space_to_keep_free()

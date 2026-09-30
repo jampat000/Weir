@@ -6165,37 +6165,11 @@
             "title": "Ffmpeg Strictness",
             "type": "string"
           },
-          "file_detection_interval_seconds": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "deprecated": true,
-            "description": "Removed. Accepted and ignored, so an older client that still sends it is not refused. A workflow's wait is ready_after_seconds.",
-            "title": "File Detection Interval Seconds"
-          },
           "file_system_events_enabled": {
             "default": true,
             "description": "Watch this folder for changes so new files are picked up within seconds. The periodic scan runs regardless, so switching this off makes Weir slower to notice a file, never blind to it.",
             "title": "File System Events Enabled",
             "type": "boolean"
-          },
-          "hold_minutes": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "deprecated": true,
-            "description": "Removed. Accepted and ignored, so an older client that still sends it is not refused. A workflow's wait is ready_after_seconds.",
-            "title": "Hold Minutes"
           },
           "ignore_size_changes": {
             "default": false,
@@ -6230,7 +6204,7 @@
             "minimum": 0.0,
             "title": "Max Concurrent Files",
             "type": "integer",
-            "description": "This library's own limit on files at once. 0 means the same as \"Files at once\" in Process settings."
+            "description": "The most files this workflow runs at once, as a share of \"Files at once\" in Settings › Performance. 0 means no limit of its own. It cannot be more than Performance's Files at once: a save that asks for more is refused."
           },
           "max_file_size_mb": {
             "default": 0,
@@ -6252,19 +6226,6 @@
             ],
             "title": "Media Type",
             "type": "string"
-          },
-          "min_file_age_seconds": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "deprecated": true,
-            "description": "Removed. Accepted and ignored, so an older client that still sends it is not refused. A workflow's wait is ready_after_seconds.",
-            "title": "Min File Age Seconds"
           },
           "min_file_size_mb": {
             "default": 50,
@@ -6463,6 +6424,14 @@
             "title": "Remove Original After Success",
             "type": "boolean"
           },
+          "minimum_free_disk_space_mb": {
+            "default": 5120,
+            "description": "Weir keeps at least this much free on the drive this workflow writes to. A file that would leave less is put on hold and tried again when there is room. 0 turns the check off.",
+            "maximum": 1048576,
+            "minimum": 0,
+            "title": "Minimum Free Disk Space Mb",
+            "type": "integer"
+          },
           "remux_writer": {
             "default": "best",
             "description": "Which tool writes the workflow's output, for new downloads and for cleaning files already in the library. best: mkvmerge for Matroska when it is installed, ffmpeg for everything else, and ffmpeg again when mkvmerge's write fails its checks. ffmpeg: ffmpeg writes every file.",
@@ -6646,7 +6615,7 @@
           "max_concurrent_files": {
             "title": "Max Concurrent Files",
             "type": "integer",
-            "description": "This library's own limit on files at once. 0 means the same as \"Files at once\" in Process settings."
+            "description": "The most files this workflow runs at once. 0 means no limit of its own."
           },
           "max_file_size_mb": {
             "title": "Max File Size Mb",
@@ -6854,6 +6823,16 @@
             "title": "Remove Original After Success",
             "type": "boolean"
           },
+          "minimum_free_disk_space_mb": {
+            "description": "Weir keeps at least this much free on the drive this workflow writes to. A file that would leave less is put on hold and tried again when there is room. 0 turns the check off.",
+            "title": "Minimum Free Disk Space Mb",
+            "type": "integer"
+          },
+          "effective_max_concurrent_files": {
+            "description": "The most files this workflow is held to now: its own limit, and never more than Files at once in Settings › Performance, even if that was lowered after this was set.",
+            "title": "Effective Max Concurrent Files",
+            "type": "integer"
+          },
           "remux_writer": {
             "default": "best",
             "description": "Which tool writes the workflow's output, for new downloads and for cleaning files already in the library. best: mkvmerge for Matroska when it is installed, ffmpeg for everything else, and ffmpeg again when mkvmerge's write fails its checks. ffmpeg: ffmpeg writes every file.",
@@ -6908,6 +6887,8 @@
           "schedule_start",
           "schedule_end",
           "max_concurrent_files",
+          "effective_max_concurrent_files",
+          "minimum_free_disk_space_mb",
           "priority"
         ],
         "title": "ProcessingLibraryOut",
@@ -7018,37 +6999,11 @@
             "title": "Ffmpeg Strictness",
             "type": "string"
           },
-          "file_detection_interval_seconds": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "deprecated": true,
-            "description": "Removed. Accepted and ignored, so an older client that still sends it is not refused. A workflow's wait is ready_after_seconds.",
-            "title": "File Detection Interval Seconds"
-          },
           "file_system_events_enabled": {
             "default": true,
             "description": "Watch this folder for changes so new files are picked up within seconds. The periodic scan runs regardless, so switching this off makes Weir slower to notice a file, never blind to it.",
             "title": "File System Events Enabled",
             "type": "boolean"
-          },
-          "hold_minutes": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "deprecated": true,
-            "description": "Removed. Accepted and ignored, so an older client that still sends it is not refused. A workflow's wait is ready_after_seconds.",
-            "title": "Hold Minutes"
           },
           "ignore_size_changes": {
             "default": false,
@@ -7083,7 +7038,7 @@
             "minimum": 0.0,
             "title": "Max Concurrent Files",
             "type": "integer",
-            "description": "This library's own limit on files at once. 0 means the same as \"Files at once\" in Process settings."
+            "description": "The most files this workflow runs at once, as a share of \"Files at once\" in Settings › Performance. 0 means no limit of its own. It cannot be more than Performance's Files at once: a save that asks for more is refused."
           },
           "max_file_size_mb": {
             "default": 0,
@@ -7105,19 +7060,6 @@
             ],
             "title": "Media Type",
             "type": "string"
-          },
-          "min_file_age_seconds": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "deprecated": true,
-            "description": "Removed. Accepted and ignored, so an older client that still sends it is not refused. A workflow's wait is ready_after_seconds.",
-            "title": "Min File Age Seconds"
           },
           "min_file_size_mb": {
             "default": 50,
@@ -7316,6 +7258,14 @@
             "title": "Remove Original After Success",
             "type": "boolean"
           },
+          "minimum_free_disk_space_mb": {
+            "default": 5120,
+            "description": "Weir keeps at least this much free on the drive this workflow writes to. A file that would leave less is put on hold and tried again when there is room. 0 turns the check off.",
+            "maximum": 1048576,
+            "minimum": 0,
+            "title": "Minimum Free Disk Space Mb",
+            "type": "integer"
+          },
           "remux_writer": {
             "default": "best",
             "description": "Which tool writes the workflow's output, for new downloads and for cleaning files already in the library. best: mkvmerge for Matroska when it is installed, ffmpeg for everything else, and ffmpeg again when mkvmerge's write fails its checks. ffmpeg: ffmpeg writes every file.",
@@ -7460,13 +7410,6 @@
             "title": "Max Concurrent Files",
             "type": "integer"
           },
-          "minimum_free_disk_space_mb": {
-            "description": "Processing skips before writes when the target drive has less free space than this.",
-            "maximum": 1048576.0,
-            "minimum": 0.0,
-            "title": "Minimum Free Disk Space Mb",
-            "type": "integer"
-          },
           "movie_schedule_days": {
             "maxLength": 2000,
             "title": "Movie Schedule Days",
@@ -7525,13 +7468,6 @@
             "maximum": 64.0,
             "minimum": 0.0,
             "title": "Runner Cost Sd",
-            "type": "integer"
-          },
-          "runner_cost_undetermined": {
-            "description": "What a file Weir has not measured yet costs. Zero admits it rather than stalling on the unknown.",
-            "maximum": 64.0,
-            "minimum": 0.0,
-            "title": "Runner Cost Undetermined",
             "type": "integer"
           },
           "schedule_timezone": {
@@ -7622,8 +7558,6 @@
           "unclaimed_handback_window_days",
           "keep_failed_work_files",
           "file_log_retention_days",
-          "runner_cost_undetermined",
-          "minimum_free_disk_space_mb",
           "movie_schedule_enabled",
           "movie_schedule_hours_limited",
           "movie_schedule_days",
@@ -7710,32 +7644,6 @@
             ],
             "title": "Max Concurrent Files"
           },
-          "min_file_age_seconds": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "deprecated": true,
-            "description": "Removed. Accepted and ignored, so an older client that still sends it is not refused. This now belongs to each workflow.",
-            "title": "Min File Age Seconds"
-          },
-          "minimum_free_disk_space_mb": {
-            "anyOf": [
-              {
-                "maximum": 1048576.0,
-                "minimum": 0.0,
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Minimum Free Disk Space Mb"
-          },
           "movie_schedule_days": {
             "anyOf": [
               {
@@ -7793,19 +7701,6 @@
               }
             ],
             "title": "Movie Schedule Start"
-          },
-          "min_input_file_size_mb": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "deprecated": true,
-            "description": "Removed. Accepted and ignored, so an older client that still sends it is not refused. This now belongs to each workflow.",
-            "title": "Processing Min Input File Size Mb"
           },
           "runner_capacity": {
             "anyOf": [
@@ -7883,19 +7778,6 @@
             ],
             "title": "Runner Cost Sd"
           },
-          "runner_cost_undetermined": {
-            "anyOf": [
-              {
-                "maximum": 64.0,
-                "minimum": 0.0,
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Runner Cost Undetermined"
-          },
           "tv_schedule_days": {
             "anyOf": [
               {
@@ -7953,19 +7835,6 @@
               }
             ],
             "title": "Tv Schedule Start"
-          },
-          "verbose_detection_logging": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "deprecated": true,
-            "description": "Removed. Accepted and ignored, so an older client that still sends it is not refused.",
-            "title": "Verbose Detection Logging"
           },
           "work_temp_stale_sweep_enabled": {
             "anyOf": [

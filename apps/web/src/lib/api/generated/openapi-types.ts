@@ -5153,23 +5153,11 @@ export interface components {
       ffmpeg_strictness:
         "very" | "strict" | "normal" | "unofficial" | "experimental";
       /**
-       * File Detection Interval Seconds
-       * @deprecated
-       * @description Removed. Accepted and ignored, so an older client that still sends it is not refused. A workflow's wait is ready_after_seconds.
-       */
-      file_detection_interval_seconds?: number | null;
-      /**
        * File System Events Enabled
        * @description Watch this folder for changes so new files are picked up within seconds. The periodic scan runs regardless, so switching this off makes Weir slower to notice a file, never blind to it.
        * @default true
        */
       file_system_events_enabled: boolean;
-      /**
-       * Hold Minutes
-       * @deprecated
-       * @description Removed. Accepted and ignored, so an older client that still sends it is not refused. A workflow's wait is ready_after_seconds.
-       */
-      hold_minutes?: number | null;
       /**
        * Ignore Size Changes
        * @description Skip size settling entirely for this library.
@@ -5191,7 +5179,7 @@ export interface components {
       max_attempts: number;
       /**
        * Max Concurrent Files
-       * @description This library's own limit on files at once. 0 means the same as "Files at once" in Process settings.
+       * @description The most files this workflow runs at once, as a share of "Files at once" in Settings › Performance. 0 means no limit of its own. It cannot be more than Performance's Files at once: a save that asks for more is refused.
        * @default 0
        */
       max_concurrent_files: number;
@@ -5210,12 +5198,6 @@ export interface components {
        * @enum {string}
        */
       media_type: "movie" | "tv";
-      /**
-       * Min File Age Seconds
-       * @deprecated
-       * @description Removed. Accepted and ignored, so an older client that still sends it is not refused. A workflow's wait is ready_after_seconds.
-       */
-      min_file_age_seconds?: number | null;
       /**
        * Min File Size Mb
        * @description The smallest file this workflow takes, in MB. 0 takes any size.
@@ -5365,6 +5347,12 @@ export interface components {
        */
       remove_original_after_success: boolean;
       /**
+       * Minimum Free Disk Space Mb
+       * @description Weir keeps at least this much free on the drive this workflow writes to. A file that would leave less is put on hold and tried again when there is room. 0 turns the check off.
+       * @default 5120
+       */
+      minimum_free_disk_space_mb: number;
+      /**
        * Remux Writer
        * @description Which tool writes the workflow's output, for new downloads and for cleaning files already in the library. best: mkvmerge for Matroska when it is installed, ffmpeg for everything else, and ffmpeg again when mkvmerge's write fails its checks. ffmpeg: ffmpeg writes every file.
        * @default best
@@ -5445,7 +5433,7 @@ export interface components {
       max_attempts: number;
       /**
        * Max Concurrent Files
-       * @description This library's own limit on files at once. 0 means the same as "Files at once" in Process settings.
+       * @description The most files this workflow runs at once. 0 means no limit of its own.
        */
       max_concurrent_files: number;
       /** Max File Size Mb */
@@ -5543,6 +5531,16 @@ export interface components {
        */
       remove_original_after_success: boolean;
       /**
+       * Minimum Free Disk Space Mb
+       * @description Weir keeps at least this much free on the drive this workflow writes to. A file that would leave less is put on hold and tried again when there is room. 0 turns the check off.
+       */
+      minimum_free_disk_space_mb: number;
+      /**
+       * Effective Max Concurrent Files
+       * @description The most files this workflow is held to now: its own limit, and never more than Files at once in Settings › Performance, even if that was lowered after this was set.
+       */
+      effective_max_concurrent_files: number;
+      /**
        * Remux Writer
        * @description Which tool writes the workflow's output, for new downloads and for cleaning files already in the library. best: mkvmerge for Matroska when it is installed, ffmpeg for everything else, and ffmpeg again when mkvmerge's write fails its checks. ffmpeg: ffmpeg writes every file.
        * @default best
@@ -5610,23 +5608,11 @@ export interface components {
       ffmpeg_strictness:
         "very" | "strict" | "normal" | "unofficial" | "experimental";
       /**
-       * File Detection Interval Seconds
-       * @deprecated
-       * @description Removed. Accepted and ignored, so an older client that still sends it is not refused. A workflow's wait is ready_after_seconds.
-       */
-      file_detection_interval_seconds?: number | null;
-      /**
        * File System Events Enabled
        * @description Watch this folder for changes so new files are picked up within seconds. The periodic scan runs regardless, so switching this off makes Weir slower to notice a file, never blind to it.
        * @default true
        */
       file_system_events_enabled: boolean;
-      /**
-       * Hold Minutes
-       * @deprecated
-       * @description Removed. Accepted and ignored, so an older client that still sends it is not refused. A workflow's wait is ready_after_seconds.
-       */
-      hold_minutes?: number | null;
       /**
        * Ignore Size Changes
        * @description Skip size settling entirely for this library.
@@ -5648,7 +5634,7 @@ export interface components {
       max_attempts: number;
       /**
        * Max Concurrent Files
-       * @description This library's own limit on files at once. 0 means the same as "Files at once" in Process settings.
+       * @description The most files this workflow runs at once, as a share of "Files at once" in Settings › Performance. 0 means no limit of its own. It cannot be more than Performance's Files at once: a save that asks for more is refused.
        * @default 0
        */
       max_concurrent_files: number;
@@ -5667,12 +5653,6 @@ export interface components {
        * @enum {string}
        */
       media_type: "movie" | "tv";
-      /**
-       * Min File Age Seconds
-       * @deprecated
-       * @description Removed. Accepted and ignored, so an older client that still sends it is not refused. A workflow's wait is ready_after_seconds.
-       */
-      min_file_age_seconds?: number | null;
       /**
        * Min File Size Mb
        * @description The smallest file this workflow takes, in MB. 0 takes any size.
@@ -5822,6 +5802,12 @@ export interface components {
        */
       remove_original_after_success: boolean;
       /**
+       * Minimum Free Disk Space Mb
+       * @description Weir keeps at least this much free on the drive this workflow writes to. A file that would leave less is put on hold and tried again when there is room. 0 turns the check off.
+       * @default 5120
+       */
+      minimum_free_disk_space_mb: number;
+      /**
        * Remux Writer
        * @description Which tool writes the workflow's output, for new downloads and for cleaning files already in the library. best: mkvmerge for Matroska when it is installed, ffmpeg for everything else, and ffmpeg again when mkvmerge's write fails its checks. ffmpeg: ffmpeg writes every file.
        * @default best
@@ -5896,11 +5882,6 @@ export interface components {
       keep_failed_work_files: boolean;
       /** Max Concurrent Files */
       max_concurrent_files: number;
-      /**
-       * Minimum Free Disk Space Mb
-       * @description Processing skips before writes when the target drive has less free space than this.
-       */
-      minimum_free_disk_space_mb: number;
       /** Movie Schedule Days */
       movie_schedule_days: string;
       /** Movie Schedule Enabled */
@@ -5932,11 +5913,6 @@ export interface components {
       runner_cost_720p: number;
       /** Runner Cost Sd */
       runner_cost_sd: number;
-      /**
-       * Runner Cost Undetermined
-       * @description What a file Weir has not measured yet costs. Zero admits it rather than stalling on the unknown.
-       */
-      runner_cost_undetermined: number;
       /**
        * Schedule Timezone
        * @description IANA zone for schedule windows (suite settings).
@@ -5997,14 +5973,6 @@ export interface components {
       keep_failed_work_files?: boolean | null;
       /** Max Concurrent Files */
       max_concurrent_files?: number | null;
-      /**
-       * Min File Age Seconds
-       * @deprecated
-       * @description Removed. Accepted and ignored, so an older client that still sends it is not refused. This now belongs to each workflow.
-       */
-      min_file_age_seconds?: number | null;
-      /** Minimum Free Disk Space Mb */
-      minimum_free_disk_space_mb?: number | null;
       /** Movie Schedule Days */
       movie_schedule_days?: string | null;
       /** Movie Schedule Enabled */
@@ -6015,12 +5983,6 @@ export interface components {
       movie_schedule_hours_limited?: boolean | null;
       /** Movie Schedule Start */
       movie_schedule_start?: string | null;
-      /**
-       * Processing Min Input File Size Mb
-       * @deprecated
-       * @description Removed. Accepted and ignored, so an older client that still sends it is not refused. This now belongs to each workflow.
-       */
-      min_input_file_size_mb?: number | null;
       /** Runner Capacity */
       runner_capacity?: number | null;
       /** Runner Cost 1080P */
@@ -6033,8 +5995,6 @@ export interface components {
       runner_cost_720p?: number | null;
       /** Runner Cost Sd */
       runner_cost_sd?: number | null;
-      /** Runner Cost Undetermined */
-      runner_cost_undetermined?: number | null;
       /** Tv Schedule Days */
       tv_schedule_days?: string | null;
       /** Tv Schedule Enabled */
@@ -6045,12 +6005,6 @@ export interface components {
       tv_schedule_hours_limited?: boolean | null;
       /** Tv Schedule Start */
       tv_schedule_start?: string | null;
-      /**
-       * Verbose Detection Logging
-       * @deprecated
-       * @description Removed. Accepted and ignored, so an older client that still sends it is not refused.
-       */
-      verbose_detection_logging?: boolean | null;
       /** Work Temp Stale Sweep Enabled */
       work_temp_stale_sweep_enabled?: boolean | null;
       /** Work Temp Stale Sweep Interval Seconds */

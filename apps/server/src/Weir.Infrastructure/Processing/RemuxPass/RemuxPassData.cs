@@ -2,8 +2,10 @@ using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
 using Weir.Core.Json;
 using Weir.Core.MediaManagers;
+using Weir.Core.Processing;
 using Weir.Core.Processing.RemuxPass;
 using Weir.Core.Rules;
+using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.MediaManagers;
 using Weir.Infrastructure.Sqlite;
 
@@ -74,7 +76,18 @@ public sealed class SqliteRemuxPassData : IRemuxPassFileFacts, IPostSuccessClean
     }
 
     public Task RecordMeasuredMediaFactsAsync(MeasuredMediaFacts facts, CancellationToken cancellationToken) =>
-        BestEffortAsync(uow => RemuxPassFileState.RecordMeasuredMediaFactsAsync(uow, facts), "measured media facts", cancellationToken);
+        BestEffortAsync(
+            async uow =>
+            {
+                await RemuxPassFileState.RecordMeasuredMediaFactsAsync(uow, facts).ConfigureAwait(false);
+                if (facts.JobId is { } jobId)
+                {
+                    RunnerCosts.RecordMeasured(
+                        uow.Connection, uow.WriteTransaction(), jobId, RunnerUnits.ResolutionClassForDimensions(facts.VideoWidth, facts.VideoHeight));
+                }
+            },
+            "measured media facts",
+            cancellationToken);
 
     public Task RecordOutputCollisionAsync(string relativePath, CollisionDecision decision, long? libraryId, CancellationToken cancellationToken) =>
         BestEffortAsync(uow => RemuxPassFileState.RecordOutputCollisionAsync(uow, relativePath, decision, libraryId), "output collision", cancellationToken);

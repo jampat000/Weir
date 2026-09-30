@@ -70,11 +70,7 @@ public sealed partial class RemuxPassHandler
                             if (result.Get("failure_next_retry_at") is WireString { Value.Length: > 0 } booked &&
                                 TimestampColumns.Parse(booked.Value) is { } lookAgainAt)
                             {
-                                await uow.ExecuteAsync(
-                                    "UPDATE files SET hold_until = $hold WHERE library_id = $library AND relative_path = $path",
-                                    ("$hold", TimestampColumns.Orm(lookAgainAt)),
-                                    ("$library", library.Id),
-                                    ("$path", rel)).ConfigureAwait(false);
+                                await RemuxPassFileState.HoldUntilAsync(uow, library.Id, rel, lookAgainAt).ConfigureAwait(false);
                             }
                         }
 

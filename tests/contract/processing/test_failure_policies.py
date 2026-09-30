@@ -162,7 +162,6 @@ def test_content_rejection_under_reject_policy_removes_and_blocklists_the_radarr
     folders = h.Folders.make(tmp_path)
     radarr = fake_managers("radarr", root_folders=[str(tmp_path / "library")])
     connection = h.create_connection(admin, radarr)
-    h.relax_operator_guards(admin)
     library = h.create_library(admin, folders, manager_connection_ids=[connection["id"]], failure_policy="reject")
     download = folders.watched / "Bad.Movie.2019.1080p"
     download.mkdir()
@@ -207,7 +206,6 @@ def test_a_rules_rejection_with_no_media_manager_is_a_rejected_file_the_remove_d
 ) -> None:
     _server, admin = _signed_in_working_server(server_factory, client_factory, fake_ffmpeg)
     folders = h.Folders.make(tmp_path)
-    h.relax_operator_guards(admin)
     library = h.create_library(admin, folders, failure_policy="pass_through")
     release = folders.watched / "No.Audio.2023"
     release.mkdir()

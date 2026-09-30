@@ -9,8 +9,8 @@ using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Infrastructure.Jobs;
 
-/// <summary>Which scan queued a pass, how it was started, and what passes cost.</summary>
-internal sealed record ScanPassRequest(long ScanJobId, string ScanTrigger, RunnerBudget Budget);
+/// <summary>Which scan queued a pass, and how it was started.</summary>
+internal sealed record ScanPassRequest(long ScanJobId, string ScanTrigger);
 
 /// <summary>
 /// One watched-folder scan over the files its walk found: each file is decided in memory, the writes go out in short batches,
@@ -170,7 +170,6 @@ internal sealed class WatchedFolderScanRun
 
         var dedupe = $"{RequeueStore.RemuxPassJobKind}:scan:{Guid.NewGuid():N}";
         var payloadJson = WireJsonWriter.Dumps(payload, WireJsonFormat.Compact);
-        var runnerCost = _passes.Budget.CostFor(RunnerUnits.ResolutionClassForDimensions(decision.Previous?.VideoWidth, decision.Previous?.VideoHeight));
 
         // The dedupe key is random, so it cannot stop a second pass for the same file. The file's identity does: look for a
         // pending or leased pass for this file and insert only when there is none, both inside one short BEGIN IMMEDIATE.
@@ -179,7 +178,7 @@ internal sealed class WatchedFolderScanRun
             (connection, transaction) =>
                 ActiveRemuxPasses.ForRelativePath(connection, transaction, rel, _scan.MediaScope, _scan.Library.Id)
                 ?? _jobStore.EnqueueOrGet(
-                    connection, transaction, dedupe, RequeueStore.RemuxPassJobKind, payloadJson, JobQueueRules.DefaultMaxAttempts, runnerCost,
+                    connection, transaction, dedupe, RequeueStore.RemuxPassJobKind, payloadJson, JobQueueRules.DefaultMaxAttempts, runnerCost: null,
                     (int)_scan.Library.Priority)).ConfigureAwait(false);
     }
 }

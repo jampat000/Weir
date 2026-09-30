@@ -65,6 +65,8 @@ public sealed class LibraryScanStore
     /// <paramref name="manualPlan"/> is one person's own choice of tracks for this one file (#501 shape); the
     /// library's rules decide when it is null. <paramref name="expectedSizeBytes"/> is the size the file had when
     /// they chose, so a file that changed in between is refused rather than cleaned to a stale plan.
+    /// <paramref name="probeJson"/> is what the scan probed the file as: the job counts against the resolution budget as that
+    /// file, and as an unknown resolution when it is null.
     /// </remarks>
     public async Task<ProcessingJob> EnqueueCleanAsync(
         UnitOfWork uow,
@@ -74,7 +76,8 @@ public sealed class LibraryScanStore
         string trigger,
         bool confirmFinalRemoval,
         WireObject? manualPlan = null,
-        long? expectedSizeBytes = null)
+        long? expectedSizeBytes = null,
+        string? probeJson = null)
     {
         ArgumentNullException.ThrowIfNull(uow);
         ArgumentNullException.ThrowIfNull(jobs);
@@ -107,14 +110,15 @@ public sealed class LibraryScanStore
             $"DELETE FROM jobs WHERE dedupe_key = @dedupe AND status IN ({string.Join(", ", names)})",
             parameters).ConfigureAwait(false);
 
+        var transaction = uow.WriteTransaction();
         return jobs.EnqueueOrGet(
             uow.Connection,
-            uow.WriteTransaction(),
+            transaction,
             dedupeKey,
             LibraryModeJobKinds.CleanKind,
             WireJsonWriter.Dumps(payload, WireJsonFormat.Compact),
             JobQueueRules.DefaultMaxAttempts,
-            0,
+            RunnerCosts.ForProbeJson(uow.Connection, transaction, probeJson),
             LibraryModePriority.Low);
     }
 

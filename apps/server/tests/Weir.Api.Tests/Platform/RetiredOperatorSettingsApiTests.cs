@@ -43,9 +43,9 @@ public sealed class RetiredOperatorSettingsApiTests
 
         using var alongside = await client.PutAsync(
             "/api/v1/processing/operator-settings",
-            new { csrf_token = await client.CsrfAsync(), verbose_detection_logging = true, minimum_free_disk_space_mb = 1024 });
+            new { csrf_token = await client.CsrfAsync(), verbose_detection_logging = true, runner_capacity = 8 });
         Assert.Equal(HttpStatusCode.OK, alongside.StatusCode);
-        Assert.Equal(1024, (await ApiTestClient.Json(alongside))["minimum_free_disk_space_mb"]!.GetValue<int>());
+        Assert.Equal(8, (await ApiTestClient.Json(alongside))["runner_capacity"]!.GetValue<int>());
 
         // The column is still there for configuration backups that carry it, and keeps its default.
         Assert.Equal(0, await TestDatabase.ScalarAsync(server, "SELECT verbose_detection_logging FROM operator_settings WHERE id = 1"));

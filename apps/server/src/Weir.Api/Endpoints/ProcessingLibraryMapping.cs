@@ -112,10 +112,13 @@ internal static class ProcessingLibraryMapping
             .Set("schedule_start", row.ScheduleStart)
             .Set("schedule_end", row.ScheduleEnd)
             .Set("max_concurrent_files", row.MaxConcurrentFiles)
+            // What the workflow is held to right now: never more than Settings › Performance's "Files at once", even if that was lowered after this was set.
+            .Set("effective_max_concurrent_files", OperatorSettingsRules.EffectiveLibraryLimit(row.MaxConcurrentFiles, performance.MaxConcurrentFiles))
             .Set("priority", row.Priority)
             .Set("rule_set_id", row.RuleSetId)
             .Set("manager_connection_ids", new WireArray(managerIds.Select(id => (WireValue)WireValue.Of(id))))
             .Set("remove_original_after_success", row.RemoveOriginalAfterSuccess)
+            .Set("minimum_free_disk_space_mb", OperatorSettingsRules.ClampSizeMb(row.MinimumFreeDiskSpaceMb))
             .Set("manager_coverage", coverage)
             .Set("manager_coverage_detail", coverageDetail)
             .Set("discovered_from_connection_id", row.DiscoveredFromConnectionId)
@@ -149,11 +152,13 @@ internal static class ProcessingLibraryMapping
 
     /// <summary>
     /// Settings a workflow used to carry that no longer do anything: the fallback rewrite (folded into the "best"
-    /// writer) and hardware decoding (Weir copies video without decoding it). A save may still send them.
+    /// writer), hardware decoding (Weir copies video without decoding it) and the three waits that became
+    /// <c>ready_after_seconds</c>. A save may still send them.
     /// </summary>
     private static readonly string[] RemovedSettings =
     [
         "rewrite_with_ffmpeg", "hardware_decode_mode", "hardware_device", "hardware_disabled_vendors_csv",
+        "min_file_age_seconds", "hold_minutes", "file_detection_interval_seconds",
     ];
 
     internal static ProcessingLibraryInput ReadLibraryBody(BodyModel model)
@@ -173,7 +178,6 @@ internal static class ProcessingLibraryMapping
         var maxFileSizeMb = model.Number("max_file_size_mb", 0, required: false, ge: 0, le: LibraryIntake.LargestSizeLimitMb);
         var rejectedFileAction = model.Literal("rejected_file_action", [.. RejectedFileActions.All], defaultValue: RejectedFileActions.Leave);
         var readyAfterSeconds = model.Number("ready_after_seconds", LibraryIntake.DefaultReadyAfterSeconds, required: false, ge: 0, le: LibraryIntake.MaxReadyAfterSeconds);
-        ReadRetiredReadinessFields(model);
         var createdAfter = model.OptionalDateTime("created_after");
         var createdBefore = model.OptionalDateTime("created_before");
         var modifiedAfter = model.OptionalDateTime("modified_after");
@@ -208,6 +212,8 @@ internal static class ProcessingLibraryMapping
         var ruleSetId = model.OptionalInt("rule_set_id");
         var managerConnectionIds = model.IntList("manager_connection_ids");
         var removeOriginalAfterSuccess = model.Bool("remove_original_after_success", defaultValue: true);
+        var minimumFreeDiskSpaceMb = model.Number(
+            "minimum_free_disk_space_mb", ProcessingLibraryRecord.DefaultMinimumFreeDiskSpaceMb, required: false, ge: 0, le: 1024 * 1024);
 
         return new ProcessingLibraryInput
         {
@@ -256,18 +262,8 @@ internal static class ProcessingLibraryMapping
             RuleSetId = ruleSetId,
             ManagerConnectionIds = managerConnectionIds,
             RemoveOriginalAfterSuccess = removeOriginalAfterSuccess,
+            MinimumFreeDiskSpaceMb = minimumFreeDiskSpaceMb,
         };
-    }
-
-    /// <summary>
-    /// The three waits that became <c>ready_after_seconds</c>. Read and ignored so an older client that still sends them is
-    /// not refused: the body forbids fields it does not know.
-    /// </summary>
-    private static void ReadRetiredReadinessFields(BodyModel model)
-    {
-        model.OptionalInt("min_file_age_seconds");
-        model.OptionalInt("hold_minutes");
-        model.OptionalInt("file_detection_interval_seconds");
     }
 
     /// <summary>

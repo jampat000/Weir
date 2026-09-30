@@ -71,7 +71,7 @@ manager link.
   folder to Weir's output folder, so Completed Download Handling only ever looks
   at cleaned files. Weir writes each output under the same relative path, name
   and extension as the download, and publishes it in one step. With a torrent
-  client, turn off the workflow's "After cleaning, remove the original download":
+  client, turn off the workflow's "New downloads: after cleaning, delete the original download":
   Sonarr/Radarr only import a download the client reports as completed, and a
   torrent whose files Weir removed reports missing files instead. Kept originals
   are recognised by size and modification time and never cleaned twice. The workflow editor

@@ -221,7 +221,7 @@ public sealed class LibraryScanHandler : IJobHandler
         var queued = 0;
         foreach (var entry in toClean.Where(e => !skipped.Contains(e.Path)))
         {
-            await _scans.EnqueueCleanAsync(uow, _jobs, libraryId, entry.Path, LibraryModeSchedule.Trigger, confirmFinalRemoval: true)
+            await _scans.EnqueueCleanAsync(uow, _jobs, libraryId, entry.Path, LibraryModeSchedule.Trigger, confirmFinalRemoval: true, probeJson: entry.ProbeJson)
                 .ConfigureAwait(false);
             queued++;
         }

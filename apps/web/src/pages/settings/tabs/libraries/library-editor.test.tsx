@@ -136,7 +136,7 @@ it("adds a library through the API", async () => {
   });
 });
 
-it("starts a new library on the same files-at-once as Performance, and lets it be held lower (#633)", async () => {
+it("starts a new workflow with no limit of its own, and lets it be held to a share of the total (#633)", async () => {
   asOperator();
   vi.spyOn(api, "fetchProcessingLibraries").mockResolvedValue([library()]);
   const create = vi
@@ -149,10 +149,10 @@ it("starts a new library on the same files-at-once as Performance, and lets it b
   fireEvent.change(screen.getByPlaceholderText("Movies 4K"), {
     target: { value: "Kids" },
   });
-  const filesAtOnce = screen.getByRole("combobox", { name: /Files at once/ });
-  expect(filesAtOnce).toHaveValue("0");
-  expect(filesAtOnce).toHaveTextContent("Same as Performance");
-  expect(filesAtOnce).toHaveTextContent("At most 10 files");
+  const filesAtOnce = screen.getByRole("textbox", {
+    name: /Most files at once from this workflow/,
+  });
+  expect(filesAtOnce).toHaveValue("");
 
   fireEvent.change(filesAtOnce, { target: { value: "2" } });
   fireEvent.click(screen.getByTestId("processing-library-save"));
@@ -309,7 +309,7 @@ it("keeps the original download when told to, saves it, and asks the check about
   render(<LibrariesTab />, { wrapper });
   fireEvent.click(await screen.findByRole("button", { name: "Edit" }));
   const toggle = screen.getByRole("checkbox", {
-    name: /After cleaning, remove the original download/,
+    name: /New downloads: after cleaning, delete the original download/,
   });
   expect(toggle).toBeChecked();
   expect(

@@ -24,6 +24,8 @@ namespace Weir.Infrastructure.LibraryMode;
 /// </summary>
 public sealed partial class LibraryCleanHandler : IJobHandler
 {
+    private const long BytesPerMib = 1024 * 1024;
+
     private readonly SqliteDatabase _database;
     private readonly MediaTools _tools;
     private readonly SafeSwap _swap;
@@ -156,6 +158,7 @@ public sealed partial class LibraryCleanHandler : IJobHandler
             return;
         }
 
+        await RecordMeasuredCostAsync(context.Id, probe, cancellationToken).ConfigureAwait(false);
         LibraryFilePlanResult plan;
         if (ManualPlanJson.FromPyJson(payload.Get("manual_plan")) is { } choice)
         {
@@ -233,7 +236,12 @@ public sealed partial class LibraryCleanHandler : IJobHandler
                     throw;
                 }
             },
-            SwapOptions.Default with { OriginalDurationSeconds = durationSeconds, KeepOriginal = keepOriginal },
+            SwapOptions.Default with
+            {
+                OriginalDurationSeconds = durationSeconds,
+                KeepOriginal = keepOriginal,
+                KeepFreeBytes = library.MinimumFreeDiskSpaceMb * BytesPerMib,
+            },
             cancellationToken).ConfigureAwait(false);
 
         switch (result.Outcome)
@@ -243,6 +251,9 @@ public sealed partial class LibraryCleanHandler : IJobHandler
                 return;
             case SwapOutcome.InUse:
                 await OnInUseAsync(context, payload, libraryId, path, trigger, inUseAttempts).ConfigureAwait(false);
+                return;
+            case SwapOutcome.InsufficientSpace:
+                await OnWaitingForSpaceAsync(context, payload, libraryId, path, trigger, result.Message).ConfigureAwait(false);
                 return;
             default:
                 await RecordAsync(libraryId, path, trigger, LibraryActivityEventTypes.FileFailed, result.Message).ConfigureAwait(false);

@@ -8,7 +8,8 @@ namespace Weir.Infrastructure.Processing.RemuxPass;
 /// What a pass measured about the source, for the scheduler and the Files screen.
 /// <c>LibraryId</c> (#545) says which library's row to update; null only when a pass ran with no library
 /// resolved (which the handler never does in practice), and the write is then skipped rather than touching every
-/// library's row for the path.
+/// library's row for the path. <c>JobId</c> is the running pass the measurement belongs to: its resolution settles what the
+/// pass costs against the resolution budget.
 /// </summary>
 public sealed record MeasuredMediaFacts(
     string RelativePath,
@@ -20,7 +21,8 @@ public sealed record MeasuredMediaFacts(
     double? DurationSeconds,
     IReadOnlyList<string>? AudioCodecs,
     long? VideoBitDepth,
-    long? LibraryId = null);
+    long? LibraryId = null,
+    long? JobId = null);
 
 /// <summary>The optional metadata a pass keeps on the file row while it works. Implementations never throw.</summary>
 public interface IRemuxPassFileFacts

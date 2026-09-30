@@ -57,6 +57,17 @@ public static class RemuxPassFileState
         return true;
     }
 
+    /// <summary>Keeps an on-hold file from being picked up again by a scan before <paramref name="lookAgainAt"/>, when its own next look is booked.</summary>
+    public static Task HoldUntilAsync(UnitOfWork uow, long libraryId, string relativePath, DateTimeOffset lookAgainAt)
+    {
+        ArgumentNullException.ThrowIfNull(uow);
+        return uow.ExecuteAsync(
+            "UPDATE files SET hold_until = $hold WHERE library_id = $library AND relative_path = $path",
+            ("$hold", TimestampColumns.Orm(lookAgainAt)),
+            ("$library", libraryId),
+            ("$path", relativePath));
+    }
+
     /// <summary>
     /// A rejection always upserts a Files row, whether or not a scan had already seen the file, so a hand-off rejected
     /// before any watched-folder scan still appears on the Files screen (#532). Sets status <c>rejected</c>, the reason and the failure class; clears

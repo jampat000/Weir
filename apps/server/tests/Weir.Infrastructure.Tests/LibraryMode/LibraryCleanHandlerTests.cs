@@ -6,6 +6,7 @@ using Weir.Core.LibraryMode;
 using Weir.Core.Processing;
 using Weir.Core.Processing.RemuxPass;
 using Weir.Infrastructure.Activity;
+using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.LibraryMode;
 using Weir.Infrastructure.Media;
 using Weir.Infrastructure.MediaManagers;
@@ -413,6 +414,57 @@ public sealed class LibraryCleanHandlerTests : IDisposable
         Assert.NotNull(mark);
         Assert.NotNull(mark!.CleanedAt);
         Assert.False(mark.LeaveAlone);
+    }
+
+    /// <summary>More than any drive has, so the free-space check always finds the drive short.</summary>
+    private const long MoreFreeThanAnyDriveHasMb = 1_000_000_000;
+
+    private Task KeepMoreFreeThanTheDriveHasAsync(long library) =>
+        _fixture.Store.Execute($"UPDATE libraries SET minimum_free_disk_space_mb = {MoreFreeThanAnyDriveHasMb} WHERE id = {library}");
+
+    [Fact]
+    public async Task A_clean_waits_for_room_when_the_workflow_keeps_more_free_than_the_drive_has()
+    {
+        var library = await LibraryAsync();
+        var path = _libraryFolder.Join("film.mkv");
+        await File.WriteAllBytesAsync(path, [1, 2, 3]);
+        _media.Probes["film.mkv"] = FakeMediaRunner.EnglishAndJapanese;
+        await KeepMoreFreeThanTheDriveHasAsync(library);
+        var jobId = await EnqueueCleanAsync(library, path, confirmFinalRemoval: true);
+
+        await RunCleanAsync(jobId);
+
+        Assert.Equal(new byte[] { 1, 2, 3 }, await File.ReadAllBytesAsync(path));
+        Assert.Empty(_media.Remuxes);
+        Assert.Equal(1, await _fixture.Store.Scalar($"SELECT count(*) FROM jobs WHERE id = {jobId} AND status = '{ProcessingJobStatus.Pending}' AND not_before IS NOT NULL"));
+        var reason = await _fixture.Db(uow => uow.QuerySingleAsync(
+            $"SELECT title FROM activity_events WHERE event_type = '{LibraryActivityEventTypes.FileSkipped}'", reader => reader.GetString(0)));
+        Assert.StartsWith("Waiting: the drive this file is on has less than", reason, StringComparison.Ordinal);
+        Assert.EndsWith("Weir tries again when there is room.", reason, StringComparison.Ordinal);
+        Assert.Equal(0, await _fixture.Store.Scalar($"SELECT count(*) FROM activity_events WHERE event_type = '{LibraryActivityEventTypes.FileFailed}'"));
+    }
+
+    [Fact]
+    public async Task A_clean_waiting_for_room_is_looked_at_again_further_apart_and_never_gives_up()
+    {
+        var library = await LibraryAsync();
+        var path = _libraryFolder.Join("film.mkv");
+        await File.WriteAllBytesAsync(path, [1, 2, 3]);
+        _media.Probes["film.mkv"] = FakeMediaRunner.EnglishAndJapanese;
+        await KeepMoreFreeThanTheDriveHasAsync(library);
+        var jobId = await EnqueueCleanAsync(library, path, confirmFinalRemoval: true);
+        var looksAt = new List<TimeSpan>();
+
+        foreach (var _ in DiskSpaceWaits.LookMinutes.Append(DiskSpaceWaits.LookMinutes[^1]))
+        {
+            var lookedAt = _fixture.Store.Clock.GetUtcNow();
+            await RunCleanAsync(jobId);
+            var booked = TimestampColumns.Parse(await _fixture.Db(uow => uow.ScalarAsync($"SELECT not_before FROM jobs WHERE id = {jobId}")))!.Value;
+            looksAt.Add(booked - lookedAt);
+            _fixture.Store.Clock.SetUtcNow(booked);
+        }
+
+        Assert.Equal([10, 30, 60, 60], looksAt.Select(gap => (int)gap.TotalMinutes));
     }
 
     [Theory]

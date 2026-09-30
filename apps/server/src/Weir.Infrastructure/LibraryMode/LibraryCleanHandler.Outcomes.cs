@@ -8,10 +8,12 @@ using Weir.Core.LibraryMode;
 using Weir.Core.Media;
 using Weir.Core.MediaManagers;
 using Weir.Core.Processing;
+using Weir.Core.Rules;
 using Weir.Core.Text;
 using Weir.Infrastructure.Activity;
 using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.Media;
+using Weir.Infrastructure.Processing.RemuxPass;
 using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Infrastructure.LibraryMode;
@@ -81,10 +83,8 @@ public sealed partial class LibraryCleanHandler
     }
 
     /// <summary>
-    /// A locked file is not a failure (#506): back off 5, 15 then 60 minutes by putting the row back to <c>pending</c> with a
-    /// future <c>not_before</c> and clearing the lease ourselves — <see cref="ProcessingJobStore.CompleteClaimedAsync"/>'s own
-    /// lease check then finds the lease already gone and leaves this update alone. After the third attempt, report it as
-    /// given up and let the job complete normally.
+    /// A locked file is not a failure (#506): back off 5, 15 then 60 minutes, by <see cref="PostponeAsync"/>. After the third
+    /// attempt, report it as given up and let the job complete normally.
     /// </summary>
     private async Task OnInUseAsync(JobWorkContext context, WireObject payload, long libraryId, string path, string trigger, int inUseAttempts)
     {
@@ -97,7 +97,29 @@ public sealed partial class LibraryCleanHandler
         }
 
         payload.Set("in_use_attempts", attempt);
-        var notBefore = _time.GetUtcNow() + delay.Value;
+        await PostponeAsync(context, payload, _time.GetUtcNow() + delay.Value).ConfigureAwait(false);
+        _logger.LogInformation("Library clean postponed (in use, attempt {Attempt}) job_id={JobId} path={Path}", attempt, context.Id, path);
+    }
+
+    /// <summary>
+    /// A drive short of room is not a failure either: the file is looked at again later, spread out the way a file waiting
+    /// for room is elsewhere, and never gives up, because room can come back. Each look leaves its reason in Activity.
+    /// </summary>
+    private async Task OnWaitingForSpaceAsync(JobWorkContext context, WireObject payload, long libraryId, string path, string trigger, string reason)
+    {
+        var looks = payload.Get("disk_space_looks") is WireInteger counted ? (long)counted.Value : 0;
+        payload.Set("disk_space_looks", looks + 1);
+        await PostponeAsync(context, payload, _time.GetUtcNow() + DiskSpaceWaits.LookAfter(looks)).ConfigureAwait(false);
+        await RecordAsync(libraryId, path, trigger, LibraryActivityEventTypes.FileSkipped, reason).ConfigureAwait(false);
+        _logger.LogInformation("Library clean waiting for room, look {Look} job_id={JobId} path={Path}", looks + 1, context.Id, path);
+    }
+
+    /// <summary>
+    /// Puts the row back to <c>pending</c> with a future <c>not_before</c> and clears the lease ourselves, so
+    /// <see cref="ProcessingJobStore.CompleteClaimedAsync"/> finds the lease already gone and leaves this update alone.
+    /// </summary>
+    private async Task PostponeAsync(JobWorkContext context, WireObject payload, DateTimeOffset notBefore)
+    {
         await using var uow = await UnitOfWork.OpenAsync(_database, CancellationToken.None).ConfigureAwait(false);
         await uow.ExecuteAsync(
             "UPDATE jobs SET payload_json = @payload, status = @pending, lease_owner = NULL, lease_expires_at = NULL, not_before = @notBefore, updated_at = CURRENT_TIMESTAMP WHERE id = @id",
@@ -106,7 +128,32 @@ public sealed partial class LibraryCleanHandler
             ("@notBefore", notBefore.UtcDateTime),
             ("@id", context.Id)).ConfigureAwait(false);
         await uow.CommitAsync().ConfigureAwait(false);
-        _logger.LogInformation("Library clean postponed (in use, attempt {Attempt}) job_id={JobId} path={Path}", attempt, context.Id, path);
+    }
+
+    /// <summary>
+    /// The resolution the file was just probed at settles what this clean costs against the resolution budget, whatever the scan
+    /// that queued it had cached. Bookkeeping: a failure to write it is logged and never fails the clean.
+    /// </summary>
+    private async Task RecordMeasuredCostAsync(long jobId, ProbeResult probe, CancellationToken cancellationToken)
+    {
+        var resolution = RunnerUnits.ResolutionClassForProbe(probe);
+        try
+        {
+            await LockedWrites.RunAsync(
+                _database,
+                uow =>
+                {
+                    RunnerCosts.RecordMeasured(uow.Connection, uow.WriteTransaction(), jobId, resolution);
+                    return Task.CompletedTask;
+                },
+                _logger,
+                "library clean cost",
+                cancellationToken).ConfigureAwait(false);
+        }
+        catch (SqliteException exception)
+        {
+            _logger.LogWarning(exception, "Library clean could not record the file's resolution against the budget; job_id={JobId}.", jobId);
+        }
     }
 
     private async Task RecordAsync(long libraryId, string path, string? trigger, string eventType, string detail, string? result = null, string? keptOriginalPath = null)
