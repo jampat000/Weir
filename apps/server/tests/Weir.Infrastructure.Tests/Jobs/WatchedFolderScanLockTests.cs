@@ -60,8 +60,8 @@ public sealed class WatchedFolderScanLockTests : IDisposable
     private async Task<long> LibraryAsync()
     {
         await _store.Execute(
-            "INSERT INTO operator_settings (id, min_file_age_seconds, min_input_file_size_mb, minimum_free_disk_space_mb) VALUES (1, 0, 0, 0) " +
-            "ON CONFLICT(id) DO UPDATE SET min_file_age_seconds = 0, min_input_file_size_mb = 0, minimum_free_disk_space_mb = 0");
+            "INSERT INTO operator_settings (id, minimum_free_disk_space_mb) VALUES (1, 0) " +
+            "ON CONFLICT(id) DO UPDATE SET minimum_free_disk_space_mb = 0");
         await using var uow = await UnitOfWork.OpenAsync(_store.Database);
         var created = await _libraries.CreateAsync(uow, new ProcessingLibraryInput
         {
@@ -69,9 +69,9 @@ public sealed class WatchedFolderScanLockTests : IDisposable
             MediaType = ProcessingMediaScopes.Movie,
             WatchedFolder = _watched,
             OutputFolder = _output,
-            // Every file is looked at in full at once: no settling interval, no minimum age.
-            FileDetectionIntervalSeconds = 0,
-            MinFileAgeSeconds = 0,
+            // Every file is looked at in full at once: no wait, no minimum size.
+            ReadyAfterSeconds = 0,
+            MinFileSizeMb = 0,
         });
         await uow.CommitAsync();
         return created.Id;

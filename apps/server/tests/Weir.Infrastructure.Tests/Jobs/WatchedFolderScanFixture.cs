@@ -12,7 +12,7 @@ internal static class WatchedFolderScanFixture
 
     private static readonly FileStateStore Files = new();
 
-    /// <summary>The store, the watched folder, and a scan of one library that queues no passes. The operator's own limits are zero.</summary>
+    /// <summary>The store, the watched folder, and a scan of one library that queues no passes. The workflow waits for nothing and takes any size.</summary>
     internal static async Task<(StoreFixture Store, string Watched, Func<long, Task> Scan)> StartAsync()
     {
         var (store, jobs, handler) = await ProcessingWatchedFolderScanDispatchJobHandlerTests.BuildAsync();
@@ -23,9 +23,9 @@ internal static class WatchedFolderScanFixture
         return (store, watched, libraryId => ProcessingWatchedFolderScanDispatchJobHandlerTests.RunScanAsync(handler, jobs, libraryId, enqueueRemuxJobs: false));
     }
 
-    internal static Task<long> LibraryAsync(StoreFixture store, string watched, long? minFileAgeSeconds, long? minFileSizeMb = null) =>
+    internal static Task<long> LibraryAsync(StoreFixture store, string watched, long readyAfterSeconds = 0, long minFileSizeMb = 0) =>
         ProcessingWatchedFolderScanDispatchJobHandlerTests.CreateLibraryAsync(
-            store, watched, store.Home.Join("out"), minFileAgeSeconds: minFileAgeSeconds, minFileSizeMb: minFileSizeMb);
+            store, watched, store.Home.Join("out"), readyAfterSeconds: readyAfterSeconds, minFileSizeMb: minFileSizeMb);
 
     internal static async Task<ProcessingFileRecord> FileAsync(StoreFixture store, long libraryId, string relativePath = SmallFile)
     {

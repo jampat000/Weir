@@ -42,8 +42,6 @@ public sealed record ProcessingOperatorSettingsRecord
     public long? UnclaimedHandbackCleanupIntervalSeconds { get; init; }
     public bool KeepFailedWorkFiles { get; init; }
     public long FileLogRetentionDays { get; init; } = 90;
-    public long MinFileAgeSeconds { get; init; } = 60;
-    public long ProcessingMinInputFileSizeMb { get; init; } = 50;
     public long MinimumFreeDiskSpaceMb { get; init; } = 5120;
     public bool MovieScheduleEnabled { get; init; } = true;
     public bool MovieScheduleHoursLimited { get; init; }
@@ -180,8 +178,6 @@ public static class OperatorSettingsRules
         var global = (int)ClampMaxConcurrentFiles(filesAtOnce);
         return libraryLimit <= LibraryFollowsFilesAtOnce ? global : (int)Math.Min(global, ClampLibraryMaxConcurrentFiles(libraryLimit));
     }
-
-    public static long ClampMinFileAgeSeconds(long raw) => Math.Clamp(raw, 0, 7 * 24 * 3600);
 
     public static long ClampSizeMb(long raw) => Math.Clamp(raw, 0, 1024 * 1024);
 

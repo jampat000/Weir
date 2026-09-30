@@ -18,7 +18,7 @@ public sealed class ProcessingWatchedFolderScanNotificationTests
             File.WriteAllBytes(Path.Combine(watched, name), [1]);
         }
 
-        var libraryId = await WatchedFolderScanFixture.LibraryAsync(store, watched, minFileAgeSeconds: 0);
+        var libraryId = await WatchedFolderScanFixture.LibraryAsync(store, watched);
         var notifier = ActivityNotifications.For(store.Database);
         var before = notifier.Snapshot();
 
@@ -33,7 +33,7 @@ public sealed class ProcessingWatchedFolderScanNotificationTests
     {
         var (store, watched, scan) = await WatchedFolderScanFixture.StartAsync();
         using var _ = store;
-        var libraryId = await WatchedFolderScanFixture.LibraryAsync(store, watched, minFileAgeSeconds: 0);
+        var libraryId = await WatchedFolderScanFixture.LibraryAsync(store, watched);
         await scan(libraryId);
         var notifier = ActivityNotifications.For(store.Database);
         var afterFirstScan = notifier.Snapshot();

@@ -153,13 +153,17 @@ public sealed record ProcessingLibraryRecord
     public string IncludePatternsCsv { get; init; } = string.Empty;
     public string ExcludePatternsCsv { get; init; } = string.Empty;
 
-    /// <summary>The smallest file this library takes; null follows Settings › Performance (see <see cref="IntakeLimits"/>).</summary>
-    public long? MinFileSizeMb { get; init; }
+    /// <summary>The smallest file this library takes, in MB; 0 takes any size.</summary>
+    public long MinFileSizeMb { get; init; } = LibraryIntake.DefaultMinFileSizeMb;
     public long MaxFileSizeMb { get; init; }
     public string RejectedFileAction { get; init; } = "leave";
 
-    /// <summary>How long a file must be left alone before Weir starts on it; null follows Settings › Performance.</summary>
-    public long? MinFileAgeSeconds { get; init; }
+    /// <summary>
+    /// A new file is ready once neither its size nor its last-changed time has moved for this many seconds; 0 needs no wait.
+    /// A media-manager hand-off skips the scan's wait, because the manager says the download is finished; the pass still
+    /// checks the file's last-changed age against this value.
+    /// </summary>
+    public long ReadyAfterSeconds { get; init; } = LibraryIntake.DefaultReadyAfterSeconds;
     public Timestamp? CreatedAfter { get; init; }
     public Timestamp? CreatedBefore { get; init; }
     public Timestamp? ModifiedAfter { get; init; }
@@ -189,8 +193,6 @@ public sealed record ProcessingLibraryRecord
     public bool RemoveOriginalAfterSuccess { get; init; } = true;
 
     public long ScanIntervalSeconds { get; init; } = 300;
-    public long HoldMinutes { get; init; }
-    public long FileDetectionIntervalSeconds { get; init; } = 30;
     public bool IgnoreSizeChanges { get; init; }
     public bool FileSystemEventsEnabled { get; init; } = true;
     public bool SkipAccessTests { get; init; }

@@ -30,7 +30,7 @@ public sealed partial class RemuxPassHandlerTests : IDisposable
     public RemuxPassHandlerTests()
     {
         _fixture.Store.Execute(
-            "UPDATE operator_settings SET min_file_age_seconds = 0, min_input_file_size_mb = 0, minimum_free_disk_space_mb = 0")
+            "UPDATE operator_settings SET minimum_free_disk_space_mb = 0")
             .GetAwaiter().GetResult();
         _fixture.Http.Json(HttpMethod.Post, EventsPath, "{}", HttpStatusCode.Accepted);
     }
@@ -72,20 +72,21 @@ public sealed partial class RemuxPassHandlerTests : IDisposable
             _fixture.Jobs);
     }
 
-    private async Task<long> LibraryAsync(string failurePolicy = "pass_through", long maxAttempts = 3, string rejectedFileAction = "leave", string mediaType = "movie")
+    private async Task<long> LibraryAsync(string failurePolicy = "pass_through", long maxAttempts = 3, string rejectedFileAction = "leave", string mediaType = "movie", long readyAfterSeconds = 0)
     {
         await _fixture.Store.Execute("DELETE FROM libraries");
         return Convert.ToInt64(await _fixture.Db(uow => uow.ExecuteScalarWriteAsync(
             "INSERT INTO libraries (name, media_type, watched_folder, output_folder, work_folder, failure_policy, max_attempts, " +
-            "rejected_file_action, retry_backoff_seconds, display_order) " +
-            "VALUES ('Movies', $type, $w, $o, $k, $policy, $max, $action, 60, 1) RETURNING id",
+            "rejected_file_action, retry_backoff_seconds, display_order, min_file_size_mb, ready_after_seconds) " +
+            "VALUES ('Movies', $type, $w, $o, $k, $policy, $max, $action, 60, 1, 0, $ready) RETURNING id",
             ("$type", mediaType),
             ("$w", _folders.Watched),
             ("$o", _folders.Output),
             ("$k", _folders.Work),
             ("$policy", failurePolicy),
             ("$max", maxAttempts),
-            ("$action", rejectedFileAction))), CultureInfo.InvariantCulture);
+            ("$action", rejectedFileAction),
+            ("$ready", readyAfterSeconds))), CultureInfo.InvariantCulture);
     }
 
     private Task FileRowAsync(long libraryId, string relativePath, string status = "processing") =>
@@ -189,11 +190,10 @@ public sealed partial class RemuxPassHandlerTests : IDisposable
     [Fact]
     public async Task A_handed_off_file_that_is_too_young_is_looked_at_again_instead_of_failing()
     {
-        // A media manager hands a file over within seconds of the download finishing, inside the minimum file age.
+        // A media manager hands a file over within seconds of the download finishing, inside the workflow's wait.
         // Failing the pre-check there would skip the retry and run the failure policy: every such file would be passed
         // through unprocessed, and under "reject" a good release would be reported bad.
-        var library = await LibraryAsync(failurePolicy: "reject");
-        await _fixture.Store.Execute("UPDATE operator_settings SET min_file_age_seconds = 60");
+        var library = await LibraryAsync(failurePolicy: "reject", readyAfterSeconds: 60);
         var source = _folders.Source(Path.Join("Film", "film.mkv"));
         await FileRowAsync(library, "Film/film.mkv");
         await _fixture.AddConnectionAsync("native", "http://192.0.2.30:5099", "k1");
@@ -232,8 +232,7 @@ public sealed partial class RemuxPassHandlerTests : IDisposable
     [Fact]
     public async Task A_file_that_never_stops_changing_is_not_looked_at_forever()
     {
-        var library = await LibraryAsync();
-        await _fixture.Store.Execute("UPDATE operator_settings SET min_file_age_seconds = 60");
+        var library = await LibraryAsync(readyAfterSeconds: 60);
         _folders.Source(Path.Join("Film", "film.mkv"));
         await FileRowAsync(library, "Film/film.mkv");
         var payload = $$$"""{"relative_media_path":"Film/film.mkv","media_scope":"movie","library_id":{{{library}}},"minimum_age_waits":{{{RemuxPassHandler.MaxMinimumAgeWaits}}}}""";

@@ -217,8 +217,8 @@ If Weir can't clean a file, what Sonarr sees depends on the workflow's **When re
 - **Keep it until someone acts**: Sonarr waits, and Weir shows the file on hold.
 - **Reject the release so a different one is found**: Weir removes the download and blocklists it in Sonarr, so it searches again.
 
-Files below the workflow's minimum size are never cleaned, so Sonarr waits on them indefinitely. Keep
-the minimum size below your smallest real episode.
+Files below the workflow's minimum size (50 MB for a new workflow, under **Intake rules**) are never cleaned,
+so Sonarr waits on them indefinitely. Keep the minimum size below your smallest real episode.
 
 ### Optional: hand back with Downloaded Scan
 

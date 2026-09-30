@@ -31,7 +31,6 @@ internal static class ProcessingLibraryMapping
         var managerIds = await libraries.ManagerConnectionIdsAsync(uow, row.Id).ConfigureAwait(false);
         var activeJobs = await libraries.ActiveJobCountAsync(uow, row).ConfigureAwait(false);
         var performance = await operatorSettings.EnsureAsync(uow).ConfigureAwait(false);
-        var intake = IntakeLimits.Resolve(row, performance);
         var periodicScan = await PeriodicScanStatusAsync(request, uow, row, performance, suiteSettings, looks).ConfigureAwait(false);
 
         // manager_coverage: the linked connections' last saved connection-test result (no live call — a
@@ -82,13 +81,10 @@ internal static class ProcessingLibraryMapping
             .Set("exclude_markers_csv", row.ExcludeMarkersCsv)
             .Set("include_patterns_csv", row.IncludePatternsCsv)
             .Set("exclude_patterns_csv", row.ExcludePatternsCsv)
-            // Null is "uses the Performance setting"; the effective_ pair is what the library is held to right now.
             .Set("min_file_size_mb", row.MinFileSizeMb)
-            .Set("effective_min_file_size_mb", intake.MinFileSizeMb)
             .Set("max_file_size_mb", row.MaxFileSizeMb)
             .Set("rejected_file_action", row.RejectedFileAction.Length > 0 ? row.RejectedFileAction : "leave")
-            .Set("min_file_age_seconds", row.MinFileAgeSeconds)
-            .Set("effective_min_file_age_seconds", intake.MinFileAgeSeconds)
+            .Set("ready_after_seconds", row.ReadyAfterSeconds)
             .Set("created_after", row.CreatedAfter?.ToWireText())
             .Set("created_before", row.CreatedBefore?.ToWireText())
             .Set("modified_after", row.ModifiedAfter?.ToWireText())
@@ -96,7 +92,6 @@ internal static class ProcessingLibraryMapping
             .Set("exclude_hidden", row.ExcludeHidden)
             .Set("top_level_only", row.TopLevelOnly)
             .Set("scan_interval_seconds", row.ScanIntervalSeconds)
-            .Set("hold_minutes", row.HoldMinutes)
             .Set("sidecar_patterns_csv", row.SidecarPatternsCsv)
             .Set("preserve_original_timestamps", row.PreserveOriginalTimestamps)
             .Set("output_collision_policy", row.OutputCollisionPolicy.Length > 0 ? row.OutputCollisionPolicy : "replace")
@@ -106,7 +101,6 @@ internal static class ProcessingLibraryMapping
             .Set("ffmpeg_strictness", row.FfmpegStrictness.Length > 0 ? row.FfmpegStrictness : "normal")
             .Set("remux_writer", RemuxWriterChoice.Normalize(row.RemuxWriter))
             .Set("rewrite_with_ffmpeg", row.RewriteWithFfmpeg)
-            .Set("file_detection_interval_seconds", row.FileDetectionIntervalSeconds)
             .Set("ignore_size_changes", row.IgnoreSizeChanges)
             .Set("skip_access_tests", row.SkipAccessTests)
             .Set("file_system_events_enabled", row.FileSystemEventsEnabled)
@@ -169,11 +163,11 @@ internal static class ProcessingLibraryMapping
         var excludeMarkersCsv = model.OptionalStr("exclude_markers_csv", defaultValue: "", maxLength: 1000) ?? "";
         var includePatternsCsv = model.OptionalStr("include_patterns_csv", defaultValue: "", maxLength: 1000) ?? "";
         var excludePatternsCsv = model.OptionalStr("exclude_patterns_csv", defaultValue: "", maxLength: 1000) ?? "";
-        // Left out or null, a library follows Settings › Performance for its minimum size and wait.
-        var minFileSizeMb = model.OptionalInt("min_file_size_mb", ge: 0, le: 1_000_000);
-        var maxFileSizeMb = model.Number("max_file_size_mb", 0, required: false, ge: 0, le: 1_000_000);
+        var minFileSizeMb = model.Number("min_file_size_mb", LibraryIntake.DefaultMinFileSizeMb, required: false, ge: 0, le: LibraryIntake.LargestSizeLimitMb);
+        var maxFileSizeMb = model.Number("max_file_size_mb", 0, required: false, ge: 0, le: LibraryIntake.LargestSizeLimitMb);
         var rejectedFileAction = model.Literal("rejected_file_action", [.. RejectedFileActions.All], defaultValue: RejectedFileActions.Leave);
-        var minFileAgeSeconds = model.OptionalInt("min_file_age_seconds", ge: 0, le: 604800);
+        var readyAfterSeconds = model.Number("ready_after_seconds", LibraryIntake.DefaultReadyAfterSeconds, required: false, ge: 0, le: LibraryIntake.MaxReadyAfterSeconds);
+        ReadRetiredReadinessFields(model);
         var createdAfter = model.OptionalDateTime("created_after");
         var createdBefore = model.OptionalDateTime("created_before");
         var modifiedAfter = model.OptionalDateTime("modified_after");
@@ -191,8 +185,6 @@ internal static class ProcessingLibraryMapping
         var remuxWriter = model.Literal("remux_writer", [.. RemuxWriterChoice.All], defaultValue: RemuxWriterChoice.Best);
         var rewriteWithFfmpeg = model.Bool("rewrite_with_ffmpeg", defaultValue: true);
         var scanIntervalSeconds = model.Number("scan_interval_seconds", 300, required: false, ge: 10, le: 604800);
-        var holdMinutes = model.Number("hold_minutes", 0, required: false, ge: 0, le: 10080);
-        var fileDetectionIntervalSeconds = model.Number("file_detection_interval_seconds", 30, required: false, ge: 0, le: 3600);
         var ignoreSizeChanges = model.Bool("ignore_size_changes", defaultValue: false);
         var skipAccessTests = model.Bool("skip_access_tests", defaultValue: false);
         var maxAttempts = model.Number("max_attempts", 3, required: false, ge: 1, le: 20);
@@ -230,7 +222,7 @@ internal static class ProcessingLibraryMapping
             MinFileSizeMb = minFileSizeMb,
             MaxFileSizeMb = maxFileSizeMb,
             RejectedFileAction = rejectedFileAction,
-            MinFileAgeSeconds = minFileAgeSeconds,
+            ReadyAfterSeconds = readyAfterSeconds,
             CreatedAfter = createdAfter,
             CreatedBefore = createdBefore,
             ModifiedAfter = modifiedAfter,
@@ -247,8 +239,6 @@ internal static class ProcessingLibraryMapping
             RemuxWriter = remuxWriter,
             RewriteWithFfmpeg = rewriteWithFfmpeg,
             ScanIntervalSeconds = scanIntervalSeconds,
-            HoldMinutes = holdMinutes,
-            FileDetectionIntervalSeconds = fileDetectionIntervalSeconds,
             IgnoreSizeChanges = ignoreSizeChanges,
             SkipAccessTests = skipAccessTests,
             MaxAttempts = maxAttempts,
@@ -269,6 +259,17 @@ internal static class ProcessingLibraryMapping
             ManagerConnectionIds = managerConnectionIds,
             RemoveOriginalAfterSuccess = removeOriginalAfterSuccess,
         };
+    }
+
+    /// <summary>
+    /// The three waits that became <c>ready_after_seconds</c>. Read and ignored so an older client that still sends them is
+    /// not refused: the body forbids fields it does not know.
+    /// </summary>
+    private static void ReadRetiredReadinessFields(BodyModel model)
+    {
+        model.OptionalInt("min_file_age_seconds");
+        model.OptionalInt("hold_minutes");
+        model.OptionalInt("file_detection_interval_seconds");
     }
 
     /// <summary>

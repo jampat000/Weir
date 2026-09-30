@@ -15,8 +15,7 @@ public sealed class OperatorSettingsStore
     private const string Columns =
         "max_concurrent_files, runner_capacity, runner_cost_sd, runner_cost_720p, runner_cost_1080p, runner_cost_4k, " +
         "runner_cost_undetermined, work_temp_stale_sweep_enabled, failure_cleanup_enabled, keep_failed_work_files, " +
-        "file_log_retention_days, min_file_age_seconds, min_input_file_size_mb, " +
-        "minimum_free_disk_space_mb, movie_schedule_enabled, movie_schedule_hours_limited, movie_schedule_days, " +
+        "file_log_retention_days, minimum_free_disk_space_mb, movie_schedule_enabled, movie_schedule_hours_limited, movie_schedule_days, " +
         "movie_schedule_start, movie_schedule_end, tv_schedule_enabled, tv_schedule_hours_limited, tv_schedule_days, " +
         "tv_schedule_start, tv_schedule_end, updated_at, runner_budget_enabled, work_temp_stale_sweep_interval_seconds, " +
         "failure_cleanup_interval_seconds, unclaimed_handback_cleanup_enabled, unclaimed_handback_window_days, " +
@@ -37,10 +36,9 @@ public sealed class OperatorSettingsStore
         await uow.ExecuteAsync(
             "INSERT INTO operator_settings (id, max_concurrent_files, runner_capacity, runner_cost_sd, runner_cost_720p, " +
             "runner_cost_1080p, runner_cost_4k, runner_cost_undetermined, work_temp_stale_sweep_enabled, failure_cleanup_enabled, " +
-            "keep_failed_work_files, file_log_retention_days, min_file_age_seconds, " +
-            "min_input_file_size_mb, minimum_free_disk_space_mb, movie_schedule_enabled, movie_schedule_hours_limited, " +
+            "keep_failed_work_files, file_log_retention_days, minimum_free_disk_space_mb, movie_schedule_enabled, movie_schedule_hours_limited, " +
             "movie_schedule_days, movie_schedule_start, movie_schedule_end, tv_schedule_enabled, tv_schedule_hours_limited, " +
-            "tv_schedule_days, tv_schedule_start, tv_schedule_end) VALUES (1, 1, 4, 0, 0, 1, 1, 0, 1, 0, 0, 90, 60, 50, 5120, " +
+            "tv_schedule_days, tv_schedule_start, tv_schedule_end) VALUES (1, 1, 4, 0, 0, 1, 1, 0, 1, 0, 0, 90, 5120, " +
             "1, 0, '', '00:00', '23:59', 1, 0, '', '00:00', '23:59')").ConfigureAwait(false);
         return await GetAsync(uow).ConfigureAwait(false) ?? throw new InvalidOperationException("operator_settings row was not created.");
     }
@@ -75,8 +73,6 @@ public sealed class OperatorSettingsStore
         Compare("unclaimed_handback_cleanup_interval_seconds", before.UnclaimedHandbackCleanupIntervalSeconds, after.UnclaimedHandbackCleanupIntervalSeconds, v => v);
         Compare("keep_failed_work_files", before.KeepFailedWorkFiles, after.KeepFailedWorkFiles, v => v ? 1 : 0);
         Compare("file_log_retention_days", before.FileLogRetentionDays, after.FileLogRetentionDays, v => v);
-        Compare("min_file_age_seconds", before.MinFileAgeSeconds, after.MinFileAgeSeconds, v => v);
-        Compare("min_input_file_size_mb", before.ProcessingMinInputFileSizeMb, after.ProcessingMinInputFileSizeMb, v => v);
         Compare("minimum_free_disk_space_mb", before.MinimumFreeDiskSpaceMb, after.MinimumFreeDiskSpaceMb, v => v);
         Compare("movie_schedule_enabled", before.MovieScheduleEnabled, after.MovieScheduleEnabled, v => v ? 1 : 0);
         Compare("movie_schedule_hours_limited", before.MovieScheduleHoursLimited, after.MovieScheduleHoursLimited, v => v ? 1 : 0);
@@ -110,25 +106,23 @@ public sealed class OperatorSettingsStore
         FailureCleanupEnabled = SqliteValues.GetBool(reader, 8),
         KeepFailedWorkFiles = SqliteValues.GetBool(reader, 9),
         FileLogRetentionDays = SqliteValues.GetInt64(reader, 10),
-        MinFileAgeSeconds = SqliteValues.GetInt64(reader, 11),
-        ProcessingMinInputFileSizeMb = SqliteValues.GetInt64(reader, 12),
-        MinimumFreeDiskSpaceMb = SqliteValues.GetInt64(reader, 13),
-        MovieScheduleEnabled = SqliteValues.GetBool(reader, 14),
-        MovieScheduleHoursLimited = SqliteValues.GetBool(reader, 15),
-        MovieScheduleDays = SqliteValues.GetString(reader, 16),
-        MovieScheduleStart = SqliteValues.GetString(reader, 17),
-        MovieScheduleEnd = SqliteValues.GetString(reader, 18),
-        TvScheduleEnabled = SqliteValues.GetBool(reader, 19),
-        TvScheduleHoursLimited = SqliteValues.GetBool(reader, 20),
-        TvScheduleDays = SqliteValues.GetString(reader, 21),
-        TvScheduleStart = SqliteValues.GetString(reader, 22),
-        TvScheduleEnd = SqliteValues.GetString(reader, 23),
-        UpdatedAt = SqliteValues.GetDateTime(reader, 24),
-        RunnerBudgetEnabled = SqliteValues.GetBool(reader, 25),
-        WorkTempStaleSweepIntervalSeconds = reader.IsDBNull(26) ? null : reader.GetInt64(26),
-        FailureCleanupIntervalSeconds = reader.IsDBNull(27) ? null : reader.GetInt64(27),
-        UnclaimedHandbackCleanupEnabled = SqliteValues.GetBool(reader, 28),
-        UnclaimedHandbackWindowDays = SqliteValues.GetInt64(reader, 29),
-        UnclaimedHandbackCleanupIntervalSeconds = reader.IsDBNull(30) ? null : reader.GetInt64(30),
+        MinimumFreeDiskSpaceMb = SqliteValues.GetInt64(reader, 11),
+        MovieScheduleEnabled = SqliteValues.GetBool(reader, 12),
+        MovieScheduleHoursLimited = SqliteValues.GetBool(reader, 13),
+        MovieScheduleDays = SqliteValues.GetString(reader, 14),
+        MovieScheduleStart = SqliteValues.GetString(reader, 15),
+        MovieScheduleEnd = SqliteValues.GetString(reader, 16),
+        TvScheduleEnabled = SqliteValues.GetBool(reader, 17),
+        TvScheduleHoursLimited = SqliteValues.GetBool(reader, 18),
+        TvScheduleDays = SqliteValues.GetString(reader, 19),
+        TvScheduleStart = SqliteValues.GetString(reader, 20),
+        TvScheduleEnd = SqliteValues.GetString(reader, 21),
+        UpdatedAt = SqliteValues.GetDateTime(reader, 22),
+        RunnerBudgetEnabled = SqliteValues.GetBool(reader, 23),
+        WorkTempStaleSweepIntervalSeconds = reader.IsDBNull(24) ? null : reader.GetInt64(24),
+        FailureCleanupIntervalSeconds = reader.IsDBNull(25) ? null : reader.GetInt64(25),
+        UnclaimedHandbackCleanupEnabled = SqliteValues.GetBool(reader, 26),
+        UnclaimedHandbackWindowDays = SqliteValues.GetInt64(reader, 27),
+        UnclaimedHandbackCleanupIntervalSeconds = reader.IsDBNull(28) ? null : reader.GetInt64(28),
     };
 }

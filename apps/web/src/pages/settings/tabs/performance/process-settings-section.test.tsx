@@ -33,8 +33,6 @@ const settings: ProcessingOperatorSettingsOut = {
   unclaimed_handback_window_days: 14,
   keep_failed_work_files: false,
   file_log_retention_days: 90,
-  min_file_age_seconds: 60,
-  min_input_file_size_mb: 50,
   minimum_free_disk_space_mb: 5120,
   movie_schedule_enabled: true,
   movie_schedule_hours_limited: false,
@@ -111,9 +109,12 @@ it("saves Files at once up to ten, and the budget and checks with it", async () 
   expect(choices.querySelectorAll("button")).toHaveLength(10);
   expect(screen.getByLabelText("Budget")).toHaveValue(6);
   expect(screen.getByLabelText("A 1080p file costs")).toHaveValue(2);
-  expect(screen.getByLabelText("Wait after a file last changes")).toHaveValue(
-    60,
-  );
+  expect(
+    screen.queryByLabelText("Wait after a file last changes"),
+  ).not.toBeInTheDocument();
+  expect(
+    screen.queryByLabelText("Skip files smaller than"),
+  ).not.toBeInTheDocument();
 
   // #633: files at once goes up to ten.
   fireEvent.click(screen.getByRole("button", { name: "10" }));
@@ -129,7 +130,6 @@ it("saves Files at once up to ten, and the budget and checks with it", async () 
         runner_cost_1080p: 2,
         runner_budget_enabled: true,
         keep_failed_work_files: false,
-        min_file_age_seconds: 60,
       }),
     );
   });
@@ -139,6 +139,8 @@ it("saves Files at once up to ten, and the budget and checks with it", async () 
   expect(body).not.toHaveProperty("failure_cleanup_enabled");
   expect(body).not.toHaveProperty("file_log_retention_days");
   expect(body).not.toHaveProperty("verbose_detection_logging");
+  expect(body).not.toHaveProperty("min_file_age_seconds");
+  expect(body).not.toHaveProperty("min_input_file_size_mb");
   expect(
     screen.queryByText(/Verbose file-detection records/),
   ).not.toBeInTheDocument();

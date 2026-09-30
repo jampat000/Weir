@@ -14,10 +14,10 @@ public sealed partial class LibraryStore
     private const string LibraryColumns =
         "id, name, enabled, media_type, display_order, watched_folder, work_folder, output_folder, " +
         "media_extensions_csv, exclude_markers_csv, include_patterns_csv, exclude_patterns_csv, min_file_size_mb, max_file_size_mb, " +
-        "rejected_file_action, min_file_age_seconds, created_after, created_before, modified_after, modified_before, " +
+        "rejected_file_action, ready_after_seconds, created_after, created_before, modified_after, modified_before, " +
         "exclude_hidden, top_level_only, sidecar_patterns_csv, preserve_original_timestamps, output_collision_policy, " +
         "hardware_decode_mode, hardware_device, hardware_disabled_vendors_csv, ffmpeg_strictness, scan_interval_seconds, " +
-        "hold_minutes, file_detection_interval_seconds, ignore_size_changes, file_system_events_enabled, skip_access_tests, " +
+        "ignore_size_changes, file_system_events_enabled, skip_access_tests, " +
         "schedule_enabled, schedule_hours_limited, schedule_days, schedule_grid, schedule_start, schedule_end, max_attempts, " +
         "retry_backoff_seconds, retry_execution_failures, retry_preflight_failures, failure_policy, max_concurrent_files, " +
         "priority, rule_set_id, discovered_from_connection_id, discovered_library_key, created_at, updated_at, " +

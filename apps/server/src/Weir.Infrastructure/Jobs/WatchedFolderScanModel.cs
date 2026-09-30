@@ -14,7 +14,6 @@ internal sealed record WatchedFolderScan(
     LibraryAdmissionRules Rules,
     IReadOnlyList<ManagerQueueSignal> Signals,
     ScanAdmissionWindow Window,
-    long EffectiveMinAgeSeconds,
     bool EnqueueRemuxJobs,
     DateTimeOffset Now)
 {

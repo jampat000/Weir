@@ -26,13 +26,12 @@ public sealed record ProcessingLibraryInput
     public string IncludePatternsCsv { get; init; } = string.Empty;
     public string ExcludePatternsCsv { get; init; } = string.Empty;
 
-    /// <summary>Null follows Settings › Performance; see <see cref="ProcessingLibraryRecord.MinFileSizeMb"/>.</summary>
-    public long? MinFileSizeMb { get; init; }
+    public long MinFileSizeMb { get; init; } = LibraryIntake.DefaultMinFileSizeMb;
     public long MaxFileSizeMb { get; init; }
     public string RejectedFileAction { get; init; } = "leave";
 
-    /// <summary>Null follows Settings › Performance; see <see cref="ProcessingLibraryRecord.MinFileAgeSeconds"/>.</summary>
-    public long? MinFileAgeSeconds { get; init; }
+    /// <summary>See <see cref="ProcessingLibraryRecord.ReadyAfterSeconds"/>.</summary>
+    public long ReadyAfterSeconds { get; init; } = LibraryIntake.DefaultReadyAfterSeconds;
     public Time.Timestamp? CreatedAfter { get; init; }
     public Time.Timestamp? CreatedBefore { get; init; }
     public Time.Timestamp? ModifiedAfter { get; init; }
@@ -49,8 +48,6 @@ public sealed record ProcessingLibraryInput
     public string RemuxWriter { get; init; } = RemuxWriterChoice.Best;
     public bool RewriteWithFfmpeg { get; init; } = true;
     public long ScanIntervalSeconds { get; init; } = 300;
-    public long HoldMinutes { get; init; }
-    public long FileDetectionIntervalSeconds { get; init; } = 30;
     public bool IgnoreSizeChanges { get; init; }
     public bool SkipAccessTests { get; init; }
     public long MaxAttempts { get; init; } = 3;
@@ -196,7 +193,7 @@ public static partial class LibraryRules
             MinFileSizeMb = body.MinFileSizeMb,
             MaxFileSizeMb = body.MaxFileSizeMb,
             RejectedFileAction = body.RejectedFileAction,
-            MinFileAgeSeconds = body.MinFileAgeSeconds,
+            ReadyAfterSeconds = body.ReadyAfterSeconds,
             CreatedAfter = body.CreatedAfter,
             CreatedBefore = body.CreatedBefore,
             ModifiedAfter = body.ModifiedAfter,
@@ -204,7 +201,6 @@ public static partial class LibraryRules
             ExcludeHidden = body.ExcludeHidden,
             TopLevelOnly = body.TopLevelOnly,
             ScanIntervalSeconds = body.ScanIntervalSeconds,
-            HoldMinutes = body.HoldMinutes,
             SidecarPatternsCsv = body.SidecarPatternsCsv,
             PreserveOriginalTimestamps = body.PreserveOriginalTimestamps,
             OutputCollisionPolicy = body.OutputCollisionPolicy,
@@ -212,7 +208,6 @@ public static partial class LibraryRules
             HardwareDevice = body.HardwareDevice,
             HardwareDisabledVendorsCsv = body.HardwareDisabledVendorsCsv,
             FfmpegStrictness = body.FfmpegStrictness,
-            FileDetectionIntervalSeconds = body.FileDetectionIntervalSeconds,
             IgnoreSizeChanges = body.IgnoreSizeChanges,
             SkipAccessTests = body.SkipAccessTests,
             FileSystemEventsEnabled = body.FileSystemEventsEnabled,

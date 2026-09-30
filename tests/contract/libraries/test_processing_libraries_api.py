@@ -297,44 +297,53 @@ def test_reject_support_needs_a_session(client) -> None:
     assert client.get(f"{API}/processing/reject-support").status_code == 401
 
 
-# --- the minimum size and wait follow Settings > Performance (#815) -------------------------------
+# --- the wait and minimum size live on the workflow (Performance holds neither) --------------------
 
 
-def test_a_library_with_no_minimum_size_or_wait_follows_the_performance_settings(operator) -> None:
-    """Performance holds the defaults; a library reports what they come to for it, and a value of its own wins."""
+def test_a_new_workflow_starts_at_sixty_seconds_and_fifty_megabytes(operator) -> None:
+    created = _create(operator).json()
 
-    settings = f"{API}/processing/operator-settings"
-    before = operator.get(settings).json()
-    saved = operator.put_csrf(settings, {"min_file_age_seconds": 15, "min_input_file_size_mb": 7})
-    assert saved.status_code == 200, saved.text
-    try:
-        following = _create(operator).json()
-        assert following["min_file_size_mb"] is None
-        assert following["min_file_age_seconds"] is None
-        assert following["effective_min_file_size_mb"] == 7
-        assert following["effective_min_file_age_seconds"] == 15
+    assert created["ready_after_seconds"] == 60
+    assert created["min_file_size_mb"] == 50
+    for retired in (
+        "min_file_age_seconds",
+        "hold_minutes",
+        "file_detection_interval_seconds",
+        "effective_min_file_size_mb",
+        "effective_min_file_age_seconds",
+    ):
+        assert retired not in created
 
-        own = _create(
-            operator,
-            name="Movies own",
-            watched_folder="/srv/own/in",
-            output_folder="/srv/own/out",
-            min_file_size_mb=0,
-            min_file_age_seconds=0,
-        ).json()
-        assert own["min_file_size_mb"] == 0
-        assert own["effective_min_file_size_mb"] == 0
-        assert own["effective_min_file_age_seconds"] == 0
 
-        changed = operator.put_csrf(settings, {"min_file_age_seconds": 40, "min_input_file_size_mb": 9})
-        assert changed.status_code == 200, changed.text
-        assert operator.get(f"{LIBRARIES}/{following['id']}").json()["effective_min_file_age_seconds"] == 40
-        assert operator.get(f"{LIBRARIES}/{own['id']}").json()["effective_min_file_age_seconds"] == 0
-    finally:
-        operator.put_csrf(
-            settings,
-            {
-                "min_file_age_seconds": before["min_file_age_seconds"],
-                "min_input_file_size_mb": before["min_input_file_size_mb"],
-            },
-        )
+def test_a_workflow_keeps_the_wait_and_minimum_size_it_was_given(operator) -> None:
+    created = _create(operator, ready_after_seconds=0, min_file_size_mb=5).json()
+
+    stored = operator.get(f"{LIBRARIES}/{created['id']}").json()
+    assert stored["ready_after_seconds"] == 0
+    assert stored["min_file_size_mb"] == 5
+
+
+def test_the_seeded_workflows_hold_a_wait_and_minimum_size_of_their_own(operator) -> None:
+    for row in operator.get(LIBRARIES).json():
+        assert isinstance(row["ready_after_seconds"], int)
+        assert isinstance(row["min_file_size_mb"], int)
+
+
+def test_performance_settings_do_not_change_a_workflow(operator) -> None:
+    created = _create(operator).json()
+
+    operator.put_csrf(
+        f"{API}/processing/operator-settings", {"min_file_age_seconds": 120, "min_input_file_size_mb": 200}
+    )
+
+    stored = operator.get(f"{LIBRARIES}/{created['id']}").json()
+    assert stored["ready_after_seconds"] == 60
+    assert stored["min_file_size_mb"] == 50
+
+
+def test_an_older_client_sending_the_three_waits_is_answered_and_they_are_ignored(operator) -> None:
+    created = _create(operator, min_file_age_seconds=5, hold_minutes=10, file_detection_interval_seconds=999).json()
+
+    assert created["ready_after_seconds"] == 60
+
+

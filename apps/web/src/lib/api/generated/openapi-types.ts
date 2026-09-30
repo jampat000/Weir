@@ -5144,10 +5144,10 @@ export interface components {
         "very" | "strict" | "normal" | "unofficial" | "experimental";
       /**
        * File Detection Interval Seconds
-       * @description How long this file's size must stay unchanged before Weir treats it as finished being written. 0 turns size settling off.
-       * @default 30
+       * @deprecated
+       * @description Removed. Accepted and ignored, so an older client that still sends it is not refused. A workflow's wait is ready_after_seconds.
        */
-      file_detection_interval_seconds: number;
+      file_detection_interval_seconds?: number | null;
       /**
        * File System Events Enabled
        * @description Watch this folder for changes so new files are picked up within seconds. The periodic scan runs regardless, so switching this off makes Weir slower to notice a file, never blind to it.
@@ -5175,9 +5175,10 @@ export interface components {
       hardware_disabled_vendors_csv: string;
       /**
        * Hold Minutes
-       * @default 0
+       * @deprecated
+       * @description Removed. Accepted and ignored, so an older client that still sends it is not refused. A workflow's wait is ready_after_seconds.
        */
-      hold_minutes: number;
+      hold_minutes?: number | null;
       /**
        * Ignore Size Changes
        * @description Skip size settling entirely for this library.
@@ -5220,14 +5221,16 @@ export interface components {
       media_type: "movie" | "tv";
       /**
        * Min File Age Seconds
-       * @description Seconds a file must go unchanged. Null uses the Performance setting.
+       * @deprecated
+       * @description Removed. Accepted and ignored, so an older client that still sends it is not refused. A workflow's wait is ready_after_seconds.
        */
       min_file_age_seconds?: number | null;
       /**
        * Min File Size Mb
-       * @description Smallest file the library takes. Null uses the Performance setting.
+       * @description The smallest file this workflow takes, in MB. 0 takes any size.
+       * @default 50
        */
-      min_file_size_mb?: number | null;
+      min_file_size_mb: number;
       /**
        * Modified After
        * @description Only admit files whose last-modified time is on or after this instant.
@@ -5268,6 +5271,12 @@ export interface components {
        * @default 0
        */
       priority: number;
+      /**
+       * Ready After Seconds
+       * @description A new file is ready once neither its size nor its last-changed time has moved for this many seconds. 0 needs no wait.
+       * @default 60
+       */
+      ready_after_seconds: number;
       /**
        * Rejected File Action
        * @description What to do with a settled file rejected by size/path rules or because it contains no video. delete_file removes only that file and then empty parent folders; it never removes a folder containing other files.
@@ -5411,16 +5420,6 @@ export interface components {
       discovered_library_key?: string | null;
       /** Display Order */
       display_order: number;
-      /**
-       * Effective Min File Age Seconds
-       * @description Seconds a file must go unchanged now: the library's own value, or the Performance setting.
-       */
-      effective_min_file_age_seconds: number;
-      /**
-       * Effective Min File Size Mb
-       * @description Smallest file the library takes now: its own value, or the Performance setting.
-       */
-      effective_min_file_size_mb: number;
       /** Enabled */
       enabled: boolean;
       /** Exclude Hidden */
@@ -5433,8 +5432,6 @@ export interface components {
       failure_policy: string;
       /** Ffmpeg Strictness */
       ffmpeg_strictness: string;
-      /** File Detection Interval Seconds */
-      file_detection_interval_seconds: number;
       /** File System Events Enabled */
       file_system_events_enabled: boolean;
       /** Hardware Decode Mode */
@@ -5443,8 +5440,6 @@ export interface components {
       hardware_device: string;
       /** Hardware Disabled Vendors Csv */
       hardware_disabled_vendors_csv: string;
-      /** Hold Minutes */
-      hold_minutes: number;
       /** Id */
       id: number;
       /** Ignore Size Changes */
@@ -5484,15 +5479,10 @@ export interface components {
        */
       media_type: "movie" | "tv";
       /**
-       * Min File Age Seconds
-       * @description Seconds a file must go unchanged. Null means the library uses the Performance setting.
-       */
-      min_file_age_seconds: number | null;
-      /**
        * Min File Size Mb
-       * @description Smallest file the library takes. Null means the library uses the Performance setting.
+       * @description The smallest file this workflow takes, in MB. 0 takes any size.
        */
-      min_file_size_mb: number | null;
+      min_file_size_mb: number;
       /** Modified After */
       modified_after: string | null;
       /** Modified Before */
@@ -5526,6 +5516,11 @@ export interface components {
       preserve_original_timestamps: boolean;
       /** Priority */
       priority: number;
+      /**
+       * Ready After Seconds
+       * @description A new file is ready once neither its size nor its last-changed time has moved for this many seconds. 0 needs no wait.
+       */
+      ready_after_seconds: number;
       /** Rejected File Action */
       rejected_file_action: string;
       /** Retry Backoff Seconds */
@@ -5643,10 +5638,10 @@ export interface components {
         "very" | "strict" | "normal" | "unofficial" | "experimental";
       /**
        * File Detection Interval Seconds
-       * @description How long this file's size must stay unchanged before Weir treats it as finished being written. 0 turns size settling off.
-       * @default 30
+       * @deprecated
+       * @description Removed. Accepted and ignored, so an older client that still sends it is not refused. A workflow's wait is ready_after_seconds.
        */
-      file_detection_interval_seconds: number;
+      file_detection_interval_seconds?: number | null;
       /**
        * File System Events Enabled
        * @description Watch this folder for changes so new files are picked up within seconds. The periodic scan runs regardless, so switching this off makes Weir slower to notice a file, never blind to it.
@@ -5674,9 +5669,10 @@ export interface components {
       hardware_disabled_vendors_csv: string;
       /**
        * Hold Minutes
-       * @default 0
+       * @deprecated
+       * @description Removed. Accepted and ignored, so an older client that still sends it is not refused. A workflow's wait is ready_after_seconds.
        */
-      hold_minutes: number;
+      hold_minutes?: number | null;
       /**
        * Ignore Size Changes
        * @description Skip size settling entirely for this library.
@@ -5719,14 +5715,16 @@ export interface components {
       media_type: "movie" | "tv";
       /**
        * Min File Age Seconds
-       * @description Seconds a file must go unchanged. Null uses the Performance setting.
+       * @deprecated
+       * @description Removed. Accepted and ignored, so an older client that still sends it is not refused. A workflow's wait is ready_after_seconds.
        */
       min_file_age_seconds?: number | null;
       /**
        * Min File Size Mb
-       * @description Smallest file the library takes. Null uses the Performance setting.
+       * @description The smallest file this workflow takes, in MB. 0 takes any size.
+       * @default 50
        */
-      min_file_size_mb?: number | null;
+      min_file_size_mb: number;
       /**
        * Modified After
        * @description Only admit files whose last-modified time is on or after this instant.
@@ -5767,6 +5765,12 @@ export interface components {
        * @default 0
        */
       priority: number;
+      /**
+       * Ready After Seconds
+       * @description A new file is ready once neither its size nor its last-changed time has moved for this many seconds. 0 needs no wait.
+       * @default 60
+       */
+      ready_after_seconds: number;
       /**
        * Rejected File Action
        * @description What to do with a settled file rejected by size/path rules or because it contains no video. delete_file removes only that file and then empty parent folders; it never removes a folder containing other files.
@@ -5944,8 +5948,6 @@ export interface components {
       keep_failed_work_files: boolean;
       /** Max Concurrent Files */
       max_concurrent_files: number;
-      /** Min File Age Seconds */
-      min_file_age_seconds: number;
       /**
        * Minimum Free Disk Space Mb
        * @description Processing skips before writes when the target drive has less free space than this.
@@ -5964,11 +5966,6 @@ export interface components {
       movie_schedule_hours_limited: boolean;
       /** Movie Schedule Start */
       movie_schedule_start: string;
-      /**
-       * Processing Min Input File Size Mb
-       * @description Files smaller than this are skipped before Weir probes or writes them.
-       */
-      min_input_file_size_mb: number;
       /**
        * Runner Capacity
        * @description Total processing capacity. Active files consume it according to their cost, and new work waits once it is fully occupied.
@@ -6052,7 +6049,11 @@ export interface components {
       keep_failed_work_files?: boolean | null;
       /** Max Concurrent Files */
       max_concurrent_files?: number | null;
-      /** Min File Age Seconds */
+      /**
+       * Min File Age Seconds
+       * @deprecated
+       * @description Removed. Accepted and ignored, so an older client that still sends it is not refused. This now belongs to each workflow.
+       */
       min_file_age_seconds?: number | null;
       /** Minimum Free Disk Space Mb */
       minimum_free_disk_space_mb?: number | null;
@@ -6066,7 +6067,11 @@ export interface components {
       movie_schedule_hours_limited?: boolean | null;
       /** Movie Schedule Start */
       movie_schedule_start?: string | null;
-      /** Processing Min Input File Size Mb */
+      /**
+       * Processing Min Input File Size Mb
+       * @deprecated
+       * @description Removed. Accepted and ignored, so an older client that still sends it is not refused. This now belongs to each workflow.
+       */
       min_input_file_size_mb?: number | null;
       /** Runner Capacity */
       runner_capacity?: number | null;

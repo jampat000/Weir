@@ -180,7 +180,6 @@ internal sealed class WatchedFileDecider
             settling.StableAt,
             accessProblem,
             blockedBy,
-            _scan.EffectiveMinAgeSeconds,
             _scan.Now);
 
         // A pass for this file booked for later is not a file waiting for a free lane; calling it ready would put it first in
@@ -199,7 +198,7 @@ internal sealed class WatchedFileDecider
     {
         var reason = rejection.Reason;
         RejectedFileRemoval? removal = null;
-        if (_scan.Rules.RejectedFileAction == "delete_file" && rejection.MayRemoveFile)
+        if (_scan.Rules.RejectedFileAction == "delete_file")
         {
             removal = new RejectedFileRemoval(write.RelativePath, filePath, reason, _scan.Rules.RejectedFileAction);
             reason = $"{reason} This workflow is set to delete rejected files; Weir will record this decision before removing only this file.";

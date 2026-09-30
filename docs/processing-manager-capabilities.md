@@ -1,7 +1,7 @@
 # Processing and media-manager coverage
 
 Processing's basic watched-folder remux is standalone. After a file has passed the
-local age, settling, access, schedule, and lifecycle checks, it can be processed
+wait for the file to stop changing (the workflow's own), settling, access, schedule, and lifecycle checks, it can be processed
 without Radarr, Sonarr, Deluno, or another manager.
 
 Weir's Settings call each route a file takes (watched folder, work folder, output folder and

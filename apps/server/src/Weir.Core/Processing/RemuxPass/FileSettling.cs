@@ -29,7 +29,7 @@ public static class FileSettling
         DateTimeOffset now)
     {
         ArgumentNullException.ThrowIfNull(library);
-        var interval = Math.Max(0, library.FileDetectionIntervalSeconds);
+        var interval = Math.Max(0, library.ReadyAfterSeconds);
         if (library.IgnoreSizeChanges || interval == 0)
         {
             return new SettlingObservation(false, now, now);

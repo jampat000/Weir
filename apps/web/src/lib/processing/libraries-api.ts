@@ -27,16 +27,12 @@ export interface ProcessingLibrary {
   exclude_markers_csv: string;
   include_patterns_csv: string;
   exclude_patterns_csv: string;
-  /** The library's own minimum size, or null when it uses the Performance setting. */
-  min_file_size_mb: number | null;
-  /** What the library is held to now: its own value, or Performance's. */
-  effective_min_file_size_mb: number;
+  /** The smallest file this workflow takes, in MB. 0 takes any size. */
+  min_file_size_mb: number;
   max_file_size_mb: number;
   rejected_file_action: "leave" | "delete_file";
-  /** The library's own wait after a file last changes, or null when it uses the Performance setting. */
-  min_file_age_seconds: number | null;
-  /** What the library waits now: its own value, or Performance's. */
-  effective_min_file_age_seconds: number;
+  /** A new file is ready once neither its size nor its last-changed time has moved for this many seconds. */
+  ready_after_seconds: number;
   created_after: string | null;
   created_before: string | null;
   modified_after: string | null;
@@ -45,7 +41,6 @@ export interface ProcessingLibrary {
   top_level_only: boolean;
 
   scan_interval_seconds: number;
-  hold_minutes: number;
   /** Files beside the video that travel with it, renamed to the output's stem. Empty migrates nothing. */
   sidecar_patterns_csv: string;
   preserve_original_timestamps: boolean;
@@ -62,7 +57,6 @@ export interface ProcessingLibrary {
   hardware_device: string;
   hardware_disabled_vendors_csv: string;
   ffmpeg_strictness: string;
-  file_detection_interval_seconds: number;
   ignore_size_changes: boolean;
   skip_access_tests: boolean;
   file_system_events_enabled: boolean;
@@ -106,12 +100,10 @@ export interface ProcessingLibraryWrite {
   exclude_markers_csv: string;
   include_patterns_csv: string;
   exclude_patterns_csv: string;
-  /** Null uses the Performance setting. */
-  min_file_size_mb: number | null;
+  min_file_size_mb: number;
   max_file_size_mb: number;
   rejected_file_action: "leave" | "delete_file";
-  /** Null uses the Performance setting. */
-  min_file_age_seconds: number | null;
+  ready_after_seconds: number;
   created_after: string | null;
   created_before: string | null;
   modified_after: string | null;
@@ -119,7 +111,6 @@ export interface ProcessingLibraryWrite {
   exclude_hidden: boolean;
   top_level_only: boolean;
   scan_interval_seconds: number;
-  hold_minutes: number;
   sidecar_patterns_csv: string;
   preserve_original_timestamps: boolean;
   /** Off keeps the original download in the watched folder after cleaning, so a torrent keeps seeding. */
@@ -133,7 +124,6 @@ export interface ProcessingLibraryWrite {
   hardware_device: string;
   hardware_disabled_vendors_csv: string;
   ffmpeg_strictness: string;
-  file_detection_interval_seconds: number;
   ignore_size_changes: boolean;
   skip_access_tests: boolean;
   file_system_events_enabled: boolean;
@@ -231,7 +221,7 @@ export function writeFromProcessingLibrary(
     min_file_size_mb: library.min_file_size_mb,
     max_file_size_mb: library.max_file_size_mb,
     rejected_file_action: library.rejected_file_action,
-    min_file_age_seconds: library.min_file_age_seconds,
+    ready_after_seconds: library.ready_after_seconds,
     created_after: library.created_after,
     created_before: library.created_before,
     modified_after: library.modified_after,
@@ -239,7 +229,6 @@ export function writeFromProcessingLibrary(
     exclude_hidden: library.exclude_hidden,
     top_level_only: library.top_level_only,
     scan_interval_seconds: library.scan_interval_seconds,
-    hold_minutes: library.hold_minutes,
     sidecar_patterns_csv: library.sidecar_patterns_csv,
     preserve_original_timestamps: library.preserve_original_timestamps,
     remove_original_after_success: library.remove_original_after_success,
@@ -250,7 +239,6 @@ export function writeFromProcessingLibrary(
     hardware_device: library.hardware_device,
     hardware_disabled_vendors_csv: library.hardware_disabled_vendors_csv,
     ffmpeg_strictness: library.ffmpeg_strictness,
-    file_detection_interval_seconds: library.file_detection_interval_seconds,
     ignore_size_changes: library.ignore_size_changes,
     skip_access_tests: library.skip_access_tests,
     file_system_events_enabled: library.file_system_events_enabled,

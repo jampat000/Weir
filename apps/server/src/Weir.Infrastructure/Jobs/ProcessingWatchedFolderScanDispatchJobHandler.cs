@@ -145,15 +145,13 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandler : IJobHandler
             var suite = await _suiteSettings.EnsureAsync(uow).ConfigureAwait(false);
             await uow.CommitAsync().ConfigureAwait(false);
 
-            var limits = IntakeLimits.Resolve(library, operatorSettings);
             var scan = new WatchedFolderScan(
                 library,
                 request.MediaScope,
                 paths,
-                LibraryAdmissionRules.For(library, limits),
+                LibraryAdmissionRules.For(library),
                 signals,
                 AdmissionWindow(library, suite, now),
-                limits.MinFileAgeSeconds,
                 request.EnqueueRemuxJobs,
                 now);
             var budget = RunnerBudget.FromSettings(

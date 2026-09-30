@@ -1,5 +1,4 @@
 import { QuietFieldGroup } from "../../../../components/shared/quiet-section";
-import { InheritedNumberSetting } from "./library-inherited-setting";
 import { REJECTED_FILE_OPTIONS } from "./library-options";
 import {
   DateTimeSetting,
@@ -52,12 +51,12 @@ export function LibraryIntakeGroup({
           placeholder="*sample*,*trailer*"
           hint="Optional comma-separated wildcards."
         />
-        <InheritedNumberSetting
+        <TextSetting
           binding={binding}
           name="min_file_size_mb"
           label="Minimum file size (MB)"
-          unit="MB"
-          performanceField="min_input_file_size_mb"
+          width="short"
+          hint="Smaller files are skipped. 0 takes any size."
         />
         <TextSetting
           binding={binding}
@@ -106,7 +105,7 @@ export function LibraryIntakeGroup({
           name="rejected_file_action"
           label="When a file is rejected"
           options={REJECTED_FILE_OPTIONS}
-          hint="Applies to a file this workflow's own size, date or path settings turn away, and to a file its rules find nothing in to keep. A minimum size taken from Performance never deletes anything. Weir never deletes a populated parent folder here."
+          hint="Applies to a file this workflow's own size, date or path settings turn away, and to a file its rules find nothing in to keep. Weir never deletes a populated parent folder here."
         />
       </div>
       <div className="mm-library-toggles">
@@ -137,26 +136,12 @@ export function LibraryReadinessGroup({
       detail="These checks prevent Weir from starting while a downloader, recorder, or media manager still owns the file."
     >
       <div className="mm-field-row">
-        <InheritedNumberSetting
-          binding={binding}
-          name="min_file_age_seconds"
-          label="Wait after a file last changes (seconds)"
-          unit="seconds"
-          performanceField="min_file_age_seconds"
-          hint="Goes by the file's last-changed time."
-        />
         <TextSetting
           binding={binding}
-          name="hold_minutes"
-          label="Hold every new file (minutes)"
+          name="ready_after_seconds"
+          label="A new file is ready once it hasn't changed for (seconds)"
           width="short"
-        />
-        <TextSetting
-          binding={binding}
-          name="file_detection_interval_seconds"
-          label="Wait for the size to stop growing (seconds)"
-          width="short"
-          hint="Weir checks the file's size on each look. A separate check from the wait after a change."
+          hint="Both its size and its last-changed time must stay the same for this long. 0 does not wait."
         />
         <TextSetting
           binding={binding}

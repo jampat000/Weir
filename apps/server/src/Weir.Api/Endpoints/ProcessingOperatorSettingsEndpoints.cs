@@ -59,8 +59,6 @@ internal sealed class ProcessingOperatorSettingsEndpointHandlers
         .Set("keep_failed_work_files", row.KeepFailedWorkFiles)
         .Set("file_log_retention_days", OperatorSettingsRules.ClampFileLogRetentionDays(row.FileLogRetentionDays))
         .Set("runner_cost_undetermined", OperatorSettingsRules.ClampRunnerCost(row.RunnerCostUndetermined))
-        .Set("min_file_age_seconds", OperatorSettingsRules.ClampMinFileAgeSeconds(row.MinFileAgeSeconds))
-        .Set("min_input_file_size_mb", OperatorSettingsRules.ClampSizeMb(row.ProcessingMinInputFileSizeMb))
         .Set("minimum_free_disk_space_mb", OperatorSettingsRules.ClampSizeMb(row.MinimumFreeDiskSpaceMb))
         .Set("movie_schedule_enabled", row.MovieScheduleEnabled)
         .Set("movie_schedule_hours_limited", row.MovieScheduleHoursLimited)
@@ -111,11 +109,11 @@ internal sealed class ProcessingOperatorSettingsEndpointHandlers
             "unclaimed_handback_cleanup_interval_seconds", ge: OperatorSettingsRules.MinCleanupIntervalSeconds, le: OperatorSettingsRules.MaxCleanupIntervalSeconds);
         var keepFailedWorkFiles = model.OptionalBool("keep_failed_work_files");
         var fileLogRetentionDays = model.OptionalInt("file_log_retention_days", ge: 0, le: 3650);
-        // Retired setting (nothing acts on it). Read and ignored so an older client that sends it is not refused:
-        // the body forbids fields it does not know.
+        // Retired settings. Read and ignored so an older client that sends them is not refused: the body forbids fields it
+        // does not know. The wait and the minimum size now belong to each workflow alone.
         var retiredVerboseDetectionLogging = model.OptionalBool("verbose_detection_logging");
-        var minFileAgeSeconds = model.OptionalInt("min_file_age_seconds", ge: 0, le: 7 * 24 * 3600);
-        var processingMinInputFileSizeMb = model.OptionalInt("min_input_file_size_mb", ge: 0, le: 1024 * 1024);
+        var retiredMinFileAgeSeconds = model.OptionalInt("min_file_age_seconds");
+        var retiredMinInputFileSizeMb = model.OptionalInt("min_input_file_size_mb");
         var minimumFreeDiskSpaceMb = model.OptionalInt("minimum_free_disk_space_mb", ge: 0, le: 1024 * 1024);
         var movieScheduleEnabled = model.OptionalBool("movie_schedule_enabled");
         var movieScheduleHoursLimited = model.OptionalBool("movie_schedule_hours_limited");
@@ -150,7 +148,7 @@ internal sealed class ProcessingOperatorSettingsEndpointHandlers
                                unclaimedHandbackCleanupEnabled is not null || unclaimedHandbackWindowDays is not null ||
                                unclaimedHandbackCleanupIntervalSeconds is not null ||
                                keepFailedWorkFiles is not null || fileLogRetentionDays is not null || retiredVerboseDetectionLogging is not null ||
-                               minFileAgeSeconds is not null || processingMinInputFileSizeMb is not null || minimumFreeDiskSpaceMb is not null;
+                               retiredMinFileAgeSeconds is not null || retiredMinInputFileSizeMb is not null || minimumFreeDiskSpaceMb is not null;
         if (!hasProcessField && movieScheduleEnabled is null && tvScheduleEnabled is null)
         {
             issues.Add(new ValidationIssue("value_error", ["body"], "Value error, No operator settings fields to update.", WireValue.Null));
@@ -247,16 +245,6 @@ internal sealed class ProcessingOperatorSettingsEndpointHandlers
         if (keepFailedWorkFiles is { } kf)
         {
             after = after with { KeepFailedWorkFiles = kf };
-        }
-
-        if (minFileAgeSeconds is { } mfa)
-        {
-            after = after with { MinFileAgeSeconds = OperatorSettingsRules.ClampMinFileAgeSeconds(mfa) };
-        }
-
-        if (processingMinInputFileSizeMb is { } rmin)
-        {
-            after = after with { ProcessingMinInputFileSizeMb = OperatorSettingsRules.ClampSizeMb(rmin) };
         }
 
         if (minimumFreeDiskSpaceMb is { } mfd)
