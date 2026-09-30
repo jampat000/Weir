@@ -28,13 +28,25 @@ says where a setting lives and what actually happens when it is saved.
   setup) sends back every other setting as it was, so nothing else is reset.
 - Rejected files (a workflow's "When a file is rejected"): "Delete only the rejected file" applies to a file
   the workflow's own size, date or path settings turn away and to a file its rules find nothing in to
-  keep. A minimum size the workflow takes from Performance never deletes a file; the file is skipped and
-  left where it is.
+  keep. The minimum size is the workflow's own (50 MB for a new workflow), so it is the one the editor shows,
+  and deleting is tied to that value alone.
 - Hardware decoding (workflow editor): shown as not available, and ignored by the server while it is.
   The saved values are kept.
 - Rules: audio and subtitle handling is a named rule set a workflow points at, so two workflows can
   share one. Deleting a rule set a workflow still uses is refused rather than silently stripping that
   handling.
+- When a new file is ready (a workflow's File readiness group): one wait, "A new file is ready once it hasn't
+  changed for N seconds", saved on the workflow (60 seconds for a new one). Both the file's size and its
+  last-changed time must stay the same for N seconds, so the scan holds a new file until then and the
+  pass checks the file's age against the same number. It replaces the three waits a workflow used to
+  have (wait after a change, hold every new file, wait for the size to stop growing); an upgrade gives
+  each workflow the longest of them, so no file is picked up sooner than before. A media-manager
+  hand-off skips the scan, because the manager says the download is finished. Settings › Performance
+  holds neither this wait nor a minimum size; an older client that still sends them to
+  `PUT /api/v1/processing/operator-settings` is answered and they are ignored.
+- Minimum file size (a workflow's Intake rules): each workflow's own value, 50 MB for a new one, shown
+  beside the maximum size. A media-manager hand-off still applies the minimum size and the video type,
+  but skips the path, date and maximum-size rules, because the manager chose the file.
 - Performance: "Files at once" (1 to 10) decides how many files run together and needs no restart. A
   workflow follows it unless the workflow is given its own lower number. The resolution budget (runner
   capacity and per-resolution costs) only applies when "Also weigh files by resolution" is switched
@@ -64,4 +76,5 @@ says where a setting lives and what actually happens when it is saved.
   stops that timer for that media type whatever is saved in Settings › Cleanup; the variables cannot
   switch a timer on.
 - `WEIR_PROCESSING_WATCHED_FOLDER_MIN_FILE_AGE_SECONDS` is retired. Setting it changes nothing: the wait
-  after a file last changes is the workflow's own, or Settings › Performance's.
+  for a new file is the workflow's own.
+

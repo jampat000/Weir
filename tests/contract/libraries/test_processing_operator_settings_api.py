@@ -32,8 +32,8 @@ def test_operator_settings_get_shape(server_factory, client_factory) -> None:
     assert r.status_code == 200, r.text
     body = r.json()
     assert body["max_concurrent_files"] == 1
-    assert body["min_file_age_seconds"] == 60
-    assert body["min_input_file_size_mb"] == 50
+    assert "min_file_age_seconds" not in body
+    assert "min_input_file_size_mb" not in body
     assert body["minimum_free_disk_space_mb"] == 5120
     assert body["movie_schedule_enabled"] is True
     assert "movie_schedule_interval_seconds" not in body
@@ -55,8 +55,6 @@ def test_operator_settings_put_updates(admin) -> None:
         PATH,
         {
             "max_concurrent_files": 4,
-            "min_file_age_seconds": 90,
-            "min_input_file_size_mb": 75,
             "minimum_free_disk_space_mb": 6144,
             "movie_schedule_enabled": True,
             "movie_schedule_hours_limited": True,
@@ -73,8 +71,6 @@ def test_operator_settings_put_updates(admin) -> None:
     assert r.status_code == 200, r.text
     body = r.json()
     assert body["max_concurrent_files"] == 4
-    assert body["min_file_age_seconds"] == 90
-    assert body["min_input_file_size_mb"] == 75
     assert body["minimum_free_disk_space_mb"] == 6144
     assert body["movie_schedule_enabled"] is True
     assert body["movie_schedule_hours_limited"] is True
@@ -133,16 +129,12 @@ def test_operator_settings_put_process_only_preserves_schedules(admin) -> None:
         PATH,
         {
             "max_concurrent_files": 3,
-            "min_file_age_seconds": 120,
-            "min_input_file_size_mb": 80,
             "minimum_free_disk_space_mb": 8192,
         },
     )
     assert r1.status_code == 200, r1.text
     body = r1.json()
     assert body["max_concurrent_files"] == 3
-    assert body["min_file_age_seconds"] == 120
-    assert body["min_input_file_size_mb"] == 80
     assert body["minimum_free_disk_space_mb"] == 8192
     assert body["movie_schedule_hours_limited"] is False
     assert body["tv_schedule_hours_limited"] is False
@@ -173,7 +165,6 @@ def test_operator_settings_put_invalid_days(admin) -> None:
         {
             **ALL_OPEN_SCHEDULES,
             "max_concurrent_files": 1,
-            "min_file_age_seconds": 60,
             "movie_schedule_days": "Caturday",
         },
     )
@@ -218,3 +209,10 @@ def test_files_at_once_read_out_shape(server_factory, client_factory) -> None:
     assert body["waiting"] == 0
     assert body["waiting_for"] == "nothing"
     assert body["message"] == ""
+
+
+def test_an_older_client_sending_the_wait_and_minimum_size_is_answered_and_they_are_ignored(admin) -> None:
+    r = admin.put_csrf(PATH, {"min_file_age_seconds": 120, "min_input_file_size_mb": 200})
+    assert r.status_code == 200, r.text
+    assert "min_file_age_seconds" not in r.json()
+    assert "min_input_file_size_mb" not in r.json()

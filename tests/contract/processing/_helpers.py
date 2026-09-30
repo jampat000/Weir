@@ -56,12 +56,12 @@ class Folders:
 
 
 def relax_operator_guards(admin: WeirClient) -> None:
-    """No minimum age, size or free space, so a small fresh fixture file is processed at once."""
+    """No minimum free space, so a small fixture file is processed at once.
 
-    r = admin.put_csrf(
-        f"{API}/processing/operator-settings",
-        {"min_file_age_seconds": 0, "min_input_file_size_mb": 0, "minimum_free_disk_space_mb": 0},
-    )
+    A workflow's own wait and minimum size are set by ``create_library``.
+    """
+
+    r = admin.put_csrf(f"{API}/processing/operator-settings", {"minimum_free_disk_space_mb": 0})
     assert r.status_code == 200, r.text
 
 
@@ -72,8 +72,8 @@ def create_library(admin: WeirClient, folders: Folders, **overrides: Any) -> dic
         "watched_folder": str(folders.watched),
         "work_folder": str(folders.work),
         "output_folder": str(folders.output),
-        "min_file_age_seconds": 0,
-        "file_detection_interval_seconds": 0,
+        "ready_after_seconds": 0,
+        "min_file_size_mb": 0,
         "skip_access_tests": True,
         "retry_backoff_seconds": 1,
         **overrides,
@@ -109,7 +109,7 @@ def _library_put_body(current: dict[str, Any], changes: dict[str, Any]) -> dict[
         "min_file_size_mb",
         "max_file_size_mb",
         "rejected_file_action",
-        "min_file_age_seconds",
+        "ready_after_seconds",
         "exclude_hidden",
         "top_level_only",
         "sidecar_patterns_csv",
@@ -120,8 +120,6 @@ def _library_put_body(current: dict[str, Any], changes: dict[str, Any]) -> dict[
         "hardware_disabled_vendors_csv",
         "ffmpeg_strictness",
         "scan_interval_seconds",
-        "hold_minutes",
-        "file_detection_interval_seconds",
         "ignore_size_changes",
         "skip_access_tests",
         "max_attempts",

@@ -54,10 +54,7 @@ def _working_server(
     sut = server_factory({**SECRET_ENV, **fake_ffmpeg.env, "WEIR_PROCESSING_WORKER_COUNT": "1"})
     admin = client_factory(sut)
     admin.ensure_admin()
-    relaxed = admin.put_csrf(
-        f"{API}/processing/operator-settings",
-        {"min_file_age_seconds": 0, "min_input_file_size_mb": 0, "minimum_free_disk_space_mb": 0},
-    )
+    relaxed = admin.put_csrf(f"{API}/processing/operator-settings", {"minimum_free_disk_space_mb": 0})
     assert relaxed.status_code == 200, relaxed.text
     folders = LibraryFolders.make(root / "library")
     work = root / "library" / "work"
@@ -71,8 +68,7 @@ def _working_server(
                 watched_folder=str(folders.watched),
                 output_folder=str(folders.output),
                 work_folder=str(work),
-                min_file_age_seconds=0,
-                file_detection_interval_seconds=0,
+                ready_after_seconds=0,
                 skip_access_tests=True,
                 min_file_size_mb=0,
             )
@@ -84,8 +80,7 @@ def _working_server(
             media_type="movie",
             folders=folders,
             work_folder=str(work),
-            min_file_age_seconds=0,
-            file_detection_interval_seconds=0,
+            ready_after_seconds=0,
             skip_access_tests=True,
             min_file_size_mb=0,
         )

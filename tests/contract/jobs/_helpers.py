@@ -23,8 +23,6 @@ _LIBRARY_READ_ONLY = frozenset(
         "manager_coverage_detail",
         "discovered_from_connection_id",
         "discovered_library_key",
-        "effective_min_file_size_mb",
-        "effective_min_file_age_seconds",
         "active_job_count",
         "next_look_at",
         "periodic_scan",
