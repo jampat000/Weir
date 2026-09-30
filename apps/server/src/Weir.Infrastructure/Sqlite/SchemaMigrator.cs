@@ -120,6 +120,7 @@ public sealed class SchemaMigrator
         new(28, "0063_connection_nickname", "Weir.Infrastructure.Migrations.0028_connection_nickname.sql"),
         new(29, "0064_failed_files_are_never_held", "Weir.Infrastructure.Migrations.0029_failed_files_are_never_held.sql"),
         new(30, "0065_remove_failed_download_cleanup_jobs", "Weir.Infrastructure.Migrations.0030_remove_failed_download_cleanup_jobs.sql"),
+        new(31, "0066_file_history_orphans", "Weir.Infrastructure.Migrations.0031_file_history_orphans.sql"),
     ];
 
     /// <summary>
