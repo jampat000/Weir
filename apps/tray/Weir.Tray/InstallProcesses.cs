@@ -13,9 +13,10 @@ namespace Weir.Tray;
 /// </summary>
 static class InstallProcesses
 {
+    private const string TrayName = "Weir";
     private const string ServerName = "WeirServer";
 
-    internal static readonly string[] Names = ["Weir", ServerName];
+    internal static readonly string[] Names = [TrayName, ServerName];
 
     /// <summary>
     /// The directory this install runs from: the folder holding this Weir.exe. Velopack runs the
@@ -57,9 +58,98 @@ static class InstallProcesses
     /// except this process. <paramref name="sameSessionOnly"/> narrows it to this Windows session.
     /// Everything else is logged and left running. Returns the ids stopped.
     /// </summary>
-    internal static List<int> StopOwn(string root, bool sameSessionOnly, Action<string> log, string why)
+    internal static List<int> StopOwn(string root, bool sameSessionOnly, Action<string> log, string why) =>
+        StopOwn(root, sameSessionOnly, log, why, ServerStopTimeouts.Default);
+
+    /// <summary>
+    /// The servers go first, asked to stop through their stop event so they finish running jobs and close their
+    /// database (#833, #868); the tray is stopped only after them, and without its process tree. Killing the tray
+    /// with its tree first would end the server it started before it could be asked. A server that does not exit in
+    /// time, or cannot be asked, is killed with its own tree as the fallback. The waits are bounded by
+    /// <paramref name="timeouts"/> and stay well inside the 30 seconds Velopack gives an install or uninstall hook.
+    /// </summary>
+    internal static List<int> StopOwn(string root, bool sameSessionOnly, Action<string> log, string why, ServerStopTimeouts timeouts)
+    {
+        var running = FindOwn(root, sameSessionOnly, log, why);
+        try
+        {
+            var stopped = StopServers(running.Where(p => p.Name == ServerName).ToList(), timeouts, log, why);
+            foreach (var tray in running.Where(p => p.Name == TrayName))
+            {
+                if (TryKill(tray, process => process.Kill(entireProcessTree: false), timeouts.AfterKill, log, why))
+                {
+                    stopped.Add(tray.Process.Id);
+                }
+            }
+            return stopped;
+        }
+        finally
+        {
+            foreach (var own in running)
+            {
+                own.Process.Dispose();
+            }
+        }
+    }
+
+    // Every server is asked at once and the graceful wait is shared, so a second server does not add a second wait.
+    private static List<int> StopServers(List<OwnProcess> servers, ServerStopTimeouts timeouts, Action<string> log, string why)
     {
         var stopped = new List<int>();
+        var asked = servers.Where(server => ServerStopRequest.TrySend(server.Process.Id, out _)).ToList();
+        var waiting = Stopwatch.StartNew();
+        foreach (var server in asked)
+        {
+            var remaining = timeouts.Graceful - waiting.Elapsed;
+            if (ExitsWithin(server.Process, remaining > TimeSpan.Zero ? remaining : TimeSpan.Zero))
+            {
+                stopped.Add(server.Process.Id);
+                log($"{why}: stopped {server.Name} (pid {server.Process.Id}) at {server.Executable} cleanly.");
+            }
+        }
+
+        foreach (var server in servers.Where(server => !stopped.Contains(server.Process.Id)))
+        {
+            if (TryKill(server, process => process.Kill(entireProcessTree: true), timeouts.AfterKill, log, why))
+            {
+                stopped.Add(server.Process.Id);
+            }
+        }
+        return stopped;
+    }
+
+    private static bool ExitsWithin(Process process, TimeSpan timeout)
+    {
+        try
+        {
+            return process.WaitForExit(timeout);
+        }
+        catch (Exception ex) when (ex is Win32Exception or InvalidOperationException or NotSupportedException)
+        {
+            return false;
+        }
+    }
+
+    private static bool TryKill(OwnProcess own, Action<Process> kill, TimeSpan wait, Action<string> log, string why)
+    {
+        try
+        {
+            kill(own.Process);
+            own.Process.WaitForExit(wait);
+            log($"{why}: stopped {own.Name} (pid {own.Process.Id}) at {own.Executable}.");
+            return true;
+        }
+        catch (Exception ex) when (ex is Win32Exception or InvalidOperationException or NotSupportedException or AggregateException)
+        {
+            log($"{why}: could not stop {own.Name} (pid {own.Process.Id}) at {own.Executable}: {ex.Message}");
+            return false;
+        }
+    }
+
+    /// <summary>The processes of this install, not yet stopped. The caller disposes each one.</summary>
+    private static List<OwnProcess> FindOwn(string root, bool sameSessionOnly, Action<string> log, string why)
+    {
+        var found = new List<OwnProcess>();
         var self = Environment.ProcessId;
         int? session = null;
         if (sameSessionOnly)
@@ -71,7 +161,7 @@ static class InstallProcesses
             catch (Exception ex) when (ex is InvalidOperationException or Win32Exception or PlatformNotSupportedException)
             {
                 log($"{why}: stopped nothing: could not read this process's Windows session ({ex.Message}).");
-                return stopped;
+                return found;
             }
         }
 
@@ -79,70 +169,51 @@ static class InstallProcesses
         {
             foreach (var proc in Process.GetProcessesByName(name))
             {
-                using (proc)
+                if (IsOwn(proc, name, self, session, root, log, why, out var executable))
                 {
-                    if (proc.Id == self)
-                    {
-                        continue;
-                    }
-
-                    string? path;
-                    try
-                    {
-                        if (session is { } s && proc.SessionId != s)
-                        {
-                            continue;
-                        }
-
-                        path = proc.MainModule?.FileName;
-                    }
-                    catch (Exception ex) when (ex is Win32Exception or InvalidOperationException or NotSupportedException)
-                    {
-                        log($"{why}: left {name} (pid {proc.Id}) running: could not read where it runs from ({ex.Message}).");
-                        continue;
-                    }
-
-                    if (!IsInside(path, root))
-                    {
-                        log($"{why}: left {name} (pid {proc.Id}) running: {path ?? "unknown path"} is not part of this install ({root}).");
-                        continue;
-                    }
-
-                    if (name == ServerName && ExitsWhenAskedToStop(proc))
-                    {
-                        stopped.Add(proc.Id);
-                        log($"{why}: stopped {name} (pid {proc.Id}) at {path} cleanly.");
-                        continue;
-                    }
-
-                    try
-                    {
-                        proc.Kill(entireProcessTree: true);
-                        proc.WaitForExit(5_000);
-                        stopped.Add(proc.Id);
-                        log($"{why}: stopped {name} (pid {proc.Id}) at {path}.");
-                    }
-                    catch (Exception ex) when (ex is Win32Exception or InvalidOperationException or NotSupportedException or AggregateException)
-                    {
-                        log($"{why}: could not stop {name} (pid {proc.Id}) at {path}: {ex.Message}");
-                    }
+                    found.Add(new OwnProcess(proc, name, executable));
+                }
+                else
+                {
+                    proc.Dispose();
                 }
             }
         }
-        return stopped;
+        return found;
     }
 
-    // A server that is asked first finishes its running jobs and closes its database; one that cannot be asked, or
-    // does not exit in time, is killed by the caller (#833).
-    private static bool ExitsWhenAskedToStop(Process server)
+    private static bool IsOwn(Process proc, string name, int self, int? session, string root, Action<string> log, string why, out string ownExecutable)
     {
-        try
-        {
-            return ServerStopRequest.TrySend(server.Id, out _) && server.WaitForExit(ServerStopTimeouts.Default.Graceful);
-        }
-        catch (Exception ex) when (ex is Win32Exception or InvalidOperationException or NotSupportedException)
+        ownExecutable = string.Empty;
+        if (proc.Id == self)
         {
             return false;
         }
+
+        string? executable;
+        try
+        {
+            if (session is { } s && proc.SessionId != s)
+            {
+                return false;
+            }
+
+            executable = proc.MainModule?.FileName;
+        }
+        catch (Exception ex) when (ex is Win32Exception or InvalidOperationException or NotSupportedException)
+        {
+            log($"{why}: left {name} (pid {proc.Id}) running: could not read where it runs from ({ex.Message}).");
+            return false;
+        }
+
+        if (!IsInside(executable, root))
+        {
+            log($"{why}: left {name} (pid {proc.Id}) running: {executable ?? "unknown path"} is not part of this install ({root}).");
+            return false;
+        }
+        ownExecutable = executable!;
+        return true;
     }
+
+    private sealed record OwnProcess(Process Process, string Name, string Executable);
 }
