@@ -27,8 +27,6 @@ public static class WorkLanes
         ProcessingWatchedFolderScanDispatchJobKinds.ScanDispatch,
         LibraryModeJobKinds.ScanKind,
         PeriodicJobKinds.WorkTempStaleSweep,
-        PeriodicJobKinds.MovieFailureCleanupSweep,
-        PeriodicJobKinds.TvFailureCleanupSweep,
         PeriodicJobKinds.UnclaimedHandbackCleanup,
     ];
 

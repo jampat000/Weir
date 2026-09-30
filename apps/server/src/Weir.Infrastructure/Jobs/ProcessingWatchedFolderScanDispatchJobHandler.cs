@@ -99,7 +99,7 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandler : IJobHandler
             }
 
             // A second after the first hold ends, so the look finds it over. A pass booked for later (#646) carries its own
-            // start time and needs no look; this is for files the scan itself holds.
+            // start time and needs no look; this is for files the scan itself holds and for failed files waiting on a retry.
             if (run.EarliestHoldEnds is { } firstEnds)
             {
                 _wakeups?.Request(scan.Library.Id, firstEnds + TimeSpan.FromSeconds(1));

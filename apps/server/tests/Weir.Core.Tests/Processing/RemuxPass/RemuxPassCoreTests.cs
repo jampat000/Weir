@@ -187,7 +187,7 @@ public sealed class FailureClassesTests
     [Fact]
     public void A_first_execution_failure_is_retried_after_the_base_delay()
     {
-        var decision = RetryPolicy.DecideForRecordedFailure(Library(), "execution", 0, null, Now);
+        var decision = RetryPolicy.DecideRetry(Library(), "execution", 1, Now);
 
         Assert.True(decision.WillRetry);
         Assert.Equal(Now.AddSeconds(300), decision.NextRetryAt);
@@ -197,34 +197,50 @@ public sealed class FailureClassesTests
     [Fact]
     public void A_one_minute_retry_reads_in_the_singular()
     {
-        var decision = RetryPolicy.DecideForRecordedFailure(Library(backoff: 60), "execution", 0, null, Now);
+        var decision = RetryPolicy.DecideRetry(Library(backoff: 60), "execution", 1, Now);
 
         Assert.Equal("This failed and Weir will try again in about 1 minute (attempt 2 of 3).", decision.Reason);
     }
 
-    [Fact]
-    public void Attempts_are_bounded_by_the_library()
+    [Theory]
+    [InlineData(1, 1, false)]
+    [InlineData(2, 2, false)]
+    [InlineData(3, 3, false)]
+    [InlineData(5, 4, true)]
+    [InlineData(5, 5, false)]
+    [InlineData(10, 9, true)]
+    [InlineData(10, 10, false)]
+    public void The_workflows_attempt_limit_allows_exactly_that_many_attempts(long maxAttempts, long attemptsMade, bool willRetry)
     {
-        var decision = RetryPolicy.DecideForRecordedFailure(Library(maxAttempts: 2), "execution", 1, "preflight", Now);
+        var decision = RetryPolicy.DecideRetry(Library(maxAttempts: maxAttempts), "execution", attemptsMade, Now);
 
-        Assert.False(decision.WillRetry);
-        Assert.Contains("tried this file 2 times and stopped, because the Movies workflow allows 2", decision.Reason, StringComparison.Ordinal);
+        Assert.Equal(willRetry, decision.WillRetry);
     }
 
     [Fact]
-    public void Three_consecutive_failures_of_one_class_hold_the_file()
+    public void Running_out_of_attempts_says_how_many_were_made_and_what_the_workflow_allows()
     {
-        var decision = RetryPolicy.DecideForRecordedFailure(Library(maxAttempts: 10), "execution", 2, "execution", Now);
+        var decision = RetryPolicy.DecideRetry(Library(maxAttempts: 5), "execution", 5, Now);
 
-        Assert.True(decision.Quarantined);
-        Assert.False(decision.WillRetry);
-        Assert.StartsWith("Weir held this file after 3 repeated execution failures.", decision.Reason, StringComparison.Ordinal);
+        Assert.Null(decision.NextRetryAt);
+        Assert.Equal(
+            "Weir tried this file 5 times and stopped, because the Movies workflow allows 5. You can still start it again by hand.",
+            decision.Reason);
+    }
+
+    [Fact]
+    public void Repeated_failures_of_one_class_are_retried_up_to_the_workflows_limit_and_never_held_earlier()
+    {
+        var decision = RetryPolicy.DecideRetry(Library(maxAttempts: 10), "execution", 3, Now);
+
+        Assert.True(decision.WillRetry);
+        Assert.Equal(Now.AddSeconds(1200), decision.NextRetryAt);
     }
 
     [Fact]
     public void A_preflight_failure_is_not_retried_by_default()
     {
-        var decision = RetryPolicy.DecideForRecordedFailure(Library(), "preflight", 0, null, Now);
+        var decision = RetryPolicy.DecideRetry(Library(), "preflight", 1, Now);
 
         Assert.False(decision.WillRetry);
         Assert.StartsWith("This file was rejected before any work started", decision.Reason, StringComparison.Ordinal);

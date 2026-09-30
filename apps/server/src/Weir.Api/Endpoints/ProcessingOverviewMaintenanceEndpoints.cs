@@ -86,7 +86,6 @@ internal sealed class ProcessingOverviewMaintenanceEndpointHandlers
         var uow = await request.DbAsync().ConfigureAwait(false);
         var operatorRow = await _operatorSettings.EnsureAsync(uow).ConfigureAwait(false);
         var sweep = await _maintenance.StateForAsync(uow, "work_temp_stale_sweep", operatorRow.WorkTempStaleSweepEnabled).ConfigureAwait(false);
-        var cleanup = await _maintenance.StateForAsync(uow, "failure_cleanup", operatorRow.FailureCleanupEnabled).ConfigureAwait(false);
         var unclaimed = await _maintenance.StateForAsync(uow, "unclaimed_handbacks", operatorRow.UnclaimedHandbackCleanupEnabled).ConfigureAwait(false);
         await request.CommitAsync().ConfigureAwait(false);
 
@@ -101,7 +100,6 @@ internal sealed class ProcessingOverviewMaintenanceEndpointHandlers
         return ApiRoutes.Ok(new WireObject().Set("families", new WireArray(
         [
             Out(sweep, operatorRow.WorkTempStaleSweepIntervalSeconds, options.ProcessingWorkTempStaleSweepMovieScheduleIntervalSeconds),
-            Out(cleanup, operatorRow.FailureCleanupIntervalSeconds, options.ProcessingMovieFailureCleanupScheduleIntervalSeconds),
             Out(unclaimed, operatorRow.UnclaimedHandbackCleanupIntervalSeconds, HandbackRules.DefaultUnclaimedIntervalSeconds)
                 .Set("window_days", OperatorSettingsRules.ClampUnclaimedHandbackWindowDays(operatorRow.UnclaimedHandbackWindowDays)),
         ])));
@@ -121,39 +119,16 @@ internal sealed class ProcessingOverviewMaintenanceEndpointHandlers
         await request.RequireUserAsync(UserRoles.OperatorOrAdmin).ConfigureAwait(false);
         request.RequireConfirmationToken(csrfToken);
 
-        var uow = await request.DbAsync().ConfigureAwait(false);
+        var scopeWord = mediaScope == "tv" ? "TV" : "Movies";
         if (family == "work_temp_stale_sweep")
         {
             await _maintenance.EnqueueWorkTempStaleSweepAsync(_jobs, mediaScope, "manual").ConfigureAwait(false);
-            await request.CommitAsync().ConfigureAwait(false);
-            var scopeWord = mediaScope == "tv" ? "TV" : "Movies";
             return ApiRoutes.Ok(new WireObject().Set("queued", true).Set("detail", $"Queued a work file sweep for {scopeWord}. It runs as soon as a worker is free."));
         }
 
-        if (family == "unclaimed_handbacks")
-        {
-            await _maintenance.EnqueueUnclaimedHandbackCleanupAsync(_jobs, mediaScope, "manual").ConfigureAwait(false);
-            await request.CommitAsync().ConfigureAwait(false);
-            var scopeWord = mediaScope == "tv" ? "TV" : "Movies";
-            return ApiRoutes.Ok(new WireObject()
-                .Set("queued", true)
-                .Set("detail", $"Queued the unclaimed hand-back cleanup for {scopeWord}. It runs as soon as a worker is free."));
-        }
-
-        var (jobId, inserted) = await _maintenance.EnqueueFailureCleanupSweepAsync(uow, mediaScope, "manual").ConfigureAwait(false);
-        await request.CommitAsync().ConfigureAwait(false);
-        if (!inserted)
-        {
-            return ApiRoutes.Ok(new WireObject()
-                .Set("queued", false)
-                .Set("job_id", jobId)
-                .Set("detail", "A failure cleanup for this scope is already waiting or running, so nothing new was queued."));
-        }
-
-        var label = mediaScope == "tv" ? "TV" : "Movies";
+        await _maintenance.EnqueueUnclaimedHandbackCleanupAsync(_jobs, mediaScope, "manual").ConfigureAwait(false);
         return ApiRoutes.Ok(new WireObject()
             .Set("queued", true)
-            .Set("job_id", jobId)
-            .Set("detail", $"Queued failure cleanup for {label}. It runs as soon as a worker is free."));
+            .Set("detail", $"Queued the unclaimed hand-back cleanup for {scopeWord}. It runs as soon as a worker is free."));
     }
 }

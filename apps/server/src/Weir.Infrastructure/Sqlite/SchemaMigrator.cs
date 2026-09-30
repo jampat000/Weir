@@ -118,6 +118,8 @@ public sealed class SchemaMigrator
         new(26, "0061_user_app_theme", "Weir.Infrastructure.Migrations.0026_user_app_theme.sql"),
         new(27, "0062_library_intake_follows_performance", "Weir.Infrastructure.Migrations.0027_library_intake_follows_performance.sql"),
         new(28, "0063_connection_nickname", "Weir.Infrastructure.Migrations.0028_connection_nickname.sql"),
+        new(29, "0064_failed_files_are_never_held", "Weir.Infrastructure.Migrations.0029_failed_files_are_never_held.sql"),
+        new(30, "0065_remove_failed_download_cleanup_jobs", "Weir.Infrastructure.Migrations.0030_remove_failed_download_cleanup_jobs.sql"),
     ];
 
     /// <summary>

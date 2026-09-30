@@ -56,15 +56,26 @@ internal sealed class WatchedFileDecider
         return previous.Status switch
         {
             ProcessingFileStatuses.PassedThrough or ProcessingFileStatuses.Rejected or ProcessingFileStatuses.Cancelled => Touch(rel, previous),
-            ProcessingFileStatuses.ProcessingFailed when previous.NextRetryAt?.AsUtc is { } retryAt && retryAt <= _scan.Now.UtcDateTime =>
-                // The automatic retry is queued the way a fresh candidate is, not through RequeueStore: its reset (attempts back
-                // to 0) is for a person's "retry now", and here it would stop a file from ever failing often enough to be
-                // quarantined.
-                new WatchedFileDecision { RelativePath = rel, Enqueue = true, Previous = previous },
-            ProcessingFileStatuses.ProcessingFailed => Touch(rel, previous),
-            ProcessingFileStatuses.OnHold when previous.FailureAttempts >= RetryPolicy.QuarantineAfterFailures => Touch(rel, previous),
+            ProcessingFileStatuses.ProcessingFailed => RetryWhenDue(rel, previous),
             _ => null,
         };
+    }
+
+    /// <summary>
+    /// A failed file whose retry is owed. Once due, the retry is queued the way a fresh candidate is, not through
+    /// RequeueStore: its reset (attempts back to 0) is for a person's "retry now", and here it would let a file that keeps
+    /// failing retry for ever. Until then the scan asks for another look at the moment the retry falls due.
+    /// </summary>
+    private WatchedFileDecision RetryWhenDue(string rel, ProcessingFileRecord row)
+    {
+        if (row.NextRetryAt?.AsUtc is not { } retryAt)
+        {
+            return Touch(rel, row);
+        }
+
+        return retryAt <= _scan.Now.UtcDateTime
+            ? new WatchedFileDecision { RelativePath = rel, Enqueue = true, Previous = row }
+            : Touch(rel, row) with { HoldEnds = new DateTimeOffset(retryAt, TimeSpan.Zero) };
     }
 
     /// <summary>
@@ -88,7 +99,7 @@ internal sealed class WatchedFileDecider
             return settled;
         }
 
-        // A changed source is a new processing opportunity: its failures and quarantine do not carry over to the new bytes.
+        // A changed source is a new processing opportunity: its failures do not carry over to the new bytes.
         var resetStatus = previous is not null && previous.SizeBytes != file.SizeBytes
             ? previous.Status is ProcessingFileStatuses.ProcessingFailed or ProcessingFileStatuses.OnHold or ProcessingFileStatuses.PassedThrough
                 or ProcessingFileStatuses.Rejected or ProcessingFileStatuses.Cancelled
