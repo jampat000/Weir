@@ -145,7 +145,7 @@ internal sealed class WatchedFileDecider
         var facts = new CandidateFileFacts(file.SizeBytes, new DateTimeOffset(file.CreatedUtc, TimeSpan.Zero), new DateTimeOffset(file.ModifiedUtc, TimeSpan.Zero));
         if (LibraryAdmission.Rejection(rel, Path.GetFileName(file.FullPath), facts, _scan.Rules) is { } rejection)
         {
-            return Rejected(decision, write, file.FullPath, rejection.Reason);
+            return Rejected(decision, write, file.FullPath, rejection);
         }
 
         if (dispatch.Verdict != WatchedFileDispatchOutcome.Proceed || !_scan.EnqueueRemuxJobs || !_queuedThisRun.Add(rel) || _lookups.ActivePasses.Contains(rel))
@@ -195,10 +195,11 @@ internal sealed class WatchedFileDecider
             : verdict;
     }
 
-    private WatchedFileDecision Rejected(WatchedFileDecision decision, ScannedFileWrite write, string filePath, string reason)
+    private WatchedFileDecision Rejected(WatchedFileDecision decision, ScannedFileWrite write, string filePath, LibraryAdmissionRejection rejection)
     {
+        var reason = rejection.Reason;
         RejectedFileRemoval? removal = null;
-        if (_scan.Rules.RejectedFileAction == "delete_file")
+        if (_scan.Rules.RejectedFileAction == "delete_file" && rejection.MayRemoveFile)
         {
             removal = new RejectedFileRemoval(write.RelativePath, filePath, reason, _scan.Rules.RejectedFileAction);
             reason = $"{reason} This workflow is set to delete rejected files; Weir will record this decision before removing only this file.";
