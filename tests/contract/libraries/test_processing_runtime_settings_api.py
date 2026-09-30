@@ -28,7 +28,6 @@ def test_processing_runtime_settings_operator_shape(admin) -> None:
         "processing_watched_folder_remux_scan_dispatch_periodic_enqueue_remux_jobs",
         "processing_probe_size_mb",
         "processing_analyze_duration_seconds",
-        "processing_watched_folder_min_file_age_seconds",
         "processing_movie_output_cleanup_min_age_seconds",
         "movie_output_cleanup_configuration_note",
         "processing_tv_output_cleanup_min_age_seconds",

@@ -55,4 +55,18 @@ public sealed class CleanupScheduleApiTests
         Assert.Equal(7200, cleanup["interval_seconds"]!.GetValue<long>());
         Assert.Null(cleanup["next_run_at"]);
     }
+
+    [Fact]
+    public async Task The_work_file_sweep_says_it_removes_a_kept_failed_copy_once_it_is_a_day_old()
+    {
+        var (server, client) = await SignedInAsync();
+        await using var disposeServer = server;
+
+        using var state = await client.GetAsync("/api/v1/processing/maintenance");
+        var families = (await ApiTestClient.Json(state))["families"]!.AsArray();
+        var description = families.Single(f => f!["family"]!.GetValue<string>() == "work_temp_stale_sweep")!["description"]!.GetValue<string>();
+
+        Assert.Contains("including a failed copy you asked Weir to keep", description, StringComparison.Ordinal);
+        Assert.DoesNotContain("while you keep failed work files", description, StringComparison.Ordinal);
+    }
 }

@@ -96,7 +96,6 @@ public sealed record WeirOptions
     public required bool ProcessingWatchedFolderRemuxScanDispatchPeriodicEnqueueRemuxJobs { get; init; }
     public required int ProcessingProbeSizeMb { get; init; }
     public required int ProcessingAnalyzeDurationSeconds { get; init; }
-    public required int ProcessingWatchedFolderMinFileAgeSeconds { get; init; }
     public required int ProcessingMovieOutputCleanupMinAgeSeconds { get; init; }
     public required int ProcessingTvOutputCleanupMinAgeSeconds { get; init; }
     public required bool ProcessingWorkTempStaleSweepMovieScheduleEnabled { get; init; }

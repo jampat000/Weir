@@ -47,7 +47,7 @@ public sealed class RemuxPassHandlerDownloadedScanTests : IDisposable
             data,
             new SkippedTvSeasonFolderCleanup(),
             new FakeOriginalLanguage(),
-            new RemuxPassSettings { WatchedFolderMinFileAgeSeconds = 0 },
+            new RemuxPassSettings(),
             TimeProvider.System,
             NullLogger<RemuxPassRunner>.Instance);
         var downloadedScan = new DownloadedScanNotifier(_fixture.Connections, _fixture.ConnectionStore, _fixture.Libraries, _fixture.Http, NullLogger<DownloadedScanNotifier>.Instance);

@@ -91,7 +91,6 @@ public static class RemuxPassServices
         {
             ProbeSizeMb = options.ProcessingProbeSizeMb,
             AnalyzeDurationSeconds = options.ProcessingAnalyzeDurationSeconds,
-            WatchedFolderMinFileAgeSeconds = options.ProcessingWatchedFolderMinFileAgeSeconds,
             MovieOutputCleanupMinAgeSeconds = options.ProcessingMovieOutputCleanupMinAgeSeconds,
             TvOutputCleanupMinAgeSeconds = options.ProcessingTvOutputCleanupMinAgeSeconds,
         });

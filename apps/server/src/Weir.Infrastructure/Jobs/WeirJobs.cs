@@ -28,19 +28,19 @@ public static class WeirJobs
         // The work file sweep is queued below, so it needs a handler or its jobs would wait in the queue for ever.
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IJobHandler, WorkTempStaleSweepHandler>());
 
-        // Kill switches: an explicitly set variable that reads as off wins over the saved setting.
-        const string sweepVariable = "WEIR_PROCESSING_WORK_TEMP_STALE_SWEEP_MOVIE_SCHEDULE_ENABLED";
-        const string cleanupVariable = "WEIR_PROCESSING_MOVIE_FAILURE_CLEANUP_SCHEDULE_ENABLED";
-        var sweepKilled = runtime.IsSet(sweepVariable) && !options.ProcessingWorkTempStaleSweepMovieScheduleEnabled;
-        var cleanupKilled = runtime.IsSet(cleanupVariable) && !options.ProcessingMovieFailureCleanupScheduleEnabled;
+        // Kill switches: an explicitly set variable that reads as off wins over the saved setting, for its own media type only.
         services.AddSingleton<IPeriodicEnqueuer>(sp => new WorkTempStaleSweepEnqueuer(
-            sp.GetRequiredService<ProcessingJobStore>(), "movie", TimeSpan.FromSeconds(options.ProcessingWorkTempStaleSweepMovieScheduleIntervalSeconds), sweepKilled));
+            sp.GetRequiredService<ProcessingJobStore>(), "movie", TimeSpan.FromSeconds(options.ProcessingWorkTempStaleSweepMovieScheduleIntervalSeconds),
+            SwitchedOffByEnvironment(runtime, "WEIR_PROCESSING_WORK_TEMP_STALE_SWEEP_MOVIE_SCHEDULE_ENABLED", options.ProcessingWorkTempStaleSweepMovieScheduleEnabled)));
         services.AddSingleton<IPeriodicEnqueuer>(sp => new WorkTempStaleSweepEnqueuer(
-            sp.GetRequiredService<ProcessingJobStore>(), "tv", TimeSpan.FromSeconds(options.ProcessingWorkTempStaleSweepTvScheduleIntervalSeconds), sweepKilled));
+            sp.GetRequiredService<ProcessingJobStore>(), "tv", TimeSpan.FromSeconds(options.ProcessingWorkTempStaleSweepTvScheduleIntervalSeconds),
+            SwitchedOffByEnvironment(runtime, "WEIR_PROCESSING_WORK_TEMP_STALE_SWEEP_TV_SCHEDULE_ENABLED", options.ProcessingWorkTempStaleSweepTvScheduleEnabled)));
         services.AddSingleton<IPeriodicEnqueuer>(sp => new FailureCleanupSweepEnqueuer(
-            sp.GetRequiredService<ProcessingJobStore>(), "movie", TimeSpan.FromSeconds(options.ProcessingMovieFailureCleanupScheduleIntervalSeconds), cleanupKilled));
+            sp.GetRequiredService<ProcessingJobStore>(), "movie", TimeSpan.FromSeconds(options.ProcessingMovieFailureCleanupScheduleIntervalSeconds),
+            SwitchedOffByEnvironment(runtime, "WEIR_PROCESSING_MOVIE_FAILURE_CLEANUP_SCHEDULE_ENABLED", options.ProcessingMovieFailureCleanupScheduleEnabled)));
         services.AddSingleton<IPeriodicEnqueuer>(sp => new FailureCleanupSweepEnqueuer(
-            sp.GetRequiredService<ProcessingJobStore>(), "tv", TimeSpan.FromSeconds(options.ProcessingTvFailureCleanupScheduleIntervalSeconds), cleanupKilled));
+            sp.GetRequiredService<ProcessingJobStore>(), "tv", TimeSpan.FromSeconds(options.ProcessingTvFailureCleanupScheduleIntervalSeconds),
+            SwitchedOffByEnvironment(runtime, "WEIR_PROCESSING_TV_FAILURE_CLEANUP_SCHEDULE_ENABLED", options.ProcessingTvFailureCleanupScheduleEnabled)));
 
         // #652: hand-back copies nobody claimed. Off until a person switches it on in Settings › Cleanup.
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IJobHandler, UnclaimedHandbackCleanupHandler>());
@@ -65,4 +65,8 @@ public static class WeirJobs
 
         return services;
     }
+
+    /// <summary>Whether the environment variable was set and reads as off, which stops its timer whatever is saved.</summary>
+    private static bool SwitchedOffByEnvironment(RuntimeEnvironment runtime, string variable, bool enabled) =>
+        runtime.IsSet(variable) && !enabled;
 }

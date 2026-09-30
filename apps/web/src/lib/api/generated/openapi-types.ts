@@ -5301,6 +5301,12 @@ export interface components {
        * @enum {string}
        */
       remux_writer: "best" | "ffmpeg";
+      /**
+       * Rewrite With Ffmpeg
+       * @description With remux_writer best: when mkvmerge's write fails its checks, ffmpeg writes the file again instead of the file failing. Off fails the file at once.
+       * @default true
+       */
+      rewrite_with_ffmpeg: boolean;
     };
     /** ProcessingLibraryDeleteIn */
     ProcessingLibraryDeleteIn: {
@@ -5499,6 +5505,12 @@ export interface components {
        * @enum {string}
        */
       remux_writer: "best" | "ffmpeg";
+      /**
+       * Rewrite With Ffmpeg
+       * @description With remux_writer best: when mkvmerge's write fails its checks, ffmpeg writes the file again instead of the file failing. Off fails the file at once.
+       * @default true
+       */
+      rewrite_with_ffmpeg: boolean;
     };
     /** ProcessingLibraryReorderIn */
     ProcessingLibraryReorderIn: {
@@ -5788,6 +5800,12 @@ export interface components {
        * @enum {string}
        */
       remux_writer: "best" | "ffmpeg";
+      /**
+       * Rewrite With Ffmpeg
+       * @description With remux_writer best: when mkvmerge's write fails its checks, ffmpeg writes the file again instead of the file failing. Off fails the file at once.
+       * @default true
+       */
+      rewrite_with_ffmpeg: boolean;
     };
     /**
      * ProcessingManualPlanIn
@@ -6692,11 +6710,6 @@ export interface components {
        * @description Minimum age (direct-child episode media newest mtime) before Pass 3b may delete a TV season output folder (1h..30d; default 48h).
        */
       processing_tv_output_cleanup_min_age_seconds: number;
-      /**
-       * Processing Watched Folder Min File Age Seconds
-       * @description Minimum file age before watched-folder scan or one-file pass touches media.
-       */
-      processing_watched_folder_min_file_age_seconds: number;
       /**
        * Processing Watched Folder Remux Scan Dispatch Periodic Enqueue Remux Jobs
        * @description When true, periodic scans may enqueue ``processing.file.remux_pass.v1``.

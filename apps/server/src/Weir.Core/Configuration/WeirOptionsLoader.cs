@@ -141,8 +141,6 @@ public static class WeirOptionsLoader
                 runtime, "WEIR_PROCESSING_WATCHED_FOLDER_REMUX_SCAN_DISPATCH_PERIODIC_ENQUEUE_REMUX_JOBS", true),
             ProcessingProbeSizeMb = Clamp(EnvInt(runtime, "WEIR_PROCESSING_PROBE_SIZE_MB", 10), 1, 1024),
             ProcessingAnalyzeDurationSeconds = Clamp(EnvInt(runtime, "WEIR_PROCESSING_ANALYZE_DURATION_SECONDS", 10), 1, 300),
-            ProcessingWatchedFolderMinFileAgeSeconds = ClampProcessingMinFileAgeSeconds(
-                EnvInt(runtime, "WEIR_PROCESSING_WATCHED_FOLDER_MIN_FILE_AGE_SECONDS", 300)),
             ProcessingMovieOutputCleanupMinAgeSeconds = Clamp(
                 EnvInt(runtime, "WEIR_PROCESSING_MOVIE_OUTPUT_CLEANUP_MIN_AGE_SECONDS", 48 * 3600), 3600, ThirtyDaysSeconds),
             ProcessingTvOutputCleanupMinAgeSeconds = Clamp(
@@ -196,9 +194,6 @@ public static class WeirOptionsLoader
 
     /// <summary>A periodic schedule interval: 60 s .. 7 days.</summary>
     public static int ClampProcessingScheduleIntervalSeconds(long raw) => Clamp(raw, 60, SevenDaysSeconds);
-
-    /// <summary>The minimum age before a watched file is picked up: 0 .. 7 days.</summary>
-    public static int ClampProcessingMinFileAgeSeconds(long raw) => Clamp(raw, 0, SevenDaysSeconds);
 
     /// <summary>
     /// For each <c>http(s)://localhost</c> or <c>127.0.0.1</c> origin, also allow the other hostname on

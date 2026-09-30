@@ -19,7 +19,7 @@ namespace Weir.Infrastructure.Tests.Processing.RemuxPass;
 /// <summary>
 /// The remux pass handler's activity reporting, plus the policy and hand-off paths the handler drives: a real database at head, real folders, and ffprobe/ffmpeg behind a fake process runner.
 /// </summary>
-public sealed class RemuxPassHandlerTests : IDisposable
+public sealed partial class RemuxPassHandlerTests : IDisposable
 {
     private const string EventsPath = "/api/integrations/processors/events";
 
@@ -41,7 +41,7 @@ public sealed class RemuxPassHandlerTests : IDisposable
         _fixture.Dispose();
     }
 
-    private RemuxPassHandler Handler(IFailurePolicy? policy = null)
+    private RemuxPassHandler Handler(IFailurePolicy? policy = null, Func<string, long>? freeBytes = null)
     {
         var data = new SqliteRemuxPassData(_fixture.Store.Database, _fixture.Connections, NullLogger<SqliteRemuxPassData>.Instance);
         var runner = new RemuxPassRunner(
@@ -51,9 +51,12 @@ public sealed class RemuxPassHandlerTests : IDisposable
             data,
             new SkippedTvSeasonFolderCleanup(),
             new FakeOriginalLanguage(),
-            new RemuxPassSettings { WatchedFolderMinFileAgeSeconds = 0 },
+            new RemuxPassSettings(),
             TimeProvider.System,
-            NullLogger<RemuxPassRunner>.Instance);
+            NullLogger<RemuxPassRunner>.Instance)
+        {
+            FreeBytes = freeBytes,
+        };
         return new RemuxPassHandler(
             _fixture.Store.Database,
             _fixture.Store.Options,

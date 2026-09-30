@@ -106,7 +106,7 @@ export function LibraryIntakeGroup({
           name="rejected_file_action"
           label="When a file is rejected"
           options={REJECTED_FILE_OPTIONS}
-          hint="Applies after readiness checks to size and path-rule rejections. Weir never deletes a populated parent folder here."
+          hint="Applies to a file this workflow's own size, date or path settings turn away, and to a file its rules find nothing in to keep. A minimum size taken from Performance never deletes anything. Weir never deletes a populated parent folder here."
         />
       </div>
       <div className="mm-library-toggles">

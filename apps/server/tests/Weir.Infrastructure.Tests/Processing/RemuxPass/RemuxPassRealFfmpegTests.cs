@@ -37,7 +37,7 @@ public sealed class RemuxPassRealFfmpegTests : IDisposable
             new FakeCleanupData(),
             new SkippedTvSeasonFolderCleanup(),
             new FakeOriginalLanguage(),
-            new RemuxPassSettings { WatchedFolderMinFileAgeSeconds = 0 },
+            new RemuxPassSettings(),
             TimeProvider.System,
             NullLogger<RemuxPassRunner>.Instance);
 
