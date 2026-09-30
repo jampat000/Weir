@@ -45,9 +45,13 @@ public sealed record MediaManagerConnectionRecord(
     bool? LastTestOk,
     Timestamp? LastTestAt,
     string? LastTestDetail,
-    bool DownloadedScanEnabled = false)
+    bool DownloadedScanEnabled = false,
+    string? Nickname = null)
 {
     public IReadOnlyList<MediaManagerSearchLaneRecord> Lanes { get; init; } = [];
+
+    /// <summary>How this connection is written in a sentence, led by its product and followed by its nickname.</summary>
+    public string Label => MediaManagerKinds.LabelForConnection(Kind, Name, Nickname);
 
     /// <summary>The path a manager of this kind posts its webhook to.</summary>
     public string WebhookUrlPath => $"/api/v1/intake/webhook/{Kind}";
@@ -63,6 +67,7 @@ public sealed record MediaManagerConnectionRecord(
         .Set("id", Id)
         .Set("kind", Kind)
         .Set("name", Name)
+        .Set("nickname", Nickname)
         .Set("enabled", Enabled)
         .Set("base_url", BaseUrl)
         .Set("api_key_is_saved", !string.IsNullOrEmpty(ApiKeyCiphertext))
@@ -71,7 +76,7 @@ public sealed record MediaManagerConnectionRecord(
         .Set(
             "unsigned_webhook_warning",
             AcceptsUnsignedWebhooks
-                ? $"This connection accepts webhooks without a secret. Create a secret and add it to {MediaManagerKinds.LabelForConnection(Kind, Name)}."
+                ? $"This connection accepts webhooks without a secret. Create a secret and add it to {Label}."
                 : null)
         .Set("last_test_ok", LastTestOk is { } ok ? WireValue.Of(ok) : WireValue.Null)
         .Set("last_test_at", LastTestAt is { } at ? at.ToWireText() : null)
@@ -101,7 +106,7 @@ public sealed class MediaManagerConnectionStore
 {
     private const string ConnectionColumns =
         "id, kind, name, enabled, base_url, api_key_ciphertext, webhook_secret_ciphertext, " +
-        "last_connection_test_ok, last_connection_test_at, last_connection_test_detail, downloaded_scan_enabled";
+        "last_connection_test_ok, last_connection_test_at, last_connection_test_detail, downloaded_scan_enabled, nickname";
 
     private const string LaneColumns =
         "id, connection_id, lane, enabled, max_items_per_run, retry_delay_minutes, schedule_enabled, schedule_days, " +
@@ -172,20 +177,21 @@ public sealed class MediaManagerConnectionStore
 
     /// <summary>Insert a connection and its two default lanes; returns the new id.</summary>
     public async Task<long> InsertAsync(
-        UnitOfWork uow, string kind, bool enabled, string baseUrl, string? apiKeyCiphertext, bool downloadedScanEnabled = false)
+        UnitOfWork uow, string kind, bool enabled, string baseUrl, string? apiKeyCiphertext, bool downloadedScanEnabled = false, string? nickname = null)
     {
         ArgumentNullException.ThrowIfNull(uow);
         var id = Convert.ToInt64(
             await uow.ExecuteScalarWriteAsync(
                 "INSERT INTO media_manager_connections (kind, name, enabled, base_url, api_key_ciphertext, webhook_secret_ciphertext, " +
-                "last_connection_test_ok, last_connection_test_at, last_connection_test_detail, downloaded_scan_enabled) " +
-                "VALUES ($kind, $name, $enabled, $base_url, $key, NULL, NULL, NULL, NULL, $scan) RETURNING id",
+                "last_connection_test_ok, last_connection_test_at, last_connection_test_detail, downloaded_scan_enabled, nickname) " +
+                "VALUES ($kind, $name, $enabled, $base_url, $key, NULL, NULL, NULL, NULL, $scan, $nickname) RETURNING id",
                 ("$kind", kind),
                 ("$name", ConnectionNameColumn.NewPlaceholder()),
                 ("$enabled", enabled ? 1 : 0),
                 ("$base_url", baseUrl),
                 ("$key", apiKeyCiphertext),
-                ("$scan", downloadedScanEnabled ? 1 : 0)).ConfigureAwait(false),
+                ("$scan", downloadedScanEnabled ? 1 : 0),
+                ("$nickname", nickname)).ConfigureAwait(false),
             System.Globalization.CultureInfo.InvariantCulture);
         foreach (var lane in MediaManagerKinds.SearchLanes)
         {
@@ -311,7 +317,8 @@ public sealed class MediaManagerConnectionStore
         SqliteValues.GetBoolOrNull(reader, 7),
         SqliteValues.GetDateTimeOrNull(reader, 8),
         SqliteValues.GetStringOrNull(reader, 9),
-        SqliteValues.GetBool(reader, 10));
+        SqliteValues.GetBool(reader, 10),
+        SqliteValues.GetStringOrNull(reader, 11));
 
     private static MediaManagerSearchLaneRecord ReadLane(SqliteDataReader reader) => new(
         SqliteValues.GetInt64(reader, 0),

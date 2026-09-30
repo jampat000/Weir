@@ -111,6 +111,13 @@ export function historyEntries(
   );
 }
 
+/** Whether any listed download was rejected: what "Process all again" is offered for. */
+export function hasRejectedFiles(entries: HistoryEntry[]): boolean {
+  return entries.some(
+    (entry) => entry.kind === "download" && entry.file.status === "rejected",
+  );
+}
+
 /** The failed downloads that "Try again" can queue: a failed library clean is cleaned again from Library. */
 export function retryableFailures(entries: HistoryEntry[]): ProcessingFile[] {
   return entries.flatMap((entry) =>

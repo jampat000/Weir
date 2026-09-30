@@ -217,6 +217,22 @@ def test_bulk_requeue(admin, viewer) -> None:
         assert _file(admin, relative_path)["status"] == "unprocessed"
 
 
+def test_rejected_files_summary_counts_what_can_be_processed_again(viewer) -> None:
+    r = viewer.get(f"{FILES}/rejected/summary")
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert set(body) == {"rejected", "ready"}
+    assert 0 <= body["ready"] <= body["rejected"]
+    assert viewer.get(f"{FILES}/rejected/summary", params={"library_id": 0}).status_code == 422
+
+
+def test_processing_all_rejected_files_again_is_for_operators_with_a_csrf_token(admin, viewer) -> None:
+    again = f"{FILES}/rejected/process-again"
+    assert viewer.post_csrf(again).status_code == 403
+    assert admin.post(again, json={}).status_code == 422
+    assert admin.post(again, json={"csrf_token": "forged"}).status_code == 400
+
+
 def test_file_log(viewer) -> None:
     assert viewer.get(f"{FILES}/999999/log").status_code == 404
 

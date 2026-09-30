@@ -3,6 +3,7 @@ import { useState } from "react";
 import { PageLoading } from "../../../../components/shared/page-loading";
 import type { DownloadClientConnection } from "../../../../lib/download-clients/download-clients-api";
 import { useDownloadClientConnectionsQuery } from "../../../../lib/download-clients/queries";
+import { connectionTitle } from "../../../../lib/ui/connection-title";
 import { mmActionButtonClass } from "../../../../lib/ui/mm-control-roles";
 import { useAppDateFormatter } from "../../../../lib/ui/mm-format-date";
 import { SettingsLoadError } from "../../settings-load-error";
@@ -48,8 +49,9 @@ export function DownloadClientsSection() {
 
       {justCreated ? (
         <p className="mm-quiet-note" data-testid="download-client-created-note">
-          {justCreated.name} is connected. Weir will offer its folder as a
-          suggestion in the workflow editor — nothing is applied on its own.
+          {connectionTitle(justCreated)} is connected. Weir will offer its
+          folder as a suggestion in the workflow editor — nothing is applied on
+          its own.
         </p>
       ) : null}
 

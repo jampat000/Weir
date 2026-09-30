@@ -27,6 +27,7 @@ const keptQueryState: {
   isError: boolean;
   error: unknown;
 } = { isLoading: false, isError: false, error: null };
+const me = { role: "admin" };
 const requeue = vi.fn();
 const requeueFiles = vi.fn();
 const processNow = vi.fn();
@@ -103,7 +104,20 @@ vi.mock("../../lib/processing/kept-files-queries", () => ({
   }),
 }));
 vi.mock("../../lib/auth/queries", () => ({
-  useMeQuery: () => ({ data: { role: "admin" } }),
+  useMeQuery: () => ({ data: me }),
+}));
+vi.mock("./history-rejected-again", () => ({
+  ProcessRejectedAgain: ({
+    libraryId,
+    libraryName,
+  }: {
+    libraryId: number | undefined;
+    libraryName: string | undefined;
+  }) => (
+    <div data-testid="process-rejected-again">
+      {libraryId ?? "all"}|{libraryName ?? "no name"}
+    </div>
+  ),
 }));
 vi.mock("../../lib/pause/pause-queries", () => ({
   usePauseQuery: () => ({ data: { paused: false } }),
@@ -171,6 +185,7 @@ function renderPage(entry = "/history") {
 describe("HistoryPage", () => {
   beforeEach(() => {
     requeue.mockReset();
+    me.role = "admin";
     requeueFiles.mockReset();
     requeueFiles.mockResolvedValue({
       requeued: 2,
@@ -434,6 +449,52 @@ describe("HistoryPage", () => {
     fireEvent.click(retryAll);
 
     expect(requeueFiles).toHaveBeenCalledWith({ file_ids: [1, 2] });
+  });
+
+  it("offers Process all again under Failed when a rejected file is listed", () => {
+    files.files = [file({ id: 1, status: "rejected" })];
+    renderPage("/history?show=failed");
+
+    expect(screen.getByTestId("process-rejected-again")).toHaveTextContent(
+      "all|no name",
+    );
+  });
+
+  it("hands Process all again the workflow History is narrowed to", () => {
+    files.files = [file({ id: 1, status: "rejected" })];
+    renderPage("/history?show=failed&library=1");
+
+    expect(screen.getByTestId("process-rejected-again")).toHaveTextContent(
+      "1|TV",
+    );
+  });
+
+  it("does not offer Process all again when only failed files are listed", () => {
+    files.files = [file({ id: 1, status: "processing_failed" })];
+    renderPage("/history?show=failed");
+
+    expect(
+      screen.queryByTestId("process-rejected-again"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("does not offer Process all again outside the Failed group", () => {
+    files.files = [file({ id: 1, status: "rejected" })];
+    renderPage();
+
+    expect(
+      screen.queryByTestId("process-rejected-again"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("does not offer Process all again to someone who cannot edit", () => {
+    me.role = "viewer";
+    files.files = [file({ id: 1, status: "rejected" })];
+    renderPage("/history?show=failed");
+
+    expect(
+      screen.queryByTestId("process-rejected-again"),
+    ).not.toBeInTheDocument();
   });
 
   it("keeps a skip out of Failed and gives it its own neutral group", () => {

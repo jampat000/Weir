@@ -47,7 +47,8 @@ public sealed class DownloadClientConnectionService
 
     /// <summary>Create a connection. Throws <see cref="DownloadClientConnectionException"/> for an operator mistake.</summary>
     public async Task<long> CreateAsync(
-        UnitOfWork uow, string kind, string baseUrl = "", string? username = null, string? password = null, string? apiKey = null, bool enabled = true)
+        UnitOfWork uow, string kind, string baseUrl = "", string? username = null, string? password = null, string? apiKey = null, bool enabled = true,
+        string? nickname = null)
     {
         ArgumentNullException.ThrowIfNull(uow);
         var validKind = ValidateKind(kind);
@@ -61,10 +62,14 @@ public sealed class DownloadClientConnectionService
             validUrl,
             trimmedUsername.Length > 0 ? trimmedUsername : null,
             EncryptOrNull(password),
-            EncryptOrNull(apiKey)).ConfigureAwait(false);
+            EncryptOrNull(apiKey),
+            ConnectionNicknames.Normalize(nickname)).ConfigureAwait(false);
     }
 
-    /// <summary>Update a connection: <see langword="null"/> leaves a field alone; an empty secret clears it.</summary>
+    /// <summary>
+    /// Update a connection: <see langword="null"/> leaves a field alone; an empty secret clears it, and so does a blank
+    /// <paramref name="nickname"/>.
+    /// </summary>
     public async Task UpdateAsync(
         UnitOfWork uow,
         DownloadClientConnectionRecord row,
@@ -72,7 +77,8 @@ public sealed class DownloadClientConnectionService
         string? username = null,
         string? password = null,
         string? apiKey = null,
-        bool? enabled = null)
+        bool? enabled = null,
+        string? nickname = null)
     {
         ArgumentNullException.ThrowIfNull(uow);
         ArgumentNullException.ThrowIfNull(row);
@@ -137,6 +143,11 @@ public sealed class DownloadClientConnectionService
             }
         }
 
+        if (ConnectionNicknames.TryChange(row.Nickname, nickname, out var wantedNickname))
+        {
+            changes.Add(("nickname", wantedNickname));
+        }
+
         await _store.UpdateColumnsAsync(uow, row.Id, changes).ConfigureAwait(false);
     }
 
@@ -155,7 +166,7 @@ public sealed class DownloadClientConnectionService
 
         var password = string.IsNullOrEmpty(row.PasswordCiphertext) ? null : _cipher.Decrypt(row.PasswordCiphertext);
         var apiKey = string.IsNullOrEmpty(row.ApiKeyCiphertext) ? null : _cipher.Decrypt(row.ApiKeyCiphertext);
-        return new DownloadClientConnection(row.Kind, row.Name, url, row.Username, password, apiKey, row.Id);
+        return new DownloadClientConnection(row.Kind, row.Name, url, row.Username, password, apiKey, row.Id, row.Nickname);
     }
 
     private string? EncryptOrNull(string? plaintext)

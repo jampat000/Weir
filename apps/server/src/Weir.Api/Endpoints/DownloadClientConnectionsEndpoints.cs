@@ -81,6 +81,7 @@ internal sealed class DownloadClientConnectionsEndpointHandlers
         var username = StrWithDefault(model, body, "username", string.Empty, 200);
         var password = StrWithDefault(model, body, "password", string.Empty, 2000);
         var apiKey = StrWithDefault(model, body, "api_key", string.Empty, 2000);
+        var nickname = MediaManagerConnectionsEndpoints.OptionalNickname(model);
         model.Finish(ExtraFields.Forbid);
         issues.ThrowIfAny();
 
@@ -90,7 +91,7 @@ internal sealed class DownloadClientConnectionsEndpointHandlers
         try
         {
             id = await _connections.CreateAsync(
-                uow, kind, baseUrl, username.Length > 0 ? username : null, password.Length > 0 ? password : null, apiKey.Length > 0 ? apiKey : null, enabled)
+                uow, kind, baseUrl, username.Length > 0 ? username : null, password.Length > 0 ? password : null, apiKey.Length > 0 ? apiKey : null, enabled, nickname)
                 .ConfigureAwait(false);
         }
         catch (DownloadClientConnectionException exception)
@@ -127,6 +128,7 @@ internal sealed class DownloadClientConnectionsEndpointHandlers
         var username = model.OptionalStr("username", maxLength: 200);
         var password = model.OptionalStr("password", maxLength: 2000);
         var apiKey = model.OptionalStr("api_key", maxLength: 2000);
+        var nickname = MediaManagerConnectionsEndpoints.OptionalNickname(model);
         model.Finish(ExtraFields.Forbid);
         issues.ThrowIfAny();
 
@@ -135,7 +137,7 @@ internal sealed class DownloadClientConnectionsEndpointHandlers
         var row = await RequireConnectionAsync(uow, connectionId).ConfigureAwait(false);
         try
         {
-            await _connections.UpdateAsync(uow, row, baseUrl, username, password, apiKey, enabled).ConfigureAwait(false);
+            await _connections.UpdateAsync(uow, row, baseUrl, username, password, apiKey, enabled, nickname).ConfigureAwait(false);
         }
         catch (DownloadClientConnectionException exception)
         {
@@ -195,7 +197,7 @@ internal sealed class DownloadClientConnectionsEndpointHandlers
         }
         else if (port is null)
         {
-            (ok, detail) = (false, $"Weir does not know how to talk to {DownloadClientKinds.LabelForConnection(row.Kind, row.Name)}.");
+            (ok, detail) = (false, $"Weir does not know how to talk to {row.Label}.");
         }
         else
         {

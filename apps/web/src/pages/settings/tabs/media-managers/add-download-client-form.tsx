@@ -14,6 +14,7 @@ import {
 } from "../../../../lib/download-clients/download-clients-api";
 import { useCreateDownloadClientConnection } from "../../../../lib/download-clients/queries";
 import { mmActionButtonClass } from "../../../../lib/ui/mm-control-roles";
+import { ConnectionNicknameField } from "./connection-nickname-field";
 
 const KINDS: DownloadClientKind[] = [
   "sabnzbd",
@@ -29,6 +30,7 @@ type FormState = {
   username: string;
   password: string;
   api_key: string;
+  nickname: string;
 };
 
 const EMPTY_FORM: FormState = {
@@ -37,6 +39,7 @@ const EMPTY_FORM: FormState = {
   username: "",
   password: "",
   api_key: "",
+  nickname: "",
 };
 
 export function AddDownloadClientForm({
@@ -67,6 +70,7 @@ export function AddDownloadClientForm({
             username: form.username,
             password: form.password,
             api_key: form.api_key,
+            nickname: form.nickname.trim(),
             enabled: true,
           },
           { onSuccess: onCreated },
@@ -169,6 +173,13 @@ export function AddDownloadClientForm({
               />
             </Field>
           ) : null}
+
+          <ConnectionNicknameField
+            testId="download-client-nickname"
+            className="mm-input"
+            value={form.nickname}
+            onChange={(value) => change("nickname", value)}
+          />
         </div>
 
         {create.isError ? (

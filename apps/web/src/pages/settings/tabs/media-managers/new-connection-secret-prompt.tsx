@@ -3,6 +3,7 @@ import { useState } from "react";
 import { errorMessage } from "../../../../lib/api/error-message";
 import type { MediaManagerConnection } from "../../../../lib/media-managers/media-managers-api";
 import { useGenerateMediaManagerWebhookSecret } from "../../../../lib/media-managers/queries";
+import { connectionTitle } from "../../../../lib/ui/connection-title";
 import { mmActionButtonClass } from "../../../../lib/ui/mm-control-roles";
 import { RevealedSecret } from "./revealed-secret";
 
@@ -29,7 +30,10 @@ export function NewConnectionSecretPrompt({
         className="mm-quiet-note"
         data-testid="media-manager-new-secret-prompt"
       >
-        <RevealedSecret managerName={connection.name} secret={revealed} />
+        <RevealedSecret
+          managerName={connectionTitle(connection)}
+          secret={revealed}
+        />
         <button
           type="button"
           className={`mt-2 ${mmActionButtonClass({ variant: "secondary" })}`}
@@ -46,7 +50,7 @@ export function NewConnectionSecretPrompt({
       className="mm-quiet-note"
       data-testid="media-manager-new-secret-prompt"
     >
-      <p>Create a secret for {connection.name} now?</p>
+      <p>Create a secret for {connectionTitle(connection)} now?</p>
       {secret.isError ? (
         <p className="mm-status-text--failed mt-2 text-sm" role="alert">
           {errorMessage(secret.error, SECRET_FAILURE)}

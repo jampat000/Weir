@@ -228,6 +228,51 @@ public sealed class ConfigurationBundleConnectionsTests : IDisposable
     }
 
     [Fact]
+    public async Task An_export_carries_each_media_managers_nickname()
+    {
+        await SeedSonarrAsync(_source);
+        await _source.Execute("UPDATE media_manager_connections SET nickname = '4K' WHERE id = 7");
+
+        var bundle = await ExportAsync();
+
+        var connection = (WireObject)((WireArray)bundle["media_manager_connections"]).Items.Single();
+        Assert.Equal("4K", ((WireString)connection["nickname"]).Value);
+    }
+
+    [Fact]
+    public async Task Restoring_adds_a_missing_media_manager_with_its_nickname()
+    {
+        var bundle = await BundleOfManagersAsync(BundledManager("radarr", null, "http://nas:7878").Set("nickname", "  4K  "));
+
+        await RestoreAsync(bundle);
+
+        Assert.Equal(1, await _target.Scalar("SELECT count(*) FROM media_manager_connections WHERE base_url = 'http://nas:7878' AND nickname = '4K'"));
+    }
+
+    [Fact]
+    public async Task Restoring_leaves_the_nickname_of_a_media_manager_this_install_already_has()
+    {
+        await InstallManagerAsync("radarr", "http://nas:7878");
+        await _target.Execute("UPDATE media_manager_connections SET nickname = 'Kids'");
+        var bundle = await BundleOfManagersAsync(BundledManager("radarr", null, "http://nas:7878").Set("nickname", "4K"));
+
+        await RestoreAsync(bundle);
+
+        Assert.Equal(1, await _target.Scalar("SELECT count(*) FROM media_manager_connections WHERE nickname = 'Kids'"));
+    }
+
+    [Fact]
+    public async Task A_backup_with_a_nickname_longer_than_a_person_could_type_is_refused()
+    {
+        var bundle = await BundleOfManagersAsync(BundledManager("radarr", null, "http://nas:7878").Set("nickname", new string('a', 31)));
+
+        var refused = await Assert.ThrowsAsync<WireValueException>(() => RestoreAsync(bundle));
+
+        Assert.Contains("nickname", refused.Message, StringComparison.Ordinal);
+        Assert.Equal(0, await _target.Scalar("SELECT count(*) FROM media_manager_connections"));
+    }
+
+    [Fact]
     public async Task A_backup_with_an_alert_label_over_two_hundred_and_fifty_five_characters_is_refused()
     {
         var bundle = await ExportAsync();

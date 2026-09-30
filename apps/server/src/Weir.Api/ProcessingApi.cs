@@ -70,6 +70,7 @@ public static class ProcessingApi
         services.AddSingleton<ProcessingMetadataProviderEndpointHandlers>();
         services.AddSingleton<ProcessingOperatorSettingsEndpointHandlers>();
         services.AddSingleton<ProcessingOverviewMaintenanceEndpointHandlers>();
+        services.AddSingleton<ProcessingRejectedFilesEndpointHandlers>();
         services.AddSingleton<ProcessingRemuxPassEndpointHandlers>();
         services.AddSingleton<ProcessingRuleSetsEndpointHandlers>();
         services.AddSingleton<ProcessingRulesPreviewEndpointHandlers>();
@@ -113,6 +114,7 @@ public static class ProcessingApi
         endpoints.MapProcessingDirectPlayEndpoints();
         endpoints.MapProcessingJobsEndpoints();
         endpoints.MapProcessingKeptFilesEndpoints();
+        endpoints.MapProcessingRejectedFilesEndpoints();
         endpoints.MapProcessingRemuxPassEndpoints();
         endpoints.MapProcessingRulesPreviewEndpoints();
         endpoints.MapProcessingOverviewMaintenanceEndpoints();

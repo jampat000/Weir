@@ -87,7 +87,7 @@ public sealed class LibrarySuggestions
         {
             if (LibraryFolderSuggestionRules.DownloadClientFolderFor(scope, folders) is { } folder)
             {
-                return new FolderSource(DownloadClientKinds.LabelForConnection(row.Kind, row.Name), folder, null);
+                return new FolderSource(row.Label, folder, null);
             }
         }
 
