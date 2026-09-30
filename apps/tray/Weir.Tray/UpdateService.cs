@@ -78,13 +78,6 @@ sealed class UpdateService : IUpdateService
         }
     }
 
-    /// <summary>
-    /// What Weir is started again with after an update (#638). An update restart is never a person opening Weir:
-    /// in Automatic mode nobody may be at the computer, and "Update now" is pressed in a browser already showing
-    /// Weir, so neither should open a window.
-    /// </summary>
-    internal static string[] RestartArguments() => [Program.NoBrowserArgument];
-
     public string? FindUpdateLeftWaiting()
     {
         if (!IsInstalled)
@@ -110,7 +103,8 @@ sealed class UpdateService : IUpdateService
             return;
         }
         _log($"Applying update v{pending.TargetFullRelease.Version} and exiting...");
-        _mgr.ApplyUpdatesAndExit(pending.TargetFullRelease);
+        HandOver(pending.TargetFullRelease, UpdateHandOver.ThenStayStopped);
+        Environment.Exit(0);
     }
 
     public void ApplyAndRestart()
@@ -121,7 +115,8 @@ sealed class UpdateService : IUpdateService
             return;
         }
         _log($"Applying update v{pending.TargetFullRelease.Version} and restarting...");
-        _mgr.ApplyUpdatesAndRestart(pending.TargetFullRelease, RestartArguments());
+        HandOver(pending.TargetFullRelease, UpdateHandOver.ThenRestart);
+        Environment.Exit(0);
     }
 
     public void ApplyLeftWaitingUpdateAndRestart()
@@ -132,6 +127,10 @@ sealed class UpdateService : IUpdateService
             return;
         }
         _log($"Applying update v{waiting.Version} left waiting, and restarting...");
-        _mgr.WaitExitThenApplyUpdates(waiting, silent: true, restart: true, RestartArguments());
+        HandOver(waiting, UpdateHandOver.ThenRestart);
     }
+
+    // Velopack's own ApplyUpdatesAndRestart is not silent; this is the call it makes, told to be (#869).
+    private void HandOver(VelopackAsset update, UpdateHandOver handOver) =>
+        _mgr.WaitExitThenApplyUpdates(update, handOver.Silent, handOver.Restart, handOver.RestartArguments);
 }
