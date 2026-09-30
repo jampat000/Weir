@@ -47,13 +47,21 @@ public sealed class LibraryModeSettingsTests
     {
         var settings = new LibrarySettings(
             ["/data/library-a", "/data/library-b"], ScheduleEnabled: true,
-            KeepOriginalAfterClean: true, OriginalsFolder: "/data/originals");
+            KeepOriginalAfterClean: true, OriginalsFolder: "/data/originals", RuleSetId: 4);
         var payload = settings.ToPayload(libraryId: 7);
         var restored = LibrarySettings.FromPayload(payload);
         Assert.Equal(settings.Folders, restored.Folders);
         Assert.Equal(settings.ScheduleEnabled, restored.ScheduleEnabled);
         Assert.Equal(settings.KeepOriginalAfterClean, restored.KeepOriginalAfterClean);
         Assert.Equal(settings.OriginalsFolder, restored.OriginalsFolder);
+        Assert.Equal(4L, restored.RuleSetId);
+    }
+
+    [Fact]
+    public void A_library_follows_its_workflows_rules_profile_until_it_chooses_one()
+    {
+        Assert.Null(LibrarySettings.Empty.RuleSetId);
+        Assert.Null(LibrarySettings.FromPayload(new LibrarySettings([], ScheduleEnabled: false).ToPayload(libraryId: 1)).RuleSetId);
     }
 
     [Fact]

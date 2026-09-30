@@ -51,6 +51,9 @@ public sealed class BodyModel
     /// <summary>A body was sent (even if it is not an object).</summary>
     public bool IsPresent { get; }
 
+    /// <summary>The body has this key, even when its value is null: what tells "clear it" from "leave it".</summary>
+    public bool Has(string name) => _dict is not null && _dict.ContainsKey(name);
+
     /// <summary>Every field read so far validated.</summary>
     public bool IsValid => _valid;
 

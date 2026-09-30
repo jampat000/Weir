@@ -13,7 +13,6 @@ using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.Media;
 using Weir.Infrastructure.MediaManagers;
 using Weir.Infrastructure.Processing;
-using Weir.Infrastructure.Processing.RemuxPass;
 using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Infrastructure.LibraryMode;
@@ -120,15 +119,14 @@ public sealed class LibraryScanHandler : IJobHandler
             {
                 await _scans.RecordResultAsync(
                         uow, context.Id, new LibraryScanOutcome(_time.GetUtcNow(), []), false,
-                        "No library folders are configured for this workflow yet. Add one in Library settings, then scan again.")
+                        "This library has no folders yet. Add one under Library setup on the Library page, then check again.")
                     .ConfigureAwait(false);
                 await uow.CommitAsync().ConfigureAwait(false);
                 await LibraryFileIndexWriter.ReplaceAsync(_database, libraryId, [], cancellationToken).ConfigureAwait(false);
                 return;
             }
 
-            var ruleSet = library.RuleSetId is { } ruleSetId ? await _libraries.GetRuleSetAsync(uow, ruleSetId).ConfigureAwait(false) : null;
-            rules = ruleSet is not null ? RemuxPassPaths.RulesConfigFor(ruleSet) : RuleSetConversion.ToRulesConfig(null);
+            rules = await LibraryModeRules.ForAsync(uow, _libraries, library, settings).ConfigureAwait(false);
             previousFiles = await _scans.CurrentFilesAsync(uow, libraryId).ConfigureAwait(false);
             connections = await _connections.ConnectionsForScopeAsync(uow, library.MediaType).ConfigureAwait(false);
             await uow.CommitAsync().ConfigureAwait(false);

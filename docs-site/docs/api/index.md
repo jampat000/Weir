@@ -41,7 +41,7 @@ The API still says "library" for what the app calls a workflow, so existing inte
 
 | Prefix | Description |
 |--------|-------------|
-| `/api/v1/processing/libraries` | Workflows and their order, rule previews, and the files already in each workflow's library folders: scan, clean, leave alone, schedule |
+| `/api/v1/processing/libraries` | Workflows and their order, rule previews, and the files already in each workflow's library folders: their setup (folders, rules profile, daily clean, originals), scan, clean, leave alone, schedule |
 | `/api/v1/processing/files` | Files Weir has picked up: tracks, logs, requeue, move to top, why a file is held |
 | `/api/v1/processing/rule-sets` | Audio and subtitle rules |
 | `/api/v1/processing/jobs` | Queue and inspect background jobs |

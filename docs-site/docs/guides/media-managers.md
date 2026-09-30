@@ -41,7 +41,8 @@ never makes a workflow linked. Under **Settings › Media managers**, each conne
 workflows it feeds and offers **Add a workflow from** it.
 
 Weir's **Library** menu is a separate thing. It cleans files that are already in place in your
-media library, and it keeps its name. A workflow is the path new files take.
+media library, and it keeps its name; the folders, rules profile and daily clean for those files are
+set up there, not on the workflow. A workflow is the path new files take.
 
 The API still says "library" for what the app calls a workflow (for example the `library-folders`
 capability below), so existing integrations keep working.

@@ -80,3 +80,10 @@ silent skip.
 Cleaning a file that's already in your library, in place, follows the same rule: Weir builds the
 cleaned version alongside the original first and only swaps it in once the new copy is confirmed
 good. It never leaves your library with a file half-replaced.
+
+You set this up on the **Library** page, not in Settings: each library has its own folders, its own
+rules profile (the workflow's until you choose another), the daily clean, and two checks made before
+each clean. One skips a file when cleaning it would make the media manager download it again. The
+other skips a file that is still seeding. **Files already in your library: keep the original after
+cleaning** moves the original into an originals folder instead of deleting it, so removed tracks can
+be recovered. Settings › Workflows is only about new downloads.

@@ -119,6 +119,7 @@ public sealed class SchemaMigrator
         new(27, "0062_library_intake_follows_performance", "Weir.Infrastructure.Migrations.0027_library_intake_follows_performance.sql"),
         new(28, "0063_connection_nickname", "Weir.Infrastructure.Migrations.0028_connection_nickname.sql"),
         new(29, "0064_workflow_readiness_and_minimum_size", "Weir.Infrastructure.Migrations.0029_workflow_readiness_and_minimum_size.sql"),
+        new(30, "0065_library_clean_rules_profile", "Weir.Infrastructure.Migrations.0030_library_clean_rules_profile.sql"),
     ];
 
     /// <summary>

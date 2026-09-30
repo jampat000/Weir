@@ -164,6 +164,21 @@ public sealed class LibraryStoreTests
     }
 
     [Fact]
+    public async Task A_rule_set_a_library_cleans_its_existing_files_by_cannot_be_deleted()
+    {
+        using var db = new JobsTestDatabase();
+        var profileId = db.AddRuleSet("Cleaning profile");
+        var libraryId = db.AddLibrary();
+        db.Execute("UPDATE libraries SET library_rule_set_id = @profile WHERE id = @id", ("@profile", profileId), ("@id", libraryId));
+        await using var uow = await UnitOfWork.OpenAsync(db.Database);
+        var ruleSet = await Store.GetRuleSetAsync(uow, profileId);
+
+        var exception = await Assert.ThrowsAsync<ProcessingLibraryException>(() => Store.DeleteRuleSetAsync(uow, ruleSet!));
+
+        Assert.Contains("still used", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task A_rule_set_no_longer_referenced_can_be_deleted()
     {
         using var db = new JobsTestDatabase();

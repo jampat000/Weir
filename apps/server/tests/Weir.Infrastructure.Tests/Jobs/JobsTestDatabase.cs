@@ -171,6 +171,15 @@ internal sealed class JobsTestDatabase : IDisposable
     }
 
     /// <summary>A raw row insert, bypassing the enqueue guard, to set up states the store itself would not write.</summary>
+    /// <summary>Insert a rules profile that keeps only <paramref name="audioLanguage"/> audio, and return its id.</summary>
+    public long AddRuleSet(string name, string audioLanguage = "eng") =>
+        Convert.ToInt64(
+            Scalar(
+                "INSERT INTO rule_sets (name, primary_audio_lang, audio_preference_mode) VALUES (@name, @language, 'preferred_langs_strict') RETURNING id",
+                ("@name", name),
+                ("@language", audioLanguage)),
+            CultureInfo.InvariantCulture);
+
     public void InsertRawJob(string dedupeKey, string jobKind, string status = ProcessingJobStatus.Pending, string? leaseOwner = null,
         string? leaseExpiresAt = null, int attemptCount = 0, int maxAttempts = 3, string? payloadJson = null) =>
         Execute(

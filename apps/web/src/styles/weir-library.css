@@ -284,3 +284,104 @@
   text-align: center;
   color: var(--mm-text3);
 }
+
+/* Library setup: the folders, the rules profile and the switches that decide how existing files are cleaned. */
+.mm-library-setup {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.mm-library-setup__folders {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--mm-type-body);
+}
+
+.mm-library-setup__folders li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.45rem 0;
+  border-bottom: 1px solid var(--mm-border);
+  overflow-wrap: anywhere;
+}
+
+.mm-library-setup__folders li:last-child {
+  border-bottom: 0;
+}
+
+.mm-library-setup__empty {
+  color: var(--mm-text3);
+}
+
+.mm-library-setup__add {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.mm-library-setup__add .mm-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 28rem;
+}
+
+.mm-library-setup__hint {
+  margin: -0.3rem 0 0;
+  color: var(--mm-text3);
+  font-size: var(--mm-type-caption);
+}
+
+.mm-library-setup__originals-folder {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.mm-library-setup__originals-folder .mm-library-setup__hint {
+  flex-basis: 100%;
+  margin-top: 0;
+}
+
+.mm-library-setup__originals-folder .mm-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 28rem;
+}
+
+.mm-library-setup__confirm {
+  padding: 0.75rem 0 0.75rem 0.9rem;
+  border-left: 2px solid var(--mm-status-warning-text);
+  color: var(--mm-text2);
+}
+
+.mm-library-setup__confirm p {
+  margin: 0 0 0.6rem;
+}
+
+.mm-library-setup__confirm-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+/* A library with no folders yet: the page is one step, and this is it. */
+.mm-library-prompt {
+  display: grid;
+  gap: 12px;
+  justify-items: center;
+}
+
+.mm-library-prompt p {
+  margin: 0;
+  max-width: 44rem;
+}
+
+.mm-library-prompt__title {
+  margin: 0;
+  font-size: var(--mm-type-panel);
+  color: var(--mm-text1);
+}

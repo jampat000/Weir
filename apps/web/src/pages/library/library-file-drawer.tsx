@@ -114,8 +114,14 @@ export function LibraryFileDrawer({
   // The tracks you have said to keep, once you start choosing; null while the rules are deciding.
   const [keep, setKeep] = useState<Set<number> | null>(null);
   const leaveAlone = useLeaveAlone(libraryId, file);
-  const preview = useLibraryFilePreviewQuery(libraryId, file.path);
   const settings = useLibrarySettingsQuery(libraryId);
+  // The plan shown is the one the library cleans by, so it waits to hear which profile that is.
+  const preview = useLibraryFilePreviewQuery(
+    libraryId,
+    file.path,
+    settings.data?.library_rule_set_id ?? null,
+    !settings.isPending,
+  );
 
   const tracks = preview.data?.tracks ?? [];
   const positions = positionsByKind(tracks);

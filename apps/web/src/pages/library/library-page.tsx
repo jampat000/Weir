@@ -15,6 +15,7 @@ import type { LibraryFileFilters } from "../../lib/processing/library-mode-api";
 import {
   useLibraryFilesQuery,
   useLibraryOverviewQuery,
+  useLibrarySettingsQuery,
 } from "../../lib/processing/library-mode-queries";
 import { useProcessingLibrariesQuery } from "../../lib/processing/libraries-queries";
 import { processingKeys } from "../../lib/processing/query-keys";
@@ -27,6 +28,8 @@ import { groupFiles, headerLead } from "./library-model";
 import { LibraryPager } from "./library-pager";
 import { LibraryPicker } from "./library-picker";
 import { LibraryScanStatus } from "./library-scan-status";
+import { LibrarySetupPanel } from "./library-setup-panel";
+import { LibrarySetupPrompt } from "./library-setup-prompt";
 import { LibraryTable } from "./library-table";
 import {
   LibraryToolbar,
@@ -87,8 +90,8 @@ function NoLibrary() {
         lead="The files already on your storage, and what Weir would do to each."
       />
       <p className="mm-library-empty">
-        No workflow is set up yet. Add one in Settings › Workflows, give it the
-        folders your media sits in, and Weir will check what is there.
+        No workflow is set up yet. Add one in Settings › Workflows, then come
+        back here and tell Weir which folders the files you already have sit in.
       </p>
     </div>
   );
@@ -105,6 +108,7 @@ export function LibraryPage(): React.ReactElement {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [openPath, setOpenPath] = useState<string | null>(params.get("path"));
   const [compact, setCompact] = useState(readCompact);
+  const [setupOpen, setSetupOpen] = useState(false);
   const now = useNow(CLOCK_TICK_MS);
   const query = useDebouncedValue(search.trim(), SEARCH_DEBOUNCE_MS);
   const tableTop = useRef<HTMLDivElement>(null);
@@ -132,6 +136,7 @@ export function LibraryPage(): React.ReactElement {
     () => fileFilters(filter, query, page),
     [filter, query, page],
   );
+  const setupSettings = useLibrarySettingsQuery(chosenId, Boolean(chosen));
   const overview = useLibraryOverviewQuery(chosenId, Boolean(chosen));
   const files = useLibraryFilesQuery(chosenId, filters, Boolean(chosen));
   const flow = useLibraryClean(chosenId, (request) => {
@@ -153,6 +158,7 @@ export function LibraryPage(): React.ReactElement {
         setLibraryId(id);
         setPage(1);
         setOpenPath(null);
+        setSetupOpen(false);
       });
       const next = new URLSearchParams(params);
       next.set("library", String(id));
@@ -200,30 +206,70 @@ export function LibraryPage(): React.ReactElement {
     tableTop.current?.scrollIntoView?.({ block: "start" });
   };
 
-  return (
-    <div className="mm-page mm-library" data-testid="library-page">
-      <PageHeader
-        title="Library"
-        titleAfter={
-          <LibraryPicker
-            libraries={libraries.data ?? []}
-            chosenId={chosen.id}
-            onPick={pick}
-            countFor={(id) =>
-              id === chosen.id ? (totals?.files ?? null) : null
-            }
-          />
-        }
-        lead={headerLead(totals, Boolean(overview.data?.schedule.enabled))}
-        aside={
+  // A library with no folders has nothing to check yet: setting it up is the page.
+  const savedSetup = setupSettings.data;
+  const needsSetup = savedSetup?.library_folders.length === 0;
+  const header = (
+    <PageHeader
+      title="Library"
+      titleAfter={
+        <LibraryPicker
+          libraries={libraries.data ?? []}
+          chosenId={chosen.id}
+          onPick={pick}
+          countFor={(id) => (id === chosen.id ? (totals?.files ?? null) : null)}
+        />
+      }
+      lead={headerLead(totals, Boolean(overview.data?.schedule.enabled))}
+      aside={
+        needsSetup ? undefined : (
           <LibraryScanStatus
             libraryId={chosen.id}
             scan={overview.data?.scan ?? files.data?.scan ?? null}
             schedule={overview.data?.schedule}
             now={now}
+            after={
+              savedSetup ? (
+                <button
+                  type="button"
+                  className="mm-head-control"
+                  onClick={() => setSetupOpen(true)}
+                >
+                  Library setup
+                </button>
+              ) : null
+            }
           />
-        }
+        )
+      }
+    />
+  );
+  const setupPanel =
+    setupOpen && savedSetup ? (
+      <LibrarySetupPanel
+        key={chosen.id}
+        workflow={chosen}
+        settings={savedSetup}
+        onClose={() => setSetupOpen(false)}
       />
+    ) : null;
+
+  if (needsSetup) {
+    return (
+      <div className="mm-page mm-library" data-testid="library-page">
+        {header}
+        <LibrarySetupPrompt
+          libraryName={chosen.name}
+          onSetUp={() => setSetupOpen(true)}
+        />
+        {setupPanel}
+      </div>
+    );
+  }
+
+  return (
+    <div className="mm-page mm-library" data-testid="library-page">
+      {header}
 
       <LibraryToolbar
         search={search}
@@ -265,7 +311,7 @@ export function LibraryPage(): React.ReactElement {
           <p className="mm-library-empty" data-testid="library-empty">
             {totals && totals.files > 0
               ? "Nothing here matches what you asked for. Clear the filters to see the whole library."
-              : "This workflow has not been scanned yet, or its folders hold nothing Weir reads. Check again, or set its folders in Settings › Workflows."}
+              : "This workflow has not been scanned yet, or its folders hold nothing Weir reads. Check again, or change its folders in Library setup."}
           </p>
         ) : (
           <LibraryTable
@@ -313,6 +359,7 @@ export function LibraryPage(): React.ReactElement {
       ) : null}
 
       <LibraryCleanConfirm flow={flow} />
+      {setupPanel}
     </div>
   );
 }

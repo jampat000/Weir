@@ -11,7 +11,6 @@ import * as managerApi from "../../../../lib/media-managers/media-managers-api";
 import type { ProcessingLibrary } from "../../../../lib/processing/libraries-api";
 import * as chainApi from "../../../../lib/processing/library-folder-chain-api";
 import * as managersApi from "../../../../lib/processing/library-managers-api";
-import * as modeApi from "../../../../lib/processing/library-mode-api";
 import * as operatorApi from "../../../../lib/processing/operator-settings-api";
 import * as ruleSetsApi from "../../../../lib/processing/rule-sets-api";
 
@@ -124,7 +123,6 @@ function answerEditorChecksAsUnavailable() {
     downloadClientsApi,
     "fetchDownloadClientSuggestions",
   ).mockImplementation(unavailable);
-  vi.spyOn(modeApi, "fetchLibrarySettings").mockImplementation(unavailable);
   vi.spyOn(operatorApi, "fetchProcessingOperatorSettings").mockImplementation(
     unavailable,
   );
