@@ -98,11 +98,11 @@ public sealed partial class ManagerHeartbeatTask(
         foreach (var row in rows.Where(r => r.Enabled))
         {
             var apiKey = string.IsNullOrEmpty(row.ApiKeyCiphertext) ? null : connections.Cipher.Decrypt(row.ApiKeyCiphertext);
-            var (ok, detail) = await ManagerHealthProbe.ProbeAsync(handlers, row.Name, row.Kind, row.BaseUrl, apiKey, ProbeTimeout, cancellationToken)
+            var (ok, detail) = await ManagerHealthProbe.ProbeAsync(handlers, row.Label, row.Kind, row.BaseUrl, apiKey, ProbeTimeout, cancellationToken)
                 .ConfigureAwait(false);
             if (row.LastTestOk is { } before && before != ok)
             {
-                logger.LogInformation("{Name}: {Detail}", row.Name, detail);
+                logger.LogInformation("{Name}: {Detail}", row.Label, detail);
             }
 
             // One short write per manager, never held across a probe: a manager that takes its full timeout must not
@@ -134,7 +134,7 @@ public sealed partial class ManagerHeartbeatTask(
         }
         catch (Exception exception) when (exception is SqliteException or InvalidOperationException or IOException)
         {
-            LogWaitingReportsFailed(logger, exception, row.Name);
+            LogWaitingReportsFailed(logger, exception, row.Label);
         }
     }
 

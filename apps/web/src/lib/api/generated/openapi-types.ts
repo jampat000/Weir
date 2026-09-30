@@ -2737,6 +2737,11 @@ export interface components {
        */
       name?: string;
       /**
+       * Nickname
+       * @description An optional short nickname, shown after the connection's name. Blank means none.
+       */
+      nickname?: string | null;
+      /**
        * Password
        * @description NZBGet/qBittorrent/Deluge/Transmission. Stored encrypted. Empty means no password.
        * @default
@@ -2771,6 +2776,11 @@ export interface components {
        * @description The connection's name: its kind and the host in its address, set by Weir.
        */
       name: string;
+      /**
+       * Nickname
+       * @description The optional short nickname shown after the connection's name, or null when there is none.
+       */
+      nickname?: string | null;
       /** Enabled */
       enabled: boolean;
       /**
@@ -2828,6 +2838,11 @@ export interface components {
        * @description Accepted and ignored: a connection is named after its kind and the host in its address.
        */
       name?: string | null;
+      /**
+       * Nickname
+       * @description An optional short nickname, shown after the connection's name. Blank clears it; leaving it out changes nothing.
+       */
+      nickname?: string | null;
       /**
        * Password
        * @description Omit to leave the saved password alone. Send an empty string to clear it.
@@ -3843,6 +3858,11 @@ export interface components {
        * @description Accepted and ignored: a connection is named after its kind and the host in its address.
        */
       name?: string;
+      /**
+       * Nickname
+       * @description An optional short nickname, shown after the connection's name. Blank means none.
+       */
+      nickname?: string | null;
     };
     /** MediaManagerConnectionDeleteIn */
     MediaManagerConnectionDeleteIn: {
@@ -3888,6 +3908,11 @@ export interface components {
        * @description The connection's name: its kind and the host in its address, set by Weir.
        */
       name: string;
+      /**
+       * Nickname
+       * @description The optional short nickname shown after the connection's name, or null when there is none.
+       */
+      nickname?: string | null;
       /**
        * Unsigned Webhook Warning
        * @description Set when this connection has no secret of its own, so its webhook is accepted unsigned.
@@ -3946,6 +3971,11 @@ export interface components {
        * @description Accepted and ignored: a connection is named after its kind and the host in its address.
        */
       name?: string | null;
+      /**
+       * Nickname
+       * @description An optional short nickname, shown after the connection's name. Blank clears it; leaving it out changes nothing.
+       */
+      nickname?: string | null;
     };
     /** MediaManagerSearchLaneIn */
     MediaManagerSearchLaneIn: {

@@ -9,6 +9,7 @@ import {
   useTestMediaManagerConnection,
   useUpdateMediaManagerConnection,
 } from "../../../../lib/media-managers/queries";
+import { connectionTitle } from "../../../../lib/ui/connection-title";
 import { mmActionButtonClass } from "../../../../lib/ui/mm-control-roles";
 import { ConnectionEditForm } from "./connection-edit-form";
 import { ConnectionFolderChain } from "./connection-folder-chain";
@@ -34,13 +35,13 @@ export function RemoveConnectionDialog({
   return (
     <ConfirmDialog
       testId="media-manager-remove-confirm"
-      title={`Remove ${connection.name}?`}
+      title={`Remove ${connectionTitle(connection)}?`}
       description={
         <>
           <p>
-            Weir will stop accepting files from {connection.name}. Its address,
-            API key and webhook secret go with it, so connecting it again means
-            setting it up from scratch.
+            Weir will stop accepting files from {connectionTitle(connection)}.
+            Its address, API key and webhook secret go with it, so connecting it
+            again means setting it up from scratch.
           </p>
           <p>No media file is touched. This cannot be undone.</p>
         </>
@@ -88,7 +89,9 @@ export function ConnectionCard({
   return (
     <section className="mm-quiet-section" data-testid="media-manager-card">
       <div className="mm-quiet-section__head">
-        <h3 className="mm-quiet-section__title">{connection.name}</h3>
+        <h3 className="mm-quiet-section__title">
+          {connectionTitle(connection)}
+        </h3>
         <div className="mm-quiet-section__aside">
           <span
             className={`mm-quiet-badge${connection.enabled ? "" : " mm-quiet-badge--off"}`}

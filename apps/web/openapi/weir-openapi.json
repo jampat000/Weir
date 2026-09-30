@@ -882,6 +882,19 @@
             "title": "Name",
             "type": "string"
           },
+          "nickname": {
+            "anyOf": [
+              {
+                "maxLength": 30,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "An optional short nickname, shown after the connection's name. Blank means none.",
+            "title": "Nickname"
+          },
           "password": {
             "default": "",
             "description": "NZBGet/qBittorrent/Deluge/Transmission. Stored encrypted. Empty means no password.",
@@ -941,6 +954,18 @@
             "description": "The connection's name: its kind and the host in its address, set by Weir.",
             "title": "Name",
             "type": "string"
+          },
+          "nickname": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The optional short nickname shown after the connection's name, or null when there is none.",
+            "title": "Nickname"
           },
           "enabled": {
             "title": "Enabled",
@@ -1117,6 +1142,19 @@
             ],
             "description": "Accepted and ignored: a connection is named after its kind and the host in its address.",
             "title": "Name"
+          },
+          "nickname": {
+            "anyOf": [
+              {
+                "maxLength": 30,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "An optional short nickname, shown after the connection's name. Blank clears it; leaving it out changes nothing.",
+            "title": "Nickname"
           },
           "password": {
             "anyOf": [
@@ -3316,6 +3354,19 @@
             "maxLength": 200,
             "title": "Name",
             "type": "string"
+          },
+          "nickname": {
+            "anyOf": [
+              {
+                "maxLength": 30,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "An optional short nickname, shown after the connection's name. Blank means none.",
+            "title": "Nickname"
           }
         },
         "required": [
@@ -3420,6 +3471,18 @@
             "description": "The connection's name: its kind and the host in its address, set by Weir.",
             "title": "Name",
             "type": "string"
+          },
+          "nickname": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The optional short nickname shown after the connection's name, or null when there is none.",
+            "title": "Nickname"
           },
           "unsigned_webhook_warning": {
             "anyOf": [
@@ -3570,6 +3633,19 @@
             ],
             "description": "Accepted and ignored: a connection is named after its kind and the host in its address.",
             "title": "Name"
+          },
+          "nickname": {
+            "anyOf": [
+              {
+                "maxLength": 30,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "An optional short nickname, shown after the connection's name. Blank clears it; leaving it out changes nothing.",
+            "title": "Nickname"
           }
         },
         "required": [

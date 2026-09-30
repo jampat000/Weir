@@ -70,7 +70,7 @@ public sealed partial class HandoffCompletionReporter
         var target = _connections.ResolveCallbackTarget(connection);
         if (target is null)
         {
-            return (null, $"the {connection.Name} connection has no address saved");
+            return (null, $"the {connection.Label} connection has no address saved");
         }
 
         var headers = new Dictionary<string, string>(StringComparer.Ordinal) { ["Content-Type"] = "application/json" };
@@ -81,7 +81,7 @@ public sealed partial class HandoffCompletionReporter
 
         return (
             new HandoffReportTarget(
-                new ManagerConnection(connection.Kind, connection.Name, target.BaseUrl, target.ApiKey ?? string.Empty, connection.Id),
+                new ManagerConnection(connection.Kind, connection.Name, target.BaseUrl, target.ApiKey ?? string.Empty, connection.Id, connection.Nickname),
                 $"{target.BaseUrl}/{origin.CallbackPath.TrimStart('/')}",
                 headers),
             null);
@@ -92,7 +92,7 @@ public sealed partial class HandoffCompletionReporter
     {
         ArgumentNullException.ThrowIfNull(target);
         ArgumentNullException.ThrowIfNull(body);
-        var name = target.Connection.Name;
+        var name = target.Connection.Label;
         int status;
         try
         {
@@ -141,7 +141,7 @@ public sealed partial class HandoffCompletionReporter
         ArgumentNullException.ThrowIfNull(target);
         ArgumentNullException.ThrowIfNull(body);
         ArgumentNullException.ThrowIfNull(delivery);
-        var name = target.Connection.Name;
+        var name = target.Connection.Label;
         var fileName = !string.IsNullOrEmpty(relativePath)
             ? MediaPathNames.Name(relativePath, OperatingSystem.IsWindows())
             : body.Get("releaseName") is { IsTruthy: true } release ? WireConvert.Str(release) : "a handed-over file";
@@ -347,7 +347,7 @@ public sealed partial class HandoffCompletionReporter
                     {
                         foreach (var relativePath in outcome.Files)
                         {
-                            await AppendFileSentenceAsync(uow, library, relativePath, ManagerWaitMessages.ReportWaiting(sent.Target.Connection.Name)).ConfigureAwait(false);
+                            await AppendFileSentenceAsync(uow, library, relativePath, ManagerWaitMessages.ReportWaiting(sent.Target.Connection.Label)).ConfigureAwait(false);
                         }
                     }
                 }

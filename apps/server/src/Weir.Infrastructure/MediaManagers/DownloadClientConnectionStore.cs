@@ -18,13 +18,18 @@ public sealed record DownloadClientConnectionRecord(
     string? ApiKeyCiphertext,
     bool? LastTestOk,
     Timestamp? LastTestAt,
-    string? LastTestDetail)
+    string? LastTestDetail,
+    string? Nickname = null)
 {
+    /// <summary>How this connection is written in a sentence, led by its product and followed by its nickname.</summary>
+    public string Label => DownloadClientKinds.LabelForConnection(Kind, Name, Nickname);
+
     /// <summary>The connection as the API returns it: secrets are reported only as saved or not.</summary>
     public WireObject ToOut() => new WireObject()
         .Set("id", Id)
         .Set("kind", Kind)
         .Set("name", Name)
+        .Set("nickname", Nickname)
         .Set("enabled", Enabled)
         .Set("base_url", BaseUrl)
         .Set("username", Username)
@@ -43,7 +48,7 @@ public sealed class DownloadClientConnectionStore
 {
     private const string Columns =
         "id, kind, name, enabled, base_url, username, password_ciphertext, api_key_ciphertext, " +
-        "last_connection_test_ok, last_connection_test_at, last_connection_test_detail";
+        "last_connection_test_ok, last_connection_test_at, last_connection_test_detail, nickname";
 
     public Task<List<DownloadClientConnectionRecord>> ListAsync(UnitOfWork uow)
     {
@@ -72,20 +77,21 @@ public sealed class DownloadClientConnectionStore
 
     /// <summary>Insert a connection; returns the new id.</summary>
     public async Task<long> InsertAsync(
-        UnitOfWork uow, string kind, bool enabled, string baseUrl, string? username, string? passwordCiphertext, string? apiKeyCiphertext)
+        UnitOfWork uow, string kind, bool enabled, string baseUrl, string? username, string? passwordCiphertext, string? apiKeyCiphertext, string? nickname = null)
     {
         ArgumentNullException.ThrowIfNull(uow);
         var id = await uow.ExecuteScalarWriteAsync(
             "INSERT INTO download_client_connections (kind, name, enabled, base_url, username, password_ciphertext, api_key_ciphertext, " +
-            "last_connection_test_ok, last_connection_test_at, last_connection_test_detail) " +
-            "VALUES ($kind, $name, $enabled, $base_url, $username, $password, $key, NULL, NULL, NULL) RETURNING id",
+            "last_connection_test_ok, last_connection_test_at, last_connection_test_detail, nickname) " +
+            "VALUES ($kind, $name, $enabled, $base_url, $username, $password, $key, NULL, NULL, NULL, $nickname) RETURNING id",
             ("$kind", kind),
             ("$name", ConnectionNameColumn.NewPlaceholder()),
             ("$enabled", enabled ? 1 : 0),
             ("$base_url", baseUrl),
             ("$username", username),
             ("$password", passwordCiphertext),
-            ("$key", apiKeyCiphertext)).ConfigureAwait(false);
+            ("$key", apiKeyCiphertext),
+            ("$nickname", nickname)).ConfigureAwait(false);
         await RefreshNamesAsync(uow).ConfigureAwait(false);
         return Convert.ToInt64(id, System.Globalization.CultureInfo.InvariantCulture);
     }
@@ -142,5 +148,6 @@ public sealed class DownloadClientConnectionStore
         SqliteValues.GetStringOrNull(reader, 7),
         SqliteValues.GetBoolOrNull(reader, 8),
         SqliteValues.GetDateTimeOrNull(reader, 9),
-        SqliteValues.GetStringOrNull(reader, 10));
+        SqliteValues.GetStringOrNull(reader, 10),
+        SqliteValues.GetStringOrNull(reader, 11));
 }

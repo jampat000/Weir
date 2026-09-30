@@ -106,7 +106,7 @@ public sealed class LibraryFolderChainCheck
 
     private WireObject DownloadClientEntry(DownloadClientConnectionRecord row, DownloadClientFolders folders, string watchedFolder)
     {
-        var label = DownloadClientKinds.LabelForConnection(row.Kind, row.Name);
+        var label = row.Label;
         var lines = LibraryFolderChainRules.CheckDownloadClientFolders(label, watchedFolder, folders, _probe);
         return new WireObject()
             .Set("connection_id", row.Id)

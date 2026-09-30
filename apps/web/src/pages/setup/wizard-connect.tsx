@@ -11,6 +11,7 @@ import {
   useDeleteMediaManagerConnection,
   useTestMediaManagerConnection,
 } from "../../lib/media-managers/queries";
+import { connectionTitle } from "../../lib/ui/connection-title";
 import { mmActionButtonClass } from "../../lib/ui/mm-control-roles";
 import { AddConnectionForm } from "../settings/tabs/media-managers/add-connection-form";
 import { AddDownloadClientForm } from "../settings/tabs/media-managers/add-download-client-form";
@@ -43,7 +44,7 @@ function ManagerConnectionRow({
     <>
       <WizardConnectionRow
         connection={{
-          name: connection.name,
+          name: connectionTitle(connection),
           address: connection.base_url,
           answering: connection.last_test_at ? connection.last_test_ok : null,
           detail: connection.last_test_detail,
@@ -82,7 +83,7 @@ function DownloadClientConnectionRow({
     <>
       <WizardConnectionRow
         connection={{
-          name: connection.name,
+          name: connectionTitle(connection),
           address: connection.base_url,
           answering: connection.last_test_at
             ? (connection.last_test_ok ?? null)

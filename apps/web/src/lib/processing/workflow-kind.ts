@@ -1,4 +1,5 @@
 import type { MediaManagerConnection } from "../media-managers/media-managers-api";
+import { connectionTitle } from "../ui/connection-title";
 import type { ProcessingLibrary } from "./libraries-api";
 
 /**
@@ -38,7 +39,7 @@ export function workflowKindOf(
       const connection = connections.find((c) => c.id === id);
       return {
         id,
-        name: connection?.name ?? REMOVED_MANAGER,
+        name: connection ? connectionTitle(connection) : REMOVED_MANAGER,
         kind: connection?.kind ?? null,
       };
     }),

@@ -13,6 +13,7 @@ import {
   useImportDiscoveredProcessingLibraries,
   useProcessingLibraryDrift,
 } from "../../../../lib/processing/libraries-queries";
+import { connectionTitle } from "../../../../lib/ui/connection-title";
 import { mmActionButtonClass } from "../../../../lib/ui/mm-control-roles";
 import { plural } from "../../../../lib/ui/mm-plural";
 
@@ -174,7 +175,7 @@ export function LibraryImportSection({
             <option value="">Choose a manager</option>
             {connections.map((connection) => (
               <option key={connection.id} value={connection.id}>
-                {connection.name}
+                {connectionTitle(connection)}
               </option>
             ))}
           </select>

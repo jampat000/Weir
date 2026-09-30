@@ -57,20 +57,24 @@ public sealed class MediaManagerConnectionService
     /// <see cref="MediaManagerConnectionException"/> for an operator mistake.
     /// </summary>
     public async Task<long> CreateAsync(
-        UnitOfWork uow, string kind, string baseUrl = "", string? apiKey = null, bool enabled = true, bool downloadedScanEnabled = false)
+        UnitOfWork uow, string kind, string baseUrl = "", string? apiKey = null, bool enabled = true, bool downloadedScanEnabled = false,
+        string? nickname = null)
     {
         ArgumentNullException.ThrowIfNull(uow);
         var key = WireStrings.Strip(apiKey ?? string.Empty);
         var validKind = ValidateKind(kind);
         var validUrl = ValidateBaseUrl(baseUrl);
         var ciphertext = key.Length > 0 ? EncryptApiKey(key) : null;
-        return await _store.InsertAsync(uow, validKind, enabled, validUrl, ciphertext, downloadedScanEnabled).ConfigureAwait(false);
+        return await _store.InsertAsync(uow, validKind, enabled, validUrl, ciphertext, downloadedScanEnabled, ConnectionNicknames.Normalize(nickname)).ConfigureAwait(false);
     }
 
-    /// <summary>Update a connection: <see langword="null"/> leaves a field alone; an empty <paramref name="apiKey"/> clears the key.</summary>
+    /// <summary>
+    /// Update a connection: <see langword="null"/> leaves a field alone; an empty <paramref name="apiKey"/> clears the key and a
+    /// blank <paramref name="nickname"/> clears the nickname.
+    /// </summary>
     public async Task UpdateAsync(
         UnitOfWork uow, MediaManagerConnectionRecord row, string? baseUrl = null, string? apiKey = null, bool? enabled = null,
-        bool? downloadedScanEnabled = null)
+        bool? downloadedScanEnabled = null, string? nickname = null)
     {
         ArgumentNullException.ThrowIfNull(uow);
         ArgumentNullException.ThrowIfNull(row);
@@ -112,6 +116,11 @@ public sealed class MediaManagerConnectionService
         if (downloadedScanEnabled is { } scan && scan != row.DownloadedScanEnabled)
         {
             changes.Add(("downloaded_scan_enabled", scan ? 1 : 0));
+        }
+
+        if (ConnectionNicknames.TryChange(row.Nickname, nickname, out var wantedNickname))
+        {
+            changes.Add(("nickname", wantedNickname));
         }
 
         await _store.UpdateColumnsAsync(uow, row.Id, changes).ConfigureAwait(false);
@@ -171,7 +180,7 @@ public sealed class MediaManagerConnectionService
         }
 
         var key = _cipher.Decrypt(ciphertext);
-        return string.IsNullOrEmpty(key) ? null : new ManagerConnection(row.Kind, row.Name, url, key, row.Id);
+        return string.IsNullOrEmpty(key) ? null : new ManagerConnection(row.Kind, row.Name, url, key, row.Id, row.Nickname);
     }
 
     /// <summary>Every enabled, credentialed manager for the scope; the environment only when nothing claims it.</summary>
