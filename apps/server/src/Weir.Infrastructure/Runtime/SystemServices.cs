@@ -6,12 +6,15 @@ using Weir.Core.Updates;
 
 namespace Weir.Infrastructure.Runtime;
 
-/// <summary>The tray's update files under <c>WEIR_HOME</c>: settings, state and the apply-now flag.</summary>
+/// <summary>The tray's update files under <c>WEIR_HOME</c>: settings, state, the apply-now flag and the work state.</summary>
 public sealed class UpdateFiles
 {
     public const string SettingsFileName = "update-settings.json";
     public const string StateFileName = "update-state.json";
     public const string ApplyFlagFileName = "update-apply-now";
+
+    /// <summary>What the tray reads to learn whether Weir is idle; written only while an update waits to install (#875).</summary>
+    public const string WorkStateFileName = "work-state.json";
 
     private readonly WeirOptions _options;
 
@@ -59,7 +62,6 @@ public sealed class UpdateFiles
     /// <summary>Save the update settings: written whole to a unique scratch file, then renamed into place.</summary>
     public WireObject WriteSettings(string mode, bool checkOnStartup, long checkIntervalMinutes)
     {
-        var path = Path.Join(_options.WeirHome, SettingsFileName);
         var text = UpdateStatus.SerializeUpdateSettings(mode, checkOnStartup, checkIntervalMinutes);
         if (OperatingSystem.IsWindows())
         {
@@ -67,22 +69,7 @@ public sealed class UpdateFiles
             text = text.Replace("\n", "\r\n", StringComparison.Ordinal);
         }
 
-        var directory = Path.GetDirectoryName(path)!;
-        var scratch = Path.Join(directory, $".{SettingsFileName}.{Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(4))}.tmp");
-        try
-        {
-            File.WriteAllBytes(scratch, Encoding.UTF8.GetBytes(text));
-            File.Move(scratch, path, overwrite: true);
-            scratch = string.Empty;
-        }
-        finally
-        {
-            if (scratch.Length > 0 && File.Exists(scratch))
-            {
-                File.Delete(scratch);
-            }
-        }
-
+        ReplaceFile(SettingsFileName, Encoding.UTF8.GetBytes(text));
         return UpdateStatus.UpdateSettingsOut(mode, checkOnStartup, checkIntervalMinutes);
     }
 
@@ -117,6 +104,33 @@ public sealed class UpdateFiles
 
         using (File.Create(path))
         {
+        }
+    }
+
+    /// <summary>Whether the tray has downloaded an update that is waiting to be installed.</summary>
+    public bool HasDownloadedUpdate() => ReadState().Get("downloaded")?.IsTruthy ?? false;
+
+    /// <summary>Tell the tray whether file work is running or could start now, as of <paramref name="checkedAt"/>.</summary>
+    public void WriteWorkState(bool busy, DateTimeOffset checkedAt) =>
+        ReplaceFile(WorkStateFileName, Encoding.UTF8.GetBytes(UpdateStatus.SerializeWorkState(busy, checkedAt)));
+
+    // Written whole to a unique scratch file, then renamed into place, so a reader sees the old file or the new one, never half.
+    private void ReplaceFile(string fileName, byte[] contents)
+    {
+        var path = Path.Join(_options.WeirHome, fileName);
+        var scratch = Path.Join(_options.WeirHome, $".{fileName}.{Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(4))}.tmp");
+        try
+        {
+            File.WriteAllBytes(scratch, contents);
+            File.Move(scratch, path, overwrite: true);
+            scratch = string.Empty;
+        }
+        finally
+        {
+            if (scratch.Length > 0 && File.Exists(scratch))
+            {
+                File.Delete(scratch);
+            }
         }
     }
 

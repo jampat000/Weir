@@ -79,6 +79,7 @@ public static class WeirApi
         services.AddSingleton<IPeriodicTask>(provider => provider.GetRequiredService<LogRetentionTask>());
         services.AddSingleton<IPeriodicTask>(provider => provider.GetRequiredService<ConfigurationBackupTask>());
         services.AddSingleton<IPeriodicTask>(provider => provider.GetRequiredService<ActivityLatestPollTask>());
+        services.AddSingleton<IPeriodicTask, WorkStateTask>();
         services.AddWeirResponseCompression();
         services.AddRouting();
         return services;
