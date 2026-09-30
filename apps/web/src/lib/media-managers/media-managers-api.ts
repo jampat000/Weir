@@ -32,6 +32,8 @@ export interface MediaManagerConnection {
   id: number;
   kind: MediaManagerKind;
   name: string;
+  /** The short label a person gave it, shown after its name. */
+  nickname?: string | null;
   enabled: boolean;
   base_url: string;
   api_key_is_saved: boolean;

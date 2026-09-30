@@ -129,4 +129,68 @@ public sealed class ConnectionNamingTests
     {
         Assert.Equal(expected, DownloadClientKinds.LabelForConnection(kind, name));
     }
+
+    [Theory]
+    [InlineData("radarr", "Radarr on nas", "4K", "Radarr on nas · 4K")]
+    [InlineData("radarr", "Radarr on nas (7879)", "Kids", "Radarr on nas (7879) · Kids")]
+    [InlineData("deluno", "Main", "4K", "Deluno (Main) · 4K")]
+    [InlineData("radarr", "Radarr on nas", null, "Radarr on nas")]
+    [InlineData("radarr", "Radarr on nas", "   ", "Radarr on nas")]
+    [InlineData("radarr", "", "4K", "Radarr · 4K")]
+    public void A_manager_nickname_follows_its_label(string kind, string name, string? nickname, string expected)
+    {
+        Assert.Equal(expected, MediaManagerKinds.LabelForConnection(kind, name, nickname));
+    }
+
+    [Fact]
+    public void A_download_client_nickname_follows_its_label()
+    {
+        Assert.Equal("qBittorrent on nas · Seedbox", DownloadClientKinds.LabelForConnection("qbittorrent", "qBittorrent on nas", "Seedbox"));
+    }
+
+    [Fact]
+    public void A_connection_that_carries_a_nickname_reads_it_in_its_label()
+    {
+        var manager = new ManagerConnection("radarr", "Radarr on nas", "http://nas:7878", "key", 1, "4K");
+        var client = new DownloadClientConnection("sabnzbd", "SABnzbd on nas", "http://nas:8080", null, null, "key", 1, "Usenet");
+
+        Assert.Equal(("Radarr on nas · 4K", "SABnzbd on nas · Usenet"), (manager.Label, client.Label));
+    }
+
+    [Theory]
+    [InlineData(null, null)]
+    [InlineData("", null)]
+    [InlineData("  	 ", null)]
+    [InlineData("  4K  ", "4K")]
+    public void A_nickname_is_trimmed_and_a_blank_one_is_none(string? typed, string? expected)
+    {
+        Assert.Equal(expected, ConnectionNicknames.Normalize(typed));
+    }
+
+    [Theory]
+    [InlineData(30, false)]
+    [InlineData(31, true)]
+    public void A_nickname_over_the_limit_does_not_fit(int length, bool tooLong)
+    {
+        Assert.Equal(!tooLong, ConnectionNicknames.Fits(new string('a', length)));
+    }
+
+    [Theory]
+    [InlineData(null, null, false, null)]
+    [InlineData("4K", null, false, null)]
+    [InlineData("4K", "4K", false, "4K")]
+    [InlineData("4K", " 4K ", false, "4K")]
+    [InlineData(null, "4K", true, "4K")]
+    [InlineData("4K", "Kids", true, "Kids")]
+    [InlineData("4K", "", true, null)]
+    public void An_update_changes_the_nickname_only_when_it_asks_for_a_different_one(string? current, string? requested, bool changes, string? wanted)
+    {
+        var changed = ConnectionNicknames.TryChange(current, requested, out var actual);
+
+        Assert.Equal(changes, changed);
+        if (changed)
+        {
+            Assert.Equal(wanted, actual);
+        }
+    }
 }

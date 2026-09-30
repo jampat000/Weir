@@ -9,11 +9,13 @@ import {
   type DownloadClientConnectionUpdate,
 } from "../../../../lib/download-clients/download-clients-api";
 import { useUpdateDownloadClientConnection } from "../../../../lib/download-clients/queries";
+import { connectionTitle } from "../../../../lib/ui/connection-title";
 import {
   mmActionButtonClass,
   mmEditableTextFieldClass,
 } from "../../../../lib/ui/mm-control-roles";
 import { useLeaveConfirmation, useUnsavedChanges } from "../../unsaved-changes";
+import { ConnectionNicknameField } from "./connection-nickname-field";
 
 const SAVE_FAILURE = "This download client could not be saved.";
 
@@ -22,6 +24,7 @@ type EditForm = {
   username: string;
   password: string;
   api_key: string;
+  nickname: string;
 };
 
 function formFrom(connection: DownloadClientConnection): EditForm {
@@ -30,6 +33,7 @@ function formFrom(connection: DownloadClientConnection): EditForm {
     username: connection.username ?? "",
     password: "",
     api_key: "",
+    nickname: connection.nickname ?? "",
   };
 }
 
@@ -38,7 +42,8 @@ function sameForm(a: EditForm, b: EditForm): boolean {
     a.base_url === b.base_url &&
     a.username === b.username &&
     a.password === b.password &&
-    a.api_key === b.api_key
+    a.api_key === b.api_key &&
+    a.nickname === b.nickname
   );
 }
 
@@ -54,6 +59,8 @@ function changesFrom(
     changes.username = form.username.trim();
   if (form.password.trim()) changes.password = form.password.trim();
   if (form.api_key.trim()) changes.api_key = form.api_key.trim();
+  if (form.nickname !== initial.nickname)
+    changes.nickname = form.nickname.trim();
   return changes;
 }
 
@@ -76,9 +83,10 @@ export function DownloadClientEditForm({
   const credentials = DOWNLOAD_CLIENT_KIND_CREDENTIALS[connection.kind];
 
   const dirty = !sameForm(form, initial);
-  useUnsavedChanges(dirty ? connection.name : null);
+  useUnsavedChanges(dirty ? connectionTitle(connection) : null);
   const { confirmLeave, dialog } = useLeaveConfirmation();
-  const close = () => confirmLeave(dirty ? connection.name : null, onClose);
+  const close = () =>
+    confirmLeave(dirty ? connectionTitle(connection) : null, onClose);
 
   const save = () =>
     update.mutate(
@@ -164,6 +172,13 @@ export function DownloadClientEditForm({
           />
         </Field>
       ) : null}
+
+      <ConnectionNicknameField
+        testId="download-client-edit-nickname"
+        className={mmEditableTextFieldClass}
+        value={form.nickname}
+        onChange={(value) => change("nickname", value)}
+      />
 
       {update.isError ? (
         <p className="mm-status-text--failed text-sm" role="alert">

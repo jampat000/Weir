@@ -50,6 +50,15 @@ describe("a workflow's kind", () => {
     );
   });
 
+  it("names a linked media manager with its nickname, so two of one kind can be told apart", () => {
+    const nicknamed = [
+      { ...connection(5, "radarr", "Radarr on nas"), nickname: "4K" },
+    ];
+    const kind = workflowKindOf({ manager_connection_ids: [5] }, nicknamed);
+
+    expect(workflowBadgeLabel(kind)).toBe("Linked to Radarr on nas · 4K");
+  });
+
   it("says how Sonarr and Radarr differ from Deluno", () => {
     const sonarr = workflowKindOf({ manager_connection_ids: [2] }, CONNECTIONS);
 

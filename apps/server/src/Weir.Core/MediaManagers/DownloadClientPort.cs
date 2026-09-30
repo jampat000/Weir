@@ -32,7 +32,7 @@ public static class DownloadClientKinds
         KindLabels.GetValueOrDefault(WireStrings.Strip(kind ?? string.Empty).ToLowerInvariant(), "Download client");
 
     /// <summary>A connection's label; see <see cref="ConnectionLabels.For"/>.</summary>
-    public static string LabelForConnection(string? kind, string? name) => ConnectionLabels.For(ProductLabel(kind), name);
+    public static string LabelForConnection(string? kind, string? name, string? nickname = null) => ConnectionLabels.For(ProductLabel(kind), name, nickname);
 }
 
 /// <summary>
@@ -41,9 +41,9 @@ public static class DownloadClientKinds
 /// Deluge only a password; the rest, a username and password (both optional for Transmission).
 /// </summary>
 public sealed record DownloadClientConnection(
-    string Kind, string Name, string BaseUrl, string? Username, string? Password, string? ApiKey, long? ConnectionId = null)
+    string Kind, string Name, string BaseUrl, string? Username, string? Password, string? ApiKey, long? ConnectionId = null, string? Nickname = null)
 {
-    public string Label => DownloadClientKinds.LabelForConnection(Kind, Name);
+    public string Label => DownloadClientKinds.LabelForConnection(Kind, Name, Nickname);
 }
 
 /// <summary>One category or label a download client organizes completed downloads by, and the folder it saves them to.</summary>

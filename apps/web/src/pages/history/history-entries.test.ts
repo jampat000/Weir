@@ -5,6 +5,7 @@ import {
   cleanEntry,
   downloadEntry,
   entryGroup,
+  hasRejectedFiles,
   historyEntries,
   historyGroupOf,
   inGroup,
@@ -129,5 +130,20 @@ describe("retryableFailures", () => {
       [clean({ id: 1, outcome: "failed" })],
     );
     expect(retryableFailures(entries).map((f) => f.id)).toEqual([1]);
+  });
+});
+
+describe("hasRejectedFiles", () => {
+  it("is true only when a listed download was rejected", () => {
+    const rejected = historyEntries([file({ id: 1, status: "rejected" })], []);
+    const failed = historyEntries(
+      [file({ id: 2, status: "processing_failed" })],
+      [clean({ id: 1, outcome: "failed" })],
+    );
+
+    expect([hasRejectedFiles(rejected), hasRejectedFiles(failed)]).toEqual([
+      true,
+      false,
+    ]);
   });
 });

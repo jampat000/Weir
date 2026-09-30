@@ -11,12 +11,14 @@ import {
   type MediaManagerConnectionUpdate,
 } from "../../../../lib/media-managers/media-managers-api";
 import { useUpdateMediaManagerConnection } from "../../../../lib/media-managers/queries";
+import { connectionTitle } from "../../../../lib/ui/connection-title";
 import {
   mmActionButtonClass,
   mmCheckboxControlClass,
   mmEditableTextFieldClass,
 } from "../../../../lib/ui/mm-control-roles";
 import { useLeaveConfirmation, useUnsavedChanges } from "../../unsaved-changes";
+import { ConnectionNicknameField } from "./connection-nickname-field";
 
 const SAVE_FAILURE = "This media manager could not be saved.";
 
@@ -29,6 +31,7 @@ const DOWNLOADED_SCAN_KINDS = new Set<MediaManagerConnection["kind"]>([
 type EditForm = {
   base_url: string;
   api_key: string;
+  nickname: string;
   downloaded_scan_enabled: boolean;
 };
 
@@ -36,6 +39,7 @@ function formFrom(connection: MediaManagerConnection): EditForm {
   return {
     base_url: connection.base_url,
     api_key: "",
+    nickname: connection.nickname ?? "",
     downloaded_scan_enabled: connection.downloaded_scan_enabled,
   };
 }
@@ -44,23 +48,28 @@ function sameForm(a: EditForm, b: EditForm): boolean {
   return (
     a.base_url === b.base_url &&
     a.api_key === b.api_key &&
+    a.nickname === b.nickname &&
     a.downloaded_scan_enabled === b.downloaded_scan_enabled
   );
 }
 
 /**
- * A blank API key means "leave the saved one alone" — it is only sent when someone typed one.
+ * A blank API key means "leave the saved one alone" — it is only sent when someone typed one. The nickname is only sent
+ * when it changed, and a blank one clears it.
  * `downloaded_scan_enabled` is only sent for a kind that offers it; a Deluno connection never shows
  * the toggle, so its own hand-off setup is never touched by editing its address.
  */
 function changesFrom(
   form: EditForm,
+  initial: EditForm,
   kind: MediaManagerConnection["kind"],
 ): MediaManagerConnectionUpdate {
   const changes: MediaManagerConnectionUpdate = {
     base_url: form.base_url.trim(),
   };
   if (form.api_key.trim()) changes.api_key = form.api_key.trim();
+  if (form.nickname !== initial.nickname)
+    changes.nickname = form.nickname.trim();
   if (DOWNLOADED_SCAN_KINDS.has(kind)) {
     changes.downloaded_scan_enabled = form.downloaded_scan_enabled;
   }
@@ -87,13 +96,14 @@ export function ConnectionEditForm({
 
   const needsAddress = connectionNeedsAddress(connection.kind);
   const dirty = !sameForm(form, initial);
-  useUnsavedChanges(dirty ? connection.name : null);
+  useUnsavedChanges(dirty ? connectionTitle(connection) : null);
   const { confirmLeave, dialog } = useLeaveConfirmation();
-  const close = () => confirmLeave(dirty ? connection.name : null, onClose);
+  const close = () =>
+    confirmLeave(dirty ? connectionTitle(connection) : null, onClose);
 
   const save = () =>
     update.mutate(
-      { id: connection.id, data: changesFrom(form, connection.kind) },
+      { id: connection.id, data: changesFrom(form, initial, connection.kind) },
       { onSuccess: onClose },
     );
 
@@ -131,6 +141,13 @@ export function ConnectionEditForm({
           onChange={(e) => change("api_key", e.target.value)}
         />
       </Field>
+
+      <ConnectionNicknameField
+        testId="media-manager-edit-nickname"
+        className={mmEditableTextFieldClass}
+        value={form.nickname}
+        onChange={(value) => change("nickname", value)}
+      />
 
       {DOWNLOADED_SCAN_KINDS.has(connection.kind) ? (
         <label className="mm-library-toggle">

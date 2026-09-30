@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 
 import type { MediaManagerConnection } from "../../../../lib/media-managers/media-managers-api";
 import { useProcessingLibrariesQuery } from "../../../../lib/processing/libraries-queries";
+import { connectionTitle } from "../../../../lib/ui/connection-title";
 
 type Formatter = (iso: string | null) => string;
 
@@ -89,7 +90,7 @@ export function UnsignedWebhookWarning({
       role="alert"
       data-testid="media-manager-unsigned-webhook-warning"
     >
-      {UNSIGNED_WEBHOOK_WARNING(connection.name)}
+      {UNSIGNED_WEBHOOK_WARNING(connectionTitle(connection))}
     </p>
   );
 }
@@ -137,7 +138,7 @@ export function FedWorkflows({
             className="mm-quiet-link"
             to={`/settings?tab=libraries&addFrom=${connection.id}`}
           >
-            Add a workflow from {connection.name}
+            Add a workflow from {connectionTitle(connection)}
           </Link>
         </>
       ) : null}

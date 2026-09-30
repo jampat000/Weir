@@ -11,6 +11,7 @@ import {
   useTestDownloadClientConnection,
   useUpdateDownloadClientConnection,
 } from "../../../../lib/download-clients/queries";
+import { connectionTitle } from "../../../../lib/ui/connection-title";
 import { mmActionButtonClass } from "../../../../lib/ui/mm-control-roles";
 import { DownloadClientEditForm } from "./download-client-edit-form";
 
@@ -78,17 +79,17 @@ export function RemoveDownloadClientDialog({
   return (
     <ConfirmDialog
       testId="download-client-remove-confirm"
-      title={`Remove ${connection.name}?`}
+      title={`Remove ${connectionTitle(connection)}?`}
       description={
         <>
           <p>
-            Weir will stop reading folder suggestions from {connection.name}.
-            Its address and saved credentials go with it, so connecting it again
-            means setting it up from scratch.
+            Weir will stop reading folder suggestions from{" "}
+            {connectionTitle(connection)}. Its address and saved credentials go
+            with it, so connecting it again means setting it up from scratch.
           </p>
           <p>
-            Weir never controlled {connection.name} — nothing about it changes.
-            No watched folder set from its suggestion is undone.
+            Weir never controlled {connectionTitle(connection)} — nothing about
+            it changes. No watched folder set from its suggestion is undone.
           </p>
         </>
       }
@@ -132,7 +133,9 @@ export function DownloadClientCard({
   return (
     <section className="mm-quiet-section" data-testid="download-client-card">
       <div className="mm-quiet-section__head">
-        <h3 className="mm-quiet-section__title">{connection.name}</h3>
+        <h3 className="mm-quiet-section__title">
+          {connectionTitle(connection)}
+        </h3>
         <div className="mm-quiet-section__aside">
           <span className="mm-quiet-badge">
             {DOWNLOAD_CLIENT_KIND_LABELS[connection.kind]}

@@ -17,6 +17,7 @@ import {
   fetchLibrarySuggestions,
   type SuggestedLibrary,
 } from "../../../../lib/processing/library-setup-api";
+import { connectionTitle } from "../../../../lib/ui/connection-title";
 import { mmActionButtonClass } from "../../../../lib/ui/mm-control-roles";
 import type { LibraryForm } from "./library-form";
 
@@ -181,7 +182,7 @@ export function AddWorkflowChoice({
             >
               {connections.map((connection) => (
                 <option key={connection.id} value={connection.id}>
-                  {connection.name}
+                  {connectionTitle(connection)}
                 </option>
               ))}
             </select>

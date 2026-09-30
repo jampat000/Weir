@@ -75,7 +75,7 @@ public sealed partial class ManagerSetupCheck
                 continue;
             }
 
-            var label = MediaManagerKinds.LabelForConnection(row.Kind, row.Name);
+            var label = row.Label;
             var entry = new WireObject()
                 .Set("connection_id", row.Id)
                 .Set("kind", row.Kind)
@@ -134,7 +134,7 @@ public sealed partial class ManagerSetupCheck
 
             if (_connections.ConnectionFromRow(row) is not { } connection)
             {
-                var label = MediaManagerKinds.LabelForConnection(row.Kind, row.Name);
+                var label = row.Label;
                 results.Add(new ManagerFolderSuggestion(row.Id, label, null, null, MissingCredentialsText(label)));
                 continue;
             }

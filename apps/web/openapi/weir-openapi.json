@@ -882,6 +882,19 @@
             "title": "Name",
             "type": "string"
           },
+          "nickname": {
+            "anyOf": [
+              {
+                "maxLength": 30,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "An optional short nickname, shown after the connection's name. Blank means none.",
+            "title": "Nickname"
+          },
           "password": {
             "default": "",
             "description": "NZBGet/qBittorrent/Deluge/Transmission. Stored encrypted. Empty means no password.",
@@ -941,6 +954,18 @@
             "description": "The connection's name: its kind and the host in its address, set by Weir.",
             "title": "Name",
             "type": "string"
+          },
+          "nickname": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The optional short nickname shown after the connection's name, or null when there is none.",
+            "title": "Nickname"
           },
           "enabled": {
             "title": "Enabled",
@@ -1117,6 +1142,19 @@
             ],
             "description": "Accepted and ignored: a connection is named after its kind and the host in its address.",
             "title": "Name"
+          },
+          "nickname": {
+            "anyOf": [
+              {
+                "maxLength": 30,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "An optional short nickname, shown after the connection's name. Blank clears it; leaving it out changes nothing.",
+            "title": "Nickname"
           },
           "password": {
             "anyOf": [
@@ -3316,6 +3354,19 @@
             "maxLength": 200,
             "title": "Name",
             "type": "string"
+          },
+          "nickname": {
+            "anyOf": [
+              {
+                "maxLength": 30,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "An optional short nickname, shown after the connection's name. Blank means none.",
+            "title": "Nickname"
           }
         },
         "required": [
@@ -3420,6 +3471,18 @@
             "description": "The connection's name: its kind and the host in its address, set by Weir.",
             "title": "Name",
             "type": "string"
+          },
+          "nickname": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The optional short nickname shown after the connection's name, or null when there is none.",
+            "title": "Nickname"
           },
           "unsigned_webhook_warning": {
             "anyOf": [
@@ -3570,6 +3633,19 @@
             ],
             "description": "Accepted and ignored: a connection is named after its kind and the host in its address.",
             "title": "Name"
+          },
+          "nickname": {
+            "anyOf": [
+              {
+                "maxLength": 30,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "An optional short nickname, shown after the connection's name. Blank clears it; leaving it out changes nothing.",
+            "title": "Nickname"
           }
         },
         "required": [
@@ -8099,6 +8175,54 @@
           "net_space_saved_percent"
         ],
         "title": "ProcessingOverviewStatsOut",
+        "type": "object"
+      },
+      "ProcessingRejectedFilesProcessAgainIn": {
+        "additionalProperties": false,
+        "properties": {
+          "csrf_token": {
+            "minLength": 1,
+            "title": "Csrf Token",
+            "type": "string"
+          },
+          "library_id": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Only this workflow's rejected files. Leave out for every workflow's.",
+            "title": "Library Id"
+          }
+        },
+        "required": [
+          "csrf_token"
+        ],
+        "title": "ProcessingRejectedFilesProcessAgainIn",
+        "type": "object"
+      },
+      "ProcessingRejectedFilesSummaryOut": {
+        "properties": {
+          "ready": {
+            "description": "How many of them still have their original in the watched folder, so can be processed again.",
+            "title": "Ready",
+            "type": "integer"
+          },
+          "rejected": {
+            "description": "How many files are rejected.",
+            "title": "Rejected",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "rejected",
+          "ready"
+        ],
+        "title": "ProcessingRejectedFilesSummaryOut",
         "type": "object"
       },
       "ProcessingRequeueOut": {
@@ -13449,6 +13573,101 @@
           }
         },
         "summary": "Requeue Processing Files",
+        "tags": [
+          "processing",
+          "processing"
+        ]
+      }
+    },
+    "/api/v1/processing/files/rejected/process-again": {
+      "post": {
+        "description": "Queues every rejected file whose original is still in its watched folder to be processed again with the current rules. Covers the whole rejected set, or one workflow's when library_id is given; files whose original is gone are skipped and counted.",
+        "operationId": "post_processing_rejected_files_process_again_api_v1_processing_files_rejected_process_again_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProcessingRejectedFilesProcessAgainIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProcessingRequeueOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Processing Rejected Files Process Again",
+        "tags": [
+          "processing",
+          "processing"
+        ]
+      }
+    },
+    "/api/v1/processing/files/rejected/summary": {
+      "get": {
+        "description": "How many files are rejected, and how many of those could be processed again right now.",
+        "operationId": "get_processing_rejected_files_summary_api_v1_processing_files_rejected_summary_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "library_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Library Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProcessingRejectedFilesSummaryOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Processing Rejected Files Summary",
         "tags": [
           "processing",
           "processing"

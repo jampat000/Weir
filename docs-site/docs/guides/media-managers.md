@@ -50,6 +50,14 @@ You don't name a connection. Weir names it after the kind and the host in its ad
 RIG", "Radarr on nas", "qBittorrent on 10.0.0.51". Two of one kind on the same host also show their
 port, like "Radarr on nas (7879)". Change the address and the name follows.
 
+To tell two connections apart at a glance, give one a **Nickname (optional)** when you add it or
+under **Edit**: up to 30 characters, such as `4K`. Weir shows it after the name wherever the
+connection appears, including in alerts and connection tests: "Radarr on nas · 4K". A nickname never
+replaces the name Weir derives, and clearing it leaves just the name. A backup carries the nickname of
+each media manager, and a restore adds it to the connections it creates; it still matches your
+existing connections by kind and address, and leaves their nicknames as they are. Download clients
+are not part of a backup.
+
 ## How the folders fit together
 
 However your setup is arranged, three things own three different folders, and every install works

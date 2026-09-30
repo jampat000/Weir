@@ -33,7 +33,7 @@ public static class MediaManagerKinds
         KindLabels.GetValueOrDefault(WireStrings.Strip(kind ?? string.Empty).ToLowerInvariant(), "Media manager");
 
     /// <summary>A connection's label; see <see cref="ConnectionLabels.For"/>.</summary>
-    public static string LabelForConnection(string? kind, string? name) => ConnectionLabels.For(ProductLabel(kind), name);
+    public static string LabelForConnection(string? kind, string? name, string? nickname = null) => ConnectionLabels.For(ProductLabel(kind), name, nickname);
 }
 
 /// <summary>How a connection is written in a sentence, shared by media managers and download clients.</summary>
@@ -41,17 +41,22 @@ public static class ConnectionLabels
 {
     /// <summary>
     /// The connection's name, led by its product unless the name already starts with it: "Deluno on RIG" stays
-    /// as it is, and a name of "Main" reads "Deluno (Main)". No name reads as the product alone.
+    /// as it is, and a name of "Main" reads "Deluno (Main)". No name reads as the product alone. A nickname follows
+    /// the rest: "Radarr on nas · 4K".
     /// </summary>
-    public static string For(string product, string? name)
+    public static string For(string product, string? name, string? nickname = null)
     {
         var label = WireStrings.Strip(name ?? string.Empty);
         if (label.Length == 0)
         {
-            return product;
+            label = product;
+        }
+        else if (!label.StartsWith(product, StringComparison.OrdinalIgnoreCase))
+        {
+            label = $"{product} ({label})";
         }
 
-        return label.StartsWith(product, StringComparison.OrdinalIgnoreCase) ? label : $"{product} ({label})";
+        return ConnectionNicknames.Normalize(nickname) is { } shown ? label + ConnectionNicknames.Separator + shown : label;
     }
 }
 
@@ -64,9 +69,9 @@ public static class SignalStatus
 }
 
 /// <summary>One configured manager, resolved far enough to talk to. <see cref="ConnectionId"/> is null for the environment credentials.</summary>
-public sealed record ManagerConnection(string Kind, string Name, string BaseUrl, string ApiKey, long? ConnectionId = null)
+public sealed record ManagerConnection(string Kind, string Name, string BaseUrl, string ApiKey, long? ConnectionId = null, string? Nickname = null)
 {
-    public string Label => MediaManagerKinds.LabelForConnection(Kind, Name);
+    public string Label => MediaManagerKinds.LabelForConnection(Kind, Name, Nickname);
 }
 
 /// <summary>One in-progress item, tagged with the scope whose dialect can read it.</summary>
