@@ -1,3 +1,5 @@
+import type { ReactNode } from "react";
+
 import { errorMessage } from "../../lib/api/error-message";
 import type {
   LibraryModeSchedule,
@@ -13,11 +15,14 @@ export function LibraryScanStatus({
   scan,
   schedule,
   now,
+  after,
 }: {
   libraryId: number;
   scan: LibraryScanInfo | null;
   schedule: LibraryModeSchedule | undefined;
   now: number;
+  /** Sits at the end of the row, after the way to check again. */
+  after?: ReactNode;
 }) {
   const formatDate = useAppDateFormatter();
   const rescan = useTriggerLibraryScan(libraryId);
@@ -46,6 +51,7 @@ export function LibraryScanStatus({
       >
         {rescan.isPending ? "Starting a check…" : "Check again"}
       </button>
+      {after}
       {rescan.isError ? (
         <span
           className="mm-library-scan__error"

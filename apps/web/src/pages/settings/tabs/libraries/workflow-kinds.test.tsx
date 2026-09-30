@@ -17,7 +17,6 @@ import type { MediaManagerConnection } from "../../../../lib/media-managers/medi
 import * as api from "../../../../lib/processing/libraries-api";
 import * as chainApi from "../../../../lib/processing/library-folder-chain-api";
 import * as managersApi from "../../../../lib/processing/library-managers-api";
-import * as modeApi from "../../../../lib/processing/library-mode-api";
 import * as setupApi from "../../../../lib/processing/library-setup-api";
 import * as operatorApi from "../../../../lib/processing/operator-settings-api";
 import type { ProcessingOperatorSettingsOut } from "../../../../lib/processing/types";
@@ -408,14 +407,6 @@ function answerEditorLoadsWithNothingToReport() {
     downloadClientsApi,
     "fetchDownloadClientSuggestions",
   ).mockResolvedValue([]);
-  vi.spyOn(modeApi, "fetchLibrarySettings").mockResolvedValue({
-    library_folders: [],
-    library_schedule_enabled: false,
-    clean_hardlinked_files: false,
-    skip_if_manager_would_redownload: true,
-    keep_original_after_clean: false,
-    originals_folder: "",
-  });
   vi.spyOn(operatorApi, "fetchProcessingOperatorSettings").mockResolvedValue({
     min_file_age_seconds: 60,
     min_input_file_size_mb: 50,

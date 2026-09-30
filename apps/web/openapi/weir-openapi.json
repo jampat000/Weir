@@ -2787,6 +2787,18 @@
             "title": "Library Folders",
             "type": "array"
           },
+          "library_rule_set_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The rules profile that cleans this library's existing files. Null means the same profile as the workflow.",
+            "title": "Library Rule Set Id"
+          },
           "library_schedule_enabled": {
             "title": "Library Schedule Enabled",
             "type": "boolean"
@@ -2808,7 +2820,8 @@
           "clean_hardlinked_files",
           "skip_if_manager_would_redownload",
           "keep_original_after_clean",
-          "originals_folder"
+          "originals_folder",
+          "library_rule_set_id"
         ],
         "title": "LibrarySettingsOut",
         "type": "object"
@@ -2838,6 +2851,19 @@
             },
             "title": "Library Folders",
             "type": "array"
+          },
+          "library_rule_set_id": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Left out to keep the saved value. Null goes back to the workflow's profile. Changing the profile checks the library again in the background.",
+            "title": "Library Rule Set Id"
           },
           "originals_folder": {
             "description": "Left out to keep the saved value. Blank resets it to the default.",
@@ -8574,6 +8600,19 @@
             "description": "Path relative to the library's watched or output folder. Mutually exclusive with absolute_path.",
             "maxLength": 4000,
             "title": "Relative Path"
+          },
+          "rule_set_id": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A saved rules profile to preview with instead of the workflow's. Ignored when rules is given.",
+            "title": "Rule Set Id"
           },
           "rules": {
             "anyOf": [

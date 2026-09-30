@@ -3515,6 +3515,11 @@ export interface components {
       keep_original_after_clean: boolean;
       /** Library Folders */
       library_folders: string[];
+      /**
+       * Library Rule Set Id
+       * @description The rules profile that cleans this library's existing files. Null means the same profile as the workflow.
+       */
+      library_rule_set_id: number | null;
       /** Library Schedule Enabled */
       library_schedule_enabled: boolean;
       /**
@@ -3547,6 +3552,11 @@ export interface components {
       keep_original_after_clean?: boolean;
       /** Library Folders */
       library_folders: string[];
+      /**
+       * Library Rule Set Id
+       * @description Left out to keep the saved value. Null goes back to the workflow's profile. Changing the profile checks the library again in the background.
+       */
+      library_rule_set_id?: number | null;
       /**
        * Originals Folder
        * @description Left out to keep the saved value. Blank resets it to the default.
@@ -6367,6 +6377,11 @@ export interface components {
        * @description Path relative to the library's watched or output folder. Mutually exclusive with absolute_path.
        */
       relative_path?: string | null;
+      /**
+       * Rule Set Id
+       * @description A saved rules profile to preview with instead of the workflow's. Ignored when rules is given.
+       */
+      rule_set_id?: number | null;
       /** @description Unsaved rule-set edits to try, in the same shape PUT /processing/rule-sets/{id} accepts (minus csrf_token). Omit to preview the library's saved rule set instead. */
       rules?: components["schemas"]["ProcessingRulesPreviewRulesIn"] | null;
     };

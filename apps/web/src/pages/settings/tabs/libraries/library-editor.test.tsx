@@ -9,7 +9,6 @@ import { afterEach, expect, it, vi } from "vitest";
 
 import * as api from "../../../../lib/processing/libraries-api";
 import * as managersApi from "../../../../lib/processing/library-managers-api";
-import * as modeApi from "../../../../lib/processing/library-mode-api";
 import { LibrariesTab } from "./libraries-tab";
 import { asOperator, library, wrapper } from "./library-test-fixtures";
 
@@ -78,32 +77,21 @@ it("closes an unchanged editor without asking", async () => {
   ).not.toBeInTheDocument();
 });
 
-it("undoes an added existing-files folder when the editor is left without saving", async () => {
+it("leaves the files a library already holds to the Library page", async () => {
   asOperator();
-  vi.spyOn(api, "fetchProcessingLibraries").mockResolvedValue([library()]);
-  vi.spyOn(modeApi, "fetchLibrarySettings").mockResolvedValue({
-    library_folders: [],
-    library_schedule_enabled: false,
-    clean_hardlinked_files: false,
-    skip_if_manager_would_redownload: true,
-    keep_original_after_clean: false,
-    originals_folder: "",
-  });
-  const saveFolders = vi.spyOn(modeApi, "saveLibrarySettings");
+  vi.spyOn(api, "fetchProcessingLibraries").mockResolvedValue([
+    library({ id: 7 }),
+  ]);
 
   render(<LibrariesTab />, { wrapper });
   fireEvent.click(await screen.findByRole("button", { name: "Edit" }));
-  fireEvent.change(await screen.findByLabelText("Folder to add"), {
-    target: { value: "/media/movies" },
-  });
-  fireEvent.click(screen.getByRole("button", { name: "Add folder" }));
-  fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
-  fireEvent.click(screen.getByTestId("settings-unsaved-changes-confirm"));
 
+  const form = await screen.findByTestId("processing-library-form");
+  expect(within(form).queryByText("Files already in your library")).toBeNull();
+  expect(within(form).queryByLabelText("Folder to add")).toBeNull();
   expect(
-    screen.queryByTestId("processing-library-form"),
-  ).not.toBeInTheDocument();
-  expect(saveFolders).not.toHaveBeenCalled();
+    within(form).getByRole("link", { name: "Library page" }),
+  ).toHaveAttribute("href", "/library?library=7");
 });
 
 it("labels hardware decoding as not available, since Weir never decodes the video", async () => {
