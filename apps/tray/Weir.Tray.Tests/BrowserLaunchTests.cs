@@ -56,7 +56,7 @@ public sealed class BrowserLaunchTests : IDisposable
     [Fact]
     public void An_update_restart_does_not_open_the_browser()
     {
-        Assert.False(Program.OpensBrowser(UpdateService.RestartArguments()));
+        Assert.False(Program.OpensBrowser(UpdateHandOver.ThenRestart.RestartArguments));
     }
 
     [Fact]

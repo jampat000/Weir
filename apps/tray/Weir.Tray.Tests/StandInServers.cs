@@ -19,15 +19,25 @@ internal sealed class StandInServers : IDisposable
 
     private readonly List<Process> _started = [];
 
-    /// <summary>Starts a stand-in in <paramref name="directory"/> and returns once it has created its stop event.</summary>
-    public async Task<Process> StartAsync(string directory, params string[] arguments)
+    /// <summary>Starts a stand-in server in <paramref name="directory"/> and returns once it has created its stop event.</summary>
+    public Task<Process> StartAsync(string directory, params string[] arguments) =>
+        StartNamedAsync(directory, "WeirServer.exe", arguments);
+
+    /// <summary>
+    /// Starts a stand-in for the tray, named Weir.exe, in <paramref name="directory"/>. It has no stop event and stays
+    /// alive until it is killed, as the real tray does.
+    /// </summary>
+    public Task<Process> StartTrayAsync(string directory) =>
+        StartNamedAsync(directory, "Weir.exe", ["no-stop-event"]);
+
+    private async Task<Process> StartNamedAsync(string directory, string executableName, string[] arguments)
     {
         Directory.CreateDirectory(directory);
         foreach (var file in StandInServerFiles)
         {
             File.Copy(Path.Combine(AppContext.BaseDirectory, file), Path.Combine(directory, file));
         }
-        var exe = Path.Combine(directory, "WeirServer.exe");
+        var exe = Path.Combine(directory, executableName);
         File.Move(Path.Combine(directory, StandInServerName + ".exe"), exe);
 
         var start = new ProcessStartInfo(exe) { UseShellExecute = false, RedirectStandardOutput = true };
