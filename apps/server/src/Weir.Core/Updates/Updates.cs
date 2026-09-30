@@ -297,6 +297,15 @@ public static class UpdateStatus
             new WireObject().Set("mode", mode).Set("checkOnStartup", checkOnStartup).Set("checkIntervalMinutes", checkIntervalMinutes),
             WireJsonFormat.Indented);
 
+    /// <summary>
+    /// The <c>work-state.json</c> the tray reads to learn whether Weir is idle: whether file work is running or could
+    /// start now, and the UTC moment that was last checked.
+    /// </summary>
+    public static string SerializeWorkState(bool busy, DateTimeOffset checkedAt) =>
+        WireJsonWriter.Dumps(
+            new WireObject().Set("busy", busy).Set("checkedAt", checkedAt.UtcDateTime.ToString("O", CultureInfo.InvariantCulture)),
+            WireJsonFormat.Compact);
+
     /// <summary>Reads the tray's update state file: whether an update is downloaded and its version, with a not-downloaded fallback.</summary>
     public static WireObject ParseUpdateState(string? text)
     {
