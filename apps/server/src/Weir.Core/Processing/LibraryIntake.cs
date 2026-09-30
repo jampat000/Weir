@@ -19,7 +19,7 @@ public static class LibraryIntake
     public const long LargestSizeLimitMb = 1_000_000;
 
     /// <summary>
-    /// The one wait a workflow gets from the three it used to have: the wait after the file last changed plus the hold on
+    /// The one wait that carries a workflow's three older waits forward: the wait after the file last changed plus the hold on
     /// every new file, or the wait for the size to stop growing when that is longer. Nothing is picked up sooner than before.
     /// </summary>
     /// <param name="ageSeconds">The wait after the file last changed, with Performance's value where the workflow had none.</param>

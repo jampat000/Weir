@@ -151,9 +151,8 @@ internal static class ProcessingLibraryMapping
     }
 
     /// <summary>
-    /// Settings a workflow used to carry that no longer do anything: the fallback rewrite (folded into the "best"
-    /// writer), hardware decoding (Weir copies video without decoding it) and the three waits that became
-    /// <c>ready_after_seconds</c>. A save may still send them.
+    /// Retired workflow settings: the fallback rewrite (folded into the "best" writer), hardware decoding (Weir copies
+    /// video without decoding it) and the three waits that became <c>ready_after_seconds</c>. A save may still send them.
     /// </summary>
     private static readonly string[] RemovedSettings =
     [

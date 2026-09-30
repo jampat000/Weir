@@ -105,7 +105,7 @@ public sealed class BodyModel
         });
 
     /// <summary>
-    /// Declares keys the server no longer reads, so a client or a backup that still sends them keeps working
+    /// Declares keys the server ignores, so a client or a backup that still sends them keeps working
     /// instead of being refused as carrying extra inputs. Their values are never looked at.
     /// </summary>
     public void AcceptAndIgnore(IEnumerable<string> names)

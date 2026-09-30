@@ -7,7 +7,7 @@ namespace Weir.Infrastructure.Processing;
 /// <summary>The singleton <c>operator_settings</c> row.</summary>
 /// <remarks>
 /// <c>verbose_detection_logging</c>, <c>runner_cost_undetermined</c>, <c>minimum_free_disk_space_mb</c>, <c>failure_cleanup_enabled</c>
-/// and <c>failure_cleanup_interval_seconds</c> are columns that nothing reads or writes any more: nothing acted on the first and
+/// and <c>failure_cleanup_interval_seconds</c> are columns that nothing reads or writes: nothing acts on the first and
 /// the last two, a file of unknown resolution costs what 1080p does, and free space to keep is each workflow's own. Dropping them
 /// would buy nothing and cost a migration, so they keep their defaults on a new row; a configuration backup carries them and
 /// restores them like any other column, which is how an older backup still restores, and how its free-space value reaches its

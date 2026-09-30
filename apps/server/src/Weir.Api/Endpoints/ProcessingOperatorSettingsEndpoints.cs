@@ -79,10 +79,9 @@ internal sealed class ProcessingOperatorSettingsEndpointHandlers
     }
 
     /// <summary>
-    /// Settings Performance no longer holds: the wait for a new file, the minimum size and the space to keep free now belong to
-    /// each workflow, the cost of an unknown resolution is a 1080p file's, and nothing acts on verbose detection records or on the
-    /// failed-download cleanup, which is gone. An older client or backup may still send them, so they are accepted and their
-    /// values are never looked at.
+    /// Retired Performance settings. The wait for a new file, the minimum size and the space to keep free belong to each
+    /// workflow, an unknown resolution costs what a 1080p file does, and nothing acts on verbose detection records or on the
+    /// failed-download cleanup. An older client or backup may still send them, so they are accepted and never read.
     /// </summary>
     private static readonly string[] RetiredSettings =
     [
