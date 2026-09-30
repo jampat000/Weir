@@ -94,6 +94,18 @@ public sealed class LibraryCleanHandlerTests : IDisposable
         await _fixture.Jobs.CompleteClaimedAsync(claimed.Id, leaseOwner);
     }
 
+    private Task<int> UpdateLibraryAsync(long libraryId, string assignment) =>
+        _fixture.Db(async uow =>
+        {
+            await uow.ExecuteAsync($"UPDATE libraries SET {assignment} WHERE id = $id", ("$id", libraryId));
+            return 0;
+        });
+
+    private Task<string?> CleanedDetailAsync() =>
+        _fixture.Db(async uow => Convert.ToString(
+            await uow.ScalarAsync($"SELECT title FROM activity_events WHERE event_type = '{LibraryActivityEventTypes.FileCleaned}'"),
+            CultureInfo.InvariantCulture));
+
     private Task<int> ReferencePolicyJobCountAsync() =>
         _fixture.Store.Scalar(
                 $"SELECT count(*) FROM jobs WHERE job_kind IN ('processing.file.reject.v1', 'processing.file.pass_through.v1')")
@@ -203,6 +215,49 @@ public sealed class LibraryCleanHandlerTests : IDisposable
         Assert.False(File.Exists(SafeSwapRules.BackupPath(path)));
         Assert.Equal(1, await _fixture.Store.Scalar($"SELECT count(*) FROM activity_events WHERE event_type = '{LibraryActivityEventTypes.FileCleaned}'"));
         Assert.Equal(0, await ReferencePolicyJobCountAsync());
+    }
+
+    [Fact]
+    public async Task A_workflow_that_prefers_mkvmerge_says_so_when_ffmpeg_had_to_write_the_file()
+    {
+        var library = await LibraryAsync();
+        var path = _libraryFolder.Join("film.mkv");
+        await File.WriteAllBytesAsync(path, [1, 2, 3]);
+        _media.Probes["film.mkv"] = FakeMediaRunner.EnglishAndJapanese;
+
+        await RunCleanAsync(await EnqueueCleanAsync(library, path, confirmFinalRemoval: true));
+
+        Assert.Contains("Weir wrote it with ffmpeg because mkvmerge could not.", await CleanedDetailAsync(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_workflow_set_to_ffmpeg_cleans_with_ffmpeg_and_has_nothing_to_explain()
+    {
+        var library = await LibraryAsync();
+        await UpdateLibraryAsync(library, "remux_writer = 'ffmpeg'");
+        var path = _libraryFolder.Join("film.mkv");
+        await File.WriteAllBytesAsync(path, [1, 2, 3]);
+        _media.Probes["film.mkv"] = FakeMediaRunner.EnglishAndJapanese;
+
+        await RunCleanAsync(await EnqueueCleanAsync(library, path, confirmFinalRemoval: true));
+
+        Assert.Single(_media.Remuxes);
+        Assert.DoesNotContain("mkvmerge", await CleanedDetailAsync(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task The_workflows_ffmpeg_compatibility_applies_when_cleaning_a_library_file()
+    {
+        var library = await LibraryAsync();
+        await UpdateLibraryAsync(library, "ffmpeg_strictness = 'experimental'");
+        var path = _libraryFolder.Join("film.mkv");
+        await File.WriteAllBytesAsync(path, [1, 2, 3]);
+        _media.Probes["film.mkv"] = FakeMediaRunner.EnglishAndJapanese;
+
+        await RunCleanAsync(await EnqueueCleanAsync(library, path, confirmFinalRemoval: true));
+
+        var remux = Assert.Single(_media.Remuxes);
+        Assert.Contains("experimental", remux.TakeWhile(argument => argument != "-i"));
     }
 
     [Fact]

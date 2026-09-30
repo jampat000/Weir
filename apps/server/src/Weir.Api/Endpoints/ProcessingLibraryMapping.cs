@@ -95,12 +95,8 @@ internal static class ProcessingLibraryMapping
             .Set("sidecar_patterns_csv", row.SidecarPatternsCsv)
             .Set("preserve_original_timestamps", row.PreserveOriginalTimestamps)
             .Set("output_collision_policy", row.OutputCollisionPolicy.Length > 0 ? row.OutputCollisionPolicy : "replace")
-            .Set("hardware_decode_mode", row.HardwareDecodeMode.Length > 0 ? row.HardwareDecodeMode : "off")
-            .Set("hardware_device", row.HardwareDevice)
-            .Set("hardware_disabled_vendors_csv", row.HardwareDisabledVendorsCsv)
             .Set("ffmpeg_strictness", row.FfmpegStrictness.Length > 0 ? row.FfmpegStrictness : "normal")
             .Set("remux_writer", RemuxWriterChoice.Normalize(row.RemuxWriter))
-            .Set("rewrite_with_ffmpeg", row.RewriteWithFfmpeg)
             .Set("ignore_size_changes", row.IgnoreSizeChanges)
             .Set("skip_access_tests", row.SkipAccessTests)
             .Set("file_system_events_enabled", row.FileSystemEventsEnabled)
@@ -151,8 +147,18 @@ internal static class ProcessingLibraryMapping
             looks?.NextPeriodicFor(row.Id));
     }
 
+    /// <summary>
+    /// Settings a workflow used to carry that no longer do anything: the fallback rewrite (folded into the "best"
+    /// writer) and hardware decoding (Weir copies video without decoding it). A save may still send them.
+    /// </summary>
+    private static readonly string[] RemovedSettings =
+    [
+        "rewrite_with_ffmpeg", "hardware_decode_mode", "hardware_device", "hardware_disabled_vendors_csv",
+    ];
+
     internal static ProcessingLibraryInput ReadLibraryBody(BodyModel model)
     {
+        model.AcceptAndIgnore(RemovedSettings);
         var name = model.Str("name", minLength: 1, maxLength: 120);
         var mediaType = model.Literal("media_type", ProcessingMediaScopes.All);
         var enabled = model.Bool("enabled", defaultValue: true);
@@ -177,13 +183,9 @@ internal static class ProcessingLibraryMapping
         var sidecarPatternsCsv = model.OptionalStr("sidecar_patterns_csv", defaultValue: ".srt,.ass,.ssa,.sub,.idx,.vtt,.nfo,.jpg,.png") ?? string.Empty;
         var preserveOriginalTimestamps = model.Bool("preserve_original_timestamps", defaultValue: false);
         var outputCollisionPolicy = model.Literal("output_collision_policy", [.. OutputCollisionPolicies.All], defaultValue: OutputCollisionPolicies.Replace);
-        var hardwareDecodeMode = model.Literal("hardware_decode_mode", [.. HardwareDecodeModes.All], defaultValue: HardwareDecodeModes.Off);
-        var hardwareDevice = model.OptionalStr("hardware_device", defaultValue: "", maxLength: 32) ?? string.Empty;
-        var hardwareDisabledVendorsCsv = model.OptionalStr("hardware_disabled_vendors_csv", defaultValue: "", maxLength: 200) ?? string.Empty;
         var ffmpegStrictness = model.Literal("ffmpeg_strictness", [.. FfmpegStrictnessLevels.All], defaultValue: FfmpegStrictnessLevels.Normal);
         // #548: two values, because "mkvmerge" and "auto" would behave identically - see RemuxWriterChoice.
         var remuxWriter = model.Literal("remux_writer", [.. RemuxWriterChoice.All], defaultValue: RemuxWriterChoice.Best);
-        var rewriteWithFfmpeg = model.Bool("rewrite_with_ffmpeg", defaultValue: true);
         var scanIntervalSeconds = model.Number("scan_interval_seconds", 300, required: false, ge: 10, le: 604800);
         var ignoreSizeChanges = model.Bool("ignore_size_changes", defaultValue: false);
         var skipAccessTests = model.Bool("skip_access_tests", defaultValue: false);
@@ -232,12 +234,8 @@ internal static class ProcessingLibraryMapping
             SidecarPatternsCsv = sidecarPatternsCsv,
             PreserveOriginalTimestamps = preserveOriginalTimestamps,
             OutputCollisionPolicy = outputCollisionPolicy,
-            HardwareDecodeMode = hardwareDecodeMode,
-            HardwareDevice = hardwareDevice,
-            HardwareDisabledVendorsCsv = hardwareDisabledVendorsCsv,
             FfmpegStrictness = ffmpegStrictness,
             RemuxWriter = remuxWriter,
-            RewriteWithFfmpeg = rewriteWithFfmpeg,
             ScanIntervalSeconds = scanIntervalSeconds,
             IgnoreSizeChanges = ignoreSizeChanges,
             SkipAccessTests = skipAccessTests,

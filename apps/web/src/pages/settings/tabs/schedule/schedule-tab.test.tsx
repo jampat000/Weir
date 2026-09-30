@@ -71,11 +71,7 @@ function library(over: Partial<ProcessingLibrary> = {}): ProcessingLibrary {
     preserve_original_timestamps: false,
     remove_original_after_success: true,
     remux_writer: "best",
-    rewrite_with_ffmpeg: true,
     output_collision_policy: "replace",
-    hardware_decode_mode: "off",
-    hardware_device: "",
-    hardware_disabled_vendors_csv: "",
     ffmpeg_strictness: "normal",
     ignore_size_changes: false,
     skip_access_tests: false,
@@ -167,7 +163,7 @@ it("asks before an unsaved library's hours are replaced by another library's", a
 it("keeps a workflow's other settings when its hours are saved", async () => {
   asOperator();
   vi.spyOn(librariesApi, "fetchProcessingLibraries").mockResolvedValue([
-    library({ remux_writer: "ffmpeg", rewrite_with_ffmpeg: false }),
+    library({ remux_writer: "ffmpeg" }),
   ]);
   const update = vi
     .spyOn(librariesApi, "updateProcessingLibrary")
@@ -184,6 +180,5 @@ it("keeps a workflow's other settings when its hours are saved", async () => {
   await waitFor(() => expect(update).toHaveBeenCalled());
   expect(update.mock.calls[0]![1]).toMatchObject({
     remux_writer: "ffmpeg",
-    rewrite_with_ffmpeg: false,
   });
 });

@@ -6,7 +6,7 @@ import { afterEach, expect, it, vi } from "vitest";
 import * as authQueries from "../../../../lib/auth/queries";
 import * as api from "../../../../lib/processing/direct-play-api";
 import type { DirectPlayDevices } from "../../../../lib/processing/direct-play-api";
-import { DirectPlaySection } from "./direct-play-section";
+import { PlaybackDevicesSection } from "./playback-devices-section";
 
 const devices: DirectPlayDevices = {
   customised: false,
@@ -53,13 +53,14 @@ it("lists each device with its note and source, and saves the chosen ids", async
     devices: devices.devices.map((d) => ({ ...d, selected: true })),
   });
 
-  render(<DirectPlaySection />, { wrapper });
+  render(<PlaybackDevicesSection />, { wrapper });
 
   expect(
     await screen.findByText(
-      "Shows which of your devices can play each file without your media server converting it. Information only — Weir never changes a file because of this.",
+      "Tick the devices you watch on. Each file then shows whether it can Direct Play on them, meaning your media server can play it as it is, without converting it. Information only: Weir never changes a file because of this.",
     ),
   ).toBeInTheDocument();
+  expect(screen.getByText("Your playback devices")).toBeInTheDocument();
   expect(
     screen.getByText("Nothing changes until you press Save."),
   ).toBeInTheDocument();
@@ -95,23 +96,23 @@ it("says when the list comes from the operator's own file", async () => {
     customised: true,
   });
 
-  render(<DirectPlaySection />, { wrapper });
+  render(<PlaybackDevicesSection />, { wrapper });
 
   expect(
     await screen.findByTestId("processing-direct-play-customised"),
   ).toHaveTextContent(/your own direct-play-devices\.json/);
 });
 
-it("shows a load error instead of a blank panel when Direct Play devices fail to load", async () => {
+it("shows a load error instead of a blank panel when the playback devices fail to load", async () => {
   asRole("operator");
   vi.spyOn(api, "fetchDirectPlayDevices").mockRejectedValue(
     new Error("network down"),
   );
 
-  render(<DirectPlaySection />, { wrapper });
+  render(<PlaybackDevicesSection />, { wrapper });
 
   expect(await screen.findByTestId("settings-load-error")).toHaveTextContent(
-    "Weir couldn’t load your Direct Play devices. Reload the page to try again.",
+    "Weir couldn’t load your playback devices. Reload the page to try again.",
   );
 });
 
@@ -120,7 +121,7 @@ it("shows a viewer the list read-only", async () => {
   vi.spyOn(api, "fetchDirectPlayDevices").mockResolvedValue(devices);
   const save = vi.spyOn(api, "putDirectPlayDevices");
 
-  render(<DirectPlaySection />, { wrapper });
+  render(<PlaybackDevicesSection />, { wrapper });
 
   const iphone = await screen.findByRole("checkbox", { name: "iPhone" });
   expect(iphone).toBeDisabled();

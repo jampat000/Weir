@@ -175,7 +175,7 @@ public sealed class MkvmergeRealTests : IDisposable
         var updates = new List<FfmpegProgressUpdate>();
 
         // ValidateStagedOutputAsync (#500) runs inside this call: it not throwing is half the assertion.
-        var output = await tools.RemuxToTempFileAsync(
+        var staged = await tools.RemuxToTempFileAsync(
             fixture,
             Path.Combine(_root, "work"),
             plan,
@@ -184,6 +184,7 @@ public sealed class MkvmergeRealTests : IDisposable
             updates.Add,
             ProbeOutput.DurationSeconds(probe),
             writer: Writer(tools));
+        var output = staged.Path;
 
         var outputProbe = await tools.FfprobeJsonAsync(output);
         Assert.Equal("eng", Language(Assert.Single(Streams(outputProbe, "audio"))));
@@ -206,14 +207,16 @@ public sealed class MkvmergeRealTests : IDisposable
         var plan = EnglishOnlyPlan(probe);
         Assert.Equal(2, plan.VideoIndices.Count);
 
-        var output = await tools.RemuxToTempFileAsync(
+        var staged = await tools.RemuxToTempFileAsync(
             fixture,
             Path.Combine(_root, "work-attached"),
             plan,
             probe,
             await tools.ProbeWarningLinesAsync(fixture),
             writer: Writer(tools));
+        var output = staged.Path;
 
+        Assert.IsType<FfmpegRemuxWriter>(staged.Writer);
         // ffmpeg's shape: the cover is an output video stream, and #547's attachment map kept the font.
         var outputProbe = await tools.FfprobeJsonAsync(output);
         Assert.Equal(2, Streams(outputProbe, "video").Count);
@@ -244,13 +247,14 @@ public sealed class MkvmergeRealTests : IDisposable
         // With the images dropped the plan keeps only the real video track, which mkvmerge can address.
         Assert.Single(plan.VideoIndices);
 
-        var output = await tools.RemuxToTempFileAsync(
+        var staged = await tools.RemuxToTempFileAsync(
             fixture,
             Path.Combine(_root, "work-no-images"),
             plan,
             probe,
             await tools.ProbeWarningLinesAsync(fixture),
             writer: Writer(tools));
+        var output = staged.Path;
 
         var identification = await tools.IdentifyMkvmergeAsync(RealMkvmerge.Tool!, output);
         var kept = Assert.Single(identification.Attachments);
@@ -265,38 +269,17 @@ public sealed class MkvmergeRealTests : IDisposable
         var probe = await tools.FfprobeJsonAsync(fixture);
         var plan = EnglishOnlyPlan(probe, new MetadataRules { RemoveImages = true, RemoveAttachments = true });
 
-        var output = await tools.RemuxToTempFileAsync(
+        var staged = await tools.RemuxToTempFileAsync(
             fixture,
             Path.Combine(_root, "work-bare"),
             plan,
             probe,
             await tools.ProbeWarningLinesAsync(fixture),
             writer: Writer(tools));
+        var output = staged.Path;
 
         var identification = await tools.IdentifyMkvmergeAsync(RealMkvmerge.Tool!, output);
         Assert.Empty(identification.Attachments);
-    }
-
-    [RequiresMkvmergeFact]
-    public async Task Turning_the_rewrite_off_lets_the_failure_through()
-    {
-        // The advanced escape hatch: with the rewrite disabled, a file mkvmerge cannot express fails instead of
-        // being written by ffmpeg. Proves the fallback in the test above is the setting doing its job and not
-        // something that happens regardless.
-        var fixture = await GenerateFixtureWithAttachmentsAsync();
-        var tools = Tools();
-        var probe = await tools.FfprobeJsonAsync(fixture);
-        var plan = EnglishOnlyPlan(probe);
-
-        await Assert.ThrowsAsync<MkvmergeUnsupportedPlanException>(
-            () => tools.RemuxToTempFileAsync(
-                fixture,
-                Path.Combine(_root, "work-no-rewrite"),
-                plan,
-                probe,
-                [],
-                writer: Writer(tools),
-                rewriteWithFfmpegOnFailure: false));
     }
 
     // --- writer selection ---------------------------------------------------------------------

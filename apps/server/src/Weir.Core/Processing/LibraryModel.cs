@@ -54,16 +54,6 @@ public static class OutputCollisionPolicies
     public static readonly IReadOnlyList<string> All = [Replace, Skip, KeepBoth, ReplaceIfLarger, ReplaceIfNewer];
 }
 
-/// <summary>How a library asks ffmpeg to decode for hardware-accelerated work.</summary>
-public static class HardwareDecodeModes
-{
-    public const string Off = "off";
-    public const string Auto = "auto";
-    public const string Device = "device";
-
-    public static readonly IReadOnlyList<string> All = [Off, Auto, Device];
-}
-
 /// <summary>How strictly ffmpeg treats a standards violation it finds in the source.</summary>
 public static class FfmpegStrictnessLevels
 {
@@ -74,6 +64,13 @@ public static class FfmpegStrictnessLevels
     public const string Experimental = "experimental";
 
     public static readonly IReadOnlyList<string> All = [Very, Strict, Normal, Unofficial, Experimental];
+
+    /// <summary>
+    /// The ffmpeg options that apply <paramref name="level"/>, placed before <c>-i</c>. ffmpeg's own default
+    /// (<c>normal</c>) and anything unrecognised add none.
+    /// </summary>
+    public static IReadOnlyList<string> InputFlags(string? level) =>
+        level is not (null or Normal) && All.Contains(level, StringComparer.Ordinal) ? ["-strict", level] : [];
 }
 
 /// <summary>One <c>rule_sets</c> row.</summary>
@@ -175,16 +172,10 @@ public sealed record ProcessingLibraryRecord
     public bool PreserveOriginalTimestamps { get; init; }
     public string OutputCollisionPolicy { get; init; } = "replace";
 
-    public string HardwareDecodeMode { get; init; } = "off";
-    public string HardwareDevice { get; init; } = string.Empty;
-    public string HardwareDisabledVendorsCsv { get; init; } = string.Empty;
-    public string FfmpegStrictness { get; init; } = "normal";
+    public string FfmpegStrictness { get; init; } = FfmpegStrictnessLevels.Normal;
 
-    /// <summary>#548: which tool writes the output. See <see cref="Weir.Core.Media.RemuxWriterChoice"/>.</summary>
+    /// <summary>Which tool writes the output, for new downloads and library cleaning alike. See <see cref="Weir.Core.Media.RemuxWriterChoice"/>.</summary>
     public string RemuxWriter { get; init; } = RemuxWriterChoice.Best;
-
-    /// <summary>#548: rewrite with ffmpeg when the preferred writer cannot write or validate a file.</summary>
-    public bool RewriteWithFfmpeg { get; init; } = true;
 
     /// <summary>
     /// Remove the source from the watched folder after a successful pass (the default). Off keeps the original download,

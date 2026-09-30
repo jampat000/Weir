@@ -41,12 +41,8 @@ public sealed record ProcessingLibraryInput
     public string SidecarPatternsCsv { get; init; } = ".srt,.ass,.ssa,.sub,.idx,.vtt,.nfo,.jpg,.png";
     public bool PreserveOriginalTimestamps { get; init; }
     public string OutputCollisionPolicy { get; init; } = "replace";
-    public string HardwareDecodeMode { get; init; } = "off";
-    public string HardwareDevice { get; init; } = string.Empty;
-    public string HardwareDisabledVendorsCsv { get; init; } = string.Empty;
     public string FfmpegStrictness { get; init; } = "normal";
     public string RemuxWriter { get; init; } = RemuxWriterChoice.Best;
-    public bool RewriteWithFfmpeg { get; init; } = true;
     public long ScanIntervalSeconds { get; init; } = 300;
     public bool IgnoreSizeChanges { get; init; }
     public bool SkipAccessTests { get; init; }
@@ -119,7 +115,6 @@ public static partial class LibraryRules
     {
         RequireOneOf("rejected file action", body.RejectedFileAction, RejectedFileActions.All);
         RequireOneOf("output collision policy", body.OutputCollisionPolicy, OutputCollisionPolicies.All);
-        RequireOneOf("hardware decode mode", body.HardwareDecodeMode, HardwareDecodeModes.All);
         RequireOneOf("ffmpeg strictness level", body.FfmpegStrictness, FfmpegStrictnessLevels.All);
         RequireOneOf("remux writer", body.RemuxWriter, RemuxWriterChoice.All);
         RequireOneOf("failure policy", body.FailurePolicy, ProcessingFailurePolicies.All);
@@ -204,9 +199,6 @@ public static partial class LibraryRules
             SidecarPatternsCsv = body.SidecarPatternsCsv,
             PreserveOriginalTimestamps = body.PreserveOriginalTimestamps,
             OutputCollisionPolicy = body.OutputCollisionPolicy,
-            HardwareDecodeMode = body.HardwareDecodeMode,
-            HardwareDevice = body.HardwareDevice,
-            HardwareDisabledVendorsCsv = body.HardwareDisabledVendorsCsv,
             FfmpegStrictness = body.FfmpegStrictness,
             IgnoreSizeChanges = body.IgnoreSizeChanges,
             SkipAccessTests = body.SkipAccessTests,

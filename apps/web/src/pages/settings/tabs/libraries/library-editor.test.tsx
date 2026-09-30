@@ -106,19 +106,24 @@ it("undoes an added existing-files folder when the editor is left without saving
   expect(saveFolders).not.toHaveBeenCalled();
 });
 
-it("labels hardware decoding as not available, since Weir never decodes the video", async () => {
+it("keeps FFmpeg compatibility folded away and offers no hardware decoding", async () => {
   asOperator();
   vi.spyOn(api, "fetchProcessingLibraries").mockResolvedValue([library()]);
 
   render(<LibrariesTab />, { wrapper });
   fireEvent.click(await screen.findByRole("button", { name: "Edit" }));
 
-  expect(screen.getByTestId("library-hardware-unavailable")).toHaveTextContent(
-    "Not available in this version",
-  );
   expect(
-    screen.getByRole("combobox", { name: "Hardware decoding" }),
-  ).toBeDisabled();
+    screen.getByText("FFmpeg compatibility (advanced)"),
+  ).toBeInTheDocument();
+  expect(
+    screen.getByRole("combobox", { name: "FFmpeg compatibility" }),
+  ).toBeEnabled();
+  expect(
+    screen.getByRole("combobox", { name: "Writes files with" }),
+  ).toBeEnabled();
+  expect(screen.queryByText(/Hardware decoding/)).not.toBeInTheDocument();
+  expect(screen.queryByText("Hardware method")).not.toBeInTheDocument();
 });
 
 it("adds a library through the API", async () => {
@@ -185,9 +190,6 @@ it("saves the complete library contract without resetting hidden or advanced val
     sidecar_patterns_csv: ".srt,.nfo,.jpg",
     preserve_original_timestamps: true,
     output_collision_policy: "keep_both",
-    hardware_decode_mode: "device",
-    hardware_device: "qsv",
-    hardware_disabled_vendors_csv: "nvidia",
     ffmpeg_strictness: "strict",
     max_attempts: 7,
     retry_backoff_seconds: 120,
@@ -225,9 +227,6 @@ it("saves the complete library contract without resetting hidden or advanced val
         sidecar_patterns_csv: ".srt,.nfo,.jpg",
         preserve_original_timestamps: true,
         output_collision_policy: "keep_both",
-        hardware_decode_mode: "device",
-        hardware_device: "qsv",
-        hardware_disabled_vendors_csv: "nvidia",
         ffmpeg_strictness: "strict",
         max_attempts: 7,
         retry_backoff_seconds: 120,

@@ -11,7 +11,7 @@ namespace Weir.Infrastructure.Media;
 /// <param name="SourceProbe">The source's own ffprobe JSON, already read by the caller.</param>
 /// <param name="ProgressCallback">Reported to as the tool runs, when given.</param>
 /// <param name="DurationSeconds">The expected output duration, for the progress percentage only.</param>
-/// <param name="Acceleration">The hardware acceleration decision, when one was made. ffmpeg only.</param>
+/// <param name="FfmpegInputFlags">Options ffmpeg reads before <c>-i</c>, such as its strictness. ffmpeg only.</param>
 public sealed record RemuxWriteRequest(
     string Source,
     string Destination,
@@ -19,7 +19,12 @@ public sealed record RemuxWriteRequest(
     JsonElement SourceProbe,
     Action<FfmpegProgressUpdate>? ProgressCallback = null,
     double? DurationSeconds = null,
-    AccelerationDecision? Acceleration = null);
+    IReadOnlyList<string>? FfmpegInputFlags = null);
+
+/// <summary>A remux written to a staged file, and the tool that actually wrote it.</summary>
+/// <param name="Path">The staged output, already validated. The caller owns moving or deleting it.</param>
+/// <param name="Writer">The tool that wrote it: the chosen one, or ffmpeg when the chosen one could not.</param>
+public sealed record StagedRemux(string Path, IRemuxWriter Writer);
 
 /// <summary>
 /// Writes the output of one remux pass. Both writers are given the same <see cref="RemuxPlan"/> and produce a

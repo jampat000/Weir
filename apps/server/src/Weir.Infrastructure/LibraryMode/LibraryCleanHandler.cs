@@ -212,20 +212,25 @@ public sealed partial class LibraryCleanHandler : IJobHandler
         var keepOriginal = settings.KeepOriginalAfterClean
             ? new KeepOriginalOptions(settings.Folders, settings.OriginalsFolder)
             : null;
+        // The workflow's "Writes files with" and FFmpeg compatibility choices apply here exactly as they do to new downloads.
+        var writer = _tools.WriterFor(path, library.RemuxWriter);
+        var ffmpegInputFlags = FfmpegStrictnessLevels.InputFlags(library.FfmpegStrictness);
+        string? writerNote = null;
         var result = await _swap.RunAsync(
             context.Id,
             path,
             async (tempPath, ct) =>
             {
                 var workDir = Path.GetDirectoryName(tempPath) is { Length: > 0 } dir ? dir : ".";
-                var written = await _tools.RemuxToTempFileAsync(path, workDir, plan.Plan!, probe.Json, sourceWarnings, durationSeconds: durationSeconds, cancellationToken: ct).ConfigureAwait(false);
+                var staged = await _tools.RemuxToTempFileAsync(path, workDir, plan.Plan!, probe.Json, sourceWarnings, durationSeconds: durationSeconds, ffmpegInputFlags: ffmpegInputFlags, writer: writer, cancellationToken: ct).ConfigureAwait(false);
+                writerNote = FfmpegFallbackNote(library.RemuxWriter, staged);
                 try
                 {
-                    File.Move(written, tempPath, overwrite: false);
+                    File.Move(staged.Path, tempPath, overwrite: false);
                 }
                 catch
                 {
-                    TryDelete(written);
+                    TryDelete(staged.Path);
                     throw;
                 }
             },
@@ -235,7 +240,7 @@ public sealed partial class LibraryCleanHandler : IJobHandler
         switch (result.Outcome)
         {
             case SwapOutcome.Committed:
-                await OnCommittedAsync(library, path, plan, result, cancellationToken).ConfigureAwait(false);
+                await OnCommittedAsync(library, path, plan, result, writerNote, cancellationToken).ConfigureAwait(false);
                 return;
             case SwapOutcome.InUse:
                 await OnInUseAsync(context, payload, libraryId, path, trigger, inUseAttempts).ConfigureAwait(false);

@@ -55,9 +55,10 @@ function DeviceSource({
 /**
  * Which devices the operator owns, so each file can say whether it will play on them without
  * the media server converting it (#467). Information only: it changes the badge on files and
- * nothing about how a file is processed.
+ * nothing about how a file is processed. It is also the list of devices a later "convert video so
+ * my TV can play it directly" rule will aim at.
  */
-export function DirectPlaySection() {
+export function PlaybackDevicesSection() {
   const me = useMeQuery();
   const q = useDirectPlayDevicesQuery();
   const save = useDirectPlayDevicesSaveMutation();
@@ -72,10 +73,10 @@ export function DirectPlaySection() {
   }, [q.data]);
 
   if (q.isPending || me.isPending) {
-    return <PageLoading label="Loading Direct Play devices" />;
+    return <PageLoading label="Loading your playback devices" />;
   }
   if (q.isError) {
-    return <SettingsLoadError what="Direct Play devices" />;
+    return <SettingsLoadError what="playback devices" />;
   }
   if (!q.data) return null;
 
@@ -96,15 +97,16 @@ export function DirectPlaySection() {
     // Nothing here is a setting — it is a reference table of what each device can play, and it was
     // taking half of Running. Folded away until someone asks for it.
     <QuietDisclosure
-      title="Direct Play devices"
+      title="Your playback devices"
       summaryWhenClosed="Reference"
       data-testid="processing-direct-play-section"
     >
       <SaveModelNote model="explicit" />
       <p className="mm-quiet-note">
-        Shows which of your devices can play each file without your media server
-        converting it. Information only — Weir never changes a file because of
-        this.
+        Tick the devices you watch on. Each file then shows whether it can
+        Direct Play on them, meaning your media server can play it as it is,
+        without converting it. Information only: Weir never changes a file
+        because of this.
       </p>
       {q.data.customised ? (
         <p

@@ -221,9 +221,9 @@ public sealed class MediaToolsTests : IDisposable
     }
 
     [Fact]
-    public async Task A_decided_hardware_acceleration_reaches_the_executed_remux_argv()
+    public async Task Ffmpeg_input_options_reach_the_executed_remux_argv()
     {
-        // #539 item 2: the executed remux argv carries the decided hwaccel flags, so the setting changes what
+        // #539 item 2: the executed remux argv carries the chosen input options, so the setting changes what
         // actually runs instead of being dropped when the remux builds its own argv.
         var source = WriteFile("source.mkv", "source"u8.ToArray());
         var workDir = Path.Combine(_root, "work");
@@ -232,17 +232,16 @@ public sealed class MediaToolsTests : IDisposable
             ? new ScriptedRun { Stdout = Encoding.UTF8.GetBytes(MatchingRemuxOutputJson) }
             : new ScriptedRun());
         var tools = new MediaTools(runner, new FixedResolver(), new ListLogger<MediaTools>(), TimeProvider.System, p => new MediaFileState(p, true, true, 100, 0));
-        var acceleration = new AccelerationDecision { Method = "cuda", ArgvFlags = ["-hwaccel", "cuda"], Reason = "test" };
         using var sourceDocument = JsonDocument.Parse(SourceWithKeptStreamDurationsJson);
 
-        await tools.RemuxToTempFileAsync(source, workDir, plan, sourceDocument.RootElement, [], durationSeconds: 100.0, acceleration: acceleration);
+        await tools.RemuxToTempFileAsync(source, workDir, plan, sourceDocument.RootElement, [], durationSeconds: 100.0, ffmpegInputFlags: ["-strict", "experimental"]);
 
         var ffmpeg = Assert.Single(runner.Requests, r => r.Argv[0] == "ffmpeg");
         Assert.Equal(
-            ["-hwaccel", "cuda", "-protocol_whitelist", "file"],
+            ["-strict", "experimental", "-protocol_whitelist", "file"],
             ffmpeg.Argv.SkipWhile(a => a != "-y").Skip(1).TakeWhile(a => a != "-i"));
         Assert.Contains("-i", ffmpeg.Argv);
-        Assert.True(ffmpeg.Argv.ToList().IndexOf("-hwaccel") < ffmpeg.Argv.ToList().IndexOf("-i"), "hwaccel flags must come before -i");
+        Assert.True(ffmpeg.Argv.ToList().IndexOf("-strict") < ffmpeg.Argv.ToList().IndexOf("-i"), "input options must come before -i");
     }
 
     [Fact]
@@ -366,31 +365,6 @@ public sealed class MediaToolsTests : IDisposable
         Assert.True(report.Detected);
         Assert.Equal(["cuda", "qsv", "vaapi"], report.AvailableMethods);
         Assert.Equal(["ffmpeg", "-hide_banner", "-hwaccels"], Assert.Single(runner.Requests).Argv);
-    }
-
-    [Fact]
-    public async Task A_known_answer_is_reused_instead_of_asking_ffmpeg_again()
-    {
-        var runner = new ScriptedRunner(_ => new ScriptedRun { Stdout = "Hardware acceleration methods:\ncuda\n"u8.ToArray() });
-        var tools = Tools(runner);
-
-        await tools.KnownAccelerationAsync("ffmpeg");
-        var report = await tools.KnownAccelerationAsync("ffmpeg");
-
-        Assert.Equal(["cuda"], report.AvailableMethods);
-        Assert.Single(runner.Requests);
-    }
-
-    [Fact]
-    public async Task An_answer_that_could_not_be_read_is_asked_for_again()
-    {
-        var runner = new ScriptedRunner(_ => new ScriptedRun { ExitCode = 1 });
-        var tools = Tools(runner);
-
-        await tools.KnownAccelerationAsync("ffmpeg");
-        await tools.KnownAccelerationAsync("ffmpeg");
-
-        Assert.Equal(2, runner.Requests.Count);
     }
 
     [Fact]
