@@ -5301,6 +5301,12 @@ export interface components {
        * @enum {string}
        */
       remux_writer: "best" | "ffmpeg";
+      /**
+       * Rewrite With Ffmpeg
+       * @description With remux_writer best: when mkvmerge's write fails its checks, ffmpeg writes the file again instead of the file failing. Off fails the file at once.
+       * @default true
+       */
+      rewrite_with_ffmpeg: boolean;
     };
     /** ProcessingLibraryDeleteIn */
     ProcessingLibraryDeleteIn: {
@@ -5499,6 +5505,12 @@ export interface components {
        * @enum {string}
        */
       remux_writer: "best" | "ffmpeg";
+      /**
+       * Rewrite With Ffmpeg
+       * @description With remux_writer best: when mkvmerge's write fails its checks, ffmpeg writes the file again instead of the file failing. Off fails the file at once.
+       * @default true
+       */
+      rewrite_with_ffmpeg: boolean;
     };
     /** ProcessingLibraryReorderIn */
     ProcessingLibraryReorderIn: {
@@ -5788,6 +5800,12 @@ export interface components {
        * @enum {string}
        */
       remux_writer: "best" | "ffmpeg";
+      /**
+       * Rewrite With Ffmpeg
+       * @description With remux_writer best: when mkvmerge's write fails its checks, ffmpeg writes the file again instead of the file failing. Off fails the file at once.
+       * @default true
+       */
+      rewrite_with_ffmpeg: boolean;
     };
     /**
      * ProcessingManualPlanIn

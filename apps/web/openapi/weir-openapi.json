@@ -6383,6 +6383,12 @@
             ],
             "title": "Remux Writer",
             "type": "string"
+          },
+          "rewrite_with_ffmpeg": {
+            "default": true,
+            "description": "With remux_writer best: when mkvmerge's write fails its checks, ffmpeg writes the file again instead of the file failing. Off fails the file at once.",
+            "title": "Rewrite With Ffmpeg",
+            "type": "boolean"
           }
         },
         "required": [
@@ -6814,6 +6820,12 @@
             ],
             "title": "Remux Writer",
             "type": "string"
+          },
+          "rewrite_with_ffmpeg": {
+            "default": true,
+            "description": "With remux_writer best: when mkvmerge's write fails its checks, ffmpeg writes the file again instead of the file failing. Off fails the file at once.",
+            "title": "Rewrite With Ffmpeg",
+            "type": "boolean"
           }
         },
         "required": [
@@ -7296,6 +7308,12 @@
             ],
             "title": "Remux Writer",
             "type": "string"
+          },
+          "rewrite_with_ffmpeg": {
+            "default": true,
+            "description": "With remux_writer best: when mkvmerge's write fails its checks, ffmpeg writes the file again instead of the file failing. Off fails the file at once.",
+            "title": "Rewrite With Ffmpeg",
+            "type": "boolean"
           }
         },
         "required": [

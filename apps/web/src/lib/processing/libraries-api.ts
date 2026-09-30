@@ -52,7 +52,9 @@ export interface ProcessingLibrary {
   /** Off keeps the original download in the watched folder after cleaning, so a torrent keeps seeding. */
   remove_original_after_success: boolean;
   /** Which tool writes the output: mkvmerge for MKV when installed and FFmpeg otherwise (best), or FFmpeg only. */
-  remux_writer?: RemuxWriter;
+  remux_writer: RemuxWriter;
+  /** When mkvmerge's write fails its checks, whether FFmpeg writes the file again instead of failing it. */
+  rewrite_with_ffmpeg: boolean;
   /** What to do when an output already exists at the same path. "replace" is the long-standing behaviour. */
   output_collision_policy: string;
   /** Hardware decoding. A choice that cannot work falls back to software and records why. */
@@ -123,7 +125,9 @@ export interface ProcessingLibraryWrite {
   /** Off keeps the original download in the watched folder after cleaning, so a torrent keeps seeding. */
   remove_original_after_success: boolean;
   /** Which tool writes the output: mkvmerge for MKV when installed and FFmpeg otherwise (best), or FFmpeg only. */
-  remux_writer?: RemuxWriter;
+  remux_writer: RemuxWriter;
+  /** When mkvmerge's write fails its checks, whether FFmpeg writes the file again instead of failing it. */
+  rewrite_with_ffmpeg: boolean;
   output_collision_policy: string;
   hardware_decode_mode: string;
   hardware_device: string;
@@ -239,6 +243,8 @@ export function writeFromProcessingLibrary(
     sidecar_patterns_csv: library.sidecar_patterns_csv,
     preserve_original_timestamps: library.preserve_original_timestamps,
     remove_original_after_success: library.remove_original_after_success,
+    remux_writer: library.remux_writer,
+    rewrite_with_ffmpeg: library.rewrite_with_ffmpeg,
     output_collision_policy: library.output_collision_policy,
     hardware_decode_mode: library.hardware_decode_mode,
     hardware_device: library.hardware_device,
