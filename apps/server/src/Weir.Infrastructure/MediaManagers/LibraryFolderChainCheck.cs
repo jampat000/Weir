@@ -44,10 +44,11 @@ public sealed class LibraryFolderChainCheck
     /// <c>managers</c> is what <see cref="ManagerSetupCheck.CheckAsync"/> returns for this library's watched/output
     /// folders and media type, for the managers the library is linked to only: a Weir-only library has none, and a
     /// manager it is not linked to never appears in its chain. A library with no id yet (a proposal) is checked against
-    /// every manager that covers its media type, since that is what it would be linked to. <c>download_clients</c> is one entry per enabled bare
-    /// download-client connection, checking whether any of its folders is this library's watched folder
-    /// (<see cref="LibraryFolderChainRules.CheckDownloadClientFolders"/>), one line per folder it saves to — with none
-    /// connected, an empty list never makes the library not ready, the same as with no manager connected.
+    /// every manager that covers its media type, since that is what it would be linked to. <c>download_clients</c> is one entry per
+    /// enabled bare download-client connection this library actually uses (<see cref="DownloadClientInvolvement"/>), checking
+    /// whether any of its folders is this library's watched folder (<see cref="LibraryFolderChainRules.CheckDownloadClientFolders"/>),
+    /// one line per folder it saves to. A Weir-only library, or a client it does not use, has none — with none, an empty
+    /// list never makes the library not ready, the same as with no manager connected.
     /// </summary>
     public async Task<WireObject> CheckForLibraryAsync(UnitOfWork uow, ProcessingLibraryRecord library, CancellationToken cancellationToken)
     {
@@ -68,7 +69,7 @@ public sealed class LibraryFolderChainCheck
             .ConfigureAwait(false);
         var managersReady = managers.All(entry => entry.Get("ready") is WireBool { Value: true });
 
-        var downloadClients = await DownloadClientEntriesAsync(uow, library.WatchedFolder, cancellationToken).ConfigureAwait(false);
+        var downloadClients = await DownloadClientEntriesAsync(uow, library, linked, cancellationToken).ConfigureAwait(false);
         var downloadClientsReady = downloadClients.All(entry => entry.Get("ready") is WireBool { Value: true });
 
         return new WireObject()
@@ -87,21 +88,33 @@ public sealed class LibraryFolderChainCheck
             ? new DelunoLibraryLink(connectionId, library.DiscoveredLibraryKey)
             : null;
 
-    private async Task<List<WireObject>> DownloadClientEntriesAsync(UnitOfWork uow, string watchedFolder, CancellationToken cancellationToken)
+    private async Task<List<WireObject>> DownloadClientEntriesAsync(
+        UnitOfWork uow, ProcessingLibraryRecord library, IReadOnlySet<long>? linkedConnectionIds, CancellationToken cancellationToken)
     {
         var connections = await _downloadClientSuggestions.ReadAllAsync(uow, cancellationToken).ConfigureAwait(false);
-        return [.. connections.Select(item =>
+        var candidates = connections.Select(item => (item.Row, item.Folders, SavesHere: DownloadClientInvolvement.SavesInto(library.WatchedFolder, item.Folders))).ToList();
+        IReadOnlyList<ArrDownloadClientEntry> managerClients = [];
+        if (candidates.Any(candidate => !candidate.SavesHere))
         {
-            var label = DownloadClientKinds.LabelForConnection(item.Row.Kind, item.Row.Name);
-            var lines = LibraryFolderChainRules.CheckDownloadClientFolders(label, watchedFolder, item.Folders);
-            return new WireObject()
-                .Set("connection_id", item.Row.Id)
-                .Set("kind", item.Row.Kind)
-                .Set("name", item.Row.Name)
-                .Set("label", label)
-                .Set("ready", lines.All(line => line.State != SetupCheckLine.Problem))
-                .Set("lines", new WireArray(lines.Select(line => (WireValue)line.ToOut())));
-        })];
+            managerClients = await _managerSetupCheck.DownloadClientsUsedAsync(uow, library.MediaType, linkedConnectionIds, cancellationToken).ConfigureAwait(false);
+        }
+
+        return [.. candidates
+            .Where(candidate => candidate.SavesHere || DownloadClientInvolvement.IsUsedBy(candidate.Row.Kind, candidate.Row.BaseUrl, managerClients))
+            .Select(candidate => DownloadClientEntry(candidate.Row, candidate.Folders, library.WatchedFolder))];
+    }
+
+    private WireObject DownloadClientEntry(DownloadClientConnectionRecord row, DownloadClientFolders folders, string watchedFolder)
+    {
+        var label = DownloadClientKinds.LabelForConnection(row.Kind, row.Name);
+        var lines = LibraryFolderChainRules.CheckDownloadClientFolders(label, watchedFolder, folders, _probe);
+        return new WireObject()
+            .Set("connection_id", row.Id)
+            .Set("kind", row.Kind)
+            .Set("name", row.Name)
+            .Set("label", label)
+            .Set("ready", lines.All(line => line.State != SetupCheckLine.Problem))
+            .Set("lines", new WireArray(lines.Select(line => (WireValue)line.ToOut())));
     }
 
     /// <summary>

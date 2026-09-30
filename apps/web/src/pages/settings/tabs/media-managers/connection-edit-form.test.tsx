@@ -117,6 +117,57 @@ describe("ConnectionEditForm", () => {
     expect(onClose).not.toHaveBeenCalled();
   });
 
+  it.each(["radarr", "sonarr", "deluno"] as const)(
+    "will not save a %s connection with the address cleared",
+    (kind) => {
+      render(
+        <ConnectionEditForm
+          connection={connection({ kind })}
+          onClose={vi.fn()}
+        />,
+        { wrapper },
+      );
+
+      fireEvent.change(screen.getByTestId("media-manager-edit-base-url"), {
+        target: { value: "  " },
+      });
+
+      expect(screen.getByTestId("media-manager-edit-save")).toBeDisabled();
+    },
+  );
+
+  it("saves a Something else connection with no address, and says the address is optional", async () => {
+    const update = vi
+      .spyOn(api, "updateMediaManagerConnection")
+      .mockResolvedValue(connection({ kind: "native", base_url: "" }));
+    const onClose = vi.fn();
+    render(
+      <ConnectionEditForm
+        connection={connection({
+          kind: "native",
+          name: "Media manager",
+          base_url: "",
+        })}
+        onClose={onClose}
+      />,
+      { wrapper },
+    );
+
+    expect(screen.getByText(/^Optional\. Leave it blank/)).toBeInTheDocument();
+    fireEvent.change(screen.getByTestId("media-manager-edit-api-key"), {
+      target: { value: "new-key" },
+    });
+    expect(screen.getByTestId("media-manager-edit-save")).toBeEnabled();
+    fireEvent.click(screen.getByTestId("media-manager-edit-save"));
+
+    await waitFor(() => expect(update).toHaveBeenCalledTimes(1));
+    expect(update).toHaveBeenCalledWith(1, {
+      base_url: "",
+      api_key: "new-key",
+    });
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+  });
+
   it("closes at once when Cancel is pressed with nothing changed", () => {
     const onClose = vi.fn();
     render(<ConnectionEditForm connection={connection()} onClose={onClose} />, {

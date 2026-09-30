@@ -138,13 +138,15 @@ public static class LibraryFolderChainRules
     /// Where a bare download client really saves, read from the client itself, against this library's watched folder. Each
     /// folder the client reports (its default completed-downloads folder, then each category's own) gets a line: Ok when it
     /// is inside the watched folder, a note when it is elsewhere but another folder of the client is inside, and, when none
-    /// is, one problem naming every folder the client saves to. Uses <see cref="ArrOsPath.Contains"/> since these are plain
-    /// local paths on Weir's own host, never remote-mapped the way a manager's are. A client that reported no folder at all
-    /// is <see cref="SetupCheckLine.Unverified"/>.
+    /// is, one problem naming every folder the client saves to. Compares with <see cref="ArrOsPath.Contains"/>, which only
+    /// means something for folders on Weir's own machine: when a folder the client reports cannot be seen here (a client in
+    /// a container or on another machine names its folders its own way) that none is inside is not a problem, it is
+    /// <see cref="SetupCheckLine.Unverified"/>, as is a client that reported no folder at all.
     /// </summary>
-    public static IReadOnlyList<SetupCheckLine> CheckDownloadClientFolders(string clientLabel, string watchedFolder, DownloadClientFolders folders)
+    public static IReadOnlyList<SetupCheckLine> CheckDownloadClientFolders(string clientLabel, string watchedFolder, DownloadClientFolders folders, IFolderProbe probe)
     {
         ArgumentNullException.ThrowIfNull(folders);
+        ArgumentNullException.ThrowIfNull(probe);
         var watched = new ArrOsPath((watchedFolder ?? string.Empty).Trim());
         if (!watched.IsRooted)
         {
@@ -163,6 +165,14 @@ public static class LibraryFolderChainRules
         if (!isInside.Contains(true))
         {
             var actual = string.Join("; ", saveFolders.Select(saveFolder => $"{saveFolder.Name} {saveFolder.Folder}"));
+            if (saveFolders.Any(saveFolder => probe.ResolveFinalPath(saveFolder.Folder) is null))
+            {
+                return [new SetupCheckLine(
+                    SetupCheckLine.Unverified,
+                    $"{clientLabel} saves to: {actual}. Weir cannot see all of that from this computer, so it cannot tell whether downloads land in this workflow's watched folder {watched}. " +
+                    $"That is expected when {clientLabel} runs on another machine or in a container that names its folders differently.")];
+            }
+
             return [new SetupCheckLine(
                 SetupCheckLine.Problem,
                 $"{clientLabel} saves to: {actual}. None of that is inside this workflow's watched folder {watched}, so Weir would never see the downloads. " +
