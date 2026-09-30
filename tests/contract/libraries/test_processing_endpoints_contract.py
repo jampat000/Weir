@@ -36,7 +36,6 @@ FILE_KEYS = {
     "progress_eta_seconds",
     "failure_class",
     "failure_attempts",
-    "quarantined",
     "next_retry_at",
     "output_collision_policy",
     "output_collision_action",
@@ -64,8 +63,6 @@ def seeded(server) -> None:
             relative_path="Alpha/alpha.mkv",
             status="on_hold",
             status_reason="Held for the test.",
-            failure_class="execution",
-            failure_attempts=3,
             size_bytes=4096,
             last_seen_at=seed.utc_text(),
         )
@@ -133,8 +130,8 @@ def test_files_list_shape(viewer) -> None:
     assert alpha["status"] == "on_hold"
     assert alpha["status_reason"] == "Held for the test."
     assert alpha["size_bytes"] == 4096
-    assert alpha["failure_attempts"] == 3
-    assert alpha["quarantined"] is True
+    assert alpha["failure_attempts"] == 0
+    assert "quarantined" not in alpha
     assert alpha["direct_play"] == []
 
 

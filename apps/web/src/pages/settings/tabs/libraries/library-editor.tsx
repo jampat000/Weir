@@ -34,6 +34,7 @@ import {
 import { LibraryDownloadClientSuggestions } from "./library-download-client-suggestions";
 import { LibraryLinkSection } from "./library-link-section";
 import { LibraryManagerSetup } from "./library-manager-setup";
+import { LibraryFailureGroup } from "./library-failure-group";
 import {
   LibraryCapacityGroup,
   LibraryOutputGroup,
@@ -166,7 +167,8 @@ export function LibraryEditor({
           <LibraryIntakeGroup binding={binding} />
           <LibraryReadinessGroup binding={binding} />
           <LibraryOutputGroup binding={binding} />
-          <LibraryCapacityGroup
+          <LibraryCapacityGroup binding={binding} />
+          <LibraryFailureGroup
             binding={binding}
             rejectSupport={rejectSupport}
           />

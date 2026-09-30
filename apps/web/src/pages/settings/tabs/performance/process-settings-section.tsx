@@ -35,8 +35,8 @@ function formatFreeSpaceGb(minimumFreeDiskSpaceMb: number): string {
 }
 
 /**
- * Settings › Performance: how hard Weir works, what it checks before it starts a file, and what it keeps when
- * one fails. The cleanup switches are on Cleanup, each beside its own timer.
+ * Settings › Performance: how hard Weir works and what it checks before it starts a file. The cleanup switches
+ * are on Cleanup, each beside its own timer.
  */
 export function ProcessSettingsSection() {
   const me = useMeQuery();
@@ -57,7 +57,6 @@ export function ProcessSettingsSection() {
   const [minFileAgeSeconds, setMinFileAgeSeconds] = useState("60");
   const [minInputFileSizeMb, setMinInputFileSizeMb] = useState("50");
   const [minimumFreeDiskSpaceGb, setMinimumFreeDiskSpaceGb] = useState("5");
-  const [keepFailedWorkFiles, setKeepFailedWorkFiles] = useState(false);
 
   useEffect(() => {
     if (!q.data) return;
@@ -74,7 +73,6 @@ export function ProcessSettingsSection() {
     setMinimumFreeDiskSpaceGb(
       formatFreeSpaceGb(q.data.minimum_free_disk_space_mb),
     );
-    setKeepFailedWorkFiles(q.data.keep_failed_work_files);
   }, [q.data]);
 
   if (q.isPending || me.isPending) {
@@ -120,8 +118,7 @@ export function ProcessSettingsSection() {
     minFileAgeSeconds !== String(q.data.min_file_age_seconds) ||
     minInputFileSizeMb !== String(q.data.min_input_file_size_mb) ||
     minimumFreeDiskSpaceGb !==
-      formatFreeSpaceGb(q.data.minimum_free_disk_space_mb) ||
-    keepFailedWorkFiles !== q.data.keep_failed_work_files;
+      formatFreeSpaceGb(q.data.minimum_free_disk_space_mb);
   const locked = !editable || save.isPending;
 
   const cost = (label: string, value: string, set: (v: string) => void) => (
@@ -142,8 +139,8 @@ export function ProcessSettingsSection() {
     <div data-testid="processing-process-settings">
       <SaveModelNote model="explicit" />
       <p className="mm-quiet-note">
-        How hard Weir works, what it checks before it starts a file, and what it
-        keeps when one fails. The defaults suit most machines.
+        How hard Weir works and what it checks before it starts a file. The
+        defaults suit most machines.
       </p>
       <div className="mm-setgroups mm-setgroups--columns">
         <div>
@@ -277,27 +274,6 @@ export function ProcessSettingsSection() {
             </SettingRow>
           </SettingsGroup>
         </div>
-
-        <div>
-          <SettingsGroup
-            title="When a file fails"
-            detail="What Weir leaves behind for you to look at. Deleting the download of a failed file is a Cleanup job."
-          >
-            <SettingRow
-              label="Keep the half-written copy"
-              hint="Left in the work folder so you can look at it. Cleanup's leftover-work-file sweep removes it once it is a day old."
-            >
-              <MmOnOffSwitch
-                id={`${ids}-keep-failed`}
-                label="Keep the half-written copy"
-                enabled={keepFailedWorkFiles}
-                disabled={locked}
-                onChange={setKeepFailedWorkFiles}
-                layout="control"
-              />
-            </SettingRow>
-          </SettingsGroup>
-        </div>
       </div>
 
       {save.isError ? (
@@ -320,7 +296,6 @@ export function ProcessSettingsSection() {
               runner_cost_4k: costs[4],
               runner_cost_undetermined: costs[5],
               runner_budget_enabled: runnerBudgetEnabled,
-              keep_failed_work_files: keepFailedWorkFiles,
               min_file_age_seconds: int(minFileAgeSeconds),
               min_input_file_size_mb: int(minInputFileSizeMb),
               minimum_free_disk_space_mb: minimumFreeMb,

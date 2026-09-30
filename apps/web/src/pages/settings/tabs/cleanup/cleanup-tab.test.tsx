@@ -42,17 +42,18 @@ function state(over: Partial<MaintenanceState> = {}): MaintenanceState {
         next_run_at: "2026-08-19T05:00:00",
       },
       {
-        family: "failure_cleanup",
+        family: "unclaimed_handbacks",
         enabled: false,
         description:
-          "Removes the source release folder after a file has failed terminally. This deletes the original.",
+          "Deletes Weir's own cleaned copy from a hand-back folder when no media manager imported it in time.",
         pending: 0,
         running: 0,
         last_completed_at: null,
         last_failed_at: null,
         last_error: null,
-        interval_seconds: 3600,
+        interval_seconds: 21600,
         next_run_at: null,
+        window_days: 14,
       },
     ],
     ...over,
@@ -62,7 +63,7 @@ function state(over: Partial<MaintenanceState> = {}): MaintenanceState {
 function setup(
   data: MaintenanceState,
   role = "operator",
-  options: { savePending?: boolean } = {},
+  options: { savePending?: boolean; keepFailedWorkFiles?: boolean } = {},
 ) {
   vi.spyOn(authQueries, "useMeQuery").mockReturnValue({
     data: { role },
@@ -87,7 +88,10 @@ function setup(
     processingQueries,
     "useProcessingOperatorSettingsQuery",
   ).mockReturnValue({
-    data: { file_log_retention_days: 90 },
+    data: {
+      keep_failed_work_files: options.keepFailedWorkFiles ?? false,
+      unclaimed_handback_window_days: 14,
+    },
     isPending: false,
     isError: false,
   } as ReturnType<typeof processingQueries.useProcessingOperatorSettingsQuery>);
@@ -132,13 +136,100 @@ it("lists each job with its switch, how often it runs and when it next does", as
       name: "How often Leftover work files runs",
     }),
   ).toHaveValue("3600");
-  const cleanup = screen.getByTestId("processing-maintenance-failure_cleanup");
-  expect(cleanup).toHaveTextContent("Downloads of failed files");
+  const cleanup = screen.getByTestId(
+    "processing-maintenance-unclaimed_handbacks",
+  );
+  expect(cleanup).toHaveTextContent("Cleaned copies nobody picked up");
   expect(within(cleanup).getByRole("radio", { name: "Off" })).toHaveAttribute(
     "aria-checked",
     "true",
   );
   expect(cleanup).toHaveTextContent("Off");
+});
+
+it("holds only the leftover work files, the kept half-written copy and the copies nobody picked up", async () => {
+  setup(state());
+
+  render(<CleanupTab />, { wrapper });
+
+  await screen.findByTestId("processing-maintenance-work_temp_stale_sweep");
+  expect(
+    screen.queryByText("Downloads of failed files"),
+  ).not.toBeInTheDocument();
+  expect(screen.queryByText("Old file history")).not.toBeInTheDocument();
+  expect(
+    screen.queryByLabelText("Keep file history for"),
+  ).not.toBeInTheDocument();
+  const rows = screen
+    .getAllByRole("row")
+    .map((row) => row.getAttribute("data-testid"))
+    .filter(Boolean);
+  expect(rows).toEqual([
+    "processing-maintenance-work_temp_stale_sweep",
+    "processing-maintenance-keep-failed-copy",
+    "processing-maintenance-unclaimed_handbacks",
+    "processing-maintenance-handback-window",
+  ]);
+});
+
+it("keeps a failed file's half-written copy for a day when switched on, and saves at once", async () => {
+  setup(state());
+  saveSettings.mockResolvedValue({});
+
+  render(<CleanupTab />, { wrapper });
+  const row = await screen.findByTestId(
+    "processing-maintenance-keep-failed-copy",
+  );
+  expect(row).toHaveTextContent(
+    "Keep a failed file’s half-written copy for a day, so you can look at it.",
+  );
+  expect(within(row).getByRole("radio", { name: "Off" })).toHaveAttribute(
+    "aria-checked",
+    "true",
+  );
+  fireEvent.click(within(row).getByRole("radio", { name: "On" }));
+
+  await waitFor(() =>
+    expect(saveSettings).toHaveBeenCalledWith({ keep_failed_work_files: true }),
+  );
+  expect(
+    await screen.findByTestId("processing-maintenance-notice"),
+  ).toHaveTextContent(
+    "A failed file’s half-written copy is now kept for a day.",
+  );
+});
+
+it("shows the kept half-written copy switched on as saved, and switches it off", async () => {
+  setup(state(), "operator", { keepFailedWorkFiles: true });
+  saveSettings.mockResolvedValue({});
+
+  render(<CleanupTab />, { wrapper });
+  const row = await screen.findByTestId(
+    "processing-maintenance-keep-failed-copy",
+  );
+  expect(within(row).getByRole("radio", { name: "On" })).toHaveAttribute(
+    "aria-checked",
+    "true",
+  );
+  fireEvent.click(within(row).getByRole("radio", { name: "Off" }));
+
+  await waitFor(() =>
+    expect(saveSettings).toHaveBeenCalledWith({
+      keep_failed_work_files: false,
+    }),
+  );
+});
+
+it("does not let a viewer change whether a failed file's copy is kept", async () => {
+  setup(state(), "viewer");
+
+  render(<CleanupTab />, { wrapper });
+  const row = await screen.findByTestId(
+    "processing-maintenance-keep-failed-copy",
+  );
+
+  expect(within(row).getByRole("radio", { name: "On" })).toBeDisabled();
+  expect(within(row).getByRole("radio", { name: "Off" })).toBeDisabled();
 });
 
 it("asks for confirmation before switching on a destructive job, then saves once confirmed", async () => {
@@ -147,40 +238,42 @@ it("asks for confirmation before switching on a destructive job, then saves once
 
   render(<CleanupTab />, { wrapper });
   const cleanup = await screen.findByTestId(
-    "processing-maintenance-failure_cleanup",
+    "processing-maintenance-unclaimed_handbacks",
   );
   fireEvent.click(within(cleanup).getByRole("radio", { name: "On" }));
 
   expect(saveSettings).not.toHaveBeenCalled();
   const dialog = await screen.findByTestId(
-    "processing-maintenance-confirm-failure_cleanup-enable",
+    "processing-maintenance-confirm-unclaimed_handbacks-enable",
   );
-  expect(dialog).toHaveTextContent('Switch on "Downloads of failed files"?');
+  expect(dialog).toHaveTextContent(
+    'Switch on "Cleaned copies nobody picked up"?',
+  );
   fireEvent.click(within(dialog).getByRole("button", { name: "Switch on" }));
 
   await waitFor(() =>
     expect(saveSettings).toHaveBeenCalledWith({
-      failure_cleanup_enabled: true,
+      unclaimed_handback_cleanup_enabled: true,
     }),
   );
   expect(
     await screen.findByTestId("processing-maintenance-notice"),
-  ).toHaveTextContent("Downloads of failed files is on.");
+  ).toHaveTextContent("Cleaned copies nobody picked up is on.");
   expect(
     screen.queryByTestId(
-      "processing-maintenance-confirm-failure_cleanup-enable",
+      "processing-maintenance-confirm-unclaimed_handbacks-enable",
     ),
   ).not.toBeInTheDocument();
 
   fireEvent.change(
     within(cleanup).getByRole("combobox", {
-      name: "How often Downloads of failed files runs",
+      name: "How often Cleaned copies nobody picked up runs",
     }),
     { target: { value: "86400" } },
   );
   await waitFor(() =>
     expect(saveSettings).toHaveBeenCalledWith({
-      failure_cleanup_interval_seconds: 86400,
+      unclaimed_handback_cleanup_interval_seconds: 86400,
     }),
   );
 });
@@ -190,9 +283,9 @@ it("switches off a destructive job straight away, with no confirmation", async (
     state({
       families: [
         {
-          family: "failure_cleanup",
+          family: "unclaimed_handbacks",
           enabled: true,
-          description: "Removes the source release folder.",
+          description: "Deletes Weir's own cleaned copy.",
           pending: 0,
           running: 0,
           last_completed_at: null,
@@ -206,18 +299,18 @@ it("switches off a destructive job straight away, with no confirmation", async (
 
   render(<CleanupTab />, { wrapper });
   const cleanup = await screen.findByTestId(
-    "processing-maintenance-failure_cleanup",
+    "processing-maintenance-unclaimed_handbacks",
   );
   fireEvent.click(within(cleanup).getByRole("radio", { name: "Off" }));
 
   await waitFor(() =>
     expect(saveSettings).toHaveBeenCalledWith({
-      failure_cleanup_enabled: false,
+      unclaimed_handback_cleanup_enabled: false,
     }),
   );
   expect(
     screen.queryByTestId(
-      "processing-maintenance-confirm-failure_cleanup-enable",
+      "processing-maintenance-confirm-unclaimed_handbacks-enable",
     ),
   ).not.toBeInTheDocument();
 });
@@ -264,10 +357,10 @@ it("carries the warning where the switch is", async () => {
 
   render(<CleanupTab />, { wrapper });
 
-  // Failure cleanup deletes originals, and the operator sees that beside the button.
+  // The copies job deletes files, and the operator sees that beside the button.
   expect(
-    await screen.findByTestId("processing-maintenance-failure_cleanup"),
-  ).toHaveTextContent(/deletes the original/i);
+    await screen.findByTestId("processing-maintenance-unclaimed_handbacks"),
+  ).toHaveTextContent(/deletes weir's own cleaned copy/i);
 });
 
 it("runs a job for both kinds of library", async () => {
@@ -300,15 +393,15 @@ it("shows the server's own words when nothing was queued", async () => {
   setup(state());
   mutate.mockResolvedValue({
     queued: false,
-    detail: "A failure cleanup for this scope is already waiting or running.",
+    detail: "A cleanup for this scope is already waiting or running.",
   });
 
   render(<CleanupTab />, { wrapper });
   fireEvent.click(
-    await screen.findByTestId("processing-maintenance-run-failure_cleanup"),
+    await screen.findByTestId("processing-maintenance-run-unclaimed_handbacks"),
   );
   const dialog = await screen.findByTestId(
-    "processing-maintenance-confirm-failure_cleanup-run",
+    "processing-maintenance-confirm-unclaimed_handbacks-run",
   );
   fireEvent.click(within(dialog).getByRole("button", { name: "Run now" }));
 
@@ -323,24 +416,28 @@ it("asks for confirmation before running a destructive job now", async () => {
 
   render(<CleanupTab />, { wrapper });
   fireEvent.click(
-    await screen.findByTestId("processing-maintenance-run-failure_cleanup"),
+    await screen.findByTestId("processing-maintenance-run-unclaimed_handbacks"),
   );
 
   expect(mutate).not.toHaveBeenCalled();
   const dialog = await screen.findByTestId(
-    "processing-maintenance-confirm-failure_cleanup-run",
+    "processing-maintenance-confirm-unclaimed_handbacks-run",
   );
-  expect(dialog).toHaveTextContent('Run "Downloads of failed files" now?');
+  expect(dialog).toHaveTextContent(
+    'Run "Cleaned copies nobody picked up" now?',
+  );
   fireEvent.click(within(dialog).getByRole("button", { name: "Run now" }));
 
   await waitFor(() =>
     expect(mutate).toHaveBeenCalledWith({
-      family: "failure_cleanup",
+      family: "unclaimed_handbacks",
       mediaScope: "movie",
     }),
   );
   expect(
-    screen.queryByTestId("processing-maintenance-confirm-failure_cleanup-run"),
+    screen.queryByTestId(
+      "processing-maintenance-confirm-unclaimed_handbacks-run",
+    ),
   ).not.toBeInTheDocument();
 });
 
@@ -349,17 +446,17 @@ it("cancels a destructive job's confirmation without saving or running it", asyn
 
   render(<CleanupTab />, { wrapper });
   const cleanup = await screen.findByTestId(
-    "processing-maintenance-failure_cleanup",
+    "processing-maintenance-unclaimed_handbacks",
   );
   fireEvent.click(within(cleanup).getByRole("radio", { name: "On" }));
   const dialog = await screen.findByTestId(
-    "processing-maintenance-confirm-failure_cleanup-enable",
+    "processing-maintenance-confirm-unclaimed_handbacks-enable",
   );
   fireEvent.click(within(dialog).getByRole("button", { name: "Keep it" }));
 
   expect(
     screen.queryByTestId(
-      "processing-maintenance-confirm-failure_cleanup-enable",
+      "processing-maintenance-confirm-unclaimed_handbacks-enable",
     ),
   ).not.toBeInTheDocument();
   expect(saveSettings).not.toHaveBeenCalled();
@@ -395,9 +492,9 @@ it("surfaces the reason a run failed", async () => {
     state({
       families: [
         {
-          family: "failure_cleanup",
+          family: "unclaimed_handbacks",
           enabled: true,
-          description: "Removes the source release folder.",
+          description: "Deletes Weir's own cleaned copy.",
           pending: 0,
           running: 0,
           last_completed_at: null,
@@ -411,32 +508,12 @@ it("surfaces the reason a run failed", async () => {
   render(<CleanupTab />, { wrapper });
 
   expect(
-    await screen.findByTestId("processing-maintenance-failure_cleanup"),
+    await screen.findByTestId("processing-maintenance-unclaimed_handbacks"),
   ).toHaveTextContent("The work folder was missing.");
 });
 
 it("lists cleaned copies nobody picked up, off, and saves how long a copy waits", async () => {
-  setup(
-    state({
-      families: [
-        ...state().families,
-        {
-          family: "unclaimed_handbacks",
-          enabled: false,
-          description:
-            "Deletes Weir's own cleaned copy from a hand-back folder when no media manager imported it in time.",
-          pending: 0,
-          running: 0,
-          last_completed_at: null,
-          last_failed_at: null,
-          last_error: null,
-          interval_seconds: 21600,
-          next_run_at: null,
-          window_days: 14,
-        },
-      ],
-    }),
-  );
+  setup(state());
   saveSettings.mockResolvedValue({});
 
   render(<CleanupTab />, { wrapper });
@@ -480,20 +557,19 @@ it("shows the Save button as pending while a day-count setting is saving", async
 
   const { rerender } = render(<CleanupTab />, { wrapper });
 
-  const retention = await screen.findByTestId(
-    "processing-maintenance-file-history",
+  const wait = await screen.findByTestId(
+    "processing-maintenance-handback-window",
   );
-  fireEvent.change(screen.getByLabelText("Keep file history for"), {
-    target: { value: "30" },
-  });
-  expect(
-    within(retention).getByRole("button", { name: "Save" }),
-  ).not.toBeDisabled();
+  fireEvent.change(
+    screen.getByLabelText("Cleaned copies nobody picked up wait for"),
+    { target: { value: "30" } },
+  );
+  expect(within(wait).getByRole("button", { name: "Save" })).not.toBeDisabled();
 
   setup(state(), "operator", { savePending: true });
   rerender(<CleanupTab />);
 
-  const button = within(retention).getByRole("button", { name: "Saving…" });
+  const button = within(wait).getByRole("button", { name: "Saving…" });
   expect(button).toBeDisabled();
 });
 

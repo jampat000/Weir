@@ -146,7 +146,6 @@ export function DaysSettingRow({
   saved,
   min,
   max,
-  lastRun,
   editable,
   saving,
   savedWords,
@@ -161,7 +160,6 @@ export function DaysSettingRow({
   saved: number | undefined;
   min: number;
   max: number;
-  lastRun?: string;
   editable: boolean;
   saving: boolean;
   savedWords: (days: number) => string;
@@ -211,7 +209,50 @@ export function DaysSettingRow({
           ) : null}
         </span>
       </td>
-      <td data-label="Last run">{lastRun}</td>
+      <td data-label="Last run" />
+      <td data-label="Next run" />
+      {editable ? <td /> : null}
+    </tr>
+  );
+}
+
+/** A yes-or-no setting in the same table as the jobs it belongs beside; it saves the moment it is switched. */
+export function SwitchSettingRow({
+  testId,
+  name,
+  description,
+  switchId,
+  enabled,
+  editable,
+  saving,
+  onChange,
+}: {
+  testId: string;
+  name: string;
+  description: string;
+  switchId: string;
+  enabled: boolean;
+  editable: boolean;
+  saving: boolean;
+  onChange: (on: boolean) => void;
+}) {
+  return (
+    <tr data-testid={testId}>
+      <th scope="row" className="mm-quiet-table__name">
+        <span>{name}</span>
+        <span className="mm-cleanup-what">{description}</span>
+      </th>
+      <td data-label="On" colSpan={2}>
+        <MmOnOffSwitch
+          id={switchId}
+          label={name}
+          enabled={enabled}
+          disabled={!editable || saving}
+          layout="control"
+          onChange={onChange}
+        />
+      </td>
+      <td data-label="Last run" />
       <td data-label="Next run" />
       {editable ? <td /> : null}
     </tr>

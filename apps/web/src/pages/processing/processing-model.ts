@@ -202,10 +202,6 @@ export function buildLanes(
     const key = `file-${file.id}`;
     switch (file.status) {
       case "on_hold": {
-        if (file.quarantined) {
-          lanes.stuck.push(file);
-          break;
-        }
         const holdUntil = parseAppTime(file.hold_until);
         const since =
           parseAppTime(file.size_changed_at) ?? parseAppTime(file.updated_at);

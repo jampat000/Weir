@@ -28,7 +28,6 @@ const settings: ProcessingOperatorSettingsOut = {
   runner_cost_undetermined: 0,
   runner_budget_enabled: true,
   work_temp_stale_sweep_enabled: true,
-  failure_cleanup_enabled: false,
   unclaimed_handback_cleanup_enabled: false,
   unclaimed_handback_window_days: 14,
   keep_failed_work_files: false,
@@ -128,16 +127,19 @@ it("saves Files at once up to ten, and the budget and checks with it", async () 
         runner_capacity: 6,
         runner_cost_1080p: 2,
         runner_budget_enabled: true,
-        keep_failed_work_files: false,
         min_file_age_seconds: 60,
       }),
     );
   });
-  // The cleanup switches and record keeping are Cleanup's; Performance never sends them.
+  // The cleanup switches, the failed file's half-written copy and record keeping are elsewhere; Performance never sends them.
   const body = save.mock.calls[0][0];
   expect(body).not.toHaveProperty("work_temp_stale_sweep_enabled");
-  expect(body).not.toHaveProperty("failure_cleanup_enabled");
+  expect(body).not.toHaveProperty("keep_failed_work_files");
   expect(body).not.toHaveProperty("file_log_retention_days");
+  expect(screen.queryByText("When a file fails")).not.toBeInTheDocument();
+  expect(
+    screen.queryByText("Keep the half-written copy"),
+  ).not.toBeInTheDocument();
   expect(body).not.toHaveProperty("verbose_detection_logging");
   expect(
     screen.queryByText(/Verbose file-detection records/),

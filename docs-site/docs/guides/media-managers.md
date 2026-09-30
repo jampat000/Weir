@@ -214,7 +214,7 @@ soon as it appears. Weir only ever publishes a finished file, so Sonarr can't im
 If Weir can't clean a file, what Sonarr sees depends on the workflow's **When retries run out** setting:
 
 - **Hand the original back unchanged** (the default): Sonarr imports the original, uncleaned.
-- **Keep it until someone acts**: Sonarr waits, and Weir shows the file on hold.
+- **Keep it until someone acts**: Sonarr waits, and Weir shows the file as Failed, with the reason.
 - **Reject the release so a different one is found**: Weir removes the download and blocklists it in Sonarr, so it searches again.
 
 Files below the workflow's minimum size are never cleaned, so Sonarr waits on them indefinitely. Keep

@@ -16,7 +16,6 @@ const JOB_KIND_LABELS: Record<string, string> = {
   "processing.supplied_payload_evaluation.v1": "Check a manually supplied file",
   "processing.file.remux_pass.v1": "Process media file",
   "processing.work_temp_stale_sweep.v1": "Clean temporary work files",
-  "processing.failure_cleanup.v1": "Clean failed work files",
   "processing.unclaimed_handback_cleanup.v1": "Remove copies nobody picked up",
 };
 
