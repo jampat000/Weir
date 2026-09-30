@@ -116,7 +116,7 @@ function FailurePolicySetting({
 
 /**
  * This workflow's own limit as a share of what Weir runs at once in total: "up to 3 of Weir's 4", blank for no limit of its
- * own. A number above the total is refused when saved, and one that Performance has since been lowered under shows here.
+ * own. A number above the total is refused when saved, and a saved one above a lowered total says so here.
  */
 function MostFilesAtOnceSetting({ binding }: { binding: LibraryFormBinding }) {
   const { form, update, editable } = binding;
