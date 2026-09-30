@@ -76,10 +76,8 @@ def test_a_folder_hand_off_answers_for_the_files_inside_it(
     assert _status(server, hid)["state"] == "completed"
 
 
-def test_a_file_held_after_repeated_failures_is_failed_not_queued(
-    server: ServerUnderTest, movies: LibraryFolders
-) -> None:
+def test_a_file_weir_gave_up_on_is_failed_not_queued(server: ServerUnderTest, movies: LibraryFolders) -> None:
     hid = _new_id()
     _hand_off(server, hid, movies.watched / hid / "film.mkv")
-    _seed(server, hid, job_status="completed", file_status="on_hold", failure_attempts=3)
+    _seed(server, hid, job_status="completed", file_status="processing_failed", failure_attempts=3)
     assert _status(server, hid)["state"] == "failed"
