@@ -15,6 +15,18 @@ export const MEDIA_MANAGER_KIND_LABELS: Record<MediaManagerKind, string> = {
   native: "Something else",
 };
 
+/**
+ * Radarr, Sonarr and Deluno are called by Weir, so they need an address. "Something else" only sends to
+ * Weir and exists to be given a webhook secret, so it can be saved without one.
+ */
+export function connectionNeedsAddress(kind: MediaManagerKind): boolean {
+  return kind !== "native";
+}
+
+/** What the address field says for a kind that can be saved without one. */
+export const OPTIONAL_ADDRESS_HINT =
+  "Optional. Leave it blank if it only sends messages to Weir and Weir never calls it.";
+
 /** Kept by hand: the server always sends the last_test_* fields and lanes, which the schema marks optional. */
 export interface MediaManagerConnection {
   id: number;

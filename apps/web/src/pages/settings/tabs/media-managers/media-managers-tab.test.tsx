@@ -297,6 +297,65 @@ describe("SettingsMediaManagersTab", () => {
     expect(screen.getByTestId("media-manager-save")).toBeDisabled();
   });
 
+  it.each(["radarr", "sonarr", "deluno"])(
+    "will not submit a %s connection with no address",
+    async (kind) => {
+      vi.spyOn(api, "fetchMediaManagerConnections").mockResolvedValue([]);
+      render(<MediaManagersTab />, { wrapper });
+      fireEvent.click(await screen.findByTestId("media-manager-add"));
+
+      fireEvent.change(screen.getByTestId("media-manager-kind"), {
+        target: { value: kind },
+      });
+      fireEvent.change(screen.getByTestId("media-manager-base-url"), {
+        target: { value: "   " },
+      });
+
+      expect(screen.getByTestId("media-manager-save")).toBeDisabled();
+    },
+  );
+
+  it("adds a Something else manager with no address and says the address is optional", async () => {
+    vi.spyOn(api, "fetchMediaManagerConnections").mockResolvedValue([]);
+    const create = vi
+      .spyOn(api, "createMediaManagerConnection")
+      .mockResolvedValue(connection({ kind: "native", base_url: "" }));
+    render(<MediaManagersTab />, { wrapper });
+    fireEvent.click(await screen.findByTestId("media-manager-add"));
+
+    fireEvent.change(screen.getByTestId("media-manager-kind"), {
+      target: { value: "native" },
+    });
+
+    expect(screen.getByText(/^Optional\. Leave it blank/)).toBeInTheDocument();
+    expect(screen.getByTestId("media-manager-save")).toBeEnabled();
+    fireEvent.click(screen.getByTestId("media-manager-save"));
+    await waitFor(() =>
+      expect(create).toHaveBeenCalledWith(
+        expect.objectContaining({ kind: "native", base_url: "" }),
+      ),
+    );
+  });
+
+  it("asks for the address again when the kind changes back from Something else", async () => {
+    vi.spyOn(api, "fetchMediaManagerConnections").mockResolvedValue([]);
+    render(<MediaManagersTab />, { wrapper });
+    fireEvent.click(await screen.findByTestId("media-manager-add"));
+
+    fireEvent.change(screen.getByTestId("media-manager-kind"), {
+      target: { value: "native" },
+    });
+    expect(screen.getByTestId("media-manager-save")).toBeEnabled();
+
+    fireEvent.change(screen.getByTestId("media-manager-kind"), {
+      target: { value: "radarr" },
+    });
+    expect(screen.getByTestId("media-manager-save")).toBeDisabled();
+    expect(
+      screen.queryByText(/^Optional\. Leave it blank/),
+    ).not.toBeInTheDocument();
+  });
+
   // #599: what matters is not that a dialog appears, but that nothing is deleted until the
   // dialog is confirmed.
   describe("removing a connection", () => {

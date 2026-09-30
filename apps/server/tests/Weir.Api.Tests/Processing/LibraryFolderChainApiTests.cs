@@ -329,15 +329,35 @@ public sealed class LibraryFolderChainApiTests
         Assert.True(chain["ready"]!.GetValue<bool>());
     }
 
+    /// <summary>One download client as Sonarr or Radarr lists it under <c>GET /api/v3/downloadclient</c>.</summary>
+    internal static string ManagerClientJson(string implementation, string host, int port) =>
+        $$"""{"enable":true,"protocol":"torrent","name":"{{implementation}}","implementation":"{{implementation}}","fields":[{"name":"host","value":"{{host}}"},{"name":"port","value":{{port}} }]}""";
+
+    /// <summary>Scripts each Sonarr or Radarr, told apart by the host it is reached at, to list the download clients given for it.</summary>
+    internal static void ScriptManagerClients(ScriptedManager manager, IReadOnlyDictionary<string, string[]> clientsByManagerHost)
+    {
+        manager.Json(HttpMethod.Get, "/api/v3/remotepathmapping", "[]")
+            .Json(HttpMethod.Get, "/api/v3/config/downloadclient", """{"enableCompletedDownloadHandling":true,"id":1}""")
+            .Route(
+                HttpMethod.Get,
+                "/api/v3/downloadclient",
+                request => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent("[" + string.Join(",", clientsByManagerHost[request.RequestUri!.Host]) + "]"),
+                }));
+    }
+
     [Fact]
-    public async Task A_download_client_with_no_matching_folder_makes_the_chain_not_ready()
+    public async Task A_download_client_the_linked_manager_uses_with_no_matching_folder_makes_the_chain_not_ready()
     {
         var (server, client, manager) = await StartAsync();
         await using var _server = server;
         using var folders = TempFolders.Create();
+        var sonarrId = await ConnectAsync(client, "sonarr", "Sonarr", "http://192.0.2.60:8989");
         await ConnectDownloadClientAsync(client, "sabnzbd", "SABnzbd", "http://192.0.2.40:8080");
-        manager.Json(HttpMethod.Get, "/api", """{"config":{"misc":{"complete_dir":"/somewhere/else"}}}""");
-        var libraryId = await CreateLibraryAsync(client, "Weir with a mismatched SABnzbd", folders);
+        ScriptManagerClients(manager, new Dictionary<string, string[]> { ["192.0.2.60"] = [ManagerClientJson("Sabnzbd", "192.0.2.40", 8080)] });
+        manager.Json(HttpMethod.Get, "/api", System.Text.Json.JsonSerializer.Serialize(new { config = new { misc = new { complete_dir = folders.Output } } }));
+        var libraryId = await CreateLibraryAsync(client, "Sonarr with a mismatched SABnzbd", folders, [sonarrId]);
 
         var chain = await FolderChainAsync(client, libraryId);
 
