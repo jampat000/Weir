@@ -41,6 +41,7 @@ public sealed class ConfigurationBundleConnections
             .Set("id", connection.Id)
             .Set("kind", connection.Kind)
             .Set("name", connection.Name)
+            .Set("nickname", connection.Nickname)
             .Set("enabled", connection.Enabled)
             .Set("base_url", connection.BaseUrl)));
     }
@@ -85,11 +86,12 @@ public sealed class ConfigurationBundleConnections
             }
 
             var baseUrl = ValidateRestoredBaseUrl(described, OptionalText(data, "base_url"));
+            var nickname = ValidateRestoredNickname(described, data);
             var match = known.Find(connection => connection.IsSameAs(kind, baseUrl, savedName));
             long id;
             if (match is null)
             {
-                id = await _connections.InsertAsync(uow, kind, enabled: false, baseUrl, apiKeyCiphertext: null).ConfigureAwait(false);
+                id = await _connections.InsertAsync(uow, kind, enabled: false, baseUrl, apiKeyCiphertext: null, nickname: nickname).ConfigureAwait(false);
                 known.Add(new KnownConnection(id, kind, baseUrl, savedName));
             }
             else
@@ -191,6 +193,15 @@ public sealed class ConfigurationBundleConnections
     }
 
     private static string OptionalText(WireObject data, string key) => data.Get(key) is WireString text ? text.Value : string.Empty;
+
+    /// <summary>The bundle row's nickname, held to the limit a hand-typed one is, so an over-long one cannot enter through a restore.</summary>
+    private static string? ValidateRestoredNickname(string connectionDescription, WireObject data)
+    {
+        var nickname = ConnectionNicknames.Normalize(OptionalText(data, "nickname"));
+        return ConnectionNicknames.Fits(nickname)
+            ? nickname
+            : throw new WireValueException($"This backup has a media manager, {connectionDescription}, with a nickname that is too long for Weir to store.");
+    }
 
     /// <summary>
     /// The same address policy a hand-typed connection is held to (<see cref="MediaManagerConnectionService.ValidateBaseUrl"/>),

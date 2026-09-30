@@ -41,7 +41,7 @@ public sealed partial class HandoffCompletionReporter
                 continue;
             }
 
-            LogWaitingReportSent(_logger, target.Connection.Name, handoffId, delivery.Status);
+            LogWaitingReportSent(_logger, target.Connection.Label, handoffId, delivery.Status);
             answered++;
         }
 
@@ -63,7 +63,7 @@ public sealed partial class HandoffCompletionReporter
             {
                 foreach (var relativePath in pending.Files)
                 {
-                    await AppendFileSentenceAsync(uow, waitingLibrary, relativePath, ManagerWaitMessages.ReportWaiting(target.Connection.Name)).ConfigureAwait(false);
+                    await AppendFileSentenceAsync(uow, waitingLibrary, relativePath, ManagerWaitMessages.ReportWaiting(target.Connection.Label)).ConfigureAwait(false);
                 }
             }
 
@@ -81,8 +81,8 @@ public sealed partial class HandoffCompletionReporter
                     uow,
                     library,
                     relativePath,
-                    ManagerWaitMessages.ReportWaiting(target.Connection.Name),
-                    delivery.Accepted ? ManagerWaitMessages.ReportDelivered(target.Connection.Name) : string.Empty).ConfigureAwait(false);
+                    ManagerWaitMessages.ReportWaiting(target.Connection.Label),
+                    delivery.Accepted ? ManagerWaitMessages.ReportDelivered(target.Connection.Label) : string.Empty).ConfigureAwait(false);
             }
         }
 

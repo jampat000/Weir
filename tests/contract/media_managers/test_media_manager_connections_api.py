@@ -119,6 +119,36 @@ def test_a_name_sent_on_update_is_ignored(operator: WeirClient) -> None:
     assert updated.json()["name"] == "Deluno on 192.0.2.10"
 
 
+def test_the_name_deluno_sends_is_never_taken_as_the_nickname(operator: WeirClient) -> None:
+    _, row = _create(operator)
+
+    assert row["nickname"] is None
+
+
+def test_a_connection_can_carry_a_trimmed_nickname_beside_its_derived_name(operator: WeirClient) -> None:
+    code, row = _create(operator, nickname="  4K  ")
+
+    assert code == 201, row
+    assert (row["name"], row["nickname"]) == ("Deluno on 192.0.2.10", "4K")
+
+
+def test_a_nickname_can_be_changed_kept_and_cleared_on_update(operator: WeirClient) -> None:
+    _, row = _create(operator, nickname="4K")
+    url = f"{API}/media-managers/connections/{row['id']}"
+
+    changed = operator.put_csrf(url, {"nickname": "Kids"}).json()
+    kept = operator.put_csrf(url, {"enabled": False}).json()
+    cleared = operator.put_csrf(url, {"nickname": ""}).json()
+
+    assert (changed["nickname"], kept["nickname"], cleared["nickname"]) == ("Kids", "Kids", None)
+
+
+def test_a_nickname_over_thirty_characters_is_refused(operator: WeirClient) -> None:
+    code, _ = _create(operator, nickname="x" * 31)
+
+    assert code == 422
+
+
 def test_moving_a_connection_to_another_host_renames_it(operator: WeirClient) -> None:
     _, row = _create(operator)
     updated = operator.put_csrf(

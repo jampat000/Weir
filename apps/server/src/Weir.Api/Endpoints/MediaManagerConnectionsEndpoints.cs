@@ -46,6 +46,9 @@ public static class MediaManagerConnectionsEndpoints
     /// </summary>
     internal static void AcceptIgnoredName(BodyModel model) => model.OptionalStr("name", maxLength: ConnectionNameMaxLength);
 
+    /// <summary>The optional <c>nickname</c> a connection is shown with. Shared with <see cref="DownloadClientConnectionsEndpoints"/>.</summary>
+    internal static string? OptionalNickname(BodyModel model) => model.OptionalStr("nickname", maxLength: ConnectionNicknames.MaxLength);
+
     /// <summary>Browser origin, session secret, then a session-bound CSRF token; 400 on a bad token. Shared
     /// with <see cref="MediaManagerReconciliationEndpoints"/> and <see cref="DownloadClientConnectionsEndpoints"/>,
     /// which guard their own routes the same way.</summary>
@@ -104,6 +107,7 @@ internal sealed class MediaManagerConnectionsEndpointHandlers
         var baseUrl = StrWithDefault(model, body, "base_url", string.Empty, 2000);
         var apiKey = StrWithDefault(model, body, "api_key", string.Empty, 2000);
         var downloadedScanEnabled = model.Bool("downloaded_scan_enabled", defaultValue: false);
+        var nickname = MediaManagerConnectionsEndpoints.OptionalNickname(model);
         model.Finish(ExtraFields.Forbid);
         issues.ThrowIfAny();
 
@@ -113,7 +117,7 @@ internal sealed class MediaManagerConnectionsEndpointHandlers
         try
         {
             id = await _connections
-                .CreateAsync(uow, kind, baseUrl, apiKey.Length > 0 ? apiKey : null, enabled, downloadedScanEnabled).ConfigureAwait(false);
+                .CreateAsync(uow, kind, baseUrl, apiKey.Length > 0 ? apiKey : null, enabled, downloadedScanEnabled, nickname).ConfigureAwait(false);
         }
         catch (MediaManagerConnectionException exception)
         {
@@ -193,6 +197,7 @@ internal sealed class MediaManagerConnectionsEndpointHandlers
         var baseUrl = model.OptionalStr("base_url", maxLength: 2000);
         var apiKey = model.OptionalStr("api_key", maxLength: 2000);
         var downloadedScanEnabled = model.OptionalBool("downloaded_scan_enabled");
+        var nickname = MediaManagerConnectionsEndpoints.OptionalNickname(model);
         model.Finish(ExtraFields.Forbid);
         issues.ThrowIfAny();
 
@@ -201,7 +206,7 @@ internal sealed class MediaManagerConnectionsEndpointHandlers
         var row = await RequireConnectionAsync(uow, _connectionStore, connectionId).ConfigureAwait(false);
         try
         {
-            await _connections.UpdateAsync(uow, row, baseUrl, apiKey, enabled, downloadedScanEnabled).ConfigureAwait(false);
+            await _connections.UpdateAsync(uow, row, baseUrl, apiKey, enabled, downloadedScanEnabled, nickname).ConfigureAwait(false);
         }
         catch (MediaManagerConnectionException exception)
         {
@@ -357,7 +362,7 @@ internal sealed class MediaManagerConnectionsEndpointHandlers
         else
         {
             var apiKey = string.IsNullOrEmpty(row.ApiKeyCiphertext) ? null : _connections.Cipher.Decrypt(row.ApiKeyCiphertext);
-            (ok, detail) = await ProbeAsync(request, row.Name, row.Kind, row.BaseUrl, apiKey).ConfigureAwait(false);
+            (ok, detail) = await ProbeAsync(request, row.Label, row.Kind, row.BaseUrl, apiKey).ConfigureAwait(false);
         }
 
         // The probe can take seconds and the connection may be removed meanwhile, so the write is conditional.

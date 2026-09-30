@@ -49,6 +49,15 @@ original file back unchanged and tells you why in History, so you (or your media
 decide what to do next. That is the default. The workflow's **When retries run out** setting can
 keep the file on hold or reject the release instead.
 
+## Changed your rules? Process rejected files again
+
+A file your rules turn down is stored as **Rejected** and left alone, so a scan doesn't keep
+checking it. After you change the rules, **History › Failed** offers **Process all again**. It asks
+first, saying how many rejected files it will check again with your current rules. It covers every
+rejected file in the workflow History is narrowed to, or in all workflows, not only the ones listed for
+the period you are looking at. A file whose original is no longer in its watched folder is skipped and
+counted. Nothing runs by itself when you change the rules.
+
 ## Subtitles and other extra files travel too, safely
 
 If your rules keep sidecar files — subtitles, `.nfo` files, cover art — next to the video, Weir

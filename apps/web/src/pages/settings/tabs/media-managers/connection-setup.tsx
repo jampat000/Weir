@@ -4,6 +4,7 @@ import { ConfirmDialog } from "../../../../components/ui/confirm-dialog";
 import { errorMessage } from "../../../../lib/api/error-message";
 import type { MediaManagerConnection } from "../../../../lib/media-managers/media-managers-api";
 import type { useGenerateMediaManagerWebhookSecret } from "../../../../lib/media-managers/queries";
+import { connectionTitle } from "../../../../lib/ui/connection-title";
 import {
   mmActionButtonClass,
   mmTechnicalMonoSmallClass,
@@ -72,8 +73,8 @@ function ReplaceSecretDialog({
   return (
     <ConfirmDialog
       testId="media-manager-replace-secret-confirm"
-      title={`Replace ${connection.name}'s secret?`}
-      description={`Replacing the secret stops ${connection.name} reaching Weir until you paste the new one into it.`}
+      title={`Replace ${connectionTitle(connection)}'s secret?`}
+      description={`Replacing the secret stops ${connectionTitle(connection)} reaching Weir until you paste the new one into it.`}
       confirmLabel="Replace secret"
       busy={secret.isPending}
       error={secret.isError ? errorMessage(secret.error, SECRET_FAILURE) : null}
@@ -128,17 +129,17 @@ export function ConnectionSetup({
       data-testid="media-manager-setup-details"
     >
       <summary className="flex cursor-pointer list-none items-baseline justify-between gap-3 font-medium text-mm-text2 [&::-webkit-details-marker]:hidden">
-        <span>How to point {connection.name} at Weir</span>
+        <span>How to point {connectionTitle(connection)} at Weir</span>
         <span className="mm-quiet-link group-open:hidden">Show →</span>
         <span className="mm-quiet-link hidden group-open:inline">Hide →</span>
       </summary>
 
       <div className="mt-3">
         {isArrApp(connection) ? (
-          <ArrInstructions name={connection.name} />
+          <ArrInstructions name={connectionTitle(connection)} />
         ) : null}
         <p className="text-mm-text2">
-          In {connection.name}, send files to this address:
+          In {connectionTitle(connection)}, send files to this address:
         </p>
         <code
           className={`mt-1 block ${mmTechnicalMonoSmallClass}`}
@@ -149,12 +150,15 @@ export function ConnectionSetup({
 
         <p className="mt-3 text-mm-text2">
           {connection.webhook_secret_is_set
-            ? `${connection.name} must send its secret with every file. Anything without it is ignored.`
-            : `There is no secret yet, so anything on your network could send files here pretending to be ${connection.name}.`}
+            ? `${connectionTitle(connection)} must send its secret with every file. Anything without it is ignored.`
+            : `There is no secret yet, so anything on your network could send files here pretending to be ${connectionTitle(connection)}.`}
         </p>
 
         {revealed ? (
-          <RevealedSecret managerName={connection.name} secret={revealed} />
+          <RevealedSecret
+            managerName={connectionTitle(connection)}
+            secret={revealed}
+          />
         ) : null}
 
         {!confirmingReplace && secret.isError ? (

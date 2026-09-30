@@ -15,6 +15,7 @@ import {
 } from "../../../../lib/media-managers/media-managers-api";
 import { useCreateMediaManagerConnection } from "../../../../lib/media-managers/queries";
 import { mmActionButtonClass } from "../../../../lib/ui/mm-control-roles";
+import { ConnectionNicknameField } from "./connection-nickname-field";
 
 /** Selected first when it is one of the choices. */
 const PREFERRED_KIND: MediaManagerKind = "deluno";
@@ -37,10 +38,11 @@ type FormState = {
   kind: MediaManagerKind;
   base_url: string;
   api_key: string;
+  nickname: string;
 };
 
 function emptyForm(kind: MediaManagerKind): FormState {
-  return { kind, base_url: "", api_key: "" };
+  return { kind, base_url: "", api_key: "", nickname: "" };
 }
 
 export function AddConnectionForm({
@@ -67,7 +69,12 @@ export function AddConnectionForm({
       onSubmit={(event) => {
         event.preventDefault();
         create.mutate(
-          { ...form, enabled: true, downloaded_scan_enabled: false },
+          {
+            ...form,
+            nickname: form.nickname.trim(),
+            enabled: true,
+            downloaded_scan_enabled: false,
+          },
           { onSuccess: onCreated },
         );
       }}
@@ -126,6 +133,12 @@ export function AddConnectionForm({
               onChange={(e) => change("api_key", e.target.value)}
             />
           </Field>
+          <ConnectionNicknameField
+            testId="media-manager-nickname"
+            className="mm-input"
+            value={form.nickname}
+            onChange={(value) => change("nickname", value)}
+          />
         </div>
 
         {create.isError ? (

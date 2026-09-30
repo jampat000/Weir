@@ -10,6 +10,7 @@ import {
   workflowStory,
   type WorkflowPath,
 } from "../../../../lib/processing/workflow-story";
+import { connectionTitle } from "../../../../lib/ui/connection-title";
 import { mmActionButtonClass } from "../../../../lib/ui/mm-control-roles";
 
 /**
@@ -133,7 +134,7 @@ function WeirOnlyOptions({
             <option value="">Choose a media manager</option>
             {connections.map((connection) => (
               <option key={connection.id} value={connection.id}>
-                {connection.name}
+                {connectionTitle(connection)}
               </option>
             ))}
           </select>

@@ -31,6 +31,9 @@ REQUIRED_SURFACES: tuple[tuple[str, str], ...] = (
     ("POST", "/api/v1/processing/files/{file_id}/requeue"),
     ("POST", "/api/v1/processing/files/{file_id}/move-to-top"),
     ("POST", "/api/v1/processing/files/requeue"),
+    # Rejected files: how many there are and can be processed again, and processing them all again in one step.
+    ("GET", "/api/v1/processing/files/rejected/summary"),
+    ("POST", "/api/v1/processing/files/rejected/process-again"),
     # Kept files (#786 review of #785): the list "keep" leaves behind, and its one way back.
     ("GET", "/api/v1/processing/kept-files"),
     ("POST", "/api/v1/processing/kept-files/{id}/process-again"),

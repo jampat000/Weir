@@ -60,7 +60,7 @@ public sealed class DownloadClientSuggestions
             .Set("connection_id", row.Id)
             .Set("kind", row.Kind)
             .Set("name", row.Name)
-            .Set("label", DownloadClientKinds.LabelForConnection(row.Kind, row.Name))
+            .Set("label", row.Label)
             .Set("suggested_watched_folder", folders.CompletedFolder)
             .Set("category_folders", new WireArray(folders.CategoryFolders.Select(category =>
                 (WireValue)new WireObject().Set("category", category.Category).Set("folder", category.Folder))));
