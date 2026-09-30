@@ -28,21 +28,71 @@ says where a setting lives and what actually happens when it is saved.
   setup) sends back every other setting as it was, so nothing else is reset.
 - Rejected files (a workflow's "When a file is rejected"): "Delete only the rejected file" applies to a file
   the workflow's own size, date or path settings turn away and to a file its rules find nothing in to
-  keep. A minimum size the workflow takes from Performance never deletes a file; the file is skipped and
-  left where it is.
-- Hardware decoding (workflow editor): shown as not available, and ignored by the server while it is.
-  The saved values are kept.
+  keep. The minimum size is the workflow's own (50 MB for a new workflow), so it is the one the editor shows,
+  and deleting is tied to that value alone.
+- Writes files with (workflow editor, Workflows): "The best tool for each file" writes Matroska with
+  mkvmerge when it is installed and everything else with FFmpeg, and writes a file again with FFmpeg
+  when mkvmerge cannot write it or its copy fails Weir's checks. It applies to new downloads and to
+  cleaning files already in the library; when FFmpeg had to step in for a library file, that file's
+  story says so. "FFmpeg only" uses FFmpeg for everything. FFmpeg compatibility (advanced) applies to
+  both as well.
+- Hardware decoding: there is no setting. Weir copies video and audio without decoding them, so a
+  graphics card has nothing to do. Older saves and backups that carry the old hardware decoding or
+  "rewrite with FFmpeg" fields are still accepted; the values are ignored and not reported.
+- Your playback devices (Settings › Rules): information only. It drives the "can play directly"
+  badge on files and changes nothing about how a file is processed.
+- When a file fails (a workflow's own section): "Maximum automatic attempts" is the whole number of tries, the
+  first one included, so 3 means the first try and two retries; nothing else caps it. Each retry
+  waits twice as long as the one before (the first delay, then double, up to an hour), and the workflow's
+  folder is looked at again shortly after the wait ends, not only at the next periodic scan. A file
+  Weir gives up on, because it ran out of attempts or the failure is not one the workflow retries, is
+  one state: Failed, with the reason. What happens next is "When retries run out": hand the original
+  back, keep it until someone acts, or reject the release. History's remove dialog and "Try again"
+  work on a failed file the same way whichever it was.
 - Rules: audio and subtitle handling is a named rule set a workflow points at, so two workflows can
   share one. Deleting a rule set a workflow still uses is refused rather than silently stripping that
   handling.
+- When a new file is ready (a workflow's File readiness group): one wait, "A new file is ready once it hasn't
+  changed for N seconds", saved on the workflow (60 seconds for a new one). Both the file's size and its
+  last-changed time must stay the same for N seconds, so the scan holds a new file until then and the
+  pass checks the file's age against the same number. It replaces the three waits a workflow used to
+  have (wait after a change, hold every new file, wait for the size to stop growing); an upgrade gives
+  each workflow the longest of them, so no file is picked up sooner than before. A media-manager
+  hand-off skips the scan, because the manager says the download is finished. Settings › Performance
+  holds neither this wait nor a minimum size; an older client that still sends them to
+  `PUT /api/v1/processing/operator-settings` is answered and they are ignored.
+- Minimum file size (a workflow's Intake rules): each workflow's own value, 50 MB for a new one, shown
+  beside the maximum size. A media-manager hand-off still applies the minimum size and the video type,
+  but skips the path, date and maximum-size rules, because the manager chose the file.
 - Performance: "Files at once" (1 to 10) decides how many files run together and needs no restart. A
-  workflow follows it unless the workflow is given its own lower number. The resolution budget (runner
-  capacity and per-resolution costs) only applies when "Also weigh files by resolution" is switched
-  on. When files are waiting, `GET /api/v1/processing/files-at-once` and the screens that use it name
-  the one limit they are waiting on. "Keep free on the output drive" is checked before a file is
-  read: below it the file waits (On hold) and is looked at again, and is never recorded as done.
-  "Keep the half-written copy" keeps a failed copy in the work folder until it is a day old, at which
-  point the Cleanup sweep removes it; a restart removes it no sooner.
+  workflow's "Most files at once from this workflow" is a share of it: blank or 0 is no limit of its
+  own, and a number above Files at once is refused when saved. A workflow already above a lowered
+  Files at once still saves its other settings, and its editor says it is limited by the total. The
+  resolution budget (runner capacity and per-resolution costs) only applies when "Also weigh files by
+  resolution" is switched on, and then counts every job that reads a whole video: a pass however it
+  arrived (a hand-off costs the resolution already recorded for its file, and is corrected to the
+  measured one once its pass has probed it) and a library clean (costed by the resolution its scan
+  probed). A file whose resolution is not known costs what a 1080p file does. When files are waiting,
+  `GET /api/v1/processing/files-at-once` and the screens that use it name the one limit they are
+  waiting on.
+- Keeping space free (a workflow's "Keep at least this many GB free on the drive this workflow writes
+  to", 5 GB unless set, 0 turns it off): checked before every write the workflow makes. A remux pass
+  and an unchanged publish check the output drive (and the work folder's drive) before the file is
+  read, and again before the output is published. A hand-back copy after retries run out checks the
+  output drive before copying. A library clean needs the file's size plus this much free beside the
+  file. Below it the file waits (On hold, "Waiting: the output drive has less than X free") and is
+  looked at again 10, then 30, then every 60 minutes, and is never recorded as done or failed. An
+  upgrade gives every workflow the value Settings › Performance had; Performance still accepts the
+  old field and ignores it.
+- Cleanup: holds the leftover-work-file sweep, "Keep a failed file's half-written copy for a day" (a failed
+  copy stays in the work folder until it is a day old, at which point the sweep removes it; a restart
+  removes it no sooner) and the cleaned-copies-nobody-picked-up job. There is no cleanup of the
+  downloads of failed files: a failed download is handled from History's remove dialog and by the
+  workflow's "When retries run out".
+- History: "Keep a file's history for N days after it's gone" (0 keeps it for ever) is saved to the database
+  and enforced by an hourly job. A file's history is kept for as long as Weir still knows the file, then
+  for N days from the hour Weir first finds the file gone or forgotten; a file that comes back before then
+  keeps it. The System › Logs retention settings are separate and unchanged.
 - Schedule: the time zone is saved to the database and every time on that tab is read in it. Each
   workflow's hours are saved per workflow and applied without a restart. `Scan now` queues a one-off
   scan of that workflow.
@@ -59,9 +109,20 @@ says where a setting lives and what actually happens when it is saved.
   workflow, whatever that workflow's own schedule says. A manual scan is unaffected.
 - The Cleanup timers' environment switches each govern their own media type:
   `WEIR_PROCESSING_WORK_TEMP_STALE_SWEEP_MOVIE_SCHEDULE_ENABLED` and `..._TV_SCHEDULE_ENABLED` for the
-  leftover work file sweep, `WEIR_PROCESSING_MOVIE_FAILURE_CLEANUP_SCHEDULE_ENABLED` and
-  `WEIR_PROCESSING_TV_FAILURE_CLEANUP_SCHEDULE_ENABLED` for the failed-download cleanup. An explicit 0
-  stops that timer for that media type whatever is saved in Settings › Cleanup; the variables cannot
-  switch a timer on.
+  leftover work file sweep. An explicit 0 stops that timer for that media type whatever is saved in
+  Settings › Cleanup; the variables cannot switch a timer on. The `..._FAILURE_CLEANUP_...` variables of
+  the removed failed-download cleanup are accepted and ignored.
 - `WEIR_PROCESSING_WATCHED_FOLDER_MIN_FILE_AGE_SECONDS` is retired. Setting it changes nothing: the wait
-  after a file last changes is the workflow's own, or Settings › Performance's.
+  for a new file is the workflow's own.
+
+## Planned: video conversion
+
+When Weir gains video conversion (the direction towards what FileFlows does), the settings land in
+these places so each one keeps a single meaning:
+
+- **Hardware** (use the graphics card, which method, which vendors to avoid) goes on Settings ›
+  Performance and is machine-wide. It is about speed, so it belongs beside "Files at once". The
+  detection behind it already exists as `GET /api/v1/processing/hardware`.
+- **Convert video** (codec and format) goes on Settings › Rules, per profile, next to the rules that
+  decide what a file keeps. "Your playback devices" is the list a rule such as "convert so my TV can
+  play it directly" will aim at.

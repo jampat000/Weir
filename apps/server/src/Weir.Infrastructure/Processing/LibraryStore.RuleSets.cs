@@ -75,7 +75,7 @@ public sealed partial class LibraryStore
     }
 
     public async Task<int> RuleSetUsageCountAsync(UnitOfWork uow, long ruleSetId) =>
-        (int)await uow.CountAsync("SELECT COUNT(*) FROM libraries WHERE rule_set_id = @id", ("@id", ruleSetId)).ConfigureAwait(false);
+        (int)await uow.CountAsync("SELECT COUNT(*) FROM libraries WHERE rule_set_id = @id OR library_rule_set_id = @id", ("@id", ruleSetId)).ConfigureAwait(false);
 
     public async Task<ProcessingRuleSetRecord> CreateRuleSetAsync(UnitOfWork uow, LibraryRules.RuleSetInput body)
     {

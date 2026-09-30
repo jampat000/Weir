@@ -36,16 +36,16 @@ public static class WorkAdmissionReader
         long filesAtOnce = 1;
         var budgetEnabled = true;
         using (var command = Command(connection, transaction,
-                   "SELECT runner_capacity, runner_cost_sd, runner_cost_720p, runner_cost_1080p, runner_cost_4k, runner_cost_undetermined, " +
+                   "SELECT runner_capacity, runner_cost_sd, runner_cost_720p, runner_cost_1080p, runner_cost_4k, " +
                    "max_concurrent_files, runner_budget_enabled FROM operator_settings WHERE id = 1"))
         using (var reader = command.ExecuteReader())
         {
             if (reader.Read())
             {
                 budget = RunnerBudget.FromSettings(Long(reader.GetValue(0)), Long(reader.GetValue(1)), Long(reader.GetValue(2)),
-                    Long(reader.GetValue(3)), Long(reader.GetValue(4)), Long(reader.GetValue(5)));
-                filesAtOnce = Long(reader.GetValue(6));
-                budgetEnabled = Bool(reader.GetValue(7));
+                    Long(reader.GetValue(3)), Long(reader.GetValue(4)));
+                filesAtOnce = Long(reader.GetValue(5));
+                budgetEnabled = Bool(reader.GetValue(6));
             }
         }
 

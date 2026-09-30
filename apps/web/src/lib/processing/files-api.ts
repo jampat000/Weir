@@ -92,8 +92,6 @@ export interface ProcessingFile {
   size_bytes: number;
   failure_class: string | null;
   failure_attempts: number;
-  /** On hold after repeated failures, until someone queues it again. Nothing lifts it by itself. */
-  quarantined?: boolean;
   next_retry_at: string | null;
   /** The collision policy in force and what it decided, kept on the file rather than only in an activity note. */
   output_collision_policy: string | null;

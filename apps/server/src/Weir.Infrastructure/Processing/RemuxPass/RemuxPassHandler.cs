@@ -4,7 +4,6 @@ using Weir.Core.Configuration;
 using Weir.Core.Jobs;
 using Weir.Core.Json;
 using Weir.Core.MediaManagers;
-using Weir.Core.Processing;
 using Weir.Core.Processing.RemuxPass;
 using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.MediaManagers;
@@ -36,6 +35,7 @@ public sealed partial class RemuxPassHandler : IJobHandler
     private readonly TimeProvider _time;
     private readonly ILogger<RemuxPassHandler> _logger;
     private readonly LiveProgressStore _liveProgress;
+    private readonly ScanWakeups? _scanWakeups;
 
     public RemuxPassHandler(
         SqliteDatabase database,
@@ -50,7 +50,8 @@ public sealed partial class RemuxPassHandler : IJobHandler
         DownloadedScanNotifier downloadedScan,
         HandoffCompletionReporter? reporter = null,
         ProcessingJobStore? jobs = null,
-        LiveProgressStore? liveProgress = null)
+        LiveProgressStore? liveProgress = null,
+        ScanWakeups? scanWakeups = null)
     {
         _database = database ?? throw new ArgumentNullException(nameof(database));
         _options = options ?? throw new ArgumentNullException(nameof(options));
@@ -65,6 +66,7 @@ public sealed partial class RemuxPassHandler : IJobHandler
         _reporter = reporter;
         _jobs = jobs;
         _liveProgress = liveProgress ?? new LiveProgressStore();
+        _scanWakeups = scanWakeups;
     }
 
     /// <summary>
@@ -157,7 +159,7 @@ public sealed partial class RemuxPassHandler : IJobHandler
 
         var progress = new ActivityProgressReporter(_database, context.Id, provenance, _logger, _time, _liveProgress);
         var performance = claim.Operator!;
-        var limits = IntakeLimits.Resolve(claim.Library, performance);
+        var workflow = claim.Library!;
         var request = new RemuxPassRequest
         {
             Runtime = claim.Runtime!,
@@ -165,9 +167,9 @@ public sealed partial class RemuxPassHandler : IJobHandler
             LibraryId = claim.Library?.Id ?? libraryId,
             RulesConfig = claim.Rules,
             RulesProfileName = claim.RulesProfileName,
-            MinFileAgeSeconds = limits.MinFileAgeSeconds,
-            MinInputFileSizeMb = limits.MinFileSizeMb,
-            MinimumFreeDiskSpaceMb = performance.MinimumFreeDiskSpaceMb,
+            MinFileAgeSeconds = workflow.ReadyAfterSeconds,
+            MinInputFileSizeMb = workflow.MinFileSizeMb,
+            MinimumFreeDiskSpaceMb = workflow.MinimumFreeDiskSpaceMb,
             KeepFailedWorkFiles = performance.KeepFailedWorkFiles,
             MediaScope = mediaScope,
             CurrentJobId = context.Id,

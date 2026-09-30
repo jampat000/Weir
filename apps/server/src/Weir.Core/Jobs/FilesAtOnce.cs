@@ -127,7 +127,7 @@ public static class FilesAtOnceRules
                 ResolutionBudget,
                 $"{files} {verb} waiting for the resolution budget: {Math.Max(0, admission.AvailableUnits).ToString(CultureInfo.InvariantCulture)} of " +
                 $"{admission.Capacity.ToString(CultureInfo.InvariantCulture)} units are free and the next file needs {cheapest.ToString(CultureInfo.InvariantCulture)}. " +
-                "Raise the capacity, or switch the resolution budget off, in Process settings.");
+                "Raise the capacity, or switch the resolution budget off, in Settings › Performance.");
         }
 
         return Result(Starting, $"{files} {verb} about to start.");

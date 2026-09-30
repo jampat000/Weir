@@ -1,4 +1,6 @@
+using Weir.Core.Media;
 using Weir.Core.Processing;
+using Weir.Core.Time;
 using Weir.Infrastructure.Processing;
 using Weir.Infrastructure.Sqlite;
 using Weir.Infrastructure.Tests.Jobs;
@@ -47,6 +49,80 @@ public sealed class LibraryStoreTests
         var reloaded = await Store.GetAsync(uow, created.Id);
         Assert.NotNull(reloaded);
         Assert.Equal(created.Name, reloaded!.Name);
+    }
+
+    /// <summary>
+    /// Every column is read back by position, so a shifted or swapped column shows up here: each setting is saved with a value
+    /// that differs from its default and from the other settings of its type, and reads back as saved.
+    /// </summary>
+    [Fact]
+    public async Task A_library_reads_back_every_setting_it_was_saved_with()
+    {
+        using var db = new JobsTestDatabase();
+        await using var uow = await UnitOfWork.OpenAsync(db.Database);
+        var input = new ProcessingLibraryInput
+        {
+            Name = "Everything set",
+            MediaType = ProcessingMediaScopes.Tv,
+            Enabled = false,
+            WatchedFolder = "/media/in",
+            WorkFolder = "/media/work",
+            OutputFolder = "/media/out",
+            MediaExtensionsCsv = ".mkv,.avi",
+            ExcludeMarkersCsv = "__sample__",
+            IncludePatternsCsv = "keep-me",
+            ExcludePatternsCsv = "drop-me",
+            MinFileSizeMb = 11,
+            MaxFileSizeMb = 12,
+            RejectedFileAction = RejectedFileActions.DeleteFile,
+            ReadyAfterSeconds = 13,
+            CreatedAfter = Timestamp.Naive(new DateTime(2020, 1, 2, 3, 4, 5)),
+            CreatedBefore = Timestamp.Naive(new DateTime(2021, 2, 3, 4, 5, 6)),
+            ModifiedAfter = Timestamp.Naive(new DateTime(2022, 3, 4, 5, 6, 7)),
+            ModifiedBefore = Timestamp.Naive(new DateTime(2023, 4, 5, 6, 7, 8)),
+            ExcludeHidden = false,
+            TopLevelOnly = true,
+            SidecarPatternsCsv = ".srt",
+            PreserveOriginalTimestamps = true,
+            OutputCollisionPolicy = OutputCollisionPolicies.KeepBoth,
+            FfmpegStrictness = FfmpegStrictnessLevels.Strict,
+            RemuxWriter = RemuxWriterChoice.Ffmpeg,
+            ScanIntervalSeconds = 14,
+            IgnoreSizeChanges = true,
+            SkipAccessTests = true,
+            MaxAttempts = 15,
+            RetryBackoffSeconds = 16,
+            RetryExecutionFailures = false,
+            RetryPreflightFailures = true,
+            FailurePolicy = ProcessingFailurePolicies.Hold,
+            FileSystemEventsEnabled = false,
+            ScheduleEnabled = false,
+            ScheduleHoursLimited = true,
+            ScheduleDays = "Mon,Tue",
+            ScheduleStart = "01:00",
+            ScheduleEnd = "05:30",
+            MaxConcurrentFiles = 1,
+            Priority = 17,
+            RemoveOriginalAfterSuccess = false,
+            MinimumFreeDiskSpaceMb = 18,
+        };
+
+        var created = await Store.CreateAsync(uow, input);
+        var reloaded = await Store.GetAsync(uow, created.Id);
+
+        Assert.NotNull(reloaded);
+        // A library saved without a profile is given its kind's default, so the profile is not one of the saved values.
+        var settings = typeof(ProcessingLibraryInput).GetProperties()
+            .Where(setting => setting.Name != nameof(ProcessingLibraryInput.RuleSetId))
+            .Where(setting => typeof(ProcessingLibraryRecord).GetProperty(setting.Name) is not null)
+            .ToList();
+        Assert.NotEmpty(settings);
+        foreach (var setting in settings)
+        {
+            var saved = setting.GetValue(input);
+            var read = typeof(ProcessingLibraryRecord).GetProperty(setting.Name)!.GetValue(reloaded);
+            Assert.True(Equals(saved, read), $"{setting.Name} was saved as {saved} and read back as {read}");
+        }
     }
 
     [Fact]
@@ -160,6 +236,21 @@ public sealed class LibraryStoreTests
         Assert.NotNull(ruleSet);
 
         var exception = await Assert.ThrowsAsync<ProcessingLibraryException>(() => Store.DeleteRuleSetAsync(uow, ruleSet!));
+        Assert.Contains("still used", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_rule_set_a_library_cleans_its_existing_files_by_cannot_be_deleted()
+    {
+        using var db = new JobsTestDatabase();
+        var profileId = db.AddRuleSet("Cleaning profile");
+        var libraryId = db.AddLibrary();
+        db.Execute("UPDATE libraries SET library_rule_set_id = @profile WHERE id = @id", ("@profile", profileId), ("@id", libraryId));
+        await using var uow = await UnitOfWork.OpenAsync(db.Database);
+        var ruleSet = await Store.GetRuleSetAsync(uow, profileId);
+
+        var exception = await Assert.ThrowsAsync<ProcessingLibraryException>(() => Store.DeleteRuleSetAsync(uow, ruleSet!));
+
         Assert.Contains("still used", exception.Message, StringComparison.Ordinal);
     }
 

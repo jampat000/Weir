@@ -227,8 +227,6 @@ def seed_one_processing_record(home: str) -> None:
         "source_size_bytes": 6_100_000_000,
         "output_size_bytes": 5_870_000_000,
         "duration_seconds": 214.0,
-        "hardware_method": None,
-        "hardware_fell_back_to_software": False,
         "after_track_lines_meaning": (
             "Live remux finished; before = source probe; after = planned disposition (copy remux — "
             "ffprobe of the written file was used for validation only)."

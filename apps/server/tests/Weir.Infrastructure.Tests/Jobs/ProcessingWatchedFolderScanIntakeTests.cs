@@ -2,21 +2,17 @@ using Weir.Core.Processing;
 
 namespace Weir.Infrastructure.Tests.Jobs;
 
-/// <summary>
-/// What a watched-folder scan holds a file to: a library's own minimum size and wait, or Settings › Performance's when it sets
-/// none (#815).
-/// </summary>
+/// <summary>What a watched-folder scan holds a file to: its workflow's wait and minimum size, and nothing else.</summary>
 public sealed class ProcessingWatchedFolderScanIntakeTests
 {
     private const long OneHourSeconds = 3600;
 
     [Fact]
-    public async Task A_library_with_no_wait_of_its_own_holds_a_new_file_for_the_Performance_wait()
+    public async Task A_new_file_is_held_for_the_workflows_wait()
     {
         var (store, watched, scan) = await WatchedFolderScanFixture.StartAsync();
         using var _ = store;
-        await store.Execute($"UPDATE operator_settings SET min_file_age_seconds = {OneHourSeconds}");
-        var libraryId = await WatchedFolderScanFixture.LibraryAsync(store, watched, minFileAgeSeconds: null);
+        var libraryId = await WatchedFolderScanFixture.LibraryAsync(store, watched, readyAfterSeconds: OneHourSeconds);
 
         await scan(libraryId);
 
@@ -24,12 +20,11 @@ public sealed class ProcessingWatchedFolderScanIntakeTests
     }
 
     [Fact]
-    public async Task A_library_with_its_own_wait_ignores_the_Performance_wait()
+    public async Task A_workflow_that_waits_for_nothing_takes_a_new_file_at_once()
     {
         var (store, watched, scan) = await WatchedFolderScanFixture.StartAsync();
         using var _ = store;
-        await store.Execute($"UPDATE operator_settings SET min_file_age_seconds = {OneHourSeconds}");
-        var libraryId = await WatchedFolderScanFixture.LibraryAsync(store, watched, minFileAgeSeconds: 0);
+        var libraryId = await WatchedFolderScanFixture.LibraryAsync(store, watched, readyAfterSeconds: 0);
 
         await scan(libraryId);
 
@@ -37,12 +32,11 @@ public sealed class ProcessingWatchedFolderScanIntakeTests
     }
 
     [Fact]
-    public async Task A_library_with_no_minimum_size_of_its_own_skips_files_under_the_Performance_minimum()
+    public async Task A_file_under_the_workflows_minimum_size_is_skipped()
     {
         var (store, watched, scan) = await WatchedFolderScanFixture.StartAsync();
         using var _ = store;
-        await store.Execute("UPDATE operator_settings SET min_input_file_size_mb = 1");
-        var libraryId = await WatchedFolderScanFixture.LibraryAsync(store, watched, minFileAgeSeconds: 0, minFileSizeMb: null);
+        var libraryId = await WatchedFolderScanFixture.LibraryAsync(store, watched, minFileSizeMb: 1);
 
         await scan(libraryId);
 
@@ -52,12 +46,11 @@ public sealed class ProcessingWatchedFolderScanIntakeTests
     }
 
     [Fact]
-    public async Task A_library_with_its_own_minimum_size_ignores_the_Performance_minimum()
+    public async Task A_workflow_with_no_minimum_size_takes_a_file_of_any_size()
     {
         var (store, watched, scan) = await WatchedFolderScanFixture.StartAsync();
         using var _ = store;
-        await store.Execute("UPDATE operator_settings SET min_input_file_size_mb = 1");
-        var libraryId = await WatchedFolderScanFixture.LibraryAsync(store, watched, minFileAgeSeconds: 0, minFileSizeMb: 0);
+        var libraryId = await WatchedFolderScanFixture.LibraryAsync(store, watched, minFileSizeMb: 0);
 
         await scan(libraryId);
 

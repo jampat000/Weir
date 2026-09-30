@@ -26,7 +26,7 @@ public sealed class ProcessingPassThroughHandlerTests : IDisposable
     }
 
     private ProcessingPassThroughHandler Handler() =>
-        new(_fixture.Store.Database, TimeProvider.System, NullLogger<ProcessingPassThroughHandler>.Instance, _fixture.Handback, _fixture.Libraries, _fixture.Reporter);
+        new(_fixture.Store.Database, TimeProvider.System, NullLogger<ProcessingPassThroughHandler>.Instance, _fixture.Handback, _fixture.Libraries, _fixture.Jobs, _fixture.Reporter);
 
     private async Task<long> LibraryAsync(string collision = "replace")
     {
@@ -164,6 +164,48 @@ public sealed class ProcessingPassThroughHandlerTests : IDisposable
         await Handler().HandleAsync(Context(6, payload), CancellationToken.None);
 
         Assert.Empty(_fixture.Http.Requests);
+        Assert.Equal("passed_through", await ScalarText("SELECT status FROM files"));
+    }
+
+    /// <summary>More than any drive has, so the free-space check always finds the drive short.</summary>
+    private const long MoreFreeThanAnyDriveHasMb = 1_000_000_000;
+
+    [Fact]
+    public async Task A_hand_back_waits_for_room_when_the_workflow_keeps_more_free_than_the_drive_has()
+    {
+        var library = await LibraryAsync();
+        await _fixture.Store.Execute($"UPDATE libraries SET minimum_free_disk_space_mb = {MoreFreeThanAnyDriveHasMb}");
+        var source = _folders.Source("file.mkv", bytes: 5000);
+        await FileRowAsync(library, "file.mkv");
+        var payload = $$"""{"relative_media_path":"file.mkv","library_id":{{library}},"trigger":"worker"}""";
+
+        await Handler().HandleAsync(Context(7, payload), CancellationToken.None);
+
+        Assert.False(File.Exists(_folders.Out("file.mkv")));
+        Assert.True(File.Exists(source));
+        Assert.Equal("on_hold", await ScalarText("SELECT status FROM files"));
+        Assert.StartsWith("Waiting: the output drive has less than", await ScalarText("SELECT status_reason FROM files"), StringComparison.Ordinal);
+        Assert.NotEqual(string.Empty, await ScalarText("SELECT hold_until FROM files"));
+        Assert.Equal(0, await _fixture.Store.Scalar("SELECT count(*) FROM activity_events WHERE event_type = 'processing.file_passed_through'"));
+        var booked = WireJsonParser.Parse(await ScalarText($"SELECT payload_json FROM jobs WHERE job_kind = '{IntakeRules.PassThroughJobKind}' AND not_before IS NOT NULL"));
+        Assert.Equal(1, (long)((WireInteger)((WireObject)booked)["disk_space_looks"]).Value);
+    }
+
+    [Fact]
+    public async Task A_hand_back_that_waited_for_room_is_delivered_once_there_is_room()
+    {
+        var library = await LibraryAsync();
+        await _fixture.Store.Execute($"UPDATE libraries SET minimum_free_disk_space_mb = {MoreFreeThanAnyDriveHasMb}");
+        var source = _folders.Source("file.mkv", bytes: 5000);
+        await FileRowAsync(library, "file.mkv");
+        var payload = $$"""{"relative_media_path":"file.mkv","library_id":{{library}},"trigger":"worker"}""";
+        await Handler().HandleAsync(Context(8, payload), CancellationToken.None);
+        var booked = await ScalarText($"SELECT payload_json FROM jobs WHERE job_kind = '{IntakeRules.PassThroughJobKind}' AND not_before IS NOT NULL");
+        await _fixture.Store.Execute("UPDATE libraries SET minimum_free_disk_space_mb = 0");
+
+        await Handler().HandleAsync(Context(9, booked), CancellationToken.None);
+
+        Assert.Equal(File.ReadAllBytes(source), File.ReadAllBytes(_folders.Out("file.mkv")));
         Assert.Equal("passed_through", await ScalarText("SELECT status FROM files"));
     }
 

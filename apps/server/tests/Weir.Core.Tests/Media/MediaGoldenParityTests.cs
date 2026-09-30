@@ -8,7 +8,7 @@ namespace Weir.Core.Tests.Media;
 
 /// <summary>
 /// <c>Weir.Core.Media</c> against the recorded answers in the golden files: command lines token for token,
-/// hardware choices, output validation messages and text handling (decoding, line splitting, clipping and
+/// hardware detection, output validation messages and text handling (decoding, line splitting, clipping and
 /// timeout messages). The orchestration (ffprobe logs, progress runs,
 /// detection) is held to the same files in <c>Weir.Infrastructure.Tests</c>.
 /// </summary>
@@ -84,69 +84,17 @@ public sealed class MediaGoldenParityTests
     }
 
     [Fact]
-    public void Hardware_decisions_match_the_golden_files()
+    public void Hardware_vendors_match_the_golden_files()
     {
         using var document = Load("hardware.json");
-        var root = document.RootElement;
-        var decisions = root.GetProperty("decisions").EnumerateArray().ToList();
-        Assert.NotEmpty(decisions);
+        var vendors = document.RootElement.GetProperty("vendor_methods").EnumerateArray().ToList();
 
-        foreach (var item in decisions)
-        {
-            var name = item.GetProperty("name").GetString()!;
-            var input = item.GetProperty("input");
-            var settingsJson = input.GetProperty("settings");
-            var settings = new HardwareSettings
-            {
-                Mode = settingsJson.GetProperty("mode").GetString()!,
-                Device = settingsJson.GetProperty("device").GetString()!,
-                DisabledVendors = Strings(settingsJson.GetProperty("disabled_vendors")),
-                Strictness = settingsJson.GetProperty("strictness").GetString()!,
-            };
-            Assert.Equal(settingsJson.GetProperty("wants_hardware").GetBoolean(), settings.WantsHardware);
-            var reportJson = input.GetProperty("report");
-            var report = new AccelerationReport
-            {
-                AvailableMethods = Strings(reportJson.GetProperty("available_methods")),
-                Detected = reportJson.GetProperty("detected").GetBoolean(),
-                Detail = reportJson.GetProperty("detail").GetString()!,
-            };
-            Assert.Equal(Strings(reportJson.GetProperty("vendors")), report.Vendors);
-
-            var decision = HardwareAcceleration.Decide(settings, report);
-
-            var expected = item.GetProperty("expected");
-            Assert.True(expected.GetProperty("method").GetString() == decision.Method, name);
-            AssertTokens(Strings(expected.GetProperty("argv_flags")), decision.ArgvFlags, name);
-            Assert.True(expected.GetProperty("fell_back_to_software").GetBoolean() == decision.FellBackToSoftware, name);
-            Assert.True(expected.GetProperty("using_hardware").GetBoolean() == decision.UsingHardware, name);
-            Assert.Equal(expected.GetProperty("reason").GetString(), decision.Reason);
-        }
-
-        foreach (var item in root.GetProperty("parse_disabled_vendors").EnumerateArray())
-        {
-            Assert.Equal(Strings(item.GetProperty("expected")), HardwareAcceleration.ParseDisabledVendors(NullableString(item.GetProperty("input"))));
-        }
-
-        foreach (var item in root.GetProperty("normalize_strictness").EnumerateArray())
-        {
-            Assert.Equal(item.GetProperty("expected").GetString(), HardwareAcceleration.NormalizeStrictness(NullableString(item.GetProperty("input"))));
-        }
-
-        foreach (var item in root.GetProperty("normalize_decode_mode").EnumerateArray())
-        {
-            Assert.Equal(item.GetProperty("expected").GetString(), HardwareAcceleration.NormalizeDecodeMode(NullableString(item.GetProperty("input"))));
-        }
-
-        var vendors = root.GetProperty("vendor_methods").EnumerateArray().ToList();
         Assert.Equal(vendors.Count, HardwareAcceleration.VendorMethods.Count);
         for (var i = 0; i < vendors.Count; i++)
         {
             Assert.Equal(vendors[i][0].GetString(), HardwareAcceleration.VendorMethods[i].Key);
             Assert.Equal(Strings(vendors[i][1]), HardwareAcceleration.VendorMethods[i].Value);
         }
-
-        Assert.Equal(Strings(root.GetProperty("strictness_levels")), HardwareAcceleration.StrictnessLevels);
     }
 
     [Fact]
@@ -366,7 +314,6 @@ public sealed class MediaGoldenParityTests
 
     private static List<string> Strings(JsonElement array) => array.EnumerateArray().Select(e => e.GetString()!).ToList();
 
-    private static string? NullableString(JsonElement value) => value.ValueKind == JsonValueKind.Null ? null : value.GetString();
 
     private static JsonDocument Load(string fileName) => JsonDocument.Parse(File.ReadAllText(Path.Combine(GoldenDirectory, fileName)));
 }

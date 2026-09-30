@@ -107,7 +107,7 @@ public sealed partial class MediaTools
     {
         ArgumentNullException.ThrowIfNull(request);
         var (_, ffmpeg) = _resolver.Resolve();
-        var argv = FfmpegCommands.BuildRemuxArgv(ffmpeg, request.Source, request.Destination, request.Plan, request.Acceleration?.ArgvFlags);
+        var argv = FfmpegCommands.BuildRemuxArgv(ffmpeg, request.Source, request.Destination, request.Plan, request.FfmpegInputFlags);
         LogFfmpegDebug(FfmpegCommands.DebugSummary(argv));
         return RunFfmpegAsync(
             argv,

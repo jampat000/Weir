@@ -21,7 +21,7 @@ SETTINGS_TABS = (
     ("Workflows", "processing-libraries-section"),
     ("Rules", "processing-rule-set-workspace"),
     ("Media managers", "suite-settings-media-managers"),
-    ("Performance", "processing-direct-play-section"),
+    ("Performance", "processing-process-settings"),
     ("Cleanup", "processing-maintenance-section"),
     ("Schedule", "processing-schedules-section"),
     ("Alerts", "suite-settings-notifications"),

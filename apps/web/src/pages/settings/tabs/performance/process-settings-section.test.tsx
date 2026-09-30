@@ -25,17 +25,12 @@ const settings: ProcessingOperatorSettingsOut = {
   runner_cost_720p: 1,
   runner_cost_1080p: 2,
   runner_cost_4k: 4,
-  runner_cost_undetermined: 0,
   runner_budget_enabled: true,
   work_temp_stale_sweep_enabled: true,
-  failure_cleanup_enabled: false,
   unclaimed_handback_cleanup_enabled: false,
   unclaimed_handback_window_days: 14,
   keep_failed_work_files: false,
   file_log_retention_days: 90,
-  min_file_age_seconds: 60,
-  min_input_file_size_mb: 50,
-  minimum_free_disk_space_mb: 5120,
   movie_schedule_enabled: true,
   movie_schedule_hours_limited: false,
   movie_schedule_days: "",
@@ -111,9 +106,12 @@ it("saves Files at once up to ten, and the budget and checks with it", async () 
   expect(choices.querySelectorAll("button")).toHaveLength(10);
   expect(screen.getByLabelText("Budget")).toHaveValue(6);
   expect(screen.getByLabelText("A 1080p file costs")).toHaveValue(2);
-  expect(screen.getByLabelText("Wait after a file last changes")).toHaveValue(
-    60,
-  );
+  expect(
+    screen.queryByLabelText("Wait after a file last changes"),
+  ).not.toBeInTheDocument();
+  expect(
+    screen.queryByLabelText("Skip files smaller than"),
+  ).not.toBeInTheDocument();
 
   // #633: files at once goes up to ten.
   fireEvent.click(screen.getByRole("button", { name: "10" }));
@@ -128,33 +126,45 @@ it("saves Files at once up to ten, and the budget and checks with it", async () 
         runner_capacity: 6,
         runner_cost_1080p: 2,
         runner_budget_enabled: true,
-        keep_failed_work_files: false,
-        min_file_age_seconds: 60,
       }),
     );
   });
-  // The cleanup switches and record keeping are Cleanup's; Performance never sends them.
+  // The cleanup switches, the failed file's half-written copy and record keeping are elsewhere; Performance never sends them.
   const body = save.mock.calls[0][0];
   expect(body).not.toHaveProperty("work_temp_stale_sweep_enabled");
-  expect(body).not.toHaveProperty("failure_cleanup_enabled");
+  expect(body).not.toHaveProperty("keep_failed_work_files");
   expect(body).not.toHaveProperty("file_log_retention_days");
+  expect(screen.queryByText("When a file fails")).not.toBeInTheDocument();
+  expect(
+    screen.queryByText("Keep the half-written copy"),
+  ).not.toBeInTheDocument();
   expect(body).not.toHaveProperty("verbose_detection_logging");
+  // The wait and minimum size, the space to keep free and the cost of an unknown resolution are not Performance settings:
+  // none of them is sent.
+  expect(body).not.toHaveProperty("min_file_age_seconds");
+  expect(body).not.toHaveProperty("min_input_file_size_mb");
+  expect(body).not.toHaveProperty("minimum_free_disk_space_mb");
+  expect(body).not.toHaveProperty("runner_cost_undetermined");
   expect(
     screen.queryByText(/Verbose file-detection records/),
   ).not.toBeInTheDocument();
 });
 
-it("formats an ugly free-space decimal sensibly, and is not dirty on load", async () => {
+it("leaves the space to keep free to each workflow, and says an unknown resolution costs what 1080p does", async () => {
   mockSignedIn();
-  vi.spyOn(api, "fetchProcessingOperatorSettings").mockResolvedValue({
-    ...settings,
-    minimum_free_disk_space_mb: 5000,
-  });
+  vi.spyOn(api, "fetchProcessingOperatorSettings").mockResolvedValue(settings);
 
   await renderLoadedSection();
 
-  const field = screen.getByLabelText("Keep free on the output drive");
-  expect(field).toHaveValue(4.88);
+  expect(
+    screen.queryByLabelText("Keep free on the output drive"),
+  ).not.toBeInTheDocument();
+  expect(
+    screen.queryByLabelText("A file of unknown size costs"),
+  ).not.toBeInTheDocument();
+  expect(
+    screen.getByText(/costs the same as a 1080p file/),
+  ).toBeInTheDocument();
   expect(
     screen.getByRole("button", { name: "No changes to save" }),
   ).toBeDisabled();

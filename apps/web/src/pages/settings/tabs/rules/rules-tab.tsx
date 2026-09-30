@@ -28,6 +28,7 @@ import {
   MetadataProviderSection,
   useProviderDraft,
 } from "./metadata-provider-section";
+import { PlaybackDevicesSection } from "./playback-devices-section";
 import { ProfileBar } from "./profile-bar";
 import { ProfileRules } from "./profile-rules";
 import type { RuleSetBinding } from "./rule-set-fields";
@@ -93,7 +94,10 @@ function ProfileActions({
   );
 }
 
-/** Settings › Rules: the reusable profiles that decide which tracks a file keeps. */
+/**
+ * Settings › Rules: the reusable profiles that decide which tracks a file keeps, and the devices
+ * you play on.
+ */
 export function RulesTab() {
   const me = useMeQuery();
   const ruleSets = useProcessingRuleSetsQuery();
@@ -283,6 +287,8 @@ export function RulesTab() {
         draft={providerDraft}
         editable={editable}
       />
+
+      <PlaybackDevicesSection />
 
       {confirmingRemove && selectedRuleSet ? (
         <ConfirmDialog

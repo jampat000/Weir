@@ -56,7 +56,7 @@ public sealed partial class RemuxPassHandler
                             await RemuxPassFileState.ClearFailureFieldsAsync(uow, library.Id, rel).ConfigureAwait(false);
                         }
 
-                        updates.Set("retry_scheduled", false).Set("quarantined", false).Set("failure_next_retry_at", WireNull.Instance).Set("failure_operator_message", reason);
+                        updates.Set("retry_scheduled", false).Set("failure_next_retry_at", WireNull.Instance).Set("failure_operator_message", reason);
                         return;
                     }
 
@@ -70,15 +70,11 @@ public sealed partial class RemuxPassHandler
                             if (result.Get("failure_next_retry_at") is WireString { Value.Length: > 0 } booked &&
                                 TimestampColumns.Parse(booked.Value) is { } lookAgainAt)
                             {
-                                await uow.ExecuteAsync(
-                                    "UPDATE files SET hold_until = $hold WHERE library_id = $library AND relative_path = $path",
-                                    ("$hold", TimestampColumns.Orm(lookAgainAt)),
-                                    ("$library", library.Id),
-                                    ("$path", rel)).ConfigureAwait(false);
+                                await RemuxPassFileState.HoldUntilAsync(uow, library.Id, rel, lookAgainAt).ConfigureAwait(false);
                             }
                         }
 
-                        updates.Set("retry_scheduled", false).Set("quarantined", false).Set("failure_next_retry_at", WireNull.Instance).Set("failure_operator_message", reason);
+                        updates.Set("retry_scheduled", false).Set("failure_next_retry_at", WireNull.Instance).Set("failure_operator_message", reason);
                         return;
                     }
 
@@ -93,6 +89,7 @@ public sealed partial class RemuxPassHandler
                         var failureClass = ProcessingFailureClasses.Classify(TextOr(result.Get("outcome"), string.Empty));
                         var reason = WireStrings.Slice(CollapseWhitespace(TextOr(result.Get("reason"), "Weir returned an unsuccessful result.")), 1200);
                         var decision = await RemuxPassFileState.RecordFailureAsync(uow, library, rel, failureClass, reason, now).ConfigureAwait(false);
+                        _scanWakeups?.RequestForRetry(library.Id, decision.NextRetryAt);
                         var followUp = await _failurePolicy.ApplyFailurePolicyAsync(
                             uow, library, rel, decision.WillRetry, origin, result.Get("content_unusable") is WireBool { Value: true }).ConfigureAwait(false);
                         updates
@@ -100,7 +97,6 @@ public sealed partial class RemuxPassHandler
                             .Set("reject_queued", followUp == ProcessingFailurePolicies.Reject)
                             .Set("failure_class", failureClass)
                             .Set("retry_scheduled", decision.WillRetry)
-                            .Set("quarantined", decision.Quarantined)
                             .Set("failure_next_retry_at", decision.NextRetryAt is { } next ? Timestamp.FromDateTimeOffset(next).IsoFormat() : null)
                             .Set("failure_operator_message", decision.Reason);
                         return;
@@ -162,7 +158,7 @@ public sealed partial class RemuxPassHandler
             await RemuxPassFileState.ClearFailureFieldsAsync(uow, library.Id, relativePath).ConfigureAwait(false);
         }
 
-        updates.Set("retry_scheduled", false).Set("quarantined", false).Set("failure_next_retry_at", WireNull.Instance).Set("failure_operator_message", reason);
+        updates.Set("retry_scheduled", false).Set("failure_next_retry_at", WireNull.Instance).Set("failure_operator_message", reason);
     }
 
     /// <summary>Records a preflight failure through the same Files/Activity contract as a run result.</summary>

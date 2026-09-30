@@ -27,16 +27,12 @@ export interface ProcessingLibrary {
   exclude_markers_csv: string;
   include_patterns_csv: string;
   exclude_patterns_csv: string;
-  /** The library's own minimum size, or null when it uses the Performance setting. */
-  min_file_size_mb: number | null;
-  /** What the library is held to now: its own value, or Performance's. */
-  effective_min_file_size_mb: number;
+  /** The smallest file this workflow takes, in MB. 0 takes any size. */
+  min_file_size_mb: number;
   max_file_size_mb: number;
   rejected_file_action: "leave" | "delete_file";
-  /** The library's own wait after a file last changes, or null when it uses the Performance setting. */
-  min_file_age_seconds: number | null;
-  /** What the library waits now: its own value, or Performance's. */
-  effective_min_file_age_seconds: number;
+  /** A new file is ready once neither its size nor its last-changed time has moved for this many seconds. */
+  ready_after_seconds: number;
   created_after: string | null;
   created_before: string | null;
   modified_after: string | null;
@@ -45,24 +41,18 @@ export interface ProcessingLibrary {
   top_level_only: boolean;
 
   scan_interval_seconds: number;
-  hold_minutes: number;
   /** Files beside the video that travel with it, renamed to the output's stem. Empty migrates nothing. */
   sidecar_patterns_csv: string;
   preserve_original_timestamps: boolean;
   /** Off keeps the original download in the watched folder after cleaning, so a torrent keeps seeding. */
   remove_original_after_success: boolean;
-  /** Which tool writes the output: mkvmerge for MKV when installed and FFmpeg otherwise (best), or FFmpeg only. */
+  /** Megabytes kept free on the drive this workflow writes to; a file that would leave less is held. 0 turns it off. */
+  minimum_free_disk_space_mb: number;
+  /** Which tool writes the output, for new downloads and library cleaning: mkvmerge for MKV when installed and FFmpeg otherwise or when mkvmerge fails (best), or FFmpeg only. */
   remux_writer: RemuxWriter;
-  /** When mkvmerge's write fails its checks, whether FFmpeg writes the file again instead of failing it. */
-  rewrite_with_ffmpeg: boolean;
   /** What to do when an output already exists at the same path. "replace" is the long-standing behaviour. */
   output_collision_policy: string;
-  /** Hardware decoding. A choice that cannot work falls back to software and records why. */
-  hardware_decode_mode: string;
-  hardware_device: string;
-  hardware_disabled_vendors_csv: string;
   ffmpeg_strictness: string;
-  file_detection_interval_seconds: number;
   ignore_size_changes: boolean;
   skip_access_tests: boolean;
   file_system_events_enabled: boolean;
@@ -79,7 +69,10 @@ export interface ProcessingLibrary {
   schedule_start: string;
   schedule_end: string;
 
+  /** The most files this workflow runs at once, as a share of Files at once in Performance; 0 is no limit of its own. */
   max_concurrent_files: number;
+  /** What the workflow is held to now: its own limit, and never more than Files at once in Performance. */
+  effective_max_concurrent_files: number;
   priority: number;
 
   rule_set_id: number | null;
@@ -106,12 +99,10 @@ export interface ProcessingLibraryWrite {
   exclude_markers_csv: string;
   include_patterns_csv: string;
   exclude_patterns_csv: string;
-  /** Null uses the Performance setting. */
-  min_file_size_mb: number | null;
+  min_file_size_mb: number;
   max_file_size_mb: number;
   rejected_file_action: "leave" | "delete_file";
-  /** Null uses the Performance setting. */
-  min_file_age_seconds: number | null;
+  ready_after_seconds: number;
   created_after: string | null;
   created_before: string | null;
   modified_after: string | null;
@@ -119,21 +110,16 @@ export interface ProcessingLibraryWrite {
   exclude_hidden: boolean;
   top_level_only: boolean;
   scan_interval_seconds: number;
-  hold_minutes: number;
   sidecar_patterns_csv: string;
   preserve_original_timestamps: boolean;
   /** Off keeps the original download in the watched folder after cleaning, so a torrent keeps seeding. */
   remove_original_after_success: boolean;
+  /** Megabytes to keep free on the drive this workflow writes to; 0 turns the check off. */
+  minimum_free_disk_space_mb: number;
   /** Which tool writes the output: mkvmerge for MKV when installed and FFmpeg otherwise (best), or FFmpeg only. */
   remux_writer: RemuxWriter;
-  /** When mkvmerge's write fails its checks, whether FFmpeg writes the file again instead of failing it. */
-  rewrite_with_ffmpeg: boolean;
   output_collision_policy: string;
-  hardware_decode_mode: string;
-  hardware_device: string;
-  hardware_disabled_vendors_csv: string;
   ffmpeg_strictness: string;
-  file_detection_interval_seconds: number;
   ignore_size_changes: boolean;
   skip_access_tests: boolean;
   file_system_events_enabled: boolean;
@@ -231,7 +217,7 @@ export function writeFromProcessingLibrary(
     min_file_size_mb: library.min_file_size_mb,
     max_file_size_mb: library.max_file_size_mb,
     rejected_file_action: library.rejected_file_action,
-    min_file_age_seconds: library.min_file_age_seconds,
+    ready_after_seconds: library.ready_after_seconds,
     created_after: library.created_after,
     created_before: library.created_before,
     modified_after: library.modified_after,
@@ -239,18 +225,13 @@ export function writeFromProcessingLibrary(
     exclude_hidden: library.exclude_hidden,
     top_level_only: library.top_level_only,
     scan_interval_seconds: library.scan_interval_seconds,
-    hold_minutes: library.hold_minutes,
     sidecar_patterns_csv: library.sidecar_patterns_csv,
     preserve_original_timestamps: library.preserve_original_timestamps,
     remove_original_after_success: library.remove_original_after_success,
+    minimum_free_disk_space_mb: library.minimum_free_disk_space_mb,
     remux_writer: library.remux_writer,
-    rewrite_with_ffmpeg: library.rewrite_with_ffmpeg,
     output_collision_policy: library.output_collision_policy,
-    hardware_decode_mode: library.hardware_decode_mode,
-    hardware_device: library.hardware_device,
-    hardware_disabled_vendors_csv: library.hardware_disabled_vendors_csv,
     ffmpeg_strictness: library.ffmpeg_strictness,
-    file_detection_interval_seconds: library.file_detection_interval_seconds,
     ignore_size_changes: library.ignore_size_changes,
     skip_access_tests: library.skip_access_tests,
     file_system_events_enabled: library.file_system_events_enabled,

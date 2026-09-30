@@ -28,7 +28,7 @@ public sealed class RemuxPassHandlerDownloadedScanTests : IDisposable
     private readonly FakeMediaRunner _media = new();
 
     public RemuxPassHandlerDownloadedScanTests() =>
-        _fixture.Store.Execute("UPDATE operator_settings SET min_file_age_seconds = 0, min_input_file_size_mb = 0, minimum_free_disk_space_mb = 0")
+        _fixture.Store.Execute("UPDATE operator_settings SET minimum_free_disk_space_mb = 0")
             .GetAwaiter().GetResult();
 
     public void Dispose()
@@ -71,8 +71,8 @@ public sealed class RemuxPassHandlerDownloadedScanTests : IDisposable
         await _fixture.Store.Execute("DELETE FROM libraries");
         return Convert.ToInt64(await _fixture.Db(uow => uow.ExecuteScalarWriteAsync(
             "INSERT INTO libraries (name, media_type, watched_folder, output_folder, work_folder, failure_policy, max_attempts, " +
-            "rejected_file_action, retry_backoff_seconds, min_file_age_seconds, display_order) " +
-            "VALUES ('Movies', 'movie', $w, $o, $k, 'pass_through', 3, 'leave', 60, 0, 1) RETURNING id",
+            "rejected_file_action, retry_backoff_seconds, ready_after_seconds, min_file_size_mb, display_order) " +
+            "VALUES ('Movies', 'movie', $w, $o, $k, 'pass_through', 3, 'leave', 60, 0, 0, 1) RETURNING id",
             ("$w", _folders.Watched),
             ("$o", _folders.Output),
             ("$k", _folders.Work))), CultureInfo.InvariantCulture);

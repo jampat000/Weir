@@ -6,7 +6,6 @@ using Weir.Core.Auth;
 using Weir.Core.Jobs;
 using Weir.Core.Json;
 using Weir.Core.Processing;
-using Weir.Core.Processing.RemuxPass;
 using Weir.Core.Time;
 using Weir.Core.Validation;
 using Weir.Infrastructure.Jobs;
@@ -78,7 +77,6 @@ internal sealed class ProcessingFilesEndpointHandlers
 
     private static WireObject FileOut(ProcessingFileRecord row, string libraryName, List<DirectPlayBadge> directPlay, LiveProgress? progress)
     {
-        var quarantined = row.Status == ProcessingFileStatuses.OnHold && row.FailureAttempts >= RetryPolicy.QuarantineAfterFailures;
         return new WireObject()
             .Set("kind", HistoryEntryKinds.Download)
             .Set("id", row.Id)
@@ -113,7 +111,6 @@ internal sealed class ProcessingFilesEndpointHandlers
             .Set("progress_removed_subtitles", progress is null ? WireValue.Null : new WireArray(progress.RemovedSubtitles.Select(t => (WireValue)WireValue.Of(t))))
             .Set("failure_class", row.FailureClass)
             .Set("failure_attempts", row.FailureAttempts)
-            .Set("quarantined", quarantined)
             .Set("next_retry_at", row.NextRetryAt?.ToWireText())
             .Set("output_collision_policy", row.OutputCollisionPolicy)
             .Set("output_collision_action", row.OutputCollisionAction)

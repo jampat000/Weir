@@ -1,5 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { useId, useState } from "react";
+import { Fragment, useId, useState } from "react";
 
 import { PageLoading } from "../../../../components/shared/page-loading";
 import { useCanEdit } from "../../../../lib/auth/can-edit";
@@ -24,6 +24,7 @@ import { CLEANUP_JOBS, type CleanupJob } from "./cleanup-jobs";
 import {
   CleanupJobRow,
   DaysSettingRow,
+  SwitchSettingRow,
   type SaveSetting,
 } from "./cleanup-rows";
 
@@ -31,8 +32,6 @@ import {
 const WINDOW_MIN_DAYS = 1;
 const WINDOW_MAX_DAYS = 365;
 const WINDOW_DEFAULT_DAYS = 14;
-/** File history is kept for up to ten years; 0 keeps every record. */
-const RETENTION_MAX_DAYS = 3650;
 
 /** Saves a setting, refreshes the jobs it changes, and says what happened. */
 function useSaveSetting(onNotice: (notice: string | null) => void) {
@@ -74,8 +73,8 @@ function useRunNow(onNotice: (notice: string | null) => void) {
 }
 
 /**
- * Settings › Cleanup: the small jobs that keep Weir's folders and records tidy, each with its own
- * switch and timer. A change applies within half a minute, with no restart: Weir's timers read the
+ * Settings › Cleanup: the small jobs that keep Weir's folders tidy, each with its own
+ * switch and timer, and the choice that decides what the leftover-work-file job leaves alone. A change applies within half a minute, with no restart: Weir's timers read the
  * switch and the interval again every 30 seconds.
  */
 export function CleanupTab() {
@@ -116,9 +115,8 @@ export function CleanupTab() {
     >
       <SaveModelNote model="instant" />
       <p className="mm-quiet-note">
-        Small jobs that keep Weir&rsquo;s folders and records tidy. Each runs on
-        its own timer, and a change applies within half a minute, with no
-        restart.
+        Small jobs that keep Weir&rsquo;s folders tidy. Each runs on its own
+        timer, and a change applies within half a minute, with no restart.
       </p>
 
       {notice ? (
@@ -156,20 +154,40 @@ export function CleanupTab() {
               {CLEANUP_JOBS.map((job) => {
                 const state = families.find((f) => f.family === job.family);
                 return state ? (
-                  <CleanupJobRow
-                    key={job.family}
-                    job={job}
-                    state={state}
-                    switchId={`${ids}-${job.family}-on`}
-                    editable={editable}
-                    saving={saving}
-                    running={running}
-                    onSave={saveSetting}
-                    onRun={() => void runNow(job.family, job.name)}
-                    onRequestConfirm={(action) =>
-                      setConfirming({ job, action })
-                    }
-                  />
+                  <Fragment key={job.family}>
+                    <CleanupJobRow
+                      job={job}
+                      state={state}
+                      switchId={`${ids}-${job.family}-on`}
+                      editable={editable}
+                      saving={saving}
+                      running={running}
+                      onSave={saveSetting}
+                      onRun={() => void runNow(job.family, job.name)}
+                      onRequestConfirm={(action) =>
+                        setConfirming({ job, action })
+                      }
+                    />
+                    {job.family === "work_temp_stale_sweep" ? (
+                      <SwitchSettingRow
+                        testId="processing-maintenance-keep-failed-copy"
+                        name="Keep a failed file’s half-written copy for a day, so you can look at it."
+                        description="Leftover work files removes it once it is a day old."
+                        switchId={`${ids}-keep-failed`}
+                        enabled={settings.data.keep_failed_work_files}
+                        editable={editable}
+                        saving={saving}
+                        onChange={(on) =>
+                          void saveSetting(
+                            { keep_failed_work_files: on },
+                            on
+                              ? "A failed file’s half-written copy is now kept for a day."
+                              : "A failed file’s half-written copy is no longer kept.",
+                          )
+                        }
+                      />
+                    ) : null}
+                  </Fragment>
                 ) : null;
               })}
               <DaysSettingRow
@@ -191,26 +209,6 @@ export function CleanupTab() {
                 }
                 onSave={saveSetting}
                 toBody={(days) => ({ unclaimed_handback_window_days: days })}
-              />
-              <DaysSettingRow
-                testId="processing-maintenance-file-history"
-                name="Old file history"
-                description="Removes a file’s record from History once it is older than this. 0 keeps every record."
-                inputId={`${ids}-retention`}
-                inputLabel="Keep file history for"
-                saved={settings.data.file_log_retention_days}
-                min={0}
-                max={RETENTION_MAX_DAYS}
-                lastRun="Checked every hour"
-                editable={editable}
-                saving={saving}
-                savedWords={(days) =>
-                  days === 0
-                    ? "History keeps every record."
-                    : `History keeps ${days} days of records.`
-                }
-                onSave={saveSetting}
-                toBody={(days) => ({ file_log_retention_days: days })}
               />
             </tbody>
           </table>

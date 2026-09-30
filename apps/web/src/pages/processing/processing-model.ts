@@ -183,7 +183,7 @@ export function buildLanes(
   files: ProcessingFile[],
   libraryJobs: ProcessingJobInspectionRow[],
   libraryNames: Map<number, string>,
-  minAgeByLibrary: Map<number, number>,
+  readyAfterByLibrary: Map<number, number>,
   nextLookByLibrary: Map<number, { at: number; interval: number }> = new Map(),
 ): Lanes {
   const lanes: Lanes = {
@@ -202,18 +202,14 @@ export function buildLanes(
     const key = `file-${file.id}`;
     switch (file.status) {
       case "on_hold": {
-        if (file.quarantined) {
-          lanes.stuck.push(file);
-          break;
-        }
         const holdUntil = parseAppTime(file.hold_until);
         const since =
           parseAppTime(file.size_changed_at) ?? parseAppTime(file.updated_at);
-        const minAge = minAgeByLibrary.get(file.library_id) ?? null;
+        const readyAfter = readyAfterByLibrary.get(file.library_id) ?? null;
         const holdTotal =
           holdUntil != null && since != null && holdUntil > since
             ? (holdUntil - since) / 1000
-            : minAge;
+            : readyAfter;
         lanes.arriving.push({
           key,
           file,

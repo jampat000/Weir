@@ -16,9 +16,12 @@ folder is only ever read, never modified, while this happens.
 
 - If your workflow doesn't set its own work folder, Weir uses a default one under its own data
   folder, separate for movies and TV.
-- Before it starts writing, Weir checks there's enough free disk space at both the work folder and
-  the output folder. If there isn't, it skips the file and tells you why, rather than starting a
-  write it can't finish.
+- Before it starts writing, Weir checks the drives it will write to still have the space your
+  workflow keeps free: **Keep at least this many GB free on the drive this workflow writes to**
+  (5 GB unless you change it, on each workflow's output settings). If they don't, the file is put
+  **On hold** with the reason, and Weir tries again when there is room. It is never marked done
+  and never started on a drive that can't finish it. The same check protects a file Weir hands
+  back unchanged, and a file cleaned in place in your library.
 
 ## Nothing "half-written" ever appears in your output folder
 
@@ -48,6 +51,33 @@ example — it doesn't leave a broken file behind or silently drop your download
 original file back unchanged and tells you why in History, so you (or your media manager) can
 decide what to do next. That is the default. The workflow's **When retries run out** setting can
 keep the file on hold or reject the release instead.
+
+## When a file fails: tries, then one clear end
+
+Each workflow has a **When a file fails** section. Weir tries a failed file again on its own, up to
+**Maximum automatic attempts**. The first try counts, so 3 means the first try and two retries, and
+nothing else limits it. The wait before each retry starts at **First retry delay** and doubles each
+time, up to an hour, and Weir looks at the folder again shortly after the wait ends, not only at the
+next scan. A file that fails the pre-check is only tried again if you switch on **Retry files that
+failed the pre-check**.
+
+When the tries run out, or the failure is not one the workflow retries, the file is **Failed** in
+History, with the reason, and **When retries run out** decides the rest: hand the original back, keep it
+until you deal with it, or reject the release. **Try again** on a failed file starts it again by hand,
+whatever the limit.
+
+A failed copy that was half written stays in the work folder only if you switch on **Keep a failed
+file's half-written copy for a day** in Settings › Cleanup. **Leftover work files** removes it once it
+is a day old. There is no job that deletes the downloads of failed files: remove one from History, where
+Weir asks first.
+
+## How long a file's history is kept
+
+Everything Weir did to a file is in History. Weir keeps a file's history for as long as it still knows
+the file, then for **Keep a file's history for N days after it's gone** (set at the bottom of History,
+90 by default, 0 for ever). The days count from when Weir finds the file gone or forgotten, and a file
+that comes back before then keeps its history. System › Logs keeps Weir's own log and Activity
+separately, with their own settings.
 
 ## Changed your rules? Process rejected files again
 
@@ -80,3 +110,10 @@ silent skip.
 Cleaning a file that's already in your library, in place, follows the same rule: Weir builds the
 cleaned version alongside the original first and only swaps it in once the new copy is confirmed
 good. It never leaves your library with a file half-replaced.
+
+You set this up on the **Library** page, not in Settings: each library has its own folders, its own
+rules profile (the workflow's until you choose another), the daily clean, and two checks made before
+each clean. One skips a file when cleaning it would make the media manager download it again. The
+other skips a file that is still seeding. **Files already in your library: keep the original after
+cleaning** moves the original into an originals folder instead of deleting it, so removed tracks can
+be recovered. Settings › Workflows is only about new downloads.

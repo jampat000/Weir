@@ -1,7 +1,7 @@
 """Black-box processing: what happens when a file cannot be processed.
 
-Retries, handing the original back, holding after repeated failures, and rejecting a bad release
-through Deluno or a Radarr queue.
+Retries, handing the original back, giving up after exactly the workflow's number of attempts, and rejecting a
+bad release through Deluno or a Radarr queue.
 """
 
 from __future__ import annotations
@@ -71,13 +71,13 @@ def test_failure_is_retried_then_the_original_is_passed_through_unchanged(
     assert "handed the original back unchanged" in row["status_reason"]
 
 
-def test_three_failures_hold_the_file_and_the_handoff_reads_failed(
+def test_a_workflow_that_allows_five_attempts_gives_up_on_the_fifth_and_the_handoff_reads_failed(
     server_factory, client_factory, fake_ffmpeg, fake_managers, tmp_path: Path
 ) -> None:
     _server, admin = _signed_in_working_server(server_factory, client_factory, fake_ffmpeg)
     folders = h.Folders.make(tmp_path)
     _fake, library = h.deluno_setup(
-        admin, fake_managers, folders, failure_policy="hold", max_attempts=10, retry_backoff_seconds=1
+        admin, fake_managers, folders, failure_policy="hold", max_attempts=5, retry_backoff_seconds=1
     )
     fake_ffmpeg.set_file_rule("film.mkv", remux_error=REMUX_CRASH)
     release = folders.watched / "Always.Broken.2022"
@@ -88,27 +88,26 @@ def test_three_failures_hold_the_file_and_the_handoff_reads_failed(
     h.detect_without_queueing(admin, library, rel)
 
     h.post_handoff(admin, handoff_id="handoff-held-1", source_path=source)
-    row = h.failure_attempts_reach(admin, library, rel, 3)
+    row = h.failure_attempts_reach(admin, library, rel, 5)
 
-    assert row["status"] == "on_hold"
-    assert row["quarantined"] is True
+    assert row["status"] == "processing_failed"
+    assert row["failure_attempts"] == 5
     assert row["next_retry_at"] is None
-    assert "held this file after 3 repeated execution failures" in row["status_reason"]
+    assert "tried this file 5 times and stopped" in row["status_reason"]
     status = h.wait_for_handoff_state(admin, "handoff-held-1", "failed")
     assert status["outputPath"] is None
     assert h.jobs(admin, kind=h.PASS_THROUGH_KIND) == []
     assert source.is_file()
-    assert len(fake_ffmpeg.calls(tool="ffmpeg", step="remux")) == 3
-    # Held means held: another scan does not start it again. A scan queues its remux jobs before it
+    assert len(fake_ffmpeg.calls(tool="ffmpeg", step="remux")) == 5
+    # Given up means given up: another scan does not start it again. A scan queues its remux jobs before it
     # finishes, so once it has finished with no remux job waiting or running, none is coming.
     scan = h.wait_for_job_finished(admin, h.enqueue_scan(admin, library))
     assert scan["status"] == "completed", scan
     assert [j for j in h.jobs(admin, kind=h.REMUX_KIND) if j["status"] in ("pending", "leased")] == []
-    assert len(fake_ffmpeg.calls(tool="ffmpeg", step="remux")) == 3
-    held = h.file_row(admin, library["id"], rel)
-    assert held is not None
-    assert held["status"] == "on_hold"
-    assert held["next_retry_at"] is None
+    assert len(fake_ffmpeg.calls(tool="ffmpeg", step="remux")) == 5
+    failed = h.file_row(admin, library["id"], rel)
+    assert failed is not None
+    assert failed["status"] == "processing_failed"
 
 
 def test_content_rejection_under_reject_policy_reports_rejected_to_deluno_and_removes_the_download(
@@ -162,7 +161,6 @@ def test_content_rejection_under_reject_policy_removes_and_blocklists_the_radarr
     folders = h.Folders.make(tmp_path)
     radarr = fake_managers("radarr", root_folders=[str(tmp_path / "library")])
     connection = h.create_connection(admin, radarr)
-    h.relax_operator_guards(admin)
     library = h.create_library(admin, folders, manager_connection_ids=[connection["id"]], failure_policy="reject")
     download = folders.watched / "Bad.Movie.2019.1080p"
     download.mkdir()
@@ -207,7 +205,6 @@ def test_a_rules_rejection_with_no_media_manager_is_a_rejected_file_the_remove_d
 ) -> None:
     _server, admin = _signed_in_working_server(server_factory, client_factory, fake_ffmpeg)
     folders = h.Folders.make(tmp_path)
-    h.relax_operator_guards(admin)
     library = h.create_library(admin, folders, failure_policy="pass_through")
     release = folders.watched / "No.Audio.2023"
     release.mkdir()

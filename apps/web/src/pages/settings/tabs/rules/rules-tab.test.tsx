@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
 import * as authQueries from "../../../../lib/auth/queries";
+import * as directPlayApi from "../../../../lib/processing/direct-play-api";
 import * as librariesApi from "../../../../lib/processing/libraries-api";
 import * as ruleSetsApi from "../../../../lib/processing/rule-sets-api";
 import type { ProcessingRuleSet } from "../../../../lib/processing/rule-sets-api";
@@ -68,6 +69,10 @@ function wrapper({ children }: { children: ReactNode }) {
 // The tab lists the libraries using each profile; unstubbed, that is a real request to the test host.
 beforeEach(() => {
   vi.spyOn(librariesApi, "fetchProcessingLibraries").mockResolvedValue([]);
+  vi.spyOn(directPlayApi, "fetchDirectPlayDevices").mockResolvedValue({
+    customised: false,
+    devices: [],
+  });
 });
 
 afterEach(() => {
@@ -120,6 +125,20 @@ it("lays the profile out as audio, subtitles, original language and cleanup, wit
   expect(screen.getByText("Audio order")).toBeInTheDocument();
   expect(screen.getByText("Subtitle order")).toBeInTheDocument();
   expect(screen.getByDisplayValue(">=5.1")).toBeInTheDocument();
+});
+
+it("offers the devices you play on below the profiles", async () => {
+  stubEditableProfile();
+
+  render(<RulesTab />, { wrapper });
+
+  const devices = await screen.findByTestId("processing-direct-play-section");
+  expect(devices).toHaveTextContent("Your playback devices");
+  expect(
+    screen
+      .getByRole("heading", { name: "Profiles" })
+      .compareDocumentPosition(devices),
+  ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
 });
 
 it("saves every edited rule with the profile", async () => {

@@ -105,8 +105,8 @@ public static class RemuxPassEnqueue
             RemuxPassOutcomes.JobKind,
             WireJsonWriter.Dumps(payload, WireJsonFormat.Compact),
             JobQueueRules.DefaultMaxAttempts,
-            0,
-            0);
+            runnerCost: null,
+            priority: 0);
     }
 
     /// <summary>The oldest pending pass for this path.</summary>

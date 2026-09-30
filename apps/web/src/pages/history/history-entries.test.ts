@@ -64,11 +64,16 @@ function clean(partial: Partial<LibraryClean>): LibraryClean {
 }
 
 describe("history groups", () => {
-  it("puts a file that waits on a person under Needs you, whatever its status", () => {
-    expect(
-      historyGroupOf(file({ status: "processing_failed", quarantined: true })),
-    ).toBe("needs");
+  it("puts a file that waits on a person under Needs you", () => {
     expect(historyGroupOf(file({ status: "blocked_upstream" }))).toBe("needs");
+  });
+
+  it("puts a file Weir gave up on under Failed, whatever it failed on and however often", () => {
+    expect(
+      historyGroupOf(
+        file({ status: "processing_failed", failure_attempts: 5 }),
+      ),
+    ).toBe("failed");
   });
 
   it("moves on_hold into Needs you rather than In progress", () => {

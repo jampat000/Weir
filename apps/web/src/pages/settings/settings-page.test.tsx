@@ -28,9 +28,6 @@ vi.mock("./tabs/media-managers/media-managers-tab", () => ({
 vi.mock("./tabs/performance/process-settings-section", () => ({
   ProcessSettingsSection: () => <div>Running content</div>,
 }));
-vi.mock("./tabs/performance/direct-play-section", () => ({
-  DirectPlaySection: () => null,
-}));
 vi.mock("./tabs/cleanup/cleanup-tab", () => ({
   CleanupTab: () => <div>Housekeeping content</div>,
 }));

@@ -27,13 +27,6 @@ public sealed record ProcessingRuntimeSettings
     public required bool ProcessingWorkTempStaleSweepTvScheduleEnabled { get; init; }
     public required int ProcessingWorkTempStaleSweepTvScheduleIntervalSeconds { get; init; }
     public required int ProcessingWorkTempStaleSweepMinStaleAgeSeconds { get; init; }
-    public required bool ProcessingMovieFailureCleanupScheduleEnabled { get; init; }
-    public required int ProcessingMovieFailureCleanupScheduleIntervalSeconds { get; init; }
-    public required bool ProcessingTvFailureCleanupScheduleEnabled { get; init; }
-    public required int ProcessingTvFailureCleanupScheduleIntervalSeconds { get; init; }
-    public required int ProcessingMovieFailureCleanupGracePeriodSeconds { get; init; }
-    public required int ProcessingTvFailureCleanupGracePeriodSeconds { get; init; }
-    public required string FailureCleanupConfigurationNote { get; init; }
     public required string WorkTempStaleSweepPeriodicConfigurationNote { get; init; }
 }
 
@@ -74,10 +67,6 @@ public static class RuntimeVisibility
         "WEIR_PROCESSING_TV_OUTPUT_CLEANUP_MIN_AGE_SECONDS in the server's environment (default 48 hours, clamped 1h..30d). " +
         "Restart the API after changing this value.";
 
-    private const string FailureCleanupNote =
-        "The Pass 4 failed-remux cleanup sweep uses separate Movies and TV timers and grace periods in " +
-        "the server's environment. Only terminal failed remux rows are eligible, and failure age uses jobs.updated_at. Restart required.";
-
     private const string WorkTempStaleSweepPeriodicNote =
         "Optional periodic enqueue for processing.work_temp_stale_sweep.v1 is per scope (Movies vs TV) in " +
         "the server's environment. Each tick enqueues one durable job per enabled scope. Restart the API after changing any of these.";
@@ -116,13 +105,6 @@ public static class RuntimeVisibility
             ProcessingWorkTempStaleSweepTvScheduleEnabled = options.ProcessingWorkTempStaleSweepTvScheduleEnabled,
             ProcessingWorkTempStaleSweepTvScheduleIntervalSeconds = options.ProcessingWorkTempStaleSweepTvScheduleIntervalSeconds,
             ProcessingWorkTempStaleSweepMinStaleAgeSeconds = options.ProcessingWorkTempStaleSweepMinStaleAgeSeconds,
-            ProcessingMovieFailureCleanupScheduleEnabled = options.ProcessingMovieFailureCleanupScheduleEnabled,
-            ProcessingMovieFailureCleanupScheduleIntervalSeconds = options.ProcessingMovieFailureCleanupScheduleIntervalSeconds,
-            ProcessingTvFailureCleanupScheduleEnabled = options.ProcessingTvFailureCleanupScheduleEnabled,
-            ProcessingTvFailureCleanupScheduleIntervalSeconds = options.ProcessingTvFailureCleanupScheduleIntervalSeconds,
-            ProcessingMovieFailureCleanupGracePeriodSeconds = options.ProcessingMovieFailureCleanupGracePeriodSeconds,
-            ProcessingTvFailureCleanupGracePeriodSeconds = options.ProcessingTvFailureCleanupGracePeriodSeconds,
-            FailureCleanupConfigurationNote = FailureCleanupNote,
             WorkTempStaleSweepPeriodicConfigurationNote = WorkTempStaleSweepPeriodicNote,
         };
     }

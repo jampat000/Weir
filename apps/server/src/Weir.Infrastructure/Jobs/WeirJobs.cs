@@ -35,12 +35,6 @@ public static class WeirJobs
         services.AddSingleton<IPeriodicEnqueuer>(sp => new WorkTempStaleSweepEnqueuer(
             sp.GetRequiredService<ProcessingJobStore>(), "tv", TimeSpan.FromSeconds(options.ProcessingWorkTempStaleSweepTvScheduleIntervalSeconds),
             SwitchedOffByEnvironment(runtime, "WEIR_PROCESSING_WORK_TEMP_STALE_SWEEP_TV_SCHEDULE_ENABLED", options.ProcessingWorkTempStaleSweepTvScheduleEnabled)));
-        services.AddSingleton<IPeriodicEnqueuer>(sp => new FailureCleanupSweepEnqueuer(
-            sp.GetRequiredService<ProcessingJobStore>(), "movie", TimeSpan.FromSeconds(options.ProcessingMovieFailureCleanupScheduleIntervalSeconds),
-            SwitchedOffByEnvironment(runtime, "WEIR_PROCESSING_MOVIE_FAILURE_CLEANUP_SCHEDULE_ENABLED", options.ProcessingMovieFailureCleanupScheduleEnabled)));
-        services.AddSingleton<IPeriodicEnqueuer>(sp => new FailureCleanupSweepEnqueuer(
-            sp.GetRequiredService<ProcessingJobStore>(), "tv", TimeSpan.FromSeconds(options.ProcessingTvFailureCleanupScheduleIntervalSeconds),
-            SwitchedOffByEnvironment(runtime, "WEIR_PROCESSING_TV_FAILURE_CLEANUP_SCHEDULE_ENABLED", options.ProcessingTvFailureCleanupScheduleEnabled)));
 
         // #652: hand-back copies nobody claimed. Off until a person switches it on in Settings › Cleanup.
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IJobHandler, UnclaimedHandbackCleanupHandler>());

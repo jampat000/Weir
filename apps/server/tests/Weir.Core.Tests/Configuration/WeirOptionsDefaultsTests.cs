@@ -76,12 +76,6 @@ public sealed class WeirOptionsDefaultsTests
         Assert.False(Defaults.ProcessingWorkTempStaleSweepTvScheduleEnabled);
         Assert.Equal(3600, Defaults.ProcessingWorkTempStaleSweepTvScheduleIntervalSeconds);
         Assert.Equal(86_400, Defaults.ProcessingWorkTempStaleSweepMinStaleAgeSeconds);
-        Assert.False(Defaults.ProcessingMovieFailureCleanupScheduleEnabled);
-        Assert.Equal(3600, Defaults.ProcessingMovieFailureCleanupScheduleIntervalSeconds);
-        Assert.False(Defaults.ProcessingTvFailureCleanupScheduleEnabled);
-        Assert.Equal(3600, Defaults.ProcessingTvFailureCleanupScheduleIntervalSeconds);
-        Assert.Equal(1800, Defaults.ProcessingMovieFailureCleanupGracePeriodSeconds);
-        Assert.Equal(1800, Defaults.ProcessingTvFailureCleanupGracePeriodSeconds);
     }
 
     [Fact]

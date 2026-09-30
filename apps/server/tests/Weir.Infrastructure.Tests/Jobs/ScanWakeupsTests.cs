@@ -55,25 +55,24 @@ public sealed class ScanWakeupsTests
         Assert.Equal(t0.AddSeconds(40), looks.NextLookFor(3));
     }
 
-    [Fact]
-    public async Task A_scan_that_holds_a_file_books_the_next_look_for_when_the_hold_ends()
+    /// <summary>A Movies workflow over an empty watched folder, and a way to run its scan with a handler that reports to the wake-ups.</summary>
+    private sealed record ScanSetup(long LibraryId, string WatchedFolder, Func<Task> ScanAsync);
+
+    private static async Task<ScanSetup> ScanSetupAsync(StoreFixture store, ScanWakeups wakeups, long readyAfterSeconds)
     {
-        using var store = new StoreFixture(("WEIR_CREDENTIALS_SECRET", "wakeup-tests-credentials-secret"));
         store.Clock.Set(DateTimeOffset.UtcNow);
         var cipher = new CredentialCipher(store.Options.CredentialsSecret, store.Options.SessionSecret, store.Options.PreviousCredentialsSecrets, store.Clock);
         var connections = new MediaManagerConnectionService(store.Options, cipher, new HttpMediaManagerPorts(new FakeManagerHttp()), new MediaManagerConnectionStore());
         var jobs = new ProcessingJobStore(store.Database, store.Clock);
-        var wakeups = new ScanWakeups();
         var handler = new ProcessingWatchedFolderScanDispatchJobHandler(
-            store.Database, store.Clock, store.Options, jobs, connections, new SuiteSettingsStore(new AuthStore()), new OperatorSettingsStore(), Libraries, Files, new FileSkipMarkerStore(), wakeups);
+            store.Database, store.Clock, store.Options, jobs, connections, new SuiteSettingsStore(new AuthStore()), Libraries, Files, new FileSkipMarkerStore(), wakeups);
         await store.Execute(
-            "INSERT INTO operator_settings (id, min_file_age_seconds, min_input_file_size_mb, minimum_free_disk_space_mb) " +
-            "VALUES (1, 0, 0, 0) ON CONFLICT(id) DO UPDATE SET min_file_age_seconds = 0, min_input_file_size_mb = 0, minimum_free_disk_space_mb = 0");
+            "INSERT INTO operator_settings (id, minimum_free_disk_space_mb) " +
+            "VALUES (1, 0) ON CONFLICT(id) DO UPDATE SET minimum_free_disk_space_mb = 0");
         var watched = store.Home.Join("watch");
         var output = store.Home.Join("out");
         Directory.CreateDirectory(watched);
         Directory.CreateDirectory(output);
-        File.WriteAllBytes(Path.Combine(watched, "Fresh Download 2026.mkv"), [1]);
 
         long libraryId;
         await using (var uow = await UnitOfWork.OpenAsync(store.Database))
@@ -84,16 +83,33 @@ public sealed class ScanWakeupsTests
                 MediaType = ProcessingMediaScopes.Movie,
                 WatchedFolder = watched,
                 OutputFolder = output,
-                MinFileAgeSeconds = 60,
+                ReadyAfterSeconds = readyAfterSeconds,
+                MinFileSizeMb = 0,
             })).Id;
             await uow.CommitAsync();
         }
 
-        var payload = new WireObject().Set("enqueue_remux_jobs", true).Set("scan_trigger", "manual").Set("media_scope", "movie").Set("library_id", libraryId);
-        var job = await jobs.EnqueueOrGetAsync("scan-wakeup", ProcessingWatchedFolderScanDispatchJobKinds.ScanDispatch, WireJsonWriter.Dumps(payload, WireJsonFormat.Compact));
-        await handler.HandleAsync(new JobWorkContext(job.Id, job.JobKind, job.PayloadJson, "test"), CancellationToken.None);
+        var scans = 0;
+        return new ScanSetup(libraryId, watched, async () =>
+        {
+            var payload = new WireObject().Set("enqueue_remux_jobs", true).Set("scan_trigger", "manual").Set("media_scope", "movie").Set("library_id", libraryId);
+            var job = await jobs.EnqueueOrGetAsync($"scan-wakeup-{scans++}", ProcessingWatchedFolderScanDispatchJobKinds.ScanDispatch, WireJsonWriter.Dumps(payload, WireJsonFormat.Compact));
+            await handler.HandleAsync(new JobWorkContext(job.Id, job.JobKind, job.PayloadJson, "test"), CancellationToken.None);
+        });
+    }
 
-        // Too new to touch, so it is on hold until a known time (first while its size settles, then its minimum age), and
+    [Fact]
+    public async Task A_scan_that_holds_a_file_books_the_next_look_for_when_the_hold_ends()
+    {
+        using var store = new StoreFixture(("WEIR_CREDENTIALS_SECRET", "wakeup-tests-credentials-secret"));
+        var wakeups = new ScanWakeups();
+        var setup = await ScanSetupAsync(store, wakeups, readyAfterSeconds: 60);
+        File.WriteAllBytes(Path.Combine(setup.WatchedFolder, "Fresh Download 2026.mkv"), [1]);
+        var libraryId = setup.LibraryId;
+
+        await setup.ScanAsync();
+
+        // Too new to touch, so it is on hold until a known time (first while its size settles, then its last-changed age), and
         // the next look is booked a second after that hold ends.
         Assert.Equal("on_hold", await StatusAsync(store, "Fresh Download 2026.mkv"));
         var holdUntil = await HoldUntilAsync(store, "Fresh Download 2026.mkv");
@@ -102,6 +118,44 @@ public sealed class ScanWakeupsTests
         var booked = wakeups.BookedFor(libraryId);
         Assert.NotNull(booked);
         Assert.InRange((booked.Value - holdUntil.Value).TotalSeconds, 0.5, 1.5);
+    }
+
+    [Fact]
+    public async Task A_scan_books_the_next_look_for_when_a_failed_files_retry_falls_due()
+    {
+        using var store = new StoreFixture(("WEIR_CREDENTIALS_SECRET", "wakeup-tests-retry-secret"));
+        var wakeups = new ScanWakeups();
+        var setup = await ScanSetupAsync(store, wakeups, readyAfterSeconds: 0);
+        File.WriteAllBytes(Path.Combine(setup.WatchedFolder, "Failed Download 2026.mkv"), [1]);
+        var retryAt = store.Clock.GetUtcNow().AddMinutes(5);
+        await store.Execute(
+            "INSERT INTO files (library_id, relative_path, status, size_bytes, failure_class, failure_attempts, next_retry_at) " +
+            $"VALUES ({setup.LibraryId}, 'Failed Download 2026.mkv', 'processing_failed', 1, 'execution', 1, '{TimestampColumns.Orm(retryAt)}')");
+
+        await setup.ScanAsync();
+
+        Assert.Equal("processing_failed", await StatusAsync(store, "Failed Download 2026.mkv"));
+        var booked = wakeups.BookedFor(setup.LibraryId);
+        Assert.NotNull(booked);
+        Assert.InRange((booked.Value - retryAt).TotalSeconds, 0.5, 1.5);
+    }
+
+    [Fact]
+    public async Task A_scan_after_a_failed_files_retry_is_due_queues_the_retry_and_books_nothing()
+    {
+        using var store = new StoreFixture(("WEIR_CREDENTIALS_SECRET", "wakeup-tests-due-retry-secret"));
+        var wakeups = new ScanWakeups();
+        var setup = await ScanSetupAsync(store, wakeups, readyAfterSeconds: 0);
+        File.WriteAllBytes(Path.Combine(setup.WatchedFolder, "Failed Download 2026.mkv"), [1]);
+        var retryAt = store.Clock.GetUtcNow().AddMinutes(-1);
+        await store.Execute(
+            "INSERT INTO files (library_id, relative_path, status, size_bytes, failure_class, failure_attempts, next_retry_at) " +
+            $"VALUES ({setup.LibraryId}, 'Failed Download 2026.mkv', 'processing_failed', 1, 'execution', 1, '{TimestampColumns.Orm(retryAt)}')");
+
+        await setup.ScanAsync();
+
+        Assert.Equal(1, await store.Scalar("SELECT count(*) FROM jobs WHERE job_kind = 'processing.file.remux_pass.v1'"));
+        Assert.Null(wakeups.BookedFor(setup.LibraryId));
     }
 
     [Fact]

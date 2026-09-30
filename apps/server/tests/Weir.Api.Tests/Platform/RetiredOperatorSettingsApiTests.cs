@@ -3,8 +3,9 @@ using System.Net;
 namespace Weir.Api.Tests.Platform;
 
 /// <summary>
-/// "Verbose file-detection records" is retired because nothing acted on it. The settings do not show it, and an
-/// older client that still sends it is answered as though it had not, rather than refused.
+/// "Verbose file-detection records", "Wait after a file last changes" and "Skip files smaller than" are retired: nothing acts on
+/// the first, and the other two now live on each workflow. The settings do not show them, and an older client that still
+/// sends them is answered as though it had not, rather than refused.
 /// </summary>
 public sealed class RetiredOperatorSettingsApiTests
 {
@@ -42,11 +43,40 @@ public sealed class RetiredOperatorSettingsApiTests
 
         using var alongside = await client.PutAsync(
             "/api/v1/processing/operator-settings",
-            new { csrf_token = await client.CsrfAsync(), verbose_detection_logging = true, min_file_age_seconds = 120 });
+            new { csrf_token = await client.CsrfAsync(), verbose_detection_logging = true, runner_capacity = 8 });
         Assert.Equal(HttpStatusCode.OK, alongside.StatusCode);
-        Assert.Equal(120, (await ApiTestClient.Json(alongside))["min_file_age_seconds"]!.GetValue<int>());
+        Assert.Equal(8, (await ApiTestClient.Json(alongside))["runner_capacity"]!.GetValue<int>());
 
         // The column is still there for configuration backups that carry it, and keeps its default.
         Assert.Equal(0, await TestDatabase.ScalarAsync(server, "SELECT verbose_detection_logging FROM operator_settings WHERE id = 1"));
+    }
+
+    [Fact]
+    public async Task The_wait_and_minimum_size_are_not_Performance_settings()
+    {
+        var (server, client) = await SignedInAsync();
+        await using var disposeServer = server;
+
+        using var response = await client.GetAsync("/api/v1/processing/operator-settings");
+
+        var body = (await ApiTestClient.Json(response)).AsObject();
+        Assert.False(body.ContainsKey("min_file_age_seconds"));
+        Assert.False(body.ContainsKey("min_input_file_size_mb"));
+    }
+
+    [Fact]
+    public async Task An_older_client_that_still_sends_the_wait_and_minimum_size_is_answered_and_they_are_ignored()
+    {
+        var (server, client) = await SignedInAsync();
+        await using var disposeServer = server;
+
+        using var saved = await client.PutAsync(
+            "/api/v1/processing/operator-settings",
+            new { csrf_token = await client.CsrfAsync(), min_file_age_seconds = 120, min_input_file_size_mb = 200 });
+
+        Assert.Equal(HttpStatusCode.OK, saved.StatusCode);
+        var body = (await ApiTestClient.Json(saved)).AsObject();
+        Assert.False(body.ContainsKey("min_file_age_seconds"));
+        Assert.False(body.ContainsKey("min_input_file_size_mb"));
     }
 }

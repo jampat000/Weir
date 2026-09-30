@@ -54,16 +54,6 @@ public static class OutputCollisionPolicies
     public static readonly IReadOnlyList<string> All = [Replace, Skip, KeepBoth, ReplaceIfLarger, ReplaceIfNewer];
 }
 
-/// <summary>How a library asks ffmpeg to decode for hardware-accelerated work.</summary>
-public static class HardwareDecodeModes
-{
-    public const string Off = "off";
-    public const string Auto = "auto";
-    public const string Device = "device";
-
-    public static readonly IReadOnlyList<string> All = [Off, Auto, Device];
-}
-
 /// <summary>How strictly ffmpeg treats a standards violation it finds in the source.</summary>
 public static class FfmpegStrictnessLevels
 {
@@ -74,6 +64,13 @@ public static class FfmpegStrictnessLevels
     public const string Experimental = "experimental";
 
     public static readonly IReadOnlyList<string> All = [Very, Strict, Normal, Unofficial, Experimental];
+
+    /// <summary>
+    /// The ffmpeg options that apply <paramref name="level"/>, placed before <c>-i</c>. ffmpeg's own default
+    /// (<c>normal</c>) and anything unrecognised add none.
+    /// </summary>
+    public static IReadOnlyList<string> InputFlags(string? level) =>
+        level is not (null or Normal) && All.Contains(level, StringComparer.Ordinal) ? ["-strict", level] : [];
 }
 
 /// <summary>One <c>rule_sets</c> row.</summary>
@@ -153,13 +150,17 @@ public sealed record ProcessingLibraryRecord
     public string IncludePatternsCsv { get; init; } = string.Empty;
     public string ExcludePatternsCsv { get; init; } = string.Empty;
 
-    /// <summary>The smallest file this library takes; null follows Settings › Performance (see <see cref="IntakeLimits"/>).</summary>
-    public long? MinFileSizeMb { get; init; }
+    /// <summary>The smallest file this library takes, in MB; 0 takes any size.</summary>
+    public long MinFileSizeMb { get; init; } = LibraryIntake.DefaultMinFileSizeMb;
     public long MaxFileSizeMb { get; init; }
     public string RejectedFileAction { get; init; } = "leave";
 
-    /// <summary>How long a file must be left alone before Weir starts on it; null follows Settings › Performance.</summary>
-    public long? MinFileAgeSeconds { get; init; }
+    /// <summary>
+    /// A new file is ready once neither its size nor its last-changed time has moved for this many seconds; 0 needs no wait.
+    /// A media-manager hand-off skips the scan's wait, because the manager says the download is finished; the pass still
+    /// checks the file's last-changed age against this value.
+    /// </summary>
+    public long ReadyAfterSeconds { get; init; } = LibraryIntake.DefaultReadyAfterSeconds;
     public Timestamp? CreatedAfter { get; init; }
     public Timestamp? CreatedBefore { get; init; }
     public Timestamp? ModifiedAfter { get; init; }
@@ -171,16 +172,10 @@ public sealed record ProcessingLibraryRecord
     public bool PreserveOriginalTimestamps { get; init; }
     public string OutputCollisionPolicy { get; init; } = "replace";
 
-    public string HardwareDecodeMode { get; init; } = "off";
-    public string HardwareDevice { get; init; } = string.Empty;
-    public string HardwareDisabledVendorsCsv { get; init; } = string.Empty;
-    public string FfmpegStrictness { get; init; } = "normal";
+    public string FfmpegStrictness { get; init; } = FfmpegStrictnessLevels.Normal;
 
-    /// <summary>#548: which tool writes the output. See <see cref="Weir.Core.Media.RemuxWriterChoice"/>.</summary>
+    /// <summary>Which tool writes the output, for new downloads and library cleaning alike. See <see cref="Weir.Core.Media.RemuxWriterChoice"/>.</summary>
     public string RemuxWriter { get; init; } = RemuxWriterChoice.Best;
-
-    /// <summary>#548: rewrite with ffmpeg when the preferred writer cannot write or validate a file.</summary>
-    public bool RewriteWithFfmpeg { get; init; } = true;
 
     /// <summary>
     /// Remove the source from the watched folder after a successful pass (the default). Off keeps the original download,
@@ -188,9 +183,13 @@ public sealed record ProcessingLibraryRecord
     /// </summary>
     public bool RemoveOriginalAfterSuccess { get; init; } = true;
 
+    /// <summary>The space a new workflow keeps free: 5 GB.</summary>
+    public const long DefaultMinimumFreeDiskSpaceMb = 5120;
+
+    /// <summary>Megabytes this workflow keeps free on the drive it writes to; 0 turns the check off.</summary>
+    public long MinimumFreeDiskSpaceMb { get; init; } = DefaultMinimumFreeDiskSpaceMb;
+
     public long ScanIntervalSeconds { get; init; } = 300;
-    public long HoldMinutes { get; init; }
-    public long FileDetectionIntervalSeconds { get; init; } = 30;
     public bool IgnoreSizeChanges { get; init; }
     public bool FileSystemEventsEnabled { get; init; } = true;
     public bool SkipAccessTests { get; init; }

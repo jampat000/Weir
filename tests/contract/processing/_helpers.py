@@ -55,16 +55,6 @@ class Folders:
         return folders
 
 
-def relax_operator_guards(admin: WeirClient) -> None:
-    """No minimum age, size or free space, so a small fresh fixture file is processed at once."""
-
-    r = admin.put_csrf(
-        f"{API}/processing/operator-settings",
-        {"min_file_age_seconds": 0, "min_input_file_size_mb": 0, "minimum_free_disk_space_mb": 0},
-    )
-    assert r.status_code == 200, r.text
-
-
 def create_library(admin: WeirClient, folders: Folders, **overrides: Any) -> dict[str, Any]:
     body: dict[str, Any] = {
         "name": overrides.pop("name", "Contract Movies"),
@@ -72,10 +62,12 @@ def create_library(admin: WeirClient, folders: Folders, **overrides: Any) -> dic
         "watched_folder": str(folders.watched),
         "work_folder": str(folders.work),
         "output_folder": str(folders.output),
-        "min_file_age_seconds": 0,
-        "file_detection_interval_seconds": 0,
+        "ready_after_seconds": 0,
+        "min_file_size_mb": 0,
         "skip_access_tests": True,
         "retry_backoff_seconds": 1,
+        # A workflow keeps 5 GB free by default; a small fixture file is processed whatever the drive holds.
+        "minimum_free_disk_space_mb": 0,
         **overrides,
     }
     r = admin.post_csrf(f"{API}/processing/libraries", body)
@@ -109,19 +101,14 @@ def _library_put_body(current: dict[str, Any], changes: dict[str, Any]) -> dict[
         "min_file_size_mb",
         "max_file_size_mb",
         "rejected_file_action",
-        "min_file_age_seconds",
+        "ready_after_seconds",
         "exclude_hidden",
         "top_level_only",
         "sidecar_patterns_csv",
         "preserve_original_timestamps",
         "output_collision_policy",
-        "hardware_decode_mode",
-        "hardware_device",
-        "hardware_disabled_vendors_csv",
         "ffmpeg_strictness",
         "scan_interval_seconds",
-        "hold_minutes",
-        "file_detection_interval_seconds",
         "ignore_size_changes",
         "skip_access_tests",
         "max_attempts",
@@ -141,6 +128,7 @@ def _library_put_body(current: dict[str, Any], changes: dict[str, Any]) -> dict[
         "rule_set_id",
         "manager_connection_ids",
         "remove_original_after_success",
+        "minimum_free_disk_space_mb",
     )
     body = {key: current[key] for key in writable if key in current}
     body.update(changes)
@@ -370,12 +358,11 @@ def deluno_setup(
     capabilities: list[str] | None = None,
     **library: Any,
 ) -> tuple[FakeManager, dict[str, Any]]:
-    """A fake Deluno that manages this library, its connection, relaxed guards, and the linked library."""
+    """A fake Deluno that manages this library, its connection, and the linked library."""
 
     fake = fake_managers("deluno", capabilities=capabilities or [])
     fake.libraries.append(deluno_library_manifest(folders))
     connection = create_connection(admin, fake)
-    relax_operator_guards(admin)
     created = create_library(admin, folders, manager_connection_ids=[connection["id"]], **library)
     return fake, created
 

@@ -20,7 +20,6 @@ function whatWeirDid(file: ProcessingFile): string {
       ? `Writing · ${Math.round(file.progress_percent)}%`
       : "Working on it";
   }
-  if (file.quarantined) return "Held after repeated failures";
   return importedLabel(file) ?? processingFileStatusLabel(file);
 }
 

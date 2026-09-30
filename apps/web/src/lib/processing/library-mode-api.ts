@@ -71,11 +71,7 @@ export async function fetchLibrarySettings(
 ): Promise<LibrarySettings> {
   const path = librarySettingsPath(libraryId);
   const r = await apiFetch(path);
-  await requireOk(
-    path,
-    r,
-    "Could not load this workflow's library-mode settings",
-  );
+  await requireOk(path, r, "Could not load this library's setup");
   return readJson<LibrarySettings>(r);
 }
 
@@ -86,31 +82,35 @@ export const DEFAULT_ORIGINALS_FOLDER_NAME = ".weir-originals";
 export function originalsFolderLabel(originalsFolder: string): string {
   return originalsFolder.trim().length > 0
     ? originalsFolder
-    : `a ${DEFAULT_ORIGINALS_FOLDER_NAME} folder inside each workflow folder`;
+    : `a ${DEFAULT_ORIGINALS_FOLDER_NAME} folder inside each library folder`;
 }
 
 /**
- * PUTs library-mode settings. `library_folders` is required on every call (the API replaces the whole list, not
- * just the fields sent, when it is present — an absent list is read as "no folders", not "leave unchanged"), so a
- * checkbox-only save must still pass the library's current folders. Every other field is optional and keeps its
- * saved value when left out.
+ * What a save of the library's setup sends. `library_folders` is required on every call (the API replaces the
+ * whole list, not just the fields sent, when it is present — an absent list is read as "no folders", not "leave
+ * unchanged"), so a checkbox-only save must still pass the library's current folders. Every other field is
+ * optional and keeps its saved value when left out; a null `library_rule_set_id` goes back to the workflow's
+ * profile.
  */
+export interface LibrarySettingsUpdate {
+  library_folders: string[];
+  clean_hardlinked_files?: boolean;
+  skip_if_manager_would_redownload?: boolean;
+  keep_original_after_clean?: boolean;
+  originals_folder?: string;
+  library_rule_set_id?: number | null;
+}
+
 export async function saveLibrarySettings(
   libraryId: number,
-  updates: {
-    library_folders: string[];
-    clean_hardlinked_files?: boolean;
-    skip_if_manager_would_redownload?: boolean;
-    keep_original_after_clean?: boolean;
-    originals_folder?: string;
-  },
+  updates: LibrarySettingsUpdate,
 ): Promise<LibrarySettings> {
   const path = librarySettingsPath(libraryId);
   const r = await sendJson(
     path,
     "PUT",
     updates,
-    "Could not save this workflow's settings",
+    "Could not save this library's setup",
   );
   return readJson<LibrarySettings>(r);
 }
