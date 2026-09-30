@@ -60,6 +60,16 @@ jobs:
           cache-from: type=gha,scope=weir-ci-amd64
           cache-to: type=gha,mode=max,scope=weir-ci-amd64,ignore-error=true
 
+      # The same gate the release applies, run here so a fixable HIGH/CRITICAL in the image stops a pull
+      # request instead of a tagged release.
+      - name: Trivy scan of the Docker candidate
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: weir-ci-smoke
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+
       - name: Start Weir Docker candidate
         run: |
           docker rm -f weir-ci-smoke >/dev/null 2>&1 || true
