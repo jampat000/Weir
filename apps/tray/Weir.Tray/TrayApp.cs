@@ -105,13 +105,16 @@ sealed class TrayApp : IDisposable
             _updateService,
             _runtimeHome,
             _updateSettings,
-            OnUi,
-            RefreshUpdateMenu,
-            ShowUpdateNotice,
-            () => BackgroundWork.Observe("Apply update", ApplyUpdateAndRestartAsync()));
+            new UpdateCallbacks(
+                OnUi,
+                RefreshUpdateMenu,
+                ShowUpdateNotice,
+                () => BackgroundWork.Observe("Apply update", ApplyUpdateAndRestartAsync())),
+            TimeProvider.System,
+            _cts.Token);
         _notifyIcon = CreateNotifyIcon();
         _notifyIcon.Visible = true;
-        _updates.Start(_cts.Token);
+        _updates.Start();
     }
 
     /// <summary>Runs <paramref name="action"/> on the UI thread, after whatever it is doing at the moment.</summary>
@@ -125,10 +128,10 @@ sealed class TrayApp : IDisposable
         switch (mode)
         {
             case UpdateMode.Auto:
-                TrayLog.Write($"Notifying user: update v{version} downloaded; it installs when Weir next quits or starts.");
+                TrayLog.Write($"Notifying user: update v{version} downloaded; it installs once Weir has been idle for {IdleInstall.IdlePeriodText}, or when Weir next quits or starts.");
                 ShowBalloon(
                     "Weir Update Ready",
-                    $"Version {version} has been downloaded. It installs the next time Weir quits or starts.",
+                    $"Version {version} has been downloaded. Weir installs it and restarts by itself once it has been idle for {IdleInstall.IdlePeriodText}, or when Weir next quits or starts.",
                     ToolTipIcon.Info);
                 break;
             case UpdateMode.DownloadOnly:
@@ -137,7 +140,11 @@ sealed class TrayApp : IDisposable
                     "Weir Update Ready",
                     $"Version {version} has been downloaded. Click here to restart and install it, or it installs the next time Weir quits or starts.",
                     ToolTipIcon.Info,
-                    () => BackgroundWork.Observe("Apply update", ApplyUpdateAndRestartAsync()));
+                    () =>
+                    {
+                        TrayLog.Write("Restart to update chosen from the update notice.");
+                        BackgroundWork.Observe("Apply update", ApplyUpdateAndRestartAsync());
+                    });
                 break;
             default:
                 TrayLog.Write($"Notifying user: update v{version} available.");
@@ -176,6 +183,7 @@ sealed class TrayApp : IDisposable
                 _updates.DownloadInBackground();
                 break;
             case UpdateMenuAction.Restart:
+                TrayLog.Write("Restart to update chosen from the tray menu.");
                 BackgroundWork.Observe("Apply update", ApplyUpdateAndRestartAsync());
                 break;
             default:
@@ -189,7 +197,7 @@ sealed class TrayApp : IDisposable
         {
             return;
         }
-        TrayLog.Write("User requested update apply and restart.");
+        TrayLog.Write("Applying the downloaded update and restarting.");
         await _shutdown.RestartToUpdateAsync();
     }
 

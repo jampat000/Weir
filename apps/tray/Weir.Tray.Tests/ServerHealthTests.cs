@@ -108,21 +108,6 @@ public sealed class ServerHealthTests
         }
     }
 
-    /// <summary>Fake time that reports each delay the code under test starts.</summary>
-    private sealed class DelayWatchingTimeProvider : FakeTimeProvider
-    {
-        private readonly Channel<TimeSpan> _delays = Channel.CreateUnbounded<TimeSpan>();
-
-        public Task<TimeSpan> NextDelay() => _delays.Reader.ReadAsync().AsTask();
-
-        public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period)
-        {
-            var timer = base.CreateTimer(callback, state, dueTime, period);
-            _delays.Writer.TryWrite(dueTime);
-            return timer;
-        }
-    }
-
     private sealed class ScriptedHandler(Func<int, HttpStatusCode> answer) : HttpMessageHandler
     {
         private readonly Channel<int> _calls = Channel.CreateUnbounded<int>();

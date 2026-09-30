@@ -25,13 +25,13 @@ const UPDATE_MODES: {
     value: "Auto",
     label: "Auto",
     description:
-      "Download updates automatically. A downloaded update installs the next time Weir quits or starts, or when you choose Restart to apply.",
+      "Download updates automatically. Once one is downloaded, Weir installs it and restarts by itself when it has been idle for 5 minutes, with no file being processed, handed back or waiting to start. It also installs when Weir next quits or starts, or when you choose Restart to apply.",
   },
   {
     value: "DownloadOnly",
     label: "Download only",
     description:
-      "Download updates silently in the background, then notify you when ready to install. A downloaded update also installs when Weir next quits or starts.",
+      "Download updates silently in the background, then notify you when ready to install. Weir never restarts by itself to install one; it installs when you choose Restart to apply, or when Weir next quits or starts.",
   },
   {
     value: "NotifyOnly",
