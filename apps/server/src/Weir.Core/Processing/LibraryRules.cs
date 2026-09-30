@@ -72,6 +72,9 @@ public sealed record ProcessingLibraryInput
 
     /// <summary><c>remove_original_after_success</c>; see <see cref="ProcessingLibraryRecord.RemoveOriginalAfterSuccess"/>.</summary>
     public bool RemoveOriginalAfterSuccess { get; init; } = true;
+
+    /// <summary>Megabytes to keep free on the drive this workflow writes to; see <see cref="ProcessingLibraryRecord.MinimumFreeDiskSpaceMb"/>.</summary>
+    public long MinimumFreeDiskSpaceMb { get; init; } = ProcessingLibraryRecord.DefaultMinimumFreeDiskSpaceMb;
 }
 
 /// <summary>One other library's folders, for the overlap check.</summary>
@@ -133,6 +136,21 @@ public static partial class LibraryRules
         if (!allowed.Contains(value, StringComparer.Ordinal))
         {
             throw new ProcessingLibraryException($"'{value}' is not a valid {label}. Use one of: {string.Join(", ", allowed)}.");
+        }
+    }
+
+    /// <summary>
+    /// A workflow's own limit is a share of Settings › Performance's "Files at once", so it cannot ask for more than that total.
+    /// Zero, the workflow following the total, always passes.
+    /// </summary>
+    public static void ValidateMaxConcurrentFiles(long requested, long filesAtOnce)
+    {
+        var total = OperatorSettingsRules.ClampMaxConcurrentFiles(filesAtOnce);
+        if (requested > total)
+        {
+            throw new ProcessingLibraryException(
+                $"The most files this workflow runs at once cannot be more than the {total} Weir runs in total. " +
+                "Choose a lower number, or raise Files at once in Settings › Performance first.");
         }
     }
 
@@ -231,6 +249,7 @@ public static partial class LibraryRules
             ScheduleGrid = grid,
             RuleSetId = ValidateRuleSet(body.RuleSetId, ruleSetExists),
             RemoveOriginalAfterSuccess = body.RemoveOriginalAfterSuccess,
+            MinimumFreeDiskSpaceMb = body.MinimumFreeDiskSpaceMb,
         };
     }
 

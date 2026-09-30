@@ -213,6 +213,24 @@ public sealed class LibraryRulesTests
         Assert.Contains("Windows system folder", exception.Message, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData(0, 4)]
+    [InlineData(1, 4)]
+    [InlineData(4, 4)]
+    public void A_workflow_may_ask_for_no_limit_of_its_own_or_up_to_the_total(long requested, long total) =>
+        LibraryRules.ValidateMaxConcurrentFiles(requested, total);
+
+    [Fact]
+    public void A_workflow_cannot_ask_for_more_at_once_than_the_total_and_is_told_what_to_do()
+    {
+        var exception = Assert.Throws<ProcessingLibraryException>(() => LibraryRules.ValidateMaxConcurrentFiles(5, 4));
+
+        Assert.Equal(
+            "The most files this workflow runs at once cannot be more than the 4 Weir runs in total. " +
+            "Choose a lower number, or raise Files at once in Settings › Performance first.",
+            exception.Message);
+    }
+
     [Fact]
     public void The_whole_user_profile_folder_cannot_be_a_library_folder_but_a_folder_inside_it_can()
     {

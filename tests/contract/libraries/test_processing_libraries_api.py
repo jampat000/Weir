@@ -338,3 +338,53 @@ def test_a_library_with_no_minimum_size_or_wait_follows_the_performance_settings
                 "min_input_file_size_mb": before["min_input_file_size_mb"],
             },
         )
+
+
+# --- the space to keep free, and the most files at once, belong to each workflow ------------------
+
+
+def test_a_workflow_keeps_five_gigabytes_free_unless_it_says_otherwise(operator) -> None:
+    default = _create(operator).json()
+    assert default["minimum_free_disk_space_mb"] == 5120
+
+    own = _create(
+        operator,
+        name="Movies own",
+        watched_folder="/srv/own/in",
+        output_folder="/srv/own/out",
+        minimum_free_disk_space_mb=20480,
+    ).json()
+    assert own["minimum_free_disk_space_mb"] == 20480
+    assert operator.get(f"{LIBRARIES}/{own['id']}").json()["minimum_free_disk_space_mb"] == 20480
+
+
+def test_performance_accepts_the_retired_free_space_field_without_acting_on_it(operator) -> None:
+    settings = f"{API}/processing/operator-settings"
+    workflow = _create(operator, minimum_free_disk_space_mb=2048).json()
+
+    saved = operator.put_csrf(settings, {"minimum_free_disk_space_mb": 999, "runner_cost_undetermined": 9})
+
+    assert saved.status_code == 200, saved.text
+    assert "minimum_free_disk_space_mb" not in saved.json()
+    assert operator.get(f"{LIBRARIES}/{workflow['id']}").json()["minimum_free_disk_space_mb"] == 2048
+
+
+def test_a_workflow_cannot_ask_for_more_at_once_than_performance_runs_in_total(operator) -> None:
+    settings = f"{API}/processing/operator-settings"
+    before = operator.get(settings).json()["max_concurrent_files"]
+    assert operator.put_csrf(settings, {"max_concurrent_files": 2}).status_code == 200
+    try:
+        within = _create(operator, max_concurrent_files=2)
+        assert within.status_code == 201, within.text
+
+        refused = _create(
+            operator,
+            name="Movies more",
+            watched_folder="/srv/more/in",
+            output_folder="/srv/more/out",
+            max_concurrent_files=3,
+        )
+        assert refused.status_code == 400, refused.text
+        assert "cannot be more than the 2 Weir runs in total" in refused.json()["detail"]
+    finally:
+        operator.put_csrf(settings, {"max_concurrent_files": before})

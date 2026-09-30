@@ -31,6 +31,7 @@ public sealed partial class ConfigurationBundleStore
             .Select(row => row as WireObject ?? throw new WireTypeException($"Each row in the backup's {LibrariesTable} section must be an object."))
             .ToList();
         ValidateRestoredLibraries(libraryRows, weirHome);
+        CarryPerformanceFreeSpaceToWorkflows(bundle, libraryRows);
 
         await uow.ExecuteAsync("DELETE FROM libraries").ConfigureAwait(false);
         await uow.ExecuteAsync("DELETE FROM rule_sets").ConfigureAwait(false);
@@ -50,6 +51,24 @@ public sealed partial class ConfigurationBundleStore
             }
 
             await InsertAsync(uow, LibrariesTable, libraryColumns, ToKwargs(libraryColumns, data)).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// A backup written when Settings › Performance held the space to keep free has no such value on its workflows. They take
+    /// that value, as an upgrade gives it to them, rather than the default.
+    /// </summary>
+    private static void CarryPerformanceFreeSpaceToWorkflows(WireObject bundle, IEnumerable<WireObject> libraryRows)
+    {
+        if (bundle.Get(ProcessingOperatorTable) is not WireObject performance ||
+            performance.Get(FreeSpaceColumn) is not { } kept || kept is WireNull)
+        {
+            return;
+        }
+
+        foreach (var row in libraryRows.Where(row => !row.ContainsKey(FreeSpaceColumn)))
+        {
+            row.Set(FreeSpaceColumn, kept);
         }
     }
 

@@ -58,10 +58,8 @@ internal sealed class ProcessingOperatorSettingsEndpointHandlers
         .Set("unclaimed_handback_cleanup_interval_seconds", row.UnclaimedHandbackCleanupIntervalSeconds is { } unclaimedEvery ? WireValue.Of(unclaimedEvery) : WireValue.Null)
         .Set("keep_failed_work_files", row.KeepFailedWorkFiles)
         .Set("file_log_retention_days", OperatorSettingsRules.ClampFileLogRetentionDays(row.FileLogRetentionDays))
-        .Set("runner_cost_undetermined", OperatorSettingsRules.ClampRunnerCost(row.RunnerCostUndetermined))
         .Set("min_file_age_seconds", OperatorSettingsRules.ClampMinFileAgeSeconds(row.MinFileAgeSeconds))
         .Set("min_input_file_size_mb", OperatorSettingsRules.ClampSizeMb(row.ProcessingMinInputFileSizeMb))
-        .Set("minimum_free_disk_space_mb", OperatorSettingsRules.ClampSizeMb(row.MinimumFreeDiskSpaceMb))
         .Set("movie_schedule_enabled", row.MovieScheduleEnabled)
         .Set("movie_schedule_hours_limited", row.MovieScheduleHoursLimited)
         .Set("movie_schedule_days", row.MovieScheduleDays)
@@ -96,7 +94,8 @@ internal sealed class ProcessingOperatorSettingsEndpointHandlers
         var runnerCost720P = model.OptionalInt("runner_cost_720p", ge: 0, le: 64);
         var runnerCost1080P = model.OptionalInt("runner_cost_1080p", ge: 0, le: 64);
         var runnerCost4K = model.OptionalInt("runner_cost_4k", ge: 0, le: 64);
-        var runnerCostUndetermined = model.OptionalInt("runner_cost_undetermined", ge: 0, le: 64);
+        // Retired: a file of unknown resolution costs what a 1080p file does.
+        var retiredRunnerCostUndetermined = model.OptionalInt("runner_cost_undetermined", ge: 0, le: 64);
         var runnerBudgetEnabled = model.OptionalBool("runner_budget_enabled");
         var workTempStaleSweepEnabled = model.OptionalBool("work_temp_stale_sweep_enabled");
         var failureCleanupEnabled = model.OptionalBool("failure_cleanup_enabled");
@@ -116,7 +115,8 @@ internal sealed class ProcessingOperatorSettingsEndpointHandlers
         var retiredVerboseDetectionLogging = model.OptionalBool("verbose_detection_logging");
         var minFileAgeSeconds = model.OptionalInt("min_file_age_seconds", ge: 0, le: 7 * 24 * 3600);
         var processingMinInputFileSizeMb = model.OptionalInt("min_input_file_size_mb", ge: 0, le: 1024 * 1024);
-        var minimumFreeDiskSpaceMb = model.OptionalInt("minimum_free_disk_space_mb", ge: 0, le: 1024 * 1024);
+        // Retired: the space to keep free belongs to each workflow. Read and ignored, like the setting above.
+        var retiredMinimumFreeDiskSpaceMb = model.OptionalInt("minimum_free_disk_space_mb", ge: 0, le: 1024 * 1024);
         var movieScheduleEnabled = model.OptionalBool("movie_schedule_enabled");
         var movieScheduleHoursLimited = model.OptionalBool("movie_schedule_hours_limited");
         var movieScheduleDays = model.OptionalStr("movie_schedule_days", maxLength: 2000);
@@ -145,12 +145,12 @@ internal sealed class ProcessingOperatorSettingsEndpointHandlers
 
         var hasProcessField = maxConcurrentFiles is not null || runnerCapacity is not null || runnerCostSd is not null ||
                                runnerCost720P is not null || runnerCost1080P is not null || runnerCost4K is not null ||
-                               runnerCostUndetermined is not null || runnerBudgetEnabled is not null || workTempStaleSweepEnabled is not null || failureCleanupEnabled is not null ||
+                               retiredRunnerCostUndetermined is not null || runnerBudgetEnabled is not null || workTempStaleSweepEnabled is not null || failureCleanupEnabled is not null ||
                                workTempStaleSweepIntervalSeconds is not null || failureCleanupIntervalSeconds is not null ||
                                unclaimedHandbackCleanupEnabled is not null || unclaimedHandbackWindowDays is not null ||
                                unclaimedHandbackCleanupIntervalSeconds is not null ||
                                keepFailedWorkFiles is not null || fileLogRetentionDays is not null || retiredVerboseDetectionLogging is not null ||
-                               minFileAgeSeconds is not null || processingMinInputFileSizeMb is not null || minimumFreeDiskSpaceMb is not null;
+                               minFileAgeSeconds is not null || processingMinInputFileSizeMb is not null || retiredMinimumFreeDiskSpaceMb is not null;
         if (!hasProcessField && movieScheduleEnabled is null && tvScheduleEnabled is null)
         {
             issues.Add(new ValidationIssue("value_error", ["body"], "Value error, No operator settings fields to update.", WireValue.Null));
@@ -197,11 +197,6 @@ internal sealed class ProcessingOperatorSettingsEndpointHandlers
         if (runnerCost4K is { } v4)
         {
             after = after with { RunnerCost4K = Math.Clamp(v4, 0, 64) };
-        }
-
-        if (runnerCostUndetermined is { } v5)
-        {
-            after = after with { RunnerCostUndetermined = Math.Clamp(v5, 0, 64) };
         }
 
         if (fileLogRetentionDays is { } fl)
@@ -257,11 +252,6 @@ internal sealed class ProcessingOperatorSettingsEndpointHandlers
         if (processingMinInputFileSizeMb is { } rmin)
         {
             after = after with { ProcessingMinInputFileSizeMb = OperatorSettingsRules.ClampSizeMb(rmin) };
-        }
-
-        if (minimumFreeDiskSpaceMb is { } mfd)
-        {
-            after = after with { MinimumFreeDiskSpaceMb = OperatorSettingsRules.ClampSizeMb(mfd) };
         }
 
         try

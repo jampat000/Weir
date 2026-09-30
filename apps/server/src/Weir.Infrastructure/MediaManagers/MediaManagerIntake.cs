@@ -321,7 +321,7 @@ public sealed class MediaManagerIntake
                 continue;
             }
 
-            _jobs.EnqueueOrGet(connection, transaction, dedupeKey, IntakeRules.RemuxPassJobKind, IntakeRules.PayloadJson(payload), JobQueueRules.DefaultMaxAttempts, 0, 0);
+            _jobs.EnqueueOrGet(connection, transaction, dedupeKey, IntakeRules.RemuxPassJobKind, IntakeRules.PayloadJson(payload), JobQueueRules.DefaultMaxAttempts, runnerCost: null, priority: 0);
             covered.Add(target);
         }
 

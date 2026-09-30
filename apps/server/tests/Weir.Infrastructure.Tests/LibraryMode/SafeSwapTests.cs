@@ -427,18 +427,19 @@ public sealed class SafeSwapTests
     public async Task Insufficient_space_is_refused_and_exactly_enough_is_allowed()
     {
         var s = new SwapScenario();
-        s.Files.FreeBytes = 3 + SafeSwapRules.FreeSpaceMarginBytes - 1;
+        var keepFree = new SwapOptions(KeepFreeBytes: 2L << 30);
+        s.Files.FreeBytes = 3 + keepFree.KeepFreeBytes - 1;
 
-        var refused = await s.RunAsync();
+        var refused = await s.RunAsync(keepFree);
 
         Assert.Equal(SwapOutcome.InsufficientSpace, refused.Outcome);
         Assert.Equal(
-            "There is not enough free space next to this file for Weir to write the cleaned copy: it needs 1.0 GB (the file's size plus 1 GB to spare) and 1.0 GB is free. Nothing was changed.",
+            "Waiting: the drive this file is on has less than 2.0 GB free (2.0 GB free now), which is the file's size plus the 2.0 GB this workflow keeps free. Nothing was changed. Weir tries again when there is room.",
             refused.Message);
         Assert.Empty(s.WrittenTo);
 
-        s.Files.FreeBytes = 3 + SafeSwapRules.FreeSpaceMarginBytes;
-        Assert.Equal(SwapOutcome.Committed, (await s.RunAsync()).Outcome);
+        s.Files.FreeBytes = 3 + keepFree.KeepFreeBytes;
+        Assert.Equal(SwapOutcome.Committed, (await s.RunAsync(keepFree)).Outcome);
     }
 
     [Fact]

@@ -1,4 +1,3 @@
-using System.Globalization;
 using Weir.Core.Json;
 
 namespace Weir.Infrastructure.Processing.RemuxPass;
@@ -46,10 +45,7 @@ public sealed partial class RemuxPassRunner
     /// <summary>A retryable wait, never a finished pass: a full disk must not mark a file done.</summary>
     private static WireObject WaitForDiskSpace(DiskSpaceCheck disk, string drive, string relativeMediaPath, string inspected, string scope, WireObject details)
     {
-        var reason =
-            $"Waiting: the {drive} has less than {Gigabytes(disk.RequiredMb)} free ({Gigabytes(disk.FreeMb)} free now). " +
-            "Weir tries again when there is room.";
-        var wait = SourceNotReady(relativeMediaPath, reason, inspected)
+        var wait = SourceNotReady(relativeMediaPath, DiskSpaceWaits.Reason(drive, disk.RequiredMb, disk.FreeMb), inspected)
             .Set("not_ready_kind", DiskSpaceWait)
             .Set("guardrail", "minimum_free_disk_space")
             .Set("disk_checked_path", disk.CheckedPath)
@@ -74,6 +70,4 @@ public sealed partial class RemuxPassRunner
 
         return summary;
     }
-
-    private static string Gigabytes(double megabytes) => (megabytes / 1024).ToString("F1", CultureInfo.InvariantCulture) + " GB";
 }

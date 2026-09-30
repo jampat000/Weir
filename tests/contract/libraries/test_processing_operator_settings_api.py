@@ -34,7 +34,9 @@ def test_operator_settings_get_shape(server_factory, client_factory) -> None:
     assert body["max_concurrent_files"] == 1
     assert body["min_file_age_seconds"] == 60
     assert body["min_input_file_size_mb"] == 50
-    assert body["minimum_free_disk_space_mb"] == 5120
+    # The space to keep free is each workflow's, and a file of unknown resolution costs what a 1080p file does.
+    assert "minimum_free_disk_space_mb" not in body
+    assert "runner_cost_undetermined" not in body
     assert body["movie_schedule_enabled"] is True
     assert "movie_schedule_interval_seconds" not in body
     assert body["movie_schedule_hours_limited"] is False
@@ -57,7 +59,6 @@ def test_operator_settings_put_updates(admin) -> None:
             "max_concurrent_files": 4,
             "min_file_age_seconds": 90,
             "min_input_file_size_mb": 75,
-            "minimum_free_disk_space_mb": 6144,
             "movie_schedule_enabled": True,
             "movie_schedule_hours_limited": True,
             "movie_schedule_days": "Mon,Tue",
@@ -75,7 +76,6 @@ def test_operator_settings_put_updates(admin) -> None:
     assert body["max_concurrent_files"] == 4
     assert body["min_file_age_seconds"] == 90
     assert body["min_input_file_size_mb"] == 75
-    assert body["minimum_free_disk_space_mb"] == 6144
     assert body["movie_schedule_enabled"] is True
     assert body["movie_schedule_hours_limited"] is True
     assert body["movie_schedule_days"] == "Mon,Tue"
@@ -135,7 +135,6 @@ def test_operator_settings_put_process_only_preserves_schedules(admin) -> None:
             "max_concurrent_files": 3,
             "min_file_age_seconds": 120,
             "min_input_file_size_mb": 80,
-            "minimum_free_disk_space_mb": 8192,
         },
     )
     assert r1.status_code == 200, r1.text
@@ -143,7 +142,6 @@ def test_operator_settings_put_process_only_preserves_schedules(admin) -> None:
     assert body["max_concurrent_files"] == 3
     assert body["min_file_age_seconds"] == 120
     assert body["min_input_file_size_mb"] == 80
-    assert body["minimum_free_disk_space_mb"] == 8192
     assert body["movie_schedule_hours_limited"] is False
     assert body["tv_schedule_hours_limited"] is False
 

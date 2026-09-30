@@ -75,7 +75,7 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandler : IJobHandler
             ScanDispatchJobPayload.NormalizeTrigger(body.Get("scan_trigger") is WireString triggerStr ? triggerStr.Value : "manual"),
             body.Get("enqueue_remux_jobs") is WireValue v && v.IsTruthy);
 
-        var (scan, budget) = await PrepareAsync(request, cancellationToken).ConfigureAwait(false);
+        var scan = await PrepareAsync(request, cancellationToken).ConfigureAwait(false);
         var candidates = WatchedFolderListing.Candidates(
             scan.Paths.WatchedFolder,
             scan.Rules.MediaExtensions.Count > 0 ? scan.Rules.MediaExtensions : null,
@@ -87,7 +87,7 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandler : IJobHandler
         await using (reads.ConfigureAwait(false))
         {
             var lookups = await WatchedFolderScanLookups.ReadAsync(reads, _files, _skipMarkers, scan).ConfigureAwait(false);
-            var run = new WatchedFolderScanRun(_database, _jobStore, _files, scan, lookups, reads, new ScanPassRequest(context.Id, request.Trigger, budget));
+            var run = new WatchedFolderScanRun(_database, _jobStore, _files, scan, lookups, reads, new ScanPassRequest(context.Id, request.Trigger));
             await run.RunAsync(candidates.Entries, cancellationToken).ConfigureAwait(false);
 
             // #645: a file that left the watched folder before Weir finished with it stops being listed. Only while the watched
@@ -115,7 +115,7 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandler : IJobHandler
     /// The library, its folders and rules, what its managers are downloading and whether it may start work now. Reads only,
     /// apart from the settings rows a fresh database creates, and it leaves no transaction open.
     /// </summary>
-    private async Task<(WatchedFolderScan Scan, RunnerBudget Budget)> PrepareAsync(ScanRequest request, CancellationToken cancellationToken)
+    private async Task<WatchedFolderScan> PrepareAsync(ScanRequest request, CancellationToken cancellationToken)
     {
         var now = _time.GetUtcNow();
         var uow = await UnitOfWork.OpenAsync(_database, cancellationToken).ConfigureAwait(false);
@@ -146,7 +146,7 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandler : IJobHandler
             await uow.CommitAsync().ConfigureAwait(false);
 
             var limits = IntakeLimits.Resolve(library, operatorSettings);
-            var scan = new WatchedFolderScan(
+            return new WatchedFolderScan(
                 library,
                 request.MediaScope,
                 paths,
@@ -156,10 +156,6 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandler : IJobHandler
                 limits.MinFileAgeSeconds,
                 request.EnqueueRemuxJobs,
                 now);
-            var budget = RunnerBudget.FromSettings(
-                operatorSettings.RunnerCapacity, operatorSettings.RunnerCostSd, operatorSettings.RunnerCost720P,
-                operatorSettings.RunnerCost1080P, operatorSettings.RunnerCost4K, operatorSettings.RunnerCostUndetermined);
-            return (scan, budget);
         }
     }
 

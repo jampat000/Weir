@@ -325,7 +325,7 @@ internal sealed class LibraryModeFilesEndpointHandlers
             var fileConfirmed = (chosen is { } c ? c.Tracks == 0 : entry.RemovedAudioCount + entry.RemovedSubtitleCount == 0) || confirmed;
             var job = await _scans.EnqueueCleanAsync(
                     uow, _jobs, library.Id, entry.Path, "manual", fileConfirmed,
-                    manualPlan, manualPlan is null ? null : expectedSizeBytes ?? entry.SizeBytes)
+                    manualPlan, manualPlan is null ? null : expectedSizeBytes ?? entry.SizeBytes, entry.ProbeJson)
                 .ConfigureAwait(false);
             jobIds.Add(job.Id);
         }

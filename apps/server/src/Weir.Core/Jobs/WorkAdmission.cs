@@ -71,11 +71,14 @@ public static class ScheduleWallClock
 /// <summary>Total runner capacity and what each resolution class costs.</summary>
 public sealed record RunnerBudget(int Capacity, IReadOnlyDictionary<string, int> Costs)
 {
+    /// <summary>The resolution whose cost a file of unknown resolution takes.</summary>
+    public const string UnknownResolutionCostsLike = "1080p";
+
     /// <summary>The budget when the operator settings row does not exist.</summary>
-    public static RunnerBudget Default { get; } = new(4, new Dictionary<string, int>(StringComparer.Ordinal));
+    public static RunnerBudget Default { get; } = FromSettings(4, 0, 0, 1, 1);
 
     /// <summary>The budget from stored settings: a capacity of zero means the default of four, and costs are never negative.</summary>
-    public static RunnerBudget FromSettings(long capacity, long costSd, long cost720p, long cost1080p, long cost4k, long costUndetermined) =>
+    public static RunnerBudget FromSettings(long capacity, long costSd, long cost720p, long cost1080p, long cost4k) =>
         new(
             (int)Math.Clamp(capacity == 0 ? 4 : capacity, 1, int.MaxValue),
             new Dictionary<string, int>(StringComparer.Ordinal)
@@ -84,20 +87,15 @@ public sealed record RunnerBudget(int Capacity, IReadOnlyDictionary<string, int>
                 ["720p"] = NonNegative(cost720p),
                 ["1080p"] = NonNegative(cost1080p),
                 ["4k"] = NonNegative(cost4k),
-                ["undetermined"] = NonNegative(costUndetermined),
             });
 
+    /// <summary>What a file of this resolution class costs; a class Weir has no cost for, or none at all, costs what 1080p does.</summary>
     public int CostFor(string? resolutionClass)
     {
-        var name = (resolutionClass ?? "undetermined").Trim().ToLowerInvariant();
-        if (name.Length == 0)
-        {
-            name = "undetermined";
-        }
-
+        var name = (resolutionClass ?? string.Empty).Trim().ToLowerInvariant();
         if (!Costs.ContainsKey(name))
         {
-            name = "undetermined";
+            name = UnknownResolutionCostsLike;
         }
 
         return Math.Max(0, Costs.TryGetValue(name, out var cost) ? cost : 0);

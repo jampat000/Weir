@@ -188,6 +188,12 @@ public sealed record ProcessingLibraryRecord
     /// </summary>
     public bool RemoveOriginalAfterSuccess { get; init; } = true;
 
+    /// <summary>The space a new workflow keeps free: 5 GB.</summary>
+    public const long DefaultMinimumFreeDiskSpaceMb = 5120;
+
+    /// <summary>Megabytes this workflow keeps free on the drive it writes to; 0 turns the check off.</summary>
+    public long MinimumFreeDiskSpaceMb { get; init; } = DefaultMinimumFreeDiskSpaceMb;
+
     public long ScanIntervalSeconds { get; init; } = 300;
     public long HoldMinutes { get; init; }
     public long FileDetectionIntervalSeconds { get; init; } = 30;

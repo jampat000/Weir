@@ -13,7 +13,6 @@ public sealed record ProcessingOperatorSettingsRecord
     public long RunnerCost720P { get; init; }
     public long RunnerCost1080P { get; init; } = 1;
     public long RunnerCost4K { get; init; } = 1;
-    public long RunnerCostUndetermined { get; init; }
 
     /// <summary>
     /// Whether the resolution budget (runner capacity and per-resolution costs) also limits what starts (#633). Off, a
@@ -44,7 +43,6 @@ public sealed record ProcessingOperatorSettingsRecord
     public long FileLogRetentionDays { get; init; } = 90;
     public long MinFileAgeSeconds { get; init; } = 60;
     public long ProcessingMinInputFileSizeMb { get; init; } = 50;
-    public long MinimumFreeDiskSpaceMb { get; init; } = 5120;
     public bool MovieScheduleEnabled { get; init; } = true;
     public bool MovieScheduleHoursLimited { get; init; }
     public string MovieScheduleDays { get; init; } = string.Empty;

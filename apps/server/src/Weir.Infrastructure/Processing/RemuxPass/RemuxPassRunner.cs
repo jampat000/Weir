@@ -224,7 +224,8 @@ public sealed partial class RemuxPassRunner
                 duration,
                 [.. audio.Select(stream => RemuxPassMedia.TruthyText(stream.Get("codec_name")))],
                 RemuxPassMedia.VideoBitDepth(video[0]),
-                request.LibraryId),
+                request.LibraryId,
+                request.CurrentJobId),
             cancellationToken).ConfigureAwait(false);
 
         try

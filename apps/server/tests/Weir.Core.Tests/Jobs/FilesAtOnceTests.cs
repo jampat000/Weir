@@ -53,7 +53,7 @@ public sealed class FilesAtOnceTests
     [Fact]
     public void With_the_resolution_budget_off_every_cost_fits()
     {
-        var budget = RunnerBudget.FromSettings(4, 1, 1, 2, 4, 0);
+        var budget = RunnerBudget.FromSettings(4, 1, 1, 2, 4);
         var running = new[] { Running(1, 4) };
 
         var on = WorkAdmissionRules.Evaluate(Suite, budget, running, [Library(1, 0)], Now, filesAtOnce: 5, budgetEnabled: true);
@@ -128,7 +128,7 @@ public sealed class FilesAtOnceTests
     [Fact]
     public void The_resolution_budget_is_named_only_when_it_is_on_and_in_the_way()
     {
-        var budget = RunnerBudget.FromSettings(4, 1, 1, 2, 4, 0);
+        var budget = RunnerBudget.FromSettings(4, 1, 1, 2, 4);
         var on = Describe(5, 10, [Running(1, 4)], [new(2, 1)], [Library(1, 0)], budgetEnabled: true, budget: budget);
         var off = Describe(5, 10, [Running(1, 4)], [new(2, 1)], [Library(1, 0)], budgetEnabled: false, budget: budget);
 

@@ -18,7 +18,7 @@ public sealed partial class LibraryStore
             "hold_minutes, file_detection_interval_seconds, ignore_size_changes, file_system_events_enabled, skip_access_tests, " +
             "schedule_enabled, schedule_hours_limited, schedule_days, schedule_grid, schedule_start, schedule_end, max_attempts, " +
             "retry_backoff_seconds, retry_execution_failures, retry_preflight_failures, failure_policy, max_concurrent_files, " +
-            "priority, rule_set_id, discovered_from_connection_id, discovered_library_key, remux_writer, rewrite_with_ffmpeg, remove_original_after_success) " +
+            "priority, rule_set_id, discovered_from_connection_id, discovered_library_key, remux_writer, rewrite_with_ffmpeg, remove_original_after_success, minimum_free_disk_space_mb) " +
             "VALUES (@name, @enabled, @media_type, " +
             "@display_order, @watched_folder, @work_folder, @output_folder, " +
             "@media_extensions_csv, @exclude_markers_csv, @include_patterns_csv, @exclude_patterns_csv, @min_file_size_mb, @max_file_size_mb, " +
@@ -28,7 +28,7 @@ public sealed partial class LibraryStore
             "@hold_minutes, @file_detection_interval_seconds, @ignore_size_changes, @file_system_events_enabled, @skip_access_tests, " +
             "@schedule_enabled, @schedule_hours_limited, @schedule_days, @schedule_grid, @schedule_start, @schedule_end, @max_attempts, " +
             "@retry_backoff_seconds, @retry_execution_failures, @retry_preflight_failures, @failure_policy, @max_concurrent_files, " +
-            "@priority, @rule_set_id, @discovered_from_connection_id, @discovered_library_key, @remux_writer, @rewrite_with_ffmpeg, @remove_original_after_success)",
+            "@priority, @rule_set_id, @discovered_from_connection_id, @discovered_library_key, @remux_writer, @rewrite_with_ffmpeg, @remove_original_after_success, @minimum_free_disk_space_mb)",
             LibraryParameters(row)).ConfigureAwait(false);
     }
 
@@ -51,7 +51,7 @@ public sealed partial class LibraryStore
             "retry_backoff_seconds=@retry_backoff_seconds, retry_execution_failures=@retry_execution_failures, " +
             "retry_preflight_failures=@retry_preflight_failures, failure_policy=@failure_policy, max_concurrent_files=@max_concurrent_files, " +
             "priority=@priority, rule_set_id=@rule_set_id, remux_writer=@remux_writer, rewrite_with_ffmpeg=@rewrite_with_ffmpeg, " +
-            "remove_original_after_success=@remove_original_after_success, " +
+            "remove_original_after_success=@remove_original_after_success, minimum_free_disk_space_mb=@minimum_free_disk_space_mb, " +
             "updated_at=CURRENT_TIMESTAMP WHERE id=@id",
             [.. LibraryParameters(row), ("@id", row.Id)]).ConfigureAwait(false);
     }
@@ -89,6 +89,7 @@ public sealed partial class LibraryStore
         ("@remux_writer", row.RemuxWriter),
         ("@rewrite_with_ffmpeg", row.RewriteWithFfmpeg ? 1 : 0),
         ("@remove_original_after_success", row.RemoveOriginalAfterSuccess ? 1 : 0),
+        ("@minimum_free_disk_space_mb", row.MinimumFreeDiskSpaceMb),
         ("@scan_interval_seconds", row.ScanIntervalSeconds),
         ("@hold_minutes", row.HoldMinutes),
         ("@file_detection_interval_seconds", row.FileDetectionIntervalSeconds),
@@ -171,5 +172,6 @@ public sealed partial class LibraryStore
         RemuxWriter = SqliteValues.GetString(reader, 53),
         RewriteWithFfmpeg = SqliteValues.GetBool(reader, 54),
         RemoveOriginalAfterSuccess = SqliteValues.GetBool(reader, 55),
+        MinimumFreeDiskSpaceMb = SqliteValues.GetInt64(reader, 56),
     };
 }

@@ -56,7 +56,7 @@ def _working_server(
     admin.ensure_admin()
     relaxed = admin.put_csrf(
         f"{API}/processing/operator-settings",
-        {"min_file_age_seconds": 0, "min_input_file_size_mb": 0, "minimum_free_disk_space_mb": 0},
+        {"min_file_age_seconds": 0, "min_input_file_size_mb": 0},
     )
     assert relaxed.status_code == 200, relaxed.text
     folders = LibraryFolders.make(root / "library")
@@ -75,6 +75,7 @@ def _working_server(
                 file_detection_interval_seconds=0,
                 skip_access_tests=True,
                 min_file_size_mb=0,
+                minimum_free_disk_space_mb=0,
             )
             break
     else:

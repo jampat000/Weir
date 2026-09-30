@@ -53,8 +53,8 @@ public static class SafeSwapRules
 
     public const string BackupMarker = ".weir-bak";
 
-    /// <summary>Free space required beyond the file's own size: 1 GiB ("plus 1 GB" in the issue).</summary>
-    public const long FreeSpaceMarginBytes = 1L << 30;
+    /// <summary>The free space kept beyond the file's own size when the workflow has not said otherwise: what a new workflow keeps free.</summary>
+    public const long DefaultFreeSpaceMarginBytes = Processing.ProcessingLibraryRecord.DefaultMinimumFreeDiskSpaceMb * 1024 * 1024;
 
     /// <summary>What an in-use file waits before each retry (5, 15 and 60 minutes); after the last, it is reported as in use.</summary>
     public static readonly IReadOnlyList<TimeSpan> InUseBackoff =
@@ -121,8 +121,8 @@ public static class SafeSwapRules
         return false;
     }
 
-    /// <summary>The free bytes a swap of a <paramref name="sizeBytes"/> file needs on its volume.</summary>
-    public static long RequiredFreeBytes(long sizeBytes) => Math.Max(0, sizeBytes) + FreeSpaceMarginBytes;
+    /// <summary>The free bytes a swap of a <paramref name="sizeBytes"/> file needs on its volume: room for the copy, and the space the workflow keeps free.</summary>
+    public static long RequiredFreeBytes(long sizeBytes, long keepFreeBytes) => Math.Max(0, sizeBytes) + Math.Max(0, keepFreeBytes);
 
     /// <summary>
     /// The wait before retrying a file found in use for the <paramref name="inUseCount"/>-th time (1-based):
@@ -131,9 +131,9 @@ public static class SafeSwapRules
     public static TimeSpan? InUseRetryDelay(int inUseCount) =>
         inUseCount >= 1 && inUseCount <= InUseBackoff.Count ? InUseBackoff[inUseCount - 1] : null;
 
-    public static string InsufficientSpaceMessage(long requiredBytes, long availableBytes) =>
-        "There is not enough free space next to this file for Weir to write the cleaned copy: it needs " +
-        $"{FormatBytes(requiredBytes)} (the file's size plus 1 GB to spare) and {FormatBytes(availableBytes)} is free. Nothing was changed.";
+    public static string InsufficientSpaceMessage(long requiredBytes, long availableBytes, long keepFreeBytes) =>
+        $"Waiting: the drive this file is on has less than {FormatBytes(requiredBytes)} free ({FormatBytes(availableBytes)} free now), " +
+        $"which is the file's size plus the {FormatBytes(keepFreeBytes)} this workflow keeps free. Nothing was changed. Weir tries again when there is room.";
 
     public static string NotWritableMessage(string detail) =>
         $"Weir cannot write to this file's folder, so it did not start. The system reported: {detail}";

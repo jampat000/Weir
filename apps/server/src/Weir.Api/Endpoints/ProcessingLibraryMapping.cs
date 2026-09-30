@@ -122,10 +122,13 @@ internal static class ProcessingLibraryMapping
             .Set("schedule_start", row.ScheduleStart)
             .Set("schedule_end", row.ScheduleEnd)
             .Set("max_concurrent_files", row.MaxConcurrentFiles)
+            // What the workflow is held to right now: never more than Settings › Performance's "Files at once", even if that was lowered after this was set.
+            .Set("effective_max_concurrent_files", OperatorSettingsRules.EffectiveLibraryLimit(row.MaxConcurrentFiles, performance.MaxConcurrentFiles))
             .Set("priority", row.Priority)
             .Set("rule_set_id", row.RuleSetId)
             .Set("manager_connection_ids", new WireArray(managerIds.Select(id => (WireValue)WireValue.Of(id))))
             .Set("remove_original_after_success", row.RemoveOriginalAfterSuccess)
+            .Set("minimum_free_disk_space_mb", OperatorSettingsRules.ClampSizeMb(row.MinimumFreeDiskSpaceMb))
             .Set("manager_coverage", coverage)
             .Set("manager_coverage_detail", coverageDetail)
             .Set("discovered_from_connection_id", row.DiscoveredFromConnectionId)
@@ -214,6 +217,8 @@ internal static class ProcessingLibraryMapping
         var ruleSetId = model.OptionalInt("rule_set_id");
         var managerConnectionIds = model.IntList("manager_connection_ids");
         var removeOriginalAfterSuccess = model.Bool("remove_original_after_success", defaultValue: true);
+        var minimumFreeDiskSpaceMb = model.Number(
+            "minimum_free_disk_space_mb", ProcessingLibraryRecord.DefaultMinimumFreeDiskSpaceMb, required: false, ge: 0, le: 1024 * 1024);
 
         return new ProcessingLibraryInput
         {
@@ -268,6 +273,7 @@ internal static class ProcessingLibraryMapping
             RuleSetId = ruleSetId,
             ManagerConnectionIds = managerConnectionIds,
             RemoveOriginalAfterSuccess = removeOriginalAfterSuccess,
+            MinimumFreeDiskSpaceMb = minimumFreeDiskSpaceMb,
         };
     }
 

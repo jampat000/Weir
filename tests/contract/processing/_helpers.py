@@ -56,11 +56,11 @@ class Folders:
 
 
 def relax_operator_guards(admin: WeirClient) -> None:
-    """No minimum age, size or free space, so a small fresh fixture file is processed at once."""
+    """No minimum age or size, so a small fresh fixture file is processed at once."""
 
     r = admin.put_csrf(
         f"{API}/processing/operator-settings",
-        {"min_file_age_seconds": 0, "min_input_file_size_mb": 0, "minimum_free_disk_space_mb": 0},
+        {"min_file_age_seconds": 0, "min_input_file_size_mb": 0},
     )
     assert r.status_code == 200, r.text
 
@@ -76,6 +76,8 @@ def create_library(admin: WeirClient, folders: Folders, **overrides: Any) -> dic
         "file_detection_interval_seconds": 0,
         "skip_access_tests": True,
         "retry_backoff_seconds": 1,
+        # A workflow keeps 5 GB free by default; a small fixture file is processed whatever the drive holds.
+        "minimum_free_disk_space_mb": 0,
         **overrides,
     }
     r = admin.post_csrf(f"{API}/processing/libraries", body)
@@ -141,6 +143,7 @@ def _library_put_body(current: dict[str, Any], changes: dict[str, Any]) -> dict[
         "rule_set_id",
         "manager_connection_ids",
         "remove_original_after_success",
+        "minimum_free_disk_space_mb",
     )
     body = {key: current[key] for key in writable if key in current}
     body.update(changes)

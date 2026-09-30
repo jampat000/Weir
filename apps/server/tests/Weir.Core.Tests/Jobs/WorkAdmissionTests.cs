@@ -118,7 +118,7 @@ public sealed class WorkAdmissionTests
     [Fact]
     public void The_budget_counts_leased_runner_costs_against_capacity()
     {
-        var budget = RunnerBudget.FromSettings(6, 0, 0, 1, 2, 0);
+        var budget = RunnerBudget.FromSettings(6, 0, 0, 1, 2);
         var admission = WorkAdmissionRules.Evaluate(
             new SuitePauseSettings("UTC", false, null, true),
             budget,
@@ -129,11 +129,21 @@ public sealed class WorkAdmissionTests
         Assert.Equal(4, admission.AvailableUnits);
         Assert.Equal(6, admission.Capacity);
         Assert.Equal(2, budget.CostFor("4K "));
-        Assert.Equal(0, budget.CostFor("8k"));
-        Assert.Equal(0, budget.CostFor(null));
-        Assert.Equal(4, RunnerBudget.FromSettings(0, 0, 0, 0, 0, 0).Capacity);
-        Assert.Equal(1, RunnerBudget.FromSettings(-2, -1, 0, 0, 0, 0).Capacity);
-        Assert.Equal(0, RunnerBudget.FromSettings(4, -1, 0, 0, 0, 0).CostFor("sd"));
+        Assert.Equal(4, RunnerBudget.FromSettings(0, 0, 0, 0, 0).Capacity);
+        Assert.Equal(1, RunnerBudget.FromSettings(-2, -1, 0, 0, 0).Capacity);
+        Assert.Equal(0, RunnerBudget.FromSettings(4, -1, 0, 0, 0).CostFor("sd"));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("undetermined")]
+    [InlineData("8k")]
+    public void A_file_of_unknown_resolution_costs_what_a_1080p_file_does(string? resolutionClass)
+    {
+        var budget = RunnerBudget.FromSettings(8, 1, 2, 3, 5);
+
+        Assert.Equal(3, budget.CostFor(resolutionClass));
     }
 
     [Fact]
