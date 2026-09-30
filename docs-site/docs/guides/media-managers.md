@@ -241,8 +241,19 @@ own folder) to suggest a watched folder, and never changes anything on the clien
 suggestion list and the same folder chain check as a full media manager, so more than one manager
 and a bare download client can all be connected to one install at once, each checked independently.
 
+Weir doesn't store which workflow a bare download client feeds, so a workflow's **Folder chain** lists
+a client only when Weir has a reason to think it delivers there: the client saves into the workflow's
+watched folder (or a folder below it), or the workflow's linked Sonarr or Radarr uses that client (the
+same product at the same address). A Weir-only workflow that watches a folder no connected client saves
+into, and a client used only by a manager the workflow isn't linked to, show no client lines and never
+cost the workflow its **Ready** badge. Deluno doesn't say which product or address each of its clients
+is, so a Deluno-linked workflow relies on Deluno's own per-client lines instead. When a client saves to a
+folder Weir can't see from its own computer, for instance a path inside a container or on another
+machine, the line reads **Not verified** rather than **Needs a fix**.
+
 ## Anything else
 
 A tool that isn't Deluno, Sonarr or Radarr can still hand files to Weir directly, by posting to its
 webhook endpoint (`/api/v1/intake/webhook/native` for a connection of kind **Something else**).
-See the [API reference](../api) for the full request shape.
+See the [API reference](../api) for the full request shape. Weir never calls this kind, so its address is
+optional: leave it blank when the tool only sends messages to Weir. The other kinds need an address.

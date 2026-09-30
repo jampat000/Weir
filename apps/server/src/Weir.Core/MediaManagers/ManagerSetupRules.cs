@@ -13,6 +13,8 @@ public static partial class ManagerSetupRules
     public const string DownloadClientPath = "/api/v3/downloadclient";
     public const string DownloadClientConfigPath = "/api/v3/config/downloadclient";
 
+    private const int MaxPort = 65535;
+
     /// <summary>
     /// <c>GET /api/v3/remotepathmapping</c>: <c>host</c>, <c>remotePath</c>, <c>localPath</c>, camelCased by STJson
     /// (Sonarr develop <c>Sonarr.Api.V3/RemotePathMappings/RemotePathMappingResource.cs</c> L10-12; the same in v5-develop's
@@ -41,22 +43,28 @@ public static partial class ManagerSetupRules
         var clients = new List<ArrDownloadClientEntry>();
         foreach (var row in ManagerValues.Dicts(payload))
         {
-            var fields = ManagerValues.Dicts(row.Get("fields"))
+            var values = ManagerValues.Dicts(row.Get("fields"))
                 .Where(field => ManagerValues.Text(field.Get("name")) is not null)
                 .GroupBy(field => ManagerValues.Text(field.Get("name"))!, StringComparer.Ordinal)
-                .ToDictionary(group => group.Key, group => ManagerValues.Text(group.First().Get("value")), StringComparer.Ordinal);
+                .ToDictionary(group => group.Key, group => group.First().Get("value"), StringComparer.Ordinal);
+            string? FieldText(string name) => ManagerValues.Text(values.GetValueOrDefault(name));
             clients.Add(new ArrDownloadClientEntry(
                 ManagerValues.FirstText(row, "name") ?? ManagerValues.FirstText(row, "implementationName") ?? "Download client",
                 ManagerValues.FirstText(row, "implementation") ?? string.Empty,
                 row.Get("enable") is not WireBool { Value: false },
-                fields.GetValueOrDefault("host"),
-                fields.GetValueOrDefault(categoryField),
-                fields.GetValueOrDefault(directoryField) ?? fields.GetValueOrDefault("completedDirectory"),
-                ManagerValues.FirstText(row, "protocol")));
+                FieldText("host"),
+                FieldText(categoryField),
+                FieldText(directoryField) ?? FieldText("completedDirectory"),
+                ManagerValues.FirstText(row, "protocol"),
+                PortOf(values.GetValueOrDefault("port"))));
         }
 
         return clients;
     }
+
+    /// <summary>A client's <c>port</c> field is a number; anything outside the range of a port is treated as not given.</summary>
+    private static int? PortOf(WireValue? value) =>
+        ManagerValues.WholeNumber(value) is { } number && number > 0 && number <= MaxPort ? (int)number : null;
 
     /// <summary>
     /// Whether the manager will look for this library's downloads in its output folder. Completed Download Handling

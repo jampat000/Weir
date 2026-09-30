@@ -13,9 +13,6 @@ public readonly record struct ConnectionAddress(long Id, string Product, string 
 /// </summary>
 public static class ConnectionNaming
 {
-    private const int DefaultHttpPort = 80;
-    private const int DefaultHttpsPort = 443;
-
     /// <summary>
     /// The name of every connection, by id. A name is the product and the address's host as typed. Connections
     /// of one product on the same host also carry their port ("Radarr on NAS (7879)"), and their path when the
@@ -81,7 +78,7 @@ public static class ConnectionNaming
         int port;
         try
         {
-            port = parts.Port ?? (parts.Scheme == "https" ? DefaultHttpsPort : DefaultHttpPort);
+            port = ConnectionEndpoint.PortOf(parts);
         }
         catch (WireValueException)
         {
