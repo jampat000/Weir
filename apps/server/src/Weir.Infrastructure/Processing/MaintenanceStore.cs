@@ -28,7 +28,7 @@ public sealed class MaintenanceStore
 
     private static readonly Dictionary<string, string> FamilyDescriptions = new(StringComparer.Ordinal)
     {
-        ["work_temp_stale_sweep"] = "Deletes half-written copies Weir left in its work folders once they are old. Never touches a file being written, or the copy of a file that failed while you keep failed work files.",
+        ["work_temp_stale_sweep"] = "Deletes half-written copies Weir left in its work folders once they have sat for a day, including a failed copy you asked Weir to keep. Never touches a file being written.",
         ["failure_cleanup"] = "Deletes the download a file came from once Weir has given up on it for good and no media manager still has it. This removes the original, so it stays off until you switch it on.",
         ["unclaimed_handbacks"] = "Deletes Weir's own cleaned copy from a hand-back folder when no media manager imported it in time. Only a copy that is still exactly as Weir wrote it; never a download. It stays off until you switch it on.",
     };

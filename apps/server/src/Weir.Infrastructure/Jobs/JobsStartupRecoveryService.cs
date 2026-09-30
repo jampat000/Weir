@@ -73,7 +73,8 @@ public sealed class JobsStartupRecoveryService : IHostedService
     {
         try
         {
-            LastReport = await StartupRecovery.RunAsync(_store, _options.WeirHome, _time.GetUtcNow(), _logger, CancellationToken.None).ConfigureAwait(false);
+            LastReport = await StartupRecovery.RunAsync(
+                _store, _options.WeirHome, _time.GetUtcNow(), TimeSpan.FromSeconds(_options.ProcessingWorkTempStaleSweepMinStaleAgeSeconds), _logger, CancellationToken.None).ConfigureAwait(false);
             await GiveEveryLibraryAProfileAsync(CancellationToken.None).ConfigureAwait(false);
             await WarnAboutReservedLibraryFoldersAsync(CancellationToken.None).ConfigureAwait(false);
 

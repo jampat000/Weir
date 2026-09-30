@@ -214,6 +214,40 @@ public sealed class StartupRecoveryTests : IDisposable
     }
 
     [Fact]
+    public async Task A_failed_copy_kept_on_request_survives_a_restart_until_it_is_a_day_old()
+    {
+        var work = _db.Join("work-movies");
+        Directory.CreateDirectory(work);
+        _db.AddLibrary(workFolder: work, outputFolder: _db.Join("out"));
+        _db.Execute("INSERT INTO operator_settings (id, keep_failed_work_files) VALUES (1, 1)");
+        var kept = Path.Join(work, "Film.processing.k3j_9x2a.mkv");
+        await File.WriteAllTextAsync(kept, "half-written remux");
+        File.SetLastWriteTimeUtc(kept, Now.UtcDateTime.AddHours(-2));
+
+        var report = await RunAsync();
+
+        Assert.Equal(0, report.WorkTempFilesRemoved);
+        Assert.True(File.Exists(kept));
+    }
+
+    [Fact]
+    public async Task A_failed_copy_kept_on_request_is_removed_at_a_restart_once_it_is_a_day_old()
+    {
+        var work = _db.Join("work-movies");
+        Directory.CreateDirectory(work);
+        _db.AddLibrary(workFolder: work, outputFolder: _db.Join("out"));
+        _db.Execute("INSERT INTO operator_settings (id, keep_failed_work_files) VALUES (1, 1)");
+        var kept = Path.Join(work, "Film.processing.k3j_9x2a.mkv");
+        await File.WriteAllTextAsync(kept, "half-written remux");
+        File.SetLastWriteTimeUtc(kept, Now.UtcDateTime.AddDays(-2));
+
+        var report = await RunAsync();
+
+        Assert.Equal(1, report.WorkTempFilesRemoved);
+        Assert.False(File.Exists(kept));
+    }
+
+    [Fact]
     public async Task Missing_work_and_output_folders_are_not_an_error()
     {
         _db.AddLibrary(workFolder: _db.Join("does-not-exist"), outputFolder: _db.Join("nor-this"));
@@ -246,5 +280,5 @@ public sealed class StartupRecoveryTests : IDisposable
             ProcessingLibraryFolders.EffectiveWorkFolder(row with { MediaType = "tv", WorkFolder = @"C:\ProgramData\Weir\processing-tv-work" }, _db.Home));
     }
 
-    private Task<StartupRecoveryReport> RunAsync() => StartupRecovery.RunAsync(_db.Store, _db.Home, Now, NullLogger.Instance);
+    private Task<StartupRecoveryReport> RunAsync() => StartupRecovery.RunAsync(_db.Store, _db.Home, Now, TimeSpan.FromDays(1), NullLogger.Instance);
 }
