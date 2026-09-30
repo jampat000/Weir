@@ -36,23 +36,7 @@ public sealed partial class RemuxPassRunner
             var workDisk = FileLifecycle.CheckMinimumFreeDiskSpace(Path.Join(workDir, $".{Path.GetFileName(src)}.work-preflight"), request.MinimumFreeDiskSpaceMb, FreeBytes);
             if (!workDisk.Ok)
             {
-                return SkipGuardrail(
-                    relativeMediaPath,
-                    workDisk.Message,
-                    "minimum_free_disk_space",
-                    context.Inspected,
-                    new WireObject()
-                        .Set("disk_checked_path", workDisk.CheckedPath)
-                        .Set("disk_free_mb", Math.Round(workDisk.FreeMb, 1, MidpointRounding.ToEven))
-                        .Set("minimum_free_disk_space_mb", workDisk.RequiredMb)
-                        .Set("media_scope", context.Scope)
-                        .Set("stream_counts", output["stream_counts"])
-                        .Set("plan_summary", output["plan_summary"])
-                        .Set("audio_before", audioBefore)
-                        .Set("audio_after", audioAfter)
-                        .Set("subs_before", subsBefore)
-                        .Set("subs_after", subsAfter)
-                        .Set("remux_required", true));
+                return WorkFolderDriveWait(workDisk, context, output);
             }
 
             report?.Invoke(new WireObject()
@@ -117,24 +101,7 @@ public sealed partial class RemuxPassRunner
             if (!outputDisk.Ok)
             {
                 FileLifecycle.BestEffortDelete(tmp);
-                return SkipGuardrail(
-                    relativeMediaPath,
-                    outputDisk.Message,
-                    "minimum_free_disk_space",
-                    context.Inspected,
-                    new WireObject()
-                        .Set("disk_checked_path", outputDisk.CheckedPath)
-                        .Set("disk_free_mb", Math.Round(outputDisk.FreeMb, 1, MidpointRounding.ToEven))
-                        .Set("minimum_free_disk_space_mb", outputDisk.RequiredMb)
-                        .Set("media_scope", context.Scope)
-                        .Set("processing_output_folder_resolved", context.OutputDirectory)
-                        .Set("stream_counts", output["stream_counts"])
-                        .Set("plan_summary", output["plan_summary"])
-                        .Set("audio_before", audioBefore)
-                        .Set("audio_after", audioAfter)
-                        .Set("subs_before", subsBefore)
-                        .Set("subs_after", subsAfter)
-                        .Set("remux_required", true));
+                return OutputDriveWait(outputDisk, context, output);
             }
 
             Directory.CreateDirectory(Path.GetDirectoryName(final)!);

@@ -1,5 +1,6 @@
 using System.Globalization;
 using Weir.Core.Json;
+using Weir.Core.Processing;
 
 namespace Weir.Infrastructure.Processing.RemuxPass;
 
@@ -35,7 +36,7 @@ public sealed partial class RemuxPassRunner
             {
                 return (SkipGuardrail(
                     relativeMediaPath,
-                    $"Skipped: file below minimum size ({sourceMb.ToString("F1", CultureInfo.InvariantCulture)} MB < {minSizeMb.ToString(CultureInfo.InvariantCulture)} MB).",
+                    LibraryAdmission.BelowMinimumSizeReason(sourceMb, minSizeMb),
                     "minimum_input_file_size",
                     inspected,
                     new WireObject()

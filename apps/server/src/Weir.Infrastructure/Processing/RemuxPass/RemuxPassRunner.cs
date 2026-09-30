@@ -164,6 +164,11 @@ public sealed partial class RemuxPassRunner
             return guardrailResult;
         }
 
+        if (WaitIfOutputDriveIsShort(request, src, inspected, scope) is { } outputDriveWait)
+        {
+            return outputDriveWait;
+        }
+
         ReportStage(report, relativeMediaPath, "processing", PassStages.Checking, "Weir is checking the file.");
         JsonElement probeJson;
         IReadOnlyList<string> sourceWarnings;
