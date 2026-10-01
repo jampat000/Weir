@@ -20,14 +20,13 @@ it("credits TMDb in the words it asks for, with a link to its site", () => {
 it("credits TheTVDB beside it, with a link, whatever the library holds", () => {
   render(<ArtworkCredits />);
 
-  expect(
-    screen.getByText(
-      "TV information and images are provided by TheTVDB.com, but we are not endorsed or certified by TheTVDB.com or its affiliates.",
-    ),
-  ).toBeVisible();
+  expect(screen.getByTestId("about-tvdb-credit")).toHaveTextContent(
+    "TV metadata provided by TheTVDB",
+  );
   const link = screen.getByTestId("about-tvdb-link");
+  expect(link).toHaveTextContent("TheTVDB");
   expect(link).toHaveAttribute("href", "https://thetvdb.com");
-  expect(link).toHaveAttribute("rel", "noreferrer");
+  expect(link).toHaveAttribute("rel", "noreferrer noopener");
 });
 
 it("shows TMDb's logo as a small image that links to its site", () => {

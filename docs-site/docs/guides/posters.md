@@ -25,4 +25,4 @@ Operators who never want Weir to contact the service can also start it with `WEI
 
 ## Credits
 
-This product uses the TMDB API but is not endorsed or certified by TMDB. Some posters come from TheTVDB; see [thetvdb.com](https://thetvdb.com). Both credits are shown in **System › About**.
+This product uses the TMDB API but is not endorsed or certified by TMDB. TV metadata provided by [TheTVDB](https://thetvdb.com). Both credits are shown in **System › About**.
