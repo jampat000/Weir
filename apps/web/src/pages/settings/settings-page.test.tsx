@@ -9,13 +9,7 @@ import { createMemoryRouter, RouterProvider } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { SettingsPage } from "./settings-page";
 
-// Each tab's own content is tested beside it; this file is about which tab is showing.
-vi.mock("../../components/shell/pause-control", () => ({
-  PauseControl: () => null,
-}));
-vi.mock("../../components/shell/theme-toggle", () => ({
-  ThemeToggle: () => null,
-}));
+// Each section's own content is tested beside it; this file is about which section is showing.
 vi.mock("./tabs/libraries/libraries-tab", () => ({
   LibrariesTab: () => <div>Libraries content</div>,
 }));
@@ -58,10 +52,6 @@ function renderAt(entry: string) {
   return router;
 }
 
-function selectedTab(): string | null {
-  return screen.getByRole("tab", { selected: true }).textContent;
-}
-
 afterEach(() => cleanup());
 
 describe("SettingsPage", () => {
@@ -78,69 +68,74 @@ describe("SettingsPage", () => {
     expect(screen.getByText("System page")).toBeTruthy();
   });
 
-  it("opens on the tab the address names, including the names 3.1 used", () => {
+  it("opens on the section the address names, including the names 3.1 used", () => {
     renderAt("/settings?tab=schedules");
-    expect(selectedTab()).toBe("Schedule");
-    expect(screen.getByText("Schedule content")).toBeInTheDocument();
+
+    expect(screen.getByRole("region", { name: "Schedule" })).toHaveTextContent(
+      "Schedule content",
+    );
   });
 
-  it("puts the tab in the address, so it can be bookmarked and gone back to", () => {
-    const router = renderAt("/settings");
-    expect(selectedTab()).toBe("Workflows");
+  it("opens on Workflows when the address names no section", () => {
+    renderAt("/settings");
 
-    fireEvent.click(screen.getByRole("tab", { name: "Alerts" }));
-    expect(router.state.location.search).toBe("?tab=alerts");
-    expect(screen.getByText("Alerts content")).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Workflows" })).toHaveTextContent(
+      "Libraries content",
+    );
+  });
+
+  it("has no row of tabs of its own: the side menu is the way between sections", () => {
+    renderAt("/settings");
+
+    expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
   });
 
   it("follows the address when it changes without the page remounting: Back, Forward and the side menu", async () => {
     const router = renderAt("/settings");
-    fireEvent.click(screen.getByRole("tab", { name: "Rules" }));
-    expect(selectedTab()).toBe("Rules");
+    await act(() => router.navigate("/settings?tab=rules"));
+    expect(screen.getByText("Rules content")).toBeInTheDocument();
 
     await act(() => router.navigate(-1));
     expect(router.state.location.search).toBe("");
-    expect(selectedTab()).toBe("Workflows");
     expect(screen.getByText("Libraries content")).toBeInTheDocument();
 
     await act(() => router.navigate(1));
-    expect(selectedTab()).toBe("Rules");
+    expect(screen.getByText("Rules content")).toBeInTheDocument();
 
-    // The side menu's Settings link is a plain /settings.
-    await act(() => router.navigate("/settings"));
-    expect(selectedTab()).toBe("Workflows");
+    await act(() => router.navigate("/settings?tab=alerts"));
+    expect(screen.getByText("Alerts content")).toBeInTheDocument();
   });
 
-  describe("with unsaved changes on a tab", () => {
+  describe("with unsaved changes in a section", () => {
     afterEach(() => {
       alerts.unsaved = null;
     });
 
-    it("asks before moving to another tab, and stays when told to", () => {
+    it("asks before moving to another section, and stays when told to", async () => {
       alerts.unsaved = "the Discord alert";
       const router = renderAt("/settings?tab=alerts");
 
-      fireEvent.click(screen.getByRole("tab", { name: "Rules" }));
+      await act(() => router.navigate("/settings?tab=rules"));
 
       expect(screen.getByTestId("settings-unsaved-changes")).toHaveTextContent(
         "You have unsaved changes to the Discord alert. Leave without saving?",
       );
       fireEvent.click(screen.getByTestId("settings-unsaved-changes-cancel"));
       expect(router.state.location.search).toBe("?tab=alerts");
-      expect(selectedTab()).toBe("Alerts");
+      expect(screen.getByText("Alerts content")).toBeInTheDocument();
     });
 
     it("moves on once the person chooses to leave without saving", async () => {
       alerts.unsaved = "the Discord alert";
       const router = renderAt("/settings?tab=alerts");
 
-      fireEvent.click(screen.getByRole("tab", { name: "Rules" }));
+      await act(() => router.navigate("/settings?tab=rules"));
       await act(async () => {
         fireEvent.click(screen.getByTestId("settings-unsaved-changes-confirm"));
       });
 
       expect(router.state.location.search).toBe("?tab=rules");
-      expect(selectedTab()).toBe("Rules");
+      expect(screen.getByText("Rules content")).toBeInTheDocument();
     });
 
     it("asks before leaving Settings for another page", async () => {

@@ -6,16 +6,12 @@ import {
   WorkspaceTabList,
 } from "./workspace-shell";
 
-// The title row carries Pause and the theme switch, which talk to the server; this test is about the tabs.
-vi.mock("../shell/pause-control", () => ({ PauseControl: () => null }));
-vi.mock("../shell/theme-toggle", () => ({ ThemeToggle: () => null }));
-
 describe("workspace shell", () => {
   it("connects the themed horizontal tabs to their shared panel", () => {
     const onSelect = vi.fn();
 
     render(
-      <WorkspacePage title="Example" description="Example sections">
+      <WorkspacePage dataTestId="example-page">
         <WorkspaceTabList
           tabs={[
             { id: "overview", label: "Overview" },
@@ -37,7 +33,7 @@ describe("workspace shell", () => {
       </WorkspacePage>,
     );
 
-    expect(screen.getByRole("heading", { name: "Example" })).toBeVisible();
+    expect(screen.getByTestId("example-page")).toBeVisible();
     expect(
       screen.getByRole("tablist", { name: "Example sections" }),
     ).toHaveClass("mm-workspace-tabs__list");

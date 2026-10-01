@@ -5,12 +5,13 @@ import {
   type Location,
 } from "react-router-dom";
 import { systemAddressForSettingsTab } from "../../app/legacy-redirects";
+import { WorkspacePage } from "../../components/shared/workspace-shell";
 import {
-  WorkspacePage,
-  WorkspacePanel,
-  WorkspaceTabList,
-  type WorkspaceTabOption,
-} from "../../components/shared/workspace-shell";
+  normalizeSettingsSection,
+  settingsSection,
+  settingsSectionFromSearch,
+  type SettingsSectionId,
+} from "../../lib/settings/settings-sections";
 import { MediaManagersTab } from "./tabs/media-managers/media-managers-tab";
 import { AlertsTab } from "./tabs/alerts/alerts-tab";
 import { LibrariesTab } from "./tabs/libraries/libraries-tab";
@@ -24,88 +25,31 @@ import {
   useUnsavedChangesRegistry,
 } from "./unsaved-changes";
 
-type TabId =
-  | "libraries"
-  | "rules"
-  | "media-managers"
-  | "performance"
-  | "cleanup"
-  | "schedule"
-  | "alerts";
-
-const SETTINGS_TABS: readonly WorkspaceTabOption<TabId>[] = [
-  { id: "libraries", label: "Workflows" },
-  { id: "rules", label: "Rules" },
-  { id: "media-managers", label: "Media managers" },
-  { id: "performance", label: "Performance" },
-  { id: "cleanup", label: "Cleanup" },
-  { id: "schedule", label: "Schedule" },
-  { id: "alerts", label: "Alerts" },
-];
-
-/** A tab name from the address, including the names earlier versions used. */
-function normalizeSettingsTab(candidate: string | null | undefined): TabId {
-  switch ((candidate || "").trim().toLowerCase()) {
-    case "rules":
-    case "audio-subtitles":
-      return "rules";
-    case "media-managers":
-      return "media-managers";
-    case "performance":
-    case "running":
-    case "processing":
-      return "performance";
-    case "cleanup":
-    case "housekeeping":
-    case "maintenance":
-      return "cleanup";
-    case "schedule":
-    case "schedules":
-      return "schedule";
-    case "alerts":
-    case "notifications":
-      return "alerts";
-    default:
-      return "libraries";
-  }
-}
-
-function tabOf(location: Location): TabId {
-  return normalizeSettingsTab(new URLSearchParams(location.search).get("tab"));
-}
-
-/** Leaving Settings, or moving to another of its tabs, would unmount the panel holding the edits. */
+/** Leaving Settings, or moving to another of its sections, would unmount the panel holding the edits. */
 function leavesPanel(current: Location, next: Location): boolean {
-  return current.pathname !== next.pathname || tabOf(current) !== tabOf(next);
+  return (
+    current.pathname !== next.pathname ||
+    settingsSectionFromSearch(current.search) !==
+      settingsSectionFromSearch(next.search)
+  );
 }
 
 /**
  * Settings: how Weir treats your media, in the order someone sets Weir up in: where the media is, what
- * to keep, who to tell, then how hard to work and when. Weir itself (what it runs, what it keeps, who
- * can sign in) is the System screen, so a page about your library never sits beside one about backups.
+ * to keep, who to tell, then how hard to work and when. The side menu is the way between sections, and
+ * the header names the one showing. Weir itself (what it runs, what it keeps, who can sign in) is the
+ * System screen, so a page about your library never sits beside one about backups.
  */
 export function SettingsPage() {
-  const [searchParams, setSearchParams] = useSearchParams();
-  // The address is the tab, so Back, Forward and the side menu move between tabs too.
-  const tab = normalizeSettingsTab(searchParams.get("tab"));
+  const [searchParams] = useSearchParams();
+  // The address is the section, so Back, Forward and the side menu all move between sections.
+  const section = normalizeSettingsSection(searchParams.get("tab"));
   const { unsaved, register } = useUnsavedChangesRegistry();
-  // Tabs, Back and Forward, and the side menu are all navigation, so one blocker asks for all of them.
+  // Back, Forward and the side menu are all navigation, so one blocker asks for all of them.
   const blocker = useBlocker(
     ({ currentLocation, nextLocation }) =>
       unsaved !== null && leavesPanel(currentLocation, nextLocation),
   );
-
-  function setSettingsTab(nextTab: TabId): void {
-    const nextParams = new URLSearchParams(searchParams);
-    // Libraries is where Settings opens, so it needs no tab in the address.
-    if (nextTab === "libraries") {
-      nextParams.delete("tab");
-    } else {
-      nextParams.set("tab", nextTab);
-    }
-    for (const name of ["show", "status", "path"]) nextParams.delete(name);
-    setSearchParams(nextParams);
-  }
 
   const movedToSystem = systemAddressForSettingsTab(searchParams.get("tab"));
   if (movedToSystem) {
@@ -113,25 +57,17 @@ export function SettingsPage() {
   }
 
   return (
-    <WorkspacePage
-      title="Settings"
-      dataTestId="suite-settings-page"
-      description="How Weir treats your media. Work down the tabs and it is set up."
-    >
-      <WorkspaceTabList
-        tabs={SETTINGS_TABS}
-        activeId={tab}
-        onSelect={setSettingsTab}
-        ariaLabel="Settings sections"
-        idPrefix="settings-tab"
-        panelId="settings-panel"
-        dataTestId="settings-section-tabs"
-      />
-      <WorkspacePanel id="settings-panel" labelledBy={`settings-tab-${tab}`}>
-        <UnsavedChangesScope register={register}>
-          <SettingsTabPanel tab={tab} />
-        </UnsavedChangesScope>
-      </WorkspacePanel>
+    <WorkspacePage dataTestId="suite-settings-page">
+      <section
+        className="mm-workspace-panel mm-bubble-stack"
+        aria-label={settingsSection(section).label}
+      >
+        <div className="mm-workspace-panel__content mm-bubble-stack">
+          <UnsavedChangesScope register={register}>
+            <SettingsSectionPanel section={section} />
+          </UnsavedChangesScope>
+        </div>
+      </section>
       {blocker.state === "blocked" && unsaved !== null ? (
         <LeaveWithoutSavingDialog
           thing={unsaved}
@@ -143,8 +79,8 @@ export function SettingsPage() {
   );
 }
 
-function SettingsTabPanel({ tab }: { tab: TabId }) {
-  switch (tab) {
+function SettingsSectionPanel({ section }: { section: SettingsSectionId }) {
+  switch (section) {
     case "libraries":
       return <LibrariesTab />;
     case "rules":

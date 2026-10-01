@@ -1,4 +1,4 @@
-type WeirLogoVariant = "sidebar" | "auth";
+type WeirLogoVariant = "auth";
 
 type Props = {
   variant?: WeirLogoVariant;
@@ -11,7 +11,7 @@ type Props = {
  * the streams to fuse (packaging/brand/README.md). The paths are generated: change the geometry in
  * packaging/brand/build/mark.py and paste the path data its build.py prints.
  */
-function WeirMark({ className }: { className?: string }) {
+export function WeirMark({ className }: { className?: string }) {
   return (
     <svg
       className={["mm-logo-mark", className].filter(Boolean).join(" ")}
@@ -54,9 +54,7 @@ export function WeirLogo({ variant = "auth", className }: Props) {
       aria-label="Weir"
     >
       <WeirMark />
-      <span className="mm-logo-wordmark" aria-hidden="true">
-        Weir
-      </span>
+      <span aria-hidden="true">Weir</span>
     </span>
   );
 }

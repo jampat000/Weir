@@ -144,10 +144,7 @@ class AuditNotificationsMixin:
         self.record("notification channel create, edit/cancel, and confirmed remove")
 
     def settings_media_managers(self) -> None:
-        self.click(
-            self.page.get_by_role("tab", name="Media managers", exact=True),
-            "open Settings media managers",
-        )
+        self.open_tab("Settings", "Media managers")
         self.visible(
             self.page.get_by_test_id("media-manager-add"),
             "Settings media managers panel",

@@ -52,7 +52,7 @@ function SettingsLoadProblem({ error }: { error: Error }) {
   return (
     <div className="mm-page" data-testid="suite-settings-page">
       <header className="mm-page__intro">
-        <h1 className="mm-page__title">Settings</h1>
+        <h2 className="mm-page__title">System</h2>
         <p className="mm-page__lead">
           {isLikelyNetworkFailure(error)
             ? "Could not reach the Weir API. Check that the backend is running."
@@ -94,11 +94,7 @@ export function SystemPage() {
   const settings = settingsQ.data;
 
   return (
-    <WorkspacePage
-      title="System"
-      dataTestId="suite-system-page"
-      description="Weir itself: what it is running, what it keeps, and who can sign in."
-    >
+    <WorkspacePage dataTestId="suite-system-page">
       <WorkspaceTabList
         tabs={SYSTEM_TABS}
         activeId={tab}

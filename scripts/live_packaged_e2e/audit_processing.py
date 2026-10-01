@@ -216,10 +216,13 @@ class AuditProcessingMixin:
             self.visible(
                 self.page.get_by_test_id(first_id), f"{sidebar} history origin {first}"
             )
-            self.click(
-                self.page.get_by_role("tab", name=second, exact=True),
-                f"exercise {sidebar} URL history forward target",
+            # A Settings section is a side menu entry, a System tab one across the top.
+            target = (
+                self.page.get_by_role("link", name=second, exact=True)
+                if sidebar == "Settings"
+                else self.page.get_by_role("tab", name=second, exact=True)
             )
+            self.click(target, f"exercise {sidebar} URL history forward target")
             self.require(
                 second_param in self.page.url,
                 f"{sidebar} {second} tab is not represented in the URL",

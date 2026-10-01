@@ -235,7 +235,9 @@ export function ProcessingPage(): React.ReactElement {
 
   return (
     <div className="mm-page mm-live" data-testid="processing-page">
-      <PageHeader title="Processing" lead={processingLead(workflowKinds)} />
+      <PageHeader>
+        <p className="mm-page-head__lead">{processingLead(workflowKinds)}</p>
+      </PageHeader>
 
       <ProcessingToolbar filter={filter} onFilter={setFilter} now={now} />
 

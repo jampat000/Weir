@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+
 from playwright.sync_api import Page, expect
 
 BOOTSTRAP_USER = "e2e-shell-admin"
@@ -46,12 +48,21 @@ def ensure_signed_in(page: Page, base_url: str) -> None:
 
 
 def open_sidebar(page: Page, label: str) -> None:
-    page.get_by_role("link", name=label, exact=True).click()
+    # A link that carries a count is named for it ("Processing, 2 working", "History, 1 need you").
+    page.get_by_role("link", name=re.compile(rf"^{re.escape(label)}(?:,|$)")).click()
 
 
 def open_tab(page: Page, sidebar: str, tab: str) -> None:
-    """A tab on Settings or System: the side menu entry, then the tab across the top."""
+    """A Settings section or a System tab.
 
+    Each Settings section is an entry of its own in the side menu, which marks the one showing. System is one
+    entry, with its tabs across the top.
+    """
+
+    if sidebar == "Settings":
+        open_sidebar(page, tab)
+        expect(page.get_by_role("link", name=tab, exact=True)).to_have_attribute("aria-current", "page")
+        return
     open_sidebar(page, sidebar)
     selected = page.get_by_role("tab", name=tab, exact=True)
     selected.click()

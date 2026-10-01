@@ -1,5 +1,4 @@
 import type { KeyboardEvent, ReactNode } from "react";
-import { PageHeader } from "../shell/page-header";
 import {
   mmModuleTabBlurbBandClass,
   mmModuleTabBlurbTextClass,
@@ -7,22 +6,14 @@ import {
 import { mmSectionTabClass } from "../../lib/ui/mm-control-roles";
 
 type WorkspacePageProps = {
-  title: string;
-  description: ReactNode;
   children: ReactNode;
   dataTestId?: string;
 };
 
-/** A page with a tab row: the shared title row (Pause and the theme switch on the right), then the tabs. */
-export function WorkspacePage({
-  title,
-  description,
-  children,
-  dataTestId,
-}: WorkspacePageProps) {
+/** A page of tabs and their panels. The shell's header above it carries the title. */
+export function WorkspacePage({ children, dataTestId }: WorkspacePageProps) {
   return (
     <div className="mm-page mm-workspace-page" data-testid={dataTestId}>
-      <PageHeader title={title} lead={description} />
       {children}
     </div>
   );

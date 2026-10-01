@@ -4,12 +4,15 @@ Library and Logs (Activity) screens. Assumes ``AuditCore`` in the same instance.
 
 from __future__ import annotations
 
+import re
+
 from .config import BASE_URL
 
 
 class AuditShellMixin:
     def open_sidebar(self, label: str) -> None:
-        link = self.page.get_by_role("link", name=label, exact=True)
+        # A link that carries a count is named for it ("Processing, 2 working", "History, 1 need you").
+        link = self.page.get_by_role("link", name=re.compile(rf"^{re.escape(label)}(?:,|$)"))
         self.click(link, f"open {label} from primary navigation")
 
     def assert_no_visible_crash(self) -> None:
@@ -29,7 +32,7 @@ class AuditShellMixin:
         self.require(
             collapse.get_attribute("aria-expanded") == "true", "sidebar starts expanded"
         )
-        # The mark, not its box: the wordmark beside it folds away on collapse by design.
+        # The mark, not its block: the name beside it folds away on collapse by design.
         logo = self.page.locator(".mm-sidebar .mm-logo-mark")
         expanded_logo = logo.bounding_box()
         self.click(collapse, "collapse sidebar")
@@ -81,8 +84,19 @@ class AuditShellMixin:
         self.record("desktop collapse/theme and mobile navigation controls")
 
     def open_tab(self, sidebar: str, tab: str) -> None:
-        """A tab on Settings or System (3.2): the side menu entry, then the tab across the top."""
+        """A Settings section or a System tab.
 
+        Each Settings section is an entry of its own in the side menu, which marks the one showing. System is
+        one entry, with its tabs across the top.
+        """
+
+        if sidebar == "Settings":
+            self.open_sidebar(tab)
+            self.visible(
+                self.page.get_by_role("link", name=tab, exact=True).and_(self.page.locator("[aria-current='page']")),
+                f"Settings › {tab} marked as the current page in the side menu",
+            )
+            return
         self.open_sidebar(sidebar)
         self.click(
             self.page.get_by_role("tab", name=tab, exact=True),
@@ -118,12 +132,25 @@ class AuditShellMixin:
             self.page.get_by_role("heading", name="Processing", exact=True),
             "Processing heading",
         )
-        # Five places since 3.2. Home became Processing, the dashboard folded into it (#459), every
-        # file's story is History, and the 3.1 Activity page is System › Logs.
+        # Home became Processing, the dashboard folded into it (#459), every file's story is History, and the
+        # 3.1 Activity page is System › Logs. Each Settings section is an entry of its own.
         primary = self.page.get_by_role("navigation", name="Primary")
         labels = [text.strip() for text in primary.locator(".mm-sidebar-link-label").all_text_contents()]
         self.require(
-            labels == ["Processing", "History", "Library", "Settings", "System"],
+            labels
+            == [
+                "Processing",
+                "History",
+                "Library",
+                "Workflows",
+                "Rules",
+                "Media managers",
+                "Performance",
+                "Schedule",
+                "Cleanup",
+                "Alerts",
+                "System",
+            ],
             f"primary navigation is {labels}",
         )
         for retired in ("Home", "Dashboard", "Activity"):
@@ -133,7 +160,7 @@ class AuditShellMixin:
             )
         self.assert_no_visible_crash()
         self.screenshot("processing")
-        self.record("Processing main screen and the five-place side menu")
+        self.record("Processing main screen and the side menu")
 
     def library(self) -> None:
         self.open_sidebar("Library")

@@ -33,6 +33,17 @@ pytestmark = [
     ),
 ]
 
+# Every Settings section, as named in the side menu.
+_SETTINGS_SECTION_LABELS = (
+    "Workflows",
+    "Rules",
+    "Media managers",
+    "Performance",
+    "Schedule",
+    "Cleanup",
+    "Alerts",
+)
+
 # Directory where screenshots are persisted (informational, .gitignored).
 _SCREENSHOT_DIR = Path(__file__).resolve().parents[3] / "artifacts" / "screenshots"
 
@@ -84,10 +95,16 @@ def _assert_document_owns_vertical_scroll(page) -> None:
     assert scroll["scrollingElement"] == "HTML", scroll
 
 
-def _assert_tab_workspace(page, *, page_test_id: str, tabs_test_id: str) -> None:
-    """A page uses the shared themed tab bar and accessible panel contract."""
+def _assert_workspace(page, *, page_test_id: str, tabs_test_id: str | None) -> None:
+    """A workspace page, and when it has tabs, the shared themed tab bar and accessible panel contract.
+
+    Settings has none: its sections are entries of the side menu.
+    """
     workspace = page.get_by_test_id(page_test_id)
     expect(workspace).to_have_class(re.compile(r"\bmm-workspace-page\b"))
+    if tabs_test_id is None:
+        expect(page.get_by_role("tablist")).to_have_count(0)
+        return
     tabs = page.get_by_test_id(tabs_test_id)
     expect(tabs).to_have_class(re.compile(r"\bmm-workspace-tabs\b"))
     active_tab = tabs.locator("[role='tab'][aria-selected='true']")
@@ -186,18 +203,20 @@ def test_settings_and_system_tabs_render(weir_shell: str) -> None:
 
             ensure_signed_in(page, base)
 
-            for label, page_test_id, tabs_test_id in (
-                ("Settings", "suite-settings-page", "settings-section-tabs"),
-                ("System", "suite-system-page", "system-section-tabs"),
-            ):
-                open_sidebar(page, label)
-                expect(page.get_by_test_id(page_test_id)).to_be_visible()
-                tabs = page.get_by_test_id(tabs_test_id).get_by_role("tab")
-                for index in range(tabs.count()):
-                    tab = tabs.nth(index)
-                    tab.click()
-                    expect(tab).to_have_attribute("aria-selected", "true")
-                    _assert_no_error_state(page)
+            # Settings sections are entries of their own in the side menu; System keeps its tabs across the top.
+            for label in _SETTINGS_SECTION_LABELS:
+                open_tab(page, "Settings", label)
+                expect(page.get_by_test_id("suite-settings-page")).to_be_visible()
+                _assert_no_error_state(page)
+
+            open_sidebar(page, "System")
+            expect(page.get_by_test_id("suite-system-page")).to_be_visible()
+            tabs = page.get_by_test_id("system-section-tabs").get_by_role("tab")
+            for index in range(tabs.count()):
+                tab = tabs.nth(index)
+                tab.click()
+                expect(tab).to_have_attribute("aria-selected", "true")
+                _assert_no_error_state(page)
 
             open_tab(page, "System", "Security")
             expect(page.get_by_test_id("suite-settings-security")).to_be_visible()
@@ -236,15 +255,11 @@ def test_settings_and_system_share_themed_tabs_and_responsive_layout(
             ensure_signed_in(page, base)
 
             for label, page_test_id, tabs_test_id, screenshot_name in (
-                ("Settings", "suite-settings-page", "settings-section-tabs", "settings-workspace"),
+                ("Workflows", "suite-settings-page", None, "settings-workspace"),
                 ("System", "suite-system-page", "system-section-tabs", "system-workspace"),
             ):
                 open_sidebar(page, label)
-                _assert_tab_workspace(
-                    page,
-                    page_test_id=page_test_id,
-                    tabs_test_id=tabs_test_id,
-                )
+                _assert_workspace(page, page_test_id=page_test_id, tabs_test_id=tabs_test_id)
                 _assert_document_owns_vertical_scroll(page)
                 _assert_no_error_state(page)
                 _scroll_to_top(page)
@@ -255,11 +270,7 @@ def test_settings_and_system_share_themed_tabs_and_responsive_layout(
                     mobile_page.set_viewport_size({"width": 390, "height": 844})
                     mobile_page.set_default_timeout(30_000)
                     mobile_page.goto(page.url, wait_until="domcontentloaded")
-                    _assert_tab_workspace(
-                        mobile_page,
-                        page_test_id=page_test_id,
-                        tabs_test_id=tabs_test_id,
-                    )
+                    _assert_workspace(mobile_page, page_test_id=page_test_id, tabs_test_id=tabs_test_id)
                     assert mobile_page.evaluate(
                         "document.documentElement.scrollWidth <= document.documentElement.clientWidth"
                     ), f"{label} overflows the narrow viewport"
