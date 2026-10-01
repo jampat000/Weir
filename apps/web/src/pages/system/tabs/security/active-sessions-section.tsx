@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Chip } from "../../../../components/panels/chip";
 
 import { LoadError } from "../../../../components/shared/load-error";
 import { QuietSection } from "../../../../components/shared/quiet-section";
@@ -39,11 +40,9 @@ function SessionsTable({
             <tr key={session.session_id}>
               <th scope="row" className="mm-quiet-table__name">
                 <span>{session.client_label || "Browser session"}</span>
-                {session.current ? (
-                  <span className="mm-quiet-badge">This browser</span>
-                ) : null}
+                {session.current ? <Chip tone="info">This browser</Chip> : null}
                 {session.trusted_device ? (
-                  <span className="mm-quiet-badge">Trusted</span>
+                  <Chip tone="healthy">Trusted</Chip>
                 ) : null}
               </th>
               <td data-label="Last seen">{formatDate(session.last_seen_at)}</td>

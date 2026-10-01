@@ -7,54 +7,57 @@
  */
 .mm-quiet-fold {
   min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--mm-hairline);
+  border-radius: var(--mm-radius-control);
+  background: color-mix(in srgb, var(--mm-surface-2) 50%, transparent);
 }
 
 .mm-quiet-fold__head {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 0.6rem;
-  padding-bottom: 0.7rem;
-  border-bottom: 1px solid var(--mm-border);
+  min-height: 52px;
+  padding: 8px 14px;
   cursor: pointer;
   list-style: none;
+}
+
+.mm-quiet-fold__head:hover {
+  background: var(--mm-surface-2);
 }
 
 .mm-quiet-fold__head::-webkit-details-marker {
   display: none;
 }
 
-.mm-quiet-fold__head::before {
+/* The chevron is at the right edge, after the state line. */
+.mm-quiet-fold__head::after {
   content: "";
+  order: 3;
   flex-shrink: 0;
   width: 0.42rem;
   height: 0.42rem;
   border-right: 1.5px solid var(--mm-text3);
   border-bottom: 1.5px solid var(--mm-text3);
-  transform: rotate(-45deg) translateY(-0.12rem);
+  transform: rotate(45deg) translateY(-0.1rem);
   transition: transform 0.15s ease;
 }
 
-.mm-quiet-fold[open] > .mm-quiet-fold__head::before {
-  transform: rotate(45deg) translateY(-0.1rem);
-}
-
-.mm-quiet-fold__head:hover::before {
-  border-color: var(--mm-text1);
+.mm-quiet-fold[open] > .mm-quiet-fold__head::after {
+  transform: rotate(-135deg) translateY(-0.1rem);
 }
 
 .mm-quiet-fold__head:focus-visible {
   outline: 2px solid var(--mm-accent);
-  outline-offset: 2px;
-  box-shadow: 0 0 0 2px var(--mm-accent-ring);
-  border-radius: var(--mm-radius-sm);
+  outline-offset: -2px;
 }
 
 .mm-quiet-fold__title {
   margin: 0;
   color: var(--mm-text1);
-  font-size: 1.0625rem;
-  font-weight: 600;
-  letter-spacing: -0.022em;
+  font-size: var(--mm-type-body);
+  font-weight: 500;
 }
 
 .mm-quiet-fold__state {
@@ -63,8 +66,13 @@
   color: var(--mm-text3);
 }
 
+.mm-quiet-fold[open] > .mm-quiet-fold__head {
+  border-bottom: 1px solid var(--mm-hairline);
+}
+
 .mm-quiet-fold__detail {
-  margin: 0.9rem 0 0;
+  margin: 0;
+  padding: 12px 14px 0;
   font-size: var(--mm-type-caption);
   line-height: 1.5;
   color: var(--mm-text3);
@@ -72,11 +80,12 @@
 
 .mm-quiet-fold__body {
   min-width: 0;
-  margin-top: 0.9rem;
+  padding: 14px;
+  background: var(--mm-card-bg);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .mm-quiet-fold__head::before {
+  .mm-quiet-fold__head::after {
     transition: none;
   }
 }

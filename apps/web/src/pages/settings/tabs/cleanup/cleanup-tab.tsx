@@ -1,6 +1,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { Fragment, useId, useState } from "react";
 
+import { Panel } from "../../../../components/panels/panel";
 import { PageLoading } from "../../../../components/shared/page-loading";
 import { useCanEdit } from "../../../../lib/auth/can-edit";
 import type { MaintenanceFamily } from "../../../../lib/processing/maintenance-api";
@@ -134,85 +135,87 @@ export function CleanupTab() {
           No cleanup jobs are available on this instance.
         </p>
       ) : (
-        <div className="mm-quiet-table-wrap">
-          <table className="mm-quiet-table mm-cleanup-table">
-            <thead>
-              <tr>
-                <th scope="col">Job</th>
-                <th scope="col">On</th>
-                <th scope="col">Every</th>
-                <th scope="col">Last run</th>
-                <th scope="col">Next run</th>
-                {editable ? (
-                  <th scope="col">
-                    <span className="sr-only">Run now</span>
-                  </th>
-                ) : null}
-              </tr>
-            </thead>
-            <tbody>
-              {CLEANUP_JOBS.map((job) => {
-                const state = families.find((f) => f.family === job.family);
-                return state ? (
-                  <Fragment key={job.family}>
-                    <CleanupJobRow
-                      job={job}
-                      state={state}
-                      switchId={`${ids}-${job.family}-on`}
-                      editable={editable}
-                      saving={saving}
-                      running={running}
-                      onSave={saveSetting}
-                      onRun={() => void runNow(job.family, job.name)}
-                      onRequestConfirm={(action) =>
-                        setConfirming({ job, action })
-                      }
-                    />
-                    {job.family === "work_temp_stale_sweep" ? (
-                      <SwitchSettingRow
-                        testId="processing-maintenance-keep-failed-copy"
-                        name="Keep a failed file’s half-written copy for a day, so you can look at it."
-                        description="Leftover work files removes it once it is a day old."
-                        switchId={`${ids}-keep-failed`}
-                        enabled={settings.data.keep_failed_work_files}
+        <Panel title="Cleanup jobs" padded>
+          <div className="mm-quiet-table-wrap">
+            <table className="mm-quiet-table mm-cleanup-table">
+              <thead>
+                <tr>
+                  <th scope="col">Job</th>
+                  <th scope="col">On</th>
+                  <th scope="col">Every</th>
+                  <th scope="col">Last run</th>
+                  <th scope="col">Next run</th>
+                  {editable ? (
+                    <th scope="col">
+                      <span className="sr-only">Run now</span>
+                    </th>
+                  ) : null}
+                </tr>
+              </thead>
+              <tbody>
+                {CLEANUP_JOBS.map((job) => {
+                  const state = families.find((f) => f.family === job.family);
+                  return state ? (
+                    <Fragment key={job.family}>
+                      <CleanupJobRow
+                        job={job}
+                        state={state}
+                        switchId={`${ids}-${job.family}-on`}
                         editable={editable}
                         saving={saving}
-                        onChange={(on) =>
-                          void saveSetting(
-                            { keep_failed_work_files: on },
-                            on
-                              ? "A failed file’s half-written copy is now kept for a day."
-                              : "A failed file’s half-written copy is no longer kept.",
-                          )
+                        running={running}
+                        onSave={saveSetting}
+                        onRun={() => void runNow(job.family, job.name)}
+                        onRequestConfirm={(action) =>
+                          setConfirming({ job, action })
                         }
                       />
-                    ) : null}
-                  </Fragment>
-                ) : null;
-              })}
-              <DaysSettingRow
-                testId="processing-maintenance-handback-window"
-                name="Cleaned copies nobody picked up wait"
-                description="How long a copy Weir made for a media manager waits before Cleaned copies nobody picked up may remove it."
-                inputId={`${ids}-window`}
-                inputLabel="Cleaned copies nobody picked up wait for"
-                saved={
-                  settings.data.unclaimed_handback_window_days ??
-                  WINDOW_DEFAULT_DAYS
-                }
-                min={WINDOW_MIN_DAYS}
-                max={WINDOW_MAX_DAYS}
-                editable={editable}
-                saving={saving}
-                savedWords={(days) =>
-                  `Cleaned copies nobody picked up now wait ${plural(days, "day", "days")}.`
-                }
-                onSave={saveSetting}
-                toBody={(days) => ({ unclaimed_handback_window_days: days })}
-              />
-            </tbody>
-          </table>
-        </div>
+                      {job.family === "work_temp_stale_sweep" ? (
+                        <SwitchSettingRow
+                          testId="processing-maintenance-keep-failed-copy"
+                          name="Keep a failed file’s half-written copy for a day, so you can look at it."
+                          description="Leftover work files removes it once it is a day old."
+                          switchId={`${ids}-keep-failed`}
+                          enabled={settings.data.keep_failed_work_files}
+                          editable={editable}
+                          saving={saving}
+                          onChange={(on) =>
+                            void saveSetting(
+                              { keep_failed_work_files: on },
+                              on
+                                ? "A failed file’s half-written copy is now kept for a day."
+                                : "A failed file’s half-written copy is no longer kept.",
+                            )
+                          }
+                        />
+                      ) : null}
+                    </Fragment>
+                  ) : null;
+                })}
+                <DaysSettingRow
+                  testId="processing-maintenance-handback-window"
+                  name="Cleaned copies nobody picked up wait"
+                  description="How long a copy Weir made for a media manager waits before Cleaned copies nobody picked up may remove it."
+                  inputId={`${ids}-window`}
+                  inputLabel="Cleaned copies nobody picked up wait for"
+                  saved={
+                    settings.data.unclaimed_handback_window_days ??
+                    WINDOW_DEFAULT_DAYS
+                  }
+                  min={WINDOW_MIN_DAYS}
+                  max={WINDOW_MAX_DAYS}
+                  editable={editable}
+                  saving={saving}
+                  savedWords={(days) =>
+                    `Cleaned copies nobody picked up now wait ${plural(days, "day", "days")}.`
+                  }
+                  onSave={saveSetting}
+                  toBody={(days) => ({ unclaimed_handback_window_days: days })}
+                />
+              </tbody>
+            </table>
+          </div>
+        </Panel>
       )}
 
       {confirming && confirmingState ? (

@@ -13,13 +13,26 @@ type PanelProps = {
   toLabel?: string;
   /** Shows the link as an arrow alone, so a long count keeps the room. The words are still said. */
   iconOnly?: boolean;
+  /** Controls at the header's right edge, after the count: a text action, a switch. */
+  aside?: ReactNode;
+  /** The title's heading level. A panel inside a page's own section is a level 3. */
+  headingLevel?: 2 | 3;
+  /** Gives the title an id the page can point at. */
+  headingId?: string;
+  /**
+   * A panel of fields or rows: its body is padded, divided from the header by a hairline, and lets a
+   * menu that opens inside it reach past the edge.
+   */
+  padded?: boolean;
+  id?: string;
+  dataTestId?: string;
   className?: string;
   bodyClassName?: string;
   children: ReactNode;
 };
 
 /**
- * The card every part of a dashboard sits in: a title, a quiet count that gives way before anything
+ * The card every part of a page sits in: a title, a quiet count that gives way before anything
  * else, an arrow link to where the subject is managed, and a body that takes the rest of the height.
  * The header never wraps onto a second line.
  */
@@ -30,28 +43,41 @@ export function Panel({
   to,
   toLabel,
   iconOnly = false,
+  aside,
+  headingLevel = 2,
+  headingId,
+  padded = false,
+  id,
+  dataTestId,
   className,
   bodyClassName,
   children,
 }: PanelProps) {
-  const titleId = useId();
+  const generatedId = useId();
+  const titleId = headingId ?? generatedId;
   const linkWords = toLabel ?? "Open";
+  const Heading = headingLevel === 2 ? "h2" : "h3";
   return (
     <section
+      id={id}
       aria-labelledby={titleId}
-      className={["mm-panel", className].filter(Boolean).join(" ")}
+      data-testid={dataTestId}
+      className={["mm-panel", padded ? "mm-panel--padded" : "", className]
+        .filter(Boolean)
+        .join(" ")}
     >
       <header className="mm-panel__head">
         {leading}
-        <h2 id={titleId} className="mm-panel__title">
+        <Heading id={titleId} className="mm-panel__title">
           {title}
-        </h2>
+        </Heading>
         <span
           className="mm-panel__count"
           title={typeof count === "string" ? count : undefined}
         >
           {count}
         </span>
+        {aside ? <div className="mm-panel__aside">{aside}</div> : null}
         {to ? (
           <Link
             to={to}

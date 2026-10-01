@@ -1,4 +1,5 @@
 import { LoadError } from "../../../../components/shared/load-error";
+import { Chip } from "../../../../components/panels/chip";
 import { QuietSection } from "../../../../components/shared/quiet-section";
 import type { useServerLogsQuery } from "../../../../lib/settings/queries";
 import type { ServerLogEntry } from "../../../../lib/settings/types";
@@ -79,7 +80,7 @@ export function LogListSection({
                 <tr key={`${entry.timestamp}-${entry.level}-${entry.message}`}>
                   <th scope="row" className="mm-quiet-table__name">
                     <span>{entry.message}</span>
-                    <span className="mm-quiet-badge">{entry.component}</span>
+                    <Chip dot={false}>{entry.component}</Chip>
                     {entry.detail ? (
                       <span className="mm-quiet-table__sub">
                         {entry.detail}

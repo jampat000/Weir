@@ -1,4 +1,5 @@
 import type { NotificationChannelOut } from "../../../../lib/settings/types";
+import { Chip } from "../../../../components/panels/chip";
 import { mmActionButtonClass } from "../../../../lib/ui/mm-control-roles";
 import { eventLabel } from "./alert-events";
 import { ALERT_CHECKBOX_CLASS } from "./channel-form";
@@ -50,10 +51,8 @@ export function ChannelRow({
     <tr>
       <th scope="row" className="mm-quiet-table__name">
         <span>{channel.label}</span>
-        <span className="mm-quiet-badge">{channel.provider}</span>
-        {!channel.enabled ? (
-          <span className="mm-quiet-badge mm-quiet-badge--off">Disabled</span>
-        ) : null}
+        <Chip dot={false}>{channel.provider}</Chip>
+        {!channel.enabled ? <Chip tone="warning">Disabled</Chip> : null}
         <span className="mm-quiet-table__sub font-mono">
           {maskWebhookUrl(channel.url)}
         </span>

@@ -63,6 +63,37 @@
   color: var(--mm-primary-bright);
 }
 
+/* The header's own controls: a text action or a switch, at the right edge. */
+.mm-panel__aside {
+  display: flex;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px 16px;
+}
+
+/* A panel of fields or rows. The body is padded and set off from the header by a hairline; the panel
+   stops clipping so a picker that opens inside it can reach past its edge. */
+.mm-panel--padded {
+  overflow: visible;
+}
+
+.mm-panel--padded > .mm-panel__head {
+  align-items: center;
+  min-height: 48px;
+  padding-top: 0;
+  padding-bottom: 0;
+  border-bottom: 1px solid var(--mm-hairline);
+}
+
+.mm-panel--padded > .mm-panel__body {
+  display: block;
+  min-width: 0;
+  overflow: visible;
+  padding: 14px 18px 18px;
+}
+
 /* Takes the height the panel is given and clips what does not fit; a panel with no height of its own
    is as tall as its content. */
 .mm-panel__body {

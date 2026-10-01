@@ -1,5 +1,6 @@
 import { useId, useState } from "react";
 
+import { Panel } from "../../../../components/panels/panel";
 import { PageLoading } from "../../../../components/shared/page-loading";
 import { QuietSection } from "../../../../components/shared/quiet-section";
 import { canEdit } from "../../../../lib/auth/can-edit";
@@ -134,12 +135,14 @@ export function ScheduleTab() {
   return (
     <div className="mm-quiet-stack" data-testid="processing-schedules-section">
       <SaveModelNote model="explicit" />
-      <TimeZoneRow
-        key={savedZone(settings.data)}
-        settings={settings.data}
-        editable={editable}
-        now={now}
-      />
+      <Panel title="Time zone" padded>
+        <TimeZoneRow
+          key={savedZone(settings.data)}
+          settings={settings.data}
+          editable={editable}
+          now={now}
+        />
+      </Panel>
       <LibrariesSection
         headingId={`${ids}-libraries`}
         libraries={libraries.data}

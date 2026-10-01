@@ -1,4 +1,5 @@
 import { QuietSection } from "../../../../components/shared/quiet-section";
+import { Chip } from "../../../../components/panels/chip";
 import { WorkflowKindSummary } from "../../../../components/shared/workflow-kind";
 import { MmOnOffSwitch } from "../../../../components/ui/mm-on-off-switch";
 import type { MediaManagerConnection } from "../../../../lib/media-managers/media-managers-api";
@@ -102,7 +103,7 @@ function LibraryRow({
     <tr data-testid={`processing-library-${library.id}`}>
       <th scope="row" className="mm-quiet-table__name">
         <span>{library.name}</span>
-        {badge ? <span className="mm-quiet-badge">{badge}</span> : null}
+        {badge ? <Chip dot={false}>{badge}</Chip> : null}
       </th>
       <td data-label="Kind">
         <WorkflowSource library={library} connections={connections} />

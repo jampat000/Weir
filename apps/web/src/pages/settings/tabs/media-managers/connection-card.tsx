@@ -1,5 +1,7 @@
 import { useState } from "react";
 
+import { Chip } from "../../../../components/panels/chip";
+import { Panel } from "../../../../components/panels/panel";
 import { ConfirmDialog } from "../../../../components/ui/confirm-dialog";
 import { errorMessage } from "../../../../lib/api/error-message";
 import type { MediaManagerConnection } from "../../../../lib/media-managers/media-managers-api";
@@ -87,101 +89,97 @@ export function ConnectionCard({
   const locked = busy || editing;
 
   return (
-    <section className="mm-quiet-section" data-testid="media-manager-card">
-      <div className="mm-quiet-section__head">
-        <h3 className="mm-quiet-section__title">
-          {connectionTitle(connection)}
-        </h3>
-        <div className="mm-quiet-section__aside">
-          <span
-            className={`mm-quiet-badge${connection.enabled ? "" : " mm-quiet-badge--off"}`}
-          >
-            {connection.enabled ? "Enabled" : "Disabled"}
-          </span>
-        </div>
+    <Panel
+      title={connectionTitle(connection)}
+      headingLevel={3}
+      padded
+      aside={
+        <Chip tone={connection.enabled ? "healthy" : "neutral"}>
+          {connection.enabled ? "Enabled" : "Disabled"}
+        </Chip>
+      }
+      dataTestId="media-manager-card"
+    >
+      <ConnectionStatusPanel connection={connection} fmt={fmt} />
+      <UnsignedWebhookWarning connection={connection} />
+      <FedWorkflows connection={connection} />
+
+      <div className="mt-3 flex flex-wrap gap-2">
+        <button
+          type="button"
+          data-testid="media-manager-test"
+          className={mmActionButtonClass({ variant: "primary" })}
+          disabled={locked}
+          onClick={() => test.mutate(connection.id)}
+        >
+          {test.isPending ? "Testing…" : "Test"}
+        </button>
+        <button
+          type="button"
+          data-testid="media-manager-edit"
+          className={mmActionButtonClass({ variant: "secondary" })}
+          disabled={locked}
+          onClick={() => setEditing(true)}
+        >
+          Edit
+        </button>
+        <button
+          type="button"
+          className={mmActionButtonClass({ variant: "secondary" })}
+          disabled={locked}
+          onClick={() =>
+            update.mutate({
+              id: connection.id,
+              data: { enabled: !connection.enabled },
+            })
+          }
+        >
+          {toggleLabel(connection, update.isPending)}
+        </button>
+        <button
+          type="button"
+          data-testid="media-manager-remove"
+          className={mmActionButtonClass({ variant: "tertiary" })}
+          disabled={locked}
+          aria-haspopup="dialog"
+          onClick={() => {
+            remove.reset();
+            setConfirmingRemoval(true);
+          }}
+        >
+          Remove
+        </button>
       </div>
-      <div className="mm-quiet-section__body">
-        <ConnectionStatusPanel connection={connection} fmt={fmt} />
-        <UnsignedWebhookWarning connection={connection} />
-        <FedWorkflows connection={connection} />
 
-        <div className="mt-3 flex flex-wrap gap-2">
-          <button
-            type="button"
-            data-testid="media-manager-test"
-            className={mmActionButtonClass({ variant: "primary" })}
-            disabled={locked}
-            onClick={() => test.mutate(connection.id)}
-          >
-            {test.isPending ? "Testing…" : "Test"}
-          </button>
-          <button
-            type="button"
-            data-testid="media-manager-edit"
-            className={mmActionButtonClass({ variant: "secondary" })}
-            disabled={locked}
-            onClick={() => setEditing(true)}
-          >
-            Edit
-          </button>
-          <button
-            type="button"
-            className={mmActionButtonClass({ variant: "secondary" })}
-            disabled={locked}
-            onClick={() =>
-              update.mutate({
-                id: connection.id,
-                data: { enabled: !connection.enabled },
-              })
-            }
-          >
-            {toggleLabel(connection, update.isPending)}
-          </button>
-          <button
-            type="button"
-            data-testid="media-manager-remove"
-            className={mmActionButtonClass({ variant: "tertiary" })}
-            disabled={locked}
-            aria-haspopup="dialog"
-            onClick={() => {
-              remove.reset();
-              setConfirmingRemoval(true);
-            }}
-          >
-            Remove
-          </button>
-        </div>
+      {test.isError ? (
+        <p className="mm-status-text--failed mt-2 text-sm" role="alert">
+          {errorMessage(test.error, TEST_FAILURE)}
+        </p>
+      ) : null}
 
-        {test.isError ? (
-          <p className="mm-status-text--failed mt-2 text-sm" role="alert">
-            {errorMessage(test.error, TEST_FAILURE)}
-          </p>
-        ) : null}
+      {update.isError ? (
+        <p className="mm-status-text--failed mt-2 text-sm" role="alert">
+          {errorMessage(update.error, TOGGLE_FAILURE)}
+        </p>
+      ) : null}
 
-        {update.isError ? (
-          <p className="mm-status-text--failed mt-2 text-sm" role="alert">
-            {errorMessage(update.error, TOGGLE_FAILURE)}
-          </p>
-        ) : null}
+      {editing ? (
+        <ConnectionEditForm
+          connection={connection}
+          onClose={() => setEditing(false)}
+        />
+      ) : null}
 
-        {editing ? (
-          <ConnectionEditForm
-            connection={connection}
-            onClose={() => setEditing(false)}
-          />
-        ) : null}
+      {confirmingRemoval ? (
+        <RemoveConnectionDialog
+          connection={connection}
+          remove={remove}
+          onClose={() => setConfirmingRemoval(false)}
+        />
+      ) : null}
 
-        {confirmingRemoval ? (
-          <RemoveConnectionDialog
-            connection={connection}
-            remove={remove}
-            onClose={() => setConfirmingRemoval(false)}
-          />
-        ) : null}
-
-        <ConnectionSetup connection={connection} secret={secret} busy={busy} />
-        <ConnectionFolderChain connectionId={connection.id} />
-      </div>
-    </section>
+      <ConnectionSetup connection={connection} secret={secret} busy={busy} />
+      <ConnectionFolderChain connectionId={connection.id} />
+    </Panel>
   );
 }

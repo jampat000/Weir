@@ -22,9 +22,9 @@
   line-height: 1.45;
 }
 
-/* ── The quiet body ──────────────────────────────────────────────────────────
- * Everything below the lead. No cards, no panels: a heading, a hairline, then
- * content. Hierarchy is type scale and whitespace.
+/* ── The page body ───────────────────────────────────────────────────────────
+ * What a page puts under the header: panels (components/panels/panel.tsx) one under another. The stack
+ * spaces them; inside a panel it spaces the groups of a form.
  */
 
 .mm-quiet-stack {
@@ -32,45 +32,16 @@
   width: 100%;
   min-width: 0;
   flex-direction: column;
-  gap: 2.5rem;
+  gap: var(--mm-panel-gap);
 }
 
-.mm-quiet-section {
-  min-width: 0;
+.mm-panel__body .mm-quiet-stack {
+  gap: 18px;
 }
 
-.mm-quiet-section__head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 0.5rem 1rem;
-  padding-bottom: 0.7rem;
-  border-bottom: 1px solid var(--mm-border);
-}
-
-.mm-quiet-section__title {
-  margin: 0;
-  color: var(--mm-text1);
-  font-size: 1.0625rem;
-  font-weight: 600;
-  letter-spacing: -0.022em;
-}
-
-.mm-quiet-section__aside {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 0.25rem 1.1rem;
-}
-
-.mm-quiet-section__body {
-  min-width: 0;
-  margin-top: 0.9rem;
-}
-
-/* The field group: a form without boxes keeps its grouping as an uppercase eyebrow over a hairline,
- * like a table's header row. It is a group inside a section, not a second kind of section: an h3,
- * quieter than .mm-quiet-section__title, with `.mm-quiet-stack` supplying the space between groups. */
+/* The field group: a form inside a panel keeps its grouping as an uppercase eyebrow over a hairline,
+ * like a table's header row. It is a group inside a panel, not a second card: an h3 quieter than the
+ * panel's title, with `.mm-quiet-stack` supplying the space between groups. */
 
 .mm-quiet-group {
   min-width: 0;
@@ -83,7 +54,7 @@
   justify-content: space-between;
   gap: 0.25rem 1rem;
   padding-bottom: 0.6rem;
-  border-bottom: 2px solid var(--mm-line);
+  border-bottom: 1px solid var(--mm-hairline);
 }
 
 .mm-quiet-group__name {
@@ -113,9 +84,9 @@
 .mm-quiet-group__title {
   margin: 0;
   color: var(--mm-text1);
-  font-size: 0.8125rem;
-  font-weight: 700;
-  letter-spacing: 0.1em;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
 }
 
@@ -136,15 +107,14 @@
   margin-top: 1rem;
 }
 
-/* The hairline above a form's own Save row. A card drew this; without the card it is
- * just a rule and the buttons under it. */
+/* The hairline above a form's own Save row. */
 .mm-quiet-actions {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 0.5rem;
-  padding-top: 1.25rem;
-  border-top: 1px solid var(--mm-border);
+  padding-top: 1rem;
+  border-top: 1px solid var(--mm-hairline);
 }
 
 /* A filter above a list: its label, then the control, stacked. */
@@ -174,6 +144,26 @@
 
 .mm-quiet-link:hover {
   color: var(--mm-accent);
+}
+
+/* In a panel's header the text link is a small control, where a toolbar puts its action. */
+.mm-panel__aside .mm-quiet-link {
+  display: inline-flex;
+  align-items: center;
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--mm-hairline);
+  border-radius: var(--mm-radius-control);
+  background: var(--mm-button-secondary-bg);
+  color: var(--mm-text1);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+.mm-panel__aside .mm-quiet-link:hover:not(:disabled) {
+  border-color: var(--mm-accent-ring);
+  color: var(--mm-text1);
 }
 
 /* A link that is busy or unavailable — an export mid-download, a "load older" with a

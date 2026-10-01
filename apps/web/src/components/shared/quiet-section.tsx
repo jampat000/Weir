@@ -1,8 +1,9 @@
 import { useId, type ReactNode } from "react";
 
+import { Panel } from "../panels/panel";
+
 /**
- * The quiet body of a page: a heading on the left, its links on the right, a hairline under both,
- * then the content. No cards, no panels, no wells.
+ * A section of a page: a panel with its heading and links in the header and its content padded below.
  * A section inside a tab panel is one level down, so it takes `level={3}`.
  */
 export function QuietSection({
@@ -22,22 +23,18 @@ export function QuietSection({
   id?: string;
   "data-testid"?: string;
 }) {
-  const Heading = level === 2 ? "h2" : "h3";
   return (
-    <section
-      className="mm-quiet-section"
-      aria-labelledby={headingId}
+    <Panel
+      title={heading}
+      headingId={headingId}
+      headingLevel={level}
+      aside={aside}
+      padded
       id={id}
-      data-testid={dataTestId}
+      dataTestId={dataTestId}
     >
-      <div className="mm-quiet-section__head">
-        <Heading id={headingId} className="mm-quiet-section__title">
-          {heading}
-        </Heading>
-        {aside ? <div className="mm-quiet-section__aside">{aside}</div> : null}
-      </div>
-      <div className="mm-quiet-section__body">{children}</div>
-    </section>
+      {children}
+    </Panel>
   );
 }
 

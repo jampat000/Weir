@@ -18,7 +18,7 @@
 
 .mm-quiet-table thead th {
   padding: 0 0.75rem 0.6rem;
-  border-bottom: 1px solid var(--mm-line);
+  border-bottom: 1px solid var(--mm-hairline);
   color: var(--mm-text3);
   font-size: var(--mm-type-eyebrow);
   font-weight: 600;
@@ -31,7 +31,7 @@
 .mm-quiet-table tbody th,
 .mm-quiet-table tbody td {
   padding: 0.85rem 0.75rem;
-  border-bottom: 1px solid var(--mm-border);
+  border-bottom: 1px solid var(--mm-hairline);
   color: var(--mm-text2);
   font-weight: 400;
   text-align: left;
@@ -79,24 +79,6 @@
   font-weight: 400;
   line-height: 1.45;
   overflow-wrap: anywhere;
-}
-
-.mm-quiet-badge {
-  display: inline-block;
-  margin: 0.1rem 0.3rem 0 0;
-  padding: 0 0.45rem;
-  border: 1px solid var(--mm-border);
-  border-radius: var(--mm-radius-pill);
-  color: var(--mm-text2);
-  font-size: 0.72rem;
-  font-weight: 500;
-  line-height: 1.6;
-  vertical-align: 0.05em;
-}
-
-.mm-quiet-badge--off {
-  border-color: var(--mm-warning-border);
-  color: var(--mm-status-warning-text);
 }
 
 @media (max-width: 760px) {
@@ -156,10 +138,4 @@
   .mm-jobs-table__job {
     position: sticky;
   }
-}
-
-/* The kind of a workflow: linked to a media manager, or Weir only. */
-.mm-workflow-badge--linked {
-  border-color: var(--mm-accent-bright);
-  color: var(--mm-accent-bright);
 }

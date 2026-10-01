@@ -1,5 +1,6 @@
 import { useState } from "react";
 
+import { Panel } from "../../../../components/panels/panel";
 import { PageLoading } from "../../../../components/shared/page-loading";
 import {
   QuietFieldGroup,
@@ -22,7 +23,7 @@ import {
 
 function AlertIntro() {
   return (
-    <>
+    <Panel title="How an alert is sent" padded>
       <p className="mm-quiet-note">
         An alert is a message Weir posts to Discord, or to any address that
         takes a webhook, when something happens you would want to know about
@@ -43,7 +44,7 @@ function AlertIntro() {
           it in System › Logs, under Server log.
         </li>
       </ol>
-    </>
+    </Panel>
   );
 }
 

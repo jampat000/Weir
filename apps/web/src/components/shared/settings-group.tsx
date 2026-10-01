@@ -1,8 +1,10 @@
 import type { ReactNode } from "react";
 
+import { Panel } from "../panels/panel";
+
 /**
- * One group of settings: what the group is and why it matters on the left, one setting per row on the right.
- * Hairlines, not boxes.
+ * One group of settings: a panel with the group's name in its header, a line on why it matters, then one
+ * setting per row, hairlines between.
  */
 export function SettingsGroup({
   title,
@@ -16,13 +18,10 @@ export function SettingsGroup({
   testId?: string;
 }) {
   return (
-    <section className="mm-setgroup" data-testid={testId}>
-      <div>
-        <h3 className="mm-setgroup__title">{title}</h3>
-        {detail ? <p className="mm-setgroup__detail">{detail}</p> : null}
-      </div>
+    <Panel title={title} headingLevel={3} padded dataTestId={testId}>
+      {detail ? <p className="mm-setgroup__detail">{detail}</p> : null}
       <div className="mm-setgroup__rows">{children}</div>
-    </section>
+    </Panel>
   );
 }
 

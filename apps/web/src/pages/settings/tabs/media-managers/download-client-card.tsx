@@ -1,5 +1,7 @@
 import { useState } from "react";
 
+import { Chip } from "../../../../components/panels/chip";
+import { Panel } from "../../../../components/panels/panel";
 import { ConfirmDialog } from "../../../../components/ui/confirm-dialog";
 import { errorMessage } from "../../../../lib/api/error-message";
 import {
@@ -131,99 +133,97 @@ export function DownloadClientCard({
   const locked = busy || editing;
 
   return (
-    <section className="mm-quiet-section" data-testid="download-client-card">
-      <div className="mm-quiet-section__head">
-        <h3 className="mm-quiet-section__title">
-          {connectionTitle(connection)}
-        </h3>
-        <div className="mm-quiet-section__aside">
-          <span className="mm-quiet-badge">
+    <Panel
+      title={connectionTitle(connection)}
+      headingLevel={3}
+      padded
+      aside={
+        <>
+          <Chip dot={false}>
             {DOWNLOAD_CLIENT_KIND_LABELS[connection.kind]}
-          </span>
-          <span
-            className={`mm-quiet-badge${connection.enabled ? "" : " mm-quiet-badge--off"}`}
-          >
+          </Chip>
+          <Chip tone={connection.enabled ? "healthy" : "neutral"}>
             {connection.enabled ? "Enabled" : "Disabled"}
-          </span>
-        </div>
+          </Chip>
+        </>
+      }
+      dataTestId="download-client-card"
+    >
+      <DownloadClientStatus connection={connection} fmt={fmt} />
+
+      <div className="mt-3 flex flex-wrap gap-2">
+        <button
+          type="button"
+          data-testid="download-client-test"
+          className={mmActionButtonClass({ variant: "primary" })}
+          disabled={locked}
+          onClick={() => test.mutate(connection.id)}
+        >
+          {test.isPending ? "Testing…" : "Test"}
+        </button>
+        <button
+          type="button"
+          data-testid="download-client-edit"
+          className={mmActionButtonClass({ variant: "secondary" })}
+          disabled={locked}
+          onClick={() => setEditing(true)}
+        >
+          Edit
+        </button>
+        <button
+          type="button"
+          className={mmActionButtonClass({ variant: "secondary" })}
+          disabled={locked}
+          onClick={() =>
+            update.mutate({
+              id: connection.id,
+              data: { enabled: !connection.enabled },
+            })
+          }
+        >
+          {toggleLabel(connection, update.isPending)}
+        </button>
+        <button
+          type="button"
+          data-testid="download-client-remove"
+          className={mmActionButtonClass({ variant: "tertiary" })}
+          disabled={locked}
+          aria-haspopup="dialog"
+          onClick={() => {
+            remove.reset();
+            setConfirmingRemoval(true);
+          }}
+        >
+          Remove
+        </button>
       </div>
-      <div className="mm-quiet-section__body">
-        <DownloadClientStatus connection={connection} fmt={fmt} />
 
-        <div className="mt-3 flex flex-wrap gap-2">
-          <button
-            type="button"
-            data-testid="download-client-test"
-            className={mmActionButtonClass({ variant: "primary" })}
-            disabled={locked}
-            onClick={() => test.mutate(connection.id)}
-          >
-            {test.isPending ? "Testing…" : "Test"}
-          </button>
-          <button
-            type="button"
-            data-testid="download-client-edit"
-            className={mmActionButtonClass({ variant: "secondary" })}
-            disabled={locked}
-            onClick={() => setEditing(true)}
-          >
-            Edit
-          </button>
-          <button
-            type="button"
-            className={mmActionButtonClass({ variant: "secondary" })}
-            disabled={locked}
-            onClick={() =>
-              update.mutate({
-                id: connection.id,
-                data: { enabled: !connection.enabled },
-              })
-            }
-          >
-            {toggleLabel(connection, update.isPending)}
-          </button>
-          <button
-            type="button"
-            data-testid="download-client-remove"
-            className={mmActionButtonClass({ variant: "tertiary" })}
-            disabled={locked}
-            aria-haspopup="dialog"
-            onClick={() => {
-              remove.reset();
-              setConfirmingRemoval(true);
-            }}
-          >
-            Remove
-          </button>
-        </div>
+      {test.isError ? (
+        <p className="mm-status-text--failed mt-2 text-sm" role="alert">
+          {errorMessage(test.error, TEST_FAILURE)}
+        </p>
+      ) : null}
 
-        {test.isError ? (
-          <p className="mm-status-text--failed mt-2 text-sm" role="alert">
-            {errorMessage(test.error, TEST_FAILURE)}
-          </p>
-        ) : null}
+      {update.isError ? (
+        <p className="mm-status-text--failed mt-2 text-sm" role="alert">
+          {errorMessage(update.error, TOGGLE_FAILURE)}
+        </p>
+      ) : null}
 
-        {update.isError ? (
-          <p className="mm-status-text--failed mt-2 text-sm" role="alert">
-            {errorMessage(update.error, TOGGLE_FAILURE)}
-          </p>
-        ) : null}
+      {editing ? (
+        <DownloadClientEditForm
+          connection={connection}
+          onClose={() => setEditing(false)}
+        />
+      ) : null}
 
-        {editing ? (
-          <DownloadClientEditForm
-            connection={connection}
-            onClose={() => setEditing(false)}
-          />
-        ) : null}
-
-        {confirmingRemoval ? (
-          <RemoveDownloadClientDialog
-            connection={connection}
-            remove={remove}
-            onClose={() => setConfirmingRemoval(false)}
-          />
-        ) : null}
-      </div>
-    </section>
+      {confirmingRemoval ? (
+        <RemoveDownloadClientDialog
+          connection={connection}
+          remove={remove}
+          onClose={() => setConfirmingRemoval(false)}
+        />
+      ) : null}
+    </Panel>
   );
 }

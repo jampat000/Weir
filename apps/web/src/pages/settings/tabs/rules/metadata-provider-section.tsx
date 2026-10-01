@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Chip } from "../../../../components/panels/chip";
 
 import { Field } from "../../../../components/shared/field";
 import { QuietSection } from "../../../../components/shared/quiet-section";
@@ -113,11 +114,11 @@ export function MetadataProviderSection({
       heading="Metadata provider"
       aside={
         <>
-          <span className="mm-quiet-badge">
+          <Chip tone={draft.name ? "healthy" : "neutral"}>
             {draft.name
               ? `${draft.name.toUpperCase()} configured`
               : "Not configured"}
-          </span>
+          </Chip>
           <button
             type="button"
             className="mm-quiet-link"

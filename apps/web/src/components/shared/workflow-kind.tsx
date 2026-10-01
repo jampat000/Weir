@@ -1,3 +1,4 @@
+import { Chip } from "../panels/chip";
 import {
   workflowBadgeLabel,
   workflowKindNote,
@@ -7,12 +8,13 @@ import {
 /** The kind of a workflow as a badge; linked ones read as connected, Weir-only ones as plain. */
 export function WorkflowKindBadge({ kind }: { kind: WorkflowKind }) {
   return (
-    <span
-      className={`mm-quiet-badge${kind.kind === "linked" ? " mm-workflow-badge--linked" : ""}`}
+    <Chip
+      tone={kind.kind === "linked" ? "info" : "neutral"}
+      dot={false}
       data-testid="workflow-kind-badge"
     >
       {workflowBadgeLabel(kind)}
-    </span>
+    </Chip>
   );
 }
 

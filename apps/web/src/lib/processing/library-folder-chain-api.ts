@@ -65,3 +65,12 @@ export async function fetchConnectionFolderChain(
   );
   return readJson<LibraryFolderChain[]>(response);
 }
+
+/** Every line of a chain: Weir's own folders, then each media manager's and each download client's. */
+export function folderChainLines(chain: LibraryFolderChain): FolderChainLine[] {
+  return [
+    ...chain.local.lines,
+    ...chain.managers.flatMap((manager) => manager.lines),
+    ...chain.download_clients.flatMap((client) => client.lines),
+  ];
+}

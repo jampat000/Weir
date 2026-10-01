@@ -1,3 +1,4 @@
+import { Chip } from "../../../../components/panels/chip";
 import { LoadError } from "../../../../components/shared/load-error";
 import { QuietSection } from "../../../../components/shared/quiet-section";
 import { formatBytes } from "../../../../lib/format/bytes";
@@ -28,7 +29,7 @@ export function BackupListSection({
       level={3}
       headingId="suite-settings-backup-snapshots-heading"
       heading="Backups on this machine"
-      aside={<span className="mm-quiet-badge">Keeps latest 5</span>}
+      aside={<Chip dot={false}>Keeps latest 5</Chip>}
     >
       {backupsQ.data ? (
         <p

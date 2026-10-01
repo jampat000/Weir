@@ -1,4 +1,5 @@
 import { QuietSection } from "../../../../components/shared/quiet-section";
+import { Chip } from "../../../../components/panels/chip";
 import {
   mmActionButtonClass,
   mmEditableTextFieldClass,
@@ -123,14 +124,12 @@ export function LogSearchSection({
 
       {anySet ? (
         <div className="mt-3 flex flex-wrap gap-2">
-          {text ? <span className="mm-quiet-badge">Search: {text}</span> : null}
+          {text ? <Chip dot={false}>Search: {text}</Chip> : null}
           {search.level ? (
-            <span className="mm-quiet-badge">
-              Level: {logLevelLabel(search.level)}
-            </span>
+            <Chip dot={false}>Level: {logLevelLabel(search.level)}</Chip>
           ) : null}
           {search.tracebacksOnly ? (
-            <span className="mm-quiet-badge">Tracebacks only</span>
+            <Chip dot={false}>Tracebacks only</Chip>
           ) : null}
         </div>
       ) : null}
