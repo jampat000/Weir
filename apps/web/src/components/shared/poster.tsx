@@ -4,7 +4,7 @@ import { useState, type CSSProperties } from "react";
 const HUE_DEGREES = 360;
 
 /** A workflow's own hue, the same every time, so every file of a workflow wears the same colour. */
-function workflowHue(workflow: string): number {
+export function workflowHue(workflow: string): number {
   let hash = 0;
   for (const character of workflow) {
     hash = (hash * 31 + (character.codePointAt(0) ?? 0)) >>> 0;

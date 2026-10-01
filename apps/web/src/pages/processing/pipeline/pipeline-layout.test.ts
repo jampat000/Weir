@@ -10,7 +10,13 @@ import {
   lanesHeight,
   stackedBoardBudget,
 } from "./pipeline-layout";
-import { SHELF_MIN_TILES, shelfFit, tilesAcross } from "./shelf-layout";
+import {
+  FULL_DECORATIONS_MIN_PX,
+  posterSize,
+  SHELF_MIN_TILES,
+  shelfFit,
+  tilesAcross,
+} from "./shelf-layout";
 
 describe("the card size", () => {
   it("is sized from the lanes' height: three rows always, 60px cards at the least, a 130px step at the most", () => {
@@ -124,6 +130,23 @@ describe("the shelf's tiles", () => {
 
   it("never makes a tile narrower than the least art, however narrow the row", () => {
     expect(shelfFit(250, 100).width).toBe(24);
+  });
+
+  it("dresses a poster fully from 64px wide, and thinly below that: a small one has no room for the badge and the tag", () => {
+    expect(FULL_DECORATIONS_MIN_PX).toBe(64);
+    expect(posterSize(64)).toBe("full");
+    expect(posterSize(102)).toBe("full");
+    expect(posterSize(155)).toBe("full");
+    expect(posterSize(63)).toBe("small");
+    expect(posterSize(42)).toBe("small");
+    expect(posterSize(24)).toBe("small");
+    // Until the shelf is measured, a tile is dressed fully.
+    expect(posterSize(null)).toBe("full");
+  });
+
+  it("makes the posters of a short row small and those of a tall one full", () => {
+    expect(posterSize(shelfFit(100, 570).width)).toBe("small");
+    expect(posterSize(shelfFit(250, 570).width)).toBe("full");
   });
 
   it("draws whole tiles only", () => {

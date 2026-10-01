@@ -325,4 +325,66 @@ describe("the size of the tiles", () => {
         ?.style.getPropertyValue("--shelf-tile-w"),
     ).toBe("58px");
   });
+
+  it("dresses a full-size poster with the saved badge and the workflow's whole tag", () => {
+    rowOf(250, 570);
+
+    render(shelf(files));
+
+    const first = screen.getAllByRole("listitem")[0];
+    expect(first).toHaveAttribute("data-size", "full");
+    expect(within(first).getByText("−318 MB")).toBeInTheDocument();
+    expect(within(first).getByRole("link", { name: "TV" })).toHaveClass(
+      "lsh-tag",
+    );
+    expect(
+      screen.getByRole("button", {
+        name: "The Quiet Harbour S01E01 (TV): 2 audio, 4 subtitles removed, 3 min ago",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  describe("on posters too small for the badge and the tag", () => {
+    it("takes the badge off the poster and puts the saving in the tile's name and tooltip", () => {
+      rowOf(100, 570);
+
+      render(shelf(files));
+
+      const first = screen.getAllByRole("listitem")[0];
+      expect(first).toHaveAttribute("data-size", "small");
+      expect(first.querySelector(".mm-shelf__saved")).toBeNull();
+      expect(screen.queryByText("−318 MB")).not.toBeInTheDocument();
+      const open = within(first).getByRole("button");
+      expect(open).toHaveAccessibleName(
+        "The Quiet Harbour S01E01 (TV): 2 audio, 4 subtitles removed, saved 318 MB, 3 min ago",
+      );
+      expect(open).toHaveAttribute("title", expect.stringContaining("318 MB"));
+    });
+
+    it("keeps the workflow's tag as a link to its library, named and tinted for the workflow", () => {
+      rowOf(100, 570);
+
+      render(shelf(files));
+
+      const tag = within(screen.getAllByRole("listitem")[0]).getByRole("link", {
+        name: "TV",
+      });
+      expect(tag).toHaveClass("lsh-tag");
+      expect(tag).toHaveAttribute("href", "/library?library=2");
+      expect(tag).toHaveAttribute("title", "Open TV in the library");
+      expect(tag.style.getPropertyValue("--tile-hue")).toMatch(/^\d+$/);
+    });
+
+    it("leaves a file that saved nothing with a name that says nothing of it", () => {
+      rowOf(100, 570);
+
+      render(shelf([finished(1, { savedBytes: 0 })]));
+
+      expect(
+        screen.getByRole("button", { name: /S01E01/ }),
+      ).toHaveAccessibleName(
+        "The Quiet Harbour S01E01 (TV): 2 audio, 4 subtitles removed, 3 min ago",
+      );
+    });
+  });
 });

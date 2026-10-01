@@ -1,16 +1,19 @@
 /**
  * The tiles of the Just finished shelf. A tile is the title's poster (or its initials on its workflow's
  * colour where there is none), with how much the file shrank by at its foot and, under that, the workflow's
- * name, which goes to that workflow in the library. The tile of a file that has just been delivered arrives
- * with a ring and flies in from the Pipeline (see delivery-flight).
+ * name, which goes to that workflow in the library. On a poster too small to carry them (see posterSize) the
+ * badge and the name give way to a slim strip in the workflow's colour, and go into the tile's tooltip and name.
+ * The tile of a file that has just been delivered arrives with a ring and flies in from the Pipeline (see
+ * delivery-flight).
  */
 import type { CSSProperties, ReactElement, RefObject } from "react";
 import { Link } from "react-router-dom";
 
-import { Poster } from "../../../components/shared/poster";
+import { Poster, workflowHue } from "../../../components/shared/poster";
 import type { FinishedFile } from "../../../lib/activity/processing-outcome";
 import { classNames } from "../../../lib/ui/class-names";
 import { SHELF_TILE_ATTRIBUTE } from "./delivery-flight";
+import { posterSize } from "./shelf-layout";
 import type { ShelfTile } from "./shelf-model";
 import { useOpenSlots } from "./shelf-slots";
 import { TILE_KEY_ATTRIBUTE, useSlideNeighbours } from "./use-slide-neighbours";
@@ -19,18 +22,26 @@ import { useTileArrivals } from "./use-tile-arrivals";
 function Tile({
   tile,
   captions,
+  small,
   onOpen,
 }: {
   tile: ShelfTile;
   captions: boolean;
+  /** The poster is too small for the saved badge and the workflow's whole tag. */
+  small: boolean;
   onOpen: (item: FinishedFile) => void;
 }) {
   const when = tile.ago ? `, ${tile.ago}` : "";
   const workflow = tile.workflowKnown ? ` (${tile.workflow})` : "";
   const library = tile.item.libraryId;
+  const hiddenSaving = small ? tile.savedAmount : null;
+  const savedInName = hiddenSaving ? `, saved ${hiddenSaving}` : "";
+  const savedInTip =
+    hiddenSaving && !tile.detail.includes(hiddenSaving) ? hiddenSaving : null;
   return (
     <li
       {...{ [TILE_KEY_ATTRIBUTE]: tile.key }}
+      data-size={small ? "small" : "full"}
       className={classNames(
         "mm-shelf__item",
         tile.fresh && "mm-shelf__item--fresh",
@@ -42,12 +53,13 @@ function Tile({
         title={[
           tile.title,
           tile.workflowKnown ? tile.workflow : null,
+          savedInTip && `Saved ${savedInTip}`,
           tile.detail,
           tile.ago,
         ]
           .filter(Boolean)
           .join(" · ")}
-        aria-label={`${tile.title}${workflow}: ${tile.what}${when}`}
+        aria-label={`${tile.title}${workflow}: ${tile.what}${savedInName}${when}`}
         onClick={() => onOpen(tile.item)}
       >
         <span
@@ -59,7 +71,7 @@ function Tile({
             title={tile.title}
             workflow={tile.workflow}
           />
-          {tile.saved ? (
+          {tile.saved && !small ? (
             <span className="mm-shelf__saved">{tile.saved}</span>
           ) : null}
         </span>
@@ -77,6 +89,7 @@ function Tile({
         <Link
           to={`/library?library=${library}`}
           className="lsh-tag"
+          style={{ ["--tile-hue" as string]: workflowHue(tile.workflow) }}
           title={`Open ${tile.workflow} in the library`}
           onClick={(event) => event.stopPropagation()}
         >
@@ -114,6 +127,7 @@ export function ShelfTiles({
     tileWidth,
   );
   useTileArrivals(boxRef, tiles.map((tile) => tile.key).join("|"));
+  const small = posterSize(tileWidth) === "small";
   const style: CSSProperties | undefined =
     tileWidth === null
       ? undefined
@@ -121,7 +135,13 @@ export function ShelfTiles({
   return (
     <ul ref={boxRef} className="mm-shelf__row" style={style}>
       {shown.map((tile) => (
-        <Tile key={tile.key} tile={tile} captions={captions} onOpen={onOpen} />
+        <Tile
+          key={tile.key}
+          tile={tile}
+          captions={captions}
+          small={small}
+          onOpen={onOpen}
+        />
       ))}
     </ul>
   );

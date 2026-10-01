@@ -28,6 +28,8 @@ export type ShelfTile = {
   workflowKnown: boolean;
   /** What the file shrank by, "−318 MB"; nothing when no sizes were recorded. */
   saved: string | null;
+  /** The same without its sign, "318 MB", for sentences. */
+  savedAmount: string | null;
   /** What was done to it, in a few words: "2 audio, 4 subtitles removed". */
   what: string;
   ago: string;
@@ -93,6 +95,7 @@ function tileOf(
     workflow: workflow || UNKNOWN_WORKFLOW,
     workflowKnown: Boolean(workflow),
     saved: item.savedBytes ? `−${formatBytes(item.savedBytes)}` : null,
+    savedAmount: item.savedBytes ? formatBytes(item.savedBytes) : null,
     what: whatWasDone(item),
     ago: ago(item.finishedAt, now),
     fresh: isJustNow(item.finishedAt, now),

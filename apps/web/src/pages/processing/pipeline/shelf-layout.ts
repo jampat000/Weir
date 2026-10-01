@@ -54,6 +54,24 @@ export function shelfFit(rowHeight: number, rowWidth = 0): ShelfFit {
   };
 }
 
+/**
+ * A poster narrower than this is too small for its decorations: the saved-space badge and the workflow's tag
+ * would cover a third of the art or more (measured: the badge is 54px by 15px, the tag 19px tall and the poster's
+ * width less 12px, so together they take 30% of a 64px poster and 36% of a 56px one).
+ */
+export const FULL_DECORATIONS_MIN_PX = 64;
+
+export type PosterSize = "small" | "full";
+
+/**
+ * How a poster of this width is dressed. A "full" poster wears the saved badge and the workflow's whole tag; a
+ * "small" one wears a slim strip in its workflow's colour, and what the badge and the tag say goes into the
+ * tile's tooltip and name. Not measured yet, it is "full".
+ */
+export function posterSize(width: number | null): PosterSize {
+  return width !== null && width < FULL_DECORATIONS_MIN_PX ? "small" : "full";
+}
+
 /** Whole tiles across a row of `rowWidth` px, at least one; never a part of one. */
 export function tilesAcross(rowWidth: number, tileWidth: number): number {
   return Math.max(
