@@ -16,3 +16,16 @@ it("credits TMDb in the words it asks for, with a link to its site", () => {
     "https://www.themoviedb.org",
   );
 });
+
+it("credits TheTVDB beside it, with a link, whatever the library holds", () => {
+  render(<ArtworkCredits />);
+
+  expect(
+    screen.getByText(
+      "TV information and images are provided by TheTVDB.com, but we are not endorsed or certified by TheTVDB.com or its affiliates.",
+    ),
+  ).toBeVisible();
+  const link = screen.getByTestId("about-tvdb-link");
+  expect(link).toHaveAttribute("href", "https://thetvdb.com");
+  expect(link).toHaveAttribute("rel", "noreferrer");
+});
