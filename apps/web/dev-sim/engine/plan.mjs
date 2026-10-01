@@ -13,6 +13,9 @@ export const VERDICT = Object.freeze({
 });
 
 const KEPT_AUDIO = "English 5.1 AC-3";
+const FOREIGN_ONLY_TRACKS = [1, 2];
+/** A rule set's own name often ends in "rules", which the sentence that names it already says. */
+const RULES_SUFFIX = / rules$/i;
 const SUBTITLE_NAMES = {
   fre: "French",
   ger: "German",
@@ -46,6 +49,12 @@ const MOST_SUBTITLES_REMOVED = 8;
  * @property {string | null} rejectionReason
  */
 
+/** "French", "French and German": the languages of the audio tracks a rejected file does have. @param {string[]} tracks */
+function languagesOf(tracks) {
+  const names = tracks.map((track) => track.split(" ")[0]);
+  return names.length === 1 ? names[0] : names.join(" and ");
+}
+
 const audioRemovalLine = (track) =>
   `${track} (not selected — ${KEPT_AUDIO} kept)`;
 const subtitleRemovalLine = (code) =>
@@ -64,9 +73,10 @@ function pickSome(rng, items, count) {
  * @param {import("./rng.mjs").Rng} rng
  * @param {string} verdict
  * @param {number} sizeBytes
+ * @param {{ rulesName?: string }} [context] The rule set a rejection names.
  * @returns {Plan}
  */
-export function makePlan(rng, verdict, sizeBytes) {
+export function makePlan(rng, verdict, sizeBytes, { rulesName } = {}) {
   const empty = {
     verdict,
     removedAudio: [],
@@ -81,11 +91,15 @@ export function makePlan(rng, verdict, sizeBytes) {
   };
   if (verdict === VERDICT.ALREADY_RIGHT) return empty;
   if (verdict === VERDICT.REJECTED) {
+    const tracks = pickSome(rng, FOREIGN_AUDIO, rng.pick(FOREIGN_ONLY_TRACKS));
+    const rules = rulesName
+      ? `the "${rulesName.replace(RULES_SUFFIX, "")}" rules`
+      : "your rules";
     return {
       ...empty,
-      audioBefore: "Japanese 2.0 AAC · French 5.1 AC-3",
+      audioBefore: tracks.join(" · "),
       audioAfter: "",
-      rejectionReason: "This file has no English audio track.",
+      rejectionReason: `None of its audio tracks are in English, and ${rules} keep only English audio, so there would be nothing to keep. It has ${languagesOf(tracks)} audio.`,
     };
   }
   const audio = pickSome(

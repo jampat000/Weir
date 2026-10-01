@@ -5,6 +5,7 @@
  * time, so a test can drive it with a clock of its own.
  */
 import { ActivityLog } from "./activity-log.mjs";
+import { ConnectionHealth } from "./connection-health.mjs";
 import { needsAttention, STATUS } from "./file.mjs";
 import { Intake } from "./intake.mjs";
 import { JobBook, JOB_KIND, JOB_STATUS } from "./jobs.mjs";
@@ -32,6 +33,8 @@ const IMPORT_DELAY_MS = [4_000, 9_000];
  * @property {number} speed How many times faster than normal the simulation runs.
  * @property {ReturnType<import("../store.mjs").createStore>} store
  * @property {import("./library-files.mjs").LibraryFiles} libraryFiles
+ * @property {import("../scenarios.mjs").Scenario} scenario
+ * @property {number} startedAt When the session opened, in epoch ms.
  */
 
 export class Engine {
@@ -61,14 +64,21 @@ export class Engine {
   #listeners = new Set();
 
   /** @param {EngineOptions} options */
-  constructor({ rng, speed, store, libraryFiles }) {
+  constructor({ rng, speed, store, libraryFiles, scenario, startedAt }) {
     this.#rng = rng;
     this.#speed = speed;
     this.#store = store;
     this.libraryFiles = libraryFiles;
+    this.scenario = scenario;
     this.#intake = new Intake(this, rng, speed);
     this.#conclusions = new Conclusions(this);
     this.#cleans = new CleanRuns(this, rng, speed);
+    this.connections = new ConnectionHealth({
+      engine: this,
+      outages: scenario.outages,
+      startedAt,
+      speed,
+    });
   }
 
   get speed() {
@@ -94,6 +104,21 @@ export class Engine {
   library(libraryId) {
     return (
       this.#store.libraries.find((library) => library.id === libraryId) ?? null
+    );
+  }
+
+  /**
+   * The media manager that takes a workflow's cleaned copies: the first of its linked managers that is switched on, or
+   * null when the workflow works without one.
+   * @param {Record<string, any>} library
+   */
+  managerFor(library) {
+    return (
+      this.#store.managers.find(
+        (manager) =>
+          manager.enabled &&
+          library.manager_connection_ids?.includes(manager.id),
+      ) ?? null
     );
   }
 
@@ -126,6 +151,7 @@ export class Engine {
   /** Advances the simulation to `nowMs`. @param {number} nowMs */
   tick(nowMs) {
     this.#resumeWhenDue(nowMs);
+    this.connections.advance(nowMs);
     this.#intake.arrive(nowMs);
     this.#intake.releaseHolds(nowMs);
     this.#advancePasses(nowMs);

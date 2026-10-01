@@ -3,6 +3,7 @@
  * read back by the next request, so the screens behave as they do against a real server; nothing touches a disk.
  */
 import {
+  FOUR_K_MANAGER_ID,
   initialDownloadClients,
   initialManagers,
 } from "./fixtures/connections.mjs";
@@ -14,6 +15,7 @@ import {
   initialUpdateSettings,
 } from "./fixtures/settings.mjs";
 import { initialLibraries, initialRuleSets } from "./fixtures/workflows.mjs";
+import { SCENARIOS, DEFAULT_SCENARIO } from "./scenarios.mjs";
 import { shaped } from "./openapi/skeleton.mjs";
 import { toWire, HOUR_MS } from "./wire-time.mjs";
 
@@ -32,12 +34,22 @@ function initialBackups() {
   );
 }
 
-export function createStore() {
+/**
+ * @param {{ scenario?: import("./scenarios.mjs").Scenario, startedAt?: number }} [options] `startedAt` is when the session opens; the connections last answered a little before it.
+ */
+export function createStore({
+  scenario = SCENARIOS[DEFAULT_SCENARIO],
+  startedAt = Date.now(),
+} = {}) {
   return {
     libraries: initialLibraries(),
     ruleSets: initialRuleSets(),
-    managers: initialManagers(),
-    downloadClients: initialDownloadClients(),
+    managers: initialManagers(startedAt),
+    downloadClients: initialDownloadClients(startedAt),
+    /** The managers that cannot say where their download client saves, so Weir can only take the folder chain on trust. */
+    managersSilentAboutDownloads: new Set(
+      scenario.fourKManagerSaysWhereItSaves ? [] : [FOUR_K_MANAGER_ID],
+    ),
     /** Each workflow's library-cleaning settings, once someone has opened or changed them. */
     libraryModes: /** @type {Record<number, Record<string, any>>} */ ({}),
     notificationChannels: /** @type {Record<string, any>[]} */ ([]),

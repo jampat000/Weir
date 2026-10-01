@@ -15,6 +15,8 @@ export const EVENT_TYPE = Object.freeze({
 
 const GIGABYTE = 1024 ** 3;
 const REJECTION_CLEANUP = "The file was left where it is.";
+const ACCEPT_HINT =
+  'To accept files like this, change the first-choice language or "How to choose audio" in Settings › Rules.';
 const FAILURE_REASON =
   "ffmpeg stopped part-way through writing the file, so Weir threw the half-written copy away.";
 
@@ -104,7 +106,7 @@ export function statusReasonFor(file) {
     case VERDICT.ALREADY_RIGHT:
       return "Already matches your rules, so Weir handed it back as it was.";
     case VERDICT.REJECTED:
-      return `Rejected: ${file.plan.rejectionReason} ${REJECTION_CLEANUP}`;
+      return `Rejected: ${file.plan.rejectionReason} ${ACCEPT_HINT} ${REJECTION_CLEANUP}`;
     default:
       return FAILURE_REASON;
   }

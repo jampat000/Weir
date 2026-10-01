@@ -114,7 +114,10 @@ describe("a file worked on by a pass", () => {
     advance(MINUTE_MS);
 
     expect(file.status).toBe(STATUS.REJECTED);
-    expect(file.statusReason).toContain("no English audio");
+    expect(file.statusReason).toContain(
+      "None of its audio tracks are in English",
+    );
+    expect(file.statusReason).toContain('the "Movies" rules keep only English');
   });
 
   it("fails part-way through writing and waits for a person", () => {

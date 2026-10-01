@@ -2,8 +2,13 @@
  * The files already sitting in each workflow's library, as the Library page lists them, and which of them Weir has
  * cleaned in place. Titles are the simulation's own.
  */
-import { FILMS, SHOWS } from "./catalogue.mjs";
-import { MOVIES_LIBRARY_ID, TV_LIBRARY_ID } from "../fixtures/workflows.mjs";
+import { FILMS, FILMS_4K, FILMS_KIDS, SHOWS } from "./catalogue.mjs";
+import {
+  FOUR_K_LIBRARY_ID,
+  KIDS_LIBRARY_ID,
+  MOVIES_LIBRARY_ID,
+  TV_LIBRARY_ID,
+} from "../fixtures/workflows.mjs";
 
 const GIGABYTE = 1024 ** 3;
 const DAY_SECONDS = 86_400;
@@ -12,6 +17,8 @@ const SHARE_PER_REMOVED_AUDIO_TRACK = 0.04;
 
 const MOVIES_ROOT = "D:\\Media\\Movies";
 const TV_ROOT = "D:\\Media\\TV";
+const KIDS_ROOT = "D:\\Media\\Kids";
+const FOUR_K_ROOT = "D:\\Media\\4K Movies";
 
 /** Out of every ten library files, this many already match the rules. */
 const MATCHING_OUT_OF_TEN = 4;
@@ -73,12 +80,16 @@ function removals(index) {
     : { removedAudio: 1 + (index % 3), removedSubtitles: 2 + (index % 5) };
 }
 
-function movieEntries(nowSeconds) {
-  return FILMS.map((film, index) =>
+/**
+ * @param {readonly import("./catalogue.mjs").FilmEntry[]} films
+ * @param {{ root: string, kind: string | null, nowSeconds: number }} where `kind` is the manager that knows the titles, or null for a workflow without one.
+ */
+function filmEntries(films, { root, kind, nowSeconds }) {
+  return films.map((film, index) =>
     entry({
-      path: `${MOVIES_ROOT}\\${film.title} (${film.year})\\${film.title} (${film.year}) [Bluray-${film.resolution}p].mkv`,
-      title: film.title,
-      kind: "radarr",
+      path: `${root}\\${film.title} (${film.year})\\${film.title} (${film.year}) [Bluray-${film.resolution}p].mkv`,
+      title: kind === null ? null : film.title,
+      kind,
       sizeBytes: Math.round(film.gigabytes * GIGABYTE),
       height: film.resolution,
       ageDays: 9 + index,
@@ -141,8 +152,23 @@ export class LibraryFiles {
   constructor(nowMs) {
     const nowSeconds = Math.floor(nowMs / 1000);
     this.#byLibrary = new Map([
-      [MOVIES_LIBRARY_ID, movieEntries(nowSeconds)],
+      [
+        MOVIES_LIBRARY_ID,
+        filmEntries(FILMS, { root: MOVIES_ROOT, kind: "radarr", nowSeconds }),
+      ],
       [TV_LIBRARY_ID, tvEntries(nowSeconds)],
+      [
+        KIDS_LIBRARY_ID,
+        filmEntries(FILMS_KIDS, { root: KIDS_ROOT, kind: null, nowSeconds }),
+      ],
+      [
+        FOUR_K_LIBRARY_ID,
+        filmEntries(FILMS_4K, {
+          root: FOUR_K_ROOT,
+          kind: "radarr",
+          nowSeconds,
+        }),
+      ],
     ]);
   }
 

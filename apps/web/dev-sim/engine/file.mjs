@@ -10,6 +10,7 @@ export const STATUS = Object.freeze({
   FAILED: "processing_failed",
   REJECTED: "rejected",
   CANCELLED: "cancelled",
+  SKIPPED: "skipped",
 });
 
 /** How the server marks a rejection by the rules themselves, where no media manager was asked for another copy. */

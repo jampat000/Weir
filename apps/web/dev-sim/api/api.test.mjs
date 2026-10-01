@@ -239,7 +239,7 @@ describe("saving settings", () => {
       request(sim, "GET", "/api/v1/processing/libraries").body.map(
         (library) => library.name,
       ),
-    ).toEqual(["Movies", "TV"]);
+    ).toEqual(["Movies", "TV", "Kids", "4K Movies"]);
   });
 
   it("keeps a connection's API key out of what is read back, saying only that one is saved", () => {

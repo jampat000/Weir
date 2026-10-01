@@ -1,93 +1,78 @@
 /**
- * A Weir that has been running all afternoon: a few hours of finished work behind it, a couple of files that need a
- * person, and a board that already has files on every lane when the page first opens.
+ * The state a session opens on, for the scenario it runs: a Weir that has been up for hours with finished work
+ * behind it, files that wait on a person, and a board with files on every lane; or one where almost nothing has
+ * happened yet.
  */
 import { STATUS } from "./file.mjs";
 import { VERDICT } from "./plan.mjs";
+import { needsYouEvents } from "./seed-needs.mjs";
+import { finishInThePast, release } from "./seed-support.mjs";
+import {
+  FOUR_K_LIBRARY_ID,
+  KIDS_LIBRARY_ID,
+  MOVIES_LIBRARY_ID,
+  TV_LIBRARY_ID,
+} from "../fixtures/workflows.mjs";
 import { SECOND_MS, MINUTE_MS } from "../wire-time.mjs";
 
-/** How far back the finished work reaches, and how many files it holds. */
+/** How far back the finished work reaches. */
 const HISTORY_MINUTES = 170;
-const HISTORY_FILES = 46;
-const CLEANS_PER_WORKFLOW = 3;
 const CLEAN_MINUTES_AGO = [24, 61, 97];
-/** Where each file that needs a person sits in the past. */
-const FAILED_MINUTES_AGO = 31;
-const REJECTED_MINUTES_AGO = [58, 112];
-/** How far through writing each file already under way is. */
-const WRITING_PROGRESS = [0.45, 0.88];
-const WAITING_MINUTES_AGO = [3, 2, 1];
-const HOLD_REMAINING_SECONDS = [14, 38];
+/** Which workflow each finished file belonged to, in turn: half TV, three tenths Movies, one each Kids and 4K. */
+const HISTORY_WORKFLOWS = [
+  TV_LIBRARY_ID,
+  MOVIES_LIBRARY_ID,
+  TV_LIBRARY_ID,
+  FOUR_K_LIBRARY_ID,
+  TV_LIBRARY_ID,
+  KIDS_LIBRARY_ID,
+  TV_LIBRARY_ID,
+  MOVIES_LIBRARY_ID,
+  TV_LIBRARY_ID,
+  MOVIES_LIBRARY_ID,
+];
+/** How far through writing each file already under way is, and which workflow it belongs to. */
+const WRITING = [
+  { workflowId: MOVIES_LIBRARY_ID, progress: 0.45 },
+  { workflowId: TV_LIBRARY_ID, progress: 0.88 },
+];
+/** The workflow each waiting file belongs to, and how long ago it arrived. */
+const WAITING = [
+  { workflowId: TV_LIBRARY_ID, minutesAgo: 3 },
+  { workflowId: FOUR_K_LIBRARY_ID, minutesAgo: 2 },
+  { workflowId: TV_LIBRARY_ID, minutesAgo: 1 },
+];
+const HELD = [
+  { workflowId: TV_LIBRARY_ID, remainingSeconds: 14 },
+  { workflowId: KIDS_LIBRARY_ID, remainingSeconds: 38 },
+];
 const BLOCKED_REMAINING_SECONDS = 20;
-const TV_OUT_OF_THREE = 2;
-const PASS_SECONDS = 40;
-const HANDBACK_SECONDS = 6;
 const ALREADY_RIGHT_EVERY = 9;
 const SIGN_IN_MINUTES_AGO = 140;
 const SWEEP_MINUTES_AGO = 40;
 const HANDBACK_SWEEP_MINUTES_AGO = 125;
 
-const libraryOfKind = (engine, mediaType) =>
-  engine.store.libraries.find((library) => library.media_type === mediaType);
-
-/** Puts a freshly admitted file straight into the queue, with nothing holding it. */
-function release(file, fields = {}) {
-  return Object.assign(file, {
-    status: STATUS.WAITING,
-    statusReason: "",
-    holdUntil: null,
-    blockedBy: null,
-    ...fields,
-  });
-}
-
-function finishInThePast(engine, library, verdict, finishedAt) {
-  const file = release(
-    engine.admit(library, finishedAt - 2 * MINUTE_MS, { verdict }),
-  );
-  file.passStartedAt = finishedAt - PASS_SECONDS * SECOND_MS;
-  engine.conclude(file, finishedAt);
-  if (file.handback)
-    engine.settle(file, finishedAt + HANDBACK_SECONDS * SECOND_MS);
-}
-
 /** Everything that happened before now, as [when, what], so it can be written down oldest first. */
-function pastEvents(engine, nowMs) {
-  const tv = libraryOfKind(engine, "tv");
-  const movies = libraryOfKind(engine, "movie");
+function pastEvents(engine, nowMs, scenario) {
+  const { files: fileCount, cleansPerWorkflow } = scenario.history;
   const events = [];
-  for (let index = 0; index < HISTORY_FILES; index += 1) {
+  for (let index = 0; index < fileCount; index += 1) {
     const at =
-      nowMs -
-      (2 + (index / HISTORY_FILES) ** 1.4 * HISTORY_MINUTES) * MINUTE_MS;
+      nowMs - (2 + (index / fileCount) ** 1.4 * HISTORY_MINUTES) * MINUTE_MS;
     const verdict =
       index % ALREADY_RIGHT_EVERY === 4 ? VERDICT.ALREADY_RIGHT : VERDICT.CLEAN;
-    const library = index % 3 < TV_OUT_OF_THREE ? tv : movies;
-    events.push([at, () => finishInThePast(engine, library, verdict, at)]);
+    const library = engine.library(
+      HISTORY_WORKFLOWS[index % HISTORY_WORKFLOWS.length],
+    );
+    if (library)
+      events.push([at, () => finishInThePast(engine, library, verdict, at)]);
   }
-  const failedAt = nowMs - FAILED_MINUTES_AGO * MINUTE_MS;
-  events.push([
-    failedAt,
-    () => finishInThePast(engine, tv, VERDICT.FAILS, failedAt),
-  ]);
-  REJECTED_MINUTES_AGO.forEach((minutes, index) => {
-    const at = nowMs - minutes * MINUTE_MS;
-    events.push([
-      at,
-      () =>
-        finishInThePast(
-          engine,
-          index === 0 ? movies : tv,
-          VERDICT.REJECTED,
-          at,
-        ),
-    ]);
-  });
+  events.push(...needsYouEvents(engine, nowMs, scenario.needsYou));
   for (const library of engine.store.libraries) {
     const files = engine.libraryFiles
       .list(library.id)
       .filter((file) => file.classification === "would_change");
-    files.slice(0, CLEANS_PER_WORKFLOW).forEach((file, index) => {
+    files.slice(0, cleansPerWorkflow).forEach((file, index) => {
       const at = nowMs - CLEAN_MINUTES_AGO[index] * MINUTE_MS;
       events.push([
         at,
@@ -139,44 +124,48 @@ function startPartWay(engine, library, progress, nowMs) {
   file.passStartedAt = startedAt;
 }
 
-function layDownWorkInProgress(engine, nowMs) {
-  const tv = libraryOfKind(engine, "tv");
-  const movies = libraryOfKind(engine, "movie");
-  startPartWay(engine, movies, WRITING_PROGRESS[0], nowMs);
-  startPartWay(engine, tv, WRITING_PROGRESS[1], nowMs);
-  WAITING_MINUTES_AGO.forEach((minutes, index) => {
-    const queuedAt = nowMs - minutes * MINUTE_MS;
-    release(
-      engine.admit(index === 1 ? movies : tv, queuedAt, {
-        verdict: VERDICT.CLEAN,
-      }),
-      { priority: queuedAt },
-    );
-  });
-  HOLD_REMAINING_SECONDS.forEach((seconds, index) => {
-    const file = engine.admit(
-      index === 0 ? tv : movies,
-      nowMs - 30 * SECOND_MS,
-      { verdict: VERDICT.CLEAN },
-    );
-    Object.assign(file, {
-      status: STATUS.ON_HOLD,
-      blockedBy: null,
-      holdUntil: nowMs + (seconds * SECOND_MS) / engine.speed,
-    });
-  });
-  const manager = engine.store.managers.find(
-    (candidate) => candidate.kind === "sonarr",
-  );
-  const blocked = engine.admit(tv, nowMs - 45 * SECOND_MS, {
+/** A download whose media manager is still importing the previous copy; none when its workflow has no manager asking. */
+function layDownBlockedFile(engine, library, nowMs) {
+  const manager = engine.managerFor(library);
+  if (!manager || manager.last_test_ok === false) return;
+  const blocked = engine.admit(library, nowMs - 45 * SECOND_MS, {
     verdict: VERDICT.CLEAN,
   });
   Object.assign(blocked, {
     status: STATUS.BLOCKED_UPSTREAM,
-    blockedBy: manager?.name ?? null,
-    statusReason: `${manager?.name ?? "Your media manager"} is still importing it.`,
+    blockedBy: manager.name,
+    statusReason: `${manager.name} is still importing it.`,
     holdUntil: nowMs + (BLOCKED_REMAINING_SECONDS * SECOND_MS) / engine.speed,
   });
+}
+
+function layDownWorkInProgress(engine, nowMs) {
+  for (const { workflowId, progress } of WRITING) {
+    const library = engine.library(workflowId);
+    if (library) startPartWay(engine, library, progress, nowMs);
+  }
+  for (const { workflowId, minutesAgo } of WAITING) {
+    const library = engine.library(workflowId);
+    if (!library) continue;
+    const queuedAt = nowMs - minutesAgo * MINUTE_MS;
+    release(engine.admit(library, queuedAt, { verdict: VERDICT.CLEAN }), {
+      priority: queuedAt,
+    });
+  }
+  for (const { workflowId, remainingSeconds } of HELD) {
+    const library = engine.library(workflowId);
+    if (!library) continue;
+    const file = engine.admit(library, nowMs - 30 * SECOND_MS, {
+      verdict: VERDICT.CLEAN,
+    });
+    Object.assign(file, {
+      status: STATUS.ON_HOLD,
+      blockedBy: null,
+      holdUntil: nowMs + (remainingSeconds * SECOND_MS) / engine.speed,
+    });
+  }
+  const tv = engine.library(TV_LIBRARY_ID);
+  if (tv) layDownBlockedFile(engine, tv, nowMs);
 }
 
 /**
@@ -184,7 +173,8 @@ function layDownWorkInProgress(engine, nowMs) {
  * @param {number} nowMs
  */
 export function seedEngine(engine, nowMs) {
-  for (const [, happen] of pastEvents(engine, nowMs)) happen();
-  layDownWorkInProgress(engine, nowMs);
+  const { scenario } = engine;
+  for (const [, happen] of pastEvents(engine, nowMs, scenario)) happen();
+  if (scenario.workInProgress) layDownWorkInProgress(engine, nowMs);
   engine.tick(nowMs);
 }

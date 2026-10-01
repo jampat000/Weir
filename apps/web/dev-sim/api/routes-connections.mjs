@@ -1,31 +1,21 @@
 /** The media managers and download clients Weir is linked to, and the setup checks that read them. */
+import { CONNECTION_KIND } from "../engine/connection-health.mjs";
 import {
+  importRootOf,
   managerCapabilities,
   managerDefaults,
 } from "../fixtures/connections.mjs";
 import { knownFields } from "../openapi/fields.mjs";
 import { shaped } from "../openapi/skeleton.mjs";
-import { toWire } from "../wire-time.mjs";
 import { registerCollection } from "./collection.mjs";
 import { folderChainOf, managerLink } from "./folder-chain.mjs";
 import { notFound } from "./reply.mjs";
 
-const TESTED_OK = "Connected.";
-
-/** A connection's write answers: the record is remembered as just tested and working. */
-function tested(connection, sim) {
-  Object.assign(connection, {
-    last_test_ok: true,
-    last_test_at: toWire(sim.now()),
-    last_test_detail: TESTED_OK,
-  });
-  return {
-    connection_id: connection.id,
-    ok: true,
-    detail: TESTED_OK,
-    checked_at: connection.last_test_at,
-  };
-}
+/** A person's test of a connection: it answers or not as it does in the scenario, and the record remembers when. */
+const tested =
+  (kind) =>
+  (connection, { sim }) =>
+    sim.engine.connections.test(kind, connection, sim.now());
 
 function withConnection(records, handler) {
   return (context) => {
@@ -38,16 +28,18 @@ function withConnection(records, handler) {
   };
 }
 
-const sourceLabel = (manager) =>
-  `${manager.kind === "radarr" ? "Radarr" : "Sonarr"}'s root folder`;
-
 function proposedChain(store, mediaType, folders) {
   const library = {
     id: 0,
     media_type: mediaType,
     watched_folder: folders.watched,
     output_folder: folders.output,
-    manager_connection_ids: store.managers.map((manager) => manager.id),
+    manager_connection_ids: store.managers
+      .filter(
+        (manager) =>
+          manager.kind === (mediaType === "tv" ? "sonarr" : "radarr"),
+      )
+      .map((manager) => manager.id),
   };
   return { problem: null, chain: folderChainOf(library, store) };
 }
@@ -69,16 +61,17 @@ function librarySuggestions(store) {
 
 function discoverable(manager, store) {
   const mediaType = manager.kind === "radarr" ? "movie" : "tv";
-  const library = store.libraries.find(
-    (candidate) => candidate.media_type === mediaType,
+  const root = importRootOf(manager);
+  const library = store.libraries.find((candidate) =>
+    candidate.manager_connection_ids?.includes(manager.id),
   );
   return [
     shaped("DiscoverableLibraryOut", {
       key: `${manager.id}:${mediaType}`,
-      name: mediaType === "movie" ? "Movies" : "TV",
+      name: root.split("\\").pop(),
       already_imported: library !== undefined,
       media_type: mediaType,
-      root_path: mediaType === "movie" ? "D:\\Media\\Movies" : "D:\\Media\\TV",
+      root_path: root,
       output_path: library?.output_folder ?? null,
       processes_before_import: true,
     }),
@@ -97,7 +90,7 @@ export function registerConnectionRoutes(router) {
   );
   router.post(
     `${managerPath}/:id/test`,
-    withConnection(managers, (manager, { sim }) => tested(manager, sim)),
+    withConnection(managers, tested(CONNECTION_KIND.MANAGER)),
   );
   router.post(
     `${managerPath}/:id/webhook-secret`,
@@ -133,7 +126,7 @@ export function registerConnectionRoutes(router) {
 
   router.post(
     `${clientPath}/:id/test`,
-    withConnection(clients, (client, { sim }) => tested(client, sim)),
+    withConnection(clients, tested(CONNECTION_KIND.CLIENT)),
   );
   router.get("/api/v1/download-clients/suggestions", ({ sim, query }) =>
     sim.store.downloadClients.map((client) =>
@@ -180,14 +173,7 @@ export function registerConnectionRoutes(router) {
       media_type: mediaType,
       managers: sim.store.managers
         .filter((manager) => manager.kind === kind)
-        .map((manager) => ({
-          ...managerLink(manager, library),
-          story: {
-            source_category: null,
-            manager_library: sourceLabel(manager),
-            root_folder: null,
-          },
-        })),
+        .map((manager) => managerLink(manager, library, sim.store)),
     };
   });
   router.post("/api/v1/processing/library-check", ({ sim, body }) => ({

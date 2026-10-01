@@ -1,9 +1,20 @@
-/** The two workflows and their rules: what a plain Weir install on a media PC looks like. */
+/** The four workflows and their rules: a Weir install on a media PC with a manager for most of its libraries. */
 import { shaped } from "../openapi/skeleton.mjs";
 import { toWire, DAY_MS } from "../wire-time.mjs";
+import {
+  FOUR_K_MANAGER_ID,
+  MOVIES_MANAGER_ID,
+  TV_MANAGER_ID,
+} from "./connections.mjs";
 
 export const MOVIES_LIBRARY_ID = 1;
 export const TV_LIBRARY_ID = 2;
+export const KIDS_LIBRARY_ID = 3;
+export const FOUR_K_LIBRARY_ID = 4;
+
+const MOVIES_RULES_ID = 1;
+const TV_RULES_ID = 2;
+const KIDS_RULES_ID = 3;
 
 const UPDATED_DAYS_AGO = 12;
 
@@ -55,8 +66,8 @@ export function initialLibraries() {
       display_order: 1,
       watched_folder: "D:\\Downloads\\Movies",
       output_folder: "D:\\Weir\\hand-back\\Movies",
-      rule_set_id: 1,
-      manager_connection_ids: [1],
+      rule_set_id: MOVIES_RULES_ID,
+      manager_connection_ids: [MOVIES_MANAGER_ID],
     }),
     workflow({
       id: TV_LIBRARY_ID,
@@ -65,11 +76,44 @@ export function initialLibraries() {
       display_order: 2,
       watched_folder: "D:\\Downloads\\TV",
       output_folder: "D:\\Weir\\hand-back\\TV",
-      rule_set_id: 2,
-      manager_connection_ids: [2],
+      rule_set_id: TV_RULES_ID,
+      manager_connection_ids: [TV_MANAGER_ID],
+    }),
+    workflow({
+      id: KIDS_LIBRARY_ID,
+      name: "Kids",
+      media_type: "movie",
+      display_order: 3,
+      watched_folder: "D:\\Downloads\\Kids",
+      output_folder: "D:\\Weir\\hand-back\\Kids",
+      rule_set_id: KIDS_RULES_ID,
+      manager_connection_ids: [],
+    }),
+    workflow({
+      id: FOUR_K_LIBRARY_ID,
+      name: "4K Movies",
+      media_type: "movie",
+      display_order: 4,
+      watched_folder: "D:\\Downloads\\4K Movies",
+      output_folder: "D:\\Weir\\hand-back\\4K Movies",
+      rule_set_id: MOVIES_RULES_ID,
+      manager_connection_ids: [FOUR_K_MANAGER_ID],
     }),
   ];
 }
+
+/** The download client kinds whose own folders a starter workflow's folder chain reads; a workflow made from Settings uses its media type's usual one. */
+const CLIENT_KINDS = {
+  [MOVIES_LIBRARY_ID]: ["qbittorrent"],
+  [TV_LIBRARY_ID]: ["sabnzbd"],
+  [KIDS_LIBRARY_ID]: [],
+  [FOUR_K_LIBRARY_ID]: [],
+};
+
+/** @param {{ id: number, media_type: string }} library */
+export const downloadClientKindsOf = (library) =>
+  CLIENT_KINDS[library.id] ??
+  (library.media_type === "tv" ? ["sabnzbd"] : ["qbittorrent"]);
 
 /** What a rule set starts with; a new one made from Settings begins here too. */
 export const ruleSetDefaults = () => ({
@@ -112,5 +156,9 @@ const ruleSet = (id, name, usedBy) =>
   });
 
 export function initialRuleSets() {
-  return [ruleSet(1, "Movies rules", 1), ruleSet(2, "TV rules", 1)];
+  return [
+    ruleSet(MOVIES_RULES_ID, "Movies rules", 2),
+    ruleSet(TV_RULES_ID, "TV rules", 1),
+    ruleSet(KIDS_RULES_ID, "Kids rules", 1),
+  ];
 }

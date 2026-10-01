@@ -3,6 +3,8 @@
  * Nothing here names a real person, hostname or private release.
  */
 
+import { FOUR_K_LIBRARY_ID, KIDS_LIBRARY_ID } from "../fixtures/workflows.mjs";
+
 /** The release group stamped on every simulated file name. */
 const RELEASE_GROUP = "WEIRSIM";
 
@@ -12,8 +14,6 @@ const RELEASE_GROUP = "WEIRSIM";
 export const FILMS = [
   { title: "The General", year: 1926, resolution: 1080, gigabytes: 5.8 },
   { title: "Sintel", year: 2010, resolution: 1080, gigabytes: 4.1 },
-  { title: "Big Buck Bunny", year: 2008, resolution: 1080, gigabytes: 3.4 },
-  { title: "Tears of Steel", year: 2012, resolution: 2160, gigabytes: 14.6 },
   { title: "Nosferatu", year: 1922, resolution: 1080, gigabytes: 6.2 },
   { title: "Metropolis", year: 1927, resolution: 1080, gigabytes: 9.4 },
   { title: "A Trip to the Moon", year: 1902, resolution: 720, gigabytes: 1.3 },
@@ -26,7 +26,6 @@ export const FILMS = [
   { title: "Charade", year: 1963, resolution: 1080, gigabytes: 8.8 },
   { title: "His Girl Friday", year: 1940, resolution: 1080, gigabytes: 7.1 },
   { title: "Elephants Dream", year: 2006, resolution: 1080, gigabytes: 3.9 },
-  { title: "Cosmos Laundromat", year: 2015, resolution: 2160, gigabytes: 11.2 },
   { title: "Sherlock Jr.", year: 1924, resolution: 1080, gigabytes: 4.7 },
   { title: "The Kid", year: 1921, resolution: 1080, gigabytes: 5.1 },
   { title: "Safety Last", year: 1923, resolution: 1080, gigabytes: 4.4 },
@@ -38,7 +37,6 @@ export const FILMS = [
   },
   { title: "Carnival of Souls", year: 1962, resolution: 1080, gigabytes: 6.0 },
   { title: "Detour", year: 1945, resolution: 1080, gigabytes: 5.2 },
-  { title: "Spring", year: 2019, resolution: 2160, gigabytes: 12.8 },
   {
     title: "The Cabinet of Dr. Caligari",
     year: 1920,
@@ -46,6 +44,45 @@ export const FILMS = [
     gigabytes: 5.5,
   },
 ];
+
+/** What the 4K Movies workflow receives: UHD releases. @type {FilmEntry[]} */
+export const FILMS_4K = [
+  { title: "Tears of Steel", year: 2012, resolution: 2160, gigabytes: 14.6 },
+  { title: "Cosmos Laundromat", year: 2015, resolution: 2160, gigabytes: 11.2 },
+  { title: "Spring", year: 2019, resolution: 2160, gigabytes: 12.8 },
+  { title: "Agent 327", year: 2017, resolution: 2160, gigabytes: 9.3 },
+  { title: "Coffee Run", year: 2020, resolution: 2160, gigabytes: 8.1 },
+  { title: "Sprite Fright", year: 2021, resolution: 2160, gigabytes: 15.2 },
+  { title: "Charge", year: 2022, resolution: 2160, gigabytes: 10.4 },
+];
+
+/** What the Kids workflow receives: family films. @type {FilmEntry[]} */
+export const FILMS_KIDS = [
+  { title: "Big Buck Bunny", year: 2008, resolution: 1080, gigabytes: 3.4 },
+  { title: "Caminandes", year: 2016, resolution: 1080, gigabytes: 2.2 },
+  { title: "Wing It", year: 2023, resolution: 1080, gigabytes: 3.0 },
+  { title: "Hero", year: 2018, resolution: 1080, gigabytes: 2.6 },
+  { title: "Glass Half", year: 2015, resolution: 720, gigabytes: 0.9 },
+  {
+    title: "Snow Day Chronicles",
+    year: 2019,
+    resolution: 1080,
+    gigabytes: 4.5,
+  },
+  { title: "Paper Boat", year: 2014, resolution: 1080, gigabytes: 3.7 },
+];
+
+/**
+ * The films a workflow's folder receives: the Kids and 4K workflows have lists of their own, and every other
+ * movie workflow takes the general one.
+ * @param {{ id: number }} library
+ */
+export const filmsFor = (library) =>
+  library.id === KIDS_LIBRARY_ID
+    ? FILMS_KIDS
+    : library.id === FOUR_K_LIBRARY_ID
+      ? FILMS_4K
+      : FILMS;
 
 /** @typedef {{ title: string, resolution: 720 | 1080 | 2160, gigabytes: number, season: number }} ShowEntry */
 

@@ -1,5 +1,6 @@
 /** Workflows (the libraries Weir watches) and the rule sets they use: what Settings › Workflows and Rules edit. */
 import { STATUS } from "../engine/file.mjs";
+import { managerLabel } from "../fixtures/connections.mjs";
 import { libraryDefaults, ruleSetDefaults } from "../fixtures/workflows.mjs";
 import { toWire } from "../wire-time.mjs";
 import { registerCollection } from "./collection.mjs";
@@ -17,11 +18,33 @@ function nextLookAt(library, nowMs) {
   return Math.ceil((nowMs - phase) / interval) * interval + phase;
 }
 
+/** Whether the managers a workflow is linked to can say what they are still importing. */
+function managerCoverage(library, store) {
+  const linked = store.managers.filter(
+    (manager) =>
+      manager.enabled && library.manager_connection_ids?.includes(manager.id),
+  );
+  if (linked.length === 0)
+    return {
+      manager_coverage: "no_upstream_signal",
+      manager_coverage_detail:
+        "No media manager is linked to this workflow, so Weir cannot tell when a download is still being imported.",
+    };
+  const silent = linked.find((manager) => manager.last_test_ok === false);
+  if (silent)
+    return {
+      manager_coverage: "unreachable",
+      manager_coverage_detail: `${managerLabel(silent)} is not answering, so Weir cannot see what it is still importing.`,
+    };
+  return {};
+}
+
 function presentLibrary(library, sim) {
   const slots = sim.engine.slots();
   const nextLook = toWire(nextLookAt(library, sim.now()));
   return {
     ...library,
+    ...managerCoverage(library, sim.store),
     active_job_count: [...sim.engine.files.values()].filter(
       (file) =>
         file.libraryId === library.id && BUSY_STATUSES.includes(file.status),

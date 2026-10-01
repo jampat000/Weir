@@ -62,6 +62,11 @@ export class JobBook {
     return job;
   }
 
+  /** Takes a job off the queue, as when the file it was for turns out not to need a pass. @param {number} id */
+  remove(id) {
+    this.#jobs.delete(id);
+  }
+
   /** @param {number} id */
   get(id) {
     return this.#jobs.get(id) ?? null;

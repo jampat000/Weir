@@ -3,11 +3,11 @@ import { REJECTED_BY_RULES, STATUS } from "./file.mjs";
 import { JOB_STATUS } from "./jobs.mjs";
 import { VERDICT } from "./plan.mjs";
 import { EVENT_TYPE, passDetail, statusReasonFor } from "./records.mjs";
+import { importRootOf, kindLabel } from "../fixtures/connections.mjs";
 import { toWire } from "../wire-time.mjs";
 
 const EXECUTION_FAILURE = "execution";
 const FFMPEG_ERROR = "ffmpeg exited with code 1.";
-const MEDIA_ROOT = { tv: "D:\\Media\\TV", movie: "D:\\Media\\Movies" };
 
 const baseName = (path) => path.split("/").pop() ?? path;
 
@@ -81,7 +81,11 @@ export class Conclusions {
       settled_at: null,
       release_note: null,
     };
-    file.handbackSettlesAt = nowMs + this.#engine.importDelay();
+    const library = this.#engine.library(file.libraryId);
+    file.handbackSettlesAt =
+      library && this.#engine.managerFor(library)
+        ? nowMs + this.#engine.importDelay()
+        : null;
     this.#record(file, nowMs, "success");
     this.#finishJob(file, nowMs, JOB_STATUS.COMPLETED);
   }
@@ -113,19 +117,17 @@ export class Conclusions {
    * @param {number} nowMs
    */
   settleHandback(file, nowMs) {
-    const manager = this.#engine.store.managers.find(
-      (m) => m.kind === (file.mediaType === "tv" ? "sonarr" : "radarr"),
-    );
-    const by = manager
-      ? manager.kind[0].toUpperCase() + manager.kind.slice(1)
-      : "Your media manager";
+    const library = this.#engine.library(file.libraryId);
+    const manager = library ? this.#engine.managerFor(library) : null;
+    if (!manager) return;
+    const by = kindLabel(manager.kind);
     const stem = baseName(file.relativePath);
     file.handback = {
       ...file.handback,
       outcome: "imported",
       outcome_by: by,
       outcome_at: toWire(nowMs),
-      imported_path: `${MEDIA_ROOT[file.mediaType]}\\${stem}`,
+      imported_path: `${importRootOf(manager)}\\${stem}`,
       released_at: toWire(nowMs),
       settled_at: toWire(nowMs),
       release_note: `${by} moved Weir's copy into its library, so there was nothing for Weir to remove.`,

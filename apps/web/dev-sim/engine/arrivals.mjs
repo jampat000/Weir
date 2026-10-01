@@ -12,12 +12,18 @@ const REJECTED_SHARE = 0.05;
 const FAILED_SHARE = 0.035;
 const ALREADY_RIGHT_SHARE = 0.12;
 
-/** @param {import("./rng.mjs").Rng} rng */
-export function chooseVerdict(rng) {
+/**
+ * @param {import("./rng.mjs").Rng} rng
+ * @param {{ rejected?: number, failed?: number }} [shares] The share of arrivals to reject and to fail, where a scenario sets its own.
+ */
+export function chooseVerdict(
+  rng,
+  { rejected = REJECTED_SHARE, failed = FAILED_SHARE } = {},
+) {
   const roll = rng.next();
-  if (roll < REJECTED_SHARE) return VERDICT.REJECTED;
-  if (roll < REJECTED_SHARE + FAILED_SHARE) return VERDICT.FAILS;
-  if (roll < REJECTED_SHARE + FAILED_SHARE + ALREADY_RIGHT_SHARE)
+  if (roll < rejected) return VERDICT.REJECTED;
+  if (roll < rejected + failed) return VERDICT.FAILS;
+  if (roll < rejected + failed + ALREADY_RIGHT_SHARE)
     return VERDICT.ALREADY_RIGHT;
   return VERDICT.CLEAN;
 }
@@ -32,7 +38,8 @@ export function chooseVerdict(rng) {
 
 export class Arrivals {
   #rng;
-  #filmsLeft = [];
+  /** The titles not yet used in this pass through each list. @type {Map<readonly import("./catalogue.mjs").FilmEntry[], import("./catalogue.mjs").FilmEntry[]>} */
+  #filmsLeft = new Map();
   /** @type {Map<string, number>} */
   #episodes = new Map();
 
@@ -47,17 +54,21 @@ export class Arrivals {
     );
   }
 
-  /** The next film: every title once, in a shuffled order, before any comes round again. */
-  #nextFilm() {
-    if (this.#filmsLeft.length === 0) {
-      this.#filmsLeft = [...FILMS].sort(() => this.#rng.next() - 0.5);
-    }
-    return this.#filmsLeft.pop();
+  /** The next film of a list: every title once, in a shuffled order, before any comes round again. */
+  #nextFilm(titles) {
+    let left = this.#filmsLeft.get(titles) ?? [];
+    if (left.length === 0)
+      left = [...titles].sort(() => this.#rng.next() - 0.5);
+    this.#filmsLeft.set(titles, left);
+    return left.pop();
   }
 
-  /** @returns {Download} */
-  film() {
-    const film = this.#nextFilm();
+  /**
+   * @param {readonly import("./catalogue.mjs").FilmEntry[]} [titles] The workflow's titles.
+   * @returns {Download}
+   */
+  film(titles = FILMS) {
+    const film = this.#nextFilm(titles);
     return {
       relativePath: filmPath(film),
       sizeBytes: this.#sized(film.gigabytes),

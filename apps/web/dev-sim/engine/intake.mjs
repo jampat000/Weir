@@ -1,8 +1,14 @@
 /** Downloads turning up in the watched folders, and the holds that keep each one waiting until it is safe to touch. */
 import { Arrivals, chooseVerdict } from "./arrivals.mjs";
+import { filmsFor } from "./catalogue.mjs";
 import { createFile, STATUS } from "./file.mjs";
 import { JOB_KIND } from "./jobs.mjs";
 import { makePlan } from "./plan.mjs";
+import {
+  FOUR_K_LIBRARY_ID,
+  KIDS_LIBRARY_ID,
+  MOVIES_LIBRARY_ID,
+} from "../fixtures/workflows.mjs";
 import { SECOND_MS } from "../wire-time.mjs";
 
 /** How long a new file takes to turn up, at normal speed. */
@@ -16,6 +22,13 @@ const BLOCKED_MS = [12_000, 26_000];
 /** The share of arrivals that are TV episodes rather than films. */
 const TV_SHARE = 0.62;
 const MOST_SECONDS_SINCE_CHANGE = 4;
+/** How often a film turns up in each movie workflow, next to the others; a workflow made from Settings counts once. */
+const FILM_WORKFLOW_WEIGHT = {
+  [MOVIES_LIBRARY_ID]: 4,
+  [KIDS_LIBRARY_ID]: 1,
+  [FOUR_K_LIBRARY_ID]: 2,
+};
+const DEFAULT_WORKFLOW_WEIGHT = 1;
 
 export class Intake {
   #engine;
@@ -37,15 +50,37 @@ export class Intake {
     this.#arrivals = new Arrivals(rng);
   }
 
+  /** The files queued or held for a reason that will pass; one held until a person looks at it is not in the way. */
   #backlog() {
     const waiting = [STATUS.ON_HOLD, STATUS.BLOCKED_UPSTREAM, STATUS.WAITING];
-    return [...this.#engine.files.values()].filter((file) =>
-      waiting.includes(file.status),
+    return [...this.#engine.files.values()].filter(
+      (file) =>
+        waiting.includes(file.status) &&
+        !(file.status === STATUS.ON_HOLD && file.holdUntil === null),
     ).length;
   }
 
+  /** How long the next download takes to turn up: a quiet scenario spaces them further apart. */
   #arrivalGap() {
-    return this.#rng.between(...ARRIVAL_GAP_MS) / this.#speed;
+    return (
+      this.#rng.between(...ARRIVAL_GAP_MS) /
+      (this.#speed * this.#engine.scenario.pace)
+    );
+  }
+
+  /** One of the workflows, chosen by how often downloads reach it. @param {Record<string, any>[]} libraries */
+  #weightedPick(libraries) {
+    const weightOf = (library) =>
+      FILM_WORKFLOW_WEIGHT[library.id] ?? DEFAULT_WORKFLOW_WEIGHT;
+    const total = libraries.reduce(
+      (sum, library) => sum + weightOf(library),
+      0,
+    );
+    let roll = this.#rng.next() * total;
+    return (
+      libraries.find((library) => (roll -= weightOf(library)) < 0) ??
+      libraries[0]
+    );
   }
 
   #libraryForNextArrival() {
@@ -53,11 +88,10 @@ export class Intake {
     const enabled = this.#engine.store.libraries.filter(
       (library) => library.enabled,
     );
-    return (
-      enabled.find((library) => library.media_type === wanted) ??
-      enabled[0] ??
-      null
-    );
+    const ofKind = enabled.filter((library) => library.media_type === wanted);
+    return ofKind.length > 0
+      ? this.#weightedPick(ofKind)
+      : (enabled[0] ?? null);
   }
 
   /** Brings in a new download when one is due, unless Weir has stopped looking or has plenty waiting. @param {number} nowMs */
@@ -86,8 +120,13 @@ export class Intake {
     const download =
       library.media_type === "tv"
         ? this.#arrivals.episode()
-        : this.#arrivals.film();
-    const verdict = options.verdict ?? chooseVerdict(this.#rng);
+        : this.#arrivals.film(filmsFor(library));
+    const verdict =
+      options.verdict ??
+      chooseVerdict(this.#rng, this.#engine.scenario.arrivalShares);
+    const rulesName = this.#engine.store.ruleSets.find(
+      (ruleSet) => ruleSet.id === library.rule_set_id,
+    )?.name;
     const id = this.#nextFileId++;
     const file = createFile({
       id,
@@ -102,7 +141,7 @@ export class Intake {
         width: Math.round((download.height * 16) / 9),
         height: download.height,
       },
-      plan: makePlan(this.#rng, verdict, download.sizeBytes),
+      plan: makePlan(this.#rng, verdict, download.sizeBytes, { rulesName }),
       createdAt: nowMs,
       updatedAt: nowMs,
       sizeChangedAt:
@@ -125,14 +164,11 @@ export class Intake {
   }
 
   #hold(file, library, nowMs) {
-    if (this.#rng.chance(BLOCKED_SHARE)) {
-      const manager = this.#engine.store.managers.find((candidate) =>
-        file.mediaType === "tv"
-          ? candidate.kind === "sonarr"
-          : candidate.kind === "radarr",
-      );
+    const manager = this.#engine.managerFor(library);
+    const asking = manager?.last_test_ok !== false;
+    if (manager && asking && this.#rng.chance(BLOCKED_SHARE)) {
       file.status = STATUS.BLOCKED_UPSTREAM;
-      file.blockedBy = manager?.name ?? "Your media manager";
+      file.blockedBy = manager.name;
       file.statusReason = `${file.blockedBy} is still importing it.`;
       file.holdUntil = nowMs + this.#rng.between(...BLOCKED_MS) / this.#speed;
       return;

@@ -8,11 +8,14 @@
  *   SIM_SPEED  how many times faster than normal the simulated work runs (default 1)
  *   SIM_SEED   the seed for which files turn up and how they fare, to replay a session
  *   SIM_PORT   the web port to use; by default the first free one from 8790
+ *   SIM_SCENARIO  busy (the default), quiet (little happening, to see the empty screens) or trouble (many files
+ *              needing a person, and a connection that is down)
  */
 import { spawn } from "node:child_process";
 import net from "node:net";
 import { fileURLToPath } from "node:url";
 
+import { scenarioNamed } from "./scenarios.mjs";
 import { createSim, DEFAULT_SEED } from "./sim.mjs";
 import { startSimServer } from "./server.mjs";
 
@@ -53,15 +56,17 @@ async function main() {
     process.exit(1);
   }
   const speed = numberFromEnv("SIM_SPEED", 1);
+  const scenario = scenarioNamed(process.env.SIM_SCENARIO);
   const sim = createSim({
     speed,
     seed: numberFromEnv("SIM_SEED", DEFAULT_SEED),
+    scenario,
   });
   const api = await startSimServer(sim);
   const webPort = numberFromEnv("SIM_PORT", await firstFreePort());
   const target = `http://${LOOPBACK}:${api.port}`;
   console.log(
-    `[dev-sim] Simulated Weir on ${target} at ${speed}x. Open http://localhost:${webPort}`,
+    `[dev-sim] Simulated Weir (${scenario.name}) on ${target} at ${speed}x. Open http://localhost:${webPort}`,
   );
 
   const vite = spawn(process.execPath, [VITE_ENTRY], {

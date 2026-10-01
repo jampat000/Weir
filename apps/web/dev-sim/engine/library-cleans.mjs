@@ -113,9 +113,10 @@ export class CleanRuns {
 
   /** Queues the next clean of a library Weir looks after on its own, once enough time has passed. @param {number} nowMs */
   scheduleNext(nowMs) {
-    if (this.#nextAt === 0) this.#nextAt = nowMs + FIRST_CLEAN_MS / this.#speed;
+    const idleSpeed = this.#speed * this.#engine.scenario.pace;
+    if (this.#nextAt === 0) this.#nextAt = nowMs + FIRST_CLEAN_MS / idleSpeed;
     if (nowMs < this.#nextAt) return;
-    this.#nextAt = nowMs + this.#rng.between(...CLEAN_GAP_MS) / this.#speed;
+    this.#nextAt = nowMs + this.#rng.between(...CLEAN_GAP_MS) / idleSpeed;
     if (
       this.#engine.pause.paused ||
       this.#engine.jobs.queued(JOB_KIND.LIBRARY_CLEAN).length >= MOST_QUEUED
