@@ -180,13 +180,13 @@ const totals = {
   left_alone: 1,
 };
 
-function renderLibrary() {
+function renderLibrary(address = "/library") {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
   return render(
     <QueryClientProvider client={client}>
-      <MemoryRouter>
+      <MemoryRouter initialEntries={[address]}>
         <LibraryPage />
       </MemoryRouter>
     </QueryClientProvider>,
@@ -208,6 +208,7 @@ function settings(over: Partial<LibrarySettings>): LibrarySettings {
 
 describe("LibraryPage", () => {
   beforeEach(() => {
+    localStorage.clear();
     clean.mockReset();
     setAside.mockReset();
     rescan.mockReset();
@@ -739,5 +740,34 @@ describe("LibraryPage", () => {
     fireEvent.click(screen.getByRole("option", { name: /Movies/ }));
 
     expect(screen.getByTestId("library-picker")).toHaveTextContent("Movies");
+  });
+
+  it("opens the library the address names", () => {
+    renderLibrary("/library?library=2");
+
+    expect(screen.getByTestId("library-picker")).toHaveTextContent("Movies");
+  });
+
+  it("opens the library last picked here when the address names none", () => {
+    const first = renderLibrary();
+    fireEvent.click(
+      within(screen.getByTestId("library-picker")).getByRole("button", {
+        name: /TV/,
+      }),
+    );
+    fireEvent.click(screen.getByRole("option", { name: /Movies/ }));
+    first.unmount();
+
+    renderLibrary();
+
+    expect(screen.getByTestId("library-picker")).toHaveTextContent("Movies");
+  });
+
+  it("prefers the library in the address to the one last picked", () => {
+    localStorage.setItem("weir-library-last", "2");
+
+    renderLibrary("/library?library=1");
+
+    expect(screen.getByTestId("library-picker")).toHaveTextContent("TV");
   });
 });

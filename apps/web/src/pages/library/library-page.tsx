@@ -26,6 +26,7 @@ import { useNow } from "../../lib/ui/use-now";
 import { LibraryCleanActions } from "./library-clean-actions";
 import { LibraryCleanConfirm } from "./library-clean-dialog";
 import { LibraryFileDrawer } from "./library-file-drawer";
+import { readLastLibrary, saveLastLibrary } from "./last-library";
 import { groupFiles, headerLead } from "./library-model";
 import { LibraryPager } from "./library-pager";
 import { LibraryPicker } from "./library-picker";
@@ -99,6 +100,7 @@ export function LibraryPage(): React.ReactElement {
   const libraries = useProcessingLibrariesQuery();
   const [params, setParams] = useSearchParams();
   const [libraryId, setLibraryId] = useState<number | null>(null);
+  const [lastLibrary] = useState(readLastLibrary);
   const [search, setSearch] = useState(params.get("q") ?? "");
   const [filter, setFilter] = useState<LibraryFilter>(NO_FILTER);
   const [page, setPage] = useState(1);
@@ -111,12 +113,13 @@ export function LibraryPage(): React.ReactElement {
   const query = useDebouncedValue(search.trim(), SEARCH_DEBOUNCE_MS);
   const tableTop = useRef<HTMLDivElement>(null);
 
-  // The chosen library survives a reload and a link, so "open this library" is a plain URL.
+  // The chosen library survives a reload and a link, so "open this library" is a plain URL. Without one in the
+  // address, the library last picked in this browser opens.
   const chosen = useMemo(() => {
     const list = libraries.data ?? [];
-    const wanted = libraryId ?? Number(params.get("library") ?? 0);
+    const wanted = libraryId ?? (Number(params.get("library")) || lastLibrary);
     return list.find((l) => l.id === wanted) ?? list[0] ?? null;
-  }, [libraries.data, libraryId, params]);
+  }, [libraries.data, libraryId, params, lastLibrary]);
   const chosenId = chosen?.id ?? 0;
 
   const libraryKeys = useMemo(
@@ -158,6 +161,7 @@ export function LibraryPage(): React.ReactElement {
         setOpenPath(null);
         setSetupOpen(false);
       });
+      saveLastLibrary(id);
       const next = new URLSearchParams(params);
       next.set("library", String(id));
       setParams(next, { replace: true });
