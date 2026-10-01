@@ -2,7 +2,7 @@ import { render } from "@testing-library/react";
 import { useRef } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { HELD_ATTRIBUTE } from "./delivery-flight";
+import { HELD_ATTRIBUTE } from "./shelf-slots";
 import { TILE_KEY_ATTRIBUTE } from "./use-slide-neighbours";
 import { RESIZING_CLASS } from "./use-still-while-resizing";
 import { useTileArrivals } from "./use-tile-arrivals";

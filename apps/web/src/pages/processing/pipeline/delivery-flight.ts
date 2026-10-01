@@ -20,14 +20,18 @@ import {
   poseAt,
   type Spot,
 } from "./flight-path";
+import {
+  FLYING_ATTRIBUTE,
+  HELD_ATTRIBUTE,
+  announceSlotsChanged,
+  closeSlot,
+  openSlot,
+  settleSlot,
+} from "./shelf-slots";
 import { RESIZING_CLASS } from "./use-still-while-resizing";
 
 /** Set by the shelf on each tile's art, to the path of the file it shows. */
 export const SHELF_TILE_ATTRIBUTE = "data-shelf-path";
-
-/** Set on a shelf tile's art while its card still says "Delivered": the tile is kept out of sight until the poster lands. */
-export const HELD_ATTRIBUTE = "data-delivery-held";
-const FLYING_ATTRIBUTE = "data-delivery-flying";
 
 const FLIGHT_Z_INDEX = "60";
 /** A flight that has not finished this long after it should have (a page whose frames stopped) is ended anyway. */
@@ -48,20 +52,25 @@ function shelfTiles(): HTMLElement[] {
   );
 }
 
+/** Keeps the tile out of sight and its slot closed, so the shelf does not change until the poster takes off. */
 function hold(tile: HTMLElement): void {
   tile.setAttribute(HELD_ATTRIBUTE, "");
   tile.style.visibility = "hidden";
+  closeSlot(tile);
+  announceSlotsChanged();
 }
 
-/** Shows the tile under the poster that is landing on it. */
+/** Shows the tile under the poster that is landing on it, in a slot that has opened as far as it goes. */
 function reveal(tile: HTMLElement): void {
   tile.removeAttribute(HELD_ATTRIBUTE);
   tile.style.visibility = "";
+  settleSlot(tile);
 }
 
 function release(tile: HTMLElement): void {
   reveal(tile);
   tile.removeAttribute(FLYING_ATTRIBUTE);
+  announceSlotsChanged();
 }
 
 /** Keeps the shelf's tiles for the files whose cards still say "Delivered" out of sight, and shows every other. */
@@ -135,6 +144,7 @@ export function flyToShelf(delivery: Delivery): void {
   document.body.appendChild(ghost);
   hold(target);
   target.setAttribute(FLYING_ATTRIBUTE, "");
+  announceSlotsChanged();
   const fromRadius = radiusOf(delivery.look);
   const toRadius = radiusOf(target);
   const startedAt = performance.now();
@@ -157,6 +167,8 @@ export function flyToShelf(delivery: Delivery): void {
     }
     const elapsed = Math.max(0, now - startedAt);
     const progress = easeInOut(Math.min(1, elapsed / FLIGHT_MS));
+    // The slot opens by the flight's own curve, so the poster lands as it finishes opening.
+    if (!landed) openSlot(target, progress);
     const pose = poseAt(progress, from, spotOf(target));
     ghost.style.transform = `translate(${pose.x}px, ${pose.y}px) scale(${pose.scale})`;
     ghost.style.borderRadius = `${(fromRadius + (toRadius - fromRadius) * progress) / pose.scale}px`;

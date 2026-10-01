@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { FinishedFile } from "../../../lib/activity/processing-outcome";
 import type { LeavingCard } from "../leaving-cards";
 import type { Lanes } from "../processing-model";
-import { FLIGHT_MS, LANDING_FADE_MS } from "./flight-path";
+import { FLIGHT_MS, LANDING_FADE_MS, easeInOut } from "./flight-path";
 import { JustFinishedShelf } from "./just-finished-shelf";
 import { PipelineBoard } from "./pipeline-board";
 import { NOW, anEndedCard, lanesOf } from "./pipeline-fixtures";
@@ -316,6 +316,114 @@ describe("a delivered file's poster", () => {
     board.unmount();
 
     expect(shelfTile().style.visibility).toBe("");
+  });
+});
+
+const slotOfTile = () => shelfTile().closest("li") as HTMLElement;
+const tilesOnShelf = () =>
+  document.querySelectorAll("[data-shelf-path]").length;
+
+describe("the shelf's slot for a delivered file", () => {
+  it("is closed while its card says Delivered: no width, no gap, so nothing on the shelf moves", () => {
+    render(page(lanesOf([]), [delivered]));
+
+    const slot = slotOfTile();
+    expect(slot.style.width).toBe("0px");
+    expect(slot.style.marginRight).toBe("-12px");
+    expect(slot.style.overflow).toBe("hidden");
+  });
+
+  it("opens over the flight by the flight's own curve, the neighbours pushed along by the width it has taken", () => {
+    takeOff();
+
+    runFramesAt(0);
+    expect(slotOfTile().style.width).toBe("0px");
+    runFramesAt(FLIGHT_MS / 4);
+    const share = easeInOut(0.25);
+    // The art is 100px wide; the gap taken back shrinks by the same share.
+    expect(parseFloat(slotOfTile().style.width)).toBeCloseTo(100 * share);
+    expect(parseFloat(slotOfTile().style.marginRight)).toBeCloseTo(
+      -12 * (1 - share),
+    );
+    runFramesAt(FLIGHT_MS / 2);
+    expect(slotOfTile().style.width).toBe("50px");
+    expect(slotOfTile().style.marginRight).toBe("-6px");
+  });
+
+  it("is open as far as it goes, and settled, as the poster lands", () => {
+    takeOff();
+
+    runFramesAt(0);
+    runFramesAt(FLIGHT_MS);
+
+    const slot = slotOfTile();
+    expect(slot.style.width).toBe("");
+    expect(slot.style.marginRight).toBe("");
+    expect(slot.style.overflow).toBe("");
+    expect(shelfTile().style.visibility).toBe("");
+  });
+
+  it("is never closed when movement is reduced", () => {
+    setReducedMotion(true);
+    placePosters();
+    const { rerender } = render(page(lanesOf([]), [delivered]));
+    expect(slotOfTile().style.width).toBe("");
+
+    rerender(page(lanesOf([]), []));
+
+    expect(slotOfTile().style.width).toBe("");
+  });
+
+  it("is open at once when the window is being resized as the poster would take off", () => {
+    placePosters();
+    const { rerender } = render(page(lanesOf([]), [delivered]));
+    expect(slotOfTile().style.width).toBe("0px");
+    document.body.classList.add(RESIZING_CLASS);
+
+    rerender(page(lanesOf([]), []));
+
+    expect(slotOfTile().style.width).toBe("");
+  });
+
+  it("keeps the last tile on the shelf until the slot has opened and the poster has landed", () => {
+    vi.spyOn(Element.prototype, "clientHeight", "get").mockReturnValue(100);
+    vi.spyOn(Element.prototype, "clientWidth", "get").mockReturnValue(80);
+    const other: FinishedFile = {
+      ...finished,
+      id: 91,
+      relativePath: "Other.mkv",
+    };
+    const both = (leaving: LeavingCard[]) => (
+      <MemoryRouter>
+        <PipelineBoard
+          lanes={lanesOf([])}
+          leaving={leaving}
+          filter="all"
+          now={NOW}
+          onOpen={vi.fn()}
+        />
+        <JustFinishedShelf
+          items={[finished, other]}
+          filter="all"
+          now={NOW}
+          onOpen={vi.fn()}
+        />
+      </MemoryRouter>
+    );
+    placePosters();
+
+    // One tile fits the shelf: the delivered file's slot is closed, and the file beside it is where it was.
+    const view = render(both([delivered]));
+    expect(tilesOnShelf()).toBe(2);
+
+    view.rerender(both([]));
+    runFramesAt(0);
+    runFramesAt(FLIGHT_MS);
+    expect(tilesOnShelf()).toBe(2);
+
+    // The poster has landed and faded: the pushed-out tile is gone.
+    runFramesAt(FLIGHT_MS + LANDING_FADE_MS);
+    expect(tilesOnShelf()).toBe(1);
   });
 });
 

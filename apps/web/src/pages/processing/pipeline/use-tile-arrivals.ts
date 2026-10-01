@@ -1,7 +1,7 @@
 import { useLayoutEffect, useRef, type RefObject } from "react";
 
 import { motionAllowed } from "../../../lib/ui/motion-allowed";
-import { HELD_ATTRIBUTE } from "./delivery-flight";
+import { HELD_ATTRIBUTE } from "./shelf-slots";
 import { TILE_KEY_ATTRIBUTE } from "./use-slide-neighbours";
 import { RESIZING_CLASS } from "./use-still-while-resizing";
 

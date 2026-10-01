@@ -12,6 +12,7 @@ import type { FinishedFile } from "../../../lib/activity/processing-outcome";
 import { classNames } from "../../../lib/ui/class-names";
 import { SHELF_TILE_ATTRIBUTE } from "./delivery-flight";
 import type { ShelfTile } from "./shelf-model";
+import { useOpenSlots } from "./shelf-slots";
 import { TILE_KEY_ATTRIBUTE, useSlideNeighbours } from "./use-slide-neighbours";
 import { useTileArrivals } from "./use-tile-arrivals";
 
@@ -103,7 +104,10 @@ export function ShelfTiles({
   boxRef: RefObject<HTMLUListElement | null>;
   onOpen: (item: FinishedFile) => void;
 }): ReactElement {
-  const shown = tilesShown === null ? tiles : tiles.slice(0, tilesShown);
+  // A file whose poster is on its way has a slot that is closed or opening: the tile it pushes out is kept until it is gone.
+  const slots = useOpenSlots(boxRef);
+  const shown =
+    tilesShown === null ? tiles : tiles.slice(0, tilesShown + slots);
   useSlideNeighbours(
     boxRef,
     shown.map((tile) => tile.key).join("|"),
