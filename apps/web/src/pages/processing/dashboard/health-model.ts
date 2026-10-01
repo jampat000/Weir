@@ -173,6 +173,21 @@ export function toolRows(tools: MediaTools): ToolRow[] {
 const isProblem = (tone: MmStatusTone) =>
   tone === "warning" || tone === "failed";
 
+/**
+ * The few words beside the panel's title: how many things need a look, else how many workflows Weir could not
+ * verify, else that all is clear. A workflow Weir takes someone's word for is not a fault, but it is not clear either.
+ */
+export function healthSummary(
+  problems: number,
+  workflows: readonly { verdict: WorkflowVerdict }[],
+): string {
+  if (problems > 0) return `${problems} to look at`;
+  const unverified = workflows.filter(
+    (item) => item.verdict.words === READINESS_WORDS.not_verified,
+  ).length;
+  return unverified > 0 ? `${unverified} not verified` : "all clear";
+}
+
 /** How many things in the panel need a look: a workflow that needs a fix, a connection or a tool that is down. */
 export function problemCount(parts: {
   workflows: readonly { verdict: WorkflowVerdict }[];

@@ -152,6 +152,19 @@ describe("the Health panel", () => {
     expect(renderPanel()).toHaveTextContent("all clear");
   });
 
+  it("names the workflows Weir could not verify rather than saying all clear", () => {
+    health.workflows = [
+      {
+        workflow: { ...movies, manager_connection_ids: [1] },
+        verdict: { words: "Not verified", tone: "neutral" },
+        why: "Radarr does not say where Transmission saves its downloads.",
+        chain: undefined,
+      },
+    ];
+
+    expect(renderPanel()).toHaveTextContent("1 not verified");
+  });
+
   it("counts a workflow that needs a fix and a connection that does not answer", () => {
     health.workflows = [
       {

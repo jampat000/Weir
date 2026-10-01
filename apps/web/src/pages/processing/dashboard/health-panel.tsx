@@ -9,7 +9,7 @@ import {
 } from "../../../lib/processing/workflow-kind";
 import { useNow } from "../../../lib/ui/use-now";
 import { CheckNowButton, useCheckNow } from "./check-now";
-import { connectionPills, problemCount } from "./health-model";
+import { connectionPills, healthSummary, problemCount } from "./health-model";
 import { useHealth } from "./use-health";
 
 const MANAGERS_PATH = "/settings?tab=media-managers";
@@ -61,7 +61,7 @@ export function HealthPanel({ workflows, workflowId }: HealthPanelProps) {
   return (
     <Panel
       title="Health"
-      count={problems === 0 ? "all clear" : `${problems} to look at`}
+      count={healthSummary(problems, health.workflows)}
       aside={<CheckNowButton check={check} />}
       to={`?${detail.toString()}`}
       toLabel="Full detail"
