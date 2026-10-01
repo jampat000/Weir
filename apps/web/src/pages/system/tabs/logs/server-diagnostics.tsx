@@ -39,44 +39,38 @@ export function ServerDiagnostics() {
   ];
 
   return (
-    <section className="mm-quiet-section">
-      <details className="mm-log-diagnostics">
-        <summary className="mm-quiet-section__head mm-log-diagnostics__summary">
-          <span
-            id="suite-settings-diagnostics-heading"
-            className="mm-quiet-section__title"
-          >
-            Server diagnostics
-          </span>
-          <span className="mm-quiet-section__aside">
-            <span className="mm-quiet-link mm-log-diagnostics__show">
-              Show →
-            </span>
-            <span className="mm-quiet-link mm-log-diagnostics__hide">
-              Hide →
-            </span>
-          </span>
-        </summary>
-        <div className="mm-quiet-section__body">
-          <p className="mm-quiet-note">
-            Advanced counters for troubleshooting. Request issues usually mean a
-            browser or API request was rejected or asked for something that was
-            not found; they are not the same as application failures.
-          </p>
-          {metricsQ.isError ? (
-            <div className="mt-4">
-              <LoadError thing="server diagnostics" error={metricsQ.error} />
-            </div>
-          ) : (
-            <div className="mt-4">
-              <FactTable caption="Server runtime counters" facts={facts} />
-            </div>
-          )}
-          {metrics ? (
-            <p className="mt-3 text-xs text-mm-text3">{requestIssues.detail}</p>
-          ) : null}
-        </div>
-      </details>
-    </section>
+    <details className="mm-quiet-fold mm-log-diagnostics">
+      <summary className="mm-quiet-fold__head mm-log-diagnostics__summary">
+        <span
+          id="suite-settings-diagnostics-heading"
+          className="mm-quiet-fold__title"
+        >
+          Server diagnostics
+        </span>
+        <span className="mm-quiet-fold__state">
+          <span className="mm-log-diagnostics__show">Show →</span>
+          <span className="mm-log-diagnostics__hide">Hide →</span>
+        </span>
+      </summary>
+      <div className="mm-quiet-fold__body">
+        <p className="mm-quiet-note">
+          Advanced counters for troubleshooting. Request issues usually mean a
+          browser or API request was rejected or asked for something that was
+          not found; they are not the same as application failures.
+        </p>
+        {metricsQ.isError ? (
+          <div className="mt-4">
+            <LoadError thing="server diagnostics" error={metricsQ.error} />
+          </div>
+        ) : (
+          <div className="mt-4">
+            <FactTable caption="Server runtime counters" facts={facts} />
+          </div>
+        )}
+        {metrics ? (
+          <p className="mt-3 text-xs text-mm-text3">{requestIssues.detail}</p>
+        ) : null}
+      </div>
+    </details>
   );
 }

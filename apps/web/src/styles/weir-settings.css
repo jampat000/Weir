@@ -60,14 +60,6 @@
   cursor: pointer;
 }
 
-.mm-library-fold__detail {
-  max-width: 65ch;
-  margin-top: 0.75rem;
-  color: var(--mm-text3);
-  font-size: var(--mm-type-caption);
-  line-height: 1.25rem;
-}
-
 /* One library a manager reported: a checkbox row that shows where the keyboard is. */
 .mm-discovered-library {
   display: flex;

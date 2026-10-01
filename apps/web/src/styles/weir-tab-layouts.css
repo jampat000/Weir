@@ -138,10 +138,6 @@
   .mm-backups-grid {
     grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
   }
-
-  .mm-backups-grid__wide {
-    grid-column: 1 / -1;
-  }
 }
 
 /* System › Security: changing the username and the password, side by side. */
@@ -161,10 +157,6 @@
 /* Settings › Libraries: where a library comes from, and its folders in the code face they are typed in. */
 .mm-library-source {
   display: block;
-}
-
-.mm-library-source--synced {
-  color: var(--mm-accent-bright);
 }
 
 .mm-library-path {

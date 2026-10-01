@@ -273,7 +273,6 @@ export function LibraryPage(): React.ReactElement {
       <Panel
         title="Files"
         count={totals ? `${totals.files.toLocaleString()} files` : undefined}
-        className="mm-library-panel"
       >
         <LibraryToolbar
           search={search}

@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 
+import { Chip } from "../../../../components/panels/chip";
 import { FileProgressDetail } from "../../../../components/activity/file-progress-detail";
 import { RemuxPassDetail } from "../../../../components/activity/remux-pass-detail";
 import { StructuredDetailFacts } from "../../../../components/activity/structured-detail-facts";
@@ -15,6 +16,15 @@ import {
   REMUX_PASS_COMPLETED_EVENT,
 } from "../../../../lib/activity/event-types";
 import type { ActivityEventItem } from "../../../../lib/api/types";
+import type { MmStatusTone } from "../../../../lib/ui/mm-status-tone";
+
+/** The chip colour for how an entry went; an entry with nothing to flag stays neutral. */
+const CHIP_TONE: Record<ActivityTone, MmStatusTone> = {
+  success: "healthy",
+  warning: "warning",
+  error: "failed",
+  info: "neutral",
+};
 
 function toneIcon(tone: ActivityTone): string {
   return tone === "success" ? "✓" : tone === "info" ? "·" : "!";
@@ -92,20 +102,18 @@ export function ActivityEventRow({
             </span>
           ) : null}
           {display.chip ? (
-            <span
-              className={`mm-activity-item__badge mm-activity-chip--${display.tone}`}
-            >
+            <Chip tone={CHIP_TONE[display.tone]} dot={false}>
               {display.chip}
-            </span>
+            </Chip>
           ) : null}
           {triggerLabel ? (
-            <span
-              className="mm-activity-item__badge mm-activity-item__badge--quiet"
+            <Chip
+              dot={false}
               data-testid="activity-trigger-chip"
               title="Why this happened"
             >
               {triggerLabel}
-            </span>
+            </Chip>
           ) : null}
         </div>
         {!compact ? (

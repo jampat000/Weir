@@ -104,21 +104,6 @@ body.mm-drawer-open {
   text-decoration: none;
 }
 
-/* A button that does what a link does — switches what this panel is showing — and so reads like one. */
-.mm-link-button {
-  padding: 0;
-  border: 0;
-  background: none;
-  font: inherit;
-  color: var(--mm-accent);
-  cursor: pointer;
-}
-
-.mm-link-button:disabled {
-  color: var(--mm-text3);
-  cursor: default;
-}
-
 .mm-drawer__tracks {
   display: flex;
   flex-direction: column;
