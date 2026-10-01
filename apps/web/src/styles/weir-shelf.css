@@ -41,7 +41,7 @@
   min-height: 0;
   flex: 1 1 0;
   flex-wrap: nowrap;
-  align-items: safe center;
+  align-items: flex-start;
   gap: 12px;
   box-sizing: border-box;
   margin: 0 -4px;

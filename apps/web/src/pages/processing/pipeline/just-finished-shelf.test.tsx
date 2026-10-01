@@ -298,30 +298,31 @@ describe("the size of the tiles", () => {
   }
   const files = Array.from({ length: 9 }, (_, index) => finished(index + 1));
 
-  it("fits whole tiles to the row's height, and shows only as many as stand across", () => {
+  it("makes the tiles no wider than lets five stand across, and shows at least five", () => {
     rowOf(250, 570);
 
     render(shelf(files));
 
-    // 250px of row gives 135px tiles, and three of them stand across 570px.
-    expect(tiles()).toHaveLength(3);
-    expect(
-      document
-        .querySelector<HTMLElement>(".mm-shelf__row")
-        ?.style.getPropertyValue("--shelf-tile-w"),
-    ).toBe("135px");
-  });
-
-  it("shows at least the fewest tiles asked for, by making the tiles narrower", () => {
-    rowOf(250, 570);
-
-    render(shelf(files, { fewestTiles: 5 }));
-
+    // 250px of row would give 135px tiles, three across; five must stand across, so they are 102px.
     expect(tiles()).toHaveLength(5);
     expect(
       document
         .querySelector<HTMLElement>(".mm-shelf__row")
         ?.style.getPropertyValue("--shelf-tile-w"),
     ).toBe("102px");
+  });
+
+  it("fits the tiles to a short row's height, and shows every one that stands across", () => {
+    rowOf(100, 570);
+
+    render(shelf(files));
+
+    // 100px of row gives 58px tiles: eight stand across 570px.
+    expect(tiles()).toHaveLength(8);
+    expect(
+      document
+        .querySelector<HTMLElement>(".mm-shelf__row")
+        ?.style.getPropertyValue("--shelf-tile-w"),
+    ).toBe("58px");
   });
 });

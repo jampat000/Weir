@@ -28,36 +28,30 @@ export type ShelfFit = {
   width: number;
 };
 
-/** The fewest whole tiles the shelf shows when the page has its right column beside it, a window of at least this size. */
+/** The fewest whole tiles the shelf shows across, however wide the window: the tiles narrow to fit them. */
 export const SHELF_MIN_TILES = 5;
 
-/** The row's width, and how many whole tiles at the least it must hold: the tiles are no wider than that allows. */
-export type ShelfRoom = { width: number; least: number };
-
-/** The widest a tile may be for `room.least` of them to stand in the row. */
-function widestForRoom({ width, least }: ShelfRoom): number {
-  return Math.max(
-    MIN_TILE_WIDTH_PX,
-    Math.floor((width - ROW_PAD_X + TILE_GAP_PX) / least) - TILE_GAP_PX,
-  );
-}
-
 /**
- * The tile size for a row of this height. The height decides it (the tiles fill the row, with a caption when it is
- * tall enough); where the row must hold `room.least` tiles, a tile is also no wider than that allows, and a tile
- * made shorter by it shows its caption when the row has the room. A tile is never stretched.
+ * The tile size, from the row's own measured height, and no wider than lets `SHELF_MIN_TILES` whole tiles fit across
+ * the row's measured width (when it is known). Tiles stay exactly 2:3: a narrower tile is also shorter, never
+ * stretched, and none is narrower than the least art allows.
  */
-export function shelfFit(rowHeight: number, room?: ShelfRoom): ShelfFit {
+export function shelfFit(rowHeight: number, rowWidth = 0): ShelfFit {
   const inner = rowHeight - ROW_PAD_Y;
-  const tall = inner >= CAPTION_MIN_ROW_PX;
+  const captions = inner >= CAPTION_MIN_ROW_PX;
   const art = Math.max(
     MIN_ART_PX,
-    Math.min(MAX_ART_PX, inner - (tall ? CAPTION_PX : 0)),
+    Math.min(MAX_ART_PX, inner - (captions ? CAPTION_PX : 0)),
   );
   const byHeight = Math.floor(art / 1.5);
-  const width = room ? Math.min(byHeight, widestForRoom(room)) : byHeight;
-  const spare = inner - width * 1.5;
-  return { captions: tall || spare >= CAPTION_PX, width };
+  if (!(rowWidth > 0)) return { captions, width: byHeight };
+  const forLeast =
+    Math.floor((rowWidth - ROW_PAD_X + TILE_GAP_PX) / SHELF_MIN_TILES) -
+    TILE_GAP_PX;
+  return {
+    captions,
+    width: Math.max(MIN_TILE_WIDTH_PX, Math.min(byHeight, forLeast)),
+  };
 }
 
 /** Whole tiles across a row of `rowWidth` px, at least one; never a part of one. */

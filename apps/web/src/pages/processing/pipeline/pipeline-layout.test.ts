@@ -10,12 +10,7 @@ import {
   lanesHeight,
   stackedBoardBudget,
 } from "./pipeline-layout";
-import {
-  SHELF_MIN_TILES,
-  shelfFit,
-  tilesAcross,
-  type ShelfRoom,
-} from "./shelf-layout";
+import { SHELF_MIN_TILES, shelfFit, tilesAcross } from "./shelf-layout";
 
 describe("the card size", () => {
   it("is sized from the lanes' height: three rows always, 60px cards at the least, a 130px step at the most", () => {
@@ -111,32 +106,24 @@ describe("the shelf's tiles", () => {
     expect(shelfFit(2000).width).toBe(170);
   });
 
-  it("shows at least five whole tiles in a row wide enough, by making the tiles narrower, never wider than their height allows", () => {
+  it("shows at least five whole tiles across, by making the tiles narrower, never wider than their height allows", () => {
     expect(SHELF_MIN_TILES).toBe(5);
     // A tall row of 570px: 250px of row would give 135px tiles, but five must stand across.
-    const room: ShelfRoom = { width: 570, least: SHELF_MIN_TILES };
-    const tall = shelfFit(250, room);
+    const tall = shelfFit(250, 570);
     expect(tall.width).toBe(102);
     expect(tilesAcross(570, tall.width)).toBeGreaterThanOrEqual(5);
     expect(shelfFit(250).width).toBe(135);
     // A short row already holds smaller tiles than five need: the height decides.
-    expect(shelfFit(100, room)).toEqual(shelfFit(100));
-    // The tile stays exactly 2:3 and is never stretched: its height is one and a half times its width.
+    expect(shelfFit(100, 570)).toEqual(shelfFit(100));
+    // The tile stays exactly 2:3 and is never stretched: its height is one and a half times its width, within its row.
     expect(tall.width * 1.5).toBeLessThan(250 - 12);
-  });
-
-  it("shows the captions of tiles the cap has made shorter than their row", () => {
-    // 108px of room under the padding, 28px tiles (42px tall): 66px is spare, and a caption takes 35px.
-    expect(shelfFit(120, { width: 200, least: 5 })).toEqual({
-      captions: true,
-      width: 28,
-    });
-    // 28px of spare is not enough for one.
-    expect(shelfFit(112, { width: 300, least: 5 }).captions).toBe(false);
+    // Captions follow the row's height, as before.
+    expect(shelfFit(250, 570).captions).toBe(true);
+    expect(shelfFit(100, 570).captions).toBe(false);
   });
 
   it("never makes a tile narrower than the least art, however narrow the row", () => {
-    expect(shelfFit(250, { width: 100, least: 5 }).width).toBe(24);
+    expect(shelfFit(250, 100).width).toBe(24);
   });
 
   it("draws whole tiles only", () => {

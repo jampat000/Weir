@@ -387,7 +387,7 @@ describe("the shelf's slot for a delivered file", () => {
 
   it("keeps the last tile on the shelf until the slot has opened and the poster has landed", () => {
     vi.spyOn(Element.prototype, "clientHeight", "get").mockReturnValue(100);
-    vi.spyOn(Element.prototype, "clientWidth", "get").mockReturnValue(80);
+    vi.spyOn(Element.prototype, "clientWidth", "get").mockReturnValue(60);
     const other: FinishedFile = {
       ...finished,
       id: 91,

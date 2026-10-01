@@ -32,7 +32,6 @@ import { useLeavingCards } from "../leaving-cards";
 import { JustFinishedShelf } from "../pipeline/just-finished-shelf";
 import { PipelineBoard } from "../pipeline/pipeline-board";
 import { stackedBoardBudget } from "../pipeline/pipeline-layout";
-import { SHELF_MIN_TILES } from "../pipeline/shelf-layout";
 import { TODAY_DAYS, type Filter } from "../processing-filter";
 import { prettyName } from "../processing-model";
 import {
@@ -232,7 +231,6 @@ export function LiveView({ filter, workflowId, layout }: LiveViewProps) {
             workflowNames={workflowNames}
             enabledWorkflowIds={enabledWorkflowIds}
             count={workflowId === null ? cleanedToday(today) : undefined}
-            fewestTiles={layout.sideBySide ? SHELF_MIN_TILES : undefined}
             onOpen={openFinished}
           />
           <ActivityStream now={now} workflowId={workflowId} />

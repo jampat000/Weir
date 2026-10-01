@@ -42,8 +42,6 @@ export type JustFinishedShelfProps = {
   enabledWorkflowIds?: ReadonlySet<number>;
   /** What the day adds up to across every workflow, when the page knows better than the loaded files tell. */
   count?: string;
-  /** The fewest whole tiles the shelf holds when its row is wide enough; one where the page is narrow. */
-  fewestTiles?: number;
   /** Opens a finished file's story. */
   onOpen: (item: FinishedFile) => void;
 };
@@ -56,7 +54,6 @@ export function JustFinishedShelf({
   workflowNames = NO_NAMES,
   enabledWorkflowIds,
   count,
-  fewestTiles = 1,
   onOpen,
 }: JustFinishedShelfProps): ReactElement {
   const [chosen, setChosen] = useState<number | null>(readShelfWorkflow);
@@ -86,10 +83,7 @@ export function JustFinishedShelf({
   useLayoutEffect(() => {
     const tiles = box.current;
     if (!tiles || !(tiles.clientHeight > 0)) return;
-    const size = shelfFit(tiles.clientHeight, {
-      width: tiles.clientWidth,
-      least: fewestTiles,
-    });
+    const size = shelfFit(tiles.clientHeight, tiles.clientWidth);
     const next: Fit = {
       ...size,
       across: tilesAcross(tiles.clientWidth, size.width),
@@ -102,7 +96,7 @@ export function JustFinishedShelf({
         ? current
         : next,
     );
-  }, [shelfSize.width, shelfSize.height, fewestTiles]);
+  }, [shelfSize.width, shelfSize.height]);
   const countWords =
     picked === null && count !== undefined && !shelf.latest
       ? count
