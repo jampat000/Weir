@@ -10,6 +10,7 @@ import { useSearchParams } from "react-router-dom";
 import { ApiEntryError } from "../../components/shared/api-entry-error";
 import { PageLoading } from "../../components/shared/page-loading";
 import { PageHeader } from "../../components/shell/page-header";
+import { ShellHeaderSlot } from "../../components/shell/shell-header-context";
 import { useActivityStreamInvalidations } from "../../lib/activity/use-activity-stream-invalidation";
 import type { LibraryFileFilters } from "../../lib/processing/library-mode-api";
 import {
@@ -85,10 +86,6 @@ function fileFilters(
 function NoLibrary() {
   return (
     <div className="mm-page mm-library" data-testid="library-page">
-      <PageHeader
-        title="Library"
-        lead="The files already on your storage, and what Weir would do to each."
-      />
       <p className="mm-library-empty">
         No workflow is set up yet. Add one in Settings › Workflows, then come
         back here and tell Weir which folders the files you already have sit in.
@@ -210,19 +207,20 @@ export function LibraryPage(): React.ReactElement {
   const savedSetup = setupSettings.data;
   const needsSetup = savedSetup?.library_folders.length === 0;
   const header = (
-    <PageHeader
-      title="Library"
-      titleAfter={
+    <>
+      <ShellHeaderSlot>
         <LibraryPicker
           libraries={libraries.data ?? []}
           chosenId={chosen.id}
           onPick={pick}
           countFor={(id) => (id === chosen.id ? (totals?.files ?? null) : null)}
         />
-      }
-      lead={headerLead(totals, Boolean(overview.data?.schedule.enabled))}
-      aside={
-        needsSetup ? undefined : (
+      </ShellHeaderSlot>
+      <PageHeader>
+        <p className="mm-page-head__lead">
+          {headerLead(totals, Boolean(overview.data?.schedule.enabled))}
+        </p>
+        {needsSetup ? null : (
           <LibraryScanStatus
             libraryId={chosen.id}
             scan={overview.data?.scan ?? files.data?.scan ?? null}
@@ -240,9 +238,9 @@ export function LibraryPage(): React.ReactElement {
               ) : null
             }
           />
-        )
-      }
-    />
+        )}
+      </PageHeader>
+    </>
   );
   const setupPanel =
     setupOpen && savedSetup ? (

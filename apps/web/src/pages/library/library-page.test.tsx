@@ -275,13 +275,10 @@ describe("LibraryPage", () => {
     };
   });
 
-  it("names the library in the title, and groups files under the title they belong to", () => {
+  it("names the library beside the title, and groups files under the title they belong to", () => {
     renderLibrary();
 
     expect(screen.getByTestId("library-picker")).toHaveTextContent("TV");
-    expect(
-      screen.getByRole("heading", { name: "Library" }),
-    ).toBeInTheDocument();
     expect(screen.getAllByTestId("library-row")).toHaveLength(3);
     expect(screen.getByText("Northbound")).toBeInTheDocument();
     expect(

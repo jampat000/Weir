@@ -1,68 +1,23 @@
-import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { BrandHeaderLink } from "../components/brand/brand-header-link";
+import { Outlet, useLocation } from "react-router-dom";
+import { useCallback, useEffect, useState } from "react";
 import { MainLandmark } from "../components/shared/page-loading";
-import {
-  NavIconChevronLeft,
-  NavIconChevronRight,
-  NavIconLibrary,
-  NavIconHistory,
-  NavIconProcessing,
-  NavIconSettings,
-  NavIconSystem,
-  NavIconSignOut,
-} from "../components/shell/nav-icons";
-import { useLogoutMutation } from "../lib/auth/queries";
+import { AppSidebar } from "../components/shell/app-sidebar";
+import { ShellHeader } from "../components/shell/shell-header";
+import { ShellHeaderProvider } from "../components/shell/shell-header-context";
 import { appTitle } from "../lib/system/app-title";
 import { useSystemReadinessQuery } from "../lib/system/readiness-queries";
-import { useModalFocus } from "../lib/ui/use-modal-focus";
-import { useWorkingCount } from "../pages/processing/working-count";
 
-// Between phone width (a drawer below 921px) and 1100px the side menu shrinks to icons by itself, so
-// the Processing lanes keep their room; a click on Collapse or Expand overrides it until a reload.
-// At 1100px and wider, including the common 1280px, every label stays readable (#697).
-const LAPTOP_WIDTH = "(min-width: 921px) and (max-width: 1099px)";
-
-function useMediaQuery(query: string): boolean {
-  return useSyncExternalStore(
-    (onChange) => {
-      if (typeof window.matchMedia !== "function") return () => undefined;
-      const list = window.matchMedia(query);
-      list.addEventListener("change", onChange);
-      return () => list.removeEventListener("change", onChange);
-    },
-    () =>
-      typeof window.matchMedia === "function" &&
-      window.matchMedia(query).matches,
-    () => false,
-  );
-}
-
-function sidebarNavClass({ isActive }: { isActive: boolean }) {
-  return isActive ? "mm-sidebar-link active" : "mm-sidebar-link";
-}
-
+/**
+ * Every signed-in screen: the side menu, the header above the page, and the page itself in the one
+ * main landmark. The header owns the title, Pause and the theme switch, so a page only fills what is
+ * its own.
+ */
 export function AppShell() {
-  const navigate = useNavigate();
   const location = useLocation();
-  const logout = useLogoutMutation();
   const readiness = useSystemReadinessQuery();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  // On phones the side menu is a drawer: opening it moves focus in, Escape closes it, and focus goes
-  // back to the Menu button (#697).
-  const firstPlace = useRef<HTMLAnchorElement>(null);
-  const drawer = useModalFocus<HTMLElement>({
-    open: sidebarOpen,
-    onClose: () => setSidebarOpen(false),
-    initialFocus: firstPlace,
-  });
-  const [collapsedChoice, setCollapsedChoice] = useState<boolean | null>(null);
-  const laptop = useMediaQuery(LAPTOP_WIDTH);
-  const sidebarCollapsed = collapsedChoice ?? laptop;
-  // How many cards Processing's Working lane shows, beside Processing wherever you are in the app.
-  const working = useWorkingCount();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const closeMenu = useCallback(() => setMenuOpen(false), []);
   const productTitle = appTitle(readiness.data?.machine_name);
-  const appVersion = readiness.data?.version;
 
   // The tab says which Weir it is, so two of them side by side can be told apart.
   useEffect(() => {
@@ -73,175 +28,36 @@ export function AppShell() {
     window.scrollTo(0, 0);
   }, [location.pathname, location.search]);
 
-  const handleSignOut = () => {
-    // The sign-in page shows at once; the session ends on the server behind it.
-    logout.mutate();
-    void navigate("/login", { replace: true });
-  };
-
   return (
-    <div className="mm-app-layout" data-testid="shell-ready">
-      <aside
-        id="mm-primary-sidebar"
-        className={`mm-sidebar${sidebarOpen ? " mm-sidebar--open" : ""}${sidebarCollapsed ? " mm-sidebar--collapsed" : ""}`}
-        // Named for the app, so a screen reader announces where the user is.
-        aria-label={productTitle}
-        ref={drawer}
-      >
-        <button
-          type="button"
-          className="mm-sidebar-collapse"
-          data-testid="sidebar-collapse"
-          aria-label={
-            sidebarCollapsed ? "Expand navigation" : "Collapse navigation"
-          }
-          aria-expanded={!sidebarCollapsed}
-          onClick={() => setCollapsedChoice(!sidebarCollapsed)}
-        >
-          {/* The chevron says it on its own; aria-label carries the words for anyone who needs them. */}
-          <span className="mm-sidebar-collapse__icon" aria-hidden="true">
-            {sidebarCollapsed ? (
-              <NavIconChevronRight />
-            ) : (
-              <NavIconChevronLeft />
-            )}
-          </span>
-        </button>
-        <div className="mm-sidebar-inner">
-          <BrandHeaderLink to="/" productTitle={productTitle} />
-          {/* Five places: what Weir is doing now, every file it has worked on, the files already
-              imported, how Weir treats your media, and Weir itself. */}
-          <nav className="mm-sidebar-nav" aria-label="Primary">
-            <NavLink
-              ref={firstPlace}
-              to="/"
-              end
-              className={sidebarNavClass}
-              title="Processing"
-              aria-label={
-                working > 0 ? `Processing, ${working} working` : undefined
-              }
-              onClick={() => setSidebarOpen(false)}
-            >
-              <span className="mm-sidebar-link-icon" aria-hidden="true">
-                <NavIconProcessing />
-              </span>
-              <span className="mm-sidebar-link-label">Processing</span>
-              {working > 0 ? (
-                <span
-                  className="mm-sidebar-link-badge"
-                  data-testid="nav-processing-working"
-                >
-                  <i className="mm-live-pulse" aria-hidden="true" />
-                  <span className="mm-sidebar-link-badge__text">
-                    {working} working
-                  </span>
-                </span>
-              ) : null}
-            </NavLink>
-            <NavLink
-              to="/history"
-              className={sidebarNavClass}
-              title="History"
-              onClick={() => setSidebarOpen(false)}
-            >
-              <span className="mm-sidebar-link-icon" aria-hidden="true">
-                <NavIconHistory />
-              </span>
-              <span className="mm-sidebar-link-label">History</span>
-            </NavLink>
-            <NavLink
-              to="/library"
-              className={sidebarNavClass}
-              title="Library"
-              onClick={() => setSidebarOpen(false)}
-            >
-              <span className="mm-sidebar-link-icon" aria-hidden="true">
-                <NavIconLibrary />
-              </span>
-              <span className="mm-sidebar-link-label">Library</span>
-            </NavLink>
-            <NavLink
-              to="/settings"
-              className={sidebarNavClass}
-              title="Settings"
-              onClick={() => setSidebarOpen(false)}
-            >
-              <span className="mm-sidebar-link-icon" aria-hidden="true">
-                <NavIconSettings />
-              </span>
-              <span className="mm-sidebar-link-label">Settings</span>
-            </NavLink>
-            <NavLink
-              to="/system"
-              className={sidebarNavClass}
-              title="System"
-              onClick={() => setSidebarOpen(false)}
-            >
-              <span className="mm-sidebar-link-icon" aria-hidden="true">
-                <NavIconSystem />
-              </span>
-              <span className="mm-sidebar-link-label">System</span>
-            </NavLink>
-          </nav>
-          <div className="mm-sidebar-footer">
-            <div className="mm-sidebar-footer-panel">
-              <div className="mm-sidebar-meta">{productTitle}</div>
-              <div
-                className="mm-sidebar-version"
-                title="Installed Weir version reported by the running server"
-              >
-                {appVersion ? `Version ${appVersion}` : "Checking version…"}
-              </div>
-              <button
-                type="button"
-                data-testid="sign-out"
-                className="mm-sidebar-signout"
-                disabled={logout.isPending}
-                onClick={handleSignOut}
-                title={sidebarCollapsed ? "Sign out" : undefined}
-              >
-                <span className="mm-sidebar-signout__icon" aria-hidden="true">
-                  <NavIconSignOut />
-                </span>
-                <span className="mm-sidebar-signout__label">
-                  {logout.isPending ? "Signing out…" : "Sign out"}
-                </span>
-              </button>
-            </div>
-          </div>
-        </div>
-      </aside>
-      {sidebarOpen ? (
-        <button
-          type="button"
-          className="mm-sidebar-backdrop"
-          aria-label="Close navigation"
-          onClick={() => setSidebarOpen(false)}
+    <ShellHeaderProvider>
+      <div className="mm-app-layout" data-testid="shell-ready">
+        <AppSidebar
+          productTitle={productTitle}
+          drawerOpen={menuOpen}
+          onCloseDrawer={closeMenu}
         />
-      ) : null}
-      <main className="mm-main" id="mm-main-content" tabIndex={-1}>
-        <div className="mm-main-inner">
-          {/* Phones only (hidden on wider screens by CSS): the menu button that opens the side
-              menu. Pause and the theme switch are in each page's title row. */}
-          <div className="mm-shell-toolbar">
-            <button
-              type="button"
-              className="mm-shell-menu-toggle"
-              data-testid="shell-nav-toggle"
-              aria-controls="mm-primary-sidebar"
-              aria-expanded={sidebarOpen}
-              onClick={() => setSidebarOpen((value) => !value)}
-            >
-              <span aria-hidden="true">☰</span>
-              <span>Menu</span>
-            </button>
-          </div>
-          <MainLandmark>
-            <Outlet />
-          </MainLandmark>
+        {menuOpen ? (
+          <button
+            type="button"
+            className="mm-sidebar-backdrop"
+            aria-label="Close navigation"
+            onClick={closeMenu}
+          />
+        ) : null}
+        <div className="mm-main-column">
+          <ShellHeader
+            menuOpen={menuOpen}
+            onToggleMenu={() => setMenuOpen((open) => !open)}
+          />
+          <main className="mm-main" id="mm-main-content" tabIndex={-1}>
+            <div className="mm-main-inner">
+              <MainLandmark>
+                <Outlet />
+              </MainLandmark>
+            </div>
+          </main>
         </div>
-      </main>
-    </div>
+      </div>
+    </ShellHeaderProvider>
   );
 }

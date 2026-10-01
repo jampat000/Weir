@@ -38,7 +38,7 @@ export function MmOnOffSwitch({
             className={[
               "min-w-[3.25rem] rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
               selected
-                ? "bg-mm-accent-soft text-mm-text1 shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--mm-gold)_35%,transparent)]"
+                ? "bg-mm-accent-soft text-mm-text1 shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--mm-primary)_35%,transparent)]"
                 : "text-mm-text2 hover:bg-mm-card-bg/70",
               disabled
                 ? "cursor-not-allowed opacity-50 hover:bg-transparent"

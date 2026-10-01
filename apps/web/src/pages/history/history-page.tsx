@@ -3,7 +3,6 @@ import { useSearchParams } from "react-router-dom";
 
 import { LoadError } from "../../components/shared/load-error";
 import { PanelLoading } from "../../components/shared/page-loading";
-import { PageHeader } from "../../components/shell/page-header";
 import { useCanEdit } from "../../lib/auth/can-edit";
 import {
   useFileHistoryQuery,
@@ -159,10 +158,6 @@ export function HistoryPage() {
 
   return (
     <div className="mm-page" data-testid="history-page">
-      <PageHeader
-        title="History"
-        lead="Every file Weir has handled, new downloads and library cleans: what it was, what Weir did, and what came out."
-      />
       <HistoryFilters
         query={params.get("q") ?? ""}
         group={group}

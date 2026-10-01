@@ -1,4 +1,4 @@
-/* The base and the page frame: box sizing, scrollbars, the app layout, page heads, workspace tabs and status text. */
+/* The base and the page frame: box sizing, scrollbars, the app layout, in-page rows, workspace tabs and status text. */
 
 *,
 *::before,
@@ -9,7 +9,7 @@
 * {
   scrollbar-width: auto;
   scrollbar-color: color-mix(in srgb, var(--mm-stone) 38%, transparent)
-    rgba(255, 255, 255, 0.06);
+    transparent;
 }
 
 *::-webkit-scrollbar {
@@ -17,7 +17,7 @@
   height: 10px;
 }
 *::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.06);
+  background: transparent;
   border-radius: var(--mm-radius-pill);
 }
 *::-webkit-scrollbar-thumb {
@@ -52,14 +52,19 @@ body.mm-body {
   color: var(--mm-text);
   background: var(--mm-bg);
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-/* Keyboard focus is a solid accent outline everywhere: 5.0:1 or better on every light surface and
-   7.9:1 or better on dark, where WCAG needs 3:1. A control's own soft halo stays as an extra, never
-   as the only sign of focus (#697). Unlayered, so it outranks utility classes that remove outlines. */
+/* Keyboard focus is a solid accent outline everywhere: 4.5:1 or better on every surface in both
+   themes, where WCAG needs 3:1. A control's own soft halo stays as an extra, never as the only sign
+   of focus (#697). Unlayered, so it outranks utility classes that remove outlines. */
 :focus-visible {
   outline: 2px solid var(--mm-accent);
   outline-offset: 2px;
+}
+
+kbd {
+  font-family: var(--mm-font-code);
 }
 
 .mm-skip {
@@ -90,71 +95,25 @@ body.mm-body {
   background: var(--mm-bg);
 }
 
-/* Phones only: holds the menu button. Pause and the theme switch live in each page's title
-   row (.mm-page-head), so on a desktop this bar has nothing to carry. */
-.mm-shell-toolbar {
-  display: none;
-  align-items: center;
-  justify-content: flex-end;
-  gap: calc(8px * var(--mm-density-ui-scale));
-  min-height: var(--mm-control-height);
-  margin: 0 0 calc(12px * var(--mm-density-ui-scale));
+/* Everything right of the side menu: the sticky header, then the page. */
+.mm-main-column {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
 }
 
-/* Every page's title row (components/shell/page-header.tsx): the title on the left, Pause
-   and the theme switch on the right. The two controls are one class so they are exactly the
-   same height. */
+/* What a page puts at the top of itself, under the shell's header: a sentence about the page, and
+   controls the header has no room for. */
 .mm-page-head {
   display: flex;
-  flex-direction: column;
-  gap: calc(6px * var(--mm-density-ui-scale));
-  margin: 0 0 calc(18px * var(--mm-density-ui-scale));
-}
-
-.mm-page-head__row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
   flex-wrap: wrap;
-  gap: calc(12px * var(--mm-density-ui-scale))
-    calc(20px * var(--mm-density-ui-scale));
-}
-
-.mm-page-head__title-wrap {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: calc(12px * var(--mm-density-ui-scale));
-  min-width: 0;
-}
-
-.mm-page-head__title {
-  margin: 0;
-  font-size: clamp(1.55rem, 3.2vw, 2rem);
-  font-weight: 600;
-  line-height: 1.25;
-  letter-spacing: -0.02em;
-  color: var(--mm-text);
-}
-
-.mm-page-head__actions {
-  display: flex;
-  align-items: center;
-  gap: calc(8px * var(--mm-density-ui-scale));
-  margin-left: auto;
-  min-width: 0;
-}
-
-/* Top-aligned, so the lead sits straight under the title on every page: bottom-aligned, a taller aside
-   (Library's scan) would pull the lead down to meet it, and the same line would sit at a different height
-   on each screen. */
-.mm-page-head__sub {
-  display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  flex-wrap: wrap;
-  gap: calc(10px * var(--mm-density-ui-scale))
-    calc(24px * var(--mm-density-ui-scale));
+  gap: 10px 24px;
+  margin: 0 0 14px;
 }
 
 .mm-page-head__lead {
@@ -165,24 +124,17 @@ body.mm-body {
   color: var(--mm-text2);
 }
 
-.mm-page-head__aside {
-  display: flex;
-  align-items: flex-end;
-  flex-wrap: wrap;
-  gap: calc(24px * var(--mm-density-ui-scale));
-  margin-left: auto;
-}
-
+/* A button in the header, or in a page's top row: Pause, the theme switch, Library setup. */
 .mm-head-control {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  height: calc(36px * var(--mm-density-ui-scale));
+  height: 36px;
   box-sizing: border-box;
-  padding: 0 calc(14px * var(--mm-density-ui-scale));
-  border: 1px solid var(--mm-line);
-  border-radius: calc(10px * var(--mm-density-ui-scale));
+  padding: 0 14px;
+  border: 1px solid var(--mm-hairline);
+  border-radius: var(--mm-radius-control);
   background: var(--mm-button-secondary-bg);
   color: var(--mm-text);
   font: inherit;
@@ -199,19 +151,26 @@ body.mm-body {
   border-color: var(--mm-accent-ring);
 }
 
-.mm-head-control:focus-visible {
-  outline: 2px solid var(--mm-accent);
-  outline-offset: 2px;
-}
-
 .mm-head-control:disabled {
   opacity: 0.6;
   cursor: default;
 }
 
 .mm-head-control--icon {
-  width: calc(36px * var(--mm-density-ui-scale));
+  width: 36px;
   padding: 0;
+}
+
+/* The one action a header is asking for, such as Resume. */
+.mm-head-control--primary {
+  border-color: var(--mm-primary);
+  background: var(--mm-primary);
+  color: var(--mm-on-accent);
+}
+
+.mm-head-control--primary:hover {
+  border-color: var(--mm-primary-bright);
+  background: var(--mm-primary-bright);
 }
 
 .mm-pause-menu .mm-head-control {
@@ -223,22 +182,11 @@ body.mm-body {
   min-width: 0;
 }
 
+/* A row of tabs: ghost buttons, the chosen one outlined in the brand colour. Its colours come from
+   mmSectionTabClass; this holds the row's shape. */
 .mm-workspace-tabs {
   width: 100%;
-  margin: 0.9rem 0 1.25rem;
-  padding: 0.3rem;
-  border: 1px solid color-mix(in srgb, var(--mm-border) 82%, var(--mm-gold) 18%);
-  border-radius: 14px;
-  background:
-    linear-gradient(
-      110deg,
-      color-mix(in srgb, var(--mm-gold) 4.5%, transparent),
-      transparent 34%
-    ),
-    color-mix(in srgb, var(--mm-surface) 92%, transparent);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.035),
-    0 10px 28px rgba(0, 0, 0, 0.1);
+  margin: 0 0 1.1rem;
 }
 
 /* Wraps onto a second line when the row is too narrow: nothing in Weir scrolls left to right
@@ -247,49 +195,13 @@ body.mm-body {
   display: flex;
   flex-wrap: wrap;
   width: 100%;
-  gap: 0.2rem;
+  gap: 4px;
 }
 
 .mm-workspace-tabs__button {
-  position: relative;
-  min-height: 2.45rem;
-  padding: 0.58rem 0.9rem;
-  border: 0;
-  border-radius: 10px;
-  background: transparent;
+  min-height: 34px;
+  padding: 0 14px;
   box-shadow: none;
-  color: var(--mm-text2);
-}
-
-.mm-workspace-tabs__button:hover {
-  background: color-mix(in srgb, var(--mm-card-bg) 72%, transparent);
-  color: var(--mm-text1);
-}
-
-.mm-workspace-tabs__button[aria-selected="true"] {
-  color: var(--mm-text1);
-  background:
-    linear-gradient(
-      135deg,
-      color-mix(in srgb, var(--mm-gold) 16%, transparent),
-      transparent 62%
-    ),
-    color-mix(in srgb, var(--mm-indigo-soft) 48%, var(--mm-card-bg));
-  box-shadow:
-    inset 0 0 0 1px color-mix(in srgb, var(--mm-gold) 32%, transparent),
-    0 4px 14px rgba(0, 0, 0, 0.12);
-}
-
-.mm-workspace-tabs__button[aria-selected="true"]::after {
-  content: "";
-  position: absolute;
-  right: 0.7rem;
-  bottom: 0.18rem;
-  left: 0.7rem;
-  height: 2px;
-  border-radius: var(--mm-radius-pill);
-  background: linear-gradient(90deg, var(--mm-gold-bright), var(--mm-indigo));
-  box-shadow: 0 0 8px color-mix(in srgb, var(--mm-gold) 28%, transparent);
 }
 
 .mm-workspace-panel,

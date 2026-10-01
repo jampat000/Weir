@@ -21,8 +21,8 @@ Use the Velopack setup exe from the release being validated.
     - Choose Deluno, Sonarr / Radarr or a download client, connect it, and confirm it tests as connected and the Movies and TV workflows are offered with folders filled in, each with its kind badge.
     - Confirm an unreachable address says so and leaves Neither available.
     - Confirm `Finish setup` saves the time zone, the ticked workflows (linked to the media manager when there is one) and the automatic backup schedule, and that What's next no longer offers to connect a media manager.
-13. Confirm the navigation shows Processing, History, Library, Settings and System, and that Processing is the first screen.
-14. Confirm Settings shows the tabs Workflows, Rules, Media managers, Performance, Cleanup, Schedule and Alerts.
+13. Confirm the side menu shows Processing and History under Live, Library under Your library, Workflows, Rules, Media managers, Performance, Schedule, Cleanup and Alerts under Setup, and System under Weir, and that Processing is the first screen.
+14. Confirm each Setup item opens its own Settings section, with the section name as the page title and no row of tabs on the page.
 15. Confirm System shows the tabs About, Backups, Security and Logs.
 16. In System › Backups, use **Export or restore now** to download a configuration backup.
 17. Restore that backup and confirm the app remains usable.

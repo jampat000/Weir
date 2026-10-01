@@ -59,8 +59,8 @@
 }
 
 .mm-schedule-cell-on {
-  background: var(--mm-accent, #3ed7c8);
-  border-color: var(--mm-accent, #3ed7c8);
+  background: var(--mm-accent);
+  border-color: var(--mm-accent);
 }
 
 .mm-schedule-grid-actions {

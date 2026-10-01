@@ -1,61 +1,110 @@
-/* Weir design tokens (one-pager palette, hex from brand sheet). */
+/*
+ * Weir design tokens.
+ *
+ * Dark is the default; `html[data-mm-theme="light"]` below redefines every colour. A stylesheet never
+ * writes a colour of its own: it names one of these, so both themes follow. Groups:
+ *
+ *   Surfaces      --mm-bg, --mm-card-bg, --mm-surface-elevated, --mm-surface-2, --mm-surface-3, --mm-hairline
+ *   Sidebar       --mm-sidebar-bg, --mm-sidebar-accent, --mm-sidebar-border
+ *   Text          --mm-text (also --mm-text1), --mm-text2 (muted), --mm-text3 (dim), --mm-text-disabled
+ *   Brand colour  --mm-primary, --mm-primary-bright, --mm-primary-dim, --mm-primary-2 (--mm-accent* are the same colour)
+ *   Signal fills  --mm-success, --mm-warning, --mm-destructive, --mm-info (bars, dots, borders)
+ *   Signal text   --mm-status-{healthy,warning,failed,info}-text, tuned to 4.5:1 on every surface
+ *   Lanes         --mm-lane-{incoming,queued,analysing,processing,delivering}, with a -text twin for words
+ *   Shape         --mm-radius-* (controls 10px, fields 12px, tiles 14px, panels 16px)
+ */
 
 :root {
   color-scheme: dark;
-  /* Kept as variables because every stylesheet multiplies by them. The setting that changed them was a
-     zoom of the whole interface in four near-identical steps, which the browser's own zoom already does. */
+  /* Kept as variables because every stylesheet multiplies by them. */
   --mm-density-font-scale: 0.9375;
   --mm-density-ui-scale: 1;
   --mm-main-max-cap: 2400px;
-  --mm-charcoal: #0b1418;
-  --mm-slate: #13212a;
-  --mm-slate-elevated: #1b2d38;
-  --mm-stone: #e8f1f4;
-  /* Opaque semantic text values keep contrast predictable over each surface. */
-  --mm-stone-muted: #a6bcc6;
-  --mm-stone-dim: #93aab5;
-  --mm-gold: #3ed7c8;
-  --mm-gold-bright: #79ecdf;
-  --mm-gold-dim: #1c9d92;
-  --mm-indigo: #3d8bfd;
-  --mm-indigo-soft: rgba(61, 139, 253, 0.22);
-  --mm-bg: #0b1418;
-  --mm-bg-main: #091114;
+
+  /* Surfaces: page, then each step up. A panel is --mm-card-bg on --mm-bg; a card inside a panel is
+     --mm-surface-2; a track or well inside that is --mm-surface-3. */
+  --mm-bg: #0c0f18;
+  --mm-bg-main: #0c0f18;
+  --mm-slate: #131a25;
+  --mm-slate-elevated: #181f2a;
   --mm-surface: var(--mm-slate);
-  --mm-surface-2: var(--mm-slate-elevated);
-  --mm-surface1: var(--mm-slate);
-  --mm-surface2: var(--mm-slate-elevated);
   --mm-card-bg: var(--mm-slate);
-  --mm-border: rgba(232, 241, 244, 0.1);
-  --mm-line: rgba(232, 241, 244, 0.14);
-  --mm-border-sidebar: rgba(232, 241, 244, 0.07);
+  --mm-surface1: var(--mm-slate);
+  --mm-surface-elevated: var(--mm-slate-elevated);
+  --mm-surface-2: #1a222d;
+  --mm-surface2: var(--mm-surface-2);
+  --mm-surface-3: #212936;
+  --mm-hairline: #252e3c;
+  --mm-border: #242c38;
+  --mm-line: var(--mm-hairline);
+  /* A panel's own edge is a veil of white, so it reads on every surface behind it. */
+  --mm-panel-border: rgba(255, 255, 255, 0.07);
+  --mm-header-rule: rgba(255, 255, 255, 0.05);
+
+  --mm-sidebar-bg: #070b12;
+  --mm-sidebar-accent: #181f2a;
+  --mm-sidebar-border: #1d242f;
+  --mm-border-sidebar: var(--mm-sidebar-border);
+
+  --mm-stone: #f3f4f7;
+  --mm-stone-muted: #a9b0bc;
+  --mm-stone-dim: #8f97a5;
   --mm-text: var(--mm-stone);
   --mm-text1: var(--mm-stone);
   --mm-text2: var(--mm-stone-muted);
   --mm-text3: var(--mm-stone-dim);
-  --mm-text-disabled: #6c828d;
-  --mm-accent: var(--mm-gold);
-  --mm-accent-bright: var(--mm-gold-bright);
-  --mm-accent-soft: rgba(62, 215, 200, 0.16);
-  --mm-accent-ring: rgba(62, 215, 200, 0.45);
-  --mm-on-accent: #04191c;
-  --mm-status-healthy-text: #4fdda6;
-  --mm-status-warning-text: #f0bf5b;
-  --mm-status-failed-text: #ff9b92;
-  --mm-status-info-text: #79b8ff;
-  --mm-status-healthy-bg: rgba(16, 185, 129, 0.14);
-  --mm-status-warning-bg: rgba(245, 158, 11, 0.14);
-  --mm-status-failed-bg: rgba(239, 68, 68, 0.14);
-  --mm-status-info-bg: rgba(61, 139, 253, 0.14);
-  --mm-warning-border: rgba(245, 158, 11, 0.46);
+  --mm-text-disabled: #6b7380;
+
+  --mm-primary: #52a5ff;
+  --mm-primary-bright: #8cc3ff;
+  --mm-primary-dim: #3a7fd4;
+  --mm-primary-2: #4f92f8;
+  --mm-primary-2-soft: rgba(79, 146, 248, 0.2);
+  --mm-accent: var(--mm-primary);
+  --mm-accent-bright: var(--mm-primary-bright);
+  --mm-accent-soft: rgba(82, 165, 255, 0.16);
+  --mm-accent-ring: rgba(82, 165, 255, 0.45);
+  --mm-on-accent: #0b1626;
+
+  --mm-success: #25e475;
+  --mm-warning: #fb8d2d;
+  --mm-destructive: #ef4d4d;
+  --mm-info: #41a7fb;
+  --mm-status-healthy-text: #25e475;
+  --mm-status-warning-text: #fb8d2d;
+  --mm-status-failed-text: #ff7b7b;
+  --mm-status-info-text: #41a7fb;
+  --mm-status-healthy-bg: rgba(37, 228, 117, 0.12);
+  --mm-status-warning-bg: rgba(251, 141, 45, 0.14);
+  --mm-status-failed-bg: rgba(239, 77, 77, 0.14);
+  --mm-status-info-bg: rgba(65, 167, 251, 0.14);
+  --mm-warning-border: rgba(251, 141, 45, 0.46);
   --mm-warning-bg: var(--mm-status-warning-bg);
   --mm-warning-text: var(--mm-status-warning-text);
-  --mm-sidebar-w: calc(256px * var(--mm-density-ui-scale));
-  --mm-sidebar-collapsed-w: calc(92px * var(--mm-density-ui-scale));
-  --mm-radius: 12px;
+
+  /* The five stations of the Pipeline. The fill colour paints bars, dots and edges; the -text twin is for
+     words set in the lane's colour, nudged until it reads at 4.5:1 on a card. */
+  --mm-lane-incoming: #9d65ec;
+  --mm-lane-queued: #2ad2f4;
+  --mm-lane-analysing: #41a7fb;
+  --mm-lane-processing: #24dbb0;
+  --mm-lane-delivering: #fbba37;
+  --mm-lane-incoming-text: #ab7bef;
+  --mm-lane-queued-text: #2ad2f4;
+  --mm-lane-analysing-text: #41a7fb;
+  --mm-lane-processing-text: #24dbb0;
+  --mm-lane-delivering-text: #fbba37;
+
+  --mm-sidebar-w: 268px;
+  --mm-sidebar-collapsed-w: 84px;
+  --mm-radius: 16px;
   --mm-radius-sm: 8px;
+  --mm-radius-control: 10px;
+  --mm-radius-field: 12px;
+  --mm-radius-tile: 14px;
+  --mm-radius-panel: 16px;
   --mm-radius-pill: 999px;
-  /* Main column: never wider than the pane; cap scales slightly with display density. */
+  /* Main column: never wider than the pane. */
   --mm-main-max: min(100%, var(--mm-main-max-cap));
   --mm-space: calc(clamp(1.125rem, 3vw, 1.75rem) * var(--mm-density-ui-scale));
   --mm-space-lg: calc(
@@ -63,101 +112,123 @@
   );
   --mm-bubble-stack-gap-mobile: calc(1.25rem * var(--mm-density-ui-scale));
   --mm-bubble-stack-gap-desktop: calc(1.75rem * var(--mm-density-ui-scale));
-  --mm-main-pad-y: calc(clamp(32px, 2.2vw, 40px) * var(--mm-density-ui-scale));
-  --mm-main-pad-x: calc(clamp(16px, 3vw, 40px) * var(--mm-density-ui-scale));
-  /* Type ramp (#464). Before this, almost everything sat at 13-14px, so no screen had a lead
-     and the eye had nowhere to land. Sizes are in rem so they follow the density font scale. */
-  --mm-type-eyebrow: 0.6875rem; /* 11px, uppercase, tracked — labels and eyebrows */
-  --mm-type-caption: 0.78125rem; /* 12.5px — secondary detail under a value */
+  --mm-page-pad-x: clamp(14px, 1.2vw, 24px);
+  --mm-page-pad-y: clamp(12px, 1vw, 20px);
+  --mm-header-pad-x: clamp(22px, 1.6vw, 28px);
+  --mm-header-title-size: 26px;
+  --mm-panel-gap: 12px;
+
+  /* Type ramp. Sizes are in rem so they follow the density font scale. */
+  --mm-type-eyebrow: 0.6875rem; /* 11px, uppercase, tracked: labels and eyebrows */
+  --mm-type-caption: 0.78125rem; /* 12.5px: secondary detail under a value */
 
   /* How wide a control is, decided by what goes in it rather than by whichever max-w-* class
-     the file happened to use. Settings had eight different control widths — 370px beside 367px,
-     752px beside 726px — which is what "not aligned, not uniform" looks like from a foot away. */
+     the file happened to use. */
   --mm-field-short: 9rem; /* a number, a time, a count */
   --mm-field-medium: 22rem; /* a choice, a short name */
   --mm-field-wide: 40rem; /* a path, a template, a sentence */
-  --mm-type-body: 0.84375rem; /* 13.5px — rows and body copy */
-  --mm-type-panel: 1rem; /* 16px — panel and card headings */
-  --mm-type-title: 1.5rem; /* 24px — page title */
-  --mm-type-figure: 1.75rem; /* 28px — hero figures and stat values */
+  --mm-type-body: 0.84375rem; /* 13.5px: rows and body copy */
+  --mm-type-panel: 1rem; /* 16px: panel and card headings */
+  --mm-type-title: 1.5rem; /* 24px: page title */
+  --mm-type-figure: 1.75rem; /* 28px: hero figures and stat values */
   --mm-tracking-eyebrow: 0.14em;
   /* Layout-only, set per instance from React; no colour or font is introduced here. */
   --mm-live-fill: 0; /* how far a pass has got writing, 0-100 (weir-processing-flow.css) */
   --mm-flow-node: 18px; /* a stage-flow step's node, which the lines between nodes are measured from (weir-processing-flow.css) */
-  /* Control sizes (#464). The single 34px height was below a comfortable hit target for form
-     fields; 40px is the field size, with smaller steps for secondary and quiet controls. */
+  --mm-bar-color: var(
+    --mm-primary
+  ); /* a bar-list row's fill, set per row (weir-panels.css) */
+  /* Control sizes: 40px is the field size, with smaller steps for secondary and quiet controls. */
   --mm-control-height-lg: calc(40px * var(--mm-density-ui-scale));
   --mm-control-height-sm: calc(32px * var(--mm-density-ui-scale));
   --mm-control-height: calc(34px * var(--mm-density-ui-scale));
   --mm-control-pad-x: calc(11px * var(--mm-density-ui-scale));
   --mm-control-pad-y: calc(7px * var(--mm-density-ui-scale));
-  --mm-font: "Outfit", system-ui, -apple-system, sans-serif;
+
+  --mm-font:
+    "Inter Variable", "Inter", ui-sans-serif, system-ui, -apple-system,
+    sans-serif;
+  /* Release and file names, where a person compares characters. */
   --mm-font-mono:
     ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
     "Courier New", monospace;
-  --mm-shadow-card: 0 16px 48px rgba(2, 12, 16, 0.55);
+  /* Keyboard hints and code. */
+  --mm-font-code:
+    "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, SFMono-Regular,
+    Menlo, monospace;
+  --mm-font-feature: "cv11", "ss01", "ss02";
+
+  --mm-shadow-card:
+    0 1px 0 rgba(4, 6, 10, 0.65), 0 2px 8px rgba(4, 6, 10, 0.32);
   --mm-shadow-card-inner: 0 1px 0 rgba(255, 255, 255, 0.05) inset;
-  --mm-shadow-shell: 0 22px 60px rgba(2, 12, 16, 0.55);
-  /* Inset field wells — slightly below card plane; tuned for quiet premium (not deep black wells). */
+  --mm-shadow-shell: 0 22px 60px rgba(2, 4, 8, 0.55);
+  --mm-shadow-popover: 0 24px 64px rgba(2, 4, 8, 0.58);
   /* A field lifts off the page rather than sinking into it: a well the same colour as the
      background leaves a control visible only by its border. */
-  --mm-input-bg: rgba(232, 241, 244, 0.055);
-  --mm-input-bg-hover: rgba(232, 241, 244, 0.085);
-  /* A field's edge is what shows where to type, so it meets the 3:1 non-text contrast WCAG asks
-     for: 3.3:1 to 3.5:1 on the dark surfaces, and 3.05:1 to 3.2:1 on the light ones below (#697). */
-  --mm-input-border: rgba(232, 241, 244, 0.4);
-  --mm-input-border-hover: rgba(62, 215, 200, 0.45);
-  --mm-input-border-focus: rgba(62, 215, 200, 0.45);
-  /* Focus halo for `.mm-input` / picker triggers — calmer than global `--mm-accent-soft` fills. */
-  --mm-input-focus-ring: rgba(62, 215, 200, 0.18);
-  --mm-font-feature: "cv11", "ss01";
+  --mm-input-bg: rgba(243, 244, 247, 0.055);
+  --mm-input-bg-hover: rgba(243, 244, 247, 0.085);
+  /* A field's edge is what shows where to type, so it meets the 3:1 non-text contrast WCAG asks for. */
+  --mm-input-border: rgba(243, 244, 247, 0.4);
+  --mm-input-border-hover: rgba(82, 165, 255, 0.55);
+  --mm-input-border-focus: rgba(82, 165, 255, 0.55);
+  /* Focus halo for `.mm-input` / picker triggers: calmer than the global accent fills. */
+  --mm-input-focus-ring: rgba(82, 165, 255, 0.2);
   --mm-eyebrow-color: var(--mm-stone-muted);
-  /* Secondary buttons sit on cards: a faint well on dark, a warm raised chip on light. */
-  --mm-button-secondary-bg: rgba(27, 45, 56, 0.55);
-  --mm-button-quiet-bg: rgba(27, 45, 56, 0.38);
-  /* Tailwind `bg-black/10`-style wells are tuned for dark; light remaps them (weir-shell.css). */
+  /* Secondary buttons sit on cards: a faint well on dark, a raised chip on light. */
+  --mm-button-secondary-bg: var(--mm-surface-2);
+  --mm-button-quiet-bg: rgba(26, 34, 45, 0.6);
+  /* A recessed well: darker than the surface on dark, a faint ink wash on light. */
   --mm-well-bg: rgba(0, 0, 0, 0.16);
   /* Brand mark (components/brand/weir-logo.tsx; packaging/brand/weir-mark.svg). The mark is a
-     single tone now (#581), so `--mm-brand-wall` went with the two-tone mark it belonged to. */
+     single tone, set on a dark tile in the sidebar in both themes. */
   --mm-brand-water: #3ed7c8;
-  --mm-brand-wordmark: #e8f1f4;
+  --mm-brand-wordmark: #f3f4f7;
+  /* The tile stays dark in both themes, so the mark on it keeps the bright water colour. */
+  --mm-brand-tile-mark: #3ed7c8;
+  --mm-brand-tile: radial-gradient(
+    circle at 30% 25%,
+    #172a3a 0%,
+    #101824 50%,
+    #070a0f 100%
+  );
 }
 
 html[data-mm-theme="light"] {
   color-scheme: light;
-  --mm-charcoal: #eaf0f2;
-  --mm-slate: #ffffff;
-  --mm-slate-elevated: #e3ecef;
-  --mm-stone: #11242b;
-  --mm-stone-muted: #4a6068;
-  --mm-stone-dim: #586d75;
-  --mm-gold: #0d6f68;
-  --mm-gold-bright: #095049;
-  --mm-gold-dim: #3aa79e;
-  --mm-indigo: #1f5fb8;
-  --mm-indigo-soft: rgba(31, 95, 184, 0.12);
-  --mm-bg: #eaf0f2;
-  --mm-bg-main: #eff4f5;
-  --mm-surface: #ffffff;
-  --mm-surface-2: #e3ecef;
-  --mm-surface1: #ffffff;
-  --mm-surface2: #e3ecef;
-  --mm-card-bg: #ffffff;
-  --mm-border: rgba(17, 36, 43, 0.14);
-  --mm-line: rgba(17, 36, 43, 0.19);
-  --mm-border-sidebar: rgba(17, 36, 43, 0.11);
-  --mm-text: var(--mm-stone);
-  --mm-text1: var(--mm-stone);
-  --mm-text2: var(--mm-stone-muted);
-  --mm-text3: var(--mm-stone-dim);
-  --mm-text-disabled: #7d9099;
-  --mm-accent: var(--mm-gold);
-  --mm-accent-bright: var(--mm-gold-bright);
-  --mm-accent-soft: rgba(13, 111, 104, 0.13);
-  --mm-accent-ring: rgba(13, 111, 104, 0.38);
-  /* White on teal-cyan #0d6f68 measures 6.0:1, comfortably above WCAG AA for button
-     text (the dark theme's pair on #3ed7c8 is 10.1:1). (#457) */
+  --mm-bg: #e1e4e9;
+  --mm-bg-main: #e1e4e9;
+  --mm-slate: #eff0f4;
+  --mm-slate-elevated: #f7f8fa;
+  --mm-surface-2: #dbdee5;
+  --mm-surface-3: #cfd3db;
+  --mm-hairline: #c3c8d1;
+  --mm-border: #bfc4ce;
+  --mm-panel-border: var(--mm-hairline);
+  --mm-header-rule: var(--mm-hairline);
+
+  --mm-sidebar-bg: #d1d6de;
+  --mm-sidebar-accent: #c1c7d1;
+  --mm-sidebar-border: #bcc1cb;
+
+  --mm-stone: #171c26;
+  --mm-stone-muted: #525966;
+  --mm-stone-dim: #5d6572;
+  --mm-text-disabled: #8a919c;
+
+  --mm-primary: #125eba;
+  --mm-primary-bright: #0d4a96;
+  --mm-primary-dim: #5a97e0;
+  --mm-primary-2: #2071e9;
+  --mm-primary-2-soft: rgba(32, 113, 233, 0.14);
+  --mm-accent-soft: rgba(18, 94, 186, 0.12);
+  --mm-accent-ring: rgba(18, 94, 186, 0.4);
+  /* White on #125eba measures 6.3:1. */
   --mm-on-accent: #ffffff;
+
+  --mm-success: #168846;
+  --mm-warning: #ab4705;
+  --mm-destructive: #ce1212;
+  --mm-info: #0872c9;
   --mm-status-healthy-text: #046c4a;
   --mm-status-warning-text: #7a5100;
   --mm-status-failed-text: #b42318;
@@ -166,23 +237,32 @@ html[data-mm-theme="light"] {
   --mm-status-warning-bg: rgba(245, 158, 11, 0.13);
   --mm-status-failed-bg: rgba(239, 68, 68, 0.13);
   --mm-status-info-bg: rgba(31, 95, 184, 0.13);
-  --mm-warning-border: rgba(245, 158, 11, 0.42);
-  --mm-warning-bg: var(--mm-status-warning-bg);
-  --mm-warning-text: var(--mm-status-warning-text);
-  --mm-shadow-card: 0 16px 48px rgba(16, 54, 64, 0.14);
+  --mm-warning-border: rgba(171, 71, 5, 0.42);
+
+  --mm-lane-incoming: #9d65ec;
+  --mm-lane-queued: #10a8c6;
+  --mm-lane-analysing: #0872c9;
+  --mm-lane-processing: #1da58a;
+  --mm-lane-delivering: #e18b09;
+  --mm-lane-incoming-text: #7a2ee5;
+  --mm-lane-queued-text: #0a687b;
+  --mm-lane-analysing-text: #0761ab;
+  --mm-lane-processing-text: #136c5b;
+  --mm-lane-delivering-text: #895506;
+
+  --mm-shadow-card:
+    0 1px 2px rgba(15, 20, 30, 0.05), 0 4px 12px rgba(15, 20, 30, 0.04);
   --mm-shadow-card-inner: 0 1px 0 rgba(255, 255, 255, 0.85) inset;
-  --mm-shadow-shell: 0 22px 60px rgba(16, 54, 64, 0.14);
+  --mm-shadow-shell: 0 22px 60px rgba(15, 20, 30, 0.14);
+  --mm-shadow-popover: 0 20px 60px rgba(15, 20, 30, 0.16);
   --mm-input-bg: rgba(255, 255, 255, 0.96);
   --mm-input-bg-hover: rgba(255, 255, 255, 1);
-  --mm-input-border: rgba(17, 36, 43, 0.5);
-  --mm-input-border-hover: rgba(13, 111, 104, 0.5);
-  --mm-input-border-focus: rgba(13, 111, 104, 0.55);
-  --mm-input-focus-ring: rgba(13, 111, 104, 0.18);
-  --mm-eyebrow-color: var(--mm-stone-muted);
-  --mm-button-secondary-bg: #e3ecef;
-  --mm-button-quiet-bg: rgba(17, 36, 43, 0.05);
-  --mm-well-bg: rgba(17, 36, 43, 0.045);
-  /* packaging/brand/weir-mark-light.svg; wordmark #11242b is 14.4:1 on the light page. */
-  --mm-brand-water: #0d6f68;
-  --mm-brand-wordmark: #11242b;
+  --mm-input-border: rgba(23, 28, 38, 0.5);
+  --mm-input-border-hover: rgba(18, 94, 186, 0.55);
+  --mm-input-border-focus: rgba(18, 94, 186, 0.6);
+  --mm-input-focus-ring: rgba(18, 94, 186, 0.18);
+  --mm-button-secondary-bg: var(--mm-surface-2);
+  --mm-button-quiet-bg: rgba(23, 28, 38, 0.05);
+  --mm-well-bg: rgba(23, 28, 38, 0.045);
+  --mm-brand-wordmark: #171c26;
 }

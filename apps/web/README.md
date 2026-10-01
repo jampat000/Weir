@@ -1,8 +1,8 @@
 # Weir — web app
 
-**React + TypeScript + Vite** app served by the .NET server (`apps/server`) on the same origin as the API. It uses the server's cookie session auth. **This directory is the source of truth** for Weir's UI: tokens, logo, the **Outfit** font, the shell and every screen.
+**React + TypeScript + Vite** app served by the .NET server (`apps/server`) on the same origin as the API. It uses the server's cookie session auth. **This directory is the source of truth** for Weir's UI: tokens, logo, the **Inter** and **JetBrains Mono** fonts (self-hosted through Fontsource), the shell and every screen.
 
-The version in the shell footer is the one the running server reports (`GET /api/v1/system/readiness`), not `package.json`.
+The version in the user menu at the foot of the side menu is the one the running server reports (`GET /api/v1/system/readiness`), not `package.json`.
 
 ## Stack
 

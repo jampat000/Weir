@@ -1,47 +1,128 @@
-/** Thin gold-outline nav icons (one-pager iconography). */
+import type { ReactNode } from "react";
 
-export function NavIconSettings({ className = "" }: { className?: string }) {
+export type NavGlyphName =
+  | "processing"
+  | "history"
+  | "library"
+  | "workflows"
+  | "rules"
+  | "managers"
+  | "performance"
+  | "schedule"
+  | "cleanup"
+  | "alerts"
+  | "system";
+
+const GLYPH_PATHS: Record<NavGlyphName, ReactNode> = {
+  processing: (
+    <>
+      <path d="M4 13h6V4H4z" />
+      <path d="M14 20h6V4h-6z" />
+      <path d="M4 20h6v-3H4z" />
+    </>
+  ),
+  history: (
+    <>
+      <path d="M4 14h5l3-8 3 12 2-4h3" />
+      <path d="M4 20h16" />
+    </>
+  ),
+  library: (
+    <>
+      <path d="M3 7h7l2 2h9v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+      <path d="M7 13h10" />
+      <path d="M7 16h6" />
+    </>
+  ),
+  workflows: (
+    <>
+      <circle cx="6" cy="8" r="2" />
+      <circle cx="18" cy="16" r="2" />
+      <path d="M8 8h4a4 4 0 0 1 4 4v2" />
+    </>
+  ),
+  rules: (
+    <>
+      <rect x="5" y="5" width="14" height="4" rx="1.5" />
+      <rect x="3" y="10" width="18" height="4" rx="1.5" />
+      <rect x="6" y="15" width="12" height="4" rx="1.5" />
+    </>
+  ),
+  managers: (
+    <>
+      <path d="M6 4h12v8H6z" />
+      <path d="M8 16h8" />
+      <path d="M12 12v8" />
+    </>
+  ),
+  performance: (
+    <>
+      <path d="M12 5v14" />
+      <path d="M5 12h14" />
+      <path d="M8 8l8 8" />
+      <path d="M16 8l-8 8" />
+    </>
+  ),
+  schedule: (
+    <>
+      <path d="M7 7V4" />
+      <path d="M17 7V4" />
+      <rect x="4" y="6" width="16" height="14" rx="2" />
+      <path d="M4 11h16" />
+    </>
+  ),
+  cleanup: <path d="M3 7h7l2 2h9v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />,
+  alerts: (
+    <>
+      <path d="M10.268 21a2 2 0 0 0 3.464 0" />
+      <path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326" />
+    </>
+  ),
+  system: (
+    <>
+      <path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z" />
+      <path d="M4 12h2" />
+      <path d="M18 12h2" />
+      <path d="M12 4v2" />
+      <path d="M12 18v2" />
+    </>
+  ),
+};
+
+/** One side-menu icon: a 24px line glyph that takes its colour from the link around it. */
+export function NavGlyph({ name }: { name: NavGlyphName }) {
   return (
     <svg
-      className={className}
-      width="18"
-      height="18"
       viewBox="0 0 24 24"
       fill="none"
-      xmlns="http://www.w3.org/2000/svg"
+      stroke="currentColor"
+      strokeWidth="2.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
       aria-hidden="true"
+      focusable="false"
     >
-      <path
-        d="M12 15a3 3 0 100-6 3 3 0 000 6z"
-        stroke="currentColor"
-        strokeWidth="1.35"
-      />
-      <path
-        d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09a1.65 1.65 0 00-1-1.51 1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09a1.65 1.65 0 001.51-1 1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"
-        stroke="currentColor"
-        strokeWidth="1.15"
-        strokeLinejoin="round"
-      />
+      {GLYPH_PATHS[name]}
     </svg>
   );
 }
 
-/** Processing: a pulse line, for the screen that shows work as it happens. */
-export function NavIconProcessing({ className = "" }: { className?: string }) {
+type IconProps = { className?: string };
+
+function Chevron({ d, className = "" }: IconProps & { d: string }) {
   return (
     <svg
       className={className}
-      width="18"
-      height="18"
+      width="16"
+      height="16"
       viewBox="0 0 24 24"
       fill="none"
-      xmlns="http://www.w3.org/2000/svg"
       aria-hidden="true"
     >
       <path
-        d="M3 12h4l2.5-6.5 5 13 2.5-6.5h4"
+        d={d}
         stroke="currentColor"
-        strokeWidth="1.35"
+        strokeWidth="2"
         strokeLinecap="round"
         strokeLinejoin="round"
       />
@@ -49,178 +130,38 @@ export function NavIconProcessing({ className = "" }: { className?: string }) {
   );
 }
 
-/** Library: two spines and a leaning third, for the files already imported. */
-export function NavIconLibrary({ className = "" }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      width="18"
-      height="18"
-      viewBox="0 0 24 24"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      aria-hidden="true"
-    >
-      <rect
-        x="4"
-        y="4.5"
-        width="4"
-        height="15"
-        rx="1"
-        stroke="currentColor"
-        strokeWidth="1.35"
-      />
-      <rect
-        x="10"
-        y="4.5"
-        width="4"
-        height="15"
-        rx="1"
-        stroke="currentColor"
-        strokeWidth="1.35"
-      />
-      <path
-        d="M16.2 6.2l3.3-.9 3 13.6-3.3.9z"
-        stroke="currentColor"
-        strokeWidth="1.35"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
+export function NavIconChevronLeft({ className }: IconProps) {
+  return <Chevron className={className} d="m14.5 6-6 6 6 6" />;
 }
 
-export function NavIconChevronLeft({ className = "" }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      width="18"
-      height="18"
-      viewBox="0 0 24 24"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      aria-hidden="true"
-    >
-      <path
-        d="m14.5 6-6 6 6 6"
-        stroke="currentColor"
-        strokeWidth="1.7"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
+export function NavIconChevronRight({ className }: IconProps) {
+  return <Chevron className={className} d="m9.5 6 6 6-6 6" />;
 }
 
-export function NavIconChevronRight({
-  className = "",
-}: {
-  className?: string;
-}) {
-  return (
-    <svg
-      className={className}
-      width="18"
-      height="18"
-      viewBox="0 0 24 24"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      aria-hidden="true"
-    >
-      <path
-        d="m9.5 6 6 6-6 6"
-        stroke="currentColor"
-        strokeWidth="1.7"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
+export function NavIconChevronDown({ className }: IconProps) {
+  return <Chevron className={className} d="m6 9 6 6 6-6" />;
 }
 
-export function NavIconSignOut({ className = "" }: { className?: string }) {
+export function NavIconSignOut({ className = "" }: IconProps) {
   return (
     <svg
       className={className}
-      width="18"
-      height="18"
+      width="16"
+      height="16"
       viewBox="0 0 24 24"
       fill="none"
-      xmlns="http://www.w3.org/2000/svg"
       aria-hidden="true"
     >
       <path
         d="M14 4H6.8A1.8 1.8 0 0 0 5 5.8v12.4A1.8 1.8 0 0 0 6.8 20H14"
         stroke="currentColor"
-        strokeWidth="1.35"
+        strokeWidth="1.75"
         strokeLinecap="round"
       />
       <path
         d="M11 12h8m0 0-3.2-3.2M19 12l-3.2 3.2"
         stroke="currentColor"
-        strokeWidth="1.35"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-/** System: a server, for the screen about the install rather than about your media. */
-export function NavIconSystem({ className = "" }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      width="18"
-      height="18"
-      viewBox="0 0 24 24"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      aria-hidden="true"
-    >
-      <rect
-        x="3.25"
-        y="4.25"
-        width="17.5"
-        height="6"
-        rx="1.6"
-        stroke="currentColor"
-        strokeWidth="1.35"
-      />
-      <rect
-        x="3.25"
-        y="13.75"
-        width="17.5"
-        height="6"
-        rx="1.6"
-        stroke="currentColor"
-        strokeWidth="1.35"
-      />
-      <path
-        d="M6.75 7.25h.01M6.75 16.75h.01"
-        stroke="currentColor"
-        strokeWidth="1.7"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
-
-/** History: a clock turning back, for every file Weir has already worked on. */
-export function NavIconHistory({ className = "" }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      width="18"
-      height="18"
-      viewBox="0 0 24 24"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      aria-hidden="true"
-    >
-      <path
-        d="M3.5 12a8.5 8.5 0 1 0 2.4-5.9M3.2 3.8v3.6h3.6M12 7.5V12l3 2"
-        stroke="currentColor"
-        strokeWidth="1.35"
+        strokeWidth="1.75"
         strokeLinecap="round"
         strokeLinejoin="round"
       />

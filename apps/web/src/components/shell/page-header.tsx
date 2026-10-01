@@ -1,47 +1,28 @@
 import type { ReactNode } from "react";
-import { PauseControl } from "./pause-control";
-import { ThemeToggle } from "./theme-toggle";
+
+import { useSetPageEyebrow } from "./shell-header-context";
 
 type PageHeaderProps = {
-  title: ReactNode;
-  /** One sentence under the title row. Optional: Processing and Library say it with their content. */
-  lead?: ReactNode;
-  /** Sits right after the title on the same line, e.g. Library's library picker. */
-  titleAfter?: ReactNode;
-  /** A second line beside the lead, right-aligned, e.g. the library's scan status. */
-  aside?: ReactNode;
+  /**
+   * The line above the shell's title, for a page whose line depends on what it has loaded. A page that
+   * leaves it out keeps the menu's own line for the page.
+   */
+  eyebrow?: string;
+  /** Controls that have no room in the shell's header, in a row at the top of the page. */
+  children?: ReactNode;
   dataTestId?: string;
 };
 
 /**
- * Every page's title row: the title on the left, Pause and the theme switch on the right, so a
- * page starts with what it is rather than with a toolbar.
+ * What a page adds to the shell's header, which owns the title, Pause and the theme switch: its own
+ * eyebrow, and an optional row of controls at the top of the page.
  */
-export function PageHeader({
-  title,
-  lead,
-  titleAfter,
-  aside,
-  dataTestId,
-}: PageHeaderProps) {
+export function PageHeader({ eyebrow, children, dataTestId }: PageHeaderProps) {
+  useSetPageEyebrow(eyebrow);
+  if (!children) return null;
   return (
-    <header className="mm-page-head" data-testid={dataTestId}>
-      <div className="mm-page-head__row">
-        <div className="mm-page-head__title-wrap">
-          <h1 className="mm-page-head__title">{title}</h1>
-          {titleAfter}
-        </div>
-        <div className="mm-page-head__actions">
-          <PauseControl />
-          <ThemeToggle />
-        </div>
-      </div>
-      {lead || aside ? (
-        <div className="mm-page-head__sub">
-          {lead ? <p className="mm-page-head__lead">{lead}</p> : <span />}
-          {aside ? <div className="mm-page-head__aside">{aside}</div> : null}
-        </div>
-      ) : null}
-    </header>
+    <div className="mm-page-head" data-testid={dataTestId}>
+      {children}
+    </div>
   );
 }

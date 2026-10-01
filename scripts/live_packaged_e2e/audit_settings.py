@@ -1,4 +1,4 @@
-"""``AuditSettingsMixin``: the Settings tabs, History and Logs jobs, and every System tab except
+"""``AuditSettingsMixin``: the Settings sections, History and Logs jobs, and every System tab except
 Alerts and Media managers (those are ``AuditNotificationsMixin``). Assumes ``AuditCore`` and
 ``AuditShellMixin`` (``open_sidebar``, ``open_tab``, ``open_logs``, ``tab_labels``) in the same
 instance.
@@ -11,23 +11,22 @@ from .config import TIMEOUT_MS
 
 class AuditSettingsMixin:
     def settings_tabs(self) -> None:
-        self.open_sidebar("Settings")
-        self.visible(self.page.get_by_test_id("suite-settings-page"), "Settings page")
         expected = {
             "Workflows": "processing-libraries-section",
             "Rules": "processing-rule-set-workspace",
             "Media managers": "suite-settings-media-managers",
             "Performance": "processing-process-settings",
-            "Cleanup": "processing-maintenance-section",
             "Schedule": "processing-schedules-section",
+            "Cleanup": "processing-maintenance-section",
             "Alerts": "suite-settings-notifications",
         }
-        labels = self.tab_labels("settings-section-tabs")
-        self.require(labels == list(expected), f"Settings tabs are {labels}")
+        # Each section is an entry of its own in the side menu; the page has no row of tabs.
         for tab, test_id in expected.items():
-            self.click(
-                self.page.get_by_role("tab", name=tab, exact=True),
-                f"open Settings {tab} tab",
+            self.open_tab("Settings", tab)
+            self.visible(self.page.get_by_test_id("suite-settings-page"), "Settings page")
+            self.visible(
+                self.page.get_by_role("heading", level=1, name=tab, exact=True),
+                f"Settings {tab} page title",
             )
             self.visible(self.page.get_by_test_id(test_id), f"Settings {tab} panel")
 
@@ -57,9 +56,13 @@ class AuditSettingsMixin:
                     "no library weeks on Schedule",
                 )
 
+        self.require(
+            not self.page.get_by_test_id("settings-section-tabs").count(),
+            "Settings still has a row of tabs of its own",
+        )
         self.screenshot("settings")
         self.record(
-            "Settings workflows, rules, media managers, performance, cleanup, schedule, and alerts tabs"
+            "Settings workflows, rules, media managers, performance, cleanup, schedule, and alerts sections"
         )
 
     def history_and_jobs(self) -> None:

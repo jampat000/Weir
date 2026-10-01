@@ -7,9 +7,8 @@ export function AuthBrandStack() {
       <div className="mm-auth-brand-logo">
         <WeirLogo variant="auth" />
       </div>
-      {/* The same sentence the sidebar carries (brand-header-link.tsx), kept identical on
-          purpose: these are the two places Weir describes itself, and they should not say two
-          different things. The reason it changed is written up there. */}
+      {/* Both of the things Weir does, and neither overstated: Processing also cleans files already
+          sitting in a library, in place. */}
       <p className="mm-auth-brand-tagline">
         Cleans new downloads, and files already in your library.
       </p>

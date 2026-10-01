@@ -1,0 +1,90 @@
+/* The shell's header (components/shell/shell-header.tsx): sticky above every page. */
+
+.mm-header {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 14px var(--mm-header-pad-x);
+  border-bottom: 1px solid var(--mm-header-rule);
+  background: color-mix(in srgb, var(--mm-bg) 85%, transparent);
+  backdrop-filter: blur(24px);
+}
+
+/* Phones only: the button that opens the side menu. */
+.mm-header__menu {
+  display: none;
+}
+
+.mm-header__titles {
+  min-width: 0;
+}
+
+.mm-header__eyebrow {
+  margin: 0;
+  font-size: var(--mm-type-eyebrow);
+  font-weight: 700;
+  letter-spacing: var(--mm-tracking-eyebrow);
+  line-height: 1.35;
+  text-transform: uppercase;
+  color: var(--mm-text2);
+}
+
+.mm-header__title {
+  margin: 4px 0 0;
+  font-size: var(--mm-header-title-size);
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+  color: var(--mm-text1);
+}
+
+/* Where a page puts its own control (a segmented choice, a picker); nothing shows when it has none. */
+.mm-header__slot {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  margin-left: 12px;
+}
+
+.mm-header__slot:empty {
+  display: none;
+}
+
+.mm-header__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  min-width: 0;
+  margin-left: auto;
+}
+
+/* Beside the menu the header stays on one row: the eyebrow and the page's own control give way
+   (wrapping inside themselves) before the status and actions are pushed down a row. */
+@media (min-width: 921px) {
+  .mm-header {
+    flex-wrap: nowrap;
+  }
+
+  .mm-header__actions {
+    flex-shrink: 0;
+    flex-wrap: nowrap;
+  }
+}
+
+/* Empty while all is well, so a pill here is always news. */
+.mm-header-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.mm-header-status:empty {
+  display: none;
+}

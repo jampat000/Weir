@@ -2,6 +2,8 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PageLoading } from "../components/shared/page-loading";
+import { PageHeader } from "../components/shell/page-header";
+import { ShellHeaderSlot } from "../components/shell/shell-header-context";
 import { AppShell } from "./app-shell";
 
 const logoutMutate = vi.fn();
@@ -12,26 +14,31 @@ vi.mock("../lib/auth/queries", () => ({
     mutate: logoutMutate,
     isPending: false,
   }),
-  // The shell now carries the pause control, which needs to know whether the signed-in
-  // person may change it.
-  useMeQuery: () => ({ data: { role: "operator" } }),
+  // The header carries the pause control, which needs to know whether the signed-in person may
+  // change it, and the side menu names them.
+  useMeQuery: () => ({ data: { role: "operator", username: "ann.lee" } }),
+  useSetThemeMutation: () => ({ mutate: vi.fn(), isError: false }),
 }));
 
+const pauseState = {
+  paused: false,
+  paused_until: null as string | null,
+  scan_while_paused: true,
+  reason: "",
+  in_flight_policy: "Work already running finishes.",
+};
 vi.mock("../lib/pause/pause-queries", () => ({
-  usePauseQuery: () => ({
-    data: {
-      paused: false,
-      paused_until: null,
-      scan_while_paused: true,
-      reason: "",
-      in_flight_policy: "Work already running finishes.",
-    },
-  }),
+  usePauseQuery: () => ({ data: pauseState }),
   useSavePause: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
+const readiness = { isError: false };
+vi.mock("../lib/ui/mm-format-date", () => ({
+  useAppDateFormatter: () => (iso: string | null | undefined) => String(iso),
+}));
 vi.mock("../lib/system/readiness-queries", () => ({
   useSystemReadinessQuery: () => ({
+    isError: readiness.isError,
     data: {
       version: "2.1.2",
       machine_name: "RIG",
@@ -39,49 +46,47 @@ vi.mock("../lib/system/readiness-queries", () => ({
   }),
 }));
 
-// The Processing entry says how many cards the Working lane is showing.
-const workingLane = { count: 0 };
+// The Processing entry says how many cards the Working lane is showing; History says how many files
+// need someone.
+const counts = { working: 0, needsYou: 0 };
 vi.mock("../pages/processing/working-count", () => ({
-  useWorkingCount: () => workingLane.count,
+  useWorkingCount: () => counts.working,
 }));
+vi.mock("../lib/processing/needs-you-count", () => ({
+  useNeedsYouCount: () => counts.needsYou,
+}));
+
+function renderShell(
+  entry: string,
+  pages = <Route index element={<div>Main</div>} />,
+) {
+  return render(
+    <MemoryRouter initialEntries={[entry]}>
+      <Routes>
+        <Route path="/" element={<AppShell />}>
+          {pages}
+        </Route>
+      </Routes>
+    </MemoryRouter>,
+  );
+}
+
+const primaryNav = () => screen.getByRole("navigation", { name: "Primary" });
 
 describe("AppShell", () => {
   beforeEach(() => {
     logoutMutate.mockReset();
     scrollToMock.mockReset();
     window.scrollTo = scrollToMock;
-  });
-
-  it("keeps only the version and sign-out controls in the sidebar footer", () => {
-    render(
-      <MemoryRouter initialEntries={["/"]}>
-        <Routes>
-          <Route path="/" element={<AppShell />}>
-            <Route index element={<div>Home</div>} />
-          </Route>
-        </Routes>
-      </MemoryRouter>,
-    );
-
-    expect(screen.getByText("Version 2.1.2")).toBeInTheDocument();
-    expect(screen.getByTestId("sign-out")).toBeInTheDocument();
-    expect(screen.queryByTestId("sidebar-support")).not.toBeInTheDocument();
-    expect(screen.queryByText("Support Weir")).not.toBeInTheDocument();
-    expect(screen.queryByText(/supporter licence/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/licence checks/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/feature limits/i)).not.toBeInTheDocument();
+    counts.working = 0;
+    counts.needsYou = 0;
+    pauseState.paused = false;
+    pauseState.reason = "";
+    readiness.isError = false;
   });
 
   it("opens on Processing; there is no Home, Dashboard or Activity entry (3.2)", () => {
-    render(
-      <MemoryRouter initialEntries={["/"]}>
-        <Routes>
-          <Route path="/" element={<AppShell />}>
-            <Route index element={<div>Main</div>} />
-          </Route>
-        </Routes>
-      </MemoryRouter>,
-    );
+    renderShell("/");
 
     expect(screen.getByRole("link", { name: "Processing" })).toHaveAttribute(
       "href",
@@ -95,18 +100,9 @@ describe("AppShell", () => {
   });
 
   it("sends every nav item to the screen its label names, and has no others", () => {
-    render(
-      <MemoryRouter initialEntries={["/"]}>
-        <Routes>
-          <Route path="/" element={<AppShell />}>
-            <Route index element={<div>Main</div>} />
-          </Route>
-        </Routes>
-      </MemoryRouter>,
-    );
+    renderShell("/");
 
-    const nav = screen.getByRole("navigation", { name: "Primary" });
-    const items = within(nav)
+    const items = within(primaryNav())
       .getAllByRole("link")
       .map((link) => [link.textContent, link.getAttribute("href")]);
 
@@ -116,71 +112,87 @@ describe("AppShell", () => {
       ["Processing", "/"],
       ["History", "/history"],
       ["Library", "/library"],
-      ["Settings", "/settings"],
+      ["Workflows", "/settings"],
+      ["Rules", "/settings?tab=rules"],
+      ["Media managers", "/settings?tab=media-managers"],
+      ["Performance", "/settings?tab=performance"],
+      ["Schedule", "/settings?tab=schedule"],
+      ["Cleanup", "/settings?tab=cleanup"],
+      ["Alerts", "/settings?tab=alerts"],
       ["System", "/system"],
     ]);
   });
 
-  it("marks only the current screen, and marks nothing on a page that is not one", () => {
-    const { unmount } = render(
-      <MemoryRouter initialEntries={["/library"]}>
-        <Routes>
-          <Route path="/" element={<AppShell />}>
-            <Route index element={<div>Processing</div>} />
-            <Route path="library" element={<div>Library</div>} />
-            <Route path="*" element={<div>Not found</div>} />
-          </Route>
-        </Routes>
-      </MemoryRouter>,
-    );
+  it("groups the menu under Live, Your library, Setup and Weir", () => {
+    renderShell("/");
 
+    expect(
+      within(primaryNav())
+        .getAllByRole("group")
+        .map((group) => group.getAttribute("aria-labelledby"))
+        .map((id) => document.getElementById(id ?? "")?.textContent),
+    ).toEqual(["Live", "Your library", "Setup", "Weir"]);
+  });
+
+  it("marks only the current screen, and marks nothing on a page that is not one", () => {
+    const pages = (
+      <>
+        <Route index element={<div>Processing</div>} />
+        <Route path="library" element={<div>Library</div>} />
+        <Route path="*" element={<div>Not found</div>} />
+      </>
+    );
     const current = () =>
-      within(screen.getByRole("navigation", { name: "Primary" }))
+      within(primaryNav())
         .getAllByRole("link")
         .filter((link) => link.getAttribute("aria-current") === "page")
         .map((link) => link.textContent);
 
+    const { unmount } = renderShell("/library", pages);
     expect(current()).toEqual(["Library"]);
     unmount();
 
     // `/dashboard` is the Not found page now that 3.0.0 dropped its redirect (#585). Processing is
     // the index route, so it must not claim to be the screen you are on.
-    render(
-      <MemoryRouter initialEntries={["/dashboard"]}>
-        <Routes>
-          <Route path="/" element={<AppShell />}>
-            <Route index element={<div>Home</div>} />
-            <Route path="*" element={<div>Not found</div>} />
-          </Route>
-        </Routes>
-      </MemoryRouter>,
-    );
-
+    renderShell("/dashboard", pages);
     expect(current()).toEqual([]);
   });
 
+  it("marks the Settings section the address names, not Settings as a whole", () => {
+    const pages = <Route path="settings" element={<div>Settings</div>} />;
+    const current = () =>
+      within(primaryNav())
+        .getAllByRole("link")
+        .filter((link) => link.getAttribute("aria-current") === "page")
+        .map((link) => link.textContent);
+
+    const { unmount } = renderShell("/settings", pages);
+    expect(current()).toEqual(["Workflows"]);
+    unmount();
+
+    const second = renderShell("/settings?tab=schedules", pages);
+    expect(current()).toEqual(["Schedule"]);
+    second.unmount();
+
+    renderShell("/settings?tab=alerts&library=3", pages);
+    expect(current()).toEqual(["Alerts"]);
+  });
+
   it("shows how many files the Working lane holds beside Processing, and nothing when none are", () => {
-    workingLane.count = 2;
-    const view = render(
-      <MemoryRouter initialEntries={["/library"]}>
-        <Routes>
-          <Route path="/" element={<AppShell />}>
-            <Route path="library" element={<div>Library</div>} />
-          </Route>
-        </Routes>
-      </MemoryRouter>,
-    );
+    counts.working = 2;
+    const pages = <Route path="library" element={<div>Library</div>} />;
+    const view = renderShell("/library", pages);
     const live = screen.getByRole("link", { name: "Processing, 2 working" });
     expect(
       within(live).getByTestId("nav-processing-working"),
-    ).toHaveTextContent("2 working");
+    ).toHaveTextContent("2");
 
-    workingLane.count = 0;
+    counts.working = 0;
     view.rerender(
       <MemoryRouter initialEntries={["/library"]}>
         <Routes>
           <Route path="/" element={<AppShell />}>
-            <Route path="library" element={<div>Library</div>} />
+            {pages}
           </Route>
         </Routes>
       </MemoryRouter>,
@@ -191,16 +203,22 @@ describe("AppShell", () => {
     ).toBeInTheDocument();
   });
 
+  it("shows how many files need you beside History, and nothing when none do", () => {
+    counts.needsYou = 3;
+    const { unmount } = renderShell("/");
+    const history = screen.getByRole("link", { name: "History, 3 need you" });
+    expect(
+      within(history).getByTestId("nav-history-needs-you"),
+    ).toHaveTextContent("3");
+    unmount();
+
+    counts.needsYou = 0;
+    renderShell("/");
+    expect(screen.queryByTestId("nav-history-needs-you")).toBeNull();
+  });
+
   it("collapses to icons when asked, and expands again", () => {
-    render(
-      <MemoryRouter initialEntries={["/"]}>
-        <Routes>
-          <Route path="/" element={<AppShell />}>
-            <Route index element={<div>Processing</div>} />
-          </Route>
-        </Routes>
-      </MemoryRouter>,
-    );
+    renderShell("/");
     const sidebar = document.getElementById("mm-primary-sidebar");
     const toggle = screen.getByTestId("sidebar-collapse");
     expect(sidebar).not.toHaveClass("mm-sidebar--collapsed");
@@ -212,51 +230,56 @@ describe("AppShell", () => {
   });
 
   it("names Weir after the machine in the browser tab and the sidebar", () => {
-    render(
-      <MemoryRouter initialEntries={["/"]}>
-        <Routes>
-          <Route path="/" element={<AppShell />}>
-            <Route index element={<div>Main</div>} />
-          </Route>
-        </Routes>
-      </MemoryRouter>,
-    );
+    renderShell("/");
 
     expect(document.title).toBe("Weir · RIG");
-    expect(
-      within(screen.getByRole("complementary")).getAllByText("Weir · RIG"),
-    ).not.toHaveLength(0);
-  });
-
-  it("names the sidebar landmark after the product", () => {
-    render(
-      <MemoryRouter initialEntries={["/"]}>
-        <Routes>
-          <Route path="/" element={<AppShell />}>
-            <Route index element={<div>Main</div>} />
-          </Route>
-        </Routes>
-      </MemoryRouter>,
-    );
-
     expect(
       screen.getByRole("complementary", { name: "Weir · RIG" }),
     ).toBeInTheDocument();
     expect(
-      screen.queryByRole("complementary", { name: "Product" }),
-    ).not.toBeInTheDocument();
+      screen.getByRole("link", { name: "Weir · RIG home" }),
+    ).toBeInTheDocument();
+  });
+
+  it("introduces itself as Weir, a media cleaner, at the top of the menu", () => {
+    renderShell("/");
+
+    const brand = screen.getByRole("link", { name: "Weir · RIG home" });
+    expect(brand).toHaveTextContent("Weir");
+    expect(brand).toHaveTextContent("Media cleaner");
+  });
+
+  it("shows who is signed in, and where, at the foot of the menu", () => {
+    renderShell("/");
+
+    const user = screen.getByTestId("user-menu");
+    expect(user).toHaveTextContent("AL");
+    expect(user).toHaveTextContent("ann.lee");
+    expect(user).toHaveTextContent("@operator · Weir on RIG");
+  });
+
+  it("signs out from the user menu, and keeps the version beside it", () => {
+    renderShell("/");
+
+    expect(screen.queryByTestId("sign-out")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("user-menu"));
+    expect(screen.getByText("Version 2.1.2")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("sign-out"));
+
+    expect(logoutMutate).toHaveBeenCalledTimes(1);
+  });
+
+  it("closes the user menu on Escape", () => {
+    renderShell("/");
+    fireEvent.click(screen.getByTestId("user-menu"));
+
+    fireEvent.keyDown(document, { key: "Escape" });
+
+    expect(screen.queryByTestId("sign-out")).not.toBeInTheDocument();
   });
 
   it("moves focus into the phone menu, closes it on Escape and hands focus back to Menu", () => {
-    render(
-      <MemoryRouter initialEntries={["/"]}>
-        <Routes>
-          <Route path="/" element={<AppShell />}>
-            <Route index element={<div>Main</div>} />
-          </Route>
-        </Routes>
-      </MemoryRouter>,
-    );
+    renderShell("/");
     const menu = screen.getByTestId("shell-nav-toggle");
     menu.focus();
 
@@ -271,35 +294,155 @@ describe("AppShell", () => {
   });
 
   it("shows a screen that is still loading inside the one main landmark", () => {
-    render(
-      <MemoryRouter initialEntries={["/"]}>
-        <Routes>
-          <Route path="/" element={<AppShell />}>
-            <Route index element={<PageLoading label="Loading Processing" />} />
-          </Route>
-        </Routes>
-      </MemoryRouter>,
+    renderShell(
+      "/",
+      <Route index element={<PageLoading label="Loading Processing" />} />,
     );
 
+    const main = screen.getByRole("main");
     expect(screen.getAllByRole("main")).toHaveLength(1);
-    expect(screen.getByRole("status")).toHaveTextContent("Loading Processing");
+    expect(within(main).getByRole("status")).toHaveTextContent(
+      "Loading Processing",
+    );
   });
 
   it("returns document scrolling to the top when the route changes", () => {
-    render(
-      <MemoryRouter initialEntries={["/"]}>
-        <Routes>
-          <Route path="/" element={<AppShell />}>
-            <Route index element={<div>Processing page</div>} />
-            <Route path="library" element={<div>Library page</div>} />
-          </Route>
-        </Routes>
-      </MemoryRouter>,
+    renderShell(
+      "/",
+      <>
+        <Route index element={<div>Processing page</div>} />
+        <Route path="library" element={<div>Library page</div>} />
+      </>,
     );
 
     fireEvent.click(screen.getByRole("link", { name: "Library" }));
 
     expect(screen.getByText("Library page")).toBeInTheDocument();
     expect(scrollToMock).toHaveBeenLastCalledWith(0, 0);
+  });
+});
+
+describe("the shell's header", () => {
+  beforeEach(() => {
+    counts.working = 0;
+    counts.needsYou = 0;
+    pauseState.paused = false;
+    pauseState.reason = "";
+    readiness.isError = false;
+  });
+
+  it("names the page: its eyebrow, and its title as the one heading", () => {
+    renderShell("/");
+
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Processing" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Cleans new downloads and your library"),
+    ).toBeInTheDocument();
+  });
+
+  it("titles a Settings section by its name, with the section's own eyebrow", () => {
+    renderShell(
+      "/settings?tab=media-managers",
+      <Route path="settings" element={<div>Settings</div>} />,
+    );
+
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Media managers" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("The apps Weir hands cleaned files back to"),
+    ).toBeInTheDocument();
+  });
+
+  it("leaves the heading to a page that is not one of the menu's", () => {
+    renderShell(
+      "/nowhere",
+      <Route path="*" element={<h1>This page doesn&apos;t exist.</h1>} />,
+    );
+
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+    expect(
+      screen.getByRole("heading", {
+        level: 1,
+        name: "This page doesn't exist.",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("lets a page replace the eyebrow with a line of its own, and puts the menu's back when it leaves", () => {
+    const view = renderShell(
+      "/",
+      <Route index element={<PageHeader eyebrow="Two files at once" />} />,
+    );
+    expect(screen.getByText("Two files at once")).toBeInTheDocument();
+    expect(
+      screen.queryByText("Cleans new downloads and your library"),
+    ).not.toBeInTheDocument();
+
+    view.unmount();
+    renderShell("/");
+    expect(
+      screen.getByText("Cleans new downloads and your library"),
+    ).toBeInTheDocument();
+  });
+
+  it("puts a page's own control in the header, beside the title", () => {
+    renderShell(
+      "/",
+      <Route
+        index
+        element={
+          <ShellHeaderSlot>
+            <button type="button">Everything</button>
+          </ShellHeaderSlot>
+        }
+      />,
+    );
+
+    const header = screen.getByTestId("shell-header");
+    expect(
+      within(header).getByRole("button", { name: "Everything" }),
+    ).toBeInTheDocument();
+  });
+
+  it("carries Pause and the theme switch", () => {
+    renderShell("/");
+
+    const header = screen.getByTestId("shell-header");
+    expect(within(header).getByTestId("pause-open")).toHaveTextContent(
+      "Pause processing",
+    );
+    expect(within(header).getByTestId("theme-toggle")).toBeInTheDocument();
+  });
+
+  it("shows no status while all is well", () => {
+    renderShell("/");
+
+    expect(screen.queryByTestId("pause-badge")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("status-offline")).not.toBeInTheDocument();
+  });
+
+  it("says Paused, and until when, while processing is paused, with Resume in place of Pause", () => {
+    pauseState.paused = true;
+    renderShell("/");
+
+    expect(screen.getByTestId("pause-badge")).toHaveTextContent(
+      "Paused until you resume",
+    );
+    expect(screen.getByTestId("pause-resume")).toHaveTextContent(
+      "Resume processing",
+    );
+    expect(screen.queryByTestId("pause-open")).not.toBeInTheDocument();
+  });
+
+  it("says Weir cannot be reached when it does not answer", () => {
+    readiness.isError = true;
+    renderShell("/");
+
+    expect(screen.getByTestId("status-offline")).toHaveTextContent(
+      "Can't reach Weir",
+    );
   });
 });

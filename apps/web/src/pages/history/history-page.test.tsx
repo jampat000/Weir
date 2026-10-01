@@ -1,6 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, within } from "@testing-library/react";
-import type { ReactNode } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
@@ -131,9 +130,6 @@ vi.mock("../../lib/pause/pause-queries", () => ({
 }));
 vi.mock("../../lib/settings/queries", () => ({
   useAppSettingsQuery: () => ({ data: undefined }),
-}));
-vi.mock("../../components/shell/page-header", () => ({
-  PageHeader: ({ title }: { title: ReactNode }) => <h1>{title}</h1>,
 }));
 vi.mock("../../lib/processing/files-api", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../lib/processing/files-api")>()),

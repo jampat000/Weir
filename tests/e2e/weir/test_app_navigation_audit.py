@@ -16,14 +16,14 @@ pytestmark = [
     ),
 ]
 
-# Settings tab -> what it shows. Settings is about your media; Weir itself is System.
-SETTINGS_TABS = (
+# Settings section (an entry of its own in the side menu) -> what it shows. Weir itself is System, not Settings.
+SETTINGS_SECTIONS = (
     ("Workflows", "processing-libraries-section"),
     ("Rules", "processing-rule-set-workspace"),
     ("Media managers", "suite-settings-media-managers"),
     ("Performance", "processing-process-settings"),
-    ("Cleanup", "processing-maintenance-section"),
     ("Schedule", "processing-schedules-section"),
+    ("Cleanup", "processing-maintenance-section"),
     ("Alerts", "suite-settings-notifications"),
 )
 
@@ -38,11 +38,17 @@ def test_signed_in_navigation_covers_main_screens_and_tabs(weir_shell: str) -> N
 
             ensure_signed_in(page, base)
 
-            # Five places: Processing (the landing screen), History, Library, Settings and System.
+            # Processing (the landing screen) and History, Library, each Settings section, then System.
             primary = page.get_by_role("navigation", name="Primary")
             # The labels, not the links: the Processing link also carries its "1 working" badge while a file runs.
             expect(primary.locator(".mm-sidebar-link-label")).to_have_text(
-                ["Processing", "History", "Library", "Settings", "System"]
+                [
+                    "Processing",
+                    "History",
+                    "Library",
+                    *[label for label, _ in SETTINGS_SECTIONS],
+                    "System",
+                ]
             )
             for retired in ("Home", "Dashboard", "Activity"):
                 expect(page.get_by_role("link", name=retired, exact=True)).to_have_count(0)
@@ -79,14 +85,15 @@ def test_signed_in_navigation_covers_main_screens_and_tabs(weir_shell: str) -> N
             expect(page).to_have_url(re.compile(r".*/library(?:$|[?#])"))
             expect(page.get_by_test_id("library-page")).to_be_visible()
 
-            open_sidebar(page, "Settings")
-            expect(page).to_have_url(re.compile(r".*/settings(?:$|[?#])"))
-            expect(page.get_by_test_id("suite-settings-page")).to_be_visible()
-            settings_tabs = page.get_by_test_id("settings-section-tabs").get_by_role("tab")
-            expect(settings_tabs).to_have_text([label for label, _ in SETTINGS_TABS])
-            for label, section in SETTINGS_TABS:
-                page.get_by_role("tab", name=label, exact=True).click()
+            # Settings has no row of tabs: the side menu is the way between its sections, and the header
+            # names the one showing.
+            for label, section in SETTINGS_SECTIONS:
+                open_sidebar(page, label)
+                expect(page).to_have_url(re.compile(r".*/settings(?:$|[?#])"))
+                expect(page.get_by_test_id("suite-settings-page")).to_be_visible()
+                expect(page.get_by_role("heading", level=1, name=label, exact=True)).to_be_visible()
                 expect(page.get_by_test_id(section)).to_be_visible()
+            expect(page.get_by_test_id("settings-section-tabs")).to_have_count(0)
 
             open_sidebar(page, "System")
             expect(page).to_have_url(re.compile(r".*/system(?:$|[?#])"))
