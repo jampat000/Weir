@@ -20,7 +20,7 @@ whose source is in [`../docs-site/docs`](../docs-site/docs).
 
 - [`../CONTRIBUTING.md`](../CONTRIBUTING.md) - how changes are made and validated.
 - [`agent-harness.md`](agent-harness.md) - working model for coding agents: where things live and which checks to run.
-- [`local-development.md`](local-development.md) - local setup and the development workflow.
+- [`local-development.md`](local-development.md) - local setup and the development workflow, including `npm run dev:sim`, the web app against a simulated Weir.
 - [`triage.md`](triage.md) - issue labels and triage rules.
 - [`exec-plans/README.md`](exec-plans/README.md) - where execution plans live.
 - [`release.md`](release.md) - the release procedure and what each release produces.

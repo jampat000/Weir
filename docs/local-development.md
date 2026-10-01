@@ -77,6 +77,27 @@ npm run dev
 
 The Vite dev server and **`vite preview`** use **[`scripts/dev-ports.json`](../scripts/dev-ports.json)**. See **[`docs/ports.md`](ports.md)**. To override temporarily, set **`VITE_DEV_API_PROXY_TARGET`** and **`WEIR_DEV_API_PORT`** together.
 
+### Simulation mode (web app without a server)
+
+```powershell
+cd apps/web
+npm run dev:sim
+```
+
+Starts Vite against a small mock of the Weir API (**`apps/web/dev-sim/`**), so the real screens can be built, reviewed and screenshotted with files flowing through them: no .NET server, no account and no media. It prints the URL to open, on the first free port from 8790 (browse it as **`http://localhost:<port>`**; set **`SIM_PORT`** to choose one). It is a development tool only: nothing in the app imports it, it is not part of `npm run build`, and it refuses to start with `NODE_ENV=production`. It writes nothing to disk, never talks to a real Weir, and does not use the dev API port.
+
+What it simulates, in memory for as long as it runs:
+
+- **A signed-in admin** on a machine called MEDIA-PC, with setup finished. Signing out and in again works, and the theme choice is remembered.
+- **Live work.** Files turn up in two workflows (Movies and TV), are held until they stop changing (sometimes with a media manager still importing them), wait for a free slot, then go through the steps a real pass reports: checking, planning, writing, verifying, handing back. Each finishes with a saved size, a hand-back that the media manager takes a few seconds later, and Activity and History entries. Now and then the rules reject a file (no English audio) or a pass fails, and the file waits under "needs you". A library clean also runs now and then. A new session opens with a few hours of history already behind it.
+- **The controls.** Pause and Resume (including a timed pause), "Files at once" and each workflow's own limit are honoured. Process again, Process all again, Remove from History, Move to top and cancelling a queued job act on the simulated files. The Everything / New downloads / Library cleaning filter is the page's own; the server does not implement it.
+- **Live updates the way the app gets them.** The same Activity stream the app uses (`GET /api/v1/activity/stream`): an `activity.latest` frame whenever something is written, and a `processing.progress` frame about once a second with every running file's step and percent.
+- **Settings and System.** Every read answers in the shape of **`apps/web/openapi/weir-openapi.json`**. Saves, creates and deletes (workflows, rule sets, media managers, download clients, notification channels, performance and the rest) are kept in memory and read back. An operation the contract describes that has no hand-written answer gets the contract's own empty answer, and the console says so once. A path the contract does not describe is refused and logged.
+
+Only fictional and public-domain titles are used. Environment variables: **`SIM_SPEED`** (how many times faster than normal the work runs; default 1), **`SIM_SEED`** (replays a session: the same files, in the same order, with the same fates) and **`SIM_PORT`**. Stop it with Ctrl+C. If you started it in the background, stop that process by the PID you recorded, along with its Vite child.
+
+The mock has its own tests, which `npm run test` runs: the state machine in **`dev-sim/engine/`**, that every read answers in the contract's shape, and that every route it has exists in the contract.
+
 ### API contract and generated types (OpenAPI)
 
 **`apps/web/openapi/weir-openapi.json`** is the committed API contract. The server embeds it at build time and serves it at **`/openapi.json`** (pruned to the operations it maps, with its own version), and the web app's TypeScript types are generated from it:
