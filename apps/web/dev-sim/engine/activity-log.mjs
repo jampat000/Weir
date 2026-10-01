@@ -13,6 +13,7 @@ const KEPT_EVENTS = 2000;
  * @property {Record<string, unknown>} detail
  * @property {number | null} libraryId
  * @property {string | null} relativePath
+ * @property {string | null} posterId The id of the title's poster, for an entry about one file.
  * @property {string} result One of success, skipped, warning, retrying, running, failed.
  * @property {string} trigger
  */
@@ -23,7 +24,7 @@ export class ActivityLog {
   #nextId = FIRST_EVENT_ID;
 
   /**
-   * @param {{ type: string, title: string, detail?: Record<string, unknown>, libraryId?: number | null, relativePath?: string | null, result?: string, trigger?: string }} entry
+   * @param {{ type: string, title: string, detail?: Record<string, unknown>, libraryId?: number | null, relativePath?: string | null, posterId?: string | null, result?: string, trigger?: string }} entry
    * @param {number} nowMs
    * @returns {ActivityEvent}
    */
@@ -36,6 +37,7 @@ export class ActivityLog {
       detail: entry.detail ?? {},
       libraryId: entry.libraryId ?? null,
       relativePath: entry.relativePath ?? null,
+      posterId: entry.posterId ?? null,
       result: entry.result ?? "success",
       trigger: entry.trigger ?? "worker",
     };

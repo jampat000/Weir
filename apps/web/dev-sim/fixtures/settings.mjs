@@ -92,6 +92,7 @@ export function initialMetadataProvider() {
     base_url: "",
     key_configured: false,
     known_providers: ["tmdb"],
+    artwork_enabled: true,
   });
 }
 

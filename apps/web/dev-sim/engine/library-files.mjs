@@ -2,7 +2,14 @@
  * The files already sitting in each workflow's library, as the Library page lists them, and which of them Weir has
  * cleaned in place. Titles are the simulation's own.
  */
-import { FILMS, FILMS_4K, FILMS_KIDS, SHOWS } from "./catalogue.mjs";
+import {
+  FILMS,
+  FILMS_4K,
+  FILMS_KIDS,
+  SHOWS,
+  filmPosterId,
+  showPosterId,
+} from "./catalogue.mjs";
 import {
   FOUR_K_LIBRARY_ID,
   KIDS_LIBRARY_ID,
@@ -28,6 +35,7 @@ const MATCHING_OUT_OF_TEN = 4;
 function entry({
   path,
   title,
+  posterId,
   kind,
   sizeBytes,
   height,
@@ -39,6 +47,7 @@ function entry({
   const matches = removedAudio === 0 && removedSubtitles === 0;
   return {
     path,
+    poster_id: posterId,
     size_bytes: sizeBytes,
     modified_at: nowSeconds - ageDays * DAY_SECONDS,
     classification: matches ? "matches" : "would_change",
@@ -89,6 +98,7 @@ function filmEntries(films, { root, kind, nowSeconds }) {
     entry({
       path: `${root}\\${film.title} (${film.year})\\${film.title} (${film.year}) [Bluray-${film.resolution}p].mkv`,
       title: kind === null ? null : film.title,
+      posterId: filmPosterId(film),
       kind,
       sizeBytes: Math.round(film.gigabytes * GIGABYTE),
       height: film.resolution,
@@ -107,6 +117,7 @@ function tvEntries(nowSeconds) {
       return entry({
         path: `${TV_ROOT}\\${show.title}\\Season ${season}\\${show.title} - ${code}.mkv`,
         title: show.title,
+        posterId: showPosterId(show),
         kind: "sonarr",
         sizeBytes: Math.round(show.gigabytes * GIGABYTE),
         height: show.resolution,

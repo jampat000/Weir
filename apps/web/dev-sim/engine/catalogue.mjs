@@ -1,7 +1,9 @@
 /**
- * Fictional and public-domain titles the simulation "downloads", with release-style file names.
- * Nothing here names a real person, hostname or private release.
+ * Public-domain films and open-licence shorts, classic public-domain television and a few fictional shows, which
+ * the simulation "downloads" under release-style file names. Nothing here names a real person, hostname or
+ * private release.
  */
+import { posterIdOf } from "../artwork/poster-id.mjs";
 
 import { FOUR_K_LIBRARY_ID, KIDS_LIBRARY_ID } from "../fixtures/workflows.mjs";
 
@@ -84,18 +86,80 @@ export const filmsFor = (library) =>
       ? FILMS_4K
       : FILMS;
 
-/** @typedef {{ title: string, resolution: 720 | 1080 | 2160, gigabytes: number, season: number }} ShowEntry */
+/** @typedef {{ title: string, year: number, resolution: 720 | 1080 | 2160, gigabytes: number, season: number }} ShowEntry */
 
 /** @type {ShowEntry[]} */
 export const SHOWS = [
-  { title: "Harbour Lights", resolution: 1080, gigabytes: 2.2, season: 1 },
-  { title: "Northbound", resolution: 720, gigabytes: 0.9, season: 3 },
-  { title: "Starlit Relay", resolution: 1080, gigabytes: 1.6, season: 2 },
-  { title: "Glass Orchard", resolution: 1080, gigabytes: 2.8, season: 1 },
-  { title: "Ember and Ash", resolution: 1080, gigabytes: 1.9, season: 2 },
-  { title: "Copper Hollow", resolution: 2160, gigabytes: 5.4, season: 1 },
-  { title: "The Lantern Keepers", resolution: 1080, gigabytes: 2.4, season: 4 },
+  {
+    title: "Harbour Lights",
+    year: 2019,
+    resolution: 1080,
+    gigabytes: 2.2,
+    season: 1,
+  },
+  {
+    title: "The Twilight Zone",
+    year: 1959,
+    resolution: 720,
+    gigabytes: 0.9,
+    season: 3,
+  },
+  { title: "Dragnet", year: 1951, resolution: 1080, gigabytes: 1.6, season: 2 },
+  {
+    title: "Glass Orchard",
+    year: 2021,
+    resolution: 1080,
+    gigabytes: 2.8,
+    season: 1,
+  },
+  {
+    title: "The Cisco Kid",
+    year: 1950,
+    resolution: 1080,
+    gigabytes: 1.9,
+    season: 2,
+  },
+  {
+    title: "Copper Hollow",
+    year: 2023,
+    resolution: 2160,
+    gigabytes: 5.4,
+    season: 1,
+  },
+  {
+    title: "The Lantern Keepers",
+    year: 2016,
+    resolution: 1080,
+    gigabytes: 2.4,
+    season: 4,
+  },
 ];
+
+/** The id a film's poster is served under. @param {FilmEntry} film */
+export const filmPosterId = (film) =>
+  posterIdOf({ mediaType: "movie", title: film.title, year: film.year });
+
+/** The id a show's poster is served under: the series' own, whatever the episode. @param {ShowEntry} show */
+export const showPosterId = (show) =>
+  posterIdOf({ mediaType: "tv", title: show.title, year: show.year });
+
+/** Every title the simulation can show, with the id its poster is served under. */
+export function posterTitles() {
+  return [
+    ...[...FILMS, ...FILMS_4K, ...FILMS_KIDS].map((film) => ({
+      id: filmPosterId(film),
+      mediaType: /** @type {const} */ ("movie"),
+      title: film.title,
+      year: film.year,
+    })),
+    ...SHOWS.map((show) => ({
+      id: showPosterId(show),
+      mediaType: /** @type {const} */ ("tv"),
+      title: show.title,
+      year: show.year,
+    })),
+  ];
+}
 
 /** Audio and subtitle tracks the simulated sources carry, and the words a plan uses for them. */
 export const FOREIGN_AUDIO = [

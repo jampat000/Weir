@@ -255,6 +255,7 @@ export class Engine {
         title: "File processing",
         libraryId: file.libraryId,
         relativePath: file.relativePath,
+        posterId: file.posterId,
         result: "running",
         detail: {
           status: "processing",

@@ -23,6 +23,7 @@ export const REJECTED_BY_RULES = "rules";
  * @property {string} libraryName
  * @property {"movie" | "tv"} mediaType
  * @property {string} relativePath
+ * @property {string | null} posterId The id the title's poster is served under.
  * @property {number} sizeBytes
  * @property {{ codec: string, width: number, height: number }} video
  * @property {number} durationSeconds
@@ -59,6 +60,7 @@ export function createFile(fields) {
       width: Math.round((resolution * 16) / 9),
       height: resolution,
     },
+    posterId: null,
     durationSeconds: 6000,
     status: STATUS.WAITING,
     statusReason: "",

@@ -134,6 +134,7 @@ export class Intake {
       libraryName: library.name,
       mediaType: library.media_type,
       relativePath: download.relativePath,
+      posterId: download.posterId,
       sizeBytes: download.sizeBytes,
       durationSeconds: download.durationSeconds,
       video: {

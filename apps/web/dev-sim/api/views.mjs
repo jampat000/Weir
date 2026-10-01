@@ -6,8 +6,9 @@ import { toWire } from "../wire-time.mjs";
  * One download as the files list shows it, with live progress laid over a file being worked on.
  * @param {import("../engine/file.mjs").SimFile} file
  * @param {Record<string, any> | null} live The file's entry in the live-progress frame, when a pass is running.
+ * @param {string | null} posterUrl Where the title's poster is served, or null when there is none to show.
  */
-export function fileOut(file, live) {
+export function fileOut(file, live, posterUrl) {
   const wire = (ms) => (ms === null ? null : toWire(ms));
   return shaped("ProcessingFileOut", {
     kind: "download",
@@ -48,6 +49,7 @@ export function fileOut(file, live) {
     last_seen_at: toWire(file.updatedAt),
     last_attempt_at: wire(file.lastAttemptAt),
     handback: file.handback,
+    poster_url: posterUrl,
   });
 }
 
@@ -57,8 +59,9 @@ const moduleOf = (type) =>
 
 /**
  * @param {import("../engine/activity-log.mjs").ActivityEvent} event
+ * @param {string | null} posterUrl Where the poster of the title the entry is about is served, or null.
  */
-export function activityItem(event) {
+export function activityItem(event, posterUrl) {
   return shaped("ActivityEventItemOut", {
     id: event.id,
     created_at: toWire(event.createdAt),
@@ -71,5 +74,6 @@ export function activityItem(event) {
     run_key: null,
     title: event.title,
     detail: JSON.stringify(event.detail),
+    poster_url: posterUrl,
   });
 }

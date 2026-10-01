@@ -8,12 +8,20 @@
  *   SIM_SPEED  how many times faster than normal the simulated work runs (default 1)
  *   SIM_SEED   the seed for which files turn up and how they fare, to replay a session
  *   SIM_PORT   the web port to use; by default the first free one from 8790
+ *   SIM_POSTERS  off to skip the lookups for real posters and draw every poster; by default each title is looked up
+ *              once in Deluno's metadata service and kept in the temp folder (weir-dev-sim/posters), so a later
+ *              start asks nothing
  *   SIM_SCENARIO  busy (the default), quiet (little happening, to see the empty screens) or trouble (many files
  *              needing a person, and a connection that is down)
  */
 import { spawn } from "node:child_process";
 import net from "node:net";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+
+import { loadGatewayPosters } from "./artwork/gateway-posters.mjs";
+import { posterTitles } from "./engine/catalogue.mjs";
 
 import { scenarioNamed } from "./scenarios.mjs";
 import { createSim, DEFAULT_SEED } from "./sim.mjs";
@@ -25,6 +33,7 @@ const VITE_ENTRY = fileURLToPath(
 const FIRST_WEB_PORT = 8790;
 const LAST_WEB_PORT = 8890;
 const LOOPBACK = "127.0.0.1";
+const POSTER_CACHE_DIR = join(tmpdir(), "weir-dev-sim", "posters");
 
 function numberFromEnv(name, fallback) {
   const value = Number(process.env[name]);
@@ -68,6 +77,16 @@ async function main() {
   console.log(
     `[dev-sim] Simulated Weir (${scenario.name}) on ${target} at ${speed}x. Open http://localhost:${webPort}`,
   );
+
+  if (process.env.SIM_POSTERS !== "off") {
+    loadGatewayPosters(posterTitles(), {
+      cacheDir: POSTER_CACHE_DIR,
+      log: console.log,
+      onPoster: (id, image) => sim.artwork.keep(id, image),
+    }).catch((error) =>
+      console.error(`[dev-sim] Posters could not be loaded: ${error.message}`),
+    );
+  }
 
   const vite = spawn(process.execPath, [VITE_ENTRY], {
     stdio: "inherit",

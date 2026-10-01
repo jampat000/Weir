@@ -42,7 +42,11 @@ function listFiles(sim, query) {
     .slice(0, limit);
   return {
     files: shown.map((file) =>
-      fileOut(file, live.get(file.relativePath) ?? null),
+      fileOut(
+        file,
+        live.get(file.relativePath) ?? null,
+        sim.artwork.urlFor(file.posterId),
+      ),
     ),
     status_counts: statusCounts,
     returned: shown.length,

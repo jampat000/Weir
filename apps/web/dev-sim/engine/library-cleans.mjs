@@ -165,6 +165,7 @@ export class CleanRuns {
         title: `Cleaned ${path.split("\\").pop()}`,
         libraryId,
         relativePath: path,
+        posterId: file?.poster_id ?? null,
         detail: { relative_path: path, outcome: "cleaned", detail },
         trigger: "scheduled",
       },

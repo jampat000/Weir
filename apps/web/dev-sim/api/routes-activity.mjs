@@ -62,6 +62,10 @@ function filtered(sim, query) {
     .reverse();
 }
 
+function itemOf(sim, event) {
+  return activityItem(event, sim.artwork.urlFor(event.posterId));
+}
+
 function recent(sim, query) {
   const all = filtered(sim, query);
   const beforeId = intParam(query, "before_id");
@@ -69,7 +73,7 @@ function recent(sim, query) {
     beforeId === null ? all : all.filter((event) => event.id < beforeId);
   const items = older.slice(0, intParam(query, "limit") ?? DEFAULT_PAGE);
   return shaped("ActivityRecentOut", {
-    items: items.map(activityItem),
+    items: items.map((event) => itemOf(sim, event)),
     total: all.length,
     has_more: older.length > items.length,
     oldest_event_at: sim.engine.activity.all()[0]
@@ -92,7 +96,7 @@ function csvLine(item) {
 }
 
 function exported(sim, query) {
-  const items = filtered(sim, query).map(activityItem);
+  const items = filtered(sim, query).map((event) => itemOf(sim, event));
   if (query.get("format") === "json")
     return download(
       JSON.stringify(items, null, 2),

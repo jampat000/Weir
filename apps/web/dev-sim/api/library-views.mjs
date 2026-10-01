@@ -102,6 +102,11 @@ function matchesFilters(file, query) {
   );
 }
 
+/** A library file as the Library page lists it: its poster id is the simulation's own, so it goes out as an address. */
+function fileWire(sim, { poster_id: posterId, ...file }) {
+  return { ...file, poster_url: sim.artwork.urlFor(posterId) };
+}
+
 export function libraryFilesPage(sim, library, query) {
   const all = sim.libraryFiles.list(library.id);
   const sort = SORTERS[query.get("sort")] ? query.get("sort") : "path";
@@ -121,7 +126,9 @@ export function libraryFilesPage(sim, library, query) {
     scan: all.length > 0 ? scanState(sim) : null,
     summary: totalsOf(all),
     filtered: totalsOf(filtered),
-    files: filtered.slice((page - 1) * pageSize, page * pageSize),
+    files: filtered
+      .slice((page - 1) * pageSize, page * pageSize)
+      .map((file) => fileWire(sim, file)),
     total: filtered.length,
     page,
     page_size: pageSize,

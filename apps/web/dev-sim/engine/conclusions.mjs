@@ -53,6 +53,7 @@ export class Conclusions {
         title: "File processing finished",
         libraryId: file.libraryId,
         relativePath: file.relativePath,
+        posterId: file.posterId,
         detail: file.outcomeDetail,
         result,
       },
@@ -139,6 +140,7 @@ export class Conclusions {
         title: "What happened to a cleaned copy",
         libraryId: file.libraryId,
         relativePath: file.relativePath,
+        posterId: file.posterId,
         detail: {
           outcome: "imported",
           outcome_by: by,

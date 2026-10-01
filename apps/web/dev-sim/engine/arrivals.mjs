@@ -1,5 +1,12 @@
 /** What turns up in the watched folders: public-domain films and fictional episodes, and how each will turn out. */
-import { FILMS, SHOWS, episodePath, filmPath } from "./catalogue.mjs";
+import {
+  FILMS,
+  SHOWS,
+  episodePath,
+  filmPath,
+  filmPosterId,
+  showPosterId,
+} from "./catalogue.mjs";
 import { VERDICT } from "./plan.mjs";
 
 const GIGABYTE = 1024 ** 3;
@@ -34,6 +41,7 @@ export function chooseVerdict(
  * @property {number} sizeBytes
  * @property {number} height
  * @property {number} durationSeconds
+ * @property {string} posterId The id the title's poster is served under.
  */
 
 export class Arrivals {
@@ -71,6 +79,7 @@ export class Arrivals {
     const film = this.#nextFilm(titles);
     return {
       relativePath: filmPath(film),
+      posterId: filmPosterId(film),
       sizeBytes: this.#sized(film.gigabytes),
       height: film.resolution,
       durationSeconds: this.#rng.int(5400, 9000),
@@ -86,6 +95,7 @@ export class Arrivals {
     this.#episodes.set(show.title, episode);
     return {
       relativePath: episodePath(show, episode),
+      posterId: showPosterId(show),
       sizeBytes: this.#sized(show.gigabytes),
       height: show.resolution,
       durationSeconds: this.#rng.int(1500, 3300),

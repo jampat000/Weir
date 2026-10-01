@@ -1,4 +1,6 @@
 /** The whole simulated install: its settings, the library, and the engine that keeps files moving. */
+import { Artwork } from "./artwork/artwork.mjs";
+import { posterTitles } from "./engine/catalogue.mjs";
 import { Engine } from "./engine/engine.mjs";
 import { LibraryFiles } from "./engine/library-files.mjs";
 import { createRng } from "./engine/rng.mjs";
@@ -13,6 +15,7 @@ export const DEFAULT_SEED = 20_261_002;
  * @property {Engine} engine
  * @property {ReturnType<typeof createStore>} store
  * @property {LibraryFiles} libraryFiles
+ * @property {Artwork} artwork
  * @property {() => number} now The current time in epoch ms.
  * @property {number} startedAt
  * @property {import("./scenarios.mjs").Scenario} scenario
@@ -32,6 +35,10 @@ export function createSim({
   const startedAt = now();
   const store = createStore({ scenario, startedAt });
   const libraryFiles = new LibraryFiles(startedAt);
+  const artwork = new Artwork({
+    titles: posterTitles(),
+    isEnabled: () => store.metadataProvider.artwork_enabled,
+  });
   const engine = new Engine({
     rng: createRng(seed),
     speed,
@@ -41,5 +48,5 @@ export function createSim({
     startedAt,
   });
   if (withHistory) seedEngine(engine, startedAt);
-  return { engine, store, libraryFiles, now, startedAt, scenario };
+  return { engine, store, libraryFiles, artwork, now, startedAt, scenario };
 }
