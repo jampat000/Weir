@@ -2,7 +2,13 @@ import { describe, expect, it } from "vitest";
 
 import type { FinishedFile } from "../../../lib/activity/processing-outcome";
 import { NOW } from "./pipeline-fixtures";
-import { SHELF_LIMIT, shelfTiles } from "./shelf-model";
+import {
+  needLookWords,
+  SHELF_LIMIT,
+  shelfOf,
+  todayWords,
+  type ShelfScope,
+} from "./shelf-model";
 import { initialsOf, workflowHue } from "./title-tile";
 
 function finished(
@@ -24,11 +30,20 @@ function finished(
   };
 }
 
-const NAMES = new Map([[2, "TV"]]);
+const NAMES = new Map([
+  [1, "Movies"],
+  [2, "TV"],
+]);
+const EVERYTHING: ShelfScope = { filter: "all", workflowId: null, now: NOW };
+const yesterday = () => new Date(NOW - 36 * 3_600_000).toISOString();
+
+function shelf(items: FinishedFile[], scope: ShelfScope = EVERYTHING) {
+  return shelfOf(items, scope, NAMES);
+}
 
 describe("the shelf's tiles", () => {
   it("say the title, what the file shrank by, what was removed and how long ago", () => {
-    const [tile] = shelfTiles([finished(1)], "all", NOW, NAMES);
+    const [tile] = shelf([finished(1)]).tiles;
 
     expect(tile).toMatchObject({
       title: "The Quiet Harbour S01E01",
@@ -36,43 +51,36 @@ describe("the shelf's tiles", () => {
       what: "2 audio, 4 subtitles removed",
       ago: "3 min ago",
       workflow: "TV",
+      workflowKnown: true,
       fresh: false,
     });
   });
 
   it("wear the ring while the file has only just finished", () => {
-    const [tile] = shelfTiles(
-      [finished(1, { finishedAt: new Date(NOW - 10_000).toISOString() })],
-      "all",
-      NOW,
-      NAMES,
-    );
+    const [tile] = shelf([
+      finished(1, { finishedAt: new Date(NOW - 10_000).toISOString() }),
+    ]).tiles;
 
     expect(tile.fresh).toBe(true);
     expect(tile.ago).toBe("just now");
   });
 
   it("say what became of a file that nothing was removed from, and claim no saving that was not recorded", () => {
-    const tiles = shelfTiles(
-      [
-        finished(1, { removedAudio: 0, removedSubtitles: 0, savedBytes: null }),
-        finished(2, {
-          kind: "already",
-          savedBytes: null,
-          removedAudio: 0,
-          removedSubtitles: 0,
-        }),
-        finished(3, {
-          source: "library",
-          removedAudio: 0,
-          removedSubtitles: 0,
-          savedBytes: null,
-        }),
-      ],
-      "all",
-      NOW,
-      NAMES,
-    );
+    const { tiles } = shelf([
+      finished(1, { removedAudio: 0, removedSubtitles: 0, savedBytes: null }),
+      finished(2, {
+        kind: "already",
+        savedBytes: null,
+        removedAudio: 0,
+        removedSubtitles: 0,
+      }),
+      finished(3, {
+        source: "library",
+        removedAudio: 0,
+        removedSubtitles: 0,
+        savedBytes: null,
+      }),
+    ]);
 
     expect(tiles.map((tile) => tile.what)).toEqual([
       "Cleaned",
@@ -82,16 +90,32 @@ describe("the shelf's tiles", () => {
     expect(tiles.every((tile) => tile.saved === null)).toBe(true);
   });
 
+  it("do not name a workflow that is not known", () => {
+    const [tile] = shelf([finished(1, { libraryId: 99 })]).tiles;
+
+    expect(tile.workflowKnown).toBe(false);
+  });
+
   it("honour the page filter", () => {
     const items = [finished(1), finished(2, { source: "library" })];
+    const keys = (filter: ShelfScope["filter"]) =>
+      shelf(items, { ...EVERYTHING, filter }).tiles.map((tile) => tile.key);
 
-    expect(
-      shelfTiles(items, "download", NOW, NAMES).map((tile) => tile.key),
-    ).toEqual(["1"]);
-    expect(
-      shelfTiles(items, "library", NOW, NAMES).map((tile) => tile.key),
-    ).toEqual(["2"]);
-    expect(shelfTiles(items, "all", NOW, NAMES)).toHaveLength(2);
+    expect(keys("download")).toEqual(["1"]);
+    expect(keys("library")).toEqual(["2"]);
+    expect(keys("all")).toEqual(["1", "2"]);
+  });
+
+  it("honour the workflow the shelf is narrowed to", () => {
+    const items = [
+      finished(1, { libraryId: 2 }),
+      finished(2, { libraryId: 1 }),
+    ];
+
+    const narrowed = shelf(items, { ...EVERYTHING, workflowId: 1 });
+
+    expect(narrowed.tiles.map((tile) => tile.key)).toEqual(["2"]);
+    expect(narrowed.today).toBe(1);
   });
 
   it("are at most as many as the shelf holds, newest first", () => {
@@ -99,10 +123,51 @@ describe("the shelf's tiles", () => {
       finished(i + 1),
     );
 
-    const tiles = shelfTiles(items, "all", NOW, NAMES);
+    const { tiles } = shelf(items);
 
     expect(tiles).toHaveLength(SHELF_LIMIT);
     expect(tiles[0].key).toBe("1");
+  });
+});
+
+describe("what the shelf adds up to", () => {
+  it("counts what finished today, what it saved, and what wants a look", () => {
+    const result = shelf([
+      finished(1),
+      finished(2, { savedBytes: 2 * 1024 ** 2 }),
+      finished(3, { kind: "rejected", savedBytes: null }),
+      finished(4, { kind: "failed", savedBytes: null }),
+      finished(5, { finishedAt: yesterday() }),
+    ]);
+
+    expect(result).toMatchObject({
+      today: 4,
+      savedBytes: 320 * 1024 ** 2,
+      needLook: 2,
+      latest: false,
+    });
+    expect(result.tiles.map((tile) => tile.key)).toEqual(["1", "2", "3", "4"]);
+    expect(todayWords(result)).toBe("4 today · 320 MB saved");
+    expect(needLookWords(result)).toBe("2 need a look");
+  });
+
+  it("says one file needs a look in the singular, and nothing when none do", () => {
+    expect(needLookWords(shelf([finished(1, { kind: "failed" })]))).toBe(
+      "1 needs a look",
+    );
+    expect(needLookWords(shelf([finished(1)]))).toBeNull();
+  });
+
+  it("shows the latest from before when nothing finished today", () => {
+    const result = shelf([finished(5, { finishedAt: yesterday() })]);
+
+    expect(result).toMatchObject({ today: 0, latest: true });
+    expect(result.tiles.map((tile) => tile.key)).toEqual(["5"]);
+    expect(todayWords(result)).toBe("Nothing yet today · latest arrivals");
+  });
+
+  it("is empty, and says nothing finished today, when there are no files at all", () => {
+    expect(shelf([])).toMatchObject({ today: 0, latest: true, tiles: [] });
   });
 });
 

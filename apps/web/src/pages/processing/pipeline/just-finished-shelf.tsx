@@ -1,82 +1,45 @@
 /**
- * Just finished: the files Weir has recently handed back, as a shelf of 2:3 tiles, newest first. Each tile
- * stands where a poster would (Weir has none, so it is the title's initials on its workflow's colour), with
- * how much the file shrank by across its foot, and under it the title and what was done and when. The tile of
- * a file that has just been delivered arrives with a ring and flies in from the Pipeline (see delivery-flight).
- * Clicking a tile opens the file's story.
+ * Just finished: the files Weir has recently handed back, as one shelf of 2:3 tiles, newest first. Chips
+ * above it narrow it to one workflow, with the day's counts for that choice beside them. Each tile is
+ * tagged with its workflow, and the tag goes to that workflow's library. Clicking a tile opens the file's
+ * story.
  *
- * Tiles are sized from the height of their row, exactly 2:3, and only whole tiles are drawn.
+ * Tiles are sized from the height of the shelf, exactly 2:3, and only whole tiles are drawn.
  */
-import { useMemo, type CSSProperties, type ReactElement } from "react";
+import {
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactElement,
+} from "react";
 
 import { Panel } from "../../../components/panels/panel";
 import type { FinishedFile } from "../../../lib/activity/processing-outcome";
-import { classNames } from "../../../lib/ui/class-names";
 import { useElementSize } from "../../../lib/ui/use-element-size";
 import type { Filter } from "../processing-filter";
 import { useFinishedAnnouncement } from "../use-finished-files";
-import { SHELF_TILE_ATTRIBUTE } from "./delivery-flight";
-import { shelfFit, tilesAcross } from "./shelf-layout";
-import { shelfTiles, type ShelfTile } from "./shelf-model";
-import { TitleTile } from "./title-tile";
+import { shelfFit, tilesAcross, type ShelfFit } from "./shelf-layout";
+import { ShelfFilter } from "./shelf-filter";
+import { needLookWords, shelfOf, todayWords } from "./shelf-model";
+import { ShelfTiles } from "./shelf-tiles";
 
-const NO_WORKFLOWS: ReadonlyMap<number, string> = new Map();
+const NO_NAMES: ReadonlyMap<number, string> = new Map();
 
-function Tile({
-  tile,
-  captions,
-  onOpen,
-}: {
-  tile: ShelfTile;
-  captions: boolean;
-  onOpen: (item: FinishedFile) => void;
-}) {
-  const when = tile.ago ? `, ${tile.ago}` : "";
-  return (
-    <li
-      className={classNames(
-        "mm-shelf__item",
-        tile.fresh && "mm-shelf__item--fresh",
-      )}
-    >
-      <button
-        type="button"
-        className="mm-shelf__open"
-        title={[tile.title, tile.detail, tile.ago].filter(Boolean).join(" · ")}
-        aria-label={`${tile.title}: ${tile.what}${when}`}
-        onClick={() => onOpen(tile.item)}
-      >
-        <span
-          className="mm-shelf__art"
-          {...{ [SHELF_TILE_ATTRIBUTE]: tile.path }}
-        >
-          <TitleTile title={tile.title} workflow={tile.workflow} />
-          {tile.saved ? (
-            <span className="mm-shelf__saved">{tile.saved}</span>
-          ) : null}
-        </span>
-        {captions ? (
-          <span className="mm-shelf__caption">
-            {tile.title}
-            <small>
-              {tile.what}
-              {tile.ago ? ` · ${tile.ago}` : ""}
-            </small>
-          </span>
-        ) : null}
-      </button>
-    </li>
-  );
-}
+type Fit = ShelfFit & { across: number };
 
 export type JustFinishedShelfProps = {
   /** The newest finished files, before any filter. */
   items: readonly FinishedFile[];
   filter: Filter;
+  /** Narrows the shelf to this workflow and leaves its chip the only one; the owner's own choice of chip otherwise. */
+  workflowId?: number | null;
   now: number;
-  /** The names of the workflows, by id: each file's tile takes its workflow's colour. */
+  /** The names of the workflows, by id: each file's tile carries its workflow's name and colour. */
   workflowNames?: ReadonlyMap<number, string>;
-  /** What the panel says beside its title, such as how many files were cleaned today. */
+  /** The workflows that have a chip; every named workflow when left out. */
+  enabledWorkflowIds?: ReadonlySet<number>;
+  /** What the day adds up to across every workflow, when the page knows better than the loaded files tell. */
   count?: string;
   /** Opens a finished file's story. */
   onOpen: (item: FinishedFile) => void;
@@ -85,45 +48,88 @@ export type JustFinishedShelfProps = {
 export function JustFinishedShelf({
   items,
   filter,
+  workflowId = null,
   now,
-  workflowNames = NO_WORKFLOWS,
+  workflowNames = NO_NAMES,
+  enabledWorkflowIds,
   count,
   onOpen,
 }: JustFinishedShelfProps): ReactElement {
-  const tiles = useMemo(
-    () => shelfTiles(items, filter, now, workflowNames),
-    [items, filter, now, workflowNames],
+  const [chosen, setChosen] = useState<number | null>(null);
+  const chips = useMemo(
+    () =>
+      [...workflowNames]
+        .filter(([id]) => enabledWorkflowIds?.has(id) ?? true)
+        .map(([id, name]) => ({ id, name })),
+    [workflowNames, enabledWorkflowIds],
+  );
+  const picked = chips.some((chip) => chip.id === chosen) ? chosen : null;
+  const narrowedTo = workflowId ?? picked;
+  const choices =
+    workflowId === null
+      ? [{ id: null, name: "All" }, ...chips]
+      : chips.filter((chip) => chip.id === workflowId);
+  const shelf = useMemo(
+    () =>
+      shelfOf(items, { filter, workflowId: narrowedTo, now }, workflowNames),
+    [items, filter, narrowedTo, now, workflowNames],
   );
   const announcement = useFinishedAnnouncement(items);
-  const [rowRef, row] = useElementSize<HTMLUListElement>();
-  const fit = row.height > 0 ? shelfFit(row.height) : null;
-  const shown = fit ? tiles.slice(0, tilesAcross(row.width, fit.width)) : tiles;
-  const rowStyle: CSSProperties | undefined = fit
-    ? { ["--shelf-tile-w" as string]: `${fit.width}px` }
-    : undefined;
+  const [shelfRef, shelfSize] = useElementSize<HTMLDivElement>();
+  const box = useRef<HTMLUListElement>(null);
+  const [fit, setFit] = useState<Fit | null>(null);
+  // The tile size comes from the tiles' own box, before paint, so nothing shifts.
+  useLayoutEffect(() => {
+    const tiles = box.current;
+    if (!tiles || !(tiles.clientHeight > 0)) return;
+    const size = shelfFit(tiles.clientHeight);
+    const next: Fit = {
+      ...size,
+      across: tilesAcross(tiles.clientWidth, size.width),
+    };
+    setFit((current) =>
+      current &&
+      current.width === next.width &&
+      current.captions === next.captions &&
+      current.across === next.across
+        ? current
+        : next,
+    );
+  }, [shelfSize.width, shelfSize.height]);
+  const countWords = [
+    picked === null && count !== undefined && !shelf.latest
+      ? count
+      : todayWords(shelf),
+    needLookWords(shelf),
+  ]
+    .filter(Boolean)
+    .join(" · ");
   return (
     <Panel
       title="Just finished"
-      count={count}
       leading={<span className="mm-shelf__dot" aria-hidden="true" />}
       to="/history"
       toLabel="History"
     >
       <div className="mm-shelf" data-testid="just-finished-shelf">
-        <ul ref={rowRef} className="mm-shelf__row" style={rowStyle}>
-          {shown.length === 0 ? (
-            <li className="mm-shelf__empty">Nothing has finished recently.</li>
-          ) : (
-            shown.map((tile) => (
-              <Tile
-                key={tile.key}
-                tile={tile}
-                captions={fit?.captions ?? true}
-                onOpen={onOpen}
-              />
-            ))
-          )}
-        </ul>
+        <div className="mm-shelf__head">
+          <ShelfFilter
+            choices={choices}
+            chosen={narrowedTo}
+            onChoose={setChosen}
+          />
+          <span className="mm-shelf__today">{countWords}</span>
+        </div>
+        <div ref={shelfRef} className="mm-shelf__rows">
+          <ShelfTiles
+            tiles={shelf.tiles}
+            tilesShown={fit?.across ?? null}
+            captions={fit?.captions ?? true}
+            tileWidth={fit?.width ?? null}
+            boxRef={box}
+            onOpen={onOpen}
+          />
+        </div>
         <p
           className="sr-only"
           role="status"

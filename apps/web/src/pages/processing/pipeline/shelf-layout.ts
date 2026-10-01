@@ -13,7 +13,7 @@ const ROW_PAD_X = 10;
 const CAPTION_MIN_ROW_PX = 130;
 const MIN_ART_PX = 36;
 /** No tile grows taller than this, however tall the row. */
-const MAX_ART_PX = 165;
+const MAX_ART_PX = 255;
 
 export type ShelfFit = {
   /** A caption (the title and what happened) goes under each tile. */

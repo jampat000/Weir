@@ -1,7 +1,7 @@
 /*
- * Just finished: a shelf of 2:3 tiles, newest first. The pipeline's stylesheet defines the colour block
- * (--pipe-*) and the tile; this one lays the shelf out. A tile's width comes from --shelf-tile-w, set from
- * the height of the row.
+ * Just finished: two shelves of 2:3 tiles, Movies above TV shows, newest first. The pipeline's stylesheet
+ * defines the colour block (--pipe-*) and the tile; this one lays the shelf out. A tile's width comes from
+ * --shelf-tile-w, set from the height of the rows.
  */
 .mm-shelf {
   display: flex;
@@ -28,6 +28,53 @@
   outline-offset: 2px;
 }
 
+/* The chips that narrow the shelf to a workflow, and what that choice finished today. */
+.mm-shelf__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+  padding: 0 18px 4px;
+}
+
+.mm-shelf__filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.mm-shelf__chip {
+  padding: 0;
+  border: 0;
+  border-radius: var(--mm-radius-pill);
+  background: none;
+  cursor: pointer;
+  font: inherit;
+}
+
+.mm-shelf__chip:focus-visible {
+  outline: 2px solid var(--pipe-ring);
+  outline-offset: 2px;
+}
+
+.mm-shelf__chip:hover .mm-chip--neutral {
+  color: var(--pipe-foreground);
+}
+
+.mm-shelf__today {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--pipe-muted);
+}
+
+.mm-shelf__rows {
+  display: flex;
+  min-height: 0;
+  flex: 1 1 0;
+  flex-direction: column;
+  padding: 0 18px 6px;
+}
+
 .mm-shelf__row {
   display: flex;
   min-height: 0;
@@ -36,13 +83,14 @@
   align-items: flex-start;
   gap: 12px;
   box-sizing: border-box;
-  margin: 0 13px;
+  margin: 0 -4px;
   padding: 7px 5px 5px;
   overflow: hidden;
   list-style: none;
 }
 
 .mm-shelf__item {
+  position: relative;
   display: flex;
   width: var(--shelf-tile-w, 80px);
   flex: none;
@@ -91,6 +139,41 @@
     0 0 26px color-mix(in srgb, var(--pipe-success) 45%, transparent);
 }
 
+/* The workflow the file belongs to, across the top of its tile. */
+.mm-shelf__tag {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 2;
+  box-sizing: border-box;
+  width: var(--shelf-tile-w, 80px);
+  padding: 2px 5px;
+  overflow: hidden;
+  border-radius: 10px 10px 0 0;
+  background: hsl(222 40% 6% / 0.82);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: hsl(220 18% 96%);
+  text-decoration: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mm-shelf__tag:hover {
+  text-decoration: underline;
+}
+
+.mm-shelf__tag:focus-visible {
+  outline: 2px solid var(--pipe-ring);
+  outline-offset: -2px;
+}
+
+/* A tile held back for the flight from the Pipeline hides its tag with it. */
+.mm-shelf__item:has([data-delivery-held]) .mm-shelf__tag {
+  visibility: hidden;
+}
+
 /* How much the file shrank by, across the foot of its tile. */
 .mm-shelf__saved {
   position: absolute;
@@ -125,13 +208,6 @@
   font-weight: 500;
   color: var(--pipe-muted);
   text-overflow: ellipsis;
-}
-
-.mm-shelf__empty {
-  padding: 6px 0;
-  font-size: 13px;
-  color: var(--pipe-muted);
-  white-space: nowrap;
 }
 
 @keyframes mm-shelf-arrive {

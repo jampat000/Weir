@@ -87,7 +87,7 @@ describe("the shelf's tiles", () => {
     expect(shelfFit(190)).toEqual({ captions: true, width: 96 });
     expect(shelfFit(100)).toEqual({ captions: false, width: 58 });
     expect(shelfFit(10).width).toBe(24);
-    expect(shelfFit(2000).width).toBe(110);
+    expect(shelfFit(2000).width).toBe(170);
   });
 
   it("draws whole tiles only", () => {

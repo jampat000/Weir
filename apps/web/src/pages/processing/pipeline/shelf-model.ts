@@ -1,5 +1,6 @@
 import type { FinishedFile } from "../../../lib/activity/processing-outcome";
 import { formatBytes } from "../../../lib/format/bytes";
+import { parseAppTime } from "../../../lib/ui/mm-format-date";
 import type { Filter } from "../processing-filter";
 import { prettyName } from "../processing-model";
 import {
@@ -21,7 +22,10 @@ export type ShelfTile = {
   key: string;
   path: string;
   title: string;
+  /** The workflow's name, which the tile is tinted for. */
   workflow: string;
+  /** Whether the workflow is known: an unknown one is tinted but not named on the tile. */
+  workflowKnown: boolean;
   /** What the file shrank by, "−318 MB"; nothing when no sizes were recorded. */
   saved: string | null;
   /** What was done to it, in a few words: "2 audio, 4 subtitles removed". */
@@ -32,6 +36,25 @@ export type ShelfTile = {
   /** The whole sentence, for the tooltip. */
   detail: string;
   item: FinishedFile;
+};
+
+/** What Just finished adds up to: today's counts and the tiles to show, newest first. */
+export type Shelf = {
+  /** Files that finished today, and what they add up to. */
+  today: number;
+  savedBytes: number;
+  /** Today's files that were rejected or could not be finished, which want the owner's eye. */
+  needLook: number;
+  /** Nothing finished today, so the tiles are the latest from before. */
+  latest: boolean;
+  tiles: ShelfTile[];
+};
+
+export type ShelfScope = {
+  filter: Filter;
+  /** Only this workflow's files; every workflow's when null. */
+  workflowId: number | null;
+  now: number;
 };
 
 const SHORT_WHAT: Partial<Record<FinishedFile["kind"], string>> = {
@@ -51,31 +74,74 @@ function whatWasDone(item: FinishedFile): string {
   );
 }
 
-/**
- * The tiles of the shelf: the newest finished files the page filter lets through. `workflowNames` says which
- * workflow each file's tile is tinted for.
- */
-export function shelfTiles(
-  items: readonly FinishedFile[],
-  filter: Filter,
+function isToday(iso: string, now: number): boolean {
+  const at = parseAppTime(iso);
+  return (
+    at != null && new Date(at).toDateString() === new Date(now).toDateString()
+  );
+}
+
+function tileOf(
+  item: FinishedFile,
   now: number,
-  workflowNames: ReadonlyMap<number, string>,
-): ShelfTile[] {
-  return items
-    .filter((item) => shownBy(filter, item))
-    .slice(0, SHELF_LIMIT)
-    .map((item) => ({
-      key: String(item.id),
-      path: item.relativePath,
-      title: prettyName(item.relativePath),
-      workflow:
-        (item.libraryId != null && workflowNames.get(item.libraryId)) ||
-        UNKNOWN_WORKFLOW,
-      saved: item.savedBytes ? `−${formatBytes(item.savedBytes)}` : null,
-      what: whatWasDone(item),
-      ago: ago(item.finishedAt, now),
-      fresh: isJustNow(item.finishedAt, now),
-      detail: finishedLine(item),
-      item,
-    }));
+  names: ReadonlyMap<number, string>,
+): ShelfTile {
+  const workflow =
+    item.libraryId == null ? undefined : names.get(item.libraryId);
+  return {
+    key: String(item.id),
+    path: item.relativePath,
+    title: prettyName(item.relativePath),
+    workflow: workflow || UNKNOWN_WORKFLOW,
+    workflowKnown: Boolean(workflow),
+    saved: item.savedBytes ? `−${formatBytes(item.savedBytes)}` : null,
+    what: whatWasDone(item),
+    ago: ago(item.finishedAt, now),
+    fresh: isJustNow(item.finishedAt, now),
+    detail: finishedLine(item),
+    item,
+  };
+}
+
+/**
+ * The shelf for the files the page's filter and workflow let through: today's files if there are any,
+ * and otherwise the latest from before.
+ */
+export function shelfOf(
+  items: readonly FinishedFile[],
+  scope: ShelfScope,
+  names: ReadonlyMap<number, string>,
+): Shelf {
+  const wanted = items.filter(
+    (item) =>
+      shownBy(scope.filter, item) &&
+      (scope.workflowId === null || item.libraryId === scope.workflowId),
+  );
+  const today = wanted.filter((item) => isToday(item.finishedAt, scope.now));
+  const latest = today.length === 0;
+  return {
+    today: today.length,
+    savedBytes: today.reduce((sum, item) => sum + (item.savedBytes ?? 0), 0),
+    needLook: today.filter(
+      (item) => item.kind === "rejected" || item.kind === "failed",
+    ).length,
+    latest,
+    tiles: (latest ? wanted : today)
+      .slice(0, SHELF_LIMIT)
+      .map((item) => tileOf(item, scope.now, names)),
+  };
+}
+
+/** "12 today · 41.20 GB saved": what the shelf's files finished today. */
+export function todayWords(shelf: Shelf): string {
+  if (shelf.latest) return "Nothing yet today · latest arrivals";
+  const saved =
+    shelf.savedBytes > 0 ? ` · ${formatBytes(shelf.savedBytes)} saved` : "";
+  return `${shelf.today} today${saved}`;
+}
+
+/** "2 need a look": today's files that want the owner's eye; nothing when none do. */
+export function needLookWords(shelf: Shelf): string | null {
+  if (shelf.needLook === 0) return null;
+  return `${shelf.needLook} ${shelf.needLook === 1 ? "needs" : "need"} a look`;
 }
