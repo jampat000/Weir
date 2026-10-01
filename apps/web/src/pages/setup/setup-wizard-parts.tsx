@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 
 import { AuthBrandStack } from "../../components/brand/auth-brand-stack";
+import { Panel } from "../../components/panels/panel";
 import { ServerFolderPickerButton } from "../../components/ui/server-folder-picker-button";
 import { mmActionButtonClass } from "../../lib/ui/mm-control-roles";
 import type { ConnectedSource } from "./wizard-source";
@@ -26,19 +27,12 @@ export function WizardSection({
   children: ReactNode;
 }) {
   return (
-    <section className="mm-quiet-section" aria-labelledby={headingId}>
-      <div className="mm-quiet-section__head">
-        <h2 id={headingId} className="mm-quiet-section__title">
-          {title}
-        </h2>
+    <Panel title={title} headingId={headingId} padded>
+      <div className="flex flex-col gap-3">
+        <p className="mm-quiet-note">{description}</p>
+        {children}
       </div>
-      <div className="mm-quiet-section__body">
-        <div className="flex flex-col gap-3">
-          <p className="mm-quiet-note">{description}</p>
-          {children}
-        </div>
-      </div>
-    </section>
+    </Panel>
   );
 }
 

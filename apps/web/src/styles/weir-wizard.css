@@ -116,3 +116,12 @@
 .mm-wizard-found--off {
   opacity: 0.65;
 }
+
+/* The wizard's sections are panels, so the card they sit in gives up its own box: the heading and lead
+   stand on the page, and the panels are the only cards. */
+.mm-auth-card.mm-setup-wizard-card {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}

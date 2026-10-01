@@ -9,7 +9,19 @@
   align-items: center;
   justify-content: center;
   padding: var(--mm-space);
-  background: var(--mm-bg);
+  /* Two soft glows of the brand colour behind the card, as on every screen outside the shell. */
+  background:
+    radial-gradient(
+      600px circle at 33% -8%,
+      color-mix(in srgb, var(--mm-primary) 9%, transparent),
+      transparent
+    ),
+    radial-gradient(
+      400px circle at 100% 100%,
+      color-mix(in srgb, var(--mm-primary) 5%, transparent),
+      transparent
+    ),
+    var(--mm-bg);
 }
 
 .mm-auth-frame {
@@ -53,10 +65,10 @@
 }
 
 .mm-auth-card {
-  padding: 1.75rem 1.85rem;
+  padding: 24px;
   background: var(--mm-card-bg);
-  border: 1px solid var(--mm-border);
-  border-radius: var(--mm-radius);
+  border: 1px solid var(--mm-panel-border);
+  border-radius: var(--mm-radius-panel);
   box-shadow: var(--mm-shadow-card);
 }
 
@@ -94,11 +106,12 @@
 
 .mm-auth-banner {
   margin: 0 0 1rem;
-  padding: 0.65rem 0.75rem;
+  padding: 12px 14px;
   font-size: 0.85rem;
-  border-radius: var(--mm-radius-sm);
+  border-radius: var(--mm-radius-field);
   background: var(--mm-status-failed-bg);
-  border: 1px solid var(--mm-status-failed-text);
+  border: 1px solid
+    color-mix(in srgb, var(--mm-status-failed-text) 40%, transparent);
   color: var(--mm-status-failed-text);
 }
 
@@ -114,11 +127,17 @@
   gap: 0.65rem;
 }
 
-/* A field label, in sentence case like every form in the app. The uppercase eyebrow is
- * kept for group titles and column heads (`.mm-auth-eyebrow` above the card title). */
+/* The fields on these screens are the large size, so the one thing to do on the page is easy to hit. */
+.mm-auth-form .mm-input {
+  min-height: var(--mm-control-height-lg);
+}
+
+/* A field label: small, uppercase and tracked, as the cards on the other screens label their columns. */
 .mm-auth-label {
-  font-size: 0.875rem;
-  font-weight: 500;
+  font-size: var(--mm-type-eyebrow);
+  font-weight: 600;
+  letter-spacing: var(--mm-tracking-eyebrow);
+  text-transform: uppercase;
   color: var(--mm-text2);
 }
 
@@ -170,9 +189,9 @@
 
 .mm-startup__card {
   margin-top: 1.5rem;
-  padding: 1rem;
-  border: 1px solid var(--mm-border);
-  border-radius: 0.25rem;
+  padding: 18px;
+  border: 1px solid var(--mm-panel-border);
+  border-radius: var(--mm-radius-panel);
   background: var(--mm-card-bg);
 }
 
@@ -232,10 +251,10 @@
   width: fit-content;
   margin-top: 1.25rem;
   padding: 0.5rem 1rem;
-  border: 1px solid var(--mm-accent);
-  border-radius: 0.25rem;
-  background: var(--mm-accent);
-  color: #000;
+  border: 1px solid var(--mm-primary);
+  border-radius: var(--mm-radius-control);
+  background: var(--mm-primary);
+  color: var(--mm-on-accent);
   font-size: 0.875rem;
   font-weight: 600;
   line-height: 1.25rem;
