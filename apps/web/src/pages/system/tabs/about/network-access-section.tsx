@@ -1,10 +1,8 @@
+import { Chip } from "../../../../components/panels/chip";
 import { QuietSection } from "../../../../components/shared/quiet-section";
 import { useNetworkAccessQuery } from "../../../../lib/settings/queries";
 import type { NetworkAccessState } from "../../../../lib/settings/types";
-import {
-  mmStatusPillClass,
-  type MmStatusTone,
-} from "../../../../lib/ui/mm-status-tone";
+import type { MmStatusTone } from "../../../../lib/ui/mm-status-tone";
 
 function stateTone(state: NetworkAccessState): MmStatusTone {
   if (state === "allowed") return "healthy";
@@ -53,9 +51,7 @@ export function NetworkAccessSection() {
           className="mt-1 flex items-center gap-2 text-base font-semibold text-mm-text1"
           data-testid="about-network-access-status"
         >
-          <span className={mmStatusPillClass(stateTone(status.state))}>
-            {stateLabel(status.state)}
-          </span>
+          <Chip tone={stateTone(status.state)}>{stateLabel(status.state)}</Chip>
           {status.summary}
         </p>
       ) : (

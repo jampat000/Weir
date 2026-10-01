@@ -65,6 +65,12 @@
   margin-right: 0.4rem;
 }
 
+/* A chip beside a row's name keeps a gap from it and from the next chip. */
+.mm-quiet-table__name .mm-chip {
+  margin: 0 0 0 0.4rem;
+  vertical-align: 0.1em;
+}
+
 .mm-quiet-table__strong {
   display: block;
   color: var(--mm-text1);

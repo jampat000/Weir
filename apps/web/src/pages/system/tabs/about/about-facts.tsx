@@ -1,3 +1,4 @@
+import { Panel } from "../../../../components/panels/panel";
 import { useProcessingRuntimeSettingsQuery } from "../../../../lib/processing/maintenance-queries";
 import { REPOSITORY_URL, LICENSE_URL } from "../../../../lib/repository";
 import {
@@ -19,16 +20,12 @@ export function AboutFacts() {
   const ffmpegMissing = ffmpeg === "not installed";
 
   return (
-    <section
-      className="mm-quiet-section"
-      aria-labelledby="about-facts-heading"
-      data-testid="about-facts"
+    <Panel
+      title="What Weir works with"
+      headingId="about-facts-heading"
+      padded
+      dataTestId="about-facts"
     >
-      <div className="mm-quiet-section__head">
-        <h2 id="about-facts-heading" className="mm-quiet-section__title">
-          What Weir works with
-        </h2>
-      </div>
       <dl className="mm-kv">
         {machine ? (
           <div data-testid="about-machine-name">
@@ -131,6 +128,6 @@ export function AboutFacts() {
           </>
         ) : null}
       </dl>
-    </section>
+    </Panel>
   );
 }

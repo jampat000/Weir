@@ -1,10 +1,16 @@
+import { Chip } from "../../../../components/panels/chip";
 import type {
   useProcessingJobCancelPendingMutation,
   useProcessingJobRecoverFinalizeFailedMutation,
 } from "../../../../lib/processing/jobs-inspection/queries";
 import type { ProcessingJobInspectionRow } from "../../../../lib/processing/jobs-inspection/types";
 import { mmActionButtonClass } from "../../../../lib/ui/mm-control-roles";
-import { jobKindLabel, statusLabel, technicalJobSummary } from "./jobs-labels";
+import {
+  jobKindLabel,
+  statusLabel,
+  statusTone,
+  technicalJobSummary,
+} from "./jobs-labels";
 
 function JobActions({
   job,
@@ -68,13 +74,13 @@ export function JobRow({
     <tr data-testid="processing-jobs-row">
       <th
         scope="row"
-        className="mm-quiet-table__name mm-jobs-table__job left-0 z-1 max-w-64 bg-mm-bg-main pr-4"
+        className="mm-quiet-table__name mm-jobs-table__job left-0 z-1 max-w-64 bg-mm-card-bg pr-4"
       >
         <span className="block">{jobKindLabel(job.job_kind)}</span>
         <span className="mm-quiet-table__sub font-mono">Job #{job.id}</span>
       </th>
       <td data-label="Status" className="whitespace-nowrap">
-        {statusLabel(job.status)}
+        <Chip tone={statusTone(job.status)}>{statusLabel(job.status)}</Chip>
       </td>
       <td
         data-label="Updated"

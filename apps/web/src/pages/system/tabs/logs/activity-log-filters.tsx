@@ -12,6 +12,7 @@ import {
   ACTIVITY_RESULT_LABELS,
   ACTIVITY_TRIGGER_LABELS,
 } from "../../../../lib/activity/activity-runs";
+import { Panel } from "../../../../components/panels/panel";
 import { mmActionButtonClass } from "../../../../lib/ui/mm-control-roles";
 
 function Choice({
@@ -69,17 +70,13 @@ export function ActivityLogFiltersSection({
     setDraft((prev) => ({ ...prev, [field]: value }));
 
   return (
-    <section
-      className="mm-quiet-section mm-activity-filters"
-      aria-labelledby="activity-filters-heading"
-      data-testid="activity-filters"
-      data-expanded={moreFilters}
-    >
-      <div className="mm-quiet-section__head">
-        <h2 id="activity-filters-heading" className="mm-quiet-section__title">
-          Filter events
-        </h2>
-        <div className="mm-quiet-section__aside">
+    <Panel
+      title="Filter events"
+      headingId="activity-filters-heading"
+      padded
+      dataTestId="activity-filters"
+      aside={
+        <>
           <button
             type="button"
             className="mm-quiet-link"
@@ -106,9 +103,10 @@ export function ActivityLogFiltersSection({
               Clear →
             </button>
           ) : null}
-        </div>
-      </div>
-      <div className="mm-quiet-section__body">
+        </>
+      }
+    >
+      <div className="mm-activity-filters" data-expanded={moreFilters}>
         <div className="mm-activity-filters__grid">
           <label className="mm-filter-field mm-activity-filters__search">
             Search
@@ -185,6 +183,6 @@ export function ActivityLogFiltersSection({
           </button>
         </div>
       </div>
-    </section>
+    </Panel>
   );
 }

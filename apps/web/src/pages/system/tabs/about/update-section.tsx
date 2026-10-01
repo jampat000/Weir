@@ -1,5 +1,6 @@
 import { useState } from "react";
 
+import { Chip } from "../../../../components/panels/chip";
 import { QuietSection } from "../../../../components/shared/quiet-section";
 import { errorMessage } from "../../../../lib/api/error-message";
 import {
@@ -8,10 +9,7 @@ import {
 } from "../../../../lib/settings/queries";
 import type { UpdateStatus } from "../../../../lib/settings/types";
 import { mmActionButtonClass } from "../../../../lib/ui/mm-control-roles";
-import {
-  mmStatusPillClass,
-  type MmStatusTone,
-} from "../../../../lib/ui/mm-status-tone";
+import { type MmStatusTone } from "../../../../lib/ui/mm-status-tone";
 import { UpdateModeSection } from "./update-mode-section";
 import { UpdateReadyNotice } from "./update-ready-notice";
 
@@ -120,9 +118,9 @@ function ReleaseStatus({
         className="mt-1 flex items-center gap-2 text-base font-semibold text-mm-text1"
         data-testid="suite-settings-release-status"
       >
-        <span className={mmStatusPillClass(statusTone(status.status))}>
+        <Chip tone={statusTone(status.status)}>
           {sentenceCase(status.status.replaceAll("_", " "))}
-        </span>
+        </Chip>
         {status.summary}
       </p>
       <dl className="mm-kv mt-2" aria-label="This Weir install">

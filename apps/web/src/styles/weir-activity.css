@@ -335,8 +335,7 @@ html[data-mm-theme="light"] .mm-activity-item__structured {
   border-top: 1px solid var(--mm-border);
 }
 
-/* The filters are a quiet section now, not a card: `.mm-activity-filters` survives
- * only as the hook the narrow-screen collapse below hangs off. */
+/* The filters sit in a panel; `.mm-activity-filters` is the hook the narrow-screen collapse below hangs off. */
 .mm-activity-filters__grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(11.5rem, 1fr));

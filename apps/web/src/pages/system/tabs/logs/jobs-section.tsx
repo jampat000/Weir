@@ -1,6 +1,7 @@
 import { useId, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
+import { Panel } from "../../../../components/panels/panel";
 import { LoadError } from "../../../../components/shared/load-error";
 import { MmJobsPagination } from "../../../../components/overview/mm-overview-cards";
 import { MmListboxPicker } from "../../../../components/ui/mm-listbox-picker";
@@ -20,7 +21,7 @@ import { JobRow } from "./job-row";
 import { JOBS_FILTER_OPTIONS, filterFromUrl } from "./jobs-labels";
 
 const PAGE_SIZE_OPTIONS = [20, 50, 100];
-const HEAD_CELL = "mm-jobs-table__head top-0 z-20 bg-mm-bg-main";
+const HEAD_CELL = "mm-jobs-table__head top-0 z-20 bg-mm-card-bg";
 
 function FailedLine({ text, testId }: { text: string; testId: string }) {
   return (
@@ -133,102 +134,93 @@ export function JobsSection() {
       aria-labelledby="processing-jobs-inspection-heading"
       data-testid="processing-jobs-inspection-section"
     >
-      <div className="mm-quiet-section">
-        <div className="mm-quiet-section__head">
-          <h2
-            id="processing-jobs-inspection-heading"
-            className="mm-quiet-section__title"
-          >
-            Jobs
-          </h2>
-        </div>
-        <div className="mm-quiet-section__body space-y-4">
-          <p className="mm-quiet-note">
-            Current and recent work, with a clear next step when you need to
-            act.
-          </p>
-          <label className="block min-w-0 max-w-xl">
-            <span id={filterLabelId} className="text-sm text-mm-text2">
-              Show jobs
-            </span>
-            <MmListboxPicker
-              className="mt-2"
-              data-testid="processing-jobs-inspection-filter"
-              ariaLabelledBy={filterLabelId}
-              placeholder="Select filter"
-              options={JOBS_FILTER_OPTIONS}
-              value={filter}
-              onChange={(value) => {
-                setFilter(value as ProcessingJobsInspectionFilter);
+      <Panel
+        title="Jobs"
+        headingId="processing-jobs-inspection-heading"
+        padded
+        bodyClassName="space-y-4"
+      >
+        <p className="mm-quiet-note">
+          Current and recent work, with a clear next step when you need to act.
+        </p>
+        <label className="block min-w-0 max-w-xl">
+          <span id={filterLabelId} className="text-sm text-mm-text2">
+            Show jobs
+          </span>
+          <MmListboxPicker
+            className="mt-2"
+            data-testid="processing-jobs-inspection-filter"
+            ariaLabelledBy={filterLabelId}
+            placeholder="Select filter"
+            options={JOBS_FILTER_OPTIONS}
+            value={filter}
+            onChange={(value) => {
+              setFilter(value as ProcessingJobsInspectionFilter);
+              setPage(1);
+            }}
+          />
+        </label>
+        {q.isPending || me.isPending ? (
+          <p className="text-sm text-mm-text2">Loading jobs…</p>
+        ) : null}
+        {q.isError ? <LoadError thing="jobs" error={q.error} /> : null}
+        {cancel.isError ? (
+          <FailedLine
+            text={errorMessage(cancel.error, "Cancel failed.")}
+            testId="processing-jobs-inspection-cancel-error"
+          />
+        ) : null}
+        {recover.isError ? (
+          <FailedLine
+            text={errorMessage(recover.error, "Recovery failed.")}
+            testId="processing-jobs-inspection-recover-error"
+          />
+        ) : null}
+
+        {!q.isPending && !q.isError && jobs.length === 0 ? (
+          <div className="py-6" data-testid="processing-jobs-inspection-empty">
+            <p className="text-sm font-medium text-mm-text1">
+              No jobs match this view
+            </p>
+            <p className="mt-1 text-xs text-mm-text2">
+              Nothing matches this filter yet. Try{" "}
+              <strong className="text-mm-text2">Recent work</strong> for the
+              latest rows.
+            </p>
+          </div>
+        ) : null}
+
+        {!q.isPending && !q.isError && jobs.length > 0 ? (
+          <>
+            <JobsTable
+              jobs={pagedRows}
+              canAct={canEdit(me.data?.role)}
+              processingPaused={pause.data?.paused === true}
+              cancel={cancel}
+              recover={recover}
+            />
+            <MmJobsPagination
+              page={shownPage}
+              totalPages={totalPages}
+              onPageChange={setPage}
+              pageSize={pageSize}
+              onPageSizeChange={(size) => {
+                setPageSize(size);
                 setPage(1);
               }}
+              pageSizeOptions={PAGE_SIZE_OPTIONS}
             />
-          </label>
-          {q.isPending || me.isPending ? (
-            <p className="text-sm text-mm-text2">Loading jobs…</p>
-          ) : null}
-          {q.isError ? <LoadError thing="jobs" error={q.error} /> : null}
-          {cancel.isError ? (
-            <FailedLine
-              text={errorMessage(cancel.error, "Cancel failed.")}
-              testId="processing-jobs-inspection-cancel-error"
-            />
-          ) : null}
-          {recover.isError ? (
-            <FailedLine
-              text={errorMessage(recover.error, "Recovery failed.")}
-              testId="processing-jobs-inspection-recover-error"
-            />
-          ) : null}
+          </>
+        ) : null}
 
-          {!q.isPending && !q.isError && jobs.length === 0 ? (
-            <div
-              className="py-6"
-              data-testid="processing-jobs-inspection-empty"
-            >
-              <p className="text-sm font-medium text-mm-text1">
-                No jobs match this view
-              </p>
-              <p className="mt-1 text-xs text-mm-text2">
-                Nothing matches this filter yet. Try{" "}
-                <strong className="text-mm-text2">Recent work</strong> for the
-                latest rows.
-              </p>
-            </div>
-          ) : null}
-
-          {!q.isPending && !q.isError && jobs.length > 0 ? (
-            <>
-              <JobsTable
-                jobs={pagedRows}
-                canAct={canEdit(me.data?.role)}
-                processingPaused={pause.data?.paused === true}
-                cancel={cancel}
-                recover={recover}
-              />
-              <MmJobsPagination
-                page={shownPage}
-                totalPages={totalPages}
-                onPageChange={setPage}
-                pageSize={pageSize}
-                onPageSizeChange={(size) => {
-                  setPageSize(size);
-                  setPage(1);
-                }}
-                pageSizeOptions={PAGE_SIZE_OPTIONS}
-              />
-            </>
-          ) : null}
-
-          <p className="text-xs text-mm-text2">
-            Full detail on each outcome is in the{" "}
-            <Link to="/system?tab=history" className="text-mm-accent underline">
-              Activity log
-            </Link>
-            .
-          </p>
-        </div>
-      </div>
+        <p className="text-xs text-mm-text2">
+          Full detail on each outcome is in the{" "}
+          <Link to="/system?tab=history" className="text-mm-accent underline">
+            Activity log
+          </Link>
+          .
+        </p>
+      </Panel>
     </section>
   );
 }

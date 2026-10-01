@@ -1,3 +1,4 @@
+import { Chip } from "../../../../components/panels/chip";
 import { eventDisplay } from "../../../../lib/activity/activity-display";
 import { groupActivityFeed } from "../../../../lib/activity/activity-groups";
 import { summarizeRun } from "../../../../lib/activity/activity-runs";
@@ -53,9 +54,9 @@ export function ActivityLogFeed({
                   </small>
                 </span>
                 {summary.failed > 0 ? (
-                  <span className="mm-status-badge mm-status-badge--failed">
+                  <Chip tone="failed" dot={false}>
                     {summary.failed} failed
-                  </span>
+                  </Chip>
                 ) : null}
               </summary>
               <div className="mm-activity-cluster__events">
@@ -105,9 +106,9 @@ export function ActivityLogFeed({
                   {firstAndLatest(group.events, fmt)}
                 </small>
               </span>
-              <span className="mm-status-badge mm-status-badge--failed">
+              <Chip tone="failed" dot={false}>
                 Review
-              </span>
+              </Chip>
             </summary>
             <div className="mm-activity-cluster__events">
               {group.events.map((ev) => (

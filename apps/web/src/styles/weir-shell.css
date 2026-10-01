@@ -182,24 +182,27 @@ kbd {
   min-width: 0;
 }
 
-/* A row of tabs: ghost buttons, the chosen one outlined in the brand colour. Its colours come from
-   mmSectionTabClass; this holds the row's shape. */
+/* A row of tabs in the header's segmented style: one bordered group, the chosen tab outlined in the brand colour.
+   Its colours come from mmSectionTabClass; this holds the row's shape. */
 .mm-workspace-tabs {
-  width: 100%;
-  margin: 0 0 1.1rem;
+  margin: 0 0 var(--mm-panel-gap);
 }
 
 /* Wraps onto a second line when the row is too narrow: nothing in Weir scrolls left to right
    at any width. */
 .mm-workspace-tabs__list {
-  display: flex;
+  display: inline-flex;
   flex-wrap: wrap;
-  width: 100%;
-  gap: 4px;
+  max-width: 100%;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--mm-hairline);
+  border-radius: var(--mm-radius-field);
+  background: var(--mm-card-bg);
 }
 
 .mm-workspace-tabs__button {
-  min-height: 34px;
+  min-height: 30px;
   padding: 0 14px;
   box-shadow: none;
 }
@@ -208,24 +211,6 @@ kbd {
 .mm-workspace-panel__content {
   width: 100%;
   min-width: 0;
-}
-
-.mm-status-badge {
-  display: inline-flex;
-  align-items: center;
-  border: 1px solid currentColor;
-  border-radius: var(--mm-radius-pill);
-  padding: 0.18rem 0.52rem;
-  font-size: 0.68rem;
-  font-weight: 700;
-  line-height: 1.2;
-  letter-spacing: 0.04em;
-  white-space: nowrap;
-}
-
-.mm-status-badge--failed {
-  color: var(--mm-status-failed-text);
-  background: var(--mm-status-failed-bg);
 }
 
 /* Each class is doubled so the status colour outranks the one- and two-part rules that colour the text it

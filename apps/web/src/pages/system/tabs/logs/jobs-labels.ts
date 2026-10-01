@@ -1,4 +1,5 @@
 import type { ProcessingJobsInspectionFilter } from "../../../../lib/processing/jobs-inspection/queries";
+import type { MmStatusTone } from "../../../../lib/ui/mm-status-tone";
 import type { ProcessingJobInspectionRow } from "../../../../lib/processing/jobs-inspection/types";
 
 const STATUS_LABELS: Record<string, string> = {
@@ -18,6 +19,18 @@ const JOB_KIND_LABELS: Record<string, string> = {
   "processing.work_temp_stale_sweep.v1": "Clean temporary work files",
   "processing.unclaimed_handback_cleanup.v1": "Remove copies nobody picked up",
 };
+
+const STATUS_TONES: Record<string, MmStatusTone> = {
+  leased: "info",
+  completed: "healthy",
+  failed: "failed",
+  handler_ok_finalize_failed: "warning",
+};
+
+/** The chip colour for a job's status; a job that has not started, or was cancelled, is neutral. */
+export function statusTone(status: string): MmStatusTone {
+  return STATUS_TONES[status] ?? "neutral";
+}
 
 export function statusLabel(status: string): string {
   return STATUS_LABELS[status] ?? status;

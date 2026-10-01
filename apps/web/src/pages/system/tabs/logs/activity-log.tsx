@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
+import { Panel } from "../../../../components/panels/panel";
 import { PageLoading } from "../../../../components/shared/page-loading";
 import { eventOptions } from "../../../../lib/activity/activity-display";
 import {
@@ -277,18 +278,12 @@ export function ActivityLog() {
           onApply={applyFilters}
         />
 
-        <section
-          className="mm-quiet-section"
-          aria-labelledby="activity-history-heading"
-        >
-          <div className="mm-quiet-section__head">
-            <h2
-              id="activity-history-heading"
-              className="mm-quiet-section__title"
-            >
-              Events
-            </h2>
-            <div className="mm-quiet-section__aside">
+        <Panel
+          title="Events"
+          headingId="activity-history-heading"
+          padded
+          aside={
+            <>
               {(["csv", "json"] as const).map((format) => (
                 <button
                   key={format}
@@ -311,42 +306,41 @@ export function ActivityLog() {
                   Clear all history →
                 </button>
               ) : null}
-            </div>
-          </div>
-          <div className="mm-quiet-section__body">
-            <section
-              ref={feedRef}
-              className="mm-activity-list"
-              data-testid="activity-feed"
-            >
-              {pendingCount > 0 ? (
-                <div className="sticky top-2 z-10 flex justify-center">
-                  <button
-                    type="button"
-                    className={mmActionButtonClass({ variant: "primary" })}
-                    onClick={() => show(liveData)}
-                  >
-                    {`${plural(pendingCount, "new entry", "new entries")} — show`}
-                  </button>
-                </div>
-              ) : null}
-              <ActivityLogFeed items={visibleItems} fmt={fmt} />
-            </section>
-
-            {hasMore ? (
-              <div className="mt-4">
+            </>
+          }
+        >
+          <section
+            ref={feedRef}
+            className="mm-activity-list"
+            data-testid="activity-feed"
+          >
+            {pendingCount > 0 ? (
+              <div className="sticky top-2 z-10 flex justify-center">
                 <button
                   type="button"
-                  className="mm-quiet-link"
-                  disabled={loadingOlder}
-                  onClick={() => void loadOlderActivity()}
+                  className={mmActionButtonClass({ variant: "primary" })}
+                  onClick={() => show(liveData)}
                 >
-                  {loadingOlder ? "Loading older…" : "Load older activity →"}
+                  {`${plural(pendingCount, "new entry", "new entries")} — show`}
                 </button>
               </div>
             ) : null}
-          </div>
-        </section>
+            <ActivityLogFeed items={visibleItems} fmt={fmt} />
+          </section>
+
+          {hasMore ? (
+            <div className="mt-4">
+              <button
+                type="button"
+                className="mm-quiet-link"
+                disabled={loadingOlder}
+                onClick={() => void loadOlderActivity()}
+              >
+                {loadingOlder ? "Loading older…" : "Load older activity →"}
+              </button>
+            </div>
+          ) : null}
+        </Panel>
       </div>
 
       {clearPreview ? (

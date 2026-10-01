@@ -1,9 +1,9 @@
+import { Chip } from "../../../../components/panels/chip";
 import { formatBytes } from "../../../../lib/format/bytes";
 import type {
   ProcessingRulesPreviewResult,
   ProcessingRulesPreviewTrack,
 } from "../../../../lib/processing/rules-preview-api";
-import { mmStatusPillClass } from "../../../../lib/ui/mm-status-tone";
 
 const TRACK_TYPE_LABELS: Record<ProcessingRulesPreviewTrack["type"], string> = {
   video: "Video",
@@ -58,9 +58,9 @@ function TrackRow({ track }: { track: ProcessingRulesPreviewTrack }) {
           : NOTHING}
       </td>
       <td data-label="Action">
-        <span className={mmStatusPillClass(kept ? "healthy" : "failed")}>
+        <Chip tone={kept ? "healthy" : "failed"} dot={false}>
           {kept ? "Keep" : "Drop"}
-        </span>
+        </Chip>
       </td>
       <td data-label="Flags" className="mm-rules-preview__small">
         {flagsOf(track)}
@@ -89,15 +89,11 @@ export function RulesPreviewResults({
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2 text-sm">
-        <span
-          className={mmStatusPillClass(
-            result.remux_required ? "warning" : "healthy",
-          )}
-        >
+        <Chip tone={result.remux_required ? "warning" : "healthy"}>
           {result.remux_required
             ? "Weir would rewrite this file"
             : "Already matches these rules — no changes needed"}
-        </span>
+        </Chip>
         {sizeText ? (
           <span className="text-mm-text3">
             Estimated size change: about {sizeText} smaller (estimate only)
