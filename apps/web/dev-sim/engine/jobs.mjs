@@ -106,6 +106,41 @@ export class JobBook {
   }
 }
 
+/** What the server says about a job in each state (OperatorJobStatus), with the file named when there is one. */
+function operatorWords(job) {
+  const name = (job.payload.relative_media_path ?? job.payload.path ?? "")
+    .split(/[\\/]/)
+    .pop();
+  const subject = name ? ` for ${name}` : "";
+  switch (job.status) {
+    case JOB_STATUS.PENDING:
+      return [
+        `Weir has queued this work${subject}.`,
+        "No action is needed. Weir will start it when the required worker capacity is available.",
+      ];
+    case JOB_STATUS.LEASED:
+      return [
+        `Weir is working on this job${subject}.`,
+        "No action is needed unless it stays here beyond the normal processing time; then open the job record.",
+      ];
+    case JOB_STATUS.COMPLETED:
+      return [
+        `Weir finished this job${subject}.`,
+        "No action is needed. Open the processing record if you want the detailed outcome.",
+      ];
+    case JOB_STATUS.CANCELLED:
+      return [
+        `This Weir job was cancelled before a worker started it${subject}.`,
+        "No action is needed. If the file still exists and should be processed, start it again from Files.",
+      ];
+    default:
+      return [
+        `Weir could not finish this job${subject}.`,
+        "Open the related Files or Jobs screen for the explanation, fix the cause, and start it again.",
+      ];
+  }
+}
+
 /**
  * A job as the inspection endpoint lists it.
  * @param {Job} job
@@ -113,6 +148,7 @@ export class JobBook {
 export function jobRow(job) {
   const leased = job.status === JOB_STATUS.LEASED;
   const failed = job.status === JOB_STATUS.FAILED;
+  const [message, nextAction] = operatorWords(job);
   return shaped("ProcessingJobInspectionRow", {
     id: job.id,
     job_kind: job.kind,
@@ -126,12 +162,8 @@ export function jobRow(job) {
     last_error: job.lastError,
     created_at: toWire(job.createdAt),
     updated_at: toWire(job.updatedAt),
-    operator_message: failed
-      ? "Weir could not finish this file. The original is untouched."
-      : "",
-    next_action: failed
-      ? "Open the file in History to see what happened, then process it again."
-      : "",
+    operator_message: message,
+    next_action: nextAction,
     technical_detail: job.lastError,
   });
 }
