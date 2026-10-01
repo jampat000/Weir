@@ -29,3 +29,15 @@ it("credits TheTVDB beside it, with a link, whatever the library holds", () => {
   expect(link).toHaveAttribute("href", "https://thetvdb.com");
   expect(link).toHaveAttribute("rel", "noreferrer");
 });
+
+it("shows TMDb's logo as a small image that links to its site", () => {
+  render(<ArtworkCredits />);
+
+  const logo = screen.getByRole("img", { name: "TMDB" });
+  expect(logo).toBeVisible();
+  expect(logo).toHaveClass("h-3.5", "w-auto");
+  expect(logo.closest("a")).toHaveAttribute(
+    "href",
+    "https://www.themoviedb.org",
+  );
+});

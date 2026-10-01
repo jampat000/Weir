@@ -1,3 +1,4 @@
+import tmdbLogoUrl from "../../../../assets/tmdb-logo.svg";
 import { Panel } from "../../../../components/panels/panel";
 
 const TMDB_URL = "https://www.themoviedb.org";
@@ -15,7 +16,15 @@ export function ArtworkCredits() {
       <p className="mm-quiet-note">
         This product uses the TMDB API but is not endorsed or certified by TMDB.
       </p>
-      <p className="mt-4">
+      <div className="mt-4 flex flex-wrap items-center gap-4">
+        <a
+          href={TMDB_URL}
+          target="_blank"
+          rel="noreferrer"
+          data-testid="about-tmdb-logo-link"
+        >
+          <img src={tmdbLogoUrl} alt="TMDB" className="h-3.5 w-auto" />
+        </a>
         <a
           href={TMDB_URL}
           target="_blank"
@@ -25,7 +34,7 @@ export function ArtworkCredits() {
         >
           themoviedb.org →
         </a>
-      </p>
+      </div>
       <p className="mm-quiet-note mt-4">
         TV information and images are provided by TheTVDB.com, but we are not
         endorsed or certified by TheTVDB.com or its affiliates.
