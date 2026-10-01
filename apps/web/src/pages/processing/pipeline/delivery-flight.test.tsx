@@ -152,6 +152,15 @@ describe("a delivered file's poster", () => {
     expect(shelfTile().style.visibility).toBe("hidden");
   });
 
+  it("flies in a frame the size of the card's tile, so the poster's own proportions are those it had on the card", () => {
+    takeOff();
+
+    const frame = ghost();
+    expect(frame?.parentElement).toBe(document.body);
+    expect(frame?.firstElementChild?.classList.contains("mm-tile")).toBe(true);
+    expect(frame?.firstElementChild?.parentElement).toBe(frame);
+  });
+
   it("keeps its shape all the way, scaling by one factor", () => {
     takeOff();
 

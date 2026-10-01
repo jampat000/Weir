@@ -83,9 +83,14 @@ function spotOf(element: HTMLElement): Spot {
 const radiusOf = (element: HTMLElement): number =>
   Number.parseFloat(getComputedStyle(element).borderTopLeftRadius) || 0;
 
-/** The copy of the card's poster, laid out at the card's size and moved only by its transform. */
-function ghostOf({ look: ghost, from }: Delivery): HTMLElement {
-  ghost.classList.add("mm-tile--flying");
+/**
+ * The copy of the card's poster, in a frame laid out at the card's size and moved only by its transform. The frame
+ * stands in for the tile the poster sat in, so the poster's own sizes, which are shares of that tile, stay the same
+ * once it is lifted out of the card.
+ */
+function ghostOf({ look, from }: Delivery): HTMLElement {
+  const ghost = document.createElement("div");
+  ghost.className = "mm-tile--flying";
   ghost.setAttribute("aria-hidden", "true");
   Object.assign(ghost.style, {
     position: "fixed",
@@ -93,11 +98,13 @@ function ghostOf({ look: ghost, from }: Delivery): HTMLElement {
     top: "0",
     width: `${from.width}px`,
     height: `${from.height}px`,
+    overflow: "hidden",
     zIndex: FLIGHT_Z_INDEX,
     pointerEvents: "none",
     transformOrigin: "top left",
     willChange: "transform",
   });
+  ghost.appendChild(look);
   return ghost;
 }
 
@@ -127,7 +134,7 @@ export function flyToShelf(delivery: Delivery): void {
   document.body.appendChild(ghost);
   hold(target);
   target.setAttribute(FLYING_ATTRIBUTE, "");
-  const fromRadius = radiusOf(ghost);
+  const fromRadius = radiusOf(delivery.look);
   const toRadius = radiusOf(target);
   const startedAt = performance.now();
   let frame = 0;
