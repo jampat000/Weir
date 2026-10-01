@@ -614,3 +614,13 @@ body.mm-pipeline-resizing .mm-tile--flying {
     animation: none;
   }
 }
+
+/* Preview placement until the page is reassembled on the new shell. */
+.mm-redesign-board {
+  height: 410px;
+  margin-top: 12px;
+}
+.mm-redesign-shelf {
+  height: 260px;
+  margin-top: 12px;
+}

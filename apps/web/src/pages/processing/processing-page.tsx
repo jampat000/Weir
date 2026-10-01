@@ -23,11 +23,10 @@ import { useProcessingFileLog } from "../../lib/processing/files-queries";
 import { useProcessingFilesAtOnceQuery } from "../../lib/processing/queries";
 import { processingKeys } from "../../lib/processing/query-keys";
 import { useNow } from "../../lib/ui/use-now";
-import { FinishedLane } from "./finished-lane";
-import { EmptyLane, Lane, More } from "./lane";
-import { ArrivingCard, HandingCard, WaitingCard } from "./lane-cards";
-import { LeavingCard } from "./leaving-card";
-import { drawnIn, useLeavingCards } from "./leaving-cards";
+import { useLeavingCards } from "./leaving-cards";
+import { JustFinishedShelf } from "./pipeline/just-finished-shelf";
+import { PipelineBoard } from "./pipeline/pipeline-board";
+import { useFinishedFiles } from "./use-finished-files";
 import { prettyName } from "./processing-model";
 import { FAILED_JOBS_LIMIT, NeedsList } from "./processing-needs";
 import {
@@ -40,7 +39,6 @@ import {
   handingLaneHint,
   processingLead,
 } from "./processing-words";
-import { WorkingCard } from "./working-card";
 import {
   FILES_QUERY,
   useLanes,
@@ -94,6 +92,7 @@ export function ProcessingPage(): React.ReactElement {
   } | null>(null);
   const [filter, setFilter] = useState<Filter>("all");
   // From the unfiltered lanes, so narrowing the page to one kind of file is never taken for a file leaving.
+  const finished = useFinishedFiles();
   const leaving = useLeavingCards(
     lanes.waiting,
     lanes.working,
@@ -139,17 +138,9 @@ export function ProcessingPage(): React.ReactElement {
     );
   }
 
-  const shows = (item: { source: Filter }) =>
-    filter === "all" || filter === item.source;
-  const arriving = filter === "library" ? [] : lanes.arriving;
-  const waiting = lanes.waiting.filter(shows);
-  const working = lanes.working.filter(shows);
-  const handing = lanes.handing.filter(shows);
-  const leavingIn = (lane: "working" | "handing") =>
-    leaving.filter((card) => drawnIn(card) === lane && shows(card));
-  const leavingWorking = leavingIn("working");
-  const leavingHanding = leavingIn("handing");
-  const lanesAtOnce = filesAtOnce.data?.effective_files_at_once ?? null;
+  const workflowNames = new Map(
+    (libraries.data ?? []).map((library) => [library.id, library.name]),
+  );
   const workflowKinds = enabledWorkflowKinds(libraries.data ?? []);
 
   return (
@@ -167,122 +158,24 @@ export function ProcessingPage(): React.ReactElement {
 
       <NeedsList stuck={lanes.stuck} />
 
-      {/* Arriving and Waiting share a column below five-lane width, as do Handing back and Just
-          finished; on a wide screen the two wrappers dissolve and all five sit side by side. */}
-      <div className="mm-live-board">
-        <div className="mm-live-lanes">
-          <div className="mm-live-col mm-live-col--next">
-            <Lane
-              id="arriving"
-              active={arriving.length > 0}
-              label="Arriving"
-              count={arriving.length}
-              hint="Not ready yet: still being written, or held back for a while"
-            >
-              {arriving.length ? (
-                <ul className="mm-live-lane__body">
-                  {arriving.slice(0, ARRIVING_SHOWN).map((item) => (
-                    <ArrivingCard key={item.key} item={item} now={now} />
-                  ))}
-                  <More
-                    count={arriving.length - ARRIVING_SHOWN}
-                    what="arriving"
-                  />
-                </ul>
-              ) : (
-                <EmptyLane>
-                  Nothing arriving. New downloads show up here within seconds.
-                </EmptyLane>
-              )}
-            </Lane>
-
-            <Lane
-              id="waiting"
-              active={waiting.length > 0}
-              label="Waiting"
-              count={waiting.length}
-              hint="Ready, and next in line to start"
-            >
-              {waiting.length ? (
-                <ul className="mm-live-lane__body">
-                  {waiting.slice(0, WAITING_SHOWN).map((item, index) => (
-                    <WaitingCard key={item.key} item={item} index={index} />
-                  ))}
-                  <More count={waiting.length - WAITING_SHOWN} what="waiting" />
-                </ul>
-              ) : (
-                <EmptyLane>Nothing waiting.</EmptyLane>
-              )}
-            </Lane>
-          </div>
-
-          <Lane
-            id="working"
-            active={working.length > 0}
-            label="Working"
-            live={working.length > 0}
-            count={null}
-            hint="Writing a copy that keeps only the tracks your rules want"
-            aside={
-              <span className="mm-live-lane__count">
-                {working.length}
-                {lanesAtOnce != null ? (
-                  <small> of {lanesAtOnce} at once</small>
-                ) : null}
-              </span>
-            }
-          >
-            {/* The cards measure this, not the lane: a lane that is a size container cannot also
-                share the board's rows (subgrid), and sharing them is what lines the lanes up. */}
-            <div className="mm-live-work-area">
-              {working.length || leavingWorking.length ? (
-                <ul className="mm-live-lane__body mm-live-lane__body--work">
-                  {working.map((item) => (
-                    <WorkingCard key={item.key} item={item} onOpen={openFile} />
-                  ))}
-                  {leavingWorking.map((card) => (
-                    <LeavingCard key={card.key} card={card} onOpen={openFile} />
-                  ))}
-                </ul>
-              ) : (
-                <EmptyLane>
-                  {pause.data?.paused
-                    ? "Paused. Nothing new starts until you resume."
-                    : "Room for one more. The next file starts as soon as it is ready."}
-                </EmptyLane>
-              )}
-            </div>
-          </Lane>
-
-          <div className="mm-live-col mm-live-col--done">
-            <Lane
-              id="handing"
-              active={handing.length > 0}
-              label="Handing back"
-              count={handing.length}
-              hint={handingLaneHint(workflowKinds)}
-            >
-              {handing.length || leavingHanding.length ? (
-                <ul className="mm-live-lane__body">
-                  {handing.slice(0, HANDING_SHOWN).map((item) => (
-                    <HandingCard key={item.key} item={item} />
-                  ))}
-                  {leavingHanding.map((card) => (
-                    <LeavingCard key={card.key} card={card} onOpen={openFile} />
-                  ))}
-                  <More
-                    count={handing.length - HANDING_SHOWN}
-                    what="on final checks"
-                  />
-                </ul>
-              ) : (
-                <EmptyLane>Nothing on its final checks.</EmptyLane>
-              )}
-            </Lane>
-
-            <FinishedLane filter={filter} now={now} onOpen={openFinished} />
-          </div>
-        </div>
+      <div className="mm-redesign-board">
+        <PipelineBoard
+          lanes={lanes}
+          leaving={leaving}
+          filter={filter}
+          now={now}
+          paused={pause.data?.paused ?? false}
+          onOpen={openFile}
+        />
+      </div>
+      <div className="mm-redesign-shelf">
+        <JustFinishedShelf
+          items={finished}
+          filter={filter}
+          now={now}
+          workflowNames={workflowNames}
+          onOpen={openFinished}
+        />
       </div>
 
       <FileStoryPanel
