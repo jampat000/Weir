@@ -1,13 +1,13 @@
 /*
- * Library (pages/library/*): the shelves themselves. The title is the picker, one row of chips carries both the
- * numbers and the filters, and a file opens a panel over the table rather than a new screen, so nobody loses
- * their place.
+ * Library (pages/library/*): the files themselves in one panel. The header's picker chooses the workflow, one row
+ * of chips carries both the numbers and the filters, and a file opens a panel over the table rather than a new
+ * screen, so nobody loses their place.
  */
 
 .mm-library {
   display: flex;
   flex-direction: column;
-  gap: calc(14px * var(--mm-density-ui-scale));
+  gap: var(--mm-panel-gap);
 }
 
 .mm-library > .mm-page-head {
@@ -135,12 +135,13 @@
   color: var(--mm-status-failed-text);
 }
 
-/* Search, the counts that are also the filters, and what cleaning would give back. */
+/* Search, the counts that are also the filters, and what cleaning would give back, under the panel's header. */
 .mm-library-toolbar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 10px 14px;
+  padding: 0 18px 12px;
 }
 
 .mm-library-search {
@@ -152,19 +153,31 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--mm-hairline);
+  border-radius: var(--mm-radius-field);
+  background: var(--mm-card-bg);
+}
+
+/* The one chip outside the group stands alone, so it keeps its own edge. */
+.mm-library-toolbar > .mm-library-chip {
+  border-color: var(--mm-hairline);
 }
 
 .mm-library-chip {
-  height: calc(32px * var(--mm-density-ui-scale));
-  padding: 0 12px;
-  border-radius: var(--mm-radius-pill);
-  border: 1px solid var(--mm-border);
-  background: var(--mm-button-quiet-bg);
+  height: 30px;
+  padding: 0 14px;
+  border-radius: var(--mm-radius-control);
+  border: 1px solid transparent;
+  background: transparent;
   color: var(--mm-text2);
-  font: 500 var(--mm-type-caption) var(--mm-font);
+  font: 500 0.8125rem var(--mm-font);
   white-space: nowrap;
   cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
 }
 
 .mm-library-chip b {
@@ -175,18 +188,22 @@
 }
 
 .mm-library-chip:hover {
-  border-color: var(--mm-line);
+  background: var(--mm-surface-2);
   color: var(--mm-text1);
 }
 
 .mm-library-chip[aria-pressed="true"] {
-  border-color: color-mix(in srgb, var(--mm-accent) 45%, transparent);
-  background: var(--mm-accent-soft);
-  color: var(--mm-text1);
+  border-color: color-mix(in srgb, var(--mm-primary) 40%, transparent);
+  background: color-mix(in srgb, var(--mm-primary) 10%, transparent);
+  color: var(--mm-primary);
+}
+
+.mm-library-chip[aria-pressed="true"] b {
+  color: inherit;
 }
 
 .mm-library-problem select.mm-input {
-  height: calc(32px * var(--mm-density-ui-scale));
+  height: 30px;
   min-width: 12rem;
 }
 
@@ -205,7 +222,8 @@
   align-items: flex-start;
   gap: 10px 14px;
   padding: 10px 14px;
-  border-radius: var(--mm-radius);
+  margin: 0 18px 12px;
+  border-radius: var(--mm-radius-control);
   border: 1px solid color-mix(in srgb, var(--mm-accent) 30%, transparent);
   background: var(--mm-accent-soft);
   font-size: var(--mm-type-body);
@@ -236,7 +254,6 @@
 .mm-library-results {
   display: flex;
   flex-direction: column;
-  gap: 8px;
   min-width: 0;
   scroll-margin-top: 16px;
 }
@@ -246,6 +263,8 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 8px 12px;
+  padding: 12px 18px;
+  border-top: 1px solid var(--mm-hairline);
 }
 
 .mm-library-pager__range {
@@ -275,8 +294,6 @@
 .mm-library-empty {
   margin: 0;
   padding: 28px 18px;
-  border-radius: var(--mm-radius);
-  border: 1px dashed var(--mm-line);
   font-size: var(--mm-type-body);
   line-height: 1.55;
   text-align: center;

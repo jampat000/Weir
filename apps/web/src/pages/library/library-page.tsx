@@ -7,6 +7,7 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
+import { Panel } from "../../components/panels/panel";
 import { ApiEntryError } from "../../components/shared/api-entry-error";
 import { PageLoading } from "../../components/shared/page-loading";
 import { PageHeader } from "../../components/shell/page-header";
@@ -269,72 +270,78 @@ export function LibraryPage(): React.ReactElement {
     <div className="mm-page mm-library" data-testid="library-page">
       {header}
 
-      <LibraryToolbar
-        search={search}
-        onSearch={(value) =>
-          showRows(() => {
-            setSearch(value);
-            setPage(1);
-          })
-        }
-        overview={overview.data}
-        filter={filter}
-        onFilter={(next) =>
-          showRows(() => {
-            setFilter(next);
-            setPage(1);
-          })
-        }
-        compact={compact}
-        onCompact={(next) => {
-          setCompact(next);
-          saveCompact(next);
-        }}
-      />
-
-      <LibraryCleanActions
-        selected={selected}
-        selectedSaving={selectedSaving}
-        known={loaded}
-        onClearSelection={() => setSelected(new Set())}
-        flow={flow}
-      />
-
-      <div ref={tableTop} className="mm-library-results">
-        {files.isPending ? (
-          <PageLoading label="Reading this workflow" />
-        ) : files.isError ? (
-          <ApiEntryError error={files.error} />
-        ) : groups.length === 0 ? (
-          <p className="mm-library-empty" data-testid="library-empty">
-            {totals && totals.files > 0
-              ? "Nothing here matches what you asked for. Clear the filters to see the whole library."
-              : "This workflow has not been scanned yet, or its folders hold nothing Weir reads. Check again, or change its folders in Library setup."}
-          </p>
-        ) : (
-          <LibraryTable
-            libraryName={chosen.name}
-            groups={groups}
-            compact={compact}
-            openPath={openPath}
-            selected={selected}
-            onToggle={toggle}
-            onOpen={setOpenPath}
-          />
-        )}
-      </div>
-
-      {files.data ? (
-        <LibraryPager
-          page={page}
-          pageSize={PAGE_SIZE}
-          shown={loaded.length}
-          total={files.data.total}
-          loading={files.isPlaceholderData}
-          hasSelection={selected.size > 0}
-          onPage={turnPage}
+      <Panel
+        title="Files"
+        count={totals ? `${totals.files.toLocaleString()} files` : undefined}
+        className="mm-library-panel"
+      >
+        <LibraryToolbar
+          search={search}
+          onSearch={(value) =>
+            showRows(() => {
+              setSearch(value);
+              setPage(1);
+            })
+          }
+          overview={overview.data}
+          filter={filter}
+          onFilter={(next) =>
+            showRows(() => {
+              setFilter(next);
+              setPage(1);
+            })
+          }
+          compact={compact}
+          onCompact={(next) => {
+            setCompact(next);
+            saveCompact(next);
+          }}
         />
-      ) : null}
+
+        <LibraryCleanActions
+          selected={selected}
+          selectedSaving={selectedSaving}
+          known={loaded}
+          onClearSelection={() => setSelected(new Set())}
+          flow={flow}
+        />
+
+        <div ref={tableTop} className="mm-library-results">
+          {files.isPending ? (
+            <PageLoading label="Reading this workflow" />
+          ) : files.isError ? (
+            <ApiEntryError error={files.error} />
+          ) : groups.length === 0 ? (
+            <p className="mm-library-empty" data-testid="library-empty">
+              {totals && totals.files > 0
+                ? "Nothing here matches what you asked for. Clear the filters to see the whole library."
+                : "This workflow has not been scanned yet, or its folders hold nothing Weir reads. Check again, or change its folders in Library setup."}
+            </p>
+          ) : (
+            <LibraryTable
+              libraryName={chosen.name}
+              groups={groups}
+              compact={compact}
+              openPath={openPath}
+              selected={selected}
+              onToggle={toggle}
+              onOpen={setOpenPath}
+            />
+          )}
+        </div>
+
+        {files.data ? (
+          <LibraryPager
+            page={page}
+            pageSize={PAGE_SIZE}
+            shown={loaded.length}
+            total={files.data.total}
+            loading={files.isPlaceholderData}
+            hasSelection={selected.size > 0}
+            onPage={turnPage}
+          />
+        ) : null}
+      </Panel>
 
       {/* Keyed by the file, so opening another one starts its track choice again. */}
       {openFile ? (

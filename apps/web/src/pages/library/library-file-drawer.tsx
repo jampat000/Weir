@@ -4,6 +4,7 @@
  * never disagree about a file. You can also pick the tracks for this one file (#501), mark it Left alone so
  * nothing cleans it, or ask its media manager to download it again when a past clean took too much (#509).
  */
+import { Chip } from "../../components/panels/chip";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { SidePanel } from "../../components/shared/side-panel";
@@ -53,26 +54,22 @@ function FileChips({
 }) {
   return (
     <div className="mm-drawer__chips">
-      {file.video_height ? (
-        <span className="mm-drawer__chip">{file.video_height}p</span>
-      ) : null}
+      {file.video_height ? <Chip dot={false}>{file.video_height}p</Chip> : null}
       {file.video_codec && file.video_codec !== "unknown" ? (
-        <span className="mm-drawer__chip">
-          {videoCodecName(file.video_codec)}
-        </span>
+        <Chip dot={false}>{videoCodecName(file.video_codec)}</Chip>
       ) : null}
-      <span className="mm-drawer__chip">{formatBytes(file.size_bytes)}</span>
+      <Chip dot={false}>{formatBytes(file.size_bytes)}</Chip>
       {file.manager_kind ? (
-        <span className="mm-drawer__chip mm-drawer__chip--ok">
+        <Chip tone="healthy">
           {MANAGER_NAMES[file.manager_kind] ?? file.manager_kind}: matched
-        </span>
+        </Chip>
       ) : null}
       {file.cleaned_at ? (
-        <span className="mm-drawer__chip mm-drawer__chip--ok">
+        <Chip tone="healthy">
           Cleaned {new Date(file.cleaned_at * 1000).toLocaleDateString()}
-        </span>
+        </Chip>
       ) : null}
-      {leftAlone ? <span className="mm-drawer__chip">Left alone</span> : null}
+      {leftAlone ? <Chip dot={false}>Left alone</Chip> : null}
     </div>
   );
 }

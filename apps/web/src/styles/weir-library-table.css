@@ -16,14 +16,16 @@
     minmax(0, 1.2fr) 5.5rem 5rem;
   align-items: center;
   gap: 10px;
-  padding: 7px 8px;
-  border-bottom: 1px solid var(--mm-border-sidebar);
+  padding: 7px 18px;
+  border-bottom: 1px solid var(--mm-hairline);
   font-size: var(--mm-type-body);
   color: var(--mm-text2);
 }
 
 .mm-library-row--head {
-  border-bottom-color: var(--mm-line);
+  min-height: 36px;
+  border-top: 1px solid var(--mm-hairline);
+  background: color-mix(in srgb, var(--mm-surface-2) 40%, transparent);
   font-size: var(--mm-type-eyebrow);
   font-weight: 600;
   letter-spacing: var(--mm-tracking-eyebrow);
@@ -32,7 +34,7 @@
 }
 
 .mm-library-row--open {
-  background: var(--mm-accent-soft);
+  background: color-mix(in srgb, var(--mm-primary) 8%, transparent);
 }
 
 .mm-library-row--would_change .mm-library-verdict {
@@ -56,8 +58,8 @@
   flex-wrap: wrap;
   align-items: baseline;
   gap: 4px 12px;
-  padding: 16px 8px 6px;
-  border-bottom: 1px solid var(--mm-line);
+  padding: 16px 18px 6px;
+  border-bottom: 1px solid var(--mm-hairline);
 }
 
 .mm-library-grouprow__title {
@@ -131,7 +133,7 @@
 
 /* Compact rows: the one density choice that changes what fits rather than how big everything is. */
 .mm-library-table--compact .mm-library-row {
-  padding: 3px 8px;
+  padding: 3px 18px;
   font-size: var(--mm-type-caption);
 }
 
@@ -140,7 +142,7 @@
 }
 
 .mm-library-table--compact .mm-library-grouprow {
-  padding: 10px 8px 4px;
+  padding: 10px 18px 4px;
 }
 
 @container mm-library-table (max-width: 860px) {

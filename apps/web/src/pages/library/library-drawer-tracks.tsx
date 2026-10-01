@@ -1,4 +1,5 @@
 /** The file panel's track lists: what the rules would keep and remove, or your own choice while you make one. */
+import { Chip } from "../../components/panels/chip";
 import { describeTrack, positionsByKind } from "../../lib/format/track";
 import type { ProcessingRulesPreviewTrack } from "../../lib/processing/rules-preview-api";
 
@@ -35,11 +36,9 @@ export function TrackList({
         const keeping = kept ? kept.has(track.index) : rulesKeep(track);
         const row = (
           <>
-            <span
-              className={`mm-drawer__verdict-tag mm-drawer__verdict-tag--${keeping ? "keep" : "drop"}`}
-            >
+            <Chip tone={keeping ? "healthy" : "warning"} dot={false}>
               {keeping ? "Keep" : "Remove"}
-            </span>
+            </Chip>
             <span className="mm-drawer__track-name">
               {describeTrack(track, positions.get(track.index) ?? 1)}
             </span>
