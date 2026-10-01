@@ -81,6 +81,7 @@ job without a workflow change.
 - **`support/fake_manager.py`** — `FakeManager`, a threaded HTTP server that records every request,
   with presets for Sonarr/Radarr v3 (status, root folders, a scriptable queue with `DELETE`, command,
   manual import) and Deluno (health, manifest with libraries and capabilities, queue, processor events).
+- **`support/fake_gateway.py`** — `FakeGateway`, Deluno's metadata service played locally: it answers the titles a test taught it with a poster, serves the image, records every request and can answer "busy". Every server runs with `WEIR_ARTWORK_GATEWAY_URL=off` unless a test points it at the fake, so no test reaches the real service.
 - **`support/fake_ffmpeg.py`** and **`support/fake_media_tool.py`** — fake `ffprobe`/`ffmpeg` installed
   into a folder that `WEIR_FFMPEG_DIR` points at. A fixture file written with `fake_media_bytes(probe(...))`
   carries its own ffprobe answer; `set_file_rule("film.mkv", remux_error=..., remux_fail_times=...,
