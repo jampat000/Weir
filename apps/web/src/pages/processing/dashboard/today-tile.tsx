@@ -1,5 +1,3 @@
-import { useState } from "react";
-
 import {
   StatSide,
   StatTile,
@@ -8,7 +6,7 @@ import {
 import { formatBytes } from "../../../lib/format/bytes";
 import type { Filter } from "../processing-filter";
 import { useHandedBack } from "../use-handed-back";
-import { chartCaption, handedBackSentence } from "./handed-back-words";
+import { handedBackSentence } from "./handed-back-words";
 import { showNeedsPanel } from "./show-needs-panel";
 import { TodayChart } from "./today-chart";
 import { useNeedsYou } from "./use-needs-you";
@@ -31,7 +29,6 @@ export function TodayTile({ filter, now, workflowId = null }: TodayTileProps) {
   const figures = useTodayFigures(workflowId, now);
   const { count: needsALook } = useNeedsYou(workflowId);
   const { handed, total, partial } = useHandedBack(filter, now, workflowId);
-  const [pointed, setPointed] = useState<number | null>(null);
   return (
     <StatTile
       label="Today"
@@ -57,15 +54,7 @@ export function TodayTile({ filter, now, workflowId = null }: TodayTileProps) {
       }
     >
       <div className="mm-today" data-testid="live-handed-back">
-        <TodayChart
-          handed={handed}
-          pointed={pointed}
-          now={now}
-          onPoint={setPointed}
-        />
-        <p className="mm-today__caption" aria-hidden="true">
-          {chartCaption(handed, pointed, now)}
-        </p>
+        <TodayChart handed={handed} now={now} />
         <span className="sr-only" data-testid="live-handed-back-sum">
           {handedBackSentence(handed, total, partial)}
         </span>

@@ -18,16 +18,32 @@ export type ChartShape = {
   area: string;
 };
 
+const PLOT_HEIGHT = CHART_HEIGHT - PAD_TOP - PAD_BOTTOM;
+
+/** Where a value sits on a scale that runs from 0 at the floor to `scaleTop` at the top, in drawing units. */
+function valueY(value: number, scaleTop: number): number {
+  return PAD_TOP + PLOT_HEIGHT - (value / scaleTop) * PLOT_HEIGHT;
+}
+
+export type ScaleLine = { value: number; y: number };
+
+/** The gridlines: the top of the scale and half of it. */
+export function scaleLines(scaleTop: number): ScaleLine[] {
+  return [scaleTop, scaleTop / 2].map((value) => ({
+    value,
+    y: valueY(value, scaleTop),
+  }));
+}
+
 /** Files finished per bucket as a line from the oldest bucket (left) to the newest (right). */
 export function chartShape(
   buckets: readonly HandedBackBucket[],
-  peak: number,
+  scaleTop: number,
 ): ChartShape {
   const last = Math.max(1, buckets.length - 1);
-  const plot = CHART_HEIGHT - PAD_TOP - PAD_BOTTOM;
   const points = buckets.map((bucket, index) => ({
     x: (index / last) * CHART_WIDTH,
-    y: PAD_TOP + plot - (peak > 0 ? bucket.total / peak : 0) * plot,
+    y: valueY(bucket.total, scaleTop),
   }));
   const line = points
     .map(
@@ -39,6 +55,27 @@ export function chartShape(
   const area =
     points.length === 0 ? "" : `${line} L${CHART_WIDTH} ${floor} L0 ${floor} Z`;
   return { points, line, area };
+}
+
+/** The bucket nearest a place across the chart: 0 is the left edge, 1 the right edge. */
+export function pointedAtFraction(fraction: number, last: number): number {
+  return Math.min(last, Math.max(0, Math.round(fraction * last)));
+}
+
+/** The gap between the pointer's line and its readout. */
+export const READOUT_GAP = 8;
+
+/**
+ * Which side of the pointer's line the readout sits on: the right, unless it would run past the chart's
+ * right edge and the left has the room.
+ */
+export function readoutSide(
+  lineX: number,
+  readoutWidth: number,
+  chartWidth: number,
+): "right" | "left" {
+  const needed = readoutWidth + READOUT_GAP;
+  return lineX + needed > chartWidth && lineX - needed >= 0 ? "left" : "right";
 }
 
 /** The bucket the arrow keys move to: left and right walk, Home and End jump to the oldest and newest. */

@@ -154,4 +154,89 @@ describe("the Today tile", () => {
       expect.stringContaining("2 cleaned"),
     );
   });
+
+  it("labels the gridlines with round numbers and the two ends of the time span", () => {
+    const handed = handedBack(
+      [finishedAt(3), finishedAt(3), finishedAt(8)],
+      NOW,
+    );
+    summary.value = { handed, total: handed.totals.all, partial: false };
+    const tile = renderTile();
+
+    expect(tile).toHaveTextContent("2 files");
+    expect(tile).toHaveTextContent("1 file");
+    expect(tile).toHaveTextContent("2 h ago");
+    expect(tile).toHaveTextContent("now");
+  });
+});
+
+describe("the Today chart's pointer readout", () => {
+  const READOUT = ".mm-today-chart__readout";
+  const CHART_BOX_WIDTH = 230;
+  /** Over the second-newest of the 24 points, where the two files cleaned 3 minutes ago were counted. */
+  const OVER_THE_CLEANED_POINT = (CHART_BOX_WIDTH * 22) / 23;
+
+  function chartOf(tile: HTMLElement) {
+    const chart = within(tile).getByRole("slider", {
+      name: "Files finished, five minutes to a point",
+    });
+    chart.getBoundingClientRect = () => new DOMRect(0, 0, CHART_BOX_WIDTH, 60);
+    return chart;
+  }
+
+  beforeEach(() => {
+    const handed = handedBack(
+      [finishedAt(3), finishedAt(3), finishedAt(8)],
+      NOW,
+    );
+    summary.value = { handed, total: handed.totals.all, partial: false };
+  });
+
+  it("shows nothing until the pointer is on the chart", () => {
+    const tile = renderTile();
+
+    expect(tile.querySelector(READOUT)).toBeNull();
+  });
+
+  it("follows the pointer to the nearest five minutes and says what finished then", () => {
+    const tile = renderTile();
+
+    fireEvent.pointerMove(chartOf(tile), { clientX: OVER_THE_CLEANED_POINT });
+
+    expect(tile.querySelector(READOUT)).toHaveTextContent("· 2 cleaned");
+    expect(tile.querySelector(".mm-today-chart__pointer")).not.toBeNull();
+  });
+
+  it("goes when the pointer leaves", () => {
+    const tile = renderTile();
+    const chart = chartOf(tile);
+    fireEvent.pointerMove(chart, { clientX: OVER_THE_CLEANED_POINT });
+
+    fireEvent.pointerLeave(chart);
+
+    expect(tile.querySelector(READOUT)).toBeNull();
+  });
+
+  it("stays after a tap lifts, and goes when the person taps elsewhere", () => {
+    const tile = renderTile();
+    const chart = chartOf(tile);
+    fireEvent.pointerDown(chart, {
+      clientX: OVER_THE_CLEANED_POINT,
+      pointerType: "touch",
+    });
+
+    fireEvent.pointerLeave(chart, { pointerType: "touch" });
+    expect(tile.querySelector(READOUT)).not.toBeNull();
+
+    fireEvent.mouseDown(document.body);
+    expect(tile.querySelector(READOUT)).toBeNull();
+  });
+
+  it("shows the newest five minutes when the chart takes keyboard focus", () => {
+    const tile = renderTile();
+
+    fireEvent.focus(chartOf(tile));
+
+    expect(tile.querySelector(READOUT)).toHaveTextContent("· nothing");
+  });
 });

@@ -1,0 +1,115 @@
+/* The Today tile's chart: the last two hours on a round-number scale, its time span and the pointer readout. */
+
+.mm-today__span {
+  display: flex;
+  justify-content: space-between;
+  margin: 0;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  line-height: 12px;
+  color: var(--mm-text2);
+}
+
+.mm-today-chart {
+  position: relative;
+  display: block;
+  min-height: 0;
+  border-radius: 6px;
+  touch-action: pan-y;
+}
+
+.mm-today-chart:focus-visible {
+  outline: 2px solid var(--mm-primary);
+  outline-offset: 2px;
+}
+
+.mm-today-chart__svg {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.mm-today-chart__grid {
+  stroke: var(--mm-hairline);
+  stroke-opacity: 0.6;
+  stroke-width: 1;
+}
+
+.mm-today-chart__stop {
+  stop-color: var(--mm-info);
+  stop-opacity: 0.45;
+}
+
+.mm-today-chart__stop--end {
+  stop-opacity: 0;
+}
+
+.mm-today-chart__line {
+  stroke: var(--mm-info);
+  stroke-linejoin: round;
+  stroke-width: 2;
+}
+
+.mm-today-chart__dot {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--mm-info);
+  box-shadow: 0 0 10px var(--mm-info);
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+}
+
+/* Each gridline's value sits on its line at the right edge, on a soft backing so the line behind stays readable. */
+.mm-today-chart__scale {
+  position: absolute;
+  right: 0;
+  padding: 0 3px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--mm-card-bg) 80%, transparent);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  line-height: 12px;
+  pointer-events: none;
+  white-space: nowrap;
+  color: var(--mm-text2);
+  transform: translateY(-50%);
+}
+
+.mm-today-chart__pointer {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--mm-text3);
+  pointer-events: none;
+}
+
+.mm-today-chart__readout {
+  position: absolute;
+  top: 0;
+  z-index: 1;
+  padding: 2px 8px;
+  border: 1px solid var(--mm-hairline);
+  border-radius: 6px;
+  background: var(--mm-surface-2);
+  box-shadow: var(--mm-shadow-popover);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  line-height: 16px;
+  pointer-events: none;
+  white-space: nowrap;
+  color: var(--mm-text1);
+}
+
+.mm-today-chart__readout--right {
+  transform: translateX(var(--today-readout-gap));
+}
+
+.mm-today-chart__readout--left {
+  transform: translateX(calc(-100% - var(--today-readout-gap)));
+}

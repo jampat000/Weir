@@ -6,6 +6,9 @@ import {
   CHART_WIDTH,
   chartShape,
   pointedAfterKey,
+  pointedAtFraction,
+  readoutSide,
+  scaleLines,
 } from "./today-chart-model";
 
 const bucket = (total: number): HandedBackBucket => ({
@@ -46,6 +49,56 @@ describe("the line of the Today chart", () => {
 
   it("draws nothing for no buckets", () => {
     expect(chartShape([], 1).area).toBe("");
+  });
+});
+
+describe("the gridlines of the Today chart", () => {
+  it("draws one at the top of the scale and one at half", () => {
+    const [top, half] = scaleLines(10);
+
+    expect(top.value).toBe(10);
+    expect(half.value).toBe(5);
+  });
+
+  it("puts the top line where a bucket at the top of the scale is drawn", () => {
+    const [top] = scaleLines(5);
+    const { points } = chartShape([bucket(5)], 5);
+
+    expect(top.y).toBe(points[0].y);
+  });
+
+  it("puts the half line midway between the top line and the line of an empty bucket", () => {
+    const [top, half] = scaleLines(4);
+    const { points } = chartShape([bucket(0)], 4);
+
+    expect(half.y).toBeCloseTo((top.y + points[0].y) / 2);
+  });
+});
+
+describe("pointing at the chart", () => {
+  it("picks the bucket nearest the pointer, from the left edge to the right edge", () => {
+    expect(pointedAtFraction(0, 23)).toBe(0);
+    expect(pointedAtFraction(0.5, 23)).toBe(12);
+    expect(pointedAtFraction(1, 23)).toBe(23);
+  });
+
+  it("stays on the chart when the pointer is beyond its edges", () => {
+    expect(pointedAtFraction(-0.2, 23)).toBe(0);
+    expect(pointedAtFraction(1.4, 23)).toBe(23);
+  });
+});
+
+describe("which side of the pointer's line the readout sits", () => {
+  it("is the right, while there is room", () => {
+    expect(readoutSide(40, 120, 300)).toBe("right");
+  });
+
+  it("flips to the left near the right edge", () => {
+    expect(readoutSide(280, 120, 300)).toBe("left");
+  });
+
+  it("stays on the right when neither side has room", () => {
+    expect(readoutSide(60, 120, 150)).toBe("right");
   });
 });
 

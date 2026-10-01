@@ -1,4 +1,4 @@
-/** The last two hours of finished files, in words: for the Today chart's caption and its screen-reader text. */
+/** The last two hours of finished files, in words: for the Today chart's labels, readout and screen-reader text. */
 import { plural } from "../../../lib/ui/mm-plural";
 import {
   HANDED_BACK_BUCKET_MS,
@@ -37,21 +37,38 @@ export function toneCounts(counts: Record<HandedBackTone, number>): string {
     .join(", ");
 }
 
-/** One bucket in words: "35–40 min ago · 3 cleaned". */
-export function bucketWords(bucket: HandedBackBucket, now: number): string {
-  const counts = bucket.total === 0 ? "nothing" : toneCounts(bucket);
-  return `${bucketWhen(bucket.from, now)} · ${counts}`;
+/** What finished in one bucket: "3 cleaned, 1 already right", or "nothing". */
+function bucketCounts(bucket: HandedBackBucket): string {
+  return bucket.total === 0 ? "nothing" : toneCounts(bucket);
 }
 
-/** The line under the chart: the bucket pointed at, or the whole two hours as counts. */
-export function chartCaption(
-  handed: HandedBack,
-  pointed: number | null,
-  now: number,
-): string {
-  if (pointed !== null) return bucketWords(handed.buckets[pointed], now);
-  if (handed.totals.all === 0) return NOTHING_HANDED_BACK;
-  return `Last 2 hours · ${toneCounts(handed.totals)}`;
+/** One bucket in words: "35–40 min ago · 3 cleaned". */
+export function bucketWords(bucket: HandedBackBucket, now: number): string {
+  return `${bucketWhen(bucket.from, now)} · ${bucketCounts(bucket)}`;
+}
+
+/** A gridline's value with the unit the chart plots: "10 files", "1 file". */
+export function scaleLabel(value: number): string {
+  return plural(value, "file", "files");
+}
+
+const HOUR_MS = 60 * MINUTE_MS;
+
+/** The two ends of the time axis, from how far back the oldest point is: "2 h ago" and "now". */
+export function spanLabels(handed: HandedBack, now: number): [string, string] {
+  const oldest = handed.buckets[0];
+  const hours = oldest
+    ? Math.max(1, Math.round((now - oldest.from) / HOUR_MS))
+    : 2;
+  return [`${hours} h ago`, "now"];
+}
+
+/** The pointer's readout for one bucket: its clock time and what finished then, "2:10 pm · 3 cleaned". */
+export function bucketReadout(bucket: HandedBackBucket): string {
+  const clock = new Date(bucket.from)
+    .toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })
+    .toLowerCase();
+  return `${clock} · ${bucketCounts(bucket)}`;
 }
 
 /** The whole two hours in one sentence, for a screen reader. */
