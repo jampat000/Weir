@@ -50,6 +50,7 @@ const NOT_JSON = [
   /\/logs\/download$/,
   /\/activity\/stream$/,
   /^\/api\/v1\/intake\//,
+  /\/artwork\/posters\//,
 ];
 
 describe("the simulated API against the API contract", () => {
