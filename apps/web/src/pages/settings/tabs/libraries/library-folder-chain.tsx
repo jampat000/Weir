@@ -6,62 +6,11 @@
  */
 
 import { QuietFieldGroup } from "../../../../components/shared/quiet-section";
-import { SetupCheckLines } from "../../../../components/shared/setup-check-lines";
+import { FolderChainSections } from "../../../../components/shared/folder-chain-sections";
 import type { ProcessingMediaType } from "../../../../lib/processing/libraries-api";
-import {
-  READINESS_CLASSES,
-  READINESS_LABELS,
-  readinessOf,
-  type FolderChainLine,
-  type LibraryFolderChainDownloadClient,
-} from "../../../../lib/processing/library-folder-chain-api";
-import type { ProcessingManagerSetupItem } from "../../../../lib/processing/library-managers-api";
 import { useLibraryFolderChainQuery } from "../../../../lib/processing/libraries-queries";
 import { useDebouncedValue } from "../../../../lib/ui/use-debounced-value";
 import { FOLDER_CHECK_SETTLE_MS } from "./folder-check-settle";
-
-function ReadinessBadge({
-  ready,
-  lines,
-}: {
-  ready: boolean;
-  lines: FolderChainLine[];
-}) {
-  const readiness = readinessOf(ready, lines);
-  return (
-    <span className={`ml-2 text-xs ${READINESS_CLASSES[readiness]}`}>
-      {READINESS_LABELS[readiness]}
-    </span>
-  );
-}
-
-function ManagerSection({ item }: { item: ProcessingManagerSetupItem }) {
-  return (
-    <section aria-label={item.label} className="space-y-3">
-      <p className="text-sm font-medium text-mm-text1">
-        {item.label}
-        <ReadinessBadge ready={item.ready} lines={item.lines} />
-      </p>
-      <SetupCheckLines label={item.label} lines={item.lines} />
-    </section>
-  );
-}
-
-function DownloadClientSection({
-  item,
-}: {
-  item: LibraryFolderChainDownloadClient;
-}) {
-  return (
-    <section aria-label={item.label} className="space-y-3">
-      <p className="text-sm font-medium text-mm-text1">
-        {item.label}
-        <ReadinessBadge ready={item.ready} lines={item.lines} />
-      </p>
-      <SetupCheckLines label={item.label} lines={item.lines} />
-    </section>
-  );
-}
 
 export function LibraryFolderChain({
   libraryId,
@@ -133,27 +82,7 @@ export function LibraryFolderChain({
             Check again in a moment.
           </p>
         ) : chain.data ? (
-          <>
-            <section aria-label="Weir's own folders" className="space-y-3">
-              <p className="text-sm font-medium text-mm-text1">
-                Weir&apos;s own folders
-                <ReadinessBadge
-                  ready={chain.data.local.ready}
-                  lines={chain.data.local.lines}
-                />
-              </p>
-              <SetupCheckLines
-                label="Weir's own folders"
-                lines={chain.data.local.lines}
-              />
-            </section>
-            {chain.data.managers.map((item) => (
-              <ManagerSection key={item.connection_id} item={item} />
-            ))}
-            {chain.data.download_clients.map((item) => (
-              <DownloadClientSection key={item.connection_id} item={item} />
-            ))}
-          </>
+          <FolderChainSections chain={chain.data} />
         ) : null}
       </div>
     </QuietFieldGroup>

@@ -4,17 +4,14 @@ import { ConfirmDialog } from "../../components/ui/confirm-dialog";
 import { errorMessage } from "../../lib/api/error-message";
 import type {
   ProcessingFile,
-  ProcessingFileRemoveOptions,
   ProcessingFileStatus,
   ProcessingFileTracks,
   ProcessingManualPlanChoice,
 } from "../../lib/processing/files-api";
 import {
-  useForgetProcessingFile,
   useMoveProcessingFileToTop,
   useProcessProcessingFileNow,
   useProcessingCheckLibraryAgain,
-  useProcessingFileRemoveOptions,
   useProcessingFileTracks,
   useProcessingWhyHeld,
   useRequeueProcessingFile,
@@ -22,7 +19,7 @@ import {
 } from "../../lib/processing/files-queries";
 import { useProcessingLibrariesQuery } from "../../lib/processing/libraries-queries";
 import { mmActionButtonClass } from "../../lib/ui/mm-control-roles";
-import { HistoryRemoveDialog } from "./history-remove-dialog";
+import { useFileRemoval } from "./use-file-removal";
 
 const PASS_THROUGH_EXPLAINED =
   "Weir will skip the audio, subtitle and metadata rules, copy and check the original in this workflow's output folder, then remove the watched original the way it does after any finished file. Readiness checks still apply, so a download still being written is left alone.";
@@ -51,8 +48,6 @@ export function HistoryFileActions({
   onRemoved: (message: string) => void;
 }) {
   const libraries = useProcessingLibrariesQuery();
-  const forget = useForgetProcessingFile();
-  const removeOptions = useProcessingFileRemoveOptions();
   const moveToTop = useMoveProcessingFileToTop();
   const requeue = useRequeueProcessingFile();
   const whyHeld = useProcessingWhyHeld();
@@ -66,11 +61,15 @@ export function HistoryFileActions({
   const [tracksError, setTracksError] = useState<string | null>(null);
   const [planError, setPlanError] = useState<string | null>(null);
   const [confirmingPassThrough, setConfirmingPassThrough] = useState(false);
-  const [removeDialogOptions, setRemoveDialogOptions] =
-    useState<ProcessingFileRemoveOptions | null>(null);
-  const [removeDialogError, setRemoveDialogError] = useState<string | null>(
-    null,
-  );
+  const removal = useFileRemoval({
+    fileId: file.id,
+    fileName: file.relative_path,
+    onRemoved: (message) => {
+      onRemoved(message);
+      setNotice(message);
+    },
+    onProblem: setNotice,
+  });
 
   if (!editable) return null;
 
@@ -80,8 +79,8 @@ export function HistoryFileActions({
       : "movie";
 
   const anyPending =
-    forget.isPending ||
-    removeOptions.isPending ||
+    removal.checking ||
+    removal.removing ||
     moveToTop.isPending ||
     requeue.isPending ||
     whyHeld.isPending ||
@@ -139,70 +138,6 @@ export function HistoryFileActions({
       async () => (await requeue.mutateAsync(file.id)).detail,
       "That file could not be queued again.",
     );
-
-  /** The plain remove every title without a choice keeps: forget the row, touch nothing else. */
-  const removePlain = () =>
-    void run(async () => {
-      const message = "Removed from the list. The file on disk is untouched.";
-      await forget.mutateAsync({ id: file.id });
-      onRemoved(message);
-      return message;
-    }, "That file could not be removed from the list.");
-
-  /** Asks whether this title qualifies for the dialog before showing anything (#785). */
-  async function startRemoval() {
-    setNotice(null);
-    try {
-      const options = await removeOptions.mutateAsync(file.id);
-      if (options.requires_choice) {
-        setRemoveDialogError(null);
-        setRemoveDialogOptions(options);
-        return;
-      }
-    } catch (error) {
-      setNotice(
-        errorMessage(
-          error,
-          "Weir could not check what removing this file would do.",
-        ),
-      );
-      return;
-    }
-
-    removePlain();
-  }
-
-  async function confirmRemoval(
-    resolution: "remove" | "delete" | "keep" | "retry",
-  ) {
-    setRemoveDialogError(null);
-    try {
-      // What the dialog showed for a title with no recorded fingerprint (#786 follow-up), echoed back so the
-      // server can check the file still matches before delete or keep touch it. Harmless to send for retry or a
-      // plain remove, which never look at it.
-      const confirm =
-        removeDialogOptions &&
-        !removeDialogOptions.fingerprint_recorded &&
-        removeDialogOptions.unconfirmed_size_bytes != null &&
-        removeDialogOptions.unconfirmed_modified_at != null
-          ? {
-              size_bytes: removeDialogOptions.unconfirmed_size_bytes,
-              modified_at: removeDialogOptions.unconfirmed_modified_at,
-            }
-          : undefined;
-      const result = await forget.mutateAsync({
-        id: file.id,
-        resolution,
-        confirm,
-      });
-      setRemoveDialogOptions(null);
-      onRemoved(result?.detail ?? "Done.");
-    } catch (error) {
-      setRemoveDialogError(
-        errorMessage(error, "That file could not be removed."),
-      );
-    }
-  }
 
   const button = (
     label: string,
@@ -335,13 +270,14 @@ export function HistoryFileActions({
           ? button(
               "Remove from list",
               "Forgets Weir's record of this file. Asks what to do first when its download is still in the watched folder.",
-              () => void startRemoval(),
+              () => {
+                setNotice(null);
+                void removal.start();
+              },
               {
                 variant: "tertiary",
-                pending: forget.isPending || removeOptions.isPending,
-                pendingLabel: removeOptions.isPending
-                  ? "Checking…"
-                  : "Removing…",
+                pending: removal.checking || removal.removing,
+                pendingLabel: removal.checking ? "Checking…" : "Removing…",
               },
             )
           : null}
@@ -368,16 +304,7 @@ export function HistoryFileActions({
           }}
         />
       ) : null}
-      {removeDialogOptions ? (
-        <HistoryRemoveDialog
-          fileName={file.relative_path}
-          options={removeDialogOptions}
-          busy={forget.isPending}
-          error={removeDialogError}
-          onCancel={() => setRemoveDialogOptions(null)}
-          onConfirm={(resolution) => void confirmRemoval(resolution)}
-        />
-      ) : null}
+      {removal.dialog}
       {notice ? (
         <p className="mm-history-note" role="status">
           {notice}
