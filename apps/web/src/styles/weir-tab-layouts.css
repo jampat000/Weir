@@ -238,7 +238,7 @@
 
 /* The schedule's tables stack into rows below 900px, not the usual 760px: a week, a state and two
    buttons do not share a tablet-width row without the page scrolling sideways. */
-@media (max-width: 900px) {
+@container (max-width: 900px) {
   .mm-schedule-table thead {
     position: absolute;
     width: 1px;
@@ -277,6 +277,11 @@
     content: attr(data-label);
     color: var(--mm-text3);
     font-size: var(--mm-type-caption);
+  }
+
+  /* What a cell holds, however many parts, stays in the value column beside its label. */
+  .mm-schedule-table tbody td > * {
+    grid-column: 2;
   }
 }
 

@@ -63,4 +63,39 @@ describe("Panel", () => {
       dot.compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
   });
+
+  it("is a level 3 heading inside a page's own section when asked", () => {
+    renderPanel({ headingLevel: 3 });
+
+    expect(
+      screen.getByRole("heading", { level: 3, name: "Just finished" }),
+    ).toBeInTheDocument();
+  });
+
+  it("puts its own controls in the header, after the title", () => {
+    const { container } = renderPanel({
+      aside: <button type="button">Add one</button>,
+    });
+
+    const header = container.querySelector<HTMLElement>(".mm-panel__head");
+    expect(header).toContainElement(
+      screen.getByRole("button", { name: "Add one" }),
+    );
+  });
+
+  it("lets the page point at its title", () => {
+    renderPanel({ headingId: "files-heading" });
+
+    expect(
+      screen.getByRole("heading", { name: "Just finished" }),
+    ).toHaveAttribute("id", "files-heading");
+  });
+
+  it("pads its body and stops clipping when it holds fields", () => {
+    const { container } = renderPanel({ padded: true });
+
+    expect(container.querySelector(".mm-panel")).toHaveClass(
+      "mm-panel--padded",
+    );
+  });
 });

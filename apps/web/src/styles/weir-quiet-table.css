@@ -8,6 +8,9 @@
 .mm-quiet-table-wrap {
   position: relative;
   overflow-x: auto;
+  /* A table stacks into rows by the room its panel gives it, which the side menu and the panel's padding
+     both take from, rather than by the window's width. */
+  container-type: inline-size;
 }
 
 .mm-quiet-table {
@@ -65,6 +68,16 @@
   margin-right: 0.4rem;
 }
 
+/* A chip in a table cell wraps in a narrow column rather than running out of it. */
+.mm-quiet-table td .mm-chip {
+  height: auto;
+  min-height: 24px;
+  padding-top: 3px;
+  padding-bottom: 3px;
+  line-height: 1.25;
+  white-space: normal;
+}
+
 /* A chip beside a row's name keeps a gap from it and from the next chip. */
 .mm-quiet-table__name .mm-chip {
   margin: 0 0 0 0.4rem;
@@ -87,7 +100,7 @@
   overflow-wrap: anywhere;
 }
 
-@media (max-width: 760px) {
+@container (max-width: 760px) {
   .mm-quiet-table thead {
     position: absolute;
     width: 1px;
@@ -128,6 +141,11 @@
     font-size: var(--mm-type-caption);
   }
 
+  /* What a cell holds, however many parts, stays in the value column beside its label. */
+  .mm-quiet-table tbody td > * {
+    grid-column: 2;
+  }
+
   .mm-quiet-table__name {
     padding-bottom: 0.3rem;
   }
@@ -135,7 +153,7 @@
 
 /* The jobs table keeps its header and Job column pinned while it scrolls sideways, and asks for room
  * for its five columns, only while it is a table: at 760px and below it stacks into rows, above. */
-@media (min-width: 761px) {
+@container (min-width: 761px) {
   .mm-jobs-table {
     min-width: 46rem;
   }
