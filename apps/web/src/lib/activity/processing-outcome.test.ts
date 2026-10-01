@@ -75,3 +75,24 @@ describe("finishedFileFromEvent for a pass that ended in a rejection", () => {
     expect(finished?.kind).toBe("failed");
   });
 });
+
+describe("finishedFileFromEvent and the poster", () => {
+  it("carries the poster address the entry names", () => {
+    const entry = {
+      ...passEvent({ outcome: "live_output_written", ok: true }),
+      poster_url: "/api/v1/artwork/posters/movie-detour-1945",
+    };
+
+    expect(finishedFileFromEvent(entry)?.posterUrl).toBe(
+      "/api/v1/artwork/posters/movie-detour-1945",
+    );
+  });
+
+  it("has none when the entry names none", () => {
+    const finished = finishedFileFromEvent(
+      passEvent({ outcome: "live_output_written", ok: true }),
+    );
+
+    expect(finished?.posterUrl).toBeNull();
+  });
+});

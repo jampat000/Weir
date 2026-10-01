@@ -151,3 +151,23 @@ it("renders nothing while closed", () => {
   mount({ open: false });
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
 });
+
+it("shows the title's poster beside the name, and the initials when it has none", () => {
+  mount({
+    poster: {
+      url: "/api/v1/artwork/posters/movie-arrival-2016",
+      workflow: "Films",
+    },
+  });
+
+  expect(screen.getByRole("img", { name: "Arrival.mkv" })).toHaveAttribute(
+    "src",
+    "/api/v1/artwork/posters/movie-arrival-2016",
+  );
+});
+
+it("shows no poster for a file whose panel was given none", () => {
+  mount();
+
+  expect(screen.queryByRole("img")).toBeNull();
+});

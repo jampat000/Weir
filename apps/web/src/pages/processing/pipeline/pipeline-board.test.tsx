@@ -124,6 +124,26 @@ describe("the heading and the stations", () => {
 });
 
 describe("the cards", () => {
+  it("shows the title's poster on its card, and the initials where the file has none", () => {
+    render(
+      board(
+        lanesOf([
+          aWriting(1, {
+            poster_url: "/api/v1/artwork/posters/tv-harbour-2019",
+          }),
+          aFile(2, "unprocessed", { poster_url: null }),
+        ]),
+      ),
+    );
+
+    const [withPoster, without] = screen.getAllByRole("button");
+    expect(within(withPoster).getByRole("img")).toHaveAttribute(
+      "src",
+      "/api/v1/artwork/posters/tv-harbour-2019",
+    );
+    expect(within(without).queryByRole("img")).toBeNull();
+  });
+
   it("puts each file's card at its station and says what it is doing", () => {
     render(board(lanesOf([aWriting(1), aFile(2, "unprocessed")])));
 
