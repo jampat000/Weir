@@ -122,6 +122,7 @@ clean and what happens to the original file after a clean.
 ## Next steps
 
 - [Connecting Deluno, Sonarr and Radarr](guides/media-managers) — hand off files automatically
+- [Posters](guides/posters) — what Artwork does, what it sends, and how to turn it off
 - [Docker deployment](deployment/docker) — media folders, file ownership, running alongside other apps
 - [Windows installer](deployment/windows) — ports, updates, unattended installs
 - [Building from source](guides/local-development) — for developers who want to run Weir from a clone

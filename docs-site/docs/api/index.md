@@ -46,7 +46,8 @@ The API still says "library" for what the app calls a workflow, so existing inte
 | `/api/v1/processing/rule-sets` | Audio and subtitle rules |
 | `/api/v1/processing/jobs` | Queue and inspect background jobs |
 | `/api/v1/processing/maintenance` | Cleanup settings, and running cleanup now |
-| `/api/v1/processing/metadata-provider` | The TMDb connection, used by rules that keep a title's original language |
+| `/api/v1/processing/metadata-provider` | The TMDb connection, used by rules that keep a title's original language, and the Artwork switch |
+| `/api/v1/artwork/posters/` | A poster image Weir already holds, as a file's `poster_url` names it. See [Posters](../guides/posters) |
 | `/api/v1/processing/` (other) | Performance and runtime settings, hardware, direct-play devices, media manager setup checks, overview counts |
 | `/api/v1/pause` | The one pause switch for processing |
 
