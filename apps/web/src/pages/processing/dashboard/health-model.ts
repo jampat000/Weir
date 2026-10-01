@@ -10,7 +10,9 @@ import type { MediaManagerConnection } from "../../../lib/media-managers/media-m
 import type { MediaTools } from "../../../lib/system/media-tools";
 import { toolVersion } from "../../../lib/system/media-tools";
 import { connectionTitle } from "../../../lib/ui/connection-title";
+import { parseAppTime } from "../../../lib/ui/mm-format-date";
 import type { MmStatusTone } from "../../../lib/ui/mm-status-tone";
+import { ago } from "../processing-words";
 
 export const READINESS_WORDS: Record<Readiness, string> = {
   ready: "In sync",
@@ -30,6 +32,21 @@ export type WorkflowVerdict = { words: string; tone: MmStatusTone };
 export function chainVerdict(chain: LibraryFolderChain): WorkflowVerdict {
   const readiness = readinessOf(chain.ready, folderChainLines(chain));
   return { words: READINESS_WORDS[readiness], tone: READINESS_TONE[readiness] };
+}
+
+const NOTHING_NAMED = "Open this workflow to see what needs a fix.";
+
+/**
+ * The one line that says why a workflow is not in sync: the first problem in its chain, else the first line
+ * Weir could only take someone's word for. Null when the chain is in sync.
+ */
+export function whyNotInSync(chain: LibraryFolderChain): string | null {
+  const lines = folderChainLines(chain);
+  if (readinessOf(chain.ready, lines) === "ready") return null;
+  const named =
+    lines.find((line) => line.state === "problem") ??
+    lines.find((line) => line.state === "unverified");
+  return named?.text ?? NOTHING_NAMED;
 }
 
 const CHECKING_VERDICT: WorkflowVerdict = {
@@ -53,7 +70,7 @@ export function checkVerdict(check: {
 export type ConnectionPill = {
   key: string;
   name: string;
-  /** "answering", "not answering" or "not tested yet": said in words, never by colour alone. */
+  /** "answered 12s ago", "not answering" or "not tested yet": said in words, never by colour alone. */
   state: string;
   tone: MmStatusTone;
 };
@@ -61,13 +78,38 @@ export type ConnectionPill = {
 type Connection = {
   enabled: boolean;
   last_test_ok?: boolean | null;
+  last_test_at?: string | null;
 };
 
-function answering(
+const SECONDS_SHOWN_AS_SECONDS = 60;
+/** A check this fresh is just now: counting its seconds only flickers. */
+const JUST_NOW_SECONDS = 3;
+
+/** How long ago a check was: "just now", then to the second for the first minute ("12s ago"), then "4 min ago". */
+export function checkedAgo(
+  iso: string | null | undefined,
+  now: number,
+): string {
+  const at = parseAppTime(iso);
+  if (at == null) return "";
+  const seconds = Math.max(0, Math.round((now - at) / 1000));
+  if (seconds < JUST_NOW_SECONDS) return "just now";
+  return seconds < SECONDS_SHOWN_AS_SECONDS
+    ? `${seconds}s ago`
+    : ago(iso as string, now);
+}
+
+export function answering(
   connection: Connection,
+  now: number,
 ): Pick<ConnectionPill, "state" | "tone"> {
-  if (connection.last_test_ok === true)
-    return { state: "answering", tone: "healthy" };
+  if (connection.last_test_ok === true) {
+    const when = checkedAgo(connection.last_test_at, now);
+    return {
+      state: when ? `answered ${when}` : "answering",
+      tone: "healthy",
+    };
+  }
   if (connection.last_test_ok === false)
     return { state: "not answering", tone: "failed" };
   return { state: "not tested yet", tone: "neutral" };
@@ -77,6 +119,7 @@ function answering(
 export function connectionPills(
   managers: readonly MediaManagerConnection[],
   downloadClients: readonly DownloadClientConnection[],
+  now: number,
 ): ConnectionPill[] {
   const pill = (
     kind: "manager" | "client",
@@ -84,7 +127,7 @@ export function connectionPills(
   ): ConnectionPill => ({
     key: `${kind}-${connection.id}`,
     name: connectionTitle(connection),
-    ...answering(connection),
+    ...answering(connection, now),
   });
   return [
     ...managers.filter((m) => m.enabled).map((m) => pill("manager", m)),
@@ -98,6 +141,8 @@ export type ToolRow = {
   key: "ffmpeg" | "mkvmerge";
   name: string;
   version: string;
+  /** The tool's own version line, as it reported it. */
+  banner: string;
   tone: MmStatusTone;
 };
 
@@ -112,12 +157,14 @@ export function toolRows(tools: MediaTools): ToolRow[] {
       key: "ffmpeg",
       name: "FFmpeg",
       version: toolVersion(tools.ffmpeg),
+      banner: tools.ffmpeg,
       tone: missing(tools.ffmpeg) ? "failed" : "healthy",
     },
     {
       key: "mkvmerge",
       name: "mkvmerge",
       version: toolVersion(tools.mkvmerge),
+      banner: tools.mkvmerge,
       tone: missing(tools.mkvmerge) ? "neutral" : "healthy",
     },
   ];

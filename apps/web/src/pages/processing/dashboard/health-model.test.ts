@@ -8,10 +8,16 @@ import type {
 } from "../../../lib/processing/library-folder-chain-api";
 import {
   chainVerdict,
+  checkedAgo,
   connectionPills,
   problemCount,
   toolRows,
+  whyNotInSync,
 } from "./health-model";
+
+const NOW = Date.parse("2026-10-02T12:00:00Z");
+const secondsBefore = (seconds: number) =>
+  new Date(NOW - seconds * 1000).toISOString();
 
 function chain(
   ready: boolean,
@@ -44,6 +50,30 @@ const unverified: FolderChainLine = {
   text: "Weir cannot see this folder from here.",
 };
 const problem: FolderChainLine = { state: "problem", text: "It is missing." };
+
+describe("why a workflow is not in sync", () => {
+  it("is nothing while the chain is in sync", () => {
+    expect(whyNotInSync(chain(true, [ok]))).toBeNull();
+  });
+
+  it("names the first problem, before anything Weir could only take on trust", () => {
+    expect(whyNotInSync(chain(false, [unverified, problem]))).toBe(
+      "It is missing.",
+    );
+  });
+
+  it("names the first unverified line when nothing is a problem, in a client's lines too", () => {
+    expect(whyNotInSync(chain(true, [ok], [unverified]))).toBe(
+      "Weir cannot see this folder from here.",
+    );
+  });
+
+  it("sends the person to the workflow when the chain is not ready but names nothing", () => {
+    expect(whyNotInSync(chain(false, [ok]))).toBe(
+      "Open this workflow to see what needs a fix.",
+    );
+  });
+});
 
 describe("a workflow's folder-chain verdict", () => {
   it("is In sync when every line was read by Weir and none is a problem", () => {
@@ -93,21 +123,43 @@ function client(
   } as DownloadClientConnection;
 }
 
+describe("how long ago a check was", () => {
+  it("counts seconds for the first minute, then minutes", () => {
+    expect(checkedAgo(secondsBefore(12), NOW)).toBe("12s ago");
+    expect(checkedAgo(secondsBefore(5 * 60), NOW)).toBe("5 min ago");
+  });
+
+  it("says just now for a check that has only just answered", () => {
+    expect(checkedAgo(secondsBefore(1), NOW)).toBe("just now");
+  });
+
+  it("is empty when there was no check", () => {
+    expect(checkedAgo(null, NOW)).toBe("");
+  });
+});
+
 describe("the connection pills", () => {
-  it("say in words whether each connection answered its last test", () => {
+  it("say in words whether each connection answered its last test, and how long ago", () => {
     const pills = connectionPills(
       [
-        manager({ id: 1 }),
+        manager({ id: 1, last_test_at: secondsBefore(12) }),
         manager({ id: 2, name: "Sonarr", last_test_ok: false }),
       ],
       [client({ last_test_ok: null })],
+      NOW,
     );
 
     expect(pills.map((pill) => [pill.name, pill.state, pill.tone])).toEqual([
-      ["Radarr on MEDIA-PC", "answering", "healthy"],
+      ["Radarr on MEDIA-PC", "answered 12s ago", "healthy"],
       ["Sonarr", "not answering", "failed"],
       ["qBittorrent on MEDIA-PC", "not tested yet", "neutral"],
     ]);
+  });
+
+  it("say answering when a test passed but was never timed", () => {
+    const [pill] = connectionPills([manager({})], [], NOW);
+
+    expect(pill.state).toBe("answering");
   });
 
   it("leave out a connection that is switched off", () => {
@@ -115,12 +167,13 @@ describe("the connection pills", () => {
       connectionPills(
         [manager({ enabled: false })],
         [client({ enabled: false })],
+        NOW,
       ),
     ).toEqual([]);
   });
 
   it("carry a nickname after the name", () => {
-    const [pill] = connectionPills([manager({ nickname: "4K" })], []);
+    const [pill] = connectionPills([manager({ nickname: "4K" })], [], NOW);
 
     expect(pill.name).toBe("Radarr on MEDIA-PC · 4K");
   });
@@ -134,8 +187,20 @@ describe("the tools", () => {
         mkvmerge: "v89.0.0",
       }),
     ).toEqual([
-      { key: "ffmpeg", name: "FFmpeg", version: "7.1.1", tone: "healthy" },
-      { key: "mkvmerge", name: "mkvmerge", version: "89.0.0", tone: "healthy" },
+      {
+        key: "ffmpeg",
+        name: "FFmpeg",
+        version: "7.1.1",
+        banner: "ffmpeg version 7.1.1 Copyright",
+        tone: "healthy",
+      },
+      {
+        key: "mkvmerge",
+        name: "mkvmerge",
+        version: "89.0.0",
+        banner: "v89.0.0",
+        tone: "healthy",
+      },
     ]);
   });
 
