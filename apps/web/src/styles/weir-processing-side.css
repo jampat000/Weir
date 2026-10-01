@@ -37,9 +37,51 @@
 
 .mm-health__row {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: 4px 10px;
+}
+
+/* Why a workflow is not in sync, on a line of its own under its name. */
+.mm-health__why {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--mm-warning-text);
+}
+
+.mm-health__notice {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--mm-text2);
+}
+
+.mm-health__action {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--mm-primary);
+  cursor: pointer;
+}
+
+.mm-health__action:hover:not(:disabled) {
+  color: var(--mm-primary-bright);
+}
+
+.mm-health__action:disabled {
+  cursor: progress;
+  color: var(--mm-text3);
+}
+
+.mm-health__action:focus-visible {
+  outline: 2px solid var(--mm-primary);
+  outline-offset: 2px;
+  border-radius: var(--mm-radius-control);
 }
 
 .mm-health__name {
@@ -99,49 +141,88 @@
   min-height: 0;
   flex: 1;
   flex-direction: column;
-  gap: 8px;
-  margin: 0;
+  gap: 14px;
   padding: 0 12px 12px;
   overflow-y: auto;
-  list-style: none;
   scrollbar-color: var(--mm-hairline) transparent;
   scrollbar-width: thin;
 }
 
-.mm-needs__calm {
+/* How many things need a person, in the header, where a glance finds it. */
+.mm-needs__count {
+  font-weight: 600;
+  color: var(--mm-warning-text);
+}
+
+.mm-needs__clear {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   margin: 0;
-  padding: 0 18px;
+  padding: 0 18px 16px;
   font-size: 13.5px;
   color: var(--mm-text2);
 }
 
-.mm-need {
-  display: grid;
-  flex: none;
-  grid-template-columns: 24px minmax(0, 1fr);
-  gap: 10px;
-  padding: 10px;
-  border: 1px solid var(--mm-warning-border);
-  border-radius: 12px;
-  background: var(--mm-warning-bg);
+.mm-needs__clear svg,
+.mm-needs__clear b {
+  color: var(--mm-status-healthy-text);
 }
 
-.mm-need__icon {
+.mm-needs__notice {
+  margin: 0 18px 10px;
+  font-size: 12.5px;
+  color: var(--mm-text2);
+}
+
+.mm-needs__notice[role="alert"] {
+  color: var(--mm-status-failed-text);
+}
+
+.mm-needs__group {
   display: grid;
-  width: 24px;
-  height: 24px;
-  place-items: center;
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--mm-warning-text) 18%, transparent);
-  font-size: 13px;
-  font-weight: 700;
+  flex: none;
+  gap: 8px;
+}
+
+.mm-needs__group-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 12px;
+  padding: 0 6px;
+}
+
+.mm-needs__group-title {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
   color: var(--mm-warning-text);
 }
 
-.mm-need__text {
+.mm-needs__rows {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.mm-needs__more {
+  padding: 0 6px;
+}
+
+.mm-need {
   display: grid;
   min-width: 0;
   gap: 2px;
+  padding: 10px 12px;
+  border: 1px solid var(--mm-warning-border);
+  border-radius: 12px;
+  background: var(--mm-warning-bg);
   font-size: 13px;
   line-height: 1.4;
 }
@@ -150,6 +231,11 @@
   overflow-wrap: anywhere;
   font-weight: 600;
   color: var(--mm-text1);
+}
+
+.mm-need__workflow {
+  font-size: 12px;
+  color: var(--mm-text2);
 }
 
 .mm-need__reason {
@@ -165,7 +251,12 @@
 }
 
 .mm-need__link {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
   font-weight: 500;
+  cursor: pointer;
   white-space: nowrap;
   color: var(--mm-primary);
   text-decoration: none;
@@ -201,13 +292,4 @@
 .mm-need__button:focus-visible {
   outline: 2px solid var(--mm-primary);
   outline-offset: 2px;
-}
-
-.mm-need__notice {
-  font-size: 12px;
-  color: var(--mm-text2);
-}
-
-.mm-need__notice[role="alert"] {
-  color: var(--mm-status-failed-text);
 }
