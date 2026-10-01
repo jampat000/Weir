@@ -40,7 +40,9 @@ export function useFinishedFiles(): FinishedFile[] {
  * "{name} finished: {summary}" for a screen reader, the moment a new file lands here. Nothing is
  * announced for the files already on screen when the page itself first loads.
  */
-export function useFinishedAnnouncement(finished: FinishedFile[]): string {
+export function useFinishedAnnouncement(
+  finished: readonly FinishedFile[],
+): string {
   const [announcement, setAnnouncement] = useState("");
   const lastId = useRef<number | null>(null);
   const initialized = useRef(false);

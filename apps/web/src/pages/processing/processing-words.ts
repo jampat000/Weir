@@ -8,7 +8,7 @@ import {
 } from "../../lib/processing/workflow-kind";
 import { parseAppTime } from "../../lib/ui/mm-format-date";
 import { plural } from "../../lib/ui/mm-plural";
-import type { ArrivingItem } from "./processing-model";
+import type { ArrivingItem, WorkingItem } from "./processing-model";
 
 /** The kind of each workflow that is switched on, which decides where the page says a file ends up. */
 export function enabledWorkflowKinds(
@@ -62,6 +62,19 @@ export function processingLead(
   return PAGE_LEAD[workflowMix(workflowKinds)];
 }
 
+/** The tracks a pass took out, as words: "2 audio", "4 subtitles". */
+export function removedTrackWords(tracks: {
+  removedAudio: number;
+  removedSubtitles: number;
+}): string[] {
+  const removed: string[] = [];
+  if (tracks.removedAudio) removed.push(`${tracks.removedAudio} audio`);
+  if (tracks.removedSubtitles) {
+    removed.push(plural(tracks.removedSubtitles, "subtitle", "subtitles"));
+  }
+  return removed;
+}
+
 /** "Saved 318 MB · removed 4 audio, 6 subtitles", in the words each outcome deserves. */
 export function finishedLine(item: FinishedFile): string {
   if (item.sentence) return item.sentence;
@@ -73,11 +86,7 @@ export function finishedLine(item: FinishedFile): string {
     case "failed":
       return "Could not be finished · the original is untouched";
     default: {
-      const removed: string[] = [];
-      if (item.removedAudio) removed.push(`${item.removedAudio} audio`);
-      if (item.removedSubtitles) {
-        removed.push(plural(item.removedSubtitles, "subtitle", "subtitles"));
-      }
+      const removed = removedTrackWords(item);
       const saved = item.savedBytes
         ? `Saved ${formatBytes(item.savedBytes)}`
         : "Cleaned";
@@ -88,12 +97,21 @@ export function finishedLine(item: FinishedFile): string {
   }
 }
 
+/** A moment younger than this is "just now". */
+const JUST_NOW_SECONDS = 45;
+
+/** Whether something at this time happened just now. */
+export function isJustNow(iso: string, now: number): boolean {
+  const at = parseAppTime(iso);
+  return at != null && Math.max(0, (now - at) / 1000) < JUST_NOW_SECONDS;
+}
+
 /** "just now", "4 min ago", "2 h ago". */
 export function ago(iso: string, now: number): string {
   const at = parseAppTime(iso);
   if (at == null) return "";
   const seconds = Math.max(0, (now - at) / 1000);
-  if (seconds < 45) return "just now";
+  if (isJustNow(iso, now)) return "just now";
   if (seconds < 90 * 60)
     return `${Math.max(1, Math.round(seconds / 60))} min ago`;
   return `${Math.round(seconds / 3600)} h ago`;
@@ -194,4 +212,36 @@ export function ringFraction(
     item.holdUntil != null ? item.holdTotal : item.nextLook?.interval;
   if (state !== "counting" || !total || left == null) return null;
   return Math.min(1, Math.max(0, 1 - left / total));
+}
+
+/** The numbers a running pass reports, each as the words a card shows, or null when the server has not said. */
+export type WorkingFigures = {
+  /** ffmpeg's speed as people read it: "148×". */
+  speed: string | null;
+  /** How fast the source is being read: "35 MB/s". */
+  reading: string | null;
+  /** How far into the file the pass is: "4:05 of 1:32:10". */
+  through: string | null;
+  /** How long the pass has been going: "2 min 14 s". */
+  running: string | null;
+};
+
+export function workingFigures(item: WorkingItem): WorkingFigures {
+  const file = item.file;
+  const rate = readRate(
+    file?.size_bytes,
+    item.percent,
+    file?.progress_elapsed_seconds,
+  );
+  const duration = file?.duration_seconds ?? null;
+  const elapsed = file?.progress_elapsed_seconds ?? 0;
+  return {
+    speed: speedWords(item.speed),
+    reading: rate ? `${formatBytes(rate)}/s` : null,
+    through:
+      duration && item.percent != null
+        ? `${clock((duration * Math.min(100, item.percent)) / 100)} of ${clock(duration)}`
+        : null,
+    running: elapsed >= 1 ? runningFor(elapsed) : null,
+  };
 }
