@@ -6,7 +6,7 @@
  * same stream's live-progress frame (#750), which moves about once a second even though the file list
  * itself only changes on a database write — the start of a pass, a stage change, or its end.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { FileStoryPanel } from "../../components/processing/file-story-panel";
@@ -15,35 +15,20 @@ import { PageLoading } from "../../components/shared/page-loading";
 import { PageHeader } from "../../components/shell/page-header";
 import type { FinishedFile } from "../../lib/activity/processing-outcome";
 import { activityKeys } from "../../lib/activity/query-keys";
-import {
-  useActivityStreamInvalidations,
-  useLiveProgress,
-} from "../../lib/activity/use-activity-stream-invalidation";
+import { useActivityStreamInvalidations } from "../../lib/activity/use-activity-stream-invalidation";
 import { loadErrorMessage } from "../../lib/api/error-message";
 import { usePauseQuery } from "../../lib/pause/pause-queries";
 import type { ProcessingFile } from "../../lib/processing/files-api";
-import {
-  useProcessingFileLog,
-  useProcessingFilesQuery,
-} from "../../lib/processing/files-queries";
-import { useProcessingJobsInspectionQuery } from "../../lib/processing/jobs-inspection/queries";
-import { useProcessingLibrariesQuery } from "../../lib/processing/libraries-queries";
-import { mergeLiveProgress } from "../../lib/processing/live-progress-merge";
+import { useProcessingFileLog } from "../../lib/processing/files-queries";
 import { useProcessingFilesAtOnceQuery } from "../../lib/processing/queries";
 import { processingKeys } from "../../lib/processing/query-keys";
-import { parseAppTime } from "../../lib/ui/mm-format-date";
 import { useNow } from "../../lib/ui/use-now";
 import { FinishedLane } from "./finished-lane";
 import { EmptyLane, Lane, More } from "./lane";
 import { ArrivingCard, HandingCard, WaitingCard } from "./lane-cards";
 import { LeavingCard } from "./leaving-card";
 import { drawnIn, useLeavingCards } from "./leaving-cards";
-import {
-  arrivingDeadline,
-  buildLanes,
-  mergeWorkingFiles,
-  prettyName,
-} from "./processing-model";
+import { prettyName } from "./processing-model";
 import { FAILED_JOBS_LIMIT, NeedsList } from "./processing-needs";
 import {
   ProcessingToolbar,
@@ -56,17 +41,16 @@ import {
   processingLead,
 } from "./processing-words";
 import { WorkingCard } from "./working-card";
+import {
+  FILES_QUERY,
+  useLanes,
+  useRefetchOverdueLooks,
+} from "./use-processing-lanes";
 import { ACTIVE_JOBS_LIMIT, WORKING_FILES_QUERY } from "./working-count";
 
-const FILES_QUERY = { limit: 200 } as const;
 const NO_FILES: ProcessingFile[] = [];
 /** Once a second, so countdowns and "min ago" move between server updates. */
 const TICK_MS = 1000;
-/** Arriving counts down to each library's next look, which moves with every scan. */
-const LIBRARIES_REFRESH_MS = 10_000;
-/** How long past a countdown's end before Weir's answer is fetched, and how often at most. */
-const LOOK_OVERDUE_MS = 1500;
-const LOOK_REFETCH_GAP_MS = 3000;
 // How many cards a lane shows before it says how many more there are. Working is never cut short:
 // it holds at most as many files as the files-at-once setting allows, and that tops out at 10.
 const ARRIVING_SHOWN = 3;
@@ -90,71 +74,6 @@ const TOTAL_KEYS = [
 ] as const;
 const LANE_THROTTLE_MS = 750;
 const TOTAL_THROTTLE_MS = 3_000;
-
-/** The lanes' files, grouped by where each one is, with what each library knows about its next look. */
-function useLanes() {
-  const files = useProcessingFilesQuery(FILES_QUERY);
-  const workingFiles = useProcessingFilesQuery(WORKING_FILES_QUERY);
-  const libraries = useProcessingLibrariesQuery(true, LIBRARIES_REFRESH_MS);
-  const activeJobs = useProcessingJobsInspectionQuery(
-    "active",
-    ACTIVE_JOBS_LIMIT,
-  );
-  const liveProgress = useLiveProgress();
-  const lanes = useMemo(() => {
-    const all = libraries.data ?? [];
-    const nextLooks = new Map<number, { at: number; interval: number }>();
-    for (const library of all) {
-      const at = parseAppTime(library.next_look_at);
-      if (at != null) {
-        nextLooks.set(library.id, {
-          at,
-          interval: library.scan_interval_seconds,
-        });
-      }
-    }
-    const allFiles = mergeWorkingFiles(
-      files.data?.files ?? [],
-      workingFiles.data?.files ?? [],
-    );
-    return buildLanes(
-      mergeLiveProgress(allFiles, liveProgress),
-      activeJobs.data?.jobs ?? [],
-      new Map(all.map((l) => [l.id, l.name])),
-      new Map(all.map((l) => [l.id, l.ready_after_seconds])),
-      nextLooks,
-    );
-  }, [
-    files.data,
-    workingFiles.data,
-    activeJobs.data,
-    libraries.data,
-    liveProgress,
-  ]);
-  return { files, libraries, lanes };
-}
-
-/**
- * A countdown that has run out means Weir is looking at that file now. Its answer, picked up or held
- * again for a new reason with a new time, only reaches the screen as fresh data, and a scan that
- * changes nothing else sends no live event, so fetch it rather than keep saying "checking it now".
- */
-function useRefetchOverdueLooks(
-  { files, libraries, lanes }: ReturnType<typeof useLanes>,
-  now: number,
-) {
-  const lastRefetch = useRef(0);
-  useEffect(() => {
-    const due = lanes.arriving.some((item) => {
-      const deadline = arrivingDeadline(item);
-      return deadline != null && deadline <= now - LOOK_OVERDUE_MS;
-    });
-    if (!due || now - lastRefetch.current < LOOK_REFETCH_GAP_MS) return;
-    lastRefetch.current = now;
-    void files.refetch();
-    void libraries.refetch();
-  }, [now, lanes.arriving, files, libraries]);
-}
 
 export function ProcessingPage(): React.ReactElement {
   useActivityStreamInvalidations(LANE_KEYS, { throttleMs: LANE_THROTTLE_MS });

@@ -8,6 +8,7 @@ import {
 } from "../../lib/processing/workflow-kind";
 import { parseAppTime } from "../../lib/ui/mm-format-date";
 import { plural } from "../../lib/ui/mm-plural";
+import type { ArrivingItem } from "./processing-model";
 
 /** The kind of each workflow that is switched on, which decides where the page says a file ends up. */
 export function enabledWorkflowKinds(
@@ -180,4 +181,17 @@ export function ringState(
 ): "counting" | "checking" | "unknown" {
   if (left == null) return "unknown";
   return left > 0 ? "counting" : "checking";
+}
+
+/** How far through its wait an arriving file is, or null when the wait has no known length. */
+export function ringFraction(
+  item: ArrivingItem,
+  left: number | null,
+): number | null {
+  const state = ringState(left);
+  if (state === "checking") return 1;
+  const total =
+    item.holdUntil != null ? item.holdTotal : item.nextLook?.interval;
+  if (state !== "counting" || !total || left == null) return null;
+  return Math.min(1, Math.max(0, 1 - left / total));
 }
