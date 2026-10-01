@@ -15,7 +15,7 @@ import {
 
 const routeErrorElement = <RouteErrorScreen />;
 
-// Five places: Processing (/), History, Library, Settings and System. Addresses bookmarked from an
+// Five places: the Dashboard (/), History, Library, Settings and System. Addresses bookmarked from an
 // installed release that no longer exist redirect to where their page lives now
 // (legacy-redirects.tsx); anything older gets the Not found page.
 const router = createBrowserRouter([
@@ -58,7 +58,7 @@ const router = createBrowserRouter([
             errorElement: routeErrorElement,
             children: [
               {
-                // Processing: every file Weir is working on, moving as it moves. The landing screen,
+                // The Dashboard: every file Weir is working on, moving as it moves. The landing screen,
                 // because what Weir is doing right now is what an operator opens the app to see.
                 index: true,
                 lazy: async () => ({

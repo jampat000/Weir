@@ -4,7 +4,8 @@ import { NAV_GROUPS, pageMeta } from "./nav-model";
 
 describe("pageMeta", () => {
   it.each([
-    ["/", "", "Processing"],
+    ["/", "", "Dashboard"],
+    ["/", "?view=system&workflow=2", "Dashboard"],
     ["/history", "", "History"],
     ["/library", "", "Library"],
     ["/system", "?tab=logs", "System"],

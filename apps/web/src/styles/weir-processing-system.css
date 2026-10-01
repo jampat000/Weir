@@ -1,0 +1,78 @@
+/*
+ * The Dashboard's System view: the health detail across the top, then the jobs Weir has run beside the
+ * timers it keeps. Wide, the lower row uses the same two columns as Live, so nothing moves between the views;
+ * narrower, the timers go under the jobs. The page decides from the width of its own area, not the window's.
+ */
+
+.mm-sys {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mm-panel-gap);
+}
+
+.mm-sys__low {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--mm-panel-gap);
+  align-items: start;
+}
+
+.mm-sys__jobs {
+  min-width: 0;
+}
+
+@container mm-dash (min-width: 66rem) {
+  .mm-sys__low {
+    grid-template-columns: minmax(0, 1fr) clamp(340px, 28%, 460px);
+  }
+}
+
+/* ---- Timers ---------------------------------------------------------------- */
+
+.mm-timers {
+  display: grid;
+  gap: 12px;
+  padding: 0 18px 16px;
+}
+
+.mm-timers__note {
+  margin: 0;
+  font-size: 13px;
+  color: var(--mm-text2);
+}
+
+.mm-timers__list {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.mm-timers__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 12px;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.mm-timers__row a {
+  min-width: 0;
+  color: var(--mm-text1);
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+.mm-timers__row a:hover {
+  color: var(--mm-primary);
+}
+
+.mm-timers__row > span:nth-child(2) {
+  color: var(--mm-text2);
+}
+
+.mm-timers__row .mm-next__bar {
+  grid-column: 1 / -1;
+  margin: 0;
+}

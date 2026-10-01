@@ -26,19 +26,24 @@ export type HandedBackSummary = {
 };
 
 /**
- * The last two hours of finished files for the chosen source. Both kinds are always fetched, so
+ * The last two hours of finished files for the chosen source and workflow. Both kinds are always fetched, so
  * switching the filter only changes which ones are counted.
  */
-export function useHandedBack(filter: Filter, now: number): HandedBackSummary {
+export function useHandedBack(
+  filter: Filter,
+  now: number,
+  workflowId: number | null = null,
+): HandedBackSummary {
   const since = new Date(handedBackSince(now))
     .toISOString()
     .replace("Z", "+00:00");
+  const workflow = workflowId === null ? {} : { library_id: workflowId };
   const passes = useActivityWindowQuery(
-    { event_type: REMUX_PASS_COMPLETED_EVENT, date_from: since },
+    { event_type: REMUX_PASS_COMPLETED_EVENT, date_from: since, ...workflow },
     HANDED_BACK_PAGES,
   );
   const cleans = useActivityWindowQuery(
-    { event_type: LIBRARY_FILE_CLEANED_EVENT, date_from: since },
+    { event_type: LIBRARY_FILE_CLEANED_EVENT, date_from: since, ...workflow },
     HANDED_BACK_PAGES,
   );
   const responses = [

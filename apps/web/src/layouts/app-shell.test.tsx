@@ -46,7 +46,7 @@ vi.mock("../lib/system/readiness-queries", () => ({
   }),
 }));
 
-// The Processing entry says how many cards the Working lane is showing; History says how many files
+// The Dashboard entry says how many cards the Working lane is showing; History says how many files
 // need someone.
 const counts = { working: 0, needsYou: 0 };
 vi.mock("../pages/processing/working-count", () => ({
@@ -85,14 +85,14 @@ describe("AppShell", () => {
     readiness.isError = false;
   });
 
-  it("opens on Processing; there is no Home, Dashboard or Activity entry (3.2)", () => {
+  it("opens on the Dashboard; there is no Home, Processing or Activity entry", () => {
     renderShell("/");
 
-    expect(screen.getByRole("link", { name: "Processing" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Dashboard" })).toHaveAttribute(
       "href",
       "/",
     );
-    for (const retired of ["Home", "Dashboard", "Activity"]) {
+    for (const retired of ["Home", "Processing", "Activity"]) {
       expect(
         screen.queryByRole("link", { name: retired }),
       ).not.toBeInTheDocument();
@@ -109,7 +109,7 @@ describe("AppShell", () => {
     // The whole nav, in order. A new entry has to be added here deliberately, and a label that
     // stops matching its destination fails rather than quietly misleading someone.
     expect(items).toEqual([
-      ["Processing", "/"],
+      ["Dashboard", "/"],
       ["History", "/history"],
       ["Library", "/library"],
       ["Workflows", "/settings"],
@@ -137,7 +137,7 @@ describe("AppShell", () => {
   it("marks only the current screen, and marks nothing on a page that is not one", () => {
     const pages = (
       <>
-        <Route index element={<div>Processing</div>} />
+        <Route index element={<div>Dashboard</div>} />
         <Route path="library" element={<div>Library</div>} />
         <Route path="*" element={<div>Not found</div>} />
       </>
@@ -152,8 +152,8 @@ describe("AppShell", () => {
     expect(current()).toEqual(["Library"]);
     unmount();
 
-    // `/dashboard` is the Not found page now that 3.0.0 dropped its redirect (#585). Processing is
-    // the index route, so it must not claim to be the screen you are on.
+    // The Dashboard is the index route at `/`; `/dashboard` is the Not found page (#585), so no entry
+    // claims to be the screen you are on.
     renderShell("/dashboard", pages);
     expect(current()).toEqual([]);
   });
@@ -178,11 +178,11 @@ describe("AppShell", () => {
     expect(current()).toEqual(["Alerts"]);
   });
 
-  it("shows how many files the Working lane holds beside Processing, and nothing when none are", () => {
+  it("shows how many files the Working lane holds beside the Dashboard, and nothing when none are", () => {
     counts.working = 2;
     const pages = <Route path="library" element={<div>Library</div>} />;
     const view = renderShell("/library", pages);
-    const live = screen.getByRole("link", { name: "Processing, 2 working" });
+    const live = screen.getByRole("link", { name: "Dashboard, 2 working" });
     expect(
       within(live).getByTestId("nav-processing-working"),
     ).toHaveTextContent("2");
@@ -198,9 +198,7 @@ describe("AppShell", () => {
       </MemoryRouter>,
     );
     expect(screen.queryByTestId("nav-processing-working")).toBeNull();
-    expect(
-      screen.getByRole("link", { name: "Processing" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Dashboard" })).toBeInTheDocument();
   });
 
   it("shows how many files need you beside History, and nothing when none do", () => {
@@ -284,7 +282,7 @@ describe("AppShell", () => {
     menu.focus();
 
     fireEvent.click(menu);
-    expect(screen.getByRole("link", { name: "Processing" })).toHaveFocus();
+    expect(screen.getByRole("link", { name: "Dashboard" })).toHaveFocus();
 
     fireEvent.keyDown(document, { key: "Escape" });
     expect(document.getElementById("mm-primary-sidebar")).not.toHaveClass(
@@ -296,13 +294,13 @@ describe("AppShell", () => {
   it("shows a screen that is still loading inside the one main landmark", () => {
     renderShell(
       "/",
-      <Route index element={<PageLoading label="Loading Processing" />} />,
+      <Route index element={<PageLoading label="Loading the Dashboard" />} />,
     );
 
     const main = screen.getByRole("main");
     expect(screen.getAllByRole("main")).toHaveLength(1);
     expect(within(main).getByRole("status")).toHaveTextContent(
-      "Loading Processing",
+      "Loading the Dashboard",
     );
   });
 
@@ -310,7 +308,7 @@ describe("AppShell", () => {
     renderShell(
       "/",
       <>
-        <Route index element={<div>Processing page</div>} />
+        <Route index element={<div>Dashboard page</div>} />
         <Route path="library" element={<div>Library page</div>} />
       </>,
     );
@@ -335,7 +333,7 @@ describe("the shell's header", () => {
     renderShell("/");
 
     expect(
-      screen.getByRole("heading", { level: 1, name: "Processing" }),
+      screen.getByRole("heading", { level: 1, name: "Dashboard" }),
     ).toBeInTheDocument();
     expect(
       screen.getByText("Cleans new downloads and your library"),

@@ -9,15 +9,26 @@ import { TodayTile } from "./today-tile";
 const NOW = Date.parse("2026-08-18T10:00:00Z");
 const stats = { files_processed: 38, net_space_saved_bytes: 44_236_078_284 };
 const needsYou = { count: 0 };
+/** The workflow the tile asked the figures and the count for, each time. */
+const figuresAsked: (number | null)[] = [];
 const summary: { value: HandedBackSummary } = {
   value: { handed: handedBack([], NOW), total: 0, partial: false },
 };
 
-vi.mock("../../../lib/processing/queries", () => ({
-  useProcessingOverviewStatsQuery: () => ({ data: stats }),
+vi.mock("./use-today-figures", () => ({
+  useTodayFigures: (workflowId: number | null) => {
+    figuresAsked.push(workflowId);
+    return {
+      cleaned: stats.files_processed,
+      savedBytes: stats.net_space_saved_bytes,
+    };
+  },
 }));
 vi.mock("../../../lib/processing/needs-you-count", () => ({
-  useNeedsYouCount: () => needsYou.count,
+  useNeedsYouCount: (workflowId: number | null) => {
+    figuresAsked.push(workflowId);
+    return needsYou.count;
+  },
 }));
 vi.mock("../use-handed-back", () => ({
   useHandedBack: () => summary.value,
@@ -38,10 +49,10 @@ function finishedAt(minutesAgo: number) {
   };
 }
 
-function renderTile() {
+function renderTile(workflowId?: number | null) {
   render(
     <MemoryRouter>
-      <TodayTile filter="all" now={NOW} />
+      <TodayTile filter="all" now={NOW} workflowId={workflowId} />
     </MemoryRouter>,
   );
   return screen.getByRole("region", { name: "Today" });
@@ -49,10 +60,23 @@ function renderTile() {
 
 beforeEach(() => {
   needsYou.count = 0;
+  figuresAsked.length = 0;
   summary.value = { handed: handedBack([], NOW), total: 0, partial: false };
 });
 
 describe("the Today tile", () => {
+  it("asks for every workflow's figures unless it is given one", () => {
+    renderTile();
+
+    expect(new Set(figuresAsked)).toEqual(new Set([null]));
+  });
+
+  it("asks for one workflow's figures and need-a-look count when narrowed to it", () => {
+    renderTile(3);
+
+    expect(new Set(figuresAsked)).toEqual(new Set([3]));
+  });
+
   it("says how many were cleaned today and how much space that saved", () => {
     const tile = renderTile();
 

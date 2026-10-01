@@ -9,11 +9,18 @@ import { nextItems, type LibraryCleanRun, type NextItem } from "./next-model";
 /** A library's clean time only moves when it runs or its schedule is changed, so a minute is soon enough. */
 const CLEAN_SCHEDULE_REFRESH_MS = 60_000;
 
-/** What Weir does next on its own, from the workflows' scans, the libraries' daily clean and the cleanup timers. */
+/**
+ * What Weir does next on its own, from the workflows' scans, the libraries' daily clean and the cleanup timers.
+ * Narrowed to one workflow it lists that workflow's scan and clean only: a cleanup timer belongs to no workflow.
+ */
 export function useNextItems(
   workflows: readonly ProcessingLibrary[] | undefined,
+  workflowId: number | null = null,
 ): NextItem[] {
-  const enabled = (workflows ?? []).filter((workflow) => workflow.enabled);
+  const enabled = (workflows ?? []).filter(
+    (workflow) =>
+      workflow.enabled && (workflowId === null || workflow.id === workflowId),
+  );
   const maintenance = useProcessingMaintenanceQuery();
   const overviews = useQueries({
     queries: enabled.map((workflow) => ({
@@ -31,6 +38,6 @@ export function useNextItems(
   return nextItems({
     workflows: enabled,
     cleanRuns,
-    cleanupJobs: maintenance.data?.families ?? [],
+    cleanupJobs: workflowId === null ? (maintenance.data?.families ?? []) : [],
   });
 }

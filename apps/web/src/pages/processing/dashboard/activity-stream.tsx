@@ -65,12 +65,24 @@ function Line({
   );
 }
 
+type ActivityStreamProps = {
+  now: number;
+  /** Only what happened to this workflow's files; everything when null or left out. */
+  workflowId?: number | null;
+};
+
 /**
  * What Weir just did, newest first, from the same feed the Activity log reads. A line that arrives while
  * the page is open slides in and glows once; lines already there when the page opened do not.
  */
-export function ActivityStream({ now }: { now: number }) {
-  const recent = useActivityRecentQuery({ limit: RECENT_EVENTS });
+export function ActivityStream({
+  now,
+  workflowId = null,
+}: ActivityStreamProps) {
+  const recent = useActivityRecentQuery({
+    limit: RECENT_EVENTS,
+    library_id: workflowId ?? undefined,
+  });
   const items = recent.data?.items;
   const stream = useMemo(() => buildStream(items ?? []), [items]);
   const newestId = items?.[0]?.id ?? null;

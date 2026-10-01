@@ -65,7 +65,7 @@ export const NAV_GROUPS: readonly NavGroup[] = [
     items: [
       {
         id: "processing",
-        label: "Processing",
+        label: "Dashboard",
         eyebrow: "Cleans new downloads and your library",
         to: "/",
         icon: "processing",

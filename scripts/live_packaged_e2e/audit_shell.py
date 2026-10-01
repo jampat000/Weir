@@ -126,20 +126,20 @@ class AuditShellMixin:
         return [label.strip() for label in tabs.all_text_contents()]
 
     def processing_live(self) -> None:
-        self.open_sidebar("Processing")
-        self.visible(self.page.get_by_test_id("processing-page"), "Processing page")
+        self.open_sidebar("Dashboard")
+        self.visible(self.page.get_by_test_id("processing-page"), "Dashboard page")
         self.visible(
-            self.page.get_by_role("heading", name="Processing", exact=True),
-            "Processing heading",
+            self.page.get_by_role("heading", name="Dashboard", exact=True),
+            "Dashboard heading",
         )
-        # Home became Processing, the dashboard folded into it (#459), every file's story is History, and the
+        # The landing page is the Dashboard, every file's story is History, and the
         # 3.1 Activity page is System › Logs. Each Settings section is an entry of its own.
         primary = self.page.get_by_role("navigation", name="Primary")
         labels = [text.strip() for text in primary.locator(".mm-sidebar-link-label").all_text_contents()]
         self.require(
             labels
             == [
-                "Processing",
+                "Dashboard",
                 "History",
                 "Library",
                 "Workflows",
@@ -153,14 +153,14 @@ class AuditShellMixin:
             ],
             f"primary navigation is {labels}",
         )
-        for retired in ("Home", "Dashboard", "Activity"):
+        for retired in ("Home", "Processing", "Activity"):
             self.require(
                 not self.page.get_by_role("link", name=retired, exact=True).count(),
                 f"{retired} must not appear in the sidebar",
             )
         self.assert_no_visible_crash()
         self.screenshot("processing")
-        self.record("Processing main screen and the side menu")
+        self.record("Dashboard main screen and the side menu")
 
     def library(self) -> None:
         self.open_sidebar("Library")

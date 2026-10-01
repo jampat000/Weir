@@ -26,8 +26,10 @@ export type ActivityWindow = {
 export function useActivityWindowQuery(
   filters: Omit<ActivityRecentFilters, "limit" | "before_id">,
   maxPages = 5,
+  { enabled = true }: { enabled?: boolean } = {},
 ) {
   return useQuery({
+    enabled,
     queryKey: activityKeys.window(filters, maxPages),
     queryFn: async (): Promise<ActivityWindow> => {
       const items: ActivityWindow["items"] = [];

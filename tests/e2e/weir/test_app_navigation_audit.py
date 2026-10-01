@@ -38,25 +38,25 @@ def test_signed_in_navigation_covers_main_screens_and_tabs(weir_shell: str) -> N
 
             ensure_signed_in(page, base)
 
-            # Processing (the landing screen) and History, Library, each Settings section, then System.
+            # The Dashboard (the landing screen) and History, Library, each Settings section, then System.
             primary = page.get_by_role("navigation", name="Primary")
-            # The labels, not the links: the Processing link also carries its "1 working" badge while a file runs.
+            # The labels, not the links: the Dashboard link also carries its "1 working" badge while a file runs.
             expect(primary.locator(".mm-sidebar-link-label")).to_have_text(
                 [
-                    "Processing",
+                    "Dashboard",
                     "History",
                     "Library",
                     *[label for label, _ in SETTINGS_SECTIONS],
                     "System",
                 ]
             )
-            for retired in ("Home", "Dashboard", "Activity"):
+            for retired in ("Home", "Processing", "Activity"):
                 expect(page.get_by_role("link", name=retired, exact=True)).to_have_count(0)
 
-            open_sidebar(page, "Processing")
+            open_sidebar(page, "Dashboard")
             expect(page).to_have_url(re.compile(r".*/(?:$|[?#])"))
             expect(page.get_by_test_id("processing-page")).to_be_visible()
-            expect(page.get_by_role("heading", name="Processing", exact=True)).to_be_visible()
+            expect(page.get_by_role("heading", name="Dashboard", exact=True)).to_be_visible()
             # A retired address gets the not-found page, not a hidden alias.
             page.goto(f"{base}/dashboard", wait_until="domcontentloaded")
             expect(page.get_by_role("heading", name="This page doesn't exist.", exact=True)).to_be_visible()

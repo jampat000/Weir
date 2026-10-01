@@ -45,13 +45,33 @@
 /* Where a page puts its own control (a segmented choice, a picker); nothing shows when it has none. */
 .mm-header__slot {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
+  gap: 8px;
   min-width: 0;
   margin-left: 12px;
 }
 
 .mm-header__slot:empty {
   display: none;
+}
+
+/* "All workflows ▾": one control among the page's others, as tall as the segmented choice beside it. */
+.mm-workflow-picker {
+  width: 12.5rem;
+  max-width: 100%;
+}
+
+.mm-workflow-picker .mm-input--opens {
+  min-height: 2.375rem;
+  margin-top: 0;
+  padding-block: 0;
+  border-color: var(--mm-hairline);
+  background: var(--mm-card-bg);
+  box-shadow: none;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--mm-text2);
 }
 
 .mm-header__actions {

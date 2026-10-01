@@ -16,6 +16,12 @@ const NEEDS_YOU_STATUSES: readonly ProcessingFileStatus[] = [
 /** The count rides on every files page, so one row is all that is read. */
 const COUNT_PROBE: ProcessingFilesQuery = { limit: 1 };
 
+function probeFor(workflowId: number | null): ProcessingFilesQuery {
+  return workflowId === null
+    ? COUNT_PROBE
+    : { ...COUNT_PROBE, library_id: workflowId };
+}
+
 const COUNT_REFRESH_MS = 30_000;
 
 /** How many files wait on a person, from the per-status counts the files endpoint sends. */
@@ -28,11 +34,15 @@ export function needsYouCount(
   );
 }
 
-/** For the sidebar, beside History: the files that need someone to look. */
-export function useNeedsYouCount(): number {
+/**
+ * For the sidebar, beside History: the files that need someone to look. Given a workflow, only its files;
+ * the sidebar counts every workflow's.
+ */
+export function useNeedsYouCount(workflowId: number | null = null): number {
+  const probe = probeFor(workflowId);
   const files = useQuery({
-    queryKey: processingKeys.fileList(COUNT_PROBE),
-    queryFn: () => fetchProcessingFiles(COUNT_PROBE),
+    queryKey: processingKeys.fileList(probe),
+    queryFn: () => fetchProcessingFiles(probe),
     refetchInterval: COUNT_REFRESH_MS,
   });
   return needsYouCount(files.data?.status_counts);

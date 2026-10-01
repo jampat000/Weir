@@ -157,6 +157,13 @@ function libraryJobParts(row: ProcessingJobInspectionRow): {
   }
 }
 
+/** The workflow a library clean job belongs to, or null when its payload does not say. */
+export function libraryCleanWorkflowId(
+  row: ProcessingJobInspectionRow,
+): number | null {
+  return libraryJobParts(row).libraryId;
+}
+
 /**
  * The general, paginated file list with the Working lane's own uncapped, status-filtered fetch folded in
  * (#781): a currently-processing file the general page's own limit left out is patched back onto the end,

@@ -64,7 +64,7 @@ def test_saved_state_persists_across_settings_and_processing(
             form.get_by_role("textbox", name="Output folder").fill(str(tv_output))
             page.get_by_test_id("processing-library-save").click()
             expect(form).to_have_count(0)
-            open_sidebar(page, "Processing")
+            open_sidebar(page, "Dashboard")
             expect(page.get_by_test_id("processing-page")).to_be_visible()
             open_tab(page, "Settings", "Workflows")
             expect(page.get_by_test_id("processing-libraries-section")).to_contain_text(str(tv_watch))

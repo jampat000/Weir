@@ -1,12 +1,16 @@
+import type { ComponentProps } from "react";
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { LiveProgressEntry } from "../../lib/activity/use-activity-stream-invalidation";
 import type { ProcessingFile } from "../../lib/processing/files-api";
 import type { NextItem } from "./dashboard/next-model";
+import type { NeedsPanel } from "./dashboard/needs-panel";
 import { LEAVING_CARD_MS } from "./leaving-cards";
 import { LIBRARY_CLEAN_JOB_KIND } from "./processing-model";
 import { ProcessingPage } from "./processing-page";
+
+type NeedsPanelProps = ComponentProps<typeof NeedsPanel>;
 
 const files: {
   files: ProcessingFile[];
@@ -60,6 +64,10 @@ const refetchFiles = vi.fn();
 const refetchLibraries = vi.fn();
 
 const liveProgress: Record<string, LiveProgressEntry> = {};
+/** What the page gave the Needs you panel, each time it rendered. */
+const needsProps: NeedsPanelProps[] = [];
+/** What the Activity stream asked for, each time it asked. */
+const streamFilters: { library_id?: number }[] = [];
 /** The query keys each call to useActivityStreamInvalidations asked to refresh on activity. */
 const invalidations: (readonly unknown[])[] = [];
 
@@ -128,13 +136,19 @@ vi.mock("../../lib/auth/queries", () => ({
 }));
 vi.mock("../../lib/activity/queries", () => ({
   // The stream asks for the newest events of every kind; Just finished and the chart ask for one kind.
-  useActivityRecentQuery: (filters: { event_type?: string }) => ({
-    data: (filters.event_type
-      ? activity[filters.event_type]
-      : activity.stream) ?? {
-      items: [],
-    },
-  }),
+  useActivityRecentQuery: (filters: {
+    event_type?: string;
+    library_id?: number;
+  }) => {
+    if (!filters.event_type) streamFilters.push(filters);
+    return {
+      data: (filters.event_type
+        ? activity[filters.event_type]
+        : activity.stream) ?? {
+        items: [],
+      },
+    };
+  },
   useActivityWindowQuery: (filters: { event_type: string }) => {
     const items = activity[filters.event_type]?.items ?? [];
     return { data: { items, total: items.length, complete: true } };
@@ -143,6 +157,16 @@ vi.mock("../../lib/activity/queries", () => ({
 // The next-up list and the Health panel read their own endpoints; their tests are beside them.
 vi.mock("./dashboard/use-next-items", () => ({
   useNextItems: () => nextItems,
+}));
+vi.mock("./dashboard/needs-panel", () => ({
+  NeedsPanel: (props: NeedsPanelProps) => {
+    needsProps.push(props);
+    return (
+      <button type="button" onClick={() => props.onOpen?.(props.stuck[0])}>
+        Open the story
+      </button>
+    );
+  },
 }));
 vi.mock("./dashboard/health-panel", () => ({
   HealthPanel: () => <div data-testid="health-panel" />,
@@ -208,9 +232,9 @@ function libraryCleanJob(id: number) {
   };
 }
 
-function renderLive() {
+function renderLive(address = "/") {
   return render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={[address]}>
       <ProcessingPage />
     </MemoryRouter>,
   );
@@ -235,6 +259,8 @@ describe("ProcessingPage", () => {
     refetchFiles.mockClear();
     refetchLibraries.mockClear();
     invalidations.length = 0;
+    streamFilters.length = 0;
+    needsProps.length = 0;
     fileLogState.isError = false;
     fileLogState.error = null;
   });
@@ -275,6 +301,59 @@ describe("ProcessingPage", () => {
     expect(
       screen.getByRole("button", { name: "Library cleaning" }),
     ).toHaveAttribute("aria-pressed", "true");
+  });
+
+  describe("narrowed to one workflow from the address", () => {
+    beforeEach(() => {
+      files.files = [file({ id: 1, status: "unprocessed" })];
+      jobs.active = { jobs: [libraryCleanJob(40)] };
+    });
+
+    it("shows the Pipeline of that workflow's files and library cleans only", () => {
+      const tv = renderLive("/?workflow=1");
+      const tvBoard = screen.getByTestId("pipeline-board");
+      expect(tvBoard).toHaveTextContent("The Quiet Harbour S01E03");
+      expect(tvBoard).not.toHaveTextContent("Paper Lanterns (2023)");
+      tv.unmount();
+
+      renderLive("/?workflow=2");
+      const moviesBoard = screen.getByTestId("pipeline-board");
+      expect(moviesBoard).not.toHaveTextContent("The Quiet Harbour S01E03");
+      expect(moviesBoard).toHaveTextContent("Paper Lanterns (2023)");
+    });
+
+    it("lists only that workflow's files under Working on now", () => {
+      files.files = [
+        file({ id: 3, status: "processing", library_id: 1 }),
+        file({
+          id: 4,
+          status: "processing",
+          library_id: 2,
+          relative_path: "Glass.Orchard.S01E04.2160p.WEB-DL.mkv",
+        }),
+      ];
+      renderLive("/?workflow=2");
+
+      const tile = screen.getByRole("region", { name: "Working on now" });
+      expect(within(tile).getByTestId("live-working")).toHaveTextContent(
+        "Glass Orchard S01E04",
+      );
+      expect(within(tile).getByTestId("live-working")).not.toHaveTextContent(
+        "The Quiet Harbour",
+      );
+    });
+
+    it("asks the Activity stream only for that workflow's entries", () => {
+      renderLive("/?workflow=2");
+
+      expect(streamFilters.at(-1)).toMatchObject({ library_id: 2 });
+    });
+
+    it("asks for every workflow's entries when none is chosen", () => {
+      renderLive("/");
+
+      expect(streamFilters.at(-1)?.library_id).toBeUndefined();
+    });
   });
 
   describe("the band", () => {
@@ -401,49 +480,33 @@ describe("ProcessingPage", () => {
   });
 
   describe("Needs you", () => {
-    it("is quiet when a healthy install has nothing to say", () => {
-      renderLive();
-
-      expect(screen.queryByTestId("live-needs")).toBeNull();
-      expect(
-        within(screen.getByRole("region", { name: "Needs you" })).getByText(
-          "Nothing needs you right now.",
-        ),
-      ).toBeInTheDocument();
-    });
-
-    it("lists a stuck file, failed jobs, stopped work and the rejected files, each with where to go", () => {
+    it("is given the failed files, the rejected count and the workflow the page is narrowed to", () => {
       files.files = [
-        file({
-          id: 9,
-          status: "processing_failed",
-          relative_path: "Ember.and.Ash.S01E02.mkv",
-          status_reason: "The new file would not play. The original is safe.",
-        }),
+        file({ id: 9, status: "processing_failed", library_id: 1 }),
       ];
       files.status_counts = { rejected: 4 };
-      jobs.failed = { jobs: [{ id: 3 }, { id: 4 }] };
-      readiness.worker_health = [
-        {
-          module: "processing",
-          status: "degraded",
-          detail: "No worker has taken a job for 20 minutes.",
-        },
-      ];
+      renderLive("/?workflow=2");
+
+      expect(needsProps.at(-1)).toMatchObject({
+        workflowId: 2,
+        rejectedCount: 4,
+      });
+      expect(needsProps.at(-1)?.stuck.map((f) => f.id)).toEqual([9]);
+    });
+
+    it("is not narrowed when no workflow is chosen", () => {
       renderLive();
 
-      const needs = screen.getByTestId("live-needs");
-      expect(needs).toHaveTextContent("2 jobs failed");
-      expect(needs).toHaveTextContent("Background work has stopped");
-      expect(needs).toHaveTextContent(
-        "No worker has taken a job for 20 minutes.",
-      );
-      expect(needs).toHaveTextContent("Ember and Ash S01E02");
-      expect(needs).toHaveTextContent("The new file would not play.");
-      expect(needs).toHaveTextContent("4 files were rejected");
-      expect(
-        within(needs).getByRole("link", { name: /Open in History/ }),
-      ).toHaveAttribute("href", "/history?q=Ember.and.Ash.S01E02.mkv");
+      expect(needsProps.at(-1)?.workflowId).toBeNull();
+    });
+
+    it("opens a file's story from a row", () => {
+      files.files = [file({ id: 9, status: "processing_failed" })];
+      renderLive();
+
+      fireEvent.click(screen.getByRole("button", { name: "Open the story" }));
+
+      expect(fileLogMutate).toHaveBeenCalledWith(9);
     });
   });
 
