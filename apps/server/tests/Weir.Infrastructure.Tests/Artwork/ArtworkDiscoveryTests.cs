@@ -82,7 +82,7 @@ public sealed class ArtworkDiscoveryTests
         fixture.ServeSearch(ArtworkFixture.SearchAnswer(PosterFile)).ServeImage(PosterFile);
         var library = await fixture.LibraryIdAsync("movie");
         await fixture.InsertFileAsync(library, "Charade.1963.mkv");
-        var task = new ArtworkResolverTask(fixture.Store.Database, fixture.Gateway, fixture.Discovery, fixture.Resolver);
+        var task = fixture.TaskFor(fixture.Gateway);
 
         await task.RunOnceAsync(CancellationToken.None);
 
@@ -95,7 +95,7 @@ public sealed class ArtworkDiscoveryTests
         using var fixture = new ArtworkFixture();
         await fixture.Store.Execute("UPDATE suite_settings SET artwork_enabled = 0 WHERE id = 1");
         await fixture.InsertFileAsync(await fixture.LibraryIdAsync("movie"), "Charade.1963.mkv");
-        var task = new ArtworkResolverTask(fixture.Store.Database, fixture.Gateway, fixture.Discovery, fixture.Resolver);
+        var task = fixture.TaskFor(fixture.Gateway);
 
         await task.RunOnceAsync(CancellationToken.None);
 
@@ -117,7 +117,7 @@ public sealed class ArtworkDiscoveryTests
             fixture.Store.Clock,
             Microsoft.Extensions.Logging.Abstractions.NullLogger<ArtworkGatewayClient>.Instance);
         await fixture.InsertFileAsync(await fixture.LibraryIdAsync("movie"), "Charade.1963.mkv");
-        var task = new ArtworkResolverTask(fixture.Store.Database, unconfigured, fixture.Discovery, fixture.Resolver);
+        var task = fixture.TaskFor(unconfigured);
 
         await task.RunOnceAsync(CancellationToken.None);
 

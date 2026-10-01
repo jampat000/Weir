@@ -6,6 +6,12 @@ public static class ArtworkSchedule
     /// <summary>How long a title the service does not know is left alone before it is asked about again.</summary>
     public static readonly TimeSpan MissingRetryAfter = TimeSpan.FromDays(7);
 
+    /// <summary>How long a file's title and poster are kept after the file is gone, so a download that comes back does not fetch its poster again.</summary>
+    public static readonly TimeSpan GoneFileGrace = TimeSpan.FromDays(30);
+
+    /// <summary>How often the pruning pass looks for files that are gone.</summary>
+    public static readonly TimeSpan PruneInterval = TimeSpan.FromHours(1);
+
     /// <summary>How long a title waits after the service could not be reached for it, before its first retry.</summary>
     public static readonly TimeSpan FirstFailureBackoff = TimeSpan.FromMinutes(5);
 

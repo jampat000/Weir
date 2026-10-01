@@ -8,6 +8,7 @@ using Weir.Core.Json;
 using Weir.Core.MediaManagers;
 using Weir.Core.Validation;
 using Weir.Infrastructure.Activity;
+using Weir.Infrastructure.Artwork;
 using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.MediaManagers;
 using Weir.Infrastructure.Processing;
@@ -41,9 +42,12 @@ internal sealed class MediaManagerIntakeEndpointHandlers
     private readonly HandbackOutcomes _handbackOutcomes;
     private readonly LibraryStore _libraries;
     private readonly MachineIdentity _machine;
+    private readonly ArtworkSubjects _artwork;
 
-    public MediaManagerIntakeEndpointHandlers(MediaManagerIntake intake, HandbackOutcomes handbackOutcomes, LibraryStore libraries, MachineIdentity machine)
+    public MediaManagerIntakeEndpointHandlers(
+        MediaManagerIntake intake, HandbackOutcomes handbackOutcomes, LibraryStore libraries, MachineIdentity machine, ArtworkSubjects artwork)
     {
+        _artwork = artwork ?? throw new ArgumentNullException(nameof(artwork));
         _machine = machine ?? throw new ArgumentNullException(nameof(machine));
         _intake = intake ?? throw new ArgumentNullException(nameof(intake));
         _handbackOutcomes = handbackOutcomes ?? throw new ArgumentNullException(nameof(handbackOutcomes));
@@ -100,6 +104,12 @@ internal sealed class MediaManagerIntakeEndpointHandlers
             if (!imported.Matched)
             {
                 return ApiRoutes.Ok(new WireObject().Set("status", "ignored").Set("source", dialect.Key).Set("event", importEvent.EventKind));
+            }
+
+            // The manager's own ids for the title are exact, so a file Weir handed back shows its poster by them rather than by a guess at its name. A message with no secret could have come from anybody, so it changes nothing.
+            if (identity.Authenticated && imported is { LibraryId: { } libraryId, RelativePath: { } relativePath } && importEvent.Artwork is { } hints)
+            {
+                await _artwork.LinkHandoffAsync(uow, libraryId, importEvent.MediaScope, [relativePath], importEvent.ReleaseName, hints).ConfigureAwait(false);
             }
 
             await request.CommitAsync().ConfigureAwait(false);

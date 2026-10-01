@@ -59,6 +59,16 @@ public sealed class ArtworkMigrationTests : IDisposable
     }
 
     [Fact]
+    public void A_file_row_starts_unmarked_and_the_mark_is_indexed()
+    {
+        Migrate();
+        Execute("INSERT INTO artwork_files (library_id, relative_path) VALUES (1, 'a.mkv')");
+
+        Assert.Equal(1, Scalar("SELECT count(*) FROM artwork_files WHERE orphaned_at IS NULL"));
+        Assert.Equal(1, Scalar("SELECT count(*) FROM sqlite_master WHERE type = 'index' AND name = 'ix_artwork_files_orphaned_at'"));
+    }
+
+    [Fact]
     public void Forgetting_a_lookup_forgets_the_files_that_pointed_at_it()
     {
         Migrate();

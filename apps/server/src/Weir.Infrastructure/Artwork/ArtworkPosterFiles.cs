@@ -33,6 +33,9 @@ public sealed class ArtworkPosterFiles
         return File.Exists(path) ? new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, bufferSize: 4096, useAsync: true) : null;
     }
 
+    /// <summary>Remove an image. An image that is already gone is not an error.</summary>
+    public void Delete(string posterId) => File.Delete(PathFor(posterId));
+
     public bool Exists(string posterId) => File.Exists(PathFor(posterId));
 
     /// <summary>The file for an id. Only ids <see cref="ArtworkKeys.IsPosterId"/> accepts name a file, so no id can reach outside the folder.</summary>

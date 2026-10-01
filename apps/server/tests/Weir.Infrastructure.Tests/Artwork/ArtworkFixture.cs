@@ -31,6 +31,7 @@ internal sealed class ArtworkFixture : IDisposable
         Gateway = new ArtworkGatewayClient(Store.Options, Http, Store.Clock, NullLogger<ArtworkGatewayClient>.Instance);
         Resolver = new ArtworkResolver(Store.Database, Lookups, Gateway, PosterFiles, Limiter, Store.Clock, NullLogger<ArtworkResolver>.Instance);
         Discovery = new ArtworkDiscovery(Store.Database, Files, Subjects);
+        Pruner = new ArtworkPruner(Store.Database, PosterFiles, Store.Clock, NullLogger<ArtworkPruner>.Instance);
     }
 
     public StoreFixture Store { get; }
@@ -54,6 +55,10 @@ internal sealed class ArtworkFixture : IDisposable
     public ArtworkResolver Resolver { get; }
 
     public ArtworkDiscovery Discovery { get; }
+
+    public ArtworkPruner Pruner { get; }
+
+    public ArtworkResolverTask TaskFor(ArtworkGatewayClient gateway) => new(Store.Database, gateway, Discovery, Resolver, Pruner, Store.Clock);
 
     /// <summary>The id of the library the database is seeded with for a kind of media.</summary>
     public Task<long> LibraryIdAsync(string mediaType) =>

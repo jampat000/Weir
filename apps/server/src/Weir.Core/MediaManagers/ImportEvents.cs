@@ -105,8 +105,13 @@ public static class ImportEvents
             SourceEntityId = ManagerValues.WholeNumber(episode.Get("id")),
             SourcePath = ManagerValues.Text(episodeFile!.Get("sourcePath")),
             DownloadId = ManagerValues.Text(body.Get("downloadId")),
+            Artwork = series is null || ArtworkHints.FromTitleRecord(series) is not { } hints
+                ? null
+                : hints with { Season = ArtworkNumber(episode.Get("seasonNumber")), Episode = ArtworkNumber(episode.Get("episodeNumber")) },
         };
     }
+
+    private static int? ArtworkNumber(WireValue? value) => ManagerValues.WholeNumber(value) is { } number && number >= 0 && number <= int.MaxValue ? (int)number : null;
 
     private static MediaManagerImportEvent? NormalizeRadarr(WireObject body)
     {
@@ -139,6 +144,7 @@ public static class ImportEvents
             SourceEntityId = ManagerValues.WholeNumber(movie.Get("id")),
             SourcePath = ManagerValues.Text(movieFile!.Get("sourcePath")),
             DownloadId = ManagerValues.Text(body.Get("downloadId")),
+            Artwork = ArtworkHints.FromTitleRecord(movie),
         };
     }
 

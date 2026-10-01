@@ -18,6 +18,7 @@ public static class ArtworkServices
         services.TryAddSingleton<ArtworkGatewayClient>();
         services.TryAddSingleton<ArtworkDiscovery>();
         services.TryAddSingleton<ArtworkResolver>();
+        services.TryAddSingleton<ArtworkPruner>();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IPeriodicTask, ArtworkResolverTask>());
         return services;
     }

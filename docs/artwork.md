@@ -5,6 +5,7 @@ Weir shows a poster for the files it lists (Pipeline cards, the Just finished sh
 ## Where a file's title comes from
 
 - **A Deluno hand-off** may carry optional `title`, `year`, `tmdbId`, `tvdbId`, `imdbId`, `season`, `episode` and `posterUrl`. A malformed field is ignored, never an error. A `posterUrl` is used only when it is absolute https on `deluno-metadata-gateway.ejmdigital.workers.dev`, `image.tmdb.org`, `artworks.thetvdb.com` or `m.media-amazon.com` (`ArtworkPosterSource.ImageHosts`); anything else is ignored and the ids or the name decide.
+- **Radarr and Sonarr imports** of a file Weir handed back carry the manager's own ids: Radarr's movie `tmdbId` and `imdbId`, Sonarr's series `tvdbId` and `imdbId`. They replace the title read from the name, so those files get an exact lookup. A message with no webhook secret could be from anybody, so it changes nothing; a missing or malformed id is ignored.
 - **Every other file** is read from its path by `ArtworkTitleReader`: the release name, file name and folders for a film; the text before the season or episode marker for a series, so every episode shares one title.
 
 ## One lookup per title
@@ -16,6 +17,10 @@ Weir shows a poster for the files it lists (Pipeline cards, the Just finished sh
 - A TMDb id is looked up exactly (`providerId=`); a series with only a TheTVDB id uses `/metadata/tvdb/tv/{id}`; anything else is a title search. A poster address from a hand-off skips the search.
 - The service allows 120 calls a minute per address, shared with every other app on the network. Weir searches at most once every two seconds (`ArtworkRateLimiter`), pauses every lookup for as long as a 503 `Retry-After` asks (a minute when it names none, an hour at most) and for a minute after the service could not be reached.
 - A title the service does not know is remembered and asked about again after seven days. A title that could not be asked about is retried after 5 minutes, doubling up to 6 hours. Files from a library scan queue behind files Weir is processing.
+
+## Pruning
+
+About once an hour `ArtworkResolverTask` runs `ArtworkPruner`, which needs no network and runs even with Artwork off. A file that is in neither `files` nor `library_files` is marked (`artwork_files.orphaned_at`); the mark clears if the file comes back. Thirty days after the mark (`ArtworkSchedule.GoneFileGrace`, so a re-download does not fetch its poster again) the row goes, then any title no file uses, then any poster no title uses, image and database row. What stays is one small row per title and per file Weir still knows.
 
 ## Settings and tests
 

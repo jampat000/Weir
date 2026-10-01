@@ -25,6 +25,25 @@ public sealed partial record ArtworkHints(
     [GeneratedRegex(@"^tt\d{5,10}$")]
     private static partial Regex ImdbIdPattern();
 
+    /// <summary>
+    /// The hints in a media manager's own record of a title (Radarr's <c>movie</c>, Sonarr's <c>series</c>): its name, year and ids.
+    /// Null when the record carries none of them.
+    /// </summary>
+    public static ArtworkHints? FromTitleRecord(WireObject record)
+    {
+        ArgumentNullException.ThrowIfNull(record);
+        var hints = new ArtworkHints(
+            Title: ReadTitle(record.Get("title")),
+            Year: (int?)ReadNumber(record.Get("year"), FirstYear, LastYear),
+            TmdbId: ReadNumber(record.Get("tmdbId"), 1, long.MaxValue),
+            TvdbId: ReadNumber(record.Get("tvdbId"), 1, long.MaxValue),
+            ImdbId: ReadImdbId(record.Get("imdbId")),
+            Season: null,
+            Episode: null,
+            PosterRef: null);
+        return hints == Empty ? null : hints;
+    }
+
     /// <summary>The hints a hand-off body carries, or null when it carries none.</summary>
     public static ArtworkHints? FromHandoff(WireObject body)
     {
@@ -34,7 +53,7 @@ public sealed partial record ArtworkHints(
             Year: (int?)ReadNumber(body.Get("year"), FirstYear, LastYear),
             TmdbId: ReadNumber(body.Get("tmdbId"), 1, long.MaxValue),
             TvdbId: ReadNumber(body.Get("tvdbId"), 1, long.MaxValue),
-            ImdbId: ManagerValues.Text(body.Get("imdbId")) is { } imdb && ImdbIdPattern().IsMatch(imdb) ? imdb : null,
+            ImdbId: ReadImdbId(body.Get("imdbId")),
             Season: (int?)ReadNumber(body.Get("season"), 0, int.MaxValue),
             Episode: (int?)ReadNumber(body.Get("episode"), 0, int.MaxValue),
             PosterRef: ArtworkPosterSource.RefFromHandoffUrl(ManagerValues.Text(body.Get("posterUrl"))));
@@ -42,6 +61,9 @@ public sealed partial record ArtworkHints(
     }
 
     private static ArtworkHints Empty { get; } = new(null, null, null, null, null, null, null, null);
+
+    private static string? ReadImdbId(WireValue? value) =>
+        ManagerValues.Text(value) is { } imdb && ImdbIdPattern().IsMatch(imdb) ? imdb : null;
 
     private static string? ReadTitle(WireValue? value) =>
         ManagerValues.Text(value) is { Length: <= ArtworkTitleReader.MaxTitleLength } title ? title : null;

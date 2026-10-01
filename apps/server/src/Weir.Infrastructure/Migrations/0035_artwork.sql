@@ -39,15 +39,18 @@ CREATE TABLE artwork_lookups (
 
 CREATE INDEX ix_artwork_lookups_outcome_retry_at ON artwork_lookups (outcome, retry_at);
 
--- lookup_key is null for a file whose name gave no title, so it is not read again on every pass.
+-- lookup_key is null for a file whose name gave no title, so it is not read again on every pass. orphaned_at is when the pruning
+-- pass first found no file behind the row (null while the file is known); a row goes once that is long enough ago.
 CREATE TABLE artwork_files (
 	library_id INTEGER NOT NULL,
 	relative_path TEXT NOT NULL,
 	lookup_key TEXT,
 	season INTEGER,
 	episode INTEGER,
+	orphaned_at DATETIME,
 	CONSTRAINT pk_artwork_files PRIMARY KEY (library_id, relative_path),
 	CONSTRAINT fk_artwork_files_artwork_lookups_lookup_key FOREIGN KEY (lookup_key) REFERENCES artwork_lookups (lookup_key) ON DELETE CASCADE
 );
 
 CREATE INDEX ix_artwork_files_lookup_key ON artwork_files (lookup_key);
+CREATE INDEX ix_artwork_files_orphaned_at ON artwork_files (orphaned_at);
