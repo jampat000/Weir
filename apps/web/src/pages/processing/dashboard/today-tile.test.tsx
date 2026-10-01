@@ -195,7 +195,7 @@ describe("the Today tile", () => {
 });
 
 describe("the Today chart's pointer readout", () => {
-  const READOUT = ".mm-today-chart__readout";
+  const READOUT = ".cs-read";
   const CHART_BOX_WIDTH = 230;
   /** Over the second-newest of the 24 points, where the two files cleaned 3 minutes ago were counted. */
   const OVER_THE_CLEANED_POINT = (CHART_BOX_WIDTH * 22) / 23;
@@ -228,7 +228,7 @@ describe("the Today chart's pointer readout", () => {
     fireEvent.pointerMove(chartOf(tile), { clientX: OVER_THE_CLEANED_POINT });
 
     expect(tile.querySelector(READOUT)).toHaveTextContent("· 2 cleaned");
-    expect(tile.querySelector(".mm-today-chart__pointer")).not.toBeNull();
+    expect(tile.querySelector(".cs-cursor")).not.toBeNull();
   });
 
   it("writes the time in the time zone chosen in Settings", () => {

@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { Fragment, useCallback, useState } from "react";
 import type { KeyboardEvent, PointerEvent } from "react";
 
 import { roundScaleTop } from "../../../lib/ui/chart-scale";
@@ -31,13 +31,13 @@ type TodayChartProps = {
 
 /**
  * The last two hours as a filled line, five minutes to a point, on a round-number scale with its time
- * span under it. The pointer, a tap or the keyboard picks a point and a readout says what finished then.
+ * span inside its bottom edge. The pointer, a tap or the keyboard picks a point and a readout says what finished then.
  * It is a slider over the points, so the keyboard reaches each five minutes the pointer does, and a
  * screen reader reads that point's value text.
  */
 export function TodayChart({ handed, now }: TodayChartProps) {
   const [pointed, setPointed] = useState<number | null>(null);
-  const [chartRef, chartSize] = useElementSize<HTMLSpanElement>();
+  const [chartRef, chartSize] = useElementSize<HTMLDivElement>();
   const clock = useAppClockFormatter();
   const hide = useCallback(() => setPointed(null), []);
   useCloseOnOutsideAndEscape(pointed !== null, hide, chartRef);
@@ -62,85 +62,80 @@ export function TodayChart({ handed, now }: TodayChartProps) {
     setPointed(next);
   };
   return (
-    <>
-      <span
-        ref={chartRef}
-        className="mm-today-chart"
-        role="slider"
-        tabIndex={0}
-        aria-label="Files finished, five minutes to a point"
-        aria-valuemin={0}
-        aria-valuemax={last}
-        aria-valuenow={current}
-        aria-valuetext={bucketWords(handed.buckets[current], now)}
-        onPointerDown={onPointerAt}
-        onPointerMove={onPointerAt}
-        onPointerLeave={(event) => {
-          if (event.pointerType !== "touch") hide();
-        }}
-        onFocus={() => setPointed((already) => already ?? last)}
-        onBlur={hide}
-        onKeyDown={onKeyDown}
+    <div
+      ref={chartRef}
+      className="mm-today-chart"
+      role="slider"
+      tabIndex={0}
+      aria-label="Files finished, five minutes to a point"
+      aria-valuemin={0}
+      aria-valuemax={last}
+      aria-valuenow={current}
+      aria-valuetext={bucketWords(handed.buckets[current], now)}
+      onPointerDown={onPointerAt}
+      onPointerMove={onPointerAt}
+      onPointerLeave={(event) => {
+        if (event.pointerType !== "touch") hide();
+      }}
+      onFocus={() => setPointed((already) => already ?? last)}
+      onBlur={hide}
+      onKeyDown={onKeyDown}
+    >
+      <svg
+        aria-hidden="true"
+        viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}
+        preserveAspectRatio="none"
+        className="mm-today-chart__svg"
       >
-        <svg
-          aria-hidden="true"
-          viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}
-          preserveAspectRatio="none"
-          className="mm-today-chart__svg"
-        >
-          <defs>
-            <linearGradient id={GRADIENT_ID} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0" className="mm-today-chart__stop" />
-              <stop
-                offset="1"
-                className="mm-today-chart__stop mm-today-chart__stop--end"
-              />
-            </linearGradient>
-          </defs>
-          {lines.map((line) => (
-            <line
-              key={line.value}
-              x1={0}
-              x2={CHART_WIDTH}
-              y1={line.y}
-              y2={line.y}
-              className="mm-today-chart__grid"
-              vectorEffect="non-scaling-stroke"
+        <defs>
+          <linearGradient id={GRADIENT_ID} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" className="mm-today-chart__stop" />
+            <stop
+              offset="1"
+              className="mm-today-chart__stop mm-today-chart__stop--end"
             />
-          ))}
-          <path d={shape.area} fill={`url(#${GRADIENT_ID})`} />
-          <path
-            d={shape.line}
-            className="mm-today-chart__line"
-            fill="none"
-            vectorEffect="non-scaling-stroke"
-          />
-        </svg>
-        {lines.map((line) => (
-          <span
-            key={line.value}
-            aria-hidden="true"
-            className="mm-today-chart__scale"
-            style={{ top: `${(line.y / CHART_HEIGHT) * 100}%` }}
-          >
-            {scaleLabel(line.value)}
-          </span>
-        ))}
-        {handed.totals.all === 0 ? (
-          <span aria-hidden="true" className="mm-today-chart__empty">
-            {NOTHING_HANDED_BACK}
-          </span>
-        ) : null}
-        {dot ? (
-          <span
-            aria-hidden="true"
-            className="mm-today-chart__dot"
-            style={{
-              left: `${(dot.x / CHART_WIDTH) * 100}%`,
-              top: `${(dot.y / CHART_HEIGHT) * 100}%`,
-            }}
-          />
-        ) : null}
+          </linearGradient>
+        </defs>
+        <path d={shape.area} fill={`url(#${GRADIENT_ID})`} />
+        <path
+          d={shape.line}
+          className="mm-today-chart__line"
+          fill="none"
+          vectorEffect="non-scaling-stroke"
+        />
+      </svg>
+      {handed.totals.all === 0 ? (
+        <span aria-hidden="true" className="mm-today-chart__empty">
+          {NOTHING_HANDED_BACK}
+        </span>
+      ) : null}
+      {dot ? (
+        <span
+          aria-hidden="true"
+          className="mm-today-chart__dot"
+          style={{
+            left: `${(dot.x / CHART_WIDTH) * 100}%`,
+            top: `${(dot.y / CHART_HEIGHT) * 100}%`,
+          }}
+        />
+      ) : null}
+      <div
+        aria-hidden="true"
+        className={pointed === null ? "cs-layer" : "cs-layer cs-on"}
+      >
+        {lines.map((line) => {
+          const style = { top: `${(line.y / CHART_HEIGHT) * 100}%` };
+          return (
+            <Fragment key={line.value}>
+              <i className="cs-grid" style={style} />
+              <b className="cs-tick cs-below" style={style}>
+                {scaleLabel(line.value)}
+              </b>
+            </Fragment>
+          );
+        })}
+        <span className="cs-end cs-start">{oldest}</span>
+        <span className="cs-end cs-now">{newest}</span>
         {pointed !== null && dot ? (
           <TodayChartReadout
             bucket={handed.buckets[pointed]}
@@ -149,11 +144,7 @@ export function TodayChart({ handed, now }: TodayChartProps) {
             clock={clock}
           />
         ) : null}
-      </span>
-      <p className="mm-today__span" aria-hidden="true">
-        <span>{oldest}</span>
-        <span>{newest}</span>
-      </p>
-    </>
+      </div>
+    </div>
   );
 }

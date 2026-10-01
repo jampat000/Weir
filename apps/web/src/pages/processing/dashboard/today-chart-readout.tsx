@@ -1,7 +1,7 @@
-import { bucketReadout } from "./handed-back-words";
-import { READOUT_GAP, readoutSide } from "./today-chart-model";
-import type { HandedBackBucket } from "../handed-back-model";
 import { useElementSize } from "../../../lib/ui/use-element-size";
+import type { HandedBackBucket } from "../handed-back-model";
+import { bucketReadout } from "./handed-back-words";
+import { readoutLeft } from "./today-chart-model";
 
 type TodayChartReadoutProps = {
   bucket: HandedBackBucket;
@@ -20,19 +20,18 @@ export function TodayChartReadout({
   chartWidth,
   clock,
 }: TodayChartReadoutProps) {
-  const [readoutRef, readout] = useElementSize<HTMLSpanElement>();
-  const side = readoutSide(fraction * chartWidth, readout.width, chartWidth);
-  const left = `${fraction * 100}%`;
+  const [readoutRef, readout] = useElementSize<HTMLDivElement>();
+  const lineX = fraction * chartWidth;
   return (
-    <span aria-hidden="true">
-      <span className="mm-today-chart__pointer" style={{ left }} />
-      <span
+    <>
+      <i className="cs-cursor" style={{ left: `${lineX}px` }} />
+      <div
         ref={readoutRef}
-        className={`mm-today-chart__readout mm-today-chart__readout--${side}`}
-        style={{ left, ["--today-readout-gap" as string]: `${READOUT_GAP}px` }}
+        className="cs-read"
+        style={{ left: `${readoutLeft(lineX, readout.width, chartWidth)}px` }}
       >
         {bucketReadout(bucket, clock)}
-      </span>
-    </span>
+      </div>
+    </>
   );
 }

@@ -7,7 +7,7 @@ import {
   chartShape,
   pointedAfterKey,
   pointedAtFraction,
-  readoutSide,
+  readoutLeft,
   scaleLines,
 } from "./today-chart-model";
 
@@ -88,17 +88,21 @@ describe("pointing at the chart", () => {
   });
 });
 
-describe("which side of the pointer's line the readout sits", () => {
-  it("is the right, while there is room", () => {
-    expect(readoutSide(40, 120, 300)).toBe("right");
+describe("where the pointer's readout sits", () => {
+  it("is 10px right of the pointer's line, while there is room", () => {
+    expect(readoutLeft(40, 120, 300)).toBe(50);
   });
 
-  it("flips to the left near the right edge", () => {
-    expect(readoutSide(280, 120, 300)).toBe("left");
+  it("flips to the left of the line near the right edge", () => {
+    expect(readoutLeft(280, 120, 300)).toBe(150);
   });
 
-  it("stays on the right when neither side has room", () => {
-    expect(readoutSide(60, 120, 150)).toBe("right");
+  it("stays 6px inside the chart's left edge", () => {
+    expect(readoutLeft(2, 120, 130)).toBe(6);
+  });
+
+  it("flips to the left when the line is hard against the right edge", () => {
+    expect(readoutLeft(300, 120, 300)).toBe(170);
   });
 });
 

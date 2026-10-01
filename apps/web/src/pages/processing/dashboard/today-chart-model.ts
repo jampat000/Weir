@@ -4,9 +4,12 @@ import type { HandedBackBucket } from "../handed-back-model";
 /** The drawing's own units; the SVG stretches to the tile. */
 export const CHART_WIDTH = 240;
 export const CHART_HEIGHT = 56;
-/** Room kept above the highest point and below the lowest, so the line is never clipped. */
+/**
+ * Room kept above the highest point, so the line is never clipped, and below the lowest, where the labels
+ * of the time span sit inside the chart's bottom edge.
+ */
 const PAD_TOP = 4;
-const PAD_BOTTOM = 2;
+const PAD_BOTTOM = 9;
 
 export type ChartPoint = { x: number; y: number };
 
@@ -62,20 +65,24 @@ export function pointedAtFraction(fraction: number, last: number): number {
   return Math.min(last, Math.max(0, Math.round(fraction * last)));
 }
 
-/** The gap between the pointer's line and its readout. */
-export const READOUT_GAP = 8;
+/** How far the readout sits from the pointer's line, and the least it keeps from the chart's edges. */
+const READOUT_OFFSET = 10;
+const READOUT_INSET = 6;
 
 /**
- * Which side of the pointer's line the readout sits on: the right, unless it would run past the chart's
- * right edge and the left has the room.
+ * Where the readout's left edge goes: just right of the pointer's line, or just left of it when it would
+ * run past the chart's right edge, and never closer than the inset to either edge.
  */
-export function readoutSide(
+export function readoutLeft(
   lineX: number,
   readoutWidth: number,
   chartWidth: number,
-): "right" | "left" {
-  const needed = readoutWidth + READOUT_GAP;
-  return lineX + needed > chartWidth && lineX - needed >= 0 ? "left" : "right";
+): number {
+  const right = lineX + READOUT_OFFSET;
+  const fits = right + readoutWidth <= chartWidth - READOUT_INSET;
+  const wanted = fits ? right : lineX - READOUT_OFFSET - readoutWidth;
+  const furthest = chartWidth - readoutWidth - READOUT_INSET;
+  return Math.max(READOUT_INSET, Math.min(wanted, furthest));
 }
 
 /** The bucket the arrow keys move to: left and right walk, Home and End jump to the oldest and newest. */
