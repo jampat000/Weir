@@ -100,13 +100,22 @@ describe("Just finished", () => {
     ).toBeInTheDocument();
   });
 
+  it("says what the panel counts beside its title", () => {
+    render(
+      shelf([finished(1)], { count: "38 cleaned today · 41.20 GB saved" }),
+    );
+
+    expect(
+      screen.getByRole("region", { name: "Just finished" }),
+    ).toHaveTextContent("38 cleaned today · 41.20 GB saved");
+  });
+
   it("links on to History", () => {
     render(shelf([finished(1)]));
 
-    expect(screen.getByRole("link", { name: "History →" })).toHaveAttribute(
-      "href",
-      "/history",
-    );
+    expect(
+      screen.getByRole("link", { name: "History: Just finished" }),
+    ).toHaveAttribute("href", "/history");
   });
 
   it("marks each tile with the path of its file, so the board can fly a delivered tile to it", () => {

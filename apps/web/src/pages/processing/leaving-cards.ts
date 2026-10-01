@@ -114,11 +114,6 @@ function failed(file: ProcessingFile, step: FlowStepId): LeavingOutcome {
   };
 }
 
-/** The lane an ended card is drawn in: a file that ended from Waiting takes the place its pass would have had. */
-export function drawnIn(card: ShownCard): "working" | "handing" {
-  return card.lane === "handing" ? "handing" : "working";
-}
-
 /** The cards on screen in Waiting, Working and Handing back, one per file. Library cleans have no file to follow. */
 export function shownCards(
   waiting: readonly WaitingItem[],

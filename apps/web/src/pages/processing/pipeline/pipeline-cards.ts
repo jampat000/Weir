@@ -1,7 +1,7 @@
 import type { ProcessingFile } from "../../../lib/processing/files-api";
 import type { LeavingCard } from "../leaving-cards";
 import type { Lanes, WorkSource } from "../processing-model";
-import type { Filter } from "../processing-toolbar";
+import type { Filter } from "../processing-filter";
 import {
   arrivingWorkflow,
   deliveredWords,

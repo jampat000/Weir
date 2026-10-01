@@ -1,0 +1,46 @@
+import { describe, expect, it } from "vitest";
+
+import { STEP_WORDS, sharedWaitSeconds } from "./working-words";
+
+const workflow = (enabled: boolean, ready_after_seconds: number) => ({
+  enabled,
+  ready_after_seconds,
+});
+
+describe("how long a new download waits", () => {
+  it("is the wait every workflow that is switched on agrees on", () => {
+    expect(sharedWaitSeconds([workflow(true, 60), workflow(true, 60)])).toBe(
+      60,
+    );
+  });
+
+  it("ignores a workflow that is switched off", () => {
+    expect(sharedWaitSeconds([workflow(true, 60), workflow(false, 5)])).toBe(
+      60,
+    );
+  });
+
+  it("is not one number when the workflows differ", () => {
+    expect(
+      sharedWaitSeconds([workflow(true, 60), workflow(true, 10)]),
+    ).toBeNull();
+  });
+
+  it("is not a number when nothing waits or nothing is on", () => {
+    expect(sharedWaitSeconds([workflow(true, 0)])).toBeNull();
+    expect(sharedWaitSeconds([workflow(false, 60)])).toBeNull();
+    expect(sharedWaitSeconds([])).toBeNull();
+  });
+});
+
+describe("the step a pass is on, in words", () => {
+  it("names every step as an action", () => {
+    expect(Object.values(STEP_WORDS)).toEqual([
+      "Checking",
+      "Planning",
+      "Writing",
+      "Verifying",
+      "Handing back",
+    ]);
+  });
+});

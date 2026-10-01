@@ -1,59 +1,61 @@
 /**
- * Every file Weir is working on, from the moment it lands to the moment the media manager has it back,
- * in five lanes that fold to the width they are given (weir-processing-board.css). Every number comes
- * from the server; the page follows the Activity stream rather than polling, and ticks once a second so
- * countdowns and "min ago" move between updates. A working file's percent, ETA and message come from the
- * same stream's live-progress frame (#750), which moves about once a second even though the file list
- * itself only changes on a database write — the start of a pass, a stage change, or its end.
+ * Everything Weir is doing, on one page: today's figures, what is being worked on and what comes next, the
+ * Pipeline every file moves through, what just finished and what Weir just did, and down the side its health
+ * and what needs a person. Every number comes from the server; the page follows the Activity stream rather
+ * than polling, and ticks once a second so countdowns and "min ago" move between updates. A working file's
+ * percent, ETA and message come from the same stream's live-progress frame (#750), which moves about once a
+ * second even though the file list itself only changes on a database write: the start of a pass, a stage
+ * change, or its end.
  */
 import { useCallback, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
+import { SegmentedControl } from "../../components/panels/segmented-control";
 import { FileStoryPanel } from "../../components/processing/file-story-panel";
 import { ApiEntryError } from "../../components/shared/api-entry-error";
 import { PageLoading } from "../../components/shared/page-loading";
 import { PageHeader } from "../../components/shell/page-header";
+import { ShellHeaderSlot } from "../../components/shell/shell-header-context";
 import type { FinishedFile } from "../../lib/activity/processing-outcome";
 import { activityKeys } from "../../lib/activity/query-keys";
 import { useActivityStreamInvalidations } from "../../lib/activity/use-activity-stream-invalidation";
 import { loadErrorMessage } from "../../lib/api/error-message";
+import { formatBytes } from "../../lib/format/bytes";
 import { usePauseQuery } from "../../lib/pause/pause-queries";
 import type { ProcessingFile } from "../../lib/processing/files-api";
 import { useProcessingFileLog } from "../../lib/processing/files-queries";
-import { useProcessingFilesAtOnceQuery } from "../../lib/processing/queries";
+import {
+  useProcessingFilesAtOnceQuery,
+  useProcessingOverviewStatsQuery,
+} from "../../lib/processing/queries";
 import { processingKeys } from "../../lib/processing/query-keys";
 import { useNow } from "../../lib/ui/use-now";
+import { ActivityStream } from "./dashboard/activity-stream";
+import { HealthPanel } from "./dashboard/health-panel";
+import { NeedsPanel } from "./dashboard/needs-panel";
+import { FAILED_JOBS_LIMIT } from "./dashboard/needs-model";
+import { NextTile } from "./dashboard/next-tile";
+import { TodayTile } from "./dashboard/today-tile";
+import { useNextItems } from "./dashboard/use-next-items";
+import { WorkingTile } from "./dashboard/working-tile";
+import { sharedWaitSeconds } from "./dashboard/working-words";
 import { useLeavingCards } from "./leaving-cards";
 import { JustFinishedShelf } from "./pipeline/just-finished-shelf";
 import { PipelineBoard } from "./pipeline/pipeline-board";
-import { useFinishedFiles } from "./use-finished-files";
+import { FILTER_OPTIONS, TODAY_DAYS, type Filter } from "./processing-filter";
 import { prettyName } from "./processing-model";
-import { FAILED_JOBS_LIMIT, NeedsList } from "./processing-needs";
-import {
-  ProcessingToolbar,
-  TODAY_DAYS,
-  type Filter,
-} from "./processing-toolbar";
-import {
-  enabledWorkflowKinds,
-  handingLaneHint,
-  processingLead,
-} from "./processing-words";
 import {
   FILES_QUERY,
   useLanes,
   useRefetchOverdueLooks,
 } from "./use-processing-lanes";
+import { useFinishedFiles } from "./use-finished-files";
 import { ACTIVE_JOBS_LIMIT, WORKING_FILES_QUERY } from "./working-count";
 
+const EYEBROW = "Cleans new downloads and your library";
 const NO_FILES: ProcessingFile[] = [];
 /** Once a second, so countdowns and "min ago" move between server updates. */
 const TICK_MS = 1000;
-// How many cards a lane shows before it says how many more there are. Working is never cut short:
-// it holds at most as many files as the files-at-once setting allows, and that tops out at 10.
-const ARRIVING_SHOWN = 3;
-const WAITING_SHOWN = 5;
-const HANDING_SHOWN = 4;
 
 // A running pass rewrites its progress row several times a second and every write reaches the
 // stream, so the lanes follow it closely and the totals, which only change when a file finishes,
@@ -73,6 +75,14 @@ const TOTAL_KEYS = [
 const LANE_THROTTLE_MS = 750;
 const TOTAL_THROTTLE_MS = 3_000;
 
+/** "38 cleaned today · 41.2 GB saved", for the shelf's title row. */
+function cleanedToday(
+  stats: { files_processed: number; net_space_saved_bytes: number } | undefined,
+): string | undefined {
+  if (!stats) return undefined;
+  const saved = formatBytes(stats.net_space_saved_bytes) || "0 B";
+  return `${stats.files_processed.toLocaleString()} cleaned today · ${saved} saved`;
+}
 export function ProcessingPage(): React.ReactElement {
   useActivityStreamInvalidations(LANE_KEYS, { throttleMs: LANE_THROTTLE_MS });
   useActivityStreamInvalidations(TOTAL_KEYS, {
@@ -83,6 +93,7 @@ export function ProcessingPage(): React.ReactElement {
   useRefetchOverdueLooks(board, now);
   const { files, libraries, lanes } = board;
   const filesAtOnce = useProcessingFilesAtOnceQuery();
+  const stats = useProcessingOverviewStatsQuery(TODAY_DAYS);
   const pause = usePauseQuery();
   const fileLog = useProcessingFileLog();
   const navigate = useNavigate();
@@ -99,6 +110,7 @@ export function ProcessingPage(): React.ReactElement {
     lanes.handing,
     files.data?.files ?? NO_FILES,
   );
+  const next = useNextItems(libraries.data);
 
   const openFile = useCallback(
     (file: ProcessingFile) => {
@@ -141,43 +153,66 @@ export function ProcessingPage(): React.ReactElement {
   const workflowNames = new Map(
     (libraries.data ?? []).map((library) => [library.id, library.name]),
   );
-  const workflowKinds = enabledWorkflowKinds(libraries.data ?? []);
+  const paused = pause.data?.paused ?? false;
+  const rejectedCount = files.data.status_counts.rejected ?? 0;
 
   return (
-    <div className="mm-page mm-live" data-testid="processing-page">
-      <PageHeader>
-        <p className="mm-page-head__lead">{processingLead(workflowKinds)}</p>
-      </PageHeader>
-
-      <ProcessingToolbar filter={filter} onFilter={setFilter} now={now} />
-
-      {pause.data?.paused ? (
-        <p className="mm-live-paused" role="status" data-testid="live-paused">
-          <b>Paused.</b> {pause.data.reason} Files already being written finish;
-          nothing new starts.
-        </p>
-      ) : null}
-
-      <NeedsList stuck={lanes.stuck} />
-
-      <div className="mm-redesign-board">
-        <PipelineBoard
-          lanes={lanes}
-          leaving={leaving}
-          filter={filter}
-          now={now}
-          paused={pause.data?.paused ?? false}
-          onOpen={openFile}
+    <div className="mm-page mm-dash" data-testid="processing-page">
+      <PageHeader eyebrow={EYEBROW} />
+      <ShellHeaderSlot>
+        <SegmentedControl
+          options={FILTER_OPTIONS}
+          value={filter}
+          onChange={setFilter}
+          ariaLabel="Show work from"
+          dataTestId="live-filter"
         />
-      </div>
-      <div className="mm-redesign-shelf">
-        <JustFinishedShelf
-          items={finished}
-          filter={filter}
-          now={now}
-          workflowNames={workflowNames}
-          onOpen={openFinished}
-        />
+      </ShellHeaderSlot>
+
+      <div className="mm-dash__grid">
+        <div className="mm-dash__band">
+          <div className="mm-dash__tiles">
+            <TodayTile filter={filter} now={now} />
+            <WorkingTile
+              working={lanes.working}
+              filesAtOnce={filesAtOnce.data?.effective_files_at_once ?? null}
+              waitSeconds={sharedWaitSeconds(libraries.data ?? [])}
+              onOpen={openFile}
+            />
+            <NextTile items={next} now={now} paused={paused} />
+          </div>
+        </div>
+        <div className="mm-dash__board">
+          <PipelineBoard
+            lanes={lanes}
+            leaving={leaving}
+            filter={filter}
+            now={now}
+            paused={paused}
+            onOpen={openFile}
+          />
+        </div>
+        <div className="mm-dash__low">
+          <JustFinishedShelf
+            items={finished}
+            filter={filter}
+            now={now}
+            workflowNames={workflowNames}
+            count={cleanedToday(stats.data)}
+            onOpen={openFinished}
+          />
+          <ActivityStream now={now} />
+        </div>
+        <div className="mm-dash__needs">
+          <NeedsPanel
+            workflows={libraries.data}
+            stuck={lanes.stuck}
+            rejectedCount={rejectedCount}
+          />
+        </div>
+        <div className="mm-dash__health">
+          <HealthPanel workflows={libraries.data ?? []} />
+        </div>
       </div>
 
       <FileStoryPanel

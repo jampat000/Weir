@@ -28,11 +28,10 @@
 @import "./styles/weir-system.css";
 @import "./styles/weir-settings.css";
 @import "./styles/weir-rules.css";
-@import "./styles/weir-processing.css";
-@import "./styles/weir-processing-board.css";
-@import "./styles/weir-processing-cards.css";
-@import "./styles/weir-processing-flow.css";
-@import "./styles/weir-processing-trend.css";
+@import "./styles/weir-processing-dashboard.css";
+@import "./styles/weir-processing-tiles.css";
+@import "./styles/weir-processing-side.css";
+@import "./styles/weir-processing-stream.css";
 @import "./styles/weir-pipeline.css";
 @import "./styles/weir-shelf.css";
 @import "./styles/weir-library.css";

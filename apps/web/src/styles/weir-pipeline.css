@@ -9,72 +9,47 @@
  */
 .mm-pipe,
 .mm-shelf {
-  --pipe-card: var(--weir-card, #131a25);
-  --pipe-surface-2: var(--weir-surface-2, #1a222d);
-  --pipe-surface-3: var(--weir-surface-3, #212936);
-  --pipe-hairline: var(--weir-hairline, #252e3c);
-  --pipe-foreground: var(--weir-foreground, #f3f4f7);
-  --pipe-muted: var(--weir-muted, #a9b0bc);
-  --pipe-primary: var(--weir-primary, #52a5ff);
-  --pipe-success: var(--weir-success, #25e475);
-  --pipe-warning: var(--weir-warning, #fb8d2d);
-  --pipe-destructive: var(--weir-destructive, #ef4d4d);
-  --pipe-ring: var(--weir-ring, var(--weir-primary, #52a5ff));
+  --pipe-card: var(--mm-card-bg);
+  --pipe-surface-2: var(--mm-surface-2);
+  --pipe-surface-3: var(--mm-surface-3);
+  --pipe-hairline: var(--mm-hairline);
+  --pipe-foreground: var(--mm-text);
+  --pipe-muted: var(--mm-text2);
+  --pipe-primary: var(--mm-primary);
+  --pipe-success: var(--mm-success);
+  --pipe-warning: var(--mm-warning);
+  --pipe-destructive: var(--mm-destructive);
+  --pipe-ring: var(--mm-primary);
 }
 
 .mm-pipe [data-stage="incoming"] {
-  --pipe-st: var(--weir-lane-incoming, hsl(265 78% 66%));
+  --pipe-st: var(--mm-lane-incoming);
 }
 
 .mm-pipe [data-stage="queued"] {
-  --pipe-st: var(--weir-lane-queued, hsl(190 90% 56%));
+  --pipe-st: var(--mm-lane-queued);
 }
 
 .mm-pipe [data-stage="analysing"] {
-  --pipe-st: var(--weir-lane-analysing, var(--weir-info, #41a7fb));
+  --pipe-st: var(--mm-lane-analysing);
 }
 
 .mm-pipe [data-stage="processing"] {
-  --pipe-st: var(--weir-lane-processing, hsl(166 72% 50%));
+  --pipe-st: var(--mm-lane-processing);
 }
 
 .mm-pipe [data-stage="delivering"] {
-  --pipe-st: var(--weir-lane-delivering, hsl(40 96% 60%));
+  --pipe-st: var(--mm-lane-delivering);
 }
 
-/* The panel: a header, the board, and room for the board to take the height it is given. */
+/* The board sits in a panel and takes the height the panel gives it. */
 .mm-pipe {
   display: flex;
   min-height: 0;
   min-width: 0;
-  height: 100%;
+  flex: 1;
   flex-direction: column;
-  overflow: hidden;
-  border: 1px solid var(--pipe-hairline);
-  border-radius: 14px;
-  background: var(--pipe-card);
   color: var(--pipe-foreground);
-}
-
-.mm-pipe__head {
-  display: flex;
-  align-items: baseline;
-  gap: 12px;
-  min-height: 44px;
-  padding: 14px 18px 10px;
-}
-
-.mm-pipe__heading {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 700;
-  line-height: 1.2;
-}
-
-.mm-pipe__count {
-  font-size: 14px;
-  font-weight: 400;
-  color: var(--pipe-muted);
 }
 
 .mm-pipe__body {
@@ -613,14 +588,4 @@ body.mm-pipeline-resizing .mm-tile--flying {
   .mm-pipe__card--arrived {
     animation: none;
   }
-}
-
-/* Preview placement until the page is reassembled on the new shell. */
-.mm-redesign-board {
-  height: 410px;
-  margin-top: 12px;
-}
-.mm-redesign-shelf {
-  height: 260px;
-  margin-top: 12px;
 }

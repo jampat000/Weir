@@ -1,5 +1,5 @@
 import type { Lanes } from "../processing-model";
-import type { Filter } from "../processing-toolbar";
+import type { Filter } from "../processing-filter";
 import { shownBy } from "./pipeline-cards";
 
 /** "2:28 pm": the clock time the way people read it, the same in every browser. */

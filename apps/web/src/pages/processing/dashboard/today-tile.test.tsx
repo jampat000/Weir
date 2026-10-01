@@ -1,0 +1,119 @@
+import { fireEvent, render, screen, within } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import { handedBack } from "../handed-back-model";
+import type { HandedBackSummary } from "../use-handed-back";
+import { TodayTile } from "./today-tile";
+
+const NOW = Date.parse("2026-08-18T10:00:00Z");
+const stats = { files_processed: 38, net_space_saved_bytes: 44_236_078_284 };
+const needsYou = { count: 0 };
+const summary: { value: HandedBackSummary } = {
+  value: { handed: handedBack([], NOW), total: 0, partial: false },
+};
+
+vi.mock("../../../lib/processing/queries", () => ({
+  useProcessingOverviewStatsQuery: () => ({ data: stats }),
+}));
+vi.mock("../../../lib/processing/needs-you-count", () => ({
+  useNeedsYouCount: () => needsYou.count,
+}));
+vi.mock("../use-handed-back", () => ({
+  useHandedBack: () => summary.value,
+}));
+
+function finishedAt(minutesAgo: number) {
+  return {
+    id: minutesAgo,
+    source: "download" as const,
+    kind: "cleaned" as const,
+    relativePath: "Heat.mkv",
+    libraryId: 1,
+    savedBytes: null,
+    removedAudio: 0,
+    removedSubtitles: 0,
+    sentence: null,
+    finishedAt: new Date(NOW - minutesAgo * 60_000).toISOString(),
+  };
+}
+
+function renderTile() {
+  render(
+    <MemoryRouter>
+      <TodayTile filter="all" now={NOW} />
+    </MemoryRouter>,
+  );
+  return screen.getByRole("region", { name: "Today" });
+}
+
+beforeEach(() => {
+  needsYou.count = 0;
+  summary.value = { handed: handedBack([], NOW), total: 0, partial: false };
+});
+
+describe("the Today tile", () => {
+  it("says how many were cleaned today and how much space that saved", () => {
+    const tile = renderTile();
+
+    expect(within(tile).getByTestId("live-done-today")).toHaveTextContent("38");
+    expect(tile).toHaveTextContent("cleaned");
+    expect(tile).toHaveTextContent("41.20 GB saved");
+  });
+
+  it("links to the files that need a look when there are any, and says nothing when there are none", () => {
+    expect(renderTile()).not.toHaveTextContent("need a look");
+  });
+
+  it("names the number that need a look and where to see them", () => {
+    needsYou.count = 12;
+    const tile = renderTile();
+
+    expect(
+      within(tile).getByRole("link", { name: "12 need a look →" }),
+    ).toHaveAttribute("href", "/history?show=failed");
+  });
+
+  it("says nothing finished in the last 2 hours rather than drawing a chart of nothing", () => {
+    const tile = renderTile();
+
+    expect(within(tile).getByTestId("live-handed-back-sum")).toHaveTextContent(
+      "Nothing finished in the last 2 hours.",
+    );
+  });
+
+  it("describes the two hours in words, for a screen reader", () => {
+    const handed = handedBack([finishedAt(3), finishedAt(8)], NOW);
+    summary.value = { handed, total: handed.totals.all, partial: false };
+    const tile = renderTile();
+
+    expect(within(tile).getByTestId("live-handed-back-sum")).toHaveTextContent(
+      "2 files finished in the last 2 hours: 2 cleaned.",
+    );
+  });
+
+  it("lets the keyboard walk the chart and reads each five minutes of it", () => {
+    const handed = handedBack(
+      [finishedAt(3), finishedAt(3), finishedAt(8)],
+      NOW,
+    );
+    summary.value = { handed, total: handed.totals.all, partial: false };
+    const tile = renderTile();
+    const chart = within(tile).getByRole("slider", {
+      name: "Files finished, five minutes to a point",
+    });
+
+    chart.focus();
+    expect(chart).toHaveAttribute(
+      "aria-valuetext",
+      expect.stringContaining("nothing"),
+    );
+
+    fireEvent.keyDown(chart, { key: "ArrowLeft" });
+
+    expect(chart).toHaveAttribute(
+      "aria-valuetext",
+      expect.stringContaining("2 cleaned"),
+    );
+  });
+});

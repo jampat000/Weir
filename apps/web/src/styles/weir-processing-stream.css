@@ -1,0 +1,159 @@
+/* The Activity stream, and the pulsing dot that says something is live. Motion stops under prefers-reduced-motion. */
+
+/* ---- Activity stream -------------------------------------------------------- */
+
+.mm-stream__list {
+  display: flex;
+  min-height: 0;
+  flex: 1 1 0;
+  flex-direction: column;
+  margin: 0;
+  padding: 0 10px 10px;
+  overflow-y: auto;
+  list-style: none;
+  scrollbar-color: var(--mm-hairline) transparent;
+  scrollbar-width: thin;
+}
+
+.mm-stream__empty {
+  margin: 0;
+  padding: 0 18px;
+  font-size: 13.5px;
+  color: var(--mm-text2);
+}
+
+.mm-stream__item {
+  flex: none;
+  border-radius: 10px;
+}
+
+.mm-stream__item--new {
+  animation: mm-stream-in 0.6s ease;
+}
+
+.mm-stream__link {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  gap: 10px;
+  padding: 9px 8px;
+  border-radius: 10px;
+  text-decoration: none;
+  color: inherit;
+}
+
+.mm-stream__link:hover {
+  background: var(--mm-surface-2);
+}
+
+.mm-stream__link:focus-visible {
+  outline: 2px solid var(--mm-primary);
+  outline-offset: -2px;
+}
+
+.mm-stream__icon {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border-radius: 9px;
+}
+
+.mm-stream__icon--success {
+  background: var(--mm-status-healthy-bg);
+  color: var(--mm-status-healthy-text);
+}
+
+.mm-stream__icon--info {
+  background: var(--mm-status-info-bg);
+  color: var(--mm-status-info-text);
+}
+
+.mm-stream__icon--warning {
+  background: var(--mm-status-warning-bg);
+  color: var(--mm-status-warning-text);
+}
+
+.mm-stream__icon--error {
+  background: var(--mm-status-failed-bg);
+  color: var(--mm-status-failed-text);
+}
+
+.mm-stream__text {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.mm-stream__what {
+  display: -webkit-box;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+  line-height: 1.35;
+  color: var(--mm-text1);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.mm-stream__what b {
+  font-weight: 600;
+}
+
+.mm-stream__note {
+  overflow: hidden;
+  font-size: 11.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--mm-text2);
+}
+
+/* ---- A steady dot with a ring that fades away from it ----------------------- */
+
+/* The ring is a separate layer scaled and faded rather than a growing box-shadow, which repaints the whole
+   element every frame (#719). */
+.mm-live-pulse {
+  position: relative;
+  display: inline-block;
+  flex-shrink: 0;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--mm-accent);
+}
+
+.mm-live-pulse::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: var(--mm-accent);
+  animation: mm-live-pulse 1.8s ease-out infinite;
+}
+
+@keyframes mm-live-pulse {
+  0% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+
+  70%,
+  100% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+}
+
+@keyframes mm-stream-in {
+  from {
+    opacity: 0;
+    background: color-mix(in srgb, var(--mm-primary) 30%, transparent);
+    transform: translateY(-10px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mm-live-pulse::after,
+  .mm-stream__item--new {
+    animation: none;
+  }
+}

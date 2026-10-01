@@ -7,13 +7,13 @@
  *
  * Tiles are sized from the height of their row, exactly 2:3, and only whole tiles are drawn.
  */
-import { useId, useMemo, type CSSProperties, type ReactElement } from "react";
-import { Link } from "react-router-dom";
+import { useMemo, type CSSProperties, type ReactElement } from "react";
 
+import { Panel } from "../../../components/panels/panel";
 import type { FinishedFile } from "../../../lib/activity/processing-outcome";
 import { classNames } from "../../../lib/ui/class-names";
 import { useElementSize } from "../../../lib/ui/use-element-size";
-import type { Filter } from "../processing-toolbar";
+import type { Filter } from "../processing-filter";
 import { useFinishedAnnouncement } from "../use-finished-files";
 import { SHELF_TILE_ATTRIBUTE } from "./delivery-flight";
 import { shelfFit, tilesAcross } from "./shelf-layout";
@@ -76,6 +76,8 @@ export type JustFinishedShelfProps = {
   now: number;
   /** The names of the workflows, by id: each file's tile takes its workflow's colour. */
   workflowNames?: ReadonlyMap<number, string>;
+  /** What the panel says beside its title, such as how many files were cleaned today. */
+  count?: string;
   /** Opens a finished file's story. */
   onOpen: (item: FinishedFile) => void;
 };
@@ -85,9 +87,9 @@ export function JustFinishedShelf({
   filter,
   now,
   workflowNames = NO_WORKFLOWS,
+  count,
   onOpen,
 }: JustFinishedShelfProps): ReactElement {
-  const headingId = useId();
   const tiles = useMemo(
     () => shelfTiles(items, filter, now, workflowNames),
     [items, filter, now, workflowNames],
@@ -100,44 +102,37 @@ export function JustFinishedShelf({
     ? { ["--shelf-tile-w" as string]: `${fit.width}px` }
     : undefined;
   return (
-    <section
-      className="mm-shelf"
-      aria-labelledby={headingId}
-      data-testid="just-finished-shelf"
+    <Panel
+      title="Just finished"
+      count={count}
+      leading={<span className="mm-shelf__dot" aria-hidden="true" />}
+      to="/history"
+      toLabel="History"
     >
-      <header className="mm-shelf__head">
-        <h2 id={headingId} className="mm-shelf__heading">
-          Just finished
-        </h2>
-        <span className="mm-shelf__hint">
-          Open one to see exactly what Weir did
-        </span>
-        <Link className="mm-shelf__link" to="/history">
-          History →
-        </Link>
-      </header>
-      <ul ref={rowRef} className="mm-shelf__row" style={rowStyle}>
-        {shown.length === 0 ? (
-          <li className="mm-shelf__empty">Nothing has finished recently.</li>
-        ) : (
-          shown.map((tile) => (
-            <Tile
-              key={tile.key}
-              tile={tile}
-              captions={fit?.captions ?? true}
-              onOpen={onOpen}
-            />
-          ))
-        )}
-      </ul>
-      <p
-        className="sr-only"
-        role="status"
-        aria-live="polite"
-        data-testid="shelf-announcement"
-      >
-        {announcement}
-      </p>
-    </section>
+      <div className="mm-shelf" data-testid="just-finished-shelf">
+        <ul ref={rowRef} className="mm-shelf__row" style={rowStyle}>
+          {shown.length === 0 ? (
+            <li className="mm-shelf__empty">Nothing has finished recently.</li>
+          ) : (
+            shown.map((tile) => (
+              <Tile
+                key={tile.key}
+                tile={tile}
+                captions={fit?.captions ?? true}
+                onOpen={onOpen}
+              />
+            ))
+          )}
+        </ul>
+        <p
+          className="sr-only"
+          role="status"
+          aria-live="polite"
+          data-testid="shelf-announcement"
+        >
+          {announcement}
+        </p>
+      </div>
+    </Panel>
   );
 }

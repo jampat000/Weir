@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { LeavingCard } from "../leaving-cards";
 import type { Lanes } from "../processing-model";
-import type { Filter } from "../processing-toolbar";
+import type { Filter } from "../processing-filter";
 import { PipelineBoard, type PipelineBoardProps } from "./pipeline-board";
 import {
   NOW,
@@ -48,6 +48,12 @@ function board(
   );
 }
 
+/** What the panel says beside "Pipeline": how many files are in progress, and when they should be through. */
+const progressLine = () =>
+  screen
+    .getByRole("region", { name: "Pipeline" })
+    .querySelector(".mm-panel__count");
+
 const cardNamed = (name: RegExp | string) =>
   screen.getByRole("button", { name });
 
@@ -58,11 +64,7 @@ describe("the heading and the stations", () => {
   it("says nothing is in progress when nothing is", () => {
     render(board(lanesOf([])));
 
-    expect(
-      screen.getByRole("heading", {
-        name: "Pipeline · nothing in progress right now",
-      }),
-    ).toBeInTheDocument();
+    expect(progressLine()).toHaveTextContent("nothing in progress right now");
     expect(
       screen.getByText(/Nothing is being cleaned right now/),
     ).toBeInTheDocument();
@@ -79,19 +81,15 @@ describe("the heading and the stations", () => {
   it("counts what is in progress and gives a time only when every file in progress is writing", () => {
     render(board(lanesOf([aWriting(1, { progress_eta_seconds: 600 })])));
 
-    expect(
-      screen.getByRole("heading", {
-        name: /^Pipeline · 1 in progress · all done by about \d{1,2}:\d{2} [ap]m$/,
-      }),
-    ).toBeInTheDocument();
+    expect(progressLine()?.textContent).toMatch(
+      /^1 in progress · all done by about \d{1,2}:\d{2} [ap]m$/,
+    );
   });
 
   it("leaves the time out while a file is waiting", () => {
     render(board(lanesOf([aWriting(1), aFile(2, "unprocessed")])));
 
-    expect(
-      screen.getByRole("heading", { name: "Pipeline · 2 in progress" }),
-    ).toBeInTheDocument();
+    expect(progressLine()).toHaveTextContent(/^2 in progress$/);
   });
 
   it("shows the five stations with how many files are at each", () => {
@@ -212,9 +210,7 @@ describe("the filter", () => {
   it("counts only the cards it shows", () => {
     render(board(lanes, { filter: "library" }));
 
-    expect(
-      screen.getByRole("heading", { name: "Pipeline · 1 in progress" }),
-    ).toBeInTheDocument();
+    expect(progressLine()).toHaveTextContent(/^1 in progress$/);
   });
 });
 
@@ -235,9 +231,7 @@ describe("a file that has just ended", () => {
   it("does not count towards what is in progress", () => {
     render(board(lanesOf([aWriting(2)]), { leaving: delivered }));
 
-    expect(
-      screen.getByRole("heading", { name: /^Pipeline · 1 in progress/ }),
-    ).toBeInTheDocument();
+    expect(progressLine()).toHaveTextContent(/^1 in progress/);
   });
 
   it("shows why a file stopped, in the station of the step it stopped at", () => {

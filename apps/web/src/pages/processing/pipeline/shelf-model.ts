@@ -1,6 +1,6 @@
 import type { FinishedFile } from "../../../lib/activity/processing-outcome";
 import { formatBytes } from "../../../lib/format/bytes";
-import type { Filter } from "../processing-toolbar";
+import type { Filter } from "../processing-filter";
 import { prettyName } from "../processing-model";
 import {
   ago,

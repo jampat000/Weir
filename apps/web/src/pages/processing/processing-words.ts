@@ -1,66 +1,9 @@
 /** The words and numbers on the Processing cards: times, speeds and how a finished file turned out. */
 import type { FinishedFile } from "../../lib/activity/processing-outcome";
 import { formatBytes } from "../../lib/format/bytes";
-import type { ProcessingLibrary } from "../../lib/processing/libraries-api";
-import {
-  workflowKindName,
-  type WorkflowKind,
-} from "../../lib/processing/workflow-kind";
 import { parseAppTime } from "../../lib/ui/mm-format-date";
 import { plural } from "../../lib/ui/mm-plural";
 import type { ArrivingItem, WorkingItem } from "./processing-model";
-
-/** The kind of each workflow that is switched on, which decides where the page says a file ends up. */
-export function enabledWorkflowKinds(
-  workflows: readonly Pick<
-    ProcessingLibrary,
-    "enabled" | "manager_connection_ids"
-  >[],
-): WorkflowKind["kind"][] {
-  return workflows.filter((workflow) => workflow.enabled).map(workflowKindName);
-}
-
-/** Which kinds of workflow the page covers. With none, it reads as linked. */
-type WorkflowMix = "linked" | "weir_only" | "mixed";
-
-function workflowMix(
-  workflowKinds: readonly WorkflowKind["kind"][],
-): WorkflowMix {
-  const weirOnly = workflowKinds.includes("weir_only");
-  const linked = workflowKinds.includes("linked");
-  if (weirOnly && linked) return "mixed";
-  return weirOnly ? "weir_only" : "linked";
-}
-
-const HANDING_HINT: Record<WorkflowMix, string> = {
-  linked: "Final checks, then back to your media manager",
-  weir_only: "Final checks, then into the output folder",
-  mixed:
-    "Final checks, then into the output folder or back to your media manager",
-};
-
-const PAGE_LEAD: Record<WorkflowMix, string> = {
-  linked:
-    "Every file Weir is working on, from the moment it lands to the moment your media manager has it back.",
-  weir_only:
-    "Every file Weir is working on, from the moment it lands to the moment its cleaned copy is in the output folder.",
-  mixed:
-    "Every file Weir is working on, from the moment it lands to the moment its cleaned copy is in the output folder or your media manager has it back.",
-};
-
-/** Where the Handing back lane says a file goes next, in the words of the workflows that exist. */
-export function handingLaneHint(
-  workflowKinds: readonly WorkflowKind["kind"][],
-): string {
-  return HANDING_HINT[workflowMix(workflowKinds)];
-}
-
-/** The Processing page's opening line, ending where a file ends up for the workflows that exist. */
-export function processingLead(
-  workflowKinds: readonly WorkflowKind["kind"][],
-): string {
-  return PAGE_LEAD[workflowMix(workflowKinds)];
-}
 
 /** The tracks a pass took out, as words: "2 audio", "4 subtitles". */
 export function removedTrackWords(tracks: {

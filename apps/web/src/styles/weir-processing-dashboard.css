@@ -1,0 +1,123 @@
+/*
+ * The Processing page's grid. The tiles, the side panels and the stream have sheets of their own
+ * (weir-processing-tiles.css, -side.css and -stream.css); the panel, the tile and the chip come from
+ * weir-panels.css.
+ *
+ * Wide, the page is the main column with Health and Needs you down the right: the band, the Pipeline and the
+ * lower row are its rows, Health spans the band and the Pipeline, and Needs you sits beside the lower row, so
+ * their tops and bottoms line up. Narrower than that the right column moves under the lower row and everything
+ * stacks. The page decides from the width of its own area, not the window's.
+ */
+
+.mm-dash {
+  container: mm-dash / inline-size;
+}
+
+.mm-dash__grid {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mm-panel-gap);
+}
+
+.mm-dash__band {
+  container: mm-band / inline-size;
+}
+
+.mm-dash__tiles {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--mm-panel-gap);
+}
+
+.mm-dash__board,
+.mm-dash__health,
+.mm-dash__needs {
+  display: flex;
+  min-height: 0;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.mm-dash__board > .mm-panel,
+.mm-dash__health > .mm-panel,
+.mm-dash__needs > .mm-panel {
+  flex: 1;
+}
+
+/* Stacked, each part is as tall as it needs to read; the Pipeline is most of a window. */
+.mm-dash__board {
+  height: clamp(24rem, 70vh, 40rem);
+}
+
+.mm-dash__low {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--mm-panel-gap);
+}
+
+.mm-dash__low > *,
+.mm-dash__health,
+.mm-dash__needs {
+  height: 26rem;
+}
+
+@container mm-band (min-width: 42rem) {
+  .mm-dash__tiles {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* Three tiles in a narrow band are about 220px each: a smaller figure keeps its unit and side figure in view. */
+@container mm-band (max-width: 56rem) {
+  .mm-dash .mm-stat__figure {
+    gap: 8px;
+    font-size: 28px;
+  }
+
+  .mm-dash .mm-stat__unit,
+  .mm-dash .mm-stat__side {
+    font-size: 13px;
+  }
+}
+
+@container mm-dash (min-width: 66rem) {
+  .mm-dash__grid {
+    --dash-board-h: clamp(25rem, 46vh, 34rem);
+    --dash-low-h: clamp(17rem, 30vh, 22rem);
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) clamp(340px, 28%, 460px);
+    grid-template-rows: auto var(--dash-board-h) var(--dash-low-h);
+    grid-template-areas:
+      "now health"
+      "board health"
+      "low needs";
+  }
+
+  .mm-dash__band {
+    grid-area: now;
+  }
+
+  .mm-dash__board {
+    grid-area: board;
+    height: auto;
+  }
+
+  .mm-dash__low {
+    grid-area: low;
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  }
+
+  .mm-dash__health {
+    grid-area: health;
+  }
+
+  .mm-dash__needs {
+    grid-area: needs;
+  }
+
+  .mm-dash__low > *,
+  .mm-dash__health,
+  .mm-dash__needs {
+    height: auto;
+  }
+}

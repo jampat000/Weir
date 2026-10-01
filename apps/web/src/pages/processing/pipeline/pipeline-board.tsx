@@ -13,19 +13,19 @@ import {
   useLayoutEffect,
   useMemo,
   useRef,
-  useId,
   type CSSProperties,
   type ReactElement,
 } from "react";
 import { Link } from "react-router-dom";
 
+import { Panel } from "../../../components/panels/panel";
 import type { ProcessingFile } from "../../../lib/processing/files-api";
 import { classNames } from "../../../lib/ui/class-names";
 import { useElementSize } from "../../../lib/ui/use-element-size";
 import { useRemPx } from "../../../lib/ui/use-rem-px";
 import type { LeavingCard } from "../leaving-cards";
 import type { Lanes } from "../processing-model";
-import type { Filter } from "../processing-toolbar";
+import type { Filter } from "../processing-filter";
 import type { Delivery } from "./delivery-flight";
 import { fitDetails } from "./fit-details";
 import type { PipelineCard } from "./pipeline-card-types";
@@ -121,7 +121,6 @@ export function PipelineBoard({
   onOpen,
   onDelivered,
 }: PipelineBoardProps): ReactElement {
-  const headingId = useId();
   const cards = useMemo(
     () => buildPipelineCards(lanes, leaving, filter, now),
     [lanes, leaving, filter, now],
@@ -140,7 +139,7 @@ export function PipelineBoard({
   const stacked = boardMode(body.width, stations, rem) === "stacked";
   const room = stacked || lanesBox.height <= 0 ? undefined : lanesBox.height;
   const size = cardSize(room);
-  const boardRef = useRef<HTMLElement>(null);
+  const boardRef = useRef<HTMLDivElement>(null);
   useDeliveryFlight(boardRef, cards, endedKeys, onDelivered);
 
   const grouped = groupByStage(cards);
@@ -204,99 +203,91 @@ export function PipelineBoard({
   };
 
   return (
-    <section
-      ref={boardRef}
-      className="mm-pipe"
-      aria-labelledby={headingId}
-      data-testid="pipeline-board"
+    <Panel
+      title="Pipeline"
+      count={pipelineCount(live.length, allDoneBy(lanes, filter, now))}
     >
-      <header className="mm-pipe__head">
-        <h2 id={headingId} className="mm-pipe__heading">
-          Pipeline{" "}
-          <span className="mm-pipe__count">
-            · {pipelineCount(live.length, allDoneBy(lanes, filter, now))}
-          </span>
-        </h2>
-      </header>
-      <div
-        ref={bodyRef}
-        className={classNames(
-          "mm-pipe__body",
-          stacked && "mm-pipe__body--stacked",
-        )}
-        style={vars}
-      >
-        {stacked ? (
-          <>
-            {calm ? <p className="mm-pipe__calm">{calmLine}</p> : null}
-            {PIPELINE_STAGES.map((stage) =>
-              grouped[stage].length === 0 ? null : (
-                <div key={stage} data-station={stage}>
-                  <Station stage={stage} count={countAt(stage)} />
-                  {grouped[stage].map((card) => (
-                    <PipelineCardView
-                      key={card.key}
-                      card={card}
-                      arrived={arrived.has(card.key)}
-                      onOpen={onOpen}
-                    />
-                  ))}
-                </div>
-              ),
-            )}
-          </>
-        ) : (
-          <>
-            <div className="mm-pipe__stations">
-              {PIPELINE_STAGES.map((stage) => (
-                <Station key={stage} stage={stage} count={countAt(stage)} />
-              ))}
-            </div>
-            <div ref={lanesRef} className="mm-pipe__lanes" style={laneStyle}>
-              {PIPELINE_STAGES.slice(1).map((stage, index) => (
-                <div
-                  key={stage}
-                  aria-hidden="true"
-                  className="mm-pipe__divider"
-                  style={{ left: `${((index + 1) * 100) / stations}%` }}
-                />
-              ))}
+      <div ref={boardRef} className="mm-pipe" data-testid="pipeline-board">
+        <div
+          ref={bodyRef}
+          className={classNames(
+            "mm-pipe__body",
+            stacked && "mm-pipe__body--stacked",
+          )}
+          style={vars}
+        >
+          {stacked ? (
+            <>
               {calm ? <p className="mm-pipe__calm">{calmLine}</p> : null}
-              {everyCard.map((card) => (
-                <PipelineCardView
-                  key={card.key}
-                  card={card}
-                  place={places.get(card.key)}
-                  arrived={arrived.has(card.key)}
-                  onOpen={onOpen}
-                />
-              ))}
-              {more.map((line) => (
-                <Link
-                  key={line.stage}
-                  to={MORE_TARGET}
-                  title={`${STAGE_LABEL[line.stage]}: ${line.titles}`}
-                  className="mm-pipe__more"
-                  style={{
-                    left: `calc(${PIPELINE_STAGES.indexOf(line.stage)} * 100% / ${stations} + 8px)`,
-                    top: PIPELINE_ROWS * size.step,
-                  }}
-                >
-                  and {line.left.toLocaleString()} more →
-                </Link>
-              ))}
-            </div>
-          </>
-        )}
+              {PIPELINE_STAGES.map((stage) =>
+                grouped[stage].length === 0 ? null : (
+                  <div key={stage} data-station={stage}>
+                    <Station stage={stage} count={countAt(stage)} />
+                    {grouped[stage].map((card) => (
+                      <PipelineCardView
+                        key={card.key}
+                        card={card}
+                        arrived={arrived.has(card.key)}
+                        onOpen={onOpen}
+                      />
+                    ))}
+                  </div>
+                ),
+              )}
+            </>
+          ) : (
+            <>
+              <div className="mm-pipe__stations">
+                {PIPELINE_STAGES.map((stage) => (
+                  <Station key={stage} stage={stage} count={countAt(stage)} />
+                ))}
+              </div>
+              <div ref={lanesRef} className="mm-pipe__lanes" style={laneStyle}>
+                {PIPELINE_STAGES.slice(1).map((stage, index) => (
+                  <div
+                    key={stage}
+                    aria-hidden="true"
+                    className="mm-pipe__divider"
+                    style={{ left: `${((index + 1) * 100) / stations}%` }}
+                  />
+                ))}
+                {calm ? <p className="mm-pipe__calm">{calmLine}</p> : null}
+                {everyCard.map((card) => (
+                  <PipelineCardView
+                    key={card.key}
+                    card={card}
+                    place={places.get(card.key)}
+                    arrived={arrived.has(card.key)}
+                    onOpen={onOpen}
+                  />
+                ))}
+                {more.map((line) => (
+                  <Link
+                    key={line.stage}
+                    to={MORE_TARGET}
+                    title={`${STAGE_LABEL[line.stage]}: ${line.titles}`}
+                    className="mm-pipe__more"
+                    style={{
+                      left: `calc(${PIPELINE_STAGES.indexOf(line.stage)} * 100% / ${stations} + 8px)`,
+                      top: PIPELINE_ROWS * size.step,
+                    }}
+                  >
+                    and {line.left.toLocaleString()} more →
+                  </Link>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+        <p
+          className="sr-only"
+          role="status"
+          aria-live="polite"
+          data-testid="pipeline-announcement"
+        >
+          {announcementOf(cards)}
+        </p>
       </div>
-      <p
-        className="sr-only"
-        role="status"
-        aria-live="polite"
-        data-testid="pipeline-announcement"
-      >
-        {announcementOf(cards)}
-      </p>
-    </section>
+    </Panel>
   );
 }
