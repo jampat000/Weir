@@ -5,6 +5,8 @@ import { bucketReadout, scaleLabel, spanLabels } from "./handed-back-words";
 
 const NOW = Date.parse("2026-08-18T10:00:00Z");
 
+const clock = (ms: number) => `at ${new Date(ms).getUTCHours()}h`;
+
 const bucket = (
   from: number,
   counts: Partial<Pick<HandedBackBucket, "ok" | "same" | "warn">>,
@@ -29,18 +31,18 @@ describe("the ends of the Today chart's time axis", () => {
 
 describe("the pointer's readout", () => {
   it("gives the time of the bucket and what finished in it", () => {
-    const text = bucketReadout(bucket(NOW, { ok: 3 }));
+    const text = bucketReadout(bucket(NOW, { ok: 3 }), clock);
 
-    expect(text).toMatch(/^\d{1,2}[:.]\d{2}.* · 3 cleaned$/);
+    expect(text).toBe("at 10h · 3 cleaned");
   });
 
   it("says nothing finished in an empty bucket", () => {
-    expect(bucketReadout(bucket(NOW, {}))).toMatch(/ · nothing$/);
+    expect(bucketReadout(bucket(NOW, {}), clock)).toBe("at 10h · nothing");
   });
 
   it("lists each way files turned out", () => {
-    expect(bucketReadout(bucket(NOW, { ok: 2, warn: 1 }))).toMatch(
-      / · 2 cleaned, 1 need a look$/,
+    expect(bucketReadout(bucket(NOW, { ok: 2, warn: 1 }), clock)).toBe(
+      "at 10h · 2 cleaned, 1 need a look",
     );
   });
 });

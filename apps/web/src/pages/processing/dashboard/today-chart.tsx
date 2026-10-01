@@ -3,9 +3,15 @@ import type { KeyboardEvent, PointerEvent } from "react";
 
 import { roundScaleTop } from "../../../lib/ui/chart-scale";
 import { useCloseOnOutsideAndEscape } from "../../../lib/ui/use-close-on-outside";
+import { useAppClockFormatter } from "../../../lib/ui/mm-format-date";
 import { useElementSize } from "../../../lib/ui/use-element-size";
 import type { HandedBack } from "../handed-back-model";
-import { bucketWords, scaleLabel, spanLabels } from "./handed-back-words";
+import {
+  NOTHING_HANDED_BACK,
+  bucketWords,
+  scaleLabel,
+  spanLabels,
+} from "./handed-back-words";
 import { TodayChartReadout } from "./today-chart-readout";
 import {
   CHART_HEIGHT,
@@ -32,12 +38,13 @@ type TodayChartProps = {
 export function TodayChart({ handed, now }: TodayChartProps) {
   const [pointed, setPointed] = useState<number | null>(null);
   const [chartRef, chartSize] = useElementSize<HTMLSpanElement>();
+  const clock = useAppClockFormatter();
   const hide = useCallback(() => setPointed(null), []);
   useCloseOnOutsideAndEscape(pointed !== null, hide, chartRef);
 
   const last = handed.buckets.length - 1;
   const current = pointed ?? last;
-  const scaleTop = roundScaleTop(handed.peak);
+  const scaleTop = roundScaleTop(handed.peak, { wholeNumbers: true });
   const lines = scaleLines(scaleTop);
   const shape = chartShape(handed.buckets, scaleTop);
   const dot = shape.points[current];
@@ -119,6 +126,11 @@ export function TodayChart({ handed, now }: TodayChartProps) {
             {scaleLabel(line.value)}
           </span>
         ))}
+        {handed.totals.all === 0 ? (
+          <span aria-hidden="true" className="mm-today-chart__empty">
+            {NOTHING_HANDED_BACK}
+          </span>
+        ) : null}
         {dot ? (
           <span
             aria-hidden="true"
@@ -134,6 +146,7 @@ export function TodayChart({ handed, now }: TodayChartProps) {
             bucket={handed.buckets[pointed]}
             fraction={dot.x / CHART_WIDTH}
             chartWidth={chartSize.width}
+            clock={clock}
           />
         ) : null}
       </span>

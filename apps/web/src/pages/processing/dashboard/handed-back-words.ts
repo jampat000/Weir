@@ -64,11 +64,11 @@ export function spanLabels(handed: HandedBack, now: number): [string, string] {
 }
 
 /** The pointer's readout for one bucket: its clock time and what finished then, "2:10 pm · 3 cleaned". */
-export function bucketReadout(bucket: HandedBackBucket): string {
-  const clock = new Date(bucket.from)
-    .toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })
-    .toLowerCase();
-  return `${clock} · ${bucketCounts(bucket)}`;
+export function bucketReadout(
+  bucket: HandedBackBucket,
+  clock: (ms: number) => string,
+): string {
+  return `${clock(bucket.from)} · ${bucketCounts(bucket)}`;
 }
 
 /** The whole two hours in one sentence, for a screen reader. */

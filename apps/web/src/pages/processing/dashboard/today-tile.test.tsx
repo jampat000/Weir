@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -16,6 +22,10 @@ const summary: { value: HandedBackSummary } = {
   value: { handed: handedBack([], NOW), total: 0, partial: false },
 };
 
+const settings = { timezone: "UTC" };
+vi.mock("../../../lib/settings/queries", () => ({
+  useAppSettingsQuery: () => ({ data: { app_timezone: settings.timezone } }),
+}));
 vi.mock("./use-today-figures", () => ({
   useTodayFigures: (workflowId: number | null) => {
     figuresAsked.push(workflowId);
@@ -65,6 +75,7 @@ afterEach(() => {
 
 beforeEach(() => {
   needsYou.count = 0;
+  settings.timezone = "UTC";
   figuresAsked.length = 0;
   summary.value = { handed: handedBack([], NOW), total: 0, partial: false };
 });
@@ -118,6 +129,19 @@ describe("the Today tile", () => {
     expect(within(tile).getByTestId("live-handed-back-sum")).toHaveTextContent(
       "Nothing finished in the last 2 hours.",
     );
+  });
+
+  it("says in the chart itself when nothing finished, and draws no such line when something did", () => {
+    const tile = renderTile();
+    expect(tile.querySelector(".mm-today-chart__empty")).toHaveTextContent(
+      "Nothing finished in the last 2 hours",
+    );
+
+    cleanup();
+    const handed = handedBack([finishedAt(3)], NOW);
+    summary.value = { handed, total: handed.totals.all, partial: false };
+
+    expect(renderTile().querySelector(".mm-today-chart__empty")).toBeNull();
   });
 
   it("describes the two hours in words, for a screen reader", () => {
@@ -205,6 +229,15 @@ describe("the Today chart's pointer readout", () => {
 
     expect(tile.querySelector(READOUT)).toHaveTextContent("· 2 cleaned");
     expect(tile.querySelector(".mm-today-chart__pointer")).not.toBeNull();
+  });
+
+  it("writes the time in the time zone chosen in Settings", () => {
+    settings.timezone = "Australia/Brisbane";
+    const tile = renderTile();
+
+    fireEvent.pointerMove(chartOf(tile), { clientX: OVER_THE_CLEANED_POINT });
+
+    expect(tile.querySelector(READOUT)).toHaveTextContent(/^7:55\spm/);
   });
 
   it("goes when the pointer leaves", () => {

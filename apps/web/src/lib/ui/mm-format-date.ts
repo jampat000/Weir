@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import { useAppSettingsQuery } from "../settings/queries";
 
 /** A trailing "Z", "+10:00", "-0500": the timestamp already says which zone it is in. */
@@ -16,12 +16,38 @@ export function parseAppTime(iso: string | null | undefined): number | null {
   return Number.isNaN(ms) ? null : ms;
 }
 
+/** The timezone chosen in Settings, or undefined for the browser's when none is set. */
+function useAppTimeZone(): string | undefined {
+  return useAppSettingsQuery().data?.app_timezone || undefined;
+}
+
+/** Formats an instant as a clock time, "8:50 am", in the timezone chosen in Settings, or the browser's. */
+export function useAppClockFormatter(): (ms: number) => string {
+  const tz = useAppTimeZone();
+  return useMemo(() => {
+    const options: Intl.DateTimeFormatOptions = {
+      hour: "numeric",
+      minute: "2-digit",
+    };
+    try {
+      const clock = new Intl.DateTimeFormat(undefined, {
+        ...options,
+        timeZone: tz,
+      });
+      return (ms: number) => clock.format(ms).toLowerCase();
+    } catch {
+      // An unknown timezone name: show the browser's clock rather than none.
+      const clock = new Intl.DateTimeFormat(undefined, options);
+      return (ms: number) => clock.format(ms).toLowerCase();
+    }
+  }, [tz]);
+}
+
 /** Formats server timestamps in the timezone chosen in Settings, or the browser's when none is set. */
 export function useAppDateFormatter(): (
   iso: string | null | undefined,
 ) => string {
-  const q = useAppSettingsQuery();
-  const tz = q.data?.app_timezone || undefined;
+  const tz = useAppTimeZone();
 
   return useCallback(
     (iso: string | null | undefined): string => {

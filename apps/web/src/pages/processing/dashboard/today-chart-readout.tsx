@@ -9,6 +9,8 @@ type TodayChartReadoutProps = {
   fraction: number;
   /** The chart's width in pixels, so the readout can keep inside it. */
   chartWidth: number;
+  /** Writes a time as a clock time in Weir's time zone. */
+  clock: (ms: number) => string;
 };
 
 /** The pointer's line and the small card beside it that says what finished at that time. */
@@ -16,6 +18,7 @@ export function TodayChartReadout({
   bucket,
   fraction,
   chartWidth,
+  clock,
 }: TodayChartReadoutProps) {
   const [readoutRef, readout] = useElementSize<HTMLSpanElement>();
   const side = readoutSide(fraction * chartWidth, readout.width, chartWidth);
@@ -28,7 +31,7 @@ export function TodayChartReadout({
         className={`mm-today-chart__readout mm-today-chart__readout--${side}`}
         style={{ left, ["--today-readout-gap" as string]: `${READOUT_GAP}px` }}
       >
-        {bucketReadout(bucket)}
+        {bucketReadout(bucket, clock)}
       </span>
     </span>
   );
