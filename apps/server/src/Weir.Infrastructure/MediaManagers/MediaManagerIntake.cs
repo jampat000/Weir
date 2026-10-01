@@ -7,6 +7,7 @@ using Weir.Core.Media;
 using Weir.Core.MediaManagers;
 using Weir.Core.Processing;
 using Weir.Infrastructure.Activity;
+using Weir.Infrastructure.Artwork;
 using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.Processing;
 using Weir.Infrastructure.Processing.RemuxPass;
@@ -66,6 +67,7 @@ public sealed class MediaManagerIntake
     private readonly ProcessingJobStore _jobs;
     private readonly FileSkipMarkerStore _skipMarkers;
     private readonly HandoffCompletionReporter _reporter;
+    private readonly ArtworkSubjects _artwork;
     private readonly TimeProvider _time;
 
     public MediaManagerIntake(
@@ -77,6 +79,7 @@ public sealed class MediaManagerIntake
         ProcessingJobStore jobs,
         FileSkipMarkerStore skipMarkers,
         HandoffCompletionReporter reporter,
+        ArtworkSubjects artwork,
         TimeProvider time)
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
@@ -87,6 +90,7 @@ public sealed class MediaManagerIntake
         _jobs = jobs ?? throw new ArgumentNullException(nameof(jobs));
         _reporter = reporter ?? throw new ArgumentNullException(nameof(reporter));
         _skipMarkers = skipMarkers ?? throw new ArgumentNullException(nameof(skipMarkers));
+        _artwork = artwork ?? throw new ArgumentNullException(nameof(artwork));
         _time = time ?? throw new ArgumentNullException(nameof(time));
     }
 
@@ -354,6 +358,7 @@ public sealed class MediaManagerIntake
 
         if (library is not null)
         {
+            await _artwork.LinkHandoffAsync(uow, library.Id, library.MediaType, targets, importEvent.ReleaseName, importEvent.Artwork).ConfigureAwait(false);
             foreach (var target in targets)
             {
                 await RecordFingerprintAsync(uow, library, target).ConfigureAwait(false);

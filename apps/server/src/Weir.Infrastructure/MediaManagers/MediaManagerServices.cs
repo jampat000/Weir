@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Weir.Core.Configuration;
 using Weir.Core.MediaManagers;
 using Weir.Core.Security;
+using Weir.Infrastructure.Artwork;
 using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.Processing;
 using Weir.Infrastructure.Scheduling;
@@ -34,6 +35,7 @@ public static class MediaManagerServices
         services.TryAddSingleton<ManagerSetupCheck>();
         services.TryAddSingleton<HandoffLedgerStore>();
         services.AddWeirJobStore();
+        services.AddWeirArtwork();
         services.TryAddSingleton<MediaManagerIntake>();
         services.TryAddSingleton<HandoffCompletionReporter>();
         // Cancelling one queued job from the Jobs screen (#745 part 5): the ledger, the report and the file

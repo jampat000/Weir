@@ -8,6 +8,7 @@ using Weir.Core.Json;
 using Weir.Core.Processing;
 using Weir.Core.Time;
 using Weir.Core.Validation;
+using Weir.Infrastructure.Artwork;
 using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.MediaManagers;
 using Weir.Infrastructure.Processing;
@@ -56,6 +57,7 @@ internal sealed class ProcessingFilesEndpointHandlers
     private readonly ProcessingJobStore _jobs;
     private readonly LibraryStore _libraries;
     private readonly HistoryFileRemovalService _removal;
+    private readonly ArtworkPosterUrls _posters;
 
     public ProcessingFilesEndpointHandlers(
         FileStateStore files,
@@ -64,7 +66,8 @@ internal sealed class ProcessingFilesEndpointHandlers
         HandbackStore handback,
         ProcessingJobStore jobs,
         LibraryStore libraries,
-        HistoryFileRemovalService removal)
+        HistoryFileRemovalService removal,
+        ArtworkPosterUrls posters)
     {
         _files = files ?? throw new ArgumentNullException(nameof(files));
         _directPlay = directPlay ?? throw new ArgumentNullException(nameof(directPlay));
@@ -73,9 +76,10 @@ internal sealed class ProcessingFilesEndpointHandlers
         _jobs = jobs ?? throw new ArgumentNullException(nameof(jobs));
         _libraries = libraries ?? throw new ArgumentNullException(nameof(libraries));
         _removal = removal ?? throw new ArgumentNullException(nameof(removal));
+        _posters = posters ?? throw new ArgumentNullException(nameof(posters));
     }
 
-    private static WireObject FileOut(ProcessingFileRecord row, string libraryName, List<DirectPlayBadge> directPlay, LiveProgress? progress)
+    private static WireObject FileOut(ProcessingFileRecord row, string libraryName, List<DirectPlayBadge> directPlay, LiveProgress? progress, string? posterUrl)
     {
         return new WireObject()
             .Set("kind", HistoryEntryKinds.Download)
@@ -83,6 +87,7 @@ internal sealed class ProcessingFilesEndpointHandlers
             .Set("library_id", row.LibraryId)
             .Set("library_name", libraryName)
             .Set("relative_path", row.RelativePath)
+            .Set("poster_url", posterUrl)
             .Set("status", row.Status)
             .Set("status_reason", row.StatusReason)
             .Set("blocked_by_connection", row.BlockedByConnection)
@@ -153,6 +158,7 @@ internal sealed class ProcessingFilesEndpointHandlers
         var devices = await _directPlay.SelectedProfilesAsync(uow, knownDevices).ConfigureAwait(false);
         var progressByPath = _liveProgress.Snapshot();
         var handbacks = await _handback.ForLibrariesAsync(uow, rows.Select(row => row.LibraryId)).ConfigureAwait(false);
+        var posters = await _posters.ForFilesAsync(uow, rows.Select(row => (row.LibraryId, row.RelativePath))).ConfigureAwait(false);
 
         var files = new List<WireValue>();
         foreach (var row in rows)
@@ -162,7 +168,8 @@ internal sealed class ProcessingFilesEndpointHandlers
             progressByPath.TryGetValue(row.RelativePath, out var progress);
             // #652: the copy Weir handed back, and what a media manager said about it, for History.
             handbacks.TryGetValue((row.LibraryId, row.RelativePath), out var handback);
-            files.Add(FileOut(row, libraryName, directPlay, progress).Set("handback", HandbackStore.ToOut(handback)));
+            posters.TryGetValue((row.LibraryId, row.RelativePath), out var posterUrl);
+            files.Add(FileOut(row, libraryName, directPlay, progress, posterUrl).Set("handback", HandbackStore.ToOut(handback)));
         }
 
         var counts = await _files.StatusCountsAsync(uow, libraryId).ConfigureAwait(false);

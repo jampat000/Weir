@@ -52,6 +52,7 @@ public static class ProcessingApi
 
         // Endpoint handler classes (#745 part 5): each endpoint file's real dependencies, constructor-injected
         // and resolved once when routes are mapped, rather than looked up per call through the request.
+        services.AddSingleton<ArtworkEndpointHandlers>();
         services.AddSingleton<LibraryModeEndpointHandlers>();
         services.AddSingleton<LibraryModeFilesEndpointHandlers>();
         services.AddSingleton<LibraryModeOverviewEndpointHandlers>();
@@ -108,6 +109,7 @@ public static class ProcessingApi
         endpoints.MapProcessingLibrarySetupEndpoints();
         endpoints.MapProcessingRuleSetsEndpoints();
         endpoints.MapProcessingFilesEndpoints();
+        endpoints.MapArtworkEndpoints();
         endpoints.MapProcessingFileLogEndpoints();
         endpoints.MapProcessingFileTracksEndpoints();
         endpoints.MapProcessingLibraryCleansEndpoints();

@@ -1,4 +1,5 @@
 using Weir.Core.Security;
+using Weir.Infrastructure.Artwork;
 using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.MediaManagers;
 using Weir.Infrastructure.Processing;
@@ -28,7 +29,8 @@ internal sealed class MediaManagerFixture : IDisposable
         Jobs = new ProcessingJobStore(Store.Database, Store.Clock);
         SkipMarkers = new FileSkipMarkerStore();
         Reporter = new HandoffCompletionReporter(Connections, ConnectionStore, Ledger, Targets, Libraries, Http);
-        Intake = new MediaManagerIntake(Store.Options, Connections, ConnectionStore, Ledger, Targets, Jobs, SkipMarkers, Reporter, Store.Clock);
+        Artwork = new ArtworkSubjects(new ArtworkLookupStore(), new ArtworkFileStore());
+        Intake = new MediaManagerIntake(Store.Options, Connections, ConnectionStore, Ledger, Targets, Jobs, SkipMarkers, Reporter, Artwork, Store.Clock);
         OperatorSettings = new OperatorSettingsStore();
         Cancellation = new PendingJobCancellation(Ledger, Reporter, Files);
     }
@@ -58,6 +60,8 @@ internal sealed class MediaManagerFixture : IDisposable
     public ProcessingJobStore Jobs { get; }
 
     public FileSkipMarkerStore SkipMarkers { get; }
+
+    public ArtworkSubjects Artwork { get; }
 
     public MediaManagerIntake Intake { get; }
 

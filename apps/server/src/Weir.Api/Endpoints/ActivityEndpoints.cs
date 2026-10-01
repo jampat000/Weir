@@ -13,6 +13,7 @@ using Weir.Core.Json;
 using Weir.Core.Time;
 using Weir.Core.Validation;
 using Weir.Infrastructure.Activity;
+using Weir.Infrastructure.Artwork;
 using Weir.Infrastructure.Settings;
 
 namespace Weir.Api.Endpoints;
@@ -124,17 +125,20 @@ internal sealed class ActivityEndpointHandlers
     private readonly SuiteSettingsStore _suiteSettings;
     private readonly ActivityProgressFrames _progressFrames;
     private readonly IHostApplicationLifetime _lifetime;
+    private readonly ArtworkPosterUrls _posters;
 
     public ActivityEndpointHandlers(
         ActivityHistoryStore history,
         SuiteSettingsStore suiteSettings,
         ActivityProgressFrames progressFrames,
-        IHostApplicationLifetime lifetime)
+        IHostApplicationLifetime lifetime,
+        ArtworkPosterUrls posters)
     {
         _history = history ?? throw new ArgumentNullException(nameof(history));
         _suiteSettings = suiteSettings ?? throw new ArgumentNullException(nameof(suiteSettings));
         _progressFrames = progressFrames ?? throw new ArgumentNullException(nameof(progressFrames));
         _lifetime = lifetime ?? throw new ArgumentNullException(nameof(lifetime));
+        _posters = posters ?? throw new ArgumentNullException(nameof(posters));
     }
 
     public async Task<ApiResult> GetRecentAsync(ApiRequest request)
@@ -165,8 +169,13 @@ internal sealed class ActivityEndpointHandlers
         long? total = beforeId is null ? await _history.CountAsync(uow, filter).ConfigureAwait(false) : null;
         var settings = await _suiteSettings.EnsureAsync(uow).ConfigureAwait(false);
         var oldest = await _history.OldestCreatedAtAsync(uow).ConfigureAwait(false);
-        return ApiRoutes.Ok(ActivityHistory.RecentOut(page.Items, page.HasMore, total, settings.ActivityRetentionDays, oldest));
+        var posters = await _posters.ForFilesAsync(uow, FilesOf(page.Items)).ConfigureAwait(false);
+        return ApiRoutes.Ok(ActivityHistory.RecentOut(page.Items, page.HasMore, total, settings.ActivityRetentionDays, oldest, posters));
     }
+
+    /// <summary>The library and path of each event that is about a file.</summary>
+    private static IEnumerable<(long LibraryId, string Path)> FilesOf(IEnumerable<ActivityEventRow> events) =>
+        events.Where(row => row.LibraryId is not null && row.RelativePath is not null).Select(row => (row.LibraryId!.Value, row.RelativePath!));
 
     public async Task<ApiResult> GetExportAsync(ApiRequest request)
     {

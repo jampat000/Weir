@@ -44,6 +44,18 @@
             "title": "Module",
             "type": "string"
           },
+          "poster_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Where Weir serves this file's poster (/api/v1/artwork/posters/{id}). Null until one is found, when the title has none, or while Artwork is off.",
+            "title": "Poster Url"
+          },
           "relative_path": {
             "anyOf": [
               {
@@ -1766,6 +1778,18 @@
           "path": {
             "title": "Path",
             "type": "string"
+          },
+          "poster_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Where Weir serves this file's poster (/api/v1/artwork/posters/{id}). Null until one is found, when the title has none, or while Artwork is off.",
+            "title": "Poster Url"
           },
           "problem_kind": {
             "anyOf": [
@@ -3876,6 +3900,18 @@
             "description": "Omit to leave the stored key untouched. An empty string clears it.",
             "title": "Api Key"
           },
+          "artwork_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Omit to leave the Artwork switch as it is.",
+            "title": "Artwork Enabled"
+          },
           "base_url": {
             "default": "",
             "maxLength": 500,
@@ -3906,6 +3942,11 @@
       },
       "MetadataProviderOut": {
         "properties": {
+          "artwork_enabled": {
+            "description": "Whether Weir looks posters up through Deluno's metadata service and shows them. On by default.",
+            "title": "Artwork Enabled",
+            "type": "boolean"
+          },
           "base_url": {
             "description": "Where Weir asks. Configurable so a cache or gateway in front of the provider works.",
             "title": "Base Url",
@@ -3932,7 +3973,8 @@
         "required": [
           "provider",
           "base_url",
-          "key_configured"
+          "key_configured",
+          "artwork_enabled"
         ],
         "title": "MetadataProviderOut",
         "type": "object"
@@ -4607,6 +4649,18 @@
             "title": "Relative Path",
             "type": "string"
           },
+          "poster_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Where Weir serves this file's poster (/api/v1/artwork/posters/{id}). Null until one is found, when the title has none, or while Artwork is off.",
+            "title": "Poster Url"
+          },
           "size_bytes": {
             "title": "Size Bytes",
             "type": "integer"
@@ -4958,6 +5012,18 @@
             ],
             "description": "Why, written for the person asking why there is no new output for this file.",
             "title": "Output Collision Reason"
+          },
+          "poster_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Where Weir serves this file's poster (/api/v1/artwork/posters/{id}). Null until one is found, when the title has none, or while Artwork is off.",
+            "title": "Poster Url"
           },
           "progress_elapsed_seconds": {
             "anyOf": [
@@ -6015,6 +6081,18 @@
             ],
             "title": "Outcome",
             "type": "string"
+          },
+          "poster_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Where Weir serves this file's poster (/api/v1/artwork/posters/{id}). Null until one is found, when the title has none, or while Artwork is off.",
+            "title": "Poster Url"
           },
           "recorded_at": {
             "format": "date-time",
@@ -11297,6 +11375,44 @@
         "summary": "Get Activity Stream",
         "tags": [
           "activity"
+        ]
+      }
+    },
+    "/api/v1/artwork/posters/{poster_id}": {
+      "get": {
+        "description": "A poster image Weir already holds, as a files list names it in poster_url. The image is the cached copy, so the browser never asks the metadata service itself. Answers 404 for an id Weir does not hold.",
+        "operationId": "get_artwork_poster_api_v1_artwork_posters__poster_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "poster_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{32}$",
+              "title": "Poster Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "image/*": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              }
+            },
+            "description": "The poster image. Cached by the browser for 30 days."
+          },
+          "404": {
+            "description": "Weir holds no poster with that id."
+          }
+        },
+        "summary": "Get Artwork Poster",
+        "tags": [
+          "processing"
         ]
       }
     },

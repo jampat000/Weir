@@ -8,6 +8,7 @@ using Weir.Core.LibraryMode;
 using Weir.Core.Processing;
 using Weir.Core.Rules;
 using Weir.Core.Validation;
+using Weir.Infrastructure.Artwork;
 using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.LibraryMode;
 using Weir.Infrastructure.MediaManagers;
@@ -47,6 +48,7 @@ internal sealed class LibraryModeFilesEndpointHandlers
     private readonly RedownloadRiskChecker _riskChecker;
     private readonly ProcessingJobStore _jobs;
     private readonly LibraryStore _libraries;
+    private readonly ArtworkPosterUrls _posters;
 
     public LibraryModeFilesEndpointHandlers(
         LibraryScanStore scans,
@@ -57,7 +59,8 @@ internal sealed class LibraryModeFilesEndpointHandlers
         IHardlinkInspector hardlinkInspector,
         RedownloadRiskChecker riskChecker,
         ProcessingJobStore jobs,
-        LibraryStore libraries)
+        LibraryStore libraries,
+        ArtworkPosterUrls posters)
     {
         _scans = scans ?? throw new ArgumentNullException(nameof(scans));
         _fileMarks = fileMarks ?? throw new ArgumentNullException(nameof(fileMarks));
@@ -68,10 +71,12 @@ internal sealed class LibraryModeFilesEndpointHandlers
         _riskChecker = riskChecker ?? throw new ArgumentNullException(nameof(riskChecker));
         _libraries = libraries ?? throw new ArgumentNullException(nameof(libraries));
         _jobs = jobs ?? throw new ArgumentNullException(nameof(jobs));
+        _posters = posters ?? throw new ArgumentNullException(nameof(posters));
     }
 
-    private static WireObject FileOut(LibraryFileRow row) => new WireObject()
+    private static WireObject FileOut(LibraryFileRow row, string? posterUrl) => new WireObject()
         .Set("path", row.Path)
+        .Set("poster_url", posterUrl)
         .Set("size_bytes", row.SizeBytes)
         .Set("modified_at", row.ModifiedTimeUnixSeconds)
         .Set("classification", LibraryScanFileEntry.ClassificationName(row.Classification))
@@ -152,13 +157,14 @@ internal sealed class LibraryModeFilesEndpointHandlers
         var overall = await _libraryView.TotalsAsync(uow, libraryId).ConfigureAwait(false);
         var filtered = await _libraryView.TotalsAsync(uow, libraryId, query).ConfigureAwait(false);
         var rows = await _libraryView.ListFilesAsync(uow, libraryId, query).ConfigureAwait(false);
+        var posters = await _posters.ForFilesAsync(uow, rows.Select(row => (libraryId, row.Path))).ConfigureAwait(false);
 
         return ApiRoutes.Ok(new WireObject()
             .Set("library_id", libraryId)
             .Set("scan", await LibraryModeMapping.ScanOutAsync(uow, _scans, libraryId, LibraryModeMapping.Logger(request)).ConfigureAwait(false))
             .Set("summary", LibraryModeMapping.TotalsOut(overall))
             .Set("filtered", LibraryModeMapping.TotalsOut(filtered))
-            .Set("files", new WireArray(rows.Select(row => (WireValue)FileOut(row))))
+            .Set("files", new WireArray(rows.Select(row => (WireValue)FileOut(row, posters.GetValueOrDefault((libraryId, row.Path))))))
             .Set("total", filtered.Files)
             .Set("page", query.Page)
             .Set("page_size", query.PageSize)

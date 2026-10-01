@@ -67,7 +67,7 @@ public sealed class ActivityApiTests
         Assert.Equal(["items", "total", "has_more", "retention_days", "oldest_event_at"], body.AsObject().Select(pair => pair.Key));
         var item = body["items"]![0]!.AsObject();
         Assert.Equal(
-            ["id", "created_at", "event_type", "module", "title", "detail", "trigger", "result", "library_id", "relative_path", "run_key"],
+            ["id", "created_at", "event_type", "module", "title", "detail", "trigger", "result", "library_id", "relative_path", "poster_url", "run_key"],
             item.Select(pair => pair.Key));
         Assert.Matches("^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}$", item["created_at"]!.GetValue<string>());
     }

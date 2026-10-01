@@ -8,7 +8,7 @@ using Weir.Infrastructure.Sqlite;
 namespace Weir.Infrastructure.Processing;
 
 /// <summary>The Processing metadata-provider connection view.</summary>
-public sealed record MetadataProviderView(string Provider, string BaseUrl, bool KeyConfigured, IReadOnlyList<string> KnownProviders);
+public sealed record MetadataProviderView(string Provider, string BaseUrl, bool KeyConfigured, IReadOnlyList<string> KnownProviders, bool ArtworkEnabled);
 
 /// <summary>
 /// Metadata provider settings: the key is stored encrypted and never returned. <c>POST /test</c> asks the real provider through
@@ -32,7 +32,8 @@ public sealed class MetadataProviderStore
         row.MetadataProvider,
         string.IsNullOrWhiteSpace(row.MetadataProviderBaseUrl) ? DefaultTmdbBaseUrl : row.MetadataProviderBaseUrl.Trim(),
         !string.IsNullOrWhiteSpace(row.MetadataProviderKeyCiphertext),
-        KnownProviders);
+        KnownProviders,
+        row.ArtworkEnabled);
 
     /// <summary>Encrypts the provider key with the same cipher the manager credentials use.</summary>
     public string EncryptKey(WeirOptions options, string plaintext, TimeProvider time)
@@ -46,7 +47,8 @@ public sealed class MetadataProviderStore
         return cipher.Encrypt(plaintext);
     }
 
-    public async Task<SuiteSettingsRecord> ApplyAsync(UnitOfWork uow, WeirOptions options, TimeProvider time, string provider, string baseUrl, string? apiKey)
+    /// <summary>Save the connection. <paramref name="artworkEnabled"/> is the Artwork switch; null leaves it as it is.</summary>
+    public async Task<SuiteSettingsRecord> ApplyAsync(UnitOfWork uow, WeirOptions options, TimeProvider time, string provider, string baseUrl, string? apiKey, bool? artworkEnabled)
     {
         var before = await _suiteSettings.EnsureAsync(uow).ConfigureAwait(false);
         var after = before with
@@ -54,6 +56,7 @@ public sealed class MetadataProviderStore
             MetadataProvider = provider,
             MetadataProviderBaseUrl = baseUrl.Trim(),
             MetadataProviderKeyCiphertext = apiKey is null ? before.MetadataProviderKeyCiphertext : EncryptKey(options, apiKey, time),
+            ArtworkEnabled = artworkEnabled ?? before.ArtworkEnabled,
         };
         await _suiteSettings.UpdateAsync(uow, before, after).ConfigureAwait(false);
         return await _suiteSettings.EnsureAsync(uow).ConfigureAwait(false);

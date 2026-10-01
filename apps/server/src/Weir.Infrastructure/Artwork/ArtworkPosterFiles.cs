@@ -1,0 +1,43 @@
+using Weir.Core.Artwork;
+using Weir.Core.Configuration;
+
+namespace Weir.Infrastructure.Artwork;
+
+/// <summary>The poster images on disk, under <c>WEIR_HOME/artwork/posters</c>, one file per poster id.</summary>
+public sealed class ArtworkPosterFiles
+{
+    private const string TemporarySuffix = ".partial";
+
+    private readonly string _directory;
+
+    public ArtworkPosterFiles(WeirOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        _directory = Path.Join(options.WeirHome, "artwork", "posters");
+    }
+
+    /// <summary>Store an image. It becomes visible whole or not at all, so a reader never sees half of it.</summary>
+    public async Task WriteAsync(string posterId, byte[] image, CancellationToken cancellationToken)
+    {
+        var path = PathFor(posterId);
+        Directory.CreateDirectory(_directory);
+        var temporary = path + TemporarySuffix;
+        await File.WriteAllBytesAsync(temporary, image, cancellationToken).ConfigureAwait(false);
+        File.Move(temporary, path, overwrite: true);
+    }
+
+    /// <summary>The image, opened for reading, or null when it is not on disk.</summary>
+    public Stream? Open(string posterId)
+    {
+        var path = PathFor(posterId);
+        return File.Exists(path) ? new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, bufferSize: 4096, useAsync: true) : null;
+    }
+
+    public bool Exists(string posterId) => File.Exists(PathFor(posterId));
+
+    /// <summary>The file for an id. Only ids <see cref="ArtworkKeys.IsPosterId"/> accepts name a file, so no id can reach outside the folder.</summary>
+    private string PathFor(string posterId) =>
+        ArtworkKeys.IsPosterId(posterId)
+            ? Path.Join(_directory, posterId)
+            : throw new ArgumentException("Not a poster id.", nameof(posterId));
+}

@@ -1,3 +1,5 @@
+using Weir.Core.Artwork;
+
 namespace Weir.Core.Configuration;
 
 /// <summary>How the session cookie's <c>Secure</c> flag is decided (<c>WEIR_SESSION_COOKIE_SECURE</c>).</summary>
@@ -151,6 +153,12 @@ public sealed record WeirOptions
     /// an octal string such as <c>775</c> or the setgid form <c>2775</c>). <see langword="null"/> when unset. Linux only.
     /// </summary>
     public required UnixFileMode? OutputOwnershipDirectoryMode { get; init; }
+
+    /// <summary>
+    /// Where poster lookups are asked (<c>WEIR_ARTWORK_GATEWAY_URL</c>): Deluno's metadata service unless set. Empty means
+    /// poster lookups are switched off for this process (the variable is <c>off</c>).
+    /// </summary>
+    public string ArtworkGatewayUrl { get; init; } = ArtworkPosterSource.DefaultGatewayUrl;
 
     /// <summary>Origins allowed for the unsafe-request Origin/Referer check.</summary>
     public IReadOnlyList<string> TrustedBrowserOrigins =>

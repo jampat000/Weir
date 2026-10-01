@@ -104,6 +104,26 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/artwork/posters/{poster_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Artwork Poster
+     * @description A poster image Weir already holds, as a files list names it in poster_url. The image is the cached copy, so the browser never asks the metadata service itself. Answers 404 for an id Weir does not hold.
+     */
+    get: operations["get_artwork_poster_api_v1_artwork_posters__poster_id__get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/auth/bootstrap": {
     parameters: {
       query?: never;
@@ -2365,6 +2385,11 @@ export interface components {
        */
       module: string;
       /**
+       * Poster Url
+       * @description Where Weir serves this file's poster (/api/v1/artwork/posters/{id}). Null until one is found, when the title has none, or while Artwork is off.
+       */
+      poster_url?: string | null;
+      /**
        * Relative Path
        * @description The file this concerns, relative to its library.
        */
@@ -3111,6 +3136,11 @@ export interface components {
       modified_at: number;
       /** Path */
       path: string;
+      /**
+       * Poster Url
+       * @description Where Weir serves this file's poster (/api/v1/artwork/posters/{id}). Null until one is found, when the title has none, or while Artwork is off.
+       */
+      poster_url?: string | null;
       /** Problem Kind */
       problem_kind:
         | (
@@ -4080,6 +4110,11 @@ export interface components {
        */
       api_key?: string | null;
       /**
+       * Artwork Enabled
+       * @description Omit to leave the Artwork switch as it is.
+       */
+      artwork_enabled?: boolean | null;
+      /**
        * Base Url
        * @default
        */
@@ -4096,6 +4131,11 @@ export interface components {
     };
     /** MetadataProviderOut */
     MetadataProviderOut: {
+      /**
+       * Artwork Enabled
+       * @description Whether Weir looks posters up through Deluno's metadata service and shows them. On by default.
+       */
+      artwork_enabled: boolean;
       /**
        * Base Url
        * @description Where Weir asks. Configurable so a cache or gateway in front of the provider works.
@@ -4420,6 +4460,11 @@ export interface components {
       library_name: string;
       /** Relative Path */
       relative_path: string;
+      /**
+       * Poster Url
+       * @description Where Weir serves this file's poster (/api/v1/artwork/posters/{id}). Null until one is found, when the title has none, or while Artwork is off.
+       */
+      poster_url?: string | null;
       /** Size Bytes */
       size_bytes: number;
       /** Kept At */
@@ -4579,6 +4624,11 @@ export interface components {
        * @description Why, written for the person asking why there is no new output for this file.
        */
       output_collision_reason?: string | null;
+      /**
+       * Poster Url
+       * @description Where Weir serves this file's poster (/api/v1/artwork/posters/{id}). Null until one is found, when the title has none, or while Artwork is off.
+       */
+      poster_url?: string | null;
       /**
        * Progress Elapsed Seconds
        * @description How long the running pass has been writing, in seconds.
@@ -5073,6 +5123,11 @@ export interface components {
        * @enum {string}
        */
       outcome: "cleaned" | "skipped" | "failed";
+      /**
+       * Poster Url
+       * @description Where Weir serves this file's poster (/api/v1/artwork/posters/{id}). Null until one is found, when the title has none, or while Artwork is off.
+       */
+      poster_url?: string | null;
       /**
        * Recorded At
        * Format: date-time
@@ -7709,6 +7764,35 @@ export interface operations {
         content: {
           "application/json": unknown;
         };
+      };
+    };
+  };
+  get_artwork_poster_api_v1_artwork_posters__poster_id__get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        poster_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description The poster image. Cached by the browser for 30 days. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "image/*": string;
+        };
+      };
+      /** @description Weir holds no poster with that id. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
       };
     };
   };

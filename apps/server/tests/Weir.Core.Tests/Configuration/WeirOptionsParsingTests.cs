@@ -460,4 +460,29 @@ public sealed class WeirOptionsParsingTests
         var error = Assert.Throws<WeirConfigurationException>(() => TestRuntime.Load(("WEIR_FILE_MODE_OUTPUT", "abc")));
         Assert.Equal("WEIR_FILE_MODE_OUTPUT must be an octal file mode such as 664 or 775.", error.Message);
     }
+
+    [Fact]
+    public void The_artwork_gateway_is_the_real_service_unless_set() =>
+        Assert.Equal("https://deluno-metadata-gateway.ejmdigital.workers.dev", TestRuntime.Load().ArtworkGatewayUrl);
+
+    [Theory]
+    [InlineData(" http://localhost:9000/ ", "http://localhost:9000")]
+    [InlineData("https://metadata.example/base", "https://metadata.example/base")]
+    public void A_configured_artwork_gateway_is_trimmed_without_a_trailing_slash(string raw, string expected) =>
+        Assert.Equal(expected, TestRuntime.Load(("WEIR_ARTWORK_GATEWAY_URL", raw)).ArtworkGatewayUrl);
+
+    [Theory]
+    [InlineData("off")]
+    [InlineData("OFF")]
+    public void Off_switches_poster_lookups_off_for_the_process(string raw) =>
+        Assert.Equal(string.Empty, TestRuntime.Load(("WEIR_ARTWORK_GATEWAY_URL", raw)).ArtworkGatewayUrl);
+
+    [Theory]
+    [InlineData("metadata.example")]
+    [InlineData("ftp://metadata.example")]
+    public void An_artwork_gateway_that_is_not_an_http_address_refuses_to_start(string raw)
+    {
+        var error = Assert.Throws<WeirConfigurationException>(() => TestRuntime.Load(("WEIR_ARTWORK_GATEWAY_URL", raw)));
+        Assert.Equal("WEIR_ARTWORK_GATEWAY_URL must be an http or https address, or off.", error.Message);
+    }
 }

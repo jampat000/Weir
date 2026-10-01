@@ -30,6 +30,9 @@ public sealed record SuiteSettingsRecord
     /// <summary>Encrypted at rest with <see cref="Weir.Core.Security.CredentialCipher"/>; never returned by the API.</summary>
     public string MetadataProviderKeyCiphertext { get; init; } = string.Empty;
 
+    /// <summary>Whether Weir looks posters up and shows them (the Rules page's Artwork switch).</summary>
+    public bool ArtworkEnabled { get; init; } = true;
+
     public Timestamp UpdatedAt { get; init; }
 }
 

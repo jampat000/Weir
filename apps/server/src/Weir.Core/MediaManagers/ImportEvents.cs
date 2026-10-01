@@ -1,4 +1,5 @@
 using System.Numerics;
+using Weir.Core.Artwork;
 using Weir.Core.Json;
 
 namespace Weir.Core.MediaManagers;
@@ -40,6 +41,9 @@ public sealed record MediaManagerImportEvent
 
     /// <summary>The download client's id for the download, when the manager sent one (Sonarr's and Radarr's <c>downloadId</c>).</summary>
     public string? DownloadId { get; init; }
+
+    /// <summary>What the manager said about the title, for the file's poster. Null when it said nothing usable.</summary>
+    public ArtworkHints? Artwork { get; init; }
 }
 
 /// <summary>How one manager phrases an inbound event.</summary>
@@ -177,6 +181,7 @@ public static class ImportEvents
             CallbackPath = ManagerValues.Text(body.Get("callbackPath")),
             LibraryId = ManagerValues.Text(body.Get("libraryId")),
             DownloadId = ManagerValues.Text(body.Get("downloadId")),
+            Artwork = ArtworkHints.FromHandoff(body),
         };
     }
 

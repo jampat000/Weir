@@ -198,7 +198,7 @@ public sealed class ActivityHistoryStoreTests
         {
             var page = await _history.ListRecentAsync(uow, ActivityFilter.None, limit: 2, beforeId: null);
             var count = await _history.CountAsync(uow, ActivityFilter.None);
-            var body = ActivityHistory.RecentOut(page.Items, page.HasMore, count, 90, null);
+            var body = ActivityHistory.RecentOut(page.Items, page.HasMore, count, 90, null, new Dictionary<(long, string), string>());
             using var doc = JsonDocument.Parse(WireJsonWriter.DumpsUtf8(body, WireJsonFormat.Response));
             return (doc.RootElement.GetProperty("total").GetInt64(), doc.RootElement.GetProperty("has_more").GetBoolean(), page.Items.Count);
         });

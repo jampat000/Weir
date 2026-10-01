@@ -12,7 +12,7 @@ public sealed class SuiteSettingsStore
         "signed_in_home_notice, setup_wizard_state, app_timezone, log_retention_days, activity_retention_days, " +
         "direct_play_devices, configuration_backup_enabled, configuration_backup_interval_hours, configuration_backup_preferred_time, " +
         "configuration_backup_last_run_at, processing_paused, processing_paused_until, scan_while_paused, " +
-        "metadata_provider, metadata_provider_base_url, metadata_provider_key_ciphertext, updated_at";
+        "metadata_provider, metadata_provider_base_url, metadata_provider_key_ciphertext, artwork_enabled, updated_at";
 
     private readonly AuthStore _users;
 
@@ -81,6 +81,7 @@ public sealed class SuiteSettingsStore
         Compare("metadata_provider", before.MetadataProvider, after.MetadataProvider, v => v);
         Compare("metadata_provider_base_url", before.MetadataProviderBaseUrl, after.MetadataProviderBaseUrl, v => v);
         Compare("metadata_provider_key_ciphertext", before.MetadataProviderKeyCiphertext, after.MetadataProviderKeyCiphertext, v => v);
+        Compare("artwork_enabled", before.ArtworkEnabled, after.ArtworkEnabled, v => v ? 1 : 0);
         if (sets.Count == 0)
         {
             return;
@@ -108,6 +109,7 @@ public sealed class SuiteSettingsStore
         MetadataProvider = SqliteValues.GetString(reader, 13),
         MetadataProviderBaseUrl = SqliteValues.GetString(reader, 14),
         MetadataProviderKeyCiphertext = SqliteValues.GetString(reader, 15),
-        UpdatedAt = SqliteValues.GetDateTime(reader, 16),
+        ArtworkEnabled = SqliteValues.GetBool(reader, 16),
+        UpdatedAt = SqliteValues.GetDateTime(reader, 17),
     };
 }

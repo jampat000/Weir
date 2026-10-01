@@ -65,8 +65,8 @@ public static class ActivityHistory
     /// <summary>JSON export: two-space indent, non-ASCII written as-is.</summary>
     public static readonly WireJsonFormat ExportJsonFormat = new(false, ",", ": ", 2, false);
 
-    /// <summary>One event as the API returns it.</summary>
-    public static WireObject ItemOut(ActivityEventRow row)
+    /// <summary>One event as the API returns it. <paramref name="posterUrl"/> is the poster of the file the event is about, when it has one.</summary>
+    public static WireObject ItemOut(ActivityEventRow row, string? posterUrl)
     {
         ArgumentNullException.ThrowIfNull(row);
         return new WireObject()
@@ -80,6 +80,7 @@ public static class ActivityHistory
             .Set("result", row.Result)
             .Set("library_id", row.LibraryId)
             .Set("relative_path", row.RelativePath)
+            .Set("poster_url", posterUrl)
             .Set("run_key", row.RunKey);
     }
 
@@ -87,10 +88,17 @@ public static class ActivityHistory
     /// The recent-events response. <paramref name="total"/> is counted for the first page only (#714), so a later
     /// page, which has no use for it, leaves <c>total</c> out; when present it is never smaller than the page.
     /// </summary>
-    public static WireObject RecentOut(IReadOnlyList<ActivityEventRow> rows, bool hasMore, long? total, long retentionDays, Timestamp? oldestEventAt)
+    public static WireObject RecentOut(
+        IReadOnlyList<ActivityEventRow> rows,
+        bool hasMore,
+        long? total,
+        long retentionDays,
+        Timestamp? oldestEventAt,
+        IReadOnlyDictionary<(long LibraryId, string Path), string> posters)
     {
         ArgumentNullException.ThrowIfNull(rows);
-        var body = new WireObject().Set("items", new WireArray(rows.Select(row => (WireValue)ItemOut(row))));
+        ArgumentNullException.ThrowIfNull(posters);
+        var body = new WireObject().Set("items", new WireArray(rows.Select(row => (WireValue)ItemOut(row, PosterUrlOf(row, posters)))));
         if (total is { } count)
         {
             body.Set("total", Math.Max(count, rows.Count));
@@ -101,6 +109,9 @@ public static class ActivityHistory
             .Set("retention_days", retentionDays)
             .Set("oldest_event_at", oldestEventAt?.ToWireText());
     }
+
+    private static string? PosterUrlOf(ActivityEventRow row, IReadOnlyDictionary<(long LibraryId, string Path), string> posters) =>
+        row.LibraryId is { } library && row.RelativePath is { } path ? posters.GetValueOrDefault((library, path)) : null;
 
     /// <summary>One export record: <c>created_at</c> in ISO 8601, every other column as stored.</summary>
     public static WireObject ExportRecord(ActivityEventRow row)

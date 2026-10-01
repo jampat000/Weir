@@ -42,7 +42,8 @@ internal sealed class ProcessingMetadataProviderEndpointHandlers
         .Set("provider", view.Provider)
         .Set("base_url", view.BaseUrl)
         .Set("key_configured", view.KeyConfigured)
-        .Set("known_providers", new WireArray(view.KnownProviders.Select(p => (WireValue)WireValue.Of(p))));
+        .Set("known_providers", new WireArray(view.KnownProviders.Select(p => (WireValue)WireValue.Of(p))))
+        .Set("artwork_enabled", view.ArtworkEnabled);
 
     public async Task<ApiResult> GetMetadataProviderAsync(ApiRequest request)
     {
@@ -62,6 +63,7 @@ internal sealed class ProcessingMetadataProviderEndpointHandlers
         var provider = model.Literal("provider", ["", "tmdb"], defaultValue: "");
         var baseUrl = model.OptionalStr("base_url", defaultValue: "", maxLength: 500) ?? string.Empty;
         var apiKey = model.OptionalStr("api_key", maxLength: 500);
+        var artworkEnabled = model.OptionalBool("artwork_enabled");
         model.Finish(ExtraFields.Forbid);
         issues.ThrowIfAny();
 
@@ -69,7 +71,7 @@ internal sealed class ProcessingMetadataProviderEndpointHandlers
         request.RequireConfirmationToken(csrfToken);
 
         var uow = await request.DbAsync().ConfigureAwait(false);
-        var row = await _metadataProvider.ApplyAsync(uow, request.Options, request.Time, provider, baseUrl, apiKey).ConfigureAwait(false);
+        var row = await _metadataProvider.ApplyAsync(uow, request.Options, request.Time, provider, baseUrl, apiKey, artworkEnabled).ConfigureAwait(false);
         await request.CommitAsync().ConfigureAwait(false);
         return ApiRoutes.Ok(MetadataProviderOut(_metadataProvider.View(row)));
     }
@@ -84,6 +86,7 @@ internal sealed class ProcessingMetadataProviderEndpointHandlers
         model.Literal("provider", ["", "tmdb"], defaultValue: "");
         model.OptionalStr("base_url", defaultValue: "", maxLength: 500);
         model.OptionalStr("api_key", maxLength: 500);
+        model.OptionalBool("artwork_enabled");
         model.Finish(ExtraFields.Forbid);
         issues.ThrowIfAny();
 
