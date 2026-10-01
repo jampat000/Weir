@@ -12,6 +12,7 @@
  */
 import type { CSSProperties, ReactElement } from "react";
 
+import { Poster } from "../../../components/shared/poster";
 import { classNames } from "../../../lib/ui/class-names";
 import { motionAllowed } from "../../../lib/ui/motion-allowed";
 import type { ProcessingFile } from "../../../lib/processing/files-api";
@@ -22,7 +23,6 @@ import type {
   DetailLine,
   PipelineCard as Card,
 } from "./pipeline-card-types";
-import { TitleTile } from "./title-tile";
 import { TILE_ATTRIBUTE } from "./use-delivery-flight";
 
 /** Where a card sits on the lanes: its station's column and its row. */
@@ -112,7 +112,11 @@ export function PipelineCardView({
   const body = (
     <>
       <span {...{ [TILE_ATTRIBUTE]: card.key }} className="mm-pipe__tile">
-        <TitleTile title={card.title} workflow={card.workflow} />
+        <Poster
+          url={card.file?.poster_url}
+          title={card.title}
+          workflow={card.workflow}
+        />
       </span>
       <span className="mm-pipe__text">
         <span className="mm-pipe__title">{card.title}</span>

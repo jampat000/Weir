@@ -8,6 +8,8 @@ export interface ProcessingMetadataProvider {
   base_url: string;
   key_configured: boolean;
   known_providers: string[];
+  /** Whether Weir looks up posters through Deluno's metadata service. */
+  artwork_enabled: boolean;
 }
 
 export type ProcessingMetadataProviderWrite = RequestBody<"MetadataProviderIn">;

@@ -89,6 +89,7 @@ function stubEditableProfile() {
     base_url: "https://api.themoviedb.org/3",
     key_configured: false,
     known_providers: ["tmdb"],
+    artwork_enabled: true,
   });
 }
 
@@ -248,6 +249,7 @@ it("saves the metadata provider and reports whether it answered", async () => {
       base_url: "https://api.themoviedb.org/3",
       key_configured: true,
       known_providers: ["tmdb"],
+      artwork_enabled: true,
     });
   const testProvider = vi
     .spyOn(providerApi, "testProcessingMetadataProvider")
@@ -288,6 +290,7 @@ it("shows a load error when the profiles fail to load", async () => {
     base_url: "https://api.themoviedb.org/3",
     key_configured: false,
     known_providers: ["tmdb"],
+    artwork_enabled: true,
   });
 
   render(<RulesTab />, { wrapper });
@@ -310,6 +313,7 @@ it("asks before switching profiles with unsaved edits, and keeps them when told 
     base_url: "https://api.themoviedb.org/3",
     key_configured: false,
     known_providers: ["tmdb"],
+    artwork_enabled: true,
   });
 
   render(<RulesTab />, { wrapper });

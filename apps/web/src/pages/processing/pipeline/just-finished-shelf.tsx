@@ -1,8 +1,8 @@
 /**
  * Just finished: the files Weir has recently handed back, as one shelf of 2:3 tiles, newest first. Chips
- * above it narrow it to one workflow, with the day's counts for that choice beside them. Each tile is
- * tagged with its workflow, and the tag goes to that workflow's library. Clicking a tile opens the file's
- * story.
+ * above it narrow it to one workflow, and the panel's header counts what that choice finished today. Each
+ * tile is tagged with its workflow, and the tag goes to that workflow's library. Clicking a tile opens the
+ * file's story.
  *
  * Tiles are sized from the height of the shelf, exactly 2:3, and only whole tiles are drawn.
  */
@@ -21,8 +21,9 @@ import type { Filter } from "../processing-filter";
 import { useFinishedAnnouncement } from "../use-finished-files";
 import { shelfFit, tilesAcross, type ShelfFit } from "./shelf-layout";
 import { ShelfFilter } from "./shelf-filter";
-import { needLookWords, shelfOf, todayWords } from "./shelf-model";
+import { shelfOf, todayWords } from "./shelf-model";
 import { ShelfTiles } from "./shelf-tiles";
+import { readShelfWorkflow, saveShelfWorkflow } from "./shelf-workflow-choice";
 
 const NO_NAMES: ReadonlyMap<number, string> = new Map();
 
@@ -55,7 +56,7 @@ export function JustFinishedShelf({
   count,
   onOpen,
 }: JustFinishedShelfProps): ReactElement {
-  const [chosen, setChosen] = useState<number | null>(null);
+  const [chosen, setChosen] = useState<number | null>(readShelfWorkflow);
   const chips = useMemo(
     () =>
       [...workflowNames]
@@ -96,30 +97,24 @@ export function JustFinishedShelf({
         : next,
     );
   }, [shelfSize.width, shelfSize.height]);
-  const countWords = [
+  const countWords =
     picked === null && count !== undefined && !shelf.latest
       ? count
-      : todayWords(shelf),
-    needLookWords(shelf),
-  ]
-    .filter(Boolean)
-    .join(" · ");
+      : todayWords(shelf);
+  const choose = (workflowId: number | null) => {
+    setChosen(workflowId);
+    saveShelfWorkflow(workflowId);
+  };
   return (
     <Panel
       title="Just finished"
+      count={countWords}
       leading={<span className="mm-shelf__dot" aria-hidden="true" />}
       to="/history"
       toLabel="History"
     >
       <div className="mm-shelf" data-testid="just-finished-shelf">
-        <div className="mm-shelf__head">
-          <ShelfFilter
-            choices={choices}
-            chosen={narrowedTo}
-            onChoose={setChosen}
-          />
-          <span className="mm-shelf__today">{countWords}</span>
-        </div>
+        <ShelfFilter choices={choices} chosen={narrowedTo} onChoose={choose} />
         <div ref={shelfRef} className="mm-shelf__rows">
           <ShelfTiles
             tiles={shelf.tiles}

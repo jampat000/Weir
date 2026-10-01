@@ -10,7 +10,10 @@
 import { useCallback, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { FileStoryPanel } from "../../../components/processing/file-story-panel";
+import {
+  FileStoryPanel,
+  type FileStoryPanelProps,
+} from "../../../components/processing/file-story-panel";
 import { ApiEntryError } from "../../../components/shared/api-entry-error";
 import { PageLoading } from "../../../components/shared/page-loading";
 import type { FinishedFile } from "../../../lib/activity/processing-outcome";
@@ -75,6 +78,12 @@ function cleanedToday(figures: TodayFigures | undefined): string | undefined {
   return `${figures.cleaned.toLocaleString()} cleaned today · ${saved} saved`;
 }
 
+/** The file whose story is open: its name, and what its header shows beside it. */
+type StoryFile = Pick<FileStoryPanelProps, "poster"> & {
+  id: number;
+  name: string;
+};
+
 type LiveViewProps = {
   filter: Filter;
   /** Narrows every part to one workflow; every workflow when null. */
@@ -95,10 +104,7 @@ export function LiveView({ filter, workflowId }: LiveViewProps) {
   const pause = usePauseQuery();
   const fileLog = useProcessingFileLog();
   const navigate = useNavigate();
-  const [storyFile, setStoryFile] = useState<{
-    id: number;
-    name: string;
-  } | null>(null);
+  const [storyFile, setStoryFile] = useState<StoryFile | null>(null);
   // Cards that left are tracked against every workflow's lanes, so narrowing the page to one kind of file or
   // one workflow is never taken for a file leaving.
   const finished = useFinishedFiles();
@@ -112,7 +118,14 @@ export function LiveView({ filter, workflowId }: LiveViewProps) {
 
   const openFile = useCallback(
     (file: ProcessingFile) => {
-      setStoryFile({ id: file.id, name: file.relative_path });
+      setStoryFile({
+        id: file.id,
+        name: file.relative_path,
+        poster: {
+          url: file.poster_url,
+          workflow: file.library_name,
+        },
+      });
       fileLog.mutate(file.id);
     },
     [fileLog],
@@ -205,6 +218,7 @@ export function LiveView({ filter, workflowId }: LiveViewProps) {
       <FileStoryPanel
         open={storyFile !== null}
         fileName={storyFile ? prettyName(storyFile.name) : ""}
+        poster={storyFile?.poster}
         log={fileLog.data}
         loading={fileLog.isPending}
         error={

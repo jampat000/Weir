@@ -1,7 +1,7 @@
 /*
- * Just finished: two shelves of 2:3 tiles, Movies above TV shows, newest first. The pipeline's stylesheet
- * defines the colour block (--pipe-*) and the tile; this one lays the shelf out. A tile's width comes from
- * --shelf-tile-w, set from the height of the rows.
+ * Just finished: one shelf of 2:3 tiles, newest first, under the chips that narrow it to a workflow. The
+ * pipeline's stylesheet defines the colour block (--pipe-*) and the tile; this one lays the shelf out. A tile's
+ * width comes from --shelf-tile-w, set from the height of the rows.
  */
 .mm-shelf {
   display: flex;
@@ -28,45 +28,6 @@
   outline-offset: 2px;
 }
 
-/* The chips that narrow the shelf to a workflow, and what that choice finished today. */
-.mm-shelf__head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px 14px;
-  padding: 0 18px 4px;
-}
-
-.mm-shelf__filter {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.mm-shelf__chip {
-  padding: 0;
-  border: 0;
-  border-radius: var(--mm-radius-pill);
-  background: none;
-  cursor: pointer;
-  font: inherit;
-}
-
-.mm-shelf__chip:focus-visible {
-  outline: 2px solid var(--pipe-ring);
-  outline-offset: 2px;
-}
-
-.mm-shelf__chip:hover .mm-chip--neutral {
-  color: var(--pipe-foreground);
-}
-
-.mm-shelf__today {
-  font-size: 12px;
-  font-variant-numeric: tabular-nums;
-  color: var(--pipe-muted);
-}
-
 .mm-shelf__rows {
   display: flex;
   min-height: 0;
@@ -90,6 +51,7 @@
 }
 
 .mm-shelf__item {
+  --aw: var(--shelf-tile-w, 80px);
   position: relative;
   display: flex;
   width: var(--shelf-tile-w, 80px);
@@ -139,42 +101,90 @@
     0 0 26px color-mix(in srgb, var(--pipe-success) 45%, transparent);
 }
 
-/* The workflow the file belongs to, across the top of its tile. */
-.mm-shelf__tag {
+/* The chips that narrow the shelf to a workflow, as Deluno's shelf draws them. */
+.lsh-chips {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 6px;
+  padding: 0 18px 8px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+}
+
+.lsh-chip {
+  height: 24px;
+  padding: 0 10px;
+  border: 1px solid var(--pipe-hairline);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--pipe-muted);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color 0.15s,
+    color 0.15s,
+    border-color 0.15s;
+}
+
+.lsh-chip:hover {
+  background: color-mix(in srgb, var(--pipe-foreground) 5%, transparent);
+  color: var(--pipe-foreground);
+}
+
+.lsh-chip[aria-pressed="true"] {
+  border-color: color-mix(in srgb, var(--pipe-primary) 45%, transparent);
+  background: color-mix(in srgb, var(--pipe-primary) 16%, transparent);
+  color: var(--pipe-primary);
+  font-weight: 600;
+}
+
+.lsh-chip:focus-visible {
+  outline: 2px solid var(--pipe-ring);
+  outline-offset: 2px;
+}
+
+/* The workflow the file belongs to, across the foot of its poster. --aw is the poster's width, and the poster is 2:3. */
+.lsh-tag {
   position: absolute;
-  top: 0;
-  left: 0;
+  top: calc(var(--aw, 80px) * 1.5 - 24px);
+  right: 6px;
+  left: 6px;
   z-index: 2;
-  box-sizing: border-box;
-  width: var(--shelf-tile-w, 80px);
-  padding: 2px 5px;
+  padding: 3px 6px;
   overflow: hidden;
-  border-radius: 10px 10px 0 0;
+  border-radius: 6px;
   background: hsl(222 40% 6% / 0.82);
+  backdrop-filter: blur(4px);
   font-size: 10px;
-  font-weight: 700;
-  line-height: 1.2;
+  font-weight: 600;
+  line-height: 1.3;
   color: hsl(220 18% 96%);
   text-decoration: none;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.mm-shelf__tag:hover {
+.lsh-tag:hover {
+  background: hsl(222 40% 6% / 0.95);
   text-decoration: underline;
 }
 
-.mm-shelf__tag:focus-visible {
+.lsh-tag:focus-visible {
   outline: 2px solid var(--pipe-ring);
   outline-offset: -2px;
 }
 
 /* A tile held back for the flight from the Pipeline hides its tag with it. */
-.mm-shelf__item:has([data-delivery-held]) .mm-shelf__tag {
+.mm-shelf__item:has([data-delivery-held]) .lsh-tag {
   visibility: hidden;
 }
 
-/* How much the file shrank by, across the foot of its tile. */
+/* How much the file shrank by, at the foot of its tile on the right, above the workflow's tag when it has one. */
 .mm-shelf__saved {
   position: absolute;
   right: 5px;
@@ -186,6 +196,10 @@
   font-weight: 700;
   line-height: 1.3;
   color: #fff;
+}
+
+.mm-shelf__item:has(.lsh-tag) .mm-shelf__saved {
+  bottom: 30px;
 }
 
 .mm-shelf__caption {

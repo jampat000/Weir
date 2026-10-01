@@ -6,17 +6,14 @@ import { flyToShelf, holdShelfTiles, type Delivery } from "./delivery-flight";
 /** Set on each card's tile, to the card's key: where a tile is found to read its place on screen. */
 export const TILE_ATTRIBUTE = "data-pipeline-tile";
 
-function tileRects(root: HTMLElement): Map<string, DOMRect> {
-  const rects = new Map<string, DOMRect>();
+function tilesByKey(root: HTMLElement): Map<string, HTMLElement> {
+  const tiles = new Map<string, HTMLElement>();
   for (const tile of root.querySelectorAll<HTMLElement>(
     `[${TILE_ATTRIBUTE}]`,
   )) {
-    rects.set(
-      tile.getAttribute(TILE_ATTRIBUTE) ?? "",
-      tile.getBoundingClientRect(),
-    );
+    tiles.set(tile.getAttribute(TILE_ATTRIBUTE) ?? "", tile);
   }
-  return rects;
+  return tiles;
 }
 
 /**
@@ -34,17 +31,17 @@ export function useDeliveryFlight(
   useLayoutEffect(() => {
     const host = root.current;
     if (!host) return undefined;
-    const rects = tileRects(host);
+    const tiles = tilesByKey(host);
     const delivered = cards.filter((card) => card.end === "delivered");
     const now = new Map<string, Delivery>();
     for (const card of delivered) {
-      const from = rects.get(card.key);
-      if (from) {
+      const tile = tiles.get(card.key);
+      const look = tile?.firstElementChild?.cloneNode(true);
+      if (tile && look instanceof HTMLElement) {
         now.set(card.key, {
           path: card.path,
-          title: card.title,
-          workflow: card.workflow,
-          from,
+          look,
+          from: tile.getBoundingClientRect(),
         });
       }
     }

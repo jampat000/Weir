@@ -13,6 +13,7 @@ import {
   mmActionButtonClass,
   mmCheckboxControlClass,
 } from "../../../../lib/ui/mm-control-roles";
+import { ArtworkSetting } from "./artwork-setting";
 
 type ProviderName = "" | "tmdb";
 
@@ -44,10 +45,11 @@ export function useProviderDraft(
     setKey,
     clearKey,
     setClearKey,
-    /** A blank key keeps the saved one; clearing sends an empty key. */
+    /** A blank key keeps the saved one; clearing sends an empty key. Artwork is the switch's own, so it is sent as saved. */
     body: () => ({
       provider: name,
       base_url: baseUrl.trim(),
+      artwork_enabled: saved?.artwork_enabled ?? true,
       ...(clearKey
         ? { api_key: "" }
         : key.trim()
@@ -130,7 +132,8 @@ export function MetadataProviderSection({
         </>
       }
     >
-      <p className="mm-quiet-note">
+      <ArtworkSetting saved={saved} editable={editable} />
+      <p className="mm-quiet-note mt-4">
         Only needed by profiles that keep a title&apos;s original language. Weir
         falls back safely when metadata is unavailable.
       </p>

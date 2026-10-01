@@ -56,10 +56,17 @@
 .mm-library-grouprow {
   display: flex;
   flex-wrap: wrap;
-  align-items: baseline;
+  align-items: center;
   gap: 4px 12px;
   padding: 16px 18px 6px;
   border-bottom: 1px solid var(--mm-hairline);
+}
+
+.mm-library-grouprow__poster {
+  display: block;
+  width: 30px;
+  flex: none;
+  aspect-ratio: 2 / 3;
 }
 
 .mm-library-grouprow__title {

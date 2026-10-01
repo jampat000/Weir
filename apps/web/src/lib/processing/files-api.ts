@@ -131,6 +131,8 @@ export interface ProcessingFile {
   last_attempt_at: string | null;
   /** The copy Weir handed back, when it wrote one. */
   handback?: ProcessingFileHandback | null;
+  /** Where Weir serves the title's poster. Null until one is found, when none exists, or when artwork is off. */
+  poster_url?: string | null;
 }
 
 export interface ProcessingFilesPage {

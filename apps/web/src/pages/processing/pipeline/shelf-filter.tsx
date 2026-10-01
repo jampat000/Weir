@@ -1,5 +1,3 @@
-import { Chip } from "../../../components/panels/chip";
-
 /** One chip: a workflow, or null for all of them. */
 export type ShelfFilterChoice = { id: number | null; name: string };
 
@@ -15,23 +13,19 @@ export function ShelfFilter({
   onChoose: (workflowId: number | null) => void;
 }) {
   return (
-    <div className="mm-shelf__filter" role="group" aria-label="Show workflow">
-      {choices.map((choice) => {
-        const pressed = choice.id === chosen;
-        return (
-          <button
-            key={choice.id ?? "all"}
-            type="button"
-            className="mm-shelf__chip"
-            aria-pressed={pressed}
-            onClick={() => onChoose(choice.id)}
-          >
-            <Chip dot={false} tone={pressed ? "info" : "neutral"}>
-              {choice.name}
-            </Chip>
-          </button>
-        );
-      })}
+    <div className="lsh-chips" role="group" aria-label="Workflows">
+      {choices.map((choice) => (
+        <button
+          key={choice.id ?? "all"}
+          type="button"
+          className="lsh-chip"
+          aria-pressed={choice.id === chosen}
+          data-library={choice.id ?? "all"}
+          onClick={() => onChoose(choice.id)}
+        >
+          {choice.name}
+        </button>
+      ))}
     </div>
   );
 }

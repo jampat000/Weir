@@ -446,31 +446,9 @@ button.mm-pipe__card {
   outline-offset: 1px;
 }
 
-/* The tile that stands where a poster would: the title's initials on the workflow's colour. */
-.mm-tile {
-  display: flex;
-  width: 100%;
-  height: 100%;
-  box-sizing: border-box;
-  align-items: flex-end;
-  justify-content: center;
-  padding-bottom: 6%;
-  overflow: hidden;
-  border-radius: 6px;
-  background: linear-gradient(
-    160deg,
-    hsl(var(--tile-hue, 210) 45% 34%),
-    hsl(calc(var(--tile-hue, 210) + 40) 50% 14%)
-  );
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  color: hsl(0 0% 100% / 0.88);
-}
-
+/* The poster in flight: lifted off the page, its corners set by the flight as it passes from the card's to the shelf's. */
 .mm-tile--flying {
-  border-radius: 8px;
-  box-shadow: 0 8px 24px hsl(0 0% 0% / 0.35);
+  box-shadow: 0 16px 36px hsl(0 0% 0% / 0.5);
 }
 
 /* A phone: the stations stack and the same cards flow one under another. */

@@ -3,13 +3,11 @@ import { describe, expect, it } from "vitest";
 import type { FinishedFile } from "../../../lib/activity/processing-outcome";
 import { NOW } from "./pipeline-fixtures";
 import {
-  needLookWords,
   SHELF_LIMIT,
   shelfOf,
   todayWords,
   type ShelfScope,
 } from "./shelf-model";
-import { initialsOf, workflowHue } from "./title-tile";
 
 function finished(
   id: number,
@@ -131,7 +129,7 @@ describe("the shelf's tiles", () => {
 });
 
 describe("what the shelf adds up to", () => {
-  it("counts what finished today, what it saved, and what wants a look", () => {
+  it("counts what finished today and what it saved", () => {
     const result = shelf([
       finished(1),
       finished(2, { savedBytes: 2 * 1024 ** 2 }),
@@ -143,19 +141,10 @@ describe("what the shelf adds up to", () => {
     expect(result).toMatchObject({
       today: 4,
       savedBytes: 320 * 1024 ** 2,
-      needLook: 2,
       latest: false,
     });
     expect(result.tiles.map((tile) => tile.key)).toEqual(["1", "2", "3", "4"]);
     expect(todayWords(result)).toBe("4 today · 320 MB saved");
-    expect(needLookWords(result)).toBe("2 need a look");
-  });
-
-  it("says one file needs a look in the singular, and nothing when none do", () => {
-    expect(needLookWords(shelf([finished(1, { kind: "failed" })]))).toBe(
-      "1 needs a look",
-    );
-    expect(needLookWords(shelf([finished(1)]))).toBeNull();
   });
 
   it("shows the latest from before when nothing finished today", () => {
@@ -168,19 +157,5 @@ describe("what the shelf adds up to", () => {
 
   it("is empty, and says nothing finished today, when there are no files at all", () => {
     expect(shelf([])).toMatchObject({ today: 0, latest: true, tiles: [] });
-  });
-});
-
-describe("the tile", () => {
-  it("takes the first letters of the first two words of the title", () => {
-    expect(initialsOf("The Quiet Harbour (2024)")).toBe("QH");
-    expect(initialsOf("Lioness S03E08")).toBe("L");
-    expect(initialsOf("A Paper Lantern")).toBe("PL");
-  });
-
-  it("is tinted for the workflow, the same every time and not the same for every workflow", () => {
-    expect(workflowHue("Movies")).toBe(workflowHue("Movies"));
-    expect(workflowHue("Movies")).not.toBe(workflowHue("TV"));
-    expect(workflowHue("Movies")).toBeLessThan(360);
   });
 });

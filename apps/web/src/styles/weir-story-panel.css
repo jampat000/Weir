@@ -59,6 +59,12 @@
   border-bottom: 1px solid var(--mm-hairline);
 }
 
+.mm-story-panel__art {
+  width: 56px;
+  flex: none;
+  aspect-ratio: 2 / 3;
+}
+
 .mm-story-panel__titles {
   flex-grow: 1;
   min-width: 0;

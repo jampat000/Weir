@@ -6,6 +6,7 @@
  * wants the technical detail, but it is never the first thing shown.
  */
 
+import { Poster } from "../shared/poster";
 import { fileHistoryRetentionNote } from "../../lib/processing/file-history-retention";
 import { useAppDateFormatter } from "../../lib/ui/mm-format-date";
 import { DirectPlayLine } from "./direct-play-line";
@@ -35,6 +36,8 @@ function Step({ step }: { step: ProcessingFileStoryStep }): React.ReactElement {
 export interface FileStoryPanelProps {
   open: boolean;
   fileName: string;
+  /** What the header shows beside the name: the title's poster, tinted for its workflow when there is none. */
+  poster?: { url: string | null | undefined; workflow: string };
   /** Which of the operator's devices will play the file directly. Information only. */
   directPlay?: ProcessingDirectPlay[];
   log: ProcessingFileLog | undefined;
@@ -46,6 +49,7 @@ export interface FileStoryPanelProps {
 export function FileStoryPanel({
   open,
   fileName,
+  poster,
   directPlay = [],
   log,
   loading,
@@ -62,6 +66,15 @@ export function FileStoryPanel({
     <StoryPanelShell
       eyebrow="What happened to this file"
       title={fileName}
+      art={
+        poster ? (
+          <Poster
+            url={poster.url}
+            title={fileName}
+            workflow={poster.workflow}
+          />
+        ) : undefined
+      }
       backdropLabel="Close file history"
       onClose={onClose}
     >

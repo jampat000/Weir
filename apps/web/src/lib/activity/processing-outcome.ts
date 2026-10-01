@@ -34,6 +34,8 @@ export type FinishedFile = {
   /** The entry's own sentence, for kinds that have one worth showing as it is. */
   sentence: string | null;
   finishedAt: string;
+  /** Where Weir serves the title's poster, when it has one. */
+  posterUrl?: string | null;
 };
 
 /**
@@ -103,6 +105,7 @@ export function finishedFileFromEvent(
       removedSubtitles: count(detail?.removed_subtitles),
       sentence: rejected && detail ? rejectionSentence(detail) : null,
       finishedAt: ev.created_at,
+      posterUrl: ev.poster_url ?? null,
     };
   }
   if (ev.event_type === LIBRARY_FILE_CLEANED_EVENT) {
@@ -118,6 +121,7 @@ export function finishedFileFromEvent(
       removedSubtitles: 0,
       sentence: ev.title,
       finishedAt: ev.created_at,
+      posterUrl: ev.poster_url ?? null,
     };
   }
   return null;

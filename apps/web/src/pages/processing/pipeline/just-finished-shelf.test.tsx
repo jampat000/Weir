@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { FinishedFile } from "../../../lib/activity/processing-outcome";
 import { JustFinishedShelf } from "./just-finished-shelf";
@@ -80,6 +80,36 @@ describe("Just finished", () => {
     );
   });
 
+  it("keeps the tag beside the poster's button, so a click on the tag does not open the story", () => {
+    const onOpen = vi.fn();
+    render(shelf([finished(1, { libraryId: 2 })], { onOpen }));
+
+    const tag = screen.getByRole("link", { name: "TV" });
+
+    expect(tag).toHaveClass("lsh-tag");
+    expect(screen.getByRole("button", { name: /S01E01/ })).not.toContainElement(
+      tag,
+    );
+    fireEvent.click(tag);
+    expect(onOpen).not.toHaveBeenCalled();
+  });
+
+  it("shows the title's poster on its tile, and the initials where the file has none", () => {
+    render(
+      shelf([
+        finished(1, { posterUrl: "/api/v1/artwork/posters/tv-harbour-2019" }),
+        finished(2, { posterUrl: null }),
+      ]),
+    );
+
+    const [withPoster, without] = screen.getAllByRole("listitem");
+    expect(within(withPoster).getByRole("img")).toHaveAttribute(
+      "src",
+      "/api/v1/artwork/posters/tv-harbour-2019",
+    );
+    expect(within(without).queryByRole("img")).toBeNull();
+  });
+
   it("opens the file's story when a tile is clicked", () => {
     const onOpen = vi.fn();
     const item = finished(1);
@@ -132,10 +162,12 @@ describe("Just finished", () => {
 });
 
 describe("Just finished's workflow chips", () => {
+  afterEach(() => localStorage.clear());
+
   it("offers All and a chip for each workflow, with All pressed", () => {
     render(shelf([finished(1)]));
 
-    const group = screen.getByRole("group", { name: "Show workflow" });
+    const group = screen.getByRole("group", { name: "Workflows" });
     expect(
       within(group)
         .getAllByRole("button")
@@ -151,7 +183,7 @@ describe("Just finished's workflow chips", () => {
   it("offers a chip only to the workflows that are on, when told which", () => {
     render(shelf([finished(1)], { enabledWorkflowIds: new Set([1, 2]) }));
 
-    const group = screen.getByRole("group", { name: "Show workflow" });
+    const group = screen.getByRole("group", { name: "Workflows" });
     expect(within(group).queryByRole("button", { name: "Kids" })).toBeNull();
   });
 
@@ -170,9 +202,7 @@ describe("Just finished's workflow chips", () => {
       "aria-pressed",
       "true",
     );
-    expect(
-      screen.getByText("1 today · 318 MB saved · 1 needs a look"),
-    ).toBeVisible();
+    expect(screen.getByText("1 today · 318 MB saved")).toBeVisible();
 
     fireEvent.click(screen.getByRole("button", { name: "All" }));
 
@@ -186,23 +216,21 @@ describe("Just finished's workflow chips", () => {
       }),
     );
 
-    const group = screen.getByRole("group", { name: "Show workflow" });
+    const group = screen.getByRole("group", { name: "Workflows" });
     const chips = within(group).getAllByRole("button");
     expect(chips.map((chip) => chip.textContent)).toEqual(["Movies"]);
     expect(chips[0]).toHaveAttribute("aria-pressed", "true");
     expect(tiles()).toEqual([expect.stringContaining("S01E02")]);
   });
 
-  it("says what the page counts for the day across every workflow, and what needs a look", () => {
+  it("says what the page counts for the day across every workflow, in the panel's header", () => {
     render(
       shelf([finished(1, { kind: "failed" })], {
         count: "38 cleaned today · 41.20 GB saved",
       }),
     );
 
-    expect(
-      screen.getByText("38 cleaned today · 41.20 GB saved · 1 needs a look"),
-    ).toBeVisible();
+    expect(screen.getByText("38 cleaned today · 41.20 GB saved")).toBeVisible();
   });
 
   it("says nothing finished yet today, and shows the latest from before", () => {
@@ -221,5 +249,42 @@ describe("Just finished's workflow chips", () => {
       screen.getByText("Nothing yet today · latest arrivals"),
     ).toBeVisible();
     expect(tiles()).toHaveLength(1);
+  });
+
+  it("remembers the chip pressed, and opens on it the next time", () => {
+    const first = render(shelf([finished(1, { libraryId: 2 })]));
+    fireEvent.click(screen.getByRole("button", { name: "TV" }));
+    first.unmount();
+
+    render(shelf([finished(1, { libraryId: 2 })]));
+
+    expect(screen.getByRole("button", { name: "TV" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(localStorage.getItem("weir.live.shelfWorkflow")).toBe("2");
+  });
+
+  it("opens on All when the workflow it remembered is no longer there", () => {
+    localStorage.setItem("weir.live.shelfWorkflow", "9");
+
+    render(shelf([finished(1)]));
+
+    expect(screen.getByRole("button", { name: "All" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+  });
+
+  it("lets the dashboard's workflow win over the one remembered", () => {
+    localStorage.setItem("weir.live.shelfWorkflow", "2");
+
+    render(
+      shelf([finished(1, { libraryId: 2 }), finished(2, { libraryId: 1 })], {
+        workflowId: 1,
+      }),
+    );
+
+    expect(tiles()).toEqual([expect.stringContaining("S01E02")]);
   });
 });

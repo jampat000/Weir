@@ -1,4 +1,5 @@
 import { FileName } from "../../components/shared/file-name";
+import { Poster } from "../../components/shared/poster";
 import { formatBytes } from "../../lib/format/bytes";
 import { baseName } from "../../lib/format/path";
 import type { LibraryFile } from "../../lib/processing/library-mode-api";
@@ -132,6 +133,13 @@ export function LibraryTable({
       {groups.map(([title, rows]) => (
         <div key={title} role="rowgroup" className="mm-library-group">
           <div role="row" className="mm-library-grouprow">
+            <span role="cell" className="mm-library-grouprow__poster">
+              <Poster
+                url={rows.find((row) => row.poster_url)?.poster_url}
+                title={title}
+                workflow={libraryName}
+              />
+            </span>
             <span role="cell" className="mm-library-grouprow__title">
               {title}
             </span>

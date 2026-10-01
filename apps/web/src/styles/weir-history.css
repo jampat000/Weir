@@ -109,8 +109,8 @@
 
 .mm-history-file {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
+  align-items: center;
+  gap: 10px;
   width: 100%;
   min-width: 0;
   padding: 6px 0;
@@ -120,6 +120,21 @@
   font: inherit;
   text-align: left;
   cursor: pointer;
+}
+
+/* The title's poster, small, at the start of the row. */
+.mm-history-file__poster {
+  display: block;
+  width: 30px;
+  flex: none;
+  aspect-ratio: 2 / 3;
+}
+
+.mm-history-file__text {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-start;
 }
 
 /* A file's name is shown whole, wrapping between its parts, never cut to "…". */

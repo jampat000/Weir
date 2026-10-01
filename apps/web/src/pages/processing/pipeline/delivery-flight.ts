@@ -1,31 +1,43 @@
 /**
  * The one movement on the Pipeline that is not a number changing: a file that has been delivered shows
- * it first (its card full and green for a moment), and then its tile flies from the card to the same
+ * it first (its card full and green for a moment), and then its poster flies from the card to the same
  * file on the Just finished shelf, where it lands in its place. The shelf's tile is kept out of sight
  * while the card still shows "Delivered", so the file is never in two places at once.
  *
- * With reduced motion, or a page nobody is looking at, nothing flies and the shelf tile simply shows.
- * The two components find each other in the document through the attributes below.
+ * Both the card's poster and the shelf's are 2:3, and the poster that flies is a copy of the card's, scaled
+ * by one factor so it keeps its shape. It follows the shelf tile's place frame by frame, so it lands on the
+ * tile even if the shelf slid or the page scrolled during the flight, and then gives way to the real tile
+ * by fading rather than being swapped in a single frame (see flight-path for the path).
+ *
+ * With reduced motion, a page nobody is looking at, or a window being resized, nothing flies and the shelf
+ * tile simply shows. The two components find each other in the document through the attributes below.
  */
 import { motionAllowed } from "../../../lib/ui/motion-allowed";
-import { initialsOf, workflowHue } from "./title-tile";
+import {
+  FLIGHT_MS,
+  LANDING_FADE_MS,
+  easeInOut,
+  poseAt,
+  type Spot,
+} from "./flight-path";
+import { RESIZING_CLASS } from "./use-still-while-resizing";
 
-/** Set by the shelf on each tile, to the path of the file it shows. */
+/** Set by the shelf on each tile's art, to the path of the file it shows. */
 export const SHELF_TILE_ATTRIBUTE = "data-shelf-path";
 
 const HELD_ATTRIBUTE = "data-delivery-held";
 const FLYING_ATTRIBUTE = "data-delivery-flying";
 
-const FLIGHT_MS = 1100;
-const FLIGHT_EASING = "cubic-bezier(.45,.05,.25,1)";
 const FLIGHT_Z_INDEX = "60";
+/** A flight that has not finished this long after it should have (a page whose frames stopped) is ended anyway. */
+const STALL_GRACE_MS = 500;
 
-/** A delivered file's tile as it was drawn on its card, and what it needs to be drawn again in flight. */
+/** A delivered file's poster as it was drawn on its card, and what it needs to be drawn again in flight. */
 export type Delivery = {
   path: string;
-  title: string;
-  workflow: string;
-  /** Where the tile was on screen. */
+  /** A copy of the poster as drawn: the picture, or the initials, so the same thing flies to the shelf. */
+  look: HTMLElement;
+  /** Where the poster was on screen. */
   from: DOMRect;
 };
 
@@ -40,10 +52,15 @@ function hold(tile: HTMLElement): void {
   tile.style.visibility = "hidden";
 }
 
-function release(tile: HTMLElement): void {
+/** Shows the tile under the poster that is landing on it. */
+function reveal(tile: HTMLElement): void {
   tile.removeAttribute(HELD_ATTRIBUTE);
-  tile.removeAttribute(FLYING_ATTRIBUTE);
   tile.style.visibility = "";
+}
+
+function release(tile: HTMLElement): void {
+  reveal(tile);
+  tile.removeAttribute(FLYING_ATTRIBUTE);
 }
 
 /** Keeps the shelf's tiles for the files whose cards still say "Delivered" out of sight, and shows every other. */
@@ -58,28 +75,34 @@ export function holdShelfTiles(paths: ReadonlySet<string>): void {
   }
 }
 
-function ghostOf(delivery: Delivery): HTMLElement {
-  const ghost = document.createElement("span");
-  ghost.className = "mm-tile mm-tile--flying";
+function spotOf(element: HTMLElement): Spot {
+  const { left, top, width } = element.getBoundingClientRect();
+  return { left, top, width };
+}
+
+const radiusOf = (element: HTMLElement): number =>
+  Number.parseFloat(getComputedStyle(element).borderTopLeftRadius) || 0;
+
+/** The copy of the card's poster, laid out at the card's size and moved only by its transform. */
+function ghostOf({ look: ghost, from }: Delivery): HTMLElement {
+  ghost.classList.add("mm-tile--flying");
   ghost.setAttribute("aria-hidden", "true");
-  ghost.textContent = initialsOf(delivery.title);
-  const { from } = delivery;
   Object.assign(ghost.style, {
     position: "fixed",
-    left: `${from.left}px`,
-    top: `${from.top}px`,
+    left: "0",
+    top: "0",
     width: `${from.width}px`,
     height: `${from.height}px`,
     zIndex: FLIGHT_Z_INDEX,
     pointerEvents: "none",
     transformOrigin: "top left",
+    willChange: "transform",
   });
-  ghost.style.setProperty("--tile-hue", String(workflowHue(delivery.workflow)));
   return ghost;
 }
 
 /**
- * Flies a copy of the delivered tile to the file's tile on the shelf. Without a shelf tile for the file, or
+ * Flies a copy of the delivered poster to the file's tile on the shelf. Without a shelf tile for the file, or
  * where movement is not allowed, there is nothing to fly to and the shelf's tile is simply shown.
  */
 export function flyToShelf(delivery: Delivery): void {
@@ -87,11 +110,11 @@ export function flyToShelf(delivery: Delivery): void {
     (tile) => tile.getAttribute(SHELF_TILE_ATTRIBUTE) === delivery.path,
   );
   if (!target) return;
-  const to = target.getBoundingClientRect();
   const { from } = delivery;
+  const to = target.getBoundingClientRect();
   if (
     !motionAllowed() ||
-    typeof target.animate !== "function" ||
+    document.body.classList.contains(RESIZING_CLASS) ||
     to.width === 0 ||
     to.height === 0 ||
     from.width === 0 ||
@@ -104,19 +127,42 @@ export function flyToShelf(delivery: Delivery): void {
   document.body.appendChild(ghost);
   hold(target);
   target.setAttribute(FLYING_ATTRIBUTE, "");
-  const land = () => {
+  const fromRadius = radiusOf(ghost);
+  const toRadius = radiusOf(target);
+  const startedAt = performance.now();
+  let frame = 0;
+  let stall = 0;
+  let landed = false;
+
+  const end = () => {
+    cancelAnimationFrame(frame);
+    window.clearTimeout(stall);
     ghost.remove();
     release(target);
   };
-  const flight = ghost.animate(
-    [
-      { transform: "translate(0, 0) scale(1, 1)" },
-      {
-        transform: `translate(${to.left - from.left}px, ${to.top - from.top}px) scale(${to.width / from.width}, ${to.height / from.height})`,
-      },
-    ],
-    { duration: FLIGHT_MS, easing: FLIGHT_EASING, fill: "forwards" },
-  );
-  flight.onfinish = land;
-  flight.oncancel = land;
+  stall = window.setTimeout(end, FLIGHT_MS + LANDING_FADE_MS + STALL_GRACE_MS);
+
+  const step = (now: number) => {
+    if (!target.isConnected) {
+      end();
+      return;
+    }
+    const elapsed = Math.max(0, now - startedAt);
+    const progress = easeInOut(Math.min(1, elapsed / FLIGHT_MS));
+    const pose = poseAt(progress, from, spotOf(target));
+    ghost.style.transform = `translate(${pose.x}px, ${pose.y}px) scale(${pose.scale})`;
+    ghost.style.borderRadius = `${(fromRadius + (toRadius - fromRadius) * progress) / pose.scale}px`;
+    if (elapsed >= FLIGHT_MS && !landed) {
+      landed = true;
+      reveal(target);
+    }
+    const fade = Math.max(0, (elapsed - FLIGHT_MS) / LANDING_FADE_MS);
+    if (fade >= 1) {
+      end();
+      return;
+    }
+    if (fade > 0) ghost.style.opacity = String(1 - fade);
+    frame = requestAnimationFrame(step);
+  };
+  frame = requestAnimationFrame(step);
 }

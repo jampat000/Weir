@@ -1,17 +1,18 @@
 /**
- * The tiles of the Just finished shelf. A tile stands where a poster would (Weir has none, so it is the
- * title's initials on its workflow's colour) with the workflow's name across its top, which goes to that
- * workflow in the library, and how much the file shrank by across its foot. The tile of a file that has
- * just been delivered arrives with a ring and flies in from the Pipeline (see delivery-flight).
+ * The tiles of the Just finished shelf. A tile is the title's poster (or its initials on its workflow's
+ * colour where there is none), with how much the file shrank by at its foot and, under that, the workflow's
+ * name, which goes to that workflow in the library. The tile of a file that has just been delivered arrives
+ * with a ring and flies in from the Pipeline (see delivery-flight).
  */
-import type { CSSProperties, ReactElement, Ref } from "react";
+import type { CSSProperties, ReactElement, RefObject } from "react";
 import { Link } from "react-router-dom";
 
+import { Poster } from "../../../components/shared/poster";
 import type { FinishedFile } from "../../../lib/activity/processing-outcome";
 import { classNames } from "../../../lib/ui/class-names";
 import { SHELF_TILE_ATTRIBUTE } from "./delivery-flight";
 import type { ShelfTile } from "./shelf-model";
-import { TitleTile } from "./title-tile";
+import { TILE_KEY_ATTRIBUTE, useSlideNeighbours } from "./use-slide-neighbours";
 
 function Tile({
   tile,
@@ -27,6 +28,7 @@ function Tile({
   const library = tile.item.libraryId;
   return (
     <li
+      {...{ [TILE_KEY_ATTRIBUTE]: tile.key }}
       className={classNames(
         "mm-shelf__item",
         tile.fresh && "mm-shelf__item--fresh",
@@ -50,7 +52,11 @@ function Tile({
           className="mm-shelf__art"
           {...{ [SHELF_TILE_ATTRIBUTE]: tile.path }}
         >
-          <TitleTile title={tile.title} workflow={tile.workflow} />
+          <Poster
+            url={tile.item.posterUrl}
+            title={tile.title}
+            workflow={tile.workflow}
+          />
           {tile.saved ? (
             <span className="mm-shelf__saved">{tile.saved}</span>
           ) : null}
@@ -68,8 +74,9 @@ function Tile({
       {tile.workflowKnown && library != null ? (
         <Link
           to={`/library?library=${library}`}
-          className="mm-shelf__tag"
+          className="lsh-tag"
           title={`Open ${tile.workflow} in the library`}
+          onClick={(event) => event.stopPropagation()}
         >
           {tile.workflow}
         </Link>
@@ -92,10 +99,15 @@ export function ShelfTiles({
   captions: boolean;
   /** The tile width the shelf's height allows; unset until it is measured. */
   tileWidth: number | null;
-  boxRef: Ref<HTMLUListElement>;
+  boxRef: RefObject<HTMLUListElement | null>;
   onOpen: (item: FinishedFile) => void;
 }): ReactElement {
   const shown = tilesShown === null ? tiles : tiles.slice(0, tilesShown);
+  useSlideNeighbours(
+    boxRef,
+    shown.map((tile) => tile.key).join("|"),
+    tileWidth,
+  );
   const style: CSSProperties | undefined =
     tileWidth === null
       ? undefined

@@ -43,8 +43,6 @@ export type Shelf = {
   /** Files that finished today, and what they add up to. */
   today: number;
   savedBytes: number;
-  /** Today's files that were rejected or could not be finished, which want the owner's eye. */
-  needLook: number;
   /** Nothing finished today, so the tiles are the latest from before. */
   latest: boolean;
   tiles: ShelfTile[];
@@ -122,9 +120,6 @@ export function shelfOf(
   return {
     today: today.length,
     savedBytes: today.reduce((sum, item) => sum + (item.savedBytes ?? 0), 0),
-    needLook: today.filter(
-      (item) => item.kind === "rejected" || item.kind === "failed",
-    ).length,
     latest,
     tiles: (latest ? wanted : today)
       .slice(0, SHELF_LIMIT)
@@ -138,10 +133,4 @@ export function todayWords(shelf: Shelf): string {
   const saved =
     shelf.savedBytes > 0 ? ` · ${formatBytes(shelf.savedBytes)} saved` : "";
   return `${shelf.today} today${saved}`;
-}
-
-/** "2 need a look": today's files that want the owner's eye; nothing when none do. */
-export function needLookWords(shelf: Shelf): string | null {
-  if (shelf.needLook === 0) return null;
-  return `${shelf.needLook} ${shelf.needLook === 1 ? "needs" : "need"} a look`;
 }

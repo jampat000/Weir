@@ -266,8 +266,7 @@ describe("a file that has just ended", () => {
     expect(onDelivered).toHaveBeenCalledWith(
       expect.objectContaining({
         path: delivered[0].path,
-        title: "The Quiet Harbour S01E01",
-        workflow: "TV",
+        look: expect.any(HTMLElement),
       }),
     );
   });

@@ -1,0 +1,33 @@
+/*
+ * A title's poster, 2:3, filling the box it is put in. Under the image, and where there is none, is the title's
+ * initials on the colour of the workflow that has the file.
+ */
+.mm-tile {
+  position: relative;
+  display: flex;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: 6%;
+  overflow: hidden;
+  border-radius: 6px;
+  background: linear-gradient(
+    160deg,
+    hsl(var(--tile-hue, 210) 45% 34%),
+    hsl(calc(var(--tile-hue, 210) + 40) 50% 14%)
+  );
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: hsl(0 0% 100% / 0.88);
+}
+
+.mm-tile__image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}

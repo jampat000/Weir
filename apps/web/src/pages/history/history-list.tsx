@@ -1,6 +1,7 @@
 import { Chip } from "../../components/panels/chip";
 import type { MmStatusTone } from "../../lib/ui/mm-status-tone";
 import { FileName } from "../../components/shared/file-name";
+import { Poster } from "../../components/shared/poster";
 import { formatBytes } from "../../lib/format/bytes";
 import {
   processingFileStatusLabel,
@@ -14,6 +15,7 @@ import {
   entryTime,
   type HistoryEntry,
 } from "./history-entries";
+import { prettyName } from "../processing/processing-model";
 import { agoWords, importedLabel } from "./history-model";
 
 /** What Weir did, in a few words, for the list. */
@@ -31,6 +33,17 @@ const CLEAN_OUTCOME_WORDS: Record<LibraryClean["outcome"], string> = {
   skipped: "Already matched the rules",
   failed: "Clean failed",
 };
+
+/** The poster of a download; a clean in a library has none. */
+function posterUrlOf(entry: HistoryEntry): string | null | undefined {
+  return entry.kind === "download" ? entry.file.poster_url : null;
+}
+
+function libraryNameOf(entry: HistoryEntry): string {
+  return entry.kind === "library_clean"
+    ? entry.clean.library_name
+    : entry.file.library_name;
+}
 
 /** The library name and, for a download, its size. */
 function subLine(entry: HistoryEntry): string {
@@ -91,11 +104,22 @@ export function HistoryList({
                   onClick={() => onPick(entry)}
                   title={entryPath(entry)}
                 >
-                  <FileName
-                    path={entryPath(entry)}
-                    className="mm-history-file__name"
-                  />
-                  <span className="mm-history-file__sub">{subLine(entry)}</span>
+                  <span className="mm-history-file__poster">
+                    <Poster
+                      url={posterUrlOf(entry)}
+                      title={prettyName(entryPath(entry))}
+                      workflow={libraryNameOf(entry)}
+                    />
+                  </span>
+                  <span className="mm-history-file__text">
+                    <FileName
+                      path={entryPath(entry)}
+                      className="mm-history-file__name"
+                    />
+                    <span className="mm-history-file__sub">
+                      {subLine(entry)}
+                    </span>
+                  </span>
                 </button>
               </td>
               <td>
