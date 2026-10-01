@@ -45,6 +45,7 @@ whose source is in [`../docs-site/docs`](../docs-site/docs).
 - [`file-lifecycle-contract.md`](file-lifecycle-contract.md) - how Weir moves, replaces and deletes media files safely.
 - [`diagnostics-contract.md`](diagnostics-contract.md) - diagnostics and failure reporting.
 - [`processing-manager-capabilities.md`](processing-manager-capabilities.md) - what Processing does on its own and what needs a media manager.
+- [`artwork.md`](artwork.md) - how posters are found, kept and limited.
 
 ## Archive
 
