@@ -13,6 +13,7 @@ import { classNames } from "../../../lib/ui/class-names";
 import { SHELF_TILE_ATTRIBUTE } from "./delivery-flight";
 import type { ShelfTile } from "./shelf-model";
 import { TILE_KEY_ATTRIBUTE, useSlideNeighbours } from "./use-slide-neighbours";
+import { useTileArrivals } from "./use-tile-arrivals";
 
 function Tile({
   tile,
@@ -108,6 +109,7 @@ export function ShelfTiles({
     shown.map((tile) => tile.key).join("|"),
     tileWidth,
   );
+  useTileArrivals(boxRef, tiles.map((tile) => tile.key).join("|"));
   const style: CSSProperties | undefined =
     tileWidth === null
       ? undefined

@@ -2,8 +2,13 @@ import { Link } from "react-router-dom";
 
 import { StatTile, StatUnit } from "../../../components/panels/stat-tile";
 import type { ProcessingFile } from "../../../lib/processing/files-api";
+import { IN_PROGRESS_PATH } from "../pipeline/pipeline-stages";
 import type { WorkingItem } from "../processing-model";
+import { useFittingRows } from "./fit-rows";
 import { STEP_WORDS } from "./working-words";
+
+/** The most files the tile lists before saying how many more there are; how many show is up to its height. */
+const MOST_OPERATIONS = 4;
 
 /** Where a person changes how many files Weir works on at once, and how long a new download waits. */
 const PERFORMANCE_PATH = "/settings?tab=performance";
@@ -14,6 +19,8 @@ type WorkingTileProps = {
   filesAtOnce: number | null;
   /** How long a new download is left alone, when every workflow agrees. */
   waitSeconds: number | null;
+  /** The band keeps its three tiles across, so the tile is as tall as the band and lists only the rows that fit. */
+  across?: boolean;
   onOpen: (file: ProcessingFile) => void;
 };
 
@@ -49,11 +56,18 @@ function Operation({
   return (
     <li>
       {file ? (
-        <button type="button" className="mm-op" onClick={() => onOpen(file)}>
+        <button
+          type="button"
+          className="mm-op"
+          onClick={() => onOpen(file)}
+          data-fit=""
+        >
           {content}
         </button>
       ) : (
-        <div className="mm-op">{content}</div>
+        <div className="mm-op" data-fit="">
+          {content}
+        </div>
       )}
     </li>
   );
@@ -64,13 +78,29 @@ export function WorkingTile({
   working,
   filesAtOnce,
   waitSeconds,
+  across = true,
   onOpen,
 }: WorkingTileProps) {
+  const [bodyRef, fits] = useFittingRows(across);
+  const shown = working.slice(0, MOST_OPERATIONS);
+  const more = working.length - Math.min(fits, shown.length);
   return (
     <StatTile
       label="Working on now"
+      bodyRef={bodyRef}
       aside={
         <span className="mm-aside">
+          {more > 0 ? (
+            <span className="mm-aside__more">
+              <Link
+                to={IN_PROGRESS_PATH}
+                aria-label={`${more.toLocaleString()} more in History`}
+              >
+                {more.toLocaleString()} more
+              </Link>
+              {" · "}
+            </span>
+          ) : null}
           {waitSeconds === null ? null : (
             <span className="mm-aside__note">
               new downloads wait {waitSeconds}s ·{" "}
@@ -96,7 +126,7 @@ export function WorkingTile({
         <p className="mm-stat__idle">Nothing is being cleaned right now.</p>
       ) : (
         <ul className="mm-ops" data-testid="live-working">
-          {working.map((item) => (
+          {shown.map((item) => (
             <Operation key={item.key} item={item} onOpen={onOpen} />
           ))}
         </ul>

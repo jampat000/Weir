@@ -1,0 +1,114 @@
+import { describe, expect, it } from "vitest";
+
+import tokens from "../../../styles/weir-tokens.css?raw";
+import {
+  BOARD_CHROME_PX,
+  BOARD_PX,
+  GRID_AREAS,
+  GRID_COLUMNS,
+  LOW_COLUMNS,
+  MIN_GRID_PX,
+  gridRows,
+  pageLayout,
+} from "./dashboard-layout";
+
+describe("page layout from the measured main area", () => {
+  it("puts the right column beside the page from 66rem of main area", () => {
+    expect(pageLayout(1055, 16).sideBySide).toBe(false);
+    expect(pageLayout(1056, 16).sideBySide).toBe(true);
+    expect(pageLayout(2200, 16).sideBySide).toBe(true);
+  });
+
+  it("keeps the top band three across down to 56.25rem, then stacks it", () => {
+    expect(pageLayout(900, 16).band).toBe("across");
+    expect(pageLayout(899, 16).band).toBe("stacked");
+    expect(pageLayout(352, 16).band).toBe("stacked");
+  });
+
+  it("uses the roomy layout until measured", () => {
+    expect(pageLayout(0, 16)).toEqual({ sideBySide: true, band: "across" });
+  });
+
+  it("scales the thresholds with the type size", () => {
+    expect(pageLayout(1150, 20).sideBySide).toBe(false);
+    expect(pageLayout(990, 15).sideBySide).toBe(true);
+    expect(pageLayout(989, 15).sideBySide).toBe(false);
+  });
+});
+
+describe("the shared page grid", () => {
+  it("has Health spanning the band and the Pipeline, and Needs you beside the lower row", () => {
+    expect(GRID_COLUMNS).toBe("minmax(0, 1fr) clamp(340px, 28%, 600px)");
+    expect(GRID_AREAS).toBe('"now health" "board health" "low needs"');
+    expect(LOW_COLUMNS).toBe("minmax(0, 1.15fr) minmax(0, 1fr)");
+  });
+
+  it("measures the Pipeline's chrome and keeps its comfortable row to three rows of 86px cards", () => {
+    expect(BOARD_CHROME_PX).toBe(104);
+    // 104 of chrome, three rows of 94px less the last gap, and the 22px line for "and N more".
+    expect(BOARD_PX).toBe(400);
+  });
+
+  it("gives a window with room for the band's 20% and the Pipeline's comfortable height what they ask for", () => {
+    // 780px of grid, less two 12px gaps: the band's 20% is 156px, the Pipeline's 400px, and the lower row has 200px.
+    expect(gridRows(780)).toEqual({
+      band: 156,
+      board: 400,
+      low: 200,
+      template: "156px 400px 200px",
+    });
+  });
+
+  it("gives way band first (never under 150px), then the Pipeline (never under three rows of 60px cards)", () => {
+    // 663px: the band keeps 150px, the Pipeline goes from 400px to 322px, the lower row gets what is left.
+    expect(gridRows(663)).toEqual({
+      band: 150,
+      board: 322,
+      low: 167,
+      template: "150px 322px 167px",
+    });
+    expect(gridRows(700).band).toBeGreaterThanOrEqual(150);
+  });
+
+  it("gives the lower row way last, down to its floor", () => {
+    expect(gridRows(615)).toMatchObject({ band: 150, board: 322, low: 119 });
+    expect(gridRows(300)).toMatchObject({ band: 150, board: 322, low: 110 });
+  });
+
+  it("holds a page as tall as the three least rows and the gaps between them", () => {
+    expect(MIN_GRID_PX).toBe(150 + 322 + 110 + 24);
+    const least = gridRows(MIN_GRID_PX);
+    expect(least.band + least.board + least.low + 24).toBe(MIN_GRID_PX);
+  });
+
+  it("shares spare height: the band up to 240px, the lower row a third at most, the rest grows the cards", () => {
+    // 956px: the band's 20% is 191px and takes spare up to 240px; the lower row keeps what is left.
+    expect(gridRows(956)).toEqual({
+      band: 240,
+      board: 400,
+      low: 292,
+      template: "240px 400px 292px",
+    });
+    // A tall window: the lower row takes a third at most and the cards grow to the 130px step (36px a row).
+    expect(gridRows(2000).board).toBe(BOARD_PX + 3 * (130 - 94));
+    expect(gridRows(1315)).toEqual({
+      band: 240,
+      board: 508,
+      low: 543,
+      template: "240px 508px 543px",
+    });
+  });
+
+  it("is a roomy page until the grid is measured", () => {
+    expect(gridRows(0)).toEqual(gridRows(1000));
+    expect(gridRows(-1)).toEqual(gridRows(1000));
+  });
+
+  it("uses the same gap as the page's --mm-panel-gap token", () => {
+    const gap = /--mm-panel-gap:\s*(\d+)px/.exec(tokens);
+    // The rows leave two gaps between the three of them.
+    expect(gap).not.toBeNull();
+    const rows = gridRows(1000);
+    expect(rows.band + rows.board + rows.low + 2 * Number(gap?.[1])).toBe(1000);
+  });
+});

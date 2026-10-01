@@ -538,17 +538,7 @@ button.mm-pipe__card {
   }
 }
 
-/* Nothing moves while the window is being resized: the page snaps, then the motion comes back. */
-body.mm-pipeline-resizing .mm-pipe *,
-body.mm-pipeline-resizing .mm-pipe *::before,
-body.mm-pipeline-resizing .mm-pipe *::after,
-body.mm-pipeline-resizing .mm-shelf *,
-body.mm-pipeline-resizing .mm-shelf *::before,
-body.mm-pipeline-resizing .mm-shelf *::after {
-  animation: none !important;
-  transition: none !important;
-}
-
+/* While the window is being resized the poster in flight is out of sight; it keeps following the shelf's tile and lands when the resize is over (the rest of the page is stilled by weir-processing-dashboard.css). */
 body.mm-pipeline-resizing .mm-tile--flying {
   display: none !important;
 }

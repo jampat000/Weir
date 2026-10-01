@@ -1,7 +1,8 @@
 /*
  * The Dashboard's System view: the health detail across the top, then the jobs Weir has run beside the
- * timers it keeps. Wide, the lower row uses the same two columns as Live, so nothing moves between the views;
- * narrower, the timers go under the jobs. The page decides from the width of its own area, not the window's.
+ * timers it keeps. Wide, the lower row uses the same two columns as Live (the view's --dash-columns), so nothing
+ * moves between the views; narrower, the timers go under the jobs. The page decides from the width of its own
+ * area, not the window's.
  */
 
 .mm-sys {
@@ -21,10 +22,8 @@
   min-width: 0;
 }
 
-@container mm-dash (min-width: 66rem) {
-  .mm-sys__low {
-    grid-template-columns: minmax(0, 1fr) clamp(340px, 28%, 460px);
-  }
+.mm-sys--beside .mm-sys__low {
+  grid-template-columns: var(--dash-columns);
 }
 
 /* ---- Timers ---------------------------------------------------------------- */

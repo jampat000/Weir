@@ -288,3 +288,40 @@ describe("Just finished's workflow chips", () => {
     expect(tiles()).toEqual([expect.stringContaining("S01E02")]);
   });
 });
+
+describe("the size of the tiles", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  function rowOf(height: number, width: number) {
+    vi.spyOn(Element.prototype, "clientHeight", "get").mockReturnValue(height);
+    vi.spyOn(Element.prototype, "clientWidth", "get").mockReturnValue(width);
+  }
+  const files = Array.from({ length: 9 }, (_, index) => finished(index + 1));
+
+  it("fits whole tiles to the row's height, and shows only as many as stand across", () => {
+    rowOf(250, 570);
+
+    render(shelf(files));
+
+    // 250px of row gives 135px tiles, and three of them stand across 570px.
+    expect(tiles()).toHaveLength(3);
+    expect(
+      document
+        .querySelector<HTMLElement>(".mm-shelf__row")
+        ?.style.getPropertyValue("--shelf-tile-w"),
+    ).toBe("135px");
+  });
+
+  it("shows at least the fewest tiles asked for, by making the tiles narrower", () => {
+    rowOf(250, 570);
+
+    render(shelf(files, { fewestTiles: 5 }));
+
+    expect(tiles()).toHaveLength(5);
+    expect(
+      document
+        .querySelector<HTMLElement>(".mm-shelf__row")
+        ?.style.getPropertyValue("--shelf-tile-w"),
+    ).toBe("102px");
+  });
+});

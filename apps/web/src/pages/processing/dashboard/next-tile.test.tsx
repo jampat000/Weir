@@ -1,6 +1,6 @@
 import { render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { NextItem } from "./next-model";
 import { NextTile } from "./next-tile";
@@ -17,10 +17,12 @@ function item(key: string, secondsAway: number, label: string): NextItem {
   };
 }
 
-function renderTile(items: NextItem[], paused = false) {
+afterEach(() => vi.restoreAllMocks());
+
+function renderTile(items: NextItem[], paused = false, across = true) {
   render(
     <MemoryRouter>
-      <NextTile items={items} now={NOW} paused={paused} />
+      <NextTile items={items} now={NOW} paused={paused} across={across} />
     </MemoryRouter>,
   );
   return screen.getByRole("region", { name: "Next" });
@@ -71,5 +73,52 @@ describe("the Next tile", () => {
     expect(tile).toHaveTextContent("nothing new starts");
     expect(tile).not.toHaveTextContent("Look for new downloads");
     expect(tile).toHaveTextContent("Files already being written finish");
+  });
+
+  it('lists only the "then" lines that fit the tile, whole ones', () => {
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(
+      function (this: HTMLElement) {
+        if (this.classList.contains("mm-stat__body"))
+          return { bottom: 50 } as DOMRect;
+        const index = Array.from(this.parentElement?.children ?? []).indexOf(
+          this,
+        );
+        return { bottom: (index + 1) * 30 } as DOMRect;
+      },
+    );
+
+    renderTile([1, 2, 3, 4].map((n) => item(`k${n}`, n * 60, `Thing ${n}`)));
+
+    const lines = within(screen.getByTestId("live-next-then")).getAllByRole(
+      "listitem",
+      { hidden: true },
+    );
+    expect(lines.map((line) => line.style.visibility)).toEqual([
+      "",
+      "hidden",
+      "hidden",
+    ]);
+  });
+
+  it('lists every "then" line when the tile grows with them', () => {
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(
+      function (this: HTMLElement) {
+        return {
+          bottom: this.classList.contains("mm-stat__body") ? 50 : 500,
+        } as DOMRect;
+      },
+    );
+
+    renderTile(
+      [1, 2, 3, 4].map((n) => item(`k${n}`, n * 60, `Thing ${n}`)),
+      false,
+      false,
+    );
+
+    const lines = within(screen.getByTestId("live-next-then")).getAllByRole(
+      "listitem",
+      { hidden: true },
+    );
+    expect(lines.map((line) => line.style.visibility)).toEqual(["", "", ""]);
   });
 });

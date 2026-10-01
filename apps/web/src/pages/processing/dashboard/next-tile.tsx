@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 
 import { StatTile, StatUnit } from "../../../components/panels/stat-tile";
+import { useFittingRows } from "./fit-rows";
 import {
   figureWords,
   lineWords,
@@ -16,6 +17,8 @@ type NextTileProps = {
   items: readonly NextItem[];
   now: number;
   paused: boolean;
+  /** The band keeps its three tiles across, so the tile is as tall as the band and lists only the rows that fit. */
+  across?: boolean;
 };
 
 type TileParts = { figure: ReactNode; body: ReactNode };
@@ -67,7 +70,7 @@ function scheduledParts(
         </span>
         <ul className="mm-next__then" data-testid="live-next-then">
           {rest.slice(0, THEN_LINES).map((item) => (
-            <li key={item.key}>
+            <li key={item.key} data-fit="">
               <Link to={item.to}>then {item.label}</Link>
               <span>{lineWords(item.at, now)}</span>
             </li>
@@ -87,10 +90,11 @@ function partsOf(items: readonly NextItem[], now: number, paused: boolean) {
 }
 
 /** The next thing Weir does on its own, with a countdown, and what comes after it. */
-export function NextTile({ items, now, paused }: NextTileProps) {
+export function NextTile({ items, now, paused, across = true }: NextTileProps) {
+  const [bodyRef] = useFittingRows(across);
   const { figure, body } = partsOf(items, now, paused);
   return (
-    <StatTile label="Next" aside="on its own" figure={figure}>
+    <StatTile label="Next" aside="on its own" figure={figure} bodyRef={bodyRef}>
       {body}
     </StatTile>
   );

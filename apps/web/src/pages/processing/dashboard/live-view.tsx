@@ -26,10 +26,13 @@ import type { ProcessingFile } from "../../../lib/processing/files-api";
 import { useProcessingFileLog } from "../../../lib/processing/files-queries";
 import { useProcessingFilesAtOnceQuery } from "../../../lib/processing/queries";
 import { processingKeys } from "../../../lib/processing/query-keys";
+import { classNames } from "../../../lib/ui/class-names";
 import { useNow } from "../../../lib/ui/use-now";
 import { useLeavingCards } from "../leaving-cards";
 import { JustFinishedShelf } from "../pipeline/just-finished-shelf";
 import { PipelineBoard } from "../pipeline/pipeline-board";
+import { stackedBoardBudget } from "../pipeline/pipeline-layout";
+import { SHELF_MIN_TILES } from "../pipeline/shelf-layout";
 import { TODAY_DAYS, type Filter } from "../processing-filter";
 import { prettyName } from "../processing-model";
 import {
@@ -41,7 +44,9 @@ import { useFinishedFiles } from "../use-finished-files";
 import { ACTIVE_JOBS_LIMIT, WORKING_FILES_QUERY } from "../working-count";
 import { leavingInWorkflow } from "../workflow-scope";
 import { ActivityStream } from "./activity-stream";
+import { LOW_COLUMNS, type PageLayout } from "./dashboard-layout";
 import { HealthPanel } from "./health-panel";
+import { LiveGrid } from "./live-grid";
 import { NeedsPanel } from "./needs-panel";
 import { NextTile } from "./next-tile";
 import { TodayTile } from "./today-tile";
@@ -88,9 +93,11 @@ type LiveViewProps = {
   filter: Filter;
   /** Narrows every part to one workflow; every workflow when null. */
   workflowId: number | null;
+  /** How the page lays itself out, decided from the width of its main area. */
+  layout: PageLayout;
 };
 
-export function LiveView({ filter, workflowId }: LiveViewProps) {
+export function LiveView({ filter, workflowId, layout }: LiveViewProps) {
   useActivityStreamInvalidations(LANE_KEYS, { throttleMs: LANE_THROTTLE_MS });
   useActivityStreamInvalidations(TOTAL_KEYS, {
     throttleMs: TOTAL_THROTTLE_MS,
@@ -168,33 +175,55 @@ export function LiveView({ filter, workflowId }: LiveViewProps) {
     (workflow) => workflowId === null || workflow.id === workflowId,
   );
   const paused = pause.data?.paused ?? false;
+  const across = layout.band === "across";
+  const boardBudget = layout.sideBySide
+    ? undefined
+    : stackedBoardBudget(window.innerHeight);
 
   return (
     <>
-      <div className="mm-dash__grid" data-testid="dashboard-live">
+      <LiveGrid layout={layout}>
         <div className="mm-dash__band">
-          <div className="mm-dash__tiles">
+          <div
+            className={classNames(
+              "mm-dash__tiles",
+              across ? "mm-dash__tiles--across" : "mm-dash__tiles--stacked",
+            )}
+          >
             <TodayTile filter={filter} now={now} workflowId={workflowId} />
             <WorkingTile
               working={scoped.working}
               filesAtOnce={filesAtOnce.data?.effective_files_at_once ?? null}
               waitSeconds={sharedWaitSeconds(shownWorkflows)}
+              across={across}
               onOpen={openFile}
             />
-            <NextTile items={next} now={now} paused={paused} />
+            <NextTile items={next} now={now} paused={paused} across={across} />
           </div>
         </div>
-        <div className="mm-dash__board">
+        <div
+          className="mm-dash__board"
+          style={
+            boardBudget === undefined ? undefined : { maxHeight: boardBudget }
+          }
+        >
           <PipelineBoard
             lanes={scoped}
             leaving={leavingInWorkflow(leaving, workflowId)}
             filter={filter}
             now={now}
             paused={paused}
+            fill={layout.sideBySide}
+            budget={boardBudget}
             onOpen={openFile}
           />
         </div>
-        <div className="mm-dash__low">
+        <div
+          className="mm-dash__low"
+          style={
+            layout.sideBySide ? { gridTemplateColumns: LOW_COLUMNS } : undefined
+          }
+        >
           <JustFinishedShelf
             items={finished}
             filter={filter}
@@ -203,6 +232,7 @@ export function LiveView({ filter, workflowId }: LiveViewProps) {
             workflowNames={workflowNames}
             enabledWorkflowIds={enabledWorkflowIds}
             count={workflowId === null ? cleanedToday(today) : undefined}
+            fewestTiles={layout.sideBySide ? SHELF_MIN_TILES : undefined}
             onOpen={openFinished}
           />
           <ActivityStream now={now} workflowId={workflowId} />
@@ -213,7 +243,7 @@ export function LiveView({ filter, workflowId }: LiveViewProps) {
         <div className="mm-dash__health">
           <HealthPanel workflows={workflows} workflowId={workflowId} />
         </div>
-      </div>
+      </LiveGrid>
 
       <FileStoryPanel
         open={storyFile !== null}

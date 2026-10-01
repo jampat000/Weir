@@ -67,6 +67,24 @@ export function lanesHeight(size: CardSize): number {
   return PIPELINE_ROWS * size.step - ROW_GAP_PX + MORE_PX;
 }
 
+/** Under the side-by-side threshold the page scrolls, and the board may be at most this share of a window tall. */
+const STACKED_BOARD_SHARE = 0.7;
+
+/** The tallest the whole board may be on a page that scrolls; nothing without a measured window. */
+export function stackedBoardBudget(windowHeight: number): number | undefined {
+  return windowHeight > 0
+    ? Math.floor(windowHeight * STACKED_BOARD_SHARE)
+    : undefined;
+}
+
+/** The height the cards may use: the board's budget less the header, stations and spacing around the lanes (chrome). */
+export function cardsBudget(
+  budget: number | undefined,
+  chrome: number,
+): number | undefined {
+  return budget === undefined ? undefined : Math.max(0, budget - chrome);
+}
+
 /** The stations sit side by side when each has room, and stack when it does not (a phone, a narrow window). */
 export function boardMode(
   width: number,

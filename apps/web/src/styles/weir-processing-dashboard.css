@@ -3,15 +3,13 @@
  * (weir-processing-tiles.css, -side.css and -stream.css); the panel, the tile and the chip come from
  * weir-panels.css.
  *
- * Wide, the page is the main column with Health and Needs you down the right: the band, the Pipeline and the
- * lower row are its rows, Health spans the band and the Pipeline, and Needs you sits beside the lower row, so
- * their tops and bottoms line up. Narrower than that the right column moves under the lower row and everything
- * stacks. The page decides from the width of its own area, not the window's.
+ * Beside the right column the page is the main column with Health and Needs you down the right: the band, the
+ * Pipeline and the lower row are its rows, Health spans the band and the Pipeline, and Needs you sits beside the
+ * lower row, so their tops and bottoms line up. The grid is as tall as the window and its rows are shares of the
+ * height it has (dashboard-layout.ts, which also names the grid's columns and areas, set inline by live-grid.tsx).
+ * Narrower than that the right column moves under the lower row and everything stacks. The page decides from the
+ * width of its own area, not the window's (see processing-page.tsx).
  */
-
-.mm-dash {
-  container: mm-dash / inline-size;
-}
 
 .mm-dash__grid {
   display: flex;
@@ -29,6 +27,16 @@
   gap: var(--mm-panel-gap);
 }
 
+.mm-dash__tiles--across {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+/* Stacked, a tile is as tall as its rows need it. */
+.mm-dash__tiles--stacked > .mm-stat {
+  height: auto;
+  min-height: 190px;
+}
+
 .mm-dash__board,
 .mm-dash__health,
 .mm-dash__needs {
@@ -44,11 +52,6 @@
   flex: 1;
 }
 
-/* Stacked, each part is as tall as it needs to read; the Pipeline is most of a window. */
-.mm-dash__board {
-  height: clamp(24rem, 70vh, 40rem);
-}
-
 .mm-dash__low {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -59,12 +62,6 @@
 .mm-dash__health,
 .mm-dash__needs {
   height: 26rem;
-}
-
-@container mm-band (min-width: 42rem) {
-  .mm-dash__tiles {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
 }
 
 /* Three tiles in a narrow band are about 220px each: a smaller figure keeps its unit and side figure in view. */
@@ -78,46 +75,81 @@
   .mm-dash .mm-stat__side {
     font-size: 13px;
   }
+
+  /* There is no room beside the label for how many more rows there are: the figure says how many are running. */
+  .mm-dash .mm-aside__more {
+    display: none;
+  }
 }
 
-@container mm-dash (min-width: 66rem) {
-  .mm-dash__grid {
-    --dash-board-h: clamp(25rem, 46vh, 34rem);
-    --dash-low-h: clamp(17rem, 30vh, 22rem);
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) clamp(340px, 28%, 460px);
-    grid-template-rows: auto var(--dash-board-h) var(--dash-low-h);
-    grid-template-areas:
-      "now health"
-      "board health"
-      "low needs";
+/* The note about the wait for a new download is shown whole or not at all: it needs a band this wide. */
+@container mm-band (max-width: 74rem) {
+  .mm-dash .mm-aside__note {
+    display: none;
   }
+}
 
-  .mm-dash__band {
-    grid-area: now;
-  }
+.mm-dash__grid--beside {
+  display: grid;
+  height: 100%;
+}
 
-  .mm-dash__board {
-    grid-area: board;
-    height: auto;
-  }
+.mm-dash__grid--beside > .mm-dash__band {
+  grid-area: now;
+  min-height: 0;
+}
 
-  .mm-dash__low {
-    grid-area: low;
-    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
-  }
+.mm-dash__grid--beside > .mm-dash__board {
+  grid-area: board;
+}
 
-  .mm-dash__health {
-    grid-area: health;
-  }
+.mm-dash__grid--beside > .mm-dash__low {
+  grid-area: low;
+  min-height: 0;
+}
 
-  .mm-dash__needs {
-    grid-area: needs;
-  }
+.mm-dash__grid--beside > .mm-dash__health {
+  grid-area: health;
+}
 
-  .mm-dash__low > *,
-  .mm-dash__health,
-  .mm-dash__needs {
-    height: auto;
-  }
+.mm-dash__grid--beside > .mm-dash__needs {
+  grid-area: needs;
+}
+
+.mm-dash__grid--beside > .mm-dash__low > *,
+.mm-dash__grid--beside > .mm-dash__health,
+.mm-dash__grid--beside > .mm-dash__needs {
+  height: auto;
+}
+
+/* The band fills its row: the tiles are as tall as the band, and list the whole rows that fit. */
+.mm-dash__grid--beside .mm-dash__band,
+.mm-dash__grid--beside .mm-dash__tiles {
+  height: 100%;
+}
+
+.mm-dash__grid--beside .mm-dash__tiles {
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.mm-dash__grid--beside .mm-dash__tiles > .mm-stat {
+  height: auto;
+  min-height: 0;
+}
+
+/*
+ * Nothing moves while the window is being resized: the page snaps, then the motion comes back. The animations and
+ * transitions are given no time rather than taken away, so the ones that have finished stay finished: taking an
+ * animation off an element and putting it back plays it from the start, and every tile on the page would arrive again.
+ */
+body.mm-pipeline-resizing .mm-dash__grid *,
+body.mm-pipeline-resizing .mm-dash__grid *::before,
+body.mm-pipeline-resizing .mm-dash__grid *::after,
+body.mm-pipeline-resizing .mm-sys *,
+body.mm-pipeline-resizing .mm-sys *::before,
+body.mm-pipeline-resizing .mm-sys *::after {
+  animation-delay: 0s !important;
+  animation-duration: 0s !important;
+  transition-delay: 0s !important;
+  transition-duration: 0s !important;
 }

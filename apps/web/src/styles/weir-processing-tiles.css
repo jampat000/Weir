@@ -7,6 +7,7 @@
   white-space: nowrap;
 }
 
+/* In a narrow tile the aside gives way from its note: the words after "Change" go first, then how many more. */
 .mm-aside {
   display: flex;
   min-width: 0;
@@ -17,6 +18,11 @@
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: pre;
+}
+
+.mm-aside__more {
+  flex: none;
   white-space: pre;
 }
 
@@ -38,15 +44,11 @@
   gap: 4px;
 }
 
+/* The rows sit in the tile's body in the order they come, and the tile shows only the whole ones that fit (fit-rows.ts). */
 .mm-ops {
-  position: absolute;
-  inset: 0;
   margin: 0;
   padding: 0;
-  overflow-y: auto;
   list-style: none;
-  scrollbar-color: var(--mm-hairline) transparent;
-  scrollbar-width: thin;
 }
 
 .mm-op {

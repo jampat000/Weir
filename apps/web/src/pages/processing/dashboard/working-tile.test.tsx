@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { ProcessingFile } from "../../../lib/processing/files-api";
 import type { WorkingItem } from "../processing-model";
@@ -44,6 +44,30 @@ function renderTile(
   );
   return { onOpen };
 }
+
+afterEach(() => vi.restoreAllMocks());
+
+/** Lays the tile out: its body ends at `bodyBottom`, and each row is `rowHeight` tall, one under another. */
+function layOut(bodyBottom: number, rowHeight: number) {
+  vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(
+    function (this: HTMLElement) {
+      if (this.classList.contains("mm-stat__body")) {
+        return { bottom: bodyBottom } as DOMRect;
+      }
+      const index = Array.from(
+        this.parentElement?.parentElement?.children ?? [],
+      ).indexOf(this.parentElement as Element);
+      return { bottom: (index + 1) * rowHeight } as DOMRect;
+    },
+  );
+}
+
+const rowsOf = () =>
+  within(screen.getByTestId("live-working")).getAllByRole("listitem");
+const many = (count: number) =>
+  Array.from({ length: count }, (_, index) =>
+    item({ key: `file-${index}`, name: `File ${index}` }),
+  );
 
 describe("the Working on now tile", () => {
   it("says how many are being worked on out of how many may be at once", () => {
@@ -137,5 +161,58 @@ describe("the Working on now tile", () => {
     expect(
       within(tile).getByRole("link", { name: "Change" }),
     ).toBeInTheDocument();
+  });
+
+  describe("with more files than the tile has room for", () => {
+    it("lists at most four, and says how many more there are", () => {
+      renderTile({ working: many(6) });
+
+      expect(rowsOf()).toHaveLength(4);
+      const more = screen.getByRole("link", { name: "2 more in History" });
+      expect(more).toHaveAttribute("href", "/history?show=working");
+    });
+
+    it("shows only the whole rows that fit the tile, and counts the rest as more", () => {
+      layOut(100, 40);
+
+      renderTile({ working: many(5) });
+
+      const rows = rowsOf().map((row) =>
+        within(row).getByText(/File/).closest("li"),
+      );
+      expect(
+        rows.map(
+          (row) =>
+            row?.querySelector<HTMLElement>("[data-fit]")?.style.visibility,
+        ),
+      ).toEqual(["", "", "hidden", "hidden"]);
+      expect(
+        screen.getByRole("link", { name: "3 more in History" }),
+      ).toBeInTheDocument();
+    });
+
+    it("lists every row of a tile that grows with them, up to four", () => {
+      layOut(100, 40);
+
+      renderTile({ working: many(5), across: false });
+
+      expect(
+        rowsOf().map(
+          (row) =>
+            row.querySelector<HTMLElement>("[data-fit]")?.style.visibility,
+        ),
+      ).toEqual(["", "", "", ""]);
+      expect(
+        screen.getByRole("link", { name: "1 more in History" }),
+      ).toBeInTheDocument();
+    });
+
+    it("says nothing about more when every file shows", () => {
+      renderTile({ working: many(2) });
+
+      expect(
+        screen.queryByRole("link", { name: /more in History/ }),
+      ).toBeNull();
+    });
   });
 });

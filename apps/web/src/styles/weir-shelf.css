@@ -41,7 +41,7 @@
   min-height: 0;
   flex: 1 1 0;
   flex-wrap: nowrap;
-  align-items: flex-start;
+  align-items: safe center;
   gap: 12px;
   box-sizing: border-box;
   margin: 0 -4px;
@@ -57,7 +57,6 @@
   width: var(--shelf-tile-w, 80px);
   flex: none;
   flex-direction: column;
-  animation: mm-shelf-arrive 0.8s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 .mm-shelf__open {
@@ -222,17 +221,4 @@
   font-weight: 500;
   color: var(--pipe-muted);
   text-overflow: ellipsis;
-}
-
-@keyframes mm-shelf-arrive {
-  from {
-    opacity: 0;
-    transform: translateY(14px) scale(0.92);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .mm-shelf__item {
-    animation: none;
-  }
 }

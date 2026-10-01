@@ -13,6 +13,7 @@ import {
   useLayoutEffect,
   useMemo,
   useRef,
+  useState,
   type CSSProperties,
   type ReactElement,
 } from "react";
@@ -36,9 +37,11 @@ import {
   PIPELINE_ROWS,
   boardMode,
   cardSize,
+  cardsBudget,
   lanesHeight,
 } from "./pipeline-layout";
 import {
+  IN_PROGRESS_PATH,
   PIPELINE_STAGES,
   STAGE_LABEL,
   type PipelineStage,
@@ -47,9 +50,6 @@ import { StationIcon } from "./station-icons";
 import { useDeliveryFlight } from "./use-delivery-flight";
 import { useStageChanges } from "./use-stage-changes";
 import { useStillWhileResizing } from "./use-still-while-resizing";
-
-/** Where "and N more" and the stations' overflow lead: the files in progress, listed. */
-const MORE_TARGET = "/history?show=working";
 
 /** The space under the lanes inside the board, in px. */
 const LANES_BOTTOM_PX = 10;
@@ -108,6 +108,10 @@ export type PipelineBoardProps = {
   paused?: boolean;
   /** Opens a file's story. */
   onOpen: (file: ProcessingFile) => void;
+  /** The board fills the grid cell it is in: its lanes take the height left under the stations, and the cards are sized to it. */
+  fill?: boolean;
+  /** Without a grid cell (the page scrolls): the tallest the whole board may be, in px. It is only a ceiling. */
+  budget?: number;
   /** A delivered card's tile is leaving. By default it flies to the file's tile on the Just finished shelf. */
   onDelivered?: (delivery: Delivery) => void;
 };
@@ -118,6 +122,8 @@ export function PipelineBoard({
   filter,
   now,
   paused = false,
+  fill = false,
+  budget,
   onOpen,
   onDelivered,
 }: PipelineBoardProps): ReactElement {
@@ -137,9 +143,27 @@ export function PipelineBoard({
   const [lanesRef, lanesBox] = useElementSize<HTMLDivElement>();
   const rem = useRemPx();
   const stacked = boardMode(body.width, stations, rem) === "stacked";
-  const room = stacked || lanesBox.height <= 0 ? undefined : lanesBox.height;
-  const size = cardSize(room);
   const boardRef = useRef<HTMLDivElement>(null);
+  // What sits above the lanes (header, stations): measured, so a page that scrolls can count the rows its budget
+  // holds in real pixels. It only changes when the board changes shape.
+  const [chrome, setChrome] = useState(0);
+  useLayoutEffect(() => {
+    const panel = boardRef.current?.closest("section");
+    const lanes = lanesRef.current;
+    if (!panel || !lanes || fill) return;
+    const next = Math.round(
+      lanes.getBoundingClientRect().top - panel.getBoundingClientRect().top,
+    );
+    setChrome(next);
+  }, [fill, stacked, lanesRef]);
+  const room = stacked
+    ? undefined
+    : fill
+      ? lanesBox.height > 0
+        ? lanesBox.height
+        : undefined
+      : cardsBudget(budget, chrome + LANES_BOTTOM_PX);
+  const size = cardSize(room);
   useDeliveryFlight(boardRef, cards, endedKeys, onDelivered);
 
   const grouped = groupByStage(cards);
@@ -196,11 +220,13 @@ export function PipelineBoard({
     ["--pipe-tile-h" as string]: `${size.tile}px`,
     ["--pipe-title-lines" as string]: size.oneLine ? 1 : 2,
   };
-  const laneStyle: CSSProperties = {
-    flex: `1 1 ${lanesHeight(cardSize(undefined))}px`,
-    minHeight: lanesHeight(cardSize(0)),
-    marginBottom: LANES_BOTTOM_PX,
-  };
+  const laneStyle: CSSProperties = fill
+    ? { flex: "1 1 0", marginBottom: LANES_BOTTOM_PX }
+    : {
+        height: room ?? lanesHeight(size),
+        flex: "none",
+        marginBottom: LANES_BOTTOM_PX,
+      };
 
   return (
     <Panel
@@ -264,7 +290,7 @@ export function PipelineBoard({
                 {more.map((line) => (
                   <Link
                     key={line.stage}
-                    to={MORE_TARGET}
+                    to={IN_PROGRESS_PATH}
                     title={`${STAGE_LABEL[line.stage]}: ${line.titles}`}
                     className="mm-pipe__more"
                     style={{

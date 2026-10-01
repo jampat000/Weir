@@ -1,8 +1,8 @@
 /*
  * The Dashboard's System view, Health in full: the workflows with their whole folder chains in the main
  * column, and the connections, tools and disk space down the side. Wide, the columns are the same two as
- * Live's, so nothing moves between the views; narrower they stack. The page decides from the width of its own
- * area, not the window's.
+ * Live's (the view's --dash-columns), so nothing moves between the views; narrower they stack. The page
+ * decides from the width of its own area, not the window's.
  */
 
 .mm-health-detail {
@@ -20,10 +20,8 @@
   gap: var(--mm-panel-gap);
 }
 
-@container mm-dash (min-width: 66rem) {
-  .mm-health-detail {
-    grid-template-columns: minmax(0, 1fr) clamp(340px, 28%, 460px);
-  }
+.mm-sys--beside .mm-health-detail {
+  grid-template-columns: var(--dash-columns);
 }
 
 .mm-health-detail__body {

@@ -65,6 +65,7 @@ export function HealthPanel({ workflows, workflowId }: HealthPanelProps) {
       aside={<CheckNowButton check={check} />}
       to={`?${detail.toString()}`}
       toLabel="Full detail"
+      iconOnly
     >
       <div data-testid="live-health" className="mm-health__scroll">
         {check.notice ? (

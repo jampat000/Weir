@@ -25,7 +25,8 @@ import { RESIZING_CLASS } from "./use-still-while-resizing";
 /** Set by the shelf on each tile's art, to the path of the file it shows. */
 export const SHELF_TILE_ATTRIBUTE = "data-shelf-path";
 
-const HELD_ATTRIBUTE = "data-delivery-held";
+/** Set on a shelf tile's art while its card still says "Delivered": the tile is kept out of sight until the poster lands. */
+export const HELD_ATTRIBUTE = "data-delivery-held";
 const FLYING_ATTRIBUTE = "data-delivery-flying";
 
 const FLIGHT_Z_INDEX = "60";

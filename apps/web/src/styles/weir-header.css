@@ -56,10 +56,12 @@
   display: none;
 }
 
-/* "All workflows ▾": one control among the page's others, as tall as the segmented choice beside it. */
+/* "All workflows ▾": one control among the page's others, as tall as the segmented choice beside it. It is
+   wide enough to read from a narrow header, and grows to 12.5rem where there is room, so it joins the others' row
+   rather than wrapping to its own. */
 .mm-workflow-picker {
-  width: 12.5rem;
-  max-width: 100%;
+  flex: 1 1 8.5rem;
+  max-width: min(12.5rem, 100%);
 }
 
 .mm-workflow-picker .mm-input--opens {

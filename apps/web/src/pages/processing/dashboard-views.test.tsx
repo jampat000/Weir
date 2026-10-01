@@ -157,4 +157,13 @@ describe("the workflow picker", () => {
       "All workflows",
     );
   });
+
+  it("holds Live to the window, so everything is sized from the space it has, and lets System scroll", () => {
+    show("/");
+    expect(screen.getByTestId("processing-page").style.height).not.toBe("");
+
+    fireEvent.click(within(view()).getByRole("button", { name: "System" }));
+
+    expect(screen.getByTestId("processing-page").style.height).toBe("");
+  });
 });
