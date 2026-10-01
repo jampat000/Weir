@@ -112,9 +112,11 @@
   );
   --mm-bubble-stack-gap-mobile: calc(1.25rem * var(--mm-density-ui-scale));
   --mm-bubble-stack-gap-desktop: calc(1.75rem * var(--mm-density-ui-scale));
-  --mm-page-pad-x: clamp(14px, 1.2vw, 24px);
+  /* The one inset from the left edge of the main column: the header's title and the page's cards start at it. */
+  --mm-page-inset: clamp(14px, 1.08vw, 26px);
+  --mm-page-pad-x: var(--mm-page-inset);
   --mm-page-pad-y: clamp(12px, 1vw, 20px);
-  --mm-header-pad-x: clamp(22px, 1.6vw, 28px);
+  --mm-header-pad-x: var(--mm-page-inset);
   --mm-header-title-size: 26px;
   --mm-panel-gap: 12px;
 

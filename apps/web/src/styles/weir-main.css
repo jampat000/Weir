@@ -25,13 +25,8 @@
   position: relative;
 }
 
-/* Desktop (Material "expanded" and up): first typography step before large / extra-large tiers. */
+/* Desktop: the in-page titles step up with the window; body text does not, it is the one 15px size at every width. */
 @media (min-width: 1280px) {
-  body.mm-body {
-    font-size: 0.9921875rem; /* 15.875px at 16px root; scales via html font-size + density */
-    line-height: 1.53;
-  }
-
   .mm-page__title {
     font-size: clamp(1.58rem, 2.45vw, 1.95rem);
   }
@@ -43,11 +38,6 @@
 
 /* Large / extra-large desktop: stronger scale (aligned ~ Material 1200dp+ / 1600dp+). */
 @media (min-width: 1600px) {
-  body.mm-body {
-    font-size: 1.015625rem; /* 16.25px at 16px root */
-    line-height: 1.54;
-  }
-
   .mm-page__title {
     font-size: clamp(1.65rem, 2.55vw, 2.12rem);
   }
@@ -59,11 +49,6 @@
 
 /* Wide desktop (incl. 1440p at 125–150% OS scale where CSS width sits ~1700–2048px). */
 @media (min-width: 1760px) {
-  body.mm-body {
-    font-size: 1.0390625rem; /* 16.625px at 16px root */
-    line-height: 1.54;
-  }
-
   .mm-page__title {
     font-size: clamp(1.68rem, 2.2vw, 2.2rem);
   }
@@ -74,11 +59,6 @@
 }
 
 @media (min-width: 2000px) {
-  body.mm-body {
-    font-size: 1.078125rem; /* 17.25px at 16px root */
-    line-height: 1.55;
-  }
-
   .mm-page__title {
     font-size: clamp(1.72rem, 2.05vw, 2.35rem);
   }
