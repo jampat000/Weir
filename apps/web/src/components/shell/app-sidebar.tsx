@@ -88,7 +88,11 @@ export function AppSidebar({
         {collapsed ? <NavIconChevronRight /> : <NavIconChevronLeft />}
       </button>
       <div className="mm-sidebar-inner">
-        <SidebarBrand productTitle={productTitle} onNavigate={onCloseDrawer} />
+        <SidebarBrand
+          productTitle={productTitle}
+          machineName={readiness.data?.machine_name}
+          onNavigate={onCloseDrawer}
+        />
         <SidebarNav
           badges={{ working, "needs-you": needsYou }}
           firstLinkRef={firstPlace}

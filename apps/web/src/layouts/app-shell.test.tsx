@@ -239,12 +239,13 @@ describe("AppShell", () => {
     ).toBeInTheDocument();
   });
 
-  it("introduces itself as Weir, a media cleaner, at the top of the menu", () => {
+  it("shows Weir and the computer it runs on at the top of the menu, as Deluno does", () => {
     renderShell("/");
 
     const brand = screen.getByRole("link", { name: "Weir · RIG home" });
     expect(brand).toHaveTextContent("Weir");
-    expect(brand).toHaveTextContent("Media cleaner");
+    expect(brand).toHaveTextContent("RIG");
+    expect(brand).not.toHaveTextContent("Media cleaner");
   });
 
   it("shows who is signed in, and where, at the foot of the menu", () => {
