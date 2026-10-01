@@ -13,6 +13,7 @@
     "dev:stop-web": "node ../../scripts/stop-dev-web-port.mjs",
     "dev:quick": "node ./scripts/run-dev-stack.mjs",
     "dev:web": "node ./node_modules/vite/bin/vite.js",
+    "dev:sim": "node ./dev-sim/run.mjs",
     "lint": "eslint src --max-warnings 0",
     "lint:fix": "eslint src --fix",
     "format": "prettier --check \"src/**/*.{ts,tsx,css}\" \"index.html\" \"vite.config.ts\"",
