@@ -2,7 +2,7 @@ import { useState } from "react";
 
 import { Field } from "../../../../components/shared/field";
 import {
-  QuietFieldGroup,
+  QuietSection,
   quietActionRowClass,
 } from "../../../../components/shared/quiet-section";
 import { errorMessage } from "../../../../lib/api/error-message";
@@ -77,7 +77,11 @@ export function AddDownloadClientForm({
         );
       }}
     >
-      <QuietFieldGroup title="Add a download client">
+      <QuietSection
+        headingId="add-download-client-heading"
+        heading="Add a download client"
+        level={3}
+      >
         <div className="mm-quiet-stack">
           <div className="mm-field-row">
             <Field label="Which download client is it?" width="medium">
@@ -209,7 +213,7 @@ export function AddDownloadClientForm({
             Cancel
           </button>
         </div>
-      </QuietFieldGroup>
+      </QuietSection>
     </form>
   );
 }

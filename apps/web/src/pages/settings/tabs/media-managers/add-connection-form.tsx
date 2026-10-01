@@ -2,7 +2,7 @@ import { useState } from "react";
 
 import { Field } from "../../../../components/shared/field";
 import {
-  QuietFieldGroup,
+  QuietSection,
   quietActionRowClass,
 } from "../../../../components/shared/quiet-section";
 import { errorMessage } from "../../../../lib/api/error-message";
@@ -79,7 +79,11 @@ export function AddConnectionForm({
         );
       }}
     >
-      <QuietFieldGroup title="Add a media manager">
+      <QuietSection
+        headingId="add-media-manager-heading"
+        heading="Add a media manager"
+        level={3}
+      >
         <div className="mm-quiet-stack">
           <div className="mm-field-row">
             {kinds.length > 1 ? (
@@ -166,7 +170,7 @@ export function AddConnectionForm({
             Cancel
           </button>
         </div>
-      </QuietFieldGroup>
+      </QuietSection>
     </form>
   );
 }

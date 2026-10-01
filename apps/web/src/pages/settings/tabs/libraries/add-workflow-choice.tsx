@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 
 import { Field } from "../../../../components/shared/field";
 import {
-  QuietFieldGroup,
+  QuietSection,
   quietActionRowClass,
 } from "../../../../components/shared/quiet-section";
 import { errorMessage } from "../../../../lib/api/error-message";
@@ -119,7 +119,11 @@ export function AddWorkflowChoice({
   };
 
   return (
-    <QuietFieldGroup title="Add a workflow">
+    <QuietSection
+      headingId="add-workflow-heading"
+      heading="Add a workflow"
+      level={3}
+    >
       <div className="mm-quiet-stack" data-testid="add-workflow-choice">
         <fieldset className="mm-wizard-choices">
           <legend className="mm-wizard-label">Which kind?</legend>
@@ -233,6 +237,6 @@ export function AddWorkflowChoice({
           </button>
         </div>
       </div>
-    </QuietFieldGroup>
+    </QuietSection>
   );
 }
