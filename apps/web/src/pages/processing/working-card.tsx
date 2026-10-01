@@ -1,49 +1,23 @@
 import { FileName } from "../../components/shared/file-name";
-import { formatBytes } from "../../lib/format/bytes";
 import type { ProcessingFile } from "../../lib/processing/files-api";
-import { plural } from "../../lib/ui/mm-plural";
 import { SourceTag } from "./lane-cards";
 import type { WorkingItem } from "./processing-model";
 import {
-  clock,
-  readRate,
-  runningFor,
-  speedWords,
+  removedTrackWords,
   timeLeft,
+  workingFigures,
 } from "./processing-words";
 import { StageFlow } from "./stage-flow";
 
-/** What the pass is doing, in numbers from the server's own progress and the file's size and length. */
+/** What the pass is doing, as label and value pairs, in numbers from the server's own progress and the file's size and length. */
 function workingStats(item: WorkingItem): [string, string][] {
-  const file = item.file;
-  const speed = speedWords(item.speed);
-  const rate = readRate(
-    file?.size_bytes,
-    item.percent,
-    file?.progress_elapsed_seconds,
-  );
-  const duration = file?.duration_seconds ?? null;
-  const through =
-    duration && item.percent != null
-      ? `${clock((duration * Math.min(100, item.percent)) / 100)} of ${clock(duration)}`
-      : "";
-  const elapsed = file?.progress_elapsed_seconds ?? 0;
-  const running = elapsed >= 1 ? runningFor(elapsed) : "";
+  const figures = workingFigures(item);
   return [
-    speed ? ["Speed", `${speed} real time`] : null,
-    rate ? ["Reading", `${formatBytes(rate)}/s`] : null,
-    through ? ["Through the file", through] : null,
-    running ? ["Running for", running] : null,
+    figures.speed ? ["Speed", `${figures.speed} real time`] : null,
+    figures.reading ? ["Reading", figures.reading] : null,
+    figures.through ? ["Through the file", figures.through] : null,
+    figures.running ? ["Running for", figures.running] : null,
   ].filter((stat): stat is [string, string] => stat !== null);
-}
-
-function removedTracks(item: WorkingItem): string[] {
-  const removed: string[] = [];
-  if (item.removedAudio) removed.push(`${item.removedAudio} audio`);
-  if (item.removedSubtitles) {
-    removed.push(plural(item.removedSubtitles, "subtitle", "subtitles"));
-  }
-  return removed;
 }
 
 /** Cleaning in place reports no percentage, so the bar only says the pass is running. */
@@ -67,7 +41,7 @@ export function WorkingCard({
   onOpen: (file: ProcessingFile) => void;
 }) {
   const writing = item.percent != null;
-  const removed = removedTracks(item);
+  const removed = removedTrackWords(item);
   const stats = writing ? workingStats(item) : [];
   const file = item.file;
   return (

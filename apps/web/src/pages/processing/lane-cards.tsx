@@ -14,6 +14,7 @@ import {
   ago,
   clock,
   finishedLine,
+  ringFraction,
   ringLabel,
   ringState,
 } from "./processing-words";
@@ -43,16 +44,6 @@ export function SourceTag({
       {source === "library" ? "Library" : "Download"} · {libraryName}
     </span>
   );
-}
-
-/** How far through its wait a file is, or null when the wait has no known length. */
-function ringFraction(item: ArrivingItem, left: number | null): number | null {
-  const state = ringState(left);
-  if (state === "checking") return 1;
-  const total =
-    item.holdUntil != null ? item.holdTotal : item.nextLook?.interval;
-  if (state !== "counting" || !total || left == null) return null;
-  return Math.min(1, Math.max(0, 1 - left / total));
 }
 
 function Ring({ item, now }: { item: ArrivingItem; now: number }) {

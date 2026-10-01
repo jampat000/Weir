@@ -1,0 +1,616 @@
+/*
+ * The Pipeline: the stations as one arrow-shaped ribbon of tinted segments (busy ones with a moving
+ * sheen), under it equal columns with dashed dividers the full height of the lanes, and cards that sit in
+ * their station's column and glide when their station changes.
+ *
+ * Colours are the --weir-* tokens with the values they hold in the dark theme as fallbacks; the block just
+ * below is the one place they are read. Motion stops under prefers-reduced-motion, and while the window is
+ * being resized.
+ */
+.mm-pipe,
+.mm-shelf {
+  --pipe-card: var(--weir-card, #131a25);
+  --pipe-surface-2: var(--weir-surface-2, #1a222d);
+  --pipe-surface-3: var(--weir-surface-3, #212936);
+  --pipe-hairline: var(--weir-hairline, #252e3c);
+  --pipe-foreground: var(--weir-foreground, #f3f4f7);
+  --pipe-muted: var(--weir-muted, #a9b0bc);
+  --pipe-primary: var(--weir-primary, #52a5ff);
+  --pipe-success: var(--weir-success, #25e475);
+  --pipe-warning: var(--weir-warning, #fb8d2d);
+  --pipe-destructive: var(--weir-destructive, #ef4d4d);
+  --pipe-ring: var(--weir-ring, var(--weir-primary, #52a5ff));
+}
+
+.mm-pipe [data-stage="incoming"] {
+  --pipe-st: var(--weir-lane-incoming, hsl(265 78% 66%));
+}
+
+.mm-pipe [data-stage="queued"] {
+  --pipe-st: var(--weir-lane-queued, hsl(190 90% 56%));
+}
+
+.mm-pipe [data-stage="analysing"] {
+  --pipe-st: var(--weir-lane-analysing, var(--weir-info, #41a7fb));
+}
+
+.mm-pipe [data-stage="processing"] {
+  --pipe-st: var(--weir-lane-processing, hsl(166 72% 50%));
+}
+
+.mm-pipe [data-stage="delivering"] {
+  --pipe-st: var(--weir-lane-delivering, hsl(40 96% 60%));
+}
+
+/* The panel: a header, the board, and room for the board to take the height it is given. */
+.mm-pipe {
+  display: flex;
+  min-height: 0;
+  min-width: 0;
+  height: 100%;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--pipe-hairline);
+  border-radius: 14px;
+  background: var(--pipe-card);
+  color: var(--pipe-foreground);
+}
+
+.mm-pipe__head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  min-height: 44px;
+  padding: 14px 18px 10px;
+}
+
+.mm-pipe__heading {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.mm-pipe__count {
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--pipe-muted);
+}
+
+.mm-pipe__body {
+  position: relative;
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+/* The ribbon: one arrow-shaped bar, each station a tinted segment with its icon, name and count. */
+.mm-pipe__stations {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(var(--pipe-n), 1fr);
+  padding: 0 12px 10px;
+}
+
+.mm-pipe__station {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+  margin-right: -10px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--pipe-st) 10%, transparent);
+  clip-path: polygon(
+    0 0,
+    calc(100% - 14px) 0,
+    100% 50%,
+    calc(100% - 14px) 100%,
+    0 100%,
+    14px 50%
+  );
+}
+
+.mm-pipe__station:first-child {
+  border-radius: 9px 0 0 9px;
+  clip-path: polygon(
+    0 0,
+    calc(100% - 14px) 0,
+    100% 50%,
+    calc(100% - 14px) 100%,
+    0 100%
+  );
+}
+
+.mm-pipe__station:last-child {
+  margin-right: 0;
+  border-radius: 0 9px 9px 0;
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%, 14px 50%);
+}
+
+.mm-pipe__station-body {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 9px 22px 9px 26px;
+}
+
+.mm-pipe__station:first-child .mm-pipe__station-body {
+  padding-left: 14px;
+}
+
+.mm-pipe__dot {
+  display: grid;
+  width: 22px;
+  height: 22px;
+  flex: none;
+  place-items: center;
+  box-sizing: border-box;
+  border: 1.5px solid var(--pipe-st);
+  border-radius: 50%;
+  color: var(--pipe-st);
+}
+
+.mm-pipe__dot svg {
+  width: 12px;
+  height: 12px;
+}
+
+.mm-pipe__station-text {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  justify-content: center;
+  gap: 6px;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+
+.mm-pipe__station-name {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.mm-pipe__station-count {
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.mm-pipe__station--empty {
+  opacity: 0.55;
+}
+
+.mm-pipe__station--active {
+  background: color-mix(in srgb, var(--pipe-st) 24%, transparent);
+}
+
+.mm-pipe__station--active::after {
+  position: absolute;
+  inset: 0;
+  content: "";
+  pointer-events: none;
+  background: linear-gradient(
+    100deg,
+    transparent 30%,
+    hsl(0 0% 100% / 0.1) 50%,
+    transparent 70%
+  );
+  animation: mm-pipe-sheen 2.6s linear infinite;
+}
+
+/* The lanes: equal columns with dashed dividers; cards are placed in them by left and top. */
+.mm-pipe__lanes {
+  position: relative;
+  min-height: 0;
+  margin: 0 12px;
+  overflow: hidden;
+}
+
+.mm-pipe__divider {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-left: 1px dashed color-mix(in srgb, var(--pipe-muted) 28%, transparent);
+  pointer-events: none;
+}
+
+.mm-pipe__calm {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  display: flex;
+  height: var(--pipe-card-h, 86px);
+  align-items: center;
+  margin: 0;
+  padding: 0 8px;
+  font-size: 13px;
+  color: var(--pipe-muted);
+}
+
+/* A card: the tile is 2:3 and 17px shorter than the card at every size, so its width is a third shorter than its height. */
+.mm-pipe__card {
+  position: absolute;
+  display: grid;
+  width: calc(100% / var(--pipe-n) - 12px);
+  height: var(--pipe-card-h, 86px);
+  grid-template-columns: calc(var(--pipe-tile-h, 69px) / 1.5) minmax(0, 1fr);
+  gap: 10px;
+  box-sizing: border-box;
+  padding: 8px;
+  border: 1px solid var(--pipe-hairline);
+  border-left: 3px solid var(--pipe-st);
+  border-radius: 11px;
+  background: linear-gradient(180deg, var(--pipe-surface-2), var(--pipe-card));
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  text-decoration: none;
+  animation: mm-pipe-pop 0.6s ease;
+  transition:
+    left 0.9s cubic-bezier(0.2, 0.8, 0.2, 1),
+    top 0.9s cubic-bezier(0.2, 0.8, 0.2, 1),
+    opacity 0.4s,
+    border-color 0.6s,
+    filter 0.2s;
+}
+
+button.mm-pipe__card {
+  cursor: pointer;
+}
+
+.mm-pipe__card:hover {
+  filter: brightness(1.1);
+}
+
+.mm-pipe__card:focus-visible {
+  outline: 2px solid var(--pipe-ring);
+  outline-offset: 1px;
+}
+
+.mm-pipe__card--arrived {
+  animation:
+    mm-pipe-pop 0.6s ease,
+    mm-pipe-glow 1.4s ease-out;
+}
+
+/* Delivered: full and green for a moment, before its tile flies to Just finished. */
+.mm-pipe .mm-pipe__card--delivered {
+  --pipe-st: var(--pipe-success);
+  border-color: var(--pipe-success);
+  box-shadow:
+    0 0 0 1px var(--pipe-success),
+    0 0 22px color-mix(in srgb, var(--pipe-success) 35%, transparent);
+}
+
+.mm-pipe .mm-pipe__card--failed {
+  --pipe-st: var(--pipe-destructive);
+  border-color: var(--pipe-destructive);
+}
+
+.mm-pipe .mm-pipe__card--rejected {
+  --pipe-st: var(--pipe-warning);
+  border-color: var(--pipe-warning);
+}
+
+.mm-pipe__card--hidden {
+  visibility: hidden;
+}
+
+.mm-pipe__tile {
+  display: block;
+  width: calc(var(--pipe-tile-h, 69px) / 1.5);
+  height: var(--pipe-tile-h, 69px);
+}
+
+.mm-pipe__text > * {
+  flex: none;
+}
+
+.mm-pipe__text {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.mm-pipe__title {
+  display: -webkit-box;
+  overflow: hidden;
+  font-size: clamp(13px, calc(var(--pipe-card-h, 86px) * 0.15), 15px);
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--pipe-foreground);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: var(--pipe-title-lines, 2);
+}
+
+.mm-pipe__status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 3px;
+  overflow: hidden;
+  font-size: 11.5px;
+  line-height: 1.2;
+  color: var(--pipe-muted);
+  white-space: nowrap;
+}
+
+.mm-pipe__status-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mm-pipe__status b {
+  font-weight: 600;
+  color: var(--pipe-st);
+}
+
+.mm-pipe__status--warn {
+  color: var(--pipe-warning);
+}
+
+.mm-pipe__status--bad {
+  color: var(--pipe-destructive);
+}
+
+.mm-pipe__status--ok {
+  color: var(--pipe-success);
+}
+
+.mm-pipe__pulse {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  flex: none;
+  margin-right: 5px;
+  border-radius: 50%;
+  background: var(--pipe-st);
+  animation: mm-pipe-blink 1.2s ease-in-out infinite;
+}
+
+.mm-pipe__bar {
+  display: block;
+  height: 4px;
+  flex: none;
+  margin-top: 6px;
+  overflow: hidden;
+  border-radius: 9px;
+  background: var(--pipe-surface-3);
+}
+
+.mm-pipe__bar i {
+  position: relative;
+  display: block;
+  height: 100%;
+  overflow: hidden;
+  border-radius: 9px;
+  background: var(--pipe-st);
+  transition: width 1s linear;
+}
+
+.mm-pipe__bar--moving i::after {
+  position: absolute;
+  inset: 0;
+  content: "";
+  background: linear-gradient(
+    90deg,
+    transparent,
+    hsl(0 0% 100% / 0.35),
+    transparent
+  );
+  animation: mm-pipe-shimmer 1.4s linear infinite;
+}
+
+/* No figure says how far a pass has got: the bar only says it is under way. */
+.mm-pipe__bar--waiting i {
+  animation: mm-pipe-wait 1.6s ease-in-out infinite alternate;
+}
+
+/* The detail block: what matters at this stage, as many whole lines as the card's height holds. */
+.mm-pipe__text > .mm-pipe__details {
+  flex: 1 1 0;
+}
+
+.mm-pipe__details {
+  display: grid;
+  min-height: 0;
+  align-content: start;
+  gap: 2px;
+  margin-top: 6px;
+  overflow: hidden;
+  font-size: 11.5px;
+  color: var(--pipe-muted);
+}
+
+.mm-pipe__detail {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  overflow: hidden;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.mm-pipe__detail > span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mm-pipe__detail b {
+  font-weight: 600;
+  color: var(--pipe-foreground);
+}
+
+.mm-pipe__file {
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 10.5px;
+  color: color-mix(in srgb, var(--pipe-muted) 80%, transparent);
+}
+
+.mm-pipe__more {
+  position: absolute;
+  font-size: 12px;
+  line-height: 14px;
+  color: var(--pipe-primary);
+  text-decoration: none;
+}
+
+.mm-pipe__more:hover {
+  text-decoration: underline;
+}
+
+.mm-pipe__more:focus-visible {
+  border-radius: 4px;
+  outline: 2px solid var(--pipe-ring);
+  outline-offset: 1px;
+}
+
+/* The tile that stands where a poster would: the title's initials on the workflow's colour. */
+.mm-tile {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: 6%;
+  overflow: hidden;
+  border-radius: 6px;
+  background: linear-gradient(
+    160deg,
+    hsl(var(--tile-hue, 210) 45% 34%),
+    hsl(calc(var(--tile-hue, 210) + 40) 50% 14%)
+  );
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: hsl(0 0% 100% / 0.88);
+}
+
+.mm-tile--flying {
+  border-radius: 8px;
+  box-shadow: 0 8px 24px hsl(0 0% 0% / 0.35);
+}
+
+/* A phone: the stations stack and the same cards flow one under another. */
+.mm-pipe__body--stacked {
+  gap: 4px;
+  padding: 4px 12px 12px;
+  overflow-y: auto;
+}
+
+.mm-pipe__body--stacked .mm-pipe__station {
+  margin-right: 0;
+  margin-bottom: 6px;
+  border-radius: 9px;
+  clip-path: none;
+}
+
+.mm-pipe__body--stacked .mm-pipe__station-body {
+  justify-content: flex-start;
+  padding: 8px 12px;
+}
+
+.mm-pipe__body--stacked .mm-pipe__card {
+  position: relative;
+  width: 100%;
+  margin-bottom: 8px;
+}
+
+.mm-pipe__body--stacked .mm-pipe__calm {
+  position: static;
+}
+
+@keyframes mm-pipe-sheen {
+  from {
+    transform: translateX(-100%);
+  }
+
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes mm-pipe-shimmer {
+  from {
+    transform: translateX(-100%);
+  }
+
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes mm-pipe-blink {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@keyframes mm-pipe-pop {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes mm-pipe-wait {
+  from {
+    width: 25%;
+    margin-left: 0;
+  }
+
+  to {
+    width: 35%;
+    margin-left: 65%;
+  }
+}
+
+@keyframes mm-pipe-glow {
+  from {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--pipe-st) 55%, transparent);
+  }
+
+  40% {
+    box-shadow: 0 0 0 6px color-mix(in srgb, var(--pipe-st) 18%, transparent);
+  }
+
+  to {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+
+/* Nothing moves while the window is being resized: the page snaps, then the motion comes back. */
+body.mm-pipeline-resizing .mm-pipe *,
+body.mm-pipeline-resizing .mm-pipe *::before,
+body.mm-pipeline-resizing .mm-pipe *::after,
+body.mm-pipeline-resizing .mm-shelf *,
+body.mm-pipeline-resizing .mm-shelf *::before,
+body.mm-pipeline-resizing .mm-shelf *::after {
+  animation: none !important;
+  transition: none !important;
+}
+
+body.mm-pipeline-resizing .mm-tile--flying {
+  display: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mm-pipe__card {
+    transition: none;
+  }
+
+  .mm-pipe__station--active::after,
+  .mm-pipe__pulse,
+  .mm-pipe__bar--moving i::after,
+  .mm-pipe__bar--waiting i,
+  .mm-pipe__card,
+  .mm-pipe__card--arrived {
+    animation: none;
+  }
+}

@@ -1,0 +1,192 @@
+/*
+ * Just finished: a shelf of 2:3 tiles, newest first. The pipeline's stylesheet defines the colour block
+ * (--pipe-*) and the tile; this one lays the shelf out. A tile's width comes from --shelf-tile-w, set from
+ * the height of the row.
+ */
+.mm-shelf {
+  display: flex;
+  height: 100%;
+  min-height: 11rem;
+  min-width: 0;
+  flex-direction: column;
+  overflow: hidden;
+  padding-bottom: 8px;
+  border: 1px solid var(--pipe-hairline);
+  border-radius: 14px;
+  background: var(--pipe-card);
+  color: var(--pipe-foreground);
+}
+
+.mm-shelf__head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 14px 18px 10px;
+}
+
+.mm-shelf__heading {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.mm-shelf__heading::before {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 8px;
+  border-radius: 50%;
+  background: var(--pipe-success);
+  box-shadow: 0 0 10px var(--pipe-success);
+  content: "";
+  vertical-align: middle;
+}
+
+.mm-shelf__hint {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  font-size: 12px;
+  color: var(--pipe-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mm-shelf__link {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--pipe-primary);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.mm-shelf__link:hover {
+  text-decoration: underline;
+}
+
+.mm-shelf__link:focus-visible,
+.mm-shelf__open:focus-visible {
+  outline: 2px solid var(--pipe-ring);
+  outline-offset: 2px;
+}
+
+.mm-shelf__row {
+  display: flex;
+  min-height: 0;
+  flex: 1 1 0;
+  flex-wrap: nowrap;
+  align-items: flex-start;
+  gap: 12px;
+  box-sizing: border-box;
+  margin: 0 13px;
+  padding: 7px 5px 5px;
+  overflow: hidden;
+  list-style: none;
+}
+
+.mm-shelf__item {
+  display: flex;
+  width: var(--shelf-tile-w, 80px);
+  flex: none;
+  flex-direction: column;
+  animation: mm-shelf-arrive 0.8s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.mm-shelf__open {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.mm-shelf__art {
+  position: relative;
+  display: block;
+  width: var(--shelf-tile-w, 80px);
+  flex: none;
+  aspect-ratio: 2 / 3;
+  overflow: hidden;
+  border-radius: 10px;
+  background: var(--pipe-surface-3);
+  box-shadow: 0 8px 24px hsl(0 0% 0% / 0.35);
+  font-size: 13px;
+  transition: box-shadow 0.5s;
+}
+
+.mm-shelf__art .mm-tile {
+  align-items: center;
+  padding-bottom: 0;
+  border-radius: 10px;
+  font-size: inherit;
+}
+
+.mm-shelf__item--fresh .mm-shelf__art {
+  box-shadow:
+    0 0 0 2px var(--pipe-success),
+    0 0 26px color-mix(in srgb, var(--pipe-success) 45%, transparent);
+}
+
+/* How much the file shrank by, across the foot of its tile. */
+.mm-shelf__saved {
+  position: absolute;
+  right: 5px;
+  bottom: 5px;
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: hsl(150 90% 25% / 0.92);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.3;
+  color: #fff;
+}
+
+.mm-shelf__caption {
+  display: block;
+  width: var(--shelf-tile-w, 80px);
+  margin-top: 6px;
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--pipe-foreground);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mm-shelf__caption small {
+  display: block;
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--pipe-muted);
+  text-overflow: ellipsis;
+}
+
+.mm-shelf__empty {
+  padding: 6px 0;
+  font-size: 13px;
+  color: var(--pipe-muted);
+  white-space: nowrap;
+}
+
+@keyframes mm-shelf-arrive {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.92);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mm-shelf__item {
+    animation: none;
+  }
+}
