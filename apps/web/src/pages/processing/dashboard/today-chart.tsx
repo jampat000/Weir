@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useState } from "react";
+import { useCallback, useState } from "react";
 import type { KeyboardEvent, PointerEvent } from "react";
 
 import { roundScaleTop } from "../../../lib/ui/chart-scale";
@@ -10,7 +10,7 @@ import {
   NOTHING_HANDED_BACK,
   bucketWords,
   scaleLabel,
-  spanLabels,
+  spanLabel,
 } from "./handed-back-words";
 import { TodayChartReadout } from "./today-chart-readout";
 import {
@@ -18,6 +18,7 @@ import {
   CHART_WIDTH,
   chartShape,
   pointedAfterKey,
+  minorLabelsFit,
   pointedAtFraction,
   scaleLines,
 } from "./today-chart-model";
@@ -48,7 +49,8 @@ export function TodayChart({ handed, now }: TodayChartProps) {
   const lines = scaleLines(scaleTop);
   const shape = chartShape(handed.buckets, scaleTop);
   const dot = shape.points[current];
-  const [oldest, newest] = spanLabels(handed, now);
+  const span = spanLabel(handed, now);
+  const showMinor = minorLabelsFit(lines, chartSize.height);
 
   const onPointerAt = (event: PointerEvent<HTMLElement>) => {
     const box = event.currentTarget.getBoundingClientRect();
@@ -126,16 +128,17 @@ export function TodayChart({ handed, now }: TodayChartProps) {
         {lines.map((line) => {
           const style = { top: `${(line.y / CHART_HEIGHT) * 100}%` };
           return (
-            <Fragment key={line.value}>
+            <span key={line.value}>
               <i className="cs-grid" style={style} />
-              <b className="cs-tick cs-below" style={style}>
-                {scaleLabel(line.value)}
-              </b>
-            </Fragment>
+              {line.minor && !showMinor ? null : (
+                <b className="cs-tick cs-below" style={style}>
+                  {scaleLabel(line.value)}
+                </b>
+              )}
+            </span>
           );
         })}
-        <span className="cs-end cs-start">{oldest}</span>
-        <span className="cs-end cs-now">{newest}</span>
+        <span className="cs-end cs-now">{span}</span>
         {pointed !== null && dot ? (
           <TodayChartReadout
             bucket={handed.buckets[pointed]}

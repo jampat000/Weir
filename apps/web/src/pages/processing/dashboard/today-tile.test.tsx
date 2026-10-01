@@ -179,7 +179,7 @@ describe("the Today tile", () => {
     );
   });
 
-  it("labels the gridlines with round numbers and the two ends of the time span", () => {
+  it("labels the 100% and 50% gridlines with whole numbers and the time span in one label", () => {
     const handed = handedBack(
       [finishedAt(3), finishedAt(3), finishedAt(8)],
       NOW,
@@ -187,10 +187,9 @@ describe("the Today tile", () => {
     summary.value = { handed, total: handed.totals.all, partial: false };
     const tile = renderTile();
 
+    expect(tile).toHaveTextContent("4 files");
     expect(tile).toHaveTextContent("2 files");
-    expect(tile).toHaveTextContent("1 file");
-    expect(tile).toHaveTextContent("2 h ago");
-    expect(tile).toHaveTextContent("now");
+    expect(tile).toHaveTextContent("2 h ago – now");
   });
 });
 

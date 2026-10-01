@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { handedBack, type HandedBackBucket } from "../handed-back-model";
-import { bucketReadout, scaleLabel, spanLabels } from "./handed-back-words";
+import { bucketReadout, scaleLabel, spanLabel } from "./handed-back-words";
 
 const NOW = Date.parse("2026-08-18T10:00:00Z");
 
@@ -23,9 +23,9 @@ describe("the labels of the Today chart's scale", () => {
   });
 });
 
-describe("the ends of the Today chart's time axis", () => {
-  it("say how far back the oldest point is, and now", () => {
-    expect(spanLabels(handedBack([], NOW), NOW)).toEqual(["2 h ago", "now"]);
+describe("the Today chart's time span", () => {
+  it("says how far back the oldest point is, up to now", () => {
+    expect(spanLabel(handedBack([], NOW), NOW)).toBe("2 h ago – now");
   });
 });
 

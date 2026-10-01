@@ -5,6 +5,7 @@ import {
   CHART_HEIGHT,
   CHART_WIDTH,
   chartShape,
+  minorLabelsFit,
   pointedAfterKey,
   pointedAtFraction,
   readoutLeft,
@@ -53,25 +54,42 @@ describe("the line of the Today chart", () => {
 });
 
 describe("the gridlines of the Today chart", () => {
-  it("draws one at the top of the scale and one at half", () => {
-    const [top, half] = scaleLines(10);
+  it("draws one at every quarter of the scale, from the top down", () => {
+    expect(scaleLines(20).map((line) => line.value)).toEqual([20, 15, 10, 5]);
+  });
 
-    expect(top.value).toBe(10);
-    expect(half.value).toBe(5);
+  it("makes the 75% and 25% lines minor", () => {
+    expect(scaleLines(4).map((line) => line.minor)).toEqual([
+      false,
+      true,
+      false,
+      true,
+    ]);
   });
 
   it("puts the top line where a bucket at the top of the scale is drawn", () => {
-    const [top] = scaleLines(5);
-    const { points } = chartShape([bucket(5)], 5);
+    const [top] = scaleLines(8);
+    const { points } = chartShape([bucket(8)], 8);
 
     expect(top.y).toBe(points[0].y);
   });
 
-  it("puts the half line midway between the top line and the line of an empty bucket", () => {
-    const [top, half] = scaleLines(4);
-    const { points } = chartShape([bucket(0)], 4);
+  it("spaces the lines evenly down to the line of an empty bucket", () => {
+    const lines = scaleLines(8);
+    const { points } = chartShape([bucket(0)], 8);
+    const quarter = lines[1].y - lines[0].y;
 
-    expect(half.y).toBeCloseTo((top.y + points[0].y) / 2);
+    expect(lines[3].y + quarter).toBeCloseTo(points[0].y);
+  });
+});
+
+describe("whether every gridline of the Today chart can carry its label", () => {
+  it("does on a chart tall enough to give each label its own room", () => {
+    expect(minorLabelsFit(scaleLines(4), 100)).toBe(true);
+  });
+
+  it("does not on a short chart, where only the 100% and 50% labels fit", () => {
+    expect(minorLabelsFit(scaleLines(4), 40)).toBe(false);
   });
 });
 

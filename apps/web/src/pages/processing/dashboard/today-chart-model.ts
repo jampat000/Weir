@@ -28,14 +28,34 @@ function valueY(value: number, scaleTop: number): number {
   return PAD_TOP + PLOT_HEIGHT - (value / scaleTop) * PLOT_HEIGHT;
 }
 
-export type ScaleLine = { value: number; y: number };
+export type ScaleLine = {
+  value: number;
+  y: number;
+  /** A line whose label is left off when the chart is too short to give every label its own room. */
+  minor: boolean;
+};
 
-/** The gridlines: the top of the scale and half of it. */
+/** The gridlines, from the top of the scale down: 100%, 75%, 50% and 25% of it. */
+const QUARTER_SHARES = [1, 0.75, 0.5, 0.25];
+
 export function scaleLines(scaleTop: number): ScaleLine[] {
-  return [scaleTop, scaleTop / 2].map((value) => ({
-    value,
-    y: valueY(value, scaleTop),
+  return QUARTER_SHARES.map((share) => ({
+    value: scaleTop * share,
+    y: valueY(scaleTop * share, scaleTop),
+    minor: share === 0.75 || share === 0.25,
   }));
+}
+
+/** The room one hanging label needs between its line and the next, in pixels. */
+const LABEL_ROOM_PX = 13;
+
+/** Whether the lines are far enough apart, on a chart this tall, for every one to carry its label. */
+export function minorLabelsFit(
+  lines: readonly ScaleLine[],
+  chartHeight: number,
+): boolean {
+  const gaps = lines.slice(1).map((line, index) => line.y - lines[index].y);
+  return (Math.min(...gaps) / CHART_HEIGHT) * chartHeight >= LABEL_ROOM_PX;
 }
 
 /** Files finished per bucket as a line from the oldest bucket (left) to the newest (right). */

@@ -54,13 +54,13 @@ export function scaleLabel(value: number): string {
 
 const HOUR_MS = 60 * MINUTE_MS;
 
-/** The two ends of the time axis, from how far back the oldest point is: "2 h ago" and "now". */
-export function spanLabels(handed: HandedBack, now: number): [string, string] {
+/** The chart's time span in one label, from how far back the oldest point is: "2 h ago – now". */
+export function spanLabel(handed: HandedBack, now: number): string {
   const oldest = handed.buckets[0];
   const hours = oldest
     ? Math.max(1, Math.round((now - oldest.from) / HOUR_MS))
     : 2;
-  return [`${hours} h ago`, "now"];
+  return `${hours} h ago – now`;
 }
 
 /** The pointer's readout for one bucket: its clock time and what finished then, "2:10 pm · 3 cleaned". */

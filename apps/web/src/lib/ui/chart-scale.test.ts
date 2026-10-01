@@ -31,26 +31,33 @@ describe("the round-number top of a chart's scale", () => {
 
 describe("the top of a chart that counts whole things", () => {
   it.each([
-    [0, 2],
-    [1, 2],
-    [2, 2],
-    [3, 10],
-    [5, 10],
-    [10, 10],
-    [11, 20],
-    [26, 50],
-    [51, 100],
-    [180, 200],
+    [0, 4],
+    [1, 4],
+    [4, 4],
+    [5, 8],
+    [8, 8],
+    [9, 20],
+    [20, 20],
+    [21, 40],
+    [40, 40],
+    [41, 100],
+    [100, 100],
+    [101, 200],
+    [201, 400],
+    [401, 1000],
+    [1001, 2000],
   ])("takes %s up to %s", (highest, top) => {
     expect(roundScaleTop(highest, { wholeNumbers: true })).toBe(top);
   });
 
-  it("always has a whole half line", () => {
-    for (let highest = 0; highest <= 1_200; highest += 1) {
+  it("has a whole number at every quarter, from nothing up to 2000", () => {
+    for (let highest = 0; highest <= 2_000; highest += 1) {
       const top = roundScaleTop(highest, { wholeNumbers: true });
 
-      expect(Number.isInteger(top / 2)).toBe(true);
       expect(top).toBeGreaterThanOrEqual(highest);
+      for (const quarter of [1, 2, 3, 4]) {
+        expect(Number.isInteger((top * quarter) / 4)).toBe(true);
+      }
     }
   });
 });

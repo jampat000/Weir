@@ -62,8 +62,8 @@
   transform: translate(-50%, -50%);
 }
 
-/* The chart's overlay (the markup and class names are shared with Deluno): gridlines, the scale beside them,
-   the ends of the time span, and the pointer's line and readout. */
+/* The chart's overlay (the markup and class names are shared with Deluno): four gridlines with the scale at the left,
+   the time span at the bottom right, and the pointer's line and readout. */
 .cs-layer {
   position: absolute;
   inset: 0;
@@ -109,10 +109,6 @@
 
 .cs-end {
   bottom: 0;
-}
-
-.cs-start {
-  left: 0;
 }
 
 .cs-now {
