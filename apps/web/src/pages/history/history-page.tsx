@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
+import { Panel } from "../../components/panels/panel";
 import { LoadError } from "../../components/shared/load-error";
 import { PanelLoading } from "../../components/shared/page-loading";
 import { useCanEdit } from "../../lib/auth/can-edit";
@@ -169,14 +170,17 @@ export function HistoryPage() {
       />
 
       {group === "failed" && editable ? (
-        <RetryFailed failed={retryableFailures(shown)} />
-      ) : null}
-
-      {group === "failed" && editable && hasRejectedFiles(shown) ? (
-        <ProcessRejectedAgain
-          libraryId={libraryId}
-          libraryName={libraries.data?.find((l) => l.id === libraryId)?.name}
-        />
+        <div className="mm-history-bulks">
+          <RetryFailed failed={retryableFailures(shown)} />
+          {hasRejectedFiles(shown) ? (
+            <ProcessRejectedAgain
+              libraryId={libraryId}
+              libraryName={
+                libraries.data?.find((l) => l.id === libraryId)?.name
+              }
+            />
+          ) : null}
+        </div>
       ) : null}
 
       {cappedAtLimit ? (
@@ -198,11 +202,17 @@ export function HistoryPage() {
         ) : kept.isLoading ? (
           <PanelLoading label="Reading kept files…" />
         ) : (
-          <HistoryKeptList
-            files={kept.data?.files ?? []}
-            editable={editable}
-            onProcessed={setRemovedNotice}
-          />
+          <Panel
+            title="Kept files"
+            className="mm-history-list"
+            count={`${(kept.data?.files.length ?? 0).toLocaleString()} kept`}
+          >
+            <HistoryKeptList
+              files={kept.data?.files ?? []}
+              editable={editable}
+              onProcessed={setRemovedNotice}
+            />
+          </Panel>
         )
       ) : files.isError ? (
         <LoadError thing="your file history" error={files.error} />
@@ -216,12 +226,18 @@ export function HistoryPage() {
         </p>
       ) : (
         <div className="mm-history-body">
-          <HistoryList
-            entries={shown}
-            selectedKey={selected?.key ?? null}
-            now={now}
-            onPick={pickEntry}
-          />
+          <Panel
+            title="Files"
+            count={`${shown.length.toLocaleString()} shown`}
+            className="mm-history-list"
+          >
+            <HistoryList
+              entries={shown}
+              selectedKey={selected?.key ?? null}
+              now={now}
+              onPick={pickEntry}
+            />
+          </Panel>
           {selected?.kind === "download" ? (
             <HistoryDetail
               file={selected.file}

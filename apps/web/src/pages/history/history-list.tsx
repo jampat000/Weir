@@ -1,3 +1,5 @@
+import { Chip } from "../../components/panels/chip";
+import type { MmStatusTone } from "../../lib/ui/mm-status-tone";
 import { FileName } from "../../components/shared/file-name";
 import { formatBytes } from "../../lib/format/bytes";
 import {
@@ -7,6 +9,7 @@ import {
 import type { LibraryClean } from "../../lib/processing/library-cleans-api";
 import {
   entryGroup,
+  type HistoryGroup,
   entryPath,
   entryTime,
   type HistoryEntry,
@@ -36,6 +39,17 @@ function subLine(entry: HistoryEntry): string {
     .filter(Boolean)
     .join(" · ");
 }
+
+/** The chip's colour for where an entry stands. A skip is Weir deciding a file is not for it, so it stays neutral. */
+const GROUP_TONE: Record<HistoryGroup, MmStatusTone> = {
+  all: "neutral",
+  working: "info",
+  finished: "healthy",
+  needs: "warning",
+  skipped: "neutral",
+  failed: "failed",
+  kept: "neutral",
+};
 
 function entryIsSelected(entry: HistoryEntry, selectedKey: string | null) {
   return selectedKey !== null && entry.key === selectedKey;
@@ -85,13 +99,14 @@ export function HistoryList({
                 </button>
               </td>
               <td>
-                <span
-                  className={`mm-history-what mm-history-what--${entryGroup(entry) ?? "other"}`}
+                <Chip
+                  tone={GROUP_TONE[entryGroup(entry) ?? "all"]}
+                  className="mm-history-what"
                 >
                   {entry.kind === "download"
                     ? whatWeirDid(entry.file)
                     : CLEAN_OUTCOME_WORDS[entry.clean.outcome]}
-                </span>
+                </Chip>
               </td>
               <td className="mm-history-when">
                 {agoWords(entryTime(entry), now)}

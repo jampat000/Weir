@@ -1,3 +1,4 @@
+import { Chip } from "../../components/panels/chip";
 import type { ProcessingFileLogEntry } from "../../lib/processing/files-api";
 import { agoWords, tracksFromRecord, type HistoryTrack } from "./history-model";
 
@@ -17,12 +18,10 @@ function TrackSet({ tracks }: { tracks: HistoryTrack[] }) {
     >
       <h3 id="history-tracks-heading" className="mm-history-trackset__head">
         Tracks
-        <span className="mm-history-count is-kept">{keptCount} kept</span>
-        <span
-          className={`mm-history-count ${removedCount > 0 ? "is-removed" : "is-none"}`}
-        >
+        <Chip tone="healthy">{keptCount} kept</Chip>
+        <Chip tone={removedCount > 0 ? "failed" : "neutral"}>
           {removedCount} removed
-        </span>
+        </Chip>
       </h3>
       <table className="mm-history-tracks">
         <tbody>
@@ -39,11 +38,9 @@ function TrackSet({ tracks }: { tracks: HistoryTrack[] }) {
                 ) : null}
               </td>
               <td className="mm-history-track__verdict">
-                <span
-                  className={`mm-history-verdict ${track.kept ? "is-kept" : "is-removed"}`}
-                >
+                <Chip tone={track.kept ? "healthy" : "failed"}>
                   {track.kept ? "Kept" : "Removed"}
-                </span>
+                </Chip>
               </td>
             </tr>
           ))}

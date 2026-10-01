@@ -1,5 +1,6 @@
 import { useState } from "react";
 
+import { SegmentedControl } from "../../components/panels/segmented-control";
 import type { ProcessingLibrary } from "../../lib/processing/libraries-api";
 import { HISTORY_GROUPS, type HistoryGroup } from "./history-entries";
 
@@ -53,20 +54,20 @@ export function HistoryFilters({
           onBlur={() => setParam("q", search.trim())}
         />
       </form>
-      <div className="mm-history-chips" role="group" aria-label="Show">
-        {HISTORY_GROUPS.map((g) => (
-          <button
-            key={g.id}
-            type="button"
-            className="mm-history-chip"
-            aria-pressed={g.id === group}
-            onClick={() => setParam("show", g.id === "all" ? null : g.id)}
-          >
-            {g.label}{" "}
-            <span className="mm-history-chip__count">{counts[g.id]}</span>
-          </button>
-        ))}
-      </div>
+      <SegmentedControl
+        ariaLabel="Show"
+        value={group}
+        options={HISTORY_GROUPS.map((g) => ({
+          value: g.id,
+          label: (
+            <>
+              {g.label}{" "}
+              <span className="mm-segmented__count">{counts[g.id]}</span>
+            </>
+          ),
+        }))}
+        onChange={(next) => setParam("show", next === "all" ? null : next)}
+      />
       <div className="mm-history-scope">
         <select
           className="mm-input"

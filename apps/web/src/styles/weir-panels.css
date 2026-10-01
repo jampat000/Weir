@@ -312,12 +312,16 @@ a.mm-bar-row:hover {
 .mm-segmented {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
+  gap: 2px;
   min-width: 0;
+  padding: 3px;
+  border: 1px solid var(--mm-hairline);
+  border-radius: var(--mm-radius-field);
+  background: var(--mm-card-bg);
 }
 
 .mm-segmented__option {
-  height: 34px;
+  height: 30px;
   padding: 0 14px;
   border: 1px solid transparent;
   border-radius: var(--mm-radius-control);
@@ -342,6 +346,17 @@ a.mm-bar-row:hover {
   border-color: color-mix(in srgb, var(--mm-primary) 40%, transparent);
   background: color-mix(in srgb, var(--mm-primary) 10%, transparent);
   color: var(--mm-primary);
+}
+
+.mm-segmented__count {
+  margin-left: 2px;
+  font-variant-numeric: tabular-nums;
+  color: var(--mm-text3);
+}
+
+.mm-segmented__option[aria-pressed="true"] .mm-segmented__count {
+  color: inherit;
+  opacity: 0.8;
 }
 
 @media (prefers-reduced-motion: reduce) {

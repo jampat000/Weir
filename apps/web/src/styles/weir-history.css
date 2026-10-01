@@ -1,6 +1,6 @@
 /*
- * History: every file Weir has touched. The list on the left, the chosen file on the right, divided by a
- * hairline rather than boxed. Below 1100px the file follows the list.
+ * History: every file Weir has touched. The files in one panel on the left, the chosen file's story in a
+ * second on the right. Below 1100px the story follows the list.
  */
 
 .mm-history-filters {
@@ -8,53 +8,11 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 10px 14px;
-  margin-top: 4px;
 }
 
 .mm-history-search .mm-input {
   width: 260px;
   max-width: 100%;
-}
-
-.mm-history-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.mm-history-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 30px;
-  padding: 0 12px;
-  border-radius: var(--mm-radius-pill);
-  border: 1px solid var(--mm-line);
-  background: transparent;
-  color: var(--mm-text2);
-  font: inherit;
-  font-size: 0.8125rem;
-  cursor: pointer;
-}
-
-.mm-history-chip:hover {
-  border-color: var(--mm-input-border-hover);
-  color: var(--mm-text);
-}
-
-.mm-history-chip[aria-pressed="true"] {
-  border-color: var(--mm-accent-ring);
-  background: var(--mm-accent-soft);
-  color: var(--mm-text);
-}
-
-.mm-history-chip__count {
-  font-variant-numeric: tabular-nums;
-  color: var(--mm-text3);
-}
-
-.mm-history-chip[aria-pressed="true"] .mm-history-chip__count {
-  color: var(--mm-text2);
 }
 
 .mm-history-scope {
@@ -68,15 +26,26 @@
 }
 
 .mm-history-empty {
-  margin: 24px 0 0;
+  margin: var(--mm-panel-gap) 0 0;
+  padding: 28px 18px;
+  border: 1px solid var(--mm-panel-border);
+  border-radius: var(--mm-radius-panel);
+  background: var(--mm-card-bg);
+  text-align: center;
   color: var(--mm-text2);
+}
+
+.mm-history-list .mm-history-empty {
+  margin: 0;
+  padding: 24px 18px;
+  border: 0;
 }
 
 .mm-history-body {
   display: grid;
   grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
-  gap: 28px;
-  margin-top: 16px;
+  gap: var(--mm-panel-gap);
+  margin-top: var(--mm-panel-gap);
   align-items: start;
 }
 
@@ -93,15 +62,17 @@
 }
 
 .mm-history-table th {
-  height: 32px;
-  padding: 0 10px;
+  height: 36px;
+  padding: 0 18px;
   text-align: left;
   font-size: var(--mm-type-eyebrow);
   font-weight: 600;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--mm-text2);
-  border-bottom: 1px solid var(--mm-line);
+  background: color-mix(in srgb, var(--mm-surface-2) 40%, transparent);
+  border-top: 1px solid var(--mm-hairline);
+  border-bottom: 1px solid var(--mm-hairline);
 }
 
 .mm-history-table th:nth-child(2) {
@@ -109,23 +80,31 @@
 }
 
 .mm-history-table th:nth-child(3) {
-  width: 90px;
+  width: 120px;
 }
 
 .mm-history-table td {
-  padding: 0 10px;
-  min-height: 50px;
-  border-bottom: 1px solid var(--mm-border);
+  padding: 4px 18px;
+  min-height: 56px;
+  border-bottom: 1px solid var(--mm-hairline);
   vertical-align: middle;
   font-size: 0.875rem;
 }
 
+.mm-history-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.mm-history-table tbody tr:hover td {
+  background: color-mix(in srgb, var(--mm-surface-2) 60%, transparent);
+}
+
 .mm-history-table tr.is-selected td {
-  background: var(--mm-accent-soft);
+  background: color-mix(in srgb, var(--mm-primary) 8%, transparent);
 }
 
 .mm-history-table tr.is-selected td:first-child {
-  box-shadow: inset 3px 0 0 var(--mm-accent);
+  box-shadow: inset 3px 0 0 var(--mm-primary);
 }
 
 .mm-history-file {
@@ -166,21 +145,14 @@
   color: var(--mm-accent-bright);
 }
 
-.mm-history-what--working {
-  color: var(--mm-accent-bright);
-}
-
-.mm-history-what--needs {
-  color: var(--mm-status-warning-text);
-}
-
-/* A skip is Weir deciding a file is not for it, not a failure, so it reads as neutral information (#699). */
-.mm-history-what--skipped {
-  color: var(--mm-text2);
-}
-
-.mm-history-what--failed {
-  color: var(--mm-status-failed-text);
+/* The outcome chip may wrap in a narrow column rather than push the table sideways. */
+.mm-history-what {
+  height: auto;
+  min-height: 24px;
+  padding-top: 3px;
+  padding-bottom: 3px;
+  line-height: 1.25;
+  white-space: normal;
 }
 
 .mm-history-when {
@@ -193,27 +165,21 @@
   display: flex;
   flex-direction: column;
   gap: 14px;
-  padding-left: 28px;
-  border-left: 1px solid var(--mm-line);
+  padding: 18px;
+  border: 1px solid var(--mm-panel-border);
+  border-radius: var(--mm-radius-panel);
+  background: var(--mm-card-bg);
+  box-shadow: var(--mm-shadow-card);
 }
 
 /* At desktop widths the detail stays on screen while the list scrolls past it, so a click's result never
-   scrolls out of view (#687). */
+   scrolls out of view (#687). It sits below the sticky header. */
 @media (min-width: 1100px) {
   .mm-history-detail {
     position: sticky;
-    top: 16px;
-    max-height: calc(100vh - 32px);
+    top: 88px;
+    max-height: calc(100vh - 100px);
     overflow: auto;
-  }
-}
-
-@media (max-width: 1100px) {
-  .mm-history-detail {
-    padding-left: 0;
-    padding-top: 20px;
-    border-left: 0;
-    border-top: 1px solid var(--mm-line);
   }
 }
 
@@ -263,7 +229,7 @@
 }
 
 .mm-history-saved {
-  color: var(--mm-accent-bright);
+  color: var(--mm-status-healthy-text);
 }
 
 .mm-history-progress {
@@ -297,9 +263,11 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
-  margin-top: 28px;
-  padding-top: 16px;
-  border-top: 1px solid var(--mm-border);
+  margin-top: var(--mm-panel-gap);
+  padding: 14px 18px;
+  border: 1px solid var(--mm-panel-border);
+  border-radius: var(--mm-radius-panel);
+  background: var(--mm-card-bg);
 }
 
 .mm-history-retention__row {
