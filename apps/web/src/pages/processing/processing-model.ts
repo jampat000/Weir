@@ -90,8 +90,6 @@ export type Lanes = {
   waiting: WaitingItem[];
   working: WorkingItem[];
   handing: HandingItem[];
-  /** Files that need a person: failed, or on hold after repeated failures. */
-  stuck: ProcessingFile[];
 };
 
 const EPISODE = /^(.+?)[ ._-]+(S\d{1,2}E\d{1,3}(?:-?E\d{1,3})?)(?:[ ._-]|$)/i;
@@ -198,7 +196,6 @@ export function buildLanes(
     waiting: [],
     working: [],
     handing: [],
-    stuck: [],
   };
 
   for (const file of files) {
@@ -299,9 +296,6 @@ export function buildLanes(
         });
         break;
       }
-      case "processing_failed":
-        lanes.stuck.push(file);
-        break;
       default:
         break;
     }

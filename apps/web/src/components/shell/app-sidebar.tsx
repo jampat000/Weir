@@ -2,9 +2,9 @@ import { useRef, useState, useSyncExternalStore } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { useLogoutMutation, useMeQuery } from "../../lib/auth/queries";
-import { useNeedsYouCount } from "../../lib/processing/needs-you-count";
 import { useSystemReadinessQuery } from "../../lib/system/readiness-queries";
 import { useModalFocus } from "../../lib/ui/use-modal-focus";
+import { useNeedsYou } from "../../pages/processing/dashboard/use-needs-you";
 import { useWorkingCount } from "../../pages/processing/working-count";
 import { NavIconChevronLeft, NavIconChevronRight } from "./nav-icons";
 import { SidebarBrand } from "./sidebar-brand";
@@ -53,7 +53,7 @@ export function AppSidebar({
   const logout = useLogoutMutation();
   const readiness = useSystemReadinessQuery();
   const working = useWorkingCount();
-  const needsYou = useNeedsYouCount();
+  const { count: needsYou } = useNeedsYou(null);
   const firstPlace = useRef<HTMLAnchorElement>(null);
   const drawer = useModalFocus<HTMLElement>({
     open: drawerOpen,

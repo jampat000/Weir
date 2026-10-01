@@ -34,27 +34,37 @@ beforeEach(() => {
   });
 });
 
-describe("the held, rejected and skipped files the Needs you panel reads", () => {
-  it("reads those three kinds of file of the workflow it is narrowed to", async () => {
-    const { result } = renderHook(() => useNeedsFiles(3, 2), { wrapper });
+describe("the failed, rejected, held and skipped files the Needs you panel reads", () => {
+  it("reads those four kinds of file of the workflow it is narrowed to", async () => {
+    const { result } = renderHook(() => useNeedsFiles(3), { wrapper });
 
     await waitFor(() => expect(result.current).toEqual([{ id: 5 }]));
     expect(fetchProcessingFiles).toHaveBeenCalledWith({
-      file_status: ["rejected", "on_hold", "skipped"],
+      file_status: ["processing_failed", "rejected", "on_hold", "skipped"],
       library_id: 3,
       limit: NEEDS_FILES_READ,
     });
   });
 
-  it("reads again when the page's count changes", async () => {
-    const { rerender } = renderHook(({ count }) => useNeedsFiles(null, count), {
-      wrapper,
-      initialProps: { count: 1 },
-    });
-    await waitFor(() => expect(fetchProcessingFiles).toHaveBeenCalledTimes(1));
+  it("reads every workflow's files when it is not narrowed", async () => {
+    const { result } = renderHook(() => useNeedsFiles(null), { wrapper });
 
-    rerender({ count: 2 });
+    await waitFor(() => expect(result.current).toEqual([{ id: 5 }]));
+    expect(fetchProcessingFiles).toHaveBeenCalledWith(
+      expect.objectContaining({ library_id: undefined }),
+    );
+  });
 
-    await waitFor(() => expect(fetchProcessingFiles).toHaveBeenCalledTimes(2));
+  it("shares one read between every part of the page that asks for the same workflows", async () => {
+    const { result } = renderHook(
+      () => {
+        useNeedsFiles(null);
+        return useNeedsFiles(null);
+      },
+      { wrapper },
+    );
+
+    await waitFor(() => expect(result.current).toEqual([{ id: 5 }]));
+    expect(fetchProcessingFiles).toHaveBeenCalledTimes(1);
   });
 });

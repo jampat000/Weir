@@ -158,11 +158,18 @@ a.mm-stat__label:hover {
   color: var(--mm-text3);
 }
 
-.mm-stat__aside a {
+.mm-stat__aside a,
+.mm-stat__aside button {
+  padding: 0;
+  border: 0;
+  background: none;
   color: inherit;
+  font: inherit;
+  cursor: pointer;
 }
 
-.mm-stat__aside a:hover {
+.mm-stat__aside a:hover,
+.mm-stat__aside button:hover {
   text-decoration: underline;
 }
 

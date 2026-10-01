@@ -40,7 +40,6 @@ import { leavingInWorkflow } from "../workflow-scope";
 import { ActivityStream } from "./activity-stream";
 import { HealthPanel } from "./health-panel";
 import { NeedsPanel } from "./needs-panel";
-import { FAILED_JOBS_LIMIT } from "./needs-model";
 import { NextTile } from "./next-tile";
 import { TodayTile } from "./today-tile";
 import { useNextItems } from "./use-next-items";
@@ -65,7 +64,6 @@ const LANE_KEYS = [
 const TOTAL_KEYS = [
   processingKeys.overviewStats(TODAY_DAYS),
   processingKeys.filesAtOnce,
-  processingKeys.jobsInspectionList("failed", FAILED_JOBS_LIMIT, true),
 ] as const;
 const LANE_THROTTLE_MS = 750;
 const TOTAL_THROTTLE_MS = 3_000;
@@ -157,7 +155,6 @@ export function LiveView({ filter, workflowId }: LiveViewProps) {
     (workflow) => workflowId === null || workflow.id === workflowId,
   );
   const paused = pause.data?.paused ?? false;
-  const rejectedCount = files.data.status_counts.rejected ?? 0;
 
   return (
     <>
@@ -198,13 +195,7 @@ export function LiveView({ filter, workflowId }: LiveViewProps) {
           <ActivityStream now={now} workflowId={workflowId} />
         </div>
         <div className="mm-dash__needs">
-          <NeedsPanel
-            workflows={libraries.data}
-            stuck={lanes.stuck}
-            rejectedCount={rejectedCount}
-            workflowId={workflowId}
-            onOpen={openFile}
-          />
+          <NeedsPanel workflowId={workflowId} onOpen={openFile} />
         </div>
         <div className="mm-dash__health">
           <HealthPanel workflows={workflows} workflowId={workflowId} />

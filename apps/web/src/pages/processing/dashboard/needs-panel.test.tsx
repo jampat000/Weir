@@ -28,7 +28,7 @@ const forget = vi.fn();
 const removeOptions = vi.fn<() => Promise<ProcessingFileRemoveOptions>>();
 const readiness = { worker_health: [] as unknown[] };
 const failedJobs = { jobs: [] as unknown[] };
-const rejectedFiles = { files: [] as ProcessingFile[] };
+const needFiles = { files: [] as ProcessingFile[] };
 const rejectedAgain = vi.fn();
 const checkAgain = { mutate: vi.fn(), isPending: false };
 
@@ -50,9 +50,15 @@ vi.mock("../../../lib/system/readiness-queries", () => ({
 vi.mock("../../../lib/processing/jobs-inspection/queries", () => ({
   useProcessingJobsInspectionQuery: () => ({ data: failedJobs }),
 }));
+vi.mock("../../../lib/processing/libraries-queries", () => ({
+  useProcessingLibrariesQuery: () => ({ data: workflows }),
+}));
+vi.mock("../../../lib/activity/use-activity-stream-invalidation", () => ({
+  useActivityStreamInvalidations: vi.fn(),
+}));
 vi.mock("./needs-files", () => ({
   useNeedsFiles: (workflowId: number | null | undefined) =>
-    rejectedFiles.files.filter(
+    needFiles.files.filter(
       (file) => workflowId == null || file.library_id === workflowId,
     ),
 }));
@@ -95,12 +101,7 @@ function renderPanel(
 ) {
   render(
     <MemoryRouter>
-      <NeedsPanel
-        workflows={workflows}
-        stuck={[]}
-        rejectedCount={0}
-        {...props}
-      />
+      <NeedsPanel {...props} />
     </MemoryRouter>,
   );
   return screen.getByRole("region", { name: "Needs you" });
@@ -116,7 +117,7 @@ beforeEach(() => {
   rejectedAgain.mockReset();
   readiness.worker_health = [];
   failedJobs.jobs = [];
-  rejectedFiles.files = [];
+  needFiles.files = [];
 });
 
 describe("the Needs you panel when nothing needs a person", () => {
@@ -132,7 +133,8 @@ describe("the Needs you panel when nothing needs a person", () => {
 describe("the Needs you panel when something does", () => {
   it("shows an amber count in its header and links to the files in History", () => {
     failedJobs.jobs = [{ id: 1 }];
-    const panel = renderPanel({ stuck: [stuckFile] });
+    needFiles.files = [stuckFile];
+    const panel = renderPanel();
 
     expect(within(panel).getByText("2 to look at")).toHaveClass(
       "mm-needs__count",
@@ -143,8 +145,8 @@ describe("the Needs you panel when something does", () => {
   });
 
   it("groups files by what went wrong, each group titled in plain words", () => {
-    rejectedFiles.files = [rejected];
-    renderPanel({ stuck: [stuckFile], rejectedCount: 1 });
+    needFiles.files = [stuckFile, rejected];
+    renderPanel();
 
     expect(
       screen.getByRole("region", { name: "1 failed while writing" }),
@@ -155,7 +157,8 @@ describe("the Needs you panel when something does", () => {
   });
 
   it("gives a file its reason and its workflow", () => {
-    renderPanel({ stuck: [stuckFile] });
+    needFiles.files = [stuckFile];
+    renderPanel();
 
     const row = screen.getByTestId("live-needs");
     expect(row).toHaveTextContent("The new file would not play.");
@@ -163,8 +166,8 @@ describe("the Needs you panel when something does", () => {
   });
 
   it("offers Process all again beside the rejected files only, for the workflow the panel is narrowed to", () => {
-    rejectedFiles.files = [rejected];
-    renderPanel({ stuck: [stuckFile], rejectedCount: 1, workflowId: 1 });
+    needFiles.files = [stuckFile, rejected];
+    renderPanel({ workflowId: 1 });
 
     const failedGroup = screen.getByRole("region", {
       name: "1 failed while writing",
@@ -192,7 +195,8 @@ describe("the Needs you panel when something does", () => {
       library_name: "Movies",
       relative_path: "Old.Film.2019.mkv",
     });
-    const panel = renderPanel({ stuck: [stuckFile, movie], workflowId: 2 });
+    needFiles.files = [stuckFile, movie];
+    const panel = renderPanel({ workflowId: 2 });
 
     expect(panel).toHaveTextContent("1 to look at");
     expect(panel).not.toHaveTextContent("1 job failed");
@@ -202,7 +206,8 @@ describe("the Needs you panel when something does", () => {
 
   it("opens the file's story from the row when the page can show it", () => {
     const onOpen = vi.fn();
-    renderPanel({ stuck: [stuckFile], onOpen });
+    needFiles.files = [stuckFile];
+    renderPanel({ onOpen });
 
     fireEvent.click(screen.getByRole("button", { name: "Open →" }));
 
@@ -210,7 +215,8 @@ describe("the Needs you panel when something does", () => {
   });
 
   it("opens the file in History when the page has no story to show", () => {
-    renderPanel({ stuck: [stuckFile] });
+    needFiles.files = [stuckFile];
+    renderPanel();
 
     expect(
       screen.getByRole("link", { name: "Open in History →" }),
@@ -229,7 +235,8 @@ describe("the Needs you panel when something does", () => {
 
 describe("trying a file again", () => {
   it("queues that file", () => {
-    renderPanel({ stuck: [stuckFile] });
+    needFiles.files = [stuckFile];
+    renderPanel();
 
     fireEvent.click(screen.getByRole("button", { name: "Try again" }));
 
@@ -237,8 +244,8 @@ describe("trying a file again", () => {
   });
 
   it("calls it Process again for a rejected file", () => {
-    rejectedFiles.files = [rejected];
-    renderPanel({ rejectedCount: 1 });
+    needFiles.files = [rejected];
+    renderPanel();
 
     fireEvent.click(screen.getByRole("button", { name: "Process again" }));
 
@@ -247,7 +254,8 @@ describe("trying a file again", () => {
 
   it("shows that it is working while it queues", () => {
     requeue.isPending = true;
-    renderPanel({ stuck: [stuckFile] });
+    needFiles.files = [stuckFile];
+    renderPanel();
 
     expect(screen.getByRole("button", { name: "Queueing…" })).toBeDisabled();
   });
@@ -256,7 +264,8 @@ describe("trying a file again", () => {
     requeue.mutate = vi.fn((_id: number, handlers: RequeueHandlers) =>
       handlers.onSuccess({ detail: "Queued this file again." }),
     );
-    renderPanel({ stuck: [stuckFile] });
+    needFiles.files = [stuckFile];
+    renderPanel();
 
     fireEvent.click(screen.getByRole("button", { name: "Try again" }));
 
@@ -269,7 +278,8 @@ describe("trying a file again", () => {
     requeue.mutate = vi.fn((_id: number, handlers: RequeueHandlers) =>
       handlers.onError(new TypeError("boom")),
     );
-    renderPanel({ stuck: [stuckFile] });
+    needFiles.files = [stuckFile];
+    renderPanel();
 
     fireEvent.click(screen.getByRole("button", { name: "Try again" }));
 
@@ -290,7 +300,7 @@ describe("asking a workflow to look again at a held or skipped file", () => {
   });
 
   it("offers Check again for a stuck file, and checks its workflow", () => {
-    rejectedFiles.files = [held];
+    needFiles.files = [held];
     renderPanel();
 
     fireEvent.click(screen.getByRole("button", { name: "Check again" }));
@@ -303,7 +313,7 @@ describe("asking a workflow to look again at a held or skipped file", () => {
   });
 
   it("says that the workflow is being checked again", () => {
-    rejectedFiles.files = [held];
+    needFiles.files = [held];
     checkAgain.mutate = vi.fn((_vars: unknown, handlers: RequeueHandlers) =>
       handlers.onSuccess({ detail: "" }),
     );
@@ -332,7 +342,8 @@ describe("removing a file", () => {
 
   it("opens History's remove dialog when the file is still in the watched folder", async () => {
     removeOptions.mockResolvedValue(choice());
-    renderPanel({ stuck: [stuckFile] });
+    needFiles.files = [stuckFile];
+    renderPanel();
 
     fireEvent.click(screen.getByRole("button", { name: "Remove…" }));
 
@@ -342,7 +353,8 @@ describe("removing a file", () => {
 
   it("removes what the person chose in that dialog", async () => {
     removeOptions.mockResolvedValue(choice());
-    renderPanel({ stuck: [stuckFile] });
+    needFiles.files = [stuckFile];
+    renderPanel();
     fireEvent.click(screen.getByRole("button", { name: "Remove…" }));
 
     fireEvent.click(
@@ -362,7 +374,8 @@ describe("removing a file", () => {
 
   it("drops a file that needs no choice from the list straight away", async () => {
     removeOptions.mockResolvedValue(choice({ requires_choice: false }));
-    renderPanel({ stuck: [stuckFile] });
+    needFiles.files = [stuckFile];
+    renderPanel();
 
     fireEvent.click(screen.getByRole("button", { name: "Remove…" }));
 
@@ -372,7 +385,8 @@ describe("removing a file", () => {
 
   it("says when Weir could not tell what removing would do", async () => {
     removeOptions.mockRejectedValue(new TypeError("boom"));
-    renderPanel({ stuck: [stuckFile] });
+    needFiles.files = [stuckFile];
+    renderPanel();
 
     fireEvent.click(screen.getByRole("button", { name: "Remove…" }));
 

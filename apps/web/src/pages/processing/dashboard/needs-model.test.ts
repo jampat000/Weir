@@ -59,8 +59,7 @@ const healthy = {
   workflowId: null,
   readiness: { worker_health: [] },
   failedJobCount: 0,
-  failed: [],
-  others: [],
+  files: [],
 };
 
 describe("what needs a person", () => {
@@ -125,7 +124,7 @@ describe("the files that need a person", () => {
   it("gives each file a row with its name, its reason and the file itself for its actions", () => {
     const [group] = buildNeeds({
       ...healthy,
-      failed: [
+      files: [
         failedFile(2, {
           status_reason: "The new file would not play. The original is safe.",
         }),
@@ -140,7 +139,7 @@ describe("the files that need a person", () => {
   });
 
   it("says what is true when a file has no reason of its own", () => {
-    const [group] = buildNeeds({ ...healthy, failed: [failedFile(1)] });
+    const [group] = buildNeeds({ ...healthy, files: [failedFile(1)] });
 
     expect(group.rows[0].reason).toBe(
       "Weir could not finish this file. The original is untouched.",
@@ -150,13 +149,11 @@ describe("the files that need a person", () => {
   it("titles each group by how many files share a reason, in plain words", () => {
     const groups = buildNeeds({
       ...healthy,
-      failed: [
+      files: [
         failedFile(1),
         failedFile(2, { failure_class: "preflight" }),
         failedFile(3, { failure_class: "guardrail" }),
         failedFile(4, { failure_class: null }),
-      ],
-      others: [
         rejectedFile(5),
         rejectedFile(6),
         rejectedFile(7, { status_reason: "Rejected: no keepable track." }),
@@ -189,7 +186,7 @@ describe("the files that need a person", () => {
       hold_until: "2026-10-02T12:00:00Z",
     });
 
-    const groups = buildNeeds({ ...healthy, others: [stuck, settling] });
+    const groups = buildNeeds({ ...healthy, files: [stuck, settling] });
 
     expect(groups.map((group) => group.title)).toEqual(["1 stuck"]);
     expect(groups[0].rows[0].file?.id).toBe(1);
@@ -206,7 +203,7 @@ describe("the files that need a person", () => {
       status_reason: "Already matched the workflow's rules.",
     });
 
-    const groups = buildNeeds({ ...healthy, others: [routine, byRule] });
+    const groups = buildNeeds({ ...healthy, files: [routine, byRule] });
 
     expect(groups.map((group) => group.title)).toEqual([
       "1 skipped by a workflow rule",
@@ -217,7 +214,7 @@ describe("the files that need a person", () => {
   it("leaves a file that is waiting its turn or already finished out altogether", () => {
     const groups = buildNeeds({
       ...healthy,
-      others: [
+      files: [
         failedFile(1, { status: "unprocessed" }),
         failedFile(2, { status: "processed" }),
       ],
@@ -229,15 +226,15 @@ describe("the files that need a person", () => {
   it("lists the groups in a fixed order whatever order the files arrive in", () => {
     const keys = buildNeeds({
       ...healthy,
-      others: [
+      files: [
         failedFile(1, {
           status: "skipped",
           status_reason: "Skipped because its path matches an exclude pattern.",
         }),
         rejectedFile(2),
         failedFile(3, { status: "on_hold", hold_until: null }),
+        failedFile(4),
       ],
-      failed: [failedFile(4)],
     }).map((group) => group.key);
 
     expect(keys).toEqual([
@@ -251,17 +248,16 @@ describe("the files that need a person", () => {
   it("offers Process all again only on the rejected groups", () => {
     const groups = buildNeeds({
       ...healthy,
-      failed: [failedFile(1)],
-      others: [rejectedFile(2)],
+      files: [failedFile(1), rejectedFile(2)],
     });
 
     expect(groups.map((group) => group.rejected)).toEqual([false, true]);
   });
 
   it("lists a few files per group and counts the rest, which History has", () => {
-    const failed = [1, 2, 3, 4, 5, 6].map((id) => failedFile(id));
+    const files = [1, 2, 3, 4, 5, 6].map((id) => failedFile(id));
 
-    const [group] = buildNeeds({ ...healthy, failed });
+    const [group] = buildNeeds({ ...healthy, files });
 
     expect(group.title).toBe("6 failed while writing");
     expect(group.rows).toHaveLength(FILES_SHOWN_PER_GROUP);
@@ -273,11 +269,11 @@ describe("the files that need a person", () => {
       ...healthy,
       workflowId: 2,
       failedJobCount: 3,
-      failed: [
+      files: [
         failedFile(1, { library_id: 1 }),
         failedFile(2, { library_id: 2 }),
+        rejectedFile(3, { library_id: 1 }),
       ],
-      others: [rejectedFile(3, { library_id: 1 })],
     });
 
     expect(groups).toHaveLength(1);
@@ -290,8 +286,7 @@ describe("the files that need a person", () => {
       workflows: [{ ...workflow, enabled: false } as ProcessingLibrary],
       readiness: { worker_health: [worker("p", "degraded", "x")] },
       failedJobCount: 1,
-      failed: [failedFile(1)],
-      others: [rejectedFile(2)],
+      files: [failedFile(1), rejectedFile(2)],
     }).map((group) => group.key);
 
     expect(keys).toEqual(["weir", "failed-writing", "rejected-language"]);
@@ -301,7 +296,7 @@ describe("the files that need a person", () => {
     const groups = buildNeeds({
       ...healthy,
       failedJobCount: 1,
-      failed: [1, 2, 3, 4, 5, 6].map((id) => failedFile(id)),
+      files: [1, 2, 3, 4, 5, 6].map((id) => failedFile(id)),
     });
 
     expect(needCount(groups)).toBe(7);

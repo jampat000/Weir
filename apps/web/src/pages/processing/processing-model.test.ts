@@ -155,7 +155,7 @@ describe("buildLanes", () => {
     expect(lanes.arriving[0].upstream).toBe(false);
   });
 
-  it("counts a file Weir gave up on as stuck, not arriving", () => {
+  it("leaves a file Weir gave up on out of arriving", () => {
     const lanes = buildLanes(
       [file({ status: "processing_failed", failure_attempts: 3 })],
       [],
@@ -163,7 +163,6 @@ describe("buildLanes", () => {
       AGES,
     );
     expect(lanes.arriving).toHaveLength(0);
-    expect(lanes.stuck).toHaveLength(1);
   });
 
   it("shows a file the media manager is still importing as arriving, with no clock", () => {
@@ -239,7 +238,7 @@ describe("buildLanes", () => {
     expect(lanes.handing.map((item) => item.key)).toEqual(["file-2"]);
   });
 
-  it("counts a failed file as stuck and leaves finished files out", () => {
+  it("leaves failed and finished files out of the lanes", () => {
     const lanes = buildLanes(
       [
         file({ id: 1, status: "processing_failed" }),
@@ -249,7 +248,6 @@ describe("buildLanes", () => {
       NAMES,
       AGES,
     );
-    expect(lanes.stuck.map((f) => f.id)).toEqual([1]);
     expect(lanes.waiting).toHaveLength(0);
   });
 

@@ -12,10 +12,15 @@ import { firstSentence, prettyName } from "../processing-model";
 export const FAILED_JOBS_LIMIT = 100;
 /** How many files a group lists; the rest are counted in one line that leads to History. */
 export const FILES_SHOWN_PER_GROUP = 4;
-/** How many files of the kinds the page does not list are read for the panel. */
+/** How many files that may wait on a person are read. */
 export const NEEDS_FILES_READ = 200;
-/** The statuses, besides a failed pass, that can leave a file waiting on a person. */
-export const NEEDS_FILE_STATUSES = ["rejected", "on_hold", "skipped"] as const;
+/** The statuses that can leave a file waiting on a person. */
+export const NEEDS_FILE_STATUSES = [
+  "processing_failed",
+  "rejected",
+  "on_hold",
+  "skipped",
+] as const;
 
 /** Where the files that need a look are listed: History's failed and rejected files. */
 export const NEEDS_A_LOOK_PATH = "/history?show=failed";
@@ -239,10 +244,8 @@ type NeedSources = {
   workflowId: number | null | undefined;
   readiness: Pick<SystemReadiness, "worker_health"> | undefined;
   failedJobCount: number;
-  /** The files that failed, from the page's own list. */
-  failed: readonly ProcessingFile[];
-  /** The rejected, held and skipped files; only those that wait on a person are listed. */
-  others: readonly ProcessingFile[];
+  /** The failed, rejected, held and skipped files; only those that wait on a person are listed. */
+  files: readonly ProcessingFile[];
 };
 
 /** Everything that needs a person, most urgent first: Weir itself, then failed files, then the rest. */
@@ -251,8 +254,7 @@ export function buildNeeds({
   workflowId,
   readiness,
   failedJobCount,
-  failed,
-  others,
+  files,
 }: NeedSources): NeedGroup[] {
   const inWorkflow = (file: ProcessingFile) =>
     workflowId == null || file.library_id === workflowId;
@@ -264,10 +266,7 @@ export function buildNeeds({
           failedJobsNeed(failedJobCount),
         ].filter((row): row is NeedRow => row !== null)
       : [];
-  return [
-    ...weirGroup(weirRows),
-    ...fileGroups([...failed, ...others].filter(inWorkflow)),
-  ];
+  return [...weirGroup(weirRows), ...fileGroups(files.filter(inWorkflow))];
 }
 
 /** How many things need a person: each file and each problem with Weir counts once. */

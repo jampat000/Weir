@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
 
 import {
   StatSide,
@@ -7,12 +6,12 @@ import {
   StatUnit,
 } from "../../../components/panels/stat-tile";
 import { formatBytes } from "../../../lib/format/bytes";
-import { useNeedsYouCount } from "../../../lib/processing/needs-you-count";
 import type { Filter } from "../processing-filter";
 import { useHandedBack } from "../use-handed-back";
 import { chartCaption, handedBackSentence } from "./handed-back-words";
-import { NEEDS_A_LOOK_PATH } from "./needs-model";
+import { showNeedsPanel } from "./show-needs-panel";
 import { TodayChart } from "./today-chart";
+import { useNeedsYou } from "./use-needs-you";
 import { useTodayFigures } from "./use-today-figures";
 
 const PENDING = "…";
@@ -26,11 +25,11 @@ type TodayTileProps = {
 
 /**
  * What Weir has done today: how many files it cleaned and how much space that saved, with the last two
- * hours drawn under it. The aside points at the files that need a person, when there are any.
+ * hours drawn under it. The aside takes the person to the Needs you panel, when anything is in it.
  */
 export function TodayTile({ filter, now, workflowId = null }: TodayTileProps) {
   const figures = useTodayFigures(workflowId, now);
-  const needsALook = useNeedsYouCount(workflowId);
+  const { count: needsALook } = useNeedsYou(workflowId);
   const { handed, total, partial } = useHandedBack(filter, now, workflowId);
   const [pointed, setPointed] = useState<number | null>(null);
   return (
@@ -38,9 +37,9 @@ export function TodayTile({ filter, now, workflowId = null }: TodayTileProps) {
       label="Today"
       aside={
         needsALook > 0 ? (
-          <Link to={NEEDS_A_LOOK_PATH}>
+          <button type="button" onClick={showNeedsPanel}>
             {needsALook.toLocaleString()} need a look →
-          </Link>
+          </button>
         ) : undefined
       }
       figure={

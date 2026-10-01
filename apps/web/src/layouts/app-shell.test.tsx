@@ -52,8 +52,8 @@ const counts = { working: 0, needsYou: 0 };
 vi.mock("../pages/processing/working-count", () => ({
   useWorkingCount: () => counts.working,
 }));
-vi.mock("../lib/processing/needs-you-count", () => ({
-  useNeedsYouCount: () => counts.needsYou,
+vi.mock("../pages/processing/dashboard/use-needs-you", () => ({
+  useNeedsYou: () => ({ groups: [], count: counts.needsYou }),
 }));
 
 function renderShell(

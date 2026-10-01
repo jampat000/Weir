@@ -106,8 +106,8 @@ vi.mock("../../lib/processing/queries", () => ({
     },
   }),
 }));
-vi.mock("../../lib/processing/needs-you-count", () => ({
-  useNeedsYouCount: () => needsYou.count,
+vi.mock("./dashboard/use-needs-you", () => ({
+  useNeedsYou: () => ({ groups: [], count: needsYou.count }),
 }));
 vi.mock("../../lib/processing/jobs-inspection/queries", () => ({
   useProcessingJobsInspectionQuery: (filter: string) => ({
@@ -162,7 +162,7 @@ vi.mock("./dashboard/needs-panel", () => ({
   NeedsPanel: (props: NeedsPanelProps) => {
     needsProps.push(props);
     return (
-      <button type="button" onClick={() => props.onOpen?.(props.stuck[0])}>
+      <button type="button" onClick={() => props.onOpen?.(file({ id: 9 }))}>
         Open the story
       </button>
     );
@@ -433,7 +433,7 @@ describe("ProcessingPage", () => {
       expect(screen.getByTestId("live-working-count")).toHaveTextContent("1");
     });
 
-    it("says what has been cleaned today, and links to the files that need a look", () => {
+    it("says what has been cleaned today, and offers the files that need a look", () => {
       needsYou.count = 3;
       renderLive();
 
@@ -443,8 +443,8 @@ describe("ProcessingPage", () => {
       );
       expect(tile).toHaveTextContent("41.20 GB saved");
       expect(
-        within(tile).getByRole("link", { name: "3 need a look →" }),
-      ).toHaveAttribute("href", "/history?show=failed");
+        within(tile).getByRole("button", { name: "3 need a look →" }),
+      ).toBeInTheDocument();
     });
 
     it("says Paused in Next, and that work already running finishes", () => {
@@ -480,18 +480,10 @@ describe("ProcessingPage", () => {
   });
 
   describe("Needs you", () => {
-    it("is given the failed files, the rejected count and the workflow the page is narrowed to", () => {
-      files.files = [
-        file({ id: 9, status: "processing_failed", library_id: 1 }),
-      ];
-      files.status_counts = { rejected: 4 };
+    it("is given the workflow the page is narrowed to", () => {
       renderLive("/?workflow=2");
 
-      expect(needsProps.at(-1)).toMatchObject({
-        workflowId: 2,
-        rejectedCount: 4,
-      });
-      expect(needsProps.at(-1)?.stuck.map((f) => f.id)).toEqual([9]);
+      expect(needsProps.at(-1)?.workflowId).toBe(2);
     });
 
     it("is not narrowed when no workflow is chosen", () => {

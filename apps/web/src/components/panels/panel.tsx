@@ -25,6 +25,8 @@ type PanelProps = {
    */
   padded?: boolean;
   id?: string;
+  /** -1 lets the page move focus to the panel, such as when a link elsewhere points at it. */
+  tabIndex?: -1;
   dataTestId?: string;
   className?: string;
   bodyClassName?: string;
@@ -48,6 +50,7 @@ export function Panel({
   headingId,
   padded = false,
   id,
+  tabIndex,
   dataTestId,
   className,
   bodyClassName,
@@ -60,6 +63,7 @@ export function Panel({
   return (
     <section
       id={id}
+      tabIndex={tabIndex}
       aria-labelledby={titleId}
       data-testid={dataTestId}
       className={["mm-panel", padded ? "mm-panel--padded" : "", className]

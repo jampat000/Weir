@@ -1,9 +1,10 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { handedBack } from "../handed-back-model";
 import type { HandedBackSummary } from "../use-handed-back";
+import { NEEDS_PANEL_ID } from "./show-needs-panel";
 import { TodayTile } from "./today-tile";
 
 const NOW = Date.parse("2026-08-18T10:00:00Z");
@@ -24,10 +25,10 @@ vi.mock("./use-today-figures", () => ({
     };
   },
 }));
-vi.mock("../../../lib/processing/needs-you-count", () => ({
-  useNeedsYouCount: (workflowId: number | null) => {
+vi.mock("./use-needs-you", () => ({
+  useNeedsYou: (workflowId: number | null) => {
     figuresAsked.push(workflowId);
-    return needsYou.count;
+    return { groups: [], count: needsYou.count };
   },
 }));
 vi.mock("../use-handed-back", () => ({
@@ -57,6 +58,10 @@ function renderTile(workflowId?: number | null) {
   );
   return screen.getByRole("region", { name: "Today" });
 }
+
+afterEach(() => {
+  document.getElementById(NEEDS_PANEL_ID)?.remove();
+});
 
 beforeEach(() => {
   needsYou.count = 0;
@@ -89,13 +94,22 @@ describe("the Today tile", () => {
     expect(renderTile()).not.toHaveTextContent("need a look");
   });
 
-  it("names the number that need a look and where to see them", () => {
+  it("names the number that need a look, and takes the person to the Needs you panel", () => {
     needsYou.count = 12;
+    const panel = document.createElement("section");
+    panel.id = NEEDS_PANEL_ID;
+    panel.tabIndex = -1;
+    const scrollIntoView = vi.fn();
+    panel.scrollIntoView = scrollIntoView;
+    document.body.append(panel);
     const tile = renderTile();
 
-    expect(
-      within(tile).getByRole("link", { name: "12 need a look →" }),
-    ).toHaveAttribute("href", "/history?show=failed");
+    fireEvent.click(
+      within(tile).getByRole("button", { name: "12 need a look →" }),
+    );
+
+    expect(scrollIntoView).toHaveBeenCalled();
+    expect(panel).toHaveFocus();
   });
 
   it("says nothing finished in the last 2 hours rather than drawing a chart of nothing", () => {

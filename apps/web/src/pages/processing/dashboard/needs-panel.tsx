@@ -3,20 +3,12 @@ import { Link } from "react-router-dom";
 
 import { Panel } from "../../../components/panels/panel";
 import type { ProcessingFile } from "../../../lib/processing/files-api";
-import type { ProcessingLibrary } from "../../../lib/processing/libraries-api";
-import { useProcessingJobsInspectionQuery } from "../../../lib/processing/jobs-inspection/queries";
-import { useSystemReadinessQuery } from "../../../lib/system/readiness-queries";
+import { useProcessingLibrariesQuery } from "../../../lib/processing/libraries-queries";
 import { ProcessRejectedAgain } from "../../history/history-rejected-again";
 import { NeedFileActions, type NeedNotice } from "./needs-file-actions";
-import {
-  FAILED_JOBS_LIMIT,
-  NEEDS_A_LOOK_PATH,
-  buildNeeds,
-  needCount,
-  type NeedGroup,
-  type NeedRow,
-} from "./needs-model";
-import { useNeedsFiles } from "./needs-files";
+import { NEEDS_A_LOOK_PATH, type NeedGroup, type NeedRow } from "./needs-model";
+import { NEEDS_PANEL_ID } from "./show-needs-panel";
+import { useNeedsYou } from "./use-needs-you";
 
 type RowHandlers = {
   /** Which kind of media each workflow holds, by id. */
@@ -115,11 +107,6 @@ function AllClear() {
 }
 
 type NeedsPanelProps = {
-  workflows: readonly ProcessingLibrary[] | undefined;
-  /** The files that failed, from the page's own list. */
-  stuck: readonly ProcessingFile[];
-  /** How many files the rules rejected, from the files list's per-status counts. */
-  rejectedCount: number;
   /** Narrows the panel to one workflow's files. */
   workflowId?: number | null;
   /** Opens a file's story. Without it, Open goes to the file in History. */
@@ -130,32 +117,10 @@ type NeedsPanelProps = {
  * The files and conditions that wait on a person, grouped by what went wrong, each file with its own actions.
  * Says "All clear" when there are none.
  */
-export function NeedsPanel({
-  workflows,
-  stuck,
-  rejectedCount,
-  workflowId,
-  onOpen,
-}: NeedsPanelProps) {
-  const readiness = useSystemReadinessQuery();
-  // Leaves out a file the owner has since removed from History: this panel is about current problems, not a
-  // record of every failure Weir has ever seen (System › Jobs keeps that).
-  const failedJobs = useProcessingJobsInspectionQuery(
-    "failed",
-    FAILED_JOBS_LIMIT,
-    true,
-  );
-  const others = useNeedsFiles(workflowId, rejectedCount);
+export function NeedsPanel({ workflowId, onOpen }: NeedsPanelProps) {
+  const workflows = useProcessingLibrariesQuery().data;
+  const { groups, count } = useNeedsYou(workflowId);
   const [notice, setNotice] = useState<NeedNotice | null>(null);
-  const groups = buildNeeds({
-    workflows,
-    workflowId,
-    readiness: readiness.data,
-    failedJobCount: failedJobs.data?.jobs.length ?? 0,
-    failed: stuck,
-    others,
-  });
-  const total = needCount(groups);
   const mediaScopes = new Map(
     (workflows ?? []).map((workflow) => [workflow.id, workflow.media_type]),
   );
@@ -164,11 +129,13 @@ export function NeedsPanel({
   )?.name;
   return (
     <Panel
+      id={NEEDS_PANEL_ID}
+      tabIndex={-1}
       title="Needs you"
       count={
-        total === 0 ? undefined : (
+        count === 0 ? undefined : (
           <span className="mm-needs__count">
-            {total.toLocaleString()} to look at
+            {count.toLocaleString()} to look at
           </span>
         )
       }
