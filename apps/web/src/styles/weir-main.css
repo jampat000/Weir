@@ -12,50 +12,17 @@
      off. With a zero minimum the column takes the width it is actually given and those wrappers
      scroll, which is what they are for. */
   min-width: 0;
-  min-height: 100dvh;
-  padding: var(--mm-main-pad-y) var(--mm-main-pad-x)
-    calc(40px * var(--mm-density-ui-scale));
+  padding: var(--mm-page-pad-y) var(--mm-page-pad-x)
+    calc(28px * var(--mm-density-ui-scale));
   position: relative;
-  z-index: 1;
-  background:
-    linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--mm-bg-main) 92%, transparent),
-      var(--mm-bg-main)
-    ),
-    var(--mm-bg-main);
-}
-
-.mm-main::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 0;
-  height: min(52vh, 480px);
-  background:
-    radial-gradient(
-      ellipse 78% 88% at 50% -12%,
-      color-mix(in srgb, var(--mm-gold) 6%, transparent),
-      transparent 60%
-    ),
-    radial-gradient(
-      ellipse 45% 55% at 92% 18%,
-      var(--mm-indigo-soft),
-      transparent 50%
-    );
-  pointer-events: none;
-  z-index: 0;
+  background: var(--mm-bg-main);
 }
 
 .mm-main-inner {
   width: 100%;
   max-width: var(--mm-main-max);
   margin: 0 auto;
-  padding-left: 2px;
-  padding-right: 2px;
   position: relative;
-  z-index: 1;
 }
 
 /* Desktop (Material "expanded" and up): first typography step before large / extra-large tiers. */
@@ -79,11 +46,6 @@
   body.mm-body {
     font-size: 1.015625rem; /* 16.25px at 16px root */
     line-height: 1.54;
-  }
-
-  .mm-main {
-    padding-top: calc(34px * var(--mm-density-ui-scale));
-    padding-bottom: calc(44px * var(--mm-density-ui-scale));
   }
 
   .mm-page__title {
@@ -117,11 +79,6 @@
     line-height: 1.55;
   }
 
-  .mm-main {
-    padding-top: calc(36px * var(--mm-density-ui-scale));
-    padding-bottom: calc(48px * var(--mm-density-ui-scale));
-  }
-
   .mm-page__title {
     font-size: clamp(1.72rem, 2.05vw, 2.35rem);
   }
@@ -146,7 +103,7 @@
 .mm-page__intro {
   margin-bottom: var(--mm-space-lg);
   padding-bottom: calc(var(--mm-space) + 0.5rem);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.055);
+  border-bottom: 1px solid var(--mm-hairline);
 }
 
 .mm-page__title {

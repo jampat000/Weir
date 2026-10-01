@@ -49,7 +49,7 @@ Those accents are the Tailrace theme tokens from `apps/web/src/styles/weir-token
 The web app draws the same geometry inline (`apps/web/src/components/brand/weir-logo.tsx`) so it
 follows the theme tokens `--mm-brand-water` and `--mm-brand-wordmark` instead — always the
 three-stream primary mark, since the sidebar never renders it anywhere near 16px. The wordmark is
-the word "Weir" set in the app font (Outfit), not outlines.
+the word "Weir" set in the app font (Inter), not outlines.
 
 ## Where the geometry comes from (#581)
 

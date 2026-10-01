@@ -1,18 +1,12 @@
-import outfit400 from "@fontsource/outfit/files/outfit-latin-400-normal.woff2?url";
-import outfit500 from "@fontsource/outfit/files/outfit-latin-500-normal.woff2?url";
-import outfit600 from "@fontsource/outfit/files/outfit-latin-600-normal.woff2?url";
+import interLatin from "@fontsource-variable/inter/files/inter-latin-wght-normal.woff2?url";
 
 /**
  * The startup screen, sign-in and setup — everything rendered before a person has done anything —
- * use font weights 400, 500 and 600; nothing above the fold is 700. Preloading exactly those means
- * the browser fetches them alongside the page instead of discovering them only once it has parsed
- * the stylesheet, without paying for a weight nothing above the fold uses (#719).
+ * are set in Inter's Latin range. One variable file carries every weight, so preloading it means the
+ * browser fetches the face alongside the page instead of discovering it only once it has parsed the
+ * stylesheet (#719). The monospace face is for keyboard hints and code, never above the fold.
  */
-const ABOVE_THE_FOLD_FONTS: readonly string[] = [
-  outfit400,
-  outfit500,
-  outfit600,
-];
+const ABOVE_THE_FOLD_FONTS: readonly string[] = [interLatin];
 
 export function preloadAboveTheFoldFonts(): void {
   for (const href of ABOVE_THE_FOLD_FONTS) {

@@ -5,10 +5,10 @@
  */
 
 const actionBase =
-  "inline-flex min-h-[2.5rem] max-w-full items-center justify-center rounded-md border px-4 py-2.5 text-sm font-semibold leading-snug tracking-normal transition-all duration-150 whitespace-normal text-center";
+  "inline-flex min-h-[2.5rem] max-w-full items-center justify-center rounded-mm-control border px-4 py-2.5 text-sm font-semibold leading-snug tracking-normal transition-all duration-150 whitespace-normal text-center";
 
 const tertiaryBase =
-  "inline-flex min-h-[2.25rem] max-w-full items-center justify-center rounded-md border px-3 py-1.5 text-sm font-medium leading-snug tracking-normal transition-all duration-150 whitespace-normal text-center";
+  "inline-flex min-h-[2.25rem] max-w-full items-center justify-center rounded-mm-control border px-3 py-1.5 text-sm font-medium leading-snug tracking-normal transition-all duration-150 whitespace-normal text-center";
 
 /**
  * Default class for ordinary editable text inputs (paths, titles, CSV tokens, etc.).
@@ -34,13 +34,13 @@ export const mmPickerTriggerClass = `${mmNativeFieldShell} mm-input--opens mt-1 
 
 /** Checkbox control — used for multi-option rows and standalone toggles. */
 export const mmCheckboxControlClass =
-  "mt-0.5 h-4 w-4 shrink-0 rounded border-mm-border text-mm-gold accent-mm-gold " +
+  "mt-0.5 h-4 w-4 shrink-0 rounded border-mm-border text-mm-primary accent-mm-primary " +
   "focus:outline-none focus-visible:ring-2 focus-visible:ring-mm-accent-ring focus-visible:ring-offset-2 focus-visible:ring-offset-mm-card-bg " +
   "disabled:cursor-not-allowed disabled:opacity-50";
 
 /** Dropdown panel for {@link mmPickerTriggerClass} — matches Global Settings timezone listbox. */
 export const mmListboxPanelClass =
-  "absolute z-20 mt-1 max-h-64 w-full min-w-0 overflow-auto rounded border border-mm-border bg-mm-card-bg py-1 shadow-lg";
+  "absolute z-20 mt-1 max-h-64 w-full min-w-0 overflow-auto rounded-mm-field border border-mm-border bg-mm-card-bg py-1 shadow-lg";
 
 export function mmListboxOptionButtonClass(selected: boolean): string {
   return [
@@ -58,11 +58,11 @@ export const mmTechnicalMonoSmallClass =
 /** In-page section tabs (e.g. module Overview / Connections). Not sidebar navigation. */
 export function mmSectionTabClass(active: boolean): string {
   return [
-    "inline-flex min-h-[2.25rem] shrink-0 items-center justify-center whitespace-nowrap rounded-md border px-3 py-1.5 text-sm font-medium transition-colors",
+    "inline-flex min-h-[2.25rem] shrink-0 items-center justify-center whitespace-nowrap rounded-mm-control border px-3 py-1.5 text-sm font-medium transition-colors",
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mm-accent-ring focus-visible:ring-offset-2 focus-visible:ring-offset-mm-bg-main",
     active
-      ? "border-mm-gold bg-mm-accent-soft text-mm-text"
-      : "border-mm-border bg-transparent text-mm-text2 hover:bg-mm-card-bg",
+      ? "border-mm-primary/40 bg-mm-primary/10 text-mm-primary"
+      : "border-transparent bg-transparent text-mm-text2 hover:bg-mm-surface-2 hover:text-mm-text1",
   ].join(" ");
 }
 
@@ -92,8 +92,8 @@ export function mmActionButtonClass(opts: {
   if (variant === "primary") {
     return [
       actionBase,
-      "cursor-pointer border-mm-gold bg-[color-mix(in_srgb,var(--mm-gold)_20%,transparent)] text-mm-text shadow-[0_2px_14px_color-mix(in_srgb,var(--mm-gold)_14%,transparent)]",
-      "hover:border-mm-gold-bright hover:bg-[color-mix(in_srgb,var(--mm-gold)_28%,transparent)] hover:shadow-[0_4px_20px_color-mix(in_srgb,var(--mm-gold)_22%,transparent)] hover:-translate-y-px",
+      "cursor-pointer border-mm-primary bg-mm-primary text-mm-on-accent shadow-[0_1px_2px_color-mix(in_srgb,var(--mm-primary)_35%,transparent)]",
+      "hover:border-mm-primary-bright hover:bg-mm-primary-bright hover:shadow-[0_4px_16px_color-mix(in_srgb,var(--mm-primary)_28%,transparent)] hover:-translate-y-px",
       "active:translate-y-0 active:brightness-[0.97]",
       "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mm-accent-ring focus-visible:ring-offset-2 focus-visible:ring-offset-mm-card-bg",
       "disabled:cursor-not-allowed disabled:border-mm-border disabled:bg-mm-button-quiet-bg disabled:text-mm-text3 disabled:opacity-80 disabled:shadow-none",
@@ -104,7 +104,7 @@ export function mmActionButtonClass(opts: {
   return [
     actionBase,
     "cursor-pointer border-mm-border bg-mm-button-secondary-bg text-mm-text",
-    "hover:border-[color-mix(in_srgb,var(--mm-gold)_55%,transparent)] hover:bg-mm-accent-soft hover:shadow-sm",
+    "hover:border-[color-mix(in_srgb,var(--mm-primary)_55%,transparent)] hover:bg-mm-accent-soft hover:shadow-sm",
     "active:brightness-[0.97]",
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mm-accent-ring focus-visible:ring-offset-2 focus-visible:ring-offset-mm-card-bg",
     "disabled:cursor-not-allowed disabled:border-mm-border disabled:bg-transparent disabled:text-mm-text3 disabled:opacity-70 disabled:shadow-none",

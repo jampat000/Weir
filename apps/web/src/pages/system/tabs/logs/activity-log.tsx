@@ -219,7 +219,7 @@ export function ActivityLog() {
               : "History is kept until you clear it."}{" "}
             <Link
               to="/system?tab=history#activity-retention"
-              className="text-mm-gold underline-offset-2 hover:underline"
+              className="text-mm-primary underline-offset-2 hover:underline"
             >
               Change how long history is kept
             </Link>

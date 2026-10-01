@@ -1,0 +1,321 @@
+/* Shared panel parts: the panel, the stat tile, the chip, the bar-list row and the segmented control. */
+
+/* ---- Panel (components/panels/panel.tsx) --------------------------------- */
+
+.mm-panel {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid var(--mm-panel-border);
+  border-radius: var(--mm-radius-panel);
+  background: var(--mm-card-bg);
+  box-shadow: var(--mm-shadow-card);
+}
+
+.mm-panel__head {
+  display: flex;
+  flex-shrink: 0;
+  align-items: baseline;
+  gap: 12px;
+  padding: 14px 18px 10px;
+}
+
+/* The leading dot sits on the title's middle, not its baseline. */
+.mm-panel__head > :first-child:not(.mm-panel__title) {
+  align-self: center;
+}
+
+.mm-panel__title {
+  flex-shrink: 0;
+  margin: 0;
+  font-size: var(--mm-type-panel);
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  color: var(--mm-text1);
+}
+
+.mm-panel__count {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--mm-text2);
+}
+
+.mm-panel__link {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  color: var(--mm-primary);
+  text-decoration: none;
+}
+
+.mm-panel__link:hover {
+  color: var(--mm-primary-bright);
+}
+
+/* Takes the height the panel is given and clips what does not fit; a panel with no height of its own
+   is as tall as its content. */
+.mm-panel__body {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* ---- Stat tile (components/panels/stat-tile.tsx) ------------------------- */
+
+.mm-stat {
+  display: grid;
+  grid-template-rows: 16px 44px minmax(0, 1fr);
+  row-gap: 6px;
+  box-sizing: border-box;
+  min-width: 0;
+  height: 190px;
+  padding: 14px 18px;
+  overflow: hidden;
+  border: 1px solid var(--mm-hairline);
+  border-radius: var(--mm-radius-tile);
+  background: var(--mm-card-bg);
+}
+
+.mm-stat__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.mm-stat__label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--mm-text2);
+  text-decoration: none;
+}
+
+a.mm-stat__label:hover {
+  color: var(--mm-text1);
+}
+
+.mm-stat__aside {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--mm-text3);
+}
+
+.mm-stat__aside a {
+  color: inherit;
+}
+
+.mm-stat__aside a:hover {
+  text-decoration: underline;
+}
+
+.mm-stat__figure {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  overflow: hidden;
+  font-size: 34px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  line-height: 44px;
+  white-space: nowrap;
+  color: var(--mm-text1);
+}
+
+.mm-stat__unit {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-overflow: ellipsis;
+  color: var(--mm-text2);
+}
+
+.mm-stat__side {
+  flex: none;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--mm-status-healthy-text);
+}
+
+.mm-stat__body {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* ---- Chip (components/panels/chip.tsx) ----------------------------------- */
+
+.mm-chip {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 6px;
+  height: 24px;
+  padding: 0 10px;
+  border: 1px solid color-mix(in srgb, currentColor 30%, transparent);
+  border-radius: var(--mm-radius-pill);
+  font-size: var(--mm-type-caption);
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.mm-chip__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.mm-chip--healthy {
+  color: var(--mm-status-healthy-text);
+  background: var(--mm-status-healthy-bg);
+}
+
+.mm-chip--warning {
+  color: var(--mm-status-warning-text);
+  background: var(--mm-status-warning-bg);
+}
+
+.mm-chip--failed {
+  color: var(--mm-status-failed-text);
+  background: var(--mm-status-failed-bg);
+}
+
+.mm-chip--info {
+  color: var(--mm-status-info-text);
+  background: var(--mm-status-info-bg);
+}
+
+.mm-chip--neutral {
+  border-color: var(--mm-hairline);
+  color: var(--mm-text2);
+  background: var(--mm-surface-2);
+}
+
+/* ---- Bar-list row (components/panels/bar-list-row.tsx) ------------------- */
+
+.mm-bar-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 5px 10px;
+  margin: -3px -4px;
+  padding: 3px 4px;
+  border-radius: 6px;
+  font-size: 12.5px;
+  color: var(--mm-text2);
+  text-decoration: none;
+}
+
+a.mm-bar-row:hover {
+  background: var(--mm-surface-2);
+}
+
+.mm-bar-row__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mm-bar-row__value {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--mm-text1);
+}
+
+.mm-bar-row__track {
+  grid-column: 1 / -1;
+  height: 6px;
+  overflow: hidden;
+  border-radius: 9px;
+  background: var(--mm-surface-3);
+}
+
+.mm-bar-row__track i {
+  display: block;
+  height: 100%;
+  border-radius: 9px;
+  background: var(--mm-bar-color);
+  transition:
+    width 0.7s cubic-bezier(0.2, 0.8, 0.2, 1),
+    box-shadow 0.3s;
+}
+
+.mm-bar-row--empty {
+  color: var(--mm-text3);
+}
+
+.mm-bar-row--empty .mm-bar-row__value {
+  color: var(--mm-text3);
+}
+
+.mm-bar-row--lit .mm-bar-row__track i {
+  box-shadow: 0 0 12px var(--mm-bar-color);
+}
+
+/* ---- Segmented control (components/panels/segmented-control.tsx) --------- */
+
+.mm-segmented {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-width: 0;
+}
+
+.mm-segmented__option {
+  height: 34px;
+  padding: 0 14px;
+  border: 1px solid transparent;
+  border-radius: var(--mm-radius-control);
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  color: var(--mm-text2);
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.mm-segmented__option:hover {
+  background: var(--mm-surface-2);
+  color: var(--mm-text1);
+}
+
+.mm-segmented__option[aria-pressed="true"] {
+  border-color: color-mix(in srgb, var(--mm-primary) 40%, transparent);
+  background: color-mix(in srgb, var(--mm-primary) 10%, transparent);
+  color: var(--mm-primary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mm-bar-row__track i,
+  .mm-segmented__option {
+    transition: none;
+  }
+}

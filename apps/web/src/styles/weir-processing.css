@@ -114,7 +114,8 @@
   justify-content: space-between;
   gap: 10px 24px;
   padding: 0.3rem 1rem 0.3rem 0.3rem;
-  border: 1px solid color-mix(in srgb, var(--mm-border) 82%, var(--mm-gold) 18%);
+  border: 1px solid
+    color-mix(in srgb, var(--mm-border) 82%, var(--mm-primary) 18%);
   border-radius: 14px;
   background: color-mix(in srgb, var(--mm-surface) 92%, transparent);
 }

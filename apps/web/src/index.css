@@ -3,6 +3,8 @@
 @import "./styles/weir-shell.css";
 @import "./styles/weir-activity.css";
 @import "./styles/weir-toolbar.css";
+@import "./styles/weir-header.css";
+@import "./styles/weir-panels.css";
 @import "./styles/weir-sidebar.css";
 @import "./styles/weir-sidebar-nav.css";
 @import "./styles/weir-main.css";
@@ -43,12 +45,20 @@
  * computed value follows the light theme and any local override exactly as the token does.
  */
 @theme inline {
-  --font-outfit: "Outfit", system-ui, -apple-system, sans-serif;
+  --font-sans: var(--mm-font);
+  --font-mono: var(--mm-font-mono);
+  --font-code: var(--mm-font-code);
   --color-mm-bg: var(--mm-bg);
   --color-mm-bg-main: var(--mm-bg-main);
   --color-mm-card-bg: var(--mm-card-bg);
   --color-mm-surface2: var(--mm-surface2);
   --color-mm-surface-2: var(--mm-surface-2);
+  --color-mm-surface-3: var(--mm-surface-3);
+  --color-mm-surface-elevated: var(--mm-surface-elevated);
+  --color-mm-hairline: var(--mm-hairline);
+  --color-mm-sidebar-bg: var(--mm-sidebar-bg);
+  --color-mm-sidebar-accent: var(--mm-sidebar-accent);
+  --color-mm-sidebar-border: var(--mm-sidebar-border);
   --color-mm-text: var(--mm-text);
   --color-mm-text1: var(--mm-text1);
   --color-mm-text2: var(--mm-text2);
@@ -59,8 +69,24 @@
   --color-mm-accent-bright: var(--mm-accent-bright);
   --color-mm-accent-soft: var(--mm-accent-soft);
   --color-mm-accent-ring: var(--mm-accent-ring);
-  --color-mm-gold: var(--mm-gold);
-  --color-mm-gold-bright: var(--mm-gold-bright);
+  --color-mm-primary: var(--mm-primary);
+  --color-mm-primary-bright: var(--mm-primary-bright);
+  --color-mm-primary-2: var(--mm-primary-2);
+  --color-mm-on-accent: var(--mm-on-accent);
+  --color-mm-success: var(--mm-success);
+  --color-mm-warning: var(--mm-warning);
+  --color-mm-destructive: var(--mm-destructive);
+  --color-mm-info: var(--mm-info);
+  --color-mm-lane-incoming: var(--mm-lane-incoming);
+  --color-mm-lane-queued: var(--mm-lane-queued);
+  --color-mm-lane-analysing: var(--mm-lane-analysing);
+  --color-mm-lane-processing: var(--mm-lane-processing);
+  --color-mm-lane-delivering: var(--mm-lane-delivering);
+  --color-mm-lane-incoming-text: var(--mm-lane-incoming-text);
+  --color-mm-lane-queued-text: var(--mm-lane-queued-text);
+  --color-mm-lane-analysing-text: var(--mm-lane-analysing-text);
+  --color-mm-lane-processing-text: var(--mm-lane-processing-text);
+  --color-mm-lane-delivering-text: var(--mm-lane-delivering-text);
   --color-mm-input-bg: var(--mm-input-bg);
   --color-mm-input-border-focus: var(--mm-input-border-focus);
   --color-mm-well-bg: var(--mm-well-bg);
@@ -76,4 +102,8 @@
   --color-mm-status-info-bg: var(--mm-status-info-bg);
   --tracking-mm-eyebrow: var(--mm-tracking-eyebrow);
   --radius-mm-sm: var(--mm-radius-sm);
+  --radius-mm-control: var(--mm-radius-control);
+  --radius-mm-field: var(--mm-radius-field);
+  --radius-mm-tile: var(--mm-radius-tile);
+  --radius-mm-panel: var(--mm-radius-panel);
 }
