@@ -34,6 +34,27 @@ function initialBackups() {
   );
 }
 
+/** What a backup written while the session runs weighs. */
+const NEW_BACKUP_BYTES = 39_168;
+
+/**
+ * Writes a configuration backup at `nowMs`, as pressing Back up now does, and returns it.
+ * @param {ReturnType<typeof createStore>} store
+ * @param {number} nowMs
+ */
+export function addBackup(store, nowMs) {
+  const number = store.backups.length + 1;
+  const backup = shaped("SuiteConfigurationBackupItemOut", {
+    id: number,
+    file_name: `weir-config-${number}.zip`,
+    size_bytes: NEW_BACKUP_BYTES,
+    created_at: toWire(nowMs),
+  });
+  store.backups.push(backup);
+  store.suite.configuration_backup_last_run_at = toWire(nowMs);
+  return backup;
+}
+
 /**
  * @param {{ scenario?: import("./scenarios.mjs").Scenario, startedAt?: number }} [options] `startedAt` is when the session opens; the connections last answered a little before it.
  */

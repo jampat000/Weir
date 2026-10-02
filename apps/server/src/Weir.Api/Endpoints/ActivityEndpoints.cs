@@ -126,6 +126,7 @@ internal sealed class ActivityEndpointHandlers
     private readonly SuiteSettingsStore _suiteSettings;
     private readonly ActivityProgressFrames _progressFrames;
     private readonly ConnectionActivityFrames _connectionFrames;
+    private readonly SystemStatsFrames _statsFrames;
     private readonly ActivityStreamClients _streamClients;
     private readonly IHostApplicationLifetime _lifetime;
     private readonly ArtworkPosterUrls _posters;
@@ -135,6 +136,7 @@ internal sealed class ActivityEndpointHandlers
         SuiteSettingsStore suiteSettings,
         ActivityProgressFrames progressFrames,
         ConnectionActivityFrames connectionFrames,
+        SystemStatsFrames statsFrames,
         ActivityStreamClients streamClients,
         IHostApplicationLifetime lifetime,
         ArtworkPosterUrls posters)
@@ -143,6 +145,7 @@ internal sealed class ActivityEndpointHandlers
         _suiteSettings = suiteSettings ?? throw new ArgumentNullException(nameof(suiteSettings));
         _progressFrames = progressFrames ?? throw new ArgumentNullException(nameof(progressFrames));
         _connectionFrames = connectionFrames ?? throw new ArgumentNullException(nameof(connectionFrames));
+        _statsFrames = statsFrames ?? throw new ArgumentNullException(nameof(statsFrames));
         _streamClients = streamClients ?? throw new ArgumentNullException(nameof(streamClients));
         _lifetime = lifetime ?? throw new ArgumentNullException(nameof(lifetime));
         _posters = posters ?? throw new ArgumentNullException(nameof(posters));
@@ -285,6 +288,7 @@ internal sealed class ActivityEndpointHandlers
         var notifier = ActivityNotifications.For(database);
         var progressFrames = _progressFrames;
         var connectionFrames = _connectionFrames;
+        var statsFrames = _statsFrames;
         var streamClients = _streamClients;
         var time = request.Time;
         var lifetime = _lifetime;
@@ -335,7 +339,8 @@ internal sealed class ActivityEndpointHandlers
                     streamEndedToken));
                 var progressLoop = PumpAsync(progressFrames.ForAsync(time, streamEndedToken));
                 var connectionLoop = PumpAsync(connectionFrames.ForAsync(streamEndedToken));
-                await Task.WhenAll(activityLoop, progressLoop, connectionLoop).ConfigureAwait(false);
+                var statsLoop = PumpAsync(statsFrames.ForAsync(streamEndedToken));
+                await Task.WhenAll(activityLoop, progressLoop, connectionLoop, statsLoop).ConfigureAwait(false);
             }
             catch (OperationCanceledException) when (streamEndedToken.IsCancellationRequested)
             {

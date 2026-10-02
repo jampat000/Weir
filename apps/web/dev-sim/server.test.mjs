@@ -5,6 +5,10 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { startSimServer } from "./server.mjs";
 import { createSim } from "./sim.mjs";
+import { schemaNamed } from "./openapi/spec.mjs";
+import { violations } from "./openapi/validate.mjs";
+import { fakeClock } from "./test-support.mjs";
+import { SECOND_MS } from "./wire-time.mjs";
 
 // The app's own test setup stubs `fetch` to keep component tests off the network, so these talk to the server with
 // node:http.
@@ -17,8 +21,8 @@ afterEach(async () => {
   running = null;
 });
 
-async function start() {
-  running = await startSimServer(createSim(), { log: () => {} });
+async function start(sim = createSim()) {
+  running = await startSimServer(sim, { log: () => {} });
   return running.port;
 }
 
@@ -118,6 +122,76 @@ describe("the simulated server over HTTP", () => {
       direction: "outbound",
       at: expect.any(String),
       ms: null,
+    });
+  });
+
+  describe("the System frames", () => {
+    /** A server whose clock the test moves, so a frame can be asked for without waiting for one. */
+    async function startWithClock() {
+      const clock = fakeClock();
+      const sim = createSim({ now: clock.now });
+      const port = await start(sim);
+      return { port, sim, move: (ms) => clock.advance(sim, ms) };
+    }
+
+    const frameOf = (text, name) =>
+      JSON.parse(
+        text.split(`event: ${name}\n`)[1].split("\n")[0].slice("data: ".length),
+      );
+
+    it("sends the machine's newest reading with the point that joins the history", async () => {
+      const { port, move } = await startWithClock();
+
+      const { text } = await readStream(port, ["event: system.stats"], () =>
+        move(2 * SECOND_MS),
+      );
+
+      const frame = frameOf(text, "system.stats");
+      expect(frame.now).toMatchObject({
+        cores: 16,
+        running: expect.any(Number),
+        slots: expect.any(Number),
+      });
+      expect(violations(schemaNamed("SystemStatsFrame"), frame)).toEqual([]);
+      expect(frame.point.at).toBe(frame.now.at);
+      expect(frame.point.cpu_percent).toBe(frame.now.cpu_percent);
+    });
+
+    it("sends the whole list of tasks when one starts", async () => {
+      const { port, sim, move } = await startWithClock();
+
+      const { text } = await readStream(port, ["event: system.tasks"], () =>
+        move(40 * SECOND_MS),
+      );
+
+      const rows = frameOf(text, "system.tasks");
+      expect(rows).toHaveLength(sim.tasks.rows().length);
+      expect(rows.some((task) => task.running)).toBe(true);
+      expect(Object.keys(rows[0])).toEqual(Object.keys(sim.tasks.rows()[0]));
+    });
+
+    it("sends a warning or an error the moment it is written to the log, and nothing for information", async () => {
+      const { port, sim } = await startWithClock();
+      const at = sim.now();
+
+      const { text } = await readStream(port, ["event: system.log"], () => {
+        sim.engine.activity.record({ type: "system.note", title: "Fine" }, at);
+        sim.engine.activity.record(
+          {
+            type: "system.disk_space_low",
+            title: "D: is nearly full",
+            result: "warning",
+          },
+          at,
+        );
+      });
+
+      expect(frameOf(text, "system.log")).toEqual({
+        at: "2026-03-14T12:00:00Z",
+        level: "WARNING",
+        message: "D: is nearly full",
+      });
+      expect(text.match(/event: system.log/g)).toHaveLength(1);
     });
   });
 

@@ -7,9 +7,10 @@ const LEVEL_BY_RESULT = {
   warning: "Warning",
   retrying: "Warning",
 };
+const INFORMATION = "Information";
 
 function lineFor(event) {
-  const level = LEVEL_BY_RESULT[event.result] ?? "Information";
+  const level = LEVEL_BY_RESULT[event.result] ?? INFORMATION;
   const subject = event.relativePath
     ? ` ${event.relativePath.split(/[\\/]/).pop()}`
     : "";
@@ -25,6 +26,18 @@ function lineFor(event) {
     job_id: null,
     source: null,
   };
+}
+
+/**
+ * The `system.log` frame for a new Activity entry, or null when it reads as information: only warnings and errors are
+ * sent as they happen, with the level worded as the server's log file words it.
+ * @param {import("../engine/activity-log.mjs").ActivityEvent} event
+ */
+export function logFrameFor(event) {
+  const { timestamp, level, message } = lineFor(event);
+  return level === INFORMATION
+    ? null
+    : { at: timestamp, level: level.toUpperCase(), message };
 }
 
 /**

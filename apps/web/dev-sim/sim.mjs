@@ -3,12 +3,17 @@ import { Artwork } from "./artwork/artwork.mjs";
 import { posterTitles } from "./engine/catalogue.mjs";
 import { Engine } from "./engine/engine.mjs";
 import { LibraryFiles } from "./engine/library-files.mjs";
+import { Machine } from "./machine/machine.mjs";
 import { createRng } from "./engine/rng.mjs";
 import { seedEngine } from "./engine/seed.mjs";
 import { DEFAULT_SCENARIO, SCENARIOS } from "./scenarios.mjs";
 import { createStore } from "./store.mjs";
+import { TaskBook } from "./tasks/task-book.mjs";
 
 export const DEFAULT_SEED = 20_261_002;
+/** Mixed into the seed so the machine and the task list draw from sources of their own, and leave which files turn up as it was. */
+const MACHINE_SALT = 0x4d41_4348;
+const TASKS_SALT = 0x5441_534b;
 
 /**
  * @typedef {object} Sim
@@ -16,6 +21,8 @@ export const DEFAULT_SEED = 20_261_002;
  * @property {ReturnType<typeof createStore>} store
  * @property {LibraryFiles} libraryFiles
  * @property {Artwork} artwork
+ * @property {Machine} machine The computer Weir runs on.
+ * @property {TaskBook} tasks Weir's periodic tasks.
  * @property {() => number} now The current time in epoch ms.
  * @property {number} startedAt
  * @property {import("./scenarios.mjs").Scenario} scenario
@@ -47,6 +54,32 @@ export function createSim({
     scenario,
     startedAt,
   });
+  const machine = new Machine({
+    engine,
+    rng: createRng(seed ^ MACHINE_SALT),
+    startedAt,
+  });
+  const tasks = new TaskBook({
+    engine,
+    rng: createRng(seed ^ TASKS_SALT),
+    startedAt,
+    speed,
+    failing: machine.profile.failingTask,
+  });
+  engine.onTick((nowMs) => {
+    tasks.advance(nowMs);
+    machine.advance(nowMs);
+  });
   if (withHistory) seedEngine(engine, startedAt);
-  return { engine, store, libraryFiles, artwork, now, startedAt, scenario };
+  return {
+    engine,
+    store,
+    libraryFiles,
+    artwork,
+    machine,
+    tasks,
+    now,
+    startedAt,
+    scenario,
+  };
 }

@@ -22,6 +22,8 @@ export class ActivityLog {
   /** @type {ActivityEvent[]} */
   #events = [];
   #nextId = FIRST_EVENT_ID;
+  /** @type {Set<(event: ActivityEvent) => void>} */
+  #listeners = new Set();
 
   /**
    * @param {{ type: string, title: string, detail?: Record<string, unknown>, libraryId?: number | null, relativePath?: string | null, posterId?: string | null, result?: string, trigger?: string }} entry
@@ -43,7 +45,14 @@ export class ActivityLog {
     };
     this.#events.push(event);
     if (this.#events.length > KEPT_EVENTS) this.#events.shift();
+    for (const listener of this.#listeners) listener(event);
     return event;
+  }
+
+  /** Calls `listener` with every entry as it is written. @param {(event: ActivityEvent) => void} listener */
+  onRecord(listener) {
+    this.#listeners.add(listener);
+    return () => this.#listeners.delete(listener);
   }
 
   /** Every entry, oldest first. */

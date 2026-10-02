@@ -53,20 +53,41 @@ const NOT_JSON = [
   /\/artwork\/posters\//,
 ];
 
+/** Routes the simulation serves before the contract documents them; each one comes off this list once it is documented. */
+const AHEAD_OF_THE_CONTRACT = [
+  "GET /api/v1/system/overview",
+  "GET /api/v1/system/tasks",
+];
+
+const routeKey = (method, template) => `${method} ${templateShape(template)}`;
+
 describe("the simulated API against the API contract", () => {
   it("only has routes the contract describes", () => {
     const real = new Set(
-      operations().map((op) => `${op.method} ${templateShape(op.template)}`),
+      operations().map((op) => routeKey(op.method, op.template)),
     );
 
     const invented = router
       .routes()
       .filter(
         (route) =>
-          !real.has(`${route.method} ${templateShape(route.template)}`),
+          !real.has(routeKey(route.method, route.template)) &&
+          !AHEAD_OF_THE_CONTRACT.includes(
+            routeKey(route.method, route.template),
+          ),
       );
 
     expect(invented).toEqual([]);
+  });
+
+  it("does not list a route as ahead of the contract once the contract describes it", () => {
+    const documented = new Set(
+      operations().map((op) => routeKey(op.method, op.template)),
+    );
+
+    expect(
+      AHEAD_OF_THE_CONTRACT.filter((route) => documented.has(route)),
+    ).toEqual([]);
   });
 
   it("answers every read the contract describes in the shape the contract gives", () => {

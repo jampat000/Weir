@@ -269,8 +269,7 @@ public sealed class ActivityApiTests
 
         using var reader = new StreamReader(await response.Content.ReadAsStreamAsync());
         Assert.Equal(["retry: 5000"], await NextBlockAsync(reader));
-        var first = await NextBlockAsync(reader);
-        Assert.Equal("event: activity.latest", first[0]);
+        var first = await NextActivityLatestBlockAsync(reader);
         var latest = await TestDatabase.ScalarAsync(server, "SELECT max(id) FROM activity_events");
         Assert.Equal($"data: {{\"latest_event_id\":{latest},\"activity_revision\":{Revision(first)}}}", first[1]);
 
@@ -323,7 +322,7 @@ public sealed class ActivityApiTests
         using var response = await server.Client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
         using var reader = new StreamReader(await response.Content.ReadAsStreamAsync());
         await NextBlockAsync(reader); // "retry: ..."
-        await NextBlockAsync(reader); // the opening activity.latest frame
+        await NextActivityLatestBlockAsync(reader); // the opening frame
 
         await TestDatabase.ExecuteAsync(
             server,
@@ -334,7 +333,7 @@ public sealed class ActivityApiTests
         var poll = server.Services.GetRequiredService<ActivityLatestPollTask>();
         await poll.RunOnceAsync(CancellationToken.None);
 
-        var block = await NextBlockAsync(reader);
+        var block = await NextActivityLatestBlockAsync(reader);
         Assert.Contains($"\"latest_event_id\":{insertedId}", block[1], StringComparison.Ordinal);
         Assert.Contains("Password changed", await TitlesAboutWeirAsync(client));
     }
@@ -493,9 +492,9 @@ public sealed class ActivityApiTests
         using var readerA = await OpenStreamAsync(server, clientA);
         using var readerB = await OpenStreamAsync(server, clientB);
         await NextBlockAsync(readerA); // retry
-        await NextBlockAsync(readerA); // the opening activity.latest frame
+        await NextActivityLatestBlockAsync(readerA); // the opening frame
         await NextBlockAsync(readerB);
-        await NextBlockAsync(readerB);
+        await NextActivityLatestBlockAsync(readerB);
 
         // Connecting and watching for a change happens after the client gets its response headers back, so an
         // update sent right away can race the stream's own watch starting. Repeating the update until a frame
@@ -570,6 +569,22 @@ public sealed class ActivityApiTests
     {
         var data = JsonNode.Parse(block[1]["data: ".Length..])!;
         return data["activity_revision"]!.GetValue<long>();
+    }
+
+    /// <summary>
+    /// The next <c>activity.latest</c> frame, skipping the frames of the other kinds the stream sends (the system.stats
+    /// frame goes out the moment a stream opens, so it can come before this one).
+    /// </summary>
+    private static async Task<string[]> NextActivityLatestBlockAsync(StreamReader reader)
+    {
+        string[] block;
+        do
+        {
+            block = await NextBlockAsync(reader);
+        }
+        while (block[0] != "event: activity.latest");
+
+        return block;
     }
 
     private static async Task<string[]> NextBlockAsync(StreamReader reader)

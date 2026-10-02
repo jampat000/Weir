@@ -62,6 +62,7 @@ export class Engine {
   #cleans;
   #changed = false;
   #listeners = new Set();
+  #tickListeners = new Set();
 
   /** @param {EngineOptions} options */
   constructor({ rng, speed, store, libraryFiles, scenario, startedAt }) {
@@ -95,6 +96,12 @@ export class Engine {
   onChange(listener) {
     this.#listeners.add(listener);
     return () => this.#listeners.delete(listener);
+  }
+
+  /** Calls `listener` with the time at the end of every tick, before anything it changed is announced. @param {(nowMs: number) => void} listener */
+  onTick(listener) {
+    this.#tickListeners.add(listener);
+    return () => this.#tickListeners.delete(listener);
   }
 
   /** Marks the state as changed, so the next notification goes out. */
@@ -161,6 +168,7 @@ export class Engine {
     this.#settleHandbacks(nowMs);
     this.#cleans.scheduleNext(nowMs);
     this.#startWork(nowMs);
+    for (const listener of this.#tickListeners) listener(nowMs);
     if (!this.#changed) return;
     this.#changed = false;
     this.revision += 1;
@@ -428,6 +436,11 @@ export class Engine {
     }
     this.touch();
     return true;
+  }
+
+  /** When Weir next cleans each workflow by itself, and how long a round of them takes. @param {number} nowMs */
+  cleanDueTimes(nowMs) {
+    return this.#cleans.dueTimes(nowMs);
   }
 
   /** Library cleans recorded so far, newest first, for History. */

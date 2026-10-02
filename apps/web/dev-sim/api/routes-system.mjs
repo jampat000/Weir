@@ -4,9 +4,10 @@ import {
   mediaTools,
   readiness,
   updateStatus,
+  WEIR_UPTIME_AT_START_MS,
 } from "../fixtures/settings.mjs";
 import { shaped } from "../openapi/skeleton.mjs";
-import { toWire, HOUR_MS } from "../wire-time.mjs";
+import { toWire, SECOND_MS } from "../wire-time.mjs";
 import { activityLogLines } from "./log-lines.mjs";
 import { download, Reply } from "./reply.mjs";
 
@@ -18,7 +19,8 @@ const FOLDER_TREE = {
   "D:\\Media": ["Movies", "TV"],
   "D:\\Weir": ["hand-back", "work"],
   "D:\\Weir\\hand-back": ["Movies", "TV"],
-  "E:\\": ["Backups"],
+  "E:\\": ["Backups", "Weir"],
+  "E:\\Weir": ["work"],
 };
 
 const isDriveRoot = (path) => /^[A-Za-z]:\\?$/.test(path);
@@ -52,16 +54,13 @@ function browse(requested) {
   };
 }
 
-const SUITE_UPTIME_HOURS = 6;
-
 function metrics(sim) {
   const totalRequests = 1840 + Math.round((sim.now() - sim.startedAt) / 250);
   return shaped("SuiteMetricsOut", {
     total_requests: totalRequests,
     average_response_ms: 6.4,
     uptime_seconds:
-      SUITE_UPTIME_HOURS * (HOUR_MS / 1000) +
-      (sim.now() - sim.startedAt) / 1000,
+      (WEIR_UPTIME_AT_START_MS + (sim.now() - sim.startedAt)) / SECOND_MS,
     error_log_count: 0,
     status_counts: { 200: totalRequests - 14, 204: 9, 304: 5 },
     busiest_routes: [

@@ -18,6 +18,7 @@ using Weir.Infrastructure.Processing.RemuxPass;
 using Weir.Infrastructure.Runtime;
 using Weir.Infrastructure.Scheduling;
 using Weir.Infrastructure.Settings;
+using Weir.Infrastructure.SystemReadings;
 
 namespace Weir.Api;
 
@@ -28,6 +29,7 @@ public static class WeirApi
     {
         ArgumentNullException.ThrowIfNull(options);
         services.AddWeirPlatform(options);
+        services.AddWeirSystemStats(options);
         services.AddSingleton<ServerLifecycle>();
         services.AddSingleton(WebApp.Resolve(options.WebDist));
         services.AddSingleton<IOperatorAuthentication, SessionOperatorAuthentication>();
@@ -42,12 +44,14 @@ public static class WeirApi
         // frames it takes a single dependency instead of holding the store only to forward it.
         services.TryAddSingleton<ActivityProgressFrames>();
         services.TryAddSingleton<ConnectionActivityFrames>();
+        services.TryAddSingleton<SystemStatsFrames>();
 
         // Endpoint handler groups: one instance per group, constructor-injected with the stores it needs.
         services.AddSingleton<AuthAccountEndpointHandlers>();
         services.AddSingleton<AuthSessionEndpointHandlers>();
         services.AddSingleton<AuthSessionLifecycleEndpointHandlers>();
         services.AddSingleton<ActivityEndpointHandlers>();
+        services.AddSingleton<SystemStatsEndpointHandlers>();
         services.AddSingleton<NotificationEndpointHandlers>();
         services.AddSingleton<SuiteConfigurationEndpointHandlers>();
         services.AddSingleton<SuiteDiagnosticsEndpointHandlers>();
@@ -128,6 +132,7 @@ public static class WeirApi
         app.UseEndpoints(endpoints =>
         {
             endpoints.MapSystemEndpoints();
+            endpoints.MapSystemStatsEndpoints();
             endpoints.MapOpenApiEndpoint();
             endpoints.MapMetricsEndpoint();
             endpoints.MapAuthEndpoints();

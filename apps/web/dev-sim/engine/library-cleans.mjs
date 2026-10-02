@@ -2,7 +2,7 @@
 import { CONNECTION_KIND } from "./connection-health.mjs";
 import { JOB_KIND, JOB_STATUS } from "./jobs.mjs";
 import { EVENT_TYPE } from "./records.mjs";
-import { toWire } from "../wire-time.mjs";
+import { SECOND_MS, toWire } from "../wire-time.mjs";
 
 /** How long a clean takes and how long Weir waits between starting one on its own, at normal speed. */
 const CLEAN_MS = [5_000, 11_000];
@@ -114,6 +114,38 @@ export class CleanRuns {
       this.#running.delete(jobId);
       this.#finish(this.#engine.jobs.get(jobId), nowMs);
     }
+  }
+
+  /**
+   * When each library Weir cleans on its own is next due: the one whose turn it is when the timer runs out, then the
+   * rest in turn a typical gap apart. A round takes as long as it takes to get through them all.
+   * @param {number} nowMs
+   * @returns {Map<number, { nextRunAt: number, intervalSeconds: number }>}
+   */
+  dueTimes(nowMs) {
+    const libraries = this.#engine.store.libraries.filter(
+      (library) => library.enabled,
+    );
+    const pace = this.#engine.scenario.pace;
+    const gapMs = (CLEAN_GAP_MS[0] + CLEAN_GAP_MS[1]) / 2;
+    const first =
+      this.#nextAt === 0
+        ? nowMs + FIRST_CLEAN_MS / (this.#speed * pace)
+        : this.#nextAt;
+    const turn = this.#rotation % Math.max(1, libraries.length);
+    const roundSeconds = (gapMs * libraries.length) / pace / SECOND_MS;
+    return new Map(
+      libraries.map((library, index) => [
+        library.id,
+        {
+          nextRunAt:
+            first +
+            (((index - turn + libraries.length) % libraries.length) * gapMs) /
+              (this.#speed * pace),
+          intervalSeconds: Math.round(roundSeconds),
+        },
+      ]),
+    );
   }
 
   /** Queues the next clean of a library Weir looks after on its own, once enough time has passed. @param {number} nowMs */

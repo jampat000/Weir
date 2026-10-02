@@ -4,11 +4,9 @@ import {
   maintenanceFamilies,
 } from "../fixtures/settings.mjs";
 import { shaped } from "../openapi/skeleton.mjs";
-import { toWire } from "../wire-time.mjs";
+import { addBackup } from "../store.mjs";
 import { registerCollection } from "./collection.mjs";
 import { registerSingleton } from "./singleton.mjs";
-
-const BACKUP_BYTES = 39_168;
 
 /** Plain-language notes on how the background workers are set up; nothing here can be changed from the web app. */
 function runtimeSettings(sim) {
@@ -118,16 +116,9 @@ export function registerSettingsRoutes(router) {
     directory: "E:\\Backups\\Weir",
     items: [...sim.store.backups].reverse(),
   }));
-  router.post("/api/v1/suite/configuration-backups", ({ sim }) => {
-    const backup = shaped("SuiteConfigurationBackupItemOut", {
-      id: sim.store.backups.length + 1,
-      file_name: `weir-config-${sim.store.backups.length + 1}.zip`,
-      size_bytes: BACKUP_BYTES,
-      created_at: toWire(sim.now()),
-    });
-    sim.store.backups.push(backup);
-    return backup;
-  });
+  router.post("/api/v1/suite/configuration-backups", ({ sim }) =>
+    addBackup(sim.store, sim.now()),
+  );
   router.post("/api/v1/suite/apply-update", () => ({
     downloaded: false,
     pending_version: null,

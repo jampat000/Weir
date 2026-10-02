@@ -18,6 +18,10 @@ const KIDS_RULES_ID = 3;
 
 const UPDATED_DAYS_AGO = 12;
 
+/** Where passes write while they work: most workflows use the system drive, and the 4K one a drive of its own. */
+const SYSTEM_WORK_FOLDER = "D:\\Weir\\work";
+const SPARE_DRIVE_WORK_FOLDER = "E:\\Weir\\work";
+
 /** What a workflow starts with; a new one made from Settings begins here too. */
 export const libraryDefaults = () => ({
   enabled: true,
@@ -65,6 +69,7 @@ export function initialLibraries() {
       media_type: "movie",
       display_order: 1,
       watched_folder: "D:\\Downloads\\Movies",
+      work_folder: SYSTEM_WORK_FOLDER,
       output_folder: "D:\\Weir\\hand-back\\Movies",
       rule_set_id: MOVIES_RULES_ID,
       manager_connection_ids: [MOVIES_MANAGER_ID],
@@ -75,6 +80,7 @@ export function initialLibraries() {
       media_type: "tv",
       display_order: 2,
       watched_folder: "D:\\Downloads\\TV",
+      work_folder: SYSTEM_WORK_FOLDER,
       output_folder: "D:\\Weir\\hand-back\\TV",
       rule_set_id: TV_RULES_ID,
       manager_connection_ids: [TV_MANAGER_ID],
@@ -85,6 +91,7 @@ export function initialLibraries() {
       media_type: "movie",
       display_order: 3,
       watched_folder: "D:\\Downloads\\Kids",
+      work_folder: SYSTEM_WORK_FOLDER,
       output_folder: "D:\\Weir\\hand-back\\Kids",
       rule_set_id: KIDS_RULES_ID,
       manager_connection_ids: [],
@@ -95,6 +102,7 @@ export function initialLibraries() {
       media_type: "movie",
       display_order: 4,
       watched_folder: "D:\\Downloads\\4K Movies",
+      work_folder: SPARE_DRIVE_WORK_FOLDER,
       output_folder: "D:\\Weir\\hand-back\\4K Movies",
       rule_set_id: MOVIES_RULES_ID,
       manager_connection_ids: [FOUR_K_MANAGER_ID],

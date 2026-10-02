@@ -3,6 +3,8 @@ import { shaped } from "../openapi/skeleton.mjs";
 import { toWire, HOUR_MS, DAY_MS } from "../wire-time.mjs";
 
 export const APP_VERSION = "3.2.16";
+/** How long Weir had been running when the session opened. */
+export const WEIR_UPTIME_AT_START_MS = 6 * HOUR_MS;
 export const FILES_AT_ONCE_DEFAULT = 2;
 const WORKER_SLOTS = 4;
 
