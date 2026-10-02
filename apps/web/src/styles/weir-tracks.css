@@ -12,6 +12,13 @@
   border-radius: var(--mm-radius-sm);
 }
 
+.mm-tracks-table-tools {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0.4rem 0.6rem;
+  border-bottom: 1px solid var(--mm-border);
+}
+
 /* The way back from choosing a default subtitle, under the table it belongs to. */
 .mm-tracks-no-default {
   display: flex;

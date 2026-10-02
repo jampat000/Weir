@@ -1,30 +1,33 @@
+import { Fragment, type ReactNode } from "react";
+
 import type { ProcessingFileTrack } from "../../lib/processing/files-api";
 import { plural } from "../../lib/ui/mm-plural";
+import { useTableColumns } from "../../lib/ui/use-table-columns";
+import { ColumnsMenu } from "../shared/columns-menu";
+import { SortableColumnHeader } from "../shared/sortable-column-header";
+import {
+  TRACK_COLUMN_LABELS,
+  TRACK_COLUMNS,
+  type TrackColumnId,
+} from "./choose-tracks-columns";
 import type { TrackChoice } from "./use-track-choice";
-
-/** The table's column names, also shown beside each value once a narrow screen stacks the rows. */
-const COLUMNS = {
-  keep: "Keep",
-  track: "Track",
-  default: "Default",
-  forced: "Forced",
-  rule: "What the saved rules would do",
-} as const;
 
 function TrackRow({
   track,
   choice,
+  order,
 }: {
   track: ProcessingFileTrack;
   choice: TrackChoice;
+  order: readonly TrackColumnId[];
 }) {
   const state = choice.rows[track.index];
   const kept = state?.keep ?? false;
   const label = choice.labelOf(track);
   const type = track.type;
-  return (
-    <tr data-testid={`choose-tracks-row-${track.index}`}>
-      <td data-label={COLUMNS.keep}>
+  const cells: Record<TrackColumnId, ReactNode> = {
+    keep: (
+      <td data-col="keep" data-label={TRACK_COLUMN_LABELS.keep}>
         {/* The label is the target: a 24px square around a box drawn at the text's own size. */}
         <label className="mm-tracks-check-target">
           <input
@@ -36,10 +39,18 @@ function TrackRow({
           />
         </label>
       </td>
-      <td data-label={COLUMNS.track} className="mm-tracks-table__track">
+    ),
+    track: (
+      <td
+        data-col="track"
+        data-label={TRACK_COLUMN_LABELS.track}
+        className="mm-tracks-table__track"
+      >
         {label}
       </td>
-      <td data-label={COLUMNS.default}>
+    ),
+    default: (
+      <td data-col="default" data-label={TRACK_COLUMN_LABELS.default}>
         {type === "audio" || type === "subtitle" ? (
           <label className="mm-tracks-check-target">
             <input
@@ -54,7 +65,9 @@ function TrackRow({
           </label>
         ) : null}
       </td>
-      <td data-label={COLUMNS.forced}>
+    ),
+    forced: (
+      <td data-col="forced" data-label={TRACK_COLUMN_LABELS.forced}>
         {track.type === "subtitle" ? (
           <label className="mm-tracks-check-target">
             <input
@@ -68,10 +81,23 @@ function TrackRow({
           </label>
         ) : null}
       </td>
-      <td data-label={COLUMNS.rule} className="mm-tracks-table__rule">
+    ),
+    rule: (
+      <td
+        data-col="rule"
+        data-label={TRACK_COLUMN_LABELS.rule}
+        className="mm-tracks-table__rule"
+      >
         <strong>{track.rule_would_keep ? "Would keep" : "Would remove"}</strong>{" "}
         — {track.rule_reason}
       </td>
+    ),
+  };
+  return (
+    <tr data-testid={`choose-tracks-row-${track.index}`}>
+      {order.map((id) => (
+        <Fragment key={id}>{cells[id]}</Fragment>
+      ))}
     </tr>
   );
 }
@@ -100,21 +126,28 @@ function NoDefaultSubtitle({ choice }: { choice: TrackChoice }) {
  * row stacks into a card of labelled values rather than scrolling sideways.
  */
 export function TrackTable({ choice }: { choice: TrackChoice }) {
+  const columns = useTableColumns(TRACK_COLUMNS);
   return (
     <div className="mm-tracks-table-wrap">
-      <table className="mm-tracks-table">
+      <div className="mm-tracks-table-tools">
+        <ColumnsMenu table={columns} />
+      </div>
+      <table className="mm-tracks-table" {...columns.tableProps}>
         <thead>
           <tr>
-            {Object.values(COLUMNS).map((column) => (
-              <th key={column} scope="col">
-                {column}
-              </th>
+            {columns.order.map((id) => (
+              <SortableColumnHeader key={id} heading={columns.heading(id)} />
             ))}
           </tr>
         </thead>
         <tbody>
           {choice.selectable.map((track) => (
-            <TrackRow key={track.index} track={track} choice={choice} />
+            <TrackRow
+              key={track.index}
+              track={track}
+              choice={choice}
+              order={columns.order}
+            />
           ))}
         </tbody>
       </table>
