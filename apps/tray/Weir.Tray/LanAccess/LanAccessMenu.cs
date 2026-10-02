@@ -40,11 +40,14 @@ sealed class LanAccessMenu : IDisposable
         items.Add(_thisPcOnlyItem);
     }
 
-    /// <summary>Another process (<c>--allow-lan</c>) changed the choice and the server has restarted to match.</summary>
-    internal void OnChangedElsewhere(ListenScope scope, ScopeChange change)
+    /// <summary>Another process (the web page, <c>--allow-lan</c>) saved a choice that needs the Windows admin prompt.</summary>
+    internal void OnWaitingForWindows() => Show(LanAccessActivity.WaitingForWindows);
+
+    /// <summary>Another process changed the choice and the tray has carried it out, or could not.</summary>
+    internal void OnChangedElsewhere(SavedChoiceApplied applied)
     {
         Show(LanAccessActivity.Idle);
-        _notify(LanAccessNotice.Restarted(scope, change));
+        _notify(LanAccessNotice.ForSavedChoice(applied));
     }
 
     // Blocks on the elevated child process (and the UAC prompt the person answers) off the UI thread, so the tray's

@@ -82,4 +82,48 @@ public sealed class LanAccessNoticeTests
         Assert.True(notice.IsWarning);
         Assert.Contains("still set up the way it was", notice.Text, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void A_choice_saved_elsewhere_and_allowed_through_the_firewall_reads_like_the_menu_does()
+    {
+        var applied = new SavedChoiceApplied(ListenScope.OtherDevices, ScopeChange.Applied, FirewallElevation.Outcome.Configured);
+
+        Assert.Equal(LanAccessNotice.Restarted(ListenScope.OtherDevices, ScopeChange.Applied), LanAccessNotice.ForSavedChoice(applied));
+    }
+
+    [Fact]
+    public void Declining_the_prompt_for_a_choice_saved_elsewhere_says_the_firewall_still_blocks_and_where_to_try_again()
+    {
+        var applied = new SavedChoiceApplied(ListenScope.OtherDevices, ScopeChange.Applied, FirewallElevation.Outcome.Declined);
+
+        var notice = LanAccessNotice.ForSavedChoice(applied);
+
+        Assert.True(notice.IsWarning);
+        Assert.Contains("Windows Firewall still blocks them", notice.Text, StringComparison.Ordinal);
+        Assert.Contains("try again", notice.Text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_restart_that_failed_after_the_prompt_is_reported_as_the_restart_failing()
+    {
+        var applied = new SavedChoiceApplied(ListenScope.OtherDevices, ScopeChange.Failed, FirewallElevation.Outcome.Configured);
+
+        Assert.Equal(LanAccessNotice.Restarted(ListenScope.OtherDevices, ScopeChange.Failed), LanAccessNotice.ForSavedChoice(applied));
+    }
+
+    [Fact]
+    public void Declining_the_prompt_when_asking_again_says_the_firewall_was_not_changed()
+    {
+        var applied = new SavedChoiceApplied(ListenScope.OtherDevices, ScopeChange.Unchanged, FirewallElevation.Outcome.Declined);
+
+        Assert.Equal(LanAccessNotice.FirewallStepFailed(FirewallElevation.Outcome.Declined, ListenScope.OtherDevices), LanAccessNotice.ForSavedChoice(applied));
+    }
+
+    [Fact]
+    public void Allowing_the_firewall_when_asking_again_says_windows_now_allows_weir()
+    {
+        var applied = new SavedChoiceApplied(ListenScope.OtherDevices, ScopeChange.Unchanged, FirewallElevation.Outcome.Configured);
+
+        Assert.Equal(LanAccessNotice.FirewallAllowsWeir(), LanAccessNotice.ForSavedChoice(applied));
+    }
 }
