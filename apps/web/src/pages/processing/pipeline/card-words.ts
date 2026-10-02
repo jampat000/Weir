@@ -136,7 +136,7 @@ export function queuedWords(item: WaitingItem, place: number): CardWords {
 
 const ANALYSING_TEXT: Partial<Record<FlowStepId, string>> = {
   checking: "Checking file",
-  plan: "Planning tracks",
+  plan: "Planning",
 };
 
 function analysingWords(item: WorkingItem): CardWords {
@@ -161,7 +161,7 @@ function writingWords(item: WorkingItem, percent: number): CardWords {
   const removed = removedTrackWords(item);
   return {
     status: {
-      text: [`${whole}% writing`, figures.speed].filter(Boolean).join(" · "),
+      text: `${whole}% writing`,
       lead: `${whole}%`,
       tone: "info",
       pulse: false,
@@ -180,6 +180,7 @@ function writingWords(item: WorkingItem, percent: number): CardWords {
             right: figures.running ? `running ${figures.running}` : undefined,
           }
         : null,
+      figures.speed ? { parts: ["Speed ", bold(figures.speed)] } : null,
       removed.length > 0
         ? { parts: ["Removing ", bold(removed.join(", "))] }
         : null,

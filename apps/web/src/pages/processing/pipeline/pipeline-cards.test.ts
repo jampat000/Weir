@@ -157,7 +157,7 @@ describe("what a card says", () => {
 
     expect(card.status).toMatchObject({
       lead: "42%",
-      text: "42% writing · 148×",
+      text: "42% writing",
       pulse: false,
     });
     expect(card.bar).toEqual({ width: 42, waiting: false, moving: true });
@@ -168,6 +168,7 @@ describe("what a card says", () => {
 
     expect(written(card)).toContain("18:54 of 45:00");
     expect(written(card)).toContain("Reading");
+    expect(written(card)).toContain("Speed 148×");
     expect(written(card)).toContain("running 2 min 14 s");
     expect(written(card)).toContain("Download · TV");
     expect(written(card)).toContain(

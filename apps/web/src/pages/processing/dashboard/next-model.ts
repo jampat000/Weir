@@ -52,7 +52,7 @@ function scans(workflows: readonly ProcessingLibrary[]): NextItem[] {
     return [
       {
         key: `scan-${workflow.id}`,
-        label: `Scan ${workflow.name} downloads`,
+        label: `Scan ${workflow.name}`,
         to: workflowPath(workflow.id),
         at,
         intervalSeconds: workflow.scan_interval_seconds,
