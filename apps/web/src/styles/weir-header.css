@@ -292,6 +292,11 @@
   min-width: 0;
 }
 
+/* A tab is never squeezed into More: the row is as wide as the tabs it shows, and More follows it. */
+.mm-page-tabs-fit__row > .mm-page-tabs {
+  flex: none;
+}
+
 .mm-page-tabs__measure {
   display: flex;
   column-gap: 18px;
