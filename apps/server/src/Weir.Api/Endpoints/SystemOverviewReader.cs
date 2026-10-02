@@ -1,0 +1,117 @@
+using Weir.Core.Configuration;
+using Weir.Core.Json;
+using Weir.Core.Metrics;
+using Weir.Core.Time;
+using Weir.Infrastructure.Activity;
+using Weir.Infrastructure.Http;
+using Weir.Infrastructure.Processing;
+using Weir.Infrastructure.Runtime;
+using Weir.Infrastructure.Settings;
+using Weir.Infrastructure.Sqlite;
+
+namespace Weir.Api.Endpoints;
+
+/// <summary>
+/// The <c>GET /api/v1/system/overview</c> body: the facts System shows about this copy of Weir, each read from the store that
+/// already holds it. Nothing here asks a media manager, a download client or GitHub; the slow ones (the size of the data folder,
+/// the latest release) are kept and refreshed on their own.
+/// </summary>
+internal sealed class SystemOverviewReader
+{
+    /// <summary>How far back "restarts this week" looks.</summary>
+    private static readonly TimeSpan RestartWindow = TimeSpan.FromDays(7);
+
+    private readonly ServerLifecycle _lifecycle;
+    private readonly ServerListenOptions _listen;
+    private readonly MachineIdentity _machine;
+    private readonly ServerRunMode _runMode;
+    private readonly TimeProvider _time;
+    private readonly ActivityStreamClients _streamClients;
+    private readonly RuntimeMetricsStore _metrics;
+    private readonly JobsInspectionStore _jobs;
+    private readonly ServerStartStore _starts;
+    private readonly DataFootprint _footprint;
+    private readonly UpdateOutlook _updates;
+    private readonly SuiteSettingsStore _suiteSettings;
+    private readonly SystemChecks _checks;
+
+    public SystemOverviewReader(
+        ServerLifecycle lifecycle,
+        ServerListenOptions listen,
+        MachineIdentity machine,
+        ServerRunMode runMode,
+        TimeProvider time,
+        ActivityStreamClients streamClients,
+        RuntimeMetricsStore metrics,
+        JobsInspectionStore jobs,
+        ServerStartStore starts,
+        DataFootprint footprint,
+        UpdateOutlook updates,
+        SuiteSettingsStore suiteSettings,
+        SystemChecks checks)
+    {
+        _lifecycle = lifecycle ?? throw new ArgumentNullException(nameof(lifecycle));
+        _listen = listen ?? throw new ArgumentNullException(nameof(listen));
+        _machine = machine ?? throw new ArgumentNullException(nameof(machine));
+        _runMode = runMode ?? throw new ArgumentNullException(nameof(runMode));
+        _time = time ?? throw new ArgumentNullException(nameof(time));
+        _streamClients = streamClients ?? throw new ArgumentNullException(nameof(streamClients));
+        _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
+        _jobs = jobs ?? throw new ArgumentNullException(nameof(jobs));
+        _starts = starts ?? throw new ArgumentNullException(nameof(starts));
+        _footprint = footprint ?? throw new ArgumentNullException(nameof(footprint));
+        _updates = updates ?? throw new ArgumentNullException(nameof(updates));
+        _suiteSettings = suiteSettings ?? throw new ArgumentNullException(nameof(suiteSettings));
+        _checks = checks ?? throw new ArgumentNullException(nameof(checks));
+    }
+
+    public async Task<WireObject> ReadAsync(UnitOfWork uow, IServiceProvider services, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(uow);
+        ArgumentNullException.ThrowIfNull(services);
+        var now = _time.GetUtcNow();
+        var suite = await _suiteSettings.GetAsync(uow).ConfigureAwait(false);
+        var today = TimeZones.StartOfLocalDay(now, suite?.AppTimezone);
+        var readiness = await SystemEndpoints.BuildReadinessAsync(services).ConfigureAwait(false);
+        var checks = await _checks.CountAsync(uow, readiness).ConfigureAwait(false);
+        var jobsToday = await _jobs.CountFinishedSinceAsync(uow, today).ConfigureAwait(false);
+        var restarts = await _starts.RestartsSinceAsync(uow, now - RestartWindow).ConfigureAwait(false);
+        var requests = _metrics.GetRequestFigures(today);
+        var update = _updates.Current();
+        var dataBytes = await _footprint.BytesAsync(cancellationToken).ConfigureAwait(false);
+
+        return new WireObject()
+            .Set("version", readiness.Version)
+            .Set("update", new WireObject()
+                .Set("status", update.Status)
+                .Set("latest_version", update.LatestVersion))
+            .Set("uptime_seconds", (long)_lifecycle.Elapsed.TotalSeconds)
+            .Set("started_at", Timestamp.FromDateTimeOffset(_lifecycle.StartedAt.ToUniversalTime()).ToWireText())
+            .Set("runs_as", _runMode.Name)
+            .Set("address", AddressOf(_listen, _machine))
+            .Set("data_bytes", dataBytes)
+            .Set("browsers_live", _streamClients.Count)
+            .Set("requests", new WireObject()
+                .Set("median_ms", requests.MedianMs)
+                .Set("p95_ms", requests.P95Ms)
+                .Set("errors_today", requests.ServerErrors))
+            .Set("jobs_today", new WireObject().Set("run", jobsToday.Run).Set("failed", jobsToday.Failed))
+            .Set("restarts_this_week", restarts)
+            .Set("checks", new WireObject().Set("passing", checks.Passing).Set("total", checks.Total));
+    }
+
+    /// <summary>
+    /// Where a browser reaches Weir: this PC's own name when it listens on every interface, <c>localhost</c> when only this PC
+    /// can connect, otherwise the address it was told to bind.
+    /// </summary>
+    internal static string AddressOf(ServerListenOptions listen, MachineIdentity machine)
+    {
+        var host = listen.Host switch
+        {
+            "0.0.0.0" or "*" or "::" => machine.Name,
+            _ when listen.IsThisPcOnly => "localhost",
+            _ => listen.Host,
+        };
+        return host.Contains(':', StringComparison.Ordinal) ? $"http://[{host}]:{listen.Port}" : $"http://{host}:{listen.Port}";
+    }
+}

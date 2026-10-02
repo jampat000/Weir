@@ -127,6 +127,8 @@ internal sealed class ActivityEndpointHandlers
     private readonly ActivityProgressFrames _progressFrames;
     private readonly ConnectionActivityFrames _connectionFrames;
     private readonly SystemStatsFrames _statsFrames;
+    private readonly SystemTasksFrames _tasksFrames;
+    private readonly SystemLogFrames _logFrames;
     private readonly ActivityStreamClients _streamClients;
     private readonly IHostApplicationLifetime _lifetime;
     private readonly ArtworkPosterUrls _posters;
@@ -137,6 +139,8 @@ internal sealed class ActivityEndpointHandlers
         ActivityProgressFrames progressFrames,
         ConnectionActivityFrames connectionFrames,
         SystemStatsFrames statsFrames,
+        SystemTasksFrames tasksFrames,
+        SystemLogFrames logFrames,
         ActivityStreamClients streamClients,
         IHostApplicationLifetime lifetime,
         ArtworkPosterUrls posters)
@@ -146,6 +150,8 @@ internal sealed class ActivityEndpointHandlers
         _progressFrames = progressFrames ?? throw new ArgumentNullException(nameof(progressFrames));
         _connectionFrames = connectionFrames ?? throw new ArgumentNullException(nameof(connectionFrames));
         _statsFrames = statsFrames ?? throw new ArgumentNullException(nameof(statsFrames));
+        _tasksFrames = tasksFrames ?? throw new ArgumentNullException(nameof(tasksFrames));
+        _logFrames = logFrames ?? throw new ArgumentNullException(nameof(logFrames));
         _streamClients = streamClients ?? throw new ArgumentNullException(nameof(streamClients));
         _lifetime = lifetime ?? throw new ArgumentNullException(nameof(lifetime));
         _posters = posters ?? throw new ArgumentNullException(nameof(posters));
@@ -289,6 +295,8 @@ internal sealed class ActivityEndpointHandlers
         var progressFrames = _progressFrames;
         var connectionFrames = _connectionFrames;
         var statsFrames = _statsFrames;
+        var tasksFrames = _tasksFrames;
+        var logFrames = _logFrames;
         var streamClients = _streamClients;
         var time = request.Time;
         var lifetime = _lifetime;
@@ -340,7 +348,9 @@ internal sealed class ActivityEndpointHandlers
                 var progressLoop = PumpAsync(progressFrames.ForAsync(time, streamEndedToken));
                 var connectionLoop = PumpAsync(connectionFrames.ForAsync(streamEndedToken));
                 var statsLoop = PumpAsync(statsFrames.ForAsync(streamEndedToken));
-                await Task.WhenAll(activityLoop, progressLoop, connectionLoop, statsLoop).ConfigureAwait(false);
+                var tasksLoop = PumpAsync(tasksFrames.ForAsync(streamEndedToken));
+                var logLoop = PumpAsync(logFrames.ForAsync(streamEndedToken));
+                await Task.WhenAll(activityLoop, progressLoop, connectionLoop, statsLoop, tasksLoop, logLoop).ConfigureAwait(false);
             }
             catch (OperationCanceledException) when (streamEndedToken.IsCancellationRequested)
             {

@@ -12,6 +12,8 @@ public sealed class RequestContextMiddleware
 {
     public const string HeaderName = "X-Request-ID";
 
+    private const string EventStreamContentType = "text/event-stream";
+
     private readonly RequestDelegate _next;
     private readonly ILogger _logger;
     private readonly Core.Metrics.RuntimeMetricsStore _metrics;
@@ -56,8 +58,19 @@ public sealed class RequestContextMiddleware
             throw;
         }
 
-        _metrics.RecordRequest(context.Request.Method, RouteLabelFor(context), context.Response.StatusCode, _time.GetElapsedTime(started).TotalMilliseconds);
+        var elapsedMs = _time.GetElapsedTime(started).TotalMilliseconds;
+        if (IsEventStream(context))
+        {
+            _metrics.RecordStreamRequest(context.Request.Method, RouteLabelFor(context), context.Response.StatusCode, elapsedMs);
+        }
+        else
+        {
+            _metrics.RecordRequest(context.Request.Method, RouteLabelFor(context), context.Response.StatusCode, elapsedMs);
+        }
     }
+
+    private static bool IsEventStream(HttpContext context) =>
+        context.Response.ContentType?.StartsWith(EventStreamContentType, StringComparison.OrdinalIgnoreCase) == true;
 
     /// <summary>The label of the route the request matched (see <see cref="RouteLabel"/>), else the URL path.</summary>
     private string RouteLabelFor(HttpContext context) =>

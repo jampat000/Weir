@@ -78,6 +78,8 @@ public sealed partial class ManagerHeartbeatTask(
 
     public string Name => "media-manager-heartbeat";
 
+    public string? Label => "Check media managers";
+
     public TimeSpan Interval => TimeSpan.FromMinutes(1);
 
     public bool RunAtStart => true;

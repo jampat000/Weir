@@ -27,6 +27,8 @@ public sealed class ActivityLatestPollTask : IPeriodicTask
 
     public string Name => "activity-latest-poll";
 
+    public string? Label => null;
+
     public TimeSpan Interval => TimeSpan.FromSeconds(2);
 
     public bool RunAtStart => false;

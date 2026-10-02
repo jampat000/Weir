@@ -3,6 +3,7 @@ using Weir.Core.Activity;
 using Weir.Core.Jobs;
 using Weir.Infrastructure.Activity;
 using Weir.Infrastructure.Jobs;
+using Weir.Infrastructure.Scheduling;
 
 namespace Weir.Infrastructure.Tests.Jobs;
 
@@ -52,6 +53,47 @@ public sealed class ProcessingJobProcessorTests : IDisposable
         Assert.Contains("Weir job failed", row.LastError, StringComparison.Ordinal);
         Assert.Contains("marked failed", row.LastError, StringComparison.Ordinal);
         Assert.Equal(["failed 1 processing.test.bad.v1 willRetry=False"], notifications.Sent);
+    }
+
+    [Fact]
+    public async Task A_cleanup_job_that_runs_is_reported_to_the_task_list_as_finished_and_working()
+    {
+        var tasks = new PeriodicTaskRegistry(_db.Clock);
+        tasks.Plan(ScheduledJobTasks.LeftoverFiles.Key, ScheduledJobTasks.LeftoverFiles.Label, T0.AddHours(1), TimeSpan.FromHours(1));
+        await _db.Store.EnqueueOrGetAsync("sweep", PeriodicJobKinds.WorkTempStaleSweep, "{\"media_scope\":\"movie\"}");
+        var running = false;
+        var processor = _db.Processor([new DelegateHandler(PeriodicJobKinds.WorkTempStaleSweep, _ => running = tasks.Snapshot().Single().Running)], tasks: tasks);
+
+        await processor.ProcessOneAsync("w", 3600, T0);
+
+        var task = Assert.Single(tasks.Snapshot());
+        Assert.Equal((true, false, true, null), (running, task.Running, task.LastOk, task.LastError));
+    }
+
+    [Fact]
+    public async Task A_cleanup_job_that_fails_is_reported_to_the_task_list_with_a_plain_reason()
+    {
+        var tasks = new PeriodicTaskRegistry(_db.Clock);
+        tasks.Plan(ScheduledJobTasks.LeftoverFiles.Key, ScheduledJobTasks.LeftoverFiles.Label, T0.AddHours(1), TimeSpan.FromHours(1));
+        await _db.Store.EnqueueOrGetAsync("sweep", PeriodicJobKinds.WorkTempStaleSweep, "{\"media_scope\":\"movie\"}", maxAttempts: 1);
+        var processor = _db.Processor([new DelegateHandler(PeriodicJobKinds.WorkTempStaleSweep, _ => throw new InvalidOperationException("boom"))], tasks: tasks);
+
+        await processor.ProcessOneAsync("w", 3600, T0);
+
+        var task = Assert.Single(tasks.Snapshot());
+        Assert.Equal((false, "The job hit an unexpected error."), (task.LastOk, task.LastError));
+    }
+
+    [Fact]
+    public async Task A_job_no_timer_is_responsible_for_adds_nothing_to_the_task_list()
+    {
+        var tasks = new PeriodicTaskRegistry(_db.Clock);
+        await _db.Store.EnqueueOrGetAsync("d1", "processing.test.ok.v1");
+        var processor = _db.Processor([new DelegateHandler("processing.test.ok.v1", _ => { })], tasks: tasks);
+
+        await processor.ProcessOneAsync("w", 3600, T0);
+
+        Assert.Empty(tasks.Snapshot());
     }
 
     [Fact]

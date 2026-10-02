@@ -27,6 +27,8 @@ public sealed class ConnectionUsageFlushTask : IPeriodicTask
 
     public string Name => "connection-usage-flush";
 
+    public string? Label => null;
+
     public TimeSpan Interval => TimeSpan.FromSeconds(10);
 
     public bool RunAtStart => false;

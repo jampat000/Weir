@@ -8,12 +8,14 @@ public sealed class WeirLogFileLoggerProvider : ILoggerProvider
     private readonly WeirLogFile _file;
     private readonly TimeProvider _time;
     private readonly LogLevel _minimumLevel;
+    private readonly LogAlerts? _alerts;
 
-    public WeirLogFileLoggerProvider(WeirLogFile file, TimeProvider time, LogLevel minimumLevel)
+    public WeirLogFileLoggerProvider(WeirLogFile file, TimeProvider time, LogLevel minimumLevel, LogAlerts? alerts = null)
     {
         _file = file;
         _time = time;
         _minimumLevel = minimumLevel;
+        _alerts = alerts;
     }
 
     public ILogger CreateLogger(string categoryName) => new FileLogger(this, categoryName);
@@ -38,14 +40,13 @@ public sealed class WeirLogFileLoggerProvider : ILoggerProvider
                 return;
             }
 
-            provider._file.WriteLine(LogLineFormat.JsonLine(
-                provider._time.GetUtcNow(),
-                logLevel,
-                category,
-                formatter(state, exception),
-                exception,
-                LogContext.RequestId,
-                LogContext.JobId));
+            var now = provider._time.GetUtcNow();
+            var message = formatter(state, exception);
+            provider._file.WriteLine(LogLineFormat.JsonLine(now, logLevel, category, message, exception, LogContext.RequestId, LogContext.JobId));
+            if (logLevel >= LogLevel.Warning && message.Trim() is { Length: > 0 } alertText)
+            {
+                provider._alerts?.Publish(new LogAlert(now, LogLineFormat.LevelName(logLevel), alertText));
+            }
         }
     }
 }

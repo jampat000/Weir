@@ -30,12 +30,14 @@ public static class WeirApi
         ArgumentNullException.ThrowIfNull(options);
         services.AddWeirPlatform(options);
         services.AddWeirSystemStats(options);
+        services.AddWeirSystemOverview(options);
         services.AddSingleton<ServerLifecycle>();
         services.AddSingleton(WebApp.Resolve(options.WebDist));
         services.AddSingleton<IOperatorAuthentication, SessionOperatorAuthentication>();
         services.AddSingleton<RouteTable>();
         services.AddSingleton<WeirOpenApiDocumentCache>();
         services.TryAddSingleton<RuntimeMetricsStore>();
+        services.AddSingleton<IJobQueueMetrics, RuntimeJobQueueMetrics>();
         services.AddSingleton<AuthService>();
         services.AddSingleton<AuthRateLimiters>();
         services.AddSingleton<SetupCodeGate>();
@@ -133,6 +135,7 @@ public static class WeirApi
         {
             endpoints.MapSystemEndpoints();
             endpoints.MapSystemStatsEndpoints();
+            endpoints.MapSystemOverviewEndpoints();
             endpoints.MapOpenApiEndpoint();
             endpoints.MapMetricsEndpoint();
             endpoints.MapAuthEndpoints();

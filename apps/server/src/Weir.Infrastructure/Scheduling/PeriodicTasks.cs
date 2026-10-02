@@ -13,8 +13,11 @@ namespace Weir.Infrastructure.Scheduling;
 /// </summary>
 public interface IPeriodicTask
 {
-    /// <summary>The task's name, used in its logger category.</summary>
+    /// <summary>The task's name, used in its logger category and as its key in <see cref="PeriodicTaskRegistry"/>.</summary>
     string Name { get; }
+
+    /// <summary>What the System screen calls the task; null for plumbing that polls too often to be worth listing.</summary>
+    string? Label { get; }
 
     /// <summary>Time between runs.</summary>
     TimeSpan Interval { get; }
@@ -25,7 +28,7 @@ public interface IPeriodicTask
     /// <summary>How long to wait after a failed run before trying again (the interval when <see langword="null"/>).</summary>
     TimeSpan? FailureCooldown { get; }
 
-    /// <summary>What is logged (with the exception) when a run fails.</summary>
+    /// <summary>What is logged (with the exception) when a run fails; also what the System screen says went wrong.</summary>
     string FailureMessage { get; }
 
     Task RunOnceAsync(CancellationToken cancellationToken);
@@ -33,15 +36,23 @@ public interface IPeriodicTask
 
 /// <summary>
 /// One periodic loop: optionally wait an interval first, then run; after a success wait the interval,
-/// after a failure log it and wait the cooldown (or the interval). Stops quietly on cancellation.
+/// after a failure log it and wait the cooldown (or the interval). Stops quietly on cancellation. A task with a
+/// <see cref="IPeriodicTask.Label"/> reports each run to the <see cref="PeriodicTaskRegistry"/>.
 /// </summary>
 public static class PeriodicTaskRunner
 {
-    public static async Task RunAsync(IPeriodicTask task, TimeProvider time, ILogger logger, CancellationToken stoppingToken)
+    public static async Task RunAsync(
+        IPeriodicTask task,
+        TimeProvider time,
+        ILogger logger,
+        CancellationToken stoppingToken,
+        PeriodicTaskRegistry? registry = null)
     {
         ArgumentNullException.ThrowIfNull(task);
         ArgumentNullException.ThrowIfNull(time);
         ArgumentNullException.ThrowIfNull(logger);
+        var listing = new Listing(task, time, registry);
+        listing.Plan(task.RunAtStart ? TimeSpan.Zero : task.Interval);
         if (!task.RunAtStart && !await DelayAsync(task.Interval, time, stoppingToken).ConfigureAwait(false))
         {
             return;
@@ -50,10 +61,12 @@ public static class PeriodicTaskRunner
         while (!stoppingToken.IsCancellationRequested)
         {
             TimeSpan wait;
+            listing.Begin();
             try
             {
                 await task.RunOnceAsync(stoppingToken).ConfigureAwait(false);
                 wait = task.Interval;
+                listing.End(ok: true, wait);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
@@ -67,6 +80,7 @@ public static class PeriodicTaskRunner
                 logger.LogError(exception, task.FailureMessage);
 #pragma warning restore CA2254
                 wait = task.FailureCooldown ?? task.Interval;
+                listing.End(ok: false, wait);
             }
 
             if (!await DelayAsync(wait, time, stoppingToken).ConfigureAwait(false))
@@ -88,6 +102,36 @@ public static class PeriodicTaskRunner
             return false;
         }
     }
+
+    /// <summary>One task's entries in the registry; does nothing for a task with no label or no registry.</summary>
+    private readonly struct Listing(IPeriodicTask task, TimeProvider time, PeriodicTaskRegistry? registry)
+    {
+        private bool Listed => registry is not null && task.Label is not null;
+
+        public void Plan(TimeSpan firstRunIn)
+        {
+            if (Listed)
+            {
+                registry!.Plan(task.Name, task.Label!, time.GetUtcNow() + firstRunIn, task.Interval);
+            }
+        }
+
+        public void Begin()
+        {
+            if (Listed)
+            {
+                registry!.Begin(task.Name);
+            }
+        }
+
+        public void End(bool ok, TimeSpan nextRunIn)
+        {
+            if (Listed)
+            {
+                registry!.End(task.Name, ok, ok ? null : task.FailureMessage, time.GetUtcNow() + nextRunIn);
+            }
+        }
+    }
 }
 
 /// <summary>Runs every registered <see cref="IPeriodicTask"/> on its own loop while the server runs.</summary>
@@ -96,17 +140,19 @@ public sealed class PeriodicTaskService : BackgroundService
     private readonly IReadOnlyList<IPeriodicTask> _tasks;
     private readonly TimeProvider _time;
     private readonly ILoggerFactory _loggers;
+    private readonly PeriodicTaskRegistry _registry;
 
-    public PeriodicTaskService(IEnumerable<IPeriodicTask> tasks, TimeProvider time, ILoggerFactory loggers)
+    public PeriodicTaskService(IEnumerable<IPeriodicTask> tasks, TimeProvider time, ILoggerFactory loggers, PeriodicTaskRegistry registry)
     {
         _tasks = [.. tasks];
         _time = time;
         _loggers = loggers;
+        _registry = registry ?? throw new ArgumentNullException(nameof(registry));
     }
 
     protected override Task ExecuteAsync(CancellationToken stoppingToken) =>
         Task.WhenAll(_tasks.Select(task => Task.Run(
-            () => PeriodicTaskRunner.RunAsync(task, _time, _loggers.CreateLogger($"Weir.Periodic.{task.Name}"), stoppingToken),
+            () => PeriodicTaskRunner.RunAsync(task, _time, _loggers.CreateLogger($"Weir.Periodic.{task.Name}"), stoppingToken, _registry),
             CancellationToken.None)));
 }
 
@@ -126,6 +172,8 @@ public sealed class SessionCleanupTask : IPeriodicTask
     }
 
     public string Name => "auth-session-cleanup";
+
+    public string? Label => "Clear old sign-ins";
 
     public TimeSpan Interval => TimeSpan.FromSeconds(3600);
 
@@ -174,6 +222,8 @@ public sealed class LogRetentionTask : IPeriodicTask
     }
 
     public string Name => "suite-log-retention";
+
+    public string? Label => "Trim the log";
 
     public TimeSpan Interval => TimeSpan.FromSeconds(3600);
 
@@ -228,6 +278,8 @@ public sealed class ConfigurationBackupTask : IPeriodicTask
     }
 
     public string Name => "suite-configuration-backup";
+
+    public string? Label => "Configuration backup check";
 
     public TimeSpan Interval => TimeSpan.FromSeconds(60);
 

@@ -10,6 +10,7 @@ using Weir.Core.Workers;
 using Weir.Infrastructure.Activity;
 using Weir.Infrastructure.Auth;
 using Weir.Infrastructure.ConnectionTraffic;
+using Weir.Infrastructure.Logging;
 using Weir.Infrastructure.Notifications;
 using Weir.Infrastructure.Processing;
 using Weir.Infrastructure.Runtime;
@@ -42,6 +43,8 @@ public static class WeirPlatformServices
         services.TryAddSingleton<ConnectionUsageLedger>();
         services.TryAddSingleton<ConnectionActivityHub>();
         services.TryAddSingleton<ActivityStreamClients>();
+        services.TryAddSingleton<LogAlerts>();
+        services.TryAddSingleton<PeriodicTaskRegistry>();
 
         // Auth, Activity, Notifications and Suite settings: instance stores over UnitOfWork, stateless
         // themselves, so one shared instance serves every request.

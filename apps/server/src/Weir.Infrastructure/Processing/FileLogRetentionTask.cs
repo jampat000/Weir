@@ -16,6 +16,8 @@ public sealed class FileLogRetentionTask(
 {
     public string Name => "processing-file-log-retention";
 
+    public string? Label => "Prune file history";
+
     public TimeSpan Interval => TimeSpan.FromSeconds(3600);
 
     /// <summary>Prunes once at startup, before the first wait, so a long-running interval never delays the first prune.</summary>

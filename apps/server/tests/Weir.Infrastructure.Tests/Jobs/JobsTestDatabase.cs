@@ -5,6 +5,7 @@ using Weir.Core.Activity;
 using Weir.Core.Jobs;
 using Weir.Infrastructure.Activity;
 using Weir.Infrastructure.Jobs;
+using Weir.Infrastructure.Scheduling;
 using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Infrastructure.Tests.Jobs;
@@ -50,7 +51,8 @@ internal sealed class JobsTestDatabase : IDisposable
         IEnumerable<IJobHandler>? handlers = null,
         IUnhandledJobFailureRecorder? recorder = null,
         IJobNotifications? notifications = null,
-        bool claimAllKinds = false) =>
+        bool claimAllKinds = false,
+        PeriodicTaskRegistry? tasks = null) =>
         new(
             Store,
             new JobHandlerRegistry(handlers ?? []),
@@ -58,7 +60,8 @@ internal sealed class JobsTestDatabase : IDisposable
             recorder ?? new NoUnhandledJobFailureRecorder(),
             notifications ?? new NoJobNotifications(),
             Clock,
-            NullLogger<ProcessingJobProcessor>.Instance)
+            NullLogger<ProcessingJobProcessor>.Instance,
+            tasks)
         {
             Kinds = claimAllKinds ? null : ClaimableKinds.For(new JobHandlerRegistry(handlers ?? [])),
         };

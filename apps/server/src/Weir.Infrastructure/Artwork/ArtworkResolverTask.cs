@@ -35,6 +35,8 @@ public sealed class ArtworkResolverTask : IPeriodicTask
 
     public string Name => "artwork-resolver";
 
+    public string? Label => null;
+
     public TimeSpan Interval => TimeSpan.FromSeconds(5);
 
     public bool RunAtStart => false;

@@ -4,6 +4,7 @@ using Weir.Core.LibraryMode;
 using Weir.Infrastructure.Auth;
 using Weir.Infrastructure.LibraryMode;
 using Weir.Infrastructure.Processing;
+using Weir.Infrastructure.Scheduling;
 using Weir.Infrastructure.Settings;
 using Weir.Infrastructure.Tests.MediaManagers;
 
@@ -22,8 +23,8 @@ public sealed class LibraryModeScheduleTaskTests : IDisposable
 
     public void Dispose() => _fixture.Dispose();
 
-    private LibraryModeScheduleTask Timer() => new(
-        _fixture.Store.Database, _fixture.Jobs, _scans, _librarySettings, _libraries, _fixture.Store.Clock, _suiteSettings, NullLogger<LibraryModeScheduleTask>.Instance);
+    private LibraryModeScheduleTask Timer(PeriodicTaskRegistry? tasks = null) => new(
+        _fixture.Store.Database, _fixture.Jobs, _scans, _librarySettings, _libraries, _fixture.Store.Clock, _suiteSettings, NullLogger<LibraryModeScheduleTask>.Instance, tasks);
 
     private async Task<long> LibraryAsync(bool scheduleOn = true, bool withFolder = true, string name = "Films")
     {
@@ -56,6 +57,35 @@ public sealed class LibraryModeScheduleTaskTests : IDisposable
                 await _librarySettings.GetAsync(uow, library),
                 _fixture.Store.Clock.GetUtcNow()),
             commit: false);
+
+    [Fact]
+    public async Task A_workflow_with_the_schedule_on_is_listed_with_its_name_and_a_day_between_runs()
+    {
+        var library = await LibraryAsync(name: "Films");
+        var tasks = new PeriodicTaskRegistry(_fixture.Store.Clock);
+        var start = _fixture.Store.Clock.GetUtcNow();
+
+        await Timer(tasks).RunOnceAsync(CancellationToken.None);
+
+        var listed = Assert.Single(tasks.Snapshot());
+        Assert.Equal(
+            (ScheduledJobTasks.LibraryCleanKey(library), "Clean Films library", start.AddDays(1), TimeSpan.FromDays(1)),
+            (listed.Key, listed.Label, listed.NextRunAt, listed.Interval));
+    }
+
+    [Fact]
+    public async Task A_workflow_whose_schedule_is_switched_off_leaves_the_task_list()
+    {
+        var library = await LibraryAsync();
+        var tasks = new PeriodicTaskRegistry(_fixture.Store.Clock);
+        await Timer(tasks).RunOnceAsync(CancellationToken.None);
+        Assert.Single(tasks.Snapshot());
+
+        await _fixture.Db(async uow => { await _librarySettings.SetAsync(uow, library, new LibrarySettings(["/library/films"], ScheduleEnabled: false)); return true; });
+        await Timer(tasks).RunOnceAsync(CancellationToken.None);
+
+        Assert.Empty(tasks.Snapshot());
+    }
 
     [Fact]
     public void It_is_hosted_under_its_own_name()
