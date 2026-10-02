@@ -116,7 +116,7 @@
   border-radius: 8px;
 }
 
-.mm-conn__base,
+.mm-conn__name,
 .mm-conn__role {
   min-width: 0;
   overflow: hidden;
@@ -124,18 +124,11 @@
   white-space: nowrap;
 }
 
-/* The nickname is what tells two of one kind apart, so the name gives way before it does. */
+/* The name has the room the dot, role and time leave, and says the fullest words that fit it (FitText). */
 .mm-conn__name {
-  display: flex;
-  min-width: 0;
-  flex: 0 1 auto;
+  flex: 1 1 0;
   font-weight: 600;
-  white-space: pre;
   color: var(--mm-text1);
-}
-
-.mm-conn__nickname {
-  flex: none;
 }
 
 .mm-conn__role {

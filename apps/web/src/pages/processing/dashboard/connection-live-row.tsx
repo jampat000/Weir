@@ -3,10 +3,12 @@ import { Link } from "react-router-dom";
 import type { ConnectionLight } from "../../../lib/connections/connection-lights";
 import {
   answerWords,
+  connectionNameWords,
   type ConnectionEntry,
   type ConnectionState,
 } from "../../../lib/connections/connection-model";
 import { classNames } from "../../../lib/ui/class-names";
+import { FitText } from "../../../lib/ui/fit-text";
 import { checkedAgo } from "./health-model";
 
 const ROLE_WORDS: Record<ConnectionEntry["kind"], string> = {
@@ -59,12 +61,13 @@ export function ConnectionLiveRow({
     >
       <Link to={to} className="mm-conn__link" title={entry.name}>
         <span className="mm-conn__dot" aria-hidden="true" />
-        <span className="mm-conn__name">
-          <span className="mm-conn__base">{entry.baseName}</span>
-          {entry.nickname ? (
-            <span className="mm-conn__nickname"> · {entry.nickname}</span>
-          ) : null}
-        </span>
+        <span className="sr-only">{entry.name}</span>
+        <FitText
+          className="mm-conn__name"
+          words={connectionNameWords(entry)}
+          title={entry.name}
+          ariaHidden
+        />
         <span className="mm-conn__role">{ROLE_WORDS[entry.kind]}</span>
         <span className="mm-conn__when">
           <span className="sr-only">{STATE_WORDS[entry.state]}. </span>

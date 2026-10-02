@@ -4,7 +4,6 @@ import { connectionEntry } from "../../../lib/connections/connection-fixtures";
 import type { ConnectionEntry } from "../../../lib/connections/connection-model";
 import {
   checkedWords,
-  connectionNameWords,
   connectionSub,
   connectionSubWords,
   connectionTooltip,
@@ -186,26 +185,6 @@ describe("a row's words", () => {
 });
 
 describe("a row's words that narrow with the room", () => {
-  it("drop where it runs from the name, then the nickname, never cutting a word", () => {
-    expect(
-      connectionNameWords(
-        manager(1, {
-          name: "Radarr on LIVINGROOM-HTPC · 4K",
-          baseName: "Radarr on LIVINGROOM-HTPC",
-          nickname: "4K",
-        }),
-      ),
-    ).toEqual(["Radarr on LIVINGROOM-HTPC · 4K", "Radarr · 4K", "Radarr"]);
-    expect(
-      connectionNameWords(
-        manager(1, {
-          name: "qBittorrent on NAS",
-          baseName: "qBittorrent on NAS",
-        }),
-      ),
-    ).toEqual(["qBittorrent on NAS", "qBittorrent"]);
-  });
-
   it("drop the address from the second line, and say a down connection's state alone", () => {
     expect(connectionSubWords(manager(1))).toEqual([
       "Radarr · http://localhost:7878",

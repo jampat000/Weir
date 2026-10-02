@@ -7,6 +7,7 @@ import {
   answerWords,
   connectionEntries,
   connectionKey,
+  connectionNameWords,
   type ConnectionAnswer,
 } from "./connection-model";
 
@@ -163,5 +164,33 @@ describe("how long an answer took", () => {
   it("is said in milliseconds", () => {
     expect(answerWords(84)).toBe("84 ms");
     expect(answerWords(2384.4)).toBe("2,384 ms");
+  });
+});
+
+describe("a connection's name in words that narrow with the room", () => {
+  it("drops where it runs from the name and keeps the nickname", () => {
+    expect(
+      connectionNameWords({
+        name: "Radarr on LIVINGROOM-HTPC · 4K",
+        baseName: "Radarr on LIVINGROOM-HTPC",
+        nickname: "4K",
+      }),
+    ).toEqual(["Radarr on LIVINGROOM-HTPC · 4K", "Radarr · 4K"]);
+  });
+
+  it("is the app's name alone without a nickname", () => {
+    expect(
+      connectionNameWords({
+        name: "qBittorrent on NAS",
+        baseName: "qBittorrent on NAS",
+        nickname: "",
+      }),
+    ).toEqual(["qBittorrent on NAS", "qBittorrent"]);
+  });
+
+  it("has one set of words for a name that does not say where it runs", () => {
+    expect(
+      connectionNameWords({ name: "Radarr", baseName: "Radarr", nickname: "" }),
+    ).toEqual(["Radarr"]);
   });
 });

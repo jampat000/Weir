@@ -155,6 +155,21 @@ export function answerWords(ms: number): string {
   return `${Math.round(ms).toLocaleString()} ms`;
 }
 
+/** What Weir puts between an app's name and where it runs: "Radarr on MEDIA-PC". */
+const HOST_SEPARATOR = " on ";
+
+/**
+ * A connection's name in words that narrow with the room: the whole name, then without where it runs ("Radarr · 4K",
+ * "Sonarr"). The nickname stays, since it tells two of one kind apart; a line too narrow for even that ends in an ellipsis.
+ */
+export function connectionNameWords(
+  entry: Pick<ConnectionEntry, "name" | "baseName" | "nickname">,
+): string[] {
+  const [app] = entry.baseName.split(HOST_SEPARATOR);
+  const withoutHost = entry.nickname ? `${app} · ${entry.nickname}` : app;
+  return [...new Set([entry.name, withoutHost])];
+}
+
 /** Whether a connection is down or slow: something to look at. */
 export const needsALook = (entry: ConnectionEntry): boolean =>
   entry.state === "down" || entry.state === "slow";

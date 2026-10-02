@@ -87,6 +87,26 @@ describe("a connection's row", () => {
     );
   });
 
+  it("keeps the whole name for a screen reader and on hover, whatever words the row has room for", () => {
+    const row = renderRow({
+      name: "Radarr on MEDIA-PC · 4K",
+      baseName: "Radarr on MEDIA-PC",
+      nickname: "4K",
+    });
+
+    expect(row.querySelector(".sr-only")).toHaveTextContent(
+      "Radarr on MEDIA-PC · 4K",
+    );
+    expect(row.querySelector(".mm-conn__name")).toHaveAttribute(
+      "title",
+      "Radarr on MEDIA-PC · 4K",
+    );
+    expect(row.querySelector(".mm-conn__name")).toHaveAttribute(
+      "aria-hidden",
+      "true",
+    );
+  });
+
   it("calls a download client a client", () => {
     expect(
       renderRow({ kind: "download_client", kindLabel: "qBittorrent" }),
@@ -97,7 +117,9 @@ describe("a connection's row", () => {
     const row = renderRow({ state: "slow", checkedAt: NOW, answerMs: 2400 });
 
     expect(row).toHaveClass("mm-conn--slow");
-    expect(row.querySelector(".sr-only")).toHaveTextContent("slow to answer");
+    expect(row.querySelector(".mm-conn__when .sr-only")).toHaveTextContent(
+      "slow to answer",
+    );
   });
 
   it.each<ConnectionLight>(["asking", "answered", "failed"])(

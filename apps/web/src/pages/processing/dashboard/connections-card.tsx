@@ -1,13 +1,15 @@
 import { Panel } from "../../../components/panels/panel";
 import type { ConnectionLight } from "../../../lib/connections/connection-lights";
-import type { ConnectionEntry } from "../../../lib/connections/connection-model";
+import {
+  connectionNameWords,
+  type ConnectionEntry,
+} from "../../../lib/connections/connection-model";
 import { classNames } from "../../../lib/ui/class-names";
 import { useFittingRows } from "./fit-rows";
 import { FitText } from "../../../lib/ui/fit-text";
 import { MoreCount } from "./system/more-count";
 import {
   checkedWords,
-  connectionNameWords,
   connectionSubWords,
   connectionTooltip,
   connectionsLineWords,
