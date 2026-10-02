@@ -28,3 +28,8 @@ export function sharedWaitSeconds(
   const [wait] = waits;
   return waits.size === 1 && wait > 0 ? wait : null;
 }
+
+/** What the wait for a new download says, the fullest first: "new downloads wait 60s", then "wait 60s". */
+export function waitWords(seconds: number): string[] {
+  return [`new downloads wait ${seconds}s`, `wait ${seconds}s`];
+}

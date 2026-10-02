@@ -6,7 +6,8 @@ import { IN_PROGRESS_PATH } from "../pipeline/pipeline-stages";
 import type { Filter } from "../processing-filter";
 import type { WorkingItem } from "../processing-model";
 import { useFittingRows } from "./fit-rows";
-import { STEP_WORDS } from "./working-words";
+import { FitText } from "./system/fit-words";
+import { STEP_WORDS, waitWords } from "./working-words";
 import { setupTabPath } from "../../../lib/settings/setup-areas";
 
 /** The most files the tile lists before saying how many more there are; how many show is up to its height. */
@@ -113,11 +114,6 @@ export function WorkingTile({
               {" · "}
             </span>
           ) : null}
-          {waitSeconds === null ? null : (
-            <span className="mm-aside__note">
-              new downloads wait {waitSeconds}s ·{" "}
-            </span>
-          )}
           <Link to={PERFORMANCE_PATH}>Change</Link>
         </span>
       }
@@ -131,6 +127,13 @@ export function WorkingTile({
               ? "at once"
               : `of ${filesAtOnce.toLocaleString()} at once`}
           </StatUnit>
+          {waitSeconds === null ? null : (
+            <FitText
+              className="mm-stat__note"
+              words={waitWords(waitSeconds)}
+              title={`New downloads wait ${waitSeconds} seconds after they stop changing.`}
+            />
+          )}
         </>
       }
     >

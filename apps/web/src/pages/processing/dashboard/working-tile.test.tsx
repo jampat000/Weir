@@ -140,11 +140,18 @@ describe("the Working on now tile", () => {
     expect(screen.queryByTestId("live-working")).toBeNull();
   });
 
-  it("names the wait for a new download beside the link that changes it", () => {
+  it("names the wait for a new download beside the figure, where the tile's width never hides it", () => {
     renderTile();
 
     const tile = screen.getByRole("region", { name: "Working on now" });
-    expect(tile).toHaveTextContent("new downloads wait 60s");
+    expect(tile.querySelector(".mm-stat__figure")).toHaveTextContent(
+      "new downloads wait 60s",
+    );
+    expect(tile.querySelector(".mm-stat__note")).toHaveAttribute(
+      "title",
+      "New downloads wait 60 seconds after they stop changing.",
+    );
+    expect(tile.querySelector(".mm-stat__aside")).not.toHaveTextContent("wait");
     expect(within(tile).getByRole("link", { name: "Change" })).toHaveAttribute(
       "href",
       "/setup/performance",

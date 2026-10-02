@@ -7,18 +7,11 @@
   white-space: nowrap;
 }
 
-/* In a narrow tile the aside gives way from its note: the words after "Change" go first, then how many more. */
+/* In a narrow tile the aside gives way: how many more goes first, and the link that changes the limit stays. */
 .mm-aside {
   display: flex;
   min-width: 0;
   justify-content: flex-end;
-}
-
-.mm-aside__note {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: pre;
 }
 
 .mm-aside__more {
@@ -28,6 +21,21 @@
 
 .mm-aside a {
   flex: none;
+}
+
+/* The note beside a figure (how long a new download waits) takes the room the figure leaves and says as much of itself as
+   fits it: the tile measures it (working-tile.tsx). */
+.mm-stat__note {
+  min-width: 0;
+  flex: 1 1 0;
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--mm-text3);
 }
 
 .mm-stat__idle {

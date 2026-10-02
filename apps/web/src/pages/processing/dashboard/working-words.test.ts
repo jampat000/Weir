@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { STEP_WORDS, sharedWaitSeconds } from "./working-words";
+import { STEP_WORDS, sharedWaitSeconds, waitWords } from "./working-words";
 
 const workflow = (enabled: boolean, ready_after_seconds: number) => ({
   enabled,
@@ -42,5 +42,11 @@ describe("the step a pass is on, in words", () => {
       "Verifying",
       "Handing back",
     ]);
+  });
+});
+
+describe("what the wait for a new download says", () => {
+  it("says it whole, then in fewer words for a tile too narrow for it", () => {
+    expect(waitWords(60)).toEqual(["new downloads wait 60s", "wait 60s"]);
   });
 });

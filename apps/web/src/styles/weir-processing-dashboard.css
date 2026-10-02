@@ -82,13 +82,6 @@
   }
 }
 
-/* The note about the wait for a new download is shown whole or not at all: it needs a band this wide. */
-@container mm-band (max-width: 74rem) {
-  .mm-dash .mm-aside__note {
-    display: none;
-  }
-}
-
 .mm-dash__grid--beside {
   display: grid;
   height: 100%;
