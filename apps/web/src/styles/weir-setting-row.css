@@ -53,25 +53,11 @@
 
 /*
  * Settings groups: a panel holding a line on why the group matters, then one setting per row with
- * hairlines between (components/shared/settings-group.tsx). Two groups sit side by side above 1180px
- * (.mm-setgroups--columns), because a page too long for the screen uses the width, not more height.
+ * hairlines between (components/shared/settings-group.tsx). A group takes the page's full width, like every
+ * other card in Setup.
  */
-.mm-setgroups {
-  display: flex;
-  flex-direction: column;
-  gap: var(--mm-panel-gap);
-}
-
-@media (min-width: 1180px) {
-  .mm-setgroups--columns {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    align-items: start;
-  }
-}
-
 .mm-setgroup__detail {
-  margin: 0 0 6px;
+  margin: 0 0 10px;
   font-size: 0.8125rem;
   line-height: 1.5;
   color: var(--mm-text3);
@@ -81,6 +67,11 @@
   display: flex;
   flex-direction: column;
   min-width: 0;
+}
+
+/* The group's own actions, set off from its last row. */
+.mm-setgroup__rows + .mm-quiet-actions {
+  margin-top: 12px;
 }
 
 .mm-setrow {

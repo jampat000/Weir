@@ -176,6 +176,33 @@
   cursor: not-allowed;
 }
 
+/* An empty list: what its things are for and the one action that adds the first (components/shared/empty-state.tsx). */
+.mm-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 36px 24px;
+  border: 1px dashed var(--mm-border);
+  border-radius: var(--mm-radius-panel);
+  text-align: center;
+}
+
+.mm-empty-state__title {
+  margin: 0;
+  font-size: var(--mm-type-panel);
+  font-weight: 600;
+  color: var(--mm-text1);
+}
+
+.mm-empty-state__text {
+  max-width: 34rem;
+  margin: 0 0 8px;
+  font-size: var(--mm-type-body);
+  line-height: 1.5;
+  color: var(--mm-text2);
+}
+
 .mm-quiet-link:disabled:hover,
 .mm-quiet-link[aria-disabled="true"]:hover {
   color: var(--mm-text-disabled);

@@ -109,6 +109,7 @@ export function QuietDisclosure({
   children: ReactNode;
   "data-testid"?: string;
 }) {
+  const headingId = useId();
   return (
     <details
       className="mm-quiet-fold"
@@ -118,13 +119,17 @@ export function QuietDisclosure({
       <summary className="mm-quiet-fold__head">
         {/* A real heading, closed or open: folding a group away must not take it out of the
             document's outline, or off the list a screen reader navigates by. */}
-        <h3 className="mm-quiet-fold__title">{title}</h3>
+        <h3 id={headingId} className="mm-quiet-fold__title">
+          {title}
+        </h3>
         {summaryWhenClosed ? (
           <span className="mm-quiet-fold__state">{summaryWhenClosed}</span>
         ) : null}
       </summary>
-      {detail ? <p className="mm-quiet-fold__detail">{detail}</p> : null}
-      <div className="mm-quiet-fold__body">{children}</div>
+      <div role="region" aria-labelledby={headingId}>
+        {detail ? <p className="mm-quiet-fold__detail">{detail}</p> : null}
+        <div className="mm-quiet-fold__body">{children}</div>
+      </div>
     </details>
   );
 }

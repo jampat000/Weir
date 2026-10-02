@@ -1,30 +1,27 @@
 /* A group that starts closed, for the switches almost nobody changes. */
 
 /* ── 3d · The fold ───────────────────────────────────────────────────────────
- * A group that starts closed, for the switches almost nobody changes. It is still a
- * heading over a hairline — rule 3 holds — with a marker and, when it matters, a line
- * saying what is inside so the fold never hides that something was changed.
+ * A group that starts closed, for the switches almost nobody changes. It is a heading over a hairline with a
+ * marker and, when it matters, a line saying what is inside so the fold never hides that something was changed.
+ * It is flat: a fold inside a card is a section of that card, not a second card.
  */
 .mm-quiet-fold {
   min-width: 0;
-  overflow: hidden;
-  border: 1px solid var(--mm-hairline);
-  border-radius: var(--mm-radius-control);
-  background: color-mix(in srgb, var(--mm-surface-2) 50%, transparent);
+  border-top: 1px solid var(--mm-hairline);
 }
 
 .mm-quiet-fold__head {
   display: flex;
   align-items: center;
   gap: 0.6rem;
-  min-height: 52px;
-  padding: 8px 14px;
+  min-height: 48px;
+  padding: 8px 0;
   cursor: pointer;
   list-style: none;
 }
 
-.mm-quiet-fold__head:hover {
-  background: var(--mm-surface-2);
+.mm-quiet-fold__head:hover .mm-quiet-fold__title {
+  color: var(--mm-primary);
 }
 
 .mm-quiet-fold__head::-webkit-details-marker {
@@ -50,7 +47,8 @@
 
 .mm-quiet-fold__head:focus-visible {
   outline: 2px solid var(--mm-accent);
-  outline-offset: -2px;
+  outline-offset: 2px;
+  border-radius: 4px;
 }
 
 .mm-quiet-fold__title {
@@ -66,13 +64,9 @@
   color: var(--mm-text3);
 }
 
-.mm-quiet-fold[open] > .mm-quiet-fold__head {
-  border-bottom: 1px solid var(--mm-hairline);
-}
-
 .mm-quiet-fold__detail {
   margin: 0;
-  padding: 12px 14px 0;
+  padding: 0 0 4px;
   font-size: var(--mm-type-caption);
   line-height: 1.5;
   color: var(--mm-text3);
@@ -80,8 +74,7 @@
 
 .mm-quiet-fold__body {
   min-width: 0;
-  padding: 14px;
-  background: var(--mm-card-bg);
+  padding: 8px 0 16px;
 }
 
 @media (prefers-reduced-motion: reduce) {
