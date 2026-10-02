@@ -1,81 +1,10 @@
 import { Chip } from "../../../../components/panels/chip";
+import { ColumnsMenu } from "../../../../components/shared/columns-menu";
 import { formatBytes } from "../../../../lib/format/bytes";
-import type {
-  ProcessingRulesPreviewResult,
-  ProcessingRulesPreviewTrack,
-} from "../../../../lib/processing/rules-preview-api";
-import { trackMeaning } from "../../../../lib/ui/track-meaning";
-
-const TRACK_TYPE_LABELS: Record<ProcessingRulesPreviewTrack["type"], string> = {
-  video: "Video",
-  audio: "Audio",
-  subtitle: "Subtitle",
-};
-
-const NOTHING = "—";
-
-const TRACK_COLUMNS = [
-  "#",
-  "Type",
-  "Codec",
-  "Language",
-  "Title",
-  "Channels",
-  "Action",
-  "Flags",
-  "Reasons",
-];
-
-function flagsOf(track: ProcessingRulesPreviewTrack): string {
-  const flags = [
-    track.default ? "Default" : null,
-    track.forced ? "Forced" : null,
-  ];
-  return flags.filter(Boolean).join(", ") || NOTHING;
-}
-
-function TrackRow({ track }: { track: ProcessingRulesPreviewTrack }) {
-  const kept = track.action === "keep";
-  return (
-    <tr>
-      <td data-label="#" className="mm-rules-preview__index">
-        {track.index}
-      </td>
-      <td data-label="Type">{TRACK_TYPE_LABELS[track.type]}</td>
-      <td data-label="Codec">{track.codec || NOTHING}</td>
-      <td data-label="Language">
-        {track.language ? track.language.toUpperCase() : NOTHING}
-      </td>
-      <td
-        data-label="Title"
-        className="mm-rules-preview__track-title"
-        title={track.title}
-      >
-        {track.title || NOTHING}
-      </td>
-      <td data-label="Channels">
-        {track.type === "audio" && track.channels > 0
-          ? track.channels
-          : NOTHING}
-      </td>
-      <td data-label="Action">
-        <Chip meaning={trackMeaning(kept)} dot={false}>
-          {kept ? "Keep" : "Drop"}
-        </Chip>
-      </td>
-      <td data-label="Flags" className="mm-rules-preview__small">
-        {flagsOf(track)}
-      </td>
-      <td data-label="Reasons" className="mm-rules-preview__reasons">
-        <ul className="list-disc space-y-1 pl-4">
-          {track.reasons.map((reason, index) => (
-            <li key={index}>{reason}</li>
-          ))}
-        </ul>
-      </td>
-    </tr>
-  );
-}
+import type { ProcessingRulesPreviewResult } from "../../../../lib/processing/rules-preview-api";
+import { useTableColumns } from "../../../../lib/ui/use-table-columns";
+import { PREVIEW_COLUMNS } from "./rules-preview-columns";
+import { RulesPreviewTable } from "./rules-preview-table";
 
 /** What the rules would do to the previewed file: the verdict, every track, and the container notes. */
 export function RulesPreviewResults({
@@ -83,6 +12,7 @@ export function RulesPreviewResults({
 }: {
   result: ProcessingRulesPreviewResult;
 }) {
+  const columns = useTableColumns(PREVIEW_COLUMNS);
   const reduction = result.estimated_size_reduction_bytes;
   // A file the plan would make bigger has no "smaller" to state.
   const sizeText =
@@ -100,29 +30,12 @@ export function RulesPreviewResults({
             Estimated size change: about {sizeText} smaller (estimate only)
           </span>
         ) : null}
+        <div className="ml-auto">
+          <ColumnsMenu table={columns} />
+        </div>
       </div>
 
-      <div className="mm-quiet-table-wrap">
-        <table className="mm-quiet-table">
-          <caption className="sr-only">
-            Per-track plan for the previewed file
-          </caption>
-          <thead>
-            <tr>
-              {TRACK_COLUMNS.map((heading) => (
-                <th key={heading} scope="col">
-                  {heading}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {result.tracks.map((track) => (
-              <TrackRow key={track.index} track={track} />
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <RulesPreviewTable tracks={result.tracks} columns={columns} />
 
       {result.original_language ? (
         <p className="mm-rules-preview__note">
