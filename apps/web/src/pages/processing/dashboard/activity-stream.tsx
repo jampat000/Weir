@@ -56,9 +56,10 @@ function Line({
       <Link to={row.to} className="mm-stream__link">
         <span
           aria-hidden="true"
-          className={`mm-stream__icon mm-stream__icon--${row.tone}`}
+          className="mm-stream__icon mm-status-pill"
+          data-status={row.meaning}
         >
-          <StreamIcon tone={row.tone} />
+          <StreamIcon meaning={row.meaning} />
         </span>
         <span className="mm-stream__text">
           <span className="mm-stream__what">

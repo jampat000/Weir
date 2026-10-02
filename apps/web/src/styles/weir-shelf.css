@@ -270,7 +270,7 @@
   justify-content: center;
   gap: 5px;
   font-weight: 600;
-  color: var(--pipe-muted);
+  color: var(--mm-st);
 }
 
 .mm-shelf__status::before {
@@ -278,7 +278,7 @@
   height: 6px;
   flex: none;
   border-radius: 50%;
-  background: currentColor;
+  background: var(--mm-st);
   content: "";
 }
 
@@ -291,20 +291,4 @@
 /* Where the word fits only without the dot, the line is the word alone, centred. */
 .mm-shelf__status[data-bare]::before {
   display: none;
-}
-
-.mm-shelf__status--good {
-  color: var(--pipe-success);
-}
-
-.mm-shelf__status--neutral {
-  color: var(--pipe-muted);
-}
-
-.mm-shelf__status--warn {
-  color: var(--pipe-warning);
-}
-
-.mm-shelf__status--bad {
-  color: var(--pipe-destructive);
 }

@@ -61,26 +61,6 @@
   border-radius: 9px;
 }
 
-.mm-stream__icon--success {
-  background: var(--mm-status-healthy-bg);
-  color: var(--mm-status-healthy-text);
-}
-
-.mm-stream__icon--info {
-  background: var(--mm-status-info-bg);
-  color: var(--mm-status-info-text);
-}
-
-.mm-stream__icon--warning {
-  background: var(--mm-status-warning-bg);
-  color: var(--mm-status-warning-text);
-}
-
-.mm-stream__icon--error {
-  background: var(--mm-status-failed-bg);
-  color: var(--mm-status-failed-text);
-}
-
 .mm-stream__text {
   display: grid;
   min-width: 0;

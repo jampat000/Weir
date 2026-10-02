@@ -3,10 +3,7 @@
  * outcome; the others from the log's own title. Routine housekeeping is counted rather than listed, and a
  * pass's live progress frames are not news at all.
  */
-import {
-  eventDisplay,
-  type ActivityTone,
-} from "../../../lib/activity/activity-display";
+import { eventDisplay } from "../../../lib/activity/activity-display";
 import { asString, parseActivityDetail } from "../../../lib/activity/detail";
 import {
   FILE_PROGRESS_EVENT,
@@ -15,11 +12,13 @@ import {
   REMUX_PASS_COMPLETED_EVENT,
 } from "../../../lib/activity/event-types";
 import {
+  FINISHED_MEANING,
   finishedFileFromEvent,
   type FinishedFile,
 } from "../../../lib/activity/processing-outcome";
 import type { ActivityEventItem } from "../../../lib/api/types";
 import { narrowing } from "../../../lib/ui/fit-text";
+import type { StatusMeaning } from "../../../lib/ui/status-meaning";
 import { parseAppTime } from "../../../lib/ui/mm-format-date";
 import { prettyName } from "../processing-model";
 import { ago, finishedNote } from "../processing-words";
@@ -41,7 +40,7 @@ export type StreamRow = {
   parts: StreamPart[];
   /** What kind of thing it was, and the detail that goes with it. */
   note: string;
-  tone: ActivityTone;
+  meaning: StatusMeaning;
   at: string;
   to: string;
   /** How many identical neighbouring lines this one stands for. */
@@ -54,15 +53,12 @@ export type Stream = {
   routine: number;
 };
 
-const OUTCOME_WORDS: Record<
-  FinishedFile["kind"],
-  { tail: string; tone: ActivityTone }
-> = {
-  cleaned: { tail: " cleaned", tone: "success" },
-  already: { tail: " was already clean", tone: "info" },
-  passed: { tail: " passed through", tone: "warning" },
-  rejected: { tail: " was rejected", tone: "warning" },
-  failed: { tail: " couldn't finish", tone: "error" },
+const OUTCOME_TAILS: Record<FinishedFile["kind"], string> = {
+  cleaned: " cleaned",
+  already: " was already clean",
+  passed: " passed through",
+  rejected: " was rejected",
+  failed: " couldn't finish",
 };
 
 function activityPath(relativePath: string): string {
@@ -70,17 +66,16 @@ function activityPath(relativePath: string): string {
 }
 
 function finishedRow(ev: ActivityEventItem, file: FinishedFile): StreamRow {
-  const outcome = OUTCOME_WORDS[file.kind];
   const library = file.source === "library" && file.kind === "cleaned";
   return {
     key: `file-${ev.id}`,
     id: ev.id,
     parts: [
       { bold: prettyName(file.relativePath) },
-      library ? " cleaned in place" : outcome.tail,
+      library ? " cleaned in place" : OUTCOME_TAILS[file.kind],
     ],
     note: finishedNote(file),
-    tone: outcome.tone,
+    meaning: FINISHED_MEANING[file.kind],
     at: ev.created_at,
     to: activityPath(file.relativePath),
     times: 1,
@@ -101,7 +96,7 @@ function handbackRow(ev: ActivityEventItem): StreamRow {
       { bold: prettyName(path) },
     ],
     note: "Handed back",
-    tone: imported ? "success" : "warning",
+    meaning: imported ? "done" : "attention",
     at: ev.created_at,
     to: path ? activityPath(path) : LOG_PATH,
     times: 1,
@@ -116,7 +111,7 @@ function logRow(ev: ActivityEventItem): StreamRow {
     id: ev.id,
     parts: [display.title],
     note: display.summary,
-    tone: display.tone,
+    meaning: display.meaning,
     at: ev.created_at,
     to: file ? activityPath(file) : LOG_PATH,
     times: 1,

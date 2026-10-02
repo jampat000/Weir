@@ -323,6 +323,7 @@ describe("a file that has just ended", () => {
 
     const card = cardNamed(/The Quiet Harbour S01E01: ✓ Delivered/);
     expect(card).toHaveClass("mm-pipe__card--delivered");
+    expect(card).toHaveAttribute("data-status", "done");
     expect(card).toHaveAttribute("data-stage", "delivering");
     expect(screen.getByTestId("pipeline-announcement")).toHaveTextContent(
       "The Quiet Harbour S01E01 was delivered. It moves to Just finished.",
@@ -349,7 +350,7 @@ describe("a file that has just ended", () => {
     );
 
     const card = cardNamed(/Couldn't finish/);
-    expect(card).toHaveClass("mm-pipe__card--failed");
+    expect(card).toHaveAttribute("data-status", "broken");
     expect(card).toHaveAttribute("data-stage", "processing");
     expect(
       within(card).getByText("Writing stopped · original kept"),

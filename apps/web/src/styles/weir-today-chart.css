@@ -23,7 +23,7 @@
 }
 
 .mm-today-chart__stop {
-  stop-color: var(--mm-info);
+  stop-color: var(--mm-primary);
   stop-opacity: 0.45;
 }
 
@@ -32,7 +32,7 @@
 }
 
 .mm-today-chart__line {
-  stroke: var(--mm-info);
+  stroke: var(--mm-primary);
   stroke-linejoin: round;
   stroke-width: 2;
 }
@@ -42,8 +42,8 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: var(--mm-info);
-  box-shadow: 0 0 10px var(--mm-info);
+  background: var(--mm-primary);
+  box-shadow: 0 0 10px var(--mm-primary);
   pointer-events: none;
   transform: translate(-50%, -50%);
 }
@@ -111,7 +111,7 @@
   right: 8px;
 }
 
-/* The split of the two hours, along the bottom edge beside the time span: a count for each tone, in Just finished's colours. */
+/* The split of the two hours, along the bottom edge beside the time span: a count for each tone, with the dot of what it means. */
 .cs-legend {
   position: absolute;
   bottom: 0;
@@ -130,25 +130,6 @@
   padding: 0 2px;
   border-radius: 3px;
   background: color-mix(in srgb, var(--mm-card-bg) 78%, transparent);
-}
-
-.cs-legend__dot {
-  width: 6px;
-  height: 6px;
-  flex: none;
-  border-radius: 50%;
-}
-
-.cs-legend__dot--ok {
-  background: var(--mm-status-healthy-text);
-}
-
-.cs-legend__dot--same {
-  background: var(--mm-status-info-text);
-}
-
-.cs-legend__dot--warn {
-  background: var(--mm-status-warning-text);
 }
 
 .cs-legend__words {

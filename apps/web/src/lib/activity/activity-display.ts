@@ -1,5 +1,5 @@
 /**
- * How one Activity entry reads in the log: a title, a one-line summary, a tone and, when it says more
+ * How one Activity entry reads in the log: a title, a one-line summary, what it means and, when it says more
  * than the title, a badge. Pure, so the log and anything else that lists entries agree.
  */
 import type { ActivityEventItem } from "../api/types";
@@ -7,8 +7,7 @@ import { baseName } from "../format/path";
 import { asBoolean, asNumber, asString, parseActivityDetail } from "./detail";
 import { FILE_PROGRESS_EVENT, REMUX_PASS_COMPLETED_EVENT } from "./event-types";
 import { isRejectedByRules } from "./pass-detail";
-
-export type ActivityTone = "info" | "success" | "warning" | "error";
+import type { StatusMeaning } from "../ui/status-meaning";
 
 export type ActivityDisplay = {
   title: string;
@@ -16,7 +15,8 @@ export type ActivityDisplay = {
   detail: string | null;
   /** A status badge, only when it says more than the title does. */
   chip: string | null;
-  tone: ActivityTone;
+  /** What it means: done, under way, needs a look, broken, or only information (idle). */
+  meaning: StatusMeaning;
   compact: boolean;
 };
 
@@ -96,12 +96,8 @@ function progressDisplay(ev: ActivityEventItem): ActivityDisplay {
         : status === "finished"
           ? "Processing finished"
           : "Processing now",
-    tone:
-      status === "failed"
-        ? "error"
-        : status === "finished"
-          ? "success"
-          : "info",
+    meaning:
+      status === "failed" ? "broken" : status === "finished" ? "done" : "doing",
     compact: false,
   };
 }
@@ -149,11 +145,12 @@ function passDisplay(ev: ActivityEventItem): ActivityDisplay {
           : failed
             ? "Processing failed"
             : "File processed",
-    tone: rejected
-      ? "warning"
-      : ev.detail?.includes('"ok":false')
-        ? "error"
-        : "success",
+    meaning:
+      rejected || passedThrough
+        ? "attention"
+        : ev.detail?.includes('"ok":false')
+          ? "broken"
+          : "done",
     compact: false,
   };
 }
@@ -166,13 +163,13 @@ function authDisplay(ev: ActivityEventItem): ActivityDisplay {
       : "Account and sign-in activity",
     detail: ev.detail ?? null,
     chip: null,
-    tone:
+    meaning:
       ev.event_type.includes("failed") || ev.event_type.includes("denied")
-        ? "warning"
+        ? "attention"
         : ev.event_type.includes("succeeded") ||
             ev.event_type.includes("changed")
-          ? "success"
-          : "info",
+          ? "done"
+          : "idle",
     compact: false,
   };
 }
@@ -187,7 +184,7 @@ export function eventDisplay(ev: ActivityEventItem): ActivityDisplay {
       ...routine,
       detail: ev.detail ?? null,
       chip: null,
-      tone: "success",
+      meaning: "done",
       compact: true,
     };
   }
@@ -196,19 +193,19 @@ export function eventDisplay(ev: ActivityEventItem): ActivityDisplay {
   }
 
   const lowered = `${ev.title} ${ev.detail ?? ""}`.toLowerCase();
-  const tone: ActivityTone = /(error|failed|denied)/.test(lowered)
-    ? "error"
+  const meaning: StatusMeaning = /(error|failed|denied)/.test(lowered)
+    ? "broken"
     : /(skip|missing|review|warning|not configured|unsupported)/.test(lowered)
-      ? "warning"
+      ? "attention"
       : /(completed|finished|saved|updated|started)/.test(lowered)
-        ? "success"
-        : "info";
+        ? "done"
+        : "idle";
   return {
     title: eventLabel(ev.event_type),
     summary: ev.module === "processing" ? "Processing" : "System",
     detail: ev.detail ?? null,
     chip: null,
-    tone,
+    meaning,
     compact: Boolean(ev.detail && ev.detail.length > 120),
   };
 }

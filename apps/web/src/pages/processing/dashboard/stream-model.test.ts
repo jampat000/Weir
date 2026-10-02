@@ -53,7 +53,7 @@ describe("the activity stream", () => {
     ]);
 
     expect(sentenceOf(rows[0])).toBe("The Quiet Harbour S01E06 cleaned");
-    expect(rows[0].tone).toBe("success");
+    expect(rows[0].meaning).toBe("done");
     expect(rows[0].note).toBe("Saved 319 MB · removed 2 audio");
     expect(rows[0].to).toBe("/activity?q=The.Quiet.Harbour.S01E06.mkv");
   });
@@ -66,6 +66,7 @@ describe("the activity stream", () => {
     expect(sentenceOf(rows[0])).toBe(
       "The Quiet Harbour S01E06 was already clean",
     );
+    expect(rows[0].meaning).toBe("done");
   });
 
   it("says a rejection is a rejection and a real failure is a failure", () => {
@@ -80,9 +81,9 @@ describe("the activity stream", () => {
     ]);
 
     expect(sentenceOf(rows[0])).toContain("was rejected");
-    expect(rows[0].tone).toBe("warning");
+    expect(rows[0].meaning).toBe("attention");
     expect(sentenceOf(rows[1])).toContain("couldn't finish");
-    expect(rows[1].tone).toBe("error");
+    expect(rows[1].meaning).toBe("broken");
   });
 
   it("lists a library clean however long its entry's detail is", () => {
@@ -138,9 +139,9 @@ describe("the activity stream", () => {
     ]);
 
     expect(sentenceOf(rows[0])).toBe("Radarr imported Heat (1995)");
-    expect(rows[0].tone).toBe("success");
+    expect(rows[0].meaning).toBe("done");
     expect(sentenceOf(rows[1])).toBe("Radarr did not import Heat (1995)");
-    expect(rows[1].tone).toBe("warning");
+    expect(rows[1].meaning).toBe("attention");
   });
 
   it("uses the log's own title for anything else, and links to the log", () => {

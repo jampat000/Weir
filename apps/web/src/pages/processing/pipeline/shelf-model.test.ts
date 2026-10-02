@@ -45,7 +45,11 @@ describe("the shelf's tiles", () => {
 
     expect(tile).toMatchObject({
       title: "The Quiet Harbour S01E01",
-      status: { tone: "good", words: ["318 MB saved", "318 MB"] },
+      status: {
+        meaning: "done",
+        payoff: true,
+        words: ["318 MB saved", "318 MB"],
+      },
       detail: ["−2 audio · −4 subs", "−6 tracks"],
       ago: "3 min ago",
       workflow: "TV",
@@ -53,7 +57,7 @@ describe("the shelf's tiles", () => {
     });
   });
 
-  it("colour each outcome as red, amber, green or grey, and say it in a word where there is no saving", () => {
+  it("give each outcome the meaning it has, gold for a saving, and say it in a word where there is no saving", () => {
     const { tiles } = shelf([
       finished(1),
       finished(2, { savedBytes: null, removedAudio: 0, removedSubtitles: 0 }),
@@ -63,13 +67,19 @@ describe("the shelf's tiles", () => {
       finished(6, { kind: "failed", savedBytes: null }),
     ]);
 
-    expect(tiles.map((tile) => [tile.status.tone, tile.status.words])).toEqual([
-      ["good", ["318 MB saved", "318 MB"]],
-      ["good", ["Cleaned"]],
-      ["neutral", ["Already clean"]],
-      ["warn", ["Rejected"]],
-      ["warn", ["Passed through"]],
-      ["bad", ["Couldn't finish"]],
+    expect(
+      tiles.map((tile) => [
+        tile.status.meaning,
+        tile.status.payoff === true,
+        tile.status.words,
+      ]),
+    ).toEqual([
+      ["done", true, ["318 MB saved", "318 MB"]],
+      ["done", false, ["Cleaned"]],
+      ["done", false, ["Already clean"]],
+      ["attention", false, ["Rejected"]],
+      ["attention", false, ["Passed through"]],
+      ["broken", false, ["Couldn't finish"]],
     ]);
   });
 

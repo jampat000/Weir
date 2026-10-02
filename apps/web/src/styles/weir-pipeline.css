@@ -16,9 +16,6 @@
   --pipe-foreground: var(--mm-text);
   --pipe-muted: var(--mm-text2);
   --pipe-primary: var(--mm-primary);
-  --pipe-success: var(--mm-success);
-  --pipe-warning: var(--mm-warning);
-  --pipe-destructive: var(--mm-destructive);
   --pipe-ring: var(--mm-primary);
 }
 
@@ -269,23 +266,17 @@ button.mm-pipe__card {
     mm-pipe-glow 1.4s ease-out;
 }
 
-/* Delivered: full and green for a moment, before its tile flies to Just finished. */
+/* A card that has left the board is edged in the meaning it ended with; delivered is also full for a moment, before its
+   tile flies to Just finished. */
+.mm-pipe .mm-pipe__card[data-status] {
+  --pipe-st: var(--mm-st);
+  border-color: var(--mm-st);
+}
+
 .mm-pipe .mm-pipe__card--delivered {
-  --pipe-st: var(--pipe-success);
-  border-color: var(--pipe-success);
   box-shadow:
-    0 0 0 1px var(--pipe-success),
-    0 0 22px color-mix(in srgb, var(--pipe-success) 35%, transparent);
-}
-
-.mm-pipe .mm-pipe__card--failed {
-  --pipe-st: var(--pipe-destructive);
-  border-color: var(--pipe-destructive);
-}
-
-.mm-pipe .mm-pipe__card--rejected {
-  --pipe-st: var(--pipe-warning);
-  border-color: var(--pipe-warning);
+    0 0 0 1px var(--mm-st),
+    0 0 22px color-mix(in srgb, var(--mm-st) 35%, transparent);
 }
 
 .mm-pipe__card--hidden {
@@ -358,29 +349,19 @@ button.mm-pipe__card {
 .mm-pipe__status b {
   flex: none;
   font-weight: 600;
-  color: var(--pipe-st);
+  color: var(--mm-st);
 }
 
-.mm-pipe__status--warn {
-  color: var(--pipe-warning);
-}
-
-.mm-pipe__status--bad {
-  color: var(--pipe-destructive);
-}
-
-.mm-pipe__status--ok {
-  color: var(--pipe-success);
+/* The words say it in colour only when it is over: done, held back or broken. Waiting and under way keep to the dot. */
+.mm-pipe__status:is(
+  [data-status="done"],
+  [data-status="attention"],
+  [data-status="broken"]
+) {
+  color: var(--mm-st);
 }
 
 .mm-pipe__pulse {
-  display: inline-block;
-  width: 7px;
-  height: 7px;
-  flex: none;
-  margin-right: 5px;
-  border-radius: 50%;
-  background: var(--pipe-st);
   animation: mm-pipe-blink 1.2s ease-in-out infinite;
 }
 
@@ -400,7 +381,7 @@ button.mm-pipe__card {
   height: 100%;
   overflow: hidden;
   border-radius: 9px;
-  background: var(--pipe-st);
+  background: var(--mm-st);
   transition: width 1s linear;
 }
 

@@ -2,7 +2,7 @@
  * The tiles of the Just finished shelf. A tile is the title's poster (or its initials on its workflow's
  * colour where there is none) with the workflow's name in a tag across its foot, and under it a caption of
  * fixed slots, centred, so the lines of every tile in the row stand level: the title (two lines), how the file
- * came out in red, amber, green or grey, and, where the posters are big enough, what was removed and when. Where
+ * came out in the colour of what it means, and, where the posters are big enough, what was removed and when. Where
  * the row has room for no more than one line, the caption is that status line alone, in the fewest words that fit
  * under the poster, the dot left out where only the word fits; the rest is in the tile's tooltip and name. On a poster too small for the
  * tag (see posterSize) it gives way to a slim strip in the workflow's colour, and its name goes into the tile's
@@ -15,7 +15,6 @@ import { Link } from "react-router-dom";
 import { Poster } from "../../../components/shared/poster";
 import type { FinishedFile } from "../../../lib/activity/processing-outcome";
 import { useWorkflowHues } from "../../../lib/processing/workflow-hues";
-import { classNames } from "../../../lib/ui/class-names";
 import { SHELF_TILE_ATTRIBUTE } from "./delivery-flight";
 import {
   fittingWords,
@@ -117,14 +116,13 @@ function Tile({
               </span>
             )}
             <span
-              className={classNames(
-                "mm-shelf__line",
-                "mm-shelf__status",
-                `mm-shelf__status--${tile.status.tone}`,
-              )}
+              className="mm-shelf__line mm-shelf__status"
+              data-status={tile.status.meaning}
               data-bare={status.bare || undefined}
             >
-              <span>{status.words}</span>
+              <span className={tile.status.payoff ? "mm-payoff" : undefined}>
+                {status.words}
+              </span>
             </span>
             {caption === "full" ? (
               <>

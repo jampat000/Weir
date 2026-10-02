@@ -32,7 +32,7 @@ describe("eventDisplay for a finished pass", () => {
     expect(display.title).toBe("Rejected film.mkv");
     expect(display.summary).toBe("Rejected: it has no audio tracks.");
     expect(display.chip).toBe("Rejected");
-    expect(display.tone).toBe("warning");
+    expect(display.meaning).toBe("attention");
   });
 
   it("shows a real failure as one", () => {
@@ -40,6 +40,6 @@ describe("eventDisplay for a finished pass", () => {
 
     expect(display.title).toBe("film.mkv could not be processed");
     expect(display.chip).toBe("Processing failed");
-    expect(display.tone).toBe("error");
+    expect(display.meaning).toBe("broken");
   });
 });

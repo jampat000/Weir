@@ -387,7 +387,7 @@ describe("cards of files that have just ended", () => {
     expect(ended).toMatchObject({
       stage: "delivering",
       end: "delivered",
-      status: { lead: "✓ Delivered", tone: "ok" },
+      status: { lead: "✓ Delivered", meaning: "done" },
       bar: { width: 100, moving: false },
     });
   });
@@ -409,7 +409,7 @@ describe("cards of files that have just ended", () => {
     expect(ended).toMatchObject({
       stage: "processing",
       end: "failed",
-      status: { text: "Couldn't finish", tone: "bad" },
+      status: { text: "Couldn't finish", meaning: "broken" },
     });
     expect(written(ended)).toContain("Writing stopped · original kept");
   });
@@ -431,7 +431,7 @@ describe("cards of files that have just ended", () => {
     expect(ended).toMatchObject({
       stage: "analysing",
       end: "rejected",
-      status: { text: "Rejected", tone: "warn" },
+      status: { text: "Rejected", meaning: "attention" },
     });
   });
 

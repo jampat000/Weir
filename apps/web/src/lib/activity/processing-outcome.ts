@@ -5,6 +5,7 @@
  */
 import type { ActivityEventItem } from "../api/types";
 import { processingFileLead, REJECTED_BY_RULES } from "../processing/files-api";
+import type { StatusMeaning } from "../ui/status-meaning";
 import {
   asNumber,
   asString,
@@ -19,6 +20,18 @@ import { isRejectedByRules } from "./pass-detail";
 
 export type FinishedKind =
   "cleaned" | "already" | "passed" | "rejected" | "failed";
+
+/**
+ * What a finished file means wherever it is shown: one cleaned, or already as clean as the rules want, is done; one passed
+ * through unchanged or rejected is a decision that needs a look, never a failure; only one Weir could not finish is broken.
+ */
+export const FINISHED_MEANING: Record<FinishedKind, StatusMeaning> = {
+  cleaned: "done",
+  already: "done",
+  passed: "attention",
+  rejected: "attention",
+  failed: "broken",
+};
 
 export type FinishedFile = {
   id: number;

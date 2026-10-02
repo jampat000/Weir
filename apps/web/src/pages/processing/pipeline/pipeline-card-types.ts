@@ -1,13 +1,13 @@
 import type { ProcessingFile } from "../../../lib/processing/files-api";
+import type { StatusMeaning } from "../../../lib/ui/status-meaning";
 import type { WorkSource } from "../processing-model";
 import type { PipelineStage } from "./pipeline-stages";
-
-export type CardTone = "info" | "warn" | "bad" | "ok" | "idle";
 
 /** The one line under a card's title: what is happening to the file right now. */
 export type CardStatus = {
   text: string;
-  tone: CardTone;
+  /** What the status means: waiting for its turn, under way, done, held back or failed. */
+  meaning: StatusMeaning;
   /** A dot pulses beside it: something is being worked on this moment. */
   pulse: boolean;
   /** The front of the text, drawn bold in the station's colour (a percentage, "✓ Delivered"). */

@@ -1,4 +1,5 @@
-import type { HandedBack } from "../handed-back-model";
+import { StatusDot } from "../../../components/panels/status-dot";
+import { HANDED_BACK_MEANING, type HandedBack } from "../handed-back-model";
 import { FitText } from "../../../lib/ui/fit-text";
 import { TONES, legendWords } from "./handed-back-words";
 
@@ -8,8 +9,8 @@ type TodayLegendProps = {
 };
 
 /**
- * The split of the last two hours under the chart, in the colours Just finished uses for its dots: how many were
- * cleaned, were already clean and need a look. A tone with nothing in it is left out. Each count gets an equal share
+ * The split of the last two hours under the chart, by what each means: how many were cleaned, were already clean and
+ * need a look. A tone with nothing in it is left out. Each count gets an equal share
  * of the row and says as much of its words as the share holds, down to the bare number.
  */
 export function TodayLegend({ totals }: TodayLegendProps) {
@@ -24,7 +25,7 @@ export function TodayLegend({ totals }: TodayLegendProps) {
     >
       {shown.map((tone) => (
         <span key={tone} className="cs-legend__part">
-          <i className={`cs-legend__dot cs-legend__dot--${tone}`} />
+          <StatusDot meaning={HANDED_BACK_MEANING[tone]} />
           <FitText
             className="cs-legend__words"
             words={legendWords(tone, totals[tone])}

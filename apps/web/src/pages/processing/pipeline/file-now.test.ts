@@ -13,7 +13,7 @@ function card(overrides: Partial<PipelineCard>): PipelineCard {
     workflow: "Movies",
     file: null,
     end: null,
-    status: { text: "39% · 16 s left", tone: "info", pulse: true },
+    status: { text: "39% · 16 s left", meaning: "doing", pulse: true },
     bar: { width: 39, waiting: false, moving: true },
     details: [],
     fullFacts: ["Speed 479× real time"],
@@ -35,7 +35,7 @@ describe("a file's place on the Pipeline, as its story tells it", () => {
   it("says a file is being worked on while its card's bar is moving, though nothing pulses", () => {
     const now = fileNowOf(
       card({
-        status: { text: "39%", tone: "info", pulse: false },
+        status: { text: "39%", meaning: "doing", pulse: false },
         bar: { width: 39, waiting: false, moving: true },
       }),
     );
@@ -46,7 +46,7 @@ describe("a file's place on the Pipeline, as its story tells it", () => {
   it("says a file is not being worked on while it only waits", () => {
     const now = fileNowOf(
       card({
-        status: { text: "Waiting its turn", tone: "idle", pulse: false },
+        status: { text: "Waiting its turn", meaning: "todo", pulse: false },
         bar: { width: 0, waiting: true, moving: false },
       }),
     );

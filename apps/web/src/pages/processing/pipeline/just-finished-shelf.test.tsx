@@ -426,7 +426,7 @@ describe("the size of the tiles", () => {
       ]);
     });
 
-    it("tones the status line red, amber, green or grey for the outcome", () => {
+    it("draws the status line by what the outcome means: done, done, needs a look, broken", () => {
       rowOf(237, 570);
 
       render(
@@ -438,12 +438,14 @@ describe("the size of the tiles", () => {
         ]),
       );
 
-      const toneOf = (index: number) =>
-        captionOf(index)?.querySelector(".mm-shelf__status")?.className;
-      expect(toneOf(0)).toContain("mm-shelf__status--good");
-      expect(toneOf(1)).toContain("mm-shelf__status--neutral");
-      expect(toneOf(2)).toContain("mm-shelf__status--warn");
-      expect(toneOf(3)).toContain("mm-shelf__status--bad");
+      const meaningOf = (index: number) =>
+        captionOf(index)
+          ?.querySelector(".mm-shelf__status")
+          ?.getAttribute("data-status");
+      expect(meaningOf(0)).toBe("done");
+      expect(meaningOf(1)).toBe("done");
+      expect(meaningOf(2)).toBe("attention");
+      expect(meaningOf(3)).toBe("broken");
     });
 
     it("says 'Already clean' in the name and tooltip of a file nothing was changed in, and on its status line", () => {
@@ -516,7 +518,7 @@ describe("the size of the tiles", () => {
       const status = captionOf(0)?.querySelector(".mm-shelf__status");
       expect(linesOf(0)).toEqual(["318 MB"]);
       expect(status).toHaveAttribute("data-bare");
-      expect(status?.className).toContain("mm-shelf__status--good");
+      expect(status).toHaveAttribute("data-status", "done");
     });
 
     it("keeps the dot beside a word that fits with it, and never says nothing", () => {

@@ -12,9 +12,11 @@
  */
 import type { CSSProperties, ReactElement } from "react";
 
+import { StatusDot } from "../../../components/panels/status-dot";
 import { Poster } from "../../../components/shared/poster";
 import { classNames } from "../../../lib/ui/class-names";
 import { motionAllowed } from "../../../lib/ui/motion-allowed";
+import type { StatusMeaning } from "../../../lib/ui/status-meaning";
 import type { ProcessingFile } from "../../../lib/processing/files-api";
 import { FitText } from "../../../lib/ui/fit-text";
 import {
@@ -23,6 +25,7 @@ import {
   KEEP_ATTRIBUTE,
 } from "./fit-details";
 import type {
+  CardEnd,
   CardStatus,
   DetailLine,
   DetailPart,
@@ -40,6 +43,13 @@ export type CardPlace = {
   hidden: boolean;
 };
 
+/** What a card that has left the board says by its edge: delivered is done, stopped is broken, a rejection needs a look. */
+const END_MEANING: Record<CardEnd, StatusMeaning> = {
+  delivered: "done",
+  failed: "broken",
+  rejected: "attention",
+};
+
 /** The words after the bold lead, the lead's own space left to the lead's margin so every wording is measured as drawn. */
 function afterLead(words: string, lead: string | null): string {
   return lead && words.startsWith(lead)
@@ -53,10 +63,11 @@ function StatusLine({ status }: { status: CardStatus }) {
     status.lead && status.text.startsWith(status.lead) ? status.lead : null;
   const wordings = [status.text, ...(status.fits ?? [])];
   return (
-    <span className={`mm-pipe__status mm-pipe__status--${status.tone}`}>
-      {status.pulse ? (
-        <span aria-hidden="true" className="mm-pipe__pulse" />
-      ) : null}
+    <span className="mm-pipe__status" data-status={status.meaning}>
+      <StatusDot
+        meaning={status.meaning}
+        className={status.pulse ? "mm-pipe__pulse" : undefined}
+      />
       <span className="mm-pipe__status-text">
         {lead ? <b>{lead}</b> : null}
         <FitText
@@ -150,8 +161,6 @@ export function PipelineCardView({
   const className = classNames(
     "mm-pipe__card",
     card.end === "delivered" && "mm-pipe__card--delivered",
-    (card.end === "failed" || card.end === "rejected") &&
-      `mm-pipe__card--${card.end}`,
     place?.hidden && "mm-pipe__card--hidden",
     arrived && motionAllowed() && "mm-pipe__card--arrived",
   );
@@ -162,6 +171,7 @@ export function PipelineCardView({
     "aria-label": spokenName(card),
     "aria-hidden": place?.hidden ? true : undefined,
     "data-stage": card.stage,
+    "data-status": card.end ? END_MEANING[card.end] : undefined,
     [CARD_ATTRIBUTE]: "",
   };
   const body = (
@@ -179,6 +189,7 @@ export function PipelineCardView({
         {card.bar ? (
           <span
             aria-hidden="true"
+            data-status={card.status.meaning}
             className={classNames(
               "mm-pipe__bar",
               card.bar.moving && "mm-pipe__bar--moving",

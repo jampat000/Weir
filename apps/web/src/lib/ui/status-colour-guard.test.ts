@@ -22,13 +22,10 @@ const MIGRATE_ME: readonly string[] = [
   "styles/weir-auth.css",
   "styles/weir-dialogs.css",
   "styles/weir-panels.css",
-  "styles/weir-pipeline.css",
-  "styles/weir-processing-stream.css",
   "styles/weir-shell.css",
   "styles/weir-sidebar-nav.css",
   "styles/weir-system.css",
   "styles/weir-tab-layouts.css",
-  "styles/weir-today-chart.css",
 ];
 
 const NOT_A_STATUS: Readonly<Record<string, string>> = {};
@@ -81,6 +78,17 @@ const RETIRED_STATUS_CLASSES: readonly string[] = [
   "mm-direct-play__mark",
   "mm-activity-processing--",
   "mm-activity-remux-detail__chip--",
+  "mm-pipe__status--",
+  "mm-pipe__card--failed",
+  "mm-pipe__card--rejected",
+  "--pipe-success",
+  "--pipe-warning",
+  "--pipe-destructive",
+  "mm-shelf__status--",
+  "cs-legend__dot",
+  "mm-stream__icon--",
+  "CardTone",
+  "ActivityTone",
 ];
 
 const RAW_HEX_IN_STYLESHEETS: readonly string[] = [];

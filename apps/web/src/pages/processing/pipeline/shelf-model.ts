@@ -1,4 +1,8 @@
-import type { FinishedFile } from "../../../lib/activity/processing-outcome";
+import {
+  FINISHED_MEANING,
+  type FinishedFile,
+} from "../../../lib/activity/processing-outcome";
+import type { StatusMeaning } from "../../../lib/ui/status-meaning";
 import { formatBytes } from "../../../lib/format/bytes";
 import { parseAppTime } from "../../../lib/ui/mm-format-date";
 import { shownBy, type Filter } from "../processing-filter";
@@ -11,19 +15,18 @@ const UNKNOWN_WORKFLOW = "Workflow";
 /** The most tiles the shelf holds: the room it has decides how many of them show. */
 export const SHELF_LIMIT = 12;
 
-/** How a finished file stands, in the shelf's red, amber, green and grey. */
-export type StatusTone = "good" | "neutral" | "warn" | "bad";
-
 /** The words one caption line can say, fullest first: the first that fits the line is shown, the last always is (cut by an ellipsis if need be). */
 export type LineWords = readonly string[];
 
 /**
- * The caption's status line: its tone, and the words it can say. `short` is what the line says under a poster with no
+ * The caption's status line: what it means, and the words it can say. `short` is what the line says under a poster with no
  * room for a title, and what it falls back on where `words` do not fit: the briefest words, the last of them always a
  * word and never nothing.
  */
 export type TileStatus = {
-  tone: StatusTone;
+  meaning: StatusMeaning;
+  /** The words are the figure of space saved, which is drawn in gold: the dot beside it still says the file is done. */
+  payoff?: true;
   words: LineWords;
   short: LineWords;
 };
@@ -98,42 +101,24 @@ export function savedSize(bytes: number): string {
 
 /** How a file stands, for the caption's status line: a cleaned file's saving, and a word for any other outcome. */
 function statusOf(item: FinishedFile): TileStatus {
+  const meaning = FINISHED_MEANING[item.kind];
   switch (item.kind) {
     case "already":
-      return {
-        tone: "neutral",
-        words: ["Already clean"],
-        short: ["Clean"],
-      };
+      return { meaning, words: ["Already clean"], short: ["Clean"] };
     case "passed":
-      return {
-        tone: "warn",
-        words: ["Passed through"],
-        short: ["Passed"],
-      };
+      return { meaning, words: ["Passed through"], short: ["Passed"] };
     case "rejected":
-      return {
-        tone: "warn",
-        words: ["Rejected"],
-        short: ["Rejected"],
-      };
+      return { meaning, words: ["Rejected"], short: ["Rejected"] };
     case "failed":
-      return {
-        tone: "bad",
-        words: ["Couldn't finish"],
-        short: ["Failed"],
-      };
+      return { meaning, words: ["Couldn't finish"], short: ["Failed"] };
     default: {
       if (!item.savedBytes) {
-        return {
-          tone: "good",
-          words: ["Cleaned"],
-          short: ["Cleaned", "Done"],
-        };
+        return { meaning, words: ["Cleaned"], short: ["Cleaned", "Done"] };
       }
       const size = savedSize(item.savedBytes);
       return {
-        tone: "good",
+        meaning,
+        payoff: true,
         words: [`${size} saved`, size],
         short: [size],
       };

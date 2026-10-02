@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import type { FinishedKind } from "../activity/processing-outcome";
+import {
+  FINISHED_MEANING,
+  type FinishedKind,
+} from "../activity/processing-outcome";
 import {
   CONNECTION_LIGHT_MEANING,
   type ConnectionLight,
@@ -42,9 +45,11 @@ import {
   TASK_MEANING,
   type TaskState,
 } from "../../pages/processing/dashboard/system/tasks-card-model";
-import type { HandedBackTone } from "../../pages/processing/handed-back-model";
+import {
+  HANDED_BACK_MEANING,
+  type HandedBackTone,
+} from "../../pages/processing/handed-back-model";
 import type { StepState } from "../../pages/processing/stage-flow-model";
-import type { CardTone } from "../../pages/processing/pipeline/pipeline-card-types";
 import type { MmStatusTone } from "./mm-status-tone";
 import { STATUS_MEANINGS } from "./status-meaning";
 import type { StatusMeaning } from "./status-meaning";
@@ -144,6 +149,24 @@ const PRODUCTION_MEANINGS = {
       left_alone: "idle",
     } satisfies Record<LibraryStatus, StatusMeaning>,
   },
+  finishedFile: {
+    used: FINISHED_MEANING,
+    expected: {
+      cleaned: "done",
+      already: "done",
+      passed: "attention",
+      rejected: "attention",
+      failed: "broken",
+    } satisfies Record<FinishedKind, StatusMeaning>,
+  },
+  todayOutcome: {
+    used: HANDED_BACK_MEANING,
+    expected: {
+      ok: "done",
+      same: "done",
+      warn: "attention",
+    } satisfies Record<HandedBackTone, StatusMeaning>,
+  },
   downloadStatus: {
     used: FILE_MEANING,
     expected: {
@@ -195,31 +218,12 @@ const PRODUCTION_MEANINGS = {
  * producing a StatusMeaning itself, delete its row.
  */
 const VOCABULARIES = {
-  finishedFile: {
-    cleaned: "done",
-    already: "done",
-    passed: "attention",
-    rejected: "attention",
-    failed: "broken",
-  } satisfies Record<FinishedKind, StatusMeaning>,
-  todayOutcome: {
-    ok: "done",
-    same: "done",
-    warn: "attention",
-  } satisfies Record<HandedBackTone, StatusMeaning>,
   stageStep: {
     done: "done",
     now: "doing",
     next: "todo",
     failed: "broken",
   } satisfies Record<StepState, StatusMeaning>,
-  pipelineCard: {
-    ok: "done",
-    info: "doing",
-    warn: "attention",
-    bad: "broken",
-    idle: "idle",
-  } satisfies Record<CardTone, StatusMeaning>,
   chipTone: {
     healthy: "done",
     info: "doing",

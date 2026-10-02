@@ -58,7 +58,7 @@ function Operation({
       <span className="mm-op__right">
         {percent === null ? "" : `${percent}%`}
       </span>
-      <span className="mm-op__bar" aria-hidden="true">
+      <span className="mm-op__bar" data-status="doing" aria-hidden="true">
         <i
           className={percent === null ? "mm-op__bar--moving" : undefined}
           style={percent === null ? undefined : { width: `${percent}%` }}

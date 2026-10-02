@@ -80,7 +80,7 @@ export function StatFitUnit({ children }: { children: string }) {
   );
 }
 
-/** A second figure beside the first, in the success colour: "12 GB saved". */
+/** A second figure beside the first, in gold: "12 GB saved". */
 export function StatSide({ children }: { children: ReactNode }) {
-  return <span className="mm-stat__side">{children}</span>;
+  return <span className="mm-stat__side mm-payoff">{children}</span>;
 }

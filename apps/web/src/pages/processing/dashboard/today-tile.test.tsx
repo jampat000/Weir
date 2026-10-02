@@ -243,11 +243,11 @@ describe("the split of the last two hours, under the chart", () => {
       "1 already clean",
       "2 need a look",
     ]);
-    expect(parts.map((part) => part.querySelector("i")?.className)).toEqual([
-      "cs-legend__dot cs-legend__dot--ok",
-      "cs-legend__dot cs-legend__dot--same",
-      "cs-legend__dot cs-legend__dot--warn",
-    ]);
+    expect(
+      parts.map((part) =>
+        part.querySelector(".mm-status-dot")?.getAttribute("data-status"),
+      ),
+    ).toEqual(["done", "done", "attention"]);
   });
 
   it("leaves out a way of ending that no file had", () => {

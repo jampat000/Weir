@@ -5,6 +5,7 @@
  */
 import { baseName } from "../../../lib/format/path";
 import { narrowing } from "../../../lib/ui/fit-text";
+import type { StatusMeaning } from "../../../lib/ui/status-meaning";
 import { plural } from "../../../lib/ui/mm-plural";
 import {
   arrivingDeadline,
@@ -29,7 +30,6 @@ import type { FlowStepId } from "../stage-flow-model";
 import type {
   CardBar,
   CardStatus,
-  CardTone,
   CardWords,
   DetailLine,
   DetailPart,
@@ -72,9 +72,15 @@ const BRIEFLY: Readonly<Record<string, readonly string[]>> = {
 };
 
 /** A status that is words alone, with the briefer words it falls back on where it has them. */
-function said(text: string, tone: CardTone, pulse: boolean): CardStatus {
+function said(
+  text: string,
+  meaning: StatusMeaning,
+  pulse: boolean,
+): CardStatus {
   const briefly = BRIEFLY[text];
-  return briefly ? { text, tone, pulse, fits: briefly } : { text, tone, pulse };
+  return briefly
+    ? { text, meaning, pulse, fits: briefly }
+    : { text, meaning, pulse };
 }
 
 /** "Download · Movies": where the file came from and which workflow has it. */
@@ -132,8 +138,8 @@ export function incomingWords(item: ArrivingItem, now: number): CardWords {
   const checking = ringState(left) === "checking";
   const fraction = ringFraction(item, left);
   const status = checking
-    ? said("Checking now", "info", true)
-    : said(waitingWords(item), "info", false);
+    ? said("Checking now", "doing", true)
+    : said(waitingWords(item), "todo", false);
   const timing =
     ringState(left) === "counting" && left != null
       ? `${item.holdUntil != null ? "ready in" : "looks again in"} ${clock(left)}`
@@ -170,7 +176,7 @@ export function queuedWords(item: WaitingItem, place: number): CardWords {
   return {
     status: said(
       item.note ? outOfScheduleWords(item.note) : "Waiting its turn",
-      "idle",
+      "todo",
       false,
     ),
     bar: null,
@@ -195,7 +201,7 @@ const ANALYSING_TEXT: Partial<Record<FlowStepId, string>> = {
 function analysingWords(item: WorkingItem): CardWords {
   const running = workingFigures(item).running;
   return {
-    status: said(ANALYSING_TEXT[item.step] ?? "Checking file", "info", true),
+    status: said(ANALYSING_TEXT[item.step] ?? "Checking file", "doing", true),
     bar: MOVING_BAR,
     details: present([
       factsLine(item.facts, running ? `running ${running}` : undefined),
@@ -218,7 +224,7 @@ function workingFullFacts(item: WorkingItem): string[] {
 function writingStatus(percent: number, etaSeconds: number | null): CardStatus {
   const lead = `${Math.floor(percent)}%`;
   const left = timeLeft(etaSeconds);
-  const base = { lead, tone: "info", pulse: false } as const;
+  const base = { lead, meaning: "doing", pulse: false } as const;
   if (!left) return { ...base, text: `${lead} writing`, fits: [lead] };
   return {
     ...base,
@@ -267,7 +273,7 @@ function processingWords(item: WorkingItem): CardWords {
   }
   const running = workingFigures(item).running;
   return {
-    status: said(unmeasuredProcessingText(item), "info", true),
+    status: said(unmeasuredProcessingText(item), "doing", true),
     bar: MOVING_BAR,
     details: present([
       item.source === "download"
@@ -283,7 +289,7 @@ export function deliveringWords(item: HandingItem | WorkingItem): CardWords {
   return {
     status: said(
       item.source === "library" ? "Replacing file" : "Handing back",
-      "info",
+      "doing",
       true,
     ),
     bar: MOVING_BAR,
@@ -316,7 +322,7 @@ export function deliveredWords(
     status: {
       text: DELIVERED_LEAD,
       lead: DELIVERED_LEAD,
-      tone: "ok",
+      meaning: "done",
       pulse: false,
     },
     bar: { width: 100, waiting: false, moving: false },
@@ -336,7 +342,7 @@ export function stoppedWords(
   return {
     status: said(
       kind === "failed" ? "Couldn't finish" : "Rejected",
-      kind === "failed" ? "bad" : "warn",
+      kind === "failed" ? "broken" : "attention",
       false,
     ),
     bar: null,
