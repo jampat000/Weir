@@ -1,4 +1,4 @@
-import { screen } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import {
   afterEach,
   beforeAll,
@@ -139,6 +139,81 @@ describe("where Logs' filters go when the title line is short of room", () => {
     expect(cardHeader()).toContainElement(level);
     expect(level.closest(".mm-history-scope")).toBe(
       screen.getByTestId("logs-category-picker").closest(".mm-history-scope"),
+    );
+  });
+});
+
+describe("a picker that is open while the header refits", () => {
+  /** Each reading of the log has different counts, as a real one does once a choice has been made. */
+  function countsChangeWithEveryReading() {
+    let readings = 0;
+    mocks.fetchSystemLog.mockImplementation(async () => {
+      readings += 1;
+      const page = logPage();
+      page.counts.category.processing = readings;
+      return page;
+    });
+  }
+
+  it("stays open, with every choice made, while the pickers are folded into the Log card", async () => {
+    chipsOverflowWhile(() => inHeader(".mm-history-scope") !== null);
+    cardHeaderWrapsWhile(() => false);
+    countsChangeWithEveryReading();
+    renderLog();
+
+    const picker = await screen.findByTestId("logs-category-picker");
+    expect(cardHeader()).toContainElement(picker);
+    fireEvent.click(picker);
+    fireEvent.click(screen.getByRole("option", { name: /^Processing/ }));
+    await waitFor(() =>
+      expect(screen.getByTestId("location")).toHaveTextContent(
+        "category=processing",
+      ),
+    );
+    fireEvent.click(screen.getByRole("option", { name: /^Backups/ }));
+    await waitFor(() =>
+      expect(screen.getByTestId("location")).toHaveTextContent(
+        "category=processing%2Cbackups",
+      ),
+    );
+
+    const open = screen.getByTestId("logs-category-picker");
+    expect(open).toBe(picker);
+    expect(open).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("option", { name: /^Processing/ })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(screen.getByRole("option", { name: /^Backups/ })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+  });
+
+  it("is refitted once it has closed", async () => {
+    chipsOverflowWhile(() => inHeader(".mm-history-scope") !== null);
+    cardHeaderWrapsWhile(() => false);
+    countsChangeWithEveryReading();
+    renderLog();
+
+    const picker = await screen.findByTestId("logs-category-picker");
+    fireEvent.click(picker);
+    fireEvent.click(screen.getByRole("option", { name: /^Processing/ }));
+    await waitFor(() =>
+      expect(screen.getByTestId("location")).toHaveTextContent(
+        "category=processing",
+      ),
+    );
+    fireEvent.keyDown(document, { key: "Escape" });
+
+    await waitFor(() =>
+      expect(screen.getByTestId("logs-category-picker")).toHaveAttribute(
+        "aria-expanded",
+        "false",
+      ),
+    );
+    expect(cardHeader()).toContainElement(
+      screen.getByTestId("logs-category-picker"),
     );
   });
 });

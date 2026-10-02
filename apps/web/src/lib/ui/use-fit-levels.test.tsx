@@ -1,7 +1,8 @@
 import { act, render } from "@testing-library/react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { useCloseOnOutsideAndEscape } from "./use-close-on-outside";
 import { useFitLevels } from "./use-fit-levels";
 
 /** A row that needs `needs` pixels and is given a room that grows with the level: 100 more for each. */
@@ -115,5 +116,83 @@ describe("useFitLevels", () => {
     act(() => resized());
 
     expect(level).toBe(0);
+  });
+
+  describe("while a popover is open", () => {
+    function WithPopover({
+      needs,
+      refit,
+      report,
+    }: {
+      needs: number;
+      refit: string;
+      report: (level: number) => void;
+    }) {
+      const [open, setOpen] = useState(false);
+      const ref = useRef<HTMLDivElement>(null);
+      useCloseOnOutsideAndEscape(open, () => setOpen(false), ref);
+      return (
+        <div ref={ref}>
+          <button type="button" onClick={() => setOpen(true)}>
+            Open
+          </button>
+          <Probe needs={needs} room={300} refit={refit} report={report} />
+        </div>
+      );
+    }
+
+    it("keeps its level when what the row holds changes, and refits once the popover has closed", () => {
+      let level = -1;
+      const { rerender, getByText } = render(
+        <WithPopover needs={450} refit="a" report={(l) => (level = l)} />,
+      );
+      expect(level).toBe(2);
+
+      act(() => getByText("Open").click());
+      rerender(
+        <WithPopover needs={150} refit="b" report={(l) => (level = l)} />,
+      );
+      expect(level).toBe(2);
+
+      act(() => {
+        document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+      });
+      expect(level).toBe(0);
+    });
+
+    it("waits to answer a change of room until the popover has closed", () => {
+      let resized: () => void = () => undefined;
+      vi.stubGlobal(
+        "ResizeObserver",
+        class {
+          constructor(callback: () => void) {
+            resized = callback;
+          }
+          observe() {}
+          disconnect() {}
+        },
+      );
+      let level = -1;
+      const { container, getByText, rerender } = render(
+        <WithPopover needs={450} refit="a" report={(l) => (level = l)} />,
+      );
+      expect(level).toBe(2);
+
+      act(() => getByText("Open").click());
+      Object.defineProperty(container.querySelector("header"), "clientWidth", {
+        configurable: true,
+        value: 900,
+      });
+      rerender(
+        <WithPopover needs={100} refit="a" report={(l) => (level = l)} />,
+      );
+      act(() => resized());
+      expect(level).toBe(2);
+
+      act(() => {
+        document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+      });
+      expect(level).toBe(0);
+    });
   });
 });
