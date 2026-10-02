@@ -9922,8 +9922,67 @@
       },
       "SuiteNetworkAccessOut": {
         "additionalProperties": false,
-        "description": "Whether another device on the network can currently reach Weir.",
+        "description": "Who can reach Weir over the network, and what is happening about a change.",
         "properties": {
+          "addresses": {
+            "description": "Where another device would type to reach Weir (for example http://10.1.1.196:9347); empty unless the server listens, or is about to listen, for the network.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Addresses",
+            "type": "array"
+          },
+          "firewall": {
+            "description": "What Windows Firewall says about Weir's server program: allowed, blocked, or not_checked while nothing depends on it.",
+            "enum": [
+              "allowed",
+              "blocked",
+              "not_checked"
+            ],
+            "title": "Firewall",
+            "type": "string"
+          },
+          "machine_name": {
+            "description": "This PC's name, for \"approve on MEDIA-PC\".",
+            "title": "Machine Name",
+            "type": "string"
+          },
+          "pending_scope": {
+            "anyOf": [
+              {
+                "enum": [
+                  "this_pc_only",
+                  "network"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The saved choice when the running server has not caught up with it yet (the tray still has to restart it); null otherwise.",
+            "title": "Pending Scope"
+          },
+          "port": {
+            "title": "Port",
+            "type": "integer"
+          },
+          "scope": {
+            "anyOf": [
+              {
+                "enum": [
+                  "this_pc_only",
+                  "network"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Who the running server listens for; null when this copy of Weir does not manage that (Docker, a bare install).",
+            "title": "Scope"
+          },
           "state": {
             "description": "this_pc_only, allowed, blocked, or not_applicable",
             "minLength": 1,
@@ -9937,9 +9996,41 @@
         },
         "required": [
           "state",
-          "summary"
+          "summary",
+          "scope",
+          "pending_scope",
+          "firewall",
+          "port",
+          "machine_name",
+          "addresses"
         ],
         "title": "SuiteNetworkAccessOut",
+        "type": "object"
+      },
+      "SuiteNetworkAccessPutIn": {
+        "additionalProperties": false,
+        "description": "Body for PUT /suite/network-access.",
+        "properties": {
+          "csrf_token": {
+            "minLength": 1,
+            "title": "Csrf Token",
+            "type": "string"
+          },
+          "scope": {
+            "description": "this_pc_only or network (devices on the network, through Windows Firewall's Private and Domain networks).",
+            "enum": [
+              "this_pc_only",
+              "network"
+            ],
+            "title": "Scope",
+            "type": "string"
+          }
+        },
+        "required": [
+          "csrf_token",
+          "scope"
+        ],
+        "title": "SuiteNetworkAccessPutIn",
         "type": "object"
       },
       "SuiteOperationalHistoryResetIn": {
@@ -17848,7 +17939,7 @@
     },
     "/api/v1/suite/network-access": {
       "get": {
-        "description": "Whether other devices on the network can reach Weir (System › About). Windows package only; other platforms report not_applicable.",
+        "description": "Who can reach Weir over the network, and whether a change is waiting on the tray or the firewall (System › About). Windows package only; other installs report not_applicable.",
         "operationId": "get_suite_network_access_api_v1_suite_network_access_get",
         "responses": {
           "200": {
@@ -17863,6 +17954,46 @@
           }
         },
         "summary": "Get Suite Network Access",
+        "tags": [
+          "suite"
+        ]
+      },
+      "put": {
+        "description": "Admin only. Saves who can reach Weir for the Windows tray to apply: it restarts the server and, when Windows Firewall has no rule for Weir, asks for one on this PC (Private and Domain networks only). The answer is the state with the new choice pending. Answers 409 on Docker and on a bare install, where the way Weir is started decides.",
+        "operationId": "put_suite_network_access_api_v1_suite_network_access_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SuiteNetworkAccessPutIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuiteNetworkAccessOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Suite Network Access",
         "tags": [
           "suite"
         ]

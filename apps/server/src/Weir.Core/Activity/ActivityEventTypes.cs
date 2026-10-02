@@ -17,6 +17,9 @@ public static class ActivityEventTypes
     public const string AuthSessionsRevoked = "auth.sessions_revoked";
     public const string SystemReconciliationRepair = "system.reconciliation.repair";
 
+    /// <summary>An admin chose who can reach Weir over the network, from System › About.</summary>
+    public const string SystemNetworkAccessChanged = "system.network_access.changed";
+
     // Shared *arr library (Sonarr/Radarr): operator-triggered connection checks
     public const string ArrLibraryConnectionTestSucceeded = "arr_library.connection_test_succeeded";
     public const string ArrLibraryConnectionTestFailed = "arr_library.connection_test_failed";

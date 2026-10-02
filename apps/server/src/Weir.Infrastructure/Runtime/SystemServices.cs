@@ -1,4 +1,3 @@
-using System.Security.Cryptography;
 using System.Text;
 using Weir.Core.Configuration;
 using Weir.Core.Json;
@@ -114,25 +113,7 @@ public sealed class UpdateFiles
     public void WriteWorkState(bool busy, DateTimeOffset checkedAt) =>
         ReplaceFile(WorkStateFileName, Encoding.UTF8.GetBytes(UpdateStatus.SerializeWorkState(busy, checkedAt)));
 
-    // Written whole to a unique scratch file, then renamed into place, so a reader sees the old file or the new one, never half.
-    private void ReplaceFile(string fileName, byte[] contents)
-    {
-        var path = Path.Join(_options.WeirHome, fileName);
-        var scratch = Path.Join(_options.WeirHome, $".{fileName}.{Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(4))}.tmp");
-        try
-        {
-            File.WriteAllBytes(scratch, contents);
-            File.Move(scratch, path, overwrite: true);
-            scratch = string.Empty;
-        }
-        finally
-        {
-            if (scratch.Length > 0 && File.Exists(scratch))
-            {
-                File.Delete(scratch);
-            }
-        }
-    }
+    private void ReplaceFile(string fileName, byte[] contents) => AtomicFileWriter.Replace(_options.WeirHome, fileName, contents);
 
     /// <summary>The install type: <c>WEIR_RUNTIME</c>, a Docker marker, a packaged Windows build, else source.</summary>
     public static string DetectInstallType(string? runtimeVariable)

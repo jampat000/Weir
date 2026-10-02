@@ -53,8 +53,9 @@ This checklist defines the current practical hardening baseline for Weir.
 - The Windows package's server listens on this PC only (`127.0.0.1` and `[::1]`) until LAN access is allowed, so
   nothing on the network can connect to a fresh or silently installed Weir, whatever the firewall says. LAN access
   is one saved choice (`lan-access` in the data folder). It turns on when the person says yes at the install
-  prompt and the rule is created, when the tray's "Allow other devices on your network..." item succeeds, or when
-  `--allow-lan` runs. The tray's "Only allow this PC" item turns it off again. Any change restarts the server with
+  prompt and the rule is created, when the tray's "Allow other devices on your network..." item succeeds, when
+  an admin chooses "Devices on my network" on System › About, or when `--allow-lan` runs. The tray's "Only allow
+  this PC" item, or "This PC only" on System › About, turns it off again. Any change restarts the server with
   the new bind address. A saved choice that cannot be read or understood counts as off. Docker and a bare source
   install are unchanged: the server binds every interface there, and the operator publishes the port.
 - An install that predates the setting keeps its reach: the first start with no saved choice turns LAN access on
@@ -68,6 +69,16 @@ This checklist defines the current practical hardening baseline for Weir.
 - Creating or removing it needs a Windows admin (UAC) elevation; Weir asks for that once, at first run, with a
   plain explanation, and never asks again automatically if declined. Turning LAN access off leaves the rule in
   place: with nothing listening for the network it lets nothing in.
+- System › About changes the same saved choice: `PUT /api/v1/suite/network-access` is admin only, carries the
+  session's CSRF token like every other settings write, and only writes the `lan-access` file in the data folder
+  (the same `on` / `off` text the tray writes). The server never touches the firewall itself. The tray, which
+  watches the file, restarts the server for it and, when the choice is for the network and the `Weir` rule is
+  missing, raises the same Windows admin prompt as its own menu, on the PC itself, so a person who is signed in to
+  Weir from another device cannot approve it for themselves. Declining the prompt still restarts the server for
+  the network, because that is the saved choice; Windows Firewall then blocks, System › About says so, and
+  choosing the network again asks again. A choice saved while the tray is not running waits for it. Docker and a
+  bare install answer the `PUT` with 409 and say what decides there (the port mapping, the `--host` option).
+  Every change is written to Activity as "Network access changed", with the admin who made it.
 - `--allow-lan` (for a program driving Weir unattended) never elevates itself and never prompts. It always turns
   LAN access on, because that is what the caller asked for; it creates the rule only when already elevated, and
   otherwise logs that the rule was not created and still exits zero. The bind address, not the rule, is what
@@ -76,8 +87,10 @@ This checklist defines the current practical hardening baseline for Weir.
   addresses the server listens on. While Weir is local-only, first-run setup from another device is not
   possible, because that device cannot connect at all.
 - Reading the current state (for System › About) needs no admin rights and touches nothing; only the Windows
-  build does this, gated by OS — Docker and a bare source install report nothing. It reports "only this PC" from
-  the server's own bind address, and consults the firewall only when the server listens for the network.
+  package does this — Docker and a bare install report `not_applicable` with the reason. It reports "only this
+  PC" from the server's own bind address, shows a saved choice the server has not caught up with as pending, and
+  consults the firewall only when the server listens, or is about to listen, for the network. The addresses it
+  lists are this PC's IPv4 addresses on adapters that have a gateway, never self-assigned ones.
 - Weir never modifies a firewall rule it did not create: removing block rules is limited to inbound rules whose
   program path matches Weir's own server exe exactly.
 
@@ -97,4 +110,4 @@ Run this list before any major release:
 3. Confirm CodeQL has no open high-confidence security findings.
 4. Confirm auth setup, login, logout, and password validation smoke tests pass.
 5. Confirm backup files do not expose secrets in public docs, logs, or screenshots.
-6. Confirm History and System › Logs do not expose tokens or internal implementation details to normal users.
+6. Confirm Activity and System › Logs do not expose tokens or internal implementation details to normal users.
