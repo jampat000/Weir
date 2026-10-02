@@ -128,6 +128,55 @@ describe("what needs a person", () => {
   });
 });
 
+describe("what each need means", () => {
+  it("is broken for a failed file and attention for one held back or turned away", () => {
+    const groups = buildNeeds({
+      ...healthy,
+      files: [failedFile(1), rejectedFile(2)],
+    });
+
+    expect(groups.map((group) => group.meaning)).toEqual([
+      "broken",
+      "attention",
+    ]);
+    expect(groups.map((group) => group.rows[0].meaning)).toEqual([
+      "broken",
+      "attention",
+    ]);
+  });
+
+  it("is broken for stopped work and failed jobs, and attention for having nothing to watch", () => {
+    const [stopped] = buildNeeds({
+      ...healthy,
+      readiness: { worker_health: [worker("p", "degraded", "x")] },
+    });
+    const [nothing] = buildNeeds({
+      ...healthy,
+      workflows: [{ ...workflow, enabled: false } as ProcessingLibrary],
+    });
+
+    expect(stopped.meaning).toBe("broken");
+    expect(nothing).toMatchObject({
+      meaning: "attention",
+      rows: [{ meaning: "attention" }],
+    });
+  });
+
+  it("gives the group the worst meaning of what Weir itself has wrong", () => {
+    const [group] = buildNeeds({
+      ...healthy,
+      workflows: [{ ...workflow, enabled: false } as ProcessingLibrary],
+      failedJobs: { count: 1, capped: false },
+    });
+
+    expect(group.rows.map((row) => row.meaning)).toEqual([
+      "attention",
+      "broken",
+    ]);
+    expect(group.meaning).toBe("broken");
+  });
+});
+
 describe("the failed jobs", () => {
   const jobs = [
     { job_kind: "processing.file.remux_pass.v1" },

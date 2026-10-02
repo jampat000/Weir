@@ -2,6 +2,7 @@ import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ConnectionActivityFrame } from "./connection-activity";
+import { connectionRowMeaning } from "./connection-lights";
 
 const stopListening = vi.fn();
 const subscribeConnectionActivity = vi.fn(() => stopListening);
@@ -194,5 +195,17 @@ describe("listening to the stream", () => {
 
     expect(stopListening).toHaveBeenCalledTimes(1);
     expect(vi.getTimerCount()).toBe(0);
+  });
+});
+
+describe("what a connection's row shows", () => {
+  it("is what its state means while no light is on", () => {
+    expect(connectionRowMeaning("ok", null)).toBe("done");
+    expect(connectionRowMeaning("down", null)).toBe("broken");
+  });
+
+  it("is what the light means while one is on, whatever the state", () => {
+    expect(connectionRowMeaning("down", "asking")).toBe("doing");
+    expect(connectionRowMeaning("ok", "failed")).toBe("broken");
   });
 });
