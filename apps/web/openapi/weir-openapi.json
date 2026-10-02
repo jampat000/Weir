@@ -5934,6 +5934,18 @@
             "title": "Limit",
             "type": "integer"
           },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Pass as cursor for the next page; null on the last.",
+            "title": "Next Cursor"
+          },
           "returned": {
             "title": "Returned",
             "type": "integer"
@@ -5950,7 +5962,8 @@
           "files",
           "status_counts",
           "returned",
-          "limit"
+          "limit",
+          "next_cursor"
         ],
         "title": "ProcessingFilesPageOut",
         "type": "object"
@@ -10674,7 +10687,7 @@
         "type": "object"
       },
       "SystemLogOut": {
-        "description": "One page of System › Logs, newest first.",
+        "description": "One page of System › Logs, newest first unless sorted another way.",
         "properties": {
           "counts": {
             "$ref": "#/components/schemas/SystemLogCountsOut"
@@ -14783,6 +14796,53 @@
             }
           },
           {
+            "description": "How the list is ordered: file (by path, ignoring the case of letters), status (by what the status means, then the status word) or when (by when the file last changed). Without it the list is newest-seen first, as it has always been. Files that tie fall by id, so paging never repeats or skips one.",
+            "in": "query",
+            "name": "sort",
+            "required": false,
+            "schema": {
+              "enum": [
+                "file",
+                "status",
+                "when"
+              ],
+              "title": "Sort",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Which way the order runs. Ascending runs the sort's own way (A to Z, oldest first, done first); descending reverses it, and is the default.",
+            "in": "query",
+            "name": "direction",
+            "required": false,
+            "schema": {
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "title": "Direction",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Where the page starts: the next_cursor of the page before, asked for with the same sort and direction. A cursor made for another sort or direction is refused.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
             "in": "query",
             "name": "limit",
             "required": false,
@@ -18848,7 +18908,7 @@
     },
     "/api/v1/system/log": {
       "get": {
-        "description": "Weir's events, its jobs and its server log as one list, newest first, with a cursor for the next page and the counts the filter chips show. Events are Weir's own (a file's story is on Activity); a finished watched-folder scan is left out unless a job status is asked for.",
+        "description": "Weir's events, its jobs and its server log as one list, newest first unless sorted another way, with a cursor for the next page and the counts the filter chips show. Events are Weir's own (a file's story is on Activity); a finished watched-folder scan is left out unless a job status is asked for.",
         "operationId": "get_system_log_api_v1_system_log_get",
         "parameters": [
           {
@@ -19079,7 +19139,40 @@
             }
           },
           {
-            "description": "Where the page starts: the next_cursor of the page before.",
+            "description": "How the list is ordered: time (the default), level (by severity, errors first when ascending), source (event, job, server), category (by its word) or workflow (by the workflow's name, ignoring case; rows with no workflow come last either way). Rows that tie fall by time, newest first when descending and oldest first when ascending, so paging never repeats or skips one.",
+            "in": "query",
+            "name": "sort",
+            "required": false,
+            "schema": {
+              "default": "time",
+              "enum": [
+                "time",
+                "level",
+                "source",
+                "category",
+                "workflow"
+              ],
+              "title": "Sort",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Which way the order runs. Ascending runs the sort's own way (oldest first, errors first, A to Z); descending reverses it, and is the default: newest first.",
+            "in": "query",
+            "name": "direction",
+            "required": false,
+            "schema": {
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "title": "Direction",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Where the page starts: the next_cursor of the page before, asked for with the same sort and direction. A cursor made for another sort or direction is refused.",
             "in": "query",
             "name": "cursor",
             "required": false,
@@ -19138,7 +19231,7 @@
     },
     "/api/v1/system/log/export": {
       "get": {
-        "description": "The log for the same filters as a file, newest first: a spreadsheet (csv) or the rows as the API returns them (json).",
+        "description": "The log for the same filters and order as a file, newest first unless sorted another way: a spreadsheet (csv) or the rows as the API returns them (json).",
         "operationId": "get_system_log_export_api_v1_system_log_export_get",
         "parameters": [
           {
@@ -19377,6 +19470,39 @@
                 }
               ],
               "title": "Has Exception"
+            }
+          },
+          {
+            "description": "How the list is ordered: time (the default), level (by severity, errors first when ascending), source (event, job, server), category (by its word) or workflow (by the workflow's name, ignoring case; rows with no workflow come last either way). Rows that tie fall by time, newest first when descending and oldest first when ascending, so paging never repeats or skips one.",
+            "in": "query",
+            "name": "sort",
+            "required": false,
+            "schema": {
+              "default": "time",
+              "enum": [
+                "time",
+                "level",
+                "source",
+                "category",
+                "workflow"
+              ],
+              "title": "Sort",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Which way the order runs. Ascending runs the sort's own way (oldest first, errors first, A to Z); descending reverses it, and is the default: newest first.",
+            "in": "query",
+            "name": "direction",
+            "required": false,
+            "schema": {
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "title": "Direction",
+              "type": "string"
             }
           }
         ],

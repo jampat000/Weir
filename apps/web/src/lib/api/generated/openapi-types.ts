@@ -2265,7 +2265,7 @@ export interface paths {
     };
     /**
      * Get System Log
-     * @description Weir's events, its jobs and its server log as one list, newest first, with a cursor for the next page and the counts the filter chips show. Events are Weir's own (a file's story is on Activity); a finished watched-folder scan is left out unless a job status is asked for.
+     * @description Weir's events, its jobs and its server log as one list, newest first unless sorted another way, with a cursor for the next page and the counts the filter chips show. Events are Weir's own (a file's story is on Activity); a finished watched-folder scan is left out unless a job status is asked for.
      */
     get: operations["get_system_log_api_v1_system_log_get"];
     put?: never;
@@ -2285,7 +2285,7 @@ export interface paths {
     };
     /**
      * Get System Log Export
-     * @description The log for the same filters as a file, newest first: a spreadsheet (csv) or the rows as the API returns them (json).
+     * @description The log for the same filters and order as a file, newest first unless sorted another way: a spreadsheet (csv) or the rows as the API returns them (json).
      */
     get: operations["get_system_log_export_api_v1_system_log_export_get"];
     put?: never;
@@ -5156,6 +5156,11 @@ export interface components {
       files: components["schemas"]["ProcessingFileOut"][];
       /** Limit */
       limit: number;
+      /**
+       * Next Cursor
+       * @description Pass as cursor for the next page; null on the last.
+       */
+      next_cursor: string | null;
       /** Returned */
       returned: number;
       /** Status Counts */
@@ -7628,7 +7633,7 @@ export interface components {
     };
     /**
      * SystemLogOut
-     * @description One page of System › Logs, newest first.
+     * @description One page of System › Logs, newest first unless sorted another way.
      */
     SystemLogOut: {
       counts: components["schemas"]["SystemLogCountsOut"];
@@ -9920,6 +9925,12 @@ export interface operations {
           | null;
         path_contains?: string | null;
         within_days?: number | null;
+        /** @description How the list is ordered: file (by path, ignoring the case of letters), status (by what the status means, then the status word) or when (by when the file last changed). Without it the list is newest-seen first, as it has always been. Files that tie fall by id, so paging never repeats or skips one. */
+        sort?: "file" | "status" | "when";
+        /** @description Which way the order runs. Ascending runs the sort's own way (A to Z, oldest first, done first); descending reverses it, and is the default. */
+        direction?: "asc" | "desc";
+        /** @description Where the page starts: the next_cursor of the page before, asked for with the same sort and direction. A cursor made for another sort or direction is refused. */
+        cursor?: string | null;
         limit?: number;
       };
       header?: never;
@@ -12709,7 +12720,11 @@ export interface operations {
         status?: string | null;
         /** @description Only server lines that carry an exception (true) or none (false). Only the server log has them. */
         has_exception?: boolean | null;
-        /** @description Where the page starts: the next_cursor of the page before. */
+        /** @description How the list is ordered: time (the default), level (by severity, errors first when ascending), source (event, job, server), category (by its word) or workflow (by the workflow's name, ignoring case; rows with no workflow come last either way). Rows that tie fall by time, newest first when descending and oldest first when ascending, so paging never repeats or skips one. */
+        sort?: "time" | "level" | "source" | "category" | "workflow";
+        /** @description Which way the order runs. Ascending runs the sort's own way (oldest first, errors first, A to Z); descending reverses it, and is the default: newest first. */
+        direction?: "asc" | "desc";
+        /** @description Where the page starts: the next_cursor of the page before, asked for with the same sort and direction. A cursor made for another sort or direction is refused. */
         cursor?: string | null;
         limit?: number;
       };
@@ -12769,6 +12784,10 @@ export interface operations {
         status?: string | null;
         /** @description Only server lines that carry an exception (true) or none (false). Only the server log has them. */
         has_exception?: boolean | null;
+        /** @description How the list is ordered: time (the default), level (by severity, errors first when ascending), source (event, job, server), category (by its word) or workflow (by the workflow's name, ignoring case; rows with no workflow come last either way). Rows that tie fall by time, newest first when descending and oldest first when ascending, so paging never repeats or skips one. */
+        sort?: "time" | "level" | "source" | "category" | "workflow";
+        /** @description Which way the order runs. Ascending runs the sort's own way (oldest first, errors first, A to Z); descending reverses it, and is the default: newest first. */
+        direction?: "asc" | "desc";
       };
       header?: never;
       path?: never;
