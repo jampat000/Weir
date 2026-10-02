@@ -203,10 +203,13 @@
   align-items: flex-start;
 }
 
-/* A file's name is shown whole, wrapping between its parts, never cut to "…". */
+/* A file's name wraps between its parts to at most two lines, then an ellipsis; the whole name is the row's title. */
 .mm-history-file__name {
-  display: block;
+  display: -webkit-box;
   max-width: 100%;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   overflow-wrap: anywhere;
   font-weight: 600;
   color: var(--mm-text);
