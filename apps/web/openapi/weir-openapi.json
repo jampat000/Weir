@@ -10370,6 +10370,560 @@
         "title": "SuiteUpdateStatusOut",
         "type": "object"
       },
+      "SystemStatsDriveOut": {
+        "additionalProperties": false,
+        "description": "One drive that holds a workflow's folders. A network share has free space only: its activity is null.",
+        "properties": {
+          "busy_percent": {
+            "anyOf": [
+              {
+                "maximum": 100,
+                "minimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "How much of the time the drive was busy.",
+            "title": "Busy Percent"
+          },
+          "free_bytes": {
+            "description": "What is free for Weir to use.",
+            "minimum": 0,
+            "title": "Free Bytes",
+            "type": "integer"
+          },
+          "full_in_days": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When the drive will be full at the pace it has been filling, from the last day of readings kept since Weir started. Null when it is not filling, when there is less than an hour of history, or when it would take over a year.",
+            "title": "Full In Days"
+          },
+          "keep_free_bytes": {
+            "description": "The most any workflow on this drive wants kept free.",
+            "minimum": 0,
+            "title": "Keep Free Bytes",
+            "type": "integer"
+          },
+          "name": {
+            "description": "The drive as a person names it: a letter such as D:, a network share, or a mount point.",
+            "title": "Name",
+            "type": "string"
+          },
+          "path": {
+            "description": "The drive's root.",
+            "title": "Path",
+            "type": "string"
+          },
+          "read_bytes_per_sec": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What the drive reads each second, from the last two readings of it (every 30 seconds).",
+            "title": "Read Bytes Per Sec"
+          },
+          "total_bytes": {
+            "description": "The drive's size.",
+            "minimum": 0,
+            "title": "Total Bytes",
+            "type": "integer"
+          },
+          "weir_bytes": {
+            "description": "What Weir's own work files take on this drive.",
+            "minimum": 0,
+            "title": "Weir Bytes",
+            "type": "integer"
+          },
+          "workflows": {
+            "description": "The workflows with a folder on this drive, by name.",
+            "items": {
+              "$ref": "#/components/schemas/SystemStatsDriveWorkflowOut"
+            },
+            "title": "Workflows",
+            "type": "array"
+          },
+          "write_bytes_per_sec": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What the drive writes each second.",
+            "title": "Write Bytes Per Sec"
+          }
+        },
+        "required": [
+          "name",
+          "path",
+          "total_bytes",
+          "free_bytes",
+          "weir_bytes",
+          "keep_free_bytes",
+          "full_in_days",
+          "read_bytes_per_sec",
+          "write_bytes_per_sec",
+          "busy_percent",
+          "workflows"
+        ],
+        "title": "SystemStatsDriveOut",
+        "type": "object"
+      },
+      "SystemStatsDriveWorkflowOut": {
+        "additionalProperties": false,
+        "description": "A workflow that keeps a folder on a drive, and which of its folders those are.",
+        "properties": {
+          "id": {
+            "description": "The workflow's id.",
+            "title": "Id",
+            "type": "integer"
+          },
+          "name": {
+            "description": "The workflow's name.",
+            "title": "Name",
+            "type": "string"
+          },
+          "roles": {
+            "description": "Which of the workflow's folders are on this drive, in the order watched, work, output.",
+            "items": {
+              "enum": [
+                "watched",
+                "work",
+                "output"
+              ],
+              "type": "string"
+            },
+            "title": "Roles",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "roles"
+        ],
+        "title": "SystemStatsDriveWorkflowOut",
+        "type": "object"
+      },
+      "SystemStatsFrame": {
+        "additionalProperties": false,
+        "description": "The data of a system.stats frame on GET /activity/stream: the newest reading and the point to add to the traces.",
+        "properties": {
+          "now": {
+            "$ref": "#/components/schemas/SystemStatsNowOut",
+            "description": "The newest reading.",
+            "title": "Now"
+          },
+          "point": {
+            "$ref": "#/components/schemas/SystemStatsPointOut",
+            "description": "The point to add to the traces.",
+            "title": "Point"
+          }
+        },
+        "required": [
+          "now",
+          "point"
+        ],
+        "title": "SystemStatsFrame",
+        "type": "object"
+      },
+      "SystemStatsMachineOut": {
+        "additionalProperties": false,
+        "description": "What changes slowly about the machine. Each is null where the system cannot say.",
+        "properties": {
+          "os": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The operating system's name, such as Windows 11 Pro. In Docker, the container's distribution.",
+            "title": "Os"
+          },
+          "reboot_pending": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Whether the system is waiting for a restart. Null where it cannot tell: inside a container, or on a system without a way to record it.",
+            "title": "Reboot Pending"
+          },
+          "uptime_seconds": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "How long the machine has been running.",
+            "title": "Uptime Seconds"
+          }
+        },
+        "required": [
+          "os",
+          "uptime_seconds",
+          "reboot_pending"
+        ],
+        "title": "SystemStatsMachineOut",
+        "type": "object"
+      },
+      "SystemStatsNowOut": {
+        "additionalProperties": false,
+        "description": "The newest reading. A field is null where it cannot be read, such as disk activity on a network share or in a container without access to the host's counters.",
+        "properties": {
+          "at": {
+            "description": "When the reading was taken.",
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "cores": {
+            "description": "How many processor cores the machine, or the container's limit, has.",
+            "minimum": 1,
+            "title": "Cores",
+            "type": "integer"
+          },
+          "cpu_percent": {
+            "anyOf": [
+              {
+                "maximum": 100,
+                "minimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "How much of the whole machine's processor time is in use. Inside a container held to a processor limit, how much of that limit.",
+            "title": "Cpu Percent"
+          },
+          "disk_busy_percent": {
+            "anyOf": [
+              {
+                "maximum": 100,
+                "minimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "How much of the time the machine's local disks were busy.",
+            "title": "Disk Busy Percent"
+          },
+          "disk_read_bytes_per_sec": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What all the machine's local disks read each second.",
+            "title": "Disk Read Bytes Per Sec"
+          },
+          "disk_write_bytes_per_sec": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What all the machine's local disks write each second.",
+            "title": "Disk Write Bytes Per Sec"
+          },
+          "memory_total_bytes": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Physical memory in total, or the container's memory limit.",
+            "title": "Memory Total Bytes"
+          },
+          "memory_used_bytes": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Physical memory in use. Inside a container held to a memory limit, what the container holds against that limit.",
+            "title": "Memory Used Bytes"
+          },
+          "processing_read_bytes_per_sec": {
+            "description": "How fast the files being processed are read: the share of each source read so far, between two readings.",
+            "minimum": 0,
+            "title": "Processing Read Bytes Per Sec",
+            "type": "integer"
+          },
+          "processing_speed": {
+            "description": "The running passes' speeds added together: seconds of media written each second (148 for 148x). A copy has no such speed and adds nothing.",
+            "minimum": 0,
+            "title": "Processing Speed",
+            "type": "number"
+          },
+          "processing_write_bytes_per_sec": {
+            "description": "How fast the files being processed are written. ffmpeg reports what it has written; for mkvmerge, which does not, it is the same as what was read.",
+            "minimum": 0,
+            "title": "Processing Write Bytes Per Sec",
+            "type": "integer"
+          },
+          "running": {
+            "description": "Files being processed now.",
+            "minimum": 0,
+            "title": "Running",
+            "type": "integer"
+          },
+          "slots": {
+            "description": "How many files Weir will process at once.",
+            "minimum": 0,
+            "title": "Slots",
+            "type": "integer"
+          },
+          "tools_cpu_percent": {
+            "anyOf": [
+              {
+                "maximum": 100,
+                "minimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The tools Weir runs (ffmpeg, mkvmerge), as a share of the whole machine's processor time.",
+            "title": "Tools Cpu Percent"
+          },
+          "weir_cpu_percent": {
+            "anyOf": [
+              {
+                "maximum": 100,
+                "minimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Weir's own process, as a share of the whole machine's processor time.",
+            "title": "Weir Cpu Percent"
+          },
+          "weir_memory_bytes": {
+            "description": "The memory Weir's own process holds.",
+            "minimum": 0,
+            "title": "Weir Memory Bytes",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "at",
+          "cpu_percent",
+          "cores",
+          "memory_used_bytes",
+          "memory_total_bytes",
+          "disk_read_bytes_per_sec",
+          "disk_write_bytes_per_sec",
+          "disk_busy_percent",
+          "weir_cpu_percent",
+          "weir_memory_bytes",
+          "tools_cpu_percent",
+          "processing_read_bytes_per_sec",
+          "processing_write_bytes_per_sec",
+          "processing_speed",
+          "running",
+          "slots"
+        ],
+        "title": "SystemStatsNowOut",
+        "type": "object"
+      },
+      "SystemStatsOut": {
+        "additionalProperties": false,
+        "description": "The machine's load, Weir's share of it and the drives its workflows use, with the last ten minutes of the load. The same readings reach the Activity stream as system.stats frames.",
+        "properties": {
+          "drives": {
+            "description": "Every drive that holds a workflow's watched, work or output folder, read every 30 seconds.",
+            "items": {
+              "$ref": "#/components/schemas/SystemStatsDriveOut"
+            },
+            "title": "Drives",
+            "type": "array"
+          },
+          "history": {
+            "description": "The points of the last window, oldest first, at most 600. Each has its own time.",
+            "items": {
+              "$ref": "#/components/schemas/SystemStatsPointOut"
+            },
+            "title": "History",
+            "type": "array"
+          },
+          "interval_ms": {
+            "description": "How often a stream gets a reading while a browser is watching. With none watching, Weir reads every ten seconds, so history points can be further apart than this.",
+            "title": "Interval Ms",
+            "type": "integer"
+          },
+          "machine": {
+            "$ref": "#/components/schemas/SystemStatsMachineOut",
+            "description": "What changes slowly about the machine.",
+            "title": "Machine"
+          },
+          "now": {
+            "$ref": "#/components/schemas/SystemStatsNowOut",
+            "description": "The newest reading.",
+            "title": "Now"
+          },
+          "window_s": {
+            "description": "How far back history reaches.",
+            "title": "Window S",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "interval_ms",
+          "window_s",
+          "now",
+          "history",
+          "machine",
+          "drives"
+        ],
+        "title": "SystemStatsOut",
+        "type": "object"
+      },
+      "SystemStatsPointOut": {
+        "additionalProperties": false,
+        "description": "One moment of the traces. A field is null where it could not be read.",
+        "properties": {
+          "at": {
+            "description": "When the reading was taken.",
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "cpu_percent": {
+            "anyOf": [
+              {
+                "maximum": 100,
+                "minimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The share of the whole machine's processor time in use.",
+            "title": "Cpu Percent"
+          },
+          "disk_read_bytes_per_sec": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What all the machine's local disks read each second.",
+            "title": "Disk Read Bytes Per Sec"
+          },
+          "disk_write_bytes_per_sec": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What all the machine's local disks write each second.",
+            "title": "Disk Write Bytes Per Sec"
+          },
+          "memory_percent": {
+            "anyOf": [
+              {
+                "maximum": 100,
+                "minimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The share of physical memory in use.",
+            "title": "Memory Percent"
+          },
+          "processing_read_bytes_per_sec": {
+            "description": "How fast the files being processed are read.",
+            "minimum": 0,
+            "title": "Processing Read Bytes Per Sec",
+            "type": "integer"
+          },
+          "processing_speed": {
+            "description": "The running passes' speeds added together.",
+            "minimum": 0,
+            "title": "Processing Speed",
+            "type": "number"
+          },
+          "processing_write_bytes_per_sec": {
+            "description": "How fast the files being processed are written.",
+            "minimum": 0,
+            "title": "Processing Write Bytes Per Sec",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "at",
+          "cpu_percent",
+          "memory_percent",
+          "disk_read_bytes_per_sec",
+          "disk_write_bytes_per_sec",
+          "processing_read_bytes_per_sec",
+          "processing_write_bytes_per_sec",
+          "processing_speed"
+        ],
+        "title": "SystemStatsPointOut",
+        "type": "object"
+      },
       "ThemeIn": {
         "additionalProperties": false,
         "properties": {
@@ -11478,7 +12032,7 @@
     },
     "/api/v1/activity/stream": {
       "get": {
-        "description": "Authenticated SSE stream for activity-backed pages. Frames: activity.latest (the newest Activity event id and revision), processing.progress (every file's live progress, at most once a second), and connection.activity (one thing that happened on a media manager or download client connection: see ConnectionActivityFrame; each connection sends at most one frame per phase every 250 ms, and always the phase it ends on).",
+        "description": "Authenticated SSE stream for activity-backed pages. Frames: activity.latest (the newest Activity event id and revision), processing.progress (every file's live progress, at most once a second), connection.activity (one thing that happened on a media manager or download client connection: see ConnectionActivityFrame; each connection sends at most one frame per phase every 250 ms, and always the phase it ends on), and system.stats (the machine's newest reading, once a second: see SystemStatsFrame).",
         "operationId": "get_activity_stream_api_v1_activity_stream_get",
         "responses": {
           "200": {
@@ -17512,6 +18066,28 @@
         "summary": "Post Reconciliation Repair",
         "tags": [
           "system-reconciliation"
+        ]
+      }
+    },
+    "/api/v1/system/stats": {
+      "get": {
+        "description": "The machine's load now and over the last ten minutes, Weir's own share of it and the tools', and the drives the workflows use. A field is null where it cannot be read. The same readings arrive on the Activity stream as system.stats frames: see SystemStatsFrame.",
+        "operationId": "get_system_stats_api_v1_system_stats_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SystemStatsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get System Stats",
+        "tags": [
+          "system-stats"
         ]
       }
     },

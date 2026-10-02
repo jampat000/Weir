@@ -93,7 +93,7 @@ export interface paths {
     };
     /**
      * Get Activity Stream
-     * @description Authenticated SSE stream for activity-backed pages. Frames: activity.latest (the newest Activity event id and revision), processing.progress (every file's live progress, at most once a second), and connection.activity (one thing that happened on a media manager or download client connection: see ConnectionActivityFrame; each connection sends at most one frame per phase every 250 ms, and always the phase it ends on).
+     * @description Authenticated SSE stream for activity-backed pages. Frames: activity.latest (the newest Activity event id and revision), processing.progress (every file's live progress, at most once a second), connection.activity (one thing that happened on a media manager or download client connection: see ConnectionActivityFrame; each connection sends at most one frame per phase every 250 ms, and always the phase it ends on), and system.stats (the machine's newest reading, once a second: see SystemStatsFrame).
      */
     get: operations["get_activity_stream_api_v1_activity_stream_get"];
     put?: never;
@@ -2317,6 +2317,26 @@ export interface paths {
      * @description Apply one explicit safe repair action.
      */
     post: operations["post_reconciliation_repair_api_v1_system_reconciliation_repair_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/system/stats": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get System Stats
+     * @description The machine's load now and over the last ten minutes, Weir's own share of it and the tools', and the drives the workflows use. A field is null where it cannot be read. The same readings arrive on the Activity stream as system.stats frames: see SystemStatsFrame.
+     */
+    get: operations["get_system_stats_api_v1_system_stats_get"];
+    put?: never;
+    post?: never;
     delete?: never;
     options?: never;
     head?: never;
@@ -7374,6 +7394,295 @@ export interface components {
       /** Windows Installer Url */
       windows_installer_url?: string | null;
     };
+    /**
+     * SystemStatsDriveOut
+     * @description One drive that holds a workflow's folders. A network share has free space only: its activity is null.
+     */
+    SystemStatsDriveOut: {
+      /**
+       * Busy Percent
+       * @description How much of the time the drive was busy.
+       */
+      busy_percent: number | null;
+      /**
+       * Free Bytes
+       * @description What is free for Weir to use.
+       */
+      free_bytes: number;
+      /**
+       * Full In Days
+       * @description When the drive will be full at the pace it has been filling, from the last day of readings kept since Weir started. Null when it is not filling, when there is less than an hour of history, or when it would take over a year.
+       */
+      full_in_days: number | null;
+      /**
+       * Keep Free Bytes
+       * @description The most any workflow on this drive wants kept free.
+       */
+      keep_free_bytes: number;
+      /**
+       * Name
+       * @description The drive as a person names it: a letter such as D:, a network share, or a mount point.
+       */
+      name: string;
+      /**
+       * Path
+       * @description The drive's root.
+       */
+      path: string;
+      /**
+       * Read Bytes Per Sec
+       * @description What the drive reads each second, from the last two readings of it (every 30 seconds).
+       */
+      read_bytes_per_sec: number | null;
+      /**
+       * Total Bytes
+       * @description The drive's size.
+       */
+      total_bytes: number;
+      /**
+       * Weir Bytes
+       * @description What Weir's own work files take on this drive.
+       */
+      weir_bytes: number;
+      /**
+       * Workflows
+       * @description The workflows with a folder on this drive, by name.
+       */
+      workflows: components["schemas"]["SystemStatsDriveWorkflowOut"][];
+      /**
+       * Write Bytes Per Sec
+       * @description What the drive writes each second.
+       */
+      write_bytes_per_sec: number | null;
+    };
+    /**
+     * SystemStatsDriveWorkflowOut
+     * @description A workflow that keeps a folder on a drive, and which of its folders those are.
+     */
+    SystemStatsDriveWorkflowOut: {
+      /**
+       * Id
+       * @description The workflow's id.
+       */
+      id: number;
+      /**
+       * Name
+       * @description The workflow's name.
+       */
+      name: string;
+      /**
+       * Roles
+       * @description Which of the workflow's folders are on this drive, in the order watched, work, output.
+       */
+      roles: ("watched" | "work" | "output")[];
+    };
+    /**
+     * SystemStatsFrame
+     * @description The data of a system.stats frame on GET /activity/stream: the newest reading and the point to add to the traces.
+     */
+    SystemStatsFrame: {
+      /**
+       * Now
+       * @description The newest reading.
+       */
+      now: components["schemas"]["SystemStatsNowOut"];
+      /**
+       * Point
+       * @description The point to add to the traces.
+       */
+      point: components["schemas"]["SystemStatsPointOut"];
+    };
+    /**
+     * SystemStatsMachineOut
+     * @description What changes slowly about the machine. Each is null where the system cannot say.
+     */
+    SystemStatsMachineOut: {
+      /**
+       * Os
+       * @description The operating system's name, such as Windows 11 Pro. In Docker, the container's distribution.
+       */
+      os: string | null;
+      /**
+       * Reboot Pending
+       * @description Whether the system is waiting for a restart. Null where it cannot tell: inside a container, or on a system without a way to record it.
+       */
+      reboot_pending: boolean | null;
+      /**
+       * Uptime Seconds
+       * @description How long the machine has been running.
+       */
+      uptime_seconds: number | null;
+    };
+    /**
+     * SystemStatsNowOut
+     * @description The newest reading. A field is null where it cannot be read, such as disk activity on a network share or in a container without access to the host's counters.
+     */
+    SystemStatsNowOut: {
+      /**
+       * At
+       * Format: date-time
+       * @description When the reading was taken.
+       */
+      at: string;
+      /**
+       * Cores
+       * @description How many processor cores the machine, or the container's limit, has.
+       */
+      cores: number;
+      /**
+       * Cpu Percent
+       * @description How much of the whole machine's processor time is in use. Inside a container held to a processor limit, how much of that limit.
+       */
+      cpu_percent: number | null;
+      /**
+       * Disk Busy Percent
+       * @description How much of the time the machine's local disks were busy.
+       */
+      disk_busy_percent: number | null;
+      /**
+       * Disk Read Bytes Per Sec
+       * @description What all the machine's local disks read each second.
+       */
+      disk_read_bytes_per_sec: number | null;
+      /**
+       * Disk Write Bytes Per Sec
+       * @description What all the machine's local disks write each second.
+       */
+      disk_write_bytes_per_sec: number | null;
+      /**
+       * Memory Total Bytes
+       * @description Physical memory in total, or the container's memory limit.
+       */
+      memory_total_bytes: number | null;
+      /**
+       * Memory Used Bytes
+       * @description Physical memory in use. Inside a container held to a memory limit, what the container holds against that limit.
+       */
+      memory_used_bytes: number | null;
+      /**
+       * Processing Read Bytes Per Sec
+       * @description How fast the files being processed are read: the share of each source read so far, between two readings.
+       */
+      processing_read_bytes_per_sec: number;
+      /**
+       * Processing Speed
+       * @description The running passes' speeds added together: seconds of media written each second (148 for 148x). A copy has no such speed and adds nothing.
+       */
+      processing_speed: number;
+      /**
+       * Processing Write Bytes Per Sec
+       * @description How fast the files being processed are written. ffmpeg reports what it has written; for mkvmerge, which does not, it is the same as what was read.
+       */
+      processing_write_bytes_per_sec: number;
+      /**
+       * Running
+       * @description Files being processed now.
+       */
+      running: number;
+      /**
+       * Slots
+       * @description How many files Weir will process at once.
+       */
+      slots: number;
+      /**
+       * Tools Cpu Percent
+       * @description The tools Weir runs (ffmpeg, mkvmerge), as a share of the whole machine's processor time.
+       */
+      tools_cpu_percent: number | null;
+      /**
+       * Weir Cpu Percent
+       * @description Weir's own process, as a share of the whole machine's processor time.
+       */
+      weir_cpu_percent: number | null;
+      /**
+       * Weir Memory Bytes
+       * @description The memory Weir's own process holds.
+       */
+      weir_memory_bytes: number;
+    };
+    /**
+     * SystemStatsOut
+     * @description The machine's load, Weir's share of it and the drives its workflows use, with the last ten minutes of the load. The same readings reach the Activity stream as system.stats frames.
+     */
+    SystemStatsOut: {
+      /**
+       * Drives
+       * @description Every drive that holds a workflow's watched, work or output folder, read every 30 seconds.
+       */
+      drives: components["schemas"]["SystemStatsDriveOut"][];
+      /**
+       * History
+       * @description The points of the last window, oldest first, at most 600. Each has its own time.
+       */
+      history: components["schemas"]["SystemStatsPointOut"][];
+      /**
+       * Interval Ms
+       * @description How often a stream gets a reading while a browser is watching. With none watching, Weir reads every ten seconds, so history points can be further apart than this.
+       */
+      interval_ms: number;
+      /**
+       * Machine
+       * @description What changes slowly about the machine.
+       */
+      machine: components["schemas"]["SystemStatsMachineOut"];
+      /**
+       * Now
+       * @description The newest reading.
+       */
+      now: components["schemas"]["SystemStatsNowOut"];
+      /**
+       * Window S
+       * @description How far back history reaches.
+       */
+      window_s: number;
+    };
+    /**
+     * SystemStatsPointOut
+     * @description One moment of the traces. A field is null where it could not be read.
+     */
+    SystemStatsPointOut: {
+      /**
+       * At
+       * Format: date-time
+       * @description When the reading was taken.
+       */
+      at: string;
+      /**
+       * Cpu Percent
+       * @description The share of the whole machine's processor time in use.
+       */
+      cpu_percent: number | null;
+      /**
+       * Disk Read Bytes Per Sec
+       * @description What all the machine's local disks read each second.
+       */
+      disk_read_bytes_per_sec: number | null;
+      /**
+       * Disk Write Bytes Per Sec
+       * @description What all the machine's local disks write each second.
+       */
+      disk_write_bytes_per_sec: number | null;
+      /**
+       * Memory Percent
+       * @description The share of physical memory in use.
+       */
+      memory_percent: number | null;
+      /**
+       * Processing Read Bytes Per Sec
+       * @description How fast the files being processed are read.
+       */
+      processing_read_bytes_per_sec: number;
+      /**
+       * Processing Speed
+       * @description The running passes' speeds added together.
+       */
+      processing_speed: number;
+      /**
+       * Processing Write Bytes Per Sec
+       * @description How fast the files being processed are written.
+       */
+      processing_write_bytes_per_sec: number;
+    };
     /** ThemeIn */
     ThemeIn: {
       /** Csrf Token */
@@ -11906,6 +12215,26 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_system_stats_api_v1_system_stats_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["SystemStatsOut"];
         };
       };
     };
