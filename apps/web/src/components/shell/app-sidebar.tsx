@@ -8,6 +8,10 @@ import { useNeedsYou } from "../../pages/processing/dashboard/use-needs-you";
 import { useWorkingCount } from "../../pages/processing/working-count";
 import { NavIconChevronLeft, NavIconChevronRight } from "./nav-icons";
 import { SidebarBrand } from "./sidebar-brand";
+import {
+  readCollapsedChoice,
+  saveCollapsedChoice,
+} from "./sidebar-collapse-choice";
 import { SidebarNav } from "./sidebar-nav";
 import { SidebarUser } from "./sidebar-user";
 
@@ -60,7 +64,7 @@ export function AppSidebar({
     onClose: onCloseDrawer,
     initialFocus: firstPlace,
   });
-  const [collapsedChoice, setCollapsedChoice] = useState<boolean | null>(null);
+  const [collapsedChoice, setCollapsedChoice] = useState(readCollapsedChoice);
   const laptop = useMediaQuery(LAPTOP_WIDTH);
   const collapsed = collapsedChoice ?? laptop;
 
@@ -83,7 +87,10 @@ export function AppSidebar({
         data-testid="sidebar-collapse"
         aria-label={collapsed ? "Expand navigation" : "Collapse navigation"}
         aria-expanded={!collapsed}
-        onClick={() => setCollapsedChoice(!collapsed)}
+        onClick={() => {
+          setCollapsedChoice(!collapsed);
+          saveCollapsedChoice(!collapsed);
+        }}
       >
         {collapsed ? <NavIconChevronRight /> : <NavIconChevronLeft />}
       </button>
