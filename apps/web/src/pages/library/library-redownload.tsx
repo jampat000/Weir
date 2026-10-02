@@ -119,6 +119,7 @@ export function LibraryRedownload({
             </>
           }
           confirmLabel="Yes, download it again"
+          tone="danger"
           cancelLabel="Not now"
           busy={request.isPending}
           busyLabel="Asking your media manager…"

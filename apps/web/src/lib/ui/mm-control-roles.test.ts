@@ -5,7 +5,13 @@
 import { describe, expect, it } from "vitest";
 import { mmActionButtonClass } from "./mm-control-roles";
 
-const VARIANTS = ["primary", "secondary", "tertiary"] as const;
+const VARIANTS = [
+  "primary",
+  "secondary",
+  "tertiary",
+  "danger",
+  "danger-outline",
+] as const;
 
 /** The utilities whose roots are two words, longest first so `translate-y` is not read as `translate`. */
 const ROOTS = [
@@ -83,5 +89,14 @@ describe("mmActionButtonClass", () => {
     expect(primary).toContain("border-mm-primary");
     expect(classesFor("secondary")).toContain("border-mm-border");
     expect(classesFor("tertiary")).toContain("bg-transparent");
+  });
+
+  it("draws a destructive action in the failure colour, filled or outlined", () => {
+    expect(classesFor("danger")).toContain("bg-mm-destructive");
+    expect(classesFor("danger")).not.toContain("bg-mm-primary");
+    expect(classesFor("danger-outline")).toContain(
+      "text-mm-status-failed-text",
+    );
+    expect(classesFor("danger-outline")).toContain("bg-transparent");
   });
 });

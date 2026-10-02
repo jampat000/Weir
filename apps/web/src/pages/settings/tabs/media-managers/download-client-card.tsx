@@ -44,6 +44,7 @@ export function RemoveDownloadClientDialog({
         </>
       }
       confirmLabel="Remove download client"
+      tone="danger"
       busy={remove.isPending}
       error={
         remove.isError
@@ -128,7 +129,7 @@ export function DownloadClientCard({
           <button
             type="button"
             data-testid="download-client-remove"
-            className={mmActionButtonClass({ variant: "tertiary" })}
+            className={mmActionButtonClass({ variant: "danger-outline" })}
             disabled={locked}
             aria-haspopup="dialog"
             onClick={() => {

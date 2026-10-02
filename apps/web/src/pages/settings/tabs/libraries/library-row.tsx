@@ -116,7 +116,7 @@ export function LibraryRow({
   rowRef,
 }: LibraryRowProps) {
   const badge = processingMediaTypeBadge(library);
-  const tertiary = mmActionButtonClass({ variant: "tertiary" });
+  const remove = mmActionButtonClass({ variant: "danger-outline" });
   const secondary = mmActionButtonClass({ variant: "secondary" });
   return (
     <tr
@@ -196,7 +196,7 @@ export function LibraryRow({
           ) : null}
           <button
             type="button"
-            className={tertiary}
+            className={remove}
             onClick={() => actions.onRemove(library)}
             disabled={!editable}
             aria-haspopup="dialog"

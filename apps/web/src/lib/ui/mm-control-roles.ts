@@ -1,8 +1,17 @@
 /**
  * Control roles across Weir. Primary commits (Save, Apply, Confirm); secondary runs a utility
  * (Test, Open, Run now, Retry); tertiary is a lower-emphasis helper (Show, Clear, row actions).
- * An on/off choice uses `MmOnOffSwitch`, not these classes.
+ * A destructive action is `danger` when it is the confirming button of a dialog (filled, so the choice is
+ * unmistakable) and `danger-outline` when it sits among other buttons. An on/off choice uses `MmOnOffSwitch`,
+ * not these classes.
  */
+
+const FOCUS_RING =
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mm-accent-ring focus-visible:ring-offset-2 focus-visible:ring-offset-mm-card-bg";
+
+/** The same halo in the failure colour, so keyboard focus on a destructive button reads as part of it. */
+const DANGER_FOCUS_RING =
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mm-destructive/45 focus-visible:ring-offset-2 focus-visible:ring-offset-mm-card-bg";
 
 const actionBase =
   "inline-flex min-h-[2.5rem] max-w-full items-center justify-center rounded-mm-control border px-4 py-2.5 text-sm font-semibold leading-snug tracking-normal transition-all duration-150 whitespace-normal text-center";
@@ -69,6 +78,9 @@ export function mmListboxOptionButtonClass(selected: boolean): string {
 export const mmTechnicalMonoSmallClass =
   "font-mono text-xs break-all text-mm-text2";
 
+export type MmActionVariant =
+  "primary" | "secondary" | "tertiary" | "danger" | "danger-outline";
+
 /**
  * The classes for one action button. A disabled button looks disabled from the element's own state,
  * so `<button disabled>` is the whole story. `disabled:hover:*` repeats each hover property: CSS
@@ -76,9 +88,33 @@ export const mmTechnicalMonoSmallClass =
  * so the outcome does not depend on the order Tailwind emits its variants in.
  */
 export function mmActionButtonClass(opts: {
-  variant: "primary" | "secondary" | "tertiary";
+  variant: MmActionVariant;
 }): string {
   const { variant } = opts;
+
+  if (variant === "danger") {
+    return [
+      actionBase,
+      "cursor-pointer border-mm-destructive bg-mm-destructive text-mm-on-accent",
+      "hover:border-mm-status-failed-text hover:bg-mm-status-failed-text",
+      "active:brightness-[0.97]",
+      DANGER_FOCUS_RING,
+      "disabled:cursor-not-allowed disabled:border-mm-border disabled:bg-mm-button-quiet-bg disabled:text-mm-text3 disabled:opacity-80",
+      "disabled:hover:border-mm-border disabled:hover:bg-mm-button-quiet-bg",
+    ].join(" ");
+  }
+
+  if (variant === "danger-outline") {
+    return [
+      actionBase,
+      "cursor-pointer border-[color-mix(in_srgb,var(--mm-destructive)_55%,var(--mm-border))] bg-transparent text-mm-status-failed-text",
+      "hover:border-mm-destructive hover:bg-mm-status-failed-bg",
+      "active:brightness-[0.97]",
+      DANGER_FOCUS_RING,
+      "disabled:cursor-not-allowed disabled:border-mm-border disabled:bg-transparent disabled:text-mm-text3 disabled:opacity-70",
+      "disabled:hover:border-mm-border disabled:hover:bg-transparent",
+    ].join(" ");
+  }
 
   if (variant === "tertiary") {
     return [
@@ -86,7 +122,7 @@ export function mmActionButtonClass(opts: {
       "cursor-pointer border-mm-border bg-transparent text-mm-text2",
       "hover:border-mm-border hover:bg-mm-card-bg/55 hover:text-mm-text1",
       "active:brightness-[0.98]",
-      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mm-accent-ring focus-visible:ring-offset-2 focus-visible:ring-offset-mm-card-bg",
+      FOCUS_RING,
       "disabled:cursor-not-allowed disabled:border-mm-border disabled:bg-transparent disabled:text-mm-text3 disabled:opacity-60",
       "disabled:hover:border-mm-border disabled:hover:bg-transparent disabled:hover:text-mm-text3",
     ].join(" ");
@@ -98,7 +134,7 @@ export function mmActionButtonClass(opts: {
       "cursor-pointer border-mm-primary bg-mm-primary text-mm-on-accent shadow-[0_1px_2px_color-mix(in_srgb,var(--mm-primary)_35%,transparent)]",
       "hover:border-mm-primary-bright hover:bg-mm-primary-bright hover:shadow-[0_4px_16px_color-mix(in_srgb,var(--mm-primary)_28%,transparent)] hover:-translate-y-px",
       "active:translate-y-0 active:brightness-[0.97]",
-      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mm-accent-ring focus-visible:ring-offset-2 focus-visible:ring-offset-mm-card-bg",
+      FOCUS_RING,
       "disabled:cursor-not-allowed disabled:border-mm-border disabled:bg-mm-button-quiet-bg disabled:text-mm-text3 disabled:opacity-80 disabled:shadow-none",
       "disabled:hover:border-mm-border disabled:hover:bg-mm-button-quiet-bg disabled:hover:shadow-none disabled:hover:translate-y-0",
     ].join(" ");
@@ -109,7 +145,7 @@ export function mmActionButtonClass(opts: {
     "cursor-pointer border-mm-border bg-mm-button-secondary-bg text-mm-text",
     "hover:border-[color-mix(in_srgb,var(--mm-primary)_55%,transparent)] hover:bg-mm-accent-soft hover:shadow-sm",
     "active:brightness-[0.97]",
-    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mm-accent-ring focus-visible:ring-offset-2 focus-visible:ring-offset-mm-card-bg",
+    FOCUS_RING,
     "disabled:cursor-not-allowed disabled:border-mm-border disabled:bg-transparent disabled:text-mm-text3 disabled:opacity-70 disabled:shadow-none",
     "disabled:hover:border-mm-border disabled:hover:bg-transparent disabled:hover:shadow-none",
   ].join(" ");

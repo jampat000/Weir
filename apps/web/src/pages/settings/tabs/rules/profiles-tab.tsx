@@ -67,7 +67,7 @@ function ProfileActions({
         {!creating && selected ? (
           <button
             type="button"
-            className={mmActionButtonClass({ variant: "tertiary" })}
+            className={mmActionButtonClass({ variant: "danger-outline" })}
             disabled={disabled || inUse > 0}
             onClick={onRemove}
             title={
@@ -270,6 +270,7 @@ export function ProfilesTab() {
         <ConfirmDialog
           title={`Remove the profile “${selectedRuleSet.name}”?`}
           confirmLabel="Remove profile"
+          tone="danger"
           testId="remove-rule-set-dialog"
           onCancel={() => setConfirmingRemove(false)}
           onConfirm={remove}

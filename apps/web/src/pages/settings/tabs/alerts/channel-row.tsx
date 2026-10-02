@@ -93,7 +93,7 @@ export function ChannelRow({
           </button>
           <button
             type="button"
-            className={mmActionButtonClass({ variant: "tertiary" })}
+            className={mmActionButtonClass({ variant: "danger-outline" })}
             disabled={deleting}
             aria-haspopup="dialog"
             onClick={onDelete}

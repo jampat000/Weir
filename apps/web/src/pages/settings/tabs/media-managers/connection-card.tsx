@@ -44,6 +44,7 @@ export function RemoveConnectionDialog({
         </>
       }
       confirmLabel="Remove media manager"
+      tone="danger"
       busy={remove.isPending}
       error={
         remove.isError
@@ -124,7 +125,7 @@ export function ConnectionCard({
           <button
             type="button"
             data-testid="media-manager-remove"
-            className={mmActionButtonClass({ variant: "tertiary" })}
+            className={mmActionButtonClass({ variant: "danger-outline" })}
             disabled={locked}
             aria-haspopup="dialog"
             onClick={() => {

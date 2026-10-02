@@ -39,6 +39,7 @@ export function CleanupConfirmDialog({
         <p>{state.description} Files it deletes cannot be recovered.</p>
       }
       confirmLabel={confirmLabel(action)}
+      tone="danger"
       onCancel={onCancel}
       onConfirm={onConfirm}
     />
