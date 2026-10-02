@@ -70,8 +70,14 @@ export function eventCategory(eventType) {
 export const eventLevel = (result) => EVENT_RESULT_LEVELS[result] ?? "info";
 
 const JOB_KINDS = {
-  [JOB_KIND.FILE_PASS]: { label: "Process a media file", category: "processing" },
-  [JOB_KIND.LIBRARY_CLEAN]: { label: "Clean a library file", category: "library" },
+  [JOB_KIND.FILE_PASS]: {
+    label: "Process a media file",
+    category: "processing",
+  },
+  [JOB_KIND.LIBRARY_CLEAN]: {
+    label: "Clean a library file",
+    category: "library",
+  },
 };
 
 /** @param {string} kind */

@@ -11,7 +11,11 @@ function simWithEachSource() {
   const { sim, clock } = test;
   const now = clock.now();
   sim.engine.activity.record(
-    { type: "auth.login_succeeded", title: "Sign-in finished", trigger: "manual" },
+    {
+      type: "auth.login_succeeded",
+      title: "Sign-in finished",
+      trigger: "manual",
+    },
     now - 2 * MINUTE_MS,
   );
   sim.engine.activity.record(
@@ -29,11 +33,17 @@ function simWithEachSource() {
     { relative_media_path: "Heat (1995)/heat.mkv", library_id: 1 },
     now - 5 * MINUTE_MS,
   );
-  sim.engine.jobs.setStatus(job.id, JOB_STATUS.FAILED, now - 4 * MINUTE_MS, "ffmpeg stopped");
+  sim.engine.jobs.setStatus(
+    job.id,
+    JOB_STATUS.FAILED,
+    now - 4 * MINUTE_MS,
+    "ffmpeg stopped",
+  );
   return { ...test, job };
 }
 
-const log = (sim, query = "") => ask(sim, "GET", `/api/v1/system/log${query}`).body;
+const log = (sim, query = "") =>
+  ask(sim, "GET", `/api/v1/system/log${query}`).body;
 const ids = (body) => body.items.map((item) => item.id);
 const sourcesOf = (body) => body.items.map((item) => item.source);
 
@@ -43,7 +53,9 @@ describe("the simulated log is one list", () => {
 
     const body = log(sim);
 
-    expect(new Set(sourcesOf(body))).toEqual(new Set(["event", "job", "server"]));
+    expect(new Set(sourcesOf(body))).toEqual(
+      new Set(["event", "job", "server"]),
+    );
     const times = body.items.map((item) => Date.parse(item.at));
     expect(times).toEqual([...times].sort((a, b) => b - a));
   });
@@ -53,8 +65,14 @@ describe("the simulated log is one list", () => {
 
     const body = log(sim);
 
-    expect(body.items.some((item) => item.title === "Heat processed" && item.source === "event")).toBe(false);
-    const line = body.items.find((item) => item.source === "server" && item.level === "error");
+    expect(
+      body.items.some(
+        (item) => item.title === "Heat processed" && item.source === "event",
+      ),
+    ).toBe(false);
+    const line = body.items.find(
+      (item) => item.source === "server" && item.level === "error",
+    );
     expect(line.server.traceback).toContain("ffmpeg exited");
   });
 
@@ -81,7 +99,9 @@ describe("the simulated log is one list", () => {
     const row = log(sim).items.find((item) => item.id === `job:${job.id}`);
 
     expect(row.workflow.id).toBe(1);
-    expect(row.workflow.name).toBe(sim.store.libraries.find((l) => l.id === 1).name);
+    expect(row.workflow.name).toBe(
+      sim.store.libraries.find((l) => l.id === 1).name,
+    );
   });
 });
 
@@ -92,7 +112,11 @@ describe("the simulated log's filters", () => {
     const body = log(sim, "?source=job,server&level=error&category=processing");
 
     expect(body.items.length).toBeGreaterThan(0);
-    expect(body.items.every((item) => item.level === "error" && item.category === "processing")).toBe(true);
+    expect(
+      body.items.every(
+        (item) => item.level === "error" && item.category === "processing",
+      ),
+    ).toBe(true);
     expect(body.items.every((item) => item.source !== "event")).toBe(true);
   });
 
@@ -134,16 +158,26 @@ describe("the simulated log's filters", () => {
     const body = log(sim, `?from=${from}`);
 
     expect(body.items.length).toBeGreaterThan(0);
-    expect(body.items.every((item) => Date.parse(item.at) >= Date.parse(from))).toBe(true);
-    expect(body.items.some((item) => item.server?.logger.includes("backups"))).toBe(false);
+    expect(
+      body.items.every((item) => Date.parse(item.at) >= Date.parse(from)),
+    ).toBe(true);
+    expect(
+      body.items.some((item) => item.server?.logger.includes("backups")),
+    ).toBe(false);
   });
 
   it("keep the filters only some sources have to those sources", () => {
     const { sim } = simWithEachSource();
 
-    expect(new Set(sourcesOf(log(sim, "?trigger=manual")))).toEqual(new Set(["event"]));
-    expect(new Set(sourcesOf(log(sim, "?status=failed")))).toEqual(new Set(["job"]));
-    expect(new Set(sourcesOf(log(sim, "?has_exception=true")))).toEqual(new Set(["server"]));
+    expect(new Set(sourcesOf(log(sim, "?trigger=manual")))).toEqual(
+      new Set(["event"]),
+    );
+    expect(new Set(sourcesOf(log(sim, "?status=failed")))).toEqual(
+      new Set(["job"]),
+    );
+    expect(new Set(sourcesOf(log(sim, "?has_exception=true")))).toEqual(
+      new Set(["server"]),
+    );
   });
 
   it("gather everything about one job", () => {
@@ -179,11 +213,17 @@ describe("paging the simulated log", () => {
     const { sim, clock } = createTestSim();
     const at = clock.now() - HOUR_MS;
     for (let index = 0; index < 5; index += 1) {
-      sim.engine.activity.record({ type: "auth.login_succeeded", title: `Sign-in ${index}` }, at);
+      sim.engine.activity.record(
+        { type: "auth.login_succeeded", title: `Sign-in ${index}` },
+        at,
+      );
     }
 
     const first = log(sim, "?source=event&limit=2");
-    const second = log(sim, `?source=event&limit=3&cursor=${first.next_cursor}`);
+    const second = log(
+      sim,
+      `?source=event&limit=3&cursor=${first.next_cursor}`,
+    );
 
     expect([...ids(first), ...ids(second)]).toHaveLength(5);
     expect(new Set([...ids(first), ...ids(second)]).size).toBe(5);
@@ -196,7 +236,10 @@ describe("new rows in the simulated log", () => {
     const { sim, clock } = createTestSim();
     const before = log(sim, "?source=event").total;
 
-    sim.engine.activity.record({ type: "auth.login_succeeded", title: "Sign-in finished" }, clock.now());
+    sim.engine.activity.record(
+      { type: "auth.login_succeeded", title: "Sign-in finished" },
+      clock.now(),
+    );
 
     expect(log(sim, "?source=event").total).toBe(before + 1);
   });
@@ -207,10 +250,18 @@ describe("exporting the simulated log", () => {
     const { sim } = simWithEachSource();
 
     const csv = ask(sim, "GET", "/api/v1/system/log/export?level=error");
-    const json = ask(sim, "GET", "/api/v1/system/log/export?format=json&source=job");
+    const json = ask(
+      sim,
+      "GET",
+      "/api/v1/system/log/export?format=json&source=job",
+    );
 
-    expect(csv.body.split("\n")[0]).toBe("time,source,level,category,workflow,title,detail");
+    expect(csv.body.split("\n")[0]).toBe(
+      "time,source,level,category,workflow,title,detail",
+    );
     expect(csv.body.split("\n").length).toBeGreaterThan(1);
-    expect(JSON.parse(json.body).every((row) => row.source === "job")).toBe(true);
+    expect(JSON.parse(json.body).every((row) => row.source === "job")).toBe(
+      true,
+    );
   });
 });

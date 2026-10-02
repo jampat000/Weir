@@ -20,9 +20,7 @@ export class Artwork {
 
   /** The address of a title's poster, or null when it has none. @param {string | null | undefined} id */
   urlFor(id) {
-    return id && this.#titles.has(id)
-      ? `${POSTER_PATH}/${id}`
-      : null;
+    return id && this.#titles.has(id) ? `${POSTER_PATH}/${id}` : null;
   }
 
   /** @param {string} id @param {import("./gateway-posters.mjs").PosterImage} image */

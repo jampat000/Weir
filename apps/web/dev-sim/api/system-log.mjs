@@ -32,7 +32,9 @@ function decodeCursor(text) {
     .toString()
     .split(".")
     .map(Number);
-  return [atMs, order, key].every(Number.isFinite) ? { atMs, order, key } : null;
+  return [atMs, order, key].every(Number.isFinite)
+    ? { atMs, order, key }
+    : null;
 }
 
 /** Newest first: later time, then later source, then higher number. */
@@ -92,7 +94,9 @@ function passesOther(row, filter) {
   const { facts } = row;
   return [
     filter.workflow === null || row.workflowId === filter.workflow,
-    filter.job === null || row.jobId === filter.job || (row.source === SOURCE.JOB && row.key === filter.job),
+    filter.job === null ||
+      row.jobId === filter.job ||
+      (row.source === SOURCE.JOB && row.key === filter.job),
     contains(row.text, filter.text),
     filter.from === null || row.atMs >= filter.from,
     filter.to === null || row.atMs <= filter.to,
@@ -122,7 +126,9 @@ function page(sim, query, limit) {
   const matching = rows.filter((row) => levelOk(row) && categoryOk(row));
   const shown = matching.filter(selected).sort(newerFirst);
   const cursor = decodeCursor(query.get("cursor"));
-  const remaining = cursor ? shown.filter((row) => isAfter(row, cursor)) : shown;
+  const remaining = cursor
+    ? shown.filter((row) => isAfter(row, cursor))
+    : shown;
   const items = remaining.slice(0, limit);
 
   const counted = rows.filter(selected);
@@ -132,11 +138,7 @@ function page(sim, query, limit) {
     total: shown.length,
     counts: {
       source: tally(SOURCES, matching, (row) => row.source),
-      level: tally(
-        LEVELS,
-        counted.filter(categoryOk),
-        (row) => row.level,
-      ),
+      level: tally(LEVELS, counted.filter(categoryOk), (row) => row.level),
       category: tally(
         CATEGORIES,
         counted.filter(levelOk),
@@ -150,7 +152,10 @@ const workflowNames = (sim) =>
   new Map(sim.store.libraries.map((library) => [library.id, library.name]));
 
 function systemLog(sim, query) {
-  const limit = Math.min(MAX_LIMIT, Math.max(1, intParam(query, "limit") ?? DEFAULT_LIMIT));
+  const limit = Math.min(
+    MAX_LIMIT,
+    Math.max(1, intParam(query, "limit") ?? DEFAULT_LIMIT),
+  );
   const result = page(sim, query, limit);
   const names = workflowNames(sim);
   return shaped("SystemLogOut", {
@@ -168,7 +173,11 @@ function exported(sim, query) {
   const rows = page(sim, query, EXPORT_MAX_ROWS).items;
   if (query.get("format") === "json") {
     return download(
-      JSON.stringify(rows.map((row) => rowOut(row, names)), null, 2),
+      JSON.stringify(
+        rows.map((row) => rowOut(row, names)),
+        null,
+        2,
+      ),
       "weir-log.json",
       "application/json",
     );

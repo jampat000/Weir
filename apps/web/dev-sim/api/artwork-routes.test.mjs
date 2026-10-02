@@ -64,7 +64,11 @@ describe("the simulated artwork", () => {
   it("says the metadata service answers when the deprecated test is run", () => {
     const { sim } = createTestSim();
 
-    const { body } = ask(sim, "POST", "/api/v1/processing/metadata-provider/test");
+    const { body } = ask(
+      sim,
+      "POST",
+      "/api/v1/processing/metadata-provider/test",
+    );
 
     expect(body.status).toBe("matched");
   });

@@ -52,14 +52,40 @@ function seededServerLines(startedAt) {
     ...extra,
   });
   return [
-    line(30, "WARNING", "weir.platform.suite_settings.backups", "The backup folder has less than 2 GB free"),
-    line(26, "ERROR", "weir.platform.suite_settings.update_service", "Could not reach the release server to look for an update", {
-      traceback:
-        "System.Net.Http.HttpRequestException: A connection attempt failed because the connected party did not properly respond\n   at System.Net.Http.HttpConnectionPool.ConnectAsync()\n   at Weir.Infrastructure.Settings.GitHubReleaseCatalogClient.LatestAsync()",
-    }),
-    line(18, "WARNING", "weir.platform.auth.rate_limit", "Too many sign-in attempts from one address; it was slowed down"),
-    line(9, "INFO", "weir.platform.suite_settings.backups", "Configuration backup finished"),
-    line(5, "WARNING", "weir.connection_peer", "Sonarr answered slowly (2.4 s)"),
+    line(
+      30,
+      "WARNING",
+      "weir.platform.suite_settings.backups",
+      "The backup folder has less than 2 GB free",
+    ),
+    line(
+      26,
+      "ERROR",
+      "weir.platform.suite_settings.update_service",
+      "Could not reach the release server to look for an update",
+      {
+        traceback:
+          "System.Net.Http.HttpRequestException: A connection attempt failed because the connected party did not properly respond\n   at System.Net.Http.HttpConnectionPool.ConnectAsync()\n   at Weir.Infrastructure.Settings.GitHubReleaseCatalogClient.LatestAsync()",
+      },
+    ),
+    line(
+      18,
+      "WARNING",
+      "weir.platform.auth.rate_limit",
+      "Too many sign-in attempts from one address; it was slowed down",
+    ),
+    line(
+      9,
+      "INFO",
+      "weir.platform.suite_settings.backups",
+      "Configuration backup finished",
+    ),
+    line(
+      5,
+      "WARNING",
+      "weir.connection_peer",
+      "Sonarr answered slowly (2.4 s)",
+    ),
   ].map((entry, index) => ({ ...entry, key: FIRST_SEEDED_LINE_KEY + index }));
 }
 
@@ -81,7 +107,11 @@ function jobIdOf(sim, event) {
 function eventServerLines(sim) {
   return sim.engine.activity
     .all()
-    .filter((event) => eventLevel(event.result) !== "success" && eventLevel(event.result) !== "info")
+    .filter(
+      (event) =>
+        eventLevel(event.result) !== "success" &&
+        eventLevel(event.result) !== "info",
+    )
     .map((event) => ({
       ...lineFor(event),
       traceback: event.result === "failed" ? FAILED_PASS_TRACEBACK : null,
@@ -143,7 +173,9 @@ function jobRows(sim) {
       facts: { status: job.status },
       wire: {
         title: trimmed(row.operator_message),
-        detail: attempts ? `${kind} · attempt ${row.attempt_count} of ${row.max_attempts}` : kind,
+        detail: attempts
+          ? `${kind} · attempt ${row.attempt_count} of ${row.max_attempts}`
+          : kind,
         event: null,
         job: row,
         server: null,
@@ -193,7 +225,8 @@ export function allRows(sim) {
 /** A row as the API returns it. @param {LogRow} row @param {Map<number, string>} workflows */
 export function rowOut(row, workflows) {
   const id = `${row.source}:${row.key}`;
-  const workflowName = row.workflowId === null ? null : workflows.get(row.workflowId);
+  const workflowName =
+    row.workflowId === null ? null : workflows.get(row.workflowId);
   return shaped("SystemLogRowOut", {
     id,
     source: row.source,
@@ -207,4 +240,3 @@ export function rowOut(row, workflows) {
     ...row.wire,
   });
 }
-
