@@ -106,7 +106,7 @@ def _assert_workspace(page, *, page_test_id: str, tabs_test_id: str | None) -> N
         expect(page.get_by_role("tablist")).to_have_count(0)
         return
     tabs = page.get_by_test_id(tabs_test_id)
-    expect(tabs).to_have_class(re.compile(r"\bmm-workspace-tabs\b"))
+    expect(tabs).to_have_class(re.compile(r"\bmm-page-toolbar\b"))
     active_tab = tabs.locator("[role='tab'][aria-selected='true']")
     expect(active_tab).to_have_count(1)
     panel_id = active_tab.get_attribute("aria-controls")

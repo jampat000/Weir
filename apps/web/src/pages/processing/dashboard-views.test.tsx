@@ -44,7 +44,7 @@ function show(address: string) {
   );
 }
 
-const view = () => screen.getByRole("group", { name: "Dashboard view" });
+const view = () => screen.getByRole("tablist", { name: "Dashboard view" });
 
 beforeEach(() => {
   workflows = [
@@ -60,9 +60,10 @@ describe("the Dashboard's views", () => {
 
     expect(screen.getByTestId("live-view")).toBeInTheDocument();
     expect(screen.queryByTestId("system-view")).toBeNull();
-    expect(
-      within(view()).getByRole("button", { name: "Live" }),
-    ).toHaveAttribute("aria-pressed", "true");
+    expect(within(view()).getByRole("tab", { name: "Live" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
   });
 
   it("opens System from the address", () => {
@@ -70,19 +71,20 @@ describe("the Dashboard's views", () => {
 
     expect(screen.getByTestId("system-view")).toBeInTheDocument();
     expect(screen.queryByTestId("live-view")).toBeNull();
-    expect(
-      within(view()).getByRole("button", { name: "System" }),
-    ).toHaveAttribute("aria-pressed", "true");
+    expect(within(view()).getByRole("tab", { name: "System" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
   });
 
   it("puts System in the address and takes Live out of it again", () => {
     show("/");
 
-    fireEvent.click(within(view()).getByRole("button", { name: "System" }));
+    fireEvent.click(within(view()).getByRole("tab", { name: "System" }));
     expect(screen.getByTestId("address")).toHaveTextContent("/?view=system");
     expect(screen.getByTestId("system-view")).toBeInTheDocument();
 
-    fireEvent.click(within(view()).getByRole("button", { name: "Live" }));
+    fireEvent.click(within(view()).getByRole("tab", { name: "Live" }));
     expect(screen.getByTestId("address")).toHaveTextContent(/^\/$/);
     expect(screen.getByTestId("live-view")).toBeInTheDocument();
   });
@@ -91,7 +93,7 @@ describe("the Dashboard's views", () => {
     show("/");
     expect(screen.getByTestId("live-filter")).toBeInTheDocument();
 
-    fireEvent.click(within(view()).getByRole("button", { name: "System" }));
+    fireEvent.click(within(view()).getByRole("tab", { name: "System" }));
     expect(screen.queryByTestId("live-filter")).toBeNull();
   });
 });
@@ -115,11 +117,11 @@ describe("the kind of work", () => {
   it("stays in the address while System, which ignores it, is shown", () => {
     show("/?work=download&workflow=1");
 
-    fireEvent.click(within(view()).getByRole("button", { name: "System" }));
+    fireEvent.click(within(view()).getByRole("tab", { name: "System" }));
 
     expect(screen.getByTestId("address")).toHaveTextContent("work=download");
     expect(screen.getByTestId("address")).toHaveTextContent("view=system");
-    fireEvent.click(within(view()).getByRole("button", { name: "Live" }));
+    fireEvent.click(within(view()).getByRole("tab", { name: "Live" }));
     expect(screen.getByTestId("live-view")).toHaveTextContent(
       "live download 1",
     );
@@ -128,25 +130,20 @@ describe("the kind of work", () => {
   it("keeps the workflow picker where it is when the view changes, with the kind of work after it", () => {
     show("/");
     const controls = () =>
-      [...(view().parentElement as HTMLElement).children]
+      [...(document.querySelector(".mm-dash-controls")?.children ?? [])]
         .map((child) => child.getAttribute("data-testid") ?? child.className)
         .filter((name) =>
-          [
-            "dashboard-view",
-            "mm-workflow-picker",
-            "mm-dash-controls__work",
-          ].includes(name),
+          ["mm-workflow-picker", "mm-dash-controls__work"].includes(name),
         );
 
     expect(controls()).toEqual([
-      "dashboard-view",
       "mm-workflow-picker",
       "mm-dash-controls__work",
     ]);
 
-    fireEvent.click(within(view()).getByRole("button", { name: "System" }));
+    fireEvent.click(within(view()).getByRole("tab", { name: "System" }));
 
-    expect(controls()).toEqual(["dashboard-view", "mm-workflow-picker"]);
+    expect(controls()).toEqual(["mm-workflow-picker"]);
   });
 });
 
@@ -186,7 +183,7 @@ describe("the workflow picker", () => {
 
     expect(screen.getByTestId("live-view")).toHaveTextContent("live all 1");
 
-    fireEvent.click(within(view()).getByRole("button", { name: "System" }));
+    fireEvent.click(within(view()).getByRole("tab", { name: "System" }));
     expect(screen.getByTestId("address")).toHaveTextContent(
       "/?workflow=1&view=system",
     );
@@ -216,7 +213,7 @@ describe("the workflow picker", () => {
     show("/");
     expect(screen.getByTestId("processing-page").style.height).not.toBe("");
 
-    fireEvent.click(within(view()).getByRole("button", { name: "System" }));
+    fireEvent.click(within(view()).getByRole("tab", { name: "System" }));
 
     expect(screen.getByTestId("processing-page").style.height).not.toBe("");
   });

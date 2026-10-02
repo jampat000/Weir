@@ -94,7 +94,7 @@ Dialogs are the exception: a dialog is a bordered surface over the page.
 ### Change the shell deliberately
 
 `apps/web/src/components/shell/**`, `apps/web/src/components/shared/workspace-shell.tsx`
-(`WorkspacePage`, `WorkspacePanel`, `WorkspaceTabList`) and the parts of `weir-shell.css` that style
+(`WorkspacePage`, `WorkspacePanel`), the tabs and toolbar row in `components/shell` and the parts of `weir-shell.css` and `weir-header.css` that style
 them are shared by every screen. Do not change them as a side effect of laying out one page's
 content. If a layout needs a shell change, make that change on its own and check every screen.
 

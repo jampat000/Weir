@@ -3,7 +3,11 @@ import { useLocation } from "react-router-dom";
 import { HeaderStatus } from "./header-status";
 import { pageMeta } from "./nav-model";
 import { PauseControl } from "./pause-control";
-import { useHeaderSlotRef, usePageEyebrow } from "./shell-header-context";
+import {
+  useHeaderSlotRef,
+  useHeaderTabsSlotRef,
+  usePageEyebrow,
+} from "./shell-header-context";
 import { ThemeToggle } from "./theme-toggle";
 
 type ShellHeaderProps = {
@@ -12,14 +16,15 @@ type ShellHeaderProps = {
 };
 
 /**
- * The bar above every page, sticky: the page's eyebrow and title, a slot the page fills with its own
- * control, then the status pill, Pause and the theme switch. On a phone it also carries the Menu button.
+ * The bar above every page, sticky: the page's eyebrow and title (with its tabs after the title, when it
+ * has any), a slot the page fills with its own control, then the status pill, Pause and the theme switch. On a phone it also carries the Menu button.
  */
 export function ShellHeader({ menuOpen, onToggleMenu }: ShellHeaderProps) {
   const { pathname, search } = useLocation();
   const meta = pageMeta({ pathname, search });
   const pageEyebrow = usePageEyebrow();
   const slotRef = useHeaderSlotRef();
+  const tabsSlotRef = useHeaderTabsSlotRef();
   const eyebrow = pageEyebrow ?? meta.eyebrow;
   const Title = meta.ownsHeading ? "h1" : "p";
 
@@ -52,7 +57,10 @@ export function ShellHeader({ menuOpen, onToggleMenu }: ShellHeaderProps) {
       </button>
       <div className="mm-header__titles">
         {eyebrow ? <p className="mm-header__eyebrow">{eyebrow}</p> : null}
-        <Title className="mm-header__title">{meta.title}</Title>
+        <div className="mm-header__line">
+          <Title className="mm-header__title">{meta.title}</Title>
+          <div className="mm-header__tabs" ref={tabsSlotRef} />
+        </div>
       </div>
       <div className="mm-header__slot" ref={slotRef} />
       <div className="mm-header__actions">

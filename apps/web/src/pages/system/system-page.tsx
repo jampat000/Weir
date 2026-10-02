@@ -4,9 +4,9 @@ import { PageLoading } from "../../components/shared/page-loading";
 import {
   WorkspacePage,
   WorkspacePanel,
-  WorkspaceTabList,
-  type WorkspaceTabOption,
 } from "../../components/shared/workspace-shell";
+import type { PageTabOption } from "../../components/shell/page-tabs";
+import { PageToolbar } from "../../components/shell/page-toolbar";
 import { ConfirmDialog } from "../../components/ui/confirm-dialog";
 import {
   isHttpErrorFromApi,
@@ -25,7 +25,7 @@ import { useUnsavedChangesGuard } from "./use-unsaved-changes-guard";
 type TabId = "about" | "backups" | "security" | "logs";
 
 /** What it is first, then what it keeps, who can sign in, and last the record of what it did. */
-const SYSTEM_TABS: readonly WorkspaceTabOption<TabId>[] = [
+const SYSTEM_TABS: readonly PageTabOption<TabId>[] = [
   { id: "about", label: "About" },
   { id: "backups", label: "Backups" },
   { id: "security", label: "Security" },
@@ -95,7 +95,7 @@ export function SystemPage() {
 
   return (
     <WorkspacePage dataTestId="suite-system-page">
-      <WorkspaceTabList
+      <PageToolbar
         tabs={SYSTEM_TABS}
         activeId={tab}
         onSelect={selectTab}

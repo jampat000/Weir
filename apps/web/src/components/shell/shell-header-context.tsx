@@ -11,6 +11,7 @@ import { createPortal } from "react-dom";
 type HeaderSetters = {
   setEyebrow: (eyebrow: string | null) => void;
   setSlot: (slot: HTMLElement | null) => void;
+  setTabsSlot: (slot: HTMLElement | null) => void;
 };
 
 /**
@@ -20,15 +21,21 @@ type HeaderSetters = {
 const SettersContext = createContext<HeaderSetters | null>(null);
 const EyebrowContext = createContext<string | null>(null);
 const SlotContext = createContext<HTMLElement | null>(null);
+const TabsSlotContext = createContext<HTMLElement | null>(null);
 
 export function ShellHeaderProvider({ children }: { children: ReactNode }) {
   const [eyebrow, setEyebrow] = useState<string | null>(null);
   const [slot, setSlot] = useState<HTMLElement | null>(null);
-  const setters = useMemo(() => ({ setEyebrow, setSlot }), []);
+  const [tabsSlot, setTabsSlot] = useState<HTMLElement | null>(null);
+  const setters = useMemo(() => ({ setEyebrow, setSlot, setTabsSlot }), []);
   return (
     <SettersContext.Provider value={setters}>
       <EyebrowContext.Provider value={eyebrow}>
-        <SlotContext.Provider value={slot}>{children}</SlotContext.Provider>
+        <SlotContext.Provider value={slot}>
+          <TabsSlotContext.Provider value={tabsSlot}>
+            {children}
+          </TabsSlotContext.Provider>
+        </SlotContext.Provider>
       </EyebrowContext.Provider>
     </SettersContext.Provider>
   );
@@ -46,6 +53,15 @@ export function useHeaderSlotRef(): (slot: HTMLElement | null) => void {
     throw new Error("The header slot belongs inside ShellHeaderProvider.");
   }
   return setters.setSlot;
+}
+
+/** The header's callback ref for the slot on the title's own line, where a page's tabs go. */
+export function useHeaderTabsSlotRef(): (slot: HTMLElement | null) => void {
+  const setters = useContext(SettersContext);
+  if (!setters) {
+    throw new Error("The header slot belongs inside ShellHeaderProvider.");
+  }
+  return setters.setTabsSlot;
 }
 
 /**
@@ -68,6 +84,17 @@ export function useSetPageEyebrow(eyebrow: string | undefined): void {
  */
 export function ShellHeaderSlot({ children }: { children: ReactNode }) {
   const slot = useContext(SlotContext);
+  const inShell = useContext(SettersContext) !== null;
+  if (!inShell) return <>{children}</>;
+  return slot ? createPortal(children, slot) : null;
+}
+
+/**
+ * Puts a page's tabs on the header's title line, right after the title. Rendered outside the shell, where
+ * no header exists, they stay where they are written.
+ */
+export function ShellHeaderTabs({ children }: { children: ReactNode }) {
+  const slot = useContext(TabsSlotContext);
   const inShell = useContext(SettersContext) !== null;
   if (!inShell) return <>{children}</>;
   return slot ? createPortal(children, slot) : null;

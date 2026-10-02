@@ -1,17 +1,36 @@
+import { SegmentedControl } from "../../../components/panels/segmented-control";
 import {
-  SegmentedControl,
-  type SegmentedOption,
-} from "../../../components/panels/segmented-control";
+  PageTabs,
+  type PageTabOption,
+} from "../../../components/shell/page-tabs";
+import { ShellHeaderTabs } from "../../../components/shell/shell-header-context";
 import type { ProcessingLibrary } from "../../../lib/processing/libraries-api";
 import type { DashboardAddress, DashboardView } from "../dashboard-address";
 import { FILTER_OPTIONS } from "../processing-filter";
 import { WorkPicker } from "./work-picker";
 import { WorkflowPicker } from "./workflow-picker";
 
-const VIEW_OPTIONS: readonly SegmentedOption<DashboardView>[] = [
-  { value: "live", label: "Live" },
-  { value: "system", label: "System" },
+const VIEW_TABS: readonly PageTabOption<DashboardView>[] = [
+  { id: "live", label: "Live" },
+  { id: "system", label: "System" },
 ];
+
+/** The Live and System views, as tabs on the header's title line, right after "Dashboard". */
+export function DashboardTabs({ address }: { address: DashboardAddress }) {
+  return (
+    <ShellHeaderTabs>
+      <PageTabs
+        tabs={VIEW_TABS}
+        activeId={address.view}
+        onSelect={address.setView}
+        ariaLabel="Dashboard view"
+        idPrefix="dashboard-view"
+        placement="title"
+        dataTestId="dashboard-view"
+      />
+    </ShellHeaderTabs>
+  );
+}
 
 type DashboardControlsProps = {
   address: DashboardAddress;
@@ -20,9 +39,9 @@ type DashboardControlsProps = {
 };
 
 /**
- * What the Dashboard puts in the header: the Live and System views, the workflow to narrow everything to, and
- * on Live the kind of work to show. The one control that comes and goes is last, so none of the others moves
- * when the view changes. The kind of work is a three-button switch where the header has room for one, and a
+ * What the Dashboard puts in the header besides its tabs: the workflow to narrow everything to, and on Live
+ * the kind of work to show. The one control that comes and goes is last, so none of the others moves when the
+ * view changes. The kind of work is a three-button switch where the header has room for one, and a
  * picker where it does not; the stylesheet chooses by the room the control has, so the header stays on one line.
  */
 export function DashboardControls({
@@ -31,13 +50,6 @@ export function DashboardControls({
 }: DashboardControlsProps) {
   return (
     <div className="mm-dash-controls">
-      <SegmentedControl
-        options={VIEW_OPTIONS}
-        value={address.view}
-        onChange={address.setView}
-        ariaLabel="Dashboard view"
-        dataTestId="dashboard-view"
-      />
       <WorkflowPicker
         workflows={workflows}
         value={address.workflowId}

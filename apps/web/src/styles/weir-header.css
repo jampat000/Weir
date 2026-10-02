@@ -19,10 +19,9 @@
   display: none;
 }
 
-/* At least 300px wide, as Deluno's is, so the page's own controls start at the same place in both products
-   whatever the eyebrow says. Never wider than the header on a phone. */
+/* As wide as its eyebrow or its title line, whichever is wider, and no wider, as Deluno's is. */
 .mm-header__titles {
-  min-width: min(300px, 100%);
+  min-width: 0;
 }
 
 .mm-header__eyebrow {
@@ -42,6 +41,25 @@
   letter-spacing: -0.03em;
   line-height: 1.15;
   color: var(--mm-text1);
+}
+
+/* The title and, when the page has tabs, the tabs after it on the same line, 22px apart and on one baseline. */
+.mm-header__line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 22px;
+  min-width: 0;
+}
+
+/* Only as tall as its tabs, so the header keeps its height; nothing shows when the page has none. */
+.mm-header__tabs {
+  display: flex;
+  flex-shrink: 0;
+}
+
+.mm-header__tabs:empty {
+  display: none;
 }
 
 /* Where a page puts its own control (a segmented choice, a picker); nothing shows when it has none. */
@@ -170,4 +188,112 @@
 
 .mm-header-status:empty {
   display: none;
+}
+
+/* Tabs (components/shell/page-tabs.tsx): plain text, 18px apart. The chosen tab is in the accent colour with a
+   2px underline, and the weight is the same in every state, so the row does not shift as you move along it.
+   Tabs go on the header's title line, or in the toolbar row under the title. */
+.mm-page-tabs {
+  display: flex;
+  min-width: 0;
+  column-gap: 18px;
+}
+
+.mm-page-tabs__tab {
+  position: relative;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  color: var(--mm-text2);
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.mm-page-tabs__tab:hover {
+  color: var(--mm-text1);
+}
+
+.mm-page-tabs__tab[aria-selected="true"] {
+  color: var(--mm-primary);
+}
+
+.mm-page-tabs__tab::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  border-radius: 999px;
+  background: transparent;
+}
+
+.mm-page-tabs__tab[aria-selected="true"]::after {
+  background: var(--mm-primary);
+}
+
+/* On the title's line: the underline sits 7px below the text, so the line, and with it the header, keeps its
+   height. */
+.mm-page-tabs--title {
+  align-items: baseline;
+}
+
+.mm-page-tabs--title .mm-page-tabs__tab::after {
+  bottom: -7px;
+}
+
+/* In the toolbar row: as tall as the row's inside (its 40px less the border), the underline on the row's bottom line. */
+.mm-page-tabs--row {
+  flex-wrap: wrap;
+  align-items: stretch;
+}
+
+.mm-page-tabs--row .mm-page-tabs__tab {
+  display: flex;
+  align-items: center;
+  height: 39px;
+}
+
+.mm-page-tabs--row .mm-page-tabs__tab::after {
+  bottom: -1px;
+}
+
+/* The first row of a page with tabs, under the header: 40px, the tabs at the left and the page's own buttons at
+   the right. */
+.mm-page-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0 var(--mm-panel-gap);
+  box-sizing: border-box;
+  min-height: 40px;
+  margin: 0 0 var(--mm-panel-gap);
+  border-bottom: 1px solid var(--mm-hairline);
+}
+
+.mm-page-toolbar__tabs {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.mm-page-toolbar__actions {
+  display: flex;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mm-page-tabs__tab {
+    transition: none;
+  }
 }

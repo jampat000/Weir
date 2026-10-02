@@ -55,17 +55,6 @@ export function mmListboxOptionButtonClass(selected: boolean): string {
 export const mmTechnicalMonoSmallClass =
   "font-mono text-xs break-all text-mm-text2";
 
-/** In-page section tabs (e.g. module Overview / Connections). Not sidebar navigation. */
-export function mmSectionTabClass(active: boolean): string {
-  return [
-    "inline-flex min-h-[2.25rem] shrink-0 items-center justify-center whitespace-nowrap rounded-mm-control border px-3 py-1.5 text-sm font-medium transition-colors",
-    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mm-accent-ring focus-visible:ring-offset-2 focus-visible:ring-offset-mm-bg-main",
-    active
-      ? "border-mm-primary/40 bg-mm-primary/10 text-mm-primary"
-      : "border-transparent bg-transparent text-mm-text2 hover:bg-mm-surface-2 hover:text-mm-text1",
-  ].join(" ");
-}
-
 /**
  * The classes for one action button. A disabled button looks disabled from the element's own state,
  * so `<button disabled>` is the whole story. `disabled:hover:*` repeats each hover property: CSS

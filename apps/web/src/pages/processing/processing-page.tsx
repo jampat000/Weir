@@ -1,7 +1,7 @@
 /**
  * The Dashboard, Weir's landing page, in two views kept in the address: Live, everything Weir is doing
  * right now, and System, how it is set up and what it does in the background. The header carries the
- * switch between them, the workflow to narrow everything to, and on Live the kind of work to show.
+ * tabs between them after the title, the workflow to narrow everything to, and on Live the kind of work to show.
  *
  * The page decides its layout from the width of its own main area, not the window's. On Live, wide, it is
  * exactly as tall as the window, so everything is sized from the space it has and the page itself never
@@ -13,7 +13,10 @@ import { useProcessingLibrariesQuery } from "../../lib/processing/libraries-quer
 import { useElementSize } from "../../lib/ui/use-element-size";
 import { useFitToScreen } from "../../lib/ui/use-fit-to-screen";
 import { useRemPx } from "../../lib/ui/use-rem-px";
-import { DashboardControls } from "./dashboard/dashboard-controls";
+import {
+  DashboardControls,
+  DashboardTabs,
+} from "./dashboard/dashboard-controls";
 import { MIN_GRID_PX, pageLayout } from "./dashboard/dashboard-layout";
 import { LiveView } from "./dashboard/live-view";
 import { SystemView } from "./dashboard/system-view";
@@ -41,6 +44,7 @@ export function ProcessingPage(): React.ReactElement {
       data-testid="processing-page"
     >
       <PageHeader eyebrow={EYEBROW} />
+      <DashboardTabs address={address} />
       <ShellHeaderSlot>
         <DashboardControls
           address={address}

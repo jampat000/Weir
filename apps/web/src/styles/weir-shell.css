@@ -181,31 +181,6 @@ kbd {
   min-width: 0;
 }
 
-/* A row of tabs in the header's segmented style: one bordered group, the chosen tab outlined in the brand colour.
-   Its colours come from mmSectionTabClass; this holds the row's shape. */
-.mm-workspace-tabs {
-  margin: 0 0 var(--mm-panel-gap);
-}
-
-/* Wraps onto a second line when the row is too narrow: nothing in Weir scrolls left to right
-   at any width. */
-.mm-workspace-tabs__list {
-  display: inline-flex;
-  flex-wrap: wrap;
-  max-width: 100%;
-  gap: 2px;
-  padding: 3px;
-  border: 1px solid var(--mm-hairline);
-  border-radius: var(--mm-radius-field);
-  background: var(--mm-card-bg);
-}
-
-.mm-workspace-tabs__button {
-  min-height: 30px;
-  padding: 0 14px;
-  box-shadow: none;
-}
-
 .mm-workspace-panel,
 .mm-workspace-panel__content {
   width: 100%;
