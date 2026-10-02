@@ -13,7 +13,7 @@ import { useConnectionTesting } from "./use-connection-testing";
 import { useHealth, type Health } from "./use-health";
 
 const ABOUT_PATH = "/system";
-/** Seconds are shown, so "checked 12s ago" moves once a second. */
+/** Seconds are shown, so "12s ago" moves once a second. */
 const TICK_MS = 1000;
 
 function ToolsDetail({ tools }: { tools: Health["tools"] }) {

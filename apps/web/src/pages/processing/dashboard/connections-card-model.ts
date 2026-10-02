@@ -129,5 +129,5 @@ export function checkedWords(
   if (testing) return "testing…";
   if (entry.state === "off") return "switched off";
   const when = checkedAgo(entry.checkedAt, now);
-  return when ? `checked ${when}` : "not yet";
+  return when || "not yet";
 }

@@ -104,7 +104,7 @@ describe("the Connections card", () => {
     const row = within(card).getByTestId("system-connection");
     expect(row).toHaveTextContent("Radarr on MEDIA-PC");
     expect(row).toHaveTextContent("Radarr · http://localhost:7878");
-    expect(row).toHaveTextContent("checked 12s ago");
+    expect(row).toHaveTextContent("12s ago");
     expect(row).toHaveAttribute(
       "title",
       "Radarr on MEDIA-PC: Radarr · http://localhost:7878 — Connected.",

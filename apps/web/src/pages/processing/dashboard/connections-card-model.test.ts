@@ -162,7 +162,7 @@ describe("a row's words", () => {
   it("say when it was last checked, or that it is being tested, off, or not yet tested", () => {
     const checked = manager(1, { checkedAt: NOW - 120_000 });
 
-    expect(checkedWords(checked, false, NOW)).toBe("checked 2 min ago");
+    expect(checkedWords(checked, false, NOW)).toBe("2 min ago");
     expect(checkedWords(checked, true, NOW)).toBe("testing…");
     expect(checkedWords(manager(1, { state: "off" }), false, NOW)).toBe(
       "switched off",
