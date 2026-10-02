@@ -39,4 +39,12 @@ describe("CopyLink", () => {
 
     expect(screen.getByRole("button")).toHaveTextContent("Copy");
   });
+
+  it("is disabled when there is nothing to copy", () => {
+    render(<CopyLink value="" label="the folder" />);
+
+    expect(
+      screen.getByRole("button", { name: "Copy the folder" }),
+    ).toBeDisabled();
+  });
 });

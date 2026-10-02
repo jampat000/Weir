@@ -6,7 +6,7 @@
  * changes a manager's settings.
  */
 
-import { useState } from "react";
+import { CopyLink } from "../../../../components/ui/copy-link";
 import { EditorSubsection } from "./editor-subsection";
 import { type ProcessingMediaType } from "../../../../lib/processing/libraries-api";
 import { type ProcessingManagerSetupItem } from "../../../../lib/processing/library-managers-api";
@@ -14,30 +14,6 @@ import { useProcessingManagerSetupQuery } from "../../../../lib/processing/libra
 import { workflowStory } from "../../../../lib/processing/workflow-story";
 import { useDebouncedValue } from "../../../../lib/ui/use-debounced-value";
 import { FOLDER_CHECK_SETTLE_MS } from "./folder-check-settle";
-
-function CopyLink({ value, label }: { value: string; label: string }) {
-  const [copied, setCopied] = useState(false);
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(value);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 2000);
-    } catch {
-      setCopied(false);
-    }
-  };
-  return (
-    <button
-      type="button"
-      className="mm-quiet-link"
-      onClick={() => void copy()}
-      disabled={!value}
-      aria-label={`Copy ${label}`}
-    >
-      {copied ? "Copied" : "Copy"}
-    </button>
-  );
-}
 
 function ArrSuggestedFolder({
   item,
