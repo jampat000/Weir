@@ -81,7 +81,7 @@ export function PausePill({ pause }: { pause: PauseState }) {
   const { pillRef, shown } = useFittingWords(words);
   return (
     <Chip
-      tone="warning"
+      meaning="attention"
       data-testid="pause-badge"
       title={pause.reason}
       ref={pillRef}

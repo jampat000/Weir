@@ -89,14 +89,6 @@
   color: var(--mm-text);
 }
 
-.mm-auth-title--caution {
-  color: var(--mm-status-warning-text);
-}
-
-.mm-auth-title--alert {
-  color: var(--mm-status-failed-text);
-}
-
 .mm-auth-lead {
   margin: 0 0 1.1rem;
   font-size: var(--mm-type-body);
@@ -109,16 +101,9 @@
   padding: 12px 14px;
   font-size: var(--mm-type-body);
   border-radius: var(--mm-radius-field);
-  background: var(--mm-status-failed-bg);
-  border: 1px solid
-    color-mix(in srgb, var(--mm-status-failed-text) 40%, transparent);
-  color: var(--mm-status-failed-text);
-}
-
-.mm-auth-banner--ok {
-  background: var(--mm-status-healthy-bg);
-  border-color: var(--mm-status-healthy-text);
-  color: var(--mm-status-healthy-text);
+  background: color-mix(in srgb, var(--mm-st) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--mm-st) 40%, transparent);
+  color: var(--mm-st);
 }
 
 .mm-auth-form {
@@ -221,19 +206,7 @@
 }
 
 .mm-startup__dot {
-  width: 0.625rem;
-  height: 0.625rem;
   margin-top: 0.25rem;
-  border-radius: var(--mm-radius-pill);
-  background: var(--mm-accent);
-}
-
-.mm-startup__dot--ready {
-  background: var(--mm-status-healthy-text);
-}
-
-.mm-startup__dot--failed {
-  background: var(--mm-status-failed-text);
 }
 
 .mm-startup__step-name {

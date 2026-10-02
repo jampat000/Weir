@@ -14,16 +14,14 @@ import { describe, expect, it } from "vitest";
  * button that removes things) moves from MIGRATE_ME to NOT_A_STATUS with the reason.
  */
 
-const MIGRATE_ME: readonly string[] = [
-  "lib/ui/mm-control-roles.ts",
-  "styles/weir-auth.css",
-  "styles/weir-dialogs.css",
-  "styles/weir-panels.css",
-  "styles/weir-shell.css",
-  "styles/weir-sidebar-nav.css",
-];
+const MIGRATE_ME: readonly string[] = ["styles/weir-panels.css"];
 
-const NOT_A_STATUS: Readonly<Record<string, string>> = {};
+const NOT_A_STATUS: Readonly<Record<string, string>> = {
+  "lib/ui/mm-control-roles.ts":
+    "the danger button role: a button that removes or overrides, not a status",
+  "styles/weir-sidebar-nav.css":
+    "the sign-out menu item is a danger action, not a status",
+};
 
 const RETIRED_STATUS_CLASSES: readonly string[] = [
   "mm-conn__dot",
@@ -35,12 +33,16 @@ const RETIRED_STATUS_CLASSES: readonly string[] = [
   "mm-conn--answered",
   "mm-conn--failed",
   "mm-ctable__bar--",
+  "mm-status-text--",
+  "mm-auth-title--",
+  "mm-auth-banner--",
+  "mm-startup__dot--",
+  "mm-sidebar-link-badge--",
+  "READINESS_CLASSES",
+  "updateStatusTone",
+  "mm-protection--attention",
   "mm-cleanup-what--warn",
   "toneClass",
-  "mm-protection--attention",
-  "mm-log-dot",
-  "mm-log-row--error",
-  "mm-log-row--warning",
   "mm-sy-check__dot",
   "mm-sy-check--ok",
   "mm-sy-check--bad",
@@ -65,6 +67,9 @@ const RETIRED_STATUS_CLASSES: readonly string[] = [
   "mm-sy-ring--need",
   "mm-sy-tag--warning",
   "mm-sy-drive--low",
+  "mm-log-dot",
+  "mm-log-row--error",
+  "mm-log-row--warning",
   "data-rag",
   "STATUS_RAG",
   "mm-library-scan__dot",

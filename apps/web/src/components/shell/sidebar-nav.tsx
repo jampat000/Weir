@@ -3,7 +3,12 @@ import { Link, useLocation } from "react-router-dom";
 
 import { activityGroupPath } from "../../pages/activity/activity-links";
 import { NavGlyph } from "./nav-icons";
-import { NAV_GROUPS, type NavBadgeKind, type NavItem } from "./nav-model";
+import {
+  NAV_BADGE_MEANING,
+  NAV_GROUPS,
+  type NavBadgeKind,
+  type NavItem,
+} from "./nav-model";
 
 /** What rides on each badge: the number, and the words a screen reader says for it. */
 type Badges = Readonly<Record<NavBadgeKind, number>>;
@@ -54,7 +59,8 @@ const SidebarLink = forwardRef<HTMLAnchorElement, SidebarLinkProps>(
         <span className="mm-sidebar-link-label">{item.label}</span>
         {badge ? (
           <span
-            className={`mm-sidebar-link-badge mm-sidebar-link-badge--${badge}`}
+            className="mm-sidebar-link-badge"
+            data-status={NAV_BADGE_MEANING[badge]}
             data-testid={BADGE_TEST_IDS[badge]}
             title={words ?? undefined}
           >

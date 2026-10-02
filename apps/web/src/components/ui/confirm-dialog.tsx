@@ -61,7 +61,11 @@ export function ConfirmDialog({
         </div>
       ) : null}
       {error ? (
-        <p className="mm-modal__error" role="alert">
+        <p
+          className="mm-modal__error mm-status-text"
+          data-status="broken"
+          role="alert"
+        >
           {error}
         </p>
       ) : null}

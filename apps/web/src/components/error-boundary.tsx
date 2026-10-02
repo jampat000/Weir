@@ -75,7 +75,8 @@ export function AppErrorScreen({
       <div className="mm-auth-frame">
         <section className="mm-auth-card" aria-labelledby="app-error-title">
           <h1
-            className="mm-auth-title mm-auth-title--alert"
+            className="mm-auth-title mm-status-text"
+            data-status="broken"
             id="app-error-title"
           >
             Something went wrong

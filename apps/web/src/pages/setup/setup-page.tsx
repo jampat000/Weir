@@ -180,12 +180,12 @@ export function SetupPage() {
               </>
             ) : null}
             {validationError ? (
-              <p className="mm-auth-banner" role="alert">
+              <p className="mm-auth-banner" data-status="broken" role="alert">
                 {validationError}
               </p>
             ) : null}
             {bootstrap.isError ? (
-              <p className="mm-auth-banner" role="alert">
+              <p className="mm-auth-banner" data-status="broken" role="alert">
                 {errorMessage(bootstrap.error, "Setup failed.")}
               </p>
             ) : null}

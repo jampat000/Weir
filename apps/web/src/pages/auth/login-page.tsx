@@ -89,17 +89,17 @@ export function LoginPage() {
           <p className="mm-auth-lead">Sign in to manage Weir on this server.</p>
 
           {fromSetup ? (
-            <p className="mm-auth-banner mm-auth-banner--ok" role="status">
+            <p className="mm-auth-banner" data-status="done" role="status">
               Initial account created. Sign in with the credentials you chose.
             </p>
           ) : null}
           {sessionExpired ? (
-            <p className="mm-auth-banner" role="status">
+            <p className="mm-auth-banner" data-status="attention" role="status">
               Your session expired. Sign in again to keep using Weir.
             </p>
           ) : null}
           {sessionNotKept ? (
-            <div className="mm-auth-banner" role="alert">
+            <div className="mm-auth-banner" data-status="broken" role="alert">
               <strong>
                 Your password was correct, but the session did not stick.
               </strong>{" "}
@@ -156,7 +156,7 @@ export function LoginPage() {
               required
             />
             {loginErrorMessage ? (
-              <p className="mm-auth-banner" role="alert">
+              <p className="mm-auth-banner" data-status="broken" role="alert">
                 {loginErrorMessage}
               </p>
             ) : null}

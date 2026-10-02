@@ -91,7 +91,8 @@ export function PauseControl() {
         </button>
         {failed ? (
           <p
-            className="mm-pause-alert mm-status-text--failed"
+            className="mm-pause-alert mm-status-text"
+            data-status="broken"
             role="alert"
             data-testid="pause-alert"
           >
@@ -193,7 +194,8 @@ export function PauseControl() {
           </p>
           {failed ? (
             <p
-              className="mm-pause-alert mm-status-text--failed"
+              className="mm-pause-alert mm-status-text"
+              data-status="broken"
               role="alert"
               data-testid="pause-alert"
             >

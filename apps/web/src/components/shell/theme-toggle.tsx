@@ -75,7 +75,8 @@ export function ThemeToggle() {
       </button>
       {setTheme.isError ? (
         <p
-          className="mm-theme-alert mm-status-text--failed"
+          className="mm-theme-alert mm-status-text"
+          data-status="broken"
           role="alert"
           data-testid="theme-toggle-alert"
         >

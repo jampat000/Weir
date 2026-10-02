@@ -227,7 +227,7 @@ function WizardForm({
             // The gap goes on a wrapper: `.mm-auth-banner` sets its own margin, which
             // beats an `mt-4` on the banner itself and leaves it flush.
             <div className="mt-4">
-              <p className="mm-auth-banner" role="alert">
+              <p className="mm-auth-banner" data-status="broken" role="alert">
                 {statusMessage}
               </p>
             </div>

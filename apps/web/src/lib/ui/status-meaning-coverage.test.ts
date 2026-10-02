@@ -42,6 +42,10 @@ import {
 } from "../../pages/library/library-model";
 import type { LibraryStatus } from "../../pages/library/library-model";
 import {
+  NAV_BADGE_MEANING,
+  type NavBadgeKind,
+} from "../../components/shell/nav-model";
+import {
   BACKUP_FRESHNESS_MEANING,
   type BackupFreshness,
 } from "../../pages/system/tabs/backups/backup-freshness";
@@ -131,6 +135,13 @@ const PRODUCTION_MEANINGS = {
       warning: "attention",
       error: "broken",
     } satisfies Record<SystemLogLevel, StatusMeaning>,
+  },
+  navBadge: {
+    used: NAV_BADGE_MEANING,
+    expected: {
+      working: "doing",
+      "needs-you": "attention",
+    } satisfies Record<NavBadgeKind, StatusMeaning>,
   },
   backupFreshness: {
     used: BACKUP_FRESHNESS_MEANING,

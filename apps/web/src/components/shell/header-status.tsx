@@ -16,7 +16,7 @@ export function HeaderStatus() {
   if (readiness.isError) {
     status = (
       <Chip
-        tone="failed"
+        meaning="broken"
         data-testid="status-offline"
         title="Weir is not answering. Check that it is running."
       >

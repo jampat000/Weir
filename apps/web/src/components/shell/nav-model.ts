@@ -1,11 +1,17 @@
 import type { NavGlyphName } from "./nav-icons";
 import { SETUP_AREAS, type SetupAreaId } from "../../lib/settings/setup-areas";
+import type { StatusMeaning } from "../../lib/ui/status-meaning";
 
 /** Where the person is: the part of the address the side menu reads. */
 export type NavPlace = { pathname: string; search: string };
 
 /** Which count, if any, rides on a menu item. */
 export type NavBadgeKind = "working" | "needs-you";
+
+export const NAV_BADGE_MEANING: Record<NavBadgeKind, StatusMeaning> = {
+  working: "doing",
+  "needs-you": "attention",
+};
 
 export type NavItem = Readonly<{
   id: string;

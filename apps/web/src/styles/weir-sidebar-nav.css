@@ -152,15 +152,10 @@
   color: var(--mm-text2);
 }
 
-.mm-sidebar-link[aria-current="page"] .mm-sidebar-link-badge--working {
-  background: var(--mm-primary);
-  color: var(--mm-on-accent);
-}
-
-/* Files that need someone are news wherever you are, so this one is amber on every page. */
-.mm-sidebar-link-badge--needs-you,
-.mm-sidebar-link[aria-current="page"] .mm-sidebar-link-badge--needs-you {
-  background: var(--mm-warning);
+/* Files that need someone are news wherever you are, so that count is coloured on every page; the other is only on its own page. */
+.mm-sidebar-link-badge[data-status="attention"],
+.mm-sidebar-link[aria-current="page"] .mm-sidebar-link-badge {
+  background: var(--mm-st);
   color: var(--mm-bg);
 }
 

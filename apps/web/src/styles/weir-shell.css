@@ -159,17 +159,3 @@ kbd {
   width: 100%;
   min-width: 0;
 }
-
-/* Each class is doubled so the status colour outranks the one- and two-part rules that colour the text it
-   marks (a table cell, a note, a caption), without !important. */
-.mm-status-text--healthy.mm-status-text--healthy {
-  color: var(--mm-status-healthy-text);
-}
-
-.mm-status-text--warning.mm-status-text--warning {
-  color: var(--mm-status-warning-text);
-}
-
-.mm-status-text--failed.mm-status-text--failed {
-  color: var(--mm-status-failed-text);
-}
