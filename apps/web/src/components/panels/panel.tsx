@@ -18,6 +18,8 @@ type PanelProps = {
   to?: string;
   /** The link's words, named with the panel's title for a screen reader: "History: Just finished". */
   toLabel?: string;
+  /** What the link shows when that is not its name, such as "3 more" for a link that leads to the rest. */
+  toText?: string;
   /** Shows the link as an arrow alone, so a long count keeps the room. The words are still said. */
   iconOnly?: boolean;
   /** Controls at the header's right edge, after the count: a text action, a switch. */
@@ -53,6 +55,7 @@ export function Panel({
   description,
   to,
   toLabel,
+  toText,
   iconOnly = false,
   aside,
   headingLevel = 2,
@@ -119,7 +122,7 @@ export function Panel({
             }
             aria-label={`${linkWords}: ${title}`}
           >
-            {iconOnly ? null : linkWords}
+            {iconOnly ? null : (toText ?? linkWords)}
             <svg
               viewBox="0 0 24 24"
               width="14"

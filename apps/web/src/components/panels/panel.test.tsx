@@ -77,6 +77,14 @@ describe("Panel", () => {
     expect(link).not.toHaveTextContent("History");
   });
 
+  it("shows other words than the link's name when asked, and keeps the name for a screen reader", () => {
+    renderPanel({ to: "/history", toLabel: "History", toText: "3 more" });
+
+    const link = screen.getByRole("link", { name: "History: Just finished" });
+    expect(link).toHaveTextContent("3 more");
+    expect(link).not.toHaveTextContent("History");
+  });
+
   it("has no link when it is given nowhere to go", () => {
     renderPanel();
 

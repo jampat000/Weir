@@ -119,17 +119,7 @@ export function ActivityStream({
       }
       to={LOG_PATH}
       toLabel="All activity"
-      aside={
-        more > 0 ? (
-          <Link
-            to={LOG_PATH}
-            className="mm-stream__more"
-            aria-label={`${more.toLocaleString()} more in the activity log`}
-          >
-            {more.toLocaleString()} more
-          </Link>
-        ) : null
-      }
+      toText={more > 0 ? `${more.toLocaleString()} more` : undefined}
     >
       {/* The host is always there, so its height is watched from the first paint, before there is anything to list. */}
       <div ref={listRef} className="mm-stream__fit">

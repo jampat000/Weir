@@ -161,7 +161,7 @@ describe("the activity stream panel", () => {
       "hidden",
     ]);
     const more = screen.getByRole("link", {
-      name: "3 more in the activity log",
+      name: "All activity: Activity",
     });
     expect(more).toHaveTextContent("3 more");
     expect(more).toHaveAttribute("href", "/system?tab=logs");
@@ -187,7 +187,7 @@ describe("the activity stream panel", () => {
     );
 
     expect(
-      screen.getByRole("link", { name: "2 more in the activity log" }),
+      screen.getByRole("link", { name: "All activity: Activity" }),
     ).toBeInTheDocument();
   });
 });

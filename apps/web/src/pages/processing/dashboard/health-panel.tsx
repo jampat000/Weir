@@ -101,23 +101,11 @@ export function HealthPanel({ workflows, workflowId }: HealthPanelProps) {
     <Panel
       title="Health"
       count={healthSummary(problems, health.workflows)}
-      aside={
-        <>
-          {more > 0 ? (
-            <Link
-              to={detailPath}
-              className="mm-health__more"
-              aria-label={`${more.toLocaleString()} more in the full detail`}
-            >
-              {more.toLocaleString()} more
-            </Link>
-          ) : null}
-          <CheckNowButton check={check} />
-        </>
-      }
+      aside={<CheckNowButton check={check} />}
       to={detailPath}
       toLabel="Full detail"
-      iconOnly
+      toText={more > 0 ? `${more.toLocaleString()} more` : undefined}
+      iconOnly={more === 0}
     >
       <div ref={bodyRef} data-testid="live-health" className="mm-health__fit">
         {check.notice ? (

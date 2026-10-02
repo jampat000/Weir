@@ -270,7 +270,7 @@ describe("the Health panel", () => {
 
     expect(panel.querySelectorAll("[data-fit]")).toHaveLength(8);
     const more = within(panel).getByRole("link", {
-      name: "2 more in the full detail",
+      name: "Full detail: Health",
     });
     expect(more).toHaveTextContent("2 more");
     const { searchParams } = new URL(

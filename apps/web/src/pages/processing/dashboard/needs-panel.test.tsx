@@ -35,6 +35,11 @@ const failedJobs = { jobs: [] as unknown[] };
 const needFiles = { files: [] as ProcessingFile[] };
 const rejectedAgain = vi.fn();
 const checkAgain = { mutate: vi.fn(), isPending: false };
+let fits = Number.MAX_SAFE_INTEGER;
+
+vi.mock("./fit-rows", () => ({
+  useFittingRows: () => [{ current: null }, fits],
+}));
 
 vi.mock("../../../lib/processing/files-queries", () => ({
   useRequeueProcessingFile: () => requeue,
@@ -119,6 +124,7 @@ beforeEach(() => {
   forget.mockReset().mockResolvedValue({ detail: "Removed." });
   removeOptions.mockReset();
   rejectedAgain.mockReset();
+  fits = Number.MAX_SAFE_INTEGER;
   readiness.worker_health = [];
   failedJobs.jobs = [];
   needFiles.files = [];
@@ -201,6 +207,29 @@ describe("the Needs you panel when something does", () => {
       "/history?show=needs",
       "/history?show=skipped",
     ]);
+  });
+
+  it("lists only the rows that fit, and its header link says how many more there are", () => {
+    failedJobs.jobs = [{ id: 1 }];
+    needFiles.files = [stuckFile, rejected];
+    // The Weir group's heading and its row fit; the two files after them do not.
+    fits = 2;
+    const panel = renderPanel();
+
+    const more = within(panel).getByRole("link", {
+      name: "History: Needs you",
+    });
+    expect(more).toHaveTextContent("2 more");
+    expect(more).toHaveAttribute("href", "/history?show=failed");
+  });
+
+  it("keeps the header link's own name when every row fits", () => {
+    needFiles.files = [stuckFile];
+    const panel = renderPanel();
+
+    expect(
+      within(panel).getByRole("link", { name: "History: Needs you" }),
+    ).toHaveTextContent("History");
   });
 
   it("keeps a workflow's own view when the panel is narrowed to it", () => {

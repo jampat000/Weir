@@ -8,7 +8,14 @@ import type { Filter } from "../processing-filter";
 import { historyGroupPath } from "../../history/history-links";
 import { ProcessRejectedAgain } from "../../history/history-rejected-again";
 import { NeedFileActions, type NeedNotice } from "./needs-file-actions";
-import { NEEDS_A_LOOK_PATH, type NeedGroup, type NeedRow } from "./needs-model";
+import { useFittingRows } from "./fit-rows";
+import {
+  NEEDS_A_LOOK_PATH,
+  needUnits,
+  needsLeftOut,
+  type NeedGroup,
+  type NeedRow,
+} from "./needs-model";
 import { NEEDS_PANEL_ID } from "./show-needs-panel";
 import { useNeedsYou } from "./use-needs-you";
 
@@ -26,7 +33,7 @@ function NeedItem({
   onOpen,
 }: { row: NeedRow } & RowHandlers) {
   return (
-    <li className="mm-need" title={row.detail}>
+    <li className="mm-need" title={row.detail} data-fit="">
       <b className="mm-need__title">{row.title}</b>
       {row.file ? (
         <small className="mm-need__workflow">{row.file.library_name}</small>
@@ -63,7 +70,7 @@ function Group({
 } & RowHandlers) {
   return (
     <section aria-label={group.title} className="mm-needs__group">
-      <header className="mm-needs__group-head">
+      <header className="mm-needs__group-head" data-fit="with-next">
         <h3 className="mm-needs__group-title">{group.title}</h3>
         {group.rejected ? (
           <ProcessRejectedAgain
@@ -81,6 +88,7 @@ function Group({
         <Link
           className="mm-need__link mm-needs__more"
           to={historyGroupPath(group.history, workflowId)}
+          data-fit=""
         >
           and {group.more.toLocaleString()} more in History →
         </Link>
@@ -140,6 +148,8 @@ export function NeedsPanel({
   const { groups, files } = useNeedsYou(workflowId, filter);
   const count = files.length;
   const [notice, setNotice] = useState<NeedNotice | null>(null);
+  const [listRef, fits] = useFittingRows();
+  const left = needsLeftOut(needUnits(groups), fits);
   const mediaScopes = new Map(
     (workflows ?? []).map((workflow) => [workflow.id, workflow.media_type]),
   );
@@ -160,6 +170,7 @@ export function NeedsPanel({
       }
       to={NEEDS_A_LOOK_PATH}
       toLabel="History"
+      toText={left > 0 ? `${left.toLocaleString()} more` : undefined}
     >
       {notice ? (
         <p
@@ -169,23 +180,28 @@ export function NeedsPanel({
           {notice.text}
         </p>
       ) : null}
-      {groups.length === 0 ? (
-        <AllClear filter={filter} />
-      ) : (
-        <div className="mm-needs__list" data-testid="live-needs">
-          {groups.map((group) => (
-            <Group
-              key={group.key}
-              group={group}
-              workflowId={workflowId}
-              workflowName={workflowName}
-              mediaScopes={mediaScopes}
-              onNotice={setNotice}
-              onOpen={onOpen}
-            />
-          ))}
+      {/* The host is always there, so its height is watched from the first paint, before there is anything to list. */}
+      <div className="mm-needs">
+        <div ref={listRef} className="mm-needs__fit">
+          {groups.length === 0 ? (
+            <AllClear filter={filter} />
+          ) : (
+            <div className="mm-needs__list" data-testid="live-needs">
+              {groups.map((group) => (
+                <Group
+                  key={group.key}
+                  group={group}
+                  workflowId={workflowId}
+                  workflowName={workflowName}
+                  mediaScopes={mediaScopes}
+                  onNotice={setNotice}
+                  onOpen={onOpen}
+                />
+              ))}
+            </div>
+          )}
         </div>
-      )}
+      </div>
     </Panel>
   );
 }

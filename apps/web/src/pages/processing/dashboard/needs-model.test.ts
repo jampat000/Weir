@@ -8,6 +8,8 @@ import {
   FILES_SHOWN_PER_GROUP,
   buildNeeds,
   failedJobsOf,
+  needUnits,
+  needsLeftOut,
 } from "./needs-model";
 
 const workflow = {
@@ -419,5 +421,41 @@ describe("the files that need a person", () => {
     }).map((group) => group.key);
 
     expect(keys).toEqual(["weir", "failed-writing", "rejected-language"]);
+  });
+});
+
+describe("what the panel's fitting counts", () => {
+  const groups = () =>
+    buildNeeds({
+      workflows: [workflow],
+      workflowId: undefined,
+      readiness: undefined,
+      failedJobs: { count: 1, capped: false },
+      filter: "all",
+      files: [1, 2, 3, 4, 5, 6].map((id) => failedFile(id)),
+    });
+
+  it("lists a heading, then the rows, then the line that leads to the files a group does not list", () => {
+    expect(needUnits(groups()).map((unit) => unit.kind)).toEqual([
+      "heading",
+      "row",
+      "heading",
+      ...Array<string>(FILES_SHOWN_PER_GROUP).fill("row"),
+      "rest",
+    ]);
+  });
+
+  it("counts the hidden rows and the files a hidden group line leads to", () => {
+    const units = needUnits(groups());
+
+    expect(needsLeftOut(units, units.length)).toBe(0);
+    // Only the Weir group's heading and row show: the four files of the other group and the two it does not list are left.
+    expect(needsLeftOut(units, 2)).toBe(FILES_SHOWN_PER_GROUP + 2);
+  });
+
+  it("counts every row as left out when none of the units fits", () => {
+    expect(needsLeftOut(needUnits(groups()), 0)).toBe(
+      1 + FILES_SHOWN_PER_GROUP + 2,
+    );
   });
 });

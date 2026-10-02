@@ -230,3 +230,36 @@ export function buildNeeds({
   const fileRows = waitingFiles(files, workflowId, filter);
   return [...weirGroup(weirRows), ...fileGroups(fileRows)];
 }
+
+/**
+ * What the panel's fitting sees, in the order it lists them: a group's heading, one of its rows, or its line that
+ * leads to the files it does not list.
+ */
+export type NeedUnit =
+  { kind: "heading" } | { kind: "row" } | { kind: "rest"; files: number };
+
+/** The groups as the units the panel lists, in its order. */
+export function needUnits(groups: readonly NeedGroup[]): NeedUnit[] {
+  return groups.flatMap((group): NeedUnit[] => [
+    { kind: "heading" },
+    ...group.rows.map((): NeedUnit => ({ kind: "row" })),
+    ...(group.more > 0 && group.history
+      ? [{ kind: "rest", files: group.more } as const]
+      : []),
+  ]);
+}
+
+/**
+ * How many things are left out when only the first `fits` units show: the rows that are hidden, and the files that a
+ * hidden group line would have led to.
+ */
+export function needsLeftOut(units: readonly NeedUnit[], fits: number): number {
+  return units
+    .slice(Math.max(0, fits))
+    .reduce(
+      (left, unit) =>
+        left +
+        (unit.kind === "row" ? 1 : unit.kind === "rest" ? unit.files : 0),
+      0,
+    );
+}

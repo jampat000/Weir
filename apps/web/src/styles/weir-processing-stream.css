@@ -19,12 +19,6 @@
   list-style: none;
 }
 
-.mm-stream__more {
-  font-size: 12px;
-  white-space: nowrap;
-  color: var(--mm-primary);
-}
-
 .mm-stream__empty {
   margin: 0;
   padding: 0 18px;
