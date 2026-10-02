@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Weir.Api.Http;
+using Weir.Core;
 using Weir.Core.Activity;
 using Weir.Core.Configuration;
 using Weir.Core.Json;
@@ -43,10 +44,18 @@ internal sealed class MediaManagerIntakeEndpointHandlers
     private readonly LibraryStore _libraries;
     private readonly MachineIdentity _machine;
     private readonly ArtworkSubjects _artwork;
+    private readonly string _version;
 
     public MediaManagerIntakeEndpointHandlers(
-        MediaManagerIntake intake, HandbackOutcomes handbackOutcomes, LibraryStore libraries, MachineIdentity machine, ArtworkSubjects artwork)
+        MediaManagerIntake intake,
+        HandbackOutcomes handbackOutcomes,
+        LibraryStore libraries,
+        MachineIdentity machine,
+        ArtworkSubjects artwork,
+        WeirOptions options)
     {
+        ArgumentNullException.ThrowIfNull(options);
+        _version = WeirVersion.Resolve(options.VersionOverride);
         _artwork = artwork ?? throw new ArgumentNullException(nameof(artwork));
         _machine = machine ?? throw new ArgumentNullException(nameof(machine));
         _intake = intake ?? throw new ArgumentNullException(nameof(intake));
@@ -144,7 +153,8 @@ internal sealed class MediaManagerIntakeEndpointHandlers
         await RefusalsAsApiErrors(() => _intake.RequireSecretAsync(uow, presented, null)).ConfigureAwait(false);
         return ApiRoutes.Ok(new WireObject()
             .Set("capabilities", new WireArray(IntakeRules.HandoffCapabilities.Select(c => (WireValue)new WireString(c))))
-            .Set("machine_name", _machine.Name));
+            .Set("machine_name", _machine.Name)
+            .Set("version", _version));
     }
 
     /// <summary>

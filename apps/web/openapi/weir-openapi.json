@@ -13731,11 +13731,17 @@
                       "description": "The name of the machine Weir runs on, for a media manager to name its connection to Weir.",
                       "title": "Machine Name",
                       "type": "string"
+                    },
+                    "version": {
+                      "description": "Weir’s release version, X.Y.Z as stamped from its release tag (0.0.1-dev on a development build). Weir before 4.0.0 sends no version.",
+                      "title": "Version",
+                      "type": "string"
                     }
                   },
                   "required": [
                     "capabilities",
-                    "machine_name"
+                    "machine_name",
+                    "version"
                   ],
                   "title": "Response Get Intake Capabilities Api V1 Intake Capabilities Get",
                   "type": "object"

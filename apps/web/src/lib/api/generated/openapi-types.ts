@@ -9278,6 +9278,11 @@ export interface operations {
              * @description The name of the machine Weir runs on, for a media manager to name its connection to Weir.
              */
             machine_name: string;
+            /**
+             * Version
+             * @description Weir’s release version, X.Y.Z as stamped from its release tag (0.0.1-dev on a development build). Weir before 4.0.0 sends no version.
+             */
+            version: string;
           };
         };
       };
