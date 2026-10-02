@@ -147,6 +147,27 @@ internal static class TestDatabase
         await command.ExecuteNonQueryAsync();
     }
 
+    /// <summary>
+    /// Runs several statements as one transaction, so a background task sharing the database (the artwork pruner on its first pass,
+    /// say) sees all of the rows or none of them, never a half-seeded set.
+    /// </summary>
+    public static async Task ExecuteTogetherAsync(WeirTestServer server, string script, params (string Name, object Value)[] parameters)
+    {
+        await using var connection = new SqliteConnection($"Data Source={PathFor(server)};Pooling=False");
+        await connection.OpenAsync();
+        await using var transaction = (SqliteTransaction)await connection.BeginTransactionAsync();
+        await using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = script;
+        foreach (var (name, value) in parameters)
+        {
+            command.Parameters.AddWithValue(name, value);
+        }
+
+        await command.ExecuteNonQueryAsync();
+        await transaction.CommitAsync();
+    }
+
     /// <summary>Inserts an active user with a real password hash and the given role.</summary>
     public static Task SeedUserAsync(WeirTestServer server, string username, string password, string role) =>
         ExecuteAsync(

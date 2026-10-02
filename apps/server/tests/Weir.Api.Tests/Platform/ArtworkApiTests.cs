@@ -24,17 +24,27 @@ public sealed class ArtworkApiTests
     private static Task<long> SeedLibraryAsync(WeirTestServer server) =>
         TestDatabase.ScalarAsync(server, "SELECT id FROM libraries WHERE media_type = 'movie' ORDER BY id LIMIT 1");
 
-    /// <summary>A file with a stored poster: the title's lookup, the image row, the image on disk and the file's link to its title.</summary>
+    /// <summary>
+    /// A file with a stored poster: the title's lookup, the image row, the image on disk and the file's link to its title. The rows go
+    /// in as one transaction because the artwork task prunes any lookup no file uses on its first pass, a few seconds after the server
+    /// starts; seeded one statement at a time on a busy machine, a lookup could be pruned before its file row arrived.
+    /// </summary>
     private static async Task<long> SeedFileWithPosterAsync(WeirTestServer server, bool imageOnDisk = true)
     {
         var library = await SeedLibraryAsync(server);
-        await TestDatabase.ExecuteAsync(server, "INSERT INTO files (library_id, relative_path, status, last_seen_at) VALUES ($l, $p, 'processed', CURRENT_TIMESTAMP)", ("$l", library), ("$p", FilePath));
-        await TestDatabase.ExecuteAsync(server, "INSERT INTO artwork_posters (poster_id, source_ref, content_type, size_bytes) VALUES ($id, $ref, 'image/jpeg', $size)", ("$id", PosterId), ("$ref", PosterFile), ("$size", ImageBytes.Length));
-        await TestDatabase.ExecuteAsync(
+        await TestDatabase.ExecuteTogetherAsync(
             server,
-            "INSERT INTO artwork_lookups (lookup_key, media_scope, title, year, outcome, poster_id) VALUES ('k', 'movie', 'nosferatu', 1922, 'found', $id)",
-            ("$id", PosterId));
-        await TestDatabase.ExecuteAsync(server, "INSERT INTO artwork_files (library_id, relative_path, lookup_key) VALUES ($l, $p, 'k')", ("$l", library), ("$p", FilePath));
+            """
+            INSERT INTO files (library_id, relative_path, status, last_seen_at) VALUES ($l, $p, 'processed', CURRENT_TIMESTAMP);
+            INSERT INTO artwork_posters (poster_id, source_ref, content_type, size_bytes) VALUES ($id, $ref, 'image/jpeg', $size);
+            INSERT INTO artwork_lookups (lookup_key, media_scope, title, year, outcome, poster_id) VALUES ('k', 'movie', 'nosferatu', 1922, 'found', $id);
+            INSERT INTO artwork_files (library_id, relative_path, lookup_key) VALUES ($l, $p, 'k');
+            """,
+            ("$l", library),
+            ("$p", FilePath),
+            ("$id", PosterId),
+            ("$ref", PosterFile),
+            ("$size", ImageBytes.Length));
         if (imageOnDisk)
         {
             var directory = Path.Join(server.Home, "artwork", "posters");
