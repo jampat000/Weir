@@ -1,24 +1,24 @@
-import type { ActivityLogFilters } from "../../../../lib/activity/activity-filters";
+import type { LogFilters } from "./log-filters";
 
-/** The two dates a reader picks for themselves, above the events, once they have chosen to pick dates. */
-export function ActivityRange({
+/** The two times a reader picks for themselves, above the log, once they have chosen a custom range. Read in Weir's time zone. */
+export function LogRange({
   from,
   to,
   onChange,
 }: {
   from: string;
   to: string;
-  onChange: (next: Partial<ActivityLogFilters>) => void;
+  onChange: (next: Partial<LogFilters>) => void;
 }) {
   return (
-    <div className="mm-activity-range">
+    <div className="mm-activity-range" data-testid="logs-range">
       <label className="mm-field">
         <span className="mm-field__label">From</span>
         <input
           type="datetime-local"
           className="mm-input"
           value={from}
-          onChange={(e) => onChange({ from: e.target.value })}
+          onChange={(event) => onChange({ from: event.target.value })}
         />
       </label>
       <label className="mm-field">
@@ -27,7 +27,7 @@ export function ActivityRange({
           type="datetime-local"
           className="mm-input"
           value={to}
-          onChange={(e) => onChange({ to: e.target.value })}
+          onChange={(event) => onChange({ to: event.target.value })}
         />
       </label>
     </div>

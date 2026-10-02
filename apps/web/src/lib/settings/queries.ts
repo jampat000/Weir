@@ -4,7 +4,6 @@ import {
   deleteNotificationChannel,
   fetchConfigurationBackupList,
   fetchNotificationChannels,
-  fetchServerLogs,
   fetchServerMetrics,
   fetchSecurityOverview,
   fetchAppSettings,
@@ -25,7 +24,6 @@ import type {
   AppSettingsPutBody,
   NetworkAccessPutBody,
   NotificationChannelIn,
-  ServerLogFilters,
   UpdateSettingsPutBody,
 } from "./types";
 
@@ -147,17 +145,6 @@ export function useHistoryResetMutation() {
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: settingsKeys.metrics });
     },
-  });
-}
-
-export function useServerLogsQuery(filters: ServerLogFilters, enabled = true) {
-  return useQuery({
-    queryKey: settingsKeys.logsFor(filters),
-    queryFn: () => fetchServerLogs(filters),
-    enabled,
-    refetchInterval: enabled ? 5000 : false,
-    staleTime: 2000,
-    retry: false,
   });
 }
 

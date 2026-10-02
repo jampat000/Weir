@@ -96,7 +96,7 @@ it("shows all three retention settings in one card, each with its days", () => {
   expect(screen.getByLabelText("File activity")).toHaveValue(45);
 });
 
-it("offers one Save only once a number has changed, and saves the file history with it", async () => {
+it("offers one Save only once a number has changed, and saves the file activity with it", async () => {
   setup(90);
   mutate.mockImplementation(
     (_body: unknown, options: { onSuccess: () => void }) => options.onSuccess(),
@@ -123,7 +123,7 @@ it("offers one Save only once a number has changed, and saves the file history w
   );
 });
 
-it("saves the log and Activity numbers and the file history together with the one button", () => {
+it("saves the log and Activity numbers and the file activity together with the one button", () => {
   setup(90);
 
   renderRetention(true, true);
@@ -139,7 +139,7 @@ it("saves the log and Activity numbers and the file history together with the on
   );
 });
 
-it("refuses a file history outside 0 to 3650 and a blank one", () => {
+it("refuses a file activity setting outside 0 to 3650 and a blank one", () => {
   setup(90);
 
   renderRetention();
@@ -187,12 +187,12 @@ it("shows a viewer the numbers and no way to change them", () => {
   ).not.toBeInTheDocument();
 });
 
-it("says so when the file history setting could not be read", () => {
+it("says so when the file activity setting could not be read", () => {
   setup(null, { isError: true });
 
   renderRetention();
 
   expect(screen.getByRole("alert")).toHaveTextContent(
-    "Weir could not read how long a file’s history is kept.",
+    "Weir could not read how long a file’s activity is kept.",
   );
 });

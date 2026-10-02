@@ -17,7 +17,7 @@ export function parseAppTime(iso: string | null | undefined): number | null {
 }
 
 /** The time zone chosen in System › About, or undefined for the browser's when none is set. */
-function useAppTimeZone(): string | undefined {
+export function useAppTimeZone(): string | undefined {
   return useAppSettingsQuery().data?.app_timezone || undefined;
 }
 
@@ -80,30 +80,6 @@ export function useAppDateFormatter(): (
         return new Intl.DateTimeFormat(undefined, {
           dateStyle: "medium",
           timeStyle: "short",
-          timeZone: tz,
-        }).format(parseAppDate(iso));
-      } catch {
-        // An unreadable timestamp or an unknown timezone: show what the server sent.
-        return iso;
-      }
-    },
-    [tz],
-  );
-}
-
-/** Formats a server timestamp as a day, "2 Oct", in the time zone chosen in System › About, or the browser's. */
-export function useAppDayFormatter(): (
-  iso: string | null | undefined,
-) => string {
-  const tz = useAppTimeZone();
-
-  return useCallback(
-    (iso: string | null | undefined): string => {
-      if (!iso) return "—";
-      try {
-        return new Intl.DateTimeFormat(undefined, {
-          day: "numeric",
-          month: "short",
           timeZone: tz,
         }).format(parseAppDate(iso));
       } catch {

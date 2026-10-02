@@ -36,7 +36,7 @@ Where the screens stand:
 | Activity               | None. The file list and the chosen file, divided by a hairline.                        |
 | Library                | None. The title is the library picker; a row of chips carries the counts and filters. |
 | Settings               | None. Settings has no "now".                                                           |
-| System › Logs › Events | `.mm-lead` with a `.mm-lead-caption`.                                                   |
+| System › Logs          | None. The filters are on the header's title line; the Log card is the one list.        |
 
 `.mm-lead` and `.mm-lead-caption` (in `weir-content.css`) are the only rule-1 primitives left: a
 wrapper and a one-line caption under it. An earlier, bordered "lead band" primitive

@@ -7,9 +7,9 @@ import { mmActionButtonClass } from "../../../../lib/ui/mm-control-roles";
 import { useScrollToHash } from "../../../../lib/ui/use-scroll-to-hash";
 import type { SystemSettingsForm } from "../../use-system-settings-form";
 import {
-  useFileHistoryRetention,
-  type FileHistoryRetention,
-} from "./use-file-history-retention";
+  useFileActivityRetention,
+  type FileActivityRetention,
+} from "./use-file-activity-retention";
 
 /** Where the retention panel is in System › Logs, so a link elsewhere can bring it into view. */
 const RETENTION_ANCHOR = "retention";
@@ -50,19 +50,19 @@ function RetentionRow({
   );
 }
 
-function FileHistoryRow({
-  fileHistory,
+function FileActivityRow({
+  fileActivity,
   disabled,
 }: {
-  fileHistory: FileHistoryRetention;
+  fileActivity: FileActivityRetention;
   disabled: boolean;
 }) {
-  const inputId = "retention-file-history";
-  if (fileHistory.status === "unreadable") {
+  const inputId = "retention-file-activity";
+  if (fileActivity.status === "unreadable") {
     return (
       <p className="mm-status-text--failed mm-sys-note" role="alert">
-        Weir could not read how long a file&rsquo;s history is kept. Refresh the
-        page to try again.
+        Weir could not read how long a file&rsquo;s activity is kept. Refresh
+        the page to try again.
       </p>
     );
   }
@@ -71,24 +71,24 @@ function FileHistoryRow({
       inputId={inputId}
       label="File activity"
       help="Kept after the file is gone. 0 keeps it for ever."
-      detail="While Weir still knows a file, its history is kept. This is how many days it is kept once the file is gone or forgotten. 0 keeps it for ever."
+      detail="While Weir still knows a file, its activity is kept. This is how many days it is kept once the file is gone or forgotten. 0 keeps it for ever."
     >
       <input
         id={inputId}
         type="number"
         min={0}
-        max={fileHistory.maxDays}
+        max={fileActivity.maxDays}
         className="mm-input mm-retention__number"
-        value={fileHistory.shown}
-        disabled={disabled || fileHistory.status !== "ready"}
-        onChange={(e) => fileHistory.setDraft(e.target.value)}
+        value={fileActivity.shown}
+        disabled={disabled || fileActivity.status !== "ready"}
+        onChange={(e) => fileActivity.setDraft(e.target.value)}
       />
     </RetentionRow>
   );
 }
 
 /**
- * How long everything Weir records is kept: the system log, Activity, and a file's history. One form: the three
+ * How long everything Weir records is kept: the system log, Activity, and a file's activity. One form: the three
  * numbers are edited together and saved by one button, which appears once one of them has changed.
  */
 export function RetentionSection({
@@ -101,11 +101,11 @@ export function RetentionSection({
   savedLogDays: number;
 }) {
   const { retention, save } = form;
-  const fileHistory = useFileHistoryRetention();
+  const fileActivity = useFileActivityRetention();
   const [saved, setSaved] = useState(false);
-  const saving = save.isPending || fileHistory.saving;
+  const saving = save.isPending || fileActivity.saving;
   const disabled = !editable || saving;
-  const dirty = retention.dirty || fileHistory.dirty;
+  const dirty = retention.dirty || fileActivity.dirty;
   const failed = save.isError && form.lastSaveTarget === "logs";
   useScrollToHash();
 
@@ -114,7 +114,7 @@ export function RetentionSection({
     if (retention.dirty) {
       form.saveFrom("logs", { onSaved: () => setSaved(true) });
     }
-    if (fileHistory.dirty) fileHistory.save(() => setSaved(true));
+    if (fileActivity.dirty) fileActivity.save(() => setSaved(true));
   };
 
   return (
@@ -169,16 +169,18 @@ export function RetentionSection({
             }
           />
         </RetentionRow>
-        <FileHistoryRow fileHistory={fileHistory} disabled={disabled} />
+        <FileActivityRow fileActivity={fileActivity} disabled={disabled} />
       </div>
-      {dirty || failed || fileHistory.error || saved ? (
+      {dirty || failed || fileActivity.error || saved ? (
         <div className={quietActionRowClass}>
           {dirty ? (
             <button
               type="button"
               className={`${mmActionButtonClass({ variant: "primary" })} mm-sys-btn`}
               disabled={
-                !editable || saving || (fileHistory.dirty && !fileHistory.valid)
+                !editable ||
+                saving ||
+                (fileActivity.dirty && !fileActivity.valid)
               }
               data-testid="suite-settings-save-logs"
               onClick={saveAll}
@@ -194,10 +196,10 @@ export function RetentionSection({
             >
               {errorMessage(save.error, "Could not save.")}
             </p>
-          ) : fileHistory.error ? (
+          ) : fileActivity.error ? (
             <p className="mm-status-text--failed text-sm" role="alert">
               {errorMessage(
-                fileHistory.error,
+                fileActivity.error,
                 "That change could not be saved.",
               )}
             </p>

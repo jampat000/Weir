@@ -1,15 +1,11 @@
-import { useSearchParams } from "react-router-dom";
-
 import type { SystemSettingsForm } from "../../use-system-settings-form";
-import { ActivityLog } from "./activity-log";
-import { JobsSection } from "./jobs-section";
-import { LogsHeader, logViewFrom, type LogView } from "./logs-header-controls";
 import { RetentionSection } from "./retention-section";
-import { ServerLog } from "./server-log";
+import { ServerDiagnostics } from "./server-diagnostics";
+import { UnifiedLog } from "./unified-log";
 
 /**
- * System › Logs: Weir's own events, its jobs or its server log, with how long they are kept beside them. The choice
- * and the open list's filters are on the header's title line. A file's story is on History, not here.
+ * System › Logs: one log of everything Weir recorded, its server's counters folded below it, and how long each kind of
+ * record is kept. A file's story is on Activity, not here.
  */
 export function LogsTab({
   form,
@@ -20,29 +16,10 @@ export function LogsTab({
   editable: boolean;
   savedLogDays: number;
 }) {
-  const [searchParams, setSearchParams] = useSearchParams();
-  const view = logViewFrom(searchParams.get("show"));
-
-  function showView(next: LogView): void {
-    const nextParams = new URLSearchParams(searchParams);
-    nextParams.set("tab", "logs");
-    if (next === "activity") nextParams.delete("show");
-    else nextParams.set("show", next);
-    for (const name of ["status", "path"]) nextParams.delete(name);
-    setSearchParams(nextParams);
-  }
-
   return (
-    <div className="mm-sys-stack" data-testid="settings-history">
-      <LogsHeader view={view} onView={showView}>
-        {view === "activity" ? (
-          <ActivityLog />
-        ) : view === "jobs" ? (
-          <JobsSection />
-        ) : (
-          <ServerLog />
-        )}
-      </LogsHeader>
+    <div className="mm-sys-stack" data-testid="settings-logs">
+      <UnifiedLog />
+      <ServerDiagnostics />
       <RetentionSection
         form={form}
         editable={editable}

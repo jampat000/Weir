@@ -16,8 +16,8 @@ import * as processingQueries from "../../lib/processing/queries";
 import * as settingsApi from "../../lib/settings/settings-api";
 import { settingsKeys } from "../../lib/settings/query-keys";
 import { systemKeys } from "../../lib/system/query-keys";
+import type { SystemLogPage } from "../../lib/system/system-log-api";
 import type {
-  ServerLogs,
   ServerMetrics,
   SecurityOverview,
   AppSettings,
@@ -115,13 +115,25 @@ const minimalCurrentSession: CurrentSession = {
   absolute_timeout_days: 365,
 };
 
-const minimalLogs: ServerLogs = {
+/** A log with nothing in it, which is what Logs shows until something is recorded. */
+const emptyLog: SystemLogPage = {
   items: [],
+  next_cursor: null,
   total: 0,
   counts: {
-    error: 0,
-    warning: 0,
-    information: 0,
+    source: { event: 0, job: 0, server: 0 },
+    level: { error: 0, warning: 0, info: 0, success: 0 },
+    category: {
+      processing: 0,
+      scans: 0,
+      cleanup: 0,
+      library: 0,
+      connections: 0,
+      backups: 0,
+      sign_in: 0,
+      updates: 0,
+      weir: 0,
+    },
   },
 };
 
@@ -187,19 +199,8 @@ function renderSettings(
     settingsKeys.updateStatus,
     overrides?.updateStatus ?? minimalUpdateStatus,
   );
-  qc.setQueryData(
-    [
-      ...settingsKeys.logs,
-      {
-        level: undefined,
-        search: undefined,
-        has_exception: undefined,
-        limit: 250,
-      },
-    ],
-    minimalLogs,
-  );
   qc.setQueryData(settingsKeys.metrics, minimalMetrics);
+  qc.setQueryData(systemKeys.logEntries({}), emptyLog);
   const router = createMemoryRouter(
     [{ path: "*", element: <SystemPage /> }],
     overrides?.initialEntries
@@ -238,18 +239,6 @@ async function renderSettingsWithSupportConfig(
   qc.setQueryData(
     settingsKeys.updateStatus,
     overrides?.updateStatus ?? minimalUpdateStatus,
-  );
-  qc.setQueryData(
-    [
-      ...settingsKeys.logs,
-      {
-        level: undefined,
-        search: undefined,
-        has_exception: undefined,
-        limit: 250,
-      },
-    ],
-    minimalLogs,
   );
   qc.setQueryData(settingsKeys.metrics, minimalMetrics);
   return render(wrap(<SettingsPageWithMockedSupport />, qc));
@@ -553,18 +542,16 @@ describe("SystemPage", () => {
     expect(screen.getByTestId("suite-settings-backup-tab")).toBeInTheDocument();
     expect(screen.queryByText("Time zone")).not.toBeInTheDocument();
 
-    // How long history is kept sits with the history it governs.
+    // How long things are kept sits with the log they govern.
     fireEvent.click(screen.getByRole("tab", { name: "Logs" }));
     expect(screen.getByText("System log")).toBeInTheDocument();
     expect(screen.getByLabelText("Events")).toBeInTheDocument();
-    fireEvent.click(screen.getByTestId("settings-history-show"));
-    fireEvent.click(screen.getByRole("option", { name: "Server log" }));
-    expect(screen.getByText("System events")).toBeInTheDocument();
-    // Retention stays in view whichever of History's lists you are reading: it governs all of them.
-    expect(screen.getByText("System log")).toBeInTheDocument();
+    // The log is one list, with the retention that governs it under it.
+    expect(screen.getByRole("heading", { name: "Log" })).toBeInTheDocument();
+    expect(screen.getByTestId("settings-logs")).toBeInTheDocument();
   });
 
-  it("keeps every retention setting in one panel under Logs: log days, Activity days and file history days", () => {
+  it("keeps every retention setting in one panel under Logs: log days, Activity days and file activity days", () => {
     vi.spyOn(
       processingQueries,
       "useProcessingOperatorSettingsQuery",
@@ -649,18 +636,6 @@ describe("SystemPage", () => {
       items: [],
     });
     qc.setQueryData(settingsKeys.updateStatus, windowsUpdateAvailableStatus);
-    qc.setQueryData(
-      [
-        ...settingsKeys.logs,
-        {
-          level: undefined,
-          search: undefined,
-          has_exception: undefined,
-          limit: 250,
-        },
-      ],
-      minimalLogs,
-    );
     qc.setQueryData(settingsKeys.metrics, minimalMetrics);
 
     render(wrap(<SystemPage />, qc));
@@ -734,18 +709,6 @@ describe("SystemPage", () => {
         pending_version: null,
       });
     }
-    qc.setQueryData(
-      [
-        ...settingsKeys.logs,
-        {
-          level: undefined,
-          search: undefined,
-          has_exception: undefined,
-          limit: 250,
-        },
-      ],
-      minimalLogs,
-    );
     qc.setQueryData(settingsKeys.metrics, minimalMetrics);
     return qc;
   }

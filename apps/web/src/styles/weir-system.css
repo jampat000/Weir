@@ -516,13 +516,9 @@
 
 /* ── Logs ────────────────────────────────────────────────────────────────── */
 
-/* Logs' controls sit in the header's slot as History's do (weir-history.css): "Show" first, then the open list's own
-   filters, in the same line. A picker keeps the width its words need, so what gives way is the search (a magnifier) and
-   then the title block's tabs (under "More"); a long choice is cut with an ellipsis rather than growing the header. */
-.mm-logs-view-controls {
-  display: contents;
-}
-
+/* Logs' controls sit in the header's slot as Activity's do (weir-history.css). A picker keeps the width its words need, so
+   what gives way is the search (a magnifier) and then the title block's tabs (under "More"); a long choice is cut with an
+   ellipsis rather than growing the header. */
 .mm-logs-controls .mm-workflow-picker {
   min-width: 7.4rem;
 }
@@ -538,10 +534,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.mm-logs-controls .mm-logs-picker--wide {
-  --picker-w: 21rem;
 }
 
 /* Dates a reader picks for themselves, above the list of events. */
@@ -619,17 +611,6 @@
 .mm-log-diagnostics[open] .mm-log-diagnostics__show,
 .mm-log-diagnostics:not([open]) .mm-log-diagnostics__hide {
   display: none;
-}
-
-.mm-log-traceback {
-  overflow: auto;
-  padding: 0.75rem;
-  border: 1px solid var(--mm-border);
-  border-radius: 0.375rem;
-  color: var(--mm-text2);
-  font-size: 0.75rem;
-  line-height: 1.25rem;
-  white-space: pre-wrap;
 }
 
 /* A card's title and the line under it need a little air between them. */

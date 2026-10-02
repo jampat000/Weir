@@ -150,16 +150,3 @@
     padding-bottom: 0.3rem;
   }
 }
-
-/* The jobs table keeps its header and Job column pinned while it scrolls sideways, and asks for room
- * for its five columns, only while it is a table: at 760px and below it stacks into rows, above. */
-@container (min-width: 761px) {
-  .mm-jobs-table {
-    min-width: 46rem;
-  }
-
-  .mm-jobs-table__head,
-  .mm-jobs-table__job {
-    position: sticky;
-  }
-}

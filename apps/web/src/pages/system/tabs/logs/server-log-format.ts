@@ -1,36 +1,5 @@
 import { plural } from "../../../../lib/ui/mm-plural";
 
-/** The levels the server log can be narrowed to; "" is every level. */
-export type LogLevelFilter = "" | "INFO" | "WARNING" | "ERROR";
-
-export const LOG_LEVEL_OPTIONS: { value: LogLevelFilter; label: string }[] = [
-  { value: "", label: "All levels" },
-  { value: "INFO", label: "Information" },
-  { value: "WARNING", label: "Warnings" },
-  { value: "ERROR", label: "Errors" },
-];
-
-/** How many entries one page of the server log shows: the most the server itself will ever return. */
-export const SERVER_LOG_PAGE_SIZE = 250;
-
-/** A level as the list shows it: INFO reads as a word, the others are already loud enough. */
-export function logLevelLabel(level: string): string {
-  return level === "INFO" ? "Information" : level;
-}
-
-/** Severity as a colour on the level word; the quiet body has no tinted cards to carry it. */
-export function logLevelToneClass(level: string): string {
-  switch (level.toUpperCase()) {
-    case "ERROR":
-    case "CRITICAL":
-      return "mm-status-text--failed";
-    case "WARNING":
-      return "mm-status-text--warning";
-    default:
-      return "";
-  }
-}
-
 const SECONDS_PER_DAY = 86_400;
 const SECONDS_PER_HOUR = 3_600;
 

@@ -18,6 +18,7 @@ import { useMeQuery } from "../../lib/auth/queries";
 import { useAppSettingsQuery } from "../../lib/settings/queries";
 import { AboutTab } from "./tabs/about/about-tab";
 import { BackupsTab } from "./tabs/backups/backups-tab";
+import { LOG_PARAMS } from "./tabs/logs/log-filters";
 import { LogsTab } from "./tabs/logs/logs-tab";
 import { SecurityTab } from "./tabs/security/security-tab";
 import { useSystemSettingsForm } from "./use-system-settings-form";
@@ -84,7 +85,8 @@ export function SystemPage() {
     // About is where System opens, so it needs no tab in the address.
     if (nextTab === "about") nextParams.delete("tab");
     else nextParams.set("tab", nextTab);
-    for (const name of ["show", "status", "path"]) nextParams.delete(name);
+    // What narrows the log belongs to the log: another tab has none of it.
+    for (const name of LOG_PARAMS) nextParams.delete(name);
     setSearchParams(nextParams);
   }
 

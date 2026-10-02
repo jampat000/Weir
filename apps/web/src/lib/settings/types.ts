@@ -37,18 +37,11 @@ export type UpdateStateOut = {
 };
 
 export type HistoryResetResult = Schema<"SuiteOperationalHistoryResetOut">;
-export type ServerLogEntry = Schema<"SuiteLogEntryOut">;
 export type ServerLogs = Schema<"SuiteLogsOut">;
 export type ServerMetrics = Schema<"SuiteMetricsOut">;
 export type NotificationChannelOut = Schema<"NotificationChannelOut">;
 export type NotificationChannelListOut = Schema<"NotificationChannelListOut">;
 export type NotificationChannelIn = RequestBody<"NotificationChannelIn">;
-export type ServerLogFilters = {
-  level?: string;
-  search?: string;
-  has_exception?: boolean;
-  limit?: number;
-};
 
 export type NotificationChannelTestOut = {
   ok: boolean;

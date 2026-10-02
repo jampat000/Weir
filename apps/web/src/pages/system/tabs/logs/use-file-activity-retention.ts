@@ -9,10 +9,10 @@ import {
 } from "../../../../lib/processing/queries";
 
 /**
- * How long a file's history outlives the file: a file's history is kept for as long as Weir still knows the file, and
+ * How long a file's activity outlives the file: a file's activity is kept for as long as Weir still knows the file, and
  * this is the number of days it is kept after the file is gone or forgotten. The number is a draft until `save`.
  */
-export function useFileHistoryRetention() {
+export function useFileActivityRetention() {
   const settings = useProcessingOperatorSettingsQuery();
   const saveMutation = useProcessingOperatorSettingsSaveMutation();
   const queryClient = useQueryClient();
@@ -58,4 +58,4 @@ export function useFileHistoryRetention() {
   };
 }
 
-export type FileHistoryRetention = ReturnType<typeof useFileHistoryRetention>;
+export type FileActivityRetention = ReturnType<typeof useFileActivityRetention>;
