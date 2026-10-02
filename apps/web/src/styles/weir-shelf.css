@@ -92,14 +92,10 @@
   font-size: inherit;
 }
 
-/* The chips that narrow the shelf to a workflow, in the panel's header. They scroll sideways when the header has no
-   room for them all; the scrollbar is hidden so it cannot make the 44px header taller, and the padding keeps the focus
-   ring from being cut. The edge with chips past it fades (data-more-before and -after, from useChipRow), so a chip cut
-   off by it reads as one that scrolls. The tokens are the panel's own: the header is outside .mm-shelf, where the
-   --pipe-* block does not reach. */
+/* The chips that narrow the shelf to a workflow, in the panel's header. When the header has no room for them all the
+   last ones fold into "More" (components/shell/title-line-fit.ts); the padding keeps the focus ring from being cut.
+   The tokens are the panel's own: the header is outside .mm-shelf, where the --pipe-* block does not reach. */
 .lsh-chips {
-  --fade-before: 0px;
-  --fade-after: 0px;
   display: flex;
   flex: 1;
   flex-wrap: nowrap;
@@ -107,24 +103,6 @@
   gap: 6px;
   min-width: 0;
   padding: 4px 8px;
-  overflow-x: auto;
-  overflow-y: hidden;
-  scrollbar-width: none;
-  mask-image: linear-gradient(
-    to right,
-    transparent,
-    #000 var(--fade-before),
-    #000 calc(100% - var(--fade-after)),
-    transparent
-  );
-}
-
-.lsh-chips[data-more-before="true"] {
-  --fade-before: 32px;
-}
-
-.lsh-chips[data-more-after="true"] {
-  --fade-after: 32px;
 }
 
 .lsh-chip {
