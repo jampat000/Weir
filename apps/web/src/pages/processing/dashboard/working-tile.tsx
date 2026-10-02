@@ -7,7 +7,7 @@ import type { Filter } from "../processing-filter";
 import type { WorkingItem } from "../processing-model";
 import { useFittingRows } from "./fit-rows";
 import { FitText } from "./system/fit-words";
-import { STEP_WORDS, waitWords } from "./working-words";
+import { STEP_WORDS, moreWords, waitWords } from "./working-words";
 import { setupTabPath } from "../../../lib/settings/setup-areas";
 
 /** The most files the tile lists before saying how many more there are; how many show is up to its height. */
@@ -100,6 +100,8 @@ export function WorkingTile({
   return (
     <StatTile
       label="Working on now"
+      to={IN_PROGRESS_PATH}
+      linkName="Working on now: every file in History"
       bodyRef={bodyRef}
       aside={
         <span className="mm-aside">
@@ -109,9 +111,12 @@ export function WorkingTile({
                 to={IN_PROGRESS_PATH}
                 aria-label={`${more.toLocaleString()} more in History`}
               >
-                {more.toLocaleString()} more
+                <FitText
+                  className="mm-aside__more-words"
+                  words={moreWords(more)}
+                />
               </Link>
-              {" · "}
+              <span aria-hidden="true">{" · "}</span>
             </span>
           ) : null}
           <Link to={PERFORMANCE_PATH}>Change</Link>

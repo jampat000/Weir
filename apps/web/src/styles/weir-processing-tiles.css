@@ -14,13 +14,40 @@
   justify-content: flex-end;
 }
 
-.mm-aside__more {
+.mm-aside a {
   flex: none;
+}
+
+/* The aside takes what the label leaves, so what is measured inside it has a width of its own that does not follow the words. */
+.mm-dash .mm-stat__aside {
+  flex: 1 1 0;
+  text-align: right;
+}
+
+/* How many more files are running takes the room the link beside it leaves, and says as much of itself as fits
+   (working-tile.tsx measures). Where not even "+3" fits it says nothing, and the label is the link to them all. */
+.mm-aside__more {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 0;
+  justify-content: flex-end;
   white-space: pre;
 }
 
-.mm-aside a {
-  flex: none;
+.mm-aside .mm-aside__more > a {
+  min-width: 0;
+  flex: 1 1 0;
+}
+
+.mm-aside__more:has(.mm-aside__more-words:empty) > * {
+  visibility: hidden;
+}
+
+.mm-aside__more-words {
+  display: block;
+  overflow: hidden;
+  text-align: right;
+  text-overflow: ellipsis;
 }
 
 /* The note beside a figure (how long a new download waits) takes the room the figure leaves and says as much of itself as

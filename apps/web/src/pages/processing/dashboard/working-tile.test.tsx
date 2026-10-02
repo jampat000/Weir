@@ -168,6 +168,16 @@ describe("the Working on now tile", () => {
     ).toBeInTheDocument();
   });
 
+  it("makes the tile's label the link to every running file, whatever width the tile is", () => {
+    renderTile({ working: many(2) });
+
+    expect(
+      screen.getByRole("link", {
+        name: "Working on now: every file in History",
+      }),
+    ).toHaveAttribute("href", "/history?show=working");
+  });
+
   describe("with more files than the tile has room for", () => {
     it("lists at most four, and says how many more there are", () => {
       renderTile({ working: many(6) });
@@ -175,6 +185,7 @@ describe("the Working on now tile", () => {
       expect(rowsOf()).toHaveLength(4);
       const more = screen.getByRole("link", { name: "2 more in History" });
       expect(more).toHaveAttribute("href", "/history?show=working");
+      expect(more).toHaveTextContent("2 more");
     });
 
     it("shows only the whole rows that fit the tile, and counts the rest as more", () => {

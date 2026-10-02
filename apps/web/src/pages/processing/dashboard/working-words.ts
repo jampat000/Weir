@@ -33,3 +33,9 @@ export function sharedWaitSeconds(
 export function waitWords(seconds: number): string[] {
   return [`new downloads wait ${seconds}s`, `wait ${seconds}s`];
 }
+
+/** How many more files are running than the tile lists, the fullest first: "3 more", then "+3", then nothing. */
+export function moreWords(count: number): string[] {
+  const shown = count.toLocaleString();
+  return [`${shown} more`, `+${shown}`, ""];
+}

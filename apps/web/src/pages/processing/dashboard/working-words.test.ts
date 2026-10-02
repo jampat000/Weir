@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { STEP_WORDS, sharedWaitSeconds, waitWords } from "./working-words";
+import {
+  STEP_WORDS,
+  moreWords,
+  sharedWaitSeconds,
+  waitWords,
+} from "./working-words";
 
 const workflow = (enabled: boolean, ready_after_seconds: number) => ({
   enabled,
@@ -48,5 +53,12 @@ describe("the step a pass is on, in words", () => {
 describe("what the wait for a new download says", () => {
   it("says it whole, then in fewer words for a tile too narrow for it", () => {
     expect(waitWords(60)).toEqual(["new downloads wait 60s", "wait 60s"]);
+  });
+});
+
+describe("what the count of files beyond the tile's rows says", () => {
+  it("says it whole, then as a bare plus, then nothing where not even that fits", () => {
+    expect(moreWords(3)).toEqual(["3 more", "+3", ""]);
+    expect(moreWords(1_200)).toEqual(["1,200 more", "+1,200", ""]);
   });
 });
