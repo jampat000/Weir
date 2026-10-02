@@ -129,7 +129,6 @@ export function ThisWeirCard({ checks, onShowHealth }: ThisWeirCardProps) {
     <BandCard
       label="This Weir"
       aside={<MoreCount count={hidden} />}
-      className="mm-sy-band--weir"
       testId="system-weir"
     >
       {overview.data ? (
