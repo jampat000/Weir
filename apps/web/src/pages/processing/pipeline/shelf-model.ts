@@ -32,7 +32,14 @@ export type ShelfTile = {
   savedAmount: string | null;
   /** What was done to it, in a few words: "2 audio, 4 subtitles removed". */
   what: string;
+  /**
+   * What the full caption says of the outcome, which it may wrap over two lines: what was removed for a file that was
+   * cleaned, and the outcome's whole sentence ("Already right · nothing to change") for any other.
+   */
+  outcome: string;
   ago: string;
+  /** The full caption's last line: "−318 MB · 3 min ago", the badge's own words, or just when, where no saving was recorded. */
+  savedAgo: string;
   /** It finished a moment ago, so the tile wears the ring. */
   fresh: boolean;
   /** The whole sentence, for the tooltip. */
@@ -88,16 +95,22 @@ function tileOf(
 ): ShelfTile {
   const workflow =
     item.libraryId == null ? undefined : names.get(item.libraryId);
+  const savedAmount = item.savedBytes ? formatBytes(item.savedBytes) : null;
+  const saved = savedAmount ? `−${savedAmount}` : null;
+  const what = whatWasDone(item);
+  const when = ago(item.finishedAt, now);
   return {
     key: String(item.id),
     path: item.relativePath,
     title: prettyName(item.relativePath),
     workflow: workflow || UNKNOWN_WORKFLOW,
     workflowKnown: Boolean(workflow),
-    saved: item.savedBytes ? `−${formatBytes(item.savedBytes)}` : null,
-    savedAmount: item.savedBytes ? formatBytes(item.savedBytes) : null,
-    what: whatWasDone(item),
-    ago: ago(item.finishedAt, now),
+    saved,
+    savedAmount,
+    what,
+    outcome: item.kind === "cleaned" ? what : finishedLine(item),
+    ago: when,
+    savedAgo: [saved, when].filter(Boolean).join(" · "),
     fresh: isJustNow(item.finishedAt, now),
     detail: finishedLine(item),
     item,

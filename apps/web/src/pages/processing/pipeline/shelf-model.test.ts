@@ -54,6 +54,31 @@ describe("the shelf's tiles", () => {
     });
   });
 
+  it("give the full caption the outcome in words and the saving with when", () => {
+    const { tiles } = shelf([
+      finished(1),
+      finished(2, { savedBytes: null, removedAudio: 0, removedSubtitles: 0 }),
+      finished(3, {
+        kind: "already",
+        savedBytes: null,
+        removedAudio: 0,
+        removedSubtitles: 0,
+      }),
+      finished(4, {
+        kind: "rejected",
+        savedBytes: null,
+        sentence: "Rejected · no English audio",
+      }),
+    ]);
+
+    expect(tiles.map((tile) => [tile.outcome, tile.savedAgo])).toEqual([
+      ["2 audio, 4 subtitles removed", "−318 MB · 3 min ago"],
+      ["Cleaned", "3 min ago"],
+      ["Already right · nothing to change", "3 min ago"],
+      ["Rejected · no English audio", "3 min ago"],
+    ]);
+  });
+
   it("wear the ring while the file has only just finished", () => {
     const [tile] = shelf([
       finished(1, { finishedAt: new Date(NOW - 10_000).toISOString() }),

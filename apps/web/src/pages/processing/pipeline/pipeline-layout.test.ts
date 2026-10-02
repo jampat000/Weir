@@ -11,6 +11,8 @@ import {
   stackedBoardBudget,
 } from "./pipeline-layout";
 import {
+  CAPTION_PX,
+  FULL_CAPTION_PX,
   FULL_DECORATIONS_MIN_PX,
   posterSize,
   SHELF_MIN_TILES,
@@ -107,8 +109,8 @@ describe("the detail lines a card has room for", () => {
 describe("the shelf's tiles", () => {
   it("are sized from the row's height, exactly 2:3, with a caption only when the row is tall enough", () => {
     // 190px of row less 12px of padding and a 35px caption = 143px of art, 95px wide.
-    expect(shelfFit(190)).toEqual({ captions: true, width: 95 });
-    expect(shelfFit(100)).toEqual({ captions: false, width: 58 });
+    expect(shelfFit(190)).toEqual({ caption: "compact", width: 95 });
+    expect(shelfFit(100)).toEqual({ caption: "none", width: 58 });
     expect(shelfFit(10).width).toBe(24);
     expect(shelfFit(2000).width).toBe(170);
   });
@@ -124,9 +126,10 @@ describe("the shelf's tiles", () => {
     expect(shelfFit(100, 570)).toEqual(shelfFit(100));
     // The tile stays exactly 2:3 and is never stretched: its height is one and a half times its width, within its row.
     expect(tall.width * 1.5).toBeLessThan(250 - 12);
-    // Captions follow the row's height, as before.
-    expect(shelfFit(250, 570).captions).toBe(true);
-    expect(shelfFit(100, 570).captions).toBe(false);
+    // Captions follow the row's height.
+    expect(shelfFit(250, 570).caption).toBe("full");
+    expect(shelfFit(200, 570).caption).toBe("compact");
+    expect(shelfFit(100, 570).caption).toBe("none");
   });
 
   it("never makes a tile narrower than the least art, however narrow the row", () => {
@@ -134,24 +137,45 @@ describe("the shelf's tiles", () => {
   });
 
   it("need the height of the art the five-tile rule leaves them, plus the caption and the row's padding", () => {
-    // 570px wide: 102px tiles, 153px of art, a 35px caption and 12px of padding.
-    expect(shelfRowNeed(570)).toBe(200);
+    // 570px wide: 102px tiles, 153px of art, the 64px full caption and 12px of padding.
+    expect(shelfRowNeed(570)).toBe(229);
     // A row too wide for the rule to bind: the tallest tile is 255px of art.
-    expect(shelfRowNeed(3000)).toBe(255 + 35 + 12);
-    // Too narrow for a caption to fit, the least art and the padding.
+    expect(shelfRowNeed(3000)).toBe(255 + 64 + 12);
+    // Tiles too small for the full caption, and with no room for any: the least art and the padding.
     expect(shelfRowNeed(100)).toBe(36 + 12);
   });
 
-  it("need exactly the height at which a row's tiles stop growing", () => {
-    for (const width of [100, 300, 430, 570, 622, 829, 1200, 3000]) {
+  it("need the height at which the full caption shows, and the tiles have long stopped growing", () => {
+    for (const width of [430, 570, 622, 829, 1200, 3000]) {
       const need = shelfRowNeed(width);
       const widest = shelfFit(10_000, width).width;
-      expect(shelfFit(need, width).width).toBe(widest);
-      expect(shelfFit(need - 1, width).width).toBeLessThanOrEqual(widest);
+      expect(shelfFit(need, width)).toEqual({ caption: "full", width: widest });
+      // A pixel less and the caption is the compact one, under tiles as wide.
+      expect(shelfFit(need - 1, width)).toEqual({
+        caption: "compact",
+        width: widest,
+      });
       // A taller row only leaves empty space under the tiles.
-      expect(shelfFit(need + 80, width).width).toBe(widest);
+      expect(shelfFit(need + 80, width)).toEqual(shelfFit(need, width));
+      // The tiles only narrow once the compact caption has no room either.
+      expect(
+        shelfFit(need - (FULL_CAPTION_PX - CAPTION_PX) - 1, width).width,
+      ).toBeLessThan(widest);
     }
-    expect(shelfFit(shelfRowNeed(570) - 1, 570).width).toBeLessThan(102);
+  });
+
+  it("have the compact caption, and need no more than their art and it, where the tiles are too small for the full one", () => {
+    // 300px wide holds five 48px tiles: 72px of art, a 35px caption (the row is too short for one) and 12px of padding.
+    expect(shelfFit(10_000, 300).caption).toBe("compact");
+    expect(shelfRowNeed(300)).toBe(12 + 72);
+    expect(shelfFit(shelfRowNeed(300), 300).width).toBe(48);
+  });
+
+  it("have the full caption under tiles 64px wide and up, and not under narrower ones", () => {
+    expect(FULL_CAPTION_PX).toBe(64);
+    // 64px tiles take five across 368px: 5 * 64 + 4 * 12 + 10 = 378.
+    expect(shelfFit(10_000, 378).caption).toBe("full");
+    expect(shelfFit(10_000, 377).caption).toBe("compact");
   });
 
   it("dresses a poster fully from 64px wide, and thinly below that: a small one has no room for the badge and the tag", () => {

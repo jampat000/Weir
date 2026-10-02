@@ -327,7 +327,7 @@ describe("the size of the tiles", () => {
   });
 
   it("dresses a full-size poster with the saved badge and the workflow's whole tag", () => {
-    rowOf(250, 570);
+    rowOf(200, 570);
 
     render(shelf(files));
 
@@ -342,6 +342,84 @@ describe("the size of the tiles", () => {
         name: "The Quiet Harbour S01E01 (TV): 2 audio, 4 subtitles removed, 3 min ago",
       }),
     ).toBeInTheDocument();
+  });
+
+  describe("the caption's tier", () => {
+    const captionOf = (index: number) =>
+      screen
+        .getAllByRole("listitem")
+        [index].querySelector(".mm-shelf__caption");
+
+    it("is the full caption where the posters have the height the five-tile rule lets them use, and the room for it", () => {
+      // 570px wide: 102px posters, 153px of art, 64px of caption and 12px of padding: 229px.
+      rowOf(229, 570);
+
+      render(shelf(files));
+
+      const caption = captionOf(0);
+      expect(caption).toHaveClass("mm-shelf__caption--full");
+      expect(caption?.firstChild?.textContent).toBe("The Quiet Harbour S01E01");
+      expect(
+        [...(caption?.querySelectorAll("small") ?? [])].map(
+          (line) => line.textContent,
+        ),
+      ).toEqual(["2 audio, 4 subtitles removed", "−318 MB · 3 min ago"]);
+    });
+
+    it("is the compact caption a pixel short of that, with the tiles the same size", () => {
+      rowOf(228, 570);
+
+      render(shelf(files));
+
+      expect(captionOf(0)).not.toHaveClass("mm-shelf__caption--full");
+      expect(captionOf(0)).toHaveTextContent(
+        "The Quiet Harbour S01E012 audio, 4 subtitles removed · 3 min ago",
+      );
+      expect(
+        document
+          .querySelector<HTMLElement>(".mm-shelf__row")
+          ?.style.getPropertyValue("--shelf-tile-w"),
+      ).toBe("102px");
+    });
+
+    it("leaves the poster without the saved badge when the full caption says the saving", () => {
+      rowOf(229, 570);
+
+      render(shelf(files));
+
+      expect(screen.queryByText("−318 MB")).not.toBeInTheDocument();
+      expect(screen.getAllByText("−318 MB · 3 min ago")).toHaveLength(5);
+    });
+
+    it("says the outcome's own words for a file nothing was removed from, and only when for one that saved nothing", () => {
+      rowOf(229, 570);
+
+      render(
+        shelf([
+          finished(1, {
+            kind: "already",
+            savedBytes: null,
+            removedAudio: 0,
+            removedSubtitles: 0,
+          }),
+        ]),
+      );
+
+      expect(
+        screen.getByText("Already right · nothing to change"),
+      ).toBeInTheDocument();
+      expect(screen.getByText("3 min ago")).toBeInTheDocument();
+    });
+
+    it("is the compact caption on posters too small for the badge, however much room there is", () => {
+      // 300px wide holds five 48px posters, narrower than a poster that can wear a full caption.
+      rowOf(400, 300);
+
+      render(shelf(files));
+
+      expect(captionOf(0)).not.toHaveClass("mm-shelf__caption--full");
+      expect(captionOf(0)).toHaveTextContent("2 audio, 4 subtitles removed");
+    });
   });
 
   describe("on posters too small for the badge and the tag", () => {

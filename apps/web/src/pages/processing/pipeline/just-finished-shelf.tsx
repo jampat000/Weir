@@ -102,7 +102,7 @@ export function JustFinishedShelf({
     setFit((current) =>
       current &&
       current.width === next.width &&
-      current.captions === next.captions &&
+      current.caption === next.caption &&
       current.across === next.across
         ? current
         : next,
@@ -139,7 +139,7 @@ export function JustFinishedShelf({
           <ShelfTiles
             tiles={shelf.tiles}
             tilesShown={fit?.across ?? null}
-            captions={fit?.captions ?? true}
+            caption={fit?.caption ?? "compact"}
             tileWidth={fit?.width ?? null}
             boxRef={box}
             onOpen={onOpen}

@@ -249,3 +249,15 @@
   color: var(--pipe-muted);
   text-overflow: ellipsis;
 }
+
+/*
+ * The full caption: the title, what was done on two lines (the second ends in an ellipsis rather than a third line
+ * growing the caption) and the saving with when. Its height is FULL_CAPTION_PX (shelf-layout.ts).
+ */
+.mm-shelf__caption--full .mm-shelf__outcome {
+  display: -webkit-box;
+  height: 2.4em;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  white-space: normal;
+}

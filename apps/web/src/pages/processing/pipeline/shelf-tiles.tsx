@@ -13,7 +13,7 @@ import { Poster, workflowHue } from "../../../components/shared/poster";
 import type { FinishedFile } from "../../../lib/activity/processing-outcome";
 import { classNames } from "../../../lib/ui/class-names";
 import { SHELF_TILE_ATTRIBUTE } from "./delivery-flight";
-import { posterSize } from "./shelf-layout";
+import { posterSize, type CaptionTier } from "./shelf-layout";
 import type { ShelfTile } from "./shelf-model";
 import { useOpenSlots } from "./shelf-slots";
 import { TILE_KEY_ATTRIBUTE, useSlideNeighbours } from "./use-slide-neighbours";
@@ -21,12 +21,12 @@ import { useTileArrivals } from "./use-tile-arrivals";
 
 function Tile({
   tile,
-  captions,
+  caption,
   small,
   onOpen,
 }: {
   tile: ShelfTile;
-  captions: boolean;
+  caption: CaptionTier;
   /** The poster is too small for the saved badge and the workflow's whole tag. */
   small: boolean;
   onOpen: (item: FinishedFile) => void;
@@ -71,11 +71,18 @@ function Tile({
             title={tile.title}
             workflow={tile.workflow}
           />
-          {tile.saved && !small ? (
+          {tile.saved && !small && caption !== "full" ? (
             <span className="mm-shelf__saved">{tile.saved}</span>
           ) : null}
         </span>
-        {captions ? (
+        {caption === "full" ? (
+          <span className="mm-shelf__caption mm-shelf__caption--full">
+            {tile.title}
+            <small className="mm-shelf__outcome">{tile.outcome}</small>
+            <small>{tile.savedAgo}</small>
+          </span>
+        ) : null}
+        {caption === "compact" ? (
           <span className="mm-shelf__caption">
             {tile.title}
             <small>
@@ -103,7 +110,7 @@ function Tile({
 export function ShelfTiles({
   tiles,
   tilesShown,
-  captions,
+  caption,
   tileWidth,
   boxRef,
   onOpen,
@@ -111,7 +118,7 @@ export function ShelfTiles({
   tiles: readonly ShelfTile[];
   /** How many whole tiles the shelf has room for; all of them until it is measured. */
   tilesShown: number | null;
-  captions: boolean;
+  caption: CaptionTier;
   /** The tile width the shelf's height allows; unset until it is measured. */
   tileWidth: number | null;
   boxRef: RefObject<HTMLUListElement | null>;
@@ -138,7 +145,7 @@ export function ShelfTiles({
         <Tile
           key={tile.key}
           tile={tile}
-          captions={captions}
+          caption={caption}
           small={small}
           onOpen={onOpen}
         />
