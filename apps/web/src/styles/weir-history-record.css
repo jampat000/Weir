@@ -113,7 +113,7 @@
   flex-direction: column;
   gap: 2px;
   padding-left: 16px;
-  font-size: 0.8125rem;
+  font-size: var(--mm-type-body);
   line-height: 1.45;
   color: var(--mm-text2);
 }
@@ -156,7 +156,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 18px;
-  font-size: 0.8125rem;
+  font-size: var(--mm-type-body);
   font-weight: 500;
 }
 

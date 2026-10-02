@@ -123,7 +123,7 @@
 
 .mm-folder-picker__eyebrow {
   color: var(--mm-text3);
-  font-size: 0.7rem;
+  font-size: var(--mm-type-eyebrow);
   font-weight: 600;
   letter-spacing: 0.16em;
   text-transform: uppercase;

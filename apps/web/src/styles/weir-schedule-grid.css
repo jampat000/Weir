@@ -24,7 +24,7 @@
 }
 
 .mm-schedule-grid-hours span {
-  font-size: 0.625rem;
+  font-size: var(--mm-type-eyebrow);
   color: var(--mm-text3);
   text-align: left;
 }

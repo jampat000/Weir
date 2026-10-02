@@ -27,7 +27,7 @@
   border: 1px solid var(--mm-hairline);
   border-radius: var(--mm-radius-sm);
   background: var(--mm-card-bg);
-  font-size: 13px;
+  font-size: 0.875rem;
   font-weight: 500;
   text-overflow: ellipsis;
   white-space: nowrap;

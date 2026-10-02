@@ -348,7 +348,7 @@
 
 .mm-history-detail__lead {
   margin: -6px 0 0;
-  font-size: 0.8125rem;
+  font-size: var(--mm-type-body);
   line-height: 1.5;
   color: var(--mm-text2);
 }
@@ -402,6 +402,6 @@
 
 .mm-history-note {
   margin: 0;
-  font-size: 0.8125rem;
+  font-size: var(--mm-type-body);
   color: var(--mm-text2);
 }

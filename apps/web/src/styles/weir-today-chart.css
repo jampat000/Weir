@@ -55,7 +55,7 @@
   padding: 0 6px;
   border-radius: 3px;
   background: color-mix(in srgb, var(--mm-card-bg) 80%, transparent);
-  font-size: 12px;
+  font-size: var(--mm-type-caption);
   pointer-events: none;
   white-space: nowrap;
   color: var(--mm-text3);
@@ -69,7 +69,7 @@
   inset: 0;
   z-index: 1;
   touch-action: pan-y;
-  font-size: 10px;
+  font-size: var(--mm-type-eyebrow);
   line-height: 11px;
   font-variant-numeric: tabular-nums;
   color: var(--mm-text3);
@@ -178,7 +178,7 @@
   border-radius: 7px;
   background: var(--mm-surface-2);
   box-shadow: 0 4px 14px hsl(0 0% 0% / 0.35);
-  font-size: 11px;
+  font-size: var(--mm-type-eyebrow);
   font-weight: 600;
   line-height: 15px;
   pointer-events: none;

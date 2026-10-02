@@ -18,7 +18,7 @@
     hsl(var(--tile-hue, 210) 45% 34%),
     hsl(calc(var(--tile-hue, 210) + 40) 50% 14%)
   );
-  font-size: 10px;
+  font-size: var(--mm-type-eyebrow);
   font-weight: 700;
   letter-spacing: 0.04em;
   color: hsl(0 0% 100% / 0.88);

@@ -17,7 +17,7 @@
 
 .mm-health__heading {
   margin: 0 0 8px;
-  font-size: 11px;
+  font-size: var(--mm-type-eyebrow);
   font-weight: 600;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -48,14 +48,14 @@
 .mm-health__why {
   flex-basis: 100%;
   margin: 0;
-  font-size: 12.5px;
+  font-size: var(--mm-type-body);
   line-height: 1.4;
   color: var(--mm-warning-text);
 }
 
 .mm-health__notice {
   margin: 0;
-  font-size: 12.5px;
+  font-size: var(--mm-type-body);
   color: var(--mm-text2);
 }
 
@@ -64,7 +64,7 @@
   border: 0;
   background: none;
   font: inherit;
-  font-size: 13px;
+  font-size: 0.875rem;
   font-weight: 500;
   color: var(--mm-primary);
   cursor: pointer;
@@ -98,7 +98,7 @@
 
 .mm-health__name small {
   overflow: hidden;
-  font-size: 12px;
+  font-size: var(--mm-type-caption);
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--mm-text2);
@@ -131,7 +131,7 @@
 
 .mm-health__empty {
   margin: 0;
-  font-size: 13px;
+  font-size: 0.875rem;
   color: var(--mm-text2);
 }
 
@@ -170,7 +170,7 @@
   gap: 8px;
   margin: 0;
   padding: 0 6px;
-  font-size: 13.5px;
+  font-size: var(--mm-type-body);
   color: var(--mm-text2);
 }
 
@@ -181,7 +181,7 @@
 
 .mm-needs__notice {
   margin: 0 18px 10px;
-  font-size: 12.5px;
+  font-size: var(--mm-type-body);
   color: var(--mm-text2);
 }
 
@@ -206,7 +206,7 @@
 
 .mm-needs__group-title {
   margin: 0;
-  font-size: 11px;
+  font-size: var(--mm-type-eyebrow);
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -233,7 +233,7 @@
   border: 1px solid var(--mm-warning-border);
   border-radius: 12px;
   background: var(--mm-warning-bg);
-  font-size: 13px;
+  font-size: 0.875rem;
   line-height: 1.4;
 }
 
@@ -244,7 +244,7 @@
 }
 
 .mm-need__workflow {
-  font-size: 12px;
+  font-size: var(--mm-type-caption);
   color: var(--mm-text2);
 }
 
@@ -283,7 +283,7 @@
   border-radius: var(--mm-radius-control);
   background: var(--mm-surface-2);
   font: inherit;
-  font-size: 12.5px;
+  font-size: var(--mm-type-body);
   font-weight: 600;
   color: var(--mm-text1);
   cursor: pointer;

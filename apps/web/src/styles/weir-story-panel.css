@@ -204,7 +204,7 @@
   overflow: auto;
   border-radius: var(--mm-radius-sm);
   background: var(--mm-input-bg);
-  font-size: 0.72rem;
+  font-size: var(--mm-type-eyebrow);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }

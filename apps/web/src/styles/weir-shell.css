@@ -75,7 +75,7 @@ kbd {
   background: var(--mm-accent);
   color: var(--mm-on-accent);
   font-weight: 600;
-  font-size: 0.85rem;
+  font-size: var(--mm-type-body);
   text-decoration: none;
   border-radius: 0 0 var(--mm-radius-sm) 0;
 }
@@ -118,7 +118,7 @@ kbd {
   background: var(--mm-button-secondary-bg);
   color: var(--mm-text);
   font: inherit;
-  font-size: 0.8125rem;
+  font-size: var(--mm-type-body);
   font-weight: 600;
   white-space: nowrap;
   cursor: pointer;

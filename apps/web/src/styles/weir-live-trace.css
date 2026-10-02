@@ -66,7 +66,7 @@
   border-radius: 7px;
   background: var(--mm-surface-2);
   box-shadow: var(--mm-shadow-card);
-  font-size: 11px;
+  font-size: var(--mm-type-eyebrow);
   font-weight: 600;
   line-height: 15px;
   pointer-events: none;

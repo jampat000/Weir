@@ -48,7 +48,7 @@
 .mm-panel__note {
   margin: 0;
   overflow: hidden;
-  font-size: 12px;
+  font-size: var(--mm-type-caption);
   font-variant-numeric: tabular-nums;
   line-height: 13.8px;
   text-overflow: ellipsis;
@@ -60,7 +60,7 @@
   flex: 1;
   min-width: 0;
   overflow: hidden;
-  font-size: 12px;
+  font-size: var(--mm-type-caption);
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--mm-text2);
@@ -71,7 +71,7 @@
   flex-shrink: 0;
   align-items: center;
   gap: 5px;
-  font-size: 13px;
+  font-size: 0.875rem;
   font-weight: 500;
   /* A 13px link on its inherited line box is 19.76px tall and lowers the whole header line by 1px; 17px is the
      height of the 12px count beside it, so every header sets its title and count at the same height. */
@@ -176,7 +176,7 @@
 }
 
 .mm-stat__label {
-  font-size: 11px;
+  font-size: var(--mm-type-eyebrow);
   font-weight: 600;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -191,7 +191,7 @@ a.mm-stat__label:hover {
 .mm-stat__aside {
   min-width: 0;
   overflow: hidden;
-  font-size: 12px;
+  font-size: var(--mm-type-caption);
   font-variant-numeric: tabular-nums;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -310,7 +310,7 @@ a.mm-stat__label:hover {
   margin: -3px -4px;
   padding: 3px 4px;
   border-radius: 6px;
-  font-size: 12.5px;
+  font-size: var(--mm-type-body);
   color: var(--mm-text2);
   text-decoration: none;
 }
@@ -381,7 +381,7 @@ a.mm-bar-row:hover {
   border-radius: var(--mm-radius-control);
   background: transparent;
   font: inherit;
-  font-size: 13px;
+  font-size: 0.875rem;
   font-weight: 500;
   white-space: nowrap;
   color: var(--mm-text2);

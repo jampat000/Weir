@@ -44,7 +44,7 @@
   margin-bottom: 0.25rem;
   padding: 0;
   color: var(--mm-text1);
-  font-size: 0.9rem;
+  font-size: var(--mm-type-body);
   font-weight: 600;
 }
 

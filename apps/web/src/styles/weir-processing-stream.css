@@ -22,7 +22,7 @@
 .mm-stream__empty {
   margin: 0;
   padding: 0 18px;
-  font-size: 13.5px;
+  font-size: var(--mm-type-body);
   color: var(--mm-text2);
 }
 
@@ -92,7 +92,7 @@
   display: -webkit-box;
   overflow: hidden;
   overflow-wrap: anywhere;
-  font-size: 13px;
+  font-size: 0.875rem;
   line-height: 1.35;
   color: var(--mm-text1);
   -webkit-box-orient: vertical;
@@ -105,7 +105,7 @@
 
 .mm-stream__note {
   overflow: hidden;
-  font-size: 11.5px;
+  font-size: var(--mm-type-caption);
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--mm-text2);

@@ -58,7 +58,7 @@
  */
 .mm-setgroup__detail {
   margin: 0 0 10px;
-  font-size: 0.8125rem;
+  font-size: var(--mm-type-body);
   line-height: 1.5;
   color: var(--mm-text3);
 }
@@ -123,7 +123,7 @@
 }
 
 .mm-setrow__hint {
-  font-size: 0.8125rem;
+  font-size: var(--mm-type-body);
   line-height: 1.45;
   color: var(--mm-text3);
 }
@@ -144,7 +144,7 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  font-size: 0.8125rem;
+  font-size: var(--mm-type-body);
   color: var(--mm-text2);
 }
 
@@ -179,7 +179,7 @@
   background: transparent;
   color: var(--mm-text2);
   font: inherit;
-  font-size: 0.8125rem;
+  font-size: var(--mm-type-body);
   font-weight: 500;
   cursor: pointer;
 }

@@ -9,7 +9,7 @@
   min-height: 25px;
   padding: 0 8px;
   border-radius: 8px;
-  font-size: 13px;
+  font-size: 0.875rem;
 }
 
 .mm-sy-list > .mm-sy-task:nth-child(odd) {
@@ -21,7 +21,7 @@
   min-height: 0;
   margin: 0 10px;
   padding: 0 8px 4px;
-  font-size: 10px;
+  font-size: var(--mm-type-eyebrow);
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -68,7 +68,7 @@
 .mm-sy-task__why {
   display: block;
   overflow: hidden;
-  font-size: 11px;
+  font-size: var(--mm-type-eyebrow);
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--mm-status-failed-text);
@@ -76,7 +76,7 @@
 
 .mm-sy-task__result,
 .mm-sy-task__next {
-  font-size: 11.5px;
+  font-size: var(--mm-type-caption);
   font-variant-numeric: tabular-nums;
   text-align: right;
   white-space: nowrap;
@@ -130,7 +130,7 @@
 .mm-sy-card--log .mm-segmented__option {
   height: 18px;
   padding: 0 7px;
-  font-size: 12px;
+  font-size: var(--mm-type-caption);
   line-height: 16px;
 }
 
@@ -161,7 +161,7 @@
   padding: 4px 8px 4px 6px;
   border-bottom: 1px solid var(--mm-hairline);
   border-left: 3px solid transparent;
-  font-size: 12px;
+  font-size: var(--mm-type-caption);
 }
 
 .mm-sy-log--new {
@@ -169,14 +169,14 @@
 }
 
 .mm-sy-log__time {
-  font-size: 11.5px;
+  font-size: var(--mm-type-caption);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
   color: var(--mm-text3);
 }
 
 .mm-sy-log__level {
-  font-size: 10.5px;
+  font-size: var(--mm-type-eyebrow);
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;

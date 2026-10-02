@@ -6,7 +6,7 @@
   display: block;
   max-width: 34rem;
   margin-top: 4px;
-  font-size: 0.8125rem;
+  font-size: var(--mm-type-body);
   font-weight: 400;
   line-height: 1.45;
   color: var(--mm-text3);
@@ -72,7 +72,7 @@
 
 .mm-profile-bar__used {
   margin: 0 0 9px;
-  font-size: 0.8125rem;
+  font-size: var(--mm-type-body);
   color: var(--mm-text2);
 }
 
@@ -118,7 +118,7 @@
 
 .mm-week__label {
   color: var(--mm-text3);
-  font-size: 0.625rem;
+  font-size: var(--mm-type-eyebrow);
   line-height: 1;
 }
 

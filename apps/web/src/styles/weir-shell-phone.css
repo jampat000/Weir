@@ -55,14 +55,14 @@
     min-width: 17.6px;
     height: 17.6px;
     padding: 0 6px;
-    font-size: 9.5px;
+    font-size: var(--mm-type-eyebrow);
   }
 
   .mm-sidebar--collapsed .mm-sidebar-group__label {
     margin-right: 0;
     margin-left: 0;
     padding: 16px 13px 0;
-    font-size: 12.5px;
+    font-size: var(--mm-type-body);
     line-height: inherit;
   }
 
@@ -112,7 +112,7 @@
     color: var(--mm-text1);
     cursor: pointer;
     font: inherit;
-    font-size: 0.8rem;
+    font-size: var(--mm-type-caption);
     font-weight: 700;
   }
 

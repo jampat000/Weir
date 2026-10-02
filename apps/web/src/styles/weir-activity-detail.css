@@ -1,7 +1,7 @@
 /* The detail under an Activity entry: remux passes and file progress. */
 
 .mm-activity-row__detail {
-  font-size: 0.8125rem;
+  font-size: var(--mm-type-body);
   line-height: 1.45;
   color: var(--mm-text2);
   word-break: break-word;
@@ -63,7 +63,7 @@
 .mm-activity-processing__eyebrow {
   margin: 0 0 0.2rem;
   color: var(--mm-primary);
-  font-size: 0.68rem;
+  font-size: var(--mm-type-eyebrow);
   font-weight: 800;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -131,7 +131,7 @@
   flex-wrap: wrap;
   gap: 0.5rem;
   color: var(--mm-text2);
-  font-size: 0.82rem;
+  font-size: var(--mm-type-body);
 }
 
 .mm-activity-processing__metrics > span {
@@ -146,7 +146,7 @@
 .mm-activity-processing__error {
   margin: 0;
   color: var(--mm-status-failed-text);
-  font-size: 0.86rem;
+  font-size: var(--mm-type-body);
 }
 
 .mm-activity-remux-detail__tiles {
@@ -167,7 +167,7 @@
 }
 
 .mm-activity-remux-detail__tile-label {
-  font-size: 0.68rem;
+  font-size: var(--mm-type-eyebrow);
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -191,7 +191,7 @@
 .mm-activity-remux-detail__expand > summary {
   cursor: pointer;
   padding: 0.7rem 0.85rem;
-  font-size: 0.8125rem;
+  font-size: var(--mm-type-body);
   font-weight: 600;
   color: var(--mm-text2);
   list-style: none;
@@ -230,7 +230,7 @@
 .mm-activity-remux-detail__column-title,
 .mm-activity-remux-detail__section-title {
   margin: 0;
-  font-size: 0.78rem;
+  font-size: var(--mm-type-caption);
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -242,7 +242,7 @@
   display: grid;
   grid-template-columns: minmax(6rem, 8rem) 1fr;
   gap: 0.35rem 0.75rem;
-  font-size: 0.8125rem;
+  font-size: var(--mm-type-body);
   line-height: 1.45;
   color: var(--mm-text2);
 }
@@ -284,7 +284,7 @@
 
 .mm-activity-remux-detail__tracks-empty {
   margin: 0;
-  font-size: 0.8rem;
+  font-size: var(--mm-type-caption);
   color: var(--mm-text3);
 }
 
@@ -300,7 +300,7 @@
   padding: 0.28rem 0.55rem;
   border-radius: var(--mm-radius-pill);
   border: 1px solid color-mix(in srgb, var(--mm-stone) 8%, transparent);
-  font-size: 0.74rem;
+  font-size: var(--mm-type-caption);
   line-height: 1.2;
   color: var(--mm-text2);
 }
@@ -333,7 +333,7 @@
   padding: 0.55rem 0.65rem;
   max-height: 10rem;
   overflow: auto;
-  font-size: 0.7rem;
+  font-size: var(--mm-type-eyebrow);
   line-height: 1.35;
   border-radius: var(--mm-radius-sm);
   background: color-mix(in srgb, var(--mm-slate) 92%, transparent);
