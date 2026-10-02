@@ -1,12 +1,13 @@
 import { useRef } from "react";
 
+import { ColumnsMenu } from "../../../../components/shared/columns-menu";
 import { LoadError } from "../../../../components/shared/load-error";
 import { Panel } from "../../../../components/panels/panel";
-import { formatBytes } from "../../../../lib/format/bytes";
 import type { useConfigurationBackupsQuery } from "../../../../lib/settings/queries";
 import { mmActionButtonClass } from "../../../../lib/ui/mm-control-roles";
-import { useAppDateFormatter } from "../../../../lib/ui/mm-format-date";
-import { DownloadIcon, RestoreIcon } from "./backup-icons";
+import { useTableColumns } from "../../../../lib/ui/use-table-columns";
+import { BACKUP_COLUMNS } from "./backup-columns";
+import { BackupTable } from "./backup-table";
 
 /** How many snapshots Weir keeps; older ones are removed as new ones are taken. */
 const SNAPSHOTS_KEPT = 5;
@@ -37,7 +38,7 @@ export function BackupListSection({
   resultMessage: string | null;
   resultProblem: string | null;
 }) {
-  const formatDate = useAppDateFormatter();
+  const columns = useTableColumns(BACKUP_COLUMNS);
   const fileInput = useRef<HTMLInputElement>(null);
   const items = backupsQ.data?.items ?? [];
 
@@ -60,6 +61,7 @@ export function BackupListSection({
       }
       aside={
         <>
+          {items.length > 0 ? <ColumnsMenu table={columns} /> : null}
           <button
             type="button"
             className={`${mmActionButtonClass({ variant: "primary" })} mm-sys-btn`}
@@ -109,52 +111,13 @@ export function BackupListSection({
       ) : items.length === 0 ? (
         <p className="mm-quiet-note">No automatic snapshots yet.</p>
       ) : (
-        <table className="mm-quiet-table mm-sys-table">
-          <thead>
-            <tr>
-              <th scope="col">Taken</th>
-              <th scope="col">Size</th>
-              <th scope="col">
-                <span className="sr-only">Actions</span>
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((row) => {
-              const taken = formatDate(row.created_at);
-              return (
-                <tr key={row.id}>
-                  <th scope="row">{taken}</th>
-                  <td>{formatBytes(row.size_bytes)}</td>
-                  <td>
-                    <div className="mm-sys-table__actions">
-                      <button
-                        type="button"
-                        className={`${mmActionButtonClass({ variant: "secondary" })} mm-sys-btn mm-sys-btn--icon`}
-                        disabled={disabled}
-                        title="Download this backup"
-                        aria-label={`Download the backup taken ${taken}`}
-                        onClick={() => onDownload(row.id, row.file_name)}
-                      >
-                        <DownloadIcon />
-                      </button>
-                      <button
-                        type="button"
-                        className={`${mmActionButtonClass({ variant: "secondary" })} mm-sys-btn mm-sys-btn--icon`}
-                        disabled={disabled}
-                        title="Restore this backup"
-                        aria-label={`Restore the backup taken ${taken}`}
-                        onClick={() => onRestore(row.id)}
-                      >
-                        <RestoreIcon />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+        <BackupTable
+          items={items}
+          columns={columns}
+          disabled={disabled}
+          onDownload={onDownload}
+          onRestore={onRestore}
+        />
       )}
       {resultMessage ? (
         <p
