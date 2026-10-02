@@ -100,7 +100,9 @@ export const NAV_GROUPS: readonly NavGroup[] = [
       {
         id: "system",
         label: "System",
-        eyebrow: "Weir itself: what it runs, what it keeps, who can sign in",
+        eyebrow: "Weir itself",
+        eyebrowNote:
+          "Weir itself: what it runs, what it keeps, who can sign in",
         to: "/system",
         icon: "system",
         isCurrent: onPath("/system"),

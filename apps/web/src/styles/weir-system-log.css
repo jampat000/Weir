@@ -19,13 +19,6 @@
   padding-inline: 8px;
 }
 
-/* Where the header is wide the eyebrow keeps its words whole, and the filters that do not fit go to the card. */
-@media (min-width: 1800px) {
-  .mm-header:has(.mm-logs-controls.mm-history-controls) .mm-header__titles {
-    min-width: 27rem;
-  }
-}
-
 /* The filters the header had no room for, and the ones only some rows have: a row of their own above the list. */
 .mm-log-toolbar {
   display: flex;
