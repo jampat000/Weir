@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { Field } from "../../../../components/shared/field";
-import { QuietFieldGroup } from "../../../../components/shared/quiet-section";
+import { QuietDisclosure } from "../../../../components/shared/quiet-section";
 import { useProcessingOperatorSettingsQuery } from "../../../../lib/processing/queries";
 import { COLLISION_OPTIONS } from "./library-options";
 import {
@@ -20,11 +20,11 @@ export function LibraryOutputGroup({
   binding: LibraryFormBinding;
 }) {
   return (
-    <QuietFieldGroup
+    <QuietDisclosure
       title="Output safety"
       detail="Control the files that travel with the video, timestamps, the space kept free, and what happens when the destination already exists."
     >
-      <div className="mm-field-row">
+      <div className="mm-editor-grid">
         <TextSetting
           binding={binding}
           name="sidecar_patterns_csv"
@@ -60,7 +60,7 @@ export function LibraryOutputGroup({
           hint="Turn off if your download client is still seeding it — Sonarr, Radarr or your client will clean it up."
         />
       </div>
-    </QuietFieldGroup>
+    </QuietDisclosure>
   );
 }
 
@@ -120,11 +120,11 @@ export function LibraryCapacityGroup({
   binding: LibraryFormBinding;
 }) {
   return (
-    <QuietFieldGroup
+    <QuietDisclosure
       title="Capacity"
       detail="Priority is relative: higher-numbered workflows are offered work first."
     >
-      <div className="mm-field-row">
+      <div className="mm-editor-grid">
         <MostFilesAtOnceSetting binding={binding} />
         <TextSetting
           binding={binding}
@@ -134,6 +134,6 @@ export function LibraryCapacityGroup({
           placeholder="0"
         />
       </div>
-    </QuietFieldGroup>
+    </QuietDisclosure>
   );
 }

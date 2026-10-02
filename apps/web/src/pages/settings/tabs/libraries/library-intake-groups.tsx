@@ -1,4 +1,4 @@
-import { QuietFieldGroup } from "../../../../components/shared/quiet-section";
+import { QuietDisclosure } from "../../../../components/shared/quiet-section";
 import { REJECTED_FILE_OPTIONS } from "./library-options";
 import {
   DateTimeSetting,
@@ -15,11 +15,11 @@ export function LibraryIntakeGroup({
   binding: LibraryFormBinding;
 }) {
   return (
-    <QuietFieldGroup
+    <QuietDisclosure
       title="Intake rules"
       detail="Decide which files belong here before Weir spends time probing or processing them. A maximum of 0 means no limit."
     >
-      <div className="mm-field-row">
+      <div className="mm-editor-grid">
         <TextSetting
           binding={binding}
           name="media_extensions_csv"
@@ -65,7 +65,7 @@ export function LibraryIntakeGroup({
           width="short"
           placeholder="0"
         />
-        <div className="w-full space-y-2">
+        <div className="mm-editor-grid__full space-y-2">
           <div>
             <p className="mm-library-window__title">
               Created and modified windows
@@ -77,7 +77,7 @@ export function LibraryIntakeGroup({
               birth/change time available.
             </p>
           </div>
-          <div className="mm-field-row">
+          <div className="mm-editor-grid">
             <DateTimeSetting
               binding={binding}
               name="created_after"
@@ -120,7 +120,7 @@ export function LibraryIntakeGroup({
           label="Only inspect the top folder"
         />
       </div>
-    </QuietFieldGroup>
+    </QuietDisclosure>
   );
 }
 
@@ -131,11 +131,11 @@ export function LibraryReadinessGroup({
   binding: LibraryFormBinding;
 }) {
   return (
-    <QuietFieldGroup
+    <QuietDisclosure
       title="File readiness"
       detail="These checks prevent Weir from starting while a downloader, recorder, or media manager still owns the file."
     >
-      <div className="mm-field-row">
+      <div className="mm-editor-grid">
         <TextSetting
           binding={binding}
           name="ready_after_seconds"
@@ -170,6 +170,6 @@ export function LibraryReadinessGroup({
           hint="Less safe: locked sources and unwritable outputs may fail after queueing."
         />
       </div>
-    </QuietFieldGroup>
+    </QuietDisclosure>
   );
 }

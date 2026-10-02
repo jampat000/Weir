@@ -7,7 +7,7 @@
  */
 
 import { useState } from "react";
-import { QuietFieldGroup } from "../../../../components/shared/quiet-section";
+import { EditorSubsection } from "./editor-subsection";
 import { type ProcessingMediaType } from "../../../../lib/processing/libraries-api";
 import { type ProcessingManagerSetupItem } from "../../../../lib/processing/library-managers-api";
 import { useProcessingManagerSetupQuery } from "../../../../lib/processing/libraries-queries";
@@ -116,37 +116,31 @@ function ArrMapping({
         Settings → Download Clients → Remote Path Mappings, add a mapping with
         these values, and keep Completed Download Handling on.
       </p>
-      <div className="mm-quiet-table-wrap">
-        <table className="mm-quiet-table">
-          <thead>
-            <tr>
-              <th scope="col">Field</th>
-              <th scope="col">Value</th>
-              <th scope="col">
-                <span className="sr-only">Copy</span>
-              </th>
+      <table className="mm-copy-table">
+        <thead className="sr-only">
+          <tr>
+            <th scope="col">Field</th>
+            <th scope="col">Value</th>
+            <th scope="col">Copy</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={row.field}>
+              <th scope="row">{row.field}</th>
+              <td>
+                <code>{row.shown}</code>
+              </td>
+              <td>
+                <CopyLink
+                  value={row.value}
+                  label={`${item.label} ${row.field}`}
+                />
+              </td>
             </tr>
-          </thead>
-          <tbody>
-            {rows.map((row) => (
-              <tr key={row.field}>
-                <th scope="row" className="mm-quiet-table__name">
-                  <span>{row.field}</span>
-                </th>
-                <td data-label="Value">
-                  <code className="break-all">{row.shown}</code>
-                </td>
-                <td data-label="Copy">
-                  <CopyLink
-                    value={row.value}
-                    label={`${item.label} ${row.field}`}
-                  />
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+          ))}
+        </tbody>
+      </table>
       {mapping.hosts.length > 1 ? (
         <p className="mm-quiet-note">
           {item.label} has more than one download client. Add the same mapping
@@ -239,9 +233,9 @@ export function LibraryManagerSetup({
   const managers = setup.data?.managers ?? [];
 
   return (
-    <QuietFieldGroup
+    <EditorSubsection
       title="What your media manager needs"
-      detail="The folders and settings the media manager this workflow is linked to has to hold, to pick up what Weir writes."
+      detail="The folders and settings the media manager has to hold to pick up what Weir writes."
     >
       <div data-testid="library-manager-setup" className="space-y-6">
         {setup.isLoading ? (
@@ -294,6 +288,6 @@ export function LibraryManagerSetup({
           ))
         )}
       </div>
-    </QuietFieldGroup>
+    </EditorSubsection>
   );
 }

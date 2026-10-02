@@ -2,10 +2,9 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 
 import { Field } from "../../../../components/shared/field";
-import { QuietFieldGroup } from "../../../../components/shared/quiet-section";
 import { WorkflowKindSummary } from "../../../../components/shared/workflow-kind";
 import type { MediaManagerConnection } from "../../../../lib/media-managers/media-managers-api";
-import { workflowKindOf } from "../../../../lib/processing/workflow-kind";
+import type { WorkflowKind } from "../../../../lib/processing/workflow-kind";
 import {
   workflowStory,
   type WorkflowPath,
@@ -20,15 +19,15 @@ import { setupTabPath } from "../../../../lib/settings/setup-areas";
  * workflow being edited and save with it.
  */
 export function LibraryLinkSection({
-  linkedIds,
+  kind,
   path,
   connections,
   editable,
   onLink,
   onUnlink,
 }: {
-  /** The media managers the workflow is linked to, as it is being edited. */
-  linkedIds: number[];
+  /** Whether the workflow is Weir only or linked, as it is being edited. */
+  kind: WorkflowKind;
   /** The folders as they are being edited, for the Weir only story. */
   path: WorkflowPath;
   connections: MediaManagerConnection[];
@@ -36,59 +35,49 @@ export function LibraryLinkSection({
   onLink: (connectionId: number) => void;
   onUnlink: () => void;
 }) {
-  const kind = workflowKindOf(
-    { manager_connection_ids: linkedIds },
-    connections,
-  );
   const [chosen, setChosen] = useState("");
 
   return (
-    <QuietFieldGroup
-      title="Media manager"
-      detail="Weir only, or linked to a media manager that hands this workflow its downloads."
-    >
-      <div className="mm-quiet-stack" data-testid="library-link-section">
-        <p>
-          <WorkflowKindSummary kind={kind} />
+    <div className="mm-quiet-stack" data-testid="library-link-section">
+      <p>
+        <WorkflowKindSummary kind={kind} />
+      </p>
+      {kind.kind === "weir_only" ? (
+        <p className="mm-quiet-note" data-testid="workflow-story">
+          {workflowStory(path, null, null)}
         </p>
-        {kind.kind === "weir_only" ? (
-          <p className="mm-quiet-note" data-testid="workflow-story">
-            {workflowStory(path, null, null)}
+      ) : null}
+      {kind.kind === "weir_only" ? (
+        <WeirOnlyOptions
+          connections={connections}
+          editable={editable}
+          chosen={chosen}
+          onChoose={setChosen}
+          onLink={() => {
+            onLink(Number(chosen));
+            setChosen("");
+          }}
+        />
+      ) : (
+        <div className="space-y-2">
+          <p className="mm-quiet-note">
+            Unlinking makes this workflow Weir only: Weir stops waiting for{" "}
+            {kind.managers.map((m) => m.name).join(" and ")}, handing cleaned
+            files back and telling it what happened, and everything already set
+            up or cleaned stays as it is.
           </p>
-        ) : null}
-        {kind.kind === "weir_only" ? (
-          <WeirOnlyOptions
-            connections={connections}
-            editable={editable}
-            chosen={chosen}
-            onChoose={setChosen}
-            onLink={() => {
-              onLink(Number(chosen));
-              setChosen("");
-            }}
-          />
-        ) : (
-          <div className="space-y-2">
-            <p className="mm-quiet-note">
-              Unlinking makes this workflow Weir only. Weir stops waiting for{" "}
-              {kind.managers.map((m) => m.name).join(" and ")} to finish with a
-              download, stops handing cleaned files back to it, and stops
-              telling it what happened. The folders, the rules and the files
-              already cleaned stay as they are. It takes effect when you save.
-            </p>
-            <button
-              type="button"
-              data-testid="library-unlink"
-              className={mmActionButtonClass({ variant: "secondary" })}
-              disabled={!editable}
-              onClick={onUnlink}
-            >
-              Unlink
-            </button>
-          </div>
-        )}
-      </div>
-    </QuietFieldGroup>
+          <button
+            type="button"
+            data-testid="library-unlink"
+            className={mmActionButtonClass({ variant: "secondary" })}
+            disabled={!editable}
+            onClick={onUnlink}
+          >
+            Unlink
+          </button>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -119,11 +108,11 @@ function WeirOnlyOptions({
   return (
     <>
       <p className="mm-quiet-note">
-        Link a media manager if one hands this workflow its downloads. Weir then
-        waits for it to finish with a download, hands the cleaned file back, and
-        can ask it for a different release when one is bad.
+        Link a media manager if one hands this workflow its downloads: Weir then
+        waits for each download to finish, hands the cleaned file back, and can
+        ask for a different release when one is bad.
       </p>
-      <div className="mm-field-row">
+      <div className="mm-editor-grid">
         <Field label="Media manager" width="medium">
           <select
             data-testid="library-manager-choice"
