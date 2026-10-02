@@ -13,18 +13,11 @@ export type FactTone = "good" | "bad";
 export type Fact = {
   key: string;
   label: string;
-  /** The label in a card too short for tiles of three lines, where a tile is one line: a word or two. */
-  short: string;
   value: string;
   /** What the value says where it has to be shorter to fit, when it can be. */
   valueShort?: string;
   sub: string;
   tone?: FactTone;
-  /**
-   * What a one-line tile still says of a reading that is not good, beside the value, since its line under it is hidden:
-   * its words, then shorter ones for a narrow tile.
-   */
-  alert?: readonly string[];
 };
 
 export type RingFigures = {
@@ -141,55 +134,36 @@ export function weirFacts({
     {
       key: "version",
       label: "Version",
-      short: "Version",
       value: overview.version,
       ...updateFact(overview.update),
     },
     {
       key: "uptime",
       label: "Uptime",
-      short: "Uptime",
       value: uptimeWords(uptimeSeconds),
       sub:
         overview.restarts_this_week > 0
           ? plural(overview.restarts_this_week, "restart", "restarts")
           : "no restarts",
       tone: overview.restarts_this_week > 0 ? "bad" : "good",
-      alert:
-        overview.restarts_this_week > 0
-          ? [
-              plural(overview.restarts_this_week, "restart", "restarts"),
-              `↻ ${overview.restarts_this_week.toLocaleString()}`,
-            ]
-          : undefined,
     },
     {
       key: "files-at-once",
       label: "Files at once",
-      short: "Files",
       value: work ? `${work.running} / ${work.slots}` : "–",
       sub: work && work.running > 0 ? "running" : "idle",
     },
     {
       key: "jobs",
       label: "Jobs today",
-      short: "Jobs",
       value: `${overview.jobs_today.run.toLocaleString()} run`,
       valueShort: overview.jobs_today.run.toLocaleString(),
       sub: failed > 0 ? `${failed.toLocaleString()} failed` : "none failed",
       tone: failed > 0 ? "bad" : "good",
-      alert:
-        failed > 0
-          ? [
-              `${failed.toLocaleString()} failed`,
-              `✗ ${failed.toLocaleString()}`,
-            ]
-          : undefined,
     },
     {
       key: "usage",
       label: "Usage",
-      short: "Usage",
       value:
         usage?.cpuPercent == null
           ? "–"
@@ -200,7 +174,6 @@ export function weirFacts({
     {
       key: "waiting",
       label: "Waiting",
-      short: "Waiting",
       value: waiting === null ? "–" : waiting.toLocaleString(),
       sub:
         waiting === null
@@ -212,36 +185,31 @@ export function weirFacts({
     {
       key: "backup",
       label: "Last backup",
-      short: "Backup",
       value: lastBackupAt ? ago(lastBackupAt, now) : "None yet",
       sub: backupSub(lastBackupAt, lastBackupBytes),
     },
     {
       key: "response",
       label: "Response",
-      short: "Response",
       ...responseFact(overview.requests),
     },
     {
       key: "address",
       label: "Address",
-      short: "Address",
       value: host || "–",
       valueShort: shortHost(host),
       sub: port ? `port ${port}` : "",
     },
-    { key: "runs-as", label: "Runs as", short: "Runs as", ...runsAs },
+    { key: "runs-as", label: "Runs as", ...runsAs },
     {
       key: "data",
       label: "Data",
-      short: "Data",
       value: sizeWords(overview.data_bytes),
       sub: "on disk",
     },
     {
       key: "browsers",
       label: "Browsers",
-      short: "Browsers",
       value: overview.browsers_live.toLocaleString(),
       sub: "open now",
     },

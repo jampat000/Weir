@@ -30,8 +30,13 @@ export function fitRows(host: HTMLElement, enabled = true): number {
   const limit = host.getBoundingClientRect().bottom;
   let fits = 0;
   for (const row of rows) {
-    // The space a row keeps under its own content (its padding) may run past the tile; its content may not.
-    const padding = parseFloat(getComputedStyle(row).paddingBottom) || 0;
+    // The space a row keeps under its own content (its padding) may run past the tile; its content may not, and nor may
+    // the whole of a row that is tinted, since the tint would show cut through.
+    const style = getComputedStyle(row);
+    const tinted = !["", "transparent", "rgba(0, 0, 0, 0)"].includes(
+      style.backgroundColor,
+    );
+    const padding = tinted ? 0 : parseFloat(style.paddingBottom) || 0;
     if (row.getBoundingClientRect().bottom - padding > limit + FIT_TOLERANCE_PX)
       break;
     fits++;

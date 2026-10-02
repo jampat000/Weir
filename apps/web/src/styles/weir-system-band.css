@@ -12,6 +12,8 @@
   display: flex;
   flex-direction: column;
   gap: var(--mm-panel-gap);
+  /* Lines are 1.2 times their type, as Deluno's System sets them, so a row is as tall as Deluno's with the same padding. */
+  line-height: 1.2;
 }
 
 .mm-sy-cell {
@@ -46,9 +48,14 @@
   gap: var(--mm-panel-gap);
 }
 
-/* This computer has three readings across, so it is given the most room, and Processing, with two, the least. */
+/* The band's three cards are equal thirds, as Deluno's are, so no card's edge moves between the two. */
 .mm-sy-cell--across {
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) minmax(0, 0.92fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+/* Every card of the grid has the corner radius of a band card. */
+.mm-sy-grid .mm-panel {
+  border-radius: var(--mm-radius-tile);
 }
 
 .mm-sy-grid--beside {
@@ -125,6 +132,12 @@
 .mm-sy-band--computer > .mm-sy-band__body,
 .mm-sy-band--processing > .mm-sy-band__body {
   grid-template-rows: minmax(0, 1fr) auto;
+  row-gap: 6px;
+}
+
+/* This Weir's label row is 18px tall, 2px more than the other two cards', as Deluno's This instance is. */
+.mm-sy-band--weir > .mm-stat__top {
+  height: 18px;
 }
 
 .mm-sy-band__note {
@@ -135,25 +148,34 @@
 
 /* ---- This Weir: the ring, and tiles of facts ------------------------------- */
 
+/* The ring's column is as wide as its two-line caption (105px) and the tiles start 16px after it, whatever the caption and pill say. */
 .mm-sy-weir {
   display: grid;
-  grid-template-columns: fit-content(5.8rem) minmax(0, 1fr);
-  gap: 10px;
+  grid-template-columns: 105px minmax(0, 1fr);
+  gap: 16px;
   align-items: center;
   min-height: 0;
 }
 
 .mm-sy-ringbox {
   display: grid;
-  min-width: 4.6rem;
   justify-items: center;
   align-content: center;
   gap: 4px;
   text-align: center;
 }
 
-/* The caption drops "checks" in a short card: "of 15 pass" is one line. */
-@container mm-sy-band (max-height: 175px) {
+/* A short band (under 180px tall, 150px inside its padding) has a narrower column, a closer gap, and a caption that drops "checks": "of 15 pass" is one line. */
+@container mm-sy-band (max-height: 149px) {
+  .mm-sy-weir {
+    grid-template-columns: 86px minmax(0, 1fr);
+    gap: 10px;
+  }
+
+  .mm-sy-ringbox {
+    gap: 3px;
+  }
+
   .mm-sy-ringbox__long {
     display: none;
   }
@@ -170,11 +192,11 @@
   position: relative;
 }
 
-/* The ring grows with the card: 46px in the shortest band, 80px where there is room for it and its caption. */
+/* The ring grows with the card: 50px in the shortest band, 96px where there is room for it and its caption. */
 .mm-sy-ring svg {
   display: block;
-  width: clamp(46px, calc(100cqh - 112px), 80px);
-  height: clamp(46px, calc(100cqh - 112px), 80px);
+  width: clamp(50px, calc(100cqh - 112px), 96px);
+  height: clamp(50px, calc(100cqh - 112px), 96px);
   transform: rotate(-90deg);
 }
 
@@ -311,10 +333,6 @@
   color: var(--mm-text3);
 }
 
-.mm-sy-fact__short {
-  display: none;
-}
-
 .mm-sy-fact__value {
   font-size: 13px;
   font-weight: 700;
@@ -335,66 +353,6 @@
   color: var(--mm-status-failed-text);
 }
 
-.mm-sy-fact__alert {
-  display: none;
-}
-
-/*
- * A band too short for three lines of tile (two rows would be all it held) makes each tile one line: its short name
- * at the left and the reading at the right, with the line under it left to the tooltip. Four of these fit where two
- * of the tall ones did, so the four most useful facts all show. A reading that is not good keeps its few warning words.
- */
-@container mm-sy-band (max-height: 188px) {
-  .mm-sy-facts {
-    grid-template-columns: minmax(0, 1fr);
-    grid-auto-rows: 20px;
-    gap: 4px;
-  }
-
-  .mm-sy-fact {
-    grid-template-columns: auto minmax(0, 1fr);
-    grid-template-rows: auto;
-    align-items: center;
-    column-gap: 6px;
-    padding: 0 6px;
-  }
-
-  .mm-sy-fact__label {
-    font-size: 8.5px;
-    letter-spacing: 0.05em;
-  }
-
-  .mm-sy-fact__label > .mm-sy-fact__long:not(:last-child) {
-    display: none;
-  }
-
-  .mm-sy-fact__short {
-    display: block;
-  }
-
-  .mm-sy-fact__value {
-    font-size: 12px;
-    text-align: right;
-  }
-
-  .mm-sy-fact__sub {
-    display: none;
-  }
-
-  .mm-sy-fact[data-alert] {
-    grid-template-columns: auto auto minmax(0, 1fr);
-  }
-
-  .mm-sy-fact__alert {
-    display: block;
-    text-align: right;
-    font-size: 11px;
-    font-weight: 600;
-    white-space: nowrap;
-    color: var(--mm-status-failed-text);
-  }
-}
-
 /* ---- This computer and Processing: traces side by side -------------------- */
 
 .mm-sy-cols {
@@ -413,11 +371,11 @@
 
 .mm-sy-col {
   display: grid;
-  grid-template-rows: 14px 26px 14px minmax(0, 1fr);
+  grid-template-rows: 16px 28px 15px minmax(0, 1fr);
   row-gap: 2px;
   min-width: 0;
   min-height: 0;
-  padding: 0 10px;
+  padding: 0 12px;
   border-left: 1px solid var(--mm-hairline);
   container: mm-sy-col / inline-size;
 }
@@ -459,7 +417,7 @@
   font-size: 22px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
-  line-height: 26px;
+  line-height: 28px;
   white-space: nowrap;
   color: var(--mm-text1);
 }
@@ -475,7 +433,7 @@
   min-width: 0;
   overflow: hidden;
   font-size: 11px;
-  line-height: 14px;
+  line-height: 15px;
   white-space: nowrap;
   color: var(--mm-text2);
 }
@@ -500,6 +458,21 @@
   }
 }
 
+/* Three readings in a narrow card (a 1366px window) share their room with less padding between them, and a figure that may reach four digits is smaller. */
+@container mm-sy-band (max-width: 230px) {
+  .mm-sy-col {
+    padding: 0 3px;
+  }
+
+  .mm-sy-col__figure {
+    font-size: 14px;
+  }
+
+  .mm-sy-col__figure small {
+    font-size: 8.5px;
+  }
+}
+
 .mm-sy-span__short {
   display: none;
 }
@@ -514,12 +487,16 @@
   }
 }
 
+/* The pills under the columns: 10px above them, 6px of the card's padding below, and two of them in a short band. */
 .mm-sy-tags {
-  display: none;
+  display: flex;
   flex-wrap: wrap;
+  align-content: flex-start;
+  justify-content: center;
   gap: 5px;
-  height: 27px;
-  padding-top: 6px;
+  height: 29px;
+  margin-bottom: -6px;
+  padding-top: 10px;
   overflow: hidden;
 }
 
@@ -539,10 +516,18 @@
   color: var(--mm-status-warning-text);
 }
 
-/* The tags are shown where the card is tall enough for them and a trace still has room. */
-@container mm-sy-band (min-height: 176px) {
-  .mm-sy-tags {
-    display: flex;
+@container mm-sy-band (max-height: 149px) {
+  .mm-sy-tag:nth-child(n + 3) {
+    display: none;
+  }
+
+  /* Deluno's Network has no pills, so in a short band Processing gives its row to the traces. */
+  .mm-sy-band--processing .mm-sy-tags {
+    display: none;
+  }
+
+  .mm-sy-band--processing > .mm-sy-band__body {
+    grid-template-rows: minmax(0, 1fr);
   }
 }
 
@@ -572,9 +557,9 @@
 .mm-sy-drive {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 3px 10px;
+  gap: 2px 10px;
   margin-bottom: 8px;
-  padding-bottom: 8px;
+  padding-bottom: 7px;
   border-bottom: 1px solid var(--mm-hairline);
   font-size: 12.5px;
 }
@@ -607,7 +592,7 @@
   position: relative;
   display: flex;
   grid-column: 1 / -1;
-  height: 6px;
+  height: 5px;
   overflow: hidden;
   border-radius: 9px;
   background: var(--mm-surface-3);

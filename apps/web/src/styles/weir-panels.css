@@ -34,6 +34,28 @@
   color: var(--mm-text1);
 }
 
+/* A header with a note under its title: the title and the note are one block, centred on the line with the controls. */
+.mm-panel__head--note {
+  align-items: center;
+}
+
+.mm-panel__titles {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.mm-panel__note {
+  margin: 0;
+  overflow: hidden;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  line-height: 13.8px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--mm-text2);
+}
+
 .mm-panel__count {
   flex: 1;
   min-width: 0;

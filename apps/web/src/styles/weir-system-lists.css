@@ -5,7 +5,9 @@
   grid-template-columns: 10px minmax(0, 1fr) 112px 64px;
   align-items: center;
   gap: 10px;
-  padding: 5px 8px;
+  /* 25px tall, as Deluno's rows are (5px, a line, 5px), with no padding of its own to run past the card's edge. */
+  min-height: 25px;
+  padding: 0 8px;
   border-radius: 8px;
   font-size: 13px;
 }
@@ -16,6 +18,7 @@
 
 .mm-sy-task--head {
   flex: none;
+  min-height: 0;
   margin: 0 10px;
   padding: 0 8px 4px;
   font-size: 10px;
@@ -107,21 +110,46 @@
   white-space: nowrap;
 }
 
-/* The switch, smaller than a page's, with how many lines are left out at the far end. */
-.mm-sy-line--switch {
-  align-items: center;
-  gap: 8px;
+/* The switch sits in the header between the count and the link, as Deluno's does, smaller than a page's (24px tall), and sticks out above and below the header's line without making the header taller. */
+.mm-sy-card--log .mm-panel__head {
+  container-type: inline-size;
 }
 
-.mm-sy-line--switch .mm-segmented {
+.mm-sy-card--log .mm-panel__aside {
+  flex-wrap: nowrap;
+  align-self: center;
+  gap: 8px;
+  margin: -8px 0;
+}
+
+.mm-sy-card--log .mm-segmented {
   flex-wrap: nowrap;
   padding: 2px;
 }
 
-.mm-sy-line--switch .mm-segmented__option {
-  height: 24px;
-  padding: 0 9px;
+.mm-sy-card--log .mm-segmented__option {
+  height: 18px;
+  padding: 0 7px;
   font-size: 12px;
+  line-height: 16px;
+}
+
+/* A narrow card keeps its switch and its summary before the count of lines left out, and the link is its arrow alone (its words are still its name). */
+@container (max-width: 440px) {
+  .mm-sy-card--log .mm-sy-more {
+    display: none;
+  }
+}
+
+@container (max-width: 320px) {
+  .mm-sy-card--log .mm-panel__link {
+    gap: 0;
+    font-size: 0;
+  }
+
+  .mm-sy-card--log .mm-segmented__option {
+    padding: 0 5px;
+  }
 }
 
 /* A line says its level by its colour: information is quiet, a warning is amber and an error red, each with an accent. */

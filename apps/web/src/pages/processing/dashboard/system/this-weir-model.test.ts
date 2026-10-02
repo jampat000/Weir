@@ -110,14 +110,6 @@ describe("the fact tiles", () => {
       facts({ overview: { ...overview, jobs_today: { run: 5, failed: 0 } } })
         .jobs,
     ).toMatchObject({ sub: "none failed", tone: "good" });
-    expect(
-      facts({ overview: { ...overview, jobs_today: { run: 5, failed: 0 } } })
-        .jobs.alert,
-    ).toBeUndefined();
-  });
-
-  it("keeps a failed count beside the jobs a one-line tile shows", () => {
-    expect(facts().jobs.alert).toEqual(["2 failed", "✗ 2"]);
   });
 
   it("shows the median response and what 95% of responses beat", () => {
@@ -211,17 +203,6 @@ describe("the order of the tiles", () => {
       "data",
       "browsers",
     ]);
-  });
-
-  it("gives each tile a short name for a card whose tiles are one line", () => {
-    const all = Object.values(facts());
-
-    expect(all.every((fact) => fact.short.length <= 9)).toBe(true);
-    expect(facts()["files-at-once"]).toMatchObject({
-      label: "Files at once",
-      short: "Files",
-    });
-    expect(facts().jobs).toMatchObject({ label: "Jobs today", short: "Jobs" });
   });
 
   it("offers a computer's first name where its whole name may not fit, but never for an address of numbers", () => {

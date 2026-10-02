@@ -62,10 +62,8 @@ function Ring({
 }
 
 /**
- * One fact: its name, the reading, and a short line under it. A card too short for three lines makes a tile one line,
- * its short name and the reading, and keeps the line under it for the tooltip. Nothing in a tile is cut with an
- * ellipsis: its words are short, and a reading that has a shorter form (a long computer name) says that where it
- * would not fit.
+ * One fact: its name, the reading, and a short line under it. Nothing in a tile is cut with an ellipsis: its words are
+ * short, and a reading that has a shorter form (a long computer name) says that where it would not fit.
  */
 function FactTile({ fact }: { fact: Fact }) {
   const reading = fact.valueShort
@@ -75,19 +73,10 @@ function FactTile({ fact }: { fact: Fact }) {
     <div
       className="mm-sy-fact"
       data-tone={fact.tone}
-      data-alert={fact.alert ? "" : undefined}
       title={`${fact.label}: ${fact.value}${fact.sub ? ` · ${fact.sub}` : ""}`}
     >
-      <span className="mm-sy-fact__label">
-        <span className="mm-sy-fact__long">{fact.label}</span>
-        {fact.short === fact.label ? null : (
-          <span className="mm-sy-fact__short">{fact.short}</span>
-        )}
-      </span>
+      <span className="mm-sy-fact__label">{fact.label}</span>
       <FitText words={reading} className="mm-sy-fact__value" />
-      {fact.alert ? (
-        <FitText words={fact.alert} className="mm-sy-fact__alert" />
-      ) : null}
       <span className="mm-sy-fact__sub">{fact.sub}</span>
     </div>
   );
@@ -140,6 +129,7 @@ export function ThisWeirCard({ checks, onShowHealth }: ThisWeirCardProps) {
     <BandCard
       label="This Weir"
       aside={<MoreCount count={hidden} />}
+      className="mm-sy-band--weir"
       testId="system-weir"
     >
       {overview.data ? (

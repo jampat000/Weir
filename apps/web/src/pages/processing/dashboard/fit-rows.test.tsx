@@ -39,6 +39,13 @@ describe("fitting a tile's rows to its height", () => {
     expect(fitRows(hostWithRows(100, [40, 112], 10).host)).toBe(1);
   });
 
+  it("keeps a tinted row whole, its padding included, since the tint would show cut through", () => {
+    const { host, rows } = hostWithRows(100, [40, 108], 10);
+    rows[1].style.backgroundColor = "rgb(20, 30, 40)";
+
+    expect(fitRows(host)).toBe(1);
+  });
+
   it("allows half a pixel of rounding", () => {
     expect(fitRows(hostWithRows(100, [100.4]).host)).toBe(1);
     expect(fitRows(hostWithRows(100, [100.6]).host)).toBe(0);

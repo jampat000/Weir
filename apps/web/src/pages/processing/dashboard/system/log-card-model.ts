@@ -144,13 +144,14 @@ export function logSummary(counts: LogCounts): string {
   return `${plural(counts.errors, "error", "errors")} · ${plural(counts.warnings, "warning", "warnings")} today`;
 }
 
-/** The summary in words that narrow with the room: the day goes first, then the warnings, never the errors. */
+/** The summary in words that narrow with the room: the day goes first, then the warnings, then the errors, and last nothing (the title holds the whole) rather than a cut word. */
 export function logSummaryWords(counts: LogCounts): string[] {
   const errors = plural(counts.errors, "error", "errors");
   return [
     logSummary(counts),
     `${errors} · ${plural(counts.warnings, "warning", "warnings")}`,
     errors,
+    "",
   ];
 }
 

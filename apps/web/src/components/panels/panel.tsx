@@ -5,6 +5,8 @@ type PanelProps = {
   title: string;
   /** A quiet line after the title. It truncates before anything else when the panel is narrow. */
   count?: ReactNode;
+  /** A quiet line under the title, inside the header, which is then 54px tall rather than 44px. */
+  note?: ReactNode;
   /**
    * Controls that take the count's place between the title and the link, such as a row of chips. They scroll
    * sideways rather than wrap when the header is narrow.
@@ -46,6 +48,7 @@ type PanelProps = {
 export function Panel({
   title,
   count,
+  note,
   controls,
   description,
   to,
@@ -78,10 +81,23 @@ export function Panel({
         .filter(Boolean)
         .join(" ")}
     >
-      <header className="mm-panel__head">
-        <Heading id={titleId} className="mm-panel__title">
-          {title}
-        </Heading>
+      <header
+        className={["mm-panel__head", note ? "mm-panel__head--note" : ""]
+          .filter(Boolean)
+          .join(" ")}
+      >
+        {note ? (
+          <div className="mm-panel__titles">
+            <Heading id={titleId} className="mm-panel__title">
+              {title}
+            </Heading>
+            <p className="mm-panel__note">{note}</p>
+          </div>
+        ) : (
+          <Heading id={titleId} className="mm-panel__title">
+            {title}
+          </Heading>
+        )}
         {controls ? (
           <div className="mm-panel__controls">{controls}</div>
         ) : (

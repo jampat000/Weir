@@ -26,6 +26,16 @@ describe("Panel", () => {
     ).toBeInTheDocument();
   });
 
+  it("keeps a note under its title inside the header, and the title still names the panel", () => {
+    renderPanel({ title: "Connections", note: "5/5 answering" });
+
+    const region = screen.getByRole("region", { name: "Connections" });
+    expect(region.querySelector(".mm-panel__head--note")).not.toBeNull();
+    expect(within(region).getByText("5/5 answering")).toHaveClass(
+      "mm-panel__note",
+    );
+  });
+
   it("shows its count beside the title and the body under it", () => {
     renderPanel({ count: "4 cleaned today" });
 

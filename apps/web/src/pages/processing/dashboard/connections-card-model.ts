@@ -98,6 +98,15 @@ export function connectionsLine(entries: readonly ConnectionEntry[]): string {
     .join(" · ");
 }
 
+/** The card's line in words that narrow with the room: all of it, then how many answer, then nothing rather than a cut word. */
+export function connectionsLineWords(
+  entries: readonly ConnectionEntry[],
+): string[] {
+  const line = connectionsLine(entries);
+  const [first] = line.split(" · ");
+  return [...new Set([line, first, ""])];
+}
+
 /** What a connection is and where Weir reaches it: "Radarr · http://localhost:7878". */
 function whatItIs(entry: ConnectionEntry): string {
   return entry.address

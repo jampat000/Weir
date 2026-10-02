@@ -168,12 +168,12 @@
 
 /* ---- The System card ------------------------------------------------------- */
 
-.mm-ctable__line {
-  margin: 0;
-  padding: 0 18px 8px;
-  font-size: 12px;
-  font-variant-numeric: tabular-nums;
-  color: var(--mm-text2);
+/* The line under the title: a block, so it has the width its words are fitted to. */
+.mm-ctable__note {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
 }
 
 /* The rows that fit the card's height show whole and the header says how many more there are (fit-rows.ts). */

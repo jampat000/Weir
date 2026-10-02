@@ -23,22 +23,6 @@
   list-style: none;
 }
 
-/* A quiet line under a card's header: what the list adds up to, and how many rows its height left out. */
-.mm-sy-line {
-  display: flex;
-  flex: none;
-  justify-content: space-between;
-  gap: 12px;
-  min-height: 17px;
-  margin: 0;
-  padding: 0 18px 8px;
-  font-size: 12px;
-  line-height: 17px;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-  color: var(--mm-text2);
-}
-
 .mm-sy-note {
   margin: 0;
   padding: 8px 18px;
@@ -74,6 +58,14 @@
   white-space: nowrap;
   color: var(--mm-text1);
   cursor: pointer;
+}
+
+/* The short button of a card's header, as Connections' Test all. */
+.mm-sy-btn--tall {
+  height: 24px;
+  padding: 0 10px;
+  font-size: 12px;
+  line-height: 22px;
 }
 
 .mm-sy-btn:hover:not(:disabled) {

@@ -95,20 +95,22 @@ export function LogCard() {
           />
         )
       }
+      aside={
+        <>
+          <MoreCount count={more} />
+          <SegmentedControl
+            ariaLabel="Show"
+            options={LOG_FILTERS}
+            value={filter}
+            onChange={setPicked}
+          />
+        </>
+      }
       to={SERVER_LOG_PATH}
       toLabel="Full log"
       dataTestId="system-log"
-      className="mm-sy-card"
+      className="mm-sy-card mm-sy-card--log"
     >
-      <div className="mm-sy-line mm-sy-line--switch">
-        <SegmentedControl
-          ariaLabel="Show"
-          options={LOG_FILTERS}
-          value={filter}
-          onChange={setPicked}
-        />
-        <MoreCount count={more} />
-      </div>
       <div ref={listRef} className="mm-sy-fit">
         {log.failed ? (
           <p className="mm-sy-note">

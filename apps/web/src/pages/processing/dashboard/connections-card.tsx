@@ -3,12 +3,13 @@ import type { ConnectionLight } from "../../../lib/connections/connection-lights
 import type { ConnectionEntry } from "../../../lib/connections/connection-model";
 import { classNames } from "../../../lib/ui/class-names";
 import { useFittingRows } from "./fit-rows";
+import { FitText } from "./system/fit-words";
 import { MoreCount } from "./system/more-count";
 import {
   checkedWords,
   connectionSub,
   connectionTooltip,
-  connectionsLine,
+  connectionsLineWords,
   groupConnections,
 } from "./connections-card-model";
 import type { ConnectionTesting } from "./use-connection-testing";
@@ -93,12 +94,18 @@ export function ConnectionsCard({
   return (
     <Panel
       title="Connections"
+      note={
+        <FitText
+          words={connectionsLineWords(entries)}
+          className="mm-ctable__note"
+        />
+      }
       aside={
         <>
           <MoreCount count={more} />
           <button
             type="button"
-            className="mm-health__action"
+            className="mm-sy-btn mm-sy-btn--tall"
             title={TEST_ALL_HINT}
             aria-label="Test all connections"
             disabled={testing.allBusy || testable.length === 0}
@@ -111,7 +118,6 @@ export function ConnectionsCard({
       to={MANAGERS_PATH}
       toLabel="Manage"
     >
-      <p className="mm-ctable__line">{connectionsLine(entries)}</p>
       <div ref={listRef} className="mm-ctable">
         <div className="mm-ctable__head" aria-hidden="true">
           <span />

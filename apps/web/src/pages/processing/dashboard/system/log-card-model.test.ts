@@ -200,11 +200,12 @@ describe("the card's words", () => {
     );
   });
 
-  it("narrows the summary by the day, then the warnings, and never leaves out the errors", () => {
+  it("narrows the summary by the day, then the warnings, then to the errors, and to nothing where there is no room for those", () => {
     expect(logSummaryWords({ errors: 2, warnings: 0 })).toEqual([
       "2 errors · 0 warnings today",
       "2 errors · 0 warnings",
       "2 errors",
+      "",
     ]);
   });
 

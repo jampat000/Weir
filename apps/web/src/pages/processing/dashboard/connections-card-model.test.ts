@@ -7,6 +7,7 @@ import {
   connectionSub,
   connectionTooltip,
   connectionsLine,
+  connectionsLineWords,
   groupConnections,
 } from "./connections-card-model";
 
@@ -113,6 +114,17 @@ describe("the card's one line", () => {
 
   it("leaves out what is not so", () => {
     expect(connectionsLine([manager(1), client(1)])).toBe("2/2 answering");
+  });
+
+  it("narrows to how many answer, then to nothing, for a box without room", () => {
+    expect(
+      connectionsLineWords([
+        manager(1),
+        manager(2, { state: "slow" }),
+        client(1, { state: "down" }),
+      ]),
+    ).toEqual(["2/3 answering · 1 slow · 1 down", "2/3 answering", ""]);
+    expect(connectionsLineWords([manager(1)])).toEqual(["1/1 answering", ""]);
   });
 
   it("counts a connection never tested as not answering yet, and says so", () => {
