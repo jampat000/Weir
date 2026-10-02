@@ -7,7 +7,14 @@ import {
   useUpdateNotificationChannelMutation,
 } from "../../../../lib/settings/queries";
 import type { NotificationChannelOut } from "../../../../lib/settings/types";
-import { eventLabel } from "./alert-events";
+import { sortRows } from "../../../../lib/ui/table-columns";
+import type { TableColumns } from "../../../../lib/ui/use-table-columns";
+import { SortableColumnHeader } from "../../../../components/shared/sortable-column-header";
+import {
+  ALERT_ACTIONS_COLUMN,
+  ALERT_NAME_COLUMN,
+  alertSortValues,
+} from "./alert-columns";
 import { ChannelForm, type ChannelFormData } from "./channel-form";
 import { ChannelRow, type TestResult } from "./channel-row";
 
@@ -54,6 +61,7 @@ function useChannelTests() {
 export function ChannelTable({
   channels,
   supportedEvents,
+  columns,
   editingId,
   deletingId,
   onEdit,
@@ -61,6 +69,7 @@ export function ChannelTable({
 }: {
   channels: NotificationChannelOut[];
   supportedEvents: string[];
+  columns: TableColumns<string>;
   editingId: number | null;
   deletingId: number | null;
   onEdit: (id: number | null) => void;
@@ -105,25 +114,32 @@ export function ChannelTable({
         </p>
       ) : null}
       <div className="mm-quiet-table-wrap mt-4">
-        <table className="mm-quiet-table">
+        <table className="mm-quiet-table" {...columns.tableProps}>
           <thead>
             <tr>
-              <th scope="col">Alert</th>
-              {supportedEvents.map((event) => (
-                <th key={event} scope="col" className="mm-alerts-cell">
-                  {eventLabel(event)}
-                </th>
+              {columns.order.map((id) => (
+                <SortableColumnHeader
+                  key={id}
+                  heading={columns.heading(id)}
+                  hideLabel={id === ALERT_ACTIONS_COLUMN}
+                  className={
+                    id === ALERT_NAME_COLUMN || id === ALERT_ACTIONS_COLUMN
+                      ? undefined
+                      : "mm-alerts-cell"
+                  }
+                />
               ))}
-              <th scope="col">
-                <span className="sr-only">Actions</span>
-              </th>
             </tr>
           </thead>
           <tbody>
-            {channels.map((channel) =>
+            {sortRows(
+              channels,
+              columns.sort,
+              alertSortValues(supportedEvents),
+            ).map((channel) =>
               editingId === channel.id ? (
                 <tr key={channel.id}>
-                  <td colSpan={supportedEvents.length + 2} data-label="">
+                  <td colSpan={columns.order.length} data-label="">
                     <QuietFieldGroup title="Edit alert">
                       <ChannelForm
                         initial={formDataOf(channel)}
@@ -148,6 +164,7 @@ export function ChannelTable({
                   key={channel.id}
                   channel={channel}
                   events={supportedEvents}
+                  order={columns.order}
                   onToggleEvent={(event) => toggle(channel, event)}
                   toggling={updateMutation.isPending}
                   onEdit={() => onEdit(channel.id)}

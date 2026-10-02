@@ -1,6 +1,5 @@
 import { useRef, useState } from "react";
 
-import { Panel } from "../../../../components/panels/panel";
 import { EmptyState } from "../../../../components/shared/empty-state";
 import { PageLoading } from "../../../../components/shared/page-loading";
 import { SidePanel } from "../../../../components/shared/side-panel";
@@ -11,11 +10,10 @@ import {
   useNotificationChannelsQuery,
 } from "../../../../lib/settings/queries";
 import { mmActionButtonClass } from "../../../../lib/ui/mm-control-roles";
-import { SaveModelNote } from "../../save-model-note";
 import { SettingsLoadError } from "../../settings-load-error";
 import { orderedEvents } from "./alert-events";
 import { ChannelForm } from "./channel-form";
-import { ChannelTable } from "./channel-table";
+import { ChannelsPanel } from "./channels-panel";
 import {
   RemoveChannelDialog,
   useChannelRemoval,
@@ -70,25 +68,15 @@ export function AlertsTab() {
   return (
     <div data-testid="suite-settings-notifications" className="mm-quiet-stack">
       {channels.length > 0 ? (
-        <Panel
-          title="Where alerts go"
-          count="Tick what each one hears about. Use Send test before relying on a new one."
-          aside={<SaveModelNote model="instant" />}
-          padded
-        >
-          <ChannelTable
-            channels={channels}
-            supportedEvents={supportedEvents}
-            editingId={editingId}
-            deletingId={removal.deletingId}
-            onEdit={setEditingId}
-            onRemove={removal.ask}
-          />
-          <p className="mm-quiet-note mt-4">
-            A failure Weir will retry is sent only after its last try. When an
-            alert does not answer, Weir notes it in System › Logs.
-          </p>
-        </Panel>
+        <ChannelsPanel
+          key={supportedEvents.join(",")}
+          channels={channels}
+          supportedEvents={supportedEvents}
+          editingId={editingId}
+          deletingId={removal.deletingId}
+          onEdit={setEditingId}
+          onRemove={removal.ask}
+        />
       ) : (
         <EmptyState
           title="No alerts yet"
