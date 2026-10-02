@@ -28,6 +28,15 @@ internal sealed class SystemLogJobSource
         $"{SystemLogSql.JobLevel("status", "last_error")} AS level, {SystemLogSql.JobCategory("job_kind")} AS category, " +
         $"{WorkflowSql} AS workflow_id FROM jobs) SELECT * FROM job_rows";
 
+    private static readonly SystemLogColumns SortColumns = new(
+        SystemLogSource.Job,
+        "at_text",
+        null,
+        "id",
+        "level",
+        "category",
+        "(SELECT libraries.name FROM libraries WHERE libraries.id = workflow_id)");
+
     public async Task<SystemLogSlice> ReadAsync(UnitOfWork uow, SystemLogRequest request)
     {
         var filter = request.Filter;
@@ -48,9 +57,9 @@ internal sealed class SystemLogJobSource
 
         var levels = await TallyAsync(uow, "level", categoryOnly).ConfigureAwait(false);
         var categories = await TallyAsync(uow, "category", levelOnly).ConfigureAwait(false);
-        var page = both.Copy().AddAfter("at_text", "id", SystemLogSource.Job, request.After);
+        var page = both.Copy().AddAfter(SortColumns, request);
         var rows = await uow.QueryAsync(
-            $"{Selected}{page.WhereText} ORDER BY at_text DESC, id DESC LIMIT @take",
+            $"{Selected}{page.WhereText}{SortColumns.OrderBy(request.Order)} LIMIT @take",
             reader => (Job: JobsInspectionStore.Read(reader), At: reader.GetString(AtTextOrdinal), Workflow: SqliteValues.GetInt64OrNull(reader, WorkflowOrdinal)),
             page.Parameters.Append(("@take", (object?)request.Take)).ToArray()).ConfigureAwait(false);
         return new SystemLogSlice([.. rows.Select(row => RowOf(row.Job, row.At, row.Workflow))], matching, levels, categories);

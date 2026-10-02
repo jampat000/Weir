@@ -8,7 +8,7 @@ namespace Weir.Infrastructure.SystemLog;
 
 /// <summary>
 /// The lines of the server log file in System › Logs. The file is read once through, tallying every line that passes
-/// the filters and keeping only the newest page of them, so the work grows with the file but the memory does not.
+/// the filters and keeping only the first page of them in the order asked for, so the work grows with the file but the memory does not.
 /// </summary>
 internal sealed class SystemLogServerSource
 {
@@ -36,7 +36,8 @@ internal sealed class SystemLogServerSource
         var matching = 0L;
         var levels = new Dictionary<string, long>();
         var categories = new Dictionary<string, long>();
-        var newest = new SortedSet<SystemLogRow>(Comparer<SystemLogRow>.Create((first, second) => SystemLogPosition.NewestFirst.Compare(first.Position, second.Position)));
+        var order = request.Order;
+        var first = new SortedSet<KeyedRow>(Comparer<KeyedRow>.Create((left, right) => order.Compare(left.Key, right.Key)));
         var lineNumber = 0L;
 
         void Visit(string rawLine)
@@ -70,9 +71,15 @@ internal sealed class SystemLogServerSource
             }
 
             matching++;
-            if (selected && (request.After is not { } after || row.Position.IsAfter(after)))
+            if (!selected)
             {
-                KeepNewest(newest, row, request.Take);
+                return;
+            }
+
+            var key = order.KeyOf(row, SystemLogOrder.NoWorkflowNames);
+            if (request.After is not { } after || order.Compare(key, after) > 0)
+            {
+                KeepFirst(first, new KeyedRow(row, key), request.Take);
             }
         }
 
@@ -82,7 +89,7 @@ internal sealed class SystemLogServerSource
         }
 
         return selected
-            ? new SystemLogSlice([.. newest], matching, levels, categories)
+            ? new SystemLogSlice([.. first.Select(keyed => keyed.Row)], matching, levels, categories)
             : SystemLogSlice.None with { Matching = matching };
     }
 
@@ -93,12 +100,12 @@ internal sealed class SystemLogServerSource
         && (filter.HasException is not { } wanted || wanted == !string.IsNullOrEmpty(entry.Traceback))
         && (loweredText.Length == 0 || SuiteLogFilter.ContainsText(entry, loweredText));
 
-    private static void KeepNewest(SortedSet<SystemLogRow> newest, SystemLogRow row, int capacity)
+    private static void KeepFirst(SortedSet<KeyedRow> first, KeyedRow row, int capacity)
     {
-        newest.Add(row);
-        if (newest.Count > capacity)
+        first.Add(row);
+        if (first.Count > capacity)
         {
-            newest.Remove(newest.Max!);
+            first.Remove(first.Max!);
         }
     }
 
@@ -125,6 +132,8 @@ internal sealed class SystemLogServerSource
             entry.Detail ?? FirstLine(entry.Traceback),
             record);
     }
+
+    private sealed record KeyedRow(SystemLogRow Row, IReadOnlyList<object?> Key);
 
     private static string? FirstLine(string? text) =>
         text?.Split('\n', 2)[0].Trim() is { Length: > 0 } line ? line : null;

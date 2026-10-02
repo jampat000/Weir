@@ -13,8 +13,8 @@ using Weir.Infrastructure.SystemLog;
 namespace Weir.Api.Endpoints;
 
 /// <summary>
-/// <c>GET /api/v1/system/log</c>: Weir's events, its jobs and its server log as one list, newest first, and
-/// <c>GET /api/v1/system/log/export</c>: the same list, as a file, for the filters given.
+/// <c>GET /api/v1/system/log</c>: Weir's events, its jobs and its server log as one list, newest first unless it is asked to
+/// <c>sort</c> another way, and <c>GET /api/v1/system/log/export</c>: the same list, as a file, for the filters and order given.
 /// </summary>
 public static class SystemLogEndpoints
 {
@@ -44,7 +44,7 @@ internal sealed class SystemLogEndpointHandlers
         issues.ThrowIfAny();
 
         var uow = await request.DbAsync().ConfigureAwait(false);
-        var page = await _log.ReadAsync(uow, query.Filter, query.After, query.Limit).ConfigureAwait(false);
+        var page = await _log.ReadAsync(uow, query.Filter, query.Order, query.After, query.Limit).ConfigureAwait(false);
         var names = await WorkflowNamesAsync(uow, page.Rows).ConfigureAwait(false);
         return ApiRoutes.Ok(SystemLogWire.Page(page, names));
     }
@@ -58,7 +58,7 @@ internal sealed class SystemLogEndpointHandlers
         issues.ThrowIfAny();
 
         var uow = await request.DbAsync().ConfigureAwait(false);
-        var page = await _log.ReadAsync(uow, query.Filter, null, ActivityHistory.ExportMaxRows).ConfigureAwait(false);
+        var page = await _log.ReadAsync(uow, query.Filter, query.Order, null, ActivityHistory.ExportMaxRows).ConfigureAwait(false);
         var names = await WorkflowNamesAsync(uow, page.Rows).ConfigureAwait(false);
         var text = json ? SystemLogWire.Json(page.Rows, names) : SystemLogWire.Csv(page.Rows, names);
         var fileName = SystemLogWire.ExportFileName(request.Time.GetLocalNow(), json ? "json" : "csv");

@@ -23,6 +23,8 @@ public sealed class SystemLogApiTests
         return (server, client);
     }
 
+    private static IEnumerable<string> Levels(JsonNode page) => page["items"]!.AsArray().Select(item => item!["level"]!.GetValue<string>());
+
     private static async Task SeedAsync(WeirTestServer server)
     {
         await TestDatabase.ExecuteAsync(
@@ -124,6 +126,39 @@ public sealed class SystemLogApiTests
         Assert.Equal(3, second["total"]!.GetValue<int>());
     }
 
+    [Fact]
+    public async Task The_list_can_be_sorted_by_level_in_either_direction_and_a_cursor_keeps_to_that_sort()
+    {
+        var (server, client) = await StartAsync();
+        await using var _ = server;
+        await SeedAsync(server);
+
+        var ascending = await Json(await client.GetAsync($"{Log}?{Window}&sort=level&direction=asc&limit=2"));
+        var descending = await Json(await client.GetAsync($"{Log}?{Window}&sort=level&direction=desc"));
+        var next = await Json(await client.GetAsync($"{Log}?{Window}&sort=level&direction=asc&limit=2&cursor={Uri.EscapeDataString(ascending["next_cursor"]!.GetValue<string>())}"));
+
+        Assert.Equal(["error", "warning"], Levels(ascending));
+        Assert.Equal(["success", "warning", "error"], Levels(descending));
+        Assert.Equal(["success"], Levels(next));
+        Assert.Null(next["next_cursor"]);
+    }
+
+    [Theory]
+    [InlineData("sort=level&direction=desc")]
+    [InlineData("sort=category&direction=asc")]
+    [InlineData("sort=time&direction=desc")]
+    public async Task A_cursor_made_for_another_sort_or_direction_is_refused(string otherOrder)
+    {
+        var (server, client) = await StartAsync();
+        await using var _ = server;
+        await SeedAsync(server);
+        var first = await Json(await client.GetAsync($"{Log}?{Window}&sort=level&direction=asc&limit=2"));
+
+        using var response = await client.GetAsync($"{Log}?{Window}&{otherOrder}&cursor={Uri.EscapeDataString(first["next_cursor"]!.GetValue<string>())}");
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+    }
+
     [Theory]
     [InlineData("source=disk")]
     [InlineData("level=fatal")]
@@ -134,6 +169,9 @@ public sealed class SystemLogApiTests
     [InlineData("workflow=0")]
     [InlineData("from=yesterday")]
     [InlineData("cursor=nonsense")]
+    [InlineData("sort=message")]
+    [InlineData("sort=")]
+    [InlineData("direction=sideways")]
     [InlineData("result=great")]
     [InlineData("has_exception=maybe")]
     public async Task A_filter_the_log_does_not_understand_is_refused_with_what_was_wrong(string query)
@@ -166,6 +204,19 @@ public sealed class SystemLogApiTests
         Assert.Contains("ffmpeg stopped", lines[2], StringComparison.Ordinal);
         var rows = JsonNode.Parse(await json.Content.ReadAsStringAsync())!.AsArray();
         Assert.Equal("Movies scanned", rows.Single()!["title"]!.GetValue<string>());
+    }
+
+    [Fact]
+    public async Task The_export_lists_the_rows_in_the_order_the_screen_shows_them()
+    {
+        var (server, client) = await StartAsync();
+        await using var _ = server;
+        await SeedAsync(server);
+
+        using var json = await client.GetAsync($"{Log}/export?{Window}&format=json&sort=level&direction=asc");
+
+        var rows = JsonNode.Parse(await json.Content.ReadAsStringAsync())!.AsArray();
+        Assert.Equal(["error", "warning", "success"], rows.Select(row => row!["level"]!.GetValue<string>()));
     }
 
     [Fact]

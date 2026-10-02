@@ -20,6 +20,15 @@ internal sealed class SystemLogEventSource
     private static readonly string CategorySql = SystemLogSql.EventCategory("activity_events.event_type");
     private static readonly string AtSql = SystemLogSql.AtText("activity_events.created_at");
 
+    private static readonly SystemLogColumns SortColumns = new(
+        SystemLogSource.Event,
+        AtSql,
+        "activity_events.created_at",
+        "activity_events.id",
+        LevelSql,
+        CategorySql,
+        "(SELECT libraries.name FROM libraries WHERE libraries.id = activity_events.library_id)");
+
     public async Task<SystemLogSlice> ReadAsync(UnitOfWork uow, SystemLogRequest request)
     {
         var filter = request.Filter;
@@ -40,10 +49,10 @@ internal sealed class SystemLogEventSource
 
         var levels = await TallyAsync(uow, LevelSql, categoryOnly).ConfigureAwait(false);
         var categories = await TallyAsync(uow, CategorySql, levelOnly).ConfigureAwait(false);
-        var page = both.Copy().AddAfter(AtSql, "activity_events.id", SystemLogSource.Event, request.After, "activity_events.created_at");
+        var page = both.Copy().AddAfter(SortColumns, request);
         var parameters = page.Parameters.Append(("@take", (object?)request.Take)).ToArray();
         var rows = await uow.QueryAsync(
-            $"SELECT {ActivityHistoryStore.Columns} FROM {Table}{page.WhereText} ORDER BY activity_events.created_at DESC, activity_events.id DESC LIMIT @take",
+            $"SELECT {ActivityHistoryStore.Columns} FROM {Table}{page.WhereText}{SortColumns.OrderBy(request.Order)} LIMIT @take",
             ActivityHistoryStore.ReadRow,
             parameters).ConfigureAwait(false);
         return new SystemLogSlice([.. rows.Select(RowOf)], matching, levels, categories);

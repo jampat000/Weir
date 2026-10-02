@@ -72,5 +72,17 @@ internal static class SystemLogSql
         return builder.Append(" ELSE ").Append(Literal(SystemLogCategories.Weir)).Append(" END").ToString();
     }
 
-    private static string Literal(string value) => "'" + value.Replace("'", "''", StringComparison.Ordinal) + "'";
+    /// <summary>The level's place in <see cref="SystemLogLevels.All"/>, from a level expression.</summary>
+    public static string LevelRank(string levelExpression)
+    {
+        var builder = new StringBuilder("CASE ").Append(levelExpression);
+        foreach (var level in SystemLogLevels.All)
+        {
+            builder.Append(" WHEN ").Append(Literal(level)).Append(" THEN ").Append(SystemLogLevels.RankOf(level));
+        }
+
+        return builder.Append(" ELSE ").Append(SystemLogLevels.RankOf(string.Empty)).Append(" END").ToString();
+    }
+
+    public static string Literal(string value) => "'" + value.Replace("'", "''", StringComparison.Ordinal) + "'";
 }

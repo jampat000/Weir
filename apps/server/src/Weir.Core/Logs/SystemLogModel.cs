@@ -63,6 +63,20 @@ public static class SystemLogLevels
     public const string Success = "success";
 
     public static readonly IReadOnlyList<string> All = [Error, Warning, Info, Success];
+
+    /// <summary>The level's place in <see cref="All"/>, from most severe to least; a level that is not one of them comes after them all.</summary>
+    public static int RankOf(string level)
+    {
+        for (var rank = 0; rank < All.Count; rank++)
+        {
+            if (All[rank] == level)
+            {
+                return rank;
+            }
+        }
+
+        return All.Count;
+    }
 }
 
 /// <summary>What a row is about, in the words the category picker uses. Every row has exactly one.</summary>
@@ -106,36 +120,8 @@ public sealed record SystemLogRow(
     string? Detail,
     WireObject Record)
 {
-    /// <summary>The row's place in the newest-first order.</summary>
-    public SystemLogPosition Position => new(At, Source, Key);
-
     /// <summary>The row's id on the wire, such as <c>event:41</c>.</summary>
     public string Id => $"{SystemLogSources.NameOf(Source)}:{Key}";
-}
-
-/// <summary>
-/// Where a row sits in the log, which is also what a cursor remembers: later time first, then the source, then the number
-/// in the source, all descending.
-/// </summary>
-public readonly record struct SystemLogPosition(DateTimeOffset At, SystemLogSource Source, long Key)
-{
-    /// <summary>Orders positions newest first: the later time, then the later source, then the higher number.</summary>
-    public static readonly IComparer<SystemLogPosition> NewestFirst = Comparer<SystemLogPosition>.Create(Compare);
-
-    /// <summary>Whether this position comes after <paramref name="cursor"/> in the newest-first order.</summary>
-    public bool IsAfter(SystemLogPosition cursor) => Compare(this, cursor) > 0;
-
-    private static int Compare(SystemLogPosition first, SystemLogPosition second)
-    {
-        var byTime = second.At.UtcTicks.CompareTo(first.At.UtcTicks);
-        if (byTime != 0)
-        {
-            return byTime;
-        }
-
-        var bySource = ((int)second.Source).CompareTo((int)first.Source);
-        return bySource != 0 ? bySource : second.Key.CompareTo(first.Key);
-    }
 }
 
 /// <summary>The filters of one read of the log. Every list is empty when the filter is not set.</summary>

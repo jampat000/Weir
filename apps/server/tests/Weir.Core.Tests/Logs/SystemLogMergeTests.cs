@@ -1,5 +1,6 @@
 using Weir.Core.Json;
 using Weir.Core.Logs;
+using Weir.Core.Paging;
 
 namespace Weir.Core.Tests.Logs;
 
@@ -16,7 +17,7 @@ public sealed class SystemLogMergeTests
             jobs: [Row(SystemLogSource.Job, 7, 9)],
             server: [Row(SystemLogSource.Server, 3, 7)]);
 
-        var page = SystemLogMerge.Page(slices, new SystemLogFilter(), limit: 10);
+        var page = SystemLogMerge.Page(slices, new SystemLogFilter(), SystemLogOrder.Newest, SystemLogOrder.NoWorkflowNames, limit: 10);
 
         Assert.Equal(["event:1", "server:3", "job:7"], page.Rows.Select(row => row.Id));
         Assert.Null(page.NextCursor);
@@ -30,7 +31,7 @@ public sealed class SystemLogMergeTests
             jobs: [Row(SystemLogSource.Job, 9, 5)],
             server: [Row(SystemLogSource.Server, 1, 5)]);
 
-        var page = SystemLogMerge.Page(slices, new SystemLogFilter(), limit: 10);
+        var page = SystemLogMerge.Page(slices, new SystemLogFilter(), SystemLogOrder.Newest, SystemLogOrder.NoWorkflowNames, limit: 10);
 
         Assert.Equal(["event:4", "event:2", "job:9", "server:1"], page.Rows.Select(row => row.Id));
     }
@@ -43,12 +44,27 @@ public sealed class SystemLogMergeTests
             jobs: [Row(SystemLogSource.Job, 5, 2)],
             server: []);
 
-        var page = SystemLogMerge.Page(slices, new SystemLogFilter(), limit: 2);
+        var page = SystemLogMerge.Page(slices, new SystemLogFilter(), SystemLogOrder.Newest, SystemLogOrder.NoWorkflowNames, limit: 2);
 
         Assert.Equal(["event:2", "job:5"], page.Rows.Select(row => row.Id));
-        Assert.True(SystemLogCursor.TryDecode(page.NextCursor, out var position));
-        Assert.Equal(page.Rows[^1].Position, position);
-        Assert.True(Row(SystemLogSource.Event, 1, 3).Position.IsAfter(position));
+        Assert.True(SystemLogOrder.Newest.TryDecodeCursor(page.NextCursor, out var after));
+        Assert.Equal(SystemLogOrder.Newest.KeyOf(page.Rows[^1], SystemLogOrder.NoWorkflowNames), after);
+    }
+
+    [Fact]
+    public void Rows_of_every_source_are_listed_in_the_order_asked_for_and_the_cursor_continues_that_order()
+    {
+        var order = new SystemLogOrder(SystemLogSort.Level, SortDirection.Ascending);
+        var slices = Slices(
+            events: [Row(SystemLogSource.Event, 1, 1, SystemLogLevels.Success), Row(SystemLogSource.Event, 2, 2, SystemLogLevels.Error)],
+            jobs: [Row(SystemLogSource.Job, 7, 3, SystemLogLevels.Warning)],
+            server: [Row(SystemLogSource.Server, 3, 4, SystemLogLevels.Error)]);
+
+        var page = SystemLogMerge.Page(slices, new SystemLogFilter(), order, SystemLogOrder.NoWorkflowNames, limit: 3);
+
+        Assert.Equal(["server:3", "event:2", "job:7"], page.Rows.Select(row => row.Id));
+        Assert.True(order.TryDecodeCursor(page.NextCursor, out var after));
+        Assert.Equal(order.KeyOf(page.Rows[^1], SystemLogOrder.NoWorkflowNames), after);
     }
 
     [Fact]
@@ -60,7 +76,7 @@ public sealed class SystemLogMergeTests
             server: [Row(SystemLogSource.Server, 3, 7)],
             jobsMatching: 12);
 
-        var page = SystemLogMerge.Page(slices, new SystemLogFilter { Sources = [SystemLogSource.Event] }, limit: 10);
+        var page = SystemLogMerge.Page(slices, new SystemLogFilter { Sources = [SystemLogSource.Event] }, SystemLogOrder.Newest, SystemLogOrder.NoWorkflowNames, limit: 10);
 
         Assert.Equal(["event:1"], page.Rows.Select(row => row.Id));
         Assert.Equal(12, page.Counts.BySource[SystemLogSources.Job]);
@@ -77,7 +93,7 @@ public sealed class SystemLogMergeTests
             [SystemLogSource.Server] = new([], 9, Tally((SystemLogLevels.Warning, 9)), Tally((SystemLogCategories.Weir, 9))),
         };
 
-        var page = SystemLogMerge.Page(slices, new SystemLogFilter { Sources = [SystemLogSource.Event, SystemLogSource.Job] }, limit: 10);
+        var page = SystemLogMerge.Page(slices, new SystemLogFilter { Sources = [SystemLogSource.Event, SystemLogSource.Job] }, SystemLogOrder.Newest, SystemLogOrder.NoWorkflowNames, limit: 10);
 
         Assert.Equal(5, page.Counts.ByLevel[SystemLogLevels.Error]);
         Assert.Equal(2, page.Counts.ByLevel[SystemLogLevels.Info]);
@@ -105,11 +121,11 @@ public sealed class SystemLogMergeTests
         Assert.False(new SystemLogFilter { HasException = true }.CanMatch(SystemLogSource.Job));
     }
 
-    private static SystemLogRow Row(SystemLogSource source, long key, int minutesAgo) => new(
+    private static SystemLogRow Row(SystemLogSource source, long key, int minutesAgo, string level = SystemLogLevels.Info) => new(
         source,
         key,
         Noon - TimeSpan.FromMinutes(minutesAgo),
-        SystemLogLevels.Info,
+        level,
         SystemLogCategories.Weir,
         null,
         "Something happened",

@@ -3,13 +3,14 @@ using Weir.Api.Http;
 using Weir.Core.Activity;
 using Weir.Core.Json;
 using Weir.Core.Logs;
+using Weir.Core.Paging;
 using Weir.Core.Validation;
 using Weir.Infrastructure.SystemLog;
 
 namespace Weir.Api.Endpoints;
 
-/// <summary>What a request for System › Logs asks for: the filters, where to start and how many rows.</summary>
-internal sealed record SystemLogQuery(SystemLogFilter Filter, SystemLogPosition? After, int Limit)
+/// <summary>What a request for System › Logs asks for: the filters, the order, where to start and how many rows.</summary>
+internal sealed record SystemLogQuery(SystemLogFilter Filter, SystemLogOrder Order, IReadOnlyList<object?>? After, int Limit)
 {
     private const int TextMaxLength = 200;
     private const int EventTypeMaxLength = 64;
@@ -38,8 +39,23 @@ internal sealed record SystemLogQuery(SystemLogFilter Filter, SystemLogPosition?
             To = When(request, "to", issues),
         };
         var limit = ReadLimit(request, issues);
-        var after = Cursor(request, issues);
-        return new SystemLogQuery(filter, after, limit);
+        var order = ReadOrder(request, issues);
+        var after = order is null ? null : Cursor(request, order, issues);
+        return new SystemLogQuery(filter, order ?? SystemLogOrder.Newest, after, limit);
+    }
+
+    /// <summary>The order asked for, or null when the request names a sort or a direction this log does not have. Newest first when it names neither.</summary>
+    private static SystemLogOrder? ReadOrder(ApiRequest request, ValidationIssues issues)
+    {
+        var sort = SystemLogSort.Time;
+        var sortValid = request.Query("sort") is not { } rawSort
+            || (FieldRules.TryLiteral(new WireString(rawSort), ["query", "sort"], SystemLogSorts.All, issues, out var parsedSort)
+                && SystemLogSorts.TryParse(parsedSort, out sort));
+        var direction = SortDirection.Descending;
+        var directionValid = request.Query("direction") is not { } rawDirection
+            || (FieldRules.TryLiteral(new WireString(rawDirection), ["query", "direction"], SortDirections.All, issues, out var parsedDirection)
+                && SortDirections.TryParse(parsedDirection, out direction));
+        return sortValid && directionValid ? new SystemLogOrder(sort, direction) : null;
     }
 
     /// <summary>The values of a parameter that may be repeated, or written once with commas between them, each one of <paramref name="allowed"/>.</summary>
@@ -89,19 +105,19 @@ internal sealed record SystemLogQuery(SystemLogFilter Filter, SystemLogPosition?
             ? (int)value
             : SystemLogReader.DefaultLimit;
 
-    private static SystemLogPosition? Cursor(ApiRequest request, ValidationIssues issues)
+    private static IReadOnlyList<object?>? Cursor(ApiRequest request, SystemLogOrder order, ValidationIssues issues)
     {
         if (request.Query("cursor") is not { Length: > 0 } raw)
         {
             return null;
         }
 
-        if (SystemLogCursor.TryDecode(raw, out var position))
+        if (order.TryDecodeCursor(raw, out var after))
         {
-            return position;
+            return after;
         }
 
-        issues.Add(new ValidationIssue("value_error", ["query", "cursor"], "Value error, that is not a position this log gave out", new WireString(raw)));
+        issues.Add(new ValidationIssue("value_error", ["query", "cursor"], "Value error, that is not a position this log gave out for this sort", new WireString(raw)));
         return null;
     }
 }

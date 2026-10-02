@@ -29,12 +29,16 @@ public sealed class SystemLogReader
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
-    /// <summary>One page of the log after <paramref name="after"/> (the newest when null), and the counts of what the filters leave.</summary>
-    public async Task<SystemLogPage> ReadAsync(UnitOfWork uow, SystemLogFilter filter, SystemLogPosition? after, int limit)
+    /// <summary>
+    /// One page of the log in <paramref name="order"/>, after the row whose key is <paramref name="after"/> (from the first when
+    /// null), and the counts of what the filters leave.
+    /// </summary>
+    public async Task<SystemLogPage> ReadAsync(UnitOfWork uow, SystemLogFilter filter, SystemLogOrder order, IReadOnlyList<object?>? after, int limit)
     {
         ArgumentNullException.ThrowIfNull(uow);
         ArgumentNullException.ThrowIfNull(filter);
-        var request = new SystemLogRequest(filter, after, Math.Clamp(limit, 1, MaxLimit) + 1);
+        ArgumentNullException.ThrowIfNull(order);
+        var request = new SystemLogRequest(filter, order, after, Math.Clamp(limit, 1, MaxLimit) + 1);
         var serverRead = _server.ReadAsync(request, _logger);
         var slices = new Dictionary<SystemLogSource, SystemLogSlice>
         {
@@ -42,8 +46,12 @@ public sealed class SystemLogReader
             [SystemLogSource.Job] = await _jobs.ReadAsync(uow, request).ConfigureAwait(false),
             [SystemLogSource.Server] = await serverRead.ConfigureAwait(false),
         };
-        return SystemLogMerge.Page(slices, filter, Math.Clamp(limit, 1, MaxLimit));
+        var names = order.Sort == SystemLogSort.Workflow ? await WorkflowNamesAsync(uow, WorkflowIds(slices.Values)).ConfigureAwait(false) : SystemLogOrder.NoWorkflowNames;
+        return SystemLogMerge.Page(slices, filter, order, names, Math.Clamp(limit, 1, MaxLimit));
     }
+
+    private static long[] WorkflowIds(IEnumerable<SystemLogSlice> slices) =>
+        [.. slices.SelectMany(slice => slice.Rows).Select(row => row.WorkflowId).OfType<long>().Distinct()];
 
     /// <summary>The names of the workflows with these ids; one that no longer exists has none.</summary>
     public static async Task<IReadOnlyDictionary<long, string>> WorkflowNamesAsync(UnitOfWork uow, IReadOnlyCollection<long> ids)

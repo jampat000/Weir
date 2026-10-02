@@ -1,3 +1,4 @@
+using Weir.Core.Paging;
 using Weir.Core.Time;
 
 namespace Weir.Core.Processing;
@@ -54,6 +55,55 @@ public static class ProcessingFileStatuses
     {
         Processed, PassedThrough, Rejected, Cancelled,
     };
+}
+
+/// <summary>
+/// What a status means to a person, in the order a list sorted by meaning shows them. These are the words and the order
+/// of the web's status meanings (<c>lib/ui/status-meaning.ts</c>).
+/// </summary>
+public enum ProcessingFileMeaning
+{
+    /// <summary>Finished.</summary>
+    Done,
+
+    /// <summary>Waiting its turn.</summary>
+    Todo,
+
+    /// <summary>Being worked on right now.</summary>
+    Doing,
+
+    /// <summary>Held back, or waiting on a person.</summary>
+    Attention,
+
+    /// <summary>Failed.</summary>
+    Broken,
+
+    /// <summary>Left alone on purpose.</summary>
+    Idle,
+}
+
+/// <summary>The one place that says what each of <see cref="ProcessingFileStatuses.All"/> means.</summary>
+public static class ProcessingFileMeanings
+{
+    public static readonly IReadOnlyDictionary<string, ProcessingFileMeaning> OfStatus = new Dictionary<string, ProcessingFileMeaning>(StringComparer.Ordinal)
+    {
+        [ProcessingFileStatuses.Processed] = ProcessingFileMeaning.Done,
+        [ProcessingFileStatuses.Unprocessed] = ProcessingFileMeaning.Todo,
+        [ProcessingFileStatuses.OutOfSchedule] = ProcessingFileMeaning.Todo,
+        [ProcessingFileStatuses.Processing] = ProcessingFileMeaning.Doing,
+        [ProcessingFileStatuses.OnHold] = ProcessingFileMeaning.Attention,
+        [ProcessingFileStatuses.BlockedUpstream] = ProcessingFileMeaning.Attention,
+        [ProcessingFileStatuses.PassedThrough] = ProcessingFileMeaning.Attention,
+        [ProcessingFileStatuses.Rejected] = ProcessingFileMeaning.Attention,
+        [ProcessingFileStatuses.ProcessingFailed] = ProcessingFileMeaning.Broken,
+        [ProcessingFileStatuses.Skipped] = ProcessingFileMeaning.Idle,
+        [ProcessingFileStatuses.Disabled] = ProcessingFileMeaning.Idle,
+        [ProcessingFileStatuses.Cancelled] = ProcessingFileMeaning.Idle,
+    };
+
+    /// <summary>Where a status stands when files are sorted by meaning; a status with no meaning here follows every one that has.</summary>
+    public static int RankOf(string status) =>
+        OfStatus.TryGetValue(status, out var meaning) ? (int)meaning : Enum.GetValues<ProcessingFileMeaning>().Length;
 }
 
 /// <summary>What a cancelled file says on the Files screen (#643).</summary>
@@ -124,6 +174,11 @@ public sealed record ProcessingFileRecord
     public Timestamp UpdatedAt { get; init; }
 }
 
+/// <summary>One page of files, and where the next one starts.</summary>
+/// <param name="Rows">The files, in the order the list was asked for.</param>
+/// <param name="NextCursor">The opaque cursor of the next page, or null when this one reaches the last file.</param>
+public sealed record ProcessingFilePage(IReadOnlyList<ProcessingFileRecord> Rows, string? NextCursor);
+
 /// <summary>Filters for listing <c>files</c> rows.</summary>
 public sealed record ProcessingFileListFilter
 {
@@ -139,6 +194,14 @@ public sealed record ProcessingFileListFilter
     /// <summary>Only these files, when set: a person's exact choice rather than whatever else matches.</summary>
     public IReadOnlyList<long>? Ids { get; init; }
     public int Limit { get; init; } = 200;
+
+    public ProcessingFileSort Sort { get; init; } = ProcessingFileSort.LastSeen;
+
+    /// <summary>Which way <see cref="Sort"/> runs. Newest first is how a list has always read.</summary>
+    public SortDirection Direction { get; init; } = SortDirection.Descending;
+
+    /// <summary>The key of the file the page follows (see <c>ProcessingFileOrdering</c>), or null to start from the top.</summary>
+    public IReadOnlyList<object?>? After { get; init; }
 
     /// <summary><see cref="Limit"/> clamped to 1..1000.</summary>
     public int ClampedLimit => Math.Max(1, Math.Min(Limit, 1000));

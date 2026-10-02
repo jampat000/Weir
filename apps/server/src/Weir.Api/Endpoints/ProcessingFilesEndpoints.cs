@@ -6,7 +6,6 @@ using Weir.Core.Auth;
 using Weir.Core.Jobs;
 using Weir.Core.Json;
 using Weir.Core.Processing;
-using Weir.Core.Time;
 using Weir.Core.Validation;
 using Weir.Infrastructure.Artwork;
 using Weir.Infrastructure.Jobs;
@@ -132,27 +131,12 @@ internal sealed class ProcessingFilesEndpointHandlers
     {
         await request.RequireUserAsync().ConfigureAwait(false);
         var issues = new ValidationIssues();
-        long? libraryId = request.Query("library_id") is { } rawLibrary && FieldRules.TryInt(new WireString(rawLibrary), ["query", "library_id"], 1, null, issues, out var parsedLibrary)
-            ? (long)parsedLibrary
-            : null;
-        var fileStatuses = ParseFileStatuses(request.Query("file_status"), issues);
-        var pathContains = request.Query("path_contains");
-        long? withinDays = request.Query("within_days") is { } rawWithin && FieldRules.TryInt(new WireString(rawWithin), ["query", "within_days"], 1, 3650, issues, out var parsedWithin)
-            ? (long)parsedWithin
-            : null;
-        var limit = request.Query("limit") is { } rawLimit && FieldRules.TryInt(new WireString(rawLimit), ["query", "limit"], 1, 1000, issues, out var parsedLimit) ? (int)parsedLimit : 200;
+        var filter = ProcessingFilesQuery.Read(request, issues);
         issues.ThrowIfAny();
 
         var uow = await request.DbAsync().ConfigureAwait(false);
-        var filter = new ProcessingFileListFilter
-        {
-            LibraryId = libraryId,
-            Statuses = fileStatuses,
-            PathContains = pathContains,
-            Since = withinDays is { } days ? Timestamp.FromUtc(request.Time.GetUtcNow().AddDays(-days).UtcDateTime) : null,
-            Limit = limit,
-        };
-        var rows = await _files.ListAsync(uow, filter).ConfigureAwait(false);
+        var page = await _files.ListPageAsync(uow, filter).ConfigureAwait(false);
+        var rows = page.Rows;
         var libraryNames = await _files.LibraryNamesAsync(uow).ConfigureAwait(false);
         var knownDevices = DeviceProfileLoader.Load(request.Options.WeirHome);
         var devices = await _directPlay.SelectedProfilesAsync(uow, knownDevices).ConfigureAwait(false);
@@ -172,7 +156,7 @@ internal sealed class ProcessingFilesEndpointHandlers
             files.Add(FileOut(row, libraryName, directPlay, progress, posterUrl).Set("handback", HandbackStore.ToOut(handback)));
         }
 
-        var counts = await _files.StatusCountsAsync(uow, libraryId).ConfigureAwait(false);
+        var counts = await _files.StatusCountsAsync(uow, filter.LibraryId).ConfigureAwait(false);
         return ApiRoutes.Ok(new WireObject()
             .Set("files", new WireArray(files))
             .Set("status_counts", new WireObject().Also(dict =>
@@ -183,32 +167,8 @@ internal sealed class ProcessingFilesEndpointHandlers
                 }
             }))
             .Set("returned", files.Count)
-            .Set("limit", limit));
-    }
-
-    /// <summary>
-    /// <c>file_status</c> as one or more comma-separated statuses (#781): the Processing screen asks for every
-    /// currently-processing file in one uncapped, status-filtered page, separate from the ordinary paginated
-    /// list, so a running file can never be pushed off by the page limit. Null when the query omits the
-    /// parameter; an empty list (a blank value, or one made entirely of blanks) filters nothing, same as omitting it.
-    /// </summary>
-    private static List<string>? ParseFileStatuses(string? rawStatuses, ValidationIssues issues)
-    {
-        if (rawStatuses is null)
-        {
-            return null;
-        }
-
-        var statuses = new List<string>();
-        foreach (var token in rawStatuses.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-        {
-            if (FieldRules.TryLiteral(new WireString(token), ["query", "file_status"], ProcessingFileStatuses.All, issues, out var parsed))
-            {
-                statuses.Add(parsed);
-            }
-        }
-
-        return statuses;
+            .Set("limit", filter.Limit)
+            .Set("next_cursor", page.NextCursor));
     }
 
     /// <summary>

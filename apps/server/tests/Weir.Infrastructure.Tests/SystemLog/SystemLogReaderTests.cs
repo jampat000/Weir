@@ -12,7 +12,7 @@ using Weir.Infrastructure.Tests.Platform;
 namespace Weir.Infrastructure.Tests.SystemLog;
 
 /// <summary>System › Logs read from a real database and a real log file: one list, filtered, counted and paged.</summary>
-public sealed class SystemLogReaderTests : IDisposable
+public sealed partial class SystemLogReaderTests : IDisposable
 {
     private static readonly DateTimeOffset Noon = new(2026, 10, 2, 12, 0, 0, TimeSpan.Zero);
 
@@ -73,13 +73,13 @@ public sealed class SystemLogReaderTests : IDisposable
         }
 
         var seen = new List<string>();
-        SystemLogPosition? after = null;
+        IReadOnlyList<object?>? after = null;
         var pages = 0;
         do
         {
-            var page = await Read(new SystemLogFilter(), after, limit: 4);
+            var page = await Read(new SystemLogFilter(), after: after, limit: 4);
             seen.AddRange(page.Rows.Select(row => row.Id));
-            after = SystemLogCursor.TryDecode(page.NextCursor, out var next) ? next : null;
+            after = SystemLogOrder.Newest.TryDecodeCursor(page.NextCursor, out var next) ? next : null;
             pages++;
         }
         while (after is not null && pages < 20);
@@ -100,12 +100,12 @@ public sealed class SystemLogReaderTests : IDisposable
         }
 
         var seen = new List<string>();
-        SystemLogPosition? after = null;
+        IReadOnlyList<object?>? after = null;
         do
         {
-            var page = await Read(new SystemLogFilter(), after, limit: 2);
+            var page = await Read(new SystemLogFilter(), after: after, limit: 2);
             seen.AddRange(page.Rows.Select(row => row.Id));
-            after = SystemLogCursor.TryDecode(page.NextCursor, out var next) ? next : null;
+            after = SystemLogOrder.Newest.TryDecodeCursor(page.NextCursor, out var next) ? next : null;
         }
         while (after is not null);
 
@@ -358,8 +358,8 @@ public sealed class SystemLogReaderTests : IDisposable
         Assert.False(string.IsNullOrEmpty(names[ids[0]]));
     }
 
-    private Task<SystemLogPage> Read(SystemLogFilter filter, SystemLogPosition? after = null, int limit = 50) =>
-        _store.WithUnitOfWork(uow => _reader.ReadAsync(uow, filter, after, limit), commit: false);
+    private Task<SystemLogPage> Read(SystemLogFilter filter, SystemLogOrder? order = null, IReadOnlyList<object?>? after = null, int limit = 50) =>
+        _store.WithUnitOfWork(uow => _reader.ReadAsync(uow, filter, order ?? SystemLogOrder.Newest, after, limit), commit: false);
 
     private Task<int> AddEvent(
         int minutesAgo,

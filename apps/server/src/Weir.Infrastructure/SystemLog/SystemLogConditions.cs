@@ -1,19 +1,19 @@
 using Weir.Core.Logs;
-using Weir.Core.Time;
+using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Infrastructure.SystemLog;
 
 /// <summary>One read of the log, as the sources receive it.</summary>
 /// <param name="Filter">What to show.</param>
-/// <param name="After">Where the page starts: the rows after this position, or from the newest when null.</param>
+/// <param name="Order">What the rows are ordered by, and which way.</param>
+/// <param name="After">Where the page starts: the rows after the one with this key (see <see cref="SystemLogOrder.KeyOf"/>), or from the first when null.</param>
 /// <param name="Take">The most rows a source returns: a page, plus one to tell whether another follows.</param>
-internal sealed record SystemLogRequest(SystemLogFilter Filter, SystemLogPosition? After, int Take);
+internal sealed record SystemLogRequest(SystemLogFilter Filter, SystemLogOrder Order, IReadOnlyList<object?>? After, int Take);
 
 /// <summary>A SQL WHERE clause built up from conditions and the parameters they name.</summary>
 internal sealed class SystemLogConditions
 {
-    /// <summary>The length of a stored time up to its whole second: <c>2026-10-02 11:00:00</c>.</summary>
-    private const int SecondsTextLength = 19;
+    private const string AfterParameterPrefix = "after_";
 
     private readonly List<string> _conditions = [];
     private readonly List<(string Name, object? Value)> _parameters = [];
@@ -51,36 +51,21 @@ internal sealed class SystemLogConditions
     /// <summary>A copy that can take more conditions without changing this one.</summary>
     public SystemLogConditions Copy() => new(_conditions, _parameters);
 
-    /// <summary>
-    /// Keeps rows that come after <paramref name="cursor"/> in the newest-first order, for a source whose rows carry their
-    /// time as the fixed-shape text <paramref name="atText"/> (see <see cref="SystemLogSql.AtText"/>) and their number in
-    /// <paramref name="keyColumn"/>. Rows of the same instant fall after the cursor when their source sorts after the
-    /// cursor's, or, from the same source, when their number is lower. A column an index covers can be named as
-    /// <paramref name="indexedColumn"/>, so the rows far from the cursor are passed over without being read.
-    /// </summary>
-    public SystemLogConditions AddAfter(string atText, string keyColumn, SystemLogSource source, SystemLogPosition? cursor, string? indexedColumn = null)
+    /// <summary>Keeps rows that come after the row whose key is <paramref name="request"/>'s cursor in its order, for a source whose rows <paramref name="columns"/> describes.</summary>
+    public SystemLogConditions AddAfter(SystemLogColumns columns, SystemLogRequest request)
     {
-        if (cursor is not { } position)
+        if (request.After is not { } after)
         {
             return this;
         }
 
-        var cursorUtc = position.At.UtcDateTime;
-        var at = ("@cursor_at", (object?)Timestamp.FromUtc(cursorUtc).ToSqlite());
-        if (indexedColumn is not null)
+        var sqlKey = columns.SqlValues(request.Order, after);
+        if (columns.IndexedBound(request.Order, after) is { } bound)
         {
-            // Stored times begin with the second they were written in, so nothing past the cursor's second can be after it.
-            var upper = Timestamp.FromUtc(cursorUtc.AddSeconds(1)).ToSqlite()[..SecondsTextLength];
-            Add($"{indexedColumn} < @cursor_upper", ("@cursor_upper", upper));
+            Add(bound.Sql, bound.Parameters);
         }
 
-        if (source == position.Source)
-        {
-            return Add($"({atText} < @cursor_at OR ({atText} = @cursor_at AND {keyColumn} < @cursor_key))", at, ("@cursor_key", position.Key));
-        }
-
-        return source < position.Source
-            ? Add($"{atText} <= @cursor_at", at)
-            : Add($"{atText} < @cursor_at", at);
+        var (sql, parameters) = Keyset.After(columns.Keys(request.Order), sqlKey, AfterParameterPrefix);
+        return Add(sql, parameters);
     }
 }
