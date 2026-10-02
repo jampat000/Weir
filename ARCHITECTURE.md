@@ -54,7 +54,7 @@ flowchart LR
   API --> Core["Core + Platform Services"]
   Core --> Processing["Processing (the application)"]
   Core --> History["History (activity records)"]
-  Core --> Integrations["Media managers (Sonarr, Radarr, Deluno; TMDb metadata)"]
+  Core --> Integrations["Media managers (Sonarr, Radarr, Deluno) and Deluno's metadata service"]
   Core --> DB["SQLite (numbered SQL migrations)"]
   Processing --> Jobs["Durable jobs (jobs) + workers"]
 ```

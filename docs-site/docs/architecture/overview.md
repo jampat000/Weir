@@ -25,7 +25,7 @@ flowchart LR
   API --> Infra["Weir.Infrastructure (SQLite, filesystem, ffmpeg, jobs)"]
   Infra --> Processing["Processing (the application)"]
   Infra --> History["History (activity records)"]
-  Infra --> Integrations["Media managers (Sonarr, Radarr, Deluno; TMDb metadata)"]
+  Infra --> Integrations["Media managers (Sonarr, Radarr, Deluno) and Deluno's metadata service"]
   Infra --> DB["SQLite (numbered SQL migrations)"]
   Processing --> Jobs["Durable jobs (jobs) + workers"]
 ```

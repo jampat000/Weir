@@ -5,7 +5,7 @@ title: Posters
 
 # Posters
 
-Weir shows a poster beside each title it lists: on the Pipeline, in **Just finished**, in History, on the Library page and at the top of a file's story. When it has no poster for a title, or Artwork is off, it shows the title's initials instead.
+Weir shows a poster beside each title it lists: on the Pipeline, in **Just finished**, in History, on the Library page and at the top of a file's story. When it has no poster for a title, it shows the title's initials instead.
 
 ## How it finds them
 
@@ -17,11 +17,13 @@ Weir looks each title up once through Deluno's metadata service, which needs no 
 
 Weir reads the title from the name by itself, so a file called `Nosferatu.1922.1080p.mkv` is looked up as Nosferatu, 1922. When a media manager hands a file over with its own ids, those are used instead, which is more exact than reading a name.
 
-## Turn it off
+## Original language
 
-Under **Setup › Rules › Metadata & artwork**, switch **Artwork** off. Weir stops looking anything up and shows initials everywhere. Posters it already holds stay on disk and come back if you switch Artwork on again.
+The same lookup tells Weir what language each title was made in, so a profile's **Keep the original language** rule works without any setup: there is no provider to choose and no key to get. If the service doesn't know a title, the profile's audio preferences choose the tracks instead.
 
-Operators who never want Weir to contact the service can also start it with `WEIR_ARTWORK_GATEWAY_URL=off`.
+## Nothing to set up
+
+There is no setting for posters or original languages. Operators who never want Weir to contact the service can start it with `WEIR_ARTWORK_GATEWAY_URL=off`: Weir then shows initials everywhere, and rules fall back to the audio preferences. Posters it already holds stay on disk.
 
 ## Credits
 
