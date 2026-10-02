@@ -8,10 +8,10 @@ namespace Weir.Infrastructure.Tests.Artwork;
 /// <summary>How Weir reads the metadata service's answers, and what it refuses to take from them.</summary>
 public sealed class ArtworkGatewayClientTests
 {
-    private static ArtworkLookup Film(string title = "nosferatu", int? year = 1922) => new("k", "movie", title, year, null, null, null, 0);
+    private static ArtworkLookup Film(string title = "nosferatu", int? year = 1922) => new("k", "movie", title, year, null, null, null, 0, ArtworkOutcomes.Pending, null, true);
 
-    private static string Result(string? posterUrl, string providerId) =>
-        $$"""{"provider":"tmdb","providerId":"{{providerId}}","posterUrl":{{(posterUrl is null ? "null" : $"\"{posterUrl}\"")}}}""";
+    private static string Result(string? posterUrl, string providerId, string? originalLanguage = null) =>
+        $$"""{"provider":"tmdb","providerId":"{{providerId}}","originalLanguage":{{(originalLanguage is null ? "null" : $"\"{originalLanguage}\"")}},"posterUrl":{{(posterUrl is null ? "null" : $"\"{posterUrl}\"")}}}""";
 
     [Fact]
     public async Task The_first_result_that_has_a_poster_is_the_match()
@@ -33,7 +33,78 @@ public sealed class ArtworkGatewayClientTests
 
         var answer = await fixture.Gateway.FindAsync(Film(), CancellationToken.None);
 
-        Assert.Equal(GatewayStatus.NotFound, answer.Status);
+        Assert.Null(answer.Value!.PosterRef);
+    }
+
+    [Fact]
+    public async Task The_original_language_comes_from_the_same_result_as_the_poster_in_lower_case()
+    {
+        using var fixture = new ArtworkFixture();
+        fixture.ServeSearch($$"""{"results":[{{Result(null, "1", "ja")}},{{Result($"{ArtworkFixture.GatewayUrl}/artwork/w780/second.jpg", "2", " FR ")}}]}""");
+
+        var answer = await fixture.Gateway.FindAsync(Film(), CancellationToken.None);
+
+        Assert.Equal(("second.jpg", "fr"), (answer.Value!.PosterRef, answer.Value.OriginalLanguage));
+    }
+
+    [Fact]
+    public async Task When_no_result_has_a_poster_the_first_results_language_is_still_reported()
+    {
+        using var fixture = new ArtworkFixture();
+        fixture.ServeSearch($$"""{"results":[{{Result(null, "1", "ja")}},{{Result(null, "2", "fr")}}]}""");
+
+        var answer = await fixture.Gateway.FindAsync(Film(), CancellationToken.None);
+
+        Assert.Equal((null, "ja"), (answer.Value!.PosterRef, answer.Value.OriginalLanguage));
+    }
+
+    [Fact]
+    public async Task A_result_that_names_no_language_reports_none()
+    {
+        using var fixture = new ArtworkFixture();
+        fixture.ServeSearch($$"""{"results":[{{Result($"{ArtworkFixture.GatewayUrl}/artwork/w780/a.jpg", "1")}}]}""");
+
+        var answer = await fixture.Gateway.FindAsync(Film(), CancellationToken.None);
+
+        Assert.Null(answer.Value!.OriginalLanguage);
+    }
+
+    [Fact]
+    public async Task A_series_known_only_by_its_tvdb_id_reports_the_language_thetvdb_gives()
+    {
+        using var fixture = new ArtworkFixture();
+        fixture.Http.Json(HttpMethod.Get, "/metadata/tvdb/tv/78804", """{"provider":"tvdb","series":{"tvdbId":"78804","originalLanguage":"eng","posterUrl":null}}""");
+        var series = new ArtworkLookup("k", "tv", string.Empty, null, null, 78804, null, 0, ArtworkOutcomes.Pending, null, true);
+
+        var answer = await fixture.Gateway.FindAsync(series, CancellationToken.None);
+
+        Assert.Equal("eng", answer.Value!.OriginalLanguage);
+    }
+
+    [Fact]
+    public async Task A_service_that_answers_its_health_check_is_reachable()
+    {
+        using var fixture = new ArtworkFixture();
+        fixture.Http.Json(HttpMethod.Get, "/health", """{"service":"deluno-metadata-gateway","status":"ok"}""");
+
+        Assert.Equal(GatewayStatus.Ok, await fixture.Gateway.CheckHealthAsync(CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task A_health_check_that_does_not_say_ok_is_not_reachable()
+    {
+        using var fixture = new ArtworkFixture();
+        fixture.Http.Json(HttpMethod.Get, "/health", """{"status":"degraded"}""");
+
+        Assert.Equal(GatewayStatus.Unavailable, await fixture.Gateway.CheckHealthAsync(CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task A_service_that_cannot_be_reached_fails_its_health_check()
+    {
+        using var fixture = new ArtworkFixture();
+
+        Assert.Equal(GatewayStatus.Unavailable, await fixture.Gateway.CheckHealthAsync(CancellationToken.None));
     }
 
     [Fact]

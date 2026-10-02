@@ -3,14 +3,17 @@ using Microsoft.Extensions.DependencyInjection;
 using Weir.Api.Http;
 using Weir.Core.Auth;
 using Weir.Core.Json;
+using Weir.Core.Rules;
 using Weir.Core.Validation;
-using Weir.Infrastructure.MediaManagers;
-using Weir.Infrastructure.Processing;
-using Weir.Infrastructure.Settings;
+using Weir.Infrastructure.Artwork;
 
 namespace Weir.Api.Endpoints;
 
-/// <summary>The metadata-provider connection settings: reading, updating and test-connecting (see <see cref="MetadataProviderStore"/>).</summary>
+/// <summary>
+/// The metadata-provider routes. There is nothing left to set: Weir gets posters and original languages from Deluno's metadata
+/// service on its own. The routes keep answering, with the shape older clients read, so a client written for the old settings does
+/// not break; what a save sends is accepted and ignored.
+/// </summary>
 public static class ProcessingMetadataProviderEndpoints
 {
     public static IEndpointRouteBuilder MapProcessingMetadataProviderEndpoints(this IEndpointRouteBuilder endpoints)
@@ -23,82 +26,74 @@ public static class ProcessingMetadataProviderEndpoints
     }
 }
 
-/// <summary>Handlers for <see cref="ProcessingMetadataProviderEndpoints"/>, constructor-injected with the stores they need.</summary>
+/// <summary>Handlers for <see cref="ProcessingMetadataProviderEndpoints"/>.</summary>
 internal sealed class ProcessingMetadataProviderEndpointHandlers
 {
-    private readonly MetadataProviderStore _metadataProvider;
-    private readonly MetadataProviderService _metadataProviderService;
-    private readonly SuiteSettingsStore _suiteSettings;
+    private const string ProviderName = "deluno-gateway";
+    private const int MaxFieldLength = 500;
 
-    public ProcessingMetadataProviderEndpointHandlers(
-        MetadataProviderStore metadataProvider, MetadataProviderService metadataProviderService, SuiteSettingsStore suiteSettings)
+    private readonly ArtworkGatewayClient _gateway;
+
+    public ProcessingMetadataProviderEndpointHandlers(ArtworkGatewayClient gateway)
     {
-        _metadataProvider = metadataProvider ?? throw new ArgumentNullException(nameof(metadataProvider));
-        _metadataProviderService = metadataProviderService ?? throw new ArgumentNullException(nameof(metadataProviderService));
-        _suiteSettings = suiteSettings ?? throw new ArgumentNullException(nameof(suiteSettings));
+        _gateway = gateway ?? throw new ArgumentNullException(nameof(gateway));
     }
 
-    private static WireObject MetadataProviderOut(MetadataProviderView view) => new WireObject()
-        .Set("provider", view.Provider)
-        .Set("base_url", view.BaseUrl)
-        .Set("key_configured", view.KeyConfigured)
-        .Set("known_providers", new WireArray(view.KnownProviders.Select(p => (WireValue)WireValue.Of(p))))
-        .Set("artwork_enabled", view.ArtworkEnabled);
+    private static WireObject MetadataProviderOut() => new WireObject()
+        .Set("provider", ProviderName)
+        .Set("base_url", WireNull.Instance)
+        .Set("key_configured", false)
+        .Set("known_providers", new WireArray([WireValue.Of(ProviderName)]))
+        .Set("artwork_enabled", true);
 
     public async Task<ApiResult> GetMetadataProviderAsync(ApiRequest request)
     {
         await request.RequireUserAsync().ConfigureAwait(false);
-        var uow = await request.DbAsync().ConfigureAwait(false);
-        var row = await _suiteSettings.EnsureAsync(uow).ConfigureAwait(false);
-        await request.CommitAsync().ConfigureAwait(false);
-        return ApiRoutes.Ok(MetadataProviderOut(_metadataProvider.View(row)));
+        return ApiRoutes.Ok(MetadataProviderOut());
     }
 
     public async Task<ApiResult> PutMetadataProviderAsync(ApiRequest request)
     {
-        var payload = await request.ReadBodyAsync().ConfigureAwait(false);
-        var issues = new ValidationIssues();
-        var model = new BodyModel(payload, issues);
-        var csrfToken = model.Str("csrf_token", minLength: 1);
-        var provider = model.Literal("provider", ["", "tmdb"], defaultValue: "");
-        var baseUrl = model.OptionalStr("base_url", defaultValue: "", maxLength: 500) ?? string.Empty;
-        var apiKey = model.OptionalStr("api_key", maxLength: 500);
-        var artworkEnabled = model.OptionalBool("artwork_enabled");
-        model.Finish(ExtraFields.Forbid);
-        issues.ThrowIfAny();
-
+        var csrfToken = await ReadIgnoredBodyAsync(request).ConfigureAwait(false);
         await request.RequireUserAsync(UserRoles.OperatorOrAdmin).ConfigureAwait(false);
         request.RequireConfirmationToken(csrfToken);
-
-        var uow = await request.DbAsync().ConfigureAwait(false);
-        var row = await _metadataProvider.ApplyAsync(uow, request.Options, request.Time, provider, baseUrl, apiKey, artworkEnabled).ConfigureAwait(false);
-        await request.CommitAsync().ConfigureAwait(false);
-        return ApiRoutes.Ok(MetadataProviderOut(_metadataProvider.View(row)));
+        return ApiRoutes.Ok(MetadataProviderOut());
     }
 
     public async Task<ApiResult> PostMetadataProviderTestAsync(ApiRequest request)
     {
-        // Same body shape as PUT (MetadataProviderIn); the test itself only reads what is already saved.
+        var csrfToken = await ReadIgnoredBodyAsync(request).ConfigureAwait(false);
+        await request.RequireUserAsync(UserRoles.OperatorOrAdmin).ConfigureAwait(false);
+        request.RequireConfirmationToken(csrfToken);
+        var result = await CheckGatewayAsync(request.Context.RequestAborted).ConfigureAwait(false);
+        return ApiRoutes.Ok(new WireObject().Set("status", result.Status).Set("detail", result.Detail));
+    }
+
+    /// <summary>Reads the fields the old settings sent, checking their types and ignoring their values. Returns the confirmation token.</summary>
+    private static async Task<string> ReadIgnoredBodyAsync(ApiRequest request)
+    {
         var payload = await request.ReadBodyAsync().ConfigureAwait(false);
         var issues = new ValidationIssues();
         var model = new BodyModel(payload, issues);
         var csrfToken = model.Str("csrf_token", minLength: 1);
-        model.Literal("provider", ["", "tmdb"], defaultValue: "");
-        model.OptionalStr("base_url", defaultValue: "", maxLength: 500);
-        model.OptionalStr("api_key", maxLength: 500);
+        model.OptionalStr("provider", defaultValue: string.Empty, maxLength: MaxFieldLength);
+        model.OptionalStr("base_url", defaultValue: string.Empty, maxLength: MaxFieldLength);
+        model.OptionalStr("api_key", maxLength: MaxFieldLength);
         model.OptionalBool("artwork_enabled");
         model.Finish(ExtraFields.Forbid);
         issues.ThrowIfAny();
+        return csrfToken;
+    }
 
-        await request.RequireUserAsync(UserRoles.OperatorOrAdmin).ConfigureAwait(false);
-        request.RequireConfirmationToken(csrfToken);
+    private async Task<LookupResult> CheckGatewayAsync(CancellationToken cancellationToken)
+    {
+        if (!_gateway.IsConfigured)
+        {
+            return new LookupResult { Status = LookupResult.StatusNotConfigured, Detail = "Deluno's metadata service is switched off on this server." };
+        }
 
-        var uow = await request.DbAsync().ConfigureAwait(false);
-        var row = await _suiteSettings.EnsureAsync(uow).ConfigureAwait(false);
-        await request.CommitAsync().ConfigureAwait(false);
-        var result = string.IsNullOrWhiteSpace(row.MetadataProviderKeyCiphertext) || string.IsNullOrWhiteSpace(row.MetadataProvider)
-            ? _metadataProvider.Test(row)
-            : await _metadataProviderService.TestProviderAsync(uow, request.Context.RequestAborted).ConfigureAwait(false);
-        return ApiRoutes.Ok(new WireObject().Set("status", result.Status).Set("detail", result.Detail));
+        return await _gateway.CheckHealthAsync(cancellationToken).ConfigureAwait(false) == GatewayStatus.Ok
+            ? new LookupResult { Status = LookupResult.StatusMatched, Detail = "Weir reached Deluno's metadata service." }
+            : new LookupResult { Status = LookupResult.StatusUnreachable, Detail = "Weir could not reach Deluno's metadata service just now." };
     }
 }

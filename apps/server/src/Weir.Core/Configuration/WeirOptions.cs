@@ -155,8 +155,8 @@ public sealed record WeirOptions
     public required UnixFileMode? OutputOwnershipDirectoryMode { get; init; }
 
     /// <summary>
-    /// Where poster lookups are asked (<c>WEIR_ARTWORK_GATEWAY_URL</c>): Deluno's metadata service unless set. Empty means
-    /// poster lookups are switched off for this process (the variable is <c>off</c>).
+    /// Where poster and original-language lookups are asked (<c>WEIR_ARTWORK_GATEWAY_URL</c>): Deluno's metadata service unless set. Empty means
+    /// those lookups are switched off for this process (the variable is <c>off</c>).
     /// </summary>
     public string ArtworkGatewayUrl { get; init; } = ArtworkPosterSource.DefaultGatewayUrl;
 

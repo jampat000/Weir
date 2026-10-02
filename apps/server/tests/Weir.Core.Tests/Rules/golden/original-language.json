@@ -34,7 +34,7 @@
       "preferred_indices": [
         1
       ],
-      "note": "Kept audio in the original language (fre) because the metadata provider identified it. Preferred languages: fre.",
+      "note": "Kept audio in the original language (fre) because the metadata service identified it. Preferred languages: fre.",
       "chose": true
     }
   },
@@ -92,7 +92,7 @@
         2,
         0
       ],
-      "note": "Kept audio in the original language (spa, plus eng) because the metadata provider identified it. Preferred languages: spa, eng.",
+      "note": "Kept audio in the original language (spa, plus eng) because the metadata service identified it. Preferred languages: spa, eng.",
       "chose": true
     }
   },
@@ -145,7 +145,7 @@
         2,
         3
       ],
-      "note": "Kept audio in the original language (spa, plus eng, spa) because the metadata provider identified it. Preferred languages: spa, eng.",
+      "note": "Kept audio in the original language (spa, plus eng, spa) because the metadata service identified it. Preferred languages: spa, eng.",
       "chose": true
     }
   },
@@ -187,7 +187,7 @@
         1,
         0
       ],
-      "note": "Kept audio in the original language (jpn, plus eng) because the metadata provider identified it. Preferred languages: jpn, eng.",
+      "note": "Kept audio in the original language (jpn, plus eng) because the metadata service identified it. Preferred languages: jpn, eng.",
       "chose": true
     }
   },
@@ -267,7 +267,7 @@
       "preferred_indices": [
         0
       ],
-      "note": "Kept audio in the original language (fre) because the metadata provider identified it. Preferred languages: fre.",
+      "note": "Kept audio in the original language (fre) because the metadata service identified it. Preferred languages: fre.",
       "chose": true
     }
   },
@@ -417,7 +417,7 @@
     },
     "expected": {
       "preferred_indices": [],
-      "note": "The metadata provider matched this title but reported no original language, so the configured language preferences chose the track.",
+      "note": "The metadata service matched this title but reported no original language, so the configured language preferences chose the track.",
       "chose": false
     }
   },
@@ -554,7 +554,7 @@
       "preferred_indices": [
         1
       ],
-      "note": "Kept audio in the original language (fre) because the metadata provider identified it. Preferred languages: fre.",
+      "note": "Kept audio in the original language (fre) because the metadata service identified it. Preferred languages: fre.",
       "chose": true
     }
   },
@@ -601,7 +601,7 @@
         0,
         1
       ],
-      "note": "Kept audio in the original language (qaa, plus qaa, fre) because the metadata provider identified it. Preferred languages: qaa, fre.",
+      "note": "Kept audio in the original language (qaa, plus qaa, fre) because the metadata service identified it. Preferred languages: qaa, fre.",
       "chose": true
     }
   },
@@ -648,7 +648,7 @@
         1,
         0
       ],
-      "note": "Kept audio in the original language (ger, plus ger, eng) because the metadata provider identified it. Preferred languages: ger, eng.",
+      "note": "Kept audio in the original language (ger, plus ger, eng) because the metadata service identified it. Preferred languages: ger, eng.",
       "chose": true
     }
   }

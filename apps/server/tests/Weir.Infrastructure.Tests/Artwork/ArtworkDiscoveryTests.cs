@@ -1,5 +1,3 @@
-using Weir.Infrastructure.Artwork;
-
 namespace Weir.Infrastructure.Tests.Artwork;
 
 /// <summary>Titling files that arrive without a hand-off, and the background pass that does it.</summary>
@@ -90,32 +88,10 @@ public sealed class ArtworkDiscoveryTests
     }
 
     [Fact]
-    public async Task The_background_pass_does_nothing_while_artwork_is_off()
-    {
-        using var fixture = new ArtworkFixture();
-        await fixture.Store.Execute("UPDATE suite_settings SET artwork_enabled = 0 WHERE id = 1");
-        await fixture.InsertFileAsync(await fixture.LibraryIdAsync("movie"), "Charade.1963.mkv");
-        var task = fixture.TaskFor(fixture.Gateway);
-
-        await task.RunOnceAsync(CancellationToken.None);
-
-        Assert.Equal(0, await fixture.Store.Scalar("SELECT count(*) FROM artwork_files"));
-        Assert.Empty(fixture.Http.Requests);
-    }
-
-    [Fact]
     public async Task The_background_pass_does_nothing_when_no_gateway_is_configured()
     {
         using var fixture = new ArtworkFixture();
-        var unconfigured = new ArtworkGatewayClient(
-            Core.Configuration.WeirOptionsLoader.Load(new Core.Configuration.RuntimeEnvironment(
-                new Dictionary<string, string> { ["WEIR_HOME"] = fixture.Store.Home.Path, ["WEIR_ARTWORK_GATEWAY_URL"] = "off" },
-                OperatingSystem.IsWindows(),
-                fixture.Store.Home.Path,
-                fixture.Store.Home.Path)),
-            fixture.Http,
-            fixture.Store.Clock,
-            Microsoft.Extensions.Logging.Abstractions.NullLogger<ArtworkGatewayClient>.Instance);
+        var unconfigured = fixture.SwitchedOffGateway();
         await fixture.InsertFileAsync(await fixture.LibraryIdAsync("movie"), "Charade.1963.mkv");
         var task = fixture.TaskFor(unconfigured);
 

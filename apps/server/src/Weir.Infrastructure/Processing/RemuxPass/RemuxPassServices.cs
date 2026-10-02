@@ -6,6 +6,7 @@ using Weir.Core.Jobs;
 using Weir.Core.Json;
 using Weir.Core.Metrics;
 using Weir.Core.Processing.RemuxPass;
+using Weir.Infrastructure.Artwork;
 using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.Media;
 using Weir.Infrastructure.MediaManagers;
@@ -86,7 +87,7 @@ public static class RemuxPassServices
         // Seam: the failure policy's follow-up handlers (pass-through and reject) are
         // registered by AddWeirProcessingFailureFollowUps, which calls this method rather than duplicating it.
         services.TryAddSingleton<IFailurePolicy, QueueingFailurePolicy>();
-        services.TryAddSingleton<IOriginalLanguageLookup, MetadataProviderOriginalLanguageLookup>();
+        services.TryAddSingleton<IOriginalLanguageLookup, GatewayOriginalLanguageLookup>();
         services.TryAddSingleton(new RemuxPassSettings
         {
             ProbeSizeMb = options.ProcessingProbeSizeMb,

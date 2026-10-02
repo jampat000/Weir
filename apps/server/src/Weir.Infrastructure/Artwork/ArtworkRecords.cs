@@ -12,8 +12,23 @@ public sealed record ArtworkLookupRequest(
     string? PosterRef,
     int Priority);
 
-/// <summary>A queued lookup as the resolver reads it.</summary>
-public sealed record ArtworkLookup(string Key, string MediaScope, string Title, int? Year, long? TmdbId, long? TvdbId, string? PosterRef, int Attempts);
+/// <summary>
+/// A title's lookup as it is read back: what is known to ask the service with, what became of asking, and the original language the
+/// service reported (null before it has answered, empty when it answered without one). <paramref name="IsDue"/> is whether the wait
+/// after the last failure or not-found has passed.
+/// </summary>
+public sealed record ArtworkLookup(
+    string Key,
+    string MediaScope,
+    string Title,
+    int? Year,
+    long? TmdbId,
+    long? TvdbId,
+    string? PosterRef,
+    int Attempts,
+    string Outcome,
+    string? OriginalLanguage,
+    bool IsDue);
 
 /// <summary>A stored poster image.</summary>
 public sealed record StoredPoster(string PosterId, string ContentType);

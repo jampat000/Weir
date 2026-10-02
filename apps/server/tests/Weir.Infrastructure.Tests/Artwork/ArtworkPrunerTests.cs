@@ -1,4 +1,3 @@
-using Microsoft.Extensions.Logging.Abstractions;
 using Weir.Core.Artwork;
 using Weir.Infrastructure.Artwork;
 
@@ -145,15 +144,7 @@ public sealed class ArtworkPrunerTests
     {
         using var fixture = new ArtworkFixture();
         await FileWithPosterAsync(fixture);
-        var offline = new ArtworkGatewayClient(
-            Core.Configuration.WeirOptionsLoader.Load(new Core.Configuration.RuntimeEnvironment(
-                new Dictionary<string, string> { ["WEIR_HOME"] = fixture.Store.Home.Path, ["WEIR_ARTWORK_GATEWAY_URL"] = "off" },
-                OperatingSystem.IsWindows(),
-                fixture.Store.Home.Path,
-                fixture.Store.Home.Path)),
-            fixture.Http,
-            fixture.Store.Clock,
-            NullLogger<ArtworkGatewayClient>.Instance);
+        var offline = fixture.SwitchedOffGateway();
         var task = fixture.TaskFor(offline);
         await task.RunOnceAsync(CancellationToken.None);
         await ForgetFileAsync(fixture, FilmPath);

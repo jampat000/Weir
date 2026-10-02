@@ -36,8 +36,11 @@ public static class GatewayAnswers
         where T : class => new(GatewayStatus.Busy, RetryAfter: retryAfter);
 }
 
-/// <summary>The best match a search found: a reference to the poster image, and the title's TMDb id when the answer gave one.</summary>
-public sealed record GatewayMatch(string PosterRef, long? TmdbId);
+/// <summary>
+/// The best match a search found: a reference to the poster image when the match has one, the title's TMDb id when the answer gave one,
+/// and the original language it reported (null when it reported none).
+/// </summary>
+public sealed record GatewayMatch(string? PosterRef, long? TmdbId, string? OriginalLanguage);
 
 /// <summary>What the gateway sent back: the bytes and their content type.</summary>
 public sealed record GatewayBody(byte[] Bytes, string ContentType);

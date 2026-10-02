@@ -201,7 +201,12 @@ public sealed class ArtworkResolverTests
         await Eventually.ThatAsync(() => fixture.Searches().Count == 1);
         Assert.False(resolving.IsCompleted);
 
-        fixture.Store.Clock.Advance(ArtworkRateLimiter.MinimumBetweenSearches);
+        // The second search may not have started waiting for its turn yet, so time keeps moving until it has had it.
+        await Eventually.ThatAsync(() =>
+        {
+            fixture.Store.Clock.Advance(ArtworkRateLimiter.MinimumBetweenSearches);
+            return resolving.IsCompleted;
+        });
 
         Assert.Equal(2, await resolving);
         Assert.Equal(2, fixture.Searches().Count);
@@ -272,17 +277,54 @@ public sealed class ArtworkResolverTests
     }
 
     [Fact]
-    public async Task Switching_artwork_off_hides_every_poster_but_keeps_the_images_on_disk()
+    public async Task A_server_with_the_metadata_service_switched_off_shows_no_poster_but_keeps_the_images_on_disk()
     {
         using var fixture = new ArtworkFixture();
         fixture.ServeSearch(ArtworkFixture.SearchAnswer(PosterFile)).ServeImage(PosterFile);
         var library = await fixture.LibraryIdAsync("movie");
         await fixture.QueueFileAsync(library, FilmPath);
         await fixture.Resolver.ResolveDueAsync(10, CancellationToken.None);
+        var switchedOff = new ArtworkPosterUrls(fixture.Files, fixture.SwitchedOffGateway());
 
-        await fixture.Store.Execute("UPDATE suite_settings SET artwork_enabled = 0 WHERE id = 1");
+        var urls = await fixture.Store.WithUnitOfWork(uow => switchedOff.ForFilesAsync(uow, [(library, FilmPath)]), commit: false);
 
-        Assert.Empty(await fixture.PosterUrlsForAsync(library, FilmPath));
+        Assert.Empty(urls);
         Assert.True(File.Exists(Path.Join(fixture.Store.Options.WeirHome, "artwork", "posters", ArtworkKeys.PosterId(PosterFile))));
+    }
+
+    [Fact]
+    public async Task The_original_language_in_the_answer_is_kept_with_the_title_it_belongs_to()
+    {
+        using var fixture = new ArtworkFixture();
+        fixture.ServeSearch(ArtworkFixture.SearchAnswer(PosterFile, originalLanguage: "DE ")).ServeImage(PosterFile);
+        await fixture.QueueFileAsync(await fixture.LibraryIdAsync("movie"), FilmPath);
+
+        await fixture.Resolver.ResolveDueAsync(10, CancellationToken.None);
+
+        Assert.Equal("de", await fixture.OriginalLanguageAsync(FilmKey()));
+    }
+
+    [Fact]
+    public async Task An_answer_that_names_no_language_is_remembered_as_having_none()
+    {
+        using var fixture = new ArtworkFixture();
+        fixture.ServeSearch(ArtworkFixture.SearchAnswer(PosterFile, originalLanguage: string.Empty)).ServeImage(PosterFile);
+        await fixture.QueueFileAsync(await fixture.LibraryIdAsync("movie"), FilmPath);
+
+        await fixture.Resolver.ResolveDueAsync(10, CancellationToken.None);
+
+        Assert.Equal(string.Empty, await fixture.OriginalLanguageAsync(FilmKey()));
+    }
+
+    [Fact]
+    public async Task A_search_with_no_poster_still_keeps_the_original_language_it_reported()
+    {
+        using var fixture = new ArtworkFixture();
+        fixture.ServeSearch("""{"results":[{"provider":"tmdb","providerId":"9","originalLanguage":"ja","posterUrl":null}]}""");
+        await fixture.QueueFileAsync(await fixture.LibraryIdAsync("movie"), FilmPath);
+
+        await fixture.Resolver.ResolveDueAsync(10, CancellationToken.None);
+
+        Assert.Equal(("ja", ArtworkOutcomes.Missing), (await fixture.OriginalLanguageAsync(FilmKey()), await fixture.OutcomeAsync(FilmKey())));
     }
 }

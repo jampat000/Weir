@@ -43,7 +43,6 @@ public static class ProcessingApi
         services.TryAddSingleton<HoldDiagnosticStore>();
         services.TryAddSingleton<JobsInspectionStore>();
         services.TryAddSingleton<MaintenanceStore>();
-        services.TryAddSingleton<MetadataProviderStore>();
         services.TryAddSingleton<OperatorSettingsStore>();
         services.TryAddSingleton<OverviewStatsStore>();
         // The Direct Play device list lives in SuiteSettingsStore; wrapping it here (#745 part 5) means both

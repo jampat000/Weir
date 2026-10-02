@@ -4,7 +4,6 @@ using Weir.Core.Json;
 using Weir.Core.MediaManagers;
 using Weir.Core.Processing;
 using Weir.Core.Processing.RemuxPass;
-using Weir.Core.Rules;
 using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.MediaManagers;
 using Weir.Infrastructure.Sqlite;
@@ -141,84 +140,6 @@ public sealed class SqliteRemuxPassData : IRemuxPassFileFacts, IPostSuccessClean
         {
             _logger.LogWarning(exception, "Weir could not commit optional file metadata ({Label}); continuing the media pass.", label);
         }
-    }
-}
-
-/// <summary>
-/// The original language from the configured metadata provider (#537). Movies only, because the provider lookup asks
-/// about movies; a TV episode, an unconfigured provider or an unreadable name declines, and the language preferences decide.
-/// </summary>
-public sealed class MetadataProviderOriginalLanguageLookup : IOriginalLanguageLookup
-{
-    private readonly SqliteDatabase _database;
-    private readonly MetadataProviderService _providers;
-
-    public MetadataProviderOriginalLanguageLookup(SqliteDatabase database, MetadataProviderService providers)
-    {
-        _database = database ?? throw new ArgumentNullException(nameof(database));
-        _providers = providers ?? throw new ArgumentNullException(nameof(providers));
-    }
-
-    public async Task<LookupResult> LookupAsync(string mediaScope, string relativeMediaPath, HandoffOrigin? origin, CancellationToken cancellationToken)
-    {
-        if (mediaScope == "tv")
-        {
-            return new LookupResult
-            {
-                Status = LookupResult.StatusNoMatch,
-                Detail = "Weir only looks up films with the metadata provider, so TV episodes use the language preferences",
-            };
-        }
-
-        IMetadataProvider? provider;
-        var uow = await UnitOfWork.OpenAsync(_database, cancellationToken).ConfigureAwait(false);
-        await using (uow.ConfigureAwait(false))
-        {
-            provider = await _providers.BuildProviderAsync(uow).ConfigureAwait(false);
-        }
-
-        if (provider is null)
-        {
-            return new LookupResult
-            {
-                Status = LookupResult.StatusNotConfigured,
-                Detail = "no metadata provider is configured",
-            };
-        }
-
-        var parsed = TitleFor(relativeMediaPath, origin);
-        if (parsed is not { } title)
-        {
-            return new LookupResult { Status = LookupResult.StatusNoMatch, Detail = "Weir could not read a film title from the file name" };
-        }
-
-        return await provider.LookupMovieAsync(title.Title, title.Year, cancellationToken).ConfigureAwait(false);
-    }
-
-    /// <summary>The hand-off's release name first, then the release folder, then the file's own name.</summary>
-    public static (string Title, int? Year)? TitleFor(string relativeMediaPath, HandoffOrigin? origin)
-    {
-        var parts = (relativeMediaPath ?? string.Empty).Replace('\\', '/').Split('/', StringSplitOptions.RemoveEmptyEntries);
-        var candidates = new List<string?> { origin?.ReleaseName };
-        if (parts.Length > 1)
-        {
-            candidates.Add(parts[^2]);
-        }
-
-        if (parts.Length > 0)
-        {
-            candidates.Add(Path.GetFileNameWithoutExtension(parts[^1]));
-        }
-
-        foreach (var candidate in candidates)
-        {
-            if (ReleaseTitle.Parse(candidate) is { } title)
-            {
-                return title;
-            }
-        }
-
-        return null;
     }
 }
 

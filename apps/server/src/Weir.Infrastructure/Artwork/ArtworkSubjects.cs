@@ -57,6 +57,17 @@ public sealed class ArtworkSubjects
         }
     }
 
+    /// <summary>Queue a title read from a file's name for a caller that needs its answer now, and return the key it is queued under.</summary>
+    public async Task<string> QueueTitleAsync(UnitOfWork uow, string mediaScope, ArtworkTitle title, int priority)
+    {
+        ArgumentNullException.ThrowIfNull(uow);
+        ArgumentNullException.ThrowIfNull(title);
+        var scope = ScopeOf(mediaScope);
+        var key = ArtworkKeys.ForTitle(scope, title);
+        await _lookups.EnqueueAsync(uow, new ArtworkLookupRequest(key, scope, title.Title, title.Year, TmdbId: null, TvdbId: null, ImdbId: null, PosterRef: null, priority)).ConfigureAwait(false);
+        return key;
+    }
+
     /// <summary>The lookup key the title is queued under, or null when there is nothing to look a poster up by.</summary>
     private async Task<string?> QueueAsync(UnitOfWork uow, string scope, ArtworkTitle? title, ArtworkHints? hints, int priority)
     {
@@ -75,5 +86,5 @@ public sealed class ArtworkSubjects
     }
 
     /// <summary>A library's kind as lookups know it: a series, or a film for anything else.</summary>
-    private static string ScopeOf(string libraryMediaType) => libraryMediaType == SeriesScope ? SeriesScope : FilmScope;
+    public static string ScopeOf(string libraryMediaType) => libraryMediaType == SeriesScope ? SeriesScope : FilmScope;
 }

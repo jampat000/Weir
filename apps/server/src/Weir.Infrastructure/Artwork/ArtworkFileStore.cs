@@ -34,6 +34,17 @@ public sealed class ArtworkFileStore
             ("$episode", episode));
     }
 
+    /// <summary>The key of the title a file belongs to, or null when it has none yet.</summary>
+    public Task<string?> LookupKeyAsync(UnitOfWork uow, long libraryId, string path)
+    {
+        ArgumentNullException.ThrowIfNull(uow);
+        return uow.QuerySingleAsync(
+            "SELECT lookup_key FROM artwork_files WHERE library_id = $library AND relative_path = $path AND lookup_key IS NOT NULL",
+            reader => SqliteValues.GetString(reader, 0),
+            ("$library", libraryId),
+            ("$path", path));
+    }
+
     /// <summary>Processing files with no title yet, newest first.</summary>
     public Task<List<ArtworkCandidate>> UnlinkedProcessingFilesAsync(UnitOfWork uow, int limit)
     {

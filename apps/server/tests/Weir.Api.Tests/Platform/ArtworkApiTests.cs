@@ -4,7 +4,7 @@ using static Weir.Api.Tests.Platform.ApiTestClient;
 
 namespace Weir.Api.Tests.Platform;
 
-/// <summary>Posters over HTTP: the image route, the poster address on every file-shaped item, and the Artwork switch.</summary>
+/// <summary>Posters over HTTP: the image route, the poster address on every file-shaped item, and the metadata-provider routes that are kept for older clients.</summary>
 public sealed class ArtworkApiTests
 {
     private const string PosterFile = "zv7J85D8CC9qYagAEhPM63CIG6j.jpg";
@@ -12,9 +12,10 @@ public sealed class ArtworkApiTests
     private static readonly byte[] ImageBytes = [0xFF, 0xD8, 0xFF, 0xE0, 9, 8, 7];
     private static readonly string PosterId = ArtworkKeys.PosterId(PosterFile);
 
-    private static async Task<(WeirTestServer Server, ApiTestClient Client)> StartSignedInAsync()
+    /// <summary>A signed-in server whose metadata service is a made-up address nothing answers, unless a test says otherwise.</summary>
+    private static async Task<(WeirTestServer Server, ApiTestClient Client)> StartSignedInAsync(params (string Name, string Value)[] variables)
     {
-        var server = await StartServerAsync();
+        var server = await StartServerAsync([("WEIR_ARTWORK_GATEWAY_URL", "http://gateway.test"), .. variables]);
         await TestDatabase.SeedAdminAsync(server);
         var client = new ApiTestClient(server);
         await client.SignInAsync();
@@ -164,61 +165,56 @@ public sealed class ArtworkApiTests
     }
 
     [Fact]
-    public async Task Switching_artwork_off_makes_every_poster_address_null_and_on_brings_them_back()
+    public async Task A_server_whose_administrator_turned_the_metadata_service_off_shows_no_poster_address()
+    {
+        var (server, client) = await StartSignedInAsync(("WEIR_ARTWORK_GATEWAY_URL", "off"));
+        await using var _ = server;
+        await SeedFileWithPosterAsync(server);
+
+        using var response = await client.GetAsync("/api/v1/processing/files");
+
+        Assert.Null((await Json(response))["files"]![0]!["poster_url"]);
+    }
+
+    [Fact]
+    public async Task The_deprecated_metadata_provider_settings_always_describe_the_metadata_service()
+    {
+        var (server, client) = await StartSignedInAsync();
+        await using var _ = server;
+
+        using var response = await client.GetAsync("/api/v1/processing/metadata-provider");
+
+        var body = await Json(response);
+        Assert.Equal(("deluno-gateway", null, false, true), (body["provider"]!.GetValue<string>(), body["base_url"]?.GetValue<string>(), body["key_configured"]!.GetValue<bool>(), body["artwork_enabled"]!.GetValue<bool>()));
+    }
+
+    [Fact]
+    public async Task A_save_to_the_deprecated_metadata_provider_settings_is_accepted_and_ignored()
     {
         var (server, client) = await StartSignedInAsync();
         await using var _ = server;
         await SeedFileWithPosterAsync(server);
-        var csrf = await client.CsrfAsync();
 
-        using (var off = await client.PutAsync("/api/v1/processing/metadata-provider", new { csrf_token = csrf, provider = string.Empty, artwork_enabled = false }))
-        {
-            Assert.Equal(HttpStatusCode.OK, off.StatusCode);
-            Assert.False((await Json(off))["artwork_enabled"]!.GetValue<bool>());
-        }
+        using var saved = await client.PutAsync(
+            "/api/v1/processing/metadata-provider",
+            new { csrf_token = await client.CsrfAsync(), provider = "tmdb", base_url = "https://tmdb.example/3", api_key = "a-key", artwork_enabled = false });
 
-        using (var hidden = await client.GetAsync("/api/v1/processing/files"))
-        {
-            Assert.Null((await Json(hidden))["files"]![0]!["poster_url"]);
-        }
-
-        using (var on = await client.PutAsync("/api/v1/processing/metadata-provider", new { csrf_token = csrf, provider = string.Empty, artwork_enabled = true }))
-        {
-            Assert.True((await Json(on))["artwork_enabled"]!.GetValue<bool>());
-        }
-
-        using var shown = await client.GetAsync("/api/v1/processing/files");
-        Assert.NotNull((await Json(shown))["files"]![0]!["poster_url"]);
+        Assert.Equal(HttpStatusCode.OK, saved.StatusCode);
+        var body = await Json(saved);
+        Assert.Equal(("deluno-gateway", false, true), (body["provider"]!.GetValue<string>(), body["key_configured"]!.GetValue<bool>(), body["artwork_enabled"]!.GetValue<bool>()));
+        using var files = await client.GetAsync("/api/v1/processing/files");
+        Assert.NotNull((await Json(files))["files"]![0]!["poster_url"]);
     }
 
     [Fact]
-    public async Task Artwork_is_on_by_default_and_a_save_that_leaves_it_out_keeps_it_as_it_is()
+    public async Task The_deprecated_metadata_provider_test_says_when_the_metadata_service_is_switched_off()
     {
-        var (server, client) = await StartSignedInAsync();
-        await using var _ = server;
-        var csrf = await client.CsrfAsync();
-
-        using (var initial = await client.GetAsync("/api/v1/processing/metadata-provider"))
-        {
-            Assert.True((await Json(initial))["artwork_enabled"]!.GetValue<bool>());
-        }
-
-        using (await client.PutAsync("/api/v1/processing/metadata-provider", new { csrf_token = csrf, artwork_enabled = false }))
-        {
-        }
-
-        using var saved = await client.PutAsync("/api/v1/processing/metadata-provider", new { csrf_token = csrf, provider = string.Empty });
-        Assert.False((await Json(saved))["artwork_enabled"]!.GetValue<bool>());
-    }
-
-    [Fact]
-    public async Task The_provider_test_accepts_the_artwork_field_the_page_sends_with_it()
-    {
-        var (server, client) = await StartSignedInAsync();
+        var (server, client) = await StartSignedInAsync(("WEIR_ARTWORK_GATEWAY_URL", "off"));
         await using var _ = server;
 
         using var response = await client.PostAsync("/api/v1/processing/metadata-provider/test", new { csrf_token = await client.CsrfAsync(), provider = string.Empty, artwork_enabled = true });
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("not_configured", (await Json(response))["status"]!.GetValue<string>());
     }
 }

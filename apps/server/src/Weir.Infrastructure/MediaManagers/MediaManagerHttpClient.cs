@@ -160,7 +160,7 @@ public sealed class MediaManagerHttpClient
         }
 
         var url = _base + (path.StartsWith('/') ? path : "/" + path);
-        return parameters is { Count: > 0 } ? url + "?" + TmdbResponses.UrlEncode(parameters) : url;
+        return parameters is { Count: > 0 } ? url + "?" + QueryStrings.Encode(parameters) : url;
     }
 
     /// <summary>GET and parse JSON. Booleans in <paramref name="parameters"/> are sent as <c>1</c>/<c>0</c>.</summary>

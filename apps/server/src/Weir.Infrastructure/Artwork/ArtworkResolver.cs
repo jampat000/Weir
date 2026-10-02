@@ -5,9 +5,10 @@ using Weir.Infrastructure.Sqlite;
 namespace Weir.Infrastructure.Artwork;
 
 /// <summary>
-/// Finds the poster for each queued title, one at a time and within <see cref="ArtworkRateLimiter"/>'s limits: asks the metadata
-/// service, stores the image, and remembers what came of it. A title is asked about once; one the service does not know is
-/// asked about again after a week, and one that could not be asked is retried with growing waits.
+/// Finds the poster and original language of each queued title, one at a time and within <see cref="ArtworkRateLimiter"/>'s limits:
+/// asks the metadata service, stores the image, and remembers what came of it. A title is asked about once and the one answer serves
+/// both; one the service does not know is asked about again after a week, and one that could not be asked is retried with growing
+/// waits.
 /// </summary>
 public sealed class ArtworkResolver
 {
@@ -63,20 +64,51 @@ public sealed class ArtworkResolver
         }
     }
 
+    /// <summary>
+    /// Ask the service about a title now rather than at its turn in the queue, for a caller that needs its original language. The answer
+    /// is remembered like any other, so the poster that comes with it is not searched for again; the caller reads what it needs from the
+    /// lookup afterwards.
+    /// </summary>
+    public async Task SearchNowAsync(ArtworkLookup lookup, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(lookup);
+        await SearchAsync(lookup, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>What a search left: whether the service can take more work, and the poster it named, if any.</summary>
+    private readonly record struct Searched(bool ServiceAvailable, string? PosterRef);
+
+    /// <summary>One search and the settling of its answer: the language and the poster are remembered, and a title with no poster to fetch is settled as missing.</summary>
+    private async Task<Searched> SearchAsync(ArtworkLookup lookup, CancellationToken cancellationToken)
+    {
+        await _limiter.WaitForSearchAsync(cancellationToken).ConfigureAwait(false);
+        var answer = await _gateway.FindAsync(lookup, cancellationToken).ConfigureAwait(false);
+        if (answer.Status != GatewayStatus.Ok)
+        {
+            return new Searched(await SettleWithoutPosterAsync(lookup, answer.Status, answer.RetryAfter, cancellationToken).ConfigureAwait(false), null);
+        }
+
+        var match = answer.Value!;
+        await WriteAsync(uow => _lookups.RecordMatchAsync(uow, lookup.Key, match.OriginalLanguage, match.PosterRef), cancellationToken).ConfigureAwait(false);
+        var posterRef = lookup.PosterRef ?? match.PosterRef;
+        return posterRef is null
+            ? new Searched(await SettleWithoutPosterAsync(lookup, GatewayStatus.NotFound, retryAfter: null, cancellationToken).ConfigureAwait(false), null)
+            : new Searched(true, posterRef);
+    }
+
     /// <summary>Settle one title. False when the service cannot take more work for now, so the caller stops.</summary>
     private async Task<bool> ResolveAsync(ArtworkLookup lookup, CancellationToken cancellationToken)
     {
         var posterRef = lookup.PosterRef;
         if (posterRef is null)
         {
-            await _limiter.WaitForSearchAsync(cancellationToken).ConfigureAwait(false);
-            var match = await _gateway.FindAsync(lookup, cancellationToken).ConfigureAwait(false);
-            if (match.Status != GatewayStatus.Ok)
+            var searched = await SearchAsync(lookup, cancellationToken).ConfigureAwait(false);
+            if (searched.PosterRef is null)
             {
-                return await SettleWithoutPosterAsync(lookup, match.Status, match.RetryAfter, cancellationToken).ConfigureAwait(false);
+                return searched.ServiceAvailable;
             }
 
-            posterRef = match.Value!.PosterRef;
+            posterRef = searched.PosterRef;
         }
 
         var posterId = ArtworkKeys.PosterId(posterRef);

@@ -1,20 +1,18 @@
 using Weir.Core.Artwork;
 using Weir.Infrastructure.Scheduling;
-using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Infrastructure.Artwork;
 
 /// <summary>
-/// <c>artwork-resolver</c>: every few seconds, titles any new files and looks up the posters that are due. It looks nothing up while
-/// Artwork is switched off or no gateway is configured, and a pass is cut short when the service is busy. About once an hour it also
+/// <c>artwork-resolver</c>: every few seconds, titles any new files and looks up the posters and original languages that are due. It
+/// looks nothing up when no gateway is configured, and a pass is cut short when the service is busy. About once an hour it also
 /// prunes what files that are gone leave behind, which needs no network.
 /// </summary>
 public sealed class ArtworkResolverTask : IPeriodicTask
 {
-    /// <summary>The most titles one pass looks up, so a pass ends in good time and sees a change to the setting.</summary>
+    /// <summary>The most titles one pass looks up, so a pass ends in good time.</summary>
     private const int MaxLookupsPerPass = 20;
 
-    private readonly SqliteDatabase _database;
     private readonly ArtworkGatewayClient _gateway;
     private readonly ArtworkDiscovery _discovery;
     private readonly ArtworkResolver _resolver;
@@ -23,11 +21,10 @@ public sealed class ArtworkResolverTask : IPeriodicTask
     private DateTimeOffset _nextPruneAt = DateTimeOffset.MinValue;
 
     public ArtworkResolverTask(
-        SqliteDatabase database, ArtworkGatewayClient gateway, ArtworkDiscovery discovery, ArtworkResolver resolver, ArtworkPruner pruner, TimeProvider time)
+        ArtworkGatewayClient gateway, ArtworkDiscovery discovery, ArtworkResolver resolver, ArtworkPruner pruner, TimeProvider time)
     {
         _pruner = pruner ?? throw new ArgumentNullException(nameof(pruner));
         _time = time ?? throw new ArgumentNullException(nameof(time));
-        _database = database ?? throw new ArgumentNullException(nameof(database));
         _gateway = gateway ?? throw new ArgumentNullException(nameof(gateway));
         _discovery = discovery ?? throw new ArgumentNullException(nameof(discovery));
         _resolver = resolver ?? throw new ArgumentNullException(nameof(resolver));
@@ -48,7 +45,7 @@ public sealed class ArtworkResolverTask : IPeriodicTask
     public async Task RunOnceAsync(CancellationToken cancellationToken)
     {
         await PruneWhenDueAsync(cancellationToken).ConfigureAwait(false);
-        if (!_gateway.IsConfigured || !await IsOnAsync(cancellationToken).ConfigureAwait(false))
+        if (!_gateway.IsConfigured)
         {
             return;
         }
@@ -69,12 +66,4 @@ public sealed class ArtworkResolverTask : IPeriodicTask
         await _pruner.PruneAsync(cancellationToken).ConfigureAwait(false);
     }
 
-    private async Task<bool> IsOnAsync(CancellationToken cancellationToken)
-    {
-        var uow = await UnitOfWork.OpenAsync(_database, cancellationToken).ConfigureAwait(false);
-        await using (uow.ConfigureAwait(false))
-        {
-            return await ArtworkSwitch.IsOnAsync(uow).ConfigureAwait(false);
-        }
-    }
 }

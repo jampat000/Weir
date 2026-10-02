@@ -25,13 +25,14 @@ internal sealed class ArtworkFixture : IDisposable
         Lookups = new ArtworkLookupStore();
         Files = new ArtworkFileStore();
         Subjects = new ArtworkSubjects(Lookups, Files);
-        PosterUrls = new ArtworkPosterUrls(Files);
         PosterFiles = new ArtworkPosterFiles(Store.Options);
         Limiter = new ArtworkRateLimiter(Store.Clock);
         Gateway = new ArtworkGatewayClient(Store.Options, Http, Store.Clock, NullLogger<ArtworkGatewayClient>.Instance);
+        PosterUrls = new ArtworkPosterUrls(Files, Gateway);
         Resolver = new ArtworkResolver(Store.Database, Lookups, Gateway, PosterFiles, Limiter, Store.Clock, NullLogger<ArtworkResolver>.Instance);
         Discovery = new ArtworkDiscovery(Store.Database, Files, Subjects);
         Pruner = new ArtworkPruner(Store.Database, PosterFiles, Store.Clock, NullLogger<ArtworkPruner>.Instance);
+        OriginalLanguages = new GatewayOriginalLanguageLookup(Store.Database, Lookups, Files, Subjects, Resolver, Gateway, Limiter, Store.Clock);
     }
 
     public StoreFixture Store { get; }
@@ -58,15 +59,28 @@ internal sealed class ArtworkFixture : IDisposable
 
     public ArtworkPruner Pruner { get; }
 
-    public ArtworkResolverTask TaskFor(ArtworkGatewayClient gateway) => new(Store.Database, gateway, Discovery, Resolver, Pruner, Store.Clock);
+    public GatewayOriginalLanguageLookup OriginalLanguages { get; }
+
+    public ArtworkResolverTask TaskFor(ArtworkGatewayClient gateway) => new(gateway, Discovery, Resolver, Pruner, Store.Clock);
+
+    /// <summary>A client for a server whose administrator set <c>WEIR_ARTWORK_GATEWAY_URL=off</c>.</summary>
+    public ArtworkGatewayClient SwitchedOffGateway() => new(
+        Core.Configuration.WeirOptionsLoader.Load(new Core.Configuration.RuntimeEnvironment(
+            new Dictionary<string, string> { ["WEIR_HOME"] = Store.Home.Path, ["WEIR_ARTWORK_GATEWAY_URL"] = "off" },
+            OperatingSystem.IsWindows(),
+            Store.Home.Path,
+            Store.Home.Path)),
+        Http,
+        Store.Clock,
+        NullLogger<ArtworkGatewayClient>.Instance);
 
     /// <summary>The id of the library the database is seeded with for a kind of media.</summary>
     public Task<long> LibraryIdAsync(string mediaType) =>
         Store.Scalar($"SELECT id FROM libraries WHERE media_type = '{mediaType}' ORDER BY display_order, id LIMIT 1");
 
     /// <summary>What the metadata service answers to a search: one result with a poster, as the real one words it.</summary>
-    public static string SearchAnswer(string posterFile, long tmdbId = 603) =>
-        $$"""{"provider":"deluno-broker","results":[{"provider":"tmdb","providerId":"{{tmdbId}}","title":"x","posterUrl":"{{GatewayUrl}}/artwork/w780/{{posterFile}}"}]}""";
+    public static string SearchAnswer(string posterFile, long tmdbId = 603, string originalLanguage = "en") =>
+        $$"""{"provider":"deluno-broker","results":[{"provider":"tmdb","providerId":"{{tmdbId}}","title":"x","originalLanguage":"{{originalLanguage}}","posterUrl":"{{GatewayUrl}}/artwork/w780/{{posterFile}}"}]}""";
 
     public ArtworkFixture ServeSearch(string answerJson)
     {
@@ -101,6 +115,12 @@ internal sealed class ArtworkFixture : IDisposable
 
     public Task<string> OutcomeAsync(string lookupKey) =>
         Store.WithUnitOfWork(async uow => Convert.ToString(await uow.ScalarAsync("SELECT outcome FROM artwork_lookups WHERE lookup_key = $key", ("$key", lookupKey)), System.Globalization.CultureInfo.InvariantCulture)!, commit: false);
+
+    /// <summary>The original language kept for a title: null before the service has answered, empty when it answered with none.</summary>
+    public Task<string?> OriginalLanguageAsync(string lookupKey) =>
+        Store.WithUnitOfWork(
+            async uow => await uow.ScalarAsync("SELECT original_language FROM artwork_lookups WHERE lookup_key = $key", ("$key", lookupKey)) is string language ? language : null,
+            commit: false);
 
     public Task<IReadOnlyDictionary<(long LibraryId, string Path), string>> PosterUrlsForAsync(long libraryId, params string[] paths) =>
         Store.WithUnitOfWork(uow => PosterUrls.ForFilesAsync(uow, paths.Select(path => (libraryId, path))), commit: false);

@@ -11,14 +11,16 @@ using Weir.Infrastructure.MediaManagers;
 namespace Weir.Infrastructure.Artwork;
 
 /// <summary>
-/// Asks Deluno's metadata service for a title's poster: one request to find it, one for the image. It only reads, and sends
-/// only the title and year, or the ids a media manager gave. Every failure is an answer, never an exception.
+/// Asks Deluno's metadata service about a title: one request to find it, which also says its original language, and one for the poster
+/// image. It only reads, and sends only the title and year, or the ids a media manager gave. Every failure is an answer, never an
+/// exception.
 /// </summary>
 public sealed class ArtworkGatewayClient
 {
     private const string FilmMediaType = "movies";
     private const string SeriesMediaType = "tv";
     private const string SeriesScope = "tv";
+    private const string HealthyStatus = "ok";
     private const int MaxSearchBytes = 1024 * 1024;
     private const int MaxImageBytes = 5 * 1024 * 1024;
     private const int ReadChunkBytes = 16 * 1024;
@@ -57,6 +59,18 @@ public sealed class ArtworkGatewayClient
         return lookup.TmdbId is null && lookup.TvdbId is { } tvdbId && lookup.MediaScope == SeriesScope
             ? FindSeriesAsync(tvdbId, cancellationToken)
             : SearchAsync(lookup, cancellationToken);
+    }
+
+    /// <summary>Whether the service answers its health check, which is not a metadata lookup and costs none of the lookup budget.</summary>
+    public async Task<GatewayStatus> CheckHealthAsync(CancellationToken cancellationToken)
+    {
+        var answer = await GetAsync($"{_baseUrl}/health", MaxSearchBytes, _gatewayPolicy, cancellationToken).ConfigureAwait(false);
+        if (answer.Status != GatewayStatus.Ok)
+        {
+            return answer.Status;
+        }
+
+        return ParseObject(answer.Value!.Bytes) is { } body && Text(body.Get("status")) == HealthyStatus ? GatewayStatus.Ok : GatewayStatus.Unavailable;
     }
 
     /// <summary>The poster image, at Weir's size when it comes from TMDb.</summary>
@@ -185,19 +199,26 @@ public sealed class ArtworkGatewayClient
         }
     }
 
-    /// <summary>The first result that has a poster. The service ranks its results, so the first is its best match.</summary>
-    private GatewayMatch? ReadSearchMatch(WireObject answer) =>
-        answer.Get("results") is WireArray results
-            ? results.Items.OfType<WireObject>().Select(MatchOf).FirstOrDefault(match => match is not null)
-            : null;
+    /// <summary>The first result that has a poster, or the first result when none has. The service ranks its results, so the first is its best match.</summary>
+    private GatewayMatch? ReadSearchMatch(WireObject answer)
+    {
+        if (answer.Get("results") is not WireArray results)
+        {
+            return null;
+        }
+
+        var matches = results.Items.OfType<WireObject>().Select(MatchOf).ToList();
+        return matches.Find(match => match.PosterRef is not null) ?? matches.FirstOrDefault();
+    }
 
     private GatewayMatch? ReadSeriesMatch(WireObject answer) => answer.Get("series") is WireObject series ? MatchOf(series) : null;
 
-    private GatewayMatch? MatchOf(WireObject record)
+    private GatewayMatch MatchOf(WireObject record)
     {
         var posterRef = ArtworkPosterSource.RefFromAnswerUrl(Text(record.Get("posterUrl")), _host);
         var tmdbId = long.TryParse(Text(record.Get("tmdbId")) ?? Text(record.Get("providerId")), NumberStyles.None, CultureInfo.InvariantCulture, out var id) ? id : (long?)null;
-        return posterRef is null ? null : new GatewayMatch(posterRef, tmdbId);
+        var language = WireStrings.Strip(Text(record.Get("originalLanguage")) ?? string.Empty).ToLowerInvariant();
+        return new GatewayMatch(posterRef, tmdbId, language.Length > 0 ? language : null);
     }
 
     private static string? Text(WireValue? value) => value is WireString text ? text.Value : null;

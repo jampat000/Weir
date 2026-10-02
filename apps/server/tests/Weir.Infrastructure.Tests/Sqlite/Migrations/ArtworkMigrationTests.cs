@@ -4,8 +4,7 @@ using Weir.Infrastructure.Sqlite;
 namespace Weir.Infrastructure.Tests.Sqlite.Migrations;
 
 /// <summary>
-/// Migration <c>0035_artwork.sql</c>: the poster tables, and the Artwork setting, which an install that already has settings
-/// starts with switched on.
+/// Migration <c>0035_artwork.sql</c>: the tables that hold each title's poster and original language.
 /// <para>Each test builds a database at the revision before the migration and runs the migration's own SQL.</para>
 /// </summary>
 public sealed class ArtworkMigrationTests : IDisposable
@@ -20,7 +19,6 @@ public sealed class ArtworkMigrationTests : IDisposable
         Execute("DROP TABLE artwork_files");
         Execute("DROP TABLE artwork_lookups");
         Execute("DROP TABLE artwork_posters");
-        Execute("ALTER TABLE suite_settings DROP COLUMN artwork_enabled");
     }
 
     public void Dispose()
@@ -30,14 +28,6 @@ public sealed class ArtworkMigrationTests : IDisposable
     }
 
     private void Migrate() => Execute(SchemaMigrator.ReadMigrationSql(SchemaMigrator.Migrations.Single(migration => migration.Number == 35)));
-
-    [Fact]
-    public void Existing_settings_start_with_artwork_on()
-    {
-        Migrate();
-
-        Assert.Equal(1, Scalar("SELECT artwork_enabled FROM suite_settings WHERE id = 1"));
-    }
 
     [Fact]
     public void The_poster_tables_exist_and_are_empty()
@@ -56,6 +46,15 @@ public sealed class ArtworkMigrationTests : IDisposable
         Execute("INSERT INTO artwork_lookups (lookup_key, media_scope, title) VALUES ('title:movie:x:0', 'movie', 'x')");
 
         Assert.Equal(1, Scalar("SELECT count(*) FROM artwork_lookups WHERE outcome = 'pending' AND attempts = 0 AND retry_at IS NULL"));
+    }
+
+    [Fact]
+    public void A_lookup_has_no_original_language_until_the_service_has_answered()
+    {
+        Migrate();
+        Execute("INSERT INTO artwork_lookups (lookup_key, media_scope, title) VALUES ('title:movie:x:0', 'movie', 'x')");
+
+        Assert.Equal(1, Scalar("SELECT count(*) FROM artwork_lookups WHERE original_language IS NULL"));
     }
 
     [Fact]

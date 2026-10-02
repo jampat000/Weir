@@ -88,10 +88,10 @@ public sealed class SkippedTvSeasonFolderCleanup : ITvSeasonFolderCleanup
 }
 
 /// <summary>
-/// Issue #537 item 4: where a pass learns a title's original language. The metadata provider (TMDb) answers for movies;
+/// Where a pass learns a title's original language, from Deluno's metadata service, for films and for series;
 /// every failure is a <see cref="LookupResult"/> status, never an exception.
 /// </summary>
 public interface IOriginalLanguageLookup
 {
-    Task<LookupResult> LookupAsync(string mediaScope, string relativeMediaPath, HandoffOrigin? origin, CancellationToken cancellationToken);
+    Task<LookupResult> LookupAsync(string mediaScope, long? libraryId, string relativeMediaPath, HandoffOrigin? origin, CancellationToken cancellationToken);
 }

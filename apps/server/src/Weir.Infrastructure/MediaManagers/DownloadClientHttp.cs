@@ -77,7 +77,7 @@ public sealed class DownloadClientHttpClient
         }
 
         var url = _base + (path.StartsWith('/') ? path : "/" + path);
-        return parameters is { Count: > 0 } ? url + "?" + TmdbResponses.UrlEncode(parameters) : url;
+        return parameters is { Count: > 0 } ? url + "?" + QueryStrings.Encode(parameters) : url;
     }
 
     /// <summary>A JSON request body, matching how every JSON-RPC dialect here builds one.</summary>

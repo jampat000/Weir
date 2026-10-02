@@ -22,17 +22,6 @@ public sealed record SuiteSettingsRecord
     public bool ProcessingPaused { get; init; }
     public Timestamp? ProcessingPausedUntil { get; init; }
     public bool ScanWhilePaused { get; init; } = true;
-
-    /// <summary>Processing's optional metadata provider. Empty means none configured.</summary>
-    public string MetadataProvider { get; init; } = string.Empty;
-    public string MetadataProviderBaseUrl { get; init; } = string.Empty;
-
-    /// <summary>Encrypted at rest with <see cref="Weir.Core.Security.CredentialCipher"/>; never returned by the API.</summary>
-    public string MetadataProviderKeyCiphertext { get; init; } = string.Empty;
-
-    /// <summary>Whether Weir looks posters up and shows them (the Rules page's Artwork switch).</summary>
-    public bool ArtworkEnabled { get; init; } = true;
-
     public Timestamp UpdatedAt { get; init; }
 }
 

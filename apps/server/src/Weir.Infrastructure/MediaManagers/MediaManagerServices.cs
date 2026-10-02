@@ -45,7 +45,6 @@ public static class MediaManagerServices
         services.TryAddSingleton<HandbackOutcomes>();
         // The optional downloaded-scan hand-back for a Sonarr/Radarr connection outside Weir's own hand-off flow.
         services.TryAddSingleton<DownloadedScanNotifier>();
-        services.TryAddSingleton<MetadataProviderService>();
         services.TryAddSingleton<ILibraryFileChangeNotifier, LibraryFileChangeNotifier>();
 
         // #509: asking a manager to redownload a title. What a clean removed, and which titles wait for a

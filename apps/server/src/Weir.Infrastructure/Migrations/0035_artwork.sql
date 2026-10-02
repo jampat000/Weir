@@ -1,10 +1,9 @@
--- Weir schema 0035 (revision 0070_artwork): posters for the files Weir shows, looked up once per title.
+-- Weir schema 0035 (revision 0070_artwork): posters for the files Weir shows, and the original language of each title, looked up
+-- once per title.
 --
--- artwork_enabled is the Rules page's Artwork switch: on by default, and off stops new lookups and hides every poster.
 -- artwork_lookups holds one row per title (keyed by TMDb id when a media manager supplied one, otherwise by name and year)
 -- and what became of asking about it; artwork_posters holds one row per stored image (the image itself lives under
 -- WEIR_HOME/artwork/posters); artwork_files says which title each file belongs to.
-ALTER TABLE suite_settings ADD COLUMN artwork_enabled BOOLEAN NOT NULL DEFAULT 1;
 
 CREATE TABLE artwork_posters (
 	poster_id TEXT NOT NULL,
@@ -16,8 +15,9 @@ CREATE TABLE artwork_posters (
 );
 
 -- outcome is pending (not asked yet, or to be asked again at retry_at), found (poster_id names the image) or
--- missing (the service does not know the title; asked again at retry_at). poster_ref is a reference to the image (a TMDb file name or an https address) that a
--- media manager supplied, which saves the search.
+-- missing (the service does not know the title; asked again at retry_at). poster_ref is a reference to the image (a TMDb file name or an https address)
+-- that a media manager supplied or an earlier search found, which saves the next search. original_language is what the service
+-- reported as the title's original language, an empty string when it answered without one, and null until it has answered.
 CREATE TABLE artwork_lookups (
 	lookup_key TEXT NOT NULL,
 	media_scope TEXT NOT NULL,
@@ -27,6 +27,7 @@ CREATE TABLE artwork_lookups (
 	tvdb_id INTEGER,
 	imdb_id TEXT,
 	poster_ref TEXT,
+	original_language TEXT,
 	priority INTEGER NOT NULL DEFAULT 0,
 	outcome TEXT NOT NULL DEFAULT 'pending',
 	poster_id TEXT,

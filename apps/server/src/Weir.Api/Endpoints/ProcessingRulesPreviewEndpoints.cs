@@ -212,7 +212,7 @@ internal sealed class ProcessingRulesPreviewEndpointHandlers
         WireObject? originalLanguageOut = null;
         if (config.OriginalLanguage is { Enabled: true } originalRules)
         {
-            (config, originalLanguageOut) = await ApplyOriginalLanguageAsync(request, config, originalRules, scope, resolvedPath, audio).ConfigureAwait(false);
+            (config, originalLanguageOut) = await ApplyOriginalLanguageAsync(request, config, originalRules, scope, library.Id, resolvedPath, audio).ConfigureAwait(false);
         }
 
         var plan = RemuxRules.PlanRemux(video, audio, subtitles, config, RemuxRules.AttachmentStreams(probe));
@@ -287,7 +287,7 @@ internal sealed class ProcessingRulesPreviewEndpointHandlers
     private sealed record RulesChoice(LibraryRules.RuleSetInput? Unsaved, long? SavedRuleSetId);
 
     /// <summary>
-    /// #537 item 4's lookup, run the same way a live pass runs it: declining (no provider, no match,
+    /// #537 item 4's lookup, run the same way a live pass runs it: declining (lookup off, no match,
     /// unreachable) leaves the configured language preferences in charge, with a note saying so, rather
     /// than failing the preview.
     /// </summary>
@@ -296,13 +296,14 @@ internal sealed class ProcessingRulesPreviewEndpointHandlers
         ProcessingRulesConfig config,
         OriginalLanguageRules rules,
         string scope,
+        long libraryId,
         string resolvedPath,
         IReadOnlyList<ProbeStreamInfo> audio)
     {
         LookupResult lookup;
         try
         {
-            lookup = await _originalLanguageLookup.LookupAsync(scope, resolvedPath, origin: null, request.Context.RequestAborted).ConfigureAwait(false);
+            lookup = await _originalLanguageLookup.LookupAsync(scope, libraryId, resolvedPath, origin: null, request.Context.RequestAborted).ConfigureAwait(false);
         }
 #pragma warning disable CA1031 // A failed metadata lookup is shown as unreachable; the preview still answers.
         catch (Exception exception) when (exception is not OperationCanceledException)
