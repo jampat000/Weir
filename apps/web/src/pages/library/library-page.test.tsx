@@ -858,7 +858,7 @@ describe("LibraryPage", () => {
       "Needs cleaning 9",
       "Cleaning 1",
       "Matches rules 2",
-      "Can't clean yet 1",
+      "Can't clean 1",
       "Left alone 1",
     ]);
 
@@ -969,7 +969,7 @@ describe("LibraryPage", () => {
     expect(tone(/Needs cleaning/)).toBe("failed");
     expect(tone(/Cleaning \d/)).toBe("info");
     expect(tone(/Matches rules/)).toBe("healthy");
-    expect(tone(/Can't clean yet/)).toBe("warning");
+    expect(tone(/Can't clean/)).toBe("warning");
     expect(tone(/Left alone/)).toBe("neutral");
     expect(tone(/^All/)).toBeNull();
 
@@ -987,7 +987,7 @@ describe("LibraryPage", () => {
       screen.queryByRole("combobox", { name: /cannot clean a file yet/ }),
     ).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: /Can't clean yet/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Can't clean/ }));
     fireEvent.change(
       screen.getByRole("combobox", { name: /cannot clean a file yet/ }),
       { target: { value: "seeding" } },
@@ -1026,7 +1026,7 @@ describe("LibraryPage", () => {
         "Needs cleaning 9",
         "Cleaning 0",
         "Matches rules 2",
-        "Can't clean yet 1",
+        "Can't clean 1",
         "Left alone 0",
       ]);
       expect(screen.getByRole("button", { name: /Cleaning/ })).toHaveAttribute(
@@ -1052,7 +1052,7 @@ describe("LibraryPage", () => {
         "Needs cleaning 0",
         "Cleaning 0",
         "Matches rules 0",
-        "Can't clean yet 0",
+        "Can't clean 0",
         "Left alone 0",
       ]);
     });

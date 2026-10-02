@@ -88,7 +88,7 @@ const CHIPS: Chip[] = [
   },
   {
     id: "cant_clean_yet",
-    label: "Can't clean yet",
+    label: "Can't clean",
     hint: "Can't clean yet: still seeding, or Weir cannot read them. Weir tries again on its own",
     rag: STATUS_RAG.cant_clean_yet,
     count: (totals) => totals.by_status.cant_clean_yet,
