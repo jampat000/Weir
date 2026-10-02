@@ -76,6 +76,8 @@ export class Engine {
     this.connections = new ConnectionHealth({
       engine: this,
       outages: scenario.outages,
+      slowSpells: scenario.slowSpells,
+      rng,
       startedAt,
       speed,
     });

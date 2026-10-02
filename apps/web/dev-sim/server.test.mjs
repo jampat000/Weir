@@ -48,15 +48,20 @@ function send(port, path, { method = "GET", body } = {}) {
   });
 }
 
-/** Reads the stream until it has said everything in `wanted`. */
-function readStream(port, wanted) {
+/** Reads the stream until it has said everything in `wanted`; `onOpen` runs once the stream has begun to answer. */
+function readStream(port, wanted, onOpen = () => {}) {
   return new Promise((resolve, reject) => {
     const request = http.get(
       { host: "127.0.0.1", port, path: "/api/v1/activity/stream" },
       (response) => {
         let text = "";
+        let opened = false;
         response.on("data", (chunk) => {
           text += chunk;
+          if (!opened) {
+            opened = true;
+            onOpen();
+          }
           if (wanted.every((frame) => text.includes(frame)))
             resolve({ contentType: response.headers["content-type"], text });
         });
@@ -89,6 +94,31 @@ describe("the simulated server over HTTP", () => {
         ),
       }),
     );
+  });
+
+  it("says on the stream when Weir asks a connection, with the frame the server sends", async () => {
+    const port = await start();
+
+    const { text } = await readStream(
+      port,
+      ["event: connection.activity"],
+      () =>
+        void send(port, "/api/v1/media-managers/connections/1/test", {
+          method: "POST",
+        }),
+    );
+
+    const frame = JSON.parse(
+      /event: connection.activity\ndata: (.*)\n/.exec(text)[1],
+    );
+    expect(frame).toEqual({
+      kind: "media_manager",
+      id: 1,
+      phase: "asked",
+      direction: "outbound",
+      at: expect.any(String),
+      ms: null,
+    });
   });
 
   it("answers JSON for a read and carries a write's body through", async () => {

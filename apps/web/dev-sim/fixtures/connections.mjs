@@ -16,16 +16,27 @@ const SECONDS_SINCE_LAST_ANSWER = {
   client: { 1: 33, 2: 54 },
 };
 
+/** How long each starter connection's last answer took, in ms. */
+const LAST_ANSWER_MS = {
+  manager: { 1: 84, 2: 61, 3: 112 },
+  client: { 1: 47, 2: 96 },
+};
+const DEFAULT_ANSWER_MS = 70;
+
 /**
- * What a connection reads as when it answered `secondsAgo` seconds before `startedAt`.
+ * What a connection reads as when it answered `secondsAgo` seconds before `startedAt`, taking `ms`.
  * @param {number} startedAt
  * @param {number} secondsAgo
+ * @param {number} ms
  */
-function answeredAt(startedAt, secondsAgo) {
+function answeredAt(startedAt, secondsAgo, ms) {
+  const at = toWire(startedAt - secondsAgo * SECOND_MS);
   return {
     last_test_ok: true,
-    last_test_at: toWire(startedAt - secondsAgo * SECOND_MS),
+    last_test_at: at,
     last_test_detail: CONNECTED_DETAIL,
+    last_answer_ms: ms,
+    last_used_at: at,
   };
 }
 
@@ -61,7 +72,11 @@ function manager(startedAt, { id, kind, label, port, nickname = null }) {
     api_key_is_saved: true,
     webhook_secret_is_set: true,
     webhook_url_path: `/api/v1/intake/webhook/${kind}-${id}`,
-    ...answeredAt(startedAt, SECONDS_SINCE_LAST_ANSWER.manager[id] ?? 30),
+    ...answeredAt(
+      startedAt,
+      SECONDS_SINCE_LAST_ANSWER.manager[id] ?? 30,
+      LAST_ANSWER_MS.manager[id] ?? DEFAULT_ANSWER_MS,
+    ),
   });
 }
 
@@ -101,7 +116,11 @@ function downloadClient(startedAt, { id, kind, label, port }) {
     username: null,
     password_is_saved: false,
     api_key_is_saved: kind === "sabnzbd",
-    ...answeredAt(startedAt, SECONDS_SINCE_LAST_ANSWER.client[id] ?? 30),
+    ...answeredAt(
+      startedAt,
+      SECONDS_SINCE_LAST_ANSWER.client[id] ?? 30,
+      LAST_ANSWER_MS.client[id] ?? DEFAULT_ANSWER_MS,
+    ),
   });
 }
 

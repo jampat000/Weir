@@ -1,7 +1,8 @@
 /**
  * The Activity stream the web app listens to (`GET /api/v1/activity/stream`): an `activity.latest` frame whenever
- * something is written, a `processing.progress` frame carrying every running file's progress about once a second, and
- * keepalives. The frame shapes are the server's (ActivityEndpoints, ActivityProgressFrames).
+ * something is written, a `processing.progress` frame carrying every running file's progress about once a second, a
+ * `connection.activity` frame whenever Weir talks to a media manager or download client or one talks to Weir, and
+ * keepalives. The frame shapes are the server's (ActivityEndpoints, ActivityProgressFrames, ConnectionActivityHub).
  */
 
 const RETRY_MS = 3000;
@@ -13,12 +14,14 @@ const latestFrame = ({ latestEventId, revision }) =>
   `event: activity.latest\ndata: ${JSON.stringify({ latest_event_id: latestEventId, activity_revision: revision })}\n\n`;
 const progressFrame = (files) =>
   `event: processing.progress\ndata: ${JSON.stringify({ files })}\n\n`;
+const connectionFrame = (frame) =>
+  `event: connection.activity\ndata: ${JSON.stringify(frame)}\n\n`;
 
 export class SseHub {
   #sim;
   #clients = new Set();
   #timers = [];
-  #unsubscribe = null;
+  #unsubscribe = [];
   #lastProgress = "";
 
   /** @param {import("./sim.mjs").Sim} sim */
@@ -29,8 +32,11 @@ export class SseHub {
   /** Begins following the engine and sending frames to whoever is connected. */
   start() {
     const { engine } = this.#sim;
-    this.#unsubscribe = engine.onChange(() =>
-      this.#broadcast(latestFrame(this.#position())),
+    this.#unsubscribe.push(
+      engine.onChange(() => this.#broadcast(latestFrame(this.#position()))),
+      engine.connections.activity.onFrame((frame) =>
+        this.#broadcast(connectionFrame(frame)),
+      ),
     );
     this.#timers.push(
       setInterval(() => this.#sendProgress(), PROGRESS_INTERVAL_MS),
@@ -41,7 +47,8 @@ export class SseHub {
   }
 
   stop() {
-    this.#unsubscribe?.();
+    this.#unsubscribe.forEach((stop) => stop());
+    this.#unsubscribe = [];
     this.#timers.forEach(clearInterval);
     for (const response of this.#clients) response.end();
     this.#clients.clear();

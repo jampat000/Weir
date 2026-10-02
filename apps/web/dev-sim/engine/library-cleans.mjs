@@ -1,4 +1,5 @@
 /** Library cleans: Weir cleaning a file where it already sits in a library, now and then and when a person asks. */
+import { CONNECTION_KIND } from "./connection-health.mjs";
 import { JOB_KIND, JOB_STATUS } from "./jobs.mjs";
 import { EVENT_TYPE } from "./records.mjs";
 import { toWire } from "../wire-time.mjs";
@@ -95,6 +96,10 @@ export class CleanRuns {
 
   /** A worker takes a queued clean. @param {import("./jobs.mjs").Job} job @param {number} nowMs */
   start(job, nowMs) {
+    const library = this.#engine.library(job.payload.library_id);
+    const manager = library ? this.#engine.managerFor(library) : null;
+    if (manager)
+      this.#engine.connections.reach(CONNECTION_KIND.MANAGER, manager, nowMs);
     this.#engine.jobs.setStatus(job.id, JOB_STATUS.LEASED, nowMs);
     this.#running.set(job.id, {
       endsAt: nowMs + this.#rng.between(...CLEAN_MS) / this.#speed,

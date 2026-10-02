@@ -31,6 +31,7 @@ export const DEFAULT_SCENARIO = SCENARIO.BUSY;
  * @property {{ rejected: number, failed: number }} arrivalShares The share of new downloads the rules reject, and the share that fail while writing.
  * @property {boolean} fourKManagerSaysWhereItSaves Whether the 4K manager reports where its downloads land, so its folder chain can be verified.
  * @property {Outage[]} outages
+ * @property {Outage[]} slowSpells When a connection still answers but takes two seconds or more to; the same shape as an outage.
  */
 
 /** @type {Record<string, Scenario>} */
@@ -56,6 +57,14 @@ export const SCENARIOS = {
         repeatsEveryMs: 10 * MINUTE_MS,
       },
     ],
+    slowSpells: [
+      {
+        connection: { kind: "manager", id: FOUR_K_MANAGER_ID },
+        startsAfterMs: 60 * SECOND_MS,
+        lastsMs: 80 * SECOND_MS,
+        repeatsEveryMs: 10 * MINUTE_MS,
+      },
+    ],
   },
   [SCENARIO.QUIET]: {
     name: SCENARIO.QUIET,
@@ -71,6 +80,7 @@ export const SCENARIOS = {
     arrivalShares: { rejected: 0, failed: 0 },
     fourKManagerSaysWhereItSaves: true,
     outages: [],
+    slowSpells: [],
   },
   [SCENARIO.TROUBLE]: {
     name: SCENARIO.TROUBLE,
@@ -91,6 +101,14 @@ export const SCENARIOS = {
         startsAfterMs: 0,
         lastsMs: Infinity,
         repeatsEveryMs: null,
+      },
+    ],
+    slowSpells: [
+      {
+        connection: { kind: "manager", id: FOUR_K_MANAGER_ID },
+        startsAfterMs: 45 * SECOND_MS,
+        lastsMs: 120 * SECOND_MS,
+        repeatsEveryMs: 8 * MINUTE_MS,
       },
     ],
   },

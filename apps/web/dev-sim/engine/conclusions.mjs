@@ -4,6 +4,7 @@ import { JOB_STATUS } from "./jobs.mjs";
 import { VERDICT } from "./plan.mjs";
 import { EVENT_TYPE, passDetail, statusReasonFor } from "./records.mjs";
 import { importRootOf, kindLabel } from "../fixtures/connections.mjs";
+import { CONNECTION_KIND } from "./connection-health.mjs";
 import { toWire } from "../wire-time.mjs";
 
 const EXECUTION_FAILURE = "execution";
@@ -83,10 +84,12 @@ export class Conclusions {
       release_note: null,
     };
     const library = this.#engine.library(file.libraryId);
-    file.handbackSettlesAt =
-      library && this.#engine.managerFor(library)
-        ? nowMs + this.#engine.importDelay()
-        : null;
+    const manager = library ? this.#engine.managerFor(library) : null;
+    if (manager)
+      this.#engine.connections.reach(CONNECTION_KIND.MANAGER, manager, nowMs);
+    file.handbackSettlesAt = manager
+      ? nowMs + this.#engine.importDelay()
+      : null;
     this.#record(file, nowMs, "success");
     this.#finishJob(file, nowMs, JOB_STATUS.COMPLETED);
   }
@@ -121,6 +124,7 @@ export class Conclusions {
     const library = this.#engine.library(file.libraryId);
     const manager = library ? this.#engine.managerFor(library) : null;
     if (!manager) return;
+    this.#engine.connections.receive(CONNECTION_KIND.MANAGER, manager, nowMs);
     const by = kindLabel(manager.kind);
     const stem = baseName(file.relativePath);
     file.handback = {

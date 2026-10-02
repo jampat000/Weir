@@ -4,7 +4,7 @@ import { managerLabel } from "../fixtures/connections.mjs";
 import { libraryDefaults, ruleSetDefaults } from "../fixtures/workflows.mjs";
 import { toWire } from "../wire-time.mjs";
 import { registerCollection } from "./collection.mjs";
-import { folderChainOf } from "./folder-chain.mjs";
+import { askChain, folderChainOf } from "./folder-chain.mjs";
 import { notFound } from "./reply.mjs";
 
 const BUSY_STATUSES = [STATUS.WAITING, STATUS.PROCESSING];
@@ -101,7 +101,9 @@ export function registerWorkflowRoutes(router) {
   );
   router.get(
     `${libraryPath}/:id/folder-chain`,
-    withLibrary((library, { sim }) => folderChainOf(library, sim.store)),
+    withLibrary((library, { sim }) =>
+      askChain(folderChainOf(library, sim.store), sim),
+    ),
   );
   router.get(
     "/api/v1/media-managers/connections/:id/folder-chain",
@@ -110,7 +112,7 @@ export function registerWorkflowRoutes(router) {
         .filter((library) =>
           library.manager_connection_ids?.includes(Number(params.id)),
         )
-        .map((library) => folderChainOf(library, sim.store)),
+        .map((library) => askChain(folderChainOf(library, sim.store), sim)),
   );
 
   registerCollection(router, {

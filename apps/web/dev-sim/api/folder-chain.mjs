@@ -3,7 +3,10 @@
  * folders, then asks each linked manager and each download client, and each answers in the lines the real server
  * words: read for itself, a problem with its fix, or only taken on someone's word.
  */
-import { unreachableText } from "../engine/connection-health.mjs";
+import {
+  CONNECTION_KIND,
+  unreachableText,
+} from "../engine/connection-health.mjs";
 import { importRootOf, managerLabel } from "../fixtures/connections.mjs";
 import { downloadClientKindsOf } from "../fixtures/workflows.mjs";
 import { shaped } from "../openapi/skeleton.mjs";
@@ -129,6 +132,30 @@ function downloadClientLink(client, library) {
     ready: true,
     lines,
   };
+}
+
+/**
+ * Weir reads a workflow's folder chain: it asks each linked manager and each download client the chain names, so
+ * the stream says so.
+ * @param {ReturnType<typeof folderChainOf>} chain
+ * @param {import("../sim.mjs").Sim} sim
+ */
+export function askChain(chain, sim) {
+  const asked = (kind, links, records) => {
+    for (const link of links) {
+      const connection = records.find(
+        (record) => record.id === link.connection_id,
+      );
+      if (connection) sim.engine.connections.reach(kind, connection, sim.now());
+    }
+  };
+  asked(CONNECTION_KIND.MANAGER, chain.managers, sim.store.managers);
+  asked(
+    CONNECTION_KIND.CLIENT,
+    chain.download_clients,
+    sim.store.downloadClients,
+  );
+  return chain;
 }
 
 /**

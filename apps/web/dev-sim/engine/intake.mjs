@@ -1,6 +1,7 @@
 /** Downloads turning up in the watched folders, and the holds that keep each one waiting until it is safe to touch. */
 import { Arrivals, chooseVerdict } from "./arrivals.mjs";
 import { filmsFor } from "./catalogue.mjs";
+import { CONNECTION_KIND } from "./connection-health.mjs";
 import { createFile, STATUS } from "./file.mjs";
 import { JOB_KIND } from "./jobs.mjs";
 import { makePlan } from "./plan.mjs";
@@ -167,6 +168,8 @@ export class Intake {
   #hold(file, library, nowMs) {
     const manager = this.#engine.managerFor(library);
     const asking = manager?.last_test_ok !== false;
+    if (manager)
+      this.#engine.connections.reach(CONNECTION_KIND.MANAGER, manager, nowMs);
     if (manager && asking && this.#rng.chance(BLOCKED_SHARE)) {
       file.status = STATUS.BLOCKED_UPSTREAM;
       file.blockedBy = manager.name;
