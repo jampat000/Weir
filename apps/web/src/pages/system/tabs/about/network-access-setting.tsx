@@ -79,13 +79,15 @@ export function NetworkAccessSetting({ editable }: { editable: boolean }) {
   return (
     <div className="space-y-2.5" data-testid="network-access-setting">
       {editable ? (
-        <SegmentedControl
-          options={SCOPE_OPTIONS}
-          value={intendedScope(status)}
-          onChange={choose}
-          ariaLabel="Who can reach Weir"
-          dataTestId="network-access-scope"
-        />
+        <div className="w-fit max-w-full">
+          <SegmentedControl
+            options={SCOPE_OPTIONS}
+            value={intendedScope(status)}
+            onChange={choose}
+            ariaLabel="Who can reach Weir"
+            dataTestId="network-access-scope"
+          />
+        </div>
       ) : null}
       <div
         className="mm-status-line flex-wrap"
