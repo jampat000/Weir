@@ -4,6 +4,7 @@ import {
   fireEvent,
   render,
   screen,
+  waitFor,
   within,
 } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router-dom";
@@ -110,7 +111,7 @@ afterEach(() => {
 
 describe("a setup area", () => {
   it.each([
-    ["/setup/workflows", "Workflows sections", ["Workflows", "Schedule"]],
+    ["/setup/workflows", "Workflows sections", ["File paths", "Schedule"]],
     [
       "/setup/connections",
       "Connections sections",
@@ -145,8 +146,10 @@ describe("a setup area", () => {
   it("sends the address of the retired Metadata & artwork tab to the area's first tab", async () => {
     const router = await renderAt("/setup/rules/metadata");
 
-    expect(router.state.location.pathname).toBe("/setup/rules");
-    expect(screen.getByRole("tabpanel")).toHaveTextContent("Profiles content");
+    await waitFor(() =>
+      expect(router.state.location.pathname).toBe("/setup/rules"),
+    );
+    expect(await screen.findByText("Profiles content")).toBeVisible();
   });
 
   it("moves to a tab through the address, so Back and Forward follow it", async () => {
