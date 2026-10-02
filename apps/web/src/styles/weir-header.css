@@ -67,6 +67,24 @@
   display: none;
 }
 
+/* A page's own buttons, on the title line at the right, just before the status and Pause. They keep their own size and
+   style, 8px apart. They never shrink, so it is the tabs that fold into More first. */
+.mm-header__buttons {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.mm-header__buttons:not(:has(button, a)) {
+  display: none;
+}
+
+.mm-header__buttons:has(button, a) + .mm-header__actions {
+  margin-left: 0;
+}
+
 /* Where a page puts its own control (a segmented choice, a picker); nothing shows when it has none. */
 .mm-header__slot {
   display: flex;
@@ -210,7 +228,8 @@
   column-gap: 18px;
 }
 
-.mm-page-tabs__tab {
+.mm-page-tabs__tab,
+.mm-page-tabs__more-button {
   position: relative;
   margin: 0;
   padding: 0;
@@ -227,7 +246,8 @@
   transition: color 0.15s ease;
 }
 
-.mm-page-tabs__tab:hover {
+.mm-page-tabs__tab:hover,
+.mm-page-tabs__more-button:hover {
   color: var(--mm-text1);
 }
 
@@ -336,23 +356,6 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  margin: 0;
-  padding: 0;
-  border: 0;
-  border-radius: 4px;
-  background: none;
-  font: inherit;
-  font-size: 14px;
-  font-weight: 500;
-  line-height: 1;
-  white-space: nowrap;
-  color: var(--mm-text2);
-  cursor: pointer;
-  transition: color 0.15s ease;
-}
-
-.mm-page-tabs__more-button:hover {
-  color: var(--mm-text1);
 }
 
 .mm-page-tabs__more-chevron {
@@ -428,15 +431,6 @@
   align-items: center;
   justify-content: flex-end;
   gap: 8px;
-}
-
-/* With the tabs on the title line the row holds only the page's buttons, at the right, and is there only while one is. */
-.mm-page-toolbar--buttons {
-  justify-content: flex-end;
-}
-
-.mm-page-toolbar--buttons:not(:has(button, a)) {
-  display: none;
 }
 
 /* The tab-owned buttons arrive through a portal into this element; it adds no box of its own, so they lay out as the

@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { PageToolbar } from "./page-toolbar";
 import {
   ShellHeaderProvider,
+  useHeaderButtonsSlotRef,
   useHeaderTabsSlotRef,
 } from "./shell-header-context";
 
@@ -13,10 +14,16 @@ const TABS = [
   { id: "jobs", label: "Jobs" },
 ] as const;
 
-/** The shell's header, reduced to the place its tabs go. */
+/** The shell's header, reduced to the places its tabs and its page buttons go. */
 function TitleLine() {
-  const slotRef = useHeaderTabsSlotRef();
-  return <div data-testid="title-line" ref={slotRef} />;
+  const tabsRef = useHeaderTabsSlotRef();
+  const buttonsRef = useHeaderButtonsSlotRef();
+  return (
+    <div data-testid="title-line">
+      <div ref={tabsRef} />
+      <div data-testid="title-line-buttons" ref={buttonsRef} />
+    </div>
+  );
 }
 
 function stubWindowWidth(wide: boolean) {
@@ -60,7 +67,7 @@ describe("where the header has room", () => {
     expect(tabs).toHaveClass("mm-page-tabs--title");
   });
 
-  it("has no row under the title when the page has no buttons", () => {
+  it("has no row under the title", () => {
     stubWindowWidth(true);
     const { container } = renderInShell();
 
@@ -68,20 +75,18 @@ describe("where the header has room", () => {
     expect(screen.queryByRole("navigation", { name: "Page tabs" })).toBeNull();
   });
 
-  it("keeps the page's buttons in a row of their own under the title", () => {
+  it("puts the page's buttons at the right of the title line, and draws no row of their own", () => {
     stubWindowWidth(true);
     const { container } = renderInShell(
       <button type="button">Add workflow</button>,
     );
 
-    const row = container.querySelector(".mm-page-toolbar");
-    expect(row).toHaveClass("mm-page-toolbar--buttons");
     expect(
-      within(row as HTMLElement).getByRole("button", { name: "Add workflow" }),
+      within(screen.getByTestId("title-line-buttons")).getByRole("button", {
+        name: "Add workflow",
+      }),
     ).toBeInTheDocument();
-    expect(
-      within(screen.getByTestId("title-line")).queryByRole("button"),
-    ).toBeNull();
+    expect(container.querySelector(".mm-page-toolbar")).toBeNull();
   });
 });
 

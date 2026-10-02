@@ -12,6 +12,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { setupRoutes } from "../../app/setup-routes";
 import {
   ShellHeaderProvider,
+  useHeaderButtonsSlotRef,
   useHeaderTabsSlotRef,
 } from "../../components/shell/shell-header-context";
 
@@ -68,8 +69,14 @@ vi.mock("./tabs/alerts/alerts-tab", async () => {
 
 /** The shell's header, reduced to the place its tabs go. */
 function TitleLine() {
-  const slotRef = useHeaderTabsSlotRef();
-  return <div data-testid="title-line" ref={slotRef} />;
+  const tabsRef = useHeaderTabsSlotRef();
+  const buttonsRef = useHeaderButtonsSlotRef();
+  return (
+    <div data-testid="title-line">
+      <div ref={tabsRef} />
+      <div data-testid="title-line-buttons" ref={buttonsRef} />
+    </div>
+  );
 }
 
 function stubWideWindow() {
@@ -197,7 +204,7 @@ describe("a setup area", () => {
     expect(screen.getByRole("tabpanel")).not.toContainElement(add);
   });
 
-  it("puts the tabs on the header's title line in a wide window, with the button in a row under it", async () => {
+  it("puts the tabs on the header's title line in a wide window, with the button at the right of that line", async () => {
     stubWideWindow();
     const router = createMemoryRouter(setupRoutes(null), {
       initialEntries: ["/setup/connections/alerts"],
@@ -215,9 +222,7 @@ describe("a setup area", () => {
         name: "Connections sections",
       }),
     ).toBeInTheDocument();
-    expect(add.closest(".mm-page-toolbar")).toHaveClass(
-      "mm-page-toolbar--buttons",
-    );
+    expect(screen.getByTestId("title-line-buttons")).toContainElement(add);
     expect(screen.getByRole("tabpanel")).not.toContainElement(add);
   });
 

@@ -4,6 +4,7 @@ import { HeaderStatus } from "./header-status";
 import { pageMeta } from "./nav-model";
 import { PauseControl } from "./pause-control";
 import {
+  useHeaderButtonsSlotRef,
   useHeaderSlotRef,
   useHeaderTabsSlotRef,
   usePageEyebrow,
@@ -17,7 +18,8 @@ type ShellHeaderProps = {
 
 /**
  * The bar above every page, sticky: the page's eyebrow and title (with its tabs after the title, when it
- * has any), a slot the page fills with its own control, then the status pill, Pause and the theme switch. On a phone it also carries the Menu button.
+ * has any), a slot the page fills with its own control, the page's own buttons, then the status pill, Pause and the
+ * theme switch. On a phone it also carries the Menu button.
  */
 export function ShellHeader({ menuOpen, onToggleMenu }: ShellHeaderProps) {
   const { pathname, search } = useLocation();
@@ -25,6 +27,7 @@ export function ShellHeader({ menuOpen, onToggleMenu }: ShellHeaderProps) {
   const pageEyebrow = usePageEyebrow();
   const slotRef = useHeaderSlotRef();
   const tabsSlotRef = useHeaderTabsSlotRef();
+  const buttonsSlotRef = useHeaderButtonsSlotRef();
   const eyebrow = pageEyebrow ?? meta.eyebrow;
   const Title = meta.ownsHeading ? "h1" : "p";
 
@@ -63,6 +66,7 @@ export function ShellHeader({ menuOpen, onToggleMenu }: ShellHeaderProps) {
         </div>
       </div>
       <div className="mm-header__slot" ref={slotRef} />
+      <div className="mm-header__buttons" ref={buttonsSlotRef} />
       <div className="mm-header__actions">
         <HeaderStatus />
         <PauseControl />

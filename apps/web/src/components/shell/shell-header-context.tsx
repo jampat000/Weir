@@ -12,6 +12,7 @@ type HeaderSetters = {
   setEyebrow: (eyebrow: string | null) => void;
   setSlot: (slot: HTMLElement | null) => void;
   setTabsSlot: (slot: HTMLElement | null) => void;
+  setButtonsSlot: (slot: HTMLElement | null) => void;
 };
 
 /**
@@ -22,18 +23,25 @@ const SettersContext = createContext<HeaderSetters | null>(null);
 const EyebrowContext = createContext<string | null>(null);
 const SlotContext = createContext<HTMLElement | null>(null);
 const TabsSlotContext = createContext<HTMLElement | null>(null);
+const ButtonsSlotContext = createContext<HTMLElement | null>(null);
 
 export function ShellHeaderProvider({ children }: { children: ReactNode }) {
   const [eyebrow, setEyebrow] = useState<string | null>(null);
   const [slot, setSlot] = useState<HTMLElement | null>(null);
   const [tabsSlot, setTabsSlot] = useState<HTMLElement | null>(null);
-  const setters = useMemo(() => ({ setEyebrow, setSlot, setTabsSlot }), []);
+  const [buttonsSlot, setButtonsSlot] = useState<HTMLElement | null>(null);
+  const setters = useMemo(
+    () => ({ setEyebrow, setSlot, setTabsSlot, setButtonsSlot }),
+    [],
+  );
   return (
     <SettersContext.Provider value={setters}>
       <EyebrowContext.Provider value={eyebrow}>
         <SlotContext.Provider value={slot}>
           <TabsSlotContext.Provider value={tabsSlot}>
-            {children}
+            <ButtonsSlotContext.Provider value={buttonsSlot}>
+              {children}
+            </ButtonsSlotContext.Provider>
           </TabsSlotContext.Provider>
         </SlotContext.Provider>
       </EyebrowContext.Provider>
@@ -62,6 +70,15 @@ export function useHeaderTabsSlotRef(): (slot: HTMLElement | null) => void {
     throw new Error("The header slot belongs inside ShellHeaderProvider.");
   }
   return setters.setTabsSlot;
+}
+
+/** The header's callback ref for the slot on the title's own line, at the right, where a page's own buttons go. */
+export function useHeaderButtonsSlotRef(): (slot: HTMLElement | null) => void {
+  const setters = useContext(SettersContext);
+  if (!setters) {
+    throw new Error("The header slot belongs inside ShellHeaderProvider.");
+  }
+  return setters.setButtonsSlot;
 }
 
 /**
@@ -95,6 +112,17 @@ export function ShellHeaderSlot({ children }: { children: ReactNode }) {
  */
 export function ShellHeaderTabs({ children }: { children: ReactNode }) {
   const slot = useContext(TabsSlotContext);
+  const inShell = useContext(SettersContext) !== null;
+  if (!inShell) return <>{children}</>;
+  return slot ? createPortal(children, slot) : null;
+}
+
+/**
+ * Puts a page's own buttons on the header's title line, at the right, just before Pause. Rendered outside the
+ * shell, where no header exists, they stay where they are written.
+ */
+export function ShellHeaderButtons({ children }: { children: ReactNode }) {
+  const slot = useContext(ButtonsSlotContext);
   const inShell = useContext(SettersContext) !== null;
   if (!inShell) return <>{children}</>;
   return slot ? createPortal(children, slot) : null;
