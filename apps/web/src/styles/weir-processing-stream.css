@@ -2,17 +2,27 @@
 
 /* ---- Activity stream -------------------------------------------------------- */
 
-.mm-stream__list {
-  display: flex;
+/* The panel's height decides how many whole lines show (fit-rows.ts hides the ones that do not fit), so the list
+   does not scroll and the 10px under it is the host's margin, outside what is measured. */
+.mm-stream__fit {
   min-height: 0;
   flex: 1 1 0;
+  margin-bottom: 10px;
+  overflow: hidden;
+}
+
+.mm-stream__list {
+  display: flex;
   flex-direction: column;
   margin: 0;
-  padding: 0 10px 10px;
-  overflow-y: auto;
+  padding: 0 10px;
   list-style: none;
-  scrollbar-color: var(--mm-hairline) transparent;
-  scrollbar-width: thin;
+}
+
+.mm-stream__more {
+  font-size: 12px;
+  white-space: nowrap;
+  color: var(--mm-primary);
 }
 
 .mm-stream__empty {

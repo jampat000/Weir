@@ -5,6 +5,7 @@ import { Panel } from "../../../components/panels/panel";
 import { useActivityRecentQuery } from "../../../lib/activity/queries";
 import { classNames } from "../../../lib/ui/class-names";
 import { motionAllowed } from "../../../lib/ui/motion-allowed";
+import { useFittingRows } from "./fit-rows";
 import { StreamIcon } from "./stream-icons";
 import {
   buildStream,
@@ -15,6 +16,8 @@ import {
 
 /** Enough events to fill the list after the progress frames and routine entries are set aside. */
 const RECENT_EVENTS = 80;
+/** The most lines drawn: the panel's height decides how many whole ones show, and this bounds what is measured. */
+const MOST_LINES = 40;
 const LOG_PATH = "/system?tab=logs";
 const NOTHING_YET =
   "Nothing has happened yet. What Weir does shows up here as it works.";
@@ -41,6 +44,7 @@ function Line({
   return (
     <li
       className={classNames("mm-stream__item", fresh && "mm-stream__item--new")}
+      data-fit=""
     >
       <Link to={row.to} className="mm-stream__link">
         <span
@@ -72,8 +76,9 @@ type ActivityStreamProps = {
 };
 
 /**
- * What Weir just did, newest first, from the same feed the Activity log reads. A line that arrives while
- * the page is open slides in and glows once; lines already there when the page opened do not.
+ * What Weir just did, newest first, from the same feed the Activity log reads. The panel's height decides how
+ * many whole lines it shows, never a line cut through, and the header says how many more there are. A line that
+ * arrives while the page is open slides in and glows once; lines already there when the page opened do not.
  */
 export function ActivityStream({
   now,
@@ -91,6 +96,9 @@ export function ActivityStream({
     if (openedAt === null && newestId !== null) setOpenedAt(newestId);
   }, [openedAt, newestId]);
   const animate = motionAllowed();
+  const [listRef, fits] = useFittingRows();
+  const shown = stream.rows.slice(0, MOST_LINES);
+  const more = stream.rows.length - Math.min(fits, shown.length);
   return (
     <Panel
       title="Activity"
@@ -101,21 +109,35 @@ export function ActivityStream({
       }
       to={LOG_PATH}
       toLabel="All activity"
+      aside={
+        more > 0 ? (
+          <Link
+            to={LOG_PATH}
+            className="mm-stream__more"
+            aria-label={`${more.toLocaleString()} more in the activity log`}
+          >
+            {more.toLocaleString()} more
+          </Link>
+        ) : null
+      }
     >
-      {stream.rows.length === 0 ? (
-        <p className="mm-stream__empty">{NOTHING_YET}</p>
-      ) : (
-        <ul className="mm-stream__list" data-testid="live-stream">
-          {stream.rows.map((row) => (
-            <Line
-              key={row.key}
-              row={row}
-              now={now}
-              fresh={animate && openedAt !== null && row.id > openedAt}
-            />
-          ))}
-        </ul>
-      )}
+      {/* The host is always there, so its height is watched from the first paint, before there is anything to list. */}
+      <div ref={listRef} className="mm-stream__fit">
+        {stream.rows.length === 0 ? (
+          <p className="mm-stream__empty">{NOTHING_YET}</p>
+        ) : (
+          <ul className="mm-stream__list" data-testid="live-stream">
+            {shown.map((row) => (
+              <Line
+                key={row.key}
+                row={row}
+                now={now}
+                fresh={animate && openedAt !== null && row.id > openedAt}
+              />
+            ))}
+          </ul>
+        )}
+      </div>
     </Panel>
   );
 }

@@ -13,16 +13,6 @@
   color: var(--pipe-foreground);
 }
 
-/* The live dot before the title: something finished moments ago is on the shelf. */
-.mm-shelf__dot {
-  width: 8px;
-  height: 8px;
-  flex: none;
-  border-radius: 50%;
-  background: var(--pipe-success);
-  box-shadow: 0 0 10px var(--pipe-success);
-}
-
 .mm-shelf__open:focus-visible {
   outline: 2px solid var(--pipe-ring);
   outline-offset: 2px;

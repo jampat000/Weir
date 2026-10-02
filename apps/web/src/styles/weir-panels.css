@@ -24,11 +24,6 @@
   padding: 14px 18px 10px;
 }
 
-/* The leading dot sits on the title's middle, not its baseline. */
-.mm-panel__head > :first-child:not(.mm-panel__title) {
-  align-self: center;
-}
-
 .mm-panel__title {
   flex-shrink: 0;
   margin: 0;

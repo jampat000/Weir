@@ -1,6 +1,6 @@
 import { render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ActivityEventItem } from "../../../lib/api/types";
 import { ActivityStream } from "./activity-stream";
@@ -49,6 +49,25 @@ function renderStream() {
 beforeEach(() => {
   feed.items = [];
 });
+
+afterEach(() => vi.restoreAllMocks());
+
+/** Gives the panel's list room for `rows` whole lines of 40px: each line ends where its number says. */
+function roomForLines(rows: number) {
+  vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(
+    function (this: HTMLElement) {
+      if (this.classList.contains("mm-stream__fit"))
+        return { bottom: rows * 40 + 20 } as DOMRect;
+      if (this.hasAttribute("data-fit")) {
+        const index = Array.from(this.parentElement?.children ?? []).indexOf(
+          this,
+        );
+        return { bottom: (index + 1) * 40 } as DOMRect;
+      }
+      return { bottom: 0 } as DOMRect;
+    },
+  );
+}
 
 describe("the activity stream panel", () => {
   it("says nothing has happened yet when there is nothing to list", () => {
@@ -117,5 +136,52 @@ describe("the activity stream panel", () => {
 
     expect(lines()[0]).toHaveClass("mm-stream__item--new");
     expect(lines()[1]).not.toHaveClass("mm-stream__item--new");
+  });
+
+  it("shows only the whole lines that fit and says how many more there are", () => {
+    feed.items = [5, 4, 3, 2, 1].map((id) => passEvent(id, `Film.${id}.mkv`));
+    roomForLines(2);
+    renderStream();
+
+    const lines = within(screen.getByTestId("live-stream")).getAllByRole(
+      "listitem",
+      { hidden: true },
+    );
+    expect(lines.map((line) => line.style.visibility)).toEqual([
+      "",
+      "",
+      "hidden",
+      "hidden",
+      "hidden",
+    ]);
+    const more = screen.getByRole("link", {
+      name: "3 more in the activity log",
+    });
+    expect(more).toHaveTextContent("3 more");
+    expect(more).toHaveAttribute("href", "/system?tab=logs");
+  });
+
+  it("says nothing about more when every line fits", () => {
+    feed.items = [passEvent(2, "Heat.1995.mkv"), passEvent(1, "Sintel.mkv")];
+    roomForLines(2);
+    renderStream();
+
+    expect(screen.queryByText(/more$/)).toBeNull();
+  });
+
+  it("fits the lines that arrive after the panel has drawn its empty message", () => {
+    roomForLines(1);
+    const { rerender } = renderStream();
+
+    feed.items = [3, 2, 1].map((id) => passEvent(id, `Film.${id}.mkv`));
+    rerender(
+      <MemoryRouter>
+        <ActivityStream now={NOW} />
+      </MemoryRouter>,
+    );
+
+    expect(
+      screen.getByRole("link", { name: "2 more in the activity log" }),
+    ).toBeInTheDocument();
   });
 });

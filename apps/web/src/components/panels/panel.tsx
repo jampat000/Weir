@@ -5,8 +5,6 @@ type PanelProps = {
   title: string;
   /** A quiet line after the title. It truncates before anything else when the panel is narrow. */
   count?: ReactNode;
-  /** Something before the title, such as a live dot. */
-  leading?: ReactNode;
   /** Where the panel's subject is managed. Without it the header has no link. */
   to?: string;
   /** The link's words, named with the panel's title for a screen reader: "History: Just finished". */
@@ -41,7 +39,6 @@ type PanelProps = {
 export function Panel({
   title,
   count,
-  leading,
   to,
   toLabel,
   iconOnly = false,
@@ -71,7 +68,6 @@ export function Panel({
         .join(" ")}
     >
       <header className="mm-panel__head">
-        {leading}
         <Heading id={titleId} className="mm-panel__title">
           {title}
         </Heading>

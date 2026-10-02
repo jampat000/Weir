@@ -54,16 +54,6 @@ describe("Panel", () => {
     expect(screen.queryByRole("link")).not.toBeInTheDocument();
   });
 
-  it("puts what leads the title before it", () => {
-    renderPanel({ leading: <span data-testid="live-dot" /> });
-
-    const heading = screen.getByRole("heading", { name: "Just finished" });
-    const dot = screen.getByTestId("live-dot");
-    expect(
-      dot.compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
-  });
-
   it("is a level 3 heading inside a page's own section when asked", () => {
     renderPanel({ headingLevel: 3 });
 

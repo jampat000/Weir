@@ -109,7 +109,6 @@ export function JustFinishedShelf({
     <Panel
       title="Just finished"
       count={countWords}
-      leading={<span className="mm-shelf__dot" aria-hidden="true" />}
       to="/history"
       toLabel="History"
     >
