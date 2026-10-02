@@ -34,6 +34,7 @@
 @import "./styles/weir-processing-side.css";
 @import "./styles/weir-processing-stream.css";
 @import "./styles/weir-processing-system.css";
+@import "./styles/weir-live-trace.css";
 @import "./styles/weir-connections.css";
 @import "./styles/weir-health-detail.css";
 @import "./styles/weir-poster.css";

@@ -5,6 +5,7 @@ import {
   parseAppDate,
   parseAppTime,
   useAppClockFormatter,
+  useAppClockSecondsFormatter,
 } from "./mm-format-date";
 
 const settings = { timezone: "UTC" };
@@ -61,5 +62,23 @@ describe("useAppClockFormatter", () => {
 
   it("falls back to the browser's clock for a timezone it does not know", () => {
     expect(clockIn("Not/AZone")).toMatch(/\d:\d\d/);
+  });
+});
+
+describe("useAppClockSecondsFormatter", () => {
+  const clockIn = (timezone: string) => {
+    settings.timezone = timezone;
+    return renderHook(() => useAppClockSecondsFormatter()).result.current(
+      TEN_AM_UTC + 5000,
+    );
+  };
+
+  it("writes the time with its seconds in the timezone chosen in Settings", () => {
+    expect(clockIn("UTC")).toMatch(/^10:00:05\sam$/);
+    expect(clockIn("Australia/Brisbane")).toMatch(/^8:00:05\spm$/);
+  });
+
+  it("falls back to the browser's clock for a timezone it does not know", () => {
+    expect(clockIn("Not/AZone")).toMatch(/\d:\d\d:\d\d/);
   });
 });

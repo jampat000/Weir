@@ -1,10 +1,8 @@
 import { useEffect } from "react";
 
-/**
- * The class the document carries while its window is being resized; the Dashboard's stylesheet gives every
- * animation and transition under it no time (weir-processing-dashboard.css).
- */
-export const RESIZING_CLASS = "mm-pipeline-resizing";
+import { RESIZING_CLASS } from "../../../lib/ui/resizing-class";
+
+export { RESIZING_CLASS };
 
 /** How long after the last change of the window's size it still counts as being resized. */
 const RESIZE_SETTLE_MS = 350;

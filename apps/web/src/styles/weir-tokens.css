@@ -139,6 +139,9 @@
   --mm-bar-color: var(
     --mm-primary
   ); /* a bar-list row's fill, set per row (weir-panels.css) */
+  /* A live trace line's colour, set per line from React (weir-live-trace.css), and a System card column's (weir-system-band.css). */
+  --mm-trace-colour: var(--mm-primary);
+  --mm-sy-colour: var(--mm-primary);
   /* Control sizes: 40px is the field size, with smaller steps for secondary and quiet controls. */
   --mm-control-height-lg: calc(40px * var(--mm-density-ui-scale));
   --mm-control-height-sm: calc(32px * var(--mm-density-ui-scale));

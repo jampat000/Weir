@@ -1,0 +1,81 @@
+/*
+ * The live trace (components/charts/live-trace.tsx): lines over the last stretch of time with no scale, a dot that
+ * glows on the head of each line, and the pointer's line and readout. The line itself is redrawn every animation
+ * frame by the component; this sheet only says how it looks. Each line's colour is set inline from a design token.
+ */
+
+.mm-trace {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+}
+
+.mm-trace__svg {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.mm-trace__line {
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.5;
+}
+
+.mm-trace__stop {
+  stop-opacity: 0.4;
+}
+
+.mm-trace__stop--end {
+  stop-opacity: 0;
+}
+
+.mm-trace__dot {
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--mm-trace-colour);
+  box-shadow: 0 0 8px 1px var(--mm-trace-colour);
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+}
+
+.mm-trace__cursor {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 0;
+  border-left: 1px solid color-mix(in srgb, var(--mm-text1) 45%, transparent);
+  pointer-events: none;
+}
+
+/* The readout sits on the side of the trace the pointer is not on, so it never covers what it describes and never
+   runs out of the card. */
+.mm-trace__read {
+  position: absolute;
+  top: 2px;
+  z-index: 3;
+  right: 4px;
+  padding: 3px 7px;
+  border: 1px solid var(--mm-border);
+  border-radius: 7px;
+  background: var(--mm-surface-2);
+  box-shadow: var(--mm-shadow-card);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 15px;
+  pointer-events: none;
+  white-space: nowrap;
+  color: var(--mm-text1);
+  font-variant-numeric: tabular-nums;
+}
+
+.mm-trace__read--left {
+  right: auto;
+  left: 4px;
+}
