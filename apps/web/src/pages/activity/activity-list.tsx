@@ -1,5 +1,4 @@
 import { Chip } from "../../components/panels/chip";
-import type { MmStatusTone } from "../../lib/ui/mm-status-tone";
 import { FileName } from "../../components/shared/file-name";
 import { Poster } from "../../components/shared/poster";
 import { formatBytes } from "../../lib/format/bytes";
@@ -9,8 +8,7 @@ import {
 } from "../../lib/processing/files-api";
 import type { LibraryClean } from "../../lib/processing/library-cleans-api";
 import {
-  entryGroup,
-  type ActivityGroup,
+  entryMeaning,
   entryPath,
   entryTime,
   type ActivityEntry,
@@ -52,18 +50,6 @@ function subLine(entry: ActivityEntry): string {
     .filter(Boolean)
     .join(" · ");
 }
-
-/** The chip's colour for where an entry stands. A skip is Weir deciding a file is not for it, so it stays neutral. */
-const GROUP_TONE: Record<ActivityGroup, MmStatusTone> = {
-  all: "neutral",
-  working: "info",
-  finished: "healthy",
-  attention: "warning",
-  needs: "warning",
-  skipped: "neutral",
-  failed: "failed",
-  kept: "neutral",
-};
 
 function entryIsSelected(entry: ActivityEntry, selectedKey: string | null) {
   return selectedKey !== null && entry.key === selectedKey;
@@ -124,10 +110,7 @@ export function ActivityList({
                 </button>
               </td>
               <td>
-                <Chip
-                  tone={GROUP_TONE[entryGroup(entry) ?? "all"]}
-                  className="mm-history-what"
-                >
+                <Chip meaning={entryMeaning(entry)} className="mm-history-what">
                   {entry.kind === "download"
                     ? whatWeirDid(entry.file)
                     : CLEAN_OUTCOME_WORDS[entry.clean.outcome]}

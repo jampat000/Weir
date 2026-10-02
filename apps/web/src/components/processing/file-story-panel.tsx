@@ -7,6 +7,7 @@
  */
 
 import { Poster } from "../shared/poster";
+import { STORY_STEP_MEANING } from "../../lib/processing/story-step-meaning";
 import { fileActivityRetentionNote } from "../../lib/processing/file-activity-retention";
 import { useAppDateFormatter } from "../../lib/ui/mm-format-date";
 import { DirectPlayLine } from "./direct-play-line";
@@ -18,16 +19,12 @@ import type {
   ProcessingFileStoryStep,
 } from "../../lib/processing/files-api";
 
-const TONE_CLASS: Record<string, string> = {
-  good: "mm-story-step--good",
-  warn: "mm-story-step--warn",
-  bad: "mm-story-step--bad",
-  neutral: "",
-};
-
 function Step({ step }: { step: ProcessingFileStoryStep }): React.ReactElement {
   return (
-    <li className={`mm-story-step ${TONE_CLASS[step.tone] ?? ""}`}>
+    <li
+      className="mm-story-step"
+      data-status={STORY_STEP_MEANING[step.tone] ?? "idle"}
+    >
       <p className="mm-story-step__heading">{step.heading}</p>
       <p className="mm-story-step__sentence">{step.sentence}</p>
     </li>
@@ -91,7 +88,11 @@ export function FileStoryPanel({
       {loading ? (
         <p className="mm-story-panel__note">Loading…</p>
       ) : error ? (
-        <p className="mm-story-panel__note mm-status-text--failed" role="alert">
+        <p
+          className="mm-story-panel__note mm-status-text"
+          data-status="broken"
+          role="alert"
+        >
           {error}
         </p>
       ) : !log || log.entries.length === 0 ? (

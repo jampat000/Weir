@@ -17,7 +17,11 @@ export type FileNow = {
 /** A file that is on the Pipeline: its live state, which its history does not have yet. */
 export function FileNowSection({ now }: { now: FileNow }): ReactElement {
   return (
-    <section className="mm-story-now" aria-label="Right now">
+    <section
+      className="mm-story-now"
+      data-status={now.working ? "doing" : "todo"}
+      aria-label="Right now"
+    >
       <h3 className="mm-story-now__heading">Right now</h3>
       <p className="mm-story-now__stage">
         {now.working ? (

@@ -1,5 +1,6 @@
 import { Chip } from "../../components/panels/chip";
 import type { ProcessingFileLogEntry } from "../../lib/processing/files-api";
+import { STORY_STEP_MEANING } from "../../lib/processing/story-step-meaning";
 import {
   agoWords,
   tracksFromRecord,
@@ -22,17 +23,16 @@ function TrackSet({ tracks }: { tracks: ActivityTrack[] }) {
     >
       <h3 id="activity-tracks-heading" className="mm-history-trackset__head">
         Tracks
-        <Chip tone="healthy">{keptCount} kept</Chip>
-        <Chip tone={removedCount > 0 ? "failed" : "neutral"}>
-          {removedCount} removed
-        </Chip>
+        <Chip meaning="done">{keptCount} kept</Chip>
+        <Chip meaning="idle">{removedCount} removed</Chip>
       </h3>
       <table className="mm-history-tracks">
         <tbody>
           {tracks.map((track, index) => (
             <tr
               key={`${track.kind}-${index}`}
-              className={track.kept ? "is-kept" : "is-removed"}
+              className={track.kept ? undefined : "is-removed"}
+              data-status={track.kept ? "done" : "idle"}
             >
               <th scope="row">{track.kind}</th>
               <td className="mm-history-track">
@@ -42,7 +42,7 @@ function TrackSet({ tracks }: { tracks: ActivityTrack[] }) {
                 ) : null}
               </td>
               <td className="mm-history-track__verdict">
-                <Chip tone={track.kept ? "healthy" : "failed"}>
+                <Chip meaning={track.kept ? "done" : "idle"}>
                   {track.kept ? "Kept" : "Removed"}
                 </Chip>
               </td>
@@ -69,7 +69,7 @@ export function PassRecord({
       {pass.story.length > 0 ? (
         <ol className="mm-history-story" aria-label="What happened">
           {pass.story.map((step, index) => (
-            <li key={index} className={`is-${step.tone}`}>
+            <li key={index} data-status={STORY_STEP_MEANING[step.tone]}>
               <b>{step.heading}</b>
               <span>{step.sentence}</span>
             </li>

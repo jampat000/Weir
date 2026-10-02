@@ -3,6 +3,7 @@ import type {
   ProcessingFileStatus,
 } from "../../lib/processing/files-api";
 import type { LibraryClean } from "../../lib/processing/library-cleans-api";
+import type { StatusMeaning } from "../../lib/ui/status-meaning";
 import { serverMs } from "./activity-model";
 
 /**
@@ -72,6 +73,39 @@ const CLEAN_GROUPS: Record<LibraryClean["outcome"], ActivityGroup> = {
   skipped: "skipped",
   failed: "failed",
 };
+
+/**
+ * What each state of a download means, whatever group it is listed under: a file waiting for its turn is still to do,
+ * one Weir is writing is under way, one it handed back is done, and one that passed through, was rejected or is held
+ * needs a look. Only a failure is broken.
+ */
+export const FILE_MEANING: Record<ProcessingFileStatus, StatusMeaning> = {
+  unprocessed: "todo",
+  out_of_schedule: "todo",
+  processing: "doing",
+  processed: "done",
+  processing_failed: "broken",
+  on_hold: "attention",
+  blocked_upstream: "attention",
+  passed_through: "attention",
+  rejected: "attention",
+  skipped: "idle",
+  disabled: "idle",
+  cancelled: "idle",
+};
+
+/** What a clean in a library means: a file already matching the rules is as done as one just cleaned. */
+export const CLEAN_MEANING: Record<LibraryClean["outcome"], StatusMeaning> = {
+  cleaned: "done",
+  skipped: "done",
+  failed: "broken",
+};
+
+export function entryMeaning(entry: ActivityEntry): StatusMeaning {
+  return entry.kind === "download"
+    ? FILE_MEANING[entry.file.status]
+    : CLEAN_MEANING[entry.clean.outcome];
+}
 
 /**
  * Where a download belongs. A file on hold, or one its media manager still has, waits on a person, so it is

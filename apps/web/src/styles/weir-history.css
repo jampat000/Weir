@@ -358,10 +358,6 @@
   font-variant-numeric: tabular-nums;
 }
 
-.mm-history-saved {
-  color: var(--mm-status-healthy-text);
-}
-
 .mm-history-progress {
   display: flex;
   flex-direction: column;
@@ -379,7 +375,7 @@
   display: block;
   height: 100%;
   border-radius: var(--mm-radius-pill);
-  background: var(--mm-accent);
+  background: var(--mm-st);
   transition: width 0.6s ease;
 }
 

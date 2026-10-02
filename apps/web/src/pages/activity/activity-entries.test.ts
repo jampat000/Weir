@@ -5,6 +5,7 @@ import {
   cleanEntry,
   downloadEntry,
   entryGroup,
+  entryMeaning,
   hasRejectedFiles,
   activityEntries,
   activityGroupOf,
@@ -209,5 +210,42 @@ describe("the files that wait on a person", () => {
       "Failed",
       "Kept",
     ]);
+  });
+});
+
+describe("what an entry means", () => {
+  const meaningOf = (status: ProcessingFile["status"]) =>
+    entryMeaning(downloadEntry(file({ status })));
+
+  it("is waiting for a file that has not started, under way for one being written, and done for one handed back", () => {
+    expect(meaningOf("unprocessed")).toBe("todo");
+    expect(meaningOf("out_of_schedule")).toBe("todo");
+    expect(meaningOf("processing")).toBe("doing");
+    expect(meaningOf("processed")).toBe("done");
+  });
+
+  it("asks for a look at a file on hold, passed through or rejected, and calls only a failure broken, though a rejection is listed under Failed", () => {
+    expect(meaningOf("on_hold")).toBe("attention");
+    expect(meaningOf("passed_through")).toBe("attention");
+    expect(meaningOf("rejected")).toBe("attention");
+    expect(meaningOf("processing_failed")).toBe("broken");
+  });
+
+  it("leaves a skipped, switched-off or cancelled file idle", () => {
+    expect(meaningOf("skipped")).toBe("idle");
+    expect(meaningOf("disabled")).toBe("idle");
+    expect(meaningOf("cancelled")).toBe("idle");
+  });
+
+  it("counts a library file that already matched as done, as one that was cleaned", () => {
+    expect(entryMeaning(cleanEntry(clean({ outcome: "cleaned" })))).toBe(
+      "done",
+    );
+    expect(entryMeaning(cleanEntry(clean({ outcome: "skipped" })))).toBe(
+      "done",
+    );
+    expect(entryMeaning(cleanEntry(clean({ outcome: "failed" })))).toBe(
+      "broken",
+    );
   });
 });

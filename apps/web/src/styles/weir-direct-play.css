@@ -13,18 +13,6 @@
   color: var(--mm-text2);
 }
 
-.mm-direct-play__device--yes .mm-direct-play__mark {
-  color: var(--mm-status-healthy-text);
-}
-
-.mm-direct-play__device--no .mm-direct-play__mark {
-  color: var(--mm-status-failed-text);
-}
-
-.mm-direct-play__device--maybe .mm-direct-play__mark {
-  color: var(--mm-status-warning-text);
-}
-
 .mm-direct-play__why {
   margin-top: 0.15rem;
 }

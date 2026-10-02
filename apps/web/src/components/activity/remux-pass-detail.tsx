@@ -7,6 +7,7 @@ import {
   type RemuxPassDetail as Detail,
 } from "../../lib/activity/pass-detail";
 import { formatBytes } from "../../lib/format/bytes";
+import type { StatusMeaning } from "../../lib/ui/status-meaning";
 
 function detailRow(label: string, value: string | undefined | null) {
   if (value === undefined || value === null || value === "") return null;
@@ -21,7 +22,7 @@ function detailRow(label: string, value: string | undefined | null) {
 function trackSection(
   label: string,
   values: string[],
-  tone: "before" | "kept" | "removed",
+  meaning: StatusMeaning,
   emptyLabel = "None",
 ) {
   return (
@@ -34,7 +35,8 @@ function trackSection(
           {values.map((value) => (
             <span
               key={`${label}-${value}`}
-              className={`mm-activity-remux-detail__chip mm-activity-remux-detail__chip--${tone}`}
+              className="mm-activity-remux-detail__chip mm-status-pill"
+              data-status={meaning}
             >
               {value}
             </span>
@@ -140,12 +142,12 @@ export function RemuxPassDetail({ detail }: { detail: string }) {
                 {trackSection(
                   "Audio in file",
                   splitTrackList(parsed.audio_before),
-                  "before",
+                  "idle",
                 )}
                 {trackSection(
                   "Subtitles in file",
                   splitTrackList(parsed.subs_before),
-                  "before",
+                  "idle",
                 )}
               </div>
             </section>
@@ -156,23 +158,23 @@ export function RemuxPassDetail({ detail }: { detail: string }) {
                 {trackSection(
                   "Audio kept",
                   splitTrackList(parsed.audio_after),
-                  "kept",
+                  "done",
                 )}
                 {trackSection(
                   "Audio removed",
                   parsed.removed_audio ?? [],
-                  "removed",
+                  "idle",
                   "None removed",
                 )}
                 {trackSection(
                   "Subtitles kept",
                   splitTrackList(parsed.subs_after),
-                  "kept",
+                  "done",
                 )}
                 {trackSection(
                   "Subtitles removed",
                   parsed.removed_subtitles ?? [],
-                  "removed",
+                  "idle",
                   "None removed",
                 )}
               </div>

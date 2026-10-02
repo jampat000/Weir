@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 
+import { StatusDot } from "../../components/panels/status-dot";
 import { DirectPlayLine } from "../../components/processing/direct-play-line";
 import { LoadError } from "../../components/shared/load-error";
 import { PanelLoading } from "../../components/shared/page-loading";
@@ -56,10 +57,13 @@ function Guidance({ file, now }: { file: ProcessingFile; now: number }) {
       ) : null}
       {handedBack ? (
         <div
-          className={`mm-history-next mm-history-handback is-${handedBack.tone}`}
+          className="mm-history-next mm-history-handback"
           data-testid="activity-handback"
         >
-          <p className="mm-history-next__title">{handedBack.heading}</p>
+          <p className="mm-history-next__title">
+            <StatusDot meaning={handedBack.meaning} />
+            {handedBack.heading}
+          </p>
           <p className="mm-history-note">{handedBack.sentence}</p>
         </div>
       ) : null}

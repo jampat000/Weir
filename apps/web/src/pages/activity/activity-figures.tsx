@@ -11,6 +11,7 @@ export function WorkingFigures({ file }: { file: ProcessingFile }) {
     <div className="mm-history-progress">
       <div
         className="mm-history-progress__bar"
+        data-status="doing"
         role="progressbar"
         aria-valuemin={0}
         aria-valuemax={100}
@@ -64,7 +65,7 @@ export function SizeFigures({ sizes }: { sizes: DetailSizes }) {
         </div>
         <div>
           <dt>Saved</dt>
-          <dd className="mm-history-saved">
+          <dd className={sizes.saved ? "mm-payoff" : undefined}>
             {sizes.saved == null
               ? UNKNOWN
               : sizes.saved === 0

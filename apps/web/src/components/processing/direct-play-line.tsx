@@ -9,12 +9,24 @@ import type {
   ProcessingDirectPlay,
   ProcessingDirectPlayVerdict,
 } from "../../lib/processing/files-api";
+import type { StatusMeaning } from "../../lib/ui/status-meaning";
 
 const SYMBOL: Record<ProcessingDirectPlayVerdict, string> = {
   yes: "✓",
   no: "✗",
   maybe: "?",
   unknown: "",
+};
+
+/** What a device's verdict means: it plays the file, may not, cannot, or has not been measured. */
+export const VERDICT_MEANING: Record<
+  ProcessingDirectPlayVerdict,
+  StatusMeaning
+> = {
+  yes: "done",
+  maybe: "attention",
+  no: "broken",
+  unknown: "idle",
 };
 
 const WORD: Record<ProcessingDirectPlayVerdict, string> = {
@@ -63,13 +75,14 @@ function DeviceVerdict({
   const reason = shortReason(entry);
   return (
     <span
-      className={`mm-direct-play__device mm-direct-play__device--${entry.verdict}`}
+      className="mm-direct-play__device"
+      data-status={VERDICT_MEANING[entry.verdict]}
       title={fullSentence(entry)}
     >
       {entry.device_name}
       {symbol ? (
         <>
-          <span className="mm-direct-play__mark" aria-hidden="true">
+          <span className="mm-status-text" aria-hidden="true">
             {" "}
             {symbol}
           </span>

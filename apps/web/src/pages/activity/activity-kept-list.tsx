@@ -51,7 +51,11 @@ function KeptFileRow({
           </button>
         ) : null}
         {failure ? (
-          <p className="mm-status-text--failed mt-1 text-sm" role="alert">
+          <p
+            className="mm-status-text mt-1 text-sm"
+            data-status="broken"
+            role="alert"
+          >
             {failure}
           </p>
         ) : null}

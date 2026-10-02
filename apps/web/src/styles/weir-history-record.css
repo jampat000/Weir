@@ -29,16 +29,8 @@
   border-bottom: 1px solid var(--mm-border);
 }
 
-.mm-history-tracks tr.is-kept > :first-child {
-  box-shadow: inset 3px 0 0 var(--mm-status-healthy-text);
-}
-
-.mm-history-tracks tr.is-removed > :first-child {
-  box-shadow: inset 3px 0 0 var(--mm-status-failed-text);
-}
-
-.mm-history-tracks tr.is-removed {
-  background: color-mix(in srgb, var(--mm-status-failed-text) 5%, transparent);
+.mm-history-tracks tr > :first-child {
+  box-shadow: inset 3px 0 0 var(--mm-st);
 }
 
 .mm-history-tracks th,
@@ -71,11 +63,6 @@
 .mm-history-tracks tr.is-removed .mm-history-track__what {
   color: var(--mm-text2);
   text-decoration: line-through;
-  text-decoration-color: color-mix(
-    in srgb,
-    var(--mm-status-failed-text) 70%,
-    transparent
-  );
 }
 
 .mm-history-track__why {
@@ -126,19 +113,7 @@
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  background: var(--mm-text3);
-}
-
-.mm-history-story li.is-good::before {
-  background: var(--mm-accent);
-}
-
-.mm-history-story li.is-warn::before {
-  background: var(--mm-status-warning-text);
-}
-
-.mm-history-story li.is-bad::before {
-  background: var(--mm-status-failed-text);
+  background: var(--mm-st);
 }
 
 .mm-history-story b {
@@ -182,6 +157,10 @@
 .mm-history-next__title {
   font-size: 0.875rem;
   font-weight: 600;
+}
+
+.mm-history-next__title .mm-status-dot {
+  margin-right: 6px;
 }
 
 .mm-history-actions {

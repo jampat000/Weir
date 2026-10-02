@@ -10,6 +10,7 @@ import {
   languageName,
 } from "../../lib/format/track";
 import { parseAppDate } from "../../lib/ui/mm-format-date";
+import type { StatusMeaning } from "../../lib/ui/status-meaning";
 
 /** A server time as epoch ms. Its times carry no zone and are UTC. */
 export function serverMs(iso: string): number {
@@ -204,7 +205,7 @@ export function detailSizes(
 export type HandbackStory = {
   heading: string;
   sentence: string;
-  tone: "good" | "neutral" | "warn";
+  meaning: StatusMeaning;
 };
 
 /**
@@ -230,7 +231,7 @@ export function handbackStory(
     return {
       heading: `Imported by ${by}`,
       sentence: `${by} imported it${when}.${where} ${note}`.trim(),
-      tone: "good",
+      meaning: "done",
     };
   }
   if (handback.outcome === "not-imported") {
@@ -239,11 +240,11 @@ export function handbackStory(
       sentence:
         note ||
         `${by} will not import this file. Weir kept its copy at ${handback.output_path}.`,
-      tone: "warn",
+      meaning: "attention",
     };
   }
   if (handback.settled_at && note) {
-    return { heading: "Handed back", sentence: note, tone: "neutral" };
+    return { heading: "Handed back", sentence: note, meaning: "idle" };
   }
   const written = handback.written_at
     ? agoWords(handback.written_at, now)
@@ -253,14 +254,14 @@ export function handbackStory(
     return {
       heading: "Cleaned copy",
       sentence: `The cleaned copy is in the output folder, at ${handback.output_path}.${writtenNote}`,
-      tone: "neutral",
+      meaning: "done",
     };
   }
   const when = written ? ` ${written}` : "";
   return {
     heading: "Handed back",
     sentence: `Weir put the cleaned copy at ${handback.output_path}${when} for your media manager to import. No media manager has said it imported it yet.`,
-    tone: "neutral",
+    meaning: "todo",
   };
 }
 

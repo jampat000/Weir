@@ -153,23 +153,11 @@
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  background: var(--mm-text3);
+  background: var(--mm-st);
 }
 
 .mm-story-step:last-child {
   padding-bottom: 0;
-}
-
-.mm-story-step--good::before {
-  background: var(--mm-status-healthy-text);
-}
-
-.mm-story-step--warn::before {
-  background: var(--mm-status-warning-text);
-}
-
-.mm-story-step--bad::before {
-  background: var(--mm-status-failed-text);
 }
 
 .mm-story-step__heading {
@@ -246,7 +234,7 @@
   height: 7px;
   flex: none;
   border-radius: 50%;
-  background: var(--mm-primary);
+  background: var(--mm-st);
   animation: mm-story-now-blink 1.2s ease-in-out infinite;
 }
 
@@ -281,7 +269,7 @@
   display: block;
   height: 100%;
   border-radius: 9px;
-  background: var(--mm-primary);
+  background: var(--mm-st);
   transition: width 1s linear;
 }
 

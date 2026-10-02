@@ -44,7 +44,7 @@ describe("FileProgressDetail", () => {
     render(<FileProgressDetail detail={detail} />);
     const card = screen.getByTestId("processing-processing-progress-detail");
 
-    expect(card).toHaveClass("mm-activity-processing--finished");
+    expect(card).toHaveAttribute("data-status", "done");
     expect(screen.getAllByText("Finished")).toHaveLength(2);
     expect(
       screen.getByText("Weir finished processing this file."),
@@ -64,7 +64,7 @@ describe("FileProgressDetail", () => {
 
     expect(
       screen.getByTestId("processing-processing-progress-detail"),
-    ).toHaveClass("mm-activity-processing--failed");
+    ).toHaveAttribute("data-status", "broken");
     expect(screen.getAllByText("Stopped")).toHaveLength(2);
     expect(
       screen.getByText("ffmpeg stopped unexpectedly."),

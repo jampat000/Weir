@@ -162,7 +162,7 @@ describe("what became of the copy Weir handed back", () => {
       heading: "Imported by Sonarr",
       sentence:
         "Sonarr imported it 6 min ago. It is in the library at /tv/Show/Season 01/Show - S01E01.mkv. Weir removed its copy from the hand-back folder, because Sonarr has the file now.",
-      tone: "good",
+      meaning: "done",
     });
     expect(importedLabel(file({ handback }))).toBe("Imported by Sonarr");
   });
@@ -180,13 +180,14 @@ describe("what became of the copy Weir handed back", () => {
       "linked",
     );
     expect(story?.heading).toBe("Deluno will not import it");
-    expect(story?.tone).toBe("warn");
+    expect(story?.meaning).toBe("attention");
   });
 
   it("says Weir is still waiting when no media manager has said anything", () => {
     expect(handbackStory(copy, now, "linked")?.sentence).toBe(
       "Weir put the cleaned copy at /hand-back/Show/Show.S01E01.mkv 1 h ago for your media manager to import. No media manager has said it imported it yet.",
     );
+    expect(handbackStory(copy, now, "linked")?.meaning).toBe("todo");
     expect(handbackStory(null, now, "linked")).toBeNull();
     expect(importedLabel(file({ handback: copy }))).toBeNull();
   });
@@ -198,7 +199,7 @@ describe("what became of the copy Weir handed back", () => {
       heading: "Cleaned copy",
       sentence:
         "The cleaned copy is in the output folder, at /hand-back/Show/Show.S01E01.mkv. It was written 1 h ago.",
-      tone: "neutral",
+      meaning: "done",
     });
     expect(story?.sentence).not.toMatch(/import|media manager|yet/i);
   });

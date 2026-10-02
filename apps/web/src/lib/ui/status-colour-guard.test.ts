@@ -21,12 +21,8 @@ const MIGRATE_ME: readonly string[] = [
   "pages/settings/tabs/libraries/library-import-section.tsx",
   "pages/settings/tabs/rules/rules-preview-panel.tsx",
   "pages/system/tabs/about/update-section.tsx",
-  "styles/weir-activity-detail.css",
   "styles/weir-auth.css",
   "styles/weir-dialogs.css",
-  "styles/weir-direct-play.css",
-  "styles/weir-history-record.css",
-  "styles/weir-history.css",
   "styles/weir-interrupt.css",
   "styles/weir-panels.css",
   "styles/weir-pipeline.css",
@@ -34,7 +30,6 @@ const MIGRATE_ME: readonly string[] = [
   "styles/weir-processing-stream.css",
   "styles/weir-shell.css",
   "styles/weir-sidebar-nav.css",
-  "styles/weir-story-panel.css",
   "styles/weir-system-backups.css",
   "styles/weir-system-band.css",
   "styles/weir-system-cards.css",
@@ -61,11 +56,17 @@ const RETIRED_STATUS_CLASSES: readonly string[] = [
   "data-rag",
   "STATUS_RAG",
   "mm-library-scan__dot",
+  "GROUP_TONE",
+  "TONE_CLASS",
+  "mm-history-saved",
+  "mm-story-step--",
+  "mm-direct-play__device--",
+  "mm-direct-play__mark",
+  "mm-activity-processing--",
+  "mm-activity-remux-detail__chip--",
 ];
 
-const RAW_HEX_IN_STYLESHEETS: readonly string[] = [
-  "styles/weir-activity-detail.css",
-];
+const RAW_HEX_IN_STYLESHEETS: readonly string[] = [];
 
 /** The files that define or map the colours: they are the one place a colour is chosen. */
 const COLOUR_DEFINITIONS = new Set([

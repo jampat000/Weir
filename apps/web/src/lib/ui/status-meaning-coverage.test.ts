@@ -9,7 +9,18 @@ import {
   CONNECTION_STATE_MEANING,
   type ConnectionState,
 } from "../connections/connection-model";
-import type { ProcessingDirectPlayVerdict } from "../processing/files-api";
+import { VERDICT_MEANING as DIRECT_PLAY_MEANING } from "../../components/processing/direct-play-line";
+import {
+  CLEAN_MEANING,
+  FILE_MEANING,
+} from "../../pages/activity/activity-entries";
+import type {
+  ProcessingDirectPlayVerdict,
+  ProcessingFileStatus,
+  ProcessingFileStoryStep,
+} from "../processing/files-api";
+import type { LibraryClean } from "../processing/library-cleans-api";
+import { STORY_STEP_MEANING } from "../processing/story-step-meaning";
 import type { Readiness } from "../processing/library-folder-chain-api";
 import type { SystemLogLevel } from "../system/system-log-api";
 import {
@@ -44,6 +55,49 @@ const PRODUCTION_MEANINGS = {
       cant_clean_yet: "attention",
       left_alone: "idle",
     } satisfies Record<LibraryStatus, StatusMeaning>,
+  },
+  downloadStatus: {
+    used: FILE_MEANING,
+    expected: {
+      unprocessed: "todo",
+      out_of_schedule: "todo",
+      processing: "doing",
+      processed: "done",
+      processing_failed: "broken",
+      on_hold: "attention",
+      blocked_upstream: "attention",
+      passed_through: "attention",
+      rejected: "attention",
+      skipped: "idle",
+      disabled: "idle",
+      cancelled: "idle",
+    } satisfies Record<ProcessingFileStatus, StatusMeaning>,
+  },
+  libraryClean: {
+    used: CLEAN_MEANING,
+    expected: {
+      cleaned: "done",
+      skipped: "done",
+      failed: "broken",
+    } satisfies Record<LibraryClean["outcome"], StatusMeaning>,
+  },
+  storyStep: {
+    used: STORY_STEP_MEANING,
+    expected: {
+      neutral: "idle",
+      good: "done",
+      warn: "attention",
+      bad: "broken",
+    } satisfies Record<ProcessingFileStoryStep["tone"], StatusMeaning>,
+  },
+  directPlay: {
+    used: DIRECT_PLAY_MEANING,
+    expected: {
+      yes: "done",
+      maybe: "attention",
+      no: "broken",
+      unknown: "idle",
+    } satisfies Record<ProcessingDirectPlayVerdict, StatusMeaning>,
   },
 };
 
@@ -128,12 +182,6 @@ const VOCABULARIES = {
     bad: "broken",
     idle: "idle",
   } satisfies Record<CardTone, StatusMeaning>,
-  directPlay: {
-    yes: "done",
-    maybe: "attention",
-    no: "broken",
-    unknown: "idle",
-  } satisfies Record<ProcessingDirectPlayVerdict, StatusMeaning>,
   chipTone: {
     healthy: "done",
     info: "doing",
