@@ -43,19 +43,24 @@
   color: var(--mm-text1);
 }
 
-/* The title and, when the page has tabs, the tabs after it on the same line, 22px apart and on one baseline. */
+/* The title and, when the page has tabs, the tabs after it on the same line, 22px apart and on one baseline. The
+   title keeps its width; when the header is short of room it is the tabs that give way, folding into More. */
 .mm-header__line {
   display: flex;
-  flex-wrap: wrap;
   align-items: baseline;
   column-gap: 22px;
   min-width: 0;
 }
 
+.mm-header__line .mm-header__title {
+  flex-shrink: 0;
+}
+
 /* Only as tall as its tabs, so the header keeps its height; nothing shows when the page has none. */
 .mm-header__tabs {
   display: flex;
-  flex-shrink: 0;
+  flex: 0 1 auto;
+  min-width: 0;
 }
 
 .mm-header__tabs:empty {
@@ -264,6 +269,128 @@
   bottom: -1px;
 }
 
+/* Tabs on the title line (components/shell/page-tabs.tsx): the box takes the room the header leaves them, and the
+   tabs that do not fit fold into More. The width of a tab is measured on a hidden copy, drawn with the same 18px
+   gap and type. That copy is in the flow so the box asks for the room all the tabs need, but it is no taller than
+   a line of nothing and no wider than the box, so it never adds to the page's size. */
+.mm-page-tabs-fit {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.mm-page-tabs-fit__row {
+  display: flex;
+  align-items: baseline;
+  column-gap: 18px;
+  min-width: 0;
+}
+
+.mm-page-tabs__measure {
+  display: flex;
+  column-gap: 18px;
+  width: max-content;
+  max-width: 100%;
+  height: 0;
+  overflow: hidden;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.mm-page-tabs__measure .mm-page-tabs__tab {
+  flex: none;
+}
+
+.mm-page-tabs__measure .mm-page-tabs__tab::before,
+.mm-page-tabs__probe::before {
+  content: attr(data-label);
+}
+
+.mm-page-tabs__probe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* "More" is set as a tab is, in 14px at weight 500, and is never drawn as the chosen one: the chosen tab always has
+   its place in the row. */
+.mm-page-tabs__more {
+  position: relative;
+  display: flex;
+}
+
+.mm-page-tabs__more-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  color: var(--mm-text2);
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.mm-page-tabs__more-button:hover {
+  color: var(--mm-text1);
+}
+
+.mm-page-tabs__more-chevron {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  transition: transform 0.15s ease;
+}
+
+.mm-page-tabs__more-button[aria-expanded="true"] .mm-page-tabs__more-chevron {
+  transform: rotate(180deg);
+}
+
+/* The menu is the user menu's: the same surface, border, radius and shadow, and rows of the same type. */
+.mm-page-tabs__menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 90;
+  min-width: 176px;
+  overflow: hidden;
+  border: 1px solid var(--mm-panel-border);
+  border-radius: var(--mm-radius-field);
+  background: var(--mm-surface-elevated);
+  box-shadow: var(--mm-shadow-popover);
+}
+
+.mm-page-tabs__menu-item {
+  display: block;
+  width: 100%;
+  padding: 10px 12px;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--mm-text2);
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.mm-page-tabs__menu-item:hover,
+.mm-page-tabs__menu-item:focus-visible {
+  background: var(--mm-surface-2);
+  color: var(--mm-text1);
+  outline: none;
+}
+
 /* The first row of a page with tabs, under the header: 40px, the tabs at the left and the page's own buttons at
    the right. */
 .mm-page-toolbar {
@@ -308,7 +435,9 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .mm-page-tabs__tab {
+  .mm-page-tabs__tab,
+  .mm-page-tabs__more-button,
+  .mm-page-tabs__more-chevron {
     transition: none;
   }
 }
