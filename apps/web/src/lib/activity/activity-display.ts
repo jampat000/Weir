@@ -29,6 +29,7 @@ const EVENT_LABELS: Record<string, string> = {
   "auth.password_changed": "Password changed",
   "auth.username_changed": "Username changed",
   "system.reconciliation.repair": "System repair finished",
+  "system.network_access.changed": "Network access changed",
   "arr_library.connection_test_succeeded": "Connection check finished",
   "arr_library.connection_test_failed": "Connection check failed",
   "processing.supplied_payload_evaluation_completed":

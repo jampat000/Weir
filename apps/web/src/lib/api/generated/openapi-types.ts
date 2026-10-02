@@ -2020,10 +2020,14 @@ export interface paths {
     };
     /**
      * Get Suite Network Access
-     * @description Whether other devices on the network can reach Weir (System › About). Windows package only; other platforms report not_applicable.
+     * @description Who can reach Weir over the network, and whether a change is waiting on the tray or the firewall (System › About). Windows package only; other installs report not_applicable.
      */
     get: operations["get_suite_network_access_api_v1_suite_network_access_get"];
-    put?: never;
+    /**
+     * Put Suite Network Access
+     * @description Admin only. Saves who can reach Weir for the Windows tray to apply: it restarts the server and, when Windows Firewall has no rule for Weir, asks for one on this PC (Private and Domain networks only). The answer is the state with the new choice pending. Answers 409 on Docker and on a bare install, where the way Weir is started decides.
+     */
+    put: operations["put_suite_network_access_api_v1_suite_network_access_put"];
     post?: never;
     delete?: never;
     options?: never;
@@ -7226,9 +7230,37 @@ export interface components {
     };
     /**
      * SuiteNetworkAccessOut
-     * @description Whether another device on the network can currently reach Weir.
+     * @description Who can reach Weir over the network, and what is happening about a change.
      */
     SuiteNetworkAccessOut: {
+      /**
+       * Addresses
+       * @description Where another device would type to reach Weir (for example http://10.1.1.196:9347); empty unless the server listens, or is about to listen, for the network.
+       */
+      addresses: string[];
+      /**
+       * Firewall
+       * @description What Windows Firewall says about Weir's server program: allowed, blocked, or not_checked while nothing depends on it.
+       * @enum {string}
+       */
+      firewall: "allowed" | "blocked" | "not_checked";
+      /**
+       * Machine Name
+       * @description This PC's name, for "approve on MEDIA-PC".
+       */
+      machine_name: string;
+      /**
+       * Pending Scope
+       * @description The saved choice when the running server has not caught up with it yet (the tray still has to restart it); null otherwise.
+       */
+      pending_scope: ("this_pc_only" | "network") | null;
+      /** Port */
+      port: number;
+      /**
+       * Scope
+       * @description Who the running server listens for; null when this copy of Weir does not manage that (Docker, a bare install).
+       */
+      scope: ("this_pc_only" | "network") | null;
       /**
        * State
        * @description this_pc_only, allowed, blocked, or not_applicable
@@ -7236,6 +7268,20 @@ export interface components {
       state: string;
       /** Summary */
       summary: string;
+    };
+    /**
+     * SuiteNetworkAccessPutIn
+     * @description Body for PUT /suite/network-access.
+     */
+    SuiteNetworkAccessPutIn: {
+      /** Csrf Token */
+      csrf_token: string;
+      /**
+       * Scope
+       * @description this_pc_only or network (devices on the network, through Windows Firewall's Private and Domain networks).
+       * @enum {string}
+       */
+      scope: "this_pc_only" | "network";
     };
     /**
      * SuiteOperationalHistoryResetIn
@@ -12004,6 +12050,39 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["SuiteNetworkAccessOut"];
+        };
+      };
+    };
+  };
+  put_suite_network_access_api_v1_suite_network_access_put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["SuiteNetworkAccessPutIn"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["SuiteNetworkAccessOut"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
         };
       };
     };

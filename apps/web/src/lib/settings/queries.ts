@@ -9,6 +9,7 @@ import {
   fetchSecurityOverview,
   fetchAppSettings,
   fetchNetworkAccess,
+  putNetworkAccess,
   fetchUpdateStatus,
   fetchUpdateSettings,
   fetchUpdateState,
@@ -22,6 +23,7 @@ import {
 import { settingsKeys } from "./query-keys";
 import type {
   AppSettingsPutBody,
+  NetworkAccessPutBody,
   NotificationChannelIn,
   ServerLogFilters,
   UpdateSettingsPutBody,
@@ -52,13 +54,34 @@ export function useConfigurationBackupsQuery(enabled: boolean) {
   });
 }
 
-/** System › About's network-reach state. Independent of every other card on the page (ux-common: no panel waits on another's data). */
-export function useNetworkAccessQuery() {
+/** How often the state is read again while a change waits for the tray, or while someone retries the firewall step. */
+const NETWORK_ACCESS_PENDING_POLL_MS = 2_000;
+
+/**
+ * System › About's network-reach state. Independent of every other card on the page (ux-common: no panel waits on
+ * another's data). It is read again every couple of seconds while a change is pending, and while `watching` says a
+ * retry of the firewall step is under way.
+ */
+export function useNetworkAccessQuery(watching = false) {
   return useQuery({
     queryKey: settingsKeys.networkAccess,
     queryFn: () => fetchNetworkAccess(),
     staleTime: 30_000,
     retry: false,
+    refetchInterval: (query) =>
+      watching || query.state.data?.pending_scope
+        ? NETWORK_ACCESS_PENDING_POLL_MS
+        : false,
+  });
+}
+
+export function useNetworkAccessMutation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: NetworkAccessPutBody) => putNetworkAccess(body),
+    onSuccess: (data) => {
+      qc.setQueryData(settingsKeys.networkAccess, data);
+    },
   });
 }
 

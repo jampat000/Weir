@@ -83,13 +83,6 @@ function metrics(sim) {
   });
 }
 
-/** What the Windows package says when the server only accepts connections from this PC, as the server words it. */
-const NETWORK_ACCESS = shaped("SuiteNetworkAccessOut", {
-  state: "this_pc_only",
-  summary:
-    "Only this PC can reach Weir. To let other devices on your network in, use the Weir tray icon → Allow other devices on your network.",
-});
-
 /** @param {import("./router.mjs").Router} router */
 export function registerSystemRoutes(router) {
   router.get("/ready", () => ({ ready: true, status: "ready" }));
@@ -114,7 +107,6 @@ export function registerSystemRoutes(router) {
     downloaded: false,
     pending_version: null,
   }));
-  router.get("/api/v1/suite/network-access", () => NETWORK_ACCESS);
   router.get("/api/v1/suite/metrics", ({ sim }) => metrics(sim));
   router.get("/api/v1/suite/security-overview", () =>
     shaped("SuiteSecurityOverviewOut", {
