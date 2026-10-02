@@ -15,6 +15,10 @@
   /* Its own width is what the page's controls in it are sized by (a container query), not the window's, since the
      menu takes a different share of the window open and collapsed. */
   container: mm-header / inline-size;
+  /* The title sits lower than the header's middle by half of the eyebrow's line (1.35 times its size) and of the 4px
+     under it, less 0.45px that the title's line has above its letters. A control on the title line moves down by that
+     much, so it is centred on the title's text; a transform keeps the header's height. */
+  --title-line-shift: calc(var(--mm-type-eyebrow) * 0.675 + 1.55px);
 }
 
 /* Phones only: the button that opens the side menu. */
@@ -281,6 +285,12 @@
   .mm-header__actions {
     flex-shrink: 0;
     flex-wrap: nowrap;
+  }
+
+  .mm-header__slot,
+  .mm-header__buttons,
+  .mm-header__actions {
+    transform: translateY(var(--title-line-shift));
   }
 }
 

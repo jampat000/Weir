@@ -19,23 +19,34 @@
   flex-shrink: 0;
   align-items: baseline;
   gap: 12px;
-  /* Deluno's card header is 44px whether or not it has a link or a count: 14px above, 10px below, a 20px line. */
+  /* Deluno's card header is 44px whether or not it has a link or a count: 10px above and 11px below the title's own 23px
+     line, on which its letters, and so a card's controls, are centred. */
   min-height: 44px;
-  padding: 14px 18px 10px;
+  padding: 10px 18px 11px;
+  --panel-line: 23px;
 }
 
 .mm-panel__title {
   flex-shrink: 0;
   font-size: var(--mm-type-panel);
   font-weight: 600;
-  line-height: 1;
+  line-height: var(--panel-line);
   white-space: nowrap;
   color: var(--mm-text1);
 }
 
 /* A header with a note under its title: the title and the note are one block, centred on the line with the controls. */
 .mm-panel__head--note {
+  --panel-line: var(--mm-type-panel);
   align-items: center;
+  row-gap: 20px;
+}
+
+/* The controls start at the title's line and are lifted by half of what they are taller than it, so they are centred on
+   the title and not on the block; a row of their own, where they wrap, keeps clear of the block. */
+.mm-panel__head--note > :is(.mm-panel__controls, .mm-panel__aside) {
+  align-self: flex-start;
+  transform: translateY(calc(var(--panel-line) / 2 - 50%));
 }
 
 .mm-panel__titles {
@@ -103,6 +114,7 @@
 .mm-panel__aside {
   display: flex;
   flex-shrink: 0;
+  align-self: center;
   flex-wrap: wrap;
   align-items: center;
   justify-content: flex-end;
@@ -147,6 +159,11 @@
   padding-top: 8px;
   padding-bottom: 8px;
   border-bottom: 1px solid var(--mm-hairline);
+}
+
+/* Room above the title for controls that are as tall as the block and centred on its first line. */
+.mm-panel--padded > .mm-panel__head--note {
+  padding-top: 16px;
 }
 
 .mm-panel--padded > .mm-panel__head .mm-panel__count {
@@ -260,7 +277,6 @@ a.mm-stat__label:hover {
   font-size: 15px;
   font-weight: 600;
   letter-spacing: 0;
-  color: var(--mm-status-healthy-text);
 }
 
 .mm-stat__body {
