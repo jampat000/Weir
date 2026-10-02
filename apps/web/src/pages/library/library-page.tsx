@@ -30,7 +30,9 @@ import { LibraryFileDrawer } from "./library-file-drawer";
 import { readLastLibrary, saveLastLibrary } from "./last-library";
 import {
   LibraryFilters,
+  LibraryReasonSelect,
   NO_FILTER,
+  statusFromShow,
   type LibraryFilter,
 } from "./library-filters";
 import {
@@ -80,9 +82,8 @@ function fileFilters(
   page: number,
 ): LibraryFileFilters {
   return {
-    ...(filter.classification ? { classification: filter.classification } : {}),
+    ...(filter.status ? { status: filter.status } : {}),
     ...(filter.problem ? { problem: filter.problem } : {}),
-    ...(filter.state ? { state: filter.state } : {}),
     ...(query ? { q: query } : {}),
     sort: "path",
     direction: "asc",
@@ -108,7 +109,11 @@ export function LibraryPage(): React.ReactElement {
   const [libraryId, setLibraryId] = useState<number | null>(null);
   const [lastLibrary] = useState(readLastLibrary);
   const [search, setSearch] = useState(params.get("q") ?? "");
-  const [filter, setFilter] = useState<LibraryFilter>(NO_FILTER);
+  // The slice of the library lives in the address (no parameter is All), so a link can open straight onto it.
+  const [filter, setFilter] = useState<LibraryFilter>(() => ({
+    ...NO_FILTER,
+    status: statusFromShow(params.get("show")),
+  }));
   const [page, setPage] = useState(1);
   // A selection belongs to the page it was made on: anything that changes the rows on screen clears it.
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -220,6 +225,15 @@ export function LibraryPage(): React.ReactElement {
   const savedSetup = setupSettings.data;
   const needsSetup = savedSetup?.library_folders.length === 0;
   const scan = overview.data?.scan ?? files.data?.scan ?? null;
+  const chooseFilter = (next: LibraryFilter) =>
+    showRows(() => {
+      setFilter(next);
+      setPage(1);
+      const address = new URLSearchParams(params);
+      if (next.status) address.set("show", next.status);
+      else address.delete("show");
+      setParams(address, { replace: true });
+    });
   const filterControls = (
     <LibraryFilters
       search={search}
@@ -231,12 +245,7 @@ export function LibraryPage(): React.ReactElement {
       }
       overview={overview.data}
       filter={filter}
-      onFilter={(next) =>
-        showRows(() => {
-          setFilter(next);
-          setPage(1);
-        })
-      }
+      onFilter={chooseFilter}
     />
   );
   const header = (
@@ -303,6 +312,11 @@ export function LibraryPage(): React.ReactElement {
         description={lead}
         aside={
           <>
+            <LibraryReasonSelect
+              overview={overview.data}
+              filter={filter}
+              onFilter={chooseFilter}
+            />
             <LibraryScanStatus
               scan={scan}
               schedule={overview.data?.schedule}

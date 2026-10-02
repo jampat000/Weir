@@ -10,6 +10,9 @@ function file(path: string, overrides: Partial<LibraryFile> = {}): LibraryFile {
     path,
     size_bytes: 1_000_000,
     classification: "matches",
+    status: "matches",
+    status_reason: null,
+    cleaned_at: null,
     estimated_bytes_saved: 0,
     audio_track_count: 1,
     subtitle_track_count: 1,
@@ -103,10 +106,12 @@ const episodes: [string, LibraryFile[]][] = [
     [
       file("Northbound/S01E01.mkv", {
         classification: "would_change",
+        status: "needs_cleaning",
         manager_kind: "sonarr",
       }),
       file("Northbound/S01E02.mkv", {
         classification: "would_change",
+        status: "needs_cleaning",
         manager_kind: "sonarr",
       }),
       file("Northbound/S01E03.mkv", { manager_kind: "sonarr" }),
@@ -121,6 +126,7 @@ it("gives a title with one file a single row that carries the title, the file an
       [
         file("Detour (1945)/Detour (1945).mkv", {
           classification: "would_change",
+          status: "needs_cleaning",
           manager_kind: "radarr",
         }),
       ],
@@ -144,7 +150,7 @@ it("nests a title's files under it, with its source and file count on the title"
   renderSelectable(episodes);
 
   expect(screen.getByText("Sonarr · 3 files")).toBeVisible();
-  expect(screen.getByText("2 would change")).toBeVisible();
+  expect(screen.getByText("2 need cleaning")).toBeVisible();
   expect(screen.getAllByTestId("library-row")).toHaveLength(3);
   expect(
     screen.getByRole("checkbox", { name: "Select S01E01.mkv" }),

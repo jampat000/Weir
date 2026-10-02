@@ -9,8 +9,10 @@ import {
   groupOf,
   headerLead,
   nextScheduledBrief,
+  groupSummary,
   scanned,
-  verdictOf,
+  statusNote,
+  statusWords,
 } from "./library-model";
 
 const NOW = Date.UTC(2026, 7, 22, 10, 0, 0);
@@ -21,6 +23,10 @@ function libraryFile(overrides: Partial<LibraryFile>): LibraryFile {
   return {
     path: "Show/Season 1/Show.S01E01.mkv",
     classification: "would_change",
+    status: "needs_cleaning",
+    status_reason: null,
+    cleaned_at: null,
+    problem_kind: null,
     manager_title: null,
     removed_audio_tracks: 0,
     removed_subtitle_tracks: 0,
@@ -48,29 +54,126 @@ describe("groupOf", () => {
   });
 });
 
-describe("verdictOf", () => {
-  it("counts what would come out, with the plural that agrees", () => {
+describe("statusWords", () => {
+  it("counts what would come out of a file that needs cleaning, with the plural that agrees", () => {
     const file = libraryFile({
       removed_audio_tracks: 2,
       removed_subtitle_tracks: 1,
     });
 
-    expect(verdictOf(file)).toBe("Would remove 2 audio, 1 subtitle");
+    expect(statusWords(file)).toBe("Would remove 2 audio, 1 subtitle");
   });
 
-  it("keeps only the first sentence of why a file is not touched", () => {
-    const file = libraryFile({
-      classification: "cannot_process",
-      reason: "Still seeding. Weir waits for the torrent to finish.",
-    });
-
-    expect(verdictOf(file)).toBe("Still seeding");
+  it("says plainly that a file needs cleaning when the plan has nothing to count", () => {
+    expect(statusWords(libraryFile({}))).toBe("Needs cleaning");
   });
 
-  it("says a file already matches your rules", () => {
-    expect(verdictOf(libraryFile({ classification: "matches" }))).toBe(
+  it("says a file matches your rules", () => {
+    expect(statusWords(libraryFile({ status: "matches" }))).toBe(
       "Matches your rules",
     );
+  });
+
+  it("says a file is being cleaned, or has been set aside", () => {
+    expect(statusWords(libraryFile({ status: "cleaning" }))).toBe(
+      "Cleaning now",
+    );
+    expect(statusWords(libraryFile({ status: "left_alone" }))).toBe(
+      "Left alone",
+    );
+  });
+
+  it("gives the reason a file cannot be cleaned yet, from the problem when there is one", () => {
+    expect(
+      statusWords(
+        libraryFile({ status: "cant_clean_yet", problem_kind: "seeding" }),
+      ),
+    ).toBe("Still seeding");
+  });
+
+  it("keeps only the first sentence of why Weir cannot read a file", () => {
+    const file = libraryFile({
+      status: "cant_clean_yet",
+      classification: "cannot_process",
+      reason: "Weir could not read this file. It may be damaged.",
+    });
+
+    expect(statusWords(file)).toBe("Weir could not read this file");
+  });
+
+  it("says a file that is only shared with a download is still seeding", () => {
+    expect(
+      statusWords(libraryFile({ status: "cant_clean_yet", link_count: 2 })),
+    ).toBe("Still seeding");
+  });
+});
+
+describe("statusNote", () => {
+  it.each([
+    ["new", "new"],
+    ["replaced", "replaced"],
+    ["rules_changed", "rules changed"],
+  ] as const)("says why a file needs cleaning: %s", (reason, words) => {
+    expect(statusNote(libraryFile({ status_reason: reason }))).toBe(words);
+  });
+
+  it("says nothing when the scan cannot say why", () => {
+    expect(statusNote(libraryFile({ status_reason: null }))).toBeNull();
+  });
+
+  it("says when Weir cleaned a file that matches now, and that one it never touched was already clean", () => {
+    const cleaned = libraryFile({
+      status: "matches",
+      cleaned_at: Date.UTC(2026, 9, 3, 12) / 1000,
+    });
+
+    expect(statusNote(cleaned)).toMatch(/^cleaned .*\S/);
+    expect(statusNote(libraryFile({ status: "matches" }))).toBe(
+      "already clean",
+    );
+  });
+
+  it("says nothing about history on a file in any other status", () => {
+    for (const status of ["cleaning", "cant_clean_yet", "left_alone"] as const)
+      expect(
+        statusNote(libraryFile({ status, cleaned_at: 1_700_000_000 })),
+      ).toBeNull();
+  });
+});
+
+describe("groupSummary", () => {
+  const filesIn = (...statuses: LibraryFile["status"][]) =>
+    statuses.map((status) => libraryFile({ status }));
+
+  it("says in red how many of a title's files need cleaning, whatever else they are", () => {
+    expect(
+      groupSummary(filesIn("matches", "needs_cleaning", "needs_cleaning")),
+    ).toEqual({ rag: "failed", text: "2 need cleaning" });
+  });
+
+  it("says in green how many match when none needs anything", () => {
+    expect(groupSummary(filesIn("matches", "matches", "left_alone"))).toEqual({
+      rag: "healthy",
+      text: "2 match",
+    });
+  });
+
+  it("puts Weir at work, then a file held back, before a match", () => {
+    expect(groupSummary(filesIn("matches", "cleaning"))).toEqual({
+      rag: "info",
+      text: "1 cleaning",
+    });
+    expect(groupSummary(filesIn("matches", "cant_clean_yet"))).toEqual({
+      rag: "warning",
+      text: "1 can't clean yet",
+    });
+  });
+
+  it("says in grey that files set aside are left alone", () => {
+    expect(groupSummary(filesIn("left_alone", "left_alone"))).toEqual({
+      rag: "neutral",
+      text: "2 left alone",
+    });
   });
 });
 

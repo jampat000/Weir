@@ -138,7 +138,9 @@
    until it is down to its minimum. */
 .mm-library-search {
   flex: 0 1000 260px;
-  min-width: 5.5rem;
+  min-width: 5rem;
+  padding-inline: 10px;
+  font-size: 13px;
 }
 
 .mm-library-chips-box {
@@ -178,7 +180,7 @@
 .mm-library-chips .mm-library-chip {
   align-self: stretch;
   height: auto;
-  padding-inline: 12px;
+  padding-inline: 10px;
 }
 
 @media (min-width: 921px) {
@@ -208,7 +210,12 @@
   }
 
   .mm-library-search {
-    flex-basis: 5.5rem;
+    flex-basis: 5rem;
+  }
+
+  /* The clear mark would take room from the one word the box has to show. */
+  .mm-library-search::-webkit-search-cancel-button {
+    display: none;
   }
 }
 
@@ -258,18 +265,26 @@
     color 0.15s ease;
 }
 
-/* Red, amber, green: the colour of a count and of the same files in the table (see library-model's Rag). Green is a file
-   that matches the rules or has been cleaned, red one the rules say needs fixing, grey one Weir leaves alone. The words
-   are the signal-text colours, which are tuned for contrast in both themes, and the dot is the words' own colour. */
-[data-rag="good"] {
+/* The colour of a count and of the same files in the table (library-model's Rag): red needs cleaning, blue is being
+   cleaned, green matches, amber cannot be cleaned yet, grey is left alone. The words are the signal-text colours, which
+   are tuned for contrast in both themes, and the dot is the words' own colour. */
+[data-rag="healthy"] {
   --rag: var(--mm-status-healthy-text);
 }
 
-[data-rag="bad"] {
+[data-rag="failed"] {
   --rag: var(--mm-status-failed-text);
 }
 
-[data-rag="muted"] {
+[data-rag="warning"] {
+  --rag: var(--mm-status-warning-text);
+}
+
+[data-rag="info"] {
+  --rag: var(--mm-status-info-text);
+}
+
+[data-rag="neutral"] {
   --rag: var(--mm-text2);
 }
 

@@ -4,7 +4,7 @@ import { Poster } from "../../components/shared/poster";
 import { formatBytes } from "../../lib/format/bytes";
 import { baseName } from "../../lib/format/path";
 import type { LibraryFile } from "../../lib/processing/library-mode-api";
-import { ragOfClassification, verdictOf } from "./library-model";
+import { STATUS_RAG, statusNote, statusWords, type Rag } from "./library-model";
 
 const MANAGER_NAMES: Record<string, string> = {
   sonarr: "Sonarr",
@@ -50,21 +50,44 @@ export function CheckCell({
   );
 }
 
+/**
+ * The "What Weir would do" cell: a file's status in its colour, with a dot, and under it a quiet note: why it needs
+ * cleaning, or what Weir did. A title with several files says the same of them all in the same cell.
+ */
+export function StatusCell({
+  rag,
+  words,
+  note,
+}: {
+  rag: Rag;
+  words: string;
+  note?: string | null;
+}) {
+  return (
+    <span
+      role="cell"
+      className="mm-library-verdict"
+      title={note ? `${words} (${note})` : words}
+    >
+      <span className="mm-library-rag" data-rag={rag}>
+        {words}
+      </span>
+      {note ? <span className="mm-library-verdict__note">{note}</span> : null}
+    </span>
+  );
+}
+
 /** What Weir would do with a file and the figures that go with it: the cells every file row ends with. */
 function FileFigures({ file }: { file: LibraryFile }) {
-  const verdict = verdictOf(file);
   const audio = file.audio_summary ?? `${file.audio_track_count}`;
   const subtitles = file.subtitle_summary ?? `${file.subtitle_track_count}`;
   return (
     <>
-      <span
-        role="cell"
-        className="mm-library-verdict mm-library-rag"
-        data-rag={ragOfClassification(file.classification)}
-        title={verdict}
-      >
-        {verdict}
-      </span>
+      <StatusCell
+        rag={STATUS_RAG[file.status]}
+        words={statusWords(file)}
+        note={statusNote(file)}
+      />
       <span role="cell" className="mm-library-tracks" title={audio}>
         {audio}
       </span>
@@ -111,7 +134,7 @@ function FileRowFrame({
       <CheckCell
         label={checkLabel}
         checked={selected}
-        disabled={file.classification !== "would_change"}
+        disabled={file.status !== "needs_cleaning"}
         onChange={() => onToggle(file.path)}
       />
       {children}

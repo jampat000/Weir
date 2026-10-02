@@ -27,6 +27,7 @@ import { errorMessage } from "../../lib/api/error-message";
 import { useAppDateFormatter } from "../../lib/ui/mm-format-date";
 import { plural } from "../../lib/ui/mm-plural";
 import { LibraryCleanOutcome } from "./library-clean-dialog";
+import { STATUS_RAG, statusNote, statusWords } from "./library-model";
 import { REMOVAL_IS_FINAL, removalIsRecoverable } from "./library-clean-model";
 import { TrackList, rulesKeep, toggled } from "./library-drawer-tracks";
 import { LibraryLeaveAlone, useLeaveAlone } from "./library-leave-alone";
@@ -53,6 +54,7 @@ function FileChips({
   file: LibraryFile;
   leftAlone: boolean;
 }) {
+  const note = statusNote(file);
   return (
     <div className="mm-drawer__chips">
       {file.video_height ? <Chip dot={false}>{file.video_height}p</Chip> : null}
@@ -65,12 +67,12 @@ function FileChips({
           {MANAGER_NAMES[file.manager_kind] ?? file.manager_kind}: matched
         </Chip>
       ) : null}
-      {file.cleaned_at ? (
-        <Chip tone="healthy">
-          Cleaned {new Date(file.cleaned_at * 1000).toLocaleDateString()}
-        </Chip>
-      ) : null}
-      {leftAlone ? <Chip dot={false}>Left alone</Chip> : null}
+      <Chip tone={STATUS_RAG[leftAlone ? "left_alone" : file.status]}>
+        {leftAlone && file.status !== "left_alone"
+          ? "Left alone"
+          : statusWords(file)}
+      </Chip>
+      {note ? <span className="mm-drawer__note">{note}</span> : null}
     </div>
   );
 }

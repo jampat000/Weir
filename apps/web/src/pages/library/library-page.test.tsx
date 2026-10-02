@@ -6,7 +6,7 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, useLocation } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   LibraryCleanResult,
@@ -167,6 +167,8 @@ function file(overrides: Partial<LibraryFile>): LibraryFile {
     problem_kind: null,
     cleaned_at: null,
     leave_alone: false,
+    status: "needs_cleaning",
+    status_reason: "new",
     ...overrides,
   };
 }
@@ -182,7 +184,19 @@ const totals = {
   estimated_bytes_saved: 3_300_000_000,
   cleaned: 2,
   left_alone: 1,
+  by_status: {
+    needs_cleaning: 9,
+    cleaning: 1,
+    matches: 2,
+    cant_clean_yet: 1,
+    left_alone: 1,
+  },
 };
+
+/** What the address says, so a test can read what the page wrote to it. */
+function Address() {
+  return <output data-testid="address">{useLocation().search}</output>;
+}
 
 function renderLibrary(address = "/library") {
   const client = new QueryClient({
@@ -192,6 +206,7 @@ function renderLibrary(address = "/library") {
     <QueryClientProvider client={client}>
       <MemoryRouter initialEntries={[address]}>
         <LibraryPage />
+        <Address />
       </MemoryRouter>
     </QueryClientProvider>,
   );
@@ -282,6 +297,8 @@ describe("LibraryPage", () => {
         file({
           path: "D:/tv/The Quiet Harbour/Season 01/The.Quiet.Harbour.S01E02.mkv",
           classification: "matches",
+          status: "matches",
+          status_reason: null,
           summary: "Already matches your rules",
           estimated_bytes_saved: 0,
         }),
@@ -289,6 +306,8 @@ describe("LibraryPage", () => {
           path: "D:/tv/Northbound/Season 01/Northbound.S01E01.mkv",
           manager_title: "Northbound",
           classification: "cannot_process",
+          status: "cant_clean_yet",
+          status_reason: null,
           summary: "Still seeding, so Weir left it alone",
           problem_kind: "seeding",
           estimated_bytes_saved: 0,
@@ -309,9 +328,9 @@ describe("LibraryPage", () => {
     expect(screen.getAllByTestId("library-row")).toHaveLength(3);
     expect(screen.getByText("Northbound")).toBeInTheDocument();
     expect(screen.getByText("Sonarr · 2 files")).toBeInTheDocument();
-    expect(screen.getByText("1 would change")).toHaveAttribute(
+    expect(screen.getByText("1 need cleaning")).toHaveAttribute(
       "data-rag",
-      "bad",
+      "failed",
     );
     expect(
       screen.getByText(/back if everything that would change is cleaned/),
@@ -375,20 +394,22 @@ describe("LibraryPage", () => {
     );
   });
 
-  it("makes each count a filter, and asks the server for that filter", () => {
+  it("makes each count a filter, asks the server for that status, and puts it in the address", () => {
     renderLibrary();
-    const chip = screen.getByRole("button", { name: /Would change/ });
-    expect(chip).toHaveTextContent("10");
+    const chip = screen.getByRole("button", { name: /Needs cleaning/ });
+    expect(chip).toHaveTextContent("9");
 
     fireEvent.click(chip);
 
     expect(chip).toHaveAttribute("aria-pressed", "true");
-    expect(lastFilters.at(-1)).toMatchObject({
-      classification: "would_change",
-    });
+    expect(lastFilters.at(-1)).toMatchObject({ status: "needs_cleaning" });
+    expect(screen.getByTestId("address")).toHaveTextContent(
+      "?show=needs_cleaning",
+    );
 
     fireEvent.click(chip);
-    expect(lastFilters.at(-1)?.classification).toBeUndefined();
+    expect(lastFilters.at(-1)?.status).toBeUndefined();
+    expect(screen.getByTestId("address")).toBeEmptyDOMElement();
   });
 
   it("only offers to clean what it would change, and asks before doing it", () => {
@@ -724,18 +745,14 @@ describe("LibraryPage", () => {
     expect(said).toHaveTextContent("still shared with a download");
   });
 
-  it("counts what Weir has done with these files, and filters by it", () => {
+  it("has no chip for what Weir has done: that is history, a note on the row", () => {
     renderLibrary();
 
-    const cleaned = screen.getByRole("button", { name: /Cleaned/ });
-    expect(cleaned).toHaveTextContent("2");
     expect(
-      screen.getByRole("button", { name: /Left alone/ }),
-    ).toHaveTextContent("1");
-
-    fireEvent.click(cleaned);
-
-    expect(lastFilters.at(-1)).toMatchObject({ state: "cleaned" });
+      screen.queryByRole("button", { name: /^Cleaned/ }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText("already clean")).toBeInTheDocument();
+    expect(screen.getByText("new")).toBeInTheDocument();
   });
 
   it("shows a library with no folders a step to set it up, not a link back to Settings", () => {
@@ -838,10 +855,10 @@ describe("LibraryPage", () => {
         .map((chip) => chip.textContent),
     ).toEqual([
       "All 14",
-      "Would change 10",
-      "Matches rules 3",
-      "Untouched 1",
-      "Cleaned 2",
+      "Needs cleaning 9",
+      "Cleaning 1",
+      "Matches rules 2",
+      "Can't clean yet 1",
       "Left alone 1",
     ]);
 
@@ -904,35 +921,84 @@ describe("LibraryPage", () => {
     const all = screen.getByRole("button", { name: /^All/ });
     expect(all).toHaveAttribute("aria-pressed", "true");
 
-    fireEvent.click(screen.getByRole("button", { name: /Would change/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Needs cleaning/ }));
     expect(all).toHaveAttribute("aria-pressed", "false");
-    expect(lastFilters.at(-1)).toMatchObject({
-      classification: "would_change",
-    });
+    expect(lastFilters.at(-1)).toMatchObject({ status: "needs_cleaning" });
 
     fireEvent.click(all);
     expect(all).toHaveAttribute("aria-pressed", "true");
-    expect(lastFilters.at(-1)?.classification).toBeUndefined();
-    expect(lastFilters.at(-1)?.state).toBeUndefined();
+    expect(lastFilters.at(-1)?.status).toBeUndefined();
+    expect(screen.getByTestId("address")).toBeEmptyDOMElement();
   });
 
-  it("colours each count and each file by what the rules say: green matches, red needs fixing, grey is left alone", () => {
+  it.each([
+    ["needs_cleaning", "needs_cleaning"],
+    ["cleaning", "cleaning"],
+    ["matches", "matches"],
+    ["cant_clean_yet", "cant_clean_yet"],
+    ["left_alone", "left_alone"],
+    // The words the old chips used still land on the slice they were about.
+    ["would_change", "needs_cleaning"],
+    ["would-change", "needs_cleaning"],
+    ["cannot_process", "cant_clean_yet"],
+    ["untouched", "cant_clean_yet"],
+  ])("opens on the status an address names: ?show=%s", (show, status) => {
+    renderLibrary(`/library?show=${show}`);
+
+    expect(lastFilters.at(-1)).toMatchObject({ status });
+  });
+
+  it.each(["cleaned", "nonsense", ""])(
+    "shows every file for an address that names no status: ?show=%s",
+    (show) => {
+      renderLibrary(`/library?show=${show}`);
+
+      expect(lastFilters.at(-1)?.status).toBeUndefined();
+      expect(screen.getByRole("button", { name: /^All/ })).toHaveAttribute(
+        "aria-pressed",
+        "true",
+      );
+    },
+  );
+
+  it("colours each count and each file by its status: red needs cleaning, blue cleaning, green matches, amber waiting, grey set aside", () => {
     renderLibrary();
 
     const tone = (name: RegExp) =>
       screen.getByRole("button", { name }).getAttribute("data-rag");
-    expect(tone(/Would change/)).toBe("bad");
-    expect(tone(/Matches rules/)).toBe("good");
-    expect(tone(/Untouched/)).toBe("muted");
-    expect(tone(/Cleaned/)).toBe("good");
-    expect(tone(/Left alone/)).toBe("muted");
+    expect(tone(/Needs cleaning/)).toBe("failed");
+    expect(tone(/Cleaning \d/)).toBe("info");
+    expect(tone(/Matches rules/)).toBe("healthy");
+    expect(tone(/Can't clean yet/)).toBe("warning");
+    expect(tone(/Left alone/)).toBe("neutral");
     expect(tone(/^All/)).toBeNull();
 
     const rows = screen.getAllByTestId("library-row");
     const verdict = (row: HTMLElement) =>
-      row.querySelector(".mm-library-verdict");
+      row.querySelector(".mm-library-verdict .mm-library-rag");
     expect(
       new Set(rows.map((row) => verdict(row)?.getAttribute("data-rag"))),
-    ).toEqual(new Set(["bad", "good", "muted"]));
+    ).toEqual(new Set(["failed", "healthy", "warning"]));
+  });
+
+  it("narrows can't clean yet to one reason, only while that status is chosen", () => {
+    renderLibrary();
+    expect(
+      screen.queryByRole("combobox", { name: /cannot clean a file yet/ }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /Can't clean yet/ }));
+    fireEvent.change(
+      screen.getByRole("combobox", { name: /cannot clean a file yet/ }),
+      { target: { value: "seeding" } },
+    );
+
+    expect(lastFilters.at(-1)).toMatchObject({
+      status: "cant_clean_yet",
+      problem: "seeding",
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /^All/ }));
+    expect(lastFilters.at(-1)?.problem).toBeUndefined();
   });
 });

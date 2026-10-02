@@ -55,12 +55,7 @@ export function LibraryScanStatus({
         )}
         <span>{when}</span>
         {scheduleBrief ? (
-          <span
-            className="mm-library-scan__next"
-            data-testid="library-schedule"
-          >
-            · {scheduleBrief}
-          </span>
+          <span data-testid="library-schedule">· {scheduleBrief}</span>
         ) : null}
         <span className="sr-only">
           {scheduleLine ? `, ${scheduleLine}` : ""}

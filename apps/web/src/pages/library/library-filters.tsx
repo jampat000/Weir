@@ -1,84 +1,60 @@
 import type {
-  LibraryFileClassification,
   LibraryOverview,
-  LibraryTotals,
   LibraryProblemKind,
+  LibraryTotals,
 } from "../../lib/processing/library-mode-api";
 import { useChipRow } from "../../lib/ui/use-chip-row";
-import { PROBLEM_LABELS, type Rag } from "./library-model";
+import {
+  LIBRARY_STATUSES,
+  PROBLEM_LABELS,
+  STATUS_RAG,
+  type LibraryStatus,
+  type Rag,
+} from "./library-model";
 
-export type LibraryState = "cleaned" | "left_alone";
-
-/** Which slice of the library the table shows. A chip picks one; the reason list narrows "will not touch". */
+/** Which slice of the library the table shows: one status, or all of it. The reason list narrows "can't clean yet". */
 export type LibraryFilter = {
-  classification: LibraryFileClassification | null;
+  status: LibraryStatus | null;
   problem: LibraryProblemKind | null;
-  state: LibraryState | null;
 };
 
-export const NO_FILTER: LibraryFilter = {
-  classification: null,
-  problem: null,
-  state: null,
-};
-
-type Chip = {
-  id: string;
-  label: string;
-  hint: string;
-  /** Its colour, which is the same as the colour of the same thing in the table. Without one it is plain. */
-  rag?: Rag;
-  count: (totals: LibraryTotals) => number;
-  selected: (filter: LibraryFilter) => boolean;
-  /** The filter a click on this chip asks for. */
-  choose: (filter: LibraryFilter) => LibraryFilter;
-};
-
-function byClassification(
-  id: LibraryFileClassification,
-  label: string,
-  hint: string,
-  rag: Rag,
-  count: Chip["count"],
-): Chip {
-  return {
-    id,
-    label,
-    hint,
-    rag,
-    count,
-    selected: (filter) => filter.classification === id,
-    choose: (filter) => ({
-      ...NO_FILTER,
-      classification: filter.classification === id ? null : id,
-    }),
-  };
-}
-
-function byState(
-  id: LibraryState,
-  label: string,
-  hint: string,
-  rag: Rag,
-  count: Chip["count"],
-): Chip {
-  return {
-    id,
-    label,
-    hint,
-    rag,
-    count,
-    selected: (filter) => filter.state === id,
-    choose: (filter) => ({
-      ...NO_FILTER,
-      state: filter.state === id ? null : id,
-    }),
-  };
-}
+export const NO_FILTER: LibraryFilter = { status: null, problem: null };
 
 /**
- * The chips, in the order an operator reads them: every file, then the counts by what the rules say about a file, then
- * by what Weir has done with it. Each count that is also a filter has the colour of its files in the table.
+ * The status a link or a bookmark asks for, in `?show=`. Every address that has ever pointed at a slice of the library
+ * still lands on it: the old words for the two statuses that were renamed are read as the new ones, and a slice that no
+ * longer exists (what Weir has cleaned is history, not a status) shows everything. No parameter at all is "All".
+ */
+const LEGACY_SHOW: Record<string, LibraryStatus> = {
+  would_change: "needs_cleaning",
+  "would-change": "needs_cleaning",
+  cannot_process: "cant_clean_yet",
+  "cannot-process": "cant_clean_yet",
+  "will-not-touch": "cant_clean_yet",
+  untouched: "cant_clean_yet",
+  "left-alone": "left_alone",
+  "cant-clean-yet": "cant_clean_yet",
+  "needs-cleaning": "needs_cleaning",
+};
+
+export function statusFromShow(value: string | null): LibraryStatus | null {
+  if (!value) return null;
+  const known = LIBRARY_STATUSES.find((status) => status === value);
+  return known ?? LEGACY_SHOW[value] ?? null;
+}
+
+type Chip = {
+  id: "all" | LibraryStatus;
+  label: string;
+  hint: string;
+  /** Its colour, which is the colour of the same thing in the table. "All" is plain. */
+  rag?: Rag;
+  count: (totals: LibraryTotals) => number;
+};
+
+/**
+ * The chips, in the order a person reads them: every file, then one for each status. Each file is in exactly one status,
+ * so the five add up to All. The words are short; the tooltip says what each one means.
  */
 const CHIPS: Chip[] = [
   {
@@ -86,50 +62,51 @@ const CHIPS: Chip[] = [
     label: "All",
     hint: "Every file in this workflow",
     count: (totals) => totals.files,
-    selected: (filter) =>
-      !filter.classification && !filter.state && !filter.problem,
-    choose: () => NO_FILTER,
   },
-  byClassification(
-    "would_change",
-    "Would change",
-    "Would change: Weir would take tracks out of these",
-    "bad",
-    (totals) => totals.would_change,
-  ),
-  byClassification(
-    "matches",
-    "Matches rules",
-    "Matches your rules: nothing to do, these already look the way your rules ask",
-    "good",
-    (totals) => totals.matches,
-  ),
-  byClassification(
-    "cannot_process",
-    "Untouched",
-    "Weir will not touch these: still seeding, or Weir cannot read them",
-    "muted",
-    (totals) => totals.cannot_process,
-  ),
-  byState(
-    "cleaned",
-    "Cleaned",
-    "Cleaned: Weir has cleaned these at least once; a rescan does not forget",
-    "good",
-    (totals) => totals.cleaned,
-  ),
-  byState(
-    "left_alone",
-    "Left alone",
-    "Left alone: you marked these; nothing cleans them until you clear it",
-    "muted",
-    (totals) => totals.left_alone,
-  ),
+  {
+    id: "needs_cleaning",
+    label: "Needs cleaning",
+    hint: "Needs cleaning: these do not match your rules as they are now",
+    rag: STATUS_RAG.needs_cleaning,
+    count: (totals) => totals.by_status.needs_cleaning,
+  },
+  {
+    id: "cleaning",
+    label: "Cleaning",
+    hint: "Cleaning: queued for a clean, or being cleaned right now",
+    rag: STATUS_RAG.cleaning,
+    count: (totals) => totals.by_status.cleaning,
+  },
+  {
+    id: "matches",
+    label: "Matches rules",
+    hint: "Matches your rules: fine as they are",
+    rag: STATUS_RAG.matches,
+    count: (totals) => totals.by_status.matches,
+  },
+  {
+    id: "cant_clean_yet",
+    label: "Can't clean yet",
+    hint: "Can't clean yet: still seeding, or Weir cannot read them. Weir tries again on its own",
+    rag: STATUS_RAG.cant_clean_yet,
+    count: (totals) => totals.by_status.cant_clean_yet,
+  },
+  {
+    id: "left_alone",
+    label: "Left alone",
+    hint: "Left alone: you chose to skip these; nothing cleans them until you clear it",
+    rag: STATUS_RAG.left_alone,
+    count: (totals) => totals.by_status.left_alone,
+  },
 ];
 
 const UNKNOWN_COUNT = "—";
 
-function ProblemSelect({
+/**
+ * Narrows "can't clean yet" to one reason, in the Files card's header beside the chips' own counts: the reasons are
+ * only about those files, so the list is there only while that status is chosen.
+ */
+export function LibraryReasonSelect({
   overview,
   filter,
   onFilter,
@@ -139,20 +116,16 @@ function ProblemSelect({
   onFilter: (filter: LibraryFilter) => void;
 }) {
   const problems = overview?.problems ?? [];
-  if (problems.length === 0) return null;
+  if (filter.status !== "cant_clean_yet" || problems.length === 0) return null;
   return (
     <label className="mm-library-problem">
-      <span className="sr-only">Why Weir will not touch a file</span>
+      <span className="sr-only">Why Weir cannot clean a file yet</span>
       <select
         className="mm-input"
         value={filter.problem ?? ""}
         onChange={(event) => {
           const value = event.target.value as LibraryProblemKind | "";
-          onFilter({
-            ...filter,
-            problem: value === "" ? null : value,
-            classification: null,
-          });
+          onFilter({ ...filter, problem: value === "" ? null : value });
         }}
       >
         <option value="">Any reason</option>
@@ -168,7 +141,7 @@ function ProblemSelect({
 
 /**
  * What narrows the Files table: the search, then the counts that are also the filters. They sit on the header's title
- * line after the library picker (see LibraryHeaderControls), where the search gives up room first, then the chips
+ * line after the library picker (see the library page's header), where the search gives up room first, then the chips
  * scroll sideways inside their own box if they still do not fit.
  */
 export function LibraryFilters({
@@ -185,9 +158,7 @@ export function LibraryFilters({
   onFilter: (filter: LibraryFilter) => void;
 }) {
   const totals = overview?.totals;
-  const { setRow, scrolls } = useChipRow(
-    filter.classification ?? filter.state ?? "all",
-  );
+  const { setRow, scrolls } = useChipRow(filter.status ?? "all");
   return (
     <>
       <input
@@ -202,6 +173,10 @@ export function LibraryFilters({
         <div className="mm-library-chips" role="group" aria-label="Show">
           {CHIPS.map((chip) => {
             const count = totals ? chip.count(totals) : null;
+            const selected =
+              chip.id === "all"
+                ? filter.status === null
+                : filter.status === chip.id;
             return (
               <button
                 key={chip.id}
@@ -210,19 +185,23 @@ export function LibraryFilters({
                 data-rag={chip.rag}
                 data-empty={count === 0 ? "" : undefined}
                 title={chip.hint}
-                aria-pressed={chip.selected(filter)}
-                onClick={() => onFilter(chip.choose(filter))}
+                aria-pressed={selected}
+                onClick={() =>
+                  onFilter({
+                    // A second click on the chosen one is the same as All; All is the way back.
+                    status:
+                      chip.id === "all" || selected
+                        ? null
+                        : (chip.id as LibraryStatus),
+                    problem: null,
+                  })
+                }
               >
                 {chip.label}{" "}
                 <b>{count === null ? UNKNOWN_COUNT : count.toLocaleString()}</b>
               </button>
             );
           })}
-          <ProblemSelect
-            overview={overview}
-            filter={filter}
-            onFilter={onFilter}
-          />
         </div>
       </div>
     </>

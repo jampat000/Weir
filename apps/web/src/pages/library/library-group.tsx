@@ -4,7 +4,12 @@ import { Poster } from "../../components/shared/poster";
 import { NavIconChevronDown } from "../../components/shell/nav-icons";
 import type { LibraryFile } from "../../lib/processing/library-mode-api";
 import { plural } from "../../lib/ui/mm-plural";
-import { CheckCell, NestedFileRow, sourceName } from "./library-file-row";
+import {
+  CheckCell,
+  NestedFileRow,
+  StatusCell,
+  sourceName,
+} from "./library-file-row";
 import { groupSummary } from "./library-model";
 
 function groupMeta(rows: LibraryFile[]): string {
@@ -38,7 +43,7 @@ export function LibraryGroup({
 }) {
   const [folded, setFolded] = useState(false);
   const summary = groupSummary(rows);
-  const cleanable = rows.filter((row) => row.classification === "would_change");
+  const cleanable = rows.filter((row) => row.status === "needs_cleaning");
   const chosen = cleanable.filter((row) => selected.has(row.path)).length;
   const allChosen = cleanable.length > 0 && chosen === cleanable.length;
 
@@ -87,13 +92,7 @@ export function LibraryGroup({
             </span>
           </button>
         </span>
-        <span
-          role="cell"
-          className="mm-library-verdict mm-library-rag"
-          data-rag={summary.rag}
-        >
-          {summary.text}
-        </span>
+        <StatusCell rag={summary.rag} words={summary.text} />
       </div>
       {folded
         ? null

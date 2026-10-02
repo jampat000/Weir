@@ -5,7 +5,7 @@ import type { Schema } from "../api/types";
 
 export type LibrarySettings = Schema<"LibrarySettingsOut">;
 export type LibraryFile = Schema<"LibraryFileOut">;
-export type LibraryFileClassification = LibraryFile["classification"];
+export type LibraryFileStatus = LibraryFile["status"];
 /** Why a file is not something Weir will clean. */
 export type LibraryProblemKind = NonNullable<LibraryFile["problem_kind"]>;
 export type LibraryTotals = Schema<"LibraryTotalsOut">;
@@ -38,12 +38,11 @@ export type LibraryFileSort = LibraryFilesResult["sort"];
 
 /** Every way the Files table can be narrowed, sorted and paged. */
 export interface LibraryFileFilters {
-  classification?: LibraryFileClassification;
+  /** Where each file stands now against the current rules; no value is every file. */
+  status?: LibraryFileStatus;
   manager?: string;
   q?: string;
   problem?: LibraryProblemKind;
-  /** What Weir has done with the file, rather than what is in it. */
-  state?: "cleaned" | "left_alone";
   facets?: Partial<Record<LibraryFacet, string>>;
   sort?: LibraryFileSort;
   direction?: "asc" | "desc";
@@ -128,12 +127,10 @@ export function libraryFileFiltersToParams(
   filters: LibraryFileFilters,
 ): URLSearchParams {
   const params = new URLSearchParams();
-  if (filters.classification)
-    params.set("classification", filters.classification);
+  if (filters.status) params.set("status", filters.status);
   if (filters.manager) params.set("manager", filters.manager);
   if (filters.q) params.set("q", filters.q);
   if (filters.problem) params.set("problem", filters.problem);
-  if (filters.state) params.set("state", filters.state);
   for (const facet of LIBRARY_FACETS) {
     const value = filters.facets?.[facet];
     if (value) params.set(facet, value);

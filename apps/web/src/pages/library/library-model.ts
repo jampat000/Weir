@@ -7,6 +7,7 @@ import type {
 } from "../../lib/processing/library-mode-api";
 import { parseAppDate } from "../../lib/ui/mm-format-date";
 import { plural } from "../../lib/ui/mm-plural";
+import type { MmStatusTone } from "../../lib/ui/mm-status-tone";
 
 const MINUTE_MS = 60_000;
 /** Past this many minutes a scan's age reads in hours, and past this many hours in days. */
@@ -49,52 +50,116 @@ export function groupFiles(files: LibraryFile[]): [string, LibraryFile[]][] {
   return [...byTitle.entries()].sort((a, b) => a[0].localeCompare(b[0]));
 }
 
-/** The table says what would happen in as few words as fit the column; the panel carries the whole sentence. */
-export function verdictOf(file: LibraryFile): string {
-  if (file.classification === "matches") return "Matches your rules";
-  if (file.classification === "cannot_process") {
-    const text = (
-      file.reason ??
-      file.summary ??
-      "Weir will not touch this one"
-    ).trim();
-    const end = text.search(/[.!?](\s|$)/);
-    return end > 0 ? text.slice(0, end) : text;
-  }
+/**
+ * Where a file stands now, against the current rules: exactly one status, as the server works it out, so the counts
+ * add up to the files. What Weir once did to a file is history beside its status, never a status of its own.
+ */
+export type LibraryStatus = LibraryFile["status"];
 
-  const parts: string[] = [];
-  if (file.removed_audio_tracks) {
-    parts.push(`${file.removed_audio_tracks} audio`);
+/** The statuses in the order a person reads them, with the words the chips and the table use. */
+export const LIBRARY_STATUSES: readonly LibraryStatus[] = [
+  "needs_cleaning",
+  "cleaning",
+  "matches",
+  "cant_clean_yet",
+  "left_alone",
+];
+
+/**
+ * The colour of a count or a file, in the status colours the rest of Weir uses: red is what the rules say needs fixing,
+ * blue is Weir working on it now, green is fine, amber is held back for now, and grey is what a person set aside.
+ */
+export type Rag = MmStatusTone;
+
+export const STATUS_RAG: Record<LibraryStatus, Rag> = {
+  needs_cleaning: "failed",
+  cleaning: "info",
+  matches: "healthy",
+  cant_clean_yet: "warning",
+  left_alone: "neutral",
+};
+
+const REASON_WORDS: Record<
+  NonNullable<LibraryFile["status_reason"]>,
+  string
+> = {
+  new: "new",
+  replaced: "replaced",
+  rules_changed: "rules changed",
+};
+
+/** The first sentence of why a file is held back, which is as much as the column has room for. */
+function firstSentence(text: string): string {
+  const end = text.search(/[.!?](\s|$)/);
+  return end > 0 ? text.slice(0, end) : text;
+}
+
+/** What the table says about a file in as few words as fit the column; the file panel carries the whole sentence. */
+export function statusWords(file: LibraryFile): string {
+  switch (file.status) {
+    case "matches":
+      return "Matches your rules";
+    case "cleaning":
+      return "Cleaning now";
+    case "left_alone":
+      return "Left alone";
+    case "cant_clean_yet": {
+      if (file.problem_kind) return PROBLEM_LABELS[file.problem_kind];
+      if (file.classification === "cannot_process") {
+        return firstSentence(
+          (file.reason ?? file.summary ?? "Weir cannot clean this one").trim(),
+        );
+      }
+      return "Still seeding";
+    }
+    default: {
+      const parts: string[] = [];
+      if (file.removed_audio_tracks) {
+        parts.push(`${file.removed_audio_tracks} audio`);
+      }
+      if (file.removed_subtitle_tracks) {
+        parts.push(
+          plural(file.removed_subtitle_tracks, "subtitle", "subtitles"),
+        );
+      }
+      return parts.length
+        ? `Would remove ${parts.join(", ")}`
+        : "Needs cleaning";
+    }
   }
-  if (file.removed_subtitle_tracks) {
-    parts.push(plural(file.removed_subtitle_tracks, "subtitle", "subtitles"));
-  }
-  return parts.length ? `Would remove ${parts.join(", ")}` : "Would change";
 }
 
 /**
- * The red, amber, green of a count or a file: green is where Weir has nothing left to do or has done it, red is what the
- * rules say needs fixing, grey is what Weir leaves alone.
+ * The quiet note beside a file's status. For a file that needs cleaning it is why, when the scan can say; for one that
+ * matches it is what Weir did, "cleaned 3 Oct", or that it was "already clean". It is never a status, and nothing is
+ * said where nothing on record supports it.
  */
-export type Rag = "good" | "bad" | "muted";
-
-export function ragOfClassification(
-  classification: LibraryFile["classification"],
-): Rag {
-  if (classification === "matches") return "good";
-  if (classification === "would_change") return "bad";
-  return "muted";
+export function statusNote(file: LibraryFile): string | null {
+  if (file.status === "needs_cleaning") {
+    return file.status_reason ? REASON_WORDS[file.status_reason] : null;
+  }
+  if (file.status !== "matches") return null;
+  return file.cleaned_at
+    ? `cleaned ${new Date(file.cleaned_at * 1000).toLocaleDateString(undefined, { day: "numeric", month: "short" })}`
+    : "already clean";
 }
 
-/** What a title with several files comes to, worst first: any file to fix, else the files that match, else the rest. */
+/**
+ * What a title with several files comes to: the worst of its files, in the order a person has to act on them. Any file to
+ * clean says so in red; otherwise Weir at work, then a file held back, then the files that match, then the rest.
+ */
 export function groupSummary(files: LibraryFile[]): { rag: Rag; text: string } {
-  const count = (c: LibraryFile["classification"]) =>
-    files.filter((file) => file.classification === c).length;
-  const changing = count("would_change");
-  if (changing > 0) return { rag: "bad", text: `${changing} would change` };
+  const count = (status: LibraryStatus) =>
+    files.filter((file) => file.status === status).length;
+  const needing = count("needs_cleaning");
+  if (needing > 0) return { rag: "failed", text: `${needing} need cleaning` };
+  const cleaning = count("cleaning");
+  if (cleaning > 0) return { rag: "info", text: `${cleaning} cleaning` };
+  const held = count("cant_clean_yet");
+  if (held > 0) return { rag: "warning", text: `${held} can't clean yet` };
   const matching = count("matches");
-  if (matching > 0) return { rag: "good", text: `${matching} match` };
-  return { rag: "muted", text: `${files.length} untouched` };
+  if (matching > 0) return { rag: "healthy", text: `${matching} match` };
+  return { rag: "neutral", text: `${files.length} left alone` };
 }
 
 /**

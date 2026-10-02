@@ -200,6 +200,25 @@
   white-space: nowrap;
 }
 
+/* The status in its colour, and under it, quieter, why it needs cleaning or what Weir did. */
+.mm-library-verdict {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.mm-library-verdict > .mm-library-rag {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mm-library-verdict__note {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: var(--mm-type-caption);
+  color: var(--mm-text3);
+}
+
 .mm-library-num {
   text-align: right;
   font-variant-numeric: tabular-nums;
