@@ -19,6 +19,9 @@ public sealed record FfmpegProgressUpdate
 
     public string? Speed { get; init; }
 
+    /// <summary>ffmpeg's <c>total_size</c>: how many bytes of output it has written so far; null before it has measured it.</summary>
+    public long? TotalSizeBytes { get; init; }
+
     /// <summary>ffmpeg's own <c>progress=</c> value: <c>continue</c> or <c>end</c>.</summary>
     public required string Progress { get; init; }
 }
@@ -108,6 +111,7 @@ public sealed class FfmpegProgressTracker
             ElapsedSeconds = (long)TruncateToWhole(elapsed),
             ProcessedSeconds = outTime,
             Speed = _fields.TryGetValue("speed", out var speed) ? speed : null,
+            TotalSizeBytes = _fields.TryGetValue("total_size", out var size) && long.TryParse(size, NumberStyles.None, CultureInfo.InvariantCulture, out var bytes) ? bytes : null,
             Progress = value,
         };
     }

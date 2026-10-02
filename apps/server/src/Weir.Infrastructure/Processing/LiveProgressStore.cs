@@ -12,6 +12,8 @@ namespace Weir.Infrastructure.Processing;
 /// <param name="RemovedAudio">The audio tracks this pass is taking out, as the plan describes each one.</param>
 /// <param name="RemovedSubtitles">The subtitle tracks this pass is taking out.</param>
 /// <param name="Stage">The step the pass is on, one of <see cref="PassStages"/>; <see langword="null"/> when the report names none.</param>
+/// <param name="BytesRead">How much of the source the pass has read so far; <see langword="null"/> when the report gives none.</param>
+/// <param name="BytesWritten">How much of the output the pass has written so far; <see langword="null"/> when the report gives none.</param>
 public sealed record LiveProgress(
     double? Percent,
     string? Message,
@@ -21,8 +23,13 @@ public sealed record LiveProgress(
     double? ElapsedSeconds,
     IReadOnlyList<string> RemovedAudio,
     IReadOnlyList<string> RemovedSubtitles,
-    string? Stage = null)
+    string? Stage = null,
+    long? BytesRead = null,
+    long? BytesWritten = null)
 {
+    /// <summary>How many seconds of the file's own running time the pass gets through each second (<c>148x</c> is 148); null for a copy, which reports bytes a second.</summary>
+    public double? SpeedMultiple => PassSpeed.Multiple(Speed);
+
     /// <summary>Builds the live entry from one of <see cref="RemuxPass.ActivityProgressReporter"/>'s reports.</summary>
     public static LiveProgress FromReport(WireObject body)
     {
@@ -36,8 +43,13 @@ public sealed record LiveProgress(
             CoerceSeconds(body.TryGetValue("elapsed_seconds", out var el) ? el : null),
             Strings(body, "removed_audio"),
             Strings(body, "removed_subtitles"),
-            PassStages.Normalize(Text(body, "stage")));
+            PassStages.Normalize(Text(body, "stage")),
+            ByteCount(body, "bytes_read"),
+            ByteCount(body, "bytes_written"));
     }
+
+    private static long? ByteCount(WireObject payload, string key) =>
+        Number(payload.TryGetValue(key, out var value) ? value : null) is { } bytes && double.IsFinite(bytes) && bytes >= 0 ? (long)bytes : null;
 
     /// <summary><c>str(body.get("status") or "processing")</c>.</summary>
     public static string StatusOf(WireObject body) =>
