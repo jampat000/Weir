@@ -5,11 +5,7 @@ import type {
   SystemNow,
   SystemStats,
 } from "../../../../lib/system/system-stats-types";
-import {
-  processingColumns,
-  speedFigure,
-  workPills,
-} from "./processing-card-model";
+import { processingColumns, speedFigure } from "./processing-card-model";
 import { recentSince, recentWorkOf } from "./use-recent-work";
 
 const MB = 1024 * 1024;
@@ -54,14 +50,23 @@ const stats = (changes: Partial<SystemNow> = {}): SystemStats => ({
 });
 
 describe("the disk work column", () => {
-  const disk = () => processingColumns(stats())[0];
+  const recent = { done: 14, savedBytes: 3 * 1024 ** 3 };
+  const disk = (work = recent) => processingColumns(stats(), work)[0];
 
-  it("shows what the running passes write, with what they read", () => {
+  it("shows what the running passes write, with what they read and what the last ten minutes saved", () => {
     expect(disk()).toMatchObject({
       value: 6,
       unit: " MB/s",
-      sub: ["writing · reading 20", "reading 20", "read 20"],
+      sub: ["reading 20 · 3.00 GB saved", "3.00 GB saved", "read 20"],
     });
+  });
+
+  it("says only what is read while the finished work is still being read", () => {
+    expect(processingColumns(stats(), undefined)[0].sub).toEqual([
+      "writing · reading 20",
+      "reading 20",
+      "read 20",
+    ]);
   });
 
   it("draws reads and writes as two lines", () => {
@@ -73,25 +78,32 @@ describe("the disk work column", () => {
 });
 
 describe("the speed column", () => {
-  it("shows how fast the passes go and how many files that is across", () => {
-    expect(processingColumns(stats())[1]).toMatchObject({
+  const recent = { done: 14, savedBytes: 0 };
+
+  it("shows how fast the passes go, how many run of the slots, and what the last ten minutes finished", () => {
+    expect(processingColumns(stats(), recent)[1]).toMatchObject({
       value: 148,
       unit: "×",
-      sub: ["across 2 files", "2 files"],
+      sub: ["2 of 4 running · 14 done", "2 of 4 running", "2/4"],
     });
   });
 
   it("says nothing is running, and has no figure, when nothing is", () => {
     const idle = processingColumns(
       stats({ running: 0, processing_speed: 0 }),
+      undefined,
     )[1];
     expect(idle.value).toBeNull();
     expect(idle.sub).toEqual(["nothing running", "idle"]);
+    expect(
+      processingColumns(stats({ running: 0, processing_speed: 0 }), recent)[1]
+        .sub,
+    ).toEqual(["idle · 14 done", "idle"]);
   });
 
   it("draws the speeds the history holds, an idle second as zero", () => {
     expect(
-      processingColumns(stats())[1].lines[0].samples.map(
+      processingColumns(stats(), undefined)[1].lines[0].samples.map(
         (sample) => sample.value,
       ),
     ).toEqual([0]);
@@ -104,20 +116,6 @@ describe("speed figures", () => {
     expect(speedFigure(2)).toBe("2");
     expect(speedFigure(35.4)).toBe("35");
     expect(speedFigure(1260)).toBe("1,260");
-  });
-});
-
-describe("the pills under the columns", () => {
-  it("say how many passes run, and what the last ten minutes came to", () => {
-    expect(
-      workPills(now, { done: 14, savedBytes: 3 * 1024 ** 3 }).map(
-        (pill) => pill.text,
-      ),
-    ).toEqual(["2 of 4 running", "14 files done", "3.00 GB saved"]);
-  });
-
-  it("show only the passes while the finished work is still being read", () => {
-    expect(workPills(now, undefined)).toHaveLength(1);
   });
 });
 

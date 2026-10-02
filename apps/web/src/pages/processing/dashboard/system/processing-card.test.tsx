@@ -30,20 +30,20 @@ beforeEach(() => {
 });
 
 describe("the Processing card", () => {
-  it("shows the disk work, writing with reading beside it", () => {
+  it("shows the disk work, with what is read and what the last ten minutes saved beside it", () => {
     render(<ProcessingCard />);
 
     expect(screen.getByText("Disk work")).toBeInTheDocument();
     expect(screen.getByText("6.0")).toBeInTheDocument();
-    expect(screen.getByText("writing · reading 20")).toBeInTheDocument();
+    expect(screen.getByText("reading 20 · 3.00 GB saved")).toBeInTheDocument();
   });
 
-  it("shows the speed and how many files it is across", () => {
+  it("shows the speed, how many passes run of the slots, and what the last ten minutes finished", () => {
     render(<ProcessingCard />);
 
     expect(screen.getByText("Speed")).toBeInTheDocument();
     expect(screen.getByText("148")).toBeInTheDocument();
-    expect(screen.getByText("across 2 files")).toBeInTheDocument();
+    expect(screen.getByText("2 of 4 running · 14 done")).toBeInTheDocument();
   });
 
   it("draws reads and writes as two lines on one trace, and the speed as one", () => {
@@ -55,14 +55,6 @@ describe("the Processing card", () => {
       "Disk work, last 10 minutes | read+write",
       "Speed, last 10 minutes | speed",
     ]);
-  });
-
-  it("says how many passes run and what the last ten minutes finished and saved", () => {
-    render(<ProcessingCard />);
-
-    expect(screen.getByText("2 of 4 running")).toBeInTheDocument();
-    expect(screen.getByText("14 files done")).toBeInTheDocument();
-    expect(screen.getByText("3.00 GB saved")).toBeInTheDocument();
   });
 
   it("shows only the running passes while the finished work is still being read", () => {

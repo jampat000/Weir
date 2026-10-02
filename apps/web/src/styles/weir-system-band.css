@@ -135,11 +135,6 @@
   row-gap: 6px;
 }
 
-/* This Weir's label row is 18px tall, 2px more than the other two cards', as Deluno's This instance is. */
-.mm-sy-band--weir > .mm-stat__top {
-  height: 18px;
-}
-
 .mm-sy-band__note {
   margin: 0;
   font-size: 13px;
@@ -520,15 +515,11 @@
   .mm-sy-tag:nth-child(n + 3) {
     display: none;
   }
+}
 
-  /* Deluno's Network has no pills, so in a short band Processing gives its row to the traces. */
-  .mm-sy-band--processing .mm-sy-tags {
-    display: none;
-  }
-
-  .mm-sy-band--processing > .mm-sy-band__body {
-    grid-template-rows: minmax(0, 1fr);
-  }
+/* Deluno's Network card has no pills, so Processing gives that row to its traces. */
+.mm-sy-band--processing > .mm-sy-band__body {
+  grid-template-rows: minmax(0, 1fr);
 }
 
 /* ---- Storage --------------------------------------------------------------- */

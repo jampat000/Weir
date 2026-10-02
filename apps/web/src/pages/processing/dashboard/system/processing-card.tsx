@@ -4,7 +4,7 @@ import { useSystemStatsQuery } from "../../../../lib/system/use-system-stats";
 import { useNow } from "../../../../lib/ui/use-now";
 import { BandCard, BandNote, TenMinutes } from "./band-card";
 import { TraceColumn } from "./trace-column";
-import { processingColumns, workPills } from "./processing-card-model";
+import { processingColumns } from "./processing-card-model";
 import { useRecentWork } from "./use-recent-work";
 
 const SPAN_WORDS = "last 10 minutes";
@@ -13,7 +13,8 @@ const TICK_MS = 1000;
 
 /**
  * Dashboard › System: Weir's own work over the last ten minutes: what the running passes read and write, and how
- * fast they go, with how many are running and what the last ten minutes finished and saved.
+ * fast they go, with how many are running and what the last ten minutes finished and saved in the lines under them.
+ * It has no row of pills, as Deluno's Network card has none.
  */
 export function ProcessingCard() {
   const stats = useSystemStatsQuery();
@@ -30,7 +31,7 @@ export function ProcessingCard() {
       {data ? (
         <>
           <div className="mm-sy-cols mm-sy-cols--two">
-            {processingColumns(data).map((column) => (
+            {processingColumns(data, recent).map((column) => (
               <TraceColumn
                 key={column.key}
                 colour={column.colour}
@@ -54,13 +55,6 @@ export function ProcessingCard() {
                   label={`${column.label}, ${SPAN_WORDS}`}
                 />
               </TraceColumn>
-            ))}
-          </div>
-          <div className="mm-sy-tags">
-            {workPills(data.now, recent).map((pill) => (
-              <span key={pill.key} className="mm-sy-tag">
-                {pill.text}
-              </span>
             ))}
           </div>
         </>

@@ -2,7 +2,6 @@
 import type { TraceSample } from "../../../../components/charts/live-trace-math";
 import { seriesOf } from "../../../../lib/system/system-stats-model";
 import type { SystemStats } from "../../../../lib/system/system-stats-types";
-import { plural } from "../../../../lib/ui/mm-plural";
 import type { Words } from "./fit-words";
 import { megabytes, rateFigure, sizeWords } from "./system-words";
 
@@ -47,9 +46,25 @@ export function speedFigure(times: number): string {
   return times.toFixed(1).replace(/\.0$/, "");
 }
 
-/** The card's two columns: what the running passes read and write, and how fast they go. */
-export function processingColumns(stats: SystemStats): ProcessingColumn[] {
+export type RecentWork = {
+  /** Files Weir finished in the last ten minutes. */
+  done: number;
+  /** The space those saved, in bytes. */
+  savedBytes: number;
+};
+
+/**
+ * The card's two columns: what the running passes read and write, and how fast they go. Their lines under the figures
+ * also carry what the last ten minutes finished and saved, and how many passes run of the slots Weir has.
+ */
+export function processingColumns(
+  stats: SystemStats,
+  recent: RecentWork | undefined,
+): ProcessingColumn[] {
   const { now, history } = stats;
+  const saved = recent ? `${sizeWords(recent.savedBytes)} saved` : null;
+  const done = recent ? `${recent.done.toLocaleString()} done` : null;
+  const running = `${now.running} of ${now.slots} running`;
   return [
     {
       key: "disk",
@@ -60,7 +75,9 @@ export function processingColumns(stats: SystemStats): ProcessingColumn[] {
       unit: " MB/s",
       sub: (() => {
         const read = rateFigure(megabytes(now.processing_read_bytes_per_sec));
-        return [`writing · reading ${read}`, `reading ${read}`, `read ${read}`];
+        return saved
+          ? [`reading ${read} · ${saved}`, saved, `read ${read}`]
+          : [`writing · reading ${read}`, `reading ${read}`, `read ${read}`];
       })(),
       lines: [
         {
@@ -92,11 +109,12 @@ export function processingColumns(stats: SystemStats): ProcessingColumn[] {
       unit: "×",
       sub:
         now.running === 0
-          ? ["nothing running", "idle"]
-          : [
-              `across ${plural(now.running, "file", "files")}`,
-              plural(now.running, "file", "files"),
-            ],
+          ? done
+            ? [`idle · ${done}`, "idle"]
+            : ["nothing running", "idle"]
+          : done
+            ? [`${running} · ${done}`, running, `${now.running}/${now.slots}`]
+            : [running, `${now.running}/${now.slots}`],
       lines: [
         {
           key: "speed",
@@ -109,31 +127,4 @@ export function processingColumns(stats: SystemStats): ProcessingColumn[] {
       readout: (value) => `${speedFigure(value)}×`,
     },
   ];
-}
-
-export type RecentWork = {
-  /** Files Weir finished in the last ten minutes. */
-  done: number;
-  /** The space those saved, in bytes. */
-  savedBytes: number;
-};
-
-export type WorkPill = { key: string; text: string };
-
-/** The pills under the columns: passes running over slots, and what the last ten minutes came to. */
-export function workPills(
-  now: SystemStats["now"],
-  recent: RecentWork | undefined,
-): WorkPill[] {
-  const pills: WorkPill[] = [
-    { key: "running", text: `${now.running} of ${now.slots} running` },
-  ];
-  if (recent) {
-    pills.push({
-      key: "done",
-      text: `${plural(recent.done, "file", "files")} done`,
-    });
-    pills.push({ key: "saved", text: `${sizeWords(recent.savedBytes)} saved` });
-  }
-  return pills;
 }
