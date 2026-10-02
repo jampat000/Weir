@@ -212,12 +212,12 @@ describe("the workflow picker", () => {
     );
   });
 
-  it("holds Live to the window, so everything is sized from the space it has, and lets System scroll", () => {
+  it("holds Live and System to the window, so everything is sized from the space it has", () => {
     show("/");
     expect(screen.getByTestId("processing-page").style.height).not.toBe("");
 
     fireEvent.click(within(view()).getByRole("button", { name: "System" }));
 
-    expect(screen.getByTestId("processing-page").style.height).toBe("");
+    expect(screen.getByTestId("processing-page").style.height).not.toBe("");
   });
 });

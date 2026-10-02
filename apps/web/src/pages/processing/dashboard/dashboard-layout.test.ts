@@ -6,6 +6,7 @@ import {
   BAND_TALL_MAX_PX,
   BOARD_PX,
   GRID_AREAS,
+  GRID_AREAS_SYSTEM,
   GRID_COLUMNS,
   LOW_COLUMNS,
   MIN_GRID_PX,
@@ -41,6 +42,7 @@ describe("the shared page grid", () => {
   it("has Health spanning the band and the Pipeline, and Needs you beside the lower row", () => {
     expect(GRID_COLUMNS).toBe("minmax(0, 1fr) clamp(340px, 28%, 600px)");
     expect(GRID_AREAS).toBe('"now health" "board health" "low needs"');
+    expect(GRID_AREAS_SYSTEM).toBe('"band store" "mid conn" "low upd"');
     expect(LOW_COLUMNS).toBe("minmax(0, 1.15fr) minmax(0, 1fr)");
   });
 

@@ -1,50 +1,175 @@
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { GRID_COLUMNS } from "./dashboard-layout";
+import { GRID_AREAS_SYSTEM, GRID_COLUMNS } from "./dashboard-layout";
 import { SystemView } from "./system-view";
 
+type HealthState = {
+  checks: { tone: string }[];
+  checking: boolean;
+  overviewChecks: null;
+};
+
+let libraries: { isPending: boolean; isError: boolean; data: unknown[] };
+let health: HealthState;
+let overviewChecks: { passing: number; total: number } | undefined;
+const hearFrames = vi.fn();
+
 vi.mock("../../../lib/processing/libraries-queries", () => ({
-  useProcessingLibrariesQuery: () => ({
-    data: [],
-    isPending: false,
-    isError: false,
+  useProcessingLibrariesQuery: () => libraries,
+}));
+vi.mock("../../../lib/system/use-system-stats", () => ({
+  useSystemStatsFrames: () => hearFrames(),
+  useSystemOverviewQuery: () => ({
+    data: overviewChecks ? { checks: overviewChecks } : undefined,
   }),
 }));
-vi.mock("../../../lib/pause/pause-queries", () => ({
-  usePauseQuery: () => ({ data: { paused: false } }),
+vi.mock("./system/use-health-checks", () => ({
+  useHealthChecks: () => health,
 }));
-vi.mock("./use-next-items", () => ({ useNextItems: () => [] }));
-vi.mock("./health-detail", () => ({ HealthDetail: () => <p>health</p> }));
-vi.mock("./timers-panel", () => ({ TimersPanel: () => <p>timers</p> }));
-vi.mock("../../system/tabs/logs/jobs-section", () => ({
-  JobsSection: () => <p>jobs</p>,
+vi.mock("./system/health-card-model", () => ({
+  healthSummary: (checks: { tone: string }[]) => ({
+    pass: checks.filter((check) => check.tone === "ok").length,
+    total: checks.length,
+    need: checks.filter((check) => check.tone === "bad").length,
+  }),
+}));
+vi.mock("./system/this-weir-card", () => ({
+  ThisWeirCard: ({
+    checks,
+    onShowHealth,
+  }: {
+    checks: { passing: number; total: number; need: number };
+    onShowHealth: () => void;
+  }) => (
+    <button type="button" onClick={onShowHealth}>
+      {`ring ${checks.passing}/${checks.total} need ${checks.need}`}
+    </button>
+  ),
+}));
+vi.mock("./system/this-computer-card", () => ({
+  ThisComputerCard: () => <p>computer</p>,
+}));
+vi.mock("./system/processing-card", () => ({
+  ProcessingCard: () => <p>processing</p>,
+}));
+vi.mock("./system/storage-card", () => ({
+  StorageCard: ({ workflowId }: { workflowId: number | null }) => (
+    <p>{`storage ${String(workflowId)}`}</p>
+  ),
+}));
+vi.mock("./system/health-card", () => ({
+  HealthCard: ({
+    jump,
+    workflowId,
+  }: {
+    jump: number;
+    workflowId: number | null;
+  }) => <p>{`health jump ${jump} workflow ${String(workflowId)}`}</p>,
+}));
+vi.mock("./system/connections-slot", () => ({
+  ConnectionsSlot: () => <p>connections</p>,
+}));
+vi.mock("./system/tasks-card", () => ({ TasksCard: () => <p>tasks</p> }));
+vi.mock("./system/log-card", () => ({ LogCard: () => <p>log</p> }));
+vi.mock("./system/backups-card", () => ({
+  BackupsCard: () => <p>backups</p>,
 }));
 
-describe("the System view's layout", () => {
-  it("shares Live's columns where the right column sits beside the page", () => {
-    render(
-      <SystemView
-        workflowId={null}
-        layout={{ sideBySide: true, band: "across" }}
-      />,
-    );
+const beside = { sideBySide: true, band: "across" } as const;
+const narrow = { sideBySide: false, band: "stacked" } as const;
 
-    const view = screen.getByTestId("dashboard-system");
-    expect(view).toHaveClass("mm-sys--beside");
-    expect(view.style.getPropertyValue("--dash-columns")).toBe(GRID_COLUMNS);
+beforeEach(() => {
+  libraries = { isPending: false, isError: false, data: [] };
+  health = { checks: [], checking: false, overviewChecks: null };
+  overviewChecks = undefined;
+  hearFrames.mockClear();
+});
+
+describe("the System view's cards", () => {
+  it("shows every card of the view", () => {
+    render(<SystemView workflowId={null} layout={beside} />);
+
+    for (const words of [
+      "computer",
+      "processing",
+      "storage null",
+      "connections",
+      "tasks",
+      "log",
+      "backups",
+    ]) {
+      expect(screen.getByText(words)).toBeInTheDocument();
+    }
+    expect(screen.getByText(/health jump 0/)).toBeInTheDocument();
   });
 
-  it("stacks its parts where the page is narrow", () => {
-    render(
-      <SystemView
-        workflowId={null}
-        layout={{ sideBySide: false, band: "stacked" }}
-      />,
-    );
+  it("follows the stream's readings", () => {
+    render(<SystemView workflowId={null} layout={beside} />);
 
-    expect(screen.getByTestId("dashboard-system")).not.toHaveClass(
-      "mm-sys--beside",
-    );
+    expect(hearFrames).toHaveBeenCalled();
+  });
+
+  it("narrows the drives and the health to the workflow picked", () => {
+    render(<SystemView workflowId={4} layout={beside} />);
+
+    expect(screen.getByText("storage 4")).toBeInTheDocument();
+    expect(screen.getByText(/workflow 4/)).toBeInTheDocument();
+  });
+
+  it("waits for the workflows before it shows anything", () => {
+    libraries = { isPending: true, isError: false, data: [] };
+    render(<SystemView workflowId={null} layout={beside} />);
+
+    expect(screen.queryByText("computer")).toBeNull();
+  });
+});
+
+describe("the ring's checks", () => {
+  it("count the checks Health lists, so the two say the same", () => {
+    health = {
+      checks: [{ tone: "ok" }, { tone: "ok" }, { tone: "bad" }],
+      checking: false,
+      overviewChecks: null,
+    };
+    render(<SystemView workflowId={null} layout={beside} />);
+
+    expect(screen.getByText("ring 2/3 need 1")).toBeInTheDocument();
+  });
+
+  it("stand on Weir's own count while a folder check has not answered", () => {
+    health = { checks: [{ tone: "ok" }], checking: true, overviewChecks: null };
+    overviewChecks = { passing: 8, total: 10 };
+    render(<SystemView workflowId={null} layout={beside} />);
+
+    expect(screen.getByText("ring 8/10 need 0")).toBeInTheDocument();
+  });
+
+  it("send the person to Health when they press that checks need them", () => {
+    render(<SystemView workflowId={null} layout={beside} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /^ring/ }));
+
+    expect(screen.getByText(/health jump 1/)).toBeInTheDocument();
+  });
+});
+
+describe("the System view's grid", () => {
+  it("shares Live's columns, and names its own areas, where the right column sits beside the page", () => {
+    render(<SystemView workflowId={null} layout={beside} />);
+
+    const grid = screen.getByTestId("dashboard-system");
+    expect(grid).toHaveClass("mm-sy-grid--beside");
+    expect(grid.style.gridTemplateColumns).toBe(GRID_COLUMNS);
+    expect(grid.style.gridTemplateAreas).toBe(GRID_AREAS_SYSTEM);
+    expect(grid.style.gridTemplateRows).toMatch(/^\d+px \d+px \d+px$/);
+  });
+
+  it("stacks its cards where the page is narrow", () => {
+    render(<SystemView workflowId={null} layout={narrow} />);
+
+    const grid = screen.getByTestId("dashboard-system");
+    expect(grid).not.toHaveClass("mm-sy-grid--beside");
+    expect(grid.style.gridTemplateColumns).toBe("");
   });
 });

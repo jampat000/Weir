@@ -45,6 +45,11 @@ const GRID_GAPS_PX = 2 * GRID_GAP_PX;
  */
 export const GRID_COLUMNS = "minmax(0, 1fr) clamp(340px, 28%, 600px)";
 export const GRID_AREAS = '"now health" "board health" "low needs"';
+/**
+ * The System view's grid on the same columns and rows: the band (This Weir, This computer and Processing) beside
+ * Storage, Health beside Connections, and the lower row (Scheduled tasks and Log) beside Backups and tools.
+ */
+export const GRID_AREAS_SYSTEM = '"band store" "mid conn" "low upd"';
 /** The lower row's own two columns: Just finished, and Activity. */
 export const LOW_COLUMNS = "minmax(0, 1.15fr) minmax(0, 1fr)";
 

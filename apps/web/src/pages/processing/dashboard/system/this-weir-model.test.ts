@@ -1,0 +1,161 @@
+import { describe, expect, it } from "vitest";
+
+import type { SystemOverview } from "../../../../lib/system/system-stats-types";
+import { newestBackup, ringFigures, weirFacts } from "./this-weir-model";
+
+const NOW = Date.parse("2026-10-02T12:00:00Z");
+
+const overview: SystemOverview = {
+  version: "3.2.16",
+  update: { status: "up_to_date", latest_version: "3.2.16" },
+  uptime_seconds: 100,
+  started_at: "2026-10-02T11:00:00Z",
+  runs_as: "service",
+  address: "http://192.168.1.5:9347/",
+  data_bytes: 5 * 1024 * 1024,
+  browsers_live: 2,
+  requests: { median_ms: 6.4, p95_ms: 20, errors_today: 0 },
+  jobs_today: { run: 1200, failed: 2 },
+  restarts_this_week: 0,
+  checks: { passing: 9, total: 10 },
+};
+
+const facts = (changes: Partial<Parameters<typeof weirFacts>[0]> = {}) =>
+  Object.fromEntries(
+    weirFacts({
+      overview,
+      work: { running: 2, slots: 4 },
+      lastBackupAt: "2026-10-02T09:00:00Z",
+      lastBackupBytes: 2048,
+      now: NOW,
+      ...changes,
+    }).map((fact) => [fact.key, fact]),
+  );
+
+describe("the health ring", () => {
+  it("fills by the share of checks that pass and counts those that need a person", () => {
+    expect(ringFigures({ passing: 9, total: 10, need: 1 })).toEqual({
+      fraction: 0.9,
+      passing: 9,
+      total: 10,
+      needYou: 1,
+    });
+  });
+
+  it("is full when there are no checks to fail", () => {
+    expect(ringFigures({ passing: 0, total: 0, need: 0 }).fraction).toBe(1);
+  });
+
+  it("never counts more passing than there are checks", () => {
+    expect(ringFigures({ passing: 12, total: 10, need: 0 }).passing).toBe(10);
+  });
+
+  it("does not call a check that is only unproven a need", () => {
+    expect(ringFigures({ passing: 8, total: 10, need: 0 }).needYou).toBe(0);
+  });
+});
+
+describe("the fact tiles", () => {
+  it("shows the version with where the update stands", () => {
+    expect(facts().version).toMatchObject({
+      value: "3.2.16",
+      sub: "up to date",
+      tone: "good",
+    });
+    expect(
+      facts({
+        overview: {
+          ...overview,
+          update: { status: "update_available", latest_version: "3.3.0" },
+        },
+      }).version.sub,
+    ).toBe("3.3.0 ready");
+  });
+
+  it("counts the uptime from when Weir started, so it ticks with the clock", () => {
+    expect(facts().uptime.value).toBe("1h 00m");
+    expect(facts({ now: NOW + 60_000 }).uptime.value).toBe("1h 01m");
+  });
+
+  it("reds the uptime's note when Weir restarted this week", () => {
+    const restarted = facts({
+      overview: { ...overview, restarts_this_week: 3 },
+    });
+    expect(restarted.uptime).toMatchObject({
+      sub: "3 restarts",
+      tone: "bad",
+    });
+  });
+
+  it("shows the files at once as running over slots", () => {
+    expect(facts()["files-at-once"]).toMatchObject({
+      value: "2 / 4",
+      sub: "running",
+    });
+    expect(facts({ work: { running: 0, slots: 4 } })["files-at-once"].sub).toBe(
+      "idle",
+    );
+    expect(facts({ work: null })["files-at-once"].value).toBe("–");
+  });
+
+  it("shows jobs run and failed today", () => {
+    expect(facts().jobs).toMatchObject({
+      value: "1,200 run",
+      sub: "2 failed",
+      tone: "bad",
+    });
+    expect(
+      facts({ overview: { ...overview, jobs_today: { run: 5, failed: 0 } } })
+        .jobs,
+    ).toMatchObject({ sub: "none failed", tone: "good" });
+  });
+
+  it("shows the median answer and what 95% of answers beat", () => {
+    expect(facts().answers).toMatchObject({
+      value: "6 ms",
+      sub: "95% under 20 ms",
+    });
+  });
+
+  it("shows when the last backup was made, or that there is none", () => {
+    expect(facts().backup).toMatchObject({ value: "3 h ago", sub: "2.0 KB" });
+    expect(
+      facts({ lastBackupAt: null, lastBackupBytes: null }).backup,
+    ).toMatchObject({
+      value: "None yet",
+      sub: "back up in Backups",
+    });
+  });
+
+  it("says in words how Weir runs", () => {
+    expect(facts()["runs-as"]).toMatchObject({ value: "Service" });
+    expect(
+      facts({ overview: { ...overview, runs_as: "docker" } })["runs-as"].value,
+    ).toBe("Docker");
+  });
+
+  it("splits the address into host and port", () => {
+    expect(facts().address).toMatchObject({
+      value: "192.168.1.5",
+      sub: "port 9347",
+    });
+  });
+
+  it("shows the size of Weir's data and how many browsers are open", () => {
+    expect(facts().data.value).toBe("5.0 MB");
+    expect(facts().browsers.value).toBe("2");
+  });
+});
+
+describe("the newest backup", () => {
+  it("is the one made last, whatever order the list is in", () => {
+    const older = { created_at: "2026-10-01T03:00:00", size_bytes: 1 };
+    const newer = { created_at: "2026-10-02T03:00:00", size_bytes: 2 };
+    expect(newestBackup([newer, older])).toBe(newer);
+    expect(newestBackup([older, newer])).toBe(newer);
+  });
+
+  it("is nothing when there are no backups", () => {
+    expect(newestBackup([])).toBeNull();
+  });
+});

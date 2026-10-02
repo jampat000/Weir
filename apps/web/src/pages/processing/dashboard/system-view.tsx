@@ -1,63 +1,102 @@
 /**
- * The Dashboard's System view: how Weir is set up and what it does in the background. The health of every
- * workflow, connection and tool in full, then the jobs Weir has run and the timers it keeps. Each part loads
- * and fails on its own. Wide, its two columns are Live's, so nothing moves between the views; it lists every
- * workflow, so it scrolls where Live is held to the window.
+ * The Dashboard's System view: how Weir itself is running and what it is doing in the background, as live cards on
+ * Live's grid. The band across the top has This Weir (a ring of the checks that pass, and tiles of facts), This
+ * computer (CPU, memory and disk) and Processing (Weir's own disk work and speed), with Storage beside it. Health,
+ * Connections, Scheduled tasks, the Log, and Backups and tools are the rows below. Every figure follows the
+ * Activity stream's once-a-second readings; nothing polls fast. Each card loads and fails on its own. The jobs Weir has
+ * run are in System › Logs, one link from Scheduled tasks.
  */
-import type { CSSProperties } from "react";
+import { useState } from "react";
 
 import { ApiEntryError } from "../../../components/shared/api-entry-error";
 import { PageLoading } from "../../../components/shared/page-loading";
-import { usePauseQuery } from "../../../lib/pause/pause-queries";
+import type { ProcessingLibrary } from "../../../lib/processing/libraries-api";
 import { useProcessingLibrariesQuery } from "../../../lib/processing/libraries-queries";
+import {
+  useSystemOverviewQuery,
+  useSystemStatsFrames,
+} from "../../../lib/system/use-system-stats";
 import { classNames } from "../../../lib/ui/class-names";
-import { useNow } from "../../../lib/ui/use-now";
-import { JobsSection } from "../../system/tabs/logs/jobs-section";
 import { LIBRARIES_REFRESH_MS } from "../use-processing-lanes";
-import { GRID_COLUMNS, type PageLayout } from "./dashboard-layout";
-import { HealthDetail } from "./health-detail";
-import { TimersPanel } from "./timers-panel";
-import { useNextItems } from "./use-next-items";
+import { LOW_COLUMNS, type PageLayout } from "./dashboard-layout";
+import { BackupsCard } from "./system/backups-card";
+import { ConnectionsSlot } from "./system/connections-slot";
+import { healthSummary } from "./system/health-card-model";
+import { HealthCard } from "./system/health-card";
+import { LogCard } from "./system/log-card";
+import { ProcessingCard } from "./system/processing-card";
+import { StorageCard } from "./system/storage-card";
+import { SystemGrid } from "./system/system-grid";
+import { TasksCard } from "./system/tasks-card";
+import { ThisComputerCard } from "./system/this-computer-card";
+import { ThisWeirCard } from "./system/this-weir-card";
+import { useHealthChecks } from "./system/use-health-checks";
 
-/** Once a second, so the timers' countdowns move between server updates. */
-const TICK_MS = 1000;
+const NO_WORKFLOWS: readonly ProcessingLibrary[] = [];
 
 type SystemViewProps = {
-  /** Narrows the health and the timers to one workflow; every workflow when null. */
+  /** Narrows the health, the connections and the drives to one workflow; every workflow when null. */
   workflowId: number | null;
   /** How the page lays itself out, decided from the width of its main area. */
   layout: PageLayout;
 };
 
-/** The columns the view's two rows share when the right column sits beside the page. */
-const COLUMNS_STYLE = { "--dash-columns": GRID_COLUMNS } as CSSProperties;
-
 export function SystemView({ workflowId, layout }: SystemViewProps) {
+  useSystemStatsFrames();
   const workflows = useProcessingLibrariesQuery(true, LIBRARIES_REFRESH_MS);
-  const pause = usePauseQuery();
-  const now = useNow(TICK_MS);
-  const next = useNextItems(workflows.data, workflowId);
+  const overview = useSystemOverviewQuery();
+  const health = useHealthChecks(workflows.data ?? NO_WORKFLOWS, workflowId);
+  const [jump, setJump] = useState(0);
 
   if (workflows.isPending) return <PageLoading label="Loading the system" />;
   if (workflows.isError) return <ApiEntryError error={workflows.error} />;
 
+  const summary = healthSummary(health.checks);
+  const ringChecks =
+    health.checking && overview.data
+      ? { ...overview.data.checks, need: summary.need }
+      : { passing: summary.pass, total: summary.total, need: summary.need };
+  const across = layout.band === "across";
   return (
-    <div
-      className={classNames("mm-sys", layout.sideBySide && "mm-sys--beside")}
-      style={COLUMNS_STYLE}
-      data-testid="dashboard-system"
-    >
-      <HealthDetail workflows={workflows.data} workflowId={workflowId} />
-      <div className="mm-sys__low">
-        <div className="mm-sys__jobs">
-          <JobsSection />
-        </div>
-        <TimersPanel
-          items={next}
-          now={now}
-          paused={pause.data?.paused ?? false}
+    <SystemGrid layout={layout}>
+      <div
+        className={classNames(
+          "mm-sy-cell mm-sy-cell--band",
+          across ? "mm-sy-cell--across" : "mm-sy-cell--stacked",
+        )}
+      >
+        <ThisWeirCard
+          checks={ringChecks}
+          onShowHealth={() => setJump((count) => count + 1)}
+        />
+        <ThisComputerCard />
+        <ProcessingCard />
+      </div>
+      <div className="mm-sy-cell mm-sy-cell--store">
+        <StorageCard workflowId={workflowId} />
+      </div>
+      <div className="mm-sy-cell mm-sy-cell--mid">
+        <HealthCard
+          workflows={workflows.data}
+          workflowId={workflowId}
+          jump={jump}
         />
       </div>
-    </div>
+      <div className="mm-sy-cell mm-sy-cell--conn">
+        <ConnectionsSlot workflows={workflows.data} workflowId={workflowId} />
+      </div>
+      <div
+        className="mm-sy-cell mm-sy-cell--low"
+        style={
+          layout.sideBySide ? { gridTemplateColumns: LOW_COLUMNS } : undefined
+        }
+      >
+        <TasksCard />
+        <LogCard />
+      </div>
+      <div className="mm-sy-cell mm-sy-cell--upd">
+        <BackupsCard />
+      </div>
+    </SystemGrid>
   );
 }

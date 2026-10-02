@@ -32,7 +32,7 @@ export function ProcessingPage(): React.ReactElement {
   const rem = useRemPx();
   const layout = pageLayout(page.width, rem);
   const live = address.view === "live";
-  useFitToScreen(pageRef, live && layout.sideBySide, MIN_GRID_PX);
+  useFitToScreen(pageRef, layout.sideBySide, MIN_GRID_PX);
 
   return (
     <div

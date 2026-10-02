@@ -1,0 +1,574 @@
+/*
+ * The Dashboard's System view: its grid, and the cards of its top band (This Weir, This computer, Processing) with
+ * Storage beside them. The grid is Live's: wide, it is as tall as the window and its three rows are shares of that
+ * height (dashboard-layout.ts names the columns, rows and areas, set inline by system-grid.tsx); narrower, the
+ * cards stack and the page scrolls. Every card lists only the whole rows that fit. Bars and the ring move on a
+ * transition; nothing moves under reduced motion, or while the window is being resized.
+ */
+
+/* ---- The grid -------------------------------------------------------------- */
+
+.mm-sy-grid {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mm-panel-gap);
+}
+
+.mm-sy-cell {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.mm-sy-cell > .mm-panel {
+  flex: 1;
+}
+
+/* Stacked, a card is a fixed, comfortable height, so the rows it lists are measured the same way as when it is beside. */
+.mm-sy-cell--store,
+.mm-sy-cell--mid,
+.mm-sy-cell--conn,
+.mm-sy-cell--upd,
+.mm-sy-cell--low > .mm-panel {
+  height: 26rem;
+}
+
+.mm-sy-cell--low {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--mm-panel-gap);
+}
+
+.mm-sy-cell--band {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--mm-panel-gap);
+}
+
+/* This computer has three readings across, so it is given the most room, and Processing, with two, the least. */
+.mm-sy-cell--across {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) minmax(0, 0.92fr);
+}
+
+.mm-sy-grid--beside {
+  display: grid;
+  height: 100%;
+}
+
+.mm-sy-grid--beside > .mm-sy-cell--band {
+  grid-area: band;
+  height: 100%;
+}
+
+.mm-sy-grid--beside > .mm-sy-cell--store {
+  grid-area: store;
+}
+
+.mm-sy-grid--beside > .mm-sy-cell--mid {
+  grid-area: mid;
+}
+
+.mm-sy-grid--beside > .mm-sy-cell--conn {
+  grid-area: conn;
+}
+
+.mm-sy-grid--beside > .mm-sy-cell--low {
+  grid-area: low;
+}
+
+.mm-sy-grid--beside > .mm-sy-cell--upd {
+  grid-area: upd;
+}
+
+.mm-sy-grid--beside > .mm-sy-cell--store,
+.mm-sy-grid--beside > .mm-sy-cell--mid,
+.mm-sy-grid--beside > .mm-sy-cell--conn,
+.mm-sy-grid--beside > .mm-sy-cell--upd,
+.mm-sy-grid--beside > .mm-sy-cell--low > .mm-panel {
+  height: auto;
+}
+
+/* ---- A band card ----------------------------------------------------------- */
+
+.mm-sy-band {
+  display: grid;
+  grid-template-rows: 16px minmax(0, 1fr);
+  row-gap: 6px;
+  box-sizing: border-box;
+  min-width: 0;
+  min-height: 0;
+  padding: 14px 18px;
+  overflow: hidden;
+  border: 1px solid var(--mm-hairline);
+  border-radius: var(--mm-radius-tile);
+  background: var(--mm-card-bg);
+  container: mm-sy-band / size;
+}
+
+/* A card of the stacked page has the height of its content, so it needs a height to be a size container. */
+.mm-sy-cell--stacked > .mm-sy-band {
+  height: 14.5rem;
+}
+
+.mm-sy-grid--beside .mm-sy-cell--band > .mm-sy-band {
+  height: auto;
+}
+
+.mm-sy-band__body {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.mm-sy-band--computer > .mm-sy-band__body,
+.mm-sy-band--processing > .mm-sy-band__body {
+  grid-template-rows: minmax(0, 1fr) auto;
+}
+
+.mm-sy-band__note {
+  margin: 0;
+  font-size: 13px;
+  color: var(--mm-text2);
+}
+
+/* ---- This Weir: the ring, and tiles of facts ------------------------------- */
+
+.mm-sy-weir {
+  display: grid;
+  grid-template-columns: 4.6rem minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  min-height: 0;
+}
+
+.mm-sy-ringbox {
+  display: grid;
+  min-width: 0;
+  justify-items: center;
+  align-content: center;
+  gap: 4px;
+  text-align: center;
+}
+
+/* The caption drops "checks" in a short card: "of 15 pass" is one line. */
+@container mm-sy-band (max-height: 175px) {
+  .mm-sy-ringbox__long {
+    display: none;
+  }
+}
+
+.mm-sy-ringbox__caption {
+  max-width: 100%;
+  font-size: 11px;
+  line-height: 1.3;
+  color: var(--mm-text2);
+}
+
+.mm-sy-ring {
+  position: relative;
+}
+
+/* The ring grows with the card: 46px in the shortest band, 80px where there is room for it and its caption. */
+.mm-sy-ring svg {
+  display: block;
+  width: clamp(46px, calc(100cqh - 112px), 80px);
+  height: clamp(46px, calc(100cqh - 112px), 80px);
+  transform: rotate(-90deg);
+}
+
+.mm-sy-ring circle {
+  fill: none;
+  stroke-width: 8;
+}
+
+.mm-sy-ring__track {
+  stroke: var(--mm-surface-3);
+}
+
+.mm-sy-ring__value {
+  stroke: var(--mm-success);
+  stroke-linecap: round;
+  transition: stroke-dashoffset 1.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.mm-sy-ring--need .mm-sy-ring__value {
+  stroke: var(--mm-warning);
+}
+
+.mm-sy-ring b {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: clamp(16px, calc(100cqh - 124px), 22px);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--mm-text1);
+}
+
+.mm-sy-needs {
+  padding: 2px 10px;
+  border: 1px solid var(--mm-warning-border);
+  border-radius: var(--mm-radius-pill);
+  background: var(--mm-status-warning-bg);
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 700;
+  white-space: nowrap;
+  color: var(--mm-status-warning-text);
+  cursor: pointer;
+}
+
+.mm-sy-needs:hover {
+  filter: brightness(1.15);
+}
+
+.mm-sy-needs--good {
+  border-color: color-mix(in srgb, var(--mm-success) 45%, transparent);
+  background: var(--mm-status-healthy-bg);
+  color: var(--mm-status-healthy-text);
+  cursor: default;
+}
+
+.mm-sy-facts-room {
+  display: grid;
+  align-content: center;
+  align-self: stretch;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* The tiles scroll a whole row at a time; the height the component sets is whole rows, so no row is cut through. */
+.mm-sy-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(4.9rem, 1fr));
+  grid-auto-rows: 42px;
+  gap: 5px;
+  align-content: start;
+  min-width: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scroll-snap-type: y mandatory;
+  scrollbar-width: none;
+}
+
+.mm-sy-facts::-webkit-scrollbar {
+  display: none;
+}
+
+.mm-sy-facts:focus-visible {
+  border-radius: 8px;
+  outline: 2px solid var(--mm-primary);
+  outline-offset: 2px;
+}
+
+.mm-sy-fact {
+  display: grid;
+  grid-template-rows: auto auto auto;
+  align-content: center;
+  min-width: 0;
+  padding: 0 9px;
+  border: 1px solid var(--mm-hairline);
+  border-radius: 8px;
+  background: var(--mm-surface-2);
+  scroll-snap-align: start;
+}
+
+.mm-sy-fact span,
+.mm-sy-fact b,
+.mm-sy-fact em {
+  overflow: hidden;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mm-sy-fact span {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--mm-text3);
+}
+
+.mm-sy-fact b {
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--mm-text1);
+}
+
+.mm-sy-fact em {
+  font-size: 10.5px;
+  font-style: normal;
+  color: var(--mm-text2);
+}
+
+.mm-sy-fact em.mm-sy-fact--good {
+  color: var(--mm-status-healthy-text);
+}
+
+.mm-sy-fact em.mm-sy-fact--bad {
+  color: var(--mm-status-failed-text);
+}
+
+/* ---- This computer and Processing: traces side by side -------------------- */
+
+.mm-sy-cols {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+}
+
+.mm-sy-cols--three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.mm-sy-cols--two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.mm-sy-col {
+  display: grid;
+  grid-template-rows: 14px 26px 14px minmax(0, 1fr);
+  row-gap: 2px;
+  min-width: 0;
+  min-height: 0;
+  padding: 0 10px;
+  border-left: 1px solid var(--mm-hairline);
+  container: mm-sy-col / inline-size;
+}
+
+.mm-sy-col:first-child {
+  padding-left: 0;
+  border-left: 0;
+}
+
+.mm-sy-col:last-child {
+  padding-right: 0;
+}
+
+.mm-sy-col__label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--mm-text2);
+}
+
+.mm-sy-col__label i {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 3px;
+  background: var(--mm-sy-colour);
+  box-shadow: 0 0 8px var(--mm-sy-colour);
+}
+
+.mm-sy-col__figure {
+  overflow: hidden;
+  font-size: 22px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 26px;
+  white-space: nowrap;
+  color: var(--mm-text1);
+}
+
+.mm-sy-col__figure small {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--mm-text2);
+}
+
+.mm-sy-col__sub {
+  overflow: hidden;
+  font-size: 11px;
+  line-height: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--mm-text2);
+}
+
+/* A narrow column gives its figure and unit less room, so a reading like 14.5 GB is never cut off. */
+@container mm-sy-col (max-width: 100px) {
+  .mm-sy-col__figure {
+    font-size: 18px;
+  }
+
+  .mm-sy-col__figure small {
+    font-size: 10px;
+  }
+}
+
+.mm-sy-tags {
+  display: none;
+  flex-wrap: wrap;
+  gap: 5px;
+  height: 24px;
+  padding-top: 6px;
+  overflow: hidden;
+}
+
+.mm-sy-tag {
+  padding: 1px 8px;
+  border: 1px solid var(--mm-hairline);
+  border-radius: var(--mm-radius-pill);
+  background: var(--mm-surface-2);
+  font-size: 10.5px;
+  white-space: nowrap;
+  color: var(--mm-text2);
+}
+
+.mm-sy-tag--warning {
+  border-color: var(--mm-warning-border);
+  background: var(--mm-status-warning-bg);
+  color: var(--mm-status-warning-text);
+}
+
+/* The tags are shown where the card is tall enough for them and a trace still has room. */
+@container mm-sy-band (min-height: 176px) {
+  .mm-sy-tags {
+    display: flex;
+  }
+}
+
+/* ---- Storage --------------------------------------------------------------- */
+
+.mm-sy-drives-fit {
+  flex: 1 1 0;
+  min-height: 0;
+  margin-bottom: 10px;
+  padding: 0 18px;
+  overflow: hidden;
+}
+
+.mm-sy-drives {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.mm-sy-drives-note {
+  margin: 0;
+  font-size: 13px;
+  color: var(--mm-text2);
+}
+
+.mm-sy-drive {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 3px 10px;
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--mm-hairline);
+  font-size: 12.5px;
+}
+
+.mm-sy-drive:last-child {
+  margin-bottom: 0;
+  border-bottom: 0;
+}
+
+.mm-sy-drive__name {
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--mm-text1);
+}
+
+.mm-sy-drive__name small {
+  font-size: inherit;
+  font-weight: 500;
+  color: var(--mm-text2);
+}
+
+.mm-sy-drive__free {
+  white-space: nowrap;
+  color: var(--mm-text2);
+}
+
+.mm-sy-drive__bar {
+  position: relative;
+  display: flex;
+  grid-column: 1 / -1;
+  height: 6px;
+  overflow: hidden;
+  border-radius: 9px;
+  background: var(--mm-surface-3);
+}
+
+.mm-sy-drive__bar i {
+  display: block;
+  height: 100%;
+  background: var(--mm-info);
+  transition: width 1s;
+}
+
+.mm-sy-drive__bar i.mm-sy-drive__weir {
+  background: color-mix(in srgb, var(--mm-primary) 62%, var(--mm-surface-3));
+}
+
+.mm-sy-drive--low .mm-sy-drive__bar i {
+  background: var(--mm-warning);
+}
+
+.mm-sy-drive__keep {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--mm-text1);
+  opacity: 0.7;
+  transform: translateX(-1px);
+}
+
+.mm-sy-drive__io {
+  display: flex;
+  grid-column: 1 / -1;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 10.5px;
+  color: var(--mm-text2);
+}
+
+.mm-sy-drive__io > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mm-sy-drive__io > span:last-child {
+  flex: none;
+}
+
+.mm-sy-drive--low .mm-sy-drive__io > span:last-child {
+  color: var(--mm-status-warning-text);
+}
+
+/* ---- Motion ---------------------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .mm-sy-band *,
+  .mm-sy-drive * {
+    transition: none !important;
+  }
+}
+
+/* Nothing moves while the window is being resized: the transitions are given no time rather than taken away. */
+body.mm-pipeline-resizing .mm-sy-band *,
+body.mm-pipeline-resizing .mm-sy-drive * {
+  transition-delay: 0s !important;
+  transition-duration: 0s !important;
+}
