@@ -34,7 +34,7 @@ export const mmEditableTextFieldClass = "mm-input w-full min-w-0";
 
 /**
  * Shared layout/interaction for native selects and anchored listbox triggers.
- * Visual chrome (inset, border, height, padding, focus) lives on `.mm-input` in `weir-shell.css`.
+ * Visual chrome (inset, border, height, padding, focus) lives on `.mm-input` in `weir-forms.css`.
  */
 const mmNativeFieldShell =
   "mm-input w-full min-w-0 text-sm text-mm-text transition-[border-color,background-color,box-shadow] duration-150 " +
@@ -44,8 +44,7 @@ const mmNativeFieldShell =
 export const mmSelectFieldClass = `${mmNativeFieldShell} mt-1 cursor-pointer`;
 
 /** Anchored picker button (custom listbox) — visually aligned with {@link mmSelectFieldClass}.
- *  `mm-input--opens` gives it the same tinted well a native select has, so everything that opens
- *  something looks alike; it draws its own chevron in markup, so the well comes without the mark. */
+ *  `mm-input--opens` gives it the quiet picker box a native select has; it draws its own chevron in markup. */
 export const mmPickerTriggerClass = `${mmNativeFieldShell} mm-input--opens mt-1 cursor-pointer text-left`;
 
 /** The trigger as the Dashboard's pickers draw it: a field's height with the label at the left and the chevron at the
@@ -53,7 +52,7 @@ export const mmPickerTriggerClass = `${mmNativeFieldShell} mm-input--opens mt-1 
 export function mmPickerTriggerSurface(open: boolean): string {
   return [
     mmPickerTriggerClass,
-    "flex min-h-[2.5rem] items-center justify-between gap-2",
+    "flex items-center justify-between gap-2",
     open
       ? "border-mm-input-border-focus !shadow-[inset_0_1px_3px_rgba(0,0,0,0.22),inset_0_1px_0_rgba(255,255,255,0.04),0_0_0_2px_var(--mm-input-focus-ring)]"
       : "",

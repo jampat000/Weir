@@ -149,6 +149,9 @@
   --mm-control-pad-x: calc(11px * var(--mm-density-ui-scale));
   --mm-control-pad-y: calc(7px * var(--mm-density-ui-scale));
 
+  /* The chevron of a native select, the mark MmPickerChevron draws in --mm-primary. */
+  --mm-picker-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath fill='%2352a5ff' d='M5.5 7.5 10 12l4.5-4.5H5.5z'/%3E%3C/svg%3E");
+
   --mm-font:
     "Inter Variable", "Inter", ui-sans-serif, system-ui, -apple-system,
     sans-serif;
@@ -269,6 +272,7 @@ html[data-mm-theme="light"] {
   --mm-input-focus-ring: rgba(18, 94, 186, 0.18);
   --mm-button-secondary-bg: var(--mm-surface-2);
   --mm-button-quiet-bg: rgba(23, 28, 38, 0.05);
+  --mm-picker-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath fill='%23125eba' d='M5.5 7.5 10 12l4.5-4.5H5.5z'/%3E%3C/svg%3E");
   --mm-well-bg: rgba(23, 28, 38, 0.045);
   --mm-brand-wordmark: #171c26;
 }

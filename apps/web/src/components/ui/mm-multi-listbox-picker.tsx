@@ -2,7 +2,7 @@ import { useCallback, useId, useRef, useState } from "react";
 import {
   mmCheckboxControlClass,
   mmListboxPanelClass,
-  mmPickerTriggerClass,
+  mmPickerTriggerSurface,
 } from "../../lib/ui/mm-control-roles";
 import { useCloseOnOutsideAndEscape } from "../../lib/ui/use-close-on-outside";
 import type { MmListboxOption } from "./mm-listbox-picker";
@@ -64,15 +64,7 @@ export function MmMultiListboxPicker({
       : selectedLabels.length > 0
         ? selectedLabels.join(", ")
         : placeholder;
-  const triggerSurface = [
-    mmPickerTriggerClass,
-    "flex min-h-[2.5rem] items-center justify-between gap-2",
-    open && !disabled
-      ? "border-mm-input-border-focus !shadow-[inset_0_1px_3px_rgba(0,0,0,0.22),inset_0_1px_0_rgba(255,255,255,0.04),0_0_0_2px_var(--mm-input-focus-ring)]"
-      : "",
-  ]
-    .filter(Boolean)
-    .join(" ");
+  const triggerSurface = mmPickerTriggerSurface(open && !disabled);
 
   return (
     <div

@@ -105,13 +105,6 @@
   display: none;
 }
 
-/* Every control a page puts in the slot is the height of the "All workflows" picker below, and the header centres them
-   on one line: a field, and the group of choices with its choices inside it. */
-.mm-header__slot .mm-input {
-  height: 2.375rem;
-  min-height: 0;
-}
-
 /* The search in the slot (components/shell/header-search.tsx). Short of room it is a magnifier, a control's height square,
    until it is focused or holds a search; it is the same input throughout, so nothing typed or focused moves. */
 .mm-header-search {
@@ -267,15 +260,7 @@
 }
 
 .mm-workflow-picker .mm-input--opens {
-  min-height: 2.375rem;
   margin-top: 0;
-  padding-block: 0;
-  border-color: var(--mm-hairline);
-  background: var(--mm-card-bg);
-  box-shadow: none;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--mm-text2);
 }
 
 .mm-header__actions {
