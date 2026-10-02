@@ -50,16 +50,9 @@
   background: color-mix(in srgb, var(--mm-primary) 8%, transparent);
 }
 
-.mm-library-row--would_change .mm-library-verdict {
-  color: var(--mm-text1);
-}
-
-.mm-library-row--cannot_process .mm-library-verdict {
-  color: var(--mm-status-warning-text);
-}
-
-.mm-library-row--matches .mm-library-verdict {
-  color: var(--mm-text3);
+/* What Weir would do with a file, or what a title's files come to, in the colour of its status. */
+.mm-library-rag {
+  color: var(--rag, var(--mm-text2));
 }
 
 .mm-library-group {
@@ -105,7 +98,7 @@
 }
 
 .mm-library-identity--group {
-  grid-column: 2 / -1;
+  grid-column: 2 / 4;
 }
 
 .mm-library-open {
@@ -262,7 +255,6 @@
     grid-column: 3 / -1;
     white-space: normal;
     font-size: var(--mm-type-caption);
-    color: var(--mm-text3);
   }
 
   .mm-library-num {

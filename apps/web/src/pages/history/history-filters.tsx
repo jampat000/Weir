@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 
 import { SegmentedControl } from "../../components/panels/segmented-control";
+import { MmListboxPicker } from "../../components/ui/mm-listbox-picker";
 import { ShellHeaderSlot } from "../../components/shell/shell-header-context";
 import type { ProcessingLibrary } from "../../lib/processing/libraries-api";
 import { HISTORY_GROUPS, type HistoryGroup } from "./history-entries";
-import { useChipRow } from "./use-chip-row";
+import { useChipRow } from "../../lib/ui/use-chip-row";
 
 /** How far back History looks, as the server's within_days. */
 export const PERIODS: { id: string; label: string; days?: number }[] = [
@@ -43,6 +44,8 @@ export function HistoryFilters({
 }) {
   const [search, setSearch] = useState(query);
   const { setRow, scrolls } = useChipRow(group);
+  const workflowLabel = useId();
+  const periodLabel = useId();
   return (
     <ShellHeaderSlot>
       <div className="mm-history-controls" data-testid="history-filters">
@@ -84,31 +87,34 @@ export function HistoryFilters({
           />
         </div>
         <div className="mm-history-scope">
-          <select
-            className="mm-input"
-            aria-label="Workflow"
-            value={libraryId ?? ""}
-            onChange={(event) => setParam("library", event.target.value)}
-          >
-            <option value="">All workflows</option>
-            {libraries.map((library) => (
-              <option key={library.id} value={library.id}>
-                {library.name}
-              </option>
-            ))}
-          </select>
-          <select
-            className="mm-input"
-            aria-label="How far back"
-            value={periodId}
-            onChange={(event) => setParam("within", event.target.value)}
-          >
-            {PERIODS.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.label}
-              </option>
-            ))}
-          </select>
+          <div className="mm-workflow-picker">
+            <span id={workflowLabel} className="sr-only">
+              Workflow
+            </span>
+            <MmListboxPicker
+              options={[
+                { value: "", label: "All workflows" },
+                ...libraries.map((library) => ({
+                  value: String(library.id),
+                  label: library.name,
+                })),
+              ]}
+              value={libraryId === undefined ? "" : String(libraryId)}
+              onChange={(next) => setParam("library", next)}
+              ariaLabelledBy={workflowLabel}
+            />
+          </div>
+          <div className="mm-workflow-picker mm-period-picker">
+            <span id={periodLabel} className="sr-only">
+              How far back
+            </span>
+            <MmListboxPicker
+              options={PERIODS.map((p) => ({ value: p.id, label: p.label }))}
+              value={periodId}
+              onChange={(next) => setParam("within", next)}
+              ariaLabelledBy={periodLabel}
+            />
+          </div>
         </div>
       </div>
     </ShellHeaderSlot>

@@ -4,8 +4,8 @@ import type {
   LibraryTotals,
   LibraryProblemKind,
 } from "../../lib/processing/library-mode-api";
-import { useChipRow } from "../history/use-chip-row";
-import { PROBLEM_LABELS } from "./library-model";
+import { useChipRow } from "../../lib/ui/use-chip-row";
+import { PROBLEM_LABELS, type Rag } from "./library-model";
 
 export type LibraryState = "cleaned" | "left_alone";
 
@@ -22,52 +22,109 @@ export const NO_FILTER: LibraryFilter = {
   state: null,
 };
 
-/** The chips: a count and the filter it stands for, in the order an operator reads them. */
-const CHIPS: {
-  id: LibraryFileClassification;
+type Chip = {
+  id: string;
   label: string;
   hint: string;
+  /** Its colour, which is the same as the colour of the same thing in the table. Without one it is plain. */
+  rag?: Rag;
   count: (totals: LibraryTotals) => number;
-}[] = [
-  {
-    id: "would_change",
-    label: "Would change",
-    hint: "Weir would take tracks out of these",
-    count: (totals) => totals.would_change,
-  },
-  {
-    id: "matches",
-    label: "Matches your rules",
-    hint: "Nothing to do: these already look the way your rules ask",
-    count: (totals) => totals.matches,
-  },
-  {
-    id: "cannot_process",
-    label: "Weir will not touch",
-    hint: "Still seeding, or Weir cannot read them",
-    count: (totals) => totals.cannot_process,
-  },
-];
+  selected: (filter: LibraryFilter) => boolean;
+  /** The filter a click on this chip asks for. */
+  choose: (filter: LibraryFilter) => LibraryFilter;
+};
 
-/** The same row of chips, for what Weir has done with a file rather than what is in it. */
-const STATE_CHIPS: {
-  id: LibraryState;
-  label: string;
-  hint: string;
-  count: (totals: LibraryTotals) => number;
-}[] = [
+function byClassification(
+  id: LibraryFileClassification,
+  label: string,
+  hint: string,
+  rag: Rag,
+  count: Chip["count"],
+): Chip {
+  return {
+    id,
+    label,
+    hint,
+    rag,
+    count,
+    selected: (filter) => filter.classification === id,
+    choose: (filter) => ({
+      ...NO_FILTER,
+      classification: filter.classification === id ? null : id,
+    }),
+  };
+}
+
+function byState(
+  id: LibraryState,
+  label: string,
+  hint: string,
+  rag: Rag,
+  count: Chip["count"],
+): Chip {
+  return {
+    id,
+    label,
+    hint,
+    rag,
+    count,
+    selected: (filter) => filter.state === id,
+    choose: (filter) => ({
+      ...NO_FILTER,
+      state: filter.state === id ? null : id,
+    }),
+  };
+}
+
+/**
+ * The chips, in the order an operator reads them: every file, then the counts by what the rules say about a file, then
+ * by what Weir has done with it. Each count that is also a filter has the colour of its files in the table.
+ */
+const CHIPS: Chip[] = [
   {
-    id: "cleaned",
-    label: "Cleaned",
-    hint: "Weir has cleaned these at least once; a rescan does not forget",
-    count: (totals) => totals.cleaned,
+    id: "all",
+    label: "All",
+    hint: "Every file in this workflow",
+    count: (totals) => totals.files,
+    selected: (filter) =>
+      !filter.classification && !filter.state && !filter.problem,
+    choose: () => NO_FILTER,
   },
-  {
-    id: "left_alone",
-    label: "Left alone",
-    hint: "You marked these Left alone; nothing cleans them until you clear it",
-    count: (totals) => totals.left_alone,
-  },
+  byClassification(
+    "would_change",
+    "Would change",
+    "Would change: Weir would take tracks out of these",
+    "bad",
+    (totals) => totals.would_change,
+  ),
+  byClassification(
+    "matches",
+    "Matches rules",
+    "Matches your rules: nothing to do, these already look the way your rules ask",
+    "good",
+    (totals) => totals.matches,
+  ),
+  byClassification(
+    "cannot_process",
+    "Untouched",
+    "Weir will not touch these: still seeding, or Weir cannot read them",
+    "muted",
+    (totals) => totals.cannot_process,
+  ),
+  byState(
+    "cleaned",
+    "Cleaned",
+    "Cleaned: Weir has cleaned these at least once; a rescan does not forget",
+    "good",
+    (totals) => totals.cleaned,
+  ),
+  byState(
+    "left_alone",
+    "Left alone",
+    "Left alone: you marked these; nothing cleans them until you clear it",
+    "muted",
+    (totals) => totals.left_alone,
+  ),
 ];
 
 const UNKNOWN_COUNT = "—";
@@ -129,7 +186,7 @@ export function LibraryFilters({
 }) {
   const totals = overview?.totals;
   const { setRow, scrolls } = useChipRow(
-    filter.classification ?? filter.state ?? "",
+    filter.classification ?? filter.state ?? "all",
   );
   return (
     <>
@@ -143,47 +200,24 @@ export function LibraryFilters({
       />
       <div className="mm-library-chips-box" data-scrolls={scrolls} ref={setRow}>
         <div className="mm-library-chips" role="group" aria-label="Show">
-          {CHIPS.map((chip) => (
-            <button
-              key={chip.id}
-              type="button"
-              className="mm-library-chip"
-              title={chip.hint}
-              aria-pressed={filter.classification === chip.id}
-              onClick={() =>
-                onFilter({
-                  ...NO_FILTER,
-                  classification:
-                    filter.classification === chip.id ? null : chip.id,
-                })
-              }
-            >
-              {chip.label}{" "}
-              <b>
-                {totals ? chip.count(totals).toLocaleString() : UNKNOWN_COUNT}
-              </b>
-            </button>
-          ))}
-          {STATE_CHIPS.map((chip) => (
-            <button
-              key={chip.id}
-              type="button"
-              className="mm-library-chip"
-              title={chip.hint}
-              aria-pressed={filter.state === chip.id}
-              onClick={() =>
-                onFilter({
-                  ...NO_FILTER,
-                  state: filter.state === chip.id ? null : chip.id,
-                })
-              }
-            >
-              {chip.label}{" "}
-              <b>
-                {totals ? chip.count(totals).toLocaleString() : UNKNOWN_COUNT}
-              </b>
-            </button>
-          ))}
+          {CHIPS.map((chip) => {
+            const count = totals ? chip.count(totals) : null;
+            return (
+              <button
+                key={chip.id}
+                type="button"
+                className="mm-library-chip"
+                data-rag={chip.rag}
+                data-empty={count === 0 ? "" : undefined}
+                title={chip.hint}
+                aria-pressed={chip.selected(filter)}
+                onClick={() => onFilter(chip.choose(filter))}
+              >
+                {chip.label}{" "}
+                <b>{count === null ? UNKNOWN_COUNT : count.toLocaleString()}</b>
+              </button>
+            );
+          })}
           <ProblemSelect
             overview={overview}
             filter={filter}

@@ -4,7 +4,7 @@ import { Poster } from "../../components/shared/poster";
 import { formatBytes } from "../../lib/format/bytes";
 import { baseName } from "../../lib/format/path";
 import type { LibraryFile } from "../../lib/processing/library-mode-api";
-import { verdictOf } from "./library-model";
+import { ragOfClassification, verdictOf } from "./library-model";
 
 const MANAGER_NAMES: Record<string, string> = {
   sonarr: "Sonarr",
@@ -57,7 +57,12 @@ function FileFigures({ file }: { file: LibraryFile }) {
   const subtitles = file.subtitle_summary ?? `${file.subtitle_track_count}`;
   return (
     <>
-      <span role="cell" className="mm-library-verdict" title={verdict}>
+      <span
+        role="cell"
+        className="mm-library-verdict mm-library-rag"
+        data-rag={ragOfClassification(file.classification)}
+        title={verdict}
+      >
         {verdict}
       </span>
       <span role="cell" className="mm-library-tracks" title={audio}>

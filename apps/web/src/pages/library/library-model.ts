@@ -69,7 +69,32 @@ export function verdictOf(file: LibraryFile): string {
   if (file.removed_subtitle_tracks) {
     parts.push(plural(file.removed_subtitle_tracks, "subtitle", "subtitles"));
   }
-  return parts.length ? `Removes ${parts.join(", ")}` : "Would change";
+  return parts.length ? `Would remove ${parts.join(", ")}` : "Would change";
+}
+
+/**
+ * The red, amber, green of a count or a file: green is where Weir has nothing left to do or has done it, red is what the
+ * rules say needs fixing, grey is what Weir leaves alone.
+ */
+export type Rag = "good" | "bad" | "muted";
+
+export function ragOfClassification(
+  classification: LibraryFile["classification"],
+): Rag {
+  if (classification === "matches") return "good";
+  if (classification === "would_change") return "bad";
+  return "muted";
+}
+
+/** What a title with several files comes to, worst first: any file to fix, else the files that match, else the rest. */
+export function groupSummary(files: LibraryFile[]): { rag: Rag; text: string } {
+  const count = (c: LibraryFile["classification"]) =>
+    files.filter((file) => file.classification === c).length;
+  const changing = count("would_change");
+  if (changing > 0) return { rag: "bad", text: `${changing} would change` };
+  const matching = count("matches");
+  if (matching > 0) return { rag: "good", text: `${matching} match` };
+  return { rag: "muted", text: `${files.length} untouched` };
 }
 
 /**

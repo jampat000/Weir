@@ -62,8 +62,9 @@
   margin-left: auto;
 }
 
-.mm-history-scope .mm-input {
-  width: 170px;
+/* "Everything kept ▾" is the longest of the two period choices. */
+.mm-period-picker {
+  --picker-w: 10.5rem;
 }
 
 @media (min-width: 921px) {
@@ -105,14 +106,6 @@
   .mm-history-chips {
     flex: 1 1 100%;
     order: 3;
-  }
-}
-
-@media (min-width: 1280px) {
-  @container mm-header (max-width: 1620px) {
-    .mm-history-scope .mm-input {
-      width: 150px;
-    }
   }
 }
 

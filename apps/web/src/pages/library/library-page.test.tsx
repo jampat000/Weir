@@ -308,9 +308,11 @@ describe("LibraryPage", () => {
     expect(screen.getByTestId("library-picker")).toHaveTextContent("TV");
     expect(screen.getAllByTestId("library-row")).toHaveLength(3);
     expect(screen.getByText("Northbound")).toBeInTheDocument();
-    expect(
-      screen.getByText(/Sonarr · 2 files · 1 would change/),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Sonarr · 2 files")).toBeInTheDocument();
+    expect(screen.getByText("1 would change")).toHaveAttribute(
+      "data-rag",
+      "bad",
+    );
     expect(
       screen.getByText(/back if everything that would change is cleaned/),
     ).toBeInTheDocument();
@@ -835,9 +837,10 @@ describe("LibraryPage", () => {
         .getAllByRole("button")
         .map((chip) => chip.textContent),
     ).toEqual([
+      "All 14",
       "Would change 10",
-      "Matches your rules 3",
-      "Weir will not touch 1",
+      "Matches rules 3",
+      "Untouched 1",
       "Cleaned 2",
       "Left alone 1",
     ]);
@@ -878,5 +881,58 @@ describe("LibraryPage", () => {
     await waitFor(() =>
       expect(lastFilters.at(-1)).toMatchObject({ q: "harbour" }),
     );
+  });
+
+  it("puts when the library was last checked in the Files card's header, and Check again with the page's buttons", () => {
+    renderInShell();
+
+    const card = screen.getByRole("region", { name: "Files" });
+    const head = card.querySelector("header")!;
+    expect(within(head).getByTestId("library-scan")).toHaveTextContent(
+      /^checked/,
+    );
+    expect(
+      within(card).queryByRole("button", { name: "Check again" }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Check again" }));
+    expect(rescan).toHaveBeenCalled();
+  });
+
+  it("has an All chip, selected to begin with, that clears the filter and is no part of the request", () => {
+    renderLibrary();
+    const all = screen.getByRole("button", { name: /^All/ });
+    expect(all).toHaveAttribute("aria-pressed", "true");
+
+    fireEvent.click(screen.getByRole("button", { name: /Would change/ }));
+    expect(all).toHaveAttribute("aria-pressed", "false");
+    expect(lastFilters.at(-1)).toMatchObject({
+      classification: "would_change",
+    });
+
+    fireEvent.click(all);
+    expect(all).toHaveAttribute("aria-pressed", "true");
+    expect(lastFilters.at(-1)?.classification).toBeUndefined();
+    expect(lastFilters.at(-1)?.state).toBeUndefined();
+  });
+
+  it("colours each count and each file by what the rules say: green matches, red needs fixing, grey is left alone", () => {
+    renderLibrary();
+
+    const tone = (name: RegExp) =>
+      screen.getByRole("button", { name }).getAttribute("data-rag");
+    expect(tone(/Would change/)).toBe("bad");
+    expect(tone(/Matches rules/)).toBe("good");
+    expect(tone(/Untouched/)).toBe("muted");
+    expect(tone(/Cleaned/)).toBe("good");
+    expect(tone(/Left alone/)).toBe("muted");
+    expect(tone(/^All/)).toBeNull();
+
+    const rows = screen.getAllByTestId("library-row");
+    const verdict = (row: HTMLElement) =>
+      row.querySelector(".mm-library-verdict");
+    expect(
+      new Set(rows.map((row) => verdict(row)?.getAttribute("data-rag"))),
+    ).toEqual(new Set(["bad", "good", "muted"]));
   });
 });

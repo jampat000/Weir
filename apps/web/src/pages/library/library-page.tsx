@@ -18,6 +18,7 @@ import {
   useLibraryFilesQuery,
   useLibraryOverviewQuery,
   useLibrarySettingsQuery,
+  useTriggerLibraryScan,
 } from "../../lib/processing/library-mode-queries";
 import { useProcessingLibrariesQuery } from "../../lib/processing/libraries-queries";
 import { processingKeys } from "../../lib/processing/query-keys";
@@ -40,7 +41,7 @@ import {
 } from "./library-model";
 import { LibraryPager } from "./library-pager";
 import { LibraryPicker } from "./library-picker";
-import { LibraryScanStatus } from "./library-scan-status";
+import { LibraryCheckAgain, LibraryScanStatus } from "./library-scan-status";
 import { LibrarySetupPanel } from "./library-setup-panel";
 import { LibrarySetupPrompt } from "./library-setup-prompt";
 import { LibraryTable } from "./library-table";
@@ -144,6 +145,7 @@ export function LibraryPage(): React.ReactElement {
   );
   const setupSettings = useLibrarySettingsQuery(chosenId, Boolean(chosen));
   const overview = useLibraryOverviewQuery(chosenId, Boolean(chosen));
+  const rescan = useTriggerLibraryScan(chosenId);
   const files = useLibraryFilesQuery(chosenId, filters, Boolean(chosen));
   const flow = useLibraryClean(chosenId, (request) => {
     if (request.source === "selection") setSelected(new Set());
@@ -217,6 +219,7 @@ export function LibraryPage(): React.ReactElement {
   // A library with no folders has nothing to check yet: setting it up is the page.
   const savedSetup = setupSettings.data;
   const needsSetup = savedSetup?.library_folders.length === 0;
+  const scan = overview.data?.scan ?? files.data?.scan ?? null;
   const filterControls = (
     <LibraryFilters
       search={search}
@@ -253,23 +256,16 @@ export function LibraryPage(): React.ReactElement {
       </ShellHeaderSlot>
       {needsSetup ? null : (
         <PageToolbarButtons>
-          <LibraryScanStatus
-            libraryId={chosen.id}
-            scan={overview.data?.scan ?? files.data?.scan ?? null}
-            schedule={overview.data?.schedule}
-            now={now}
-            after={
-              savedSetup ? (
-                <button
-                  type="button"
-                  className="mm-head-control"
-                  onClick={() => setSetupOpen(true)}
-                >
-                  Library setup
-                </button>
-              ) : null
-            }
-          />
+          <LibraryCheckAgain scan={scan} rescan={rescan} />
+          {savedSetup ? (
+            <button
+              type="button"
+              className="mm-head-control"
+              onClick={() => setSetupOpen(true)}
+            >
+              Library setup
+            </button>
+          ) : null}
         </PageToolbarButtons>
       )}
     </>
@@ -302,10 +298,17 @@ export function LibraryPage(): React.ReactElement {
       {header}
 
       <Panel
+        className="mm-library-files"
         title="Files"
         description={lead}
         aside={
           <>
+            <LibraryScanStatus
+              scan={scan}
+              schedule={overview.data?.schedule}
+              now={now}
+              rescan={rescan}
+            />
             <p className="mm-library-saving">{savingLine(totals)}</p>
             <button
               type="button"

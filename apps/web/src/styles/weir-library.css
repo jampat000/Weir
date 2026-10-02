@@ -113,11 +113,9 @@
   color: var(--mm-status-failed-text);
 }
 
-/* The title line holds the title and its picker whole, then the status and buttons; the eyebrow gives up its room
-   first (the eyebrow is cut with an ellipsis, always one line). */
+/* The title block keeps the room for its whole eyebrow; the controls give way before it does. */
 .mm-header:has(.mm-library-controls) .mm-header__titles {
-  flex-shrink: 100;
-  min-width: 11.75rem;
+  flex-shrink: 0;
 }
 
 /* The search and the counts that are also the filters sit in the header's slot, between the title and the status. The
@@ -140,7 +138,7 @@
    until it is down to its minimum. */
 .mm-library-search {
   flex: 0 1000 260px;
-  min-width: 6.5rem;
+  min-width: 5.5rem;
 }
 
 .mm-library-chips-box {
@@ -180,6 +178,7 @@
 .mm-library-chips .mm-library-chip {
   align-self: stretch;
   height: auto;
+  padding-inline: 12px;
 }
 
 @media (min-width: 921px) {
@@ -188,10 +187,28 @@
   }
 }
 
-/* Where the header is short, the next run is left to the tooltip, before anything else gives way. */
-@container mm-header (max-width: 2030px) {
-  .mm-library-scan__next {
+/* "Check again" is refresh mark alone where the header is short: the search is at its compact width first, then this,
+   and only then do the counts scroll. */
+.mm-library-refresh svg {
+  display: none;
+}
+
+@container mm-header (max-width: 1700px) {
+  .mm-library-refresh {
+    width: 36px;
+    padding: 0;
+  }
+
+  .mm-library-refresh svg {
+    display: block;
+  }
+
+  .mm-library-refresh__label {
     display: none;
+  }
+
+  .mm-library-search {
+    flex-basis: 5.5rem;
   }
 }
 
@@ -199,11 +216,6 @@
 @media (min-width: 921px) and (max-width: 1279px) {
   .mm-header:has(.mm-library-controls) {
     flex-wrap: wrap;
-  }
-
-  /* The title block counts at the width it can be cut to, so the status and Pause stay on the title's line. */
-  .mm-header:has(.mm-library-controls) .mm-header__titles {
-    flex-basis: 11.75rem;
   }
 
   .mm-header__slot:has(.mm-library-controls) {
@@ -246,6 +258,37 @@
     color 0.15s ease;
 }
 
+/* Red, amber, green: the colour of a count and of the same files in the table (see library-model's Rag). Green is a file
+   that matches the rules or has been cleaned, red one the rules say needs fixing, grey one Weir leaves alone. The words
+   are the signal-text colours, which are tuned for contrast in both themes, and the dot is the words' own colour. */
+[data-rag="good"] {
+  --rag: var(--mm-status-healthy-text);
+}
+
+[data-rag="bad"] {
+  --rag: var(--mm-status-failed-text);
+}
+
+[data-rag="muted"] {
+  --rag: var(--mm-text2);
+}
+
+.mm-library-rag::before,
+.mm-library-chip[data-rag]::before {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: var(--rag);
+  vertical-align: 1px;
+  content: "";
+}
+
+.mm-library-chip[data-rag]:not([data-empty]) b {
+  color: var(--rag);
+}
+
 .mm-library-chip b {
   margin-left: 4px;
   font-weight: 600;
@@ -266,6 +309,23 @@
 
 .mm-library-chip[aria-pressed="true"] b {
   color: inherit;
+}
+
+/* On a narrow card the header's status, saving line and Compact rows take a line under the title and its count. */
+@media (max-width: 900px) {
+  .mm-library-files > .mm-panel__head {
+    flex-wrap: wrap;
+    row-gap: 6px;
+  }
+
+  .mm-library-files .mm-panel__aside {
+    flex: 1 1 100%;
+    justify-content: flex-start;
+  }
+
+  .mm-library-density {
+    margin-block: 0;
+  }
 }
 
 /* The one control on the Files card's header, after what cleaning would give back; it keeps its own edge. It is shorter

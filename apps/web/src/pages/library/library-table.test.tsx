@@ -143,7 +143,8 @@ it("gives a title with one file a single row that carries the title, the file an
 it("nests a title's files under it, with its source and file count on the title", () => {
   renderSelectable(episodes);
 
-  expect(screen.getByText("Sonarr · 3 files · 2 would change")).toBeVisible();
+  expect(screen.getByText("Sonarr · 3 files")).toBeVisible();
+  expect(screen.getByText("2 would change")).toBeVisible();
   expect(screen.getAllByTestId("library-row")).toHaveLength(3);
   expect(
     screen.getByRole("checkbox", { name: "Select S01E01.mkv" }),

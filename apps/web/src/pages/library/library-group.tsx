@@ -5,16 +5,13 @@ import { NavIconChevronDown } from "../../components/shell/nav-icons";
 import type { LibraryFile } from "../../lib/processing/library-mode-api";
 import { plural } from "../../lib/ui/mm-plural";
 import { CheckCell, NestedFileRow, sourceName } from "./library-file-row";
+import { groupSummary } from "./library-model";
 
 function groupMeta(rows: LibraryFile[]): string {
   const source = sourceName(rows[0]?.manager_kind);
-  const changing = rows.filter(
-    (row) => row.classification === "would_change",
-  ).length;
   return [
     source ? `${source} · ` : "",
     plural(rows.length, "file", "files"),
-    changing > 0 ? ` · ${changing} would change` : "",
   ].join("");
 }
 
@@ -40,6 +37,7 @@ export function LibraryGroup({
   onOpen: (path: string) => void;
 }) {
   const [folded, setFolded] = useState(false);
+  const summary = groupSummary(rows);
   const cleanable = rows.filter((row) => row.classification === "would_change");
   const chosen = cleanable.filter((row) => selected.has(row.path)).length;
   const allChosen = cleanable.length > 0 && chosen === cleanable.length;
@@ -88,6 +86,13 @@ export function LibraryGroup({
               <span className="mm-library-subline">{groupMeta(rows)}</span>
             </span>
           </button>
+        </span>
+        <span
+          role="cell"
+          className="mm-library-verdict mm-library-rag"
+          data-rag={summary.rag}
+        >
+          {summary.text}
         </span>
       </div>
       {folded

@@ -67,13 +67,11 @@ describe("HistoryFilters in the header", () => {
     expect(setParam).toHaveBeenLastCalledWith("show", "failed");
     fireEvent.click(screen.getByRole("button", { name: /All/ }));
     expect(setParam).toHaveBeenLastCalledWith("show", null);
-    fireEvent.change(screen.getByLabelText("Workflow"), {
-      target: { value: "9" },
-    });
+    fireEvent.click(screen.getByRole("button", { name: "Workflow" }));
+    fireEvent.click(screen.getByRole("option", { name: "TV" }));
     expect(setParam).toHaveBeenLastCalledWith("library", "9");
-    fireEvent.change(screen.getByLabelText("How far back"), {
-      target: { value: "30" },
-    });
+    fireEvent.click(screen.getByRole("button", { name: "How far back" }));
+    fireEvent.click(screen.getByRole("option", { name: "Last 30 days" }));
     expect(setParam).toHaveBeenLastCalledWith("within", "30");
   });
 

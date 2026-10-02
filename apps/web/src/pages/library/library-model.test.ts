@@ -55,7 +55,7 @@ describe("verdictOf", () => {
       removed_subtitle_tracks: 1,
     });
 
-    expect(verdictOf(file)).toBe("Removes 2 audio, 1 subtitle");
+    expect(verdictOf(file)).toBe("Would remove 2 audio, 1 subtitle");
   });
 
   it("keeps only the first sentence of why a file is not touched", () => {
