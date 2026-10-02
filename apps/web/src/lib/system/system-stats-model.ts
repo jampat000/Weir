@@ -7,17 +7,11 @@ import type {
   SystemStatsFrame,
 } from "./system-stats-types";
 
-/** How many samples the history keeps: the window the server reports, at its sampling interval. */
-export function historyLimit(
-  stats: Pick<SystemStats, "window_s" | "interval_ms">,
-): number {
-  return Math.max(1, Math.ceil((stats.window_s * 1000) / stats.interval_ms));
-}
-
 /**
- * The stats with a frame's newest reading and history point added, and the oldest points dropped to the window.
- * A frame whose point is not newer than the last one (a replay after a reconnect, or the same second twice) leaves
- * the history as it is and only refreshes the reading.
+ * The stats with a frame's newest reading and history point added, and the points older than the window dropped,
+ * by their own times: a history that was 10 seconds apart while nobody watched is trimmed the same way as one at
+ * one second. A frame whose point is not newer than the last one (a replay after a reconnect, or the same second
+ * twice) leaves the history as it is and only refreshes the reading.
  */
 export function withFrame(
   stats: SystemStats,
@@ -26,15 +20,14 @@ export function withFrame(
   const newest = stats.history.at(-1);
   const at = parseAppTime(frame.point.at);
   const lastAt = newest ? parseAppTime(newest.at) : null;
-  const isNew = at !== null && (lastAt === null || at > lastAt);
-  const history = isNew ? [...stats.history, frame.point] : stats.history;
-  const limit = historyLimit(stats);
-  return {
-    ...stats,
-    now: frame.now,
-    history:
-      history.length > limit ? history.slice(history.length - limit) : history,
-  };
+  if (at === null || (lastAt !== null && at <= lastAt)) {
+    return { ...stats, now: frame.now };
+  }
+  const from = at - stats.window_s * 1000;
+  const history = [...stats.history, frame.point].filter(
+    (point) => (parseAppTime(point.at) ?? at) >= from,
+  );
+  return { ...stats, now: frame.now, history };
 }
 
 /**

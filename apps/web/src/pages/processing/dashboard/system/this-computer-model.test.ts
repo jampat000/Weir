@@ -110,18 +110,19 @@ describe("the disk column", () => {
     });
   });
 
-  it("says it cannot be read where the machine gives no disk figures", () => {
+  it("says it is not available where the machine gives no disk figures", () => {
     const unreadable = column("disk", {
       disk_read_bytes_per_sec: null,
       disk_write_bytes_per_sec: null,
       disk_busy_percent: null,
     });
     expect(unreadable.value).toBeNull();
-    expect(unreadable.sub).toBe("not readable here");
+    expect(unreadable.sub).toBe("not available");
   });
 
-  it("adds what is readable when only one of the two is", () => {
-    expect(diskMegabytes(null, 2 * MB)).toBe(2);
+  it("is a gap, not a made-up zero, when either of the two cannot be read", () => {
+    expect(diskMegabytes(null, 2 * MB)).toBeNull();
+    expect(diskMegabytes(2 * MB, null)).toBeNull();
     expect(diskMegabytes(null, null)).toBeNull();
   });
 });

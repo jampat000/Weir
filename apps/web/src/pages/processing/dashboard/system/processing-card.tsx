@@ -2,7 +2,7 @@ import { LiveTrace } from "../../../../components/charts/live-trace";
 import { loadErrorMessage } from "../../../../lib/api/error-message";
 import { useSystemStatsQuery } from "../../../../lib/system/use-system-stats";
 import { useNow } from "../../../../lib/ui/use-now";
-import { BandCard, BandNote } from "./band-card";
+import { BandCard, BandNote, TenMinutes } from "./band-card";
 import { TraceColumn } from "./trace-column";
 import { processingColumns, workPills } from "./processing-card-model";
 import { useRecentWork } from "./use-recent-work";
@@ -23,7 +23,7 @@ export function ProcessingCard() {
   return (
     <BandCard
       label="Processing"
-      aside={SPAN_WORDS}
+      aside={<TenMinutes />}
       className="mm-sy-band--processing"
       testId="system-processing"
     >

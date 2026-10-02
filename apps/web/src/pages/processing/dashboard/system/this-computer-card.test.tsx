@@ -91,7 +91,28 @@ describe("the This computer card", () => {
     render(<ThisComputerCard />);
 
     expect(screen.getByText("–")).toBeInTheDocument();
-    expect(screen.getByText("not readable here")).toBeInTheDocument();
+    expect(screen.getByText("not available")).toBeInTheDocument();
+  });
+
+  it("shows dashes, not zeros, in the first reading, which has no rates yet", () => {
+    query = {
+      data: {
+        ...testStats,
+        now: {
+          ...testStats.now,
+          cpu_percent: null,
+          weir_cpu_percent: null,
+          tools_cpu_percent: null,
+          disk_read_bytes_per_sec: null,
+          disk_write_bytes_per_sec: null,
+          disk_busy_percent: null,
+        },
+      },
+    };
+    render(<ThisComputerCard />);
+
+    expect(screen.getAllByText("–")).toHaveLength(2);
+    expect(screen.getByText("16 cores")).toBeInTheDocument();
   });
 
   it("says it is reading while the first reading is on its way", () => {

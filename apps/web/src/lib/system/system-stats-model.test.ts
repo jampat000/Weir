@@ -1,11 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  drivesUsedBy,
-  historyLimit,
-  seriesOf,
-  withFrame,
-} from "./system-stats-model";
+import { drivesUsedBy, seriesOf, withFrame } from "./system-stats-model";
 import type {
   SystemDrive,
   SystemNow,
@@ -52,13 +47,6 @@ const stats = (history: SystemPoint[], windowS = 600): SystemStats => ({
   drives: [],
 });
 
-describe("the history's length", () => {
-  it("is the window at the sampling interval", () => {
-    expect(historyLimit({ window_s: 600, interval_ms: 1000 })).toBe(600);
-    expect(historyLimit({ window_s: 600, interval_ms: 10_000 })).toBe(60);
-  });
-});
-
 describe("adding a frame", () => {
   it("adds its point and takes its reading", () => {
     const next = withFrame(stats([point(1)]), {
@@ -69,8 +57,8 @@ describe("adding a frame", () => {
     expect(next.now.cpu_percent).toBe(55);
   });
 
-  it("drops the oldest points once the window is full", () => {
-    const next = withFrame(stats([point(1), point(2), point(3)], 3), {
+  it("drops the points older than the window, by their own times", () => {
+    const next = withFrame(stats([point(1), point(2), point(3)], 2), {
       now: now(1),
       point: point(4),
     });

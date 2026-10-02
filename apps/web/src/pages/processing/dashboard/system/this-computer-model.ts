@@ -44,13 +44,13 @@ const rateReadout = (value: number) => `${rateFigure(value)} MB/s`;
 /** A disk trace is never scaled tighter than this, in MB/s, so an idle disk reads as idle. */
 const DISK_FLOOR_MB = 1;
 
-/** Reads and writes together, in MB/s; null only when neither can be read. */
+/** Reads and writes together, in MB/s; null unless both can be read, so a trace shows a gap rather than a made-up zero. */
 export function diskMegabytes(
   read: number | null,
   write: number | null,
 ): number | null {
-  if (read === null && write === null) return null;
-  return megabytes((read ?? 0) + (write ?? 0));
+  if (read === null || write === null) return null;
+  return megabytes(read + write);
 }
 
 const joined = (parts: readonly (string | null)[]) =>
@@ -78,15 +78,12 @@ function memorySub(now: SystemNow): string {
 }
 
 function diskSub(now: SystemNow): string {
-  if (
-    now.disk_read_bytes_per_sec === null &&
-    now.disk_write_bytes_per_sec === null
-  ) {
-    return "not readable here";
-  }
+  const { disk_read_bytes_per_sec: read, disk_write_bytes_per_sec: write } =
+    now;
+  if (read === null || write === null) return "not available";
   return joined([
-    `read ${rateFigure(megabytes(now.disk_read_bytes_per_sec ?? 0))}`,
-    `write ${rateFigure(megabytes(now.disk_write_bytes_per_sec ?? 0))}`,
+    `read ${rateFigure(megabytes(read))}`,
+    `write ${rateFigure(megabytes(write))}`,
     now.disk_busy_percent === null
       ? null
       : `${Math.round(now.disk_busy_percent)}% busy`,

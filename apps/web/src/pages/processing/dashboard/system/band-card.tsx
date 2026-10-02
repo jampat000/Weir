@@ -42,3 +42,13 @@ export function BandCard({
 export function BandNote({ children }: { children: ReactNode }) {
   return <p className="mm-sy-band__note">{children}</p>;
 }
+
+/** "last 10 minutes" beside a card's label, shortened to "10 min" where the card is too narrow for the long form. */
+export function TenMinutes() {
+  return (
+    <>
+      <span className="mm-sy-span__long">last 10 minutes</span>
+      <span className="mm-sy-span__short">10 min</span>
+    </>
+  );
+}

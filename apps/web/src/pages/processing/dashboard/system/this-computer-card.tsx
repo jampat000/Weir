@@ -2,7 +2,7 @@ import { LiveTrace } from "../../../../components/charts/live-trace";
 import { loadErrorMessage } from "../../../../lib/api/error-message";
 import { useSystemStatsQuery } from "../../../../lib/system/use-system-stats";
 import { classNames } from "../../../../lib/ui/class-names";
-import { BandCard, BandNote } from "./band-card";
+import { BandCard, BandNote, TenMinutes } from "./band-card";
 import { TraceColumn } from "./trace-column";
 import { computerColumns, machineTags } from "./this-computer-model";
 
@@ -20,7 +20,7 @@ export function ThisComputerCard() {
   return (
     <BandCard
       label="This computer"
-      aside={SPAN_WORDS}
+      aside={<TenMinutes />}
       className="mm-sy-band--computer"
       testId="system-computer"
     >
