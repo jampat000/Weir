@@ -84,11 +84,25 @@ class AuditSettingsMixin:
                 "no library weeks on Schedule",
             )
 
+    def activity_chip_labels(self) -> list[str]:
+        """Every kind-of-file chip on Activity in order, without counts: those on the title line, then the ones
+        folded into More, which is opened to read them and closed again."""
+        group = self.page.get_by_role("group", name="Show")
+        on_line = group.locator("button.mm-segmented__option:not(.mm-more__button)").all_inner_texts()
+        more = group.get_by_role("button", name="More")
+        folded: list[str] = []
+        if more.count():
+            self.click(more, "open the More kinds of file menu")
+            menu = self.page.get_by_role("menu", name="More kinds of file")
+            self.visible(menu, "More kinds of file menu")
+            folded = menu.get_by_role("menuitem").all_inner_texts()
+            self.page.keyboard.press("Escape")
+        return [re.sub(r"\s+[\d,]+$", "", text.strip()) for text in [*on_line, *folded]]
+
     def activity_and_jobs(self) -> None:
         # Activity: every file Weir has touched, with the open file's record beside the list.
         self.open_sidebar("Activity")
         self.visible(self.page.get_by_test_id("activity-page"), "Activity page")
-        chips = self.page.get_by_role("group", name="Show").get_by_role("button")
         # Needs you is every file waiting on a person, as the sidebar's badge counts them, in whichever group it
         # is; a skip is its own neutral group rather than counting as Failed, on_hold sits under On hold, and
         # Kept lists the files the owner chose to keep without processing.
@@ -102,14 +116,10 @@ class AuditSettingsMixin:
             "Failed",
             "Kept",
         ]
-        chip_texts = chips.all_inner_texts()
+        chip_labels = self.activity_chip_labels()
         self.require(
-            len(chip_texts) == len(expected_chip_labels)
-            and all(
-                text.startswith(label)
-                for text, label in zip(chip_texts, expected_chip_labels)
-            ),
-            f"Activity shows {chip_texts!r}, not {expected_chip_labels!r} in order",
+            chip_labels == expected_chip_labels,
+            f"Activity shows {chip_labels!r}, not {expected_chip_labels!r} in order",
         )
         # A fresh install has no files, so assert whichever of the two states is real, and never
         # that the page rendered nothing at all.

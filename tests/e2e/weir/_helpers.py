@@ -80,3 +80,26 @@ def open_logs(page: Page, source: str | None = None) -> None:
         chip = page.get_by_role("group", name="Source").get_by_role("button", name=re.compile(rf"^{re.escape(source)}"))
         chip.click()
         expect(chip).to_have_attribute("aria-pressed", "true")
+
+
+def activity_chip_labels(page: Page) -> list[str]:
+    """Every kind-of-file chip on Activity, in order, without their counts.
+
+    Short of room the last chips fold into a "More" menu (at Playwright's 1280x720 the title line is shared with the
+    pickers), so this reads the chips still on the title line, then opens More, reads what is folded into it, and
+    closes it again. The chosen chip stays on the line wherever it sits, so the order is the page's own only while
+    the first chip, All, is the chosen one.
+    """
+
+    group = page.get_by_role("group", name="Show")
+    on_line = group.locator("button.mm-segmented__option:not(.mm-more__button)").all_inner_texts()
+    more = group.get_by_role("button", name="More")
+    folded: list[str] = []
+    if more.count():
+        more.click()
+        menu = page.get_by_role("menu", name="More kinds of file")
+        expect(menu).to_be_visible()
+        folded = menu.get_by_role("menuitem").all_inner_texts()
+        page.keyboard.press("Escape")
+        expect(menu).to_be_hidden()
+    return [re.sub(r"\s+[\d,]+$", "", text.strip()) for text in [*on_line, *folded]]

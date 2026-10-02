@@ -225,6 +225,37 @@ describe("ActivityPage", () => {
     ];
   });
 
+  describe("with no file to list", () => {
+    /** The card the header's pickers fold into: it must be there, with its header, so the title line folds the same. */
+    function expectEmptyFilesCard(words: string) {
+      const card = screen.getByRole("region", { name: "Files" });
+      expect(within(card).getByText("0 shown")).toBeInTheDocument();
+      expect(within(card).getByText(words)).toBeInTheDocument();
+    }
+
+    it("keeps the Files card when nothing has been handled yet", () => {
+      files.files = [];
+      renderPage();
+
+      expectEmptyFilesCard(
+        "Nothing yet. Every file Weir picks up will be listed here, from the moment it arrives.",
+      );
+      expect(screen.getByTestId("activity-retention")).toBeInTheDocument();
+    });
+
+    it("keeps the Files card when the filter matches nothing", () => {
+      renderPage("/activity?show=skipped");
+
+      expectEmptyFilesCard("No file matches. Try All, or look further back.");
+    });
+
+    it("keeps the Files card in the Needs you view with nothing waiting", () => {
+      renderPage("/activity?show=attention");
+
+      expectEmptyFilesCard("No file is waiting on you.");
+    });
+  });
+
   it("says its file activity could not load, through the shared load-error wording", () => {
     filesQueryState.isError = true;
     filesQueryState.error = new Error("boom");

@@ -242,7 +242,14 @@ export function ActivityPage() {
       ) : !needsYou && files.isLoading ? (
         <PanelLoading label="Reading activity…" />
       ) : shown.length === 0 ? (
-        <p className="mm-history-empty">{emptyWords(group, all.length)}</p>
+        <Panel
+          title="Files"
+          count="0 shown"
+          className="mm-history-list"
+          aside={pickersAside}
+        >
+          <p className="mm-history-empty">{emptyWords(group, all.length)}</p>
+        </Panel>
       ) : (
         <div className="mm-history-body">
           <Panel
