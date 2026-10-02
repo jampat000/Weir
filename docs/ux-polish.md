@@ -20,6 +20,11 @@ the two disagree, that document wins.
 - Processing is the first screen: what Weir is working on right now and anything that needs a person. A file's full story belongs in Activity; Weir's own events belong in System › Logs.
 - The document is the page scroll owner. Do not trap signed-in pages inside a fixed-height nested scrolling pane.
 - Nothing scrolls sideways at any width. Tables and lanes restack instead.
+- A page's tabs never fold into "More" because its filters need room. The filters on the title line give way instead, in
+  a fixed order (`components/shell/title-line-fit.ts`): a search shrinks to a mark, pickers move into the card they
+  filter, then the last chips fold, whole, into a "More" menu. The chosen chip never folds, and no chip is cut or scrolled.
+- Labels and counts are never clipped. A file's name in a list row is the exception: it wraps to two lines, then an
+  ellipsis, and the whole name is the row's title.
 - Empty states are compact, aligned with the surrounding layout, and say what to do next.
 - Long detail views are compressed by default and expandable when more information is useful.
 
