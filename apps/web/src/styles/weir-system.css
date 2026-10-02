@@ -21,7 +21,7 @@
 
 .mm-system .mm-segmented {
   box-sizing: border-box;
-  height: var(--mm-control-height-page);
+  min-height: var(--mm-control-height-page);
 }
 
 .mm-system .mm-segmented__option {
@@ -244,6 +244,12 @@
 
 .mm-this-pc__half {
   min-width: 0;
+}
+
+/* A half is a little over half a card: the two choices of "who can reach Weir" are set closer to fit in it. */
+.mm-this-pc .mm-segmented__option {
+  padding-inline: 8px;
+  font-size: 12px;
 }
 
 .mm-this-pc__label {
@@ -624,4 +630,9 @@
   font-size: 0.75rem;
   line-height: 1.25rem;
   white-space: pre-wrap;
+}
+
+/* A card's title and the line under it need a little air between them. */
+.mm-system .mm-panel__titles {
+  gap: 3px;
 }
