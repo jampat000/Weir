@@ -7,7 +7,7 @@
  *   Surfaces      --mm-bg, --mm-card-bg, --mm-surface-elevated, --mm-surface-2, --mm-surface-3, --mm-hairline
  *   Sidebar       --mm-sidebar-bg, --mm-sidebar-accent, --mm-sidebar-border
  *   Text          --mm-text (also --mm-text1), --mm-text2 (muted), --mm-text3 (dim), --mm-text-disabled
- *   Brand colour  --mm-primary, --mm-primary-bright, --mm-primary-dim, --mm-primary-2 (--mm-accent* are the same colour)
+ *   Brand colour  --mm-primary, --mm-primary-bright, --mm-primary-2 (--mm-accent* are the same colour)
  *   Signal fills  --mm-success, --mm-warning, --mm-destructive, --mm-info (bars, dots, borders)
  *   Signal text   --mm-status-{healthy,warning,failed,info}-text, tuned to 4.5:1 on every surface
  *   Lanes         --mm-lane-{incoming,queued,analysing,processing,delivering}, with a -text twin for words
@@ -27,7 +27,6 @@
   --mm-bg-main: #0c0f18;
   --mm-slate: #131a25;
   --mm-slate-elevated: #181f2a;
-  --mm-surface: var(--mm-slate);
   --mm-card-bg: var(--mm-slate);
   --mm-surface1: var(--mm-slate);
   --mm-surface-elevated: var(--mm-slate-elevated);
@@ -44,7 +43,6 @@
   --mm-sidebar-bg: #070b12;
   --mm-sidebar-accent: #181f2a;
   --mm-sidebar-border: #1d242f;
-  --mm-border-sidebar: var(--mm-sidebar-border);
 
   --mm-stone: #f3f4f7;
   --mm-stone-muted: #a9b0bc;
@@ -57,9 +55,7 @@
 
   --mm-primary: #52a5ff;
   --mm-primary-bright: #8cc3ff;
-  --mm-primary-dim: #3a7fd4;
   --mm-primary-2: #4f92f8;
-  --mm-primary-2-soft: rgba(79, 146, 248, 0.2);
   --mm-accent: var(--mm-primary);
   --mm-accent-bright: var(--mm-primary-bright);
   --mm-accent-soft: rgba(82, 165, 255, 0.16);
@@ -221,9 +217,7 @@ html[data-mm-theme="light"] {
 
   --mm-primary: #125eba;
   --mm-primary-bright: #0d4a96;
-  --mm-primary-dim: #5a97e0;
   --mm-primary-2: #2071e9;
-  --mm-primary-2-soft: rgba(32, 113, 233, 0.14);
   --mm-accent-soft: rgba(18, 94, 186, 0.12);
   --mm-accent-ring: rgba(18, 94, 186, 0.4);
   /* White on #125eba measures 6.3:1. */

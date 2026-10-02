@@ -132,10 +132,7 @@
  */
 body.mm-pipeline-resizing .mm-dash__grid *,
 body.mm-pipeline-resizing .mm-dash__grid *::before,
-body.mm-pipeline-resizing .mm-dash__grid *::after,
-body.mm-pipeline-resizing .mm-sys *,
-body.mm-pipeline-resizing .mm-sys *::before,
-body.mm-pipeline-resizing .mm-sys *::after {
+body.mm-pipeline-resizing .mm-dash__grid *::after {
   animation-delay: 0s !important;
   animation-duration: 0s !important;
   transition-delay: 0s !important;

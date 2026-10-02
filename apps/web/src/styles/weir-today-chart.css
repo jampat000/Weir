@@ -99,10 +99,6 @@
   left: 0;
 }
 
-.cs-above {
-  transform: translateY(-100%);
-}
-
 .cs-below {
   transform: translateY(1px);
 }
