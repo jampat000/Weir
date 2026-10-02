@@ -1,84 +1,27 @@
 import { useState } from "react";
 
-import { Chip } from "../../../../components/panels/chip";
 import { Panel } from "../../../../components/panels/panel";
+import { ColumnsMenu } from "../../../../components/shared/columns-menu";
 import { LoadError } from "../../../../components/shared/load-error";
-import type { ActiveSession } from "../../../../lib/api/types";
 import {
   useActiveSessionsQuery,
   useRevokeOtherSessionsMutation,
   useRevokeSessionMutation,
 } from "../../../../lib/auth/queries";
 import { mmActionButtonClass } from "../../../../lib/ui/mm-control-roles";
-import { useAppDateFormatter } from "../../../../lib/ui/mm-format-date";
+import { useTableColumns } from "../../../../lib/ui/use-table-columns";
+import { SESSION_COLUMNS } from "./session-columns";
+import { SessionsTable } from "./sessions-table";
 
 const SESSIONS_NOTE =
   "Browsers signed in to Weir. Session tokens are never shown.";
 const SESSIONS_DETAIL =
   "Review signed-in browsers and sign out anything you no longer recognize. Session tokens are never shown.";
 
-function SessionsTable({
-  sessions,
-  revoking,
-  onRevoke,
-}: {
-  sessions: ActiveSession[];
-  revoking: boolean;
-  onRevoke: (sessionId: string) => void;
-}) {
-  const formatDate = useAppDateFormatter();
-  return (
-    <table
-      className="mm-quiet-table mm-sys-table"
-      data-testid="active-sessions"
-    >
-      <thead>
-        <tr>
-          <th scope="col">Browser</th>
-          <th scope="col">Last seen</th>
-          <th scope="col">Expires</th>
-          <th scope="col">
-            <span className="sr-only">Sign out</span>
-          </th>
-        </tr>
-      </thead>
-      <tbody>
-        {sessions.map((session) => (
-          <tr key={session.session_id}>
-            <th scope="row">
-              <span className="mm-sys-table__who">
-                {session.client_label || "Browser session"}
-                {session.current ? <Chip dot={false}>This browser</Chip> : null}
-                {session.trusted_device ? (
-                  <Chip meaning="done">Trusted</Chip>
-                ) : null}
-              </span>
-            </th>
-            <td>{formatDate(session.last_seen_at)}</td>
-            <td>{formatDate(session.absolute_expires_at)}</td>
-            <td>
-              {/* The browser in use is signed out from the user menu, so it has no button here. */}
-              {session.current ? null : (
-                <button
-                  type="button"
-                  className={`${mmActionButtonClass({ variant: "secondary" })} mm-sys-btn`}
-                  disabled={revoking}
-                  onClick={() => onRevoke(session.session_id)}
-                >
-                  {revoking ? "Signing out…" : "Sign out"}
-                </button>
-              )}
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  );
-}
-
 /** Every browser signed in to Weir, with a way to sign out the ones you do not recognise. */
 export function ActiveSessionsSection({ enabled }: { enabled: boolean }) {
   const sessionsQ = useActiveSessionsQuery(enabled);
+  const columns = useTableColumns(SESSION_COLUMNS);
   const revokeOthers = useRevokeOtherSessionsMutation();
   const revokeSession = useRevokeSessionMutation();
   const [status, setStatus] = useState<string | null>(null);
@@ -114,18 +57,21 @@ export function ActiveSessionsSection({ enabled }: { enabled: boolean }) {
       padded
       note={<span title={SESSIONS_DETAIL}>{SESSIONS_NOTE}</span>}
       aside={
-        others.length > 0 ? (
-          <button
-            type="button"
-            className={`${mmActionButtonClass({ variant: "danger-outline" })} mm-sys-btn`}
-            disabled={revokeOthers.isPending}
-            onClick={signOutOthers}
-          >
-            {revokeOthers.isPending
-              ? "Signing out…"
-              : "Sign out other sessions"}
-          </button>
-        ) : null
+        <>
+          {sessions.length > 0 ? <ColumnsMenu table={columns} /> : null}
+          {others.length > 0 ? (
+            <button
+              type="button"
+              className={`${mmActionButtonClass({ variant: "danger-outline" })} mm-sys-btn`}
+              disabled={revokeOthers.isPending}
+              onClick={signOutOthers}
+            >
+              {revokeOthers.isPending
+                ? "Signing out…"
+                : "Sign out other sessions"}
+            </button>
+          ) : null}
+        </>
       }
     >
       {sessionsQ.isError ? (
@@ -137,6 +83,7 @@ export function ActiveSessionsSection({ enabled }: { enabled: boolean }) {
       ) : (
         <SessionsTable
           sessions={sessions}
+          columns={columns}
           revoking={revokeSession.isPending}
           onRevoke={signOut}
         />
