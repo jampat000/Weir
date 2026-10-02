@@ -30,6 +30,18 @@ const FOUR_K_ROOT = "D:\\Media\\4K Movies";
 /** Out of every ten library files, this many already match the rules. */
 const MATCHING_OUT_OF_TEN = 4;
 
+/**
+ * Among the files the rules would change, the reason the scan gives for each in turn: it is new, it was replaced, the
+ * rules changed, or nothing on record says. The fourth is the honest answer for a file that was there before the
+ * scan started keeping reasons.
+ */
+const CHANGE_REASONS = ["new", "replaced", "rules_changed", null];
+
+/** Every seventh file is still shared with a download, every eleventh Weir cannot read, every thirteenth is set aside. */
+const SEEDING_EVERY = 7;
+const UNREADABLE_EVERY = 11;
+const LEFT_ALONE_EVERY = 13;
+
 /** @typedef {Record<string, any>} LibraryFile */
 
 function entry({
@@ -43,16 +55,27 @@ function entry({
   removedSubtitles,
   ageDays,
   nowSeconds,
+  index,
 }) {
-  const matches = removedAudio === 0 && removedSubtitles === 0;
+  const unreadable = index % UNREADABLE_EVERY === 5;
+  const seeding = index % SEEDING_EVERY === 3;
+  const matches = unreadable || (removedAudio === 0 && removedSubtitles === 0);
+  if (unreadable) {
+    removedAudio = 0;
+    removedSubtitles = 0;
+  }
   return {
     path,
     poster_id: posterId,
     size_bytes: sizeBytes,
     modified_at: nowSeconds - ageDays * DAY_SECONDS,
-    classification: matches ? "matches" : "would_change",
+    classification: unreadable
+      ? "cannot_process"
+      : matches
+        ? "matches"
+        : "would_change",
     summary: null,
-    reason: null,
+    reason: unreadable ? "Weir could not read this file." : null,
     removed_audio_tracks: removedAudio,
     removed_subtitle_tracks: removedSubtitles,
     estimated_bytes_saved: matches
@@ -75,10 +98,14 @@ function entry({
       removedSubtitles === 0
         ? "eng"
         : `eng, fre, ger${removedSubtitles > 2 ? ` +${removedSubtitles - 2} more` : ""}`,
-    link_count: 1,
-    problem_kind: null,
+    link_count: seeding && !matches ? 2 : 1,
+    problem_kind: unreadable ? "unreadable" : null,
     cleaned_at: null,
-    leave_alone: false,
+    leave_alone: index % LEFT_ALONE_EVERY === 7,
+    // Why the scan thinks it needs cleaning: kept here, and said on the wire only for a file that does.
+    change_reason: matches
+      ? null
+      : CHANGE_REASONS[index % CHANGE_REASONS.length],
   };
 }
 
@@ -104,6 +131,7 @@ function filmEntries(films, { root, kind, nowSeconds }) {
       height: film.resolution,
       ageDays: 9 + index,
       nowSeconds,
+      index,
       ...removals(index),
     }),
   );
@@ -123,14 +151,39 @@ function tvEntries(nowSeconds) {
         height: show.resolution,
         ageDays: 5 + showIndex * 3 + episodeIndex,
         nowSeconds,
+        index: showIndex * EPISODES_PER_SHOW + episodeIndex,
         ...removals(showIndex * EPISODES_PER_SHOW + episodeIndex),
       });
     }),
   );
 }
 
-/** The sums the Library page's cards show for a list of files. */
-export function totalsOf(files) {
+/**
+ * Where a file stands now, against the current rules: one status, so the counts add up to the files. Left alone beats
+ * cleaning, which beats can't clean yet (still shared with a download, or unreadable), which beats needs cleaning, which
+ * beats matches.
+ * @param {LibraryFile} file
+ * @param {{ queuedPaths: ReadonlySet<string>, cleansHardlinked: boolean }} now
+ */
+export function statusOf(file, { queuedPaths, cleansHardlinked }) {
+  if (file.leave_alone) return "left_alone";
+  if (queuedPaths.has(file.path)) return "cleaning";
+  const shared = !cleansHardlinked && (file.link_count ?? 1) > 1;
+  if (
+    file.classification === "cannot_process" ||
+    (file.classification === "would_change" &&
+      (file.problem_kind !== null || shared))
+  )
+    return "cant_clean_yet";
+  return file.classification === "would_change" ? "needs_cleaning" : "matches";
+}
+
+/**
+ * The sums the Library page's cards show for a list of files.
+ * @param {LibraryFile[]} files
+ * @param {{ queuedPaths: ReadonlySet<string>, cleansHardlinked: boolean }} now
+ */
+export function totalsOf(files, now) {
   const totals = {
     files: files.length,
     size_bytes: 0,
@@ -142,8 +195,16 @@ export function totalsOf(files) {
     total_removed_audio_tracks: 0,
     total_removed_subtitle_tracks: 0,
     estimated_bytes_saved: 0,
+    by_status: {
+      needs_cleaning: 0,
+      cleaning: 0,
+      matches: 0,
+      cant_clean_yet: 0,
+      left_alone: 0,
+    },
   };
   for (const file of files) {
+    totals.by_status[statusOf(file, now)] += 1;
     totals.size_bytes += file.size_bytes;
     totals[file.classification] += 1;
     totals.total_removed_audio_tracks += file.removed_audio_tracks;
@@ -196,6 +257,7 @@ export class LibraryFiles {
           file.classification === "would_change" &&
           !file.cleaned_at &&
           !file.leave_alone &&
+          file.link_count <= 1 &&
           !queuedPaths.has(file.path),
       ) ?? null
     );
@@ -216,6 +278,7 @@ export class LibraryFiles {
     file.estimated_bytes_saved = 0;
     file.removed_audio_tracks = 0;
     file.removed_subtitle_tracks = 0;
+    file.change_reason = null;
   }
 
   /**

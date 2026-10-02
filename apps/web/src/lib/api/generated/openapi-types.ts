@@ -3280,6 +3280,22 @@ export interface components {
       resolution_class: string;
       /** Size Bytes */
       size_bytes: number;
+      /**
+       * Status
+       * @description Where the file stands now, against the current rules: exactly one of these. Left alone beats cleaning, which beats cant_clean_yet (still shared with a download, or unreadable), which beats needs_cleaning, which beats matches.
+       * @enum {string}
+       */
+      status:
+        | "needs_cleaning"
+        | "cleaning"
+        | "matches"
+        | "cant_clean_yet"
+        | "left_alone";
+      /**
+       * Status Reason
+       * @description Why a file that needs cleaning does, when the scan can say: it is new since the last check, the file on disk is not the one Weir last saw or cleaned, or it matched before (or Weir cleaned it) and the rules changed. Null for any other status, and when nothing on record supports a reason.
+       */
+      status_reason: ("new" | "replaced" | "rules_changed") | null;
       /** Subtitle Summary */
       subtitle_summary: string | null;
       /** Subtitle Track Count */
@@ -3405,6 +3421,22 @@ export interface components {
     LibraryFoldersOut: {
       /** Libraries */
       libraries: components["schemas"]["PublishedLibraryFoldersOut"][];
+    };
+    /**
+     * LibraryStatusCountsOut
+     * @description How many files are in each status. One status per file, so these add up to the files.
+     */
+    LibraryStatusCountsOut: {
+      /** Cant Clean Yet */
+      cant_clean_yet: number;
+      /** Cleaning */
+      cleaning: number;
+      /** Left Alone */
+      left_alone: number;
+      /** Matches */
+      matches: number;
+      /** Needs Cleaning */
+      needs_cleaning: number;
     };
     /**
      * ProposedLibraryCheckIn
@@ -3776,6 +3808,7 @@ export interface components {
      * @description Issue #568: how many files a library holds and what its rules would do to them.
      */
     LibraryTotalsOut: {
+      by_status: components["schemas"]["LibraryStatusCountsOut"];
       /** Cannot Process */
       cannot_process: number;
       /** Cleaned */
@@ -10693,6 +10726,13 @@ export interface operations {
         subtitle_language?: string;
         /** @description Narrow to files Weir has cleaned, or files you have set aside. */
         state?: ("cleaned" | "left_alone") | null;
+        /** @description Narrow to the files in one status: where each file stands now against the current rules. */
+        status?:
+          | "needs_cleaning"
+          | "cleaning"
+          | "matches"
+          | "cant_clean_yet"
+          | "left_alone";
         sort?:
           | "path"
           | "title"

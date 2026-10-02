@@ -447,4 +447,9 @@ export class Engine {
   get cleanRecords() {
     return this.#cleans.records;
   }
+
+  /** The files a library clean is queued or running for. */
+  queuedCleanPaths() {
+    return this.#cleans.queuedPaths();
+  }
 }

@@ -271,7 +271,7 @@ public sealed class LibraryScanStore
     private const string FileColumns =
         "f.path, f.size_bytes, f.mtime, f.classification, f.summary, f.reason, f.removed_audio_tracks, f.removed_subtitle_tracks, " +
         "f.manager_kind, f.manager_title, p.probe_json, f.estimated_bytes_saved, f.manager_connection_id, f.manager_title_id, " +
-        "f.manager_file_id, f.manager_quality_profile_id, f.problem_kind, f.link_count";
+        "f.manager_file_id, f.manager_quality_profile_id, f.problem_kind, f.link_count, f.change_reason";
 
     private const string FilesWithProbes = "library_files AS f LEFT JOIN library_file_probes AS p ON p.library_file_id = f.id";
 
@@ -299,7 +299,8 @@ public sealed class LibraryScanStore
         ManagerFileId: reader.IsDBNull(14) ? null : reader.GetInt64(14),
         ManagerQualityProfileId: reader.IsDBNull(15) ? null : reader.GetInt64(15),
         ProblemKind: LibraryProblems.Parse(SqliteValues.GetStringOrNull(reader, 16)),
-        LinkCount: reader.IsDBNull(17) ? null : (int)reader.GetInt64(17));
+        LinkCount: reader.IsDBNull(17) ? null : (int)reader.GetInt64(17),
+        ChangeReason: SqliteValues.GetStringOrNull(reader, 18));
 
     private static LibraryFileClassification ClassificationOf(string value) => value switch
     {

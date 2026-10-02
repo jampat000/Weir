@@ -1,11 +1,19 @@
 /** The Library page's numbers: what a scan found in each workflow's library, summed and broken down. */
-import { totalsOf } from "../engine/library-files.mjs";
+import { statusOf, totalsOf } from "../engine/library-files.mjs";
 import { shaped } from "../openapi/skeleton.mjs";
 import { toWire, HOUR_MS } from "../wire-time.mjs";
 
 const SCAN_AGE_SECONDS = 1500;
 const NEXT_RUN_HOURS = 6;
 const DEFAULT_PAGE_SIZE = 100;
+
+const STATUSES = [
+  "needs_cleaning",
+  "cleaning",
+  "matches",
+  "cant_clean_yet",
+  "left_alone",
+];
 
 const SORTERS = {
   path: (file) => file.path,
@@ -47,6 +55,14 @@ function breakdown(files, valueOf) {
     }));
 }
 
+/** What decides a file's status besides the file: the cleans outstanding, and whether this workflow cleans shared files. */
+function statusContext(sim, library) {
+  return {
+    queuedPaths: sim.engine.queuedCleanPaths(),
+    cleansHardlinked: libraryMode(sim, library).clean_hardlinked_files,
+  };
+}
+
 export function libraryOverview(sim, library) {
   const files = sim.libraryFiles.list(library.id);
   const wouldChange = files.filter(
@@ -60,7 +76,7 @@ export function libraryOverview(sim, library) {
       enabled: true,
       next_run_at: toWire(sim.now() + NEXT_RUN_HOURS * HOUR_MS),
     },
-    totals: totalsOf(files),
+    totals: totalsOf(files, statusContext(sim, library)),
     breakdowns: {
       video_codec: breakdown(files, (file) => file.video_codec.toUpperCase()),
       resolution: breakdown(files, (file) => file.resolution_class),
@@ -88,12 +104,14 @@ export function libraryOverview(sim, library) {
   });
 }
 
-function matchesFilters(file, query) {
+function matchesFilters(file, query, now) {
   const classification = query.get("classification");
   const state = query.get("state");
+  const status = query.get("status");
   const needle = (query.get("q") ?? "").toLowerCase();
   return (
     (!classification || file.classification === classification) &&
+    (!STATUSES.includes(status) || statusOf(file, now) === status) &&
     (state !== "cleaned" || file.cleaned_at !== null) &&
     (state !== "left_alone" || file.leave_alone) &&
     (!needle ||
@@ -103,8 +121,18 @@ function matchesFilters(file, query) {
 }
 
 /** A library file as the Library page lists it: its poster id is the simulation's own, so it goes out as an address. */
-function fileWire(sim, { poster_id: posterId, ...file }) {
-  return { ...file, poster_url: sim.artwork.urlFor(posterId) };
+function fileWire(
+  sim,
+  { poster_id: posterId, change_reason: reason, ...file },
+  now,
+) {
+  const status = statusOf(file, now);
+  return {
+    ...file,
+    poster_url: sim.artwork.urlFor(posterId),
+    status,
+    status_reason: status === "needs_cleaning" ? reason : null,
+  };
 }
 
 export function libraryFilesPage(sim, library, query) {
@@ -114,8 +142,9 @@ export function libraryFilesPage(sim, library, query) {
   const pageSize = Number(query.get("page_size")) || DEFAULT_PAGE_SIZE;
   const page = Number(query.get("page")) || 1;
   const sorter = SORTERS[sort];
+  const now = statusContext(sim, library);
   const filtered = all
-    .filter((file) => matchesFilters(file, query))
+    .filter((file) => matchesFilters(file, query, now))
     .sort(
       (a, b) =>
         (sorter(a) > sorter(b) ? 1 : sorter(a) < sorter(b) ? -1 : 0) *
@@ -124,11 +153,11 @@ export function libraryFilesPage(sim, library, query) {
   return shaped("LibraryFilesOut", {
     library_id: library.id,
     scan: all.length > 0 ? scanState(sim) : null,
-    summary: totalsOf(all),
-    filtered: totalsOf(filtered),
+    summary: totalsOf(all, now),
+    filtered: totalsOf(filtered, now),
     files: filtered
       .slice((page - 1) * pageSize, page * pageSize)
-      .map((file) => fileWire(sim, file)),
+      .map((file) => fileWire(sim, file, now)),
     total: filtered.length,
     page,
     page_size: pageSize,

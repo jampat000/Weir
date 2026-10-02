@@ -28,7 +28,10 @@ public sealed record LibraryFileRow(
     // When Weir last cleaned this file, or null when it never has, and whether a person told Weir to leave it
     // alone. Both come from library_file_marks (migration 0012), not from the scan.
     DateTimeOffset? CleanedAt = null,
-    bool LeaveAlone = false);
+    bool LeaveAlone = false,
+    // Where the file stands now (a LibraryFileStatus), and why the scan thinks it needs cleaning, when it can say.
+    string Status = LibraryFileStatus.Matches,
+    string? ChangeReason = null);
 
 /// <summary>The Files table's filters. Every field narrows; an empty filter is the whole library.</summary>
 public sealed record LibraryFileQuery
@@ -47,6 +50,15 @@ public sealed record LibraryFileQuery
 
     /// <summary><c>cleaned</c> or <c>left_alone</c>: what Weir has done with the file, rather than what is in it.</summary>
     public string? State { get; init; }
+
+    /// <summary>One <see cref="LibraryFileStatus"/>: where each file stands now against the current rules.</summary>
+    public string? Status { get; init; }
+
+    /// <summary>
+    /// Whether the library cleans files that another name still shares (its own #508 setting). A shared file cannot be
+    /// cleaned yet unless it does, so it decides which status those files are in.
+    /// </summary>
+    public bool CleansHardlinkedFiles { get; init; }
 
     /// <summary>A sort key from <see cref="LibraryFileSort.Columns"/>; anything else falls back to the path.</summary>
     public string Sort { get; init; } = LibraryFileSort.Path;

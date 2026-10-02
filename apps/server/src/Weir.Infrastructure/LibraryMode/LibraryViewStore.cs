@@ -23,6 +23,28 @@ public sealed class LibraryViewStore
         "FROM library_files AS f LEFT JOIN library_file_marks AS m " +
         "ON m.library_id = f.library_id AND m.path = f.path ";
 
+    /// <summary>
+    /// The paths of the files a library clean is queued or running for. One clean job per file is outstanding at a time, and
+    /// its payload names the file, so this is a small read however large the library.
+    /// </summary>
+    private const string CleaningPaths =
+        "SELECT json_extract(j.payload_json, '$.path') FROM jobs AS j WHERE j.job_kind = @clean_kind " +
+        "AND j.status IN ('pending', 'leased') AND j.dedupe_key LIKE @clean_prefix ESCAPE '\\'";
+
+    /// <summary>
+    /// Where a file stands now: exactly one <see cref="LibraryFileStatus"/>, so the counts add up to the files. Left alone
+    /// beats Cleaning, which beats Can't clean yet (still shared with a download, or unreadable), which beats Needs
+    /// cleaning, which beats Matches. It reads the scan's verdict, what a person asked, and the clean jobs outstanding.
+    /// </summary>
+    private const string StatusSql =
+        "(CASE " +
+        "WHEN COALESCE(m.leave_alone, 0) = 1 THEN 'left_alone' " +
+        "WHEN f.path IN (" + CleaningPaths + ") THEN 'cleaning' " +
+        "WHEN f.classification = 'cannot_process' OR (f.classification = 'would_change' AND (f.problem_kind IS NOT NULL " +
+        "OR (@cleans_hardlinked = 0 AND COALESCE(f.link_count, 1) > 1))) THEN 'cant_clean_yet' " +
+        "WHEN f.classification = 'would_change' THEN 'needs_cleaning' " +
+        "ELSE 'matches' END)";
+
     /// <summary>How many paths a Problems group carries inline before the operator has to open Files to see the rest.</summary>
     public const int ProblemSampleSize = 5;
 
@@ -38,11 +60,20 @@ public sealed class LibraryViewStore
             "COALESCE(SUM(f.estimated_bytes_saved), 0), COALESCE(SUM(f.removed_audio_tracks), 0), " +
             "COALESCE(SUM(f.removed_subtitle_tracks), 0), " +
             "COALESCE(SUM(CASE WHEN m.cleaned_at IS NOT NULL THEN 1 ELSE 0 END), 0), " +
-            "COALESCE(SUM(CASE WHEN COALESCE(m.leave_alone, 0) = 1 THEN 1 ELSE 0 END), 0) " + FromFiles + where,
+            "COALESCE(SUM(CASE WHEN COALESCE(m.leave_alone, 0) = 1 THEN 1 ELSE 0 END), 0), " +
+            string.Join(
+                ", ",
+                LibraryFileStatus.All.Select(status => $"COALESCE(SUM(CASE WHEN {StatusSql} = '{status}' THEN 1 ELSE 0 END), 0)")) +
+            " " + FromFiles + where,
             reader => new LibraryTotals(
                 reader.GetInt64(0), reader.GetInt64(1), reader.GetInt64(2), reader.GetInt64(3),
                 reader.GetInt64(4), reader.GetInt64(5), reader.GetInt64(6), reader.GetInt64(7),
-                reader.GetInt64(8), reader.GetInt64(9)),
+                reader.GetInt64(8), reader.GetInt64(9))
+            {
+                // LibraryFileStatus.All is in this order: needs cleaning, cleaning, matches, can't clean yet, left alone.
+                ByStatus = new LibraryStatusCounts(
+                    reader.GetInt64(10), reader.GetInt64(11), reader.GetInt64(12), reader.GetInt64(13), reader.GetInt64(14)),
+            },
             parameters).ConfigureAwait(false);
         return row ?? new LibraryTotals(0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
     }
@@ -105,7 +136,8 @@ public sealed class LibraryViewStore
             "SELECT f.id, f.path, f.size_bytes, f.mtime, f.classification, f.summary, f.reason, f.removed_audio_tracks, " +
             "f.removed_subtitle_tracks, f.estimated_bytes_saved, f.manager_kind, f.manager_title, f.video_codec, " +
             "f.video_height, f.resolution_class, f.audio_track_count, f.subtitle_track_count, f.audio_summary, " +
-            "f.subtitle_summary, f.link_count, f.problem_kind, m.cleaned_at, COALESCE(m.leave_alone, 0) " + FromFiles + where + " " + order +
+            "f.subtitle_summary, f.link_count, f.problem_kind, m.cleaned_at, COALESCE(m.leave_alone, 0), " + StatusSql +
+            ", f.change_reason " + FromFiles + where + " " + order +
             " LIMIT @limit OFFSET @offset",
             ReadRow,
             [.. parameters, ("@limit", (object?)pageSize), ("@offset", offset)]).ConfigureAwait(false);
@@ -158,7 +190,7 @@ public sealed class LibraryViewStore
         ArgumentNullException.ThrowIfNull(uow);
         var (where, parameters) = BuildWhere(libraryId, filter);
         return await uow.QueryAsync(
-            "SELECT f.path FROM library_files AS f " + where + " ORDER BY f.path",
+            "SELECT f.path " + FromFiles + where + " ORDER BY f.path",
             reader => SqliteValues.GetString(reader, 0),
             parameters).ConfigureAwait(false);
     }
@@ -203,7 +235,9 @@ public sealed class LibraryViewStore
         reader.IsDBNull(19) ? null : (int)reader.GetInt64(19),
         LibraryProblems.Parse(SqliteValues.GetStringOrNull(reader, 20)),
         TimestampColumns.Parse(reader.GetValue(21)),
-        SqliteValues.GetBool(reader, 22));
+        SqliteValues.GetBool(reader, 22),
+        SqliteValues.GetString(reader, 23),
+        SqliteValues.GetStringOrNull(reader, 24));
 
     private static LibraryFileClassification ClassificationOf(string value) => value switch
     {
@@ -219,7 +253,13 @@ public sealed class LibraryViewStore
     private static (string Where, (string Name, object? Value)[] Parameters) BuildWhere(long libraryId, LibraryFileQuery? filter)
     {
         var clauses = new List<string> { "f.library_id = @library_id" };
-        var parameters = new List<(string Name, object? Value)> { ("@library_id", libraryId) };
+        var parameters = new List<(string Name, object? Value)>
+        {
+            ("@library_id", libraryId),
+            ("@clean_kind", LibraryModeJobKinds.CleanKind),
+            ("@clean_prefix", SqliteLike.Escape($"{LibraryModeJobKinds.CleanKind}:{libraryId}:") + "%"),
+            ("@cleans_hardlinked", filter?.CleansHardlinkedFiles == true ? 1 : 0),
+        };
 
         if (filter is null)
         {
@@ -242,6 +282,12 @@ public sealed class LibraryViewStore
         {
             clauses.Add("(f.path LIKE @search ESCAPE '\\' OR COALESCE(f.manager_title, '') LIKE @search ESCAPE '\\')");
             parameters.Add(("@search", "%" + SqliteLike.Escape(filter.Search) + "%"));
+        }
+
+        if (LibraryFileStatus.IsKnown(filter.Status))
+        {
+            clauses.Add($"{StatusSql} = @status");
+            parameters.Add(("@status", filter.Status));
         }
 
         if (string.Equals(filter.State, "cleaned", StringComparison.Ordinal))

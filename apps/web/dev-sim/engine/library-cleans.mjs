@@ -43,7 +43,8 @@ export class CleanRuns {
     this.#speed = speed;
   }
 
-  #queuedPaths() {
+  /** The files a library clean is queued or running for. */
+  queuedPaths() {
     return new Set(
       this.#engine.jobs
         .all()
@@ -66,7 +67,7 @@ export class CleanRuns {
     const known = this.#engine.libraryFiles
       .list(libraryId)
       .some((file) => file.path === path);
-    if (!known || this.#queuedPaths().has(path)) return false;
+    if (!known || this.queuedPaths().has(path)) return false;
     this.#engine.jobs.create(
       JOB_KIND.LIBRARY_CLEAN,
       { library_id: libraryId, path },
@@ -166,7 +167,7 @@ export class CleanRuns {
     const library = libraries[this.#rotation++ % libraries.length];
     const file = this.#engine.libraryFiles.nextToClean(
       library.id,
-      this.#queuedPaths(),
+      this.queuedPaths(),
     );
     if (file && this.queue(library.id, file.path, nowMs)) this.#engine.touch();
   }

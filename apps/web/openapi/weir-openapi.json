@@ -1929,6 +1929,35 @@
             "title": "Size Bytes",
             "type": "integer"
           },
+          "status": {
+            "description": "Where the file stands now, against the current rules: exactly one of these. Left alone beats cleaning, which beats cant_clean_yet (still shared with a download, or unreadable), which beats needs_cleaning, which beats matches.",
+            "enum": [
+              "needs_cleaning",
+              "cleaning",
+              "matches",
+              "cant_clean_yet",
+              "left_alone"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "status_reason": {
+            "anyOf": [
+              {
+                "enum": [
+                  "new",
+                  "replaced",
+                  "rules_changed"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Why a file that needs cleaning does, when the scan can say: it is new since the last check, the file on disk is not the one Weir last saw or cleaned, or it matched before (or Weir cleaned it) and the rules changed. Null for any other status, and when nothing on record supports a reason.",
+            "title": "Status Reason"
+          },
           "subtitle_summary": {
             "anyOf": [
               {
@@ -1993,7 +2022,9 @@
           "video_codec",
           "video_height",
           "cleaned_at",
-          "leave_alone"
+          "leave_alone",
+          "status",
+          "status_reason"
         ],
         "title": "LibraryFileOut",
         "type": "object"
@@ -2248,6 +2279,41 @@
           "libraries"
         ],
         "title": "LibraryFoldersOut",
+        "type": "object"
+      },
+      "LibraryStatusCountsOut": {
+        "additionalProperties": false,
+        "description": "How many files are in each status. One status per file, so these add up to the files.",
+        "properties": {
+          "cant_clean_yet": {
+            "title": "Cant Clean Yet",
+            "type": "integer"
+          },
+          "cleaning": {
+            "title": "Cleaning",
+            "type": "integer"
+          },
+          "left_alone": {
+            "title": "Left Alone",
+            "type": "integer"
+          },
+          "matches": {
+            "title": "Matches",
+            "type": "integer"
+          },
+          "needs_cleaning": {
+            "title": "Needs Cleaning",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "cant_clean_yet",
+          "cleaning",
+          "left_alone",
+          "matches",
+          "needs_cleaning"
+        ],
+        "title": "LibraryStatusCountsOut",
         "type": "object"
       },
       "ProposedLibraryCheckIn": {
@@ -3041,6 +3107,9 @@
         "additionalProperties": false,
         "description": "Issue #568: how many files a library holds and what its rules would do to them.",
         "properties": {
+          "by_status": {
+            "$ref": "#/components/schemas/LibraryStatusCountsOut"
+          },
           "cannot_process": {
             "title": "Cannot Process",
             "type": "integer"
@@ -3092,7 +3161,8 @@
           "total_removed_subtitle_tracks",
           "would_change",
           "cleaned",
-          "left_alone"
+          "left_alone",
+          "by_status"
         ],
         "title": "LibraryTotalsOut",
         "type": "object"
@@ -15910,6 +15980,23 @@
                 }
               ],
               "title": "State"
+            }
+          },
+          {
+            "description": "Narrow to the files in one status: where each file stands now against the current rules.",
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "enum": [
+                "needs_cleaning",
+                "cleaning",
+                "matches",
+                "cant_clean_yet",
+                "left_alone"
+              ],
+              "title": "Status",
+              "type": "string"
             }
           },
           {
