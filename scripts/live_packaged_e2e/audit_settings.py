@@ -72,10 +72,10 @@ class AuditSettingsMixin:
                 if cancel.count():
                     self.click(cancel.last, "cancel workflow editor")
         elif tab == "Schedule":
-            # A week per library, the time zone above them (canvas board 6).
+            # A week per library, which says where the time zone they are read in is changed.
             self.visible(
-                self.page.get_by_text("Time zone", exact=True),
-                "time zone control",
+                self.page.get_by_role("link", name="Change the time zone", exact=True),
+                "link to the time zone in System › About",
             )
             self.require(
                 self.page.get_by_test_id("schedule-library-row").count() > 0,

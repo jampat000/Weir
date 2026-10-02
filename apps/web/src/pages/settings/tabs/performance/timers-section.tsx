@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 
-import { QuietSection } from "../../../../components/shared/quiet-section";
+import { Panel } from "../../../../components/panels/panel";
 import type { MaintenanceFamilyState } from "../../../../lib/processing/maintenance-api";
 import { useProcessingMaintenanceQuery } from "../../../../lib/processing/maintenance-queries";
 import type { AppSettings } from "../../../../lib/settings/types";
@@ -28,12 +28,6 @@ function BackupRow({ settings }: { settings: AppSettings }) {
     <tr>
       <th scope="row" className="mm-quiet-table__name">
         Settings backup
-        <Link
-          className="mm-quiet-table__sub mm-schedule-link"
-          to="/system?tab=backups"
-        >
-          Change in Backups
-        </Link>
       </th>
       <td data-label="When">
         {backupWords(
@@ -51,6 +45,15 @@ function BackupRow({ settings }: { settings: AppSettings }) {
           : NOT_YET}
       </td>
       <td data-label="Next run">{UNKNOWN}</td>
+      <td data-label="">
+        <Link
+          className="mm-quiet-link"
+          to="/system?tab=backups"
+          aria-label="Change in Backups"
+        >
+          Backups
+        </Link>
+      </td>
     </tr>
   );
 }
@@ -67,11 +70,13 @@ export function TimersSection({
   const formatDate = useAppDateFormatter();
   const families = maintenance.data?.families ?? [];
   return (
-    <QuietSection headingId={headingId} heading="Weir's own timers">
-      <p className="mm-quiet-note">
-        These run on their own clocks, whatever the workflow hours say.
-      </p>
-      <div className="mm-quiet-table-wrap mt-4">
+    <Panel
+      title="Next runs"
+      headingId={headingId}
+      count="Each runs on its own clock, whatever the workflow hours say."
+      padded
+    >
+      <div className="mm-quiet-table-wrap">
         <table className="mm-quiet-table" data-testid="schedule-timers">
           <thead>
             <tr>
@@ -79,6 +84,9 @@ export function TimersSection({
               <th scope="col">When</th>
               <th scope="col">Last run</th>
               <th scope="col">Next run</th>
+              <th scope="col">
+                <span className="sr-only">Where to change it</span>
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -88,12 +96,6 @@ export function TimersSection({
                 <tr key={job.family}>
                   <th scope="row" className="mm-quiet-table__name">
                     {job.name}
-                    <Link
-                      className="mm-quiet-table__sub mm-schedule-link"
-                      to={setupTabPath("cleanup")}
-                    >
-                      Change in Cleanup
-                    </Link>
                   </th>
                   <td data-label="When">{whenWords(state)}</td>
                   <td data-label="Last run">
@@ -106,6 +108,15 @@ export function TimersSection({
                       ? formatDate(state.next_run_at)
                       : UNKNOWN}
                   </td>
+                  <td data-label="">
+                    <Link
+                      className="mm-quiet-link"
+                      to={setupTabPath("cleanup")}
+                      aria-label="Change in Cleanup"
+                    >
+                      Cleanup
+                    </Link>
+                  </td>
                 </tr>
               );
             })}
@@ -113,6 +124,6 @@ export function TimersSection({
           </tbody>
         </table>
       </div>
-    </QuietSection>
+    </Panel>
   );
 }

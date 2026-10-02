@@ -16,15 +16,23 @@ import {
   windowNow,
 } from "./schedule-model";
 
-/** A library's week at a glance: seven rows of 24 hours, lit where it may start work. */
+/**
+ * A library's week at a glance: seven rows of 24 hours, lit where it may start work. A week with no
+ * gaps is one lit bar, since seven identical rows say nothing more.
+ */
 function WeekStrip({ grid, name }: { grid: string; name: string }) {
+  const week = weekHours(grid);
+  const label = `${name}: when it may start work, Monday to Sunday`;
+  if (week.every((day) => day.every(Boolean))) {
+    return (
+      <div className="mm-week mm-week--always" role="img" aria-label={label}>
+        <span className="mm-week__hour is-on" />
+      </div>
+    );
+  }
   return (
-    <div
-      className="mm-week"
-      role="img"
-      aria-label={`${name}: when it may start work, Monday to Sunday`}
-    >
-      {weekHours(grid).map((day, d) => (
+    <div className="mm-week" role="img" aria-label={label}>
+      {week.map((day, d) => (
         <div className="mm-week__day" key={DAY_NAMES[d]}>
           <span className="mm-week__label">{DAY_NAMES[d].slice(0, 1)}</span>
           {day.map((on, h) => (

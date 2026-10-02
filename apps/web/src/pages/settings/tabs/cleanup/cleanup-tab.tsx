@@ -114,30 +114,28 @@ export function CleanupTab() {
       className="mm-quiet-stack"
       data-testid="processing-maintenance-section"
     >
-      <SaveModelNote model="instant" />
-      <p className="mm-quiet-note">
-        Small jobs that keep Weir&rsquo;s folders tidy. Each runs on its own
-        timer, and a change applies within half a minute, with no restart.
-      </p>
-
-      {notice ? (
-        <p
-          className="text-sm font-medium text-mm-text1"
-          role="status"
-          data-testid="processing-maintenance-notice"
-        >
-          {notice}
-        </p>
-      ) : null}
-
       {families.length === 0 ? (
         <p className="mm-quiet-note">
           No cleanup jobs are available on this instance.
         </p>
       ) : (
-        <Panel title="Cleanup jobs" padded>
+        <Panel
+          title="Jobs"
+          count="Each runs on its own timer. A change applies within half a minute."
+          aside={<SaveModelNote model="instant" />}
+          padded
+        >
+          {notice ? (
+            <p
+              className="mb-3 text-sm font-medium text-mm-text1"
+              role="status"
+              data-testid="processing-maintenance-notice"
+            >
+              {notice}
+            </p>
+          ) : null}
           <div className="mm-quiet-table-wrap">
-            <table className="mm-quiet-table mm-cleanup-table">
+            <table className="mm-quiet-table">
               <thead>
                 <tr>
                   <th scope="col">Job</th>

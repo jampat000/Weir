@@ -1,14 +1,11 @@
 /* Layouts particular to one Settings or System tab. */
 
-/* Settings › Cleanup: each job's own switch and timer on one row. */
-.mm-cleanup-table .mm-quiet-table__name {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  max-width: 34rem;
-}
-
+/* Settings › Cleanup: each job's own switch and timer on one row. What a job does sits under its name inside the
+   cell, which stays a table cell: any other display breaks the row's hairline. */
 .mm-cleanup-what {
+  display: block;
+  max-width: 34rem;
+  margin-top: 4px;
   font-size: 0.8125rem;
   font-weight: 400;
   line-height: 1.45;
@@ -174,7 +171,7 @@
   color: var(--mm-text2);
 }
 
-/* Settings › Schedule: the time zone on one line, a week per library, its editor underneath. */
+/* The time zone row: its picker and Save on one line. */
 .mm-schedule-zone {
   display: flex;
   align-items: center;
@@ -187,13 +184,24 @@
   min-width: 0;
 }
 
-/* Seven rows of 24 hours, lit where the library may start work. Small on purpose: it is read at a glance,
+/* Settings › Schedule: a week per library, its editor underneath. */
+
+/* Seven rows of 24 hours, lit where the library may start work. Flat on purpose: it is read at a glance,
    and the editor below is where hours are drawn. */
 .mm-week {
   display: grid;
-  gap: 2px;
-  width: 100%;
-  max-width: 16rem;
+  gap: 1px;
+  width: 22rem;
+  max-width: 100%;
+}
+
+.mm-week--always {
+  margin-top: 0.4rem;
+}
+
+.mm-week--always .mm-week__hour {
+  height: 8px;
+  border-radius: 4px;
 }
 
 .mm-week__day {
@@ -210,7 +218,7 @@
 }
 
 .mm-week__hour {
-  height: 6px;
+  height: 5px;
   border-radius: 1px;
   background: color-mix(in srgb, var(--mm-text3) 22%, transparent);
 }

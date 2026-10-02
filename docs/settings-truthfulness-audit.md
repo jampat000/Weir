@@ -93,9 +93,10 @@ says where a setting lives and what actually happens when it is saved.
   and enforced by an hourly job. A file's history is kept for as long as Weir still knows the file, then
   for N days from the hour Weir first finds the file gone or forgotten; a file that comes back before then
   keeps it. It sits with the log and Activity retention settings, which save on their own button.
-- Schedule: the time zone is saved to the database and every time on that tab is read in it. Each
-  workflow's hours are saved per workflow and applied without a restart. `Scan now` queues a one-off
-  scan of that workflow.
+- System › About: the time zone is saved to the database and every time in Weir, including those on
+  Schedule, is read in it.
+- Schedule: each workflow's hours are saved per workflow and applied without a restart. `Scan now`
+  queues a one-off scan of that workflow.
 
 ## Startup configuration
 

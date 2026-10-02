@@ -1,8 +1,8 @@
-import { useId, useState } from "react";
+import { useState } from "react";
+import { Link } from "react-router-dom";
 
 import { Panel } from "../../../../components/panels/panel";
 import { PageLoading } from "../../../../components/shared/page-loading";
-import { QuietSection } from "../../../../components/shared/quiet-section";
 import { canEdit } from "../../../../lib/auth/can-edit";
 import { useMeQuery } from "../../../../lib/auth/queries";
 import type { ProcessingLibrary } from "../../../../lib/processing/libraries-api";
@@ -14,20 +14,20 @@ import { SettingsLoadError } from "../../settings-load-error";
 import { useLeaveConfirmation, useUnsavedChanges } from "../../unsaved-changes";
 import { LibraryHoursEditor, LibraryHoursRow } from "./library-hours";
 import { effectiveGrid } from "./schedule-model";
-import { savedZone, TimeZoneRow } from "./time-zone-row";
 
 /** Often enough that "open until" and "it is 14:32 there" stay true while the page is open. */
 const CLOCK_TICK_MS = 30_000;
 const FALLBACK_ZONE = "UTC";
 
+/** Where the time zone is chosen: every time on this tab is read in it. */
+const TIME_ZONE_ADDRESS = "/system?tab=about";
+
 function LibrariesSection({
-  headingId,
   libraries,
   zone,
   now,
   editable,
 }: {
-  headingId: string;
   libraries: ProcessingLibrary[];
   zone: string;
   now: Date;
@@ -57,22 +57,32 @@ function LibrariesSection({
   };
 
   return (
-    <QuietSection headingId={headingId} heading="Workflows">
-      <p className="mm-quiet-note">
-        When each workflow may start work. A file already being processed when
-        its hours end is finished, not stopped.
-      </p>
+    <Panel
+      title="Weekly hours"
+      count={
+        <>
+          When each workflow may start work, in {zone}.{" "}
+          <Link className="mm-schedule-link" to={TIME_ZONE_ADDRESS}>
+            Change the time zone
+          </Link>
+        </>
+      }
+      aside={<SaveModelNote model="explicit" />}
+      padded
+    >
       {ordered.length === 0 ? (
-        <p className="mt-4 text-sm text-mm-text3">
+        <p className="text-sm text-mm-text3">
           Add a workflow under Workflows to schedule it here.
         </p>
       ) : (
-        <div className="mm-quiet-table-wrap mt-4">
+        <div className="mm-quiet-table-wrap">
           <table className="mm-quiet-table mm-schedule-table">
             <thead>
               <tr>
                 <th scope="col">Workflow</th>
-                <th scope="col">Week (Mon to Sun, midnight to midnight)</th>
+                <th scope="col" title="Monday to Sunday, midnight to midnight">
+                  Week
+                </th>
                 <th scope="col">Right now</th>
                 <th scope="col">Looks for new files</th>
                 <th scope="col">
@@ -108,17 +118,16 @@ function LibrariesSection({
         />
       ) : null}
       {dialog}
-    </QuietSection>
+    </Panel>
   );
 }
 
-/** Setup › Workflows › Schedule: the time zone, and a week per workflow with its hours editor below. */
+/** Setup › Workflows › Schedule: a week per workflow with its hours editor below. */
 export function ScheduleTab() {
   const me = useMeQuery();
   const settings = useAppSettingsQuery();
   const libraries = useProcessingLibrariesQuery();
   const now = new Date(useNow(CLOCK_TICK_MS));
-  const ids = useId();
   const editable = canEdit(me.data?.role);
 
   if (settings.isPending || libraries.isPending || me.isPending) {
@@ -130,17 +139,7 @@ export function ScheduleTab() {
 
   return (
     <div className="mm-quiet-stack" data-testid="processing-schedules-section">
-      <SaveModelNote model="explicit" />
-      <Panel title="Time zone" padded>
-        <TimeZoneRow
-          key={savedZone(settings.data)}
-          settings={settings.data}
-          editable={editable}
-          now={now}
-        />
-      </Panel>
       <LibrariesSection
-        headingId={`${ids}-libraries`}
         libraries={libraries.data}
         zone={settings.data.app_timezone || FALLBACK_ZONE}
         now={now}

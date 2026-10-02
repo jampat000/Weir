@@ -113,6 +113,11 @@ it("saves Files at once up to ten, and the budget and checks with it", async () 
     screen.queryByLabelText("Skip files smaller than"),
   ).not.toBeInTheDocument();
 
+  // Save is not offered while nothing has changed.
+  expect(
+    screen.queryByRole("button", { name: "Save performance settings" }),
+  ).not.toBeInTheDocument();
+
   // #633: files at once goes up to ten.
   fireEvent.click(screen.getByRole("button", { name: "10" }));
   fireEvent.click(
@@ -166,8 +171,8 @@ it("leaves the space to keep free to each workflow, and says an unknown resoluti
     screen.getByText(/costs the same as a 1080p file/),
   ).toBeInTheDocument();
   expect(
-    screen.getByRole("button", { name: "No changes to save" }),
-  ).toBeDisabled();
+    screen.queryByRole("button", { name: "Save performance settings" }),
+  ).not.toBeInTheDocument();
 });
 
 it("shows a load error instead of a blank panel when performance settings fail to load", async () => {

@@ -16,7 +16,7 @@ export function parseAppTime(iso: string | null | undefined): number | null {
   return Number.isNaN(ms) ? null : ms;
 }
 
-/** The timezone chosen in Schedule, or undefined for the browser's when none is set. */
+/** The time zone chosen in System › About, or undefined for the browser's when none is set. */
 function useAppTimeZone(): string | undefined {
   return useAppSettingsQuery().data?.app_timezone || undefined;
 }
@@ -49,7 +49,7 @@ const SECOND_CLOCK: Intl.DateTimeFormatOptions = {
   second: "2-digit",
 };
 
-/** Formats an instant as a clock time, "8:50 am", in the timezone chosen in Schedule, or the browser's. */
+/** Formats an instant as a clock time, "8:50 am", in the time zone chosen in System › About, or the browser's. */
 export function useAppClockFormatter(): (ms: number) => string {
   const tz = useAppTimeZone();
   return useMemo(() => clockFormatter(MINUTE_CLOCK, tz), [tz]);
@@ -67,7 +67,7 @@ export function useAppClockSecondsFormatter(): (ms: number) => string {
   return useMemo(() => clockFormatter(SECOND_CLOCK, tz), [tz]);
 }
 
-/** Formats server timestamps in the timezone chosen in Schedule, or the browser's when none is set. */
+/** Formats server timestamps in the time zone chosen in System › About, or the browser's when none is set. */
 export function useAppDateFormatter(): (
   iso: string | null | undefined,
 ) => string {
