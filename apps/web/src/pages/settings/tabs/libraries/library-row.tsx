@@ -42,14 +42,10 @@ function WorkflowSource({
     .find((detail) => detail);
   return (
     <>
-      <span className="mm-library-source">
+      {/* The badge says the kind; the sentence about it is its hover, so every row stays one line tall. */}
+      <span className="mm-library-source" title={note}>
         <WorkflowKindBadge kind={kind} className="mm-workflow-table__badge" />
-      </span>
-      <span
-        className="mm-quiet-table__sub mm-workflow-table__note"
-        title={note}
-      >
-        {note}
+        <span className="sr-only">{note}</span>
       </span>
       {library.discovered_from_connection_id ? (
         <span className="mm-quiet-table__sub">Kept in step with it.</span>
