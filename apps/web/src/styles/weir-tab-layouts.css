@@ -118,7 +118,7 @@
 
 .mm-week__label {
   color: var(--mm-text3);
-  font-size: var(--mm-type-eyebrow);
+  font-size: 0.625rem;
   line-height: 1;
 }
 

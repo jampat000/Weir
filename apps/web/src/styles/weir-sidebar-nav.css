@@ -56,7 +56,7 @@
   margin: 20px 0 8px;
   padding: 16px 13px 0;
   border-top: 1px solid color-mix(in srgb, var(--mm-hairline) 70%, transparent);
-  font-size: var(--mm-type-body);
+  font-size: 12.5px;
   font-weight: 600;
   letter-spacing: 0.13em;
   text-transform: uppercase;
@@ -147,7 +147,7 @@
   padding: 0 6px;
   border-radius: var(--mm-radius-pill);
   background: var(--mm-surface-2);
-  font-size: var(--mm-type-eyebrow);
+  font-size: 9.5px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   color: var(--mm-text2);
@@ -232,7 +232,7 @@
   height: 26px;
   border-radius: 50%;
   background: linear-gradient(135deg, var(--mm-primary), var(--mm-primary-2));
-  font-size: var(--mm-type-caption);
+  font-size: 12px;
   font-weight: 700;
   color: var(--mm-on-accent);
 }
@@ -256,7 +256,7 @@
 .mm-sidebar-user__detail {
   display: block;
   overflow: hidden;
-  font-size: var(--mm-type-caption);
+  font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--mm-text2);
@@ -294,7 +294,7 @@
   margin: 0;
   padding: 10px 12px;
   border-bottom: 1px solid var(--mm-hairline);
-  font-size: var(--mm-type-caption);
+  font-size: 12px;
   font-variant-numeric: tabular-nums;
   color: var(--mm-text3);
 }

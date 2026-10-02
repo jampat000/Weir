@@ -300,7 +300,7 @@
   padding: 0.28rem 0.55rem;
   border-radius: var(--mm-radius-pill);
   border: 1px solid color-mix(in srgb, var(--mm-stone) 8%, transparent);
-  font-size: var(--mm-type-caption);
+  font-size: 0.74rem;
   line-height: 1.2;
   color: var(--mm-text2);
 }

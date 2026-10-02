@@ -381,7 +381,7 @@ a.mm-bar-row:hover {
   border-radius: var(--mm-radius-control);
   background: transparent;
   font: inherit;
-  font-size: 0.875rem;
+  font-size: 13px;
   font-weight: 500;
   white-space: nowrap;
   color: var(--mm-text2);

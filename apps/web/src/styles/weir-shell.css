@@ -118,7 +118,7 @@ kbd {
   background: var(--mm-button-secondary-bg);
   color: var(--mm-text);
   font: inherit;
-  font-size: var(--mm-type-body);
+  font-size: 0.8125rem;
   font-weight: 600;
   white-space: nowrap;
   cursor: pointer;

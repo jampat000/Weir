@@ -55,7 +55,7 @@
     min-width: 17.6px;
     height: 17.6px;
     padding: 0 6px;
-    font-size: var(--mm-type-eyebrow);
+    font-size: 9.5px;
   }
 
   .mm-sidebar--collapsed .mm-sidebar-group__label {
@@ -112,7 +112,7 @@
     color: var(--mm-text1);
     cursor: pointer;
     font: inherit;
-    font-size: var(--mm-type-caption);
+    font-size: 0.8rem;
     font-weight: 700;
   }
 
