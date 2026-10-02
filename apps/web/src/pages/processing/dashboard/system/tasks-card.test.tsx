@@ -118,7 +118,7 @@ describe("the Scheduled tasks card", () => {
 
     expect(
       within(card).getByRole("link", { name: "Jobs: Scheduled tasks" }),
-    ).toHaveAttribute("href", "/system?tab=logs&show=jobs");
+    ).toHaveAttribute("href", "/system?tab=logs&source=job");
   });
 
   it("says how many tasks the card's height left out", () => {

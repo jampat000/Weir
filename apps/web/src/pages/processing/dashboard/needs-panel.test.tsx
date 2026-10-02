@@ -382,7 +382,7 @@ describe("the Needs you panel when something does", () => {
 
     expect(
       screen.getByRole("link", { name: "Review failed jobs →" }),
-    ).toHaveAttribute("href", "/system?tab=logs&show=jobs&status=failed");
+    ).toHaveAttribute("href", "/system?tab=logs&source=job&status=failed");
   });
 });
 

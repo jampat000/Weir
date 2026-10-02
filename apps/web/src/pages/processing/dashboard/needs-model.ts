@@ -132,7 +132,7 @@ function workerNeeds(
       title: "Background work has stopped",
       reason: "Not responding · restart Weir",
       detail: worker.detail,
-      link: { label: "Open jobs", to: "/system?tab=logs&show=jobs" },
+      link: { label: "Open jobs", to: "/system?tab=logs&source=job" },
     }));
 }
 
@@ -157,7 +157,7 @@ function failedJobsNeed({ count, capped }: FailedJobs): NeedRow | null {
     reason: "Each says what to do next",
     link: {
       label: "Review failed jobs",
-      to: "/system?tab=logs&show=jobs&status=failed",
+      to: "/system?tab=logs&source=job&status=failed",
     },
   };
 }

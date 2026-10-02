@@ -12,7 +12,7 @@ const PROCESSING_TAB_HOMES: Record<string, string> = {
   "audio-subtitles": setupTabPath("profiles"),
   schedules: setupTabPath("schedule"),
   library: "/library",
-  jobs: "/system?tab=logs&show=jobs",
+  jobs: "/system?tab=logs&source=job",
   maintenance: setupTabPath("cleanup"),
 };
 

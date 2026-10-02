@@ -195,7 +195,7 @@ def test_signed_in_navigation_covers_main_screens_and_tabs(weir_shell: str) -> N
 
             # Addresses users may have saved (the Processing tabs) land on the same thing in its current place.
             for old_tab, new_address, section in (
-                ("jobs", r"/system\?tab=logs&show=jobs", "log-feed"),
+                ("jobs", r"/system\?tab=logs&source=job", "log-feed"),
                 ("files", r"/activity", "activity-page"),
                 ("libraries", r"/setup/workflows", "processing-libraries-section"),
                 ("audio-subtitles", r"/setup/rules", "processing-rule-set-workspace"),

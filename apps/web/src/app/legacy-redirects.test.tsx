@@ -80,7 +80,7 @@ describe("/processing", () => {
     ["/processing?tab=audio-subtitles", "/setup/rules"],
     ["/processing?tab=schedules", "/setup/workflows/schedule"],
     ["/processing?tab=library", "/library"],
-    ["/processing?tab=jobs", "/system?tab=logs&show=jobs"],
+    ["/processing?tab=jobs", "/system?tab=logs&source=job"],
     ["/processing?tab=maintenance", "/setup/performance/cleanup"],
   ])("%s lands on %s", (entry, target) => {
     expect(landOn(entry)).toBe(target);

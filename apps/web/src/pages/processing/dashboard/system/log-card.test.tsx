@@ -168,7 +168,7 @@ describe("the Log card", () => {
 
     expect(
       within(card).getByRole("link", { name: "Full log: Log" }),
-    ).toHaveAttribute("href", "/system?tab=logs&show=log");
+    ).toHaveAttribute("href", "/system?tab=logs&source=server");
   });
 
   it("says how many lines the card's height left out", () => {
