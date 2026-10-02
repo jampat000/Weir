@@ -61,3 +61,17 @@ export function PageToolbar<Id extends string>({
     </div>
   );
 }
+
+/**
+ * A page's own buttons when it has no tabs, such as the Library's: on the header's title line, at the right, just
+ * before Pause, where the header has the room; narrower, in a row of the page's own, at its right.
+ */
+export function PageToolbarButtons({ children }: { children: ReactNode }) {
+  const onTitleLine = useMediaQuery(TABS_ON_TITLE_LINE);
+  if (onTitleLine) return <ShellHeaderButtons>{children}</ShellHeaderButtons>;
+  return (
+    <div className="mm-page-toolbar">
+      <div className="mm-page-toolbar__actions">{children}</div>
+    </div>
+  );
+}

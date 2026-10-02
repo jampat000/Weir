@@ -1,8 +1,10 @@
 import { useState } from "react";
 
 import { SegmentedControl } from "../../components/panels/segmented-control";
+import { ShellHeaderSlot } from "../../components/shell/shell-header-context";
 import type { ProcessingLibrary } from "../../lib/processing/libraries-api";
 import { HISTORY_GROUPS, type HistoryGroup } from "./history-entries";
+import { useChipRow } from "./use-chip-row";
 
 /** How far back History looks, as the server's within_days. */
 export const PERIODS: { id: string; label: string; days?: number }[] = [
@@ -16,6 +18,12 @@ export const DEFAULT_PERIOD = PERIODS[1];
 /** Every filter lives in the address, so a filtered view survives a reload and can be linked to. */
 export type SetParam = (name: string, value: string | null) => void;
 
+/**
+ * What narrows the list: the search, the kinds of file with their counts, and the workflow and how far back. They
+ * sit on the header's title line, after the title, where the search gives up room first, then the two pickers, and the
+ * chips scroll sideways inside their own box if they still do not fit. In a window too narrow for that line they take
+ * a row under the title.
+ */
 export function HistoryFilters({
   query,
   group,
@@ -34,67 +42,75 @@ export function HistoryFilters({
   setParam: SetParam;
 }) {
   const [search, setSearch] = useState(query);
+  const { setRow, scrolls } = useChipRow(group);
   return (
-    <div className="mm-history-filters" data-testid="history-filters">
-      <form
-        className="mm-history-search"
-        role="search"
-        onSubmit={(event) => {
-          event.preventDefault();
-          setParam("q", search.trim());
-        }}
-      >
-        <input
-          className="mm-input"
-          type="search"
-          aria-label="Find a file"
-          placeholder="Find a file"
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-          onBlur={() => setParam("q", search.trim())}
-        />
-      </form>
-      <SegmentedControl
-        ariaLabel="Show"
-        value={group}
-        options={HISTORY_GROUPS.map((g) => ({
-          value: g.id,
-          label: (
-            <>
-              {g.label}{" "}
-              <span className="mm-segmented__count">{counts[g.id]}</span>
-            </>
-          ),
-        }))}
-        onChange={(next) => setParam("show", next === "all" ? null : next)}
-      />
-      <div className="mm-history-scope">
-        <select
-          className="mm-input"
-          aria-label="Workflow"
-          value={libraryId ?? ""}
-          onChange={(event) => setParam("library", event.target.value)}
+    <ShellHeaderSlot>
+      <div className="mm-history-controls" data-testid="history-filters">
+        <form
+          className="mm-history-search"
+          role="search"
+          onSubmit={(event) => {
+            event.preventDefault();
+            setParam("q", search.trim());
+          }}
         >
-          <option value="">All workflows</option>
-          {libraries.map((library) => (
-            <option key={library.id} value={library.id}>
-              {library.name}
-            </option>
-          ))}
-        </select>
-        <select
-          className="mm-input"
-          aria-label="How far back"
-          value={periodId}
-          onChange={(event) => setParam("within", event.target.value)}
-        >
-          {PERIODS.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.label}
-            </option>
-          ))}
-        </select>
+          <input
+            className="mm-input"
+            type="search"
+            aria-label="Find a file"
+            placeholder="Find a file"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            onBlur={() => setParam("q", search.trim())}
+            onKeyDown={(event) => {
+              if (event.key === "Escape") event.currentTarget.blur();
+            }}
+          />
+        </form>
+        <div className="mm-history-chips" data-scrolls={scrolls} ref={setRow}>
+          <SegmentedControl
+            ariaLabel="Show"
+            value={group}
+            options={HISTORY_GROUPS.map((g) => ({
+              value: g.id,
+              label: (
+                <>
+                  {g.label}{" "}
+                  <span className="mm-segmented__count">{counts[g.id]}</span>
+                </>
+              ),
+            }))}
+            onChange={(next) => setParam("show", next === "all" ? null : next)}
+          />
+        </div>
+        <div className="mm-history-scope">
+          <select
+            className="mm-input"
+            aria-label="Workflow"
+            value={libraryId ?? ""}
+            onChange={(event) => setParam("library", event.target.value)}
+          >
+            <option value="">All workflows</option>
+            {libraries.map((library) => (
+              <option key={library.id} value={library.id}>
+                {library.name}
+              </option>
+            ))}
+          </select>
+          <select
+            className="mm-input"
+            aria-label="How far back"
+            value={periodId}
+            onChange={(event) => setParam("within", event.target.value)}
+          >
+            {PERIODS.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.label}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
-    </div>
+    </ShellHeaderSlot>
   );
 }

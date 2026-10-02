@@ -1,10 +1,21 @@
 import { describe, expect, it } from "vitest";
 
-import type { LibraryFile } from "../../lib/processing/library-mode-api";
-import { groupOf, headerLead, scanned, verdictOf } from "./library-model";
+import type {
+  LibraryFile,
+  LibraryTotals,
+} from "../../lib/processing/library-mode-api";
+import {
+  filesCount,
+  groupOf,
+  headerLead,
+  nextScheduledBrief,
+  scanned,
+  verdictOf,
+} from "./library-model";
 
 const NOW = Date.UTC(2026, 7, 22, 10, 0, 0);
 const MINUTE = 60;
+const HOUR_MS = 3_600_000;
 
 function libraryFile(overrides: Partial<LibraryFile>): LibraryFile {
   return {
@@ -90,5 +101,56 @@ describe("scanned", () => {
     expect(scanned(at(5 * MINUTE), NOW)).toBe("checked 5 min ago");
     expect(scanned(at(3 * 60 * MINUTE), NOW)).toBe("checked 3 h ago");
     expect(scanned(at(3 * 24 * 60 * MINUTE), NOW)).toBe("checked 3 days ago");
+  });
+});
+
+describe("nextScheduledBrief", () => {
+  const clock = (ms: number) => `at ${ms - NOW}`;
+  const dayClock = (ms: number) => `on ${ms - NOW}`;
+  const run = (hours: number) => ({
+    enabled: true,
+    next_run_at: new Date(NOW + hours * HOUR_MS).toISOString(),
+  });
+
+  it("says nothing while the schedule is off", () => {
+    expect(
+      nextScheduledBrief(
+        { enabled: false, next_run_at: null },
+        NOW,
+        clock,
+        dayClock,
+      ),
+    ).toBeNull();
+  });
+
+  it("tells a run later today as a clock time and a later one with its day", () => {
+    expect(nextScheduledBrief(run(3), NOW, clock, dayClock)).toBe(
+      `next at ${3 * HOUR_MS}`,
+    );
+    expect(nextScheduledBrief(run(30), NOW, clock, dayClock)).toBe(
+      `next on ${30 * HOUR_MS}`,
+    );
+  });
+
+  it("says a due run is starting and an impossible one cannot run", () => {
+    expect(nextScheduledBrief(run(-1), NOW, clock, dayClock)).toBe(
+      "next starting now",
+    );
+    expect(
+      nextScheduledBrief(
+        { enabled: true, next_run_at: null },
+        NOW,
+        clock,
+        dayClock,
+      ),
+    ).toBe("schedule cannot run");
+  });
+});
+
+describe("filesCount", () => {
+  it("gives the number of files and the room they take", () => {
+    expect(
+      filesCount({ files: 1234, size_bytes: 2_000_000_000 } as LibraryTotals),
+    ).toBe("1,234 files · 1.86 GB");
   });
 });

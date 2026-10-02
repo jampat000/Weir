@@ -40,6 +40,10 @@ const MINUTE_CLOCK: Intl.DateTimeFormatOptions = {
   hour: "numeric",
   minute: "2-digit",
 };
+const DAY_CLOCK: Intl.DateTimeFormatOptions = {
+  weekday: "short",
+  ...MINUTE_CLOCK,
+};
 const SECOND_CLOCK: Intl.DateTimeFormatOptions = {
   ...MINUTE_CLOCK,
   second: "2-digit",
@@ -49,6 +53,12 @@ const SECOND_CLOCK: Intl.DateTimeFormatOptions = {
 export function useAppClockFormatter(): (ms: number) => string {
   const tz = useAppTimeZone();
   return useMemo(() => clockFormatter(MINUTE_CLOCK, tz), [tz]);
+}
+
+/** Formats an instant as a day and a clock time, "sat 3:00 am", in the same timezone: for a time that is not today. */
+export function useAppDayClockFormatter(): (ms: number) => string {
+  const tz = useAppTimeZone();
+  return useMemo(() => clockFormatter(DAY_CLOCK, tz), [tz]);
 }
 
 /** Formats an instant as a clock time with its seconds, "2:14:05 pm", in the same timezone. */

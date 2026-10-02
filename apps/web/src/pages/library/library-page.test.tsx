@@ -290,6 +290,19 @@ describe("LibraryPage", () => {
     ).toBeInTheDocument();
   });
 
+  it("puts the figures in the Files card's count, with what Weir does with the files on hover", () => {
+    renderLibrary();
+
+    const count = screen.getByText("14 files · 27.94 GB");
+    expect(count).toHaveAttribute(
+      "title",
+      expect.stringContaining("Weir reads them where they are"),
+    );
+    expect(
+      screen.getByText(/14 files, 27.94 GB on your storage/),
+    ).toBeInTheDocument();
+  });
+
   it("says when the scheduled check and clean next runs, and nothing while it is off", () => {
     const { unmount } = renderLibrary();
     expect(screen.queryByTestId("library-schedule")).not.toBeInTheDocument();
@@ -300,8 +313,13 @@ describe("LibraryPage", () => {
       schedule: { enabled: true, next_run_at: "2999-01-02T02:00:00Z" },
     };
     const next = renderLibrary();
+    // The header has room for a few words; the whole sentence is the tooltip.
     expect(screen.getByTestId("library-schedule")).toHaveTextContent(
-      /next scheduled check and clean .*2999/,
+      /^· next /,
+    );
+    expect(screen.getByTestId("library-scan")).toHaveAttribute(
+      "title",
+      expect.stringMatching(/next scheduled check and clean .*2999/),
     );
     next.unmount();
 
@@ -311,7 +329,11 @@ describe("LibraryPage", () => {
     };
     const due = renderLibrary();
     expect(screen.getByTestId("library-schedule")).toHaveTextContent(
-      "scheduled check and clean starting now",
+      "next starting now",
+    );
+    expect(screen.getByTestId("library-scan")).toHaveAttribute(
+      "title",
+      expect.stringContaining("scheduled check and clean starting now"),
     );
     due.unmount();
 

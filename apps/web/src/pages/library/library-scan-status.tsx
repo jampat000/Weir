@@ -6,10 +6,17 @@ import type {
   LibraryScanInfo,
 } from "../../lib/processing/library-mode-api";
 import { useTriggerLibraryScan } from "../../lib/processing/library-mode-queries";
-import { useAppDateFormatter } from "../../lib/ui/mm-format-date";
-import { nextScheduled, scanned } from "./library-model";
+import {
+  useAppClockFormatter,
+  useAppDateFormatter,
+  useAppDayClockFormatter,
+} from "../../lib/ui/mm-format-date";
+import { nextScheduled, nextScheduledBrief, scanned } from "./library-model";
 
-/** Beside the title: when the numbers were counted, when the schedule runs next, and a way to count again. */
+/**
+ * What the page puts on the header's title line, before Pause: when the numbers were counted and when the schedule
+ * runs next, in a few words with the whole sentence in the tooltip, then a way to count again.
+ */
 export function LibraryScanStatus({
   libraryId,
   scan,
@@ -25,28 +32,45 @@ export function LibraryScanStatus({
   after?: ReactNode;
 }) {
   const formatDate = useAppDateFormatter();
+  const clock = useAppClockFormatter();
+  const dayClock = useAppDayClockFormatter();
   const rescan = useTriggerLibraryScan(libraryId);
+  const running = Boolean(scan?.running);
+  const when = running
+    ? "Checking this workflow now"
+    : scanned(scan?.generated_at ?? null, now);
   const scheduleLine = nextScheduled(schedule, now, formatDate);
+  const scheduleBrief = nextScheduledBrief(schedule, now, clock, dayClock);
+  const sentence = [when, scheduleLine].filter(Boolean).join(" · ");
   return (
-    <div className="mm-library-scan" data-testid="library-scan">
-      {scan?.running ? (
-        <>
+    <>
+      <span
+        className="mm-library-scan"
+        data-testid="library-scan"
+        title={sentence}
+      >
+        {running ? (
           <i className="mm-live-pulse" aria-hidden="true" />
-          <span>Checking this workflow now</span>
-        </>
-      ) : (
-        <>
+        ) : (
           <span className="mm-library-scan__dot" aria-hidden="true" />
-          <span>{scanned(scan?.generated_at ?? null, now)}</span>
-        </>
-      )}
-      {scheduleLine ? (
-        <span data-testid="library-schedule">· {scheduleLine}</span>
-      ) : null}
+        )}
+        <span>{when}</span>
+        {scheduleBrief ? (
+          <span
+            className="mm-library-scan__next"
+            data-testid="library-schedule"
+          >
+            · {scheduleBrief}
+          </span>
+        ) : null}
+        <span className="sr-only">
+          {scheduleLine ? `, ${scheduleLine}` : ""}
+        </span>
+      </span>
       <button
         type="button"
         className="mm-head-control"
-        disabled={rescan.isPending || Boolean(scan?.running)}
+        disabled={rescan.isPending || running}
         onClick={() => rescan.mutate()}
       >
         {rescan.isPending ? "Starting a check…" : "Check again"}
@@ -56,6 +80,10 @@ export function LibraryScanStatus({
         <span
           className="mm-library-scan__error"
           role="alert"
+          title={errorMessage(
+            rescan.error,
+            "Weir couldn't start a check. Try again in a moment.",
+          )}
           data-testid="library-scan-error"
         >
           {errorMessage(
@@ -64,6 +92,6 @@ export function LibraryScanStatus({
           )}
         </span>
       ) : null}
-    </div>
+    </>
   );
 }

@@ -10,8 +10,8 @@ import { useSearchParams } from "react-router-dom";
 import { Panel } from "../../components/panels/panel";
 import { ApiEntryError } from "../../components/shared/api-entry-error";
 import { PageLoading } from "../../components/shared/page-loading";
-import { PageHeader } from "../../components/shell/page-header";
-import { ShellHeaderSlot } from "../../components/shell/shell-header-context";
+import { PageToolbarButtons } from "../../components/shell/page-toolbar";
+import { ShellHeaderTabs } from "../../components/shell/shell-header-context";
 import { useActivityStreamInvalidations } from "../../lib/activity/use-activity-stream-invalidation";
 import type { LibraryFileFilters } from "../../lib/processing/library-mode-api";
 import {
@@ -27,7 +27,7 @@ import { LibraryCleanActions } from "./library-clean-actions";
 import { LibraryCleanConfirm } from "./library-clean-dialog";
 import { LibraryFileDrawer } from "./library-file-drawer";
 import { readLastLibrary, saveLastLibrary } from "./last-library";
-import { groupFiles, headerLead } from "./library-model";
+import { filesCount, groupFiles, headerLead } from "./library-model";
 import { LibraryPager } from "./library-pager";
 import { LibraryPicker } from "./library-picker";
 import { LibraryScanStatus } from "./library-scan-status";
@@ -37,6 +37,7 @@ import { LibraryTable } from "./library-table";
 import {
   LibraryToolbar,
   NO_FILTER,
+  savingLine,
   type LibraryFilter,
 } from "./library-toolbar";
 import { useLibraryClean, type CleanRequest } from "./use-library-clean";
@@ -191,6 +192,7 @@ export function LibraryPage(): React.ReactElement {
   if (!chosen) return <NoLibrary />;
 
   const totals = overview.data?.totals;
+  const lead = headerLead(totals, Boolean(overview.data?.schedule.enabled));
   const loaded = files.data?.files ?? [];
   const openFile = loaded.find((f) => f.path === openPath) ?? null;
   const selectedSaving = loaded
@@ -213,19 +215,16 @@ export function LibraryPage(): React.ReactElement {
   const needsSetup = savedSetup?.library_folders.length === 0;
   const header = (
     <>
-      <ShellHeaderSlot>
+      <ShellHeaderTabs>
         <LibraryPicker
           libraries={libraries.data ?? []}
           chosenId={chosen.id}
           onPick={pick}
           countFor={(id) => (id === chosen.id ? (totals?.files ?? null) : null)}
         />
-      </ShellHeaderSlot>
-      <PageHeader>
-        <p className="mm-page-head__lead">
-          {headerLead(totals, Boolean(overview.data?.schedule.enabled))}
-        </p>
-        {needsSetup ? null : (
+      </ShellHeaderTabs>
+      {needsSetup ? null : (
+        <PageToolbarButtons>
           <LibraryScanStatus
             libraryId={chosen.id}
             scan={overview.data?.scan ?? files.data?.scan ?? null}
@@ -243,8 +242,8 @@ export function LibraryPage(): React.ReactElement {
               ) : null
             }
           />
-        )}
-      </PageHeader>
+        </PageToolbarButtons>
+      )}
     </>
   );
   const setupPanel =
@@ -276,7 +275,11 @@ export function LibraryPage(): React.ReactElement {
 
       <Panel
         title="Files"
-        count={totals ? `${totals.files.toLocaleString()} files` : undefined}
+        description={lead}
+        aside={<p className="mm-library-saving">{savingLine(totals)}</p>}
+        count={
+          totals ? <span title={lead}>{filesCount(totals)}</span> : undefined
+        }
       >
         <LibraryToolbar
           search={search}

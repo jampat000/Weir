@@ -12,6 +12,9 @@
   border-bottom: 1px solid var(--mm-header-rule);
   background: color-mix(in srgb, var(--mm-bg) 85%, transparent);
   backdrop-filter: blur(24px);
+  /* Its own width is what the page's controls in it are sized by (a container query), not the window's, since the
+     menu takes a different share of the window open and collapsed. */
+  container: mm-header / inline-size;
 }
 
 /* Phones only: the button that opens the side menu. */
@@ -31,6 +34,9 @@
   letter-spacing: var(--mm-tracking-eyebrow);
   line-height: 1.35;
   text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   color: var(--mm-text2);
 }
 
@@ -431,6 +437,11 @@
   align-items: center;
   justify-content: flex-end;
   gap: 8px;
+}
+
+/* A row with buttons and no tabs keeps them at the right. */
+.mm-page-toolbar__actions:only-child {
+  margin-left: auto;
 }
 
 /* The tab-owned buttons arrive through a portal into this element; it adds no box of its own, so they lay out as the

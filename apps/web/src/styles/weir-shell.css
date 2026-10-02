@@ -104,25 +104,6 @@ kbd {
   min-width: 0;
 }
 
-/* What a page puts at the top of itself, under the shell's header: a sentence about the page, and
-   controls the header has no room for. */
-.mm-page-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 10px 24px;
-  margin: 0 0 14px;
-}
-
-.mm-page-head__lead {
-  margin: 0;
-  max-width: min(100%, 62rem);
-  font-size: 0.9375rem;
-  line-height: 1.55;
-  color: var(--mm-text2);
-}
-
 /* A button in the header, or in a page's top row: Pause, the theme switch, Library setup. */
 .mm-head-control {
   display: inline-flex;

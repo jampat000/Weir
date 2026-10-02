@@ -10,19 +10,15 @@
   gap: var(--mm-panel-gap);
 }
 
-.mm-library > .mm-page-head {
-  margin-bottom: 0;
-}
-
-/* › TV ▾, in the header beside the "Library" title. */
+/* › TV ▾, on the header's title line, 22px after the "Library" title and on its baseline. */
 .mm-library-title {
   position: relative;
   display: inline-flex;
-  align-items: center;
+  align-items: baseline;
   gap: calc(10px * var(--mm-density-ui-scale));
   font-size: 1.125rem;
   font-weight: 600;
-  line-height: 1.25;
+  line-height: 1;
   letter-spacing: -0.02em;
   color: var(--mm-text1);
 }
@@ -114,12 +110,12 @@
   color: var(--mm-text3);
 }
 
-/* When this library was last checked, beside the lead. */
+/* When this library was last checked and when it is next, on the header's title line before the buttons. */
 .mm-library-scan {
   display: inline-flex;
-  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
+  white-space: nowrap;
   font-size: var(--mm-type-caption);
   color: var(--mm-text2);
 }
@@ -132,10 +128,36 @@
 }
 
 .mm-library-scan__error {
+  max-width: 16rem;
+  overflow: hidden;
+  font-size: var(--mm-type-caption);
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: var(--mm-status-failed-text);
 }
 
-/* Search, the counts that are also the filters, and what cleaning would give back, under the panel's header. */
+/* The title line holds the title and its picker whole, then the status and buttons; the eyebrow gives up its room
+   first, and is shown whole or not at all. */
+.mm-header:has(.mm-library-title) .mm-header__titles {
+  flex-shrink: 100;
+  min-width: 16rem;
+}
+
+@container mm-header (max-width: 1250px) {
+  .mm-header:has(.mm-library-title) .mm-header__eyebrow {
+    visibility: hidden;
+  }
+}
+
+/* Where the header is short, the next run is left to the tooltip. */
+@container mm-header (max-width: 1100px) {
+  .mm-library-scan__next {
+    display: none;
+  }
+}
+
+/* Search, the counts that are also the filters, and the row density, under the panel's header; what cleaning would give
+   back is in the header itself, at its right. */
 .mm-library-toolbar {
   display: flex;
   flex-wrap: wrap;
@@ -145,8 +167,8 @@
 }
 
 .mm-library-search {
-  flex: 0 1 19rem;
-  min-width: 12rem;
+  flex: 1 1 12rem;
+  max-width: 19rem;
 }
 
 .mm-library-chips {
@@ -162,6 +184,7 @@
 
 /* The one chip outside the group stands alone, so it keeps its own edge. */
 .mm-library-toolbar > .mm-library-chip {
+  margin-left: auto;
   border-color: var(--mm-hairline);
 }
 
@@ -208,7 +231,7 @@
 }
 
 .mm-library-saving {
-  margin: 0 0 0 auto;
+  margin: 0;
   font-size: var(--mm-type-caption);
   color: var(--mm-text3);
 }

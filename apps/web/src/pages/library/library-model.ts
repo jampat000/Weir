@@ -106,6 +106,31 @@ export function nextScheduled(
     : `next scheduled check and clean ${formatDate(schedule.next_run_at)}`;
 }
 
+/** How far ahead the next run is still told as a clock time; further off it needs its day too. */
+const CLOCK_ONLY_MS = 18 * 60 * MINUTE_MS;
+
+/**
+ * The same as {@link nextScheduled} in the few words the header has room for: "next 10:02 pm", or "next sat 3:00 am"
+ * from tomorrow on. The whole sentence stays in the status's tooltip.
+ */
+export function nextScheduledBrief(
+  schedule: LibraryModeSchedule | undefined,
+  now: number,
+  clock: (ms: number) => string,
+  dayClock: (ms: number) => string,
+): string | null {
+  if (!schedule?.enabled) return null;
+  if (!schedule.next_run_at) return "schedule cannot run";
+  const at = parseAppDate(schedule.next_run_at).getTime();
+  if (at <= now) return "next starting now";
+  return `next ${at - now < CLOCK_ONLY_MS ? clock(at) : dayClock(at)}`;
+}
+
+/** What the Files card's count says: how many files, and how much room they take. */
+export function filesCount(totals: LibraryTotals): string {
+  return `${totals.files.toLocaleString()} files · ${formatBytes(totals.size_bytes)}`;
+}
+
 /** How long ago the scan that these numbers come from ran. */
 export function scanned(generatedAt: number | null, now: number): string {
   if (!generatedAt) return "not scanned yet";

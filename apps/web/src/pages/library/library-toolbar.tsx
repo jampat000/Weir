@@ -76,7 +76,7 @@ const UNKNOWN_COUNT = "—";
  * What cleaning would win back. Never claims there is nothing to reclaim when Weir simply could not
  * measure it: some files carry no per-track size for the scan to add up.
  */
-function savingLine(totals: LibraryTotals | undefined): string {
+export function savingLine(totals: LibraryTotals | undefined): string {
   if (totals && totals.estimated_bytes_saved > 0) {
     return `About ${formatBytes(totals.estimated_bytes_saved)} back if everything that would change is cleaned`;
   }
@@ -210,7 +210,6 @@ export function LibraryToolbar({
       >
         Compact rows
       </button>
-      <p className="mm-library-saving">{savingLine(totals)}</p>
     </div>
   );
 }
