@@ -166,7 +166,7 @@ internal sealed class ProcessingFilesEndpointHandlers
             var libraryName = libraryNames.GetValueOrDefault(row.LibraryId, "Unknown workflow");
             var directPlay = DirectPlayService.ForRow(row, devices);
             progressByPath.TryGetValue(row.RelativePath, out var progress);
-            // #652: the copy Weir handed back, and what a media manager said about it, for History.
+            // #652: the copy Weir handed back, and what a media manager said about it, for Activity.
             handbacks.TryGetValue((row.LibraryId, row.RelativePath), out var handback);
             posters.TryGetValue((row.LibraryId, row.RelativePath), out var posterUrl);
             files.Add(FileOut(row, libraryName, directPlay, progress, posterUrl).Set("handback", HandbackStore.ToOut(handback)));
@@ -212,7 +212,7 @@ internal sealed class ProcessingFilesEndpointHandlers
     }
 
     /// <summary>
-    /// What History's remove dialog should offer for this title (#785), read before it is shown: whether it
+    /// What Activity's remove dialog should offer for this title (#785), read before it is shown: whether it
     /// qualifies for a choice at all (only a failed or rejected file whose original is still in the watched
     /// folder does), and when it does, which manager "delete" would ask — or that Weir would delete the file
     /// itself — and whether "keep" has a manager to tell it will not be imported.

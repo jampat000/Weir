@@ -21,7 +21,7 @@ public sealed record HandoffOutcomeResult(bool Released, string Message);
 
 /// <summary>
 /// A manager's word on a file Weir handed back (#652): Sonarr's and Radarr's import webhook, and the hand-off outcome
-/// Deluno sends. Both record what the manager said, so the file's History shows it, and both release Weir's copy only
+/// Deluno sends. Both record what the manager said, so the file's Activity shows it, and both release Weir's copy only
 /// through <see cref="HandbackStore.Release"/>.
 /// </summary>
 public sealed class HandbackOutcomes

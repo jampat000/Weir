@@ -142,7 +142,7 @@ public static class RemuxPassFileState
             ("$now", TimestampColumns.Orm(now)),
             ("$id", row.Id)).ConfigureAwait(false);
 
-        // #785: the file's identity the moment it became failed, so History's remove dialog can tell a later,
+        // #785: the file's identity the moment it became failed, so Activity's remove dialog can tell a later,
         // different release at the same path from the one that actually failed.
         await RecordCurrentFingerprintAsync(uow, library, relativePath).ConfigureAwait(false);
 

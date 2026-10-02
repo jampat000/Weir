@@ -60,10 +60,10 @@ public static class ProcessingFileStatuses
 public static class CancelledFileReasons
 {
     public const string InWeir =
-        "Cancelled from the jobs list in System › Logs before Weir started on it. The original is untouched; queue it again from History to process it.";
+        "Cancelled from the jobs list in System › Logs before Weir started on it. The original is untouched; queue it again from Activity to process it.";
 
     public const string ByManager =
-        "The media manager cancelled this hand-off before Weir started on it. The original is untouched; queue it again from History to process it.";
+        "The media manager cancelled this hand-off before Weir started on it. The original is untouched; queue it again from Activity to process it.";
 }
 
 /// <summary>One <c>files</c> row.</summary>
@@ -112,7 +112,7 @@ public sealed record ProcessingFileRecord
     /// <summary>
     /// The size and modification time Weir read from the source at the moment this row most recently became
     /// <see cref="ProcessingFileStatuses.ProcessingFailed"/> or <see cref="ProcessingFileStatuses.Rejected"/> (#785).
-    /// Null before migration 0025, or when the file could not be read at that moment. History's remove dialog compares
+    /// Null before migration 0025, or when the file could not be read at that moment. Activity's remove dialog compares
     /// these against the file on disk before "delete" or "keep" act, so a different release that has since landed at the
     /// same path is never mistaken for the one that actually failed.
     /// </summary>

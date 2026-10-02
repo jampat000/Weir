@@ -225,7 +225,7 @@ internal sealed class MediaManagerIntakeEndpointHandlers
         });
     }
 
-    /// <summary>The manager's name as History and Activity say it: Sonarr, Radarr, Deluno.</summary>
+    /// <summary>The manager's name as the Activity page says it: Sonarr, Radarr, Deluno.</summary>
     private static string ManagerName(string sourceKey) =>
         ImportEvents.DialectForSource(sourceKey) is { Key: not "native" } dialect ? dialect.DisplayName : "Your media manager";
 

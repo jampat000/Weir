@@ -12,8 +12,8 @@ using Weir.Infrastructure.Processing;
 namespace Weir.Api.Endpoints;
 
 /// <summary>
-/// History's library cleans, <c>/api/v1/processing/library-cleans</c> (#695): what the newest clean did to each library
-/// file, filtered the way <c>/processing/files</c> filters downloads, so History lists both kinds side by side.
+/// Activity's library cleans, <c>/api/v1/processing/library-cleans</c> (#695): what the newest clean did to each library
+/// file, filtered the way <c>/processing/files</c> filters downloads, so Activity lists both kinds side by side.
 /// </summary>
 public static class ProcessingLibraryCleansEndpoints
 {

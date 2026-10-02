@@ -194,7 +194,7 @@ public sealed class ActivityHistoryStore
             parameters.Add(("@library_id", libraryId));
         }
 
-        // System › Logs shows Weir's own events and History shows the files: "weir" keeps the events that are
+        // System › Logs shows Weir's own events and Activity shows the files: "weir" keeps the events that are
         // not about one file, "files" keeps the ones that are. Anything else filters nothing.
         switch (Core.Json.WireStrings.Strip(filter.About ?? string.Empty).ToLowerInvariant())
         {

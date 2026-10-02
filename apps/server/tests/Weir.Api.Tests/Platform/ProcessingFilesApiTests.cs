@@ -169,7 +169,7 @@ public sealed class ProcessingFilesApiTests
     }
 
     /// <summary>
-    /// Once an owner removes a finished or failed title from History (the <c>DELETE /processing/files/{id}</c>
+    /// Once an owner removes a finished or failed title from Activity (the <c>DELETE /processing/files/{id}</c>
     /// "Remove from list" action), Processing must stop reporting it as current work — its failed-jobs alert and
     /// its "Just finished" list — while System's own Activity log and Jobs list, which read the same rows without
     /// asking for that, keep the complete record. Nothing about the file is deleted beyond the <c>files</c> row
@@ -233,7 +233,7 @@ public sealed class ProcessingFilesApiTests
     /// <summary>
     /// The overview's processed/failed counts, output-written total and space saved are lifetime statistics —
     /// "Weir has saved X GB" — the same kind of fact System › Logs keeps whether or not a title is still in
-    /// History. Removing a title from History must not change them, even though the same title drops out of the
+    /// Activity. Removing a title from Activity must not change them, even though the same title drops out of the
     /// failed-jobs alert and the "Just finished" lane in the process.
     /// </summary>
     [Fact]

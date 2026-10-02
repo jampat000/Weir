@@ -133,7 +133,7 @@ public sealed partial class HandoffCompletionReporter
 
     /// <summary>
     /// Record the report in Activity, in plain words, accepted or not. <paramref name="acceptedTitle"/> names a
-    /// deliberate hold plainly — "Told Deluno you chose to keep {file} without processing it" for History's "keep"
+    /// deliberate hold plainly — "Told Deluno you chose to keep {file} without processing it" for Activity's "keep"
     /// (#786 review of #785) — rather than let the generic wording below, written for a hold that just happened to a
     /// pass, say Weir "could not process" a file a person chose to leave alone.
     /// </summary>
@@ -312,14 +312,14 @@ public sealed partial class HandoffCompletionReporter
 
     /// <summary>
     /// A report ready to record: the ledger state it means, the body, the path Activity names it by (the file, or the
-    /// folder of a hand-off of several files), and the files whose History waits on it while the manager is not answering.
+    /// folder of a hand-off of several files), and the files whose Activity waits on it while the manager is not answering.
     /// </summary>
     private sealed record ReportedOutcome(string State, WireObject Body, string? Subject, IReadOnlyList<string> Files, long? LibraryId);
 
     /// <summary>
     /// Keep the ledger and Activity in step with a final outcome recorded outside the claim mechanism (a hand-off with
     /// no target rows of its own), then commit. Never throws. A report the manager did not answer is kept on the
-    /// hand-off for the heartbeat to send once it answers, and the History of each file it covers says Weir is
+    /// hand-off for the heartbeat to send once it answers, and the Activity of each file it covers says Weir is
     /// waiting for it, in plain words (#652).
     /// </summary>
     private async Task RecordUntrackedOutcomeAsync(UnitOfWork uow, HandoffOrigin origin, ReportedOutcome outcome, (HandoffReportTarget Target, HandoffReportDelivery Delivery)? report)
