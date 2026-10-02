@@ -1,4 +1,4 @@
-"""``AuditSettingsMixin``: the Settings sections, History and Logs jobs, and every System tab except
+"""``AuditSettingsMixin``: the setup areas, History and Logs jobs, and every System tab except
 Alerts and Media managers (those are ``AuditNotificationsMixin``). Assumes ``AuditCore`` and
 ``AuditShellMixin`` (``open_sidebar``, ``open_tab``, ``open_logs``, ``tab_labels``) in the same
 instance.
@@ -12,58 +12,76 @@ from .config import TIMEOUT_MS
 class AuditSettingsMixin:
     def settings_tabs(self) -> None:
         expected = {
-            "Workflows": "processing-libraries-section",
-            "Rules": "processing-rule-set-workspace",
-            "Media managers": "suite-settings-media-managers",
-            "Performance": "processing-process-settings",
-            "Schedule": "processing-schedules-section",
-            "Cleanup": "processing-maintenance-section",
-            "Alerts": "suite-settings-notifications",
+            "Workflows": {
+                "Workflows": "processing-libraries-section",
+                "Schedule": "processing-schedules-section",
+            },
+            "Connections": {
+                "Media managers": "suite-settings-media-managers",
+                "Download clients": "suite-settings-download-clients-tab",
+                "Alerts": "suite-settings-notifications",
+            },
+            "Rules": {
+                "Profiles": "processing-rule-set-workspace",
+                "Metadata & artwork": "processing-metadata-tab",
+                "Playback devices": "processing-direct-play-section",
+            },
+            "Performance": {
+                "Speed": "processing-process-settings",
+                "Cleanup": "processing-maintenance-section",
+                "Weir's timers": "processing-timers-section",
+            },
         }
-        # Each section is an entry of its own in the side menu; the page has no row of tabs.
-        for tab, test_id in expected.items():
-            self.open_tab("Settings", tab)
-            self.visible(self.page.get_by_test_id("suite-settings-page"), "Settings page")
+        # Each setup area is an entry of its own in the side menu, with its tabs across the top of the page.
+        for area, tabs in expected.items():
+            self.open_sidebar(area)
+            self.visible(self.page.get_by_test_id("suite-settings-page"), f"{area} page")
             self.visible(
-                self.page.get_by_role("heading", level=1, name=tab, exact=True),
-                f"Settings {tab} page title",
+                self.page.get_by_role("heading", level=1, name=area, exact=True),
+                f"{area} page title",
             )
-            self.visible(self.page.get_by_test_id(test_id), f"Settings {tab} panel")
-
-            if tab == "Workflows":
-                self.visible(
-                    self.page.get_by_test_id("workflow-kind-badge").first,
-                    "each workflow says whether it is Weir only or linked to a media manager",
-                )
-                edit_buttons = self.page.get_by_role("button", name="Edit", exact=True)
-                if edit_buttons.count():
-                    self.click(edit_buttons.first, "open workflow editor")
-                    self.visible(
-                        self.page.get_by_test_id("processing-library-form"),
-                        "workflow form",
-                    )
-                    cancel = self.page.get_by_role("button", name="Cancel", exact=True)
-                    if cancel.count():
-                        self.click(cancel.last, "cancel workflow editor")
-            elif tab == "Schedule":
-                # A week per library, the time zone above them (canvas board 6).
-                self.visible(
-                    self.page.get_by_text("Time zone", exact=True),
-                    "time zone control",
-                )
-                self.require(
-                    self.page.get_by_test_id("schedule-library-row").count() > 0,
-                    "no library weeks on Schedule",
-                )
+            self.require(
+                self.tab_labels("setup-area-tabs") == list(tabs),
+                f"{area} does not offer the tabs {list(tabs)}",
+            )
+            for tab, test_id in tabs.items():
+                self.open_tab(area, tab)
+                self.visible(self.page.get_by_test_id(test_id), f"{area} › {tab} panel")
+                self.workflow_and_schedule_checks(tab)
 
         self.require(
             not self.page.get_by_test_id("settings-section-tabs").count(),
             "Settings still has a row of tabs of its own",
         )
         self.screenshot("settings")
-        self.record(
-            "Settings workflows, rules, media managers, performance, cleanup, schedule, and alerts sections"
-        )
+        self.record("setup areas: every tab of Workflows, Connections, Rules and Performance")
+
+    def workflow_and_schedule_checks(self, tab: str) -> None:
+        if tab == "Workflows":
+            self.visible(
+                self.page.get_by_test_id("workflow-kind-badge").first,
+                "each workflow says whether it is Weir only or linked to a media manager",
+            )
+            edit_buttons = self.page.get_by_role("button", name="Edit", exact=True)
+            if edit_buttons.count():
+                self.click(edit_buttons.first, "open workflow editor")
+                self.visible(
+                    self.page.get_by_test_id("processing-library-form"),
+                    "workflow form",
+                )
+                cancel = self.page.get_by_role("button", name="Cancel", exact=True)
+                if cancel.count():
+                    self.click(cancel.last, "cancel workflow editor")
+        elif tab == "Schedule":
+            # A week per library, the time zone above them (canvas board 6).
+            self.visible(
+                self.page.get_by_text("Time zone", exact=True),
+                "time zone control",
+            )
+            self.require(
+                self.page.get_by_test_id("schedule-library-row").count() > 0,
+                "no library weeks on Schedule",
+            )
 
     def history_and_jobs(self) -> None:
         # History: every file Weir has touched, with the open file's record beside the list.

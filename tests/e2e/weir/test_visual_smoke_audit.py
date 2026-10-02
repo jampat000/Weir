@@ -3,7 +3,7 @@
 Run with WEIR_E2E=1. Screenshots are saved to artifacts/screenshots/ for
 visual inspection. The artifacts/ directory is .gitignored so no pixel-exact
 baselines are committed; these are informational smoke checks. What is asserted is
-the structure of each screen: the Dashboard at "/", Settings and System as two rows of
+the structure of each screen: the Dashboard at "/", each setup area and System with a row of
 tabs, and System › Logs with its history statement.
 
 Usage:
@@ -33,15 +33,12 @@ pytestmark = [
     ),
 ]
 
-# Every Settings section, as named in the side menu.
-_SETTINGS_SECTION_LABELS = (
+# Every setup area, as named in the side menu.
+_SETUP_AREA_LABELS = (
     "Workflows",
+    "Connections",
     "Rules",
-    "Media managers",
     "Performance",
-    "Schedule",
-    "Cleanup",
-    "Alerts",
 )
 
 # Directory where screenshots are persisted (informational, .gitignored).
@@ -98,7 +95,7 @@ def _assert_document_owns_vertical_scroll(page) -> None:
 def _assert_workspace(page, *, page_test_id: str, tabs_test_id: str | None) -> None:
     """A workspace page, and when it has tabs, the shared themed tab bar and accessible panel contract.
 
-    Settings has none: its sections are entries of the side menu.
+    A page without tabs has no tab list.
     """
     workspace = page.get_by_test_id(page_test_id)
     expect(workspace).to_have_class(re.compile(r"\bmm-workspace-page\b"))
@@ -194,8 +191,8 @@ def test_history_says_how_far_back_it_goes(weir_shell: str) -> None:
             browser.close()
 
 
-def test_settings_and_system_tabs_render(weir_shell: str) -> None:
-    """Every Settings and System tab opens, and the document keeps the scroll."""
+def test_setup_and_system_tabs_render(weir_shell: str) -> None:
+    """Every setup area and System tab opens, and the document keeps the scroll."""
     base = weir_shell.rstrip("/")
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
@@ -205,11 +202,16 @@ def test_settings_and_system_tabs_render(weir_shell: str) -> None:
 
             ensure_signed_in(page, base)
 
-            # Settings sections are entries of their own in the side menu; System keeps its tabs across the top.
-            for label in _SETTINGS_SECTION_LABELS:
-                open_tab(page, "Settings", label)
+            # Each setup area is an entry of its own in the side menu, with its tabs across the top, as System has.
+            for label in _SETUP_AREA_LABELS:
+                open_sidebar(page, label)
                 expect(page.get_by_test_id("suite-settings-page")).to_be_visible()
-                _assert_no_error_state(page)
+                area_tabs = page.get_by_test_id("setup-area-tabs").get_by_role("tab")
+                for index in range(area_tabs.count()):
+                    area_tab = area_tabs.nth(index)
+                    area_tab.click()
+                    expect(area_tab).to_have_attribute("aria-selected", "true")
+                    _assert_no_error_state(page)
 
             open_sidebar(page, "System")
             expect(page.get_by_test_id("suite-system-page")).to_be_visible()
@@ -243,10 +245,10 @@ def test_settings_and_system_tabs_render(weir_shell: str) -> None:
             browser.close()
 
 
-def test_settings_and_system_share_themed_tabs_and_responsive_layout(
+def test_setup_and_system_share_themed_tabs_and_responsive_layout(
     weir_shell: str,
 ) -> None:
-    """Settings and System use the shared horizontal tab bar without page overflow."""
+    """The setup areas and System use the shared horizontal tab bar without page overflow."""
     base = weir_shell.rstrip("/")
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
@@ -257,7 +259,7 @@ def test_settings_and_system_share_themed_tabs_and_responsive_layout(
             ensure_signed_in(page, base)
 
             for label, page_test_id, tabs_test_id, screenshot_name in (
-                ("Workflows", "suite-settings-page", None, "settings-workspace"),
+                ("Workflows", "suite-settings-page", "setup-area-tabs", "settings-workspace"),
                 ("System", "suite-system-page", "system-section-tabs", "system-workspace"),
             ):
                 open_sidebar(page, label)
@@ -286,7 +288,7 @@ def test_settings_and_system_share_themed_tabs_and_responsive_layout(
 
 
 def test_rules_editor_renders(weir_shell: str) -> None:
-    """Settings › Rules: the full audio & subtitle profile editor stays readable at desktop width."""
+    """Setup › Rules › Profiles: the full audio & subtitle profile editor stays readable at desktop width."""
     base = weir_shell.rstrip("/")
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
@@ -295,9 +297,9 @@ def test_rules_editor_renders(weir_shell: str) -> None:
             page.set_default_timeout(30_000)
             ensure_signed_in(page, base)
 
-            open_tab(page, "Settings", "Rules")
+            open_tab(page, "Rules", "Profiles")
             expect(page.get_by_test_id("processing-rule-set-workspace")).to_be_visible()
-            page.get_by_role("button", name="New profile →", exact=True).click()
+            page.get_by_role("button", name="New profile", exact=True).click()
             # The profile bar: the picker, the name and who uses it on one line; the field is "Name".
             expect(page.get_by_test_id("rule-set-profile-bar").get_by_label("Name", exact=True)).to_be_visible()
             expect(page.get_by_text("Audio order", exact=True)).not_to_be_visible()

@@ -1,4 +1,4 @@
-"""``AuditNotificationsMixin``: Settings › Alerts (notification channels) and Settings › Media
+"""``AuditNotificationsMixin``: Setup › Connections › Alerts (notification channels) and Setup › Connections › Media
 managers. Assumes ``AuditCore`` and ``AuditShellMixin`` in the same instance.
 """
 
@@ -12,10 +12,10 @@ AUDIT_MANAGER_NAME = "Deluno on 127.0.0.1"
 
 class AuditNotificationsMixin:
     def settings_notifications(self) -> None:
-        self.open_tab("Settings", "Alerts")
+        self.open_tab("Connections", "Alerts")
         self.visible(
             self.page.get_by_test_id("suite-settings-notifications"),
-            "Settings alerts panel",
+            "Alerts panel",
         )
         # Make reruns safe after a diagnostic failure leaves the disposable
         # channel behind.
@@ -45,7 +45,7 @@ class AuditNotificationsMixin:
             existing.first.wait_for(state="detached", timeout=TIMEOUT_MS)
         self.click(
             self.page.get_by_role(
-                "button", name="Add an alert →", exact=True
+                "button", name="Add alert", exact=True
             ),
             "open notification channel form",
         )
@@ -144,10 +144,10 @@ class AuditNotificationsMixin:
         self.record("notification channel create, edit/cancel, and confirmed remove")
 
     def settings_media_managers(self) -> None:
-        self.open_tab("Settings", "Media managers")
+        self.open_tab("Connections", "Media managers")
         self.visible(
             self.page.get_by_test_id("media-manager-add"),
-            "Settings media managers panel",
+            "Media managers panel",
         )
         for card in self.page.get_by_test_id("media-manager-card").all():
             if AUDIT_MANAGER_NAME in card.inner_text():

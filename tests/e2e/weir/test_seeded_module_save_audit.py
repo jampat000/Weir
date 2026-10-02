@@ -52,8 +52,8 @@ def test_saved_state_persists_across_settings_and_processing(
             expect(page.get_by_test_id("processing-page")).to_be_visible()
             expect(page.locator("html")).not_to_have_attribute("data-mm-density", re.compile(".*"))
 
-            # Workflows is where Settings opens.
-            open_tab(page, "Settings", "Workflows")
+            # Workflows is where setup opens.
+            open_tab(page, "Workflows", "Workflows")
             libraries = page.get_by_test_id("processing-libraries-section")
             expect(libraries).to_be_visible()
             # Every workflow says whether it is Weir only or linked to a media manager.
@@ -66,7 +66,7 @@ def test_saved_state_persists_across_settings_and_processing(
             expect(form).to_have_count(0)
             open_sidebar(page, "Dashboard")
             expect(page.get_by_test_id("processing-page")).to_be_visible()
-            open_tab(page, "Settings", "Workflows")
+            open_tab(page, "Workflows", "Workflows")
             expect(page.get_by_test_id("processing-libraries-section")).to_contain_text(str(tv_watch))
         finally:
             browser.close()

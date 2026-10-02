@@ -53,17 +53,16 @@ def open_sidebar(page: Page, label: str) -> None:
 
 
 def open_tab(page: Page, sidebar: str, tab: str) -> None:
-    """A Settings section or a System tab.
+    """A tab of a setup area (Workflows, Connections, Rules, Performance) or of System.
 
-    Each Settings section is an entry of its own in the side menu, which marks the one showing. System is one
-    entry, with its tabs across the top.
+    Each area is an entry of its own in the side menu, which marks the one showing, and has its tabs across the top
+    of the page.
     """
 
-    if sidebar == "Settings":
-        open_sidebar(page, tab)
-        expect(page.get_by_role("link", name=tab, exact=True)).to_have_attribute("aria-current", "page")
-        return
     open_sidebar(page, sidebar)
+    expect(page.get_by_role("link", name=re.compile(rf"^{re.escape(sidebar)}(?:,|$)"))).to_have_attribute(
+        "aria-current", "page"
+    )
     selected = page.get_by_role("tab", name=tab, exact=True)
     selected.click()
     expect(selected).to_have_attribute("aria-selected", "true")

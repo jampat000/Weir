@@ -16,15 +16,56 @@ pytestmark = [
     ),
 ]
 
-# Settings section (an entry of its own in the side menu) -> what it shows. Weir itself is System, not Settings.
-SETTINGS_SECTIONS = (
-    ("Workflows", "processing-libraries-section"),
-    ("Rules", "processing-rule-set-workspace"),
-    ("Media managers", "suite-settings-media-managers"),
-    ("Performance", "processing-process-settings"),
-    ("Schedule", "processing-schedules-section"),
-    ("Cleanup", "processing-maintenance-section"),
-    ("Alerts", "suite-settings-notifications"),
+# Setup area (an entry of its own in the side menu) -> its address, and each of its tabs with the address and the
+# content it shows. The first tab is at the area's own address. Weir itself is System, not Setup.
+SETUP_AREAS = (
+    (
+        "Workflows",
+        "/setup/workflows",
+        (
+            ("Workflows", "/setup/workflows", "processing-libraries-section"),
+            ("Schedule", "/setup/workflows/schedule", "processing-schedules-section"),
+        ),
+    ),
+    (
+        "Connections",
+        "/setup/connections",
+        (
+            ("Media managers", "/setup/connections", "suite-settings-media-managers"),
+            ("Download clients", "/setup/connections/download-clients", "suite-settings-download-clients-tab"),
+            ("Alerts", "/setup/connections/alerts", "suite-settings-notifications"),
+        ),
+    ),
+    (
+        "Rules",
+        "/setup/rules",
+        (
+            ("Profiles", "/setup/rules", "processing-rule-set-workspace"),
+            ("Metadata & artwork", "/setup/rules/metadata", "processing-metadata-tab"),
+            ("Playback devices", "/setup/rules/devices", "processing-direct-play-section"),
+        ),
+    ),
+    (
+        "Performance",
+        "/setup/performance",
+        (
+            ("Speed", "/setup/performance", "processing-process-settings"),
+            ("Cleanup", "/setup/performance/cleanup", "processing-maintenance-section"),
+            ("Weir's timers", "/setup/performance/timers", "processing-timers-section"),
+        ),
+    ),
+)
+
+# Former Settings addresses, and the setup tab each one lands on.
+FORMER_SETTINGS_ADDRESSES = (
+    ("/settings", "/setup/workflows", "processing-libraries-section"),
+    ("/settings?tab=libraries", "/setup/workflows", "processing-libraries-section"),
+    ("/settings?tab=rules", "/setup/rules", "processing-rule-set-workspace"),
+    ("/settings?tab=media-managers", "/setup/connections", "suite-settings-media-managers"),
+    ("/settings?tab=performance", "/setup/performance", "processing-process-settings"),
+    ("/settings?tab=schedule", "/setup/workflows/schedule", "processing-schedules-section"),
+    ("/settings?tab=cleanup", "/setup/performance/cleanup", "processing-maintenance-section"),
+    ("/settings?tab=alerts", "/setup/connections/alerts", "suite-settings-notifications"),
 )
 
 
@@ -38,7 +79,7 @@ def test_signed_in_navigation_covers_main_screens_and_tabs(weir_shell: str) -> N
 
             ensure_signed_in(page, base)
 
-            # The Dashboard (the landing screen) and History, Library, each Settings section, then System.
+            # The Dashboard (the landing screen) and History, Library, each setup area, then System.
             primary = page.get_by_role("navigation", name="Primary")
             # The labels, not the links: the Dashboard link also carries its "1 working" badge while a file runs.
             expect(primary.locator(".mm-sidebar-link-label")).to_have_text(
@@ -46,7 +87,7 @@ def test_signed_in_navigation_covers_main_screens_and_tabs(weir_shell: str) -> N
                     "Dashboard",
                     "History",
                     "Library",
-                    *[label for label, _ in SETTINGS_SECTIONS],
+                    *[label for label, _, _ in SETUP_AREAS],
                     "System",
                 ]
             )
@@ -85,14 +126,23 @@ def test_signed_in_navigation_covers_main_screens_and_tabs(weir_shell: str) -> N
             expect(page).to_have_url(re.compile(r".*/library(?:$|[?#])"))
             expect(page.get_by_test_id("library-page")).to_be_visible()
 
-            # Settings has no row of tabs: the side menu is the way between its sections, and the header
-            # names the one showing.
-            for label, section in SETTINGS_SECTIONS:
+            # Each setup area has a row of tabs of its own: the side menu is the way between areas, the tabs are the
+            # way within one, and the header names the area showing. Every tab has its own address.
+            for label, address, tabs in SETUP_AREAS:
                 open_sidebar(page, label)
-                expect(page).to_have_url(re.compile(r".*/settings(?:$|[?#])"))
+                expect(page).to_have_url(re.compile(rf".*{address}$"))
                 expect(page.get_by_test_id("suite-settings-page")).to_be_visible()
                 expect(page.get_by_role("heading", level=1, name=label, exact=True)).to_be_visible()
-                expect(page.get_by_test_id(section)).to_be_visible()
+                expect(page.get_by_test_id("setup-area-tabs").get_by_role("tab")).to_have_text(
+                    [tab_label for tab_label, _, _ in tabs]
+                )
+                for tab_label, tab_address, section in tabs:
+                    page.get_by_role("tab", name=tab_label, exact=True).click()
+                    expect(page).to_have_url(re.compile(rf".*{tab_address}$"))
+                    expect(page.get_by_role("tab", name=tab_label, exact=True)).to_have_attribute(
+                        "aria-selected", "true"
+                    )
+                    expect(page.get_by_test_id(section)).to_be_visible()
             expect(page.get_by_test_id("settings-section-tabs")).to_have_count(0)
 
             open_sidebar(page, "System")
@@ -103,7 +153,7 @@ def test_signed_in_navigation_covers_main_screens_and_tabs(weir_shell: str) -> N
             )
             expect(page.get_by_test_id("suite-settings-global")).to_be_visible()
             expect(page.get_by_text("Setup wizard", exact=True)).to_be_visible()
-            # The time zone lives in Settings › Schedule, beside the times it governs.
+            # The time zone lives in Setup › Workflows › Schedule, beside the times it governs.
             expect(page.get_by_text("Time zone", exact=True)).to_have_count(0)
             expect(page.get_by_text("Updates", exact=True)).to_be_visible()
             # There is no display density setting.
@@ -139,12 +189,18 @@ def test_signed_in_navigation_covers_main_screens_and_tabs(weir_shell: str) -> N
             for old_tab, new_address, section in (
                 ("jobs", r"/system\?tab=logs&show=jobs", "processing-jobs-inspection-section"),
                 ("files", r"/history", "history-page"),
-                ("libraries", r"/settings\?tab=libraries", "processing-libraries-section"),
-                ("audio-subtitles", r"/settings\?tab=rules", "processing-rule-set-workspace"),
-                ("schedules", r"/settings\?tab=schedule", "processing-schedules-section"),
-                ("maintenance", r"/settings\?tab=cleanup", "processing-maintenance-section"),
+                ("libraries", r"/setup/workflows", "processing-libraries-section"),
+                ("audio-subtitles", r"/setup/rules", "processing-rule-set-workspace"),
+                ("schedules", r"/setup/workflows/schedule", "processing-schedules-section"),
+                ("maintenance", r"/setup/performance/cleanup", "processing-maintenance-section"),
             ):
                 page.goto(f"{base}/processing?tab={old_tab}", wait_until="domcontentloaded")
+                expect(page).to_have_url(re.compile(rf".*{new_address}$"))
+                expect(page.get_by_test_id(section)).to_be_visible()
+
+            # So do the Settings addresses, which are the setup areas now.
+            for old_address, new_address, section in FORMER_SETTINGS_ADDRESSES:
+                page.goto(f"{base}{old_address}", wait_until="domcontentloaded")
                 expect(page).to_have_url(re.compile(rf".*{new_address}$"))
                 expect(page.get_by_test_id(section)).to_be_visible()
         finally:

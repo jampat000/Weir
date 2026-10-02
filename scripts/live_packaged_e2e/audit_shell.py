@@ -84,20 +84,17 @@ class AuditShellMixin:
         self.record("desktop collapse/theme and mobile navigation controls")
 
     def open_tab(self, sidebar: str, tab: str) -> None:
-        """A Settings section or a System tab.
+        """A tab of a setup area (Workflows, Connections, Rules, Performance) or of System.
 
-        Each Settings section is an entry of its own in the side menu, which marks the one showing. System is
-        one entry, with its tabs across the top.
+        Each area is an entry of its own in the side menu, which marks the one showing, and has its tabs across
+        the top of the page.
         """
 
-        if sidebar == "Settings":
-            self.open_sidebar(tab)
-            self.visible(
-                self.page.get_by_role("link", name=tab, exact=True).and_(self.page.locator("[aria-current='page']")),
-                f"Settings › {tab} marked as the current page in the side menu",
-            )
-            return
         self.open_sidebar(sidebar)
+        self.visible(
+            self.page.get_by_role("link", name=sidebar, exact=True).and_(self.page.locator("[aria-current='page']")),
+            f"{sidebar} marked as the current page in the side menu",
+        )
         self.click(
             self.page.get_by_role("tab", name=tab, exact=True),
             f"open {sidebar} › {tab}",
@@ -133,7 +130,7 @@ class AuditShellMixin:
             "Dashboard heading",
         )
         # The landing page is the Dashboard, every file's story is History, and the
-        # 3.1 Activity page is System › Logs. Each Settings section is an entry of its own.
+        # 3.1 Activity page is System › Logs. Each setup area is an entry of its own.
         primary = self.page.get_by_role("navigation", name="Primary")
         labels = [text.strip() for text in primary.locator(".mm-sidebar-link-label").all_text_contents()]
         self.require(

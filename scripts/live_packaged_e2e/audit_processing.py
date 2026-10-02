@@ -1,5 +1,5 @@
 """``AuditProcessingMixin``: the Processing pass-through lifecycle proof (a real ffmpeg fixture,
-optional), and Settings/System URL history and the not-found route. Assumes ``AuditCore`` and
+optional), and setup-area/System URL history and the not-found route. Assumes ``AuditCore`` and
 ``AuditShellMixin`` in the same instance.
 """
 
@@ -196,11 +196,11 @@ class AuditProcessingMixin:
     def settings_history_and_navigation(self) -> None:
         for sidebar, first, first_id, second, second_param, second_id in (
             (
-                "Settings",
+                "Workflows",
                 "Workflows",
                 "processing-libraries-section",
                 "Schedule",
-                "tab=schedule",
+                "/setup/workflows/schedule",
                 "processing-schedules-section",
             ),
             (
@@ -216,12 +216,7 @@ class AuditProcessingMixin:
             self.visible(
                 self.page.get_by_test_id(first_id), f"{sidebar} history origin {first}"
             )
-            # A Settings section is a side menu entry, a System tab one across the top.
-            target = (
-                self.page.get_by_role("link", name=second, exact=True)
-                if sidebar == "Settings"
-                else self.page.get_by_role("tab", name=second, exact=True)
-            )
+            target = self.page.get_by_role("tab", name=second, exact=True)
             self.click(target, f"exercise {sidebar} URL history forward target")
             self.require(
                 second_param in self.page.url,
@@ -242,4 +237,4 @@ class AuditProcessingMixin:
             self.page.get_by_text("This page doesn't exist.", exact=False),
             "not-found route",
         )
-        self.record("Settings and System URL history and not-found route")
+        self.record("Workflows and System URL history and not-found route")
