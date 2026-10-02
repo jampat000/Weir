@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it } from "vitest";
 
@@ -31,6 +31,25 @@ describe("Panel", () => {
 
     expect(screen.getByText("4 cleaned today")).toBeInTheDocument();
     expect(screen.getByText("Body")).toBeInTheDocument();
+  });
+
+  it("puts controls in the count's place, and describes the panel for a screen reader", () => {
+    renderPanel({
+      count: "4 cleaned today",
+      controls: <button type="button">Movies</button>,
+      description: "4 cleaned today",
+    });
+
+    const header = screen
+      .getByRole("heading", { name: "Just finished" })
+      .closest("header") as HTMLElement;
+    expect(
+      within(header).getByRole("button", { name: "Movies" }),
+    ).toBeVisible();
+    expect(header.querySelector(".mm-panel__count")).toBeNull();
+    expect(
+      screen.getByRole("region", { name: "Just finished" }),
+    ).toHaveAccessibleDescription("4 cleaned today");
   });
 
   it("links to where its subject is managed, naming the panel in the link", () => {

@@ -5,6 +5,13 @@ type PanelProps = {
   title: string;
   /** A quiet line after the title. It truncates before anything else when the panel is narrow. */
   count?: ReactNode;
+  /**
+   * Controls that take the count's place between the title and the link, such as a row of chips. They scroll
+   * sideways rather than wrap when the header is narrow.
+   */
+  controls?: ReactNode;
+  /** What the panel adds up to, for a screen reader only: the panel's accessible description. */
+  description?: string;
   /** Where the panel's subject is managed. Without it the header has no link. */
   to?: string;
   /** The link's words, named with the panel's title for a screen reader: "History: Just finished". */
@@ -39,6 +46,8 @@ type PanelProps = {
 export function Panel({
   title,
   count,
+  controls,
+  description,
   to,
   toLabel,
   iconOnly = false,
@@ -57,11 +66,13 @@ export function Panel({
   const titleId = headingId ?? generatedId;
   const linkWords = toLabel ?? "Open";
   const Heading = headingLevel === 2 ? "h2" : "h3";
+  const descriptionId = `${titleId}-description`;
   return (
     <section
       id={id}
       tabIndex={tabIndex}
       aria-labelledby={titleId}
+      aria-describedby={description ? descriptionId : undefined}
       data-testid={dataTestId}
       className={["mm-panel", padded ? "mm-panel--padded" : "", className]
         .filter(Boolean)
@@ -71,17 +82,25 @@ export function Panel({
         <Heading id={titleId} className="mm-panel__title">
           {title}
         </Heading>
-        <span
-          className="mm-panel__count"
-          title={typeof count === "string" ? count : undefined}
-        >
-          {count}
-        </span>
+        {controls ? (
+          <div className="mm-panel__controls">{controls}</div>
+        ) : (
+          <span
+            className="mm-panel__count"
+            title={typeof count === "string" ? count : undefined}
+          >
+            {count}
+          </span>
+        )}
         {aside ? <div className="mm-panel__aside">{aside}</div> : null}
         {to ? (
           <Link
             to={to}
-            className="mm-panel__link"
+            className={
+              iconOnly
+                ? "mm-panel__link mm-panel__link--icon"
+                : "mm-panel__link"
+            }
             aria-label={`${linkWords}: ${title}`}
           >
             {iconOnly ? null : linkWords}
@@ -102,6 +121,11 @@ export function Panel({
           </Link>
         ) : null}
       </header>
+      {description ? (
+        <p id={descriptionId} className="sr-only">
+          {description}
+        </p>
+      ) : null}
       <div
         className={["mm-panel__body", bodyClassName].filter(Boolean).join(" ")}
       >

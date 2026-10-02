@@ -1,6 +1,7 @@
 /**
  * Just finished: the files Weir has recently handed back, as one shelf of 2:3 tiles, newest first. Chips
- * above it narrow it to one workflow, and the panel's header counts what that choice finished today. Each
+ * in the panel's header narrow it to one workflow, and its description counts what that choice finished today.
+ * Each
  * tile is tagged with its workflow, and the tag goes to that workflow's library. Clicking a tile opens the
  * file's story.
  *
@@ -148,12 +149,14 @@ export function JustFinishedShelf({
   return (
     <Panel
       title="Just finished"
-      count={countWords}
+      controls={
+        <ShelfFilter choices={choices} chosen={narrowedTo} onChoose={choose} />
+      }
+      description={countWords}
       to="/history"
       toLabel="History"
     >
       <div className="mm-shelf" data-testid="just-finished-shelf">
-        <ShelfFilter choices={choices} chosen={narrowedTo} onChoose={choose} />
         <div ref={shelfRef} className="mm-shelf__rows">
           <ShelfTiles
             tiles={shelf.tiles}

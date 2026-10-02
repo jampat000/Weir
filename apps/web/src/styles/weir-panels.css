@@ -51,13 +51,32 @@
   gap: 5px;
   font-size: 13px;
   font-weight: 500;
+  /* A 13px link on its inherited line box is 19.76px tall and lowers the whole header line by 1px; 17px is the
+     height of the 12px count beside it, so every header sets its title and count at the same height. */
+  line-height: 17px;
   white-space: nowrap;
   color: var(--mm-primary);
   text-decoration: none;
 }
 
+/* An arrow alone has no text baseline, and its bottom edge would be the baseline the header lines up on, lifting the
+   title 1px; it sits centred on the line instead. */
+.mm-panel__link--icon {
+  align-self: center;
+}
+
 .mm-panel__link:hover {
   color: var(--mm-primary-bright);
+}
+
+/* Controls that take the count's place, such as Just finished's workflow chips: they use the room between the title
+   and the link, and the negative margin lets chips taller than the header's line sit in it without growing it. */
+.mm-panel__controls {
+  display: flex;
+  flex: 1;
+  align-self: center;
+  min-width: 0;
+  margin: -8px -8px;
 }
 
 /* The header's own controls: a text action or a switch, at the right edge. */
@@ -68,6 +87,8 @@
   align-items: center;
   justify-content: flex-end;
   gap: 4px 16px;
+  /* The header link's 17px line, which a control with `font: inherit` takes, so it cannot lower the header line. */
+  line-height: 17px;
 }
 
 /* A panel of fields or rows. The body is padded and set off from the header by a hairline; the panel

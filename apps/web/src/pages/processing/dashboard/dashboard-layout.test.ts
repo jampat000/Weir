@@ -60,24 +60,24 @@ describe("the shared page grid", () => {
     });
   });
 
-  it("gives way band first (never under 150px), then the Pipeline (never under three rows of 60px cards)", () => {
-    // 663px: the band keeps 150px, the Pipeline goes from 398px to 324px, the lower row gets what is left.
+  it("gives way band first (never under 144px), then the Pipeline (never under three rows of 60px cards)", () => {
+    // 663px: the band keeps 144px, the Pipeline goes from 398px to 324px, the lower row gets what is left.
     expect(gridRows(663)).toEqual({
-      band: 150,
+      band: 144,
       board: 324,
-      low: 165,
-      template: "150px 324px 165px",
+      low: 171,
+      template: "144px 324px 171px",
     });
-    expect(gridRows(700).band).toBeGreaterThanOrEqual(150);
+    expect(gridRows(700).band).toBeGreaterThanOrEqual(144);
   });
 
   it("gives the lower row way last, down to its floor", () => {
-    expect(gridRows(615)).toMatchObject({ band: 150, board: 324, low: 117 });
-    expect(gridRows(300)).toMatchObject({ band: 150, board: 324, low: 110 });
+    expect(gridRows(615)).toMatchObject({ band: 144, board: 324, low: 123 });
+    expect(gridRows(300)).toMatchObject({ band: 144, board: 324, low: 110 });
   });
 
   it("holds a page as tall as the three least rows and the gaps between them", () => {
-    expect(MIN_GRID_PX).toBe(150 + 324 + 110 + 24);
+    expect(MIN_GRID_PX).toBe(144 + 324 + 110 + 24);
     const least = gridRows(MIN_GRID_PX);
     expect(least.band + least.board + least.low + 24).toBe(MIN_GRID_PX);
   });
@@ -153,13 +153,13 @@ describe("the shared page grid", () => {
       }
     });
 
-    it("keeps the 1538 by 784 window's rows: 150, 324 and 178", () => {
+    it("keeps the 1538 by 784 window's rows: 144, 328 and 180", () => {
       // The grid there is 676px tall, and the shelf's posters are held down by its height, so it needs more than it has.
       expect(gridRows(676, { lowNeed: 294 })).toEqual({
-        band: 150,
-        board: 324,
-        low: 178,
-        template: "150px 324px 178px",
+        band: 144,
+        board: 328,
+        low: 180,
+        template: "144px 328px 180px",
       });
     });
 

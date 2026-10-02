@@ -189,7 +189,9 @@ describe("Just finished's workflow chips", () => {
       "aria-pressed",
       "true",
     );
-    expect(screen.getByText("1 today · 318 MB saved")).toBeVisible();
+    expect(
+      screen.getByRole("region", { name: "Just finished" }),
+    ).toHaveAccessibleDescription("1 today · 318 MB saved");
 
     fireEvent.click(screen.getByRole("button", { name: "All" }));
 
@@ -210,14 +212,33 @@ describe("Just finished's workflow chips", () => {
     expect(tiles()).toEqual([expect.stringContaining("S01E02")]);
   });
 
-  it("says what the page counts for the day across every workflow, in the panel's header", () => {
+  it("sits the chips in the panel's header, between the title and the History link", () => {
+    render(shelf([finished(1)]));
+
+    const header = screen
+      .getByRole("heading", { name: "Just finished" })
+      .closest("header");
+    expect(header).not.toBeNull();
+    expect(
+      within(header as HTMLElement).getByRole("group", { name: "Workflows" }),
+    ).toBeInTheDocument();
+    expect(
+      within(header as HTMLElement).getByRole("link", {
+        name: "History: Just finished",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("describes what the page counts for the day across every workflow, rather than showing it in the header", () => {
     render(
       shelf([finished(1, { kind: "failed" })], {
         count: "38 cleaned today · 41.20 GB saved",
       }),
     );
 
-    expect(screen.getByText("38 cleaned today · 41.20 GB saved")).toBeVisible();
+    expect(
+      screen.getByRole("region", { name: "Just finished" }),
+    ).toHaveAccessibleDescription("38 cleaned today · 41.20 GB saved");
   });
 
   it("says nothing finished yet today, and shows the latest from before", () => {
@@ -233,8 +254,8 @@ describe("Just finished's workflow chips", () => {
     );
 
     expect(
-      screen.getByText("Nothing yet today · latest arrivals"),
-    ).toBeVisible();
+      screen.getByRole("region", { name: "Just finished" }),
+    ).toHaveAccessibleDescription("Nothing yet today · latest arrivals");
     expect(tiles()).toHaveLength(1);
   });
 

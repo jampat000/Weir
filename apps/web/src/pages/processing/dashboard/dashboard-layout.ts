@@ -65,7 +65,7 @@ const BOARD_MIN_PX =
   PIPELINE_ROWS * (MIN_CARD_PX + ROW_GAP_PX) -
   ROW_GAP_PX +
   MORE_PX;
-const BAND_MIN_PX = 150;
+const BAND_MIN_PX = 144;
 const BAND_MAX_PX = 200;
 /** The band's share of the grid's height before its limits. */
 const BAND_SHARE = 0.2;
@@ -115,9 +115,9 @@ export type GridNeeds = {
 };
 
 /**
- * The rows of the grid, from the height it has. The band takes 20% of it between 150px and 200px, the Pipeline its
+ * The rows of the grid, from the height it has. The band takes 20% of it between 144px and 200px, the Pipeline its
  * comfortable height (BOARD_PX) and the lower row at least 180px. When they do not fit they give way in that order:
- * the band first (never under 150px), then the Pipeline (never under what three rows of the smallest cards need),
+ * the band first (never under 144px), then the Pipeline (never under what three rows of the smallest cards need),
  * then the lower row (never under LOW_FLOOR_PX).
  *
  * Spare height is shared once the lower row has what it needs. Told what the lower row can use (`lowNeed`, the
