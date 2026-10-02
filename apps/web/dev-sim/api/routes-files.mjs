@@ -5,8 +5,11 @@ import { logEntryFor } from "../engine/records.mjs";
 import { shaped } from "../openapi/skeleton.mjs";
 import { toWire, DAY_MS } from "../wire-time.mjs";
 import { fileLogText, trackStreams } from "./file-details.mjs";
+import { readFileOrder } from "./file-order.mjs";
+import { pageOf } from "./keyset.mjs";
 import { contains, intParam, listParam } from "./query.mjs";
 import { noContent, notFound, Reply } from "./reply.mjs";
+import { refusal } from "./validation.mjs";
 import { fileOut } from "./views.mjs";
 
 const DEFAULT_LIST_LIMIT = 200;
@@ -26,6 +29,9 @@ function matching(sim, query) {
 }
 
 function listFiles(sim, query) {
+  const issues = [];
+  const order = readFileOrder(query, issues);
+  if (issues.length > 0) return refusal(issues);
   const statuses = listParam(query, "file_status");
   const limit = intParam(query, "limit") ?? DEFAULT_LIST_LIMIT;
   const live = new Map(
@@ -37,9 +43,12 @@ function listFiles(sim, query) {
   const statusCounts = {};
   for (const file of candidates)
     statusCounts[file.status] = (statusCounts[file.status] ?? 0) + 1;
-  const shown = candidates
-    .filter((file) => statuses.length === 0 || statuses.includes(file.status))
-    .slice(0, limit);
+  const { rows: shown, nextCursor } = pageOf(
+    candidates.filter(
+      (file) => statuses.length === 0 || statuses.includes(file.status),
+    ),
+    { ...order, limit },
+  );
   return {
     files: shown.map((file) =>
       fileOut(
@@ -51,6 +60,7 @@ function listFiles(sim, query) {
     status_counts: statusCounts,
     returned: shown.length,
     limit,
+    next_cursor: nextCursor,
   };
 }
 
