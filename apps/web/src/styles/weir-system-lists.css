@@ -2,7 +2,7 @@
 
 .mm-sy-task {
   display: grid;
-  grid-template-columns: 10px minmax(0, 1fr) 112px 64px;
+  grid-template-columns: var(--task-cols);
   align-items: center;
   gap: 10px;
   /* 25px tall, as Deluno's rows are (5px, a line, 5px), with no padding of its own to run past the card's edge. */
@@ -28,7 +28,8 @@
   color: var(--mm-text3);
 }
 
-.mm-sy-task--head > span:nth-child(n + 3) {
+.mm-sy-task--head [data-col="result"],
+.mm-sy-task--head [data-col="next"] {
   text-align: right;
 }
 

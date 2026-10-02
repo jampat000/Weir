@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -47,6 +47,7 @@ function renderCard() {
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(NOW);
+  localStorage.clear();
   query.data = [];
   query.isError = false;
   query.isSuccess = true;
@@ -146,5 +147,101 @@ describe("the Scheduled tasks card", () => {
     const card = renderCard();
 
     expect(card).toHaveTextContent("could not read its scheduled tasks");
+  });
+
+  describe("sorting and moving columns", () => {
+    function listed(card: HTMLElement) {
+      return within(card)
+        .getAllByTestId("system-task")
+        .map((row) => row.querySelector("b")?.textContent);
+    }
+
+    beforeEach(() => {
+      query.data = [
+        task({
+          key: "b",
+          label: "Back up settings",
+          last_ok: false,
+          last_run_at: "2026-10-02T11:00:00Z",
+          next_run_at: "2026-10-02T12:03:00Z",
+        }),
+        task({
+          key: "c",
+          label: "Clean copies",
+          last_ok: true,
+          last_run_at: "2026-10-02T11:00:00Z",
+          next_run_at: "2026-10-02T12:01:00Z",
+        }),
+        task({
+          key: "a",
+          label: "Scan Movies",
+          last_ok: true,
+          last_run_at: "2026-10-02T11:00:00Z",
+          next_run_at: "2026-10-02T12:02:00Z",
+        }),
+      ];
+    });
+
+    it("keeps the card's own order until a heading is clicked: failed first, then the one due soonest", () => {
+      expect(listed(renderCard())).toEqual([
+        "Back up settings",
+        "Clean copies",
+        "Scan Movies",
+      ]);
+    });
+
+    it("sorts by the task's name, and reverses on the next click", () => {
+      const card = renderCard();
+
+      fireEvent.click(within(card).getByRole("button", { name: "Task" }));
+      expect(listed(card)).toEqual([
+        "Back up settings",
+        "Clean copies",
+        "Scan Movies",
+      ]);
+
+      fireEvent.click(within(card).getByRole("button", { name: "Task" }));
+      expect(listed(card)).toEqual([
+        "Scan Movies",
+        "Clean copies",
+        "Back up settings",
+      ]);
+    });
+
+    it("sorts by how the last run went, tasks that went the same way staying in the card's order", () => {
+      const card = renderCard();
+
+      fireEvent.click(
+        within(card).getByRole("button", { name: "Last result" }),
+      );
+
+      expect(listed(card)).toEqual([
+        "Clean copies",
+        "Scan Movies",
+        "Back up settings",
+      ]);
+    });
+
+    it("sorts by when the task runs next", () => {
+      const card = renderCard();
+
+      fireEvent.click(within(card).getByRole("button", { name: "Next" }));
+
+      expect(listed(card)).toEqual([
+        "Clean copies",
+        "Scan Movies",
+        "Back up settings",
+      ]);
+    });
+
+    it("puts the card's order back with Reset columns", () => {
+      const card = renderCard();
+      fireEvent.click(within(card).getByRole("button", { name: "Next" }));
+
+      fireEvent.click(within(card).getByRole("button", { name: "Columns" }));
+      fireEvent.click(screen.getByRole("menuitem", { name: "Reset columns" }));
+
+      expect(listed(card)[0]).toBe("Back up settings");
+    });
   });
 });
