@@ -1,14 +1,7 @@
-import type { CSSProperties } from "react";
-
+import { StatusDot } from "../../../../components/panels/status-dot";
 import { classNames } from "../../../../lib/ui/class-names";
-import type { AreaTally, AreaTone } from "./health-card-model";
+import type { AreaTally } from "./health-card-model";
 import type { HealthArea } from "./health-checks";
-
-const TONE_COLOURS: Record<AreaTone, string> = {
-  bad: "var(--mm-destructive)",
-  warn: "var(--mm-warning)",
-  ok: "var(--mm-success)",
-};
 
 type HealthRibbonProps = {
   tallies: readonly AreaTally[];
@@ -40,15 +33,13 @@ export function HealthRibbon({
             picked === tally.key && "mm-sy-area--on",
             sheen && "mm-sy-area--checking",
           )}
-          style={{ "--tone": TONE_COLOURS[tally.tone] } as CSSProperties}
+          data-status={tally.meaning}
           title={`${tally.name}: ${tally.ok} of ${tally.total} pass`}
           aria-pressed={picked === tally.key}
           onClick={() => onPick(picked === tally.key ? null : tally.key)}
         >
           <span className="mm-sy-area__name">
-            <span className="mm-sy-area__dot" aria-hidden="true">
-              ●
-            </span>
+            <StatusDot meaning={tally.meaning} />
             {tally.name}
           </span>
           <span className="mm-sy-area__count">

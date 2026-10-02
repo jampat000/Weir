@@ -1,8 +1,8 @@
 import { useMemo } from "react";
 
 import { Panel } from "../../../../components/panels/panel";
+import { StatusDot } from "../../../../components/panels/status-dot";
 import { useSystemTasksQuery } from "../../../../lib/system/system-tasks";
-import { classNames } from "../../../../lib/ui/class-names";
 import { FitText, nameWords } from "../../../../lib/ui/fit-text";
 import { useNow } from "../../../../lib/ui/use-now";
 import { useFittingRows } from "../fit-rows";
@@ -11,6 +11,7 @@ import { JOBS_PATH } from "./system-paths";
 import {
   lastResultWords,
   nextWords,
+  TASK_MEANING,
   taskRows,
   tasksSummary,
   type TaskRow,
@@ -30,12 +31,13 @@ function TaskLine({ row, now }: { row: TaskRow; now: number }) {
   const mark = RESULT_MARKS[row.state];
   return (
     <li
-      className={classNames("mm-sy-task", `mm-sy-task--${row.state}`)}
+      className="mm-sy-task"
+      data-status={TASK_MEANING[row.state]}
       title={row.why ? `${row.label}: ${row.why}` : row.label}
       data-fit=""
       data-testid="system-task"
     >
-      <span className="mm-sy-task__dot" aria-hidden="true" />
+      <StatusDot meaning={TASK_MEANING[row.state]} />
       <span className="mm-sy-task__name">
         <b>
           <FitText
@@ -44,16 +46,18 @@ function TaskLine({ row, now }: { row: TaskRow; now: number }) {
             title={row.label}
           />
         </b>
-        {row.why ? <span className="mm-sy-task__why">{row.why}</span> : null}
+        {row.why ? (
+          <span className="mm-sy-task__why mm-status-text">{row.why}</span>
+        ) : null}
       </span>
       <span className="mm-sy-task__result">
         {row.state === "running" ? (
-          <b className="mm-sy-task__running">running</b>
+          <b className="mm-status-text">running</b>
         ) : (
           <>
             {mark ? (
               <b
-                className="mm-sy-task__mark"
+                className="mm-status-text"
                 aria-label={row.state === "ok" ? "Worked" : "Failed"}
               >
                 {mark}

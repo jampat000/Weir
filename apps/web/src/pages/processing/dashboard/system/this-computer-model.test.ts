@@ -176,6 +176,9 @@ describe("the machine's tags", () => {
 
   it("warns when a reboot is waiting", () => {
     const tags = machineTags({ ...stats().machine, reboot_pending: true });
-    expect(tags.at(-1)).toEqual({ text: "reboot pending", tone: "warning" });
+    expect(tags.at(-1)).toEqual({
+      text: "reboot pending",
+      meaning: "attention",
+    });
   });
 });

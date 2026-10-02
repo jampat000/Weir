@@ -1,12 +1,13 @@
 /** What the Health card says: the checks counted by area, the headline, and which checks the ribbon's filter shows. */
 import {
+  needsYou,
+  type StatusMeaning,
+} from "../../../../lib/ui/status-meaning";
+import {
   HEALTH_AREAS,
-  type CheckTone,
   type HealthArea,
   type HealthCheck,
 } from "./health-checks";
-
-export type AreaTone = "bad" | "warn" | "ok";
 
 export type AreaTally = {
   key: HealthArea;
@@ -15,23 +16,23 @@ export type AreaTally = {
   ok: number;
   /** Checks in the area, not counting notes. */
   total: number;
-  tone: AreaTone;
+  /** The worst of the area's checks: broken, then attention, else done. */
+  meaning: StatusMeaning;
 };
 
 export type HealthSummary = {
   pass: number;
   total: number;
-  /** Checks that need you: a bad or a warning one. */
+  /** Checks that need you: a broken one, or one that needs attention. */
   need: number;
+  /** The worst of the checks that need you, or done when none does. */
+  meaning: StatusMeaning;
 };
 
-const needsYou = (tone: CheckTone): boolean =>
-  tone === "bad" || tone === "warn";
+/** Facts are not checks: they never count towards a total. */
+const isCounted = (check: HealthCheck): boolean => !check.fact;
 
-/** Notes are facts, not checks: they never count towards a total. */
-const isCounted = (check: HealthCheck): boolean => check.tone !== "note";
-
-/** One tally for each area, in the ribbon's order. A bad check makes the area bad, a warning makes it a warning. */
+/** One tally for each area, in the ribbon's order. A broken check makes the area broken, one that needs attention makes it so. */
 export function areaTallies(checks: readonly HealthCheck[]): AreaTally[] {
   return HEALTH_AREAS.map(({ key, name }) => {
     const own = checks.filter((check) => check.area === key);
@@ -39,23 +40,29 @@ export function areaTallies(checks: readonly HealthCheck[]): AreaTally[] {
     return {
       key,
       name,
-      ok: counted.filter((check) => check.tone === "ok").length,
+      ok: counted.filter((check) => check.meaning === "done").length,
       total: counted.length,
-      tone: own.some((check) => check.tone === "bad")
-        ? "bad"
-        : own.some((check) => check.tone === "warn")
-          ? "warn"
-          : "ok",
+      meaning: own.some((check) => check.meaning === "broken")
+        ? "broken"
+        : own.some((check) => check.meaning === "attention")
+          ? "attention"
+          : "done",
     };
   });
 }
 
 export function healthSummary(checks: readonly HealthCheck[]): HealthSummary {
   const counted = checks.filter(isCounted);
+  const needing = counted.filter((check) => needsYou(check.meaning));
   return {
-    pass: counted.filter((check) => check.tone === "ok").length,
+    pass: counted.filter((check) => check.meaning === "done").length,
     total: counted.length,
-    need: counted.filter((check) => needsYou(check.tone)).length,
+    need: needing.length,
+    meaning: needing.some((check) => check.meaning === "broken")
+      ? "broken"
+      : needing.length > 0
+        ? "attention"
+        : "done",
   };
 }
 
@@ -80,12 +87,14 @@ export function healthHeadline(
   return `${pass.toLocaleString()} of ${total.toLocaleString()} pass · ${need}`;
 }
 
-const TONE_ORDER: Record<CheckTone, number> = {
-  bad: 0,
-  warn: 1,
+/** The worst first: broken, attention, then what has not been proven, what is being worked on or waits, and what passes. */
+const WORST_FIRST: Record<StatusMeaning, number> = {
+  broken: 0,
+  attention: 1,
   idle: 2,
-  ok: 3,
-  note: 4,
+  doing: 3,
+  todo: 4,
+  done: 5,
 };
 
 /**
@@ -98,7 +107,11 @@ export function listedChecks(
 ): HealthCheck[] {
   const wanted =
     area === null ? checks : checks.filter((check) => check.area === area);
-  return [...wanted].sort((a, b) => TONE_ORDER[a.tone] - TONE_ORDER[b.tone]);
+  return [...wanted].sort(
+    (a, b) =>
+      Number(Boolean(a.fact)) - Number(Boolean(b.fact)) ||
+      WORST_FIRST[a.meaning] - WORST_FIRST[b.meaning],
+  );
 }
 
 /** The newest time any check was looked at, or null when none has been. */

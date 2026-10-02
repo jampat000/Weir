@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 
 import { Chip } from "../../../../components/panels/chip";
 import { Panel } from "../../../../components/panels/panel";
+import { StatusDot } from "../../../../components/panels/status-dot";
 import { errorMessage } from "../../../../lib/api/error-message";
 import {
   useAppSettingsQuery,
@@ -49,7 +50,7 @@ function BackupLine({
       data-fit={fit ? "" : undefined}
       data-testid="system-backup"
     >
-      <span className="mm-sy-backup__dot" aria-hidden="true" />
+      <StatusDot meaning="done" />
       <span>{when}</span>
       <span className="mm-sy-backup__size">{row.size}</span>
     </li>
@@ -81,12 +82,13 @@ function ToolLines() {
               <b>{tool.name}</b>
               <span>{tool.version}</span>
               <span
-                className={`mm-sy-tool__mark mm-sy-tool__mark--${tool.tone}`}
+                className="mm-sy-tool__mark mm-status-text"
+                data-status={tool.meaning}
                 aria-label={
-                  tool.tone === "healthy" ? "Installed" : "Not installed"
+                  tool.meaning === "done" ? "Installed" : "Not installed"
                 }
               >
-                {tool.tone === "healthy" ? "✓" : "—"}
+                {tool.meaning === "done" ? "✓" : "—"}
               </span>
             </li>
           ))}
@@ -123,7 +125,7 @@ function UpdateLines() {
             </span>
           )}
           <Link to={ABOUT_PATH} className="mm-sy-update__state">
-            <Chip tone={facts.tone}>{facts.state}</Chip>
+            <Chip meaning={facts.meaning}>{facts.state}</Chip>
           </Link>
         </div>
       )}
@@ -212,7 +214,11 @@ export function BackupsCard() {
             {next ? <span>{next}</span> : null}
           </p>
           {backUp.isError ? (
-            <p className="mm-sy-note mm-sy-note--bad" role="alert">
+            <p
+              className="mm-sy-note mm-status-text"
+              data-status="broken"
+              role="alert"
+            >
               {errorMessage(backUp.error, "Weir could not make a backup.")}
             </p>
           ) : null}

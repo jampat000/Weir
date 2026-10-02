@@ -52,8 +52,17 @@ export function SystemView({ layout }: SystemViewProps) {
   const summary = healthSummary(health.checks);
   const ringChecks =
     health.checking && overview.data
-      ? { ...overview.data.checks, need: summary.need }
-      : { passing: summary.pass, total: summary.total, need: summary.need };
+      ? {
+          ...overview.data.checks,
+          need: summary.need,
+          meaning: summary.meaning,
+        }
+      : {
+          passing: summary.pass,
+          total: summary.total,
+          need: summary.need,
+          meaning: summary.meaning,
+        };
   const across = layout.band === "across";
   return (
     <SystemGrid layout={layout}>

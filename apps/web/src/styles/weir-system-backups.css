@@ -61,13 +61,6 @@
   margin-bottom: 0;
 }
 
-.mm-sy-backup__dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--mm-success);
-}
-
 .mm-sy-backup__size {
   font-variant-numeric: tabular-nums;
   color: var(--mm-text2);
@@ -113,18 +106,6 @@
 
 .mm-sy-tool__mark {
   font-weight: 700;
-}
-
-.mm-sy-tool__mark--healthy {
-  color: var(--mm-success);
-}
-
-.mm-sy-tool__mark--failed {
-  color: var(--mm-destructive);
-}
-
-.mm-sy-tool__mark--neutral {
-  color: var(--mm-text3);
 }
 
 .mm-sy-update {

@@ -10,6 +10,7 @@ import {
 import { formatBytes } from "../../../../lib/format/bytes";
 import type { SystemDrive } from "../../../../lib/system/system-stats-types";
 import { plural } from "../../../../lib/ui/mm-plural";
+import type { StatusMeaning } from "../../../../lib/ui/status-meaning";
 import type { ToolRow } from "../health-model";
 import type { WorkflowHealth } from "../use-health";
 import { problemWords } from "./health-words";
@@ -33,12 +34,6 @@ export const HEALTH_AREAS: readonly { key: HealthArea; name: string }[] = [
   { key: "weir", name: "Weir" },
 ];
 
-/**
- * `bad` and `warn` need you; `ok` passes; `idle` has not been proven either way (a chain Weir could only take on
- * trust, a connection never tested); `note` is a fact worth reading that is not a check, so it is not counted.
- */
-export type CheckTone = "bad" | "warn" | "ok" | "idle" | "note";
-
 export type CheckFix = {
   label: string;
   to: string;
@@ -49,7 +44,10 @@ export type CheckFix = {
 export type HealthCheck = {
   id: string;
   area: HealthArea;
-  tone: CheckTone;
+  /** Attention and broken need you; done passes; idle has not been proven either way (a connection never tested). */
+  meaning: StatusMeaning;
+  /** A fact worth reading that is not a check, so no count includes it. */
+  fact?: true;
   title: string;
   /** Why, in a sentence or two: the row's tooltip, and for a workflow what its Details say too. */
   why: string;
@@ -82,30 +80,25 @@ export function workflowChecks(
 ): HealthCheck[] {
   return workflows.map((item) => {
     const { workflow, verdict, why } = item;
-    const tone: CheckTone =
-      verdict.tone === "healthy"
-        ? "ok"
-        : verdict.tone === "warning"
-          ? "warn"
-          : "idle";
+    const inSync = verdict.meaning === "done";
     return {
       id: `workflow:${workflow.id}`,
       area: "workflows",
-      tone,
-      title: tone === "warn" ? `${workflow.name} needs a fix` : workflow.name,
-      why:
-        tone === "ok"
-          ? "Its folders and connections are in sync."
-          : (why ?? verdict.words),
-      words:
-        tone === "ok"
-          ? "Folders and connections in sync"
-          : problemWords(why ?? verdict.words),
+      meaning: verdict.meaning,
+      title:
+        verdict.readiness === "needs_attention"
+          ? `${workflow.name} needs a fix`
+          : workflow.name,
+      why: inSync
+        ? "Its folders and connections are in sync."
+        : (why ?? verdict.words),
+      words: inSync
+        ? "Folders and connections in sync"
+        : problemWords(why ?? verdict.words),
       checkedAt: item.checkedAt,
-      fix:
-        tone === "warn" || tone === "idle"
-          ? link(workflowPath(workflow.id), "Opens this workflow's settings.")
-          : null,
+      fix: inSync
+        ? null
+        : link(workflowPath(workflow.id), "Opens this workflow's settings."),
       again: { area: "workflows", key: String(workflow.id) },
       workflowId: workflow.id,
     };
@@ -133,7 +126,7 @@ function connectionCheck(entry: ConnectionEntry): HealthCheck {
     case "down":
       return {
         ...base,
-        tone: "bad",
+        meaning: "broken",
         title: `${entry.name} isn't answering`,
         why: down,
         words: problemWords(down),
@@ -142,7 +135,7 @@ function connectionCheck(entry: ConnectionEntry): HealthCheck {
     case "slow":
       return {
         ...base,
-        tone: "warn",
+        meaning: "attention",
         title: `${entry.name} is slow to answer`,
         why: `Its last answer came${took}.`,
         words: `Slow to answer${took}`,
@@ -151,7 +144,7 @@ function connectionCheck(entry: ConnectionEntry): HealthCheck {
     case "untested":
       return {
         ...base,
-        tone: "idle",
+        meaning: "idle",
         title: entry.name,
         why: "Weir has not tested it yet.",
         words: "Not tested yet",
@@ -160,7 +153,7 @@ function connectionCheck(entry: ConnectionEntry): HealthCheck {
     default:
       return {
         ...base,
-        tone: "ok",
+        meaning: "done",
         title: entry.name,
         why: `Answering${took}.`,
         words: `Answering${took}`,
@@ -188,20 +181,21 @@ export function toolChecks(
       again: { area: "tools" as const, key: null },
       workflowId: null,
     };
-    if (tool.tone === "failed") {
+    if (tool.meaning === "broken") {
       return {
         ...base,
-        tone: "bad",
+        meaning: "broken",
         title: `${tool.name} is missing`,
         why: "Weir cannot process files without it.",
         words: "Needed to process files",
         fix: link(ABOUT_PATH, "Opens System, where the tools are listed."),
       };
     }
-    if (tool.tone === "neutral") {
+    if (tool.meaning === "idle") {
       return {
         ...base,
-        tone: "note",
+        meaning: "idle",
+        fact: true,
         title: `${tool.name} is not installed`,
         why: "It is optional: Weir writes with FFmpeg where it is missing.",
         words: "Optional · FFmpeg writes instead",
@@ -210,7 +204,7 @@ export function toolChecks(
     }
     return {
       ...base,
-      tone: "ok",
+      meaning: "done",
       title: tool.name,
       why: tool.banner,
       words: `Version ${tool.version}`,
@@ -238,7 +232,7 @@ function driveCheck(drive: SystemDrive, checkedAt: number | null): HealthCheck {
   if (drive.keep_free_bytes > 0 && drive.free_bytes < drive.keep_free_bytes) {
     return {
       ...base,
-      tone: "bad",
+      meaning: "attention",
       title: `${drive.name} is low on space`,
       why: `${free} free. Weir keeps ${formatBytes(drive.keep_free_bytes)} free here, so it holds new files until there is room.`,
       words: `${free} free · keeps ${formatBytes(drive.keep_free_bytes)}`,
@@ -248,7 +242,7 @@ function driveCheck(drive: SystemDrive, checkedAt: number | null): HealthCheck {
   if (drive.full_in_days !== null && drive.full_in_days <= FILLS_SOON_DAYS) {
     return {
       ...base,
-      tone: "warn",
+      meaning: "attention",
       title: `${drive.name} fills up soon`,
       why: `${free} free. At this pace it is full in about ${plural(Math.max(1, Math.round(drive.full_in_days)), "day", "days")}.`,
       words: `${free} free · full in ${fullInWords(drive.full_in_days)}`,
@@ -257,7 +251,7 @@ function driveCheck(drive: SystemDrive, checkedAt: number | null): HealthCheck {
   }
   return {
     ...base,
-    tone: "ok",
+    meaning: "done",
     title: drive.name,
     why: `${free} free.`,
     words: `${free} free`,
@@ -300,7 +294,7 @@ export function backupChecks(
     return [
       {
         ...base,
-        tone: "warn",
+        meaning: "attention",
         why: "Automatic backups are off, so your settings are saved only when you back up by hand.",
         words: "Automatic backups off",
         fix,
@@ -312,7 +306,7 @@ export function backupChecks(
     return [
       {
         ...base,
-        tone: "warn",
+        meaning: "attention",
         why:
           backups.lastBackupAt === null
             ? "No backup has been made yet."
@@ -328,7 +322,7 @@ export function backupChecks(
   return [
     {
       ...base,
-      tone: "ok",
+      meaning: "done",
       why: "Backing up on schedule.",
       words: "On schedule",
       fix: null,
@@ -358,7 +352,7 @@ export function weirChecks(weir: WeirFacts | null): HealthCheck[] {
       ? {
           ...base,
           id: "weir:workers",
-          tone: "bad",
+          meaning: "broken",
           title: "A background worker has stopped",
           why: weir.stoppedWorkers[0],
           words: problemWords(weir.stoppedWorkers[0]),
@@ -367,7 +361,7 @@ export function weirChecks(weir: WeirFacts | null): HealthCheck[] {
       : {
           ...base,
           id: "weir:workers",
-          tone: "ok",
+          meaning: "done",
           title: "Background workers",
           why: "Every worker is running.",
           words: "All running",
@@ -379,7 +373,8 @@ export function weirChecks(weir: WeirFacts | null): HealthCheck[] {
     {
       ...base,
       id: "weir:update",
-      tone: "note",
+      meaning: "todo",
+      fact: true,
       title: `Weir ${weir.updateVersion} is out`,
       why: "A newer version is ready to install.",
       words: "Ready to install",

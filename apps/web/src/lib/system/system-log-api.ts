@@ -1,6 +1,7 @@
 import { apiFetch, readJson, requireOk } from "../api/client";
 import { filenameFromDisposition } from "../api/activity-api";
 import type { Schema } from "../api/types";
+import type { StatusMeaning } from "../ui/status-meaning";
 
 /** One page of System › Logs: Weir's events, jobs and server log as one list, newest first. */
 export type SystemLogPage = Schema<"SystemLogOut">;
@@ -8,6 +9,13 @@ export type SystemLogRow = Schema<"SystemLogRowOut">;
 export type SystemLogSource = SystemLogRow["source"];
 export type SystemLogLevel = SystemLogRow["level"];
 export type SystemLogCategory = SystemLogRow["category"];
+
+export const LOG_LEVEL_MEANING: Record<SystemLogLevel, StatusMeaning> = {
+  success: "done",
+  info: "idle",
+  warning: "attention",
+  error: "broken",
+};
 
 /** What a request for the log can narrow it by. A list is sent as one comma-separated value; an empty one is no filter. */
 export type SystemLogQuery = {

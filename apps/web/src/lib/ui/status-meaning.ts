@@ -25,3 +25,7 @@ export const STATUS_MEANINGS: readonly StatusMeaning[] = [
   "broken",
   "idle",
 ];
+
+/** Whether a status asks the person to look: it is held back, slow or unreadable, or it has failed. */
+export const needsYou = (meaning: StatusMeaning): boolean =>
+  meaning === "attention" || meaning === "broken";

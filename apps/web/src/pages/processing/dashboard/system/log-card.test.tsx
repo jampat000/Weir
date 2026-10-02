@@ -126,9 +126,10 @@ describe("the Log card", () => {
 
     const [error, warning, info] =
       within(card).getAllByTestId("system-log-line");
-    expect(error).toHaveClass("mm-sy-log--error");
-    expect(warning).toHaveClass("mm-sy-log--warning");
-    expect(info).toHaveClass("mm-sy-log--info");
+    expect(error).toHaveAttribute("data-status", "broken");
+    expect(warning).toHaveAttribute("data-status", "attention");
+    expect(info).toHaveAttribute("data-status", "idle");
+    expect(info).not.toHaveClass("mm-sy-log--problem");
   });
 
   it("narrows the list to errors, or to warnings, with the switch", () => {

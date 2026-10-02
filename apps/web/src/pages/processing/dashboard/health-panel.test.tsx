@@ -79,7 +79,7 @@ describe("the Health panel", () => {
     health.workflows = [
       {
         workflow: { ...movies, manager_connection_ids: [] },
-        verdict: { words: "In sync", tone: "healthy" },
+        verdict: { words: "In sync", meaning: "done", readiness: "ready" },
         why: null,
         chain: undefined,
         checkedAt: null,
@@ -98,7 +98,11 @@ describe("the Health panel", () => {
     health.workflows = [
       {
         workflow: { ...movies, manager_connection_ids: [] },
-        verdict: { words: "Needs a fix", tone: "warning" },
+        verdict: {
+          words: "Needs a fix",
+          meaning: "attention",
+          readiness: "needs_attention",
+        },
         why: "The output folder is missing.",
         chain: undefined,
         checkedAt: null,
@@ -117,7 +121,11 @@ describe("the Health panel", () => {
     health.workflows = [
       {
         workflow: { ...movies, manager_connection_ids: [] },
-        verdict: { words: "Not verified", tone: "neutral" },
+        verdict: {
+          words: "Not verified",
+          meaning: "attention",
+          readiness: "not_verified",
+        },
         why: whole,
         chain: undefined,
         checkedAt: null,
@@ -146,7 +154,7 @@ describe("the Health panel", () => {
     health.workflows = [
       {
         workflow: { ...movies, manager_connection_ids: [1] },
-        verdict: { words: "In sync", tone: "healthy" },
+        verdict: { words: "In sync", meaning: "done", readiness: "ready" },
         why: null,
         chain: undefined,
         checkedAt: null,
@@ -249,7 +257,7 @@ describe("the Health panel", () => {
     health.workflows = [movies, { ...movies, id: 3, name: "TV" }].map(
       (workflow) => ({
         workflow: { ...workflow, manager_connection_ids: [] },
-        verdict: { words: "In sync", tone: "healthy" as const },
+        verdict: { words: "In sync", meaning: "done", readiness: "ready" },
         why: null,
         chain: undefined,
         checkedAt: null,
@@ -298,11 +306,15 @@ describe("the Health panel", () => {
     expect(renderPanel()).toHaveTextContent("all clear");
   });
 
-  it("names the workflows Weir could not verify rather than saying all clear", () => {
+  it("counts a workflow Weir could not verify as something to look at rather than saying all clear", () => {
     health.workflows = [
       {
         workflow: { ...movies, manager_connection_ids: [1] },
-        verdict: { words: "Not verified", tone: "neutral" },
+        verdict: {
+          words: "Not verified",
+          meaning: "attention",
+          readiness: "not_verified",
+        },
         why: "Radarr does not say where Transmission saves its downloads.",
         chain: undefined,
         checkedAt: null,
@@ -310,14 +322,18 @@ describe("the Health panel", () => {
       },
     ];
 
-    expect(renderPanel()).toHaveTextContent("1 not verified");
+    expect(renderPanel()).toHaveTextContent("1 to look at");
   });
 
   it("counts a workflow that needs a fix and a connection that does not answer", () => {
     health.workflows = [
       {
         workflow: { ...movies, manager_connection_ids: [] },
-        verdict: { words: "Needs a fix", tone: "warning" },
+        verdict: {
+          words: "Needs a fix",
+          meaning: "attention",
+          readiness: "needs_attention",
+        },
         why: "It is missing.",
         chain: undefined,
         checkedAt: null,
@@ -349,14 +365,14 @@ describe("the Health panel", () => {
         name: "FFmpeg",
         version: "7.1.1",
         banner: "",
-        tone: "healthy",
+        meaning: "done",
       },
       {
         key: "mkvmerge",
         name: "mkvmerge",
         version: "89.0.0",
         banner: "",
-        tone: "healthy",
+        meaning: "done",
       },
     ];
     const panel = renderPanel();

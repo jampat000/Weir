@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { StatusMeaning } from "../../../../lib/ui/status-meaning";
 import { testOverview, testStats } from "./test-stats";
 import { ThisWeirCard } from "./this-weir-card";
 
@@ -22,7 +23,12 @@ vi.mock("../../../../lib/processing/queries", () => ({
   useProcessingFilesAtOnceQuery: () => filesAtOnce,
 }));
 
-const checks = { passing: 9, total: 10, need: 1 };
+const checks = {
+  passing: 9,
+  total: 10,
+  need: 1,
+  meaning: "attention" as StatusMeaning,
+};
 
 function show(shown = checks) {
   return render(<ThisWeirCard checks={shown} onShowHealth={showHealth} />);
@@ -59,26 +65,39 @@ describe("the This Weir card", () => {
   });
 
   it("says all is good when nothing needs a person", () => {
-    show({ passing: 10, total: 10, need: 0 });
+    show({ passing: 10, total: 10, need: 0, meaning: "done" });
 
     expect(screen.getByText("All good")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /need you/ })).toBeNull();
   });
 
-  it("colours the ring when something needs a person", () => {
+  it("colours the ring by the worst thing that needs a person", () => {
     const { container, rerender } = show();
-    expect(container.querySelector(".mm-sy-ring")).toHaveClass(
-      "mm-sy-ring--need",
+    expect(container.querySelector(".mm-sy-ring")).toHaveAttribute(
+      "data-status",
+      "attention",
     );
 
     rerender(
       <ThisWeirCard
-        checks={{ passing: 10, total: 10, need: 0 }}
+        checks={{ ...checks, meaning: "broken" }}
         onShowHealth={showHealth}
       />,
     );
-    expect(container.querySelector(".mm-sy-ring")).not.toHaveClass(
-      "mm-sy-ring--need",
+    expect(container.querySelector(".mm-sy-ring")).toHaveAttribute(
+      "data-status",
+      "broken",
+    );
+
+    rerender(
+      <ThisWeirCard
+        checks={{ passing: 10, total: 10, need: 0, meaning: "done" }}
+        onShowHealth={showHealth}
+      />,
+    );
+    expect(container.querySelector(".mm-sy-ring")).toHaveAttribute(
+      "data-status",
+      "done",
     );
   });
 

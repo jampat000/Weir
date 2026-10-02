@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 
 import { Panel } from "../../../components/panels/panel";
 import type { ProcessingFile } from "../../../lib/processing/files-api";
+import { classNames } from "../../../lib/ui/class-names";
 import { useProcessingLibrariesQuery } from "../../../lib/processing/libraries-queries";
 import type { Filter } from "../processing-filter";
 import { activityGroupPath } from "../../activity/activity-links";
@@ -33,7 +34,12 @@ function NeedItem({
   onOpen,
 }: { row: NeedRow } & RowHandlers) {
   return (
-    <li className="mm-need" title={row.detail} data-fit="">
+    <li
+      className="mm-need"
+      title={row.detail}
+      data-status={row.meaning}
+      data-fit=""
+    >
       <b className="mm-need__title">{row.title}</b>
       {row.file ? (
         <small className="mm-need__workflow">{row.file.library_name}</small>
@@ -69,7 +75,11 @@ function Group({
   workflowName: string | undefined;
 } & RowHandlers) {
   return (
-    <section aria-label={group.title} className="mm-needs__group">
+    <section
+      aria-label={group.title}
+      className="mm-needs__group"
+      data-status={group.meaning}
+    >
       <header className="mm-needs__group-head" data-fit="with-next">
         <h3 className="mm-needs__group-title">{group.title}</h3>
         {group.rejected ? (
@@ -106,7 +116,7 @@ const CLEAR_WORDS: Record<Filter, string> = {
 
 function AllClear({ filter }: { filter: Filter }) {
   return (
-    <p className="mm-needs__clear">
+    <p className="mm-needs__clear" data-status="done">
       <svg
         viewBox="0 0 24 24"
         width="16"
@@ -163,7 +173,10 @@ export function NeedsPanel({
       title="Needs you"
       count={
         count === 0 ? undefined : (
-          <span className="mm-needs__count">
+          <span
+            className="mm-needs__count mm-status-text"
+            data-status="attention"
+          >
             {count.toLocaleString()} to look at
           </span>
         )
@@ -174,7 +187,11 @@ export function NeedsPanel({
     >
       {notice ? (
         <p
-          className="mm-needs__notice"
+          className={classNames(
+            "mm-needs__notice",
+            notice.failed && "mm-status-text",
+          )}
+          data-status={notice.failed ? "broken" : undefined}
           role={notice.failed ? "alert" : "status"}
         >
           {notice.text}

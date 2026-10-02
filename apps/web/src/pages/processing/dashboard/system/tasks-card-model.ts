@@ -2,9 +2,17 @@
 import type { SystemTask } from "../../../../lib/system/system-tasks-frame";
 import { parseAppTime } from "../../../../lib/ui/mm-format-date";
 import { plural } from "../../../../lib/ui/mm-plural";
+import type { StatusMeaning } from "../../../../lib/ui/status-meaning";
 import { checkedAgo } from "../health-model";
 
 export type TaskState = "running" | "ok" | "failed" | "never";
+
+export const TASK_MEANING: Record<TaskState, StatusMeaning> = {
+  running: "doing",
+  ok: "done",
+  failed: "broken",
+  never: "idle",
+};
 
 export type TaskRow = {
   key: string;

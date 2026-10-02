@@ -58,7 +58,10 @@ describe("the Storage card", () => {
     };
     show();
 
-    expect(screen.getByTestId("system-drive")).toHaveClass("mm-sy-drive--low");
+    expect(screen.getByTestId("system-drive")).toHaveAttribute(
+      "data-status",
+      "attention",
+    );
   });
 
   it("shows free space alone for a network share, which has no disk figures to read", () => {

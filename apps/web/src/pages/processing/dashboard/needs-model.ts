@@ -3,6 +3,7 @@ import type { ProcessingFile } from "../../../lib/processing/files-api";
 import type { ProcessingLibrary } from "../../../lib/processing/libraries-api";
 import type { SystemReadiness } from "../../../lib/api/types";
 import { plural } from "../../../lib/ui/mm-plural";
+import type { StatusMeaning } from "../../../lib/ui/status-meaning";
 import { shownBy, type Filter } from "../processing-filter";
 import { firstSentence, prettyName } from "../processing-model";
 import { fileReason, type FileReason } from "../file-reason";
@@ -32,6 +33,8 @@ export const NEEDS_A_LOOK_PATH = "/activity?show=failed";
 
 export type NeedRow = {
   key: string;
+  /** A failure is broken; what is held, turned away or not set up is waiting on a look. */
+  meaning: StatusMeaning;
   title: string;
   /** A few words on why: what kind of stop it is. */
   reason: string;
@@ -47,6 +50,8 @@ export type NeedGroup = {
   key: string;
   /** "3 not in a language you keep". */
   title: string;
+  /** The worst meaning of its rows. */
+  meaning: StatusMeaning;
   rows: NeedRow[];
   /** How many more there are than the rows listed, so the group can say where the rest are. */
   more: number;
@@ -59,6 +64,7 @@ export type NeedGroup = {
 function fileRow(file: ProcessingFile): NeedRow {
   return {
     key: `file-${file.id}`,
+    meaning: file.status === "processing_failed" ? "broken" : "attention",
     title: prettyName(file.relative_path),
     reason: fileReason(file).short,
     detail: firstSentence(file.status_reason) || undefined,
@@ -98,6 +104,7 @@ function fileGroups(files: readonly ProcessingFile[]): NeedGroup[] {
   return ordered.map(({ reason, files }) => ({
     key: reason.key,
     title: `${files.length.toLocaleString()} ${reason.words}`,
+    meaning: fileRow(files[0]).meaning,
     rows: files.slice(0, FILES_SHOWN_PER_GROUP).map(fileRow),
     more: Math.max(0, files.length - FILES_SHOWN_PER_GROUP),
     activity: activityGroupOf(files[0]),
@@ -114,6 +121,7 @@ function setupNeed(
   if (!libraries || watching) return null;
   return {
     key: "setup",
+    meaning: "attention",
     title: "Nothing to watch yet",
     reason: "Add or switch on a workflow",
     detail:
@@ -129,6 +137,7 @@ function workerNeeds(
     .filter((worker) => worker.status === "degraded")
     .map((worker) => ({
       key: `worker-${worker.module}`,
+      meaning: "broken" as const,
       title: "Background work has stopped",
       reason: "Not responding · restart Weir",
       detail: worker.detail,
@@ -153,6 +162,7 @@ function failedJobsNeed({ count, capped }: FailedJobs): NeedRow | null {
   const shown = capped ? `${count}+` : `${count}`;
   return {
     key: "failed-jobs",
+    meaning: "broken",
     title: count === 1 ? "1 job failed" : `${shown} jobs failed`,
     reason: "Each says what to do next",
     link: {
@@ -176,6 +186,9 @@ function weirGroup(rows: NeedRow[]): NeedGroup[] {
         "thing to fix in Weir",
         "things to fix in Weir",
       ),
+      meaning: rows.some((row) => row.meaning === "broken")
+        ? "broken"
+        : "attention",
       rows,
       more: 0,
       activity: null,

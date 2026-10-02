@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import type { CheckTone, HealthArea, HealthCheck } from "./health-checks";
+import type { StatusMeaning } from "../../../../lib/ui/status-meaning";
+import type { HealthArea, HealthCheck } from "./health-checks";
 import {
   areaTallies,
   emptyHealthWords,
@@ -13,13 +14,13 @@ import {
 function check(
   id: string,
   area: HealthArea,
-  tone: CheckTone,
+  meaning: StatusMeaning,
   checkedAt: number | null = null,
 ): HealthCheck {
   return {
     id,
     area,
-    tone,
+    meaning,
     title: id,
     why: "",
     words: "",
@@ -31,12 +32,12 @@ function check(
 }
 
 const CHECKS = [
-  check("w1", "workflows", "ok"),
-  check("w2", "workflows", "warn"),
-  check("c1", "connections", "bad"),
-  check("c2", "connections", "ok"),
-  check("t1", "tools", "ok"),
-  check("t2", "tools", "note"),
+  check("w1", "workflows", "done"),
+  check("w2", "workflows", "attention"),
+  check("c1", "connections", "broken"),
+  check("c2", "connections", "done"),
+  check("t1", "tools", "done"),
+  { ...check("t2", "tools", "idle"), fact: true as const },
   check("b1", "backups", "idle"),
 ];
 
@@ -62,23 +63,28 @@ describe("areaTallies", () => {
     expect(tallies.find((tally) => tally.key === "tools")).toMatchObject({
       ok: 1,
       total: 1,
-      tone: "ok",
+      meaning: "done",
     });
   });
 
   it("tints an area by its worst check", () => {
-    expect(tallies.find((tally) => tally.key === "workflows")?.tone).toBe(
-      "warn",
+    expect(tallies.find((tally) => tally.key === "workflows")?.meaning).toBe(
+      "attention",
     );
-    expect(tallies.find((tally) => tally.key === "connections")?.tone).toBe(
-      "bad",
+    expect(tallies.find((tally) => tally.key === "connections")?.meaning).toBe(
+      "broken",
     );
   });
 });
 
 describe("healthSummary", () => {
   it("counts what passes, what there is and what needs you", () => {
-    expect(healthSummary(CHECKS)).toEqual({ pass: 3, total: 6, need: 2 });
+    expect(healthSummary(CHECKS)).toEqual({
+      pass: 3,
+      total: 6,
+      need: 2,
+      meaning: "broken",
+    });
   });
 });
 
@@ -90,17 +96,25 @@ describe("healthHeadline", () => {
   });
 
   it("says one needs you in the singular, and all good when none does", () => {
-    expect(healthHeadline({ pass: 9, total: 10, need: 1 }, false, null)).toBe(
-      "9 of 10 pass · 1 needs you",
-    );
-    expect(healthHeadline({ pass: 10, total: 10, need: 0 }, false, null)).toBe(
-      "10 of 10 pass · all good",
-    );
+    expect(
+      healthHeadline(
+        { pass: 9, total: 10, need: 1, meaning: "attention" },
+        false,
+        null,
+      ),
+    ).toBe("9 of 10 pass · 1 needs you");
+    expect(
+      healthHeadline(
+        { pass: 10, total: 10, need: 0, meaning: "done" },
+        false,
+        null,
+      ),
+    ).toBe("10 of 10 pass · all good");
   });
 
   it("uses Weir's own count while a folder check has not answered", () => {
     expect(
-      healthHeadline({ pass: 1, total: 2, need: 0 }, true, {
+      healthHeadline({ pass: 1, total: 2, need: 0, meaning: "done" }, true, {
         passing: 9,
         total: 10,
       }),
@@ -108,9 +122,13 @@ describe("healthHeadline", () => {
   });
 
   it("says nothing before there is any check", () => {
-    expect(healthHeadline({ pass: 0, total: 0, need: 0 }, false, null)).toBe(
-      "",
-    );
+    expect(
+      healthHeadline(
+        { pass: 0, total: 0, need: 0, meaning: "done" },
+        false,
+        null,
+      ),
+    ).toBe("");
   });
 });
 
@@ -146,15 +164,15 @@ describe("lastCheckedAt", () => {
   it("is the newest time any check was looked at", () => {
     expect(
       lastCheckedAt([
-        check("a", "tools", "ok", 5),
-        check("b", "tools", "ok", 9),
-        check("c", "tools", "ok", null),
+        check("a", "tools", "done", 5),
+        check("b", "tools", "done", 9),
+        check("c", "tools", "done", null),
       ]),
     ).toBe(9);
   });
 
   it("is null when none has been", () => {
-    expect(lastCheckedAt([check("a", "tools", "ok")])).toBeNull();
+    expect(lastCheckedAt([check("a", "tools", "done")])).toBeNull();
   });
 });
 

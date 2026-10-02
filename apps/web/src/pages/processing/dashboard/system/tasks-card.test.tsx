@@ -74,7 +74,7 @@ describe("the Scheduled tasks card", () => {
     expect(row).toHaveTextContent("Scan Movies");
     expect(row).toHaveTextContent("2 min ago");
     expect(row).toHaveTextContent("0:42");
-    expect(row).toHaveClass("mm-sy-task--ok");
+    expect(row).toHaveAttribute("data-status", "done");
   });
 
   it("shows a running task first with a blinking dot and the word running", () => {
@@ -89,7 +89,7 @@ describe("the Scheduled tasks card", () => {
     const card = renderCard();
 
     const rows = within(card).getAllByTestId("system-task");
-    expect(rows[0]).toHaveClass("mm-sy-task--running");
+    expect(rows[0]).toHaveAttribute("data-status", "doing");
     expect(rows[0]).toHaveTextContent("running");
     expect(card).toHaveTextContent("1 running");
   });
@@ -107,7 +107,7 @@ describe("the Scheduled tasks card", () => {
     const card = renderCard();
 
     const row = within(card).getByTestId("system-task");
-    expect(row).toHaveClass("mm-sy-task--failed");
+    expect(row).toHaveAttribute("data-status", "broken");
     expect(row).toHaveTextContent("✗");
     expect(row).toHaveTextContent("The backup folder is full.");
     expect(card).toHaveTextContent("1 failed");

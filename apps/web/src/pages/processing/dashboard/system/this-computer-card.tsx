@@ -62,8 +62,9 @@ export function ThisComputerCard() {
                 key={tag.text}
                 className={classNames(
                   "mm-sy-tag",
-                  tag.tone && `mm-sy-tag--${tag.tone}`,
+                  tag.meaning && "mm-status-pill",
                 )}
+                data-status={tag.meaning}
               >
                 {tag.text}
               </span>

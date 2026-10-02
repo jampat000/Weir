@@ -1,10 +1,12 @@
 /** What the Log card says: Weir's log lines as levels, merged from the first read and the live frames, and counted for today. */
+import type { SystemLogLevel } from "../../../../lib/system/system-log-api";
 import type { SystemLogFrame } from "../../../../lib/system/system-log-frame";
 import { parseAppTime } from "../../../../lib/ui/mm-format-date";
 import { plural } from "../../../../lib/ui/mm-plural";
 import { dayKey } from "./system-time";
 
-export type LogLevel = "error" | "warning" | "info";
+/** The levels the card shows: a success is not a line the card keeps. */
+export type LogLevel = Exclude<SystemLogLevel, "success">;
 /** What the switch shows: errors and warnings together, everything, or one level. */
 export type LogFilter = "problems" | "all" | "error" | "warning";
 

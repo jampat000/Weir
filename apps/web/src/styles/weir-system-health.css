@@ -4,7 +4,7 @@
   animation: mm-sy-ring 1.2s ease;
 }
 
-/* The areas as a ribbon of chevrons, each tinted by --tone. */
+/* The areas as a ribbon of chevrons, each tinted by its status. */
 .mm-sy-areas {
   display: flex;
   flex: none;
@@ -23,7 +23,7 @@
   padding: 9px 12px 9px 20px;
   overflow: hidden;
   border: 0;
-  background: color-mix(in srgb, var(--tone) 12%, transparent);
+  background: color-mix(in srgb, var(--mm-st) 12%, transparent);
   clip-path: polygon(
     0 0,
     calc(100% - 14px) 0,
@@ -64,8 +64,8 @@
 }
 
 .mm-sy-area--on {
-  background: color-mix(in srgb, var(--tone) 30%, transparent);
-  box-shadow: inset 0 -2px 0 var(--tone);
+  background: color-mix(in srgb, var(--mm-st) 30%, transparent);
+  box-shadow: inset 0 -2px 0 var(--mm-st);
 }
 
 .mm-sy-area__name {
@@ -75,10 +75,6 @@
   gap: 5px;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-.mm-sy-area__dot {
-  color: var(--tone);
 }
 
 .mm-sy-area__count {
@@ -114,29 +110,6 @@
   border-radius: 8px;
 }
 
-.mm-sy-check__dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--mm-success);
-}
-
-.mm-sy-check--bad .mm-sy-check__dot {
-  background: var(--mm-destructive);
-}
-
-.mm-sy-check--warn .mm-sy-check__dot {
-  background: var(--mm-warning);
-}
-
-.mm-sy-check--idle .mm-sy-check__dot {
-  background: var(--mm-text3);
-}
-
-.mm-sy-check--note .mm-sy-check__dot {
-  background: var(--mm-info);
-}
-
 .mm-sy-check__text {
   min-width: 0;
 }
@@ -151,8 +124,7 @@
   color: var(--mm-text1);
 }
 
-.mm-sy-check--ok .mm-sy-check__text > b,
-.mm-sy-check--idle .mm-sy-check__text > b {
+.mm-sy-check--fine .mm-sy-check__text > b {
   font-weight: 500;
   color: var(--mm-text2);
 }
@@ -195,9 +167,7 @@
 }
 
 /* A check that is fine is one tight row: what it is and a line of why, with when it was looked at on its right. */
-.mm-sy-check--ok,
-.mm-sy-check--idle,
-.mm-sy-check--note {
+.mm-sy-check--fine {
   padding-block: 6px;
 }
 

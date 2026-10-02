@@ -204,13 +204,9 @@
 }
 
 .mm-sy-ring__value {
-  stroke: var(--mm-success);
+  stroke: var(--mm-st);
   stroke-linecap: round;
   transition: stroke-dashoffset 1.2s cubic-bezier(0.2, 0.8, 0.2, 1);
-}
-
-.mm-sy-ring--need .mm-sy-ring__value {
-  stroke: var(--mm-warning);
 }
 
 .mm-sy-ring b {
@@ -226,14 +222,12 @@
 
 .mm-sy-needs {
   padding: 2px 7px;
-  border: 1px solid var(--mm-warning-border);
+  border: 1px solid color-mix(in srgb, var(--mm-st) 45%, transparent);
   border-radius: var(--mm-radius-pill);
-  background: var(--mm-status-warning-bg);
   font: inherit;
   font-size: var(--mm-type-eyebrow);
   font-weight: 700;
   white-space: nowrap;
-  color: var(--mm-status-warning-text);
   cursor: pointer;
 }
 
@@ -253,9 +247,6 @@
 }
 
 .mm-sy-needs--good {
-  border-color: color-mix(in srgb, var(--mm-success) 45%, transparent);
-  background: var(--mm-status-healthy-bg);
-  color: var(--mm-status-healthy-text);
   cursor: default;
 }
 
@@ -339,12 +330,8 @@
   color: var(--mm-text2);
 }
 
-.mm-sy-fact[data-tone="good"] .mm-sy-fact__sub {
-  color: var(--mm-status-healthy-text);
-}
-
-.mm-sy-fact[data-tone="bad"] .mm-sy-fact__sub {
-  color: var(--mm-status-failed-text);
+.mm-sy-fact[data-status] .mm-sy-fact__sub {
+  color: var(--mm-st);
 }
 
 /* ---- This computer and Processing: traces side by side -------------------- */
@@ -504,10 +491,8 @@
   color: var(--mm-text2);
 }
 
-.mm-sy-tag--warning {
-  border-color: var(--mm-warning-border);
-  background: var(--mm-status-warning-bg);
-  color: var(--mm-status-warning-text);
+.mm-sy-tag[data-status] {
+  border-color: color-mix(in srgb, var(--mm-st) 45%, transparent);
 }
 
 @container mm-sy-band (max-height: 149px) {
@@ -589,7 +574,7 @@
 .mm-sy-drive__bar i {
   display: block;
   height: 100%;
-  background: var(--mm-info);
+  background: var(--mm-text3);
   transition: width 1s;
 }
 
@@ -597,8 +582,8 @@
   background: color-mix(in srgb, var(--mm-primary) 62%, var(--mm-surface-3));
 }
 
-.mm-sy-drive--low .mm-sy-drive__bar i {
-  background: var(--mm-warning);
+.mm-sy-drive[data-status] .mm-sy-drive__bar i {
+  background: var(--mm-st);
 }
 
 .mm-sy-drive__keep {
@@ -630,8 +615,8 @@
   flex: none;
 }
 
-.mm-sy-drive--low .mm-sy-drive__io > span:last-child {
-  color: var(--mm-status-warning-text);
+.mm-sy-drive[data-status] .mm-sy-drive__io > span:last-child {
+  color: var(--mm-st);
 }
 
 /* ---- Motion ---------------------------------------------------------------- */

@@ -5,8 +5,9 @@ import type {
   UpdateStateOut,
   UpdateStatus,
 } from "../../../../lib/settings/types";
+import { updateMeaning } from "../../../../lib/settings/update-status";
 import { parseAppTime } from "../../../../lib/ui/mm-format-date";
-import type { MmStatusTone } from "../../../../lib/ui/mm-status-tone";
+import type { StatusMeaning } from "../../../../lib/ui/status-meaning";
 import { spanWords } from "./system-time";
 
 /** How many backups the card lists. */
@@ -79,7 +80,7 @@ export type UpdateFacts = {
   /** The newest version, or "—" when Weir could not look. */
   latest: string;
   state: string;
-  tone: MmStatusTone;
+  meaning: StatusMeaning;
   /** What is running is the newest, so there is no newer version to name. */
   upToDate: boolean;
 };
@@ -100,23 +101,28 @@ export function updateFacts(
       ? {
           ...base,
           state: "Downloaded and ready",
-          tone: "info",
+          meaning: updateMeaning(status.status),
           upToDate: false,
         }
       : {
           ...base,
           state: "Update available",
-          tone: "warning",
+          meaning: updateMeaning(status.status),
           upToDate: false,
         };
   }
   if (status.status === "up_to_date") {
-    return { ...base, state: "Up to date", tone: "healthy", upToDate: true };
+    return {
+      ...base,
+      state: "Up to date",
+      meaning: updateMeaning(status.status),
+      upToDate: true,
+    };
   }
   return {
     ...base,
     state: "Could not check",
-    tone: "neutral",
+    meaning: updateMeaning(status.status),
     upToDate: false,
   };
 }

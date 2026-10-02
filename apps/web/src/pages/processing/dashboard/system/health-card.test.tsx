@@ -6,7 +6,8 @@ import type { ProcessingLibrary } from "../../../../lib/processing/libraries-api
 import type { CheckNow } from "../check-now";
 import type { Health } from "../use-health";
 import { HealthCard } from "./health-card";
-import type { CheckTone, HealthArea, HealthCheck } from "./health-checks";
+import type { StatusMeaning } from "../../../../lib/ui/status-meaning";
+import type { HealthArea, HealthCheck } from "./health-checks";
 import type { HealthChecks } from "./use-health-checks";
 import { SHEEN_MS } from "./use-sheen";
 
@@ -24,7 +25,11 @@ const health: Health = {
   workflows: [
     {
       workflow: movies,
-      verdict: { words: "Needs a fix", tone: "warning" },
+      verdict: {
+        words: "Needs a fix",
+        meaning: "attention",
+        readiness: "needs_attention",
+      },
       why: "The output folder is missing.",
       chain: undefined,
       checkedAt: NOW - 12_000,
@@ -63,13 +68,13 @@ vi.mock("../check-now", () => ({
 function item(
   id: string,
   area: HealthArea,
-  tone: CheckTone,
+  meaning: StatusMeaning,
   overrides: Partial<HealthCheck> = {},
 ): HealthCheck {
   return {
     id,
     area,
-    tone,
+    meaning,
     title: id,
     why: `${id} why`,
     words: `${id} words`,
@@ -107,7 +112,7 @@ beforeEach(() => {
   checks.checking = false;
   checks.overviewChecks = null;
   checks.checks = [
-    item("movies", "workflows", "warn", {
+    item("movies", "workflows", "attention", {
       title: "Movies needs a fix",
       why: "The output folder D:/Movies does not exist. Create it, or point this workflow at one that does.",
       words: "Output folder missing · create it",
@@ -119,9 +124,9 @@ beforeEach(() => {
       again: { area: "workflows", key: "2" },
       workflowId: 2,
     }),
-    item("tv", "workflows", "ok", { title: "TV", workflowId: 3 }),
-    item("radarr", "connections", "bad", { title: RADARR }),
-    item("ffmpeg", "tools", "ok", { title: "FFmpeg" }),
+    item("tv", "workflows", "done", { title: "TV", workflowId: 3 }),
+    item("radarr", "connections", "broken", { title: RADARR }),
+    item("ffmpeg", "tools", "done", { title: "FFmpeg" }),
   ];
   vi.mocked(checks.again).mockClear();
 });
@@ -149,7 +154,7 @@ describe("the Health card", () => {
       "Output folder missing · create it",
     );
     expect(rows[1]).toHaveTextContent("checked 12s ago");
-    expect(rows[2]).toHaveClass("mm-sy-check--ok");
+    expect(rows[2]).toHaveAttribute("data-status", "done");
   });
 
   it("counts each area on the ribbon and lists all of an area's checks when it is picked", () => {
@@ -227,7 +232,7 @@ describe("the Health card", () => {
   });
 
   it("lists the passing checks, each saying when it was looked at, when nothing needs you", () => {
-    checks.checks = [item("ffmpeg", "tools", "ok", { title: "FFmpeg" })];
+    checks.checks = [item("ffmpeg", "tools", "done", { title: "FFmpeg" })];
     const { card } = renderCard();
 
     expect(card).toHaveTextContent("1 of 1 pass · all good");

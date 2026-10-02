@@ -119,7 +119,7 @@ beforeEach(() => {
   health.workflows = [
     {
       workflow: movies,
-      verdict: { words: "In sync", tone: "healthy" },
+      verdict: { words: "In sync", meaning: "done", readiness: "ready" },
       why: null,
       chain: undefined,
       checkedAt: NOW,
@@ -164,7 +164,7 @@ describe("useHealthChecks", () => {
     health.workflows = [
       {
         ...health.workflows[0],
-        verdict: { words: "Checking…", tone: "neutral" },
+        verdict: { words: "Checking…", meaning: "doing", readiness: null },
       },
     ];
     queries.overview.data = { checks: { passing: 9, total: 10 } };
@@ -186,7 +186,7 @@ describe("useHealthChecks", () => {
     const backup = result.current.checks.find(
       (check) => check.area === "backups",
     );
-    expect(backup?.tone).toBe("ok");
+    expect(backup?.meaning).toBe("done");
   });
 
   it("reads Weir's workers and a waiting update from readiness and the update status", () => {
@@ -203,9 +203,9 @@ describe("useHealthChecks", () => {
     const { result } = renderChecks();
 
     const weir = result.current.checks.filter((check) => check.area === "weir");
-    expect(weir.map((check) => [check.id, check.tone])).toEqual([
-      ["weir:workers", "bad"],
-      ["weir:update", "note"],
+    expect(weir.map((check) => [check.id, check.meaning])).toEqual([
+      ["weir:workers", "broken"],
+      ["weir:update", "todo"],
     ]);
   });
 

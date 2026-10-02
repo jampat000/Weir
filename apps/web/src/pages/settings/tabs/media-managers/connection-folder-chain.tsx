@@ -7,8 +7,8 @@
 import { Link } from "react-router-dom";
 
 import {
-  READINESS_CLASSES,
   READINESS_LABELS,
+  READINESS_MEANING,
   readinessOf,
   type LibraryFolderChain,
 } from "../../../../lib/processing/library-folder-chain-api";
@@ -56,7 +56,7 @@ export function ConnectionFolderChain({
     // Quiet failure, like FedWorkflows above it: this is an auxiliary, always-on background check inside a card
     // full of other alerts, not a user-initiated action, so it does not compete for the page's one role="alert".
     return (
-      <p className="mm-conn-row__problem mm-status-text--warning">
+      <p className="mm-conn-row__problem mm-status-text" data-status="broken">
         Weir could not check its workflows&apos; folder chains just now.
       </p>
     );
@@ -76,7 +76,10 @@ export function ConnectionFolderChain({
             <span className="mm-conn-row__when">
               {libraryName(libraries.data, entry.library_id)}
             </span>
-            <span className={READINESS_CLASSES[readiness]}>
+            <span
+              className="mm-status-text"
+              data-status={READINESS_MEANING[readiness]}
+            >
               {READINESS_LABELS[readiness]}
             </span>
             <Link

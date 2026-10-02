@@ -21,18 +21,27 @@ import type {
 } from "../processing/files-api";
 import type { LibraryClean } from "../processing/library-cleans-api";
 import { STORY_STEP_MEANING } from "../processing/story-step-meaning";
-import type { Readiness } from "../processing/library-folder-chain-api";
-import type { SystemLogLevel } from "../system/system-log-api";
+import {
+  FOLDER_LINE_MEANING,
+  READINESS_MEANING,
+  type FolderChainLine,
+  type Readiness,
+} from "../processing/library-folder-chain-api";
+import { updateMeaning } from "../settings/update-status";
+import {
+  LOG_LEVEL_MEANING,
+  type SystemLogLevel,
+} from "../system/system-log-api";
+import type { SystemOverview } from "../system/system-stats-types";
 import {
   LIBRARY_STATUSES,
   STATUS_MEANING as LIBRARY_STATUS_MEANING,
 } from "../../pages/library/library-model";
 import type { LibraryStatus } from "../../pages/library/library-model";
-import type { LogLevel } from "../../pages/processing/dashboard/system/log-card-model";
-import type { TaskState } from "../../pages/processing/dashboard/system/tasks-card-model";
-import type { CheckTone } from "../../pages/processing/dashboard/system/health-checks";
-import type { AreaTone } from "../../pages/processing/dashboard/system/health-card-model";
-import type { FactTone } from "../../pages/processing/dashboard/system/this-weir-model";
+import {
+  TASK_MEANING,
+  type TaskState,
+} from "../../pages/processing/dashboard/system/tasks-card-model";
 import type { HandedBackTone } from "../../pages/processing/handed-back-model";
 import type { StepState } from "../../pages/processing/stage-flow-model";
 import type { CardTone } from "../../pages/processing/pipeline/pipeline-card-types";
@@ -40,12 +49,91 @@ import type { MmStatusTone } from "./mm-status-tone";
 import { STATUS_MEANINGS } from "./status-meaning";
 import type { StatusMeaning } from "./status-meaning";
 
+/** The meaning of each status an update check can report, as the screens decide it. */
+function updateStatuses(): Record<string, StatusMeaning> {
+  const statuses = [
+    "checking",
+    "up_to_date",
+    "update_available",
+    "downloaded",
+    "not_published",
+    "unavailable",
+  ];
+  return Object.fromEntries(
+    statuses.map((status) => [status, updateMeaning(status)]),
+  );
+}
+
 /*
  * What the screens that show a state decide it means, beside the function the screen itself uses to decide: the two
  * must agree, so a screen cannot change what a state means without this table saying so. Each table is typed against
  * the model's own union, so a state added to a model does not compile until someone decides what it means here.
  */
 const PRODUCTION_MEANINGS = {
+  connectionState: {
+    used: CONNECTION_STATE_MEANING,
+    expected: {
+      ok: "done",
+      slow: "attention",
+      down: "broken",
+      off: "idle",
+      untested: "idle",
+    } satisfies Record<ConnectionState, StatusMeaning>,
+  },
+  connectionLight: {
+    used: CONNECTION_LIGHT_MEANING,
+    expected: {
+      asking: "doing",
+      answered: "done",
+      failed: "broken",
+    } satisfies Record<ConnectionLight, StatusMeaning>,
+  },
+  readiness: {
+    used: READINESS_MEANING,
+    expected: {
+      ready: "done",
+      not_verified: "attention",
+      needs_attention: "attention",
+    } satisfies Record<Readiness, StatusMeaning>,
+  },
+  folderChainLine: {
+    used: FOLDER_LINE_MEANING,
+    expected: {
+      ok: "done",
+      problem: "attention",
+      note: "idle",
+      unverified: "attention",
+    } satisfies Record<FolderChainLine["state"], StatusMeaning>,
+  },
+  scheduledTask: {
+    used: TASK_MEANING,
+    expected: {
+      running: "doing",
+      ok: "done",
+      failed: "broken",
+      never: "idle",
+    } satisfies Record<TaskState, StatusMeaning>,
+  },
+  logLevel: {
+    used: LOG_LEVEL_MEANING,
+    expected: {
+      success: "done",
+      info: "idle",
+      warning: "attention",
+      error: "broken",
+    } satisfies Record<SystemLogLevel, StatusMeaning>,
+  },
+  updateStatus: {
+    used: updateStatuses(),
+    expected: {
+      checking: "doing",
+      up_to_date: "done",
+      update_available: "todo",
+      downloaded: "todo",
+      not_published: "idle",
+      unavailable: "attention",
+    } satisfies Record<SystemOverview["update"]["status"], StatusMeaning>,
+  },
   libraryStatus: {
     used: LIBRARY_STATUS_MEANING,
     expected: {
@@ -114,56 +202,6 @@ const VOCABULARIES = {
     rejected: "attention",
     failed: "broken",
   } satisfies Record<FinishedKind, StatusMeaning>,
-  connectionState: {
-    ok: "done",
-    slow: "attention",
-    down: "broken",
-    off: "idle",
-    untested: "idle",
-  } satisfies Record<ConnectionState, StatusMeaning>,
-  connectionLight: {
-    asking: "doing",
-    answered: "done",
-    failed: "broken",
-  } satisfies Record<ConnectionLight, StatusMeaning>,
-  readiness: {
-    ready: "done",
-    not_verified: "attention",
-    needs_attention: "attention",
-  } satisfies Record<Readiness, StatusMeaning>,
-  healthCheck: {
-    ok: "done",
-    warn: "attention",
-    bad: "broken",
-    idle: "idle",
-    note: "idle",
-  } satisfies Record<CheckTone, StatusMeaning>,
-  healthArea: {
-    ok: "done",
-    warn: "attention",
-    bad: "broken",
-  } satisfies Record<AreaTone, StatusMeaning>,
-  thisWeirFact: {
-    good: "done",
-    bad: "broken",
-  } satisfies Record<FactTone, StatusMeaning>,
-  scheduledTask: {
-    running: "doing",
-    ok: "done",
-    failed: "broken",
-    never: "idle",
-  } satisfies Record<TaskState, StatusMeaning>,
-  logLevel: {
-    success: "done",
-    info: "idle",
-    warning: "attention",
-    error: "broken",
-  } satisfies Record<SystemLogLevel, StatusMeaning>,
-  logCardLevel: {
-    info: "idle",
-    warning: "attention",
-    error: "broken",
-  } satisfies Record<LogLevel, StatusMeaning>,
   todayOutcome: {
     ok: "done",
     same: "done",
@@ -191,14 +229,6 @@ const VOCABULARIES = {
   } satisfies Record<MmStatusTone, StatusMeaning>,
 };
 
-/* The mappings the screens really use. Each must say what its table above says. */
-const PRODUCTION_MAPS: Partial<
-  Record<keyof typeof VOCABULARIES, Record<string, StatusMeaning>>
-> = {
-  connectionState: CONNECTION_STATE_MEANING,
-  connectionLight: CONNECTION_LIGHT_MEANING,
-};
-
 describe("the meaning of every state a model can produce", () => {
   it.each(Object.entries(VOCABULARIES))(
     "%s: every state has a status meaning",
@@ -206,13 +236,6 @@ describe("the meaning of every state a model can produce", () => {
       for (const meaning of Object.values(states)) {
         expect(STATUS_MEANINGS).toContain(meaning);
       }
-    },
-  );
-
-  it.each(Object.entries(PRODUCTION_MAPS))(
-    "%s: the screens give every state the meaning decided here",
-    (name, used) => {
-      expect(used).toEqual(VOCABULARIES[name as keyof typeof VOCABULARIES]);
     },
   );
 

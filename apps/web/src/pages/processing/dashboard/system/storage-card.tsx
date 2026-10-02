@@ -1,7 +1,6 @@
 import { Panel } from "../../../../components/panels/panel";
 import { loadErrorMessage } from "../../../../lib/api/error-message";
 import { useSystemStatsQuery } from "../../../../lib/system/use-system-stats";
-import { classNames } from "../../../../lib/ui/class-names";
 import { useFittingRows } from "../fit-rows";
 import { MoreCount } from "./more-count";
 import { driveBlocks, storageCount, type DriveBlock } from "./storage-model";
@@ -12,7 +11,8 @@ const STORAGE_PATH = setupTabPath("workflows");
 function Drive({ block }: { block: DriveBlock }) {
   return (
     <li
-      className={classNames("mm-sy-drive", block.low && "mm-sy-drive--low")}
+      className="mm-sy-drive"
+      data-status={block.low ? "attention" : undefined}
       title={
         block.workflows ? `${block.path} · ${block.workflows}` : block.path
       }

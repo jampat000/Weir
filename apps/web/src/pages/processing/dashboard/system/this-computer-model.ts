@@ -7,6 +7,7 @@ import type {
   SystemStats,
 } from "../../../../lib/system/system-stats-types";
 import { narrowing, type Words } from "../../../../lib/ui/fit-text";
+import type { StatusMeaning } from "../../../../lib/ui/status-meaning";
 import {
   gigabytes,
   machineUpWords,
@@ -124,7 +125,7 @@ export function computerColumns(stats: SystemStats): ComputerColumn[] {
     {
       key: "cpu",
       label: "CPU",
-      colour: "var(--mm-success)",
+      colour: "var(--mm-lane-queued)",
       value: now.cpu_percent,
       figure: wholeFigure,
       unit: "%",
@@ -136,7 +137,7 @@ export function computerColumns(stats: SystemStats): ComputerColumn[] {
     {
       key: "memory",
       label: "Memory",
-      colour: "var(--mm-info)",
+      colour: "var(--mm-lane-analysing)",
       value:
         now.memory_used_bytes === null
           ? null
@@ -167,7 +168,7 @@ export function computerColumns(stats: SystemStats): ComputerColumn[] {
   ];
 }
 
-export type MachineTag = { text: string; tone?: "warning" };
+export type MachineTag = { text: string; meaning?: StatusMeaning };
 
 /** The pills under the columns: the operating system, how long it has been up, and a reboot waiting for a person. */
 export function machineTags(machine: SystemStats["machine"]): MachineTag[] {
@@ -176,6 +177,6 @@ export function machineTags(machine: SystemStats["machine"]): MachineTag[] {
   if (machine.uptime_seconds !== null)
     tags.push({ text: machineUpWords(machine.uptime_seconds) });
   if (machine.reboot_pending)
-    tags.push({ text: "reboot pending", tone: "warning" });
+    tags.push({ text: "reboot pending", meaning: "attention" });
   return tags;
 }

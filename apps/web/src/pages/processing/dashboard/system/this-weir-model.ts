@@ -1,5 +1,7 @@
 /** What the This Weir card says: the health ring's figures and the fact tiles beside it, from how Weir itself is running. */
+import { updateMeaning } from "../../../../lib/settings/update-status";
 import { plural } from "../../../../lib/ui/mm-plural";
+import type { StatusMeaning } from "../../../../lib/ui/status-meaning";
 import type {
   RunsAs,
   SystemOverview,
@@ -8,8 +10,6 @@ import { parseAppTime } from "../../../../lib/ui/mm-format-date";
 import { ago } from "../../processing-words";
 import { sizeWords, splitAddress, uptimeWords } from "./system-words";
 
-export type FactTone = "good" | "bad";
-
 export type Fact = {
   key: string;
   label: string;
@@ -17,7 +17,8 @@ export type Fact = {
   /** What the value says where it has to be shorter to fit, when it can be. */
   valueShort?: string;
   sub: string;
-  tone?: FactTone;
+  /** What the sub line means, when it says anything about how Weir is doing. */
+  meaning?: StatusMeaning;
 };
 
 export type RingFigures = {
@@ -27,13 +28,25 @@ export type RingFigures = {
   total: number;
   /** Checks that do not pass: what needs a person. */
   needYou: number;
+  /** The ring's meaning: the worst check, or done when none needs a person. */
+  meaning: StatusMeaning;
 };
 
 /** The checks the ring counts: those that pass, all of them, and those that need a person (a few are neither). */
-export type RingChecks = { passing: number; total: number; need: number };
+export type RingChecks = {
+  passing: number;
+  total: number;
+  need: number;
+  meaning: StatusMeaning;
+};
 
 /** The ring's figures from the checks: no checks at all is a full ring, since nothing is wrong. */
-export function ringFigures({ passing, total, need }: RingChecks): RingFigures {
+export function ringFigures({
+  passing,
+  total,
+  need,
+  meaning,
+}: RingChecks): RingFigures {
   const count = Math.max(0, total);
   const pass = Math.min(Math.max(0, passing), count);
   return {
@@ -41,6 +54,7 @@ export function ringFigures({ passing, total, need }: RingChecks): RingFigures {
     passing: pass,
     total: count,
     needYou: Math.max(0, need),
+    meaning,
   };
 }
 
@@ -61,15 +75,18 @@ const UPDATE_WORDS: Record<SystemOverview["update"]["status"], string> = {
 
 function updateFact(
   update: SystemOverview["update"],
-): Pick<Fact, "sub" | "tone"> {
+): Pick<Fact, "sub" | "meaning"> {
   const ready =
     update.status === "update_available" || update.status === "downloaded";
   if (ready && update.latest_version) {
-    return { sub: `${update.latest_version} ready` };
+    return {
+      sub: `${update.latest_version} ready`,
+      meaning: updateMeaning(update.status),
+    };
   }
   return {
     sub: UPDATE_WORDS[update.status],
-    tone: update.status === "up_to_date" ? "good" : undefined,
+    meaning: updateMeaning(update.status),
   };
 }
 
@@ -145,7 +162,7 @@ export function weirFacts({
         overview.restarts_this_week > 0
           ? plural(overview.restarts_this_week, "restart", "restarts")
           : "no restarts",
-      tone: overview.restarts_this_week > 0 ? "bad" : "good",
+      meaning: overview.restarts_this_week > 0 ? "attention" : "done",
     },
     {
       key: "files-at-once",
@@ -159,7 +176,7 @@ export function weirFacts({
       value: `${overview.jobs_today.run.toLocaleString()} run`,
       valueShort: overview.jobs_today.run.toLocaleString(),
       sub: failed > 0 ? `${failed.toLocaleString()} failed` : "none failed",
-      tone: failed > 0 ? "bad" : "good",
+      meaning: failed > 0 ? "broken" : "done",
     },
     {
       key: "usage",

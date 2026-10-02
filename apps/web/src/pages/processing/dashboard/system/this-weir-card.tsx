@@ -6,7 +6,7 @@ import {
   useSystemOverviewQuery,
   useSystemStatsQuery,
 } from "../../../../lib/system/use-system-stats";
-import { classNames } from "../../../../lib/ui/class-names";
+import type { StatusMeaning } from "../../../../lib/ui/status-meaning";
 import { useNow } from "../../../../lib/ui/use-now";
 import { BandCard, BandNote } from "./band-card";
 import { FitText } from "../../../../lib/ui/fit-text";
@@ -33,16 +33,14 @@ const wholeNumber = (value: number) => Math.round(value).toString();
 function Ring({
   passing,
   fraction,
-  needYou,
+  meaning,
 }: {
   passing: number;
   fraction: number;
-  needYou: number;
+  meaning: StatusMeaning;
 }) {
   return (
-    <div
-      className={classNames("mm-sy-ring", needYou > 0 && "mm-sy-ring--need")}
-    >
+    <div className="mm-sy-ring" data-status={meaning}>
       <svg viewBox="0 0 76 76" aria-hidden="true">
         <circle className="mm-sy-ring__track" cx="38" cy="38" r="32" />
         <circle
@@ -72,7 +70,7 @@ function FactTile({ fact }: { fact: Fact }) {
   return (
     <div
       className="mm-sy-fact"
-      data-tone={fact.tone}
+      data-status={fact.meaning}
       title={`${fact.label}: ${fact.value}${fact.sub ? ` · ${fact.sub}` : ""}`}
     >
       <span className="mm-sy-fact__label">{fact.label}</span>
@@ -137,7 +135,7 @@ export function ThisWeirCard({ checks, onShowHealth }: ThisWeirCardProps) {
             <Ring
               passing={ring.passing}
               fraction={ring.fraction}
-              needYou={ring.needYou}
+              meaning={ring.meaning}
             />
             <small className="mm-sy-ringbox__caption">
               of {ring.total.toLocaleString()}{" "}
@@ -146,14 +144,20 @@ export function ThisWeirCard({ checks, onShowHealth }: ThisWeirCardProps) {
             {ring.needYou > 0 ? (
               <button
                 type="button"
-                className="mm-sy-needs"
+                className="mm-sy-needs mm-status-pill"
+                data-status={ring.meaning}
                 onClick={onShowHealth}
               >
                 {ring.needYou.toLocaleString()} need you{" "}
                 <span className="mm-sy-needs__arrow">→</span>
               </button>
             ) : (
-              <span className="mm-sy-needs mm-sy-needs--good">All good</span>
+              <span
+                className="mm-sy-needs mm-sy-needs--good mm-status-pill"
+                data-status="done"
+              >
+                All good
+              </span>
             )}
           </div>
           <div ref={roomRef} className="mm-sy-facts-room">

@@ -2,7 +2,9 @@ import { useState } from "react";
 
 import { Panel } from "../../../../components/panels/panel";
 import { SegmentedControl } from "../../../../components/panels/segmented-control";
+import { LOG_LEVEL_MEANING } from "../../../../lib/system/system-log-api";
 import { classNames } from "../../../../lib/ui/class-names";
+import { needsYou } from "../../../../lib/ui/status-meaning";
 import { useAppClockSecondsFormatter } from "../../../../lib/ui/mm-format-date";
 import { useNow } from "../../../../lib/ui/use-now";
 import { useFittingRows } from "../fit-rows";
@@ -41,13 +43,15 @@ function LogRow({
   clock: (ms: number) => string;
   fresh: boolean;
 }) {
+  const meaning = LOG_LEVEL_MEANING[line.level];
   return (
     <li
       className={classNames(
         "mm-sy-log",
-        `mm-sy-log--${line.level}`,
+        needsYou(meaning) && "mm-sy-log--problem",
         fresh && "mm-sy-log--new",
       )}
+      data-status={meaning}
       data-fit=""
       data-testid="system-log-line"
     >
@@ -57,9 +61,7 @@ function LogRow({
       >
         {clock(line.at)}
       </time>
-      <span className={`mm-sy-log__level mm-sy-log__level--${line.level}`}>
-        {LEVEL_WORDS[line.level]}
-      </span>
+      <span className="mm-sy-log__level">{LEVEL_WORDS[line.level]}</span>
       <span className="mm-sy-log__message" title={line.message}>
         {line.message}
       </span>

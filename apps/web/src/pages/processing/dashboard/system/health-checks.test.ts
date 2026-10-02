@@ -23,7 +23,7 @@ function workflowHealth(
   const { id, name, ...rest } = overrides;
   return {
     workflow: { id, name } as ProcessingLibrary,
-    verdict: { words: "In sync", tone: "healthy" },
+    verdict: { words: "In sync", meaning: "done", readiness: "ready" },
     why: null,
     chain: undefined,
     checkedAt: NOW,
@@ -57,7 +57,7 @@ describe("workflowChecks", () => {
   it("passes a workflow whose chain is in sync", () => {
     const [check] = workflowChecks([workflowHealth({ id: 2, name: "Movies" })]);
     expect(check).toMatchObject({
-      tone: "ok",
+      meaning: "done",
       title: "Movies",
       fix: null,
       workflowId: 2,
@@ -70,12 +70,16 @@ describe("workflowChecks", () => {
       workflowHealth({
         id: 2,
         name: "Movies",
-        verdict: { words: "Needs a fix", tone: "warning" },
+        verdict: {
+          words: "Needs a fix",
+          meaning: "attention",
+          readiness: "needs_attention",
+        },
         why: "The output folder is missing.",
       }),
     ]);
     expect(check).toMatchObject({
-      tone: "warn",
+      meaning: "attention",
       title: "Movies needs a fix",
       why: "The output folder is missing.",
     });
@@ -87,10 +91,10 @@ describe("workflowChecks", () => {
       workflowHealth({
         id: 2,
         name: "Movies",
-        verdict: { words: "Checking…", tone: "neutral" },
+        verdict: { words: "Checking…", meaning: "doing", readiness: null },
       }),
     ]);
-    expect(check).toMatchObject({ tone: "idle", why: "Checking…" });
+    expect(check).toMatchObject({ meaning: "doing", why: "Checking…" });
   });
 });
 
@@ -102,7 +106,11 @@ describe("a check's few words", () => {
       workflowHealth({
         id: 2,
         name: "4K Movies",
-        verdict: { words: "Needs a fix", tone: "warning" },
+        verdict: {
+          words: "Needs a fix",
+          meaning: "attention",
+          readiness: "needs_attention",
+        },
         why: sentence,
       }),
     ]);
@@ -149,7 +157,7 @@ describe("connectionChecks", () => {
       connection({ key: "a", state: "down", detail: "Connection refused." }),
     ]);
     expect(check).toMatchObject({
-      tone: "bad",
+      meaning: "broken",
       title: "Radarr isn't answering",
       why: "Connection refused.",
     });
@@ -161,7 +169,7 @@ describe("connectionChecks", () => {
       connection({ key: "a", state: "slow", answerMs: 2500 }),
     ]);
     expect(check).toMatchObject({
-      tone: "warn",
+      meaning: "attention",
       why: "Its last answer came in 2,500 ms.",
     });
   });
@@ -171,8 +179,8 @@ describe("connectionChecks", () => {
       connection({ key: "a" }),
       connection({ key: "b", state: "untested" }),
     ]);
-    expect(ok.tone).toBe("ok");
-    expect(untested.tone).toBe("idle");
+    expect(ok.meaning).toBe("done");
+    expect(untested.meaning).toBe("idle");
   });
 
   it("leaves out a connection that is switched off", () => {
@@ -193,30 +201,33 @@ describe("connectionChecks", () => {
 });
 
 describe("toolChecks", () => {
-  const ffmpeg = (tone: ToolRow["tone"]): ToolRow => ({
+  const ffmpeg = (meaning: ToolRow["meaning"]): ToolRow => ({
     key: "ffmpeg",
     name: "FFmpeg",
     version: "7.1",
     banner: "ffmpeg version 7.1",
-    tone,
+    meaning,
   });
 
   it("fails when FFmpeg is missing", () => {
-    const [check] = toolChecks([ffmpeg("failed")], NOW);
-    expect(check).toMatchObject({ tone: "bad", title: "FFmpeg is missing" });
+    const [check] = toolChecks([ffmpeg("broken")], NOW);
+    expect(check).toMatchObject({
+      meaning: "broken",
+      title: "FFmpeg is missing",
+    });
   });
 
   it("only notes that the optional mkvmerge is missing", () => {
     const [check] = toolChecks(
-      [{ ...ffmpeg("neutral"), key: "mkvmerge", name: "mkvmerge" }],
+      [{ ...ffmpeg("idle"), key: "mkvmerge", name: "mkvmerge" }],
       NOW,
     );
-    expect(check.tone).toBe("note");
+    expect(check).toMatchObject({ meaning: "idle", fact: true });
   });
 
   it("passes a tool that is installed and says its version line", () => {
-    const [check] = toolChecks([ffmpeg("healthy")], NOW);
-    expect(check).toMatchObject({ tone: "ok", why: "ffmpeg version 7.1" });
+    const [check] = toolChecks([ffmpeg("done")], NOW);
+    expect(check).toMatchObject({ meaning: "done", why: "ffmpeg version 7.1" });
   });
 
   it("has no checks while the tools have not answered", () => {
@@ -244,19 +255,25 @@ describe("storageChecks", () => {
 
   it("fails a drive with less free than Weir keeps free, and links to a workflow that writes there", () => {
     const [check] = storageChecks([drive({ free_bytes: 5_000_000_000 })], NOW);
-    expect(check).toMatchObject({ tone: "bad", title: "D: is low on space" });
+    expect(check).toMatchObject({
+      meaning: "attention",
+      title: "D: is low on space",
+    });
     expect(check.fix?.to).toBe("/setup/workflows?edit=3");
   });
 
   it("warns on a drive that fills within a week", () => {
     const [check] = storageChecks([drive({ full_in_days: 3 })], NOW);
-    expect(check).toMatchObject({ tone: "warn", title: "D: fills up soon" });
+    expect(check).toMatchObject({
+      meaning: "attention",
+      title: "D: fills up soon",
+    });
     expect(check.why).toContain("about 3 days");
   });
 
   it("passes a drive with room, and says how much", () => {
     const [check] = storageChecks([drive({})], NOW);
-    expect(check.tone).toBe("ok");
+    expect(check.meaning).toBe("done");
     expect(check.why).toMatch(/free\.$/);
   });
 
@@ -274,12 +291,12 @@ describe("backupChecks", () => {
   };
 
   it("passes while the newest backup is within the schedule", () => {
-    expect(backupChecks(facts, NOW)[0].tone).toBe("ok");
+    expect(backupChecks(facts, NOW)[0].meaning).toBe("done");
   });
 
   it("warns when automatic backups are off", () => {
     const [check] = backupChecks({ ...facts, enabled: false }, NOW);
-    expect(check).toMatchObject({ tone: "warn" });
+    expect(check).toMatchObject({ meaning: "attention" });
     expect(check.fix?.to).toBe("/system?tab=backups");
   });
 
@@ -293,7 +310,7 @@ describe("backupChecks", () => {
       { ...facts, lastBackupAt: NOW - 49 * HOUR },
       NOW,
     );
-    expect(check.tone).toBe("warn");
+    expect(check.meaning).toBe("attention");
   });
 
   it("has no check before the settings have loaded", () => {
@@ -309,7 +326,7 @@ describe("weirChecks", () => {
       checkedAt: NOW,
     });
     expect(check).toMatchObject({
-      tone: "bad",
+      meaning: "broken",
       why: "The cleanup worker stopped.",
     });
   });
@@ -320,7 +337,10 @@ describe("weirChecks", () => {
       updateVersion: "3.3.0",
       checkedAt: NOW,
     });
-    expect(checks.map((check) => check.tone)).toEqual(["ok", "note"]);
+    expect(checks.map((check) => [check.meaning, check.fact])).toEqual([
+      ["done", undefined],
+      ["todo", true],
+    ]);
     expect(checks[1].title).toBe("Weir 3.3.0 is out");
   });
 

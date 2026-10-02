@@ -36,24 +36,33 @@ const facts = (changes: Partial<Parameters<typeof weirFacts>[0]> = {}) =>
 
 describe("the health ring", () => {
   it("fills by the share of checks that pass and counts those that need a person", () => {
-    expect(ringFigures({ passing: 9, total: 10, need: 1 })).toEqual({
+    expect(
+      ringFigures({ passing: 9, total: 10, need: 1, meaning: "attention" }),
+    ).toEqual({
       fraction: 0.9,
       passing: 9,
       total: 10,
       needYou: 1,
+      meaning: "attention",
     });
   });
 
   it("is full when there are no checks to fail", () => {
-    expect(ringFigures({ passing: 0, total: 0, need: 0 }).fraction).toBe(1);
+    expect(
+      ringFigures({ passing: 0, total: 0, need: 0, meaning: "done" }).fraction,
+    ).toBe(1);
   });
 
   it("never counts more passing than there are checks", () => {
-    expect(ringFigures({ passing: 12, total: 10, need: 0 }).passing).toBe(10);
+    expect(
+      ringFigures({ passing: 12, total: 10, need: 0, meaning: "done" }).passing,
+    ).toBe(10);
   });
 
   it("does not call a check that is only unproven a need", () => {
-    expect(ringFigures({ passing: 8, total: 10, need: 0 }).needYou).toBe(0);
+    expect(
+      ringFigures({ passing: 8, total: 10, need: 0, meaning: "done" }).needYou,
+    ).toBe(0);
   });
 });
 
@@ -62,7 +71,7 @@ describe("the fact tiles", () => {
     expect(facts().version).toMatchObject({
       value: "3.2.16",
       sub: "up to date",
-      tone: "good",
+      meaning: "done",
     });
     expect(
       facts({
@@ -79,13 +88,13 @@ describe("the fact tiles", () => {
     expect(facts({ now: NOW + 60_000 }).uptime.value).toBe("1h 01m");
   });
 
-  it("reds the uptime's note when Weir restarted this week", () => {
+  it("asks for attention on the uptime's note when Weir restarted this week", () => {
     const restarted = facts({
       overview: { ...overview, restarts_this_week: 3 },
     });
     expect(restarted.uptime).toMatchObject({
       sub: "3 restarts",
-      tone: "bad",
+      meaning: "attention",
     });
   });
 
@@ -104,12 +113,12 @@ describe("the fact tiles", () => {
     expect(facts().jobs).toMatchObject({
       value: "1,200 run",
       sub: "2 failed",
-      tone: "bad",
+      meaning: "broken",
     });
     expect(
       facts({ overview: { ...overview, jobs_today: { run: 5, failed: 0 } } })
         .jobs,
-    ).toMatchObject({ sub: "none failed", tone: "good" });
+    ).toMatchObject({ sub: "none failed", meaning: "done" });
   });
 
   it("shows the median response and what 95% of responses beat", () => {

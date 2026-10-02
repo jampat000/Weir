@@ -48,7 +48,7 @@
   margin: 0;
   font-size: var(--mm-type-body);
   line-height: 1.4;
-  color: var(--mm-warning-text);
+  color: var(--mm-st);
 }
 
 .mm-health__notice {
@@ -158,7 +158,6 @@
 /* How many things need a person, in the header, where a glance finds it. */
 .mm-needs__count {
   font-weight: 600;
-  color: var(--mm-warning-text);
 }
 
 .mm-needs__clear {
@@ -173,17 +172,13 @@
 
 .mm-needs__clear svg,
 .mm-needs__clear b {
-  color: var(--mm-status-healthy-text);
+  color: var(--mm-st);
 }
 
 .mm-needs__notice {
   margin: 0 18px 10px;
   font-size: var(--mm-type-body);
   color: var(--mm-text2);
-}
-
-.mm-needs__notice[role="alert"] {
-  color: var(--mm-status-failed-text);
 }
 
 .mm-needs__group {
@@ -206,7 +201,7 @@
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--mm-warning-text);
+  color: var(--mm-st);
 }
 
 .mm-needs__rows {
@@ -224,9 +219,9 @@
   min-width: 0;
   gap: 2px;
   padding: 10px 12px;
-  border: 1px solid var(--mm-warning-border);
+  border: 1px solid color-mix(in srgb, var(--mm-st) 45%, transparent);
   border-radius: 12px;
-  background: var(--mm-warning-bg);
+  background: color-mix(in srgb, var(--mm-st) 10%, transparent);
   font-size: 0.875rem;
   line-height: 1.4;
 }

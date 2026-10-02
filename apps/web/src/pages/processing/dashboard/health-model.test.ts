@@ -77,20 +77,23 @@ describe("a workflow's folder-chain verdict", () => {
   it("is In sync when every line was read by Weir and none is a problem", () => {
     expect(chainVerdict(chain(true, [ok]))).toEqual({
       words: "In sync",
-      tone: "healthy",
+      meaning: "done",
+      readiness: "ready",
     });
   });
 
-  it("is Not verified while any line rests on someone's word, in a manager's or a client's lines too", () => {
-    expect(chainVerdict(chain(true, [ok], [unverified])).words).toBe(
-      "Not verified",
-    );
+  it("is Not verified, and needs attention, while any line rests on someone's word, in a manager's or a client's lines too", () => {
+    expect(chainVerdict(chain(true, [ok], [unverified]))).toMatchObject({
+      words: "Not verified",
+      meaning: "attention",
+    });
   });
 
   it("is Needs a fix when the chain is not ready", () => {
     expect(chainVerdict(chain(false, [problem]))).toEqual({
       words: "Needs a fix",
-      tone: "warning",
+      meaning: "attention",
+      readiness: "needs_attention",
     });
   });
 });
@@ -123,26 +126,26 @@ describe("the tools", () => {
         name: "FFmpeg",
         version: "7.1.1",
         banner: "ffmpeg version 7.1.1 Copyright",
-        tone: "healthy",
+        meaning: "done",
       },
       {
         key: "mkvmerge",
         name: "mkvmerge",
         version: "89.0.0",
         banner: "v89.0.0",
-        tone: "healthy",
+        meaning: "done",
       },
     ]);
   });
 
-  it("call a missing FFmpeg a failure, and a missing mkvmerge only a note", () => {
+  it("call a missing FFmpeg broken, and a missing mkvmerge idle", () => {
     const [ffmpeg, mkvmerge] = toolRows({
       ffmpeg: "not installed",
       mkvmerge: "not installed",
     });
 
-    expect(ffmpeg.tone).toBe("failed");
-    expect(mkvmerge.tone).toBe("neutral");
+    expect(ffmpeg.meaning).toBe("broken");
+    expect(mkvmerge.meaning).toBe("idle");
   });
 });
 
@@ -151,8 +154,16 @@ describe("how many things need a look", () => {
     expect(
       problemCount({
         workflows: [
-          { verdict: { words: "Needs a fix", tone: "warning" } },
-          { verdict: { words: "In sync", tone: "healthy" } },
+          {
+            verdict: {
+              words: "Needs a fix",
+              meaning: "attention",
+              readiness: "needs_attention",
+            },
+          },
+          {
+            verdict: { words: "In sync", meaning: "done", readiness: "ready" },
+          },
         ],
         connections: [
           connectionEntry({ state: "down" }),

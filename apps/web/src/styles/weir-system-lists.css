@@ -32,23 +32,7 @@
   text-align: right;
 }
 
-.mm-sy-task__dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--mm-success);
-}
-
-.mm-sy-task--failed .mm-sy-task__dot {
-  background: var(--mm-destructive);
-}
-
-.mm-sy-task--never .mm-sy-task__dot {
-  background: var(--mm-text3);
-}
-
-.mm-sy-task--running .mm-sy-task__dot {
-  background: var(--mm-info);
+.mm-sy-task[data-status="doing"] .mm-status-dot {
   animation: mm-sy-blink 0.8s ease-in-out infinite;
 }
 
@@ -71,7 +55,6 @@
   font-size: var(--mm-type-eyebrow);
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--mm-status-failed-text);
 }
 
 .mm-sy-task__result,
@@ -86,18 +69,6 @@
 .mm-sy-task__next b {
   font-weight: 600;
   color: var(--mm-text1);
-}
-
-.mm-sy-task__running {
-  color: var(--mm-info);
-}
-
-.mm-sy-task__mark {
-  color: var(--mm-success);
-}
-
-.mm-sy-task--failed .mm-sy-task__mark {
-  color: var(--mm-destructive);
 }
 
 /* ---- Log ------------------------------------------------------------------- */
@@ -143,6 +114,7 @@
 
 @container (max-width: 320px) {
   .mm-sy-card--log .mm-panel__link {
+    align-self: center;
     gap: 0;
     font-size: 0;
   }
@@ -189,30 +161,20 @@
   white-space: nowrap;
 }
 
-.mm-sy-log--info .mm-sy-log__message {
+.mm-sy-log:not(.mm-sy-log--problem) .mm-sy-log__message {
   color: var(--mm-text2);
 }
 
-.mm-sy-log--warning {
-  border-left-color: var(--mm-warning);
-  background: var(--mm-status-warning-bg);
+.mm-sy-log--problem {
+  border-left-color: var(--mm-st);
+  background: color-mix(in srgb, var(--mm-st) 14%, transparent);
 }
 
-.mm-sy-log--error {
-  border-left-color: var(--mm-destructive);
-  background: var(--mm-status-failed-bg);
+.mm-sy-log--problem .mm-sy-log__level {
+  color: var(--mm-st);
 }
 
-.mm-sy-log--warning .mm-sy-log__level {
-  color: var(--mm-status-warning-text);
-}
-
-.mm-sy-log--error .mm-sy-log__level {
-  color: var(--mm-status-failed-text);
-}
-
-.mm-sy-log--warning .mm-sy-log__message,
-.mm-sy-log--error .mm-sy-log__message {
+.mm-sy-log--problem .mm-sy-log__message {
   font-weight: 500;
   color: var(--mm-text1);
 }

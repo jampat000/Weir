@@ -1,6 +1,6 @@
 import {
-  READINESS_CLASSES,
   READINESS_LABELS,
+  READINESS_MEANING,
   readinessOf,
   type FolderChainLine,
   type LibraryFolderChain,
@@ -16,7 +16,10 @@ function ReadinessBadge({
 }) {
   const readiness = readinessOf(ready, lines);
   return (
-    <span className={`ml-2 text-xs ${READINESS_CLASSES[readiness]}`}>
+    <span
+      className="mm-status-text ml-2 text-xs"
+      data-status={READINESS_MEANING[readiness]}
+    >
       {READINESS_LABELS[readiness]}
     </span>
   );

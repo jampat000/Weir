@@ -121,7 +121,7 @@ describe("updateFacts", () => {
       updateFacts({ ...status, status: "update_available" }, undefined),
     ).toMatchObject({
       state: "Update available",
-      tone: "warning",
+      meaning: "todo",
       latest: "3.3.0",
     });
   });
@@ -132,7 +132,7 @@ describe("updateFacts", () => {
         { ...status, status: "update_available" },
         { downloaded: true, pending_version: "3.3.0" },
       ),
-    ).toMatchObject({ state: "Downloaded and ready", tone: "info" });
+    ).toMatchObject({ state: "Downloaded and ready", meaning: "todo" });
   });
 
   it("says Weir is up to date", () => {
@@ -141,7 +141,7 @@ describe("updateFacts", () => {
         { ...status, status: "up_to_date", latest_version: "3.2.16" },
         undefined,
       ),
-    ).toMatchObject({ state: "Up to date", tone: "healthy" });
+    ).toMatchObject({ state: "Up to date", meaning: "done" });
   });
 
   it("says Weir could not check, with no latest version", () => {
@@ -150,6 +150,10 @@ describe("updateFacts", () => {
         { ...status, status: "unavailable", latest_version: null },
         undefined,
       ),
-    ).toMatchObject({ state: "Could not check", latest: "—", tone: "neutral" });
+    ).toMatchObject({
+      state: "Could not check",
+      latest: "—",
+      meaning: "attention",
+    });
   });
 });

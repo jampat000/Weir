@@ -1,6 +1,8 @@
 import { Link } from "react-router-dom";
 
+import { StatusDot } from "../../../../components/panels/status-dot";
 import { classNames } from "../../../../lib/ui/class-names";
+import { needsYou } from "../../../../lib/ui/status-meaning";
 import { checkedAgo } from "../health-model";
 import { HEALTH_AREAS, type HealthCheck } from "./health-checks";
 
@@ -30,7 +32,7 @@ export function HealthCheckRow({
   onDetails,
 }: HealthCheckRowProps) {
   const { workflowId } = check;
-  const problem = check.tone === "bad" || check.tone === "warn";
+  const problem = needsYou(check.meaning);
   const area = AREA_NAMES.get(check.area);
   const checked =
     check.checkedAt === null
@@ -38,11 +40,12 @@ export function HealthCheckRow({
       : `checked ${checkedAgo(check.checkedAt, now)}`;
   return (
     <li
-      className={classNames("mm-sy-check", `mm-sy-check--${check.tone}`)}
+      className={classNames("mm-sy-check", !problem && "mm-sy-check--fine")}
+      data-status={check.meaning}
       data-fit=""
       data-testid="system-check"
     >
-      <span className="mm-sy-check__dot" aria-hidden="true" />
+      <StatusDot meaning={check.meaning} />
       <span className="mm-sy-check__text">
         <b title={check.title}>{check.title}</b>
         <span className="mm-sy-check__why" title={check.why}>

@@ -4,6 +4,7 @@ import {
   type ConnectionEntry,
 } from "../../../lib/connections/connection-model";
 import {
+  READINESS_MEANING,
   folderChainLines,
   readinessOf,
   type LibraryFolderChain,
@@ -11,7 +12,7 @@ import {
 } from "../../../lib/processing/library-folder-chain-api";
 import type { MediaTools } from "../../../lib/system/media-tools";
 import { toolVersion } from "../../../lib/system/media-tools";
-import type { MmStatusTone } from "../../../lib/ui/mm-status-tone";
+import { needsYou, type StatusMeaning } from "../../../lib/ui/status-meaning";
 import { ago } from "../processing-words";
 
 export const READINESS_WORDS: Record<Readiness, string> = {
@@ -20,18 +21,21 @@ export const READINESS_WORDS: Record<Readiness, string> = {
   needs_attention: "Needs a fix",
 };
 
-const READINESS_TONE: Record<Readiness, MmStatusTone> = {
-  ready: "healthy",
-  not_verified: "neutral",
-  needs_attention: "warning",
+export type WorkflowVerdict = {
+  words: string;
+  meaning: StatusMeaning;
+  /** How the chain stands once it has been read; null while it is being checked or could not be. */
+  readiness: Readiness | null;
 };
-
-export type WorkflowVerdict = { words: string; tone: MmStatusTone };
 
 /** A workflow's chain, from its folders to each connection that touches it, as one verdict. */
 export function chainVerdict(chain: LibraryFolderChain): WorkflowVerdict {
   const readiness = readinessOf(chain.ready, folderChainLines(chain));
-  return { words: READINESS_WORDS[readiness], tone: READINESS_TONE[readiness] };
+  return {
+    words: READINESS_WORDS[readiness],
+    meaning: READINESS_MEANING[readiness],
+    readiness,
+  };
 }
 
 const NOTHING_NAMED = "Open it to see what to fix.";
@@ -53,11 +57,13 @@ export function whyNotInSync(chain: LibraryFolderChain): string | null {
 export const CHECKING_WORDS = "Checking…";
 const CHECKING_VERDICT: WorkflowVerdict = {
   words: CHECKING_WORDS,
-  tone: "neutral",
+  meaning: "doing",
+  readiness: null,
 };
 const UNCHECKED_VERDICT: WorkflowVerdict = {
   words: "Couldn't check",
-  tone: "neutral",
+  meaning: "broken",
+  readiness: null,
 };
 
 /** The verdict a check's state gives: the chain's own once it has answered, else that it is still being checked or could not be. */
@@ -105,7 +111,7 @@ export type ToolRow = {
   version: string;
   /** The tool's own version line, as it reported it. */
   banner: string;
-  tone: MmStatusTone;
+  meaning: StatusMeaning;
 };
 
 /**
@@ -120,46 +126,33 @@ export function toolRows(tools: MediaTools): ToolRow[] {
       name: "FFmpeg",
       version: toolVersion(tools.ffmpeg),
       banner: tools.ffmpeg,
-      tone: missing(tools.ffmpeg) ? "failed" : "healthy",
+      meaning: missing(tools.ffmpeg) ? "broken" : "done",
     },
     {
       key: "mkvmerge",
       name: "mkvmerge",
       version: toolVersion(tools.mkvmerge),
       banner: tools.mkvmerge,
-      tone: missing(tools.mkvmerge) ? "neutral" : "healthy",
+      meaning: missing(tools.mkvmerge) ? "idle" : "done",
     },
   ];
 }
 
-const isProblem = (tone: MmStatusTone) =>
-  tone === "warning" || tone === "failed";
-
-/**
- * The few words beside the panel's title: how many things need a look, else how many workflows Weir could not
- * verify, else that all is clear. A workflow Weir takes someone's word for is not a fault, but it is not clear either.
- */
-export function healthSummary(
-  problems: number,
-  workflows: readonly { verdict: WorkflowVerdict }[],
-): string {
-  if (problems > 0) return `${problems} to look at`;
-  const unverified = workflows.filter(
-    (item) => item.verdict.words === READINESS_WORDS.not_verified,
-  ).length;
-  return unverified > 0 ? `${unverified} not verified` : "all clear";
+/** The few words beside the panel's title: how many things need a look, else that all is clear. */
+export function healthSummary(problems: number): string {
+  return problems > 0 ? `${problems} to look at` : "all clear";
 }
 
-/** How many things in the panel need a look: a workflow that needs a fix, a connection that is down or slow, a tool that is down. */
+/** How many things in the panel need a look: a workflow that needs a fix or is not verified, a connection that is down or slow, a tool that is down. */
 export function problemCount(parts: {
   workflows: readonly { verdict: WorkflowVerdict }[];
   connections: readonly ConnectionEntry[];
   tools: readonly ToolRow[] | null;
 }): number {
   return (
-    parts.workflows.filter((item) => isProblem(item.verdict.tone)).length +
+    parts.workflows.filter((item) => needsYou(item.verdict.meaning)).length +
     parts.connections.filter((entry) => entry.enabled && needsALook(entry))
       .length +
-    (parts.tools ?? []).filter((tool) => isProblem(tool.tone)).length
+    (parts.tools ?? []).filter((tool) => needsYou(tool.meaning)).length
   );
 }

@@ -100,7 +100,7 @@ export function HealthPanel({ workflows, workflowId }: HealthPanelProps) {
   return (
     <Panel
       title="Health"
-      count={healthSummary(problems, health.workflows)}
+      count={healthSummary(problems)}
       aside={<CheckNowButton check={check} />}
       to={detailPath}
       toLabel="Full detail"
@@ -121,7 +121,12 @@ export function HealthPanel({ workflows, workflowId }: HealthPanelProps) {
           ) : (
             <ul className="mm-health__list">
               {health.workflows.map(({ workflow, verdict, why }) => (
-                <li key={workflow.id} className="mm-health__row" data-fit="">
+                <li
+                  key={workflow.id}
+                  className="mm-health__row"
+                  data-status={verdict.meaning}
+                  data-fit=""
+                >
                   <Link
                     className="mm-health__name"
                     to={workflowEditorPath(workflow.id)}
@@ -133,7 +138,7 @@ export function HealthPanel({ workflows, workflowId }: HealthPanelProps) {
                       )}
                     </small>
                   </Link>
-                  <Chip tone={verdict.tone}>{verdict.words}</Chip>
+                  <Chip meaning={verdict.meaning}>{verdict.words}</Chip>
                   {why ? (
                     <p className="mm-health__why" title={why}>
                       {firstSentence(why)}
@@ -171,7 +176,7 @@ export function HealthPanel({ workflows, workflowId }: HealthPanelProps) {
               {health.tools.map((tool) => (
                 <li key={tool.key}>
                   <Link to={ABOUT_PATH} className="mm-health__pill">
-                    <Chip tone={tool.tone}>
+                    <Chip meaning={tool.meaning}>
                       {tool.name}{" "}
                       <span className="mm-health__state">{tool.version}</span>
                     </Chip>

@@ -41,7 +41,7 @@ export function WorkflowChainDrawer({
       <div className="mm-sy-detail">
         <div className="mm-sy-detail__head">
           <span>{workflowBadgeLabel(kind)}</span>
-          <Chip tone={verdict.tone}>{verdict.words}</Chip>
+          <Chip meaning={verdict.meaning}>{verdict.words}</Chip>
         </div>
         <p className="mm-sy-detail__note">{workflowKindNote(kind)}</p>
         {why ? <p className="mm-sy-detail__why">{why}</p> : null}
