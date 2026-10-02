@@ -1,17 +1,16 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import { Panel } from "../../../../components/panels/panel";
+import { EmptyState } from "../../../../components/shared/empty-state";
 import { PageLoading } from "../../../../components/shared/page-loading";
+import { SidePanel } from "../../../../components/shared/side-panel";
 import { PageToolbarAddButton } from "../../../../components/shell/page-toolbar-actions";
-import {
-  QuietFieldGroup,
-  QuietSection,
-} from "../../../../components/shared/quiet-section";
 import { errorMessage } from "../../../../lib/api/error-message";
 import {
   useCreateNotificationChannelMutation,
   useNotificationChannelsQuery,
 } from "../../../../lib/settings/queries";
+import { mmActionButtonClass } from "../../../../lib/ui/mm-control-roles";
 import { SaveModelNote } from "../../save-model-note";
 import { SettingsLoadError } from "../../settings-load-error";
 import { orderedEvents } from "./alert-events";
@@ -22,47 +21,29 @@ import {
   useChannelRemoval,
 } from "./remove-channel-dialog";
 
-function AlertIntro() {
-  return (
-    <Panel title="How an alert is sent" padded>
-      <p className="mm-quiet-note">
-        An alert is a message Weir posts to Discord, or to any address that
-        takes a webhook, when something happens you would want to know about
-        without opening Weir. Nothing is sent until you add an alert.
-      </p>
-      <ol className="mm-alert-steps" aria-label="How an alert is sent">
-        <li>
-          <b>Something happens.</b> A file finishes or fails for good, or one of
-          Weir&rsquo;s own jobs fails for good. A failure Weir will retry is not
-          sent until the last try.
-        </li>
-        <li>
-          <b>Weir checks each alert.</b> Only alerts ticked for that event, and
-          switched on, get it.
-        </li>
-        <li>
-          <b>It posts the message.</b> If an alert does not answer, Weir notes
-          it in System › Logs, under Server log.
-        </li>
-      </ol>
-    </Panel>
-  );
-}
-
-function NewChannel({
+function NewChannelPanel({
   supportedEvents,
-  onDone,
+  onClose,
 }: {
   supportedEvents: string[];
-  onDone: () => void;
+  onClose: () => void;
 }) {
   const createMutation = useCreateNotificationChannelMutation();
+  const labelRef = useRef<HTMLInputElement>(null);
   return (
-    <QuietFieldGroup title="New alert" className="mt-6">
+    <SidePanel
+      open
+      title="New alert"
+      eyebrow="Setup · Connections"
+      initialFocus={labelRef}
+      onClose={onClose}
+      dataTestId="alert-add-panel"
+    >
       <ChannelForm
         supportedEvents={supportedEvents}
-        onSave={(data) => createMutation.mutate(data, { onSuccess: onDone })}
-        onCancel={onDone}
+        labelRef={labelRef}
+        onSave={(data) => createMutation.mutate(data, { onSuccess: onClose })}
+        onCancel={onClose}
         saving={createMutation.isPending}
         saveError={
           createMutation.isError
@@ -70,7 +51,7 @@ function NewChannel({
             : null
         }
       />
-    </QuietFieldGroup>
+    </SidePanel>
   );
 }
 
@@ -88,26 +69,13 @@ export function AlertsTab() {
 
   return (
     <div data-testid="suite-settings-notifications" className="mm-quiet-stack">
-      <AlertIntro />
-      <SaveModelNote model="instant" />
-
-      <QuietSection
-        level={3}
-        headingId="suite-settings-notifications-heading"
-        heading="Alerts"
-      >
-        {!adding && editingId === null ? (
-          <PageToolbarAddButton
-            label="Add alert"
-            onClick={() => setAdding(true)}
-          />
-        ) : null}
-        <p className="mm-quiet-note">
-          Tick what each alert should hear about; a change saves straight away.
-          Use &ldquo;Send test&rdquo; before relying on a new alert.
-        </p>
-
-        {channels.length > 0 ? (
+      {channels.length > 0 ? (
+        <Panel
+          title="Where alerts go"
+          count="Tick what each one hears about. Use Send test before relying on a new one."
+          aside={<SaveModelNote model="instant" />}
+          padded
+        >
           <ChannelTable
             channels={channels}
             supportedEvents={supportedEvents}
@@ -116,17 +84,42 @@ export function AlertsTab() {
             onEdit={setEditingId}
             onRemove={removal.ask}
           />
-        ) : !adding ? (
-          <p className="mm-quiet-note mt-4">No alerts configured yet.</p>
-        ) : null}
+          <p className="mm-quiet-note mt-4">
+            A failure Weir will retry is sent only after its last try. When an
+            alert does not answer, Weir notes it in System › Logs.
+          </p>
+        </Panel>
+      ) : (
+        <EmptyState
+          title="No alerts yet"
+          testId="alerts-empty"
+          action={
+            <button
+              type="button"
+              className={mmActionButtonClass({ variant: "secondary" })}
+              onClick={() => setAdding(true)}
+            >
+              Add your first alert
+            </button>
+          }
+        >
+          An alert is a message Weir posts to Discord, or to any address that
+          takes a webhook, when a file finishes or fails for good, or one of
+          Weir&rsquo;s own jobs does. Nothing is sent until you add one.
+        </EmptyState>
+      )}
 
-        {adding ? (
-          <NewChannel
-            supportedEvents={supportedEvents}
-            onDone={() => setAdding(false)}
-          />
-        ) : null}
-      </QuietSection>
+      <PageToolbarAddButton
+        label="Add alert"
+        disabled={editingId !== null}
+        onClick={() => setAdding(true)}
+      />
+      {adding ? (
+        <NewChannelPanel
+          supportedEvents={supportedEvents}
+          onClose={() => setAdding(false)}
+        />
+      ) : null}
 
       <RemoveChannelDialog removal={removal} />
     </div>

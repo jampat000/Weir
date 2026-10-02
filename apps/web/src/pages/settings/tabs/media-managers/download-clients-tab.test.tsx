@@ -25,15 +25,12 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-it("says what a download client is for, and that its changes save as they are made", async () => {
+it("says what a download client is for while none is connected", async () => {
   render(<DownloadClientsTab />, { wrapper });
 
-  expect(await screen.findByTestId("settings-save-model")).toHaveTextContent(
-    "Changes save as soon as you make them.",
+  expect(await screen.findByTestId("download-clients-empty")).toHaveTextContent(
+    "Weir can still suggest watched folders from Sonarr, Radarr or Deluno",
   );
-  expect(
-    screen.getByText(/Some installs have no media manager at all/),
-  ).toBeInTheDocument();
 });
 
 it("offers to add a download client", async () => {

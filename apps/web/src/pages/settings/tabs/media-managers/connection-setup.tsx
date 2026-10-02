@@ -125,16 +125,19 @@ export function ConnectionSetup({
 
   return (
     <details
-      className="group mt-4 border-t border-mm-border pt-3 text-xs text-mm-text3"
+      className="mm-conn-setup group"
       data-testid="media-manager-setup-details"
     >
-      <summary className="flex cursor-pointer list-none items-baseline justify-between gap-3 font-medium text-mm-text2 [&::-webkit-details-marker]:hidden">
+      <summary className="mm-conn-setup__summary [&::-webkit-details-marker]:hidden">
         <span>How to point {connectionTitle(connection)} at Weir</span>
+        {connection.unsigned_webhook_warning !== null ? (
+          <span className="mm-status-text--warning">Needs a secret</span>
+        ) : null}
         <span className="mm-quiet-link group-open:hidden">Show →</span>
         <span className="mm-quiet-link hidden group-open:inline">Hide →</span>
       </summary>
 
-      <div className="mt-3">
+      <div className="mm-conn-setup__body">
         {isArrApp(connection) ? (
           <ArrInstructions name={connectionTitle(connection)} />
         ) : null}

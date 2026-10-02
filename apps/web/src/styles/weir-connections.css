@@ -351,3 +351,155 @@
     animation: none;
   }
 }
+
+/* ---- Setup › Connections: a connected media manager or download client as one row ----------------------------- */
+
+.mm-conn-rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.mm-conn-row {
+  padding: 14px 0;
+  border-top: 1px solid var(--mm-hairline);
+}
+
+.mm-conn-row:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.mm-conn-row:last-child {
+  padding-bottom: 0;
+}
+
+/* The name, whether it answers and its buttons on one line while there is room, then wrapping as they must. */
+.mm-conn-row__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+}
+
+.mm-conn-row__name {
+  margin: 0;
+  font-size: var(--mm-type-panel);
+  font-weight: 600;
+  color: var(--mm-text1);
+}
+
+.mm-conn-row__status {
+  display: flex;
+  flex: 1 1 14rem;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  min-width: 0;
+}
+
+.mm-conn-row__checked {
+  font-size: var(--mm-type-caption);
+  color: var(--mm-text2);
+}
+
+.mm-conn-row__when {
+  font-weight: 500;
+  color: var(--mm-text1);
+}
+
+/* Why it does not answer, or that it has not been checked yet: a line of its own under the status. */
+.mm-conn-row__problem {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: var(--mm-type-caption);
+  line-height: 1.45;
+  color: var(--mm-text2);
+}
+
+.mm-conn-row__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-left: auto;
+}
+
+/* What it feeds, and the one way to add to that, at the two ends of a line. */
+.mm-conn-row__feeds {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 16px;
+  margin-top: 10px;
+  font-size: var(--mm-type-caption);
+  color: var(--mm-text2);
+}
+
+.mm-conn-row__feeds > p {
+  margin: 0;
+}
+
+/* One line per workflow it feeds: its name, whether its folders are chained end to end, and where to see why. */
+.mm-conn-chain {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.mm-conn-chain__row {
+  display: grid;
+  grid-template-columns: minmax(7rem, 12rem) 8rem auto;
+  align-items: baseline;
+  justify-content: start;
+  gap: 4px 16px;
+  margin: 0;
+  font-size: var(--mm-type-caption);
+  color: var(--mm-text2);
+}
+
+/* One warning for the whole list, above its first row. */
+.mm-conn-banner {
+  margin: 0 0 14px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--mm-hairline);
+  font-size: var(--mm-type-body);
+  line-height: 1.5;
+}
+
+/* How to point the other app at Weir: folded, since it is needed once. */
+.mm-conn-setup {
+  margin-top: 12px;
+  font-size: var(--mm-type-caption);
+  color: var(--mm-text3);
+}
+
+.mm-conn-setup__summary {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  font-weight: 500;
+  color: var(--mm-text2);
+  cursor: pointer;
+  list-style: none;
+}
+
+.mm-conn-setup__summary .mm-quiet-link {
+  margin-left: auto;
+}
+
+.mm-conn-setup__body {
+  margin-top: 10px;
+}
+
+/* On a phone the workflow's name and its readiness share a line, and the link to its chain takes the next. */
+@media (max-width: 640px) {
+  .mm-conn-chain__row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .mm-conn-chain__row > :last-child {
+    grid-column: 1 / -1;
+  }
+}

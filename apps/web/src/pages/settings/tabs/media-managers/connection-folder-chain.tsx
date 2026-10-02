@@ -46,7 +46,7 @@ export function ConnectionFolderChain({
 
   if (chain.isLoading) {
     return (
-      <p className="mt-2 text-xs text-mm-text2">
+      <p className="mm-conn-row__problem">
         Checking its workflows&apos; folder chains…
       </p>
     );
@@ -56,7 +56,7 @@ export function ConnectionFolderChain({
     // Quiet failure, like FedWorkflows above it: this is an auxiliary, always-on background check inside a card
     // full of other alerts, not a user-initiated action, so it does not compete for the page's one role="alert".
     return (
-      <p className="mm-status-text--warning mt-2 text-xs">
+      <p className="mm-conn-row__problem mm-status-text--warning">
         Weir could not check its workflows&apos; folder chains just now.
       </p>
     );
@@ -68,15 +68,17 @@ export function ConnectionFolderChain({
   }
 
   return (
-    <div className="mt-2 space-y-1" data-testid="media-manager-folder-chain">
+    <div className="mm-conn-chain" data-testid="media-manager-folder-chain">
       {entries.map((entry) => {
         const readiness = readinessOf(entry.ready, chainLines(entry));
         return (
-          <p key={entry.library_id} className="text-xs text-mm-text2">
-            {libraryName(libraries.data, entry.library_id)}{" "}
+          <p key={entry.library_id} className="mm-conn-chain__row">
+            <span className="mm-conn-row__when">
+              {libraryName(libraries.data, entry.library_id)}
+            </span>
             <span className={READINESS_CLASSES[readiness]}>
               {READINESS_LABELS[readiness]}
-            </span>{" "}
+            </span>
             <Link
               className="mm-quiet-link"
               to={workflowEditorPath(entry.library_id)}

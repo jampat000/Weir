@@ -20,54 +20,7 @@
   width: 10rem;
 }
 
-/* Settings › Alerts: how an alert travels, in three plain steps, then one column per event. */
-.mm-alert-steps {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px 32px;
-  margin: 4px 0 8px;
-  padding: 0;
-  list-style: none;
-  counter-reset: mm-alert-step;
-}
-
-@media (max-width: 900px) {
-  .mm-alert-steps {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-
-.mm-alert-steps li {
-  position: relative;
-  padding-left: 40px;
-  font-size: 0.8125rem;
-  line-height: 1.5;
-  color: var(--mm-text3);
-  counter-increment: mm-alert-step;
-}
-
-.mm-alert-steps li::before {
-  content: counter(mm-alert-step);
-  position: absolute;
-  left: 0;
-  top: 0;
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  border: 1px solid var(--mm-accent-ring);
-  color: var(--mm-accent-bright);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 600;
-}
-
-.mm-alert-steps b {
-  display: block;
-  font-weight: 600;
-  color: var(--mm-text);
-}
-
+/* Settings › Alerts: one column per event. */
 .mm-alerts-cell {
   text-align: center;
   width: 8.5rem;

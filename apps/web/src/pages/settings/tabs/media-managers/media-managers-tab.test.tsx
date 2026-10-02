@@ -58,6 +58,41 @@ describe("SettingsMediaManagersTab", () => {
     ).toBeInTheDocument();
   });
 
+  it("warns once, naming every manager that has no secret, and flags each one's setup", async () => {
+    vi.spyOn(api, "fetchMediaManagerConnections").mockResolvedValue([
+      connection({ id: 1, name: "Radarr", unsigned_webhook_warning: "x" }),
+      connection({ id: 2, name: "Sonarr", unsigned_webhook_warning: "x" }),
+      connection({ id: 3, name: "Deluno", webhook_secret_is_set: true }),
+    ]);
+    render(<MediaManagersTab />, { wrapper });
+
+    const warning = await screen.findByTestId(
+      "media-manager-unsigned-webhook-warning",
+    );
+    expect(warning).toHaveTextContent(
+      "Radarr and Sonarr accept webhooks without a secret.",
+    );
+    expect(
+      screen.getAllByTestId("media-manager-unsigned-webhook-warning"),
+    ).toHaveLength(1);
+    expect(screen.getAllByText("Needs a secret")).toHaveLength(2);
+  });
+
+  it("says a switched off manager is off, not what it last answered", async () => {
+    vi.spyOn(api, "fetchMediaManagerConnections").mockResolvedValue([
+      connection({
+        enabled: false,
+        last_test_ok: true,
+        last_test_at: "2026-08-26T10:00:00Z",
+      }),
+    ]);
+    render(<MediaManagersTab />, { wrapper });
+
+    const status = await screen.findByTestId("media-manager-status");
+    expect(status).toHaveTextContent("Off");
+    expect(status).not.toHaveTextContent("Answering");
+  });
+
   it("shows each manager with the address it should post to", async () => {
     vi.spyOn(api, "fetchMediaManagerConnections").mockResolvedValue([
       connection(),
@@ -278,6 +313,30 @@ describe("SettingsMediaManagersTab", () => {
       ),
     );
     expect(create.mock.calls[0]?.[0]).not.toHaveProperty("name");
+  });
+
+  it("opens the add form in a drawer with focus on its first field, and keeps the Add button", async () => {
+    vi.spyOn(api, "fetchMediaManagerConnections").mockResolvedValue([]);
+    render(<MediaManagersTab />, { wrapper });
+
+    fireEvent.click(await screen.findByTestId("media-manager-add"));
+
+    const panel = screen.getByRole("dialog", { name: "Add a media manager" });
+    expect(panel).toContainElement(screen.getByTestId("media-manager-kind"));
+    expect(screen.getByTestId("media-manager-kind")).toHaveFocus();
+    expect(screen.getByTestId("media-manager-add")).toBeInTheDocument();
+  });
+
+  it("puts the add form away without adding anything when it is cancelled", async () => {
+    vi.spyOn(api, "fetchMediaManagerConnections").mockResolvedValue([]);
+    const create = vi.spyOn(api, "createMediaManagerConnection");
+    render(<MediaManagersTab />, { wrapper });
+    fireEvent.click(await screen.findByTestId("media-manager-add"));
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(create).not.toHaveBeenCalled();
   });
 
   it("asks for no name: the connection is named after its address", async () => {
