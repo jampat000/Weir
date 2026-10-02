@@ -1,60 +1,115 @@
+import { Fragment, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 
 import { Panel } from "../../../../components/panels/panel";
-import type { MaintenanceFamilyState } from "../../../../lib/processing/maintenance-api";
+import { ColumnsMenu } from "../../../../components/shared/columns-menu";
+import { SortableColumnHeader } from "../../../../components/shared/sortable-column-header";
 import { useProcessingMaintenanceQuery } from "../../../../lib/processing/maintenance-queries";
 import type { AppSettings } from "../../../../lib/settings/types";
-import { useAppDateFormatter } from "../../../../lib/ui/mm-format-date";
-import { CLEANUP_JOBS, everyWords } from "../cleanup/cleanup-jobs";
-import { backupWords } from "../schedule/schedule-model";
-import { setupTabPath } from "../../../../lib/settings/setup-areas";
+import {
+  parseAppTime,
+  useAppDateFormatter,
+} from "../../../../lib/ui/mm-format-date";
+import { sortRows } from "../../../../lib/ui/table-columns";
+import {
+  useTableColumns,
+  type TableColumns,
+} from "../../../../lib/ui/use-table-columns";
+import { TIMER_COLUMNS, type TimerColumnId } from "./timer-columns";
+import { timerRows, type TimerRow } from "./timer-rows";
 
 const UNKNOWN = "—";
 const NOT_YET = "Not yet";
-const DEFAULT_BACKUP_HOURS = 24;
-const DEFAULT_BACKUP_TIME = "02:00";
 
-function whenWords(state: MaintenanceFamilyState | undefined): string {
-  if (!state) return UNKNOWN;
-  if (!state.enabled) return "Off";
-  return state.interval_seconds
-    ? `Every ${everyWords(state.interval_seconds)}`
-    : "On";
-}
+const TIMER_SORT_VALUES = {
+  job: (row: TimerRow) => row.name,
+  when: (row: TimerRow) => row.everySeconds,
+  lastRun: (row: TimerRow) => parseAppTime(row.lastRun),
+  nextRun: (row: TimerRow) => parseAppTime(row.nextRun),
+};
 
-function BackupRow({ settings }: { settings: AppSettings }) {
+function TimerLine({
+  row,
+  order,
+}: {
+  row: TimerRow;
+  order: readonly TimerColumnId[];
+}) {
   const formatDate = useAppDateFormatter();
-  return (
-    <tr>
-      <th scope="row" className="mm-quiet-table__name">
-        Settings backup
+  const cells: Record<TimerColumnId, ReactNode> = {
+    job: (
+      <th scope="row" data-col="job" className="mm-quiet-table__name">
+        {row.name}
       </th>
-      <td data-label="When">
-        {backupWords(
-          Boolean(settings.configuration_backup_enabled),
-          Number(
-            settings.configuration_backup_interval_hours ??
-              DEFAULT_BACKUP_HOURS,
-          ),
-          settings.configuration_backup_preferred_time ?? DEFAULT_BACKUP_TIME,
-        )}
+    ),
+    when: (
+      <td data-col="when" data-label="When">
+        {row.when}
       </td>
-      <td data-label="Last run">
-        {settings.configuration_backup_last_run_at
-          ? formatDate(settings.configuration_backup_last_run_at)
-          : NOT_YET}
+    ),
+    lastRun: (
+      <td data-col="lastRun" data-label="Last run">
+        {row.lastRun ? formatDate(row.lastRun) : NOT_YET}
       </td>
-      <td data-label="Next run">{UNKNOWN}</td>
-      <td data-label="">
+    ),
+    nextRun: (
+      <td data-col="nextRun" data-label="Next run">
+        {row.nextRun ? formatDate(row.nextRun) : UNKNOWN}
+      </td>
+    ),
+    change: (
+      <td data-col="change" data-label="">
         <Link
           className="mm-quiet-link"
-          to="/system?tab=backups"
-          aria-label="Change in Backups"
+          to={row.change.to}
+          aria-label={row.change.ariaLabel}
         >
-          Backups
+          {row.change.label}
         </Link>
       </td>
+    ),
+  };
+  return (
+    <tr>
+      {order.map((id) => (
+        <Fragment key={id}>{cells[id]}</Fragment>
+      ))}
     </tr>
+  );
+}
+
+function TimersTable({
+  rows,
+  columns,
+}: {
+  rows: readonly TimerRow[];
+  columns: TableColumns<TimerColumnId>;
+}) {
+  return (
+    <div className="mm-quiet-table-wrap">
+      <table
+        className="mm-quiet-table"
+        data-testid="schedule-timers"
+        {...columns.tableProps}
+      >
+        <thead>
+          <tr>
+            {columns.order.map((id) => (
+              <SortableColumnHeader
+                key={id}
+                heading={columns.heading(id)}
+                hideLabel={id === "change"}
+              />
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {sortRows(rows, columns.sort, TIMER_SORT_VALUES).map((row) => (
+            <TimerLine key={row.key} row={row} order={columns.order} />
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
@@ -67,63 +122,17 @@ export function TimersSection({
   settings: AppSettings;
 }) {
   const maintenance = useProcessingMaintenanceQuery();
-  const formatDate = useAppDateFormatter();
-  const families = maintenance.data?.families ?? [];
+  const columns = useTableColumns(TIMER_COLUMNS);
+  const rows = timerRows(maintenance.data?.families ?? [], settings);
   return (
     <Panel
       title="Next runs"
       headingId={headingId}
       count="Each runs on its own clock, whatever the workflow hours say."
+      aside={<ColumnsMenu table={columns} />}
       padded
     >
-      <div className="mm-quiet-table-wrap">
-        <table className="mm-quiet-table" data-testid="schedule-timers">
-          <thead>
-            <tr>
-              <th scope="col">Job</th>
-              <th scope="col">When</th>
-              <th scope="col">Last run</th>
-              <th scope="col">Next run</th>
-              <th scope="col">
-                <span className="sr-only">Where to change it</span>
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {CLEANUP_JOBS.map((job) => {
-              const state = families.find((f) => f.family === job.family);
-              return (
-                <tr key={job.family}>
-                  <th scope="row" className="mm-quiet-table__name">
-                    {job.name}
-                  </th>
-                  <td data-label="When">{whenWords(state)}</td>
-                  <td data-label="Last run">
-                    {state?.last_completed_at
-                      ? formatDate(state.last_completed_at)
-                      : NOT_YET}
-                  </td>
-                  <td data-label="Next run">
-                    {state?.enabled && state.next_run_at
-                      ? formatDate(state.next_run_at)
-                      : UNKNOWN}
-                  </td>
-                  <td data-label="">
-                    <Link
-                      className="mm-quiet-link"
-                      to={setupTabPath("cleanup")}
-                      aria-label="Change in Cleanup"
-                    >
-                      Cleanup
-                    </Link>
-                  </td>
-                </tr>
-              );
-            })}
-            <BackupRow settings={settings} />
-          </tbody>
-        </table>
-      </div>
+      <TimersTable rows={rows} columns={columns} />
     </Panel>
   );
 }

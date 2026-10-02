@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, expect, it, vi } from "vitest";
@@ -70,4 +70,41 @@ it("shows a load error when the settings fail to load", () => {
   expect(screen.getByTestId("settings-load-error")).toHaveTextContent(
     "Weir couldn’t load your timers.",
   );
+});
+
+function jobNames(table: HTMLElement) {
+  return within(table)
+    .getAllByRole("row")
+    .slice(1)
+    .map((row) => row.querySelector("th")?.textContent);
+}
+
+it("sorts the jobs by a heading, reverses on a second click and puts the order back with Reset columns", async () => {
+  localStorage.clear();
+  stubSettings({ data: SETTINGS, isPending: false, isError: false });
+  vi.spyOn(maintenanceApi, "fetchProcessingMaintenance").mockResolvedValue({
+    families: [],
+  } as Awaited<ReturnType<typeof maintenanceApi.fetchProcessingMaintenance>>);
+  render(<TimersTab />, { wrapper });
+  const table = await screen.findByTestId("schedule-timers");
+  const listed = [
+    "Leftover work files",
+    "Cleaned copies nobody picked up",
+    "Settings backup",
+  ];
+  expect(jobNames(table)).toEqual(listed);
+
+  fireEvent.click(within(table).getByRole("button", { name: "Job" }));
+  expect(jobNames(table)).toEqual([
+    "Cleaned copies nobody picked up",
+    "Leftover work files",
+    "Settings backup",
+  ]);
+
+  fireEvent.click(within(table).getByRole("button", { name: "Job" }));
+  expect(jobNames(table)[0]).toBe("Settings backup");
+
+  fireEvent.click(screen.getByRole("button", { name: "Columns" }));
+  fireEvent.click(screen.getByRole("menuitem", { name: "Reset columns" }));
+  expect(jobNames(table)).toEqual(listed);
 });
