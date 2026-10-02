@@ -15,6 +15,7 @@ import {
   posterSize,
   SHELF_MIN_TILES,
   shelfFit,
+  shelfRowNeed,
   tilesAcross,
 } from "./shelf-layout";
 
@@ -130,6 +131,27 @@ describe("the shelf's tiles", () => {
 
   it("never makes a tile narrower than the least art, however narrow the row", () => {
     expect(shelfFit(250, 100).width).toBe(24);
+  });
+
+  it("need the height of the art the five-tile rule leaves them, plus the caption and the row's padding", () => {
+    // 570px wide: 102px tiles, 153px of art, a 35px caption and 12px of padding.
+    expect(shelfRowNeed(570)).toBe(200);
+    // A row too wide for the rule to bind: the tallest tile is 255px of art.
+    expect(shelfRowNeed(3000)).toBe(255 + 35 + 12);
+    // Too narrow for a caption to fit, the least art and the padding.
+    expect(shelfRowNeed(100)).toBe(36 + 12);
+  });
+
+  it("need exactly the height at which a row's tiles stop growing", () => {
+    for (const width of [100, 300, 430, 570, 622, 829, 1200, 3000]) {
+      const need = shelfRowNeed(width);
+      const widest = shelfFit(10_000, width).width;
+      expect(shelfFit(need, width).width).toBe(widest);
+      expect(shelfFit(need - 1, width).width).toBeLessThanOrEqual(widest);
+      // A taller row only leaves empty space under the tiles.
+      expect(shelfFit(need + 80, width).width).toBe(widest);
+    }
+    expect(shelfFit(shelfRowNeed(570) - 1, 570).width).toBeLessThan(102);
   });
 
   it("dresses a poster fully from 64px wide, and thinly below that: a small one has no room for the badge and the tag", () => {

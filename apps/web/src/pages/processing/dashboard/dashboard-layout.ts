@@ -100,15 +100,32 @@ export type GridRows = {
 const clamp = (value: number, min: number, max: number) =>
   Math.min(max, Math.max(min, value));
 
+export type GridNeeds = {
+  /**
+   * The height the lower row can use, in px: its panel's chrome and the shelf's posters at the width the
+   * 5-poster minimum caps them to (see shelfRowNeed). Any height the lower row has beyond it is spare. Left out
+   * until the shelf has measured itself.
+   */
+  lowNeed?: number;
+};
+
 /**
  * The rows of the grid, from the height it has. The band takes 20% of it between 150px and 200px, the Pipeline its
  * comfortable height (BOARD_PX) and the lower row at least 180px. When they do not fit they give way in that order:
  * the band first (never under 150px), then the Pipeline (never under what three rows of the smallest cards need),
- * then the lower row (never under LOW_FLOOR_PX). Spare height goes to the band up to 240px while the lower row keeps
- * 260px, and the lower row takes at most a third of the grid (at least 260px): the rest grows the Pipeline's cards up
- * to the 130px step. Unmeasured, it is a roomy page.
+ * then the lower row (never under LOW_FLOOR_PX).
+ *
+ * Spare height is shared once the lower row has what it needs. Told what the lower row can use (`lowNeed`, the
+ * shelf's posters being capped by width rather than by height), the lower row keeps that much, at least 180px, and
+ * gives the rest first to the Pipeline, whose cards grow up to the 130px step, then to the band, up to 240px; what
+ * neither can take stays with the lower row. A lower row at or under its need gives nothing. Not told, the band
+ * takes spare up to 240px while the lower row keeps 260px, and the lower row takes at most a third of the grid (at
+ * least 260px): the rest grows the Pipeline's cards. Unmeasured, it is a roomy page.
  */
-export function gridRows(available: number): GridRows {
+export function gridRows(
+  available: number,
+  { lowNeed }: GridNeeds = {},
+): GridRows {
   const height = available > 0 ? available : ROOMY_PX;
   const avail = height - GRID_GAPS_PX;
   let band = clamp(Math.round(height * BAND_SHARE), BAND_MIN_PX, BAND_MAX_PX);
@@ -120,16 +137,27 @@ export function gridRows(available: number): GridRows {
     board = Math.max(BOARD_MIN_PX, avail - band - LOW_MIN_PX);
   }
   let low = avail - band - board;
-  if (low > LOW_ROOMY_PX) {
-    const toBand = Math.min(low - LOW_ROOMY_PX, BAND_GROWN_MAX_PX - band);
-    band += toBand;
-    low -= toBand;
-  }
-  const lowCap = Math.max(LOW_ROOMY_PX, Math.round(avail * LOW_SHARE_CAP));
-  if (low > lowCap) {
-    const grow = Math.min(low - lowCap, PIPELINE_ROWS * (MAX_STEP_PX - ROW_PX));
-    board += grow;
-    low -= grow;
+  const growBand = (keep: number) => {
+    const grow = Math.min(low - keep, BAND_GROWN_MAX_PX - band);
+    if (grow > 0) {
+      band += grow;
+      low -= grow;
+    }
+  };
+  const growBoard = (keep: number) => {
+    const grow = Math.min(low - keep, PIPELINE_ROWS * (MAX_STEP_PX - ROW_PX));
+    if (grow > 0) {
+      board += grow;
+      low -= grow;
+    }
+  };
+  if (lowNeed === undefined) {
+    growBand(LOW_ROOMY_PX);
+    growBoard(Math.max(LOW_ROOMY_PX, Math.round(avail * LOW_SHARE_CAP)));
+  } else {
+    const keep = Math.max(LOW_MIN_PX, lowNeed);
+    growBoard(keep);
+    growBand(keep);
   }
   band = Math.round(band);
   board = Math.round(board);

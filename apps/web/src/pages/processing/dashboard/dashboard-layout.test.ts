@@ -99,6 +99,74 @@ describe("the shared page grid", () => {
     });
   });
 
+  describe("when told what the lower row can use", () => {
+    it("gives a tall window's spare lower-row height to the Pipeline first, growing its cards", () => {
+      // 956px: the band's 20% is 191px, the Pipeline 398px and the lower row has 343px, 103px more than its 240px.
+      expect(gridRows(956, { lowNeed: 240 })).toEqual({
+        band: 191,
+        board: 501,
+        low: 240,
+        template: "191px 501px 240px",
+      });
+    });
+
+    it("gives what the Pipeline cannot take, past its 130px step, to the band, up to 240px", () => {
+      // 1050px: 1026px of rows, the lower row has 128px beyond its 300px. The Pipeline takes 108px and the band 20px.
+      expect(gridRows(1050, { lowNeed: 300 })).toEqual({
+        band: 220,
+        board: BOARD_PX + 3 * (130 - 94),
+        low: 300,
+        template: "220px 506px 300px",
+      });
+    });
+
+    it("leaves what neither takes with the lower row", () => {
+      expect(gridRows(1315, { lowNeed: 300 })).toEqual({
+        band: 240,
+        board: 506,
+        low: 545,
+        template: "240px 506px 545px",
+      });
+      // The same rows as without the need, where the third cap already gave the cards all they can take.
+      expect(gridRows(1315, { lowNeed: 300 })).toEqual(gridRows(1315));
+    });
+
+    it("changes nothing for a lower row already at or under its need", () => {
+      // None of these has spare height, so the rows are the ones the give-way order gives, told or not.
+      for (const height of [300, 615, 663, 676, 780]) {
+        expect(gridRows(height, { lowNeed: gridRows(height).low })).toEqual(
+          gridRows(height),
+        );
+        expect(gridRows(height, { lowNeed: 5000 })).toEqual(gridRows(height));
+      }
+    });
+
+    it("keeps the 1538 by 784 window's rows: 150, 324 and 178", () => {
+      // The grid there is 676px tall, and the shelf's posters are held down by its height, so it needs more than it has.
+      expect(gridRows(676, { lowNeed: 294 })).toEqual({
+        band: 150,
+        board: 324,
+        low: 178,
+        template: "150px 324px 178px",
+      });
+    });
+
+    it("never gives the lower row less than 180px, however little it says it needs", () => {
+      expect(gridRows(800, { lowNeed: 20 })).toMatchObject({
+        board: 436,
+        low: 180,
+      });
+      expect(gridRows(800, { lowNeed: 0 }).low).toBe(180);
+    });
+
+    it("keeps the rows adding up to the grid's height with the gaps", () => {
+      for (const height of [676, 956, 1050, 1315, 1800]) {
+        const rows = gridRows(height, { lowNeed: 300 });
+        expect(rows.band + rows.board + rows.low + 24).toBe(height);
+      }
+    });
+  });
+
   it("is a roomy page until the grid is measured", () => {
     expect(gridRows(0)).toEqual(gridRows(1000));
     expect(gridRows(-1)).toEqual(gridRows(1000));

@@ -19,7 +19,12 @@ import type { FinishedFile } from "../../../lib/activity/processing-outcome";
 import { useElementSize } from "../../../lib/ui/use-element-size";
 import type { Filter } from "../processing-filter";
 import { useFinishedAnnouncement } from "../use-finished-files";
-import { shelfFit, tilesAcross, type ShelfFit } from "./shelf-layout";
+import {
+  shelfFit,
+  shelfRowNeed,
+  tilesAcross,
+  type ShelfFit,
+} from "./shelf-layout";
 import { ShelfFilter } from "./shelf-filter";
 import { shelfOf, todayWords } from "./shelf-model";
 import { ShelfTiles } from "./shelf-tiles";
@@ -44,6 +49,11 @@ export type JustFinishedShelfProps = {
   count?: string;
   /** Opens a finished file's story. */
   onOpen: (item: FinishedFile) => void;
+  /**
+   * Told the height of this whole panel that its tiles can use, whenever it changes: any more would leave empty
+   * space under the tiles, which the page can give to something else.
+   */
+  onHeightNeed?: (px: number) => void;
 };
 
 export function JustFinishedShelf({
@@ -55,6 +65,7 @@ export function JustFinishedShelf({
   enabledWorkflowIds,
   count,
   onOpen,
+  onHeightNeed,
 }: JustFinishedShelfProps): ReactElement {
   const [chosen, setChosen] = useState<number | null>(readShelfWorkflow);
   const chips = useMemo(
@@ -96,7 +107,17 @@ export function JustFinishedShelf({
         ? current
         : next,
     );
-  }, [shelfSize.width, shelfSize.height]);
+    // The panel's own chrome (header, chips, padding) is what its height has beyond the row's, and does not change
+    // with the height: the need is that and the height the row's tiles can use at this width.
+    const panel = tiles.closest<HTMLElement>(".mm-panel");
+    if (panel && onHeightNeed) {
+      onHeightNeed(
+        panel.offsetHeight -
+          tiles.clientHeight +
+          shelfRowNeed(tiles.clientWidth),
+      );
+    }
+  }, [shelfSize.width, shelfSize.height, onHeightNeed]);
   const countWords =
     picked === null && count !== undefined && !shelf.latest
       ? count

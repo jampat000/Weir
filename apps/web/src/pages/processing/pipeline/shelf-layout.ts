@@ -54,6 +54,22 @@ export function shelfFit(rowHeight: number, rowWidth = 0): ShelfFit {
   };
 }
 
+/** Taller than any row the tiles can use: asking the fit for it gives the widest tile a row of that width allows. */
+const UNLIMITED_ROW_PX = MAX_ART_PX + CAPTION_PX + ROW_PAD_Y;
+
+/**
+ * The height of a row of `rowWidth` px at which its tiles stop growing: the `SHELF_MIN_TILES` rule has capped them by
+ * width, and a taller row would only leave empty space under them. It is the tile's art (1.5 times its width), the
+ * caption when the row is tall enough to show one, and the row's padding. The page gives a row this tall at most
+ * while something else can use the rest.
+ */
+export function shelfRowNeed(rowWidth: number): number {
+  const { width } = shelfFit(UNLIMITED_ROW_PX, rowWidth);
+  const art = Math.max(MIN_ART_PX, Math.ceil(width * 1.5));
+  const captions = art + CAPTION_PX >= CAPTION_MIN_ROW_PX;
+  return ROW_PAD_Y + art + (captions ? CAPTION_PX : 0);
+}
+
 /**
  * A poster narrower than this is too small for its decorations: the saved-space badge and the workflow's tag
  * would cover a third of the art or more (measured: the badge is 54px by 15px, the tag 19px tall and the poster's
