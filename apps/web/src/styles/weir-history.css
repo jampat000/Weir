@@ -20,7 +20,7 @@
 
 .mm-history-search {
   flex: 0 100 260px;
-  min-width: 8.5rem;
+  min-width: 6.5rem;
 }
 
 .mm-history-search .mm-input {
@@ -73,7 +73,7 @@
 
   .mm-header:has(.mm-history-controls) .mm-header__titles {
     flex-shrink: 100;
-    min-width: 6rem;
+    min-width: 11.75rem;
   }
 }
 

@@ -60,7 +60,10 @@ export function ShellHeader({ menuOpen, onToggleMenu }: ShellHeaderProps) {
       </button>
       <div className="mm-header__titles">
         {eyebrow ? (
-          <p className="mm-header__eyebrow" title={eyebrow}>
+          <p
+            className="mm-header__eyebrow"
+            title={pageEyebrow ? eyebrow : (meta.eyebrowNote ?? eyebrow)}
+          >
             {eyebrow}
           </p>
         ) : null}

@@ -140,7 +140,7 @@
    first (the eyebrow is cut with an ellipsis, always one line). */
 .mm-header:has(.mm-library-title) .mm-header__titles {
   flex-shrink: 100;
-  min-width: 16rem;
+  min-width: 17.75rem;
 }
 
 /* Where the header is short, the next run is left to the tooltip. */

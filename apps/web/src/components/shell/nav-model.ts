@@ -13,6 +13,8 @@ export type NavItem = Readonly<{
   label: string;
   /** The line above the page title: what the page is for. */
   eyebrow: string;
+  /** The longer sentence for the eyebrow's tooltip, when the eyebrow is a short form of it. */
+  eyebrowNote?: string;
   to: string;
   icon: NavGlyphName;
   badge?: NavBadgeKind;
@@ -65,7 +67,8 @@ export const NAV_GROUPS: readonly NavGroup[] = [
       {
         id: "history",
         label: "History",
-        eyebrow: "Every file Weir has handled, and what came out",
+        eyebrow: "Every file Weir handled",
+        eyebrowNote: "Every file Weir has handled, and what came out",
         to: "/history",
         icon: "history",
         badge: "needs-you",
@@ -80,7 +83,8 @@ export const NAV_GROUPS: readonly NavGroup[] = [
       {
         id: "library",
         label: "Library",
-        eyebrow:
+        eyebrow: "Your files, and what Weir would do",
+        eyebrowNote:
           "The files already on your storage, and what Weir would do to each",
         to: "/library",
         icon: "library",
@@ -108,6 +112,8 @@ export const NAV_GROUPS: readonly NavGroup[] = [
 export type PageMeta = Readonly<{
   title: string;
   eyebrow: string;
+  /** The longer sentence for the eyebrow's tooltip, when the eyebrow is a short form of it. */
+  eyebrowNote?: string;
   /** False on a screen that is not one of the menu's pages (Not found): it carries its own heading. */
   ownsHeading: boolean;
 }>;
@@ -123,7 +129,12 @@ export function pageMeta(place: NavPlace): PageMeta {
   for (const group of NAV_GROUPS) {
     const item = group.items.find((candidate) => candidate.isCurrent(place));
     if (item) {
-      return { title: item.label, eyebrow: item.eyebrow, ownsHeading: true };
+      return {
+        title: item.label,
+        eyebrow: item.eyebrow,
+        eyebrowNote: item.eyebrowNote,
+        ownsHeading: true,
+      };
     }
   }
   return NOT_A_MENU_PAGE;
