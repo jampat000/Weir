@@ -1,4 +1,21 @@
-@import "tailwindcss";
+@import "tailwindcss" source("./");
+
+/*
+ * What Tailwind reads for class names: the application's own source, not its tests, the generated API types, the
+ * dev sim, the OpenAPI document or this folder's docs. It reads every word as a candidate class, so a test title or a
+ * comment that says "the filter" or "a table" used to generate a utility nothing uses.
+ */
+@source not "./**/*.test.{ts,tsx}";
+@source not "./test";
+@source not "./lib/api/generated";
+
+/*
+ * The same words in the application's own code: "fixed" and "visible" and "resize" as CSS values and event names,
+ * "inline" as a prop value, "table" as an ARIA role, "container" and "ring" and "filter" in prose. None is used as a
+ * class anywhere in src (a name written as a class again must come off this list). Each one generated its utility,
+ * and filter, ring and transform also their custom-property registrations.
+ */
+@source not inline("{table,filter,resize,transform,inline,visible,fixed,container,ring,uppercase,underline,static,shrink,grow,transition,max-w-md}");
 
 /*
  * Weir's tokens as Tailwind theme values, so markup says `text-mm-text2` rather than
