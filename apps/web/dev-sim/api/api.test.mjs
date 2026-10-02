@@ -54,10 +54,7 @@ const NOT_JSON = [
 ];
 
 /** Routes the simulation serves before the contract documents them; each one comes off this list once it is documented. */
-const AHEAD_OF_THE_CONTRACT = [
-  "GET /api/v1/system/overview",
-  "GET /api/v1/system/tasks",
-];
+const AHEAD_OF_THE_CONTRACT = [];
 
 const routeKey = (method, template) => `${method} ${templateShape(template)}`;
 
