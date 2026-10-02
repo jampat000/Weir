@@ -75,7 +75,6 @@ function DeviceVerdict({
   const reason = shortReason(entry);
   return (
     <span
-      className="mm-direct-play__device"
       data-status={VERDICT_MEANING[entry.verdict]}
       title={fullSentence(entry)}
     >

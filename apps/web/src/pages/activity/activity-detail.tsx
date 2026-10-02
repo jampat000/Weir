@@ -56,10 +56,7 @@ function Guidance({ file, now }: { file: ProcessingFile; now: number }) {
         </div>
       ) : null}
       {handedBack ? (
-        <div
-          className="mm-history-next mm-history-handback"
-          data-testid="activity-handback"
-        >
+        <div className="mm-history-next" data-testid="activity-handback">
           <p className="mm-history-next__title">
             <StatusDot meaning={handedBack.meaning} />
             {handedBack.heading}
