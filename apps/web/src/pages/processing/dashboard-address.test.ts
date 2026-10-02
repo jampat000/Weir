@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  filterFromSearch,
   resolveWorkflow,
   viewFromSearch,
   workflowFromSearch,
@@ -14,6 +15,20 @@ describe("viewFromSearch", () => {
     expect(viewFromSearch(params("view=live"))).toBe("live");
     expect(viewFromSearch(params("view=nonsense"))).toBe("live");
     expect(viewFromSearch(params("view=system"))).toBe("system");
+  });
+});
+
+describe("filterFromSearch", () => {
+  it("narrows to the kind of work the address names", () => {
+    expect(filterFromSearch(params("work=download"))).toBe("download");
+    expect(filterFromSearch(params("work=library"))).toBe("library");
+  });
+
+  it("shows everything when the address names nothing it knows", () => {
+    for (const other of ["", "all", "nonsense", "Library"]) {
+      expect(filterFromSearch(params(`work=${other}`))).toBe("all");
+    }
+    expect(filterFromSearch(params(""))).toBe("all");
   });
 });
 

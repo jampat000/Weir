@@ -1,11 +1,14 @@
 import { useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 
+import type { Filter } from "./processing-filter";
+
 /** The Dashboard's two views: what is happening now, and how Weir's setup and background work are doing. */
 export type DashboardView = "live" | "system";
 
 const VIEW_PARAM = "view";
 const WORKFLOW_PARAM = "workflow";
+const WORK_PARAM = "work";
 
 /** An unknown or missing `?view=` is Live, which carries no parameter at all. */
 export function viewFromSearch(params: URLSearchParams): DashboardView {
@@ -32,17 +35,27 @@ export function resolveWorkflow(
   return known.some((workflow) => workflow.id === requested) ? requested : null;
 }
 
+/** The kind of work a link narrows the Live view to. An unknown or missing `?work=` is everything, which carries no parameter. */
+export function filterFromSearch(params: URLSearchParams): Filter {
+  const work = params.get(WORK_PARAM);
+  return work === "download" || work === "library" ? work : "all";
+}
+
 export type DashboardAddress = {
   view: DashboardView;
   setView: (view: DashboardView) => void;
   /** The workflow the page is narrowed to, or null for every workflow. */
   workflowId: number | null;
   setWorkflowId: (id: number | null) => void;
+  /** The kind of work Live is narrowed to. System ignores it, and it stays in the address while System is shown. */
+  filter: Filter;
+  setFilter: (filter: Filter) => void;
 };
 
 /**
- * The view and the workflow picked, kept in the address (`?view=system`, `?workflow=3`) so a view can be
- * linked and survives a reload. Each leaves the other, and any other parameter, as it is.
+ * The view, the workflow and the kind of work picked, kept in the address (`?view=system`, `?workflow=3`,
+ * `?work=library`) so a view can be linked and survives a reload. Each leaves the others, and any other
+ * parameter, as it is.
  */
 export function useDashboardAddress(
   enabledWorkflows: readonly { id: number }[] | undefined,
@@ -59,7 +72,7 @@ export function useDashboardAddress(
       }),
     [setParams],
   );
-  // Choosing a workflow is a filter, not a place, so Back does not step through every choice.
+  // Choosing a workflow or a kind of work is a filter, not a place, so Back does not step through every choice.
   const setWorkflowId = useCallback(
     (id: number | null) =>
       setParams(
@@ -74,10 +87,26 @@ export function useDashboardAddress(
     [setParams],
   );
 
+  const setFilter = useCallback(
+    (filter: Filter) =>
+      setParams(
+        (current) => {
+          const next = new URLSearchParams(current);
+          if (filter === "all") next.delete(WORK_PARAM);
+          else next.set(WORK_PARAM, filter);
+          return next;
+        },
+        { replace: true },
+      ),
+    [setParams],
+  );
+
   return {
     view: viewFromSearch(params),
     setView,
     workflowId: resolveWorkflow(workflowFromSearch(params), enabledWorkflows),
     setWorkflowId,
+    filter: filterFromSearch(params),
+    setFilter,
   };
 }

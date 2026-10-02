@@ -96,6 +96,60 @@ describe("the Dashboard's views", () => {
   });
 });
 
+describe("the kind of work", () => {
+  it("starts on what the address names, and keeps it in the address like the workflow", () => {
+    show("/?work=library");
+
+    expect(screen.getByTestId("live-view")).toHaveTextContent("live library");
+    expect(
+      screen.getByRole("button", { name: "Library cleaning" }),
+    ).toHaveAttribute("aria-pressed", "true");
+
+    fireEvent.click(screen.getByRole("button", { name: "New downloads" }));
+    expect(screen.getByTestId("address")).toHaveTextContent("/?work=download");
+
+    fireEvent.click(screen.getByRole("button", { name: "Everything" }));
+    expect(screen.getByTestId("address")).toHaveTextContent(/^\/$/);
+  });
+
+  it("stays in the address while System, which ignores it, is shown", () => {
+    show("/?work=download&workflow=1");
+
+    fireEvent.click(within(view()).getByRole("button", { name: "System" }));
+
+    expect(screen.getByTestId("address")).toHaveTextContent("work=download");
+    expect(screen.getByTestId("address")).toHaveTextContent("view=system");
+    fireEvent.click(within(view()).getByRole("button", { name: "Live" }));
+    expect(screen.getByTestId("live-view")).toHaveTextContent(
+      "live download 1",
+    );
+  });
+
+  it("keeps the workflow picker where it is when the view changes, with the kind of work after it", () => {
+    show("/");
+    const controls = () =>
+      [...(view().parentElement as HTMLElement).children]
+        .map((child) => child.getAttribute("data-testid") ?? child.className)
+        .filter((name) =>
+          [
+            "dashboard-view",
+            "mm-workflow-picker",
+            "mm-dash-controls__work",
+          ].includes(name),
+        );
+
+    expect(controls()).toEqual([
+      "dashboard-view",
+      "mm-workflow-picker",
+      "mm-dash-controls__work",
+    ]);
+
+    fireEvent.click(within(view()).getByRole("button", { name: "System" }));
+
+    expect(controls()).toEqual(["dashboard-view", "mm-workflow-picker"]);
+  });
+});
+
 describe("the workflow picker", () => {
   it("lists the workflows that are switched on, after All workflows", () => {
     show("/");

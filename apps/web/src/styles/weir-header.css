@@ -58,12 +58,71 @@
   display: none;
 }
 
-/* "All workflows ▾": one control among the page's others, as tall as the segmented choice beside it. It is
-   wide enough to read from a narrow header, and grows to 12.5rem where there is room, so it joins the others' row
-   rather than wrapping to its own. */
+/* The Dashboard's controls: the view, the workflow picker, and on Live the kind of work. Where there is room the kind
+   of work is a three-button switch; where there is not, the same choice as a picker. The room is whatever the header
+   has left after the view and the picker, which the control's own box measures, so the choice follows the window and
+   the menu whatever else the header holds, and the header stays on one line. */
+.mm-dash-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.mm-dash-controls__compact {
+  display: none;
+}
+
+@media (min-width: 921px) {
+  .mm-header__slot:has(.mm-dash-controls) {
+    flex: 1 1 0;
+  }
+
+  .mm-dash-controls {
+    flex: 1 1 0;
+    flex-wrap: nowrap;
+  }
+
+  .mm-dash-controls__work {
+    flex: 1 1 0;
+    min-width: 0;
+    container-type: inline-size;
+  }
+
+  .mm-dash-controls__switch {
+    display: none;
+  }
+
+  .mm-dash-controls__compact {
+    display: block;
+  }
+
+  /* The three buttons are 369px wide at the default text size. */
+  @container (min-width: 24.7rem) {
+    .mm-dash-controls__switch {
+      display: block;
+    }
+
+    .mm-dash-controls__compact {
+      display: none;
+    }
+  }
+}
+
+/* "All workflows ▾": one control among the page's others, as tall as the segmented choice beside it. Its width is
+   its own, whatever is chosen in it and whichever controls sit beside it, so it never moves when the view or the
+   workflow changes; it gives way only where the header is narrower than that. */
 .mm-workflow-picker {
-  flex: 1 1 8.5rem;
-  max-width: min(12.5rem, 100%);
+  flex: 0 1 var(--picker-w, 9.5rem);
+  width: var(--picker-w, 9.5rem);
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* "Library cleaning ▾" is the longest of the three. */
+.mm-work-picker {
+  --picker-w: 10.5rem;
 }
 
 .mm-workflow-picker .mm-input--opens {
