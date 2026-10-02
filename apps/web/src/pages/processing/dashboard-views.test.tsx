@@ -25,9 +25,7 @@ vi.mock("./dashboard/live-view", () => ({
   ),
 }));
 vi.mock("./dashboard/system-view", () => ({
-  SystemView: ({ workflowId }: { workflowId: number | null }) => (
-    <p data-testid="system-view">system {String(workflowId)}</p>
-  ),
+  SystemView: () => <p data-testid="system-view">system</p>,
 }));
 
 function Address() {
@@ -127,14 +125,12 @@ describe("the kind of work", () => {
     );
   });
 
-  it("keeps the workflow picker where it is when the view changes, with the kind of work after it", () => {
+  it("puts the workflow picker first on Live, with the kind of work after it, and nothing in the header on System", () => {
     show("/");
     const controls = () =>
-      [...(document.querySelector(".mm-dash-controls")?.children ?? [])]
-        .map((child) => child.getAttribute("data-testid") ?? child.className)
-        .filter((name) =>
-          ["mm-workflow-picker", "mm-dash-controls__work"].includes(name),
-        );
+      [...(document.querySelector(".mm-dash-controls")?.children ?? [])].map(
+        (child) => child.getAttribute("data-testid") ?? child.className,
+      );
 
     expect(controls()).toEqual([
       "mm-workflow-picker",
@@ -143,7 +139,8 @@ describe("the kind of work", () => {
 
     fireEvent.click(within(view()).getByRole("tab", { name: "System" }));
 
-    expect(controls()).toEqual(["mm-workflow-picker"]);
+    expect(document.querySelector(".mm-dash-controls")).toBeNull();
+    expect(screen.queryByTestId("workflow-picker")).toBeNull();
   });
 });
 
@@ -178,7 +175,7 @@ describe("the workflow picker", () => {
     expect(screen.getByTestId("workflow-picker")).toHaveTextContent("Movies");
   });
 
-  it("starts narrowed to the workflow in the address, and keeps it across the views", () => {
+  it("starts narrowed to the workflow in the address, which System leaves alone and Live narrows by again", () => {
     show("/?workflow=1");
 
     expect(screen.getByTestId("live-view")).toHaveTextContent("live all 1");
@@ -187,7 +184,12 @@ describe("the workflow picker", () => {
     expect(screen.getByTestId("address")).toHaveTextContent(
       "/?workflow=1&view=system",
     );
-    expect(screen.getByTestId("system-view")).toHaveTextContent("system 1");
+    expect(screen.getByTestId("system-view")).toBeInTheDocument();
+
+    fireEvent.click(within(view()).getByRole("tab", { name: "Live" }));
+    expect(screen.getByTestId("address")).toHaveTextContent("/?workflow=1");
+    expect(screen.getByTestId("live-view")).toHaveTextContent("live all 1");
+    expect(screen.getByTestId("workflow-picker")).toHaveTextContent("TV");
   });
 
   it("shows every workflow again when All workflows is chosen", () => {

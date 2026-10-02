@@ -52,7 +52,10 @@ const queries = {
 let entries: ConnectionEntry[] = [];
 let drives: SystemDrive[] = [];
 
-vi.mock("../use-health", () => ({ useHealth: () => health }));
+const useHealth = vi.fn<(workflows: unknown) => Health>(() => health);
+vi.mock("../use-health", () => ({
+  useHealth: (workflows: unknown) => useHealth(workflows),
+}));
 vi.mock("../../../../lib/connections/use-connections", () => ({
   useConnections: () => ({ entries, lights: new Map() }),
 }));
@@ -104,8 +107,8 @@ function drive(name: string, workflowIds: number[]): SystemDrive {
   };
 }
 
-function renderChecks(workflowId: number | null = null) {
-  return renderHook(() => useHealthChecks([movies, tv], workflowId), {
+function renderChecks() {
+  return renderHook(() => useHealthChecks([movies, tv]), {
     wrapper: wrapper(),
   });
 }
@@ -206,18 +209,21 @@ describe("useHealthChecks", () => {
     ]);
   });
 
-  it("checks the drives, narrowed to the workflow when one is chosen", async () => {
+  it("checks every drive any workflow uses, and asks for every workflow's folders", async () => {
     drives = [drive("D:", [2]), drive("E:", [3])];
-    const { result } = renderChecks(2);
+    const { result } = renderChecks();
 
     await waitFor(() =>
       expect(
         result.current.checks.filter((check) => check.area === "storage"),
-      ).toHaveLength(1),
+      ).toHaveLength(2),
     );
     expect(
-      result.current.checks.find((check) => check.area === "storage")?.title,
-    ).toBe("D:");
+      result.current.checks
+        .filter((check) => check.area === "storage")
+        .map((check) => check.title),
+    ).toEqual(["D:", "E:"]);
+    expect(useHealth).toHaveBeenLastCalledWith([movies, tv]);
   });
 
   it("looks at a workflow again by reading its folder chain again", async () => {

@@ -1,7 +1,6 @@
 import type { TraceSample } from "../../components/charts/live-trace-math";
 import { parseAppTime } from "../ui/mm-format-date";
 import type {
-  SystemDrive,
   SystemPoint,
   SystemStats,
   SystemStatsFrame,
@@ -44,16 +43,4 @@ export function seriesOf(
     const at = parseAppTime(point.at);
     return value === null || at === null ? [] : [{ at, value }];
   });
-}
-
-/** The drives a workflow uses (as its watched, work or output folder), or every drive when none is picked. */
-export function drivesUsedBy(
-  drives: readonly SystemDrive[],
-  workflowId: number | null,
-): SystemDrive[] {
-  return workflowId === null
-    ? [...drives]
-    : drives.filter((drive) =>
-        drive.workflows.some((workflow) => workflow.id === workflowId),
-      );
 }

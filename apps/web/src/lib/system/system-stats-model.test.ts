@@ -1,12 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { drivesUsedBy, seriesOf, withFrame } from "./system-stats-model";
-import type {
-  SystemDrive,
-  SystemNow,
-  SystemPoint,
-  SystemStats,
-} from "./system-stats-types";
+import { seriesOf, withFrame } from "./system-stats-model";
+import type { SystemNow, SystemPoint, SystemStats } from "./system-stats-types";
 
 const now = (cpu: number): SystemNow => ({
   at: "2026-10-02T12:00:00Z",
@@ -101,31 +96,5 @@ describe("a line from the history", () => {
       (p) => p.disk_read_bytes_per_sec,
     );
     expect(samples).toEqual([]);
-  });
-});
-
-describe("the drives a workflow uses", () => {
-  const drive = (name: string, ids: number[]): SystemDrive => ({
-    name,
-    path: `${name}\\`,
-    total_bytes: 1,
-    free_bytes: 1,
-    weir_bytes: 0,
-    keep_free_bytes: 0,
-    full_in_days: null,
-    read_bytes_per_sec: null,
-    write_bytes_per_sec: null,
-    busy_percent: null,
-    workflows: ids.map((id) => ({ id, name: `W${id}`, roles: ["output"] })),
-  });
-  const drives = [drive("D:", [1, 2]), drive("E:", [3])];
-
-  it("is every drive when no workflow is picked", () => {
-    expect(drivesUsedBy(drives, null)).toHaveLength(2);
-  });
-
-  it("is only the drives that workflow reads from or writes to", () => {
-    expect(drivesUsedBy(drives, 3).map((d) => d.name)).toEqual(["E:"]);
-    expect(drivesUsedBy(drives, 9)).toEqual([]);
   });
 });

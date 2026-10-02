@@ -35,17 +35,15 @@ import { useHealthChecks } from "./system/use-health-checks";
 const NO_WORKFLOWS: readonly ProcessingLibrary[] = [];
 
 type SystemViewProps = {
-  /** Narrows the health, the connections and the drives to one workflow; every workflow when null. */
-  workflowId: number | null;
   /** How the page lays itself out, decided from the width of its main area. */
   layout: PageLayout;
 };
 
-export function SystemView({ workflowId, layout }: SystemViewProps) {
+export function SystemView({ layout }: SystemViewProps) {
   useSystemStatsFrames();
   const workflows = useProcessingLibrariesQuery(true, LIBRARIES_REFRESH_MS);
   const overview = useSystemOverviewQuery();
-  const health = useHealthChecks(workflows.data ?? NO_WORKFLOWS, workflowId);
+  const health = useHealthChecks(workflows.data ?? NO_WORKFLOWS);
   const [jump, setJump] = useState(0);
 
   if (workflows.isPending) return <PageLoading label="Loading the system" />;
@@ -73,17 +71,13 @@ export function SystemView({ workflowId, layout }: SystemViewProps) {
         <ProcessingCard />
       </div>
       <div className="mm-sy-cell mm-sy-cell--store">
-        <StorageCard workflowId={workflowId} />
+        <StorageCard />
       </div>
       <div className="mm-sy-cell mm-sy-cell--mid">
-        <HealthCard
-          workflows={workflows.data}
-          workflowId={workflowId}
-          jump={jump}
-        />
+        <HealthCard workflows={workflows.data} jump={jump} />
       </div>
       <div className="mm-sy-cell mm-sy-cell--conn">
-        <ConnectionsSlot workflows={workflows.data} workflowId={workflowId} />
+        <ConnectionsSlot workflows={workflows.data} />
       </div>
       <div
         className="mm-sy-cell mm-sy-cell--low"

@@ -76,10 +76,10 @@
   display: none;
 }
 
-/* The Dashboard's controls: the view, the workflow picker, and on Live the kind of work. Where there is room the kind
-   of work is a three-button switch; where there is not, the same choice as a picker. The room is whatever the header
-   has left after the view and the picker, which the control's own box measures, so the choice follows the window and
-   the menu whatever else the header holds, and the header stays on one line. */
+/* The Dashboard's controls, on Live only: the workflow picker, then the kind of work. System puts nothing in the
+   header's slot. Where there is room the kind of work is a three-button switch; where there is not, the same choice
+   as a picker. The room is whatever the header has left after the picker, which the control's own box measures, so
+   the choice follows the window and the menu whatever else the header holds, and the header stays on one line. */
 .mm-dash-controls {
   display: flex;
   flex-wrap: wrap;

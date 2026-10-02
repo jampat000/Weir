@@ -35,16 +35,16 @@ vi.mock("../connections-card", () => ({
 }));
 
 describe("the Connections card's slot", () => {
-  it("gives the card the connections in scope, how each answers and the tests", () => {
-    render(<ConnectionsSlot workflows={[]} workflowId={null} />);
+  it("gives the card every connection, how each answers and the tests", () => {
+    render(<ConnectionsSlot workflows={[]} />);
 
     expect(screen.getByTestId("card")).toHaveTextContent("truetruetrue");
   });
 
-  it("asks for the connections of the picked workflow", () => {
-    render(<ConnectionsSlot workflows={[]} workflowId={7} />);
+  it("asks for the connections of every workflow", () => {
+    render(<ConnectionsSlot workflows={[]} />);
 
-    expect(useHealth).toHaveBeenLastCalledWith([], 7);
+    expect(useHealth).toHaveBeenLastCalledWith([]);
     expect(useConnections).toHaveBeenLastCalledWith(["m"], ["d"]);
   });
 });

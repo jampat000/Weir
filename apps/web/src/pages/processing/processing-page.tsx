@@ -1,7 +1,7 @@
 /**
  * The Dashboard, Weir's landing page, in two views kept in the address: Live, everything Weir is doing
  * right now, and System, how it is set up and what it does in the background. The header carries the
- * tabs between them after the title, the workflow to narrow everything to, and on Live the kind of work to show.
+ * tabs between them after the title and, on Live, the workflow to narrow everything to and the kind of work to show.
  *
  * The page decides its layout from the width of its own main area, not the window's. On Live, wide, it is
  * exactly as tall as the window, so everything is sized from the space it has and the page itself never
@@ -58,7 +58,7 @@ export function ProcessingPage(): React.ReactElement {
           layout={layout}
         />
       ) : (
-        <SystemView workflowId={address.workflowId} layout={layout} />
+        <SystemView layout={layout} />
       )}
     </div>
   );

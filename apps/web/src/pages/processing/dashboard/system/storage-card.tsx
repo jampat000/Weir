@@ -1,6 +1,5 @@
 import { Panel } from "../../../../components/panels/panel";
 import { loadErrorMessage } from "../../../../lib/api/error-message";
-import { drivesUsedBy } from "../../../../lib/system/system-stats-model";
 import { useSystemStatsQuery } from "../../../../lib/system/use-system-stats";
 import { classNames } from "../../../../lib/ui/class-names";
 import { useFittingRows } from "../fit-rows";
@@ -46,26 +45,21 @@ function Drive({ block }: { block: DriveBlock }) {
   );
 }
 
-type StorageCardProps = {
-  /** Narrows the card to the drives one workflow uses; every drive when null. */
-  workflowId: number | null;
-};
-
 /**
  * Dashboard › System: one block for each drive any workflow reads from or writes to: how much room is left and when
  * it will be full, a bar of Weir's own work files and everything else with the line where Weir stops to keep room
  * free, and how busy the drive is. The card's height decides how many whole blocks show.
  */
-export function StorageCard({ workflowId }: StorageCardProps) {
+export function StorageCard() {
   const stats = useSystemStatsQuery();
-  const shown = drivesUsedBy(stats.data?.drives ?? [], workflowId);
-  const blocks = driveBlocks(shown);
+  const drives = stats.data?.drives ?? [];
+  const blocks = driveBlocks(drives);
   const [listRef, fits] = useFittingRows();
   const more = blocks.length - Math.min(fits, blocks.length);
   return (
     <Panel
       title="Storage"
-      count={storageCount(shown)}
+      count={storageCount(drives)}
       aside={<MoreCount count={more} />}
       to={STORAGE_PATH}
       toLabel="Storage"

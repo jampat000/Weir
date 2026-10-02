@@ -39,15 +39,17 @@ type DashboardControlsProps = {
 };
 
 /**
- * What the Dashboard puts in the header besides its tabs: the workflow to narrow everything to, and on Live
- * the kind of work to show. The one control that comes and goes is last, so none of the others moves when the
- * view changes. The kind of work is a three-button switch where the header has room for one, and a
- * picker where it does not; the stylesheet chooses by the room the control has, so the header stays on one line.
+ * What the Dashboard puts in the header besides its tabs, on Live only: the workflow to narrow everything to,
+ * then the kind of work to show. System is about Weir and the computer as a whole, so it has neither and its header
+ * is just the tabs; the tabs and the title do not move when the view changes. The kind of work is a three-button
+ * switch where the header has room for one, and a picker where it does not; the stylesheet chooses by the room the
+ * control has, so the header stays on one line.
  */
 export function DashboardControls({
   address,
   workflows,
 }: DashboardControlsProps) {
+  if (address.view !== "live") return null;
   return (
     <div className="mm-dash-controls">
       <WorkflowPicker
@@ -55,22 +57,20 @@ export function DashboardControls({
         value={address.workflowId}
         onChange={address.setWorkflowId}
       />
-      {address.view === "live" ? (
-        <div className="mm-dash-controls__work">
-          <div className="mm-dash-controls__switch">
-            <SegmentedControl
-              options={FILTER_OPTIONS}
-              value={address.filter}
-              onChange={address.setFilter}
-              ariaLabel="Show work from"
-              dataTestId="live-filter"
-            />
-          </div>
-          <div className="mm-dash-controls__compact">
-            <WorkPicker value={address.filter} onChange={address.setFilter} />
-          </div>
+      <div className="mm-dash-controls__work">
+        <div className="mm-dash-controls__switch">
+          <SegmentedControl
+            options={FILTER_OPTIONS}
+            value={address.filter}
+            onChange={address.setFilter}
+            ariaLabel="Show work from"
+            dataTestId="live-filter"
+          />
         </div>
-      ) : null}
+        <div className="mm-dash-controls__compact">
+          <WorkPicker value={address.filter} onChange={address.setFilter} />
+        </div>
+      </div>
     </div>
   );
 }

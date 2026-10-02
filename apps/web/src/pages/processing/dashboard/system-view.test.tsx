@@ -54,18 +54,10 @@ vi.mock("./system/processing-card", () => ({
   ProcessingCard: () => <p>processing</p>,
 }));
 vi.mock("./system/storage-card", () => ({
-  StorageCard: ({ workflowId }: { workflowId: number | null }) => (
-    <p>{`storage ${String(workflowId)}`}</p>
-  ),
+  StorageCard: () => <p>storage</p>,
 }));
 vi.mock("./system/health-card", () => ({
-  HealthCard: ({
-    jump,
-    workflowId,
-  }: {
-    jump: number;
-    workflowId: number | null;
-  }) => <p>{`health jump ${jump} workflow ${String(workflowId)}`}</p>,
+  HealthCard: ({ jump }: { jump: number }) => <p>{`health jump ${jump}`}</p>,
 }));
 vi.mock("./system/connections-slot", () => ({
   ConnectionsSlot: () => <p>connections</p>,
@@ -88,12 +80,12 @@ beforeEach(() => {
 
 describe("the System view's cards", () => {
   it("shows every card of the view", () => {
-    render(<SystemView workflowId={null} layout={beside} />);
+    render(<SystemView layout={beside} />);
 
     for (const words of [
       "computer",
       "processing",
-      "storage null",
+      "storage",
       "connections",
       "tasks",
       "log",
@@ -105,21 +97,14 @@ describe("the System view's cards", () => {
   });
 
   it("follows the stream's readings", () => {
-    render(<SystemView workflowId={null} layout={beside} />);
+    render(<SystemView layout={beside} />);
 
     expect(hearFrames).toHaveBeenCalled();
   });
 
-  it("narrows the drives and the health to the workflow picked", () => {
-    render(<SystemView workflowId={4} layout={beside} />);
-
-    expect(screen.getByText("storage 4")).toBeInTheDocument();
-    expect(screen.getByText(/workflow 4/)).toBeInTheDocument();
-  });
-
   it("waits for the workflows before it shows anything", () => {
     libraries = { isPending: true, isError: false, data: [] };
-    render(<SystemView workflowId={null} layout={beside} />);
+    render(<SystemView layout={beside} />);
 
     expect(screen.queryByText("computer")).toBeNull();
   });
@@ -132,7 +117,7 @@ describe("the ring's checks", () => {
       checking: false,
       overviewChecks: null,
     };
-    render(<SystemView workflowId={null} layout={beside} />);
+    render(<SystemView layout={beside} />);
 
     expect(screen.getByText("ring 2/3 need 1")).toBeInTheDocument();
   });
@@ -140,13 +125,13 @@ describe("the ring's checks", () => {
   it("stand on Weir's own count while a folder check has not answered", () => {
     health = { checks: [{ tone: "ok" }], checking: true, overviewChecks: null };
     overviewChecks = { passing: 8, total: 10 };
-    render(<SystemView workflowId={null} layout={beside} />);
+    render(<SystemView layout={beside} />);
 
     expect(screen.getByText("ring 8/10 need 0")).toBeInTheDocument();
   });
 
   it("send the person to Health when they press that checks need them", () => {
-    render(<SystemView workflowId={null} layout={beside} />);
+    render(<SystemView layout={beside} />);
 
     fireEvent.click(screen.getByRole("button", { name: /^ring/ }));
 
@@ -156,7 +141,7 @@ describe("the ring's checks", () => {
 
 describe("the System view's grid", () => {
   it("shares Live's columns, and names its own areas, where the right column sits beside the page", () => {
-    render(<SystemView workflowId={null} layout={beside} />);
+    render(<SystemView layout={beside} />);
 
     const grid = screen.getByTestId("dashboard-system");
     expect(grid).toHaveClass("mm-sy-grid--beside");
@@ -166,7 +151,7 @@ describe("the System view's grid", () => {
   });
 
   it("stacks its cards where the page is narrow", () => {
-    render(<SystemView workflowId={null} layout={narrow} />);
+    render(<SystemView layout={narrow} />);
 
     const grid = screen.getByTestId("dashboard-system");
     expect(grid).not.toHaveClass("mm-sy-grid--beside");

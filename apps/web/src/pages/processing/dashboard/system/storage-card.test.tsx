@@ -12,10 +12,10 @@ vi.mock("../../../../lib/system/use-system-stats", () => ({
   useSystemStatsQuery: () => query,
 }));
 
-function show(workflowId: number | null = null) {
+function show(address = "/?view=system") {
   return render(
-    <MemoryRouter>
-      <StorageCard workflowId={workflowId} />
+    <MemoryRouter initialEntries={[address]}>
+      <StorageCard />
     </MemoryRouter>,
   );
 }
@@ -85,8 +85,16 @@ describe("the Storage card", () => {
     expect(within(drive).queryByText(/MB\/s/)).toBeNull();
   });
 
-  it("lists only the drives the picked workflow uses", () => {
-    show(9);
+  it("lists every drive even when the address names a workflow that does not use it", () => {
+    show("/?view=system&workflow=9");
+
+    expect(screen.getByTestId("system-drive")).toBeInTheDocument();
+    expect(screen.getByText("400 GB free")).toBeInTheDocument();
+  });
+
+  it("says so when no drive has been read", () => {
+    query = { data: { ...testStats, drives: [] } };
+    show();
 
     expect(screen.queryByTestId("system-drive")).toBeNull();
     expect(screen.getByText(/No drive has been read yet/)).toBeInTheDocument();

@@ -12,7 +12,6 @@ import { systemKeys } from "../../../../lib/system/query-keys";
 import { useMediaToolsQuery } from "../../../../lib/system/media-tools";
 import { useSystemReadinessQuery } from "../../../../lib/system/readiness-queries";
 import { fetchSystemStats } from "../../../../lib/system/system-stats-api";
-import type { SystemDrive } from "../../../../lib/system/system-stats-types";
 import { useSystemOverviewQuery } from "../../../../lib/system/use-system-stats";
 import { parseAppTime } from "../../../../lib/ui/mm-format-date";
 import { useNow } from "../../../../lib/ui/use-now";
@@ -49,17 +48,6 @@ export type HealthChecks = {
   again: (check: HealthCheck) => Promise<void>;
 };
 
-function drivesOf(
-  drives: readonly SystemDrive[],
-  workflowId: number | null | undefined,
-): SystemDrive[] {
-  return workflowId == null
-    ? [...drives]
-    : drives.filter((drive) =>
-        drive.workflows.some((workflow) => workflow.id === workflowId),
-      );
-}
-
 /**
  * Every check the Health card lists, read from the parts Weir already knows: each switched-on workflow's folder
  * chain, the connections, the tools, the drives, the backup schedule and Weir's workers. Each part loads and fails
@@ -67,9 +55,8 @@ function drivesOf(
  */
 export function useHealthChecks(
   workflows: readonly ProcessingLibrary[],
-  workflowId: number | null | undefined,
 ): HealthChecks {
-  const health = useHealth(workflows, workflowId);
+  const health = useHealth(workflows);
   const { entries } = useConnections(health.managers, health.downloadClients);
   const testing = useConnectionTesting();
   const tools = useMediaToolsQuery();
@@ -127,7 +114,7 @@ export function useHealthChecks(
         tools.dataUpdatedAt > 0 ? tools.dataUpdatedAt : null,
       ),
       ...storageChecks(
-        stats.data ? drivesOf(stats.data, workflowId) : null,
+        stats.data ?? null,
         stats.dataUpdatedAt > 0 ? stats.dataUpdatedAt : null,
       ),
       ...backupChecks(backups, now),
@@ -140,7 +127,6 @@ export function useHealthChecks(
       tools.dataUpdatedAt,
       stats.data,
       stats.dataUpdatedAt,
-      workflowId,
       backups,
       now,
       weir,

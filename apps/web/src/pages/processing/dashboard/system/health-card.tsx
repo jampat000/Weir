@@ -32,8 +32,6 @@ const FLASH_MS = 1300;
 
 type HealthCardProps = {
   workflows: readonly ProcessingLibrary[];
-  /** Narrows the card to one workflow: its checks, its connections and its drive. */
-  workflowId?: number | null;
   /** Goes up by one each time "N need you" is pressed: the card shows the problems, scrolls into view and rings. */
   jump?: number;
 };
@@ -44,12 +42,8 @@ type HealthCardProps = {
  * opens its whole folder chain under "Details". The card's height decides how many whole rows show, and the header
  * says how many more there are.
  */
-export function HealthCard({
-  workflows,
-  workflowId = null,
-  jump = 0,
-}: HealthCardProps) {
-  const health = useHealthChecks(workflows, workflowId);
+export function HealthCard({ workflows, jump = 0 }: HealthCardProps) {
+  const health = useHealthChecks(workflows);
   const check = useCheckNow(health.health);
   const now = useNow(TICK_MS);
   const [picked, setPicked] = useState<HealthArea | null>(null);
