@@ -97,20 +97,20 @@ describe("the filters", () => {
     expect(screen.getByRole("option", { name: "Info · 1" })).toBeVisible();
   });
 
-  it("show a dot in each level's colour beside its choice", async () => {
+  it("show a dot in each level's meaning beside its choice", async () => {
     await rendered();
 
     fireEvent.click(screen.getByTestId("logs-level-picker"));
 
-    for (const [name, level] of [
-      ["Errors · 1", "error"],
-      ["Warnings · 1", "warning"],
-      ["Info · 1", "info"],
+    for (const [name, meaning] of [
+      ["Errors · 1", "broken"],
+      ["Warnings · 1", "attention"],
+      ["Info · 1", "idle"],
     ]) {
       const dot = screen
         .getByRole("option", { name })
-        .querySelector(".mm-log-dot");
-      expect(dot).toHaveClass(`mm-log-dot--${level}`);
+        .querySelector(".mm-status-dot");
+      expect(dot).toHaveAttribute("data-status", meaning);
     }
   });
 

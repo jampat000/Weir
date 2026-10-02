@@ -36,7 +36,7 @@
   margin-right: 0.55rem;
   place-items: center;
   border-radius: 50%;
-  background: var(--mm-status-warning-text);
+  background: var(--mm-st);
   color: var(--mm-on-accent);
   font-size: var(--mm-type-eyebrow);
   font-weight: 800;

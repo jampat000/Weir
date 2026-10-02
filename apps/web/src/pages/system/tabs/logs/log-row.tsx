@@ -1,7 +1,12 @@
 import { Chip } from "../../../../components/panels/chip";
 import { eventDisplay } from "../../../../lib/activity/activity-display";
-import type { SystemLogRow } from "../../../../lib/system/system-log-api";
+import { classNames } from "../../../../lib/ui/class-names";
+import {
+  LOG_LEVEL_MEANING,
+  type SystemLogRow,
+} from "../../../../lib/system/system-log-api";
 import { parseAppTime } from "../../../../lib/ui/mm-format-date";
+import { needsYou } from "../../../../lib/ui/status-meaning";
 import { LOG_CATEGORY_LABELS, LOG_SOURCES } from "./log-filters";
 import { LogEventDetail } from "./log-event-detail";
 import { LogJobDetail } from "./log-job-detail";
@@ -96,9 +101,14 @@ export function LogRow({
   const { title, detail } = linesOf(row);
   const at = parseAppTime(row.at);
   const bodyId = `log-row-${row.id.replace(":", "-")}`;
+  const meaning = LOG_LEVEL_MEANING[row.level];
   return (
     <li
-      className={`mm-log-row mm-log-row--${row.level}`}
+      className={classNames(
+        "mm-log-row",
+        needsYou(meaning) && "mm-log-row--problem",
+      )}
+      data-status={meaning}
       data-testid="log-row"
       data-source={row.source}
       data-level={row.level}
@@ -118,7 +128,7 @@ export function LogRow({
           {at === null ? "" : clock(at)}
         </time>
         <span
-          className={`mm-log-dot mm-log-dot--${row.level}`}
+          className="mm-status-dot"
           role="img"
           aria-label={LOG_LEVEL_WORDS[row.level]}
           title={LOG_LEVEL_WORDS[row.level]}

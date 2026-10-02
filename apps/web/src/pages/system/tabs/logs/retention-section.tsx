@@ -60,7 +60,11 @@ function FileActivityRow({
   const inputId = "retention-file-activity";
   if (fileActivity.status === "unreadable") {
     return (
-      <p className="mm-status-text--failed mm-sys-note" role="alert">
+      <p
+        className="mm-status-text mm-sys-note"
+        data-status="broken"
+        role="alert"
+      >
         Weir could not read how long a file&rsquo;s activity is kept. Refresh
         the page to try again.
       </p>
@@ -190,21 +194,30 @@ export function RetentionSection({
           ) : null}
           {failed ? (
             <p
-              className="mm-status-text--failed text-sm"
+              className="mm-status-text text-sm"
+              data-status="broken"
               role="alert"
               data-testid="suite-settings-logs-save-error"
             >
               {errorMessage(save.error, "Could not save.")}
             </p>
           ) : fileActivity.error ? (
-            <p className="mm-status-text--failed text-sm" role="alert">
+            <p
+              className="mm-status-text text-sm"
+              data-status="broken"
+              role="alert"
+            >
               {errorMessage(
                 fileActivity.error,
                 "That change could not be saved.",
               )}
             </p>
           ) : saved && !dirty ? (
-            <p className="mm-status-text--healthy text-sm" role="status">
+            <p
+              className="mm-status-text text-sm"
+              data-status="done"
+              role="status"
+            >
               Retention saved.
             </p>
           ) : null}

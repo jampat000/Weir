@@ -41,12 +41,7 @@
 }
 
 .mm-log-live {
-  width: 0.5rem;
-  height: 0.5rem;
-  flex-shrink: 0;
-  border-radius: 50%;
-  background: var(--mm-status-healthy-text);
-  box-shadow: 0 0 0 3px var(--mm-status-healthy-bg);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--mm-st) 14%, transparent);
 }
 
 /* ---- The list ---------------------------------------------------------------- */
@@ -71,12 +66,8 @@
 }
 
 /* A problem has an accent at its edge, as Activity's entries do; everything else is quiet. */
-.mm-log-row--error {
-  box-shadow: inset 3px 0 0 var(--mm-status-failed-text);
-}
-
-.mm-log-row--warning {
-  box-shadow: inset 3px 0 0 var(--mm-status-warning-text);
+.mm-log-row--problem {
+  box-shadow: inset 3px 0 0 var(--mm-st);
 }
 
 /* The row's line: time, level dot, source, category, workflow, then the title with its quieter second line. */
@@ -124,27 +115,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-/* The level, as a dot in red, amber, green or grey; the words are on it for a screen reader. */
-.mm-log-dot {
-  display: inline-block;
-  width: 0.5rem;
-  height: 0.5rem;
-  border-radius: 50%;
-  background: var(--mm-text3);
-}
-
-.mm-log-dot--error {
-  background: var(--mm-destructive);
-}
-
-.mm-log-dot--warning {
-  background: var(--mm-warning);
-}
-
-.mm-log-dot--success {
-  background: var(--mm-success);
 }
 
 .mm-log-row__text {

@@ -1,11 +1,13 @@
 import { useId } from "react";
 
+import { StatusDot } from "../../../../components/panels/status-dot";
 import { MmListboxPicker } from "../../../../components/ui/mm-listbox-picker";
 import { MmMultiListboxPicker } from "../../../../components/ui/mm-multi-listbox-picker";
 import { useProcessingLibrariesQuery } from "../../../../lib/processing/libraries-queries";
-import type {
-  SystemLogCategory,
-  SystemLogPage,
+import {
+  LOG_LEVEL_MEANING,
+  type SystemLogCategory,
+  type SystemLogPage,
 } from "../../../../lib/system/system-log-api";
 import {
   LOG_CATEGORY_LABELS,
@@ -73,12 +75,7 @@ export function LogPickers({
         : `${choice.label} · ${choice.levels
             .reduce((sum, level) => sum + counts.level[level], 0)
             .toLocaleString()}`,
-    marker: (
-      <span
-        className={`mm-log-dot mm-log-dot--${choice.value}`}
-        aria-hidden="true"
-      />
-    ),
+    marker: <StatusDot meaning={LOG_LEVEL_MEANING[choice.levels[0]]} />,
   }));
   return (
     <>

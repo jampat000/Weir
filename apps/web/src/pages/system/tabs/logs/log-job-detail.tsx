@@ -62,7 +62,11 @@ function JobActions({ job, canAct }: { job: Job; canAct: boolean }) {
         </button>
       )}
       {failure ? (
-        <span className="mm-status-text--failed text-sm" role="alert">
+        <span
+          className="mm-status-text text-sm"
+          data-status="broken"
+          role="alert"
+        >
           {failure}
         </span>
       ) : null}

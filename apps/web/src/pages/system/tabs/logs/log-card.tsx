@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 
 import { Panel } from "../../../../components/panels/panel";
+import { StatusDot } from "../../../../components/panels/status-dot";
 import { LoadError } from "../../../../components/shared/load-error";
 import {
   eventLabel,
@@ -98,7 +99,11 @@ export function LogCard({
   return (
     <>
       {problems.length > 0 ? (
-        <ul className="mm-interrupt" data-testid="logs-problems">
+        <ul
+          className="mm-interrupt"
+          data-status="broken"
+          data-testid="logs-problems"
+        >
           {problems.map((text) => (
             <li key={text} className="mm-interrupt__item">
               <span className="mm-interrupt__text" role="alert">
@@ -124,7 +129,7 @@ export function LogCard({
             data-testid="log-summary"
             ref={setSummaryEl}
           >
-            <span className="mm-log-live" aria-hidden="true" />
+            <StatusDot meaning="done" className="mm-log-live" />
             {summary}
           </span>
         }

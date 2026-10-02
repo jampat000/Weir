@@ -4,7 +4,12 @@
  */
 export function SettingsLoadError({ what }: { what: string }) {
   return (
-    <ul className="mm-interrupt" role="alert" data-testid="settings-load-error">
+    <ul
+      className="mm-interrupt"
+      data-status="broken"
+      role="alert"
+      data-testid="settings-load-error"
+    >
       <li className="mm-interrupt__item">
         <span className="mm-interrupt__text">
           Weir couldn&rsquo;t load your {what}. Reload the page to try again.

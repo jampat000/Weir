@@ -129,7 +129,7 @@ export function LogRefine({
         onToggle={() => onChange({ stackOnly: !filters.stackOnly })}
       />
       {filters.job === null ? null : (
-        <Chip tone="info" dot={false} data-testid="logs-job-filter">
+        <Chip dot={false} data-testid="logs-job-filter">
           Everything about job #{filters.job}
           <button
             type="button"
