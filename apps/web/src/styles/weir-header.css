@@ -420,32 +420,32 @@
   pointer-events: none;
 }
 
-/* "More" is set as a tab is, in 14px at weight 500, and is never drawn as the chosen one: the chosen tab always has
-   its place in the row. */
-.mm-page-tabs__more {
+/* "More" (components/shell/more-menu.tsx) ends a row of tabs or chips. As a tab it is set as a tab is, in 14px at weight 500,
+   and it is never drawn as the chosen one: the chosen tab or chip always has its place in the row. */
+.mm-more {
   position: relative;
   display: flex;
 }
 
-.mm-page-tabs__more-button {
+.mm-more__button {
   display: inline-flex;
   align-items: center;
   gap: 4px;
 }
 
-.mm-page-tabs__more-chevron {
+.mm-more__chevron {
   flex: none;
   width: 14px;
   height: 14px;
   transition: transform 0.15s ease;
 }
 
-.mm-page-tabs__more-button[aria-expanded="true"] .mm-page-tabs__more-chevron {
+.mm-more__button[aria-expanded="true"] .mm-more__chevron {
   transform: rotate(180deg);
 }
 
 /* The menu is the user menu's: the same surface, border, radius and shadow, and rows of the same type. */
-.mm-page-tabs__menu {
+.mm-more__menu {
   position: absolute;
   top: calc(100% + 8px);
   left: 0;
@@ -458,7 +458,7 @@
   box-shadow: var(--mm-shadow-popover);
 }
 
-.mm-page-tabs__menu-item {
+.mm-more__item {
   display: block;
   width: 100%;
   padding: 10px 12px;
@@ -473,8 +473,8 @@
   cursor: pointer;
 }
 
-.mm-page-tabs__menu-item:hover,
-.mm-page-tabs__menu-item:focus-visible {
+.mm-more__item:hover,
+.mm-more__item:focus-visible {
   background: var(--mm-surface-2);
   color: var(--mm-text1);
   outline: none;
@@ -521,7 +521,7 @@
 @media (prefers-reduced-motion: reduce) {
   .mm-page-tabs__tab,
   .mm-page-tabs__more-button,
-  .mm-page-tabs__more-chevron {
+  .mm-more__chevron {
     transition: none;
   }
 }

@@ -1,6 +1,7 @@
 import { useEffect, useRef, type KeyboardEvent } from "react";
 
-import { PageTabsMore, PageTabsMoreProbe } from "./page-tabs-more";
+import { MoreMenu } from "./more-menu";
+import { NavIconChevronDown } from "./nav-icons";
 import { usePageTabsFit } from "./use-page-tabs-fit";
 
 export type PageTabOption<Id extends string> = Readonly<{
@@ -138,10 +139,11 @@ export function PageTabs<Id extends string>({
       <div className="mm-page-tabs-fit__row">
         {tabList}
         {fit.folded.length > 0 ? (
-          <PageTabsMore
+          <MoreMenu
             menuLabel={`More ${ariaLabel.toLowerCase()}`}
-            tabs={fit.folded.map((index) => tabs[index])}
+            folded={fit.folded.map((index) => tabs[index])}
             onChoose={chooseFolded}
+            buttonClassName="mm-page-tabs__more-button"
           />
         ) : null}
       </div>
@@ -152,7 +154,14 @@ export function PageTabs<Id extends string>({
           <span key={id} className="mm-page-tabs__tab" data-label={label} />
         ))}
       </div>
-      <PageTabsMoreProbe probeRef={probeRef} />
+      <span
+        ref={probeRef}
+        aria-hidden="true"
+        className="mm-more__button mm-page-tabs__more-button mm-page-tabs__probe"
+        data-label="More"
+      >
+        <NavIconChevronDown className="mm-more__chevron" />
+      </span>
     </div>
   );
 }

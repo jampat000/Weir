@@ -5,10 +5,10 @@
 
 /*
  * What narrows the list sits in the header's slot, on the title line after the title: the search, the kinds of file,
- * then the two pickers at the right, just before Pause. The header's title block gives its eyebrow's room first (the
- * eyebrow is cut with an ellipsis, always one line), then the search gives up its width, then the pickers take their compact width, and
- * the chips scroll sideways inside their own box when they still do not fit. The sizes follow the header's own width,
- * which is not the window's: the menu takes a different share of it open and collapsed.
+ * then the two pickers at the right, just before Pause. The title block keeps the room for its tabs and eyebrow; the
+ * controls give way, a step at a time (components/shell/title-line-fit.ts): the search to a mark, the pickers into their
+ * card, the last chips into "More". The sizes follow the header's own width, which is not the window's: the menu takes
+ * a different share of it open and collapsed.
  */
 .mm-history-controls {
   display: flex;
@@ -28,27 +28,10 @@
   min-width: 6.5rem;
 }
 
-/* The group keeps its own look and scrolls in a box a few pixels bigger than it, so its border and the focus ring are
-   not cut. The edges fade only while there is more than shows. */
+/* The chips are as wide as they are; the room they are given is what decides how many fold into "More". */
 .mm-history-chips {
-  position: relative;
   flex: 0 1 auto;
   min-width: 0;
-  margin: -4px;
-  padding: 4px;
-  overflow-x: auto;
-  overflow-y: hidden;
-  scrollbar-width: none;
-}
-
-.mm-history-chips[data-scrolls="true"] {
-  mask-image: linear-gradient(
-    to right,
-    transparent,
-    #000 8px,
-    #000 calc(100% - 8px),
-    transparent
-  );
 }
 
 .mm-history-chips .mm-segmented {
@@ -74,8 +57,7 @@
   }
 
   .mm-header:has(.mm-history-controls) .mm-header__titles {
-    flex-shrink: 100;
-    min-width: 11.75rem;
+    flex-shrink: 0;
   }
 }
 
@@ -92,7 +74,7 @@
   }
 }
 
-/* Under the title the chips scroll in the line the search and pickers share; on a phone they have a line of their own. */
+/* On a phone the chips have a line of their own. */
 @media (max-width: 920px) {
   .mm-history-controls {
     flex-wrap: wrap;

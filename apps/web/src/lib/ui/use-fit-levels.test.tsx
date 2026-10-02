@@ -1,6 +1,6 @@
 import { act, render } from "@testing-library/react";
 import { useState } from "react";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { useFitLevels } from "./use-fit-levels";
 
@@ -48,6 +48,8 @@ function levelFor(
   return level;
 }
 
+afterEach(() => vi.unstubAllGlobals());
+
 describe("useFitLevels", () => {
   it("stays at 0 when the row fits", () => {
     expect(levelFor({ needs: 300, room: 400 })).toBe(0);
@@ -82,6 +84,35 @@ describe("useFitLevels", () => {
         />,
       );
     });
+
+    expect(level).toBe(0);
+  });
+
+  it("starts again from 0 when the box the row sits in changes size, so room that comes back gives words back", () => {
+    let resized: () => void = () => undefined;
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        constructor(callback: () => void) {
+          resized = callback;
+        }
+        observe() {}
+        disconnect() {}
+      },
+    );
+    let level = -1;
+    const { rerender, container } = render(
+      <Probe needs={450} room={300} report={(l) => (level = l)} />,
+    );
+    expect(level).toBe(2);
+
+    const box = container.querySelector("header") as HTMLElement;
+    Object.defineProperty(box, "clientWidth", {
+      configurable: true,
+      value: 900,
+    });
+    rerender(<Probe needs={450} room={500} report={(l) => (level = l)} />);
+    act(() => resized());
 
     expect(level).toBe(0);
   });

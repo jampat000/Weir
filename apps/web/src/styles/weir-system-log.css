@@ -1,10 +1,10 @@
 /*
  * System › Logs: one log of everything Weir recorded. The filters sit in the header's slot (the shared rules for it are in
- * weir-history.css, which Activity uses too), or at the top of the Log card when the header has no room; this is the chips,
- * the card's list, its rows and what opens under them.
+ * weir-history.css, which Activity uses too), or in the Log card when the header has no room; this is the chips, the
+ * card's list, its rows and what opens under them.
  */
 
-/* The source and level chips share the box that scrolls, side by side, a little tighter than a page's own. */
+/* The source and level chips share a box, side by side, a little tighter than a page's own. */
 .mm-logs-controls .mm-history-chips {
   display: flex;
   gap: 8px;
@@ -37,7 +37,7 @@
 
 /* A picker's list opens as wide as its longest choice, so "Connections · 12" stays on one line. */
 .mm-log-toolbar [role="listbox"],
-.mm-logs-controls [role="listbox"] {
+.mm-history-scope [role="listbox"] {
   width: max-content;
   min-width: 100%;
   max-width: 18rem;

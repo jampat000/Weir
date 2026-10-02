@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { SegmentedControl } from "./segmented-control";
@@ -45,5 +45,45 @@ describe("SegmentedControl", () => {
     fireEvent.click(screen.getByRole("button", { name: "Library cleaning" }));
 
     expect(onChange).toHaveBeenCalledWith("library");
+  });
+
+  it("folds the options it is told to into a More menu, and still reports a choice made there", () => {
+    const onChange = vi.fn();
+    render(
+      <SegmentedControl
+        options={OPTIONS}
+        value="all"
+        onChange={onChange}
+        ariaLabel="Show work from"
+        fold={{ hidden: new Set(["library"]), menuLabel: "More sources" }}
+      />,
+    );
+
+    expect(
+      screen.queryByRole("button", { name: "Library cleaning" }),
+    ).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "More" }));
+    const menu = screen.getByRole("menu", { name: "More sources" });
+    fireEvent.click(
+      within(menu).getByRole("menuitem", { name: "Library cleaning" }),
+    );
+
+    expect(onChange).toHaveBeenCalledWith("library");
+  });
+
+  it("has no More button when nothing is folded", () => {
+    render(
+      <SegmentedControl
+        options={OPTIONS}
+        value="all"
+        onChange={() => undefined}
+        ariaLabel="Show work from"
+        fold={{ hidden: new Set<string>(), menuLabel: "More sources" }}
+      />,
+    );
+
+    expect(
+      screen.queryByRole("button", { name: "More" }),
+    ).not.toBeInTheDocument();
   });
 });

@@ -113,6 +113,9 @@ export function ActivityPage() {
   const selectedCleanId = Number(params.get("clean")) || null;
   const now = useNow(TICK_MS);
   const [removedNotice, setRemovedNotice] = useState<string | null>(null);
+  // Where the header's pickers go when it has no room for them: the aside of whichever card is on the page.
+  const [pickersSlot, setPickersSlot] = useState<HTMLDivElement | null>(null);
+  const pickersAside = <div ref={setPickersSlot} className="contents" />;
 
   const query = {
     within_days: period.days,
@@ -185,6 +188,7 @@ export function ActivityPage() {
         periodId={period.id}
         libraries={libraries.data ?? []}
         setParam={setParam}
+        cardSlot={pickersSlot}
       />
 
       {group === "failed" && editable ? (
@@ -224,6 +228,7 @@ export function ActivityPage() {
             title="Kept files"
             className="mm-history-list"
             count={`${(kept.data?.files.length ?? 0).toLocaleString()} kept`}
+            aside={pickersAside}
           >
             <ActivityKeptList
               files={kept.data?.files ?? []}
@@ -244,6 +249,7 @@ export function ActivityPage() {
             title="Files"
             count={`${shown.length.toLocaleString()} shown`}
             className="mm-history-list"
+            aside={pickersAside}
           >
             <ActivityList
               entries={shown}

@@ -111,6 +111,28 @@
   line-height: 17px;
 }
 
+/* A picker in a card's header is a card control's height, as the buttons beside it are, and sits in the header's own
+   padding so the header stays 44px tall like every card's. */
+.mm-panel__aside .mm-input {
+  height: var(--mm-control-height-sm);
+  min-height: 0;
+  padding-block: 0;
+}
+
+.mm-panel__aside .mm-workflow-picker {
+  margin-block: -6px;
+}
+
+/* A card with pickers in its header stops clipping, so a picker's list can reach past a short card's edge; its body
+   keeps the rounded corners. */
+:is(.mm-history-list, .mm-library-files) {
+  overflow: visible;
+}
+
+:is(.mm-history-list, .mm-library-files) > .mm-panel__body {
+  border-radius: 0 0 var(--mm-radius-panel) var(--mm-radius-panel);
+}
+
 /* A panel of fields or rows. The body is padded and set off from the header by a hairline; the panel
    stops clipping so a picker that opens inside it can reach past its edge. */
 .mm-panel--padded {

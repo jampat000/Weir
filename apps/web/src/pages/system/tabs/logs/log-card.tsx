@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 
 import { Panel } from "../../../../components/panels/panel";
 import { LoadError } from "../../../../components/shared/load-error";
@@ -10,9 +10,11 @@ import { useCanEdit } from "../../../../lib/auth/can-edit";
 import type { SystemLogQuery } from "../../../../lib/system/system-log-api";
 import { mmActionButtonClass } from "../../../../lib/ui/mm-control-roles";
 import { plural } from "../../../../lib/ui/mm-plural";
+import { useFitLevels } from "../../../../lib/ui/use-fit-levels";
 import { LogClearEvents } from "./log-clear-events";
 import { LogExportMenu } from "./log-export-menu";
 import { anyLogFilterSet, refineCount, type LogFilters } from "./log-filters";
+import type { CardFilters } from "./log-header-filters";
 import { LogList } from "./log-list";
 import { LogRange } from "./log-range";
 import { LogRefine } from "./log-refine";
@@ -32,12 +34,23 @@ function eventTypeOptions(
     : options;
 }
 
+/** Whether the card's header has run onto a second line: some control no longer shares the title's line. */
+function headerWraps(head: HTMLElement): boolean {
+  const first = head.firstElementChild?.getBoundingClientRect();
+  return (
+    first !== undefined &&
+    Array.from(head.children).some(
+      (child) => child.getBoundingClientRect().top >= first.bottom,
+    )
+  );
+}
+
 /**
  * The Log card: one list of everything that happened, newest first, under the day each thing fell on. Its header holds a
  * line on what the list holds, a way to refine it past what the header's filters can, Export, and Clear events.
  */
 export function LogCard({
-  toolbar,
+  moved,
   filters,
   query,
   entries,
@@ -48,8 +61,8 @@ export function LogCard({
   onClearFilters,
   onRelated,
 }: {
-  /** The filters the header had no room for, to show above the list; null when it held them all. */
-  toolbar: ReactNode;
+  /** The filters the shell's header had no room for. The pickers join this card's own header when it has the room, and a row above the list when not. */
+  moved: CardFilters;
   filters: LogFilters;
   query: SystemLogQuery;
   entries: LogEntries;
@@ -68,6 +81,20 @@ export function LogCard({
   const refining = refineCount(filters);
   const filtered = anyLogFilterSet(filters);
   const problems = [problem, entries.olderError].filter(Boolean);
+  const summary = logSummaryWords({
+    loaded: entries.rows.length,
+    total: entries.total,
+    filtered,
+  });
+  const [summaryEl, setSummaryEl] = useState<HTMLElement | null>(null);
+  const headerFit = useFitLevels(
+    summaryEl?.closest("header") ?? null,
+    1,
+    `${summary}|${filtered}|${refining}|${canClear}|${moved.pickers !== null}`,
+    moved.pickers !== null,
+    headerWraps,
+  );
+  const pickersInRow = moved.pickers !== null && headerFit >= 1;
 
   return (
     <>
@@ -93,17 +120,20 @@ export function LogCard({
         padded
         dataTestId="logs-card"
         count={
-          <span className="mm-log-status" data-testid="log-summary">
+          <span
+            className="mm-log-status"
+            data-testid="log-summary"
+            ref={setSummaryEl}
+          >
             <span className="mm-log-live" aria-hidden="true" />
-            {logSummaryWords({
-              loaded: entries.rows.length,
-              total: entries.total,
-              filtered,
-            })}
+            {summary}
           </span>
         }
         aside={
           <>
+            {moved.pickers !== null && !pickersInRow ? (
+              <div className="mm-history-scope">{moved.pickers}</div>
+            ) : null}
             {filtered ? (
               <button
                 type="button"
@@ -134,7 +164,12 @@ export function LogCard({
           </>
         }
       >
-        {toolbar}
+        {pickersInRow || moved.levels !== null ? (
+          <div className="mm-log-toolbar" data-testid="logs-toolbar">
+            {pickersInRow ? moved.pickers : null}
+            {moved.levels}
+          </div>
+        ) : null}
         {refineOpen || refining > 0 ? (
           <LogRefine
             filters={filters}

@@ -14,7 +14,7 @@
   align-items: center;
 }
 
-.mm-system .mm-panel__aside .mm-sys-btn {
+.mm-system .mm-panel__aside :is(.mm-sys-btn, .mm-input) {
   height: var(--mm-control-height-sm);
 }
 

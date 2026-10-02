@@ -5,19 +5,21 @@ import {
   useRef,
   useState,
   type KeyboardEvent,
-  type Ref,
+  type ReactNode,
 } from "react";
 
 import { useCloseOnOutsideAndEscape } from "../../lib/ui/use-close-on-outside";
 import { NavIconChevronDown } from "./nav-icons";
 
-type PageTabsMoreProps<Id extends string> = {
+type MoreMenuProps<Id extends string> = {
   /** Names the menu for a screen reader. */
   menuLabel: string;
-  /** The tabs that did not fit, in order. */
-  tabs: readonly Readonly<{ id: Id; label: string }>[];
-  /** A tab was chosen from the menu. */
+  /** What did not fit, in order: the words of each tab or chip folded into the menu. */
+  folded: readonly Readonly<{ id: Id; label: ReactNode }>[];
+  /** An entry was chosen from the menu. */
   onChoose: (id: Id) => void;
+  /** Draws the button as the row's own tabs or chips are drawn. */
+  buttonClassName: string;
 };
 
 /** What the menu's arrow keys and Home and End do: the entry to focus next, or null for any other key. */
@@ -41,14 +43,15 @@ function entryAfterKey(
 }
 
 /**
- * "More ▾" at the end of a row of tabs, opening a menu of the tabs that did not fit. It is a menu button, never
- * drawn as a chosen tab: the chosen tab always has a place in the row.
+ * "More ▾" at the end of a row of tabs or chips, opening a menu of the ones that did not fit. It is a menu button,
+ * never drawn as a chosen one: the chosen tab or chip always has a place in the row.
  */
-export function PageTabsMore<Id extends string>({
+export function MoreMenu<Id extends string>({
   menuLabel,
-  tabs,
+  folded,
   onChoose,
-}: PageTabsMoreProps<Id>) {
+  buttonClassName,
+}: MoreMenuProps<Id>) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -57,13 +60,13 @@ export function PageTabsMore<Id extends string>({
   const close = useCallback(() => setOpen(false), []);
   useCloseOnOutsideAndEscape(open, close, containerRef);
 
-  const entries = () =>
+  const menuItems = () =>
     Array.from(
       menuRef.current?.querySelectorAll<HTMLElement>("[role=menuitem]") ?? [],
     );
 
   useEffect(() => {
-    if (open) entries()[0]?.focus();
+    if (open) menuItems()[0]?.focus();
   }, [open]);
 
   const closeAndReturn = () => {
@@ -81,7 +84,7 @@ export function PageTabsMore<Id extends string>({
       setOpen(false);
       return;
     }
-    const all = entries();
+    const all = menuItems();
     const next = entryAfterKey(
       event.key,
       all.indexOf(document.activeElement as HTMLElement),
@@ -93,11 +96,11 @@ export function PageTabsMore<Id extends string>({
   };
 
   return (
-    <div className="mm-page-tabs__more" ref={containerRef}>
+    <div className="mm-more" ref={containerRef}>
       <button
         ref={buttonRef}
         type="button"
-        className="mm-page-tabs__more-button"
+        className={`mm-more__button ${buttonClassName}`}
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
@@ -109,7 +112,7 @@ export function PageTabsMore<Id extends string>({
         }}
       >
         More
-        <NavIconChevronDown className="mm-page-tabs__more-chevron" />
+        <NavIconChevronDown className="mm-more__chevron" />
       </button>
       {open ? (
         <div
@@ -118,15 +121,15 @@ export function PageTabsMore<Id extends string>({
           role="menu"
           tabIndex={-1}
           aria-label={menuLabel}
-          className="mm-page-tabs__menu"
+          className="mm-more__menu"
           onKeyDown={onMenuKeyDown}
         >
-          {tabs.map(({ id, label }) => (
+          {folded.map(({ id, label }) => (
             <button
               key={id}
               type="button"
               role="menuitem"
-              className="mm-page-tabs__menu-item"
+              className="mm-more__item"
               onClick={() => {
                 setOpen(false);
                 onChoose(id);
@@ -138,23 +141,5 @@ export function PageTabsMore<Id extends string>({
         </div>
       ) : null}
     </div>
-  );
-}
-
-/** The out-of-sight twin of the More button, as wide as it is. */
-export function PageTabsMoreProbe({
-  probeRef,
-}: {
-  probeRef: Ref<HTMLSpanElement>;
-}) {
-  return (
-    <span
-      ref={probeRef}
-      aria-hidden="true"
-      className="mm-page-tabs__more-button mm-page-tabs__probe"
-      data-label="More"
-    >
-      <NavIconChevronDown className="mm-page-tabs__more-chevron" />
-    </span>
   );
 }
