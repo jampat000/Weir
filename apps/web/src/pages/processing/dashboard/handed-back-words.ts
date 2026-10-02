@@ -14,7 +14,7 @@ const NOTHING_FINISHED_SENTENCE = "Nothing finished in the last 2 hours.";
 
 const TONE_WORDS: Record<HandedBackTone, string> = {
   ok: "cleaned",
-  same: "already right",
+  same: "already clean",
   warn: "need a look",
 };
 const TONES = ["ok", "same", "warn"] as const;
@@ -31,14 +31,14 @@ function bucketWhen(from: number, now: number): string {
     : `${newest}–${oldest} min ago`;
 }
 
-/** "3 cleaned, 1 already right" for a bucket or the whole two hours. */
+/** "3 cleaned, 1 already clean" for a bucket or the whole two hours. */
 export function toneCounts(counts: Record<HandedBackTone, number>): string {
   return TONES.filter((tone) => counts[tone] > 0)
     .map((tone) => `${counts[tone].toLocaleString()} ${TONE_WORDS[tone]}`)
     .join(", ");
 }
 
-/** What finished in one bucket: "3 cleaned, 1 already right", or "nothing". */
+/** What finished in one bucket: "3 cleaned, 1 already clean", or "nothing". */
 function bucketCounts(bucket: HandedBackBucket): string {
   return bucket.total === 0 ? "nothing" : toneCounts(bucket);
 }

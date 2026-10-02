@@ -53,6 +53,16 @@ describe("the activity stream", () => {
     expect(rows[0].to).toBe("/history?q=The.Quiet.Harbour.S01E06.mkv");
   });
 
+  it("words a file that needed nothing changed as already clean", () => {
+    const { rows } = buildStream([
+      pass({ outcome: "live_skipped_not_required", ok: true }),
+    ]);
+
+    expect(sentenceOf(rows[0])).toBe(
+      "The Quiet Harbour S01E06 was already clean",
+    );
+  });
+
   it("says a rejection is a rejection and a real failure is a failure", () => {
     const { rows } = buildStream([
       pass({

@@ -58,7 +58,7 @@ const OUTCOME_WORDS: Record<
   { tail: string; tone: ActivityTone }
 > = {
   cleaned: { tail: " cleaned", tone: "success" },
-  already: { tail: " was already right", tone: "info" },
+  already: { tail: " was already clean", tone: "info" },
   passed: { tail: " passed through", tone: "warning" },
   rejected: { tail: " was rejected", tone: "warning" },
   failed: { tail: " couldn't finish", tone: "error" },

@@ -36,6 +36,12 @@ describe("the pointer's readout", () => {
     expect(text).toBe("at 10h · 3 cleaned");
   });
 
+  it("calls a file nothing was changed in already clean", () => {
+    const text = bucketReadout(bucket(NOW, { ok: 3, same: 1 }), clock);
+
+    expect(text).toBe("at 10h · 3 cleaned, 1 already clean");
+  });
+
   it("says nothing finished in an empty bucket", () => {
     expect(bucketReadout(bucket(NOW, {}), clock)).toBe("at 10h · nothing");
   });

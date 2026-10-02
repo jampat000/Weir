@@ -165,7 +165,7 @@ export type DetailSizes = {
 
 /**
  * Before, After and Saved for the open file, whatever happened to it. A pass that measured both sizes gives them; a file
- * Weir finished without changing it ("already right", passed through) is the same size after, and saved nothing; a file
+ * Weir finished without changing it ("already clean", passed through) is the same size after, and saved nothing; a file
  * Weir has not written a copy of shows its size and says so.
  */
 export function detailSizes(
