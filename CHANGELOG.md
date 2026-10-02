@@ -7,9 +7,12 @@ Detailed notes start at 2.0.0; the 1.x releases shipped without notes.
 Versions follow `MAJOR.MINOR.PATCH`. A major version can contain breaking changes, which its notes
 list first.
 
+## 4.x
+
+- **4.0.0** (YYYY-MM-DD). Weir matches Deluno's look, with a live Dashboard that shows files moving through the Pipeline, posters beside each title, a System view that reads this computer, one status for every library file, one Logs list, and Setup in four areas. History is now Activity, and old links still work. [notes](docs/release-notes/v4.0.0.md) · [release](https://github.com/jampat000/Weir/releases/tag/v4.0.0)
+
 ## 3.x
 
-- **3.3.0** (YYYY-MM-DD). Weir matches Deluno's look, with a live Dashboard that shows files moving through the Pipeline, posters beside each title, a System view that reads this computer, and Setup in four areas. [notes](docs/release-notes/v3.3.0.md) · [release](https://github.com/jampat000/Weir/releases/tag/v3.3.0)
 - **3.2.16** (2026-10-01). Every setting has one home: Performance is only about speed, each workflow owns its new downloads, and the Library page owns your collection. Automatic updates install once Weir is idle, and a full drive no longer marks files done. [notes](docs/release-notes/v3.2.16.md) · [release](https://github.com/jampat000/Weir/releases/tag/v3.2.16)
 - **3.2.15** (2026-09-30). With Deluno 1.0.0-rc.23 or later, Weir checks where each download client really saves, using Deluno's path mappings, and says what to change when a folder does not line up. [notes](docs/release-notes/v3.2.15.md) · [release](https://github.com/jampat000/Weir/releases/tag/v3.2.15)
 - **3.2.14** (2026-09-30). qBittorrent 5.x stays connected, and a downloaded update installs when you quit or restart instead of interrupting Weir. [notes](docs/release-notes/v3.2.14.md) · [release](https://github.com/jampat000/Weir/releases/tag/v3.2.14)
