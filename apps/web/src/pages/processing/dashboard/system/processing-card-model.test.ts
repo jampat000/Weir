@@ -61,6 +61,17 @@ describe("the disk work column", () => {
     });
   });
 
+  it("is said in GB/s from a thousand MB/s, so the figure is never four digits wide", () => {
+    const big = processingColumns(
+      stats({ processing_write_bytes_per_sec: 1127 * MB }),
+      recent,
+    )[0];
+
+    expect(big.unit).toBe(" GB/s");
+    expect(big.figure(big.value ?? 0)).toBe("1.1");
+    expect(big.readout(1127)).toBe("1.1 GB/s");
+  });
+
   it("says only what is read while the finished work is still being read", () => {
     expect(processingColumns(stats(), undefined)[0].sub).toEqual([
       "writing · reading 20",

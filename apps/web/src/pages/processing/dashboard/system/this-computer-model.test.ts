@@ -100,6 +100,20 @@ describe("the CPU column", () => {
   });
 });
 
+describe("a big disk figure", () => {
+  it("counts and reads in GB/s from a thousand MB/s, in the figure, the unit and the trace's readout", () => {
+    const big = column("disk", {
+      disk_read_bytes_per_sec: 700 * MB,
+      disk_write_bytes_per_sec: 427 * MB,
+    });
+
+    expect(big.value).toBe(1127);
+    expect(big.unit).toBe(" GB/s");
+    expect(big.figure(big.value ?? 0)).toBe("1.1");
+    expect(big.readout(1127)).toBe("1.1 GB/s");
+  });
+});
+
 describe("the memory column", () => {
   it("shows gigabytes used, of the total, with the share Weir holds", () => {
     expect(column("memory")).toMatchObject({

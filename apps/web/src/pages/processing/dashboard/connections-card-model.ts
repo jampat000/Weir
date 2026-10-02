@@ -122,6 +122,34 @@ export function connectionSub(entry: ConnectionEntry): string {
   return whatItIs(entry);
 }
 
+/**
+ * The row's second line in words that narrow with the room: all of it, then what the connection is without where
+ * Weir reaches it, or the state without how it came to be; never a cut-off address.
+ */
+export function connectionSubWords(entry: ConnectionEntry): string[] {
+  const full = connectionSub(entry);
+  if (entry.state === "down") return [...new Set([full, "not answering"])];
+  if (entry.state === "slow" && entry.answerMs !== null) {
+    return [full, `slow: ${secondsWords(entry.answerMs)}`];
+  }
+  return [...new Set([full, entry.kindLabel])];
+}
+
+/**
+ * The row's name in words that narrow with the room: the name Weir derives from where the connection runs and its
+ * nickname, then the kind of app and the nickname, then the app alone.
+ */
+export function connectionNameWords(entry: ConnectionEntry): string[] {
+  const [app] = entry.baseName.split(" on ");
+  return [
+    ...new Set([
+      entry.name,
+      entry.nickname ? `${app} · ${entry.nickname}` : app,
+      app,
+    ]),
+  ];
+}
+
 /** Everything the row knows: its name, what it is and where, and what its last test said. */
 export function connectionTooltip(entry: ConnectionEntry): string {
   return [`${entry.name}: ${whatItIs(entry)}`, entry.detail]

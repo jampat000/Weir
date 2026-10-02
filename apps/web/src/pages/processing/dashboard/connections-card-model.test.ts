@@ -4,7 +4,9 @@ import { connectionEntry } from "../../../lib/connections/connection-fixtures";
 import type { ConnectionEntry } from "../../../lib/connections/connection-model";
 import {
   checkedWords,
+  connectionNameWords,
   connectionSub,
+  connectionSubWords,
   connectionTooltip,
   connectionsLine,
   connectionsLineWords,
@@ -180,5 +182,42 @@ describe("a row's words", () => {
       "switched off",
     );
     expect(checkedWords(manager(1), false, NOW)).toBe("not yet");
+  });
+});
+
+describe("a row's words that narrow with the room", () => {
+  it("drop where it runs from the name, then the nickname, never cutting a word", () => {
+    expect(
+      connectionNameWords(
+        manager(1, {
+          name: "Radarr on LIVINGROOM-HTPC · 4K",
+          baseName: "Radarr on LIVINGROOM-HTPC",
+          nickname: "4K",
+        }),
+      ),
+    ).toEqual(["Radarr on LIVINGROOM-HTPC · 4K", "Radarr · 4K", "Radarr"]);
+    expect(
+      connectionNameWords(
+        manager(1, {
+          name: "qBittorrent on NAS",
+          baseName: "qBittorrent on NAS",
+        }),
+      ),
+    ).toEqual(["qBittorrent on NAS", "qBittorrent"]);
+  });
+
+  it("drop the address from the second line, and say a down connection's state alone", () => {
+    expect(connectionSubWords(manager(1))).toEqual([
+      "Radarr · http://localhost:7878",
+      "Radarr",
+    ]);
+    expect(
+      connectionSubWords(
+        manager(1, { state: "down", detail: "Weir could not reach Radarr." }),
+      ),
+    ).toEqual(["Weir could not reach Radarr.", "not answering"]);
+    expect(
+      connectionSubWords(manager(1, { state: "slow", answerMs: 2384 })),
+    ).toEqual(["Radarr · slow: 2.4 s", "slow: 2.4 s"]);
   });
 });

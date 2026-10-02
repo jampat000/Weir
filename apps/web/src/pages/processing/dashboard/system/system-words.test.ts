@@ -6,6 +6,8 @@ import {
   machineUpWords,
   megabytes,
   rateFigure,
+  rateScale,
+  rateWords,
   sizeWords,
   splitAddress,
   uptimeWords,
@@ -88,5 +90,24 @@ describe("addresses", () => {
       host: "weir.home",
       port: null,
     });
+  });
+});
+
+describe("a big rate", () => {
+  it("stays in MB/s below a thousand", () => {
+    expect(rateScale(999).unit).toBe(" MB/s");
+    expect(rateScale(null).unit).toBe(" MB/s");
+    expect(rateWords(501)).toBe("501 MB/s");
+  });
+
+  it("is said in GB/s to a tenth from a thousand up, so a figure is never four digits wide", () => {
+    const { figure, unit } = rateScale(1127);
+
+    expect(unit).toBe(" GB/s");
+    expect(figure(1127)).toBe("1.1");
+    expect(figure(512)).toBe("0.5");
+    expect(rateWords(1000)).toBe("1.0 GB/s");
+    expect(rateWords(1127)).toBe("1.1 GB/s");
+    expect(rateWords(12_800)).toBe("13 GB/s");
   });
 });

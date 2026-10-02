@@ -3,7 +3,13 @@ import type { TraceSample } from "../../../../components/charts/live-trace-math"
 import { seriesOf } from "../../../../lib/system/system-stats-model";
 import type { SystemStats } from "../../../../lib/system/system-stats-types";
 import type { Words } from "../../../../lib/ui/fit-text";
-import { megabytes, rateFigure, sizeWords } from "./system-words";
+import {
+  megabytes,
+  rateFigure,
+  rateScale,
+  rateWords,
+  sizeWords,
+} from "./system-words";
 
 /** The window the card's finished-work figures cover, in minutes: the same ten minutes the traces show. */
 export const RECENT_MINUTES = 10;
@@ -65,14 +71,14 @@ export function processingColumns(
   const saved = recent ? `${sizeWords(recent.savedBytes)} saved` : null;
   const done = recent ? `${recent.done.toLocaleString()} done` : null;
   const running = `${now.running} of ${now.slots} running`;
+  const written = megabytes(now.processing_write_bytes_per_sec);
   return [
     {
       key: "disk",
       label: "Disk work",
       colour: "var(--mm-lane-processing)",
-      value: megabytes(now.processing_write_bytes_per_sec),
-      figure: rateFigure,
-      unit: " MB/s",
+      value: written,
+      ...rateScale(written),
       sub: (() => {
         const read = rateFigure(megabytes(now.processing_read_bytes_per_sec));
         return saved
@@ -98,7 +104,7 @@ export function processingColumns(
         },
       ],
       floorTop: DISK_FLOOR_MB,
-      readout: (value) => `${rateFigure(value)} MB/s`,
+      readout: rateWords,
     },
     {
       key: "speed",

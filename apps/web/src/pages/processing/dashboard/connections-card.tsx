@@ -7,7 +7,8 @@ import { FitText } from "../../../lib/ui/fit-text";
 import { MoreCount } from "./system/more-count";
 import {
   checkedWords,
-  connectionSub,
+  connectionNameWords,
+  connectionSubWords,
   connectionTooltip,
   connectionsLineWords,
   groupConnections,
@@ -43,8 +44,14 @@ function ConnectionRow({ entry, light, testing, now }: ConnectionRowProps) {
     >
       <span className="mm-conn__dot" aria-hidden="true" />
       <span className="mm-ctable__name">
-        <b>{entry.name}</b>
-        <span>{connectionSub(entry)}</span>
+        <b>
+          <FitText
+            className="block"
+            words={connectionNameWords(entry)}
+            title={entry.name}
+          />
+        </b>
+        <FitText words={connectionSubWords(entry)} />
       </span>
       <span className="mm-ctable__checked">
         {checkedWords(entry, busy, now)}

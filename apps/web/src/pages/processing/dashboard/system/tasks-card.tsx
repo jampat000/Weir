@@ -3,6 +3,7 @@ import { useMemo } from "react";
 import { Panel } from "../../../../components/panels/panel";
 import { useSystemTasksQuery } from "../../../../lib/system/system-tasks";
 import { classNames } from "../../../../lib/ui/class-names";
+import { FitText, nameWords } from "../../../../lib/ui/fit-text";
 import { useNow } from "../../../../lib/ui/use-now";
 import { useFittingRows } from "../fit-rows";
 import { MoreCount } from "./more-count";
@@ -36,7 +37,13 @@ function TaskLine({ row, now }: { row: TaskRow; now: number }) {
     >
       <span className="mm-sy-task__dot" aria-hidden="true" />
       <span className="mm-sy-task__name">
-        <b>{row.label}</b>
+        <b>
+          <FitText
+            className="block"
+            words={nameWords(row.label)}
+            title={row.label}
+          />
+        </b>
         {row.why ? <span className="mm-sy-task__why">{row.why}</span> : null}
       </span>
       <span className="mm-sy-task__result">

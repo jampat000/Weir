@@ -12,6 +12,8 @@ import {
   machineUpWords,
   megabytes,
   rateFigure,
+  rateScale,
+  rateWords,
 } from "./system-words";
 
 export type ComputerKey = "cpu" | "memory" | "disk";
@@ -41,7 +43,6 @@ export type ComputerColumn = {
 const wholeFigure = (value: number) => Math.round(value).toString();
 const tenthsFigure = (value: number) => value.toFixed(1);
 const percentReadout = (value: number) => `${Math.round(value)}%`;
-const rateReadout = (value: number) => `${rateFigure(value)} MB/s`;
 
 /** A disk trace is never scaled tighter than this, in MB/s, so an idle disk reads as idle. */
 const DISK_FLOOR_MB = 1;
@@ -115,6 +116,10 @@ function diskSub(now: SystemNow): Words {
 /** The three columns, CPU, memory and disk, each with its reading now and its last ten minutes. */
 export function computerColumns(stats: SystemStats): ComputerColumn[] {
   const { now, history } = stats;
+  const disk = diskMegabytes(
+    now.disk_read_bytes_per_sec,
+    now.disk_write_bytes_per_sec,
+  );
   return [
     {
       key: "cpu",
@@ -147,12 +152,8 @@ export function computerColumns(stats: SystemStats): ComputerColumn[] {
       key: "disk",
       label: "Disk",
       colour: "var(--mm-lane-incoming)",
-      value: diskMegabytes(
-        now.disk_read_bytes_per_sec,
-        now.disk_write_bytes_per_sec,
-      ),
-      figure: rateFigure,
-      unit: " MB/s",
+      value: disk,
+      ...rateScale(disk),
       sub: diskSub(now),
       samples: seriesOf(history, (point) =>
         diskMegabytes(
@@ -161,7 +162,7 @@ export function computerColumns(stats: SystemStats): ComputerColumn[] {
         ),
       ),
       scale: { kind: "rate", floorTop: DISK_FLOOR_MB },
-      readout: rateReadout,
+      readout: rateWords,
     },
   ];
 }
