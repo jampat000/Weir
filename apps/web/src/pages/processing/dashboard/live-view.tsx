@@ -32,7 +32,7 @@ import { useLeavingCards } from "../leaving-cards";
 import { JustFinishedShelf } from "../pipeline/just-finished-shelf";
 import { PipelineBoard } from "../pipeline/pipeline-board";
 import { stackedBoardBudget } from "../pipeline/pipeline-layout";
-import { TODAY_DAYS, type Filter } from "../processing-filter";
+import { TODAY_DAYS, shownBy, type Filter } from "../processing-filter";
 import { prettyName } from "../processing-model";
 import {
   FILES_QUERY,
@@ -75,11 +75,12 @@ const TOTAL_KEYS = [
 const LANE_THROTTLE_MS = 750;
 const TOTAL_THROTTLE_MS = 3_000;
 
-/** "38 cleaned today · 41.2 GB saved", for the shelf's title row. */
+/** "38 cleaned today · 41.2 GB saved", for the shelf's title row; no space is claimed when none is recorded. */
 function cleanedToday(figures: TodayFigures | undefined): string | undefined {
   if (!figures) return undefined;
-  const saved = formatBytes(figures.savedBytes) || "0 B";
-  return `${figures.cleaned.toLocaleString()} cleaned today · ${saved} saved`;
+  const cleaned = `${figures.cleaned.toLocaleString()} cleaned today`;
+  if (figures.savedBytes === null) return cleaned;
+  return `${cleaned} · ${formatBytes(figures.savedBytes) || "0 B"} saved`;
 }
 
 /** The file whose story is open: its name, and what its header shows beside it. */
@@ -106,7 +107,7 @@ export function LiveView({ filter, workflowId, layout }: LiveViewProps) {
   useRefetchOverdueLooks(board, now);
   const { files, libraries, lanes, scoped } = board;
   const filesAtOnce = useProcessingFilesAtOnceQuery();
-  const today = useTodayFigures(workflowId, now);
+  const today = useTodayFigures(workflowId, filter, now);
   const pause = usePauseQuery();
   const fileLog = useProcessingFileLog();
   const navigate = useNavigate();
@@ -114,14 +115,14 @@ export function LiveView({ filter, workflowId, layout }: LiveViewProps) {
   const [lowNeed, setLowNeed] = useState<number>();
   // Cards that left are tracked against every workflow's lanes, so narrowing the page to one kind of file or
   // one workflow is never taken for a file leaving.
-  const finished = useFinishedFiles();
+  const finished = useFinishedFiles(filter, workflowId);
   const leaving = useLeavingCards(
     lanes.waiting,
     lanes.working,
     lanes.handing,
     files.data?.files ?? NO_FILES,
   );
-  const next = useNextItems(libraries.data, workflowId);
+  const next = useNextItems(libraries.data, workflowId, filter);
 
   const openFile = useCallback(
     (file: ProcessingFile) => {
@@ -174,6 +175,7 @@ export function LiveView({ filter, workflowId, layout }: LiveViewProps) {
   const shownWorkflows = workflows.filter(
     (workflow) => workflowId === null || workflow.id === workflowId,
   );
+  const working = scoped.working.filter((item) => shownBy(filter, item));
   const paused = pause.data?.paused ?? false;
   const across = layout.band === "across";
   const boardBudget = layout.sideBySide
@@ -192,13 +194,22 @@ export function LiveView({ filter, workflowId, layout }: LiveViewProps) {
           >
             <TodayTile filter={filter} now={now} workflowId={workflowId} />
             <WorkingTile
-              working={scoped.working}
+              working={working}
               filesAtOnce={filesAtOnce.data?.effective_files_at_once ?? null}
-              waitSeconds={sharedWaitSeconds(shownWorkflows)}
+              waitSeconds={
+                filter === "library" ? null : sharedWaitSeconds(shownWorkflows)
+              }
+              filter={filter}
               across={across}
               onOpen={openFile}
             />
-            <NextTile items={next} now={now} paused={paused} across={across} />
+            <NextTile
+              items={next}
+              now={now}
+              paused={paused}
+              filter={filter}
+              across={across}
+            />
           </div>
         </div>
         <div
@@ -235,10 +246,14 @@ export function LiveView({ filter, workflowId, layout }: LiveViewProps) {
             onOpen={openFinished}
             onHeightNeed={setLowNeed}
           />
-          <ActivityStream now={now} workflowId={workflowId} />
+          <ActivityStream now={now} workflowId={workflowId} filter={filter} />
         </div>
         <div className="mm-dash__needs">
-          <NeedsPanel workflowId={workflowId} onOpen={openFile} />
+          <NeedsPanel
+            workflowId={workflowId}
+            filter={filter}
+            onOpen={openFile}
+          />
         </div>
         <div className="mm-dash__health">
           <HealthPanel workflows={workflows} workflowId={workflowId} />

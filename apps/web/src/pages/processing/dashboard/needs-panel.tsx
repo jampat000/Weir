@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { Panel } from "../../../components/panels/panel";
 import type { ProcessingFile } from "../../../lib/processing/files-api";
 import { useProcessingLibrariesQuery } from "../../../lib/processing/libraries-queries";
+import type { Filter } from "../processing-filter";
 import { ProcessRejectedAgain } from "../../history/history-rejected-again";
 import { NeedFileActions, type NeedNotice } from "./needs-file-actions";
 import { NEEDS_A_LOOK_PATH, type NeedGroup, type NeedRow } from "./needs-model";
@@ -84,7 +85,14 @@ function Group({
   );
 }
 
-function AllClear() {
+/** What an empty panel says it is clear of: everything, or just the kind of work the page is narrowed to. */
+const CLEAR_WORDS: Record<Filter, string> = {
+  all: "Nothing needs you.",
+  download: "Nothing from new downloads.",
+  library: "Nothing from library cleaning.",
+};
+
+function AllClear({ filter }: { filter: Filter }) {
   return (
     <p className="mm-needs__clear">
       <svg
@@ -101,7 +109,7 @@ function AllClear() {
         <path d="m5 12 5 5 9-10" />
       </svg>
       <b>All clear</b>
-      <span>Nothing needs you.</span>
+      <span>{CLEAR_WORDS[filter]}</span>
     </p>
   );
 }
@@ -109,6 +117,8 @@ function AllClear() {
 type NeedsPanelProps = {
   /** Narrows the panel to one workflow's files. */
   workflowId?: number | null;
+  /** Narrows the panel to one kind of work; both when left out. */
+  filter?: Filter;
   /** Opens a file's story. Without it, Open goes to the file in History. */
   onOpen?: (file: ProcessingFile) => void;
 };
@@ -117,9 +127,13 @@ type NeedsPanelProps = {
  * The files and conditions that wait on a person, grouped by what went wrong, each file with its own actions.
  * Says "All clear" when there are none.
  */
-export function NeedsPanel({ workflowId, onOpen }: NeedsPanelProps) {
+export function NeedsPanel({
+  workflowId,
+  filter = "all",
+  onOpen,
+}: NeedsPanelProps) {
   const workflows = useProcessingLibrariesQuery().data;
-  const { groups, count } = useNeedsYou(workflowId);
+  const { groups, count } = useNeedsYou(workflowId, filter);
   const [notice, setNotice] = useState<NeedNotice | null>(null);
   const mediaScopes = new Map(
     (workflows ?? []).map((workflow) => [workflow.id, workflow.media_type]),
@@ -151,7 +165,7 @@ export function NeedsPanel({ workflowId, onOpen }: NeedsPanelProps) {
         </p>
       ) : null}
       {groups.length === 0 ? (
-        <AllClear />
+        <AllClear filter={filter} />
       ) : (
         <div className="mm-needs__list" data-testid="live-needs">
           {groups.map((group) => (

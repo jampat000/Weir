@@ -54,7 +54,12 @@ import { useStillWhileResizing } from "./use-still-while-resizing";
 /** The space under the lanes inside the board, in px. */
 const LANES_BOTTOM_PX = 10;
 
-const NOTHING_IN_PROGRESS = "Nothing in progress. New downloads appear here.";
+/** What an empty board says, for everything and for each kind of work it can be narrowed to. */
+const NOTHING_IN_PROGRESS_WORDS: Record<Filter, string> = {
+  all: "Nothing in progress. New downloads appear here.",
+  download: "No new downloads in progress.",
+  library: "No library cleaning right now.",
+};
 const PAUSED = "Paused · nothing new starts.";
 
 function Station({ stage, count }: { stage: PipelineStage; count: number }) {
@@ -212,7 +217,7 @@ export function PipelineBoard({
   });
 
   const calm = live.length === 0 && cards.length === 0;
-  const calmLine = paused ? PAUSED : NOTHING_IN_PROGRESS;
+  const calmLine = paused ? PAUSED : NOTHING_IN_PROGRESS_WORDS[filter];
   const vars: CSSProperties = {
     ["--pipe-n" as string]: stations,
     ["--pipe-card-h" as string]: `${size.card}px`,

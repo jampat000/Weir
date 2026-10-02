@@ -4,7 +4,7 @@ import { shaped } from "../openapi/skeleton.mjs";
 import { toWire } from "../wire-time.mjs";
 import { contains, intParam } from "./query.mjs";
 import { download } from "./reply.mjs";
-import { activityItem } from "./views.mjs";
+import { activityItem, moduleOf } from "./views.mjs";
 
 const DEFAULT_PAGE = 100;
 const FILES_ABOUT = "files";
@@ -24,9 +24,14 @@ function aboutKnownFile(sim, event) {
   );
 }
 
+const SYSTEM_MODULE = "system";
+const PROCESSING_MODULE = "processing";
+
+/** As the server filters: "system" is every module but processing, and any other is that module alone. */
 const moduleMatches = (module, event) =>
-  event.type.startsWith(`${module}.`) ||
-  (module === "processing" && event.type.startsWith("library."));
+  module === SYSTEM_MODULE
+    ? moduleOf(event.type) !== PROCESSING_MODULE
+    : moduleOf(event.type) === module;
 
 function aboutMatches(about, event) {
   if (about === FILES_ABOUT) return event.relativePath !== null;

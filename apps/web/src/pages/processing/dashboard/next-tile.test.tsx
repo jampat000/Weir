@@ -3,6 +3,7 @@ import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { NextItem } from "./next-model";
+import type { Filter } from "../processing-filter";
 import { NextTile } from "./next-tile";
 
 const NOW = new Date(2026, 7, 18, 10, 0, 0).getTime();
@@ -19,10 +20,21 @@ function item(key: string, secondsAway: number, label: string): NextItem {
 
 afterEach(() => vi.restoreAllMocks());
 
-function renderTile(items: NextItem[], paused = false, across = true) {
+function renderTile(
+  items: NextItem[],
+  paused = false,
+  across = true,
+  filter: Filter = "all",
+) {
   render(
     <MemoryRouter>
-      <NextTile items={items} now={NOW} paused={paused} across={across} />
+      <NextTile
+        items={items}
+        now={NOW}
+        paused={paused}
+        across={across}
+        filter={filter}
+      />
     </MemoryRouter>,
   );
   return screen.getByRole("region", { name: "Next" });
@@ -61,6 +73,12 @@ describe("the Next tile", () => {
 
     expect(tile).toHaveTextContent("nothing scheduled");
     expect(tile).toHaveTextContent("Switch on a workflow or a cleanup job.");
+  });
+
+  it("says which kind of work has nothing scheduled when it is narrowed to one", () => {
+    expect(renderTile([], false, true, "library")).toHaveTextContent(
+      "No library cleaning is scheduled.",
+    );
   });
 
   it("reads Paused, and that work already running finishes, while paused", () => {

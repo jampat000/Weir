@@ -67,7 +67,7 @@ const liveProgress: Record<string, LiveProgressEntry> = {};
 /** What the page gave the Needs you panel, each time it rendered. */
 const needsProps: NeedsPanelProps[] = [];
 /** What the Activity stream asked for, each time it asked. */
-const streamFilters: { library_id?: number }[] = [];
+const streamFilters: { library_id?: number; module?: string }[] = [];
 /** The query keys each call to useActivityStreamInvalidations asked to refresh on activity. */
 const invalidations: (readonly unknown[])[] = [];
 
@@ -139,6 +139,7 @@ vi.mock("../../lib/activity/queries", () => ({
   useActivityRecentQuery: (filters: {
     event_type?: string;
     library_id?: number;
+    module?: string;
   }) => {
     if (!filters.event_type) streamFilters.push(filters);
     return {
@@ -354,6 +355,20 @@ describe("ProcessingPage", () => {
 
       expect(streamFilters.at(-1)?.library_id).toBeUndefined();
     });
+
+    it("asks for every kind of work's entries on Everything", () => {
+      renderLive("/");
+
+      expect(streamFilters.at(-1)?.module).toBeUndefined();
+    });
+
+    it("asks only for the entries of the kind of work chosen", () => {
+      renderLive("/?work=library");
+      expect(streamFilters.at(-1)?.module).toBe("library");
+
+      renderLive("/?work=download");
+      expect(streamFilters.at(-1)?.module).toBe("processing");
+    });
   });
 
   describe("the band", () => {
@@ -417,7 +432,7 @@ describe("ProcessingPage", () => {
       }
     });
 
-    it("keeps counting files being worked on when the page is narrowed to another kind of work", () => {
+    it("counts and lists only the kind of work the page is narrowed to", () => {
       files.files = [
         file({
           id: 3,
@@ -426,11 +441,40 @@ describe("ProcessingPage", () => {
           progress_percent: 46,
         }),
       ];
+      jobs.active = { jobs: [libraryCleanJob(40)] };
       renderLive();
+      const tile = screen.getByRole("region", { name: "Working on now" });
+      expect(screen.getByTestId("live-working-count")).toHaveTextContent("2");
 
       fireEvent.click(screen.getByRole("button", { name: "Library cleaning" }));
-
       expect(screen.getByTestId("live-working-count")).toHaveTextContent("1");
+      expect(tile).toHaveTextContent("Paper Lanterns (2023)");
+      expect(tile).not.toHaveTextContent("Glass Orchard");
+
+      fireEvent.click(screen.getByRole("button", { name: "New downloads" }));
+      expect(screen.getByTestId("live-working-count")).toHaveTextContent("1");
+      expect(tile).toHaveTextContent("Glass Orchard");
+      expect(tile).not.toHaveTextContent("Paper Lanterns");
+    });
+
+    it("says what is narrowed away when there is nothing left to show", () => {
+      files.files = [file({ id: 3, status: "processing" })];
+      renderLive("/?work=library");
+
+      expect(
+        screen.getByRole("region", { name: "Working on now" }),
+      ).toHaveTextContent("No library cleaning right now.");
+      expect(screen.getByTestId("pipeline-board")).toHaveTextContent(
+        "No library cleaning right now.",
+      );
+    });
+
+    it("does not name the wait for new downloads when only library cleaning is shown", () => {
+      renderLive("/?work=library");
+
+      expect(
+        screen.getByRole("region", { name: "Working on now" }),
+      ).not.toHaveTextContent("new downloads wait");
     });
 
     it("says what has been cleaned today, and offers the files that need a look", () => {
@@ -488,6 +532,11 @@ describe("ProcessingPage", () => {
       renderLive();
 
       expect(needsProps.at(-1)?.workflowId).toBeNull();
+    });
+
+    it("is given the kind of work the page is narrowed to", () => {
+      renderLive("/?work=download");
+      expect(needsProps.at(-1)?.filter).toBe("download");
     });
 
     it("opens a file's story from a row", () => {

@@ -26,8 +26,8 @@ type TodayTileProps = {
  * hours drawn under it. The aside takes the person to the Needs you panel, when anything is in it.
  */
 export function TodayTile({ filter, now, workflowId = null }: TodayTileProps) {
-  const figures = useTodayFigures(workflowId, now);
-  const { count: needsALook } = useNeedsYou(workflowId);
+  const figures = useTodayFigures(workflowId, filter, now);
+  const { count: needsALook } = useNeedsYou(workflowId, filter);
   const { handed, total, partial } = useHandedBack(filter, now, workflowId);
   return (
     <StatTile
@@ -45,7 +45,7 @@ export function TodayTile({ filter, now, workflowId = null }: TodayTileProps) {
             {figures ? figures.cleaned.toLocaleString() : PENDING}
           </span>
           <StatUnit>cleaned</StatUnit>
-          {figures ? (
+          {figures?.savedBytes != null ? (
             <StatSide>
               {formatBytes(figures.savedBytes) || "0 B"} saved
             </StatSide>

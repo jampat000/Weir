@@ -80,6 +80,25 @@ describe("the activity stream", () => {
     expect(rows[1].tone).toBe("error");
   });
 
+  it("lists a library clean however long its entry's detail is", () => {
+    const { rows, routine } = buildStream([
+      event({
+        event_type: "library.file_cleaned",
+        module: "library",
+        relative_path: "Heat (1995)/Heat.1995.mkv",
+        detail: JSON.stringify({
+          relative_path: "Heat (1995)/Heat.1995.mkv",
+          library_id: 2,
+          trigger: "scheduled",
+          note: "x".repeat(200),
+        }),
+      }),
+    ]);
+
+    expect(rows).toHaveLength(1);
+    expect(routine).toBe(0);
+  });
+
   it("words a library clean as cleaned in place", () => {
     const { rows } = buildStream([
       event({

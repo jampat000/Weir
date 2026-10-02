@@ -13,6 +13,7 @@ import {
   mergeWorkingFiles,
   prettyName,
   secondsLeft,
+  workSourceOfJobKind,
 } from "./processing-model";
 import {
   ago,
@@ -667,5 +668,30 @@ describe("an arriving file's ring", () => {
     // A file with its own hold counts down to that, not to the next look.
     expect(arrivingDeadline(timed)).toBe(Date.parse("2026-08-18T10:00:30Z"));
     expect(timed.nextLook).toBeNull();
+  });
+});
+
+describe("which kind of work a job is", () => {
+  it("calls a file's pass and the scan of a watched folder new-download work", () => {
+    expect(workSourceOfJobKind("processing.file.remux_pass.v1")).toBe(
+      "download",
+    );
+    expect(
+      workSourceOfJobKind("processing.watched_folder.remux_scan_dispatch.v1"),
+    ).toBe("download");
+  });
+
+  it("calls a library's scan and clean library work", () => {
+    expect(workSourceOfJobKind(LIBRARY_CLEAN_JOB_KIND)).toBe("library");
+    expect(workSourceOfJobKind("processing.library.scan.v1")).toBe("library");
+  });
+
+  it("calls housekeeping neither", () => {
+    expect(
+      workSourceOfJobKind("processing.work_temp_stale_sweep.v1"),
+    ).toBeNull();
+    expect(
+      workSourceOfJobKind("processing.unclaimed_handback_cleanup.v1"),
+    ).toBeNull();
   });
 });

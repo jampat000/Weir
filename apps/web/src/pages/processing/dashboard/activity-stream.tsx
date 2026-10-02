@@ -5,6 +5,7 @@ import { Panel } from "../../../components/panels/panel";
 import { useActivityRecentQuery } from "../../../lib/activity/queries";
 import { classNames } from "../../../lib/ui/class-names";
 import { motionAllowed } from "../../../lib/ui/motion-allowed";
+import { ACTIVITY_MODULE_OF_WORK, type Filter } from "../processing-filter";
 import { useFittingRows } from "./fit-rows";
 import { StreamIcon } from "./stream-icons";
 import {
@@ -19,7 +20,13 @@ const RECENT_EVENTS = 80;
 /** The most lines drawn: the panel's height decides how many whole ones show, and this bounds what is measured. */
 const MOST_LINES = 40;
 const LOG_PATH = "/system?tab=logs";
-const NOTHING_YET = "Nothing yet. What Weir does appears here.";
+
+/** What an empty list says, for everything and for each kind of work it can be narrowed to. */
+const NOTHING_YET_WORDS: Record<Filter, string> = {
+  all: "Nothing yet. What Weir does appears here.",
+  download: "Nothing yet from new downloads.",
+  library: "Nothing yet from library cleaning.",
+};
 
 function Sentence({ parts }: { parts: readonly StreamPart[] }) {
   return parts.map((part, index) =>
@@ -72,6 +79,8 @@ type ActivityStreamProps = {
   now: number;
   /** Only what happened to this workflow's files; everything when null or left out. */
   workflowId?: number | null;
+  /** Only what happened in this kind of work; both when left out. */
+  filter?: Filter;
 };
 
 /**
@@ -82,10 +91,12 @@ type ActivityStreamProps = {
 export function ActivityStream({
   now,
   workflowId = null,
+  filter = "all",
 }: ActivityStreamProps) {
   const recent = useActivityRecentQuery({
     limit: RECENT_EVENTS,
     library_id: workflowId ?? undefined,
+    module: filter === "all" ? undefined : ACTIVITY_MODULE_OF_WORK[filter],
   });
   const items = recent.data?.items;
   const stream = useMemo(() => buildStream(items ?? []), [items]);
@@ -123,7 +134,7 @@ export function ActivityStream({
       {/* The host is always there, so its height is watched from the first paint, before there is anything to list. */}
       <div ref={listRef} className="mm-stream__fit">
         {stream.rows.length === 0 ? (
-          <p className="mm-stream__empty">{NOTHING_YET}</p>
+          <p className="mm-stream__empty">{NOTHING_YET_WORDS[filter]}</p>
         ) : (
           <ul className="mm-stream__list" data-testid="live-stream">
             {shown.map((row) => (

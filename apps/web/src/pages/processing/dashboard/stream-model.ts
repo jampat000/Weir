@@ -141,13 +141,18 @@ const sentence = (row: StreamRow): string =>
     .map((part) => (typeof part === "string" ? part : part.bold))
     .join("");
 
+/** A finished file is news however long its entry's detail is; the log's own rule for a long detail is for housekeeping. */
+const isFinishedFile = (ev: ActivityEventItem): boolean =>
+  ev.event_type === REMUX_PASS_COMPLETED_EVENT ||
+  ev.event_type === LIBRARY_FILE_CLEANED_EVENT;
+
 /** The newest events as lines, newest first; neighbours that say the same thing are one line with a count. */
 export function buildStream(items: readonly ActivityEventItem[]): Stream {
   const rows: StreamRow[] = [];
   let routine = 0;
   for (const ev of items) {
     if (ev.event_type === FILE_PROGRESS_EVENT) continue;
-    if (eventDisplay(ev).compact) {
+    if (!isFinishedFile(ev) && eventDisplay(ev).compact) {
       routine += 1;
       continue;
     }

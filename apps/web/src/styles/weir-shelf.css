@@ -19,11 +19,22 @@
 }
 
 .mm-shelf__rows {
+  position: relative;
   display: flex;
   min-height: 0;
   flex: 1 1 0;
   flex-direction: column;
   padding: 0 18px 6px;
+}
+
+/* Over the empty row rather than in the column, so the row is measured at the same height with or without it. */
+.mm-shelf__empty {
+  position: absolute;
+  top: 7px;
+  left: 18px;
+  margin: 0;
+  font-size: 13.5px;
+  color: var(--mm-text2);
 }
 
 .mm-shelf__row {

@@ -1,7 +1,7 @@
 import type { ProcessingFile } from "../../../lib/processing/files-api";
 import type { LeavingCard } from "../leaving-cards";
 import type { Lanes, WorkSource } from "../processing-model";
-import type { Filter } from "../processing-filter";
+import { shownBy, type Filter } from "../processing-filter";
 import {
   arrivingWorkflow,
   deliveredWords,
@@ -17,11 +17,6 @@ import {
   stageOfStep,
   type PipelineStage,
 } from "./pipeline-stages";
-
-/** Whether a file of this source is on the board for the page's filter. */
-export function shownBy(filter: Filter, item: { source: WorkSource }): boolean {
-  return filter === "all" || filter === item.source;
-}
 
 /** What every kind of item in the lanes says about itself that the card needs to be placed. */
 type Located = {

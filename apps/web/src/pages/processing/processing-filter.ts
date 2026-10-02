@@ -12,3 +12,14 @@ export const FILTER_OPTIONS: readonly SegmentedOption<Filter>[] = [
 
 /** Today's figures are counted over the last day. */
 export const TODAY_DAYS = 1;
+
+/** The Activity module each kind of work writes its entries under, which is how the server narrows the feed to one. */
+export const ACTIVITY_MODULE_OF_WORK: Record<WorkSource, string> = {
+  download: "processing",
+  library: "library",
+};
+
+/** Whether work of this source is shown for the page's filter. */
+export function shownBy(filter: Filter, item: { source: WorkSource }): boolean {
+  return filter === "all" || filter === item.source;
+}

@@ -6,6 +6,7 @@ import {
   FAILED_JOBS_LIMIT,
   FILES_SHOWN_PER_GROUP,
   buildNeeds,
+  failedJobsFor,
   needCount,
 } from "./needs-model";
 
@@ -58,7 +59,8 @@ const healthy = {
   workflows: [workflow],
   workflowId: null,
   readiness: { worker_health: [] },
-  failedJobCount: 0,
+  failedJobs: { count: 0, capped: false },
+  filter: "all" as const,
   files: [],
 };
 
@@ -102,22 +104,94 @@ describe("what needs a person", () => {
   });
 
   it("counts failed jobs, and stops counting at the limit", () => {
-    const title = (failedJobCount: number) =>
-      buildNeeds({ ...healthy, failedJobCount })[0].rows[0].title;
+    const title = (count: number, capped = false) =>
+      buildNeeds({ ...healthy, failedJobs: { count, capped } })[0].rows[0]
+        .title;
 
     expect(title(1)).toBe("1 job failed");
     expect(title(2)).toBe("2 jobs failed");
-    expect(title(FAILED_JOBS_LIMIT)).toBe(`${FAILED_JOBS_LIMIT}+ jobs failed`);
+    expect(title(FAILED_JOBS_LIMIT, true)).toBe(
+      `${FAILED_JOBS_LIMIT}+ jobs failed`,
+    );
   });
 
   it("groups what is wrong with Weir itself under one title", () => {
     const [group] = buildNeeds({
       ...healthy,
-      failedJobCount: 2,
+      failedJobs: { count: 2, capped: false },
       readiness: { worker_health: [worker("p", "degraded", "x")] },
     });
 
     expect(group.title).toBe("2 things to fix in Weir");
+  });
+});
+
+describe("the failed jobs of one kind of work", () => {
+  const jobs = [
+    { job_kind: "processing.file.remux_pass.v1" },
+    { job_kind: "processing.watched_folder.remux_scan_dispatch.v1" },
+    { job_kind: "processing.library.clean.v1" },
+    { job_kind: "processing.work_temp_stale_sweep.v1" },
+  ];
+
+  it("counts every job on Everything, housekeeping included", () => {
+    expect(failedJobsFor(jobs, "all").count).toBe(4);
+  });
+
+  it("counts the passes and scans of new downloads", () => {
+    expect(failedJobsFor(jobs, "download").count).toBe(2);
+  });
+
+  it("counts a library's own jobs", () => {
+    expect(failedJobsFor(jobs, "library").count).toBe(1);
+  });
+
+  it("says the count may be short when the server's list was full", () => {
+    const full = Array.from({ length: FAILED_JOBS_LIMIT }, () => jobs[0]);
+
+    expect(failedJobsFor(full, "download")).toEqual({
+      count: FAILED_JOBS_LIMIT,
+      capped: true,
+    });
+    expect(failedJobsFor(jobs, "download").capped).toBe(false);
+  });
+});
+
+describe("what needs a person, for one kind of work", () => {
+  const trouble = {
+    ...healthy,
+    workflows: [{ ...workflow, enabled: false } as ProcessingLibrary],
+    readiness: { worker_health: [worker("p", "degraded", "x")] },
+    failedJobs: { count: 2, capped: false },
+    files: [failedFile(1), rejectedFile(2)],
+  };
+
+  it("keeps new downloads' files and failed jobs, and leaves Weir's own set-up and stopped work for Everything", () => {
+    const groups = buildNeeds({ ...trouble, filter: "download" });
+
+    expect(groups.map((group) => group.key)).toEqual([
+      "weir",
+      "failed-writing",
+      "rejected-language",
+    ]);
+    expect(groups[0].rows.map((row) => row.key)).toEqual(["failed-jobs"]);
+  });
+
+  it("has no files for library cleaning, whose files are cleaned from the job queue", () => {
+    const groups = buildNeeds({ ...trouble, filter: "library" });
+
+    expect(groups.map((group) => group.key)).toEqual(["weir"]);
+    expect(needCount(groups)).toBe(1);
+  });
+
+  it("is clear for library cleaning when none of its jobs failed", () => {
+    expect(
+      buildNeeds({
+        ...trouble,
+        filter: "library",
+        failedJobs: { count: 0, capped: false },
+      }),
+    ).toEqual([]);
   });
 });
 
@@ -283,7 +357,7 @@ describe("the files that need a person", () => {
     const groups = buildNeeds({
       ...healthy,
       workflowId: 2,
-      failedJobCount: 3,
+      failedJobs: { count: 3, capped: false },
       files: [
         failedFile(1, { library_id: 1 }),
         failedFile(2, { library_id: 2 }),
@@ -300,7 +374,7 @@ describe("the files that need a person", () => {
       ...healthy,
       workflows: [{ ...workflow, enabled: false } as ProcessingLibrary],
       readiness: { worker_health: [worker("p", "degraded", "x")] },
-      failedJobCount: 1,
+      failedJobs: { count: 1, capped: false },
       files: [failedFile(1), rejectedFile(2)],
     }).map((group) => group.key);
 
@@ -310,7 +384,7 @@ describe("the files that need a person", () => {
   it("counts every file and every problem once, including the ones past a group's rows", () => {
     const groups = buildNeeds({
       ...healthy,
-      failedJobCount: 1,
+      failedJobs: { count: 1, capped: false },
       files: [1, 2, 3, 4, 5, 6].map((id) => failedFile(id)),
     });
 

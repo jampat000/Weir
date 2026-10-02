@@ -12,10 +12,26 @@ import { stepForStage, type FlowStepId } from "./stage-flow-model";
 
 export const LIBRARY_CLEAN_JOB_KIND = "processing.library.clean.v1";
 
+/** The job kinds that are a library's own work: its scan and its clean. */
+const LIBRARY_JOB_KIND_PREFIX = "processing.library.";
+/** The job kinds that are new-download work: a file's pass, and the scan of a watched folder that finds it. */
+const DOWNLOAD_JOB_KIND_PREFIXES = [
+  "processing.file.",
+  "processing.watched_folder.",
+] as const;
+
 /** The file status the Working lane shows (see the `case "processing"` below). */
 export const WORKING_FILE_STATUS: ProcessingFile["status"] = "processing";
 
 export type WorkSource = "download" | "library";
+
+/** Which kind of work a job of this kind is. A job that is neither (a cleanup sweep, say) is Weir's own housekeeping: null. */
+export function workSourceOfJobKind(jobKind: string): WorkSource | null {
+  if (jobKind.startsWith(LIBRARY_JOB_KIND_PREFIX)) return "library";
+  return DOWNLOAD_JOB_KIND_PREFIXES.some((prefix) => jobKind.startsWith(prefix))
+    ? "download"
+    : null;
+}
 
 export type ArrivingItem = {
   key: string;

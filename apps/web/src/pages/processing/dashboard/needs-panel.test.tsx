@@ -134,6 +134,25 @@ describe("the Needs you panel when nothing needs a person", () => {
   });
 });
 
+describe("the Needs you panel narrowed to one kind of work", () => {
+  it("says what it is clear of when nothing from that work needs a person", () => {
+    needFiles.files = [stuckFile];
+
+    const panel = renderPanel({ filter: "library" });
+
+    expect(panel).toHaveTextContent("Nothing from library cleaning.");
+  });
+
+  it("lists the files of new downloads and counts them", () => {
+    needFiles.files = [stuckFile];
+
+    const panel = renderPanel({ filter: "download" });
+
+    expect(panel).toHaveTextContent("1 to look at");
+    expect(screen.queryByText("All clear")).toBeNull();
+  });
+});
+
 describe("the Needs you panel when something does", () => {
   it("shows an amber count in its header and links to the files in History", () => {
     failedJobs.jobs = [{ id: 1 }];

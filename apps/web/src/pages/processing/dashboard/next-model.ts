@@ -7,6 +7,7 @@ import type { ProcessingLibrary } from "../../../lib/processing/libraries-api";
 import type { MaintenanceFamilyState } from "../../../lib/processing/maintenance-api";
 import { parseAppTime } from "../../../lib/ui/mm-format-date";
 import { CLEANUP_JOBS } from "../../settings/tabs/cleanup/cleanup-jobs";
+import { shownBy, type Filter } from "../processing-filter";
 import { clockTime } from "../pipeline/pipeline-heading";
 
 const SECOND_MS = 1000;
@@ -37,6 +38,8 @@ type NextSources = {
   workflows: readonly ProcessingLibrary[];
   cleanRuns: readonly LibraryCleanRun[];
   cleanupJobs: readonly MaintenanceFamilyState[];
+  /** The kind of work to list: a scan finds new downloads, a library's clean is its own. A cleanup job is neither. */
+  filter?: Filter;
 };
 
 function workflowPath(id: number): string {
@@ -100,11 +103,12 @@ export function nextItems({
   workflows,
   cleanRuns,
   cleanupJobs,
+  filter = "all",
 }: NextSources): NextItem[] {
   return [
-    ...scans(workflows),
-    ...libraryCleans(cleanRuns),
-    ...cleanups(cleanupJobs),
+    ...(shownBy(filter, { source: "download" }) ? scans(workflows) : []),
+    ...(shownBy(filter, { source: "library" }) ? libraryCleans(cleanRuns) : []),
+    ...(filter === "all" ? cleanups(cleanupJobs) : []),
   ].sort((a, b) => a.at - b.at);
 }
 

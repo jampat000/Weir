@@ -9,15 +9,19 @@ import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { handedBack } from "../handed-back-model";
+import type { Filter } from "../processing-filter";
 import type { HandedBackSummary } from "../use-handed-back";
 import { NEEDS_PANEL_ID } from "./show-needs-panel";
 import { TodayTile } from "./today-tile";
 
 const NOW = Date.parse("2026-08-18T10:00:00Z");
-const stats = { files_processed: 38, net_space_saved_bytes: 44_236_078_284 };
+const stats: { files_processed: number; net_space_saved_bytes: number | null } =
+  { files_processed: 38, net_space_saved_bytes: 44_236_078_284 };
 const needsYou = { count: 0 };
 /** The workflow the tile asked the figures and the count for, each time. */
 const figuresAsked: (number | null)[] = [];
+/** The kind of work it asked them for, each time. */
+const filtersAsked: Filter[] = [];
 const summary: { value: HandedBackSummary } = {
   value: { handed: handedBack([], NOW), total: 0, partial: false },
 };
@@ -27,8 +31,9 @@ vi.mock("../../../lib/settings/queries", () => ({
   useAppSettingsQuery: () => ({ data: { app_timezone: settings.timezone } }),
 }));
 vi.mock("./use-today-figures", () => ({
-  useTodayFigures: (workflowId: number | null) => {
+  useTodayFigures: (workflowId: number | null, filter: Filter) => {
     figuresAsked.push(workflowId);
+    filtersAsked.push(filter);
     return {
       cleaned: stats.files_processed,
       savedBytes: stats.net_space_saved_bytes,
@@ -36,8 +41,9 @@ vi.mock("./use-today-figures", () => ({
   },
 }));
 vi.mock("./use-needs-you", () => ({
-  useNeedsYou: (workflowId: number | null) => {
+  useNeedsYou: (workflowId: number | null, filter: Filter) => {
     figuresAsked.push(workflowId);
+    filtersAsked.push(filter);
     return { groups: [], count: needsYou.count };
   },
 }));
@@ -60,10 +66,10 @@ function finishedAt(minutesAgo: number) {
   };
 }
 
-function renderTile(workflowId?: number | null) {
+function renderTile(workflowId?: number | null, filter: Filter = "all") {
   render(
     <MemoryRouter>
-      <TodayTile filter="all" now={NOW} workflowId={workflowId} />
+      <TodayTile filter={filter} now={NOW} workflowId={workflowId} />
     </MemoryRouter>,
   );
   return screen.getByRole("region", { name: "Today" });
@@ -77,6 +83,8 @@ beforeEach(() => {
   needsYou.count = 0;
   settings.timezone = "UTC";
   figuresAsked.length = 0;
+  filtersAsked.length = 0;
+  stats.net_space_saved_bytes = 44_236_078_284;
   summary.value = { handed: handedBack([], NOW), total: 0, partial: false };
 });
 
@@ -91,6 +99,20 @@ describe("the Today tile", () => {
     renderTile(3);
 
     expect(new Set(figuresAsked)).toEqual(new Set([3]));
+  });
+
+  it("asks for the figures and need-a-look count of the kind of work chosen, so they agree with the panels", () => {
+    renderTile(null, "library");
+
+    expect(new Set(filtersAsked)).toEqual(new Set(["library"]));
+  });
+
+  it("says nothing of space saved when none is recorded for the work shown", () => {
+    stats.net_space_saved_bytes = null;
+    const tile = renderTile(null, "library");
+
+    expect(within(tile).getByTestId("live-done-today")).toHaveTextContent("38");
+    expect(tile).not.toHaveTextContent("saved");
   });
 
   it("says how many were cleaned today and how much space that saved", () => {

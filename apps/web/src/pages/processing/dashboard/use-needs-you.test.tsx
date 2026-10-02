@@ -91,6 +91,24 @@ describe("what needs a person, for the panel, the Today tile and the sidebar", (
     expect(result.current.count).toBe(0);
   });
 
+  it("counts for each kind of work only what belongs to it, so the Today tile and the panel agree", () => {
+    failedJobs.jobs = [
+      { id: 1, job_kind: "processing.file.remux_pass.v1" },
+      { id: 2, job_kind: "processing.library.clean.v1" },
+    ];
+    readiness.worker_health = [
+      { module: "processing", status: "degraded", detail: "Stopped." },
+    ];
+    needFiles.files = [file({ id: 1 }), file({ id: 2 })];
+
+    const counts = (filter: "all" | "download" | "library") =>
+      renderHook(() => useNeedsYou(null, filter)).result.current.count;
+
+    expect(counts("all")).toBe(4);
+    expect(counts("download")).toBe(3);
+    expect(counts("library")).toBe(1);
+  });
+
   it("counts only the chosen workflow's files, and none of what is wrong with Weir itself", () => {
     failedJobs.jobs = [{ id: 1 }];
     needFiles.files = [

@@ -38,10 +38,10 @@ function routineEvent(id: number): ActivityEventItem {
   } as ActivityEventItem;
 }
 
-function renderStream() {
+function renderStream(filter?: "download" | "library") {
   return render(
     <MemoryRouter>
-      <ActivityStream now={NOW} />
+      <ActivityStream now={NOW} filter={filter} />
     </MemoryRouter>,
   );
 }
@@ -70,6 +70,14 @@ function roomForLines(rows: number) {
 }
 
 describe("the activity stream panel", () => {
+  it("says which kind of work has no activity when it is narrowed to one", () => {
+    renderStream("library");
+
+    expect(
+      screen.getByText("Nothing yet from library cleaning."),
+    ).toBeInTheDocument();
+  });
+
   it("says nothing has happened yet when there is nothing to list", () => {
     renderStream();
 

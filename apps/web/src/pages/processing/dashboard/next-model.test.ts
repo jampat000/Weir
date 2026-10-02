@@ -87,6 +87,38 @@ describe("what Weir does next on its own", () => {
     expect(items).toEqual([]);
   });
 
+  describe("narrowed to one kind of work", () => {
+    const sources = {
+      workflows: [workflow({ id: 1 })],
+      cleanRuns: [
+        { libraryId: 1, libraryName: "TV", nextRunAt: iso(minutes(600)) },
+      ],
+      cleanupJobs: [cleanupJob({})],
+    };
+
+    it("lists a workflow's scan for new downloads, and nothing else", () => {
+      const items = nextItems({ ...sources, filter: "download" });
+
+      expect(items.map((item) => item.key)).toEqual(["scan-1"]);
+    });
+
+    it("lists a library's clean for library cleaning, and nothing else", () => {
+      const items = nextItems({ ...sources, filter: "library" });
+
+      expect(items.map((item) => item.key)).toEqual(["clean-1"]);
+    });
+
+    it("lists every kind, cleanup jobs too, on Everything", () => {
+      const items = nextItems({ ...sources, filter: "all" });
+
+      expect(items.map((item) => item.key)).toEqual([
+        "scan-1",
+        "cleanup-work_temp_stale_sweep",
+        "clean-1",
+      ]);
+    });
+  });
+
   it("links each item to where it is set up", () => {
     const [scan, cleanup] = nextItems({
       workflows: [workflow({ id: 7 })],

@@ -53,9 +53,8 @@ export function fileOut(file, live, posterUrl) {
   });
 }
 
-/** The module an event type belongs to: the part before its first dot. */
-const moduleOf = (type) =>
-  type.split(".")[0].replace(/^library$/, "processing");
+/** The module an event type belongs to: the part before its first dot. A library's entries are its own module. */
+export const moduleOf = (type) => type.split(".")[0];
 
 /**
  * @param {import("../engine/activity-log.mjs").ActivityEvent} event

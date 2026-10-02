@@ -5,10 +5,12 @@ import { useProcessingJobsInspectionQuery } from "../../../lib/processing/jobs-i
 import { useProcessingLibrariesQuery } from "../../../lib/processing/libraries-queries";
 import { processingKeys } from "../../../lib/processing/query-keys";
 import { useSystemReadinessQuery } from "../../../lib/system/readiness-queries";
+import type { Filter } from "../processing-filter";
 import { useNeedsFiles } from "./needs-files";
 import {
   FAILED_JOBS_LIMIT,
   buildNeeds,
+  failedJobsFor,
   needCount,
   type NeedGroup,
 } from "./needs-model";
@@ -26,10 +28,14 @@ export type NeedsYou = {
 };
 
 /**
- * What needs a person, narrowed to one workflow or across all of them. The Needs you panel, the Today tile's
- * count and the sidebar's badge all read this, so they cannot disagree; they share its queries.
+ * What needs a person, narrowed to one workflow or across all of them, and to one kind of work or both. The
+ * Needs you panel, the Today tile's count and the sidebar's badge all read this, so they cannot disagree; they
+ * share its queries.
  */
-export function useNeedsYou(workflowId: number | null | undefined): NeedsYou {
+export function useNeedsYou(
+  workflowId: number | null | undefined,
+  filter: Filter = "all",
+): NeedsYou {
   const workflows = useProcessingLibrariesQuery();
   const readiness = useSystemReadinessQuery();
   // Leaves out a file the owner has since removed from History: this is about current problems, not a
@@ -46,15 +52,16 @@ export function useNeedsYou(workflowId: number | null | undefined): NeedsYou {
   });
   const workflowList = workflows.data;
   const readinessData = readiness.data;
-  const failedJobCount = failedJobs.data?.jobs.length ?? 0;
+  const failedJobRows = failedJobs.data?.jobs;
   return useMemo(() => {
     const groups = buildNeeds({
       workflows: workflowList,
       workflowId,
       readiness: readinessData,
-      failedJobCount,
+      failedJobs: failedJobsFor(failedJobRows ?? [], filter),
+      filter,
       files,
     });
     return { groups, count: needCount(groups) };
-  }, [workflowList, workflowId, readinessData, failedJobCount, files]);
+  }, [workflowList, workflowId, filter, readinessData, failedJobRows, files]);
 }

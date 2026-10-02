@@ -34,6 +34,13 @@ import { readShelfWorkflow, saveShelfWorkflow } from "./shelf-workflow-choice";
 
 const NO_NAMES: ReadonlyMap<number, string> = new Map();
 
+/** What an empty shelf says, for everything and for each kind of work it can be narrowed to. */
+const NOTHING_FINISHED_WORDS: Record<Filter, string> = {
+  all: "Nothing has finished yet.",
+  download: "No new downloads have finished yet.",
+  library: "No library cleaning has finished yet.",
+};
+
 type Fit = ShelfFit & { across: number };
 
 export type JustFinishedShelfProps = {
@@ -158,6 +165,9 @@ export function JustFinishedShelf({
     >
       <div className="mm-shelf" data-testid="just-finished-shelf">
         <div ref={shelfRef} className="mm-shelf__rows">
+          {shelf.tiles.length === 0 ? (
+            <p className="mm-shelf__empty">{NOTHING_FINISHED_WORDS[filter]}</p>
+          ) : null}
           <ShelfTiles
             tiles={shelf.tiles}
             tilesShown={fit?.across ?? null}

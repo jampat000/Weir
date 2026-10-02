@@ -6,8 +6,12 @@ import {
 
 import { activityKeys } from "./query-keys";
 
-export function useActivityRecentQuery(filters?: ActivityRecentFilters) {
+export function useActivityRecentQuery(
+  filters?: ActivityRecentFilters,
+  { enabled = true }: { enabled?: boolean } = {},
+) {
   return useQuery({
+    enabled,
     queryKey: activityKeys.recentList(filters),
     queryFn: () => fetchActivityRecent(filters),
     staleTime: 15_000,

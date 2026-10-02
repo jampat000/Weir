@@ -11,37 +11,65 @@ import {
 import { useActivityWindowQuery } from "../../../lib/activity/queries";
 import { useProcessingOverviewStatsQuery } from "../../../lib/processing/queries";
 import { HANDED_BACK_BUCKET_MS } from "../handed-back-model";
-import { TODAY_DAYS } from "../processing-filter";
+import { TODAY_DAYS, shownBy, type Filter } from "../processing-filter";
 
-/** Five pages of 100 per kind, the most a day of one workflow's work has come to. */
+/** Five pages of 100, the most a day of one workflow's new downloads has come to. */
 const TODAY_PAGES = 5;
+/** The server counts every entry that matches, so one page is enough for how many files a library cleaned. */
+const COUNT_ONLY_PAGES = 1;
 const DAY_MS = 24 * 60 * 60_000;
+const NO_DOWNLOADS = { cleaned: 0, savedBytes: 0 } as const;
 
 export type TodayFigures = {
   /** Files Weir cleaned. */
   cleaned: number;
-  savedBytes: number;
+  /** The space that saved; null when the work shown records none, as a library's in-place clean does not. */
+  savedBytes: number | null;
 };
 
-/** What a day's finished files come to for one workflow: the ones Weir cleaned, and the space that saved. */
-export function figuresOf(finished: readonly FinishedFile[]): TodayFigures {
+/** What a day's finished downloads come to for one workflow: the ones Weir cleaned, and the space that saved. */
+export function figuresOf(finished: readonly FinishedFile[]): {
+  cleaned: number;
+  savedBytes: number;
+} {
   return {
     cleaned: finished.filter((file) => file.kind === "cleaned").length,
     savedBytes: finished.reduce((sum, file) => sum + (file.savedBytes ?? 0), 0),
   };
 }
 
+/** What the day's new downloads and library cleans come to together, for the work the page shows. */
+export function combinedFigures(
+  filter: Filter,
+  downloads: { cleaned: number; savedBytes: number },
+  libraryCleaned: number,
+): TodayFigures {
+  const withDownloads = shownBy(filter, { source: "download" });
+  const withLibrary = shownBy(filter, { source: "library" });
+  return {
+    cleaned:
+      (withDownloads ? downloads.cleaned : 0) +
+      (withLibrary ? libraryCleaned : 0),
+    savedBytes: withDownloads ? downloads.savedBytes : null,
+  };
+}
+
 /**
- * Today's two figures. For every workflow they are the server's own totals; the totals cannot be split by
- * workflow, so for one workflow they are counted from that workflow's finished files over the same day. The
- * window starts on a five-minute boundary so the query is not refetched every second.
+ * Today's two figures for the chosen kind of work and workflow. New downloads' are the server's own totals, which
+ * cannot be split by workflow, so for one workflow they are counted from that workflow's finished passes over
+ * the same day. A library's are the server's count of its clean entries over that day; they record no sizes, so
+ * there is no space saved to show for a library alone. The window starts on a five-minute boundary so the query
+ * is not refetched every second.
  */
 export function useTodayFigures(
   workflowId: number | null,
+  filter: Filter,
   now: number,
 ): TodayFigures | undefined {
   const totals = useProcessingOverviewStatsQuery(TODAY_DAYS).data;
   const oneWorkflow = workflowId !== null;
+  const withDownloads = shownBy(filter, { source: "download" });
+  const withLibrary = shownBy(filter, { source: "library" });
   const since = new Date(
     Math.floor(now / HANDED_BACK_BUCKET_MS) * HANDED_BACK_BUCKET_MS - DAY_MS,
   )
@@ -54,28 +82,33 @@ export function useTodayFigures(
   const passes = useActivityWindowQuery(
     { event_type: REMUX_PASS_COMPLETED_EVENT, ...dayWindow },
     TODAY_PAGES,
-    { enabled: oneWorkflow },
+    { enabled: oneWorkflow && withDownloads },
   ).data;
   const cleans = useActivityWindowQuery(
     { event_type: LIBRARY_FILE_CLEANED_EVENT, ...dayWindow },
-    TODAY_PAGES,
-    { enabled: oneWorkflow },
+    COUNT_ONLY_PAGES,
+    { enabled: withLibrary },
   ).data;
 
   return useMemo(() => {
-    if (!oneWorkflow) {
-      return totals
-        ? {
-            cleaned: totals.files_processed,
-            savedBytes: totals.net_space_saved_bytes,
-          }
-        : undefined;
+    const downloadFigures = oneWorkflow
+      ? passes &&
+        figuresOf(
+          passes.items
+            .map(finishedFileFromEvent)
+            .filter((file): file is FinishedFile => file !== null),
+        )
+      : totals && {
+          cleaned: totals.files_processed,
+          savedBytes: totals.net_space_saved_bytes,
+        };
+    if ((withDownloads && !downloadFigures) || (withLibrary && !cleans)) {
+      return undefined;
     }
-    if (!passes || !cleans) return undefined;
-    return figuresOf(
-      [...passes.items, ...cleans.items]
-        .map(finishedFileFromEvent)
-        .filter((file): file is FinishedFile => file !== null),
+    return combinedFigures(
+      filter,
+      downloadFigures ?? NO_DOWNLOADS,
+      cleans?.total ?? 0,
     );
-  }, [oneWorkflow, totals, passes, cleans]);
+  }, [oneWorkflow, withDownloads, withLibrary, filter, totals, passes, cleans]);
 }

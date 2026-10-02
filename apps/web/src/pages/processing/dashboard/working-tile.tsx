@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { StatTile, StatUnit } from "../../../components/panels/stat-tile";
 import type { ProcessingFile } from "../../../lib/processing/files-api";
 import { IN_PROGRESS_PATH } from "../pipeline/pipeline-stages";
+import type { Filter } from "../processing-filter";
 import type { WorkingItem } from "../processing-model";
 import { useFittingRows } from "./fit-rows";
 import { STEP_WORDS } from "./working-words";
@@ -13,12 +14,21 @@ const MOST_OPERATIONS = 4;
 /** Where a person changes how many files Weir works on at once, and how long a new download waits. */
 const PERFORMANCE_PATH = "/settings?tab=performance";
 
+/** What an empty tile says, for everything and for each kind of work it can be narrowed to. */
+const IDLE_WORDS: Record<Filter, string> = {
+  all: "Nothing being cleaned.",
+  download: "No new downloads being cleaned.",
+  library: "No library cleaning right now.",
+};
+
 type WorkingTileProps = {
   working: readonly WorkingItem[];
   /** The most files Weir works on at once, or null while it is not known. */
   filesAtOnce: number | null;
   /** How long a new download is left alone, when every workflow agrees. */
   waitSeconds: number | null;
+  /** The kind of work the files were narrowed to, so an empty tile can say so. */
+  filter?: Filter;
   /** The band keeps its three tiles across, so the tile is as tall as the band and lists only the rows that fit. */
   across?: boolean;
   onOpen: (file: ProcessingFile) => void;
@@ -78,6 +88,7 @@ export function WorkingTile({
   working,
   filesAtOnce,
   waitSeconds,
+  filter = "all",
   across = true,
   onOpen,
 }: WorkingTileProps) {
@@ -123,7 +134,7 @@ export function WorkingTile({
       }
     >
       {working.length === 0 ? (
-        <p className="mm-stat__idle">Nothing being cleaned.</p>
+        <p className="mm-stat__idle">{IDLE_WORDS[filter]}</p>
       ) : (
         <ul className="mm-ops" data-testid="live-working">
           {shown.map((item) => (

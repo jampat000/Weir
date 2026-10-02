@@ -58,6 +58,14 @@ const tiles = () =>
     .map((item) => within(item).getByRole("button").getAttribute("aria-label"));
 
 describe("Just finished", () => {
+  it("says what has not finished when the work it is narrowed to has nothing", () => {
+    render(shelf([finished(1)], { filter: "library" }));
+
+    expect(
+      screen.getByText("No library cleaning has finished yet."),
+    ).toBeVisible();
+  });
+
   it("shows each file as a tile with its title and how it came out, and names what was removed and how long ago", () => {
     render(shelf([finished(1)]));
 

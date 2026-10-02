@@ -1,10 +1,9 @@
 import type { FinishedFile } from "../../../lib/activity/processing-outcome";
 import { formatBytes } from "../../../lib/format/bytes";
 import { parseAppTime } from "../../../lib/ui/mm-format-date";
-import type { Filter } from "../processing-filter";
+import { shownBy, type Filter } from "../processing-filter";
 import { prettyName } from "../processing-model";
 import { ago, finishedLine, removedTrackWords } from "../processing-words";
-import { shownBy } from "./pipeline-cards";
 
 /** The workflow's name for a file whose entry names no workflow. */
 const UNKNOWN_WORKFLOW = "Workflow";
