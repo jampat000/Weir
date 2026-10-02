@@ -1,22 +1,26 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useId, useState } from "react";
 
-import { errorMessage } from "../../lib/api/error-message";
-import { FILE_HISTORY_MAX_DAYS } from "../../lib/processing/file-history-retention";
-import { processingKeys } from "../../lib/processing/query-keys";
+import { errorMessage } from "../../../../lib/api/error-message";
+import { FILE_HISTORY_MAX_DAYS } from "../../../../lib/processing/file-history-retention";
+import { processingKeys } from "../../../../lib/processing/query-keys";
 import {
   useProcessingOperatorSettingsQuery,
   useProcessingOperatorSettingsSaveMutation,
-} from "../../lib/processing/queries";
-import { mmActionButtonClass } from "../../lib/ui/mm-control-roles";
-import { plural } from "../../lib/ui/mm-plural";
+} from "../../../../lib/processing/queries";
+import { mmActionButtonClass } from "../../../../lib/ui/mm-control-roles";
+import { plural } from "../../../../lib/ui/mm-plural";
 
 /**
  * How long a file's history outlives the file. A file's history is kept for as long as Weir still knows the
  * file; this is the number of days it is kept after the file is gone or forgotten. Operators and admins change
- * it here, beside the records it governs; a viewer reads it.
+ * it here, with the other retention settings; a viewer reads it.
  */
-export function HistoryRetentionSetting({ editable }: { editable: boolean }) {
+export function FileHistoryRetentionSetting({
+  editable,
+}: {
+  editable: boolean;
+}) {
   const settings = useProcessingOperatorSettingsQuery();
   const save = useProcessingOperatorSettingsSaveMutation();
   const queryClient = useQueryClient();

@@ -12,6 +12,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as authApi from "../../lib/api/auth-api";
 import type { CurrentSession, UserPublic } from "../../lib/api/types";
 import { authKeys } from "../../lib/auth/query-keys";
+import * as processingQueries from "../../lib/processing/queries";
 import * as settingsApi from "../../lib/settings/settings-api";
 import { settingsKeys } from "../../lib/settings/query-keys";
 import { systemKeys } from "../../lib/system/query-keys";
@@ -591,7 +592,7 @@ describe("SystemPage", () => {
       "aria-selected",
       "true",
     );
-    // The time zone moved to Settings › Schedule, beside the times it governs.
+    // The time zone moved to Setup › Workflows › Schedule, beside the times it governs.
     expect(screen.queryByText("Time zone")).not.toBeInTheDocument();
     expect(screen.getByText("Setup wizard")).toBeInTheDocument();
     // Housekeeping is a file-processing job, so it lives under Settings, not here.
@@ -616,6 +617,32 @@ describe("SystemPage", () => {
     expect(screen.getByText("Search logs")).toBeInTheDocument();
     // Retention stays in view whichever of History's lists you are reading: it governs all of them.
     expect(screen.getByText("System log retention (days)")).toBeInTheDocument();
+  });
+
+  it("keeps every retention setting in one panel under Logs: log days, Activity days and file history days", () => {
+    vi.spyOn(
+      processingQueries,
+      "useProcessingOperatorSettingsQuery",
+    ).mockReturnValue({
+      data: { file_log_retention_days: 45 },
+      isError: false,
+    } as unknown as ReturnType<
+      typeof processingQueries.useProcessingOperatorSettingsQuery
+    >);
+    renderSettings(operatorMe, { initialEntries: ["/system?tab=logs"] });
+
+    const panel = screen
+      .getByRole("heading", { name: "How long things are kept" })
+      .closest("section") as HTMLElement;
+    expect(
+      within(panel).getByText("System log retention (days)"),
+    ).toBeInTheDocument();
+    expect(
+      within(panel).getByText("Keep Activity history for (days)"),
+    ).toBeInTheDocument();
+    expect(
+      within(panel).getByLabelText("Keep a file’s history for"),
+    ).toHaveValue(45);
   });
 
   it("opens System when an old address asks for the upgrade tab", () => {

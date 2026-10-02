@@ -34,7 +34,7 @@ import {
 import { HistoryKeptList } from "./history-kept-list";
 import { HistoryList } from "./history-list";
 import { ProcessRejectedAgain } from "./history-rejected-again";
-import { HistoryRetentionSetting } from "./history-retention";
+import { HistoryRetentionNote } from "./history-retention-note";
 
 /** "min ago" moves on its own between refreshes. */
 const TICK_MS = 15_000;
@@ -251,7 +251,7 @@ export function HistoryPage() {
         </div>
       )}
 
-      <HistoryRetentionSetting editable={editable} />
+      <HistoryRetentionNote />
     </div>
   );
 }

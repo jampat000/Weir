@@ -4,9 +4,20 @@ import {
 } from "../../../../components/shared/quiet-section";
 import { errorMessage } from "../../../../lib/api/error-message";
 import { mmActionButtonClass } from "../../../../lib/ui/mm-control-roles";
+import { useScrollToHash } from "../../../../lib/ui/use-scroll-to-hash";
 import type { SystemSettingsForm } from "../../use-system-settings-form";
+import { FileHistoryRetentionSetting } from "./file-history-retention";
 
-/** How long the System log and Activity history are kept, beside the lists they govern. */
+/** Where the retention panel is in System › Logs, so a link elsewhere can bring it into view. */
+const RETENTION_ANCHOR = "retention";
+
+/** The address of the retention settings, for the pages whose records they govern. */
+export const RETENTION_PATH = `/system?tab=logs#${RETENTION_ANCHOR}`;
+
+/**
+ * How long everything Weir records is kept: the system log, Activity, and a file's history. The first two save
+ * together; the file's history saves on its own.
+ */
 export function RetentionSection({
   form,
   editable,
@@ -18,15 +29,18 @@ export function RetentionSection({
 }) {
   const { retention, save } = form;
   const disabled = !editable || save.isPending;
+  useScrollToHash();
 
   return (
     <QuietSection
       level={3}
       headingId="suite-settings-log-retention-heading"
-      heading="How long this is kept"
+      heading="How long things are kept"
+      id={RETENTION_ANCHOR}
     >
       <p className="mm-quiet-note">
-        How long Weir keeps its system log and how far back Activity goes.
+        How long Weir keeps its system log, how far back Activity goes, and how
+        long a file&rsquo;s history is kept.
       </p>
       <div className="mm-field-row mt-4">
         <label className="mm-field mm-field--short">
@@ -100,6 +114,7 @@ export function RetentionSection({
           {save.isPending ? "Saving…" : "Save retention"}
         </button>
       </div>
+      <FileHistoryRetentionSetting editable={editable} />
     </QuietSection>
   );
 }

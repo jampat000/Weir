@@ -322,15 +322,14 @@
   color: var(--mm-text2);
 }
 
+/* The file-history setting, under the log and Activity fields in System › Logs' retention panel. */
 .mm-history-retention {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  margin-top: var(--mm-panel-gap);
-  padding: 14px 18px;
-  border: 1px solid var(--mm-panel-border);
-  border-radius: var(--mm-radius-panel);
-  background: var(--mm-card-bg);
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--mm-hairline);
 }
 
 .mm-history-retention__row {

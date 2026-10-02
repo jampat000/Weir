@@ -105,12 +105,8 @@ vi.mock("../../lib/processing/kept-files-queries", () => ({
 vi.mock("../../lib/auth/queries", () => ({
   useMeQuery: () => ({ data: me }),
 }));
-vi.mock("./history-retention", () => ({
-  HistoryRetentionSetting: ({ editable }: { editable: boolean }) => (
-    <div data-testid="history-retention">
-      {editable ? "can edit" : "read only"}
-    </div>
-  ),
+vi.mock("./history-retention-note", () => ({
+  HistoryRetentionNote: () => <div data-testid="history-retention" />,
 }));
 vi.mock("./history-rejected-again", () => ({
   ProcessRejectedAgain: ({
@@ -230,19 +226,9 @@ describe("HistoryPage", () => {
     ).toBeInTheDocument();
   });
 
-  it("puts the file history setting on the page, editable for an admin and read only for a viewer", () => {
+  it("ends the page with how long file history is kept", () => {
     renderPage();
-    expect(screen.getByTestId("history-retention")).toHaveTextContent(
-      "can edit",
-    );
-  });
-
-  it("gives a viewer the file history setting to read, not change", () => {
-    me.role = "viewer";
-    renderPage();
-    expect(screen.getByTestId("history-retention")).toHaveTextContent(
-      "read only",
-    );
+    expect(screen.getByTestId("history-retention")).toBeInTheDocument();
   });
 
   it("tells, under a file, how long its history is kept once the file is gone", async () => {
