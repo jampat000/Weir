@@ -33,8 +33,10 @@ vi.mock("../lib/pause/pause-queries", () => ({
 }));
 
 const readiness = { isError: false };
-vi.mock("../lib/ui/mm-format-date", () => ({
+vi.mock("../lib/ui/mm-format-date", async (importActual) => ({
+  ...(await importActual<typeof import("../lib/ui/mm-format-date")>()),
   useAppDateFormatter: () => (iso: string | null | undefined) => String(iso),
+  useAppClockFormatter: () => () => "4:20 pm",
 }));
 vi.mock("../lib/system/readiness-queries", () => ({
   useSystemReadinessQuery: () => ({
@@ -427,7 +429,7 @@ describe("the shell's header", () => {
     renderShell("/");
 
     expect(screen.getByTestId("pause-badge")).toHaveTextContent(
-      "Paused until you resume",
+      "Paused · until you resume",
     );
     expect(screen.getByTestId("pause-resume")).toHaveTextContent(
       "Resume processing",
