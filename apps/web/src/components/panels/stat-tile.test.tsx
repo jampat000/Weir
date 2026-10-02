@@ -2,7 +2,7 @@ import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it } from "vitest";
 
-import { StatSide, StatTile, StatUnit } from "./stat-tile";
+import { StatFitUnit, StatSide, StatTile, StatUnit } from "./stat-tile";
 
 describe("StatTile", () => {
   it("shows the label, the aside, the figure with its words, and the body", () => {
@@ -71,5 +71,30 @@ describe("StatTile", () => {
     );
 
     expect(container.querySelector(".mm-stat__aside")).toBeNull();
+  });
+});
+
+describe("StatFitUnit", () => {
+  it("says its words to screen readers once, and shows them to the eye as a line that can be left out", () => {
+    render(
+      <StatTile
+        label="Today"
+        figure={
+          <>
+            12
+            <StatFitUnit>cleaned</StatFitUnit>
+            <StatSide>4.2 GB saved</StatSide>
+          </>
+        }
+      >
+        body
+      </StatTile>,
+    );
+
+    const shown = screen.getByTitle("cleaned");
+    expect(shown).toHaveAttribute("aria-hidden", "true");
+    expect(shown).toHaveTextContent("cleaned");
+    expect(screen.getAllByText("cleaned")).toHaveLength(2);
+    expect(screen.getAllByText("cleaned")[0]).toHaveClass("sr-only");
   });
 });

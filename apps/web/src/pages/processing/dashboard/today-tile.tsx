@@ -1,7 +1,7 @@
 import {
+  StatFitUnit,
   StatSide,
   StatTile,
-  StatUnit,
 } from "../../../components/panels/stat-tile";
 import { formatBytes } from "../../../lib/format/bytes";
 import type { Filter } from "../processing-filter";
@@ -44,7 +44,7 @@ export function TodayTile({ filter, now, workflowId = null }: TodayTileProps) {
           <span data-testid="live-done-today">
             {figures ? figures.cleaned.toLocaleString() : PENDING}
           </span>
-          <StatUnit>cleaned</StatUnit>
+          <StatFitUnit>cleaned</StatFitUnit>
           {figures?.savedBytes != null ? (
             <StatSide>
               {formatBytes(figures.savedBytes) || "0 B"} saved

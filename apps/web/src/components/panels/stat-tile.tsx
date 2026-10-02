@@ -1,6 +1,8 @@
 import type { ReactNode, Ref } from "react";
 import { Link } from "react-router-dom";
 
+import { FitText } from "../../lib/ui/fit-text";
+
 type StatTileProps = {
   label: string;
   /** The quiet note at the right of the label row. */
@@ -57,6 +59,25 @@ export function StatTile({
 /** The small words after a figure: "GB saved", "at once". */
 export function StatUnit({ children }: { children: ReactNode }) {
   return <small className="mm-stat__unit">{children}</small>;
+}
+
+/**
+ * The small words after a figure that has others after it: they take the room the figure and the others leave (so the
+ * others stand at the right edge), say themselves whole where that is there and are left out where it is not, never
+ * cut. Screen readers always have them.
+ */
+export function StatFitUnit({ children }: { children: string }) {
+  return (
+    <>
+      <span className="sr-only">{children}</span>
+      <FitText
+        ariaHidden
+        className="mm-stat__unit flex-1"
+        words={[children, ""]}
+        title={children}
+      />
+    </>
+  );
 }
 
 /** A second figure beside the first, in the success colour: "12 GB saved". */
