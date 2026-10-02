@@ -8,6 +8,7 @@ import {
 } from "../../lib/activity/pass-detail";
 import { formatBytes } from "../../lib/format/bytes";
 import type { StatusMeaning } from "../../lib/ui/status-meaning";
+import { trackMeaning } from "../../lib/ui/track-meaning";
 
 function detailRow(label: string, value: string | undefined | null) {
   if (value === undefined || value === null || value === "") return null;
@@ -158,23 +159,23 @@ export function RemuxPassDetail({ detail }: { detail: string }) {
                 {trackSection(
                   "Audio kept",
                   splitTrackList(parsed.audio_after),
-                  "done",
+                  trackMeaning(true),
                 )}
                 {trackSection(
                   "Audio removed",
                   parsed.removed_audio ?? [],
-                  "idle",
+                  trackMeaning(false),
                   "None removed",
                 )}
                 {trackSection(
                   "Subtitles kept",
                   splitTrackList(parsed.subs_after),
-                  "done",
+                  trackMeaning(true),
                 )}
                 {trackSection(
                   "Subtitles removed",
                   parsed.removed_subtitles ?? [],
-                  "idle",
+                  trackMeaning(false),
                   "None removed",
                 )}
               </div>

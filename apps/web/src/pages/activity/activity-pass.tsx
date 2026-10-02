@@ -1,6 +1,7 @@
 import { Chip } from "../../components/panels/chip";
 import type { ProcessingFileLogEntry } from "../../lib/processing/files-api";
 import { STORY_STEP_MEANING } from "../../lib/processing/story-step-meaning";
+import { trackMeaning } from "../../lib/ui/track-meaning";
 import {
   agoWords,
   tracksFromRecord,
@@ -23,8 +24,8 @@ function TrackSet({ tracks }: { tracks: ActivityTrack[] }) {
     >
       <h3 id="activity-tracks-heading" className="mm-history-trackset__head">
         Tracks
-        <Chip meaning="done">{keptCount} kept</Chip>
-        <Chip meaning="idle">{removedCount} removed</Chip>
+        <Chip meaning={trackMeaning(true)}>{keptCount} kept</Chip>
+        <Chip meaning={trackMeaning(false)}>{removedCount} removed</Chip>
       </h3>
       <table className="mm-history-tracks">
         <tbody>
@@ -32,7 +33,7 @@ function TrackSet({ tracks }: { tracks: ActivityTrack[] }) {
             <tr
               key={`${track.kind}-${index}`}
               className={track.kept ? undefined : "is-removed"}
-              data-status={track.kept ? "done" : "idle"}
+              data-status={trackMeaning(track.kept)}
             >
               <th scope="row">{track.kind}</th>
               <td className="mm-history-track">
@@ -42,7 +43,7 @@ function TrackSet({ tracks }: { tracks: ActivityTrack[] }) {
                 ) : null}
               </td>
               <td className="mm-history-track__verdict">
-                <Chip meaning={track.kept ? "done" : "idle"}>
+                <Chip meaning={trackMeaning(track.kept)}>
                   {track.kept ? "Kept" : "Removed"}
                 </Chip>
               </td>

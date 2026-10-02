@@ -2,6 +2,7 @@
 import { Chip } from "../../components/panels/chip";
 import { describeTrack, positionsByKind } from "../../lib/format/track";
 import type { ProcessingRulesPreviewTrack } from "../../lib/processing/rules-preview-api";
+import { trackMeaning } from "../../lib/ui/track-meaning";
 
 export const rulesKeep = (track: ProcessingRulesPreviewTrack): boolean =>
   track.action === "keep";
@@ -36,7 +37,7 @@ export function TrackList({
         const keeping = kept ? kept.has(track.index) : rulesKeep(track);
         const row = (
           <>
-            <Chip meaning={keeping ? "done" : "idle"} dot={false}>
+            <Chip meaning={trackMeaning(keeping)} dot={false}>
               {keeping ? "Keep" : "Remove"}
             </Chip>
             <span className="mm-drawer__track-name">

@@ -61,6 +61,7 @@ import type { StepState } from "../../pages/processing/stage-flow-model";
 import type { MmStatusTone } from "./mm-status-tone";
 import { STATUS_MEANINGS } from "./status-meaning";
 import type { StatusMeaning } from "./status-meaning";
+import { trackMeaning } from "./track-meaning";
 
 /** The meaning of each status an update check can report, as the screens decide it. */
 function updateStatuses(): Record<string, StatusMeaning> {
@@ -222,6 +223,13 @@ const PRODUCTION_MEANINGS = {
       warn: "attention",
       bad: "broken",
     } satisfies Record<ProcessingFileStoryStep["tone"], StatusMeaning>,
+  },
+  trackFate: {
+    used: { kept: trackMeaning(true), removed: trackMeaning(false) },
+    expected: {
+      kept: "done",
+      removed: "broken",
+    } satisfies Record<"kept" | "removed", StatusMeaning>,
   },
   directPlay: {
     used: DIRECT_PLAY_MEANING,

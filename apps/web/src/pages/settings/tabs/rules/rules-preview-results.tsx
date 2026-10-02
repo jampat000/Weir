@@ -4,6 +4,7 @@ import type {
   ProcessingRulesPreviewResult,
   ProcessingRulesPreviewTrack,
 } from "../../../../lib/processing/rules-preview-api";
+import { trackMeaning } from "../../../../lib/ui/track-meaning";
 
 const TRACK_TYPE_LABELS: Record<ProcessingRulesPreviewTrack["type"], string> = {
   video: "Video",
@@ -58,7 +59,7 @@ function TrackRow({ track }: { track: ProcessingRulesPreviewTrack }) {
           : NOTHING}
       </td>
       <td data-label="Action">
-        <Chip meaning={kept ? "idle" : "todo"} dot={false}>
+        <Chip meaning={trackMeaning(kept)} dot={false}>
           {kept ? "Keep" : "Drop"}
         </Chip>
       </td>
