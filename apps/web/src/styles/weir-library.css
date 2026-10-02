@@ -309,6 +309,15 @@
   color: var(--rag);
 }
 
+/* A status with no files: a grey dot and a grey count, still a chip that can be chosen. */
+.mm-library-chip[data-empty]::before {
+  background: var(--mm-text3);
+}
+
+.mm-library-chip[data-empty] b {
+  color: var(--mm-text3);
+}
+
 .mm-library-chip b {
   margin-left: 4px;
   font-weight: 600;

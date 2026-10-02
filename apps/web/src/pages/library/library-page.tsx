@@ -38,6 +38,7 @@ import {
   type LibraryFilter,
 } from "./library-filters";
 import {
+  emptyStatusLine,
   filesCount,
   groupFiles,
   headerLead,
@@ -373,7 +374,9 @@ export function LibraryPage(): React.ReactElement {
           ) : groups.length === 0 ? (
             <p className="mm-library-empty" data-testid="library-empty">
               {totals && totals.files > 0
-                ? "Nothing here matches what you asked for. Clear the filters to see the whole library."
+                ? filter.status && !query
+                  ? emptyStatusLine(filter.status)
+                  : "Nothing here matches what you asked for. Clear the filters to see the whole library."
                 : "This workflow has not been scanned yet, or its folders hold nothing Weir reads. Check again, or change its folders in Library setup."}
             </p>
           ) : (

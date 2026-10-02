@@ -1017,53 +1017,27 @@ describe("LibraryPage", () => {
         .getAllByRole("button")
         .map((chip) => chip.textContent);
 
-    it("has no chip, and the ones with files keep their places in order", () => {
+    it("still has its chip, with a 0 shown muted, and every chip keeps its place", () => {
       withCounts({ cleaning: 0, left_alone: 0 });
       renderLibrary();
 
       expect(chips()).toEqual([
         "All 14",
         "Needs cleaning 9",
-        "Matches rules 2",
-        "Can't clean yet 1",
-      ]);
-    });
-
-    it("keeps the chosen status at zero, so the filter never vanishes from under you", () => {
-      withCounts({ cleaning: 0, left_alone: 0 });
-      renderLibrary("/library?show=left_alone");
-
-      expect(chips()).toEqual([
-        "All 14",
-        "Needs cleaning 9",
+        "Cleaning 0",
         "Matches rules 2",
         "Can't clean yet 1",
         "Left alone 0",
       ]);
+      expect(screen.getByRole("button", { name: /Cleaning/ })).toHaveAttribute(
+        "data-empty",
+      );
       expect(
-        screen.getByRole("button", { name: /Left alone/ }),
-      ).toHaveAttribute("aria-pressed", "true");
+        screen.getByRole("button", { name: /Needs cleaning/ }),
+      ).not.toHaveAttribute("data-empty");
     });
 
-    it("comes back in its own place when a scan finds files for it", () => {
-      withCounts({ cleaning: 0, left_alone: 0 });
-      const first = renderLibrary();
-      expect(chips()).not.toContain("Cleaning 3");
-      first.unmount();
-
-      withCounts({ cleaning: 3, left_alone: 0 });
-      renderLibrary();
-
-      expect(chips()).toEqual([
-        "All 14",
-        "Needs cleaning 9",
-        "Cleaning 3",
-        "Matches rules 2",
-        "Can't clean yet 1",
-      ]);
-    });
-
-    it("shows only All when nothing is in any status", () => {
+    it("renders all six when nothing is in any status", () => {
       withCounts({
         needs_cleaning: 0,
         cleaning: 0,
@@ -1073,7 +1047,27 @@ describe("LibraryPage", () => {
       });
       renderLibrary();
 
-      expect(chips()).toEqual(["All 14"]);
+      expect(chips()).toEqual([
+        "All 14",
+        "Needs cleaning 0",
+        "Cleaning 0",
+        "Matches rules 0",
+        "Can't clean yet 0",
+        "Left alone 0",
+      ]);
+    });
+
+    it("can still be chosen, and the table says so in a line when there is nothing in it", () => {
+      withCounts({ cleaning: 0 });
+      filesResult = { ...filesResult, files: [], total: 0 };
+      renderLibrary();
+
+      fireEvent.click(screen.getByRole("button", { name: /Cleaning/ }));
+
+      expect(lastFilters.at(-1)).toMatchObject({ status: "cleaning" });
+      expect(screen.getByTestId("library-empty")).toHaveTextContent(
+        "No files are being cleaned right now.",
+      );
     });
   });
 });

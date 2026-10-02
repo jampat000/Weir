@@ -144,6 +144,22 @@ export function statusNote(file: LibraryFile): string | null {
     : "already clean";
 }
 
+/** What the table says when a status is chosen and no file is in it. */
+export function emptyStatusLine(status: LibraryStatus): string {
+  switch (status) {
+    case "needs_cleaning":
+      return "No files need cleaning right now.";
+    case "cleaning":
+      return "No files are being cleaned right now.";
+    case "matches":
+      return "No files match your rules right now.";
+    case "cant_clean_yet":
+      return "No files are held back right now.";
+    case "left_alone":
+      return "You have not set any file aside.";
+  }
+}
+
 /**
  * What a title with several files comes to: the worst of its files, in the order a person has to act on them. Any file to
  * clean says so in red; otherwise Weir at work, then a file held back, then the files that match, then the rest.
