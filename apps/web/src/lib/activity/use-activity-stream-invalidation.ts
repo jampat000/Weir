@@ -7,11 +7,17 @@ import {
   parseConnectionActivity,
   type ConnectionActivityFrame,
 } from "../connections/connection-activity";
+import {
+  SYSTEM_STATS_EVENT,
+  parseSystemStatsFrame,
+} from "../system/system-stats-frame";
+import type { SystemStatsFrame } from "../system/system-stats-types";
 
 type LatestPayload = { latest_event_id: number; activity_revision?: number };
 type ActivityLatestSubscriber = () => void;
 type LiveProgressSubscriber = () => void;
 type ConnectionActivitySubscriber = (frame: ConnectionActivityFrame) => void;
+type SystemStatsSubscriber = (frame: SystemStatsFrame) => void;
 
 /**
  * Never cancel a query that is already mid-flight just because a newer activity event arrived: the
@@ -44,6 +50,7 @@ let liveProgressByPath: Readonly<Record<string, LiveProgressEntry>> =
   EMPTY_PROGRESS;
 const progressSubscribers = new Set<LiveProgressSubscriber>();
 const connectionActivitySubscribers = new Set<ConnectionActivitySubscriber>();
+const systemStatsSubscribers = new Set<SystemStatsSubscriber>();
 /** A progress frame arrived while the tab was hidden and has not been shown yet. */
 let progressChangedWhileHidden = false;
 
@@ -59,7 +66,8 @@ function hasSubscribers(): boolean {
   return (
     subscribers.size > 0 ||
     progressSubscribers.size > 0 ||
-    connectionActivitySubscribers.size > 0
+    connectionActivitySubscribers.size > 0 ||
+    systemStatsSubscribers.size > 0
   );
 }
 
@@ -216,6 +224,10 @@ function ensureActivityStream(): EventSource | null {
     const frame = parseConnectionActivity((ev as MessageEvent<string>).data);
     if (frame) connectionActivitySubscribers.forEach((fn) => fn(frame));
   });
+  source.addEventListener(SYSTEM_STATS_EVENT, (ev) => {
+    const frame = parseSystemStatsFrame((ev as MessageEvent<string>).data);
+    if (frame) systemStatsSubscribers.forEach((fn) => fn(frame));
+  });
   return source;
 }
 
@@ -266,6 +278,23 @@ export function subscribeConnectionActivity(
 
   return () => {
     connectionActivitySubscribers.delete(subscriber);
+    closeIfNobodyIsWatching();
+  };
+}
+
+/**
+ * Calls `subscriber` with every `system.stats` frame, on the one shared stream: the machine's newest reading, once a
+ * second while any screen is listening. A frame is a moment, so nothing is replayed to a late subscriber.
+ */
+export function subscribeSystemStats(
+  subscriber: SystemStatsSubscriber,
+): () => void {
+  systemStatsSubscribers.add(subscriber);
+  watchVisibility();
+  ensureActivityStream();
+
+  return () => {
+    systemStatsSubscribers.delete(subscriber);
     closeIfNobodyIsWatching();
   };
 }
