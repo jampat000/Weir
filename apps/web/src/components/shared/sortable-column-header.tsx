@@ -9,7 +9,6 @@ const ARROW_DOWN = "M5 1.5v6M2.5 5 5 7.5 7.5 5";
 function SortArrow({ direction }: { direction: "asc" | "desc" }) {
   return (
     <svg
-      className="mm-col-head__arrow"
       viewBox="0 0 10 10"
       width="10"
       height="10"
