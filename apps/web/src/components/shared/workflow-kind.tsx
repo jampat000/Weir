@@ -31,7 +31,7 @@ export function WorkflowKindBadge({
 export function WorkflowKindSummary({ kind }: { kind: WorkflowKind }) {
   return (
     <>
-      <span className="mm-library-source">
+      <span className="block">
         <WorkflowKindBadge kind={kind} />
       </span>
       <span className="mm-quiet-table__sub">{workflowKindNote(kind)}</span>

@@ -55,11 +55,6 @@
   overflow-wrap: anywhere;
 }
 
-/* Settings › Libraries: where a library comes from. */
-.mm-library-source {
-  display: block;
-}
-
 /* Settings › Rules: which profile, its name, and who uses it, on one line. */
 .mm-profile-bar {
   display: flex;

@@ -115,6 +115,28 @@ it("says a manager that is gone by that name and still calls the workflow linked
   ).toBeInTheDocument();
 });
 
+it("keeps a workflow whose manager does not answer as short as the rest, with its full sentence on hover and for screen readers", async () => {
+  const sentence =
+    "Weir could not reach Deluno at http://deluno. Check the address.";
+  withConnections(
+    connection({ last_test_ok: false, last_test_detail: sentence }),
+  );
+  vi.spyOn(api, "fetchProcessingLibraries").mockResolvedValue([
+    library({
+      manager_connection_ids: [5],
+      manager_coverage: "unreachable",
+    }),
+  ]);
+
+  render(<LibrariesTab />, { wrapper });
+
+  const cell = within(await screen.findByTestId("processing-library-1"));
+  const status = cell.getByText("● Not answering");
+  expect(status).toHaveAttribute("aria-hidden", "true");
+  expect(status.parentElement).toHaveAttribute("title", sentence);
+  expect(cell.getByText(sentence)).toHaveClass("sr-only");
+});
+
 it("asks which kind first when adding, and Local folders opens today's form", async () => {
   withConnections(connection({}));
   vi.spyOn(api, "fetchProcessingLibraries").mockResolvedValue([library()]);

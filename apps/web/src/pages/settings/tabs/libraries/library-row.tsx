@@ -25,7 +25,8 @@ export type LibraryRowActions = {
 
 /**
  * The kind of workflow, said the same way on every page: Weir only, or linked to a media manager (and kept in
- * step with it when it came from one). The manager's own last word shows when it did not answer.
+ * step with it when it came from one). A manager that did not answer is a short red word under the badge, and its own
+ * last word is that word's hover and what a screen reader says, so every row stays the same height.
  */
 function WorkflowSource({
   library,
@@ -37,13 +38,15 @@ function WorkflowSource({
   const kind = workflowKindOf(library, connections);
   const note = workflowKindNote(kind);
   const unreachable = library.manager_coverage === "unreachable";
-  const lastWord = library.manager_connection_ids
-    .map((id) => connections.find((c) => c.id === id)?.last_test_detail)
-    .find((detail) => detail);
+  const lastWord =
+    library.manager_connection_ids
+      .map((id) => connections.find((c) => c.id === id)?.last_test_detail)
+      .find((detail) => detail) ??
+    "Its media manager did not answer the last check.";
   return (
     <>
       {/* The badge says the kind; the sentence about it is its hover, so every row stays one line tall. */}
-      <span className="mm-library-source" title={note}>
+      <span className="block" title={note}>
         <WorkflowKindBadge kind={kind} className="mm-workflow-table__badge" />
         <span className="sr-only">{note}</span>
       </span>
@@ -51,8 +54,12 @@ function WorkflowSource({
         <span className="mm-quiet-table__sub">Kept in step with it.</span>
       ) : null}
       {unreachable ? (
-        <span className="mm-quiet-table__sub mm-status-text--failed">
-          {lastWord ?? "Its media manager did not answer the last check."}
+        <span
+          className="mm-quiet-table__sub mm-status-text--failed"
+          title={lastWord}
+        >
+          <span aria-hidden="true">● Not answering</span>
+          <span className="sr-only">{lastWord}</span>
         </span>
       ) : null}
     </>
