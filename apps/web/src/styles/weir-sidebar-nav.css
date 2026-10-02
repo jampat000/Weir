@@ -141,7 +141,6 @@
   display: grid;
   flex: none;
   place-items: center;
-  box-sizing: border-box;
   min-width: 17.6px;
   height: 17.6px;
   padding: 0 6px;

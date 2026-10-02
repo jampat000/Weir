@@ -331,7 +331,6 @@
 }
 
 .mm-history-detail__eyebrow {
-  margin: 0;
   font-size: var(--mm-type-eyebrow);
   font-weight: 600;
   letter-spacing: 0.14em;
@@ -357,7 +356,6 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px 32px;
-  margin: 0;
 }
 
 .mm-history-figures dt {
@@ -401,7 +399,6 @@
 }
 
 .mm-history-note {
-  margin: 0;
   font-size: var(--mm-type-body);
   color: var(--mm-text2);
 }

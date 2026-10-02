@@ -81,8 +81,6 @@
 
 /* The rows sit in the tile's body in the order they come, and the tile shows only the whole ones that fit (fit-rows.ts). */
 .mm-ops {
-  margin: 0;
-  padding: 0;
   list-style: none;
 }
 
@@ -178,7 +176,6 @@ li:last-child > .mm-op {
   display: grid;
   gap: 4px;
   margin: 8px 0 0;
-  padding: 0;
   list-style: none;
   font-size: var(--mm-type-body);
   font-variant-numeric: tabular-nums;

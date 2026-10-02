@@ -5,7 +5,6 @@
  * Slight inset, soft edge — integrated with cards, not glossy deep wells.
  */
 .mm-input {
-  box-sizing: border-box;
   font: inherit;
   /* Fields often sit inside tracked, uppercase field labels; the value must not inherit that. */
   letter-spacing: normal;
@@ -152,7 +151,6 @@ select option:disabled {
 }
 
 .mm-auth-input.mm-auth-input--password-toggle {
-  box-sizing: border-box;
   width: 100%;
   padding-right: 2.65rem;
 }

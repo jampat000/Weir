@@ -18,7 +18,6 @@
 }
 
 .mm-sy-list {
-  margin: 0;
   padding: 0 10px;
   list-style: none;
 }
@@ -43,7 +42,6 @@
 /* ---- Buttons --------------------------------------------------------------- */
 
 .mm-sy-btn {
-  box-sizing: border-box;
   height: var(--mm-control-height-row);
   padding: 0 10px;
   border: 1px solid var(--mm-hairline);

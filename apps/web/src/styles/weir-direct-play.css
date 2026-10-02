@@ -59,8 +59,6 @@
 
 /* Setup › Rules › Playback devices: one device per row, its source at the right. */
 .mm-device-list {
-  margin: 0;
-  padding: 0;
   list-style: none;
 }
 

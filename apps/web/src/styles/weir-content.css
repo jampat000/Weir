@@ -60,7 +60,6 @@
 }
 
 .mm-quiet-group__title {
-  margin: 0;
   color: var(--mm-text1);
   font-size: var(--mm-type-eyebrow);
   font-weight: 600;
@@ -97,7 +96,6 @@
 
 /* The only control the quiet body carries: a text link, never a button chrome. */
 .mm-quiet-link {
-  padding: 0;
   border: 0;
   background: none;
   color: var(--mm-text2);
@@ -156,7 +154,6 @@
 }
 
 .mm-empty-state__title {
-  margin: 0;
   font-size: var(--mm-type-panel);
   font-weight: 600;
   color: var(--mm-text1);

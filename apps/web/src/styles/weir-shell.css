@@ -1,10 +1,4 @@
-/* The base and the page frame: box sizing, scrollbars, the app layout, in-page rows, workspace tabs and status text. */
-
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
-}
+/* The page frame: scrollbars, the app layout, in-page rows, workspace tabs and status text. Box sizing is Tailwind's preflight. */
 
 * {
   scrollbar-width: thin;
@@ -42,7 +36,6 @@ html {
 
 body.mm-body {
   min-height: 100%;
-  margin: 0;
   font-family: var(--mm-font);
   font-size: 1rem;
   line-height: 1.52;
@@ -111,7 +104,6 @@ kbd {
   justify-content: center;
   gap: 8px;
   height: var(--mm-control-height-page);
-  box-sizing: border-box;
   padding: 0 14px;
   border: 1px solid var(--mm-hairline);
   border-radius: var(--mm-radius-control);

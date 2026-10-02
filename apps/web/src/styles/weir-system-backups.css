@@ -18,7 +18,6 @@
 }
 
 .mm-sy-part__title {
-  margin: 0;
   font-size: var(--mm-type-eyebrow);
   font-weight: 600;
   letter-spacing: 0.1em;
@@ -30,7 +29,6 @@
   display: flex;
   justify-content: space-between;
   gap: 8px;
-  margin: 0;
   font-size: var(--mm-type-caption);
   white-space: nowrap;
   color: var(--mm-text2);
@@ -98,8 +96,6 @@
   flex-wrap: nowrap;
   gap: 2px 14px;
   white-space: nowrap;
-  margin: 0;
-  padding: 0;
   list-style: none;
 }
 

@@ -122,7 +122,6 @@
   height: 22px;
   flex: none;
   place-items: center;
-  box-sizing: border-box;
   border: 1.5px solid var(--pipe-st);
   border-radius: 50%;
   color: var(--pipe-st);
@@ -233,7 +232,6 @@
   height: var(--pipe-card-h, 86px);
   grid-template-columns: calc(var(--pipe-tile-h, 69px) / 1.5) minmax(0, 1fr);
   gap: 10px;
-  box-sizing: border-box;
   padding: 8px;
   border: 1px solid var(--pipe-hairline);
   border-left: 3px solid var(--pipe-st);

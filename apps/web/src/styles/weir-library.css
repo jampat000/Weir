@@ -20,7 +20,6 @@
 .mm-library-picker--one {
   display: flex;
   align-items: center;
-  box-sizing: border-box;
   min-height: var(--mm-control-height-page);
   padding: 0 11.25px;
   overflow: hidden;
@@ -171,7 +170,6 @@
   display: flex;
   align-items: center;
   gap: 2px;
-  box-sizing: border-box;
   width: max-content;
   height: var(--mm-control-height-page);
   padding: 3px;
@@ -377,7 +375,6 @@
 }
 
 .mm-library-saving {
-  margin: 0;
   font-size: var(--mm-type-caption);
   color: var(--mm-text3);
 }

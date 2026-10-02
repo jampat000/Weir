@@ -102,7 +102,6 @@
   display: grid;
   grid-template-rows: 16px minmax(0, 1fr);
   row-gap: 6px;
-  box-sizing: border-box;
   min-width: 0;
   min-height: 0;
   padding: 14px 18px;
@@ -534,8 +533,6 @@
 
 .mm-sy-drives {
   display: grid;
-  margin: 0;
-  padding: 0;
   list-style: none;
 }
 

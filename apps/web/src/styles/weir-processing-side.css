@@ -26,8 +26,6 @@
 
 .mm-health__list,
 .mm-health__pills {
-  margin: 0;
-  padding: 0;
   list-style: none;
 }
 
@@ -60,7 +58,6 @@
 }
 
 .mm-health__action {
-  padding: 0;
   border: 0;
   background: none;
   font: inherit;
@@ -205,7 +202,6 @@
 }
 
 .mm-needs__group-title {
-  margin: 0;
   font-size: var(--mm-type-eyebrow);
   font-weight: 600;
   letter-spacing: 0.08em;
@@ -216,8 +212,6 @@
 .mm-needs__rows {
   display: grid;
   gap: 8px;
-  margin: 0;
-  padding: 0;
   list-style: none;
 }
 

@@ -52,7 +52,6 @@
 }
 
 .mm-quiet-fold__title {
-  margin: 0;
   color: var(--mm-text1);
   font-size: var(--mm-type-body);
   font-weight: 500;
@@ -65,7 +64,6 @@
 }
 
 .mm-quiet-fold__detail {
-  margin: 0;
   padding: 0 0 4px;
   font-size: var(--mm-type-caption);
   line-height: 1.5;

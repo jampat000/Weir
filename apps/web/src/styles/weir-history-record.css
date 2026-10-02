@@ -147,7 +147,6 @@
 }
 
 .mm-history-record-meta {
-  margin: 0;
   font-size: 0.75rem;
   color: var(--mm-text3);
 }
@@ -181,7 +180,6 @@
 }
 
 .mm-history-next__title {
-  margin: 0;
   font-size: 0.875rem;
   font-weight: 600;
 }

@@ -28,7 +28,6 @@
 }
 
 .mm-header__eyebrow {
-  margin: 0;
   font-size: var(--mm-type-eyebrow);
   font-weight: 700;
   letter-spacing: var(--mm-tracking-eyebrow);
@@ -178,7 +177,6 @@
 }
 
 .mm-header__slot .mm-segmented {
-  box-sizing: border-box;
   height: var(--mm-control-height-page);
 }
 
@@ -310,8 +308,6 @@
 .mm-page-tabs__tab,
 .mm-page-tabs__more-button {
   position: relative;
-  margin: 0;
-  padding: 0;
   border: 0;
   border-radius: 4px;
   background: none;
@@ -492,7 +488,6 @@
   align-items: center;
   justify-content: space-between;
   gap: 0 var(--mm-panel-gap);
-  box-sizing: border-box;
   min-height: 40px;
   margin: 0 0 var(--mm-panel-gap);
   border-bottom: 1px solid var(--mm-hairline);

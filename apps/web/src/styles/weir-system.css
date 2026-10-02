@@ -4,7 +4,6 @@
    button is one line. A card's header actions are the panel's own 32px. */
 .mm-system .mm-input,
 .mm-system .mm-sys-btn {
-  box-sizing: border-box;
   height: var(--mm-control-height-page);
   min-height: 0;
   padding-block: 0;
@@ -20,7 +19,6 @@
 }
 
 .mm-system .mm-segmented {
-  box-sizing: border-box;
   min-height: var(--mm-control-height-page);
 }
 
@@ -30,7 +28,6 @@
 
 /* The On/Off switch is a pair of buttons in a frame: the frame takes the height and the buttons fill it. */
 .mm-sys-switch > div {
-  box-sizing: border-box;
   height: var(--mm-control-height-page);
 }
 
@@ -86,7 +83,6 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  margin: 0;
   color: var(--mm-text1);
   font-size: var(--mm-type-body);
   font-weight: 400;
@@ -371,7 +367,6 @@
 }
 
 .mm-account-form__title {
-  margin: 0;
   color: var(--mm-text1);
   font-size: var(--mm-type-body);
   font-weight: 600;
@@ -407,7 +402,6 @@
   align-items: center;
   justify-content: center;
   width: var(--mm-control-height-page);
-  padding: 0;
   border: 0;
   border-radius: 0 var(--mm-radius-sm) var(--mm-radius-sm) 0;
   background: transparent;
@@ -432,8 +426,6 @@
 /* The protections as a checklist: a tick for each that is in force, a warning for each that needs a person, and those
    first, in a box of their own with what to do. */
 .mm-protection__list {
-  margin: 0;
-  padding: 0;
   list-style: none;
 }
 

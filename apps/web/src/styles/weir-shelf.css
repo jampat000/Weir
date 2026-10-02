@@ -44,7 +44,6 @@
   flex-wrap: nowrap;
   align-items: flex-start;
   gap: 12px;
-  box-sizing: border-box;
   margin: 0 -4px;
   padding: 7px 5px 5px;
   overflow: hidden;
@@ -64,7 +63,6 @@
   display: flex;
   width: 100%;
   flex-direction: column;
-  padding: 0;
   border: 0;
   border-radius: 10px;
   background: none;
@@ -172,7 +170,6 @@
   z-index: 2;
   width: max-content;
   max-width: calc(var(--aw, 80px) - 12px);
-  box-sizing: border-box;
   padding: 3px 8px;
   overflow: hidden;
   border-radius: 999px;
@@ -258,7 +255,6 @@
   flex-direction: column;
   gap: 2px;
   margin: 6px 0 0;
-  padding: 0;
   text-align: center;
 }
 
@@ -266,8 +262,6 @@
   display: block;
   height: var(--shelf-line);
   flex: none;
-  margin: 0;
-  padding: 0;
   overflow: hidden;
   font-size: var(--mm-type-caption);
   font-weight: 500;

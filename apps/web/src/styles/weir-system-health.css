@@ -13,7 +13,6 @@
 
 .mm-sy-area {
   position: relative;
-  box-sizing: border-box;
   display: flex;
   min-width: 0;
   flex: 1 1 auto;

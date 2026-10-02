@@ -28,7 +28,6 @@
 
 /* Facts, one per line: the name dim on the left, the fact on the right. */
 .mm-kv {
-  margin: 0;
   display: flex;
   flex-direction: column;
 }

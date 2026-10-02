@@ -19,7 +19,6 @@
   place-items: center;
   width: var(--mm-control-height-row);
   height: var(--mm-control-height-row);
-  padding: 0;
   border: 0;
   border-radius: var(--mm-radius-sm);
   background: transparent;

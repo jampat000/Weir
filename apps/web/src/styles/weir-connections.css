@@ -7,7 +7,6 @@
  */
 
 .mm-conn {
-  box-sizing: border-box;
   border: 1px solid transparent;
   border-radius: 8px;
   transition:
@@ -192,7 +191,6 @@
 
 .mm-ctable__bar {
   height: 28px;
-  box-sizing: border-box;
   margin: 10px 0 4px;
   border: 1px solid var(--mm-hairline);
   border-radius: 8px;
@@ -244,8 +242,6 @@
 }
 
 .mm-ctable__rows {
-  margin: 0;
-  padding: 0;
   list-style: none;
 }
 
@@ -355,8 +351,6 @@
 /* ---- Setup › Connections: a connected media manager or download client as one row ----------------------------- */
 
 .mm-conn-rows {
-  margin: 0;
-  padding: 0;
   list-style: none;
 }
 
@@ -383,7 +377,6 @@
 }
 
 .mm-conn-row__name {
-  margin: 0;
   font-size: var(--mm-type-panel);
   font-weight: 600;
   color: var(--mm-text1);
