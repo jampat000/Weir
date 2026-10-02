@@ -74,31 +74,3 @@
   box-shadow: var(--mm-shadow-popover);
   font-size: 0.75rem;
 }
-
-/* A pill-shaped button inside a page: the schedule grid's "Any time" and "Clear all". */
-.mm-theme-toggle {
-  position: static;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-height: var(--mm-control-height);
-  margin: 0;
-  padding: var(--mm-control-pad-y) var(--mm-control-pad-x);
-  border: 1px solid var(--mm-hairline);
-  border-radius: var(--mm-radius-control);
-  background: var(--mm-button-secondary-bg);
-  color: var(--mm-text2);
-  cursor: pointer;
-  font: inherit;
-  font-size: var(--mm-type-body);
-  font-weight: 600;
-  transition:
-    border-color 0.16s ease,
-    color 0.16s ease,
-    background 0.16s ease;
-}
-
-.mm-theme-toggle:hover {
-  border-color: var(--mm-accent-ring);
-  color: var(--mm-text);
-}

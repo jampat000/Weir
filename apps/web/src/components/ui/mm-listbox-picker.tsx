@@ -60,7 +60,6 @@ export function MmListboxPicker({
 
   const selected = options.find((o) => o.value === value);
   const triggerLabel = selected?.label ?? placeholder;
-  const triggerSurface = mmPickerTriggerSurface(open && !disabled);
 
   return (
     <div
@@ -70,7 +69,7 @@ export function MmListboxPicker({
       <button
         ref={triggerRef}
         type="button"
-        className={triggerSurface}
+        className={mmPickerTriggerSurface}
         disabled={disabled}
         aria-haspopup="listbox"
         aria-controls={open ? listboxId : undefined}

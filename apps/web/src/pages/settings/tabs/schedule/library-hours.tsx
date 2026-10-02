@@ -100,7 +100,7 @@ function ScanNowButton({
       <button
         type="button"
         aria-label={`Scan ${library.name} now`}
-        className={mmActionButtonClass({ variant: "secondary" })}
+        className={mmActionButtonClass({ variant: "secondary", size: "row" })}
         disabled={!editable || !watchedSet || queueScan.isPending}
         title={
           watchedSet ? undefined : "This workflow has no watched folder yet."
@@ -169,7 +169,10 @@ export function LibraryHoursRow({
         <div className="mm-schedule-actions">
           <button
             type="button"
-            className={mmActionButtonClass({ variant: "secondary" })}
+            className={mmActionButtonClass({
+              variant: "secondary",
+              size: "row",
+            })}
             aria-expanded={editing}
             onClick={onToggleEdit}
           >

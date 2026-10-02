@@ -116,7 +116,7 @@ export function LibraryPicker({
       <button
         type="button"
         ref={trigger}
-        className={mmPickerTriggerSurface(open)}
+        className={mmPickerTriggerSurface}
         aria-haspopup="listbox"
         aria-expanded={open}
         title={chosen?.name}

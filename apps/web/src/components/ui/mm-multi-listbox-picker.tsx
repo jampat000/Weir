@@ -64,7 +64,6 @@ export function MmMultiListboxPicker({
       : selectedLabels.length > 0
         ? selectedLabels.join(", ")
         : placeholder;
-  const triggerSurface = mmPickerTriggerSurface(open && !disabled);
 
   return (
     <div
@@ -74,7 +73,7 @@ export function MmMultiListboxPicker({
       <button
         ref={triggerRef}
         type="button"
-        className={triggerSurface}
+        className={mmPickerTriggerSurface}
         disabled={disabled}
         aria-haspopup="listbox"
         aria-controls={open ? listboxId : undefined}

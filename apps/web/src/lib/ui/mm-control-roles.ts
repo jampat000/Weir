@@ -10,10 +10,6 @@
 const FOCUS_RING =
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mm-accent-ring focus-visible:ring-offset-2 focus-visible:ring-offset-mm-card-bg";
 
-/** The same halo in the failure colour, so keyboard focus on a destructive button reads as part of it. */
-const DANGER_FOCUS_RING =
-  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mm-destructive/45 focus-visible:ring-offset-2 focus-visible:ring-offset-mm-card-bg";
-
 const BUTTON_LAYOUT =
   "inline-flex max-w-full items-center justify-center rounded-mm-control border leading-snug tracking-normal transition-all duration-150 whitespace-normal text-center";
 
@@ -37,8 +33,7 @@ export const mmEditableTextFieldClass = "mm-input w-full min-w-0";
  * Visual chrome (inset, border, height, padding, focus) lives on `.mm-input` in `weir-forms.css`.
  */
 const mmNativeFieldShell =
-  "mm-input w-full min-w-0 text-sm text-mm-text transition-[border-color,background-color,box-shadow] duration-150 " +
-  "focus-visible:outline-none disabled:cursor-not-allowed";
+  "mm-input w-full min-w-0 text-sm text-mm-text focus-visible:outline-none disabled:cursor-not-allowed";
 
 /** A native `<select>` under a field label; includes the top spacing. */
 export const mmSelectFieldClass = `${mmNativeFieldShell} mt-1 cursor-pointer`;
@@ -48,18 +43,8 @@ export const mmSelectFieldClass = `${mmNativeFieldShell} mt-1 cursor-pointer`;
 export const mmPickerTriggerClass = `${mmNativeFieldShell} mm-input--opens mt-1 cursor-pointer text-left`;
 
 /** The trigger as the Dashboard's pickers draw it: a field's height with the label at the left and the chevron at the
- *  right, in the focused field's colours while its list is open. */
-export function mmPickerTriggerSurface(open: boolean): string {
-  return [
-    mmPickerTriggerClass,
-    "flex items-center justify-between gap-2",
-    open
-      ? "border-mm-input-border-focus !shadow-[inset_0_1px_3px_rgba(0,0,0,0.22),inset_0_1px_0_rgba(255,255,255,0.04),0_0_0_2px_var(--mm-input-focus-ring)]"
-      : "",
-  ]
-    .filter(Boolean)
-    .join(" ");
-}
+ *  right. `.mm-input` draws the focused field's colours while `aria-expanded` says its list is open. */
+export const mmPickerTriggerSurface = `${mmPickerTriggerClass} flex items-center justify-between gap-2`;
 
 /** Checkbox control — used for multi-option rows and standalone toggles. */
 export const mmCheckboxControlClass =
@@ -90,8 +75,8 @@ export type MmActionVariant =
 /** What each variant looks like and how it answers hover, focus and a disabled button. */
 const BUTTON_LOOK: Record<MmActionVariant, string> = {
   primary: [
-    "font-semibold cursor-pointer border-mm-primary bg-mm-primary text-mm-on-accent shadow-[0_1px_2px_color-mix(in_srgb,var(--mm-primary)_35%,transparent)]",
-    "hover:border-mm-primary-bright hover:bg-mm-primary-bright hover:shadow-[0_4px_16px_color-mix(in_srgb,var(--mm-primary)_28%,transparent)] hover:-translate-y-px",
+    "font-semibold cursor-pointer border-mm-primary bg-mm-primary text-mm-on-accent shadow-(--mm-shadow-action)",
+    "hover:border-mm-primary-bright hover:bg-mm-primary-bright hover:shadow-(--mm-shadow-action-hover) hover:-translate-y-px",
     "active:translate-y-0 active:brightness-[0.97]",
     FOCUS_RING,
     "disabled:cursor-not-allowed disabled:border-mm-border disabled:bg-mm-button-quiet-bg disabled:text-mm-text3 disabled:opacity-80 disabled:shadow-none",
@@ -108,7 +93,7 @@ const BUTTON_LOOK: Record<MmActionVariant, string> = {
   tertiary: [
     "font-medium cursor-pointer border-mm-border bg-transparent text-mm-text2",
     "hover:border-mm-border hover:bg-mm-card-bg/55 hover:text-mm-text1",
-    "active:brightness-[0.98]",
+    "active:brightness-[0.97]",
     FOCUS_RING,
     "disabled:cursor-not-allowed disabled:border-mm-border disabled:bg-transparent disabled:text-mm-text3 disabled:opacity-60",
     "disabled:hover:border-mm-border disabled:hover:bg-transparent disabled:hover:text-mm-text3",
@@ -117,15 +102,15 @@ const BUTTON_LOOK: Record<MmActionVariant, string> = {
     "font-semibold cursor-pointer border-mm-destructive bg-mm-destructive text-mm-on-accent",
     "hover:border-mm-status-failed-text hover:bg-mm-status-failed-text",
     "active:brightness-[0.97]",
-    DANGER_FOCUS_RING,
+    FOCUS_RING,
     "disabled:cursor-not-allowed disabled:border-mm-border disabled:bg-mm-button-quiet-bg disabled:text-mm-text3 disabled:opacity-80",
     "disabled:hover:border-mm-border disabled:hover:bg-mm-button-quiet-bg",
   ].join(" "),
   "danger-outline": [
-    "font-semibold cursor-pointer border-[color-mix(in_srgb,var(--mm-destructive)_55%,var(--mm-border))] bg-transparent text-mm-status-failed-text",
-    "hover:border-mm-destructive hover:bg-mm-status-failed-bg",
+    "font-semibold cursor-pointer border-mm-destructive bg-transparent text-mm-status-failed-text",
+    "hover:bg-mm-status-failed-bg",
     "active:brightness-[0.97]",
-    DANGER_FOCUS_RING,
+    FOCUS_RING,
     "disabled:cursor-not-allowed disabled:border-mm-border disabled:bg-transparent disabled:text-mm-text3 disabled:opacity-70",
     "disabled:hover:border-mm-border disabled:hover:bg-transparent",
   ].join(" "),

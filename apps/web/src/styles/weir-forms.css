@@ -47,6 +47,11 @@
 .mm-input:focus-visible:not(:disabled) {
   outline: 2px solid var(--mm-accent);
   outline-offset: 2px;
+}
+
+/* A field in focus, and a picker whose list is open, are drawn in the focused colours. */
+.mm-input:focus-visible:not(:disabled),
+.mm-input[aria-expanded="true"]:not(:disabled) {
   border-color: var(--mm-input-border-focus);
   box-shadow:
     inset 0 1px 3px rgba(0, 0, 0, 0.22),
