@@ -101,15 +101,15 @@ const BUTTON_LOOK: Record<MmActionVariant, string> = {
   ].join(" "),
   danger: [
     "font-semibold cursor-pointer border-mm-destructive bg-mm-destructive text-mm-on-accent",
-    "hover:border-mm-status-failed-text hover:bg-mm-status-failed-text",
+    "hover:border-mm-broken hover:bg-mm-broken",
     "active:brightness-[0.97]",
     FOCUS_RING,
     "disabled:cursor-not-allowed disabled:border-mm-border disabled:bg-mm-button-quiet-bg disabled:text-mm-text3 disabled:opacity-80",
     "disabled:hover:border-mm-border disabled:hover:bg-mm-button-quiet-bg",
   ].join(" "),
   "danger-outline": [
-    "font-semibold cursor-pointer border-mm-destructive bg-transparent text-mm-status-failed-text",
-    "hover:bg-mm-status-failed-bg",
+    "font-semibold cursor-pointer border-mm-destructive bg-transparent text-mm-broken",
+    "hover:bg-mm-broken-tint",
     "active:brightness-[0.97]",
     FOCUS_RING,
     "disabled:cursor-not-allowed disabled:border-mm-border disabled:bg-transparent disabled:text-mm-text3 disabled:opacity-70",

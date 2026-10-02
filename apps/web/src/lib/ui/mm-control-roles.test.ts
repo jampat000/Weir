@@ -115,9 +115,7 @@ describe("mmActionButtonClass", () => {
   it("draws a destructive action in the failure colour, filled or outlined", () => {
     expect(classesFor("danger")).toContain("bg-mm-destructive");
     expect(classesFor("danger")).not.toContain("bg-mm-primary");
-    expect(classesFor("danger-outline")).toContain(
-      "text-mm-status-failed-text",
-    );
+    expect(classesFor("danger-outline")).toContain("text-mm-broken");
     expect(classesFor("danger-outline")).toContain("bg-transparent");
   });
 });

@@ -10,8 +10,7 @@
  *   Brand colour  --mm-primary, --mm-primary-bright, --mm-primary-2 (--mm-accent* are the same colour)
  *   Signal fills  --mm-success, --mm-warning, --mm-destructive, --mm-info (bars, dots, borders)
  *   Status        --mm-status-{done,todo,doing,attention,broken,idle}, one colour per meaning, and --mm-payoff (gold)
-                 for space-saved figures; lib/ui/status-tone.ts is how a component asks for them
-   Signal text   --mm-status-{healthy,warning,failed,info}-text, aliases of the status colours above
+ *                 for space-saved figures; lib/ui/status-meaning.ts is how a component asks for them
  *   Lanes         --mm-lane-{incoming,queued,analysing,processing,delivering}: violet, teal, indigo, fuchsia and pink
  *   Shape         --mm-radius-* (controls 10px, fields 12px, tiles 14px, panels 14px)
  */
@@ -84,17 +83,12 @@
   --mm-payoff: #f5d23a;
   /* The colour of the status in scope: weir-status.css sets it from an element's data-status. */
   --mm-st: var(--mm-status-idle);
-  --mm-status-healthy-text: var(--mm-status-done);
-  --mm-status-warning-text: var(--mm-status-attention);
-  --mm-status-failed-text: var(--mm-status-broken);
-  --mm-status-info-text: var(--mm-status-doing);
-  --mm-status-healthy-bg: rgba(37, 228, 117, 0.12);
-  --mm-status-warning-bg: rgba(251, 141, 45, 0.14);
-  --mm-status-failed-bg: rgba(239, 77, 77, 0.14);
-  --mm-status-info-bg: rgba(65, 167, 251, 0.14);
-  --mm-warning-border: rgba(251, 141, 45, 0.46);
-  --mm-warning-bg: var(--mm-status-warning-bg);
-  --mm-warning-text: var(--mm-status-warning-text);
+  /* A wash of the removal colour, behind a danger action that is hovered. */
+  --mm-broken-tint: color-mix(
+    in srgb,
+    var(--mm-status-broken) 14%,
+    transparent
+  );
 
   /* The five stations of the Pipeline: a flow, not a status, so none is green, amber, red or the status blue. */
   --mm-lane-incoming: #9d65ec;
@@ -260,11 +254,6 @@ html[data-mm-theme="light"] {
   --mm-status-attention: #964200;
   --mm-status-broken: #b42318;
   --mm-payoff: #6b5c00;
-  --mm-status-healthy-bg: rgba(15, 157, 110, 0.13);
-  --mm-status-warning-bg: rgba(245, 158, 11, 0.13);
-  --mm-status-failed-bg: rgba(239, 68, 68, 0.13);
-  --mm-status-info-bg: rgba(31, 95, 184, 0.13);
-  --mm-warning-border: rgba(171, 71, 5, 0.42);
 
   --mm-lane-incoming: #9d65ec;
   --mm-lane-queued: #14a8a4;

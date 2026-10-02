@@ -58,7 +58,6 @@ import {
   type HandedBackTone,
 } from "../../pages/processing/handed-back-model";
 import type { StepState } from "../../pages/processing/stage-flow-model";
-import type { MmStatusTone } from "./mm-status-tone";
 import { STATUS_MEANINGS } from "./status-meaning";
 import type { StatusMeaning } from "./status-meaning";
 import { trackMeaning } from "./track-meaning";
@@ -254,13 +253,6 @@ const VOCABULARIES = {
     next: "todo",
     failed: "broken",
   } satisfies Record<StepState, StatusMeaning>,
-  chipTone: {
-    healthy: "done",
-    info: "doing",
-    warning: "attention",
-    failed: "broken",
-    neutral: "idle",
-  } satisfies Record<MmStatusTone, StatusMeaning>,
 };
 
 describe("the meaning of every state a model can produce", () => {

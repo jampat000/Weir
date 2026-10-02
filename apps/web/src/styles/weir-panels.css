@@ -302,33 +302,6 @@ a.mm-stat__label:hover {
   white-space: nowrap;
 }
 
-.mm-chip__dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: currentColor;
-}
-
-.mm-chip--healthy {
-  color: var(--mm-status-healthy-text);
-  background: var(--mm-status-healthy-bg);
-}
-
-.mm-chip--warning {
-  color: var(--mm-status-warning-text);
-  background: var(--mm-status-warning-bg);
-}
-
-.mm-chip--failed {
-  color: var(--mm-status-failed-text);
-  background: var(--mm-status-failed-bg);
-}
-
-.mm-chip--info {
-  color: var(--mm-status-info-text);
-  background: var(--mm-status-info-bg);
-}
-
 .mm-chip--neutral {
   border-color: var(--mm-hairline);
   color: var(--mm-text2);

@@ -14,13 +14,11 @@ import { describe, expect, it } from "vitest";
  * button that removes things) moves from MIGRATE_ME to NOT_A_STATUS with the reason.
  */
 
-const MIGRATE_ME: readonly string[] = ["styles/weir-panels.css"];
+const MIGRATE_ME: readonly string[] = [];
 
 const NOT_A_STATUS: Readonly<Record<string, string>> = {
   "lib/ui/mm-control-roles.ts":
     "the danger button role: a button that removes or overrides, not a status",
-  "styles/weir-sidebar-nav.css":
-    "the sign-out menu item is a danger action, not a status",
 };
 
 const RETIRED_STATUS_CLASSES: readonly string[] = [

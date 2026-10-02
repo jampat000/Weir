@@ -57,8 +57,8 @@
   --color-mm-well-bg: var(--mm-well-bg);
   --color-mm-button-quiet-bg: var(--mm-button-quiet-bg);
   --color-mm-button-secondary-bg: var(--mm-button-secondary-bg);
-  --color-mm-status-failed-text: var(--mm-status-failed-text);
-  --color-mm-status-failed-bg: var(--mm-status-failed-bg);
+  --color-mm-broken: var(--mm-status-broken);
+  --color-mm-broken-tint: var(--mm-broken-tint);
   --tracking-mm-eyebrow: var(--mm-tracking-eyebrow);
   --radius-mm-sm: var(--mm-radius-sm);
   --radius-mm-control: var(--mm-radius-control);

@@ -316,8 +316,8 @@
 }
 
 .mm-sidebar-user__item--danger:hover:not(:disabled) {
-  background: var(--mm-status-failed-bg);
-  color: var(--mm-status-failed-text);
+  background: var(--mm-broken-tint);
+  color: var(--mm-status-broken);
 }
 
 .mm-sidebar-user__item:disabled {
