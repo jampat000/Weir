@@ -12,7 +12,10 @@ import {
 import type { ProcessingDirectPlayVerdict } from "../processing/files-api";
 import type { Readiness } from "../processing/library-folder-chain-api";
 import type { SystemLogLevel } from "../system/system-log-api";
-import { LIBRARY_STATUSES } from "../../pages/library/library-model";
+import {
+  LIBRARY_STATUSES,
+  STATUS_MEANING as LIBRARY_STATUS_MEANING,
+} from "../../pages/library/library-model";
 import type { LibraryStatus } from "../../pages/library/library-model";
 import type { LogLevel } from "../../pages/processing/dashboard/system/log-card-model";
 import type { TaskState } from "../../pages/processing/dashboard/system/tasks-card-model";
@@ -27,18 +30,29 @@ import { STATUS_MEANINGS } from "./status-meaning";
 import type { StatusMeaning } from "./status-meaning";
 
 /*
+ * What the screens that show a state decide it means, beside the function the screen itself uses to decide: the two
+ * must agree, so a screen cannot change what a state means without this table saying so. Each table is typed against
+ * the model's own union, so a state added to a model does not compile until someone decides what it means here.
+ */
+const PRODUCTION_MEANINGS = {
+  libraryStatus: {
+    used: LIBRARY_STATUS_MEANING,
+    expected: {
+      needs_cleaning: "todo",
+      cleaning: "doing",
+      matches: "done",
+      cant_clean_yet: "attention",
+      left_alone: "idle",
+    } satisfies Record<LibraryStatus, StatusMeaning>,
+  },
+};
+
+/*
  * Every state a model can produce, and the meaning it has. Each table is typed against its model's own union, so
  * a state added to a model does not compile until someone decides what it means here. When a model starts
  * producing a StatusMeaning itself, delete its row.
  */
 const VOCABULARIES = {
-  libraryStatus: {
-    needs_cleaning: "todo",
-    cleaning: "doing",
-    matches: "done",
-    cant_clean_yet: "attention",
-    left_alone: "idle",
-  } satisfies Record<LibraryStatus, StatusMeaning>,
   finishedFile: {
     cleaned: "done",
     already: "done",
@@ -154,8 +168,18 @@ describe("the meaning of every state a model can produce", () => {
     },
   );
 
+  it.each(Object.entries(PRODUCTION_MEANINGS))(
+    "%s: the screen gives every state the meaning decided for it",
+    (_name, { used, expected }) => {
+      expect(used).toEqual(expected);
+      for (const meaning of Object.values(used)) {
+        expect(STATUS_MEANINGS).toContain(meaning);
+      }
+    },
+  );
+
   it("the Library table covers every status the Library lists", () => {
-    expect(Object.keys(VOCABULARIES.libraryStatus).sort()).toEqual(
+    expect(Object.keys(PRODUCTION_MEANINGS.libraryStatus.used).sort()).toEqual(
       [...LIBRARY_STATUSES].sort(),
     );
   });

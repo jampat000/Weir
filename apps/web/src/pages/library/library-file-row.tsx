@@ -3,8 +3,11 @@ import type { ReactNode } from "react";
 import { Poster } from "../../components/shared/poster";
 import { formatBytes } from "../../lib/format/bytes";
 import { baseName } from "../../lib/format/path";
+import { classNames } from "../../lib/ui/class-names";
 import type { LibraryFile } from "../../lib/processing/library-mode-api";
-import { STATUS_RAG, statusNote, statusWords, type Rag } from "./library-model";
+import { StatusDot } from "../../components/panels/status-dot";
+import type { StatusMeaning } from "../../lib/ui/status-meaning";
+import { fileMeaning, statusNote, statusWords } from "./library-model";
 
 const MANAGER_NAMES: Record<string, string> = {
   sonarr: "Sonarr",
@@ -55,11 +58,11 @@ export function CheckCell({
  * cleaning, or what Weir did. A title with several files says the same of them all in the same cell.
  */
 export function StatusCell({
-  rag,
+  meaning,
   words,
   note,
 }: {
-  rag: Rag;
+  meaning: StatusMeaning;
   words: string;
   note?: string | null;
 }) {
@@ -69,7 +72,8 @@ export function StatusCell({
       className="mm-library-verdict"
       title={note ? `${words} (${note})` : words}
     >
-      <span className="mm-library-rag" data-rag={rag}>
+      <span className="mm-library-rag mm-status-text" data-status={meaning}>
+        <StatusDot meaning={meaning} />
         {words}
       </span>
       {note ? <span className="mm-library-verdict__note">{note}</span> : null}
@@ -84,7 +88,7 @@ function FileFigures({ file }: { file: LibraryFile }) {
   return (
     <>
       <StatusCell
-        rag={STATUS_RAG[file.status]}
+        meaning={fileMeaning(file)}
         words={statusWords(file)}
         note={statusNote(file)}
       />
@@ -97,7 +101,13 @@ function FileFigures({ file }: { file: LibraryFile }) {
       <span role="cell" className="mm-library-num">
         {formatBytes(file.size_bytes)}
       </span>
-      <span role="cell" className="mm-library-num mm-library-back">
+      <span
+        role="cell"
+        className={classNames(
+          "mm-library-num mm-library-back",
+          file.estimated_bytes_saved > 0 && "mm-payoff",
+        )}
+      >
         {file.estimated_bytes_saved > 0
           ? formatBytes(file.estimated_bytes_saved)
           : "—"}

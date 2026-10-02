@@ -25,11 +25,9 @@ const MIGRATE_ME: readonly string[] = [
   "styles/weir-auth.css",
   "styles/weir-dialogs.css",
   "styles/weir-direct-play.css",
-  "styles/weir-drawer.css",
   "styles/weir-history-record.css",
   "styles/weir-history.css",
   "styles/weir-interrupt.css",
-  "styles/weir-library.css",
   "styles/weir-panels.css",
   "styles/weir-pipeline.css",
   "styles/weir-processing-side.css",
@@ -60,6 +58,9 @@ const RETIRED_STATUS_CLASSES: readonly string[] = [
   "mm-conn--answered",
   "mm-conn--failed",
   "mm-ctable__bar--",
+  "data-rag",
+  "STATUS_RAG",
+  "mm-library-scan__dot",
 ];
 
 const RAW_HEX_IN_STYLESHEETS: readonly string[] = [

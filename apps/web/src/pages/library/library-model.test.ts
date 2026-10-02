@@ -5,6 +5,7 @@ import type {
   LibraryTotals,
 } from "../../lib/processing/library-mode-api";
 import {
+  fileMeaning,
   filesCount,
   groupOf,
   headerLead,
@@ -141,37 +142,69 @@ describe("statusNote", () => {
   });
 });
 
+describe("fileMeaning", () => {
+  const held = (problem_kind: LibraryFile["problem_kind"]) =>
+    libraryFile({ status: "cant_clean_yet", problem_kind });
+
+  it("is the meaning of the file's status", () => {
+    expect(fileMeaning(libraryFile({ status: "needs_cleaning" }))).toBe("todo");
+    expect(fileMeaning(libraryFile({ status: "cleaning" }))).toBe("doing");
+    expect(fileMeaning(libraryFile({ status: "matches" }))).toBe("done");
+    expect(fileMeaning(held("seeding"))).toBe("attention");
+    expect(fileMeaning(libraryFile({ status: "left_alone" }))).toBe("idle");
+  });
+
+  it("is broken for a file Weir cannot read or write, and not for one held back for another reason", () => {
+    expect(fileMeaning(held("unreadable"))).toBe("broken");
+    expect(fileMeaning(held("no_permission"))).toBe("broken");
+    expect(fileMeaning(held("manager_redownload"))).toBe("attention");
+    expect(fileMeaning(held(null))).toBe("attention");
+  });
+});
+
 describe("groupSummary", () => {
   const filesIn = (...statuses: LibraryFile["status"][]) =>
     statuses.map((status) => libraryFile({ status }));
 
-  it("says in red how many of a title's files need cleaning, whatever else they are", () => {
+  it("says how many of a title's files need cleaning, as files still to do, whatever else they are", () => {
     expect(
       groupSummary(filesIn("matches", "needs_cleaning", "needs_cleaning")),
-    ).toEqual({ rag: "failed", text: "2 need cleaning" });
+    ).toEqual({ meaning: "todo", text: "2 need cleaning" });
   });
 
-  it("says in green how many match when none needs anything", () => {
+  it("says how many match, as done, when none needs anything", () => {
     expect(groupSummary(filesIn("matches", "matches", "left_alone"))).toEqual({
-      rag: "healthy",
+      meaning: "done",
       text: "2 match",
     });
   });
 
   it("puts Weir at work, then a file held back, before a match", () => {
     expect(groupSummary(filesIn("matches", "cleaning"))).toEqual({
-      rag: "info",
+      meaning: "doing",
       text: "1 cleaning",
     });
     expect(groupSummary(filesIn("matches", "cant_clean_yet"))).toEqual({
-      rag: "warning",
+      meaning: "attention",
       text: "1 can't clean yet",
     });
   });
 
-  it("says in grey that files set aside are left alone", () => {
+  it("says a title's held files are broken when Weir cannot read one of them", () => {
+    const files = [
+      libraryFile({ status: "cant_clean_yet", problem_kind: "seeding" }),
+      libraryFile({ status: "cant_clean_yet", problem_kind: "unreadable" }),
+    ];
+
+    expect(groupSummary(files)).toEqual({
+      meaning: "broken",
+      text: "2 can't clean yet",
+    });
+  });
+
+  it("says that files set aside are left alone, as idle", () => {
     expect(groupSummary(filesIn("left_alone", "left_alone"))).toEqual({
-      rag: "neutral",
+      meaning: "idle",
       text: "2 left alone",
     });
   });

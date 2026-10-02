@@ -3,15 +3,16 @@ import type {
   LibraryProblemKind,
   LibraryTotals,
 } from "../../lib/processing/library-mode-api";
+import { StatusDot } from "../../components/panels/status-dot";
 import { HeaderSearch } from "../../components/shell/header-search";
 import { MoreMenu } from "../../components/shell/more-menu";
 import { foldedChipIndexes } from "../../components/shell/title-line-fit";
+import type { StatusMeaning } from "../../lib/ui/status-meaning";
 import {
   LIBRARY_STATUSES,
   PROBLEM_LABELS,
-  STATUS_RAG,
+  STATUS_MEANING,
   type LibraryStatus,
-  type Rag,
 } from "./library-model";
 
 /** Which slice of the library the table shows: one status, or all of it. The reason list narrows "can't clean yet". */
@@ -49,8 +50,8 @@ type Chip = {
   id: "all" | LibraryStatus;
   label: string;
   hint: string;
-  /** Its colour, which is the colour of the same thing in the table. "All" is plain. */
-  rag?: Rag;
+  /** What its files mean, which is what the same files mean in the table. "All" has none. */
+  meaning?: StatusMeaning;
   count: (totals: LibraryTotals) => number;
 };
 
@@ -70,35 +71,35 @@ const CHIPS: Chip[] = [
     id: "needs_cleaning",
     label: "Needs cleaning",
     hint: "Needs cleaning: these do not match your rules as they are now",
-    rag: STATUS_RAG.needs_cleaning,
+    meaning: STATUS_MEANING.needs_cleaning,
     count: (totals) => totals.by_status.needs_cleaning,
   },
   {
     id: "cleaning",
     label: "Cleaning",
     hint: "Cleaning: queued for a clean, or being cleaned right now",
-    rag: STATUS_RAG.cleaning,
+    meaning: STATUS_MEANING.cleaning,
     count: (totals) => totals.by_status.cleaning,
   },
   {
     id: "matches",
     label: "Matches rules",
     hint: "Matches your rules: fine as they are",
-    rag: STATUS_RAG.matches,
+    meaning: STATUS_MEANING.matches,
     count: (totals) => totals.by_status.matches,
   },
   {
     id: "cant_clean_yet",
     label: "Can't clean",
     hint: "Can't clean yet: still seeding, or Weir cannot read them. Weir tries again on its own",
-    rag: STATUS_RAG.cant_clean_yet,
+    meaning: STATUS_MEANING.cant_clean_yet,
     count: (totals) => totals.by_status.cant_clean_yet,
   },
   {
     id: "left_alone",
     label: "Left alone",
     hint: "Left alone: you chose to skip these; nothing cleans them until you clear it",
-    rag: STATUS_RAG.left_alone,
+    meaning: STATUS_MEANING.left_alone,
     count: (totals) => totals.by_status.left_alone,
   },
 ];
@@ -202,22 +203,26 @@ export function LibraryFilters({
       />
       <div className="mm-library-chips-box" ref={onRow}>
         <div className="mm-library-chips" role="group" aria-label="Show">
-          {CHIPS.map((chip, index) =>
-            hidden.has(index) ? null : (
+          {CHIPS.map((chip, index) => {
+            if (hidden.has(index)) return null;
+            const empty = totals && chip.count(totals) === 0;
+            const meaning = empty ? "idle" : chip.meaning;
+            return (
               <button
                 key={chip.id}
                 type="button"
                 className="mm-library-chip"
-                data-rag={chip.rag}
-                data-empty={totals && chip.count(totals) === 0 ? "" : undefined}
+                data-status={meaning}
+                data-empty={empty ? "" : undefined}
                 title={chip.hint}
                 aria-pressed={isChosen(chip)}
                 onClick={() => choose(chip)}
               >
+                {meaning ? <StatusDot meaning={meaning} /> : null}
                 {chip.label} <b>{countText(chip)}</b>
               </button>
-            ),
-          )}
+            );
+          })}
           {foldedChips.length > 0 ? (
             <MoreMenu
               menuLabel="More statuses"

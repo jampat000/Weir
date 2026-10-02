@@ -7,7 +7,7 @@ import type {
 } from "../../lib/processing/library-mode-api";
 import { parseAppDate } from "../../lib/ui/mm-format-date";
 import { plural } from "../../lib/ui/mm-plural";
-import type { MmStatusTone } from "../../lib/ui/mm-status-tone";
+import type { StatusMeaning } from "../../lib/ui/status-meaning";
 
 const MINUTE_MS = 60_000;
 /** Past this many minutes a scan's age reads in hours, and past this many hours in days. */
@@ -66,18 +66,32 @@ export const LIBRARY_STATUSES: readonly LibraryStatus[] = [
 ];
 
 /**
- * The colour of a count or a file, in the status colours the rest of Weir uses: red is what the rules say needs fixing,
- * blue is Weir working on it now, green is fine, amber is held back for now, and grey is what a person set aside.
+ * What each status means, so what is shown for it reads the same as the same state anywhere in Weir: a file to clean is
+ * waiting for its turn, Weir at work is under way, a match is done, a file held back needs a look, and one a person set
+ * aside is idle. A held file Weir cannot reach is the exception, see fileMeaning.
  */
-export type Rag = MmStatusTone;
-
-export const STATUS_RAG: Record<LibraryStatus, Rag> = {
-  needs_cleaning: "failed",
-  cleaning: "info",
-  matches: "healthy",
-  cant_clean_yet: "warning",
-  left_alone: "neutral",
+export const STATUS_MEANING: Record<LibraryStatus, StatusMeaning> = {
+  needs_cleaning: "todo",
+  cleaning: "doing",
+  matches: "done",
+  cant_clean_yet: "attention",
+  left_alone: "idle",
 };
+
+/** The problems that mean Weir cannot reach the file at all, which is broken and not merely held back. */
+const UNREACHABLE: ReadonlySet<LibraryProblemKind> = new Set([
+  "unreadable",
+  "no_permission",
+]);
+
+/** What a file's status means: its status's meaning, but broken where Weir cannot read or write the file. */
+export function fileMeaning(file: LibraryFile): StatusMeaning {
+  return file.status === "cant_clean_yet" &&
+    file.problem_kind &&
+    UNREACHABLE.has(file.problem_kind)
+    ? "broken"
+    : STATUS_MEANING[file.status];
+}
 
 const REASON_WORDS: Record<
   NonNullable<LibraryFile["status_reason"]>,
@@ -161,21 +175,33 @@ export function emptyStatusLine(status: LibraryStatus): string {
 }
 
 /**
- * What a title with several files comes to: the worst of its files, in the order a person has to act on them. Any file to
- * clean says so in red; otherwise Weir at work, then a file held back, then the files that match, then the rest.
+ * What a title with several files comes to: the first of its files to say something, in the order a person reads the
+ * statuses: files to clean, then Weir at work, then a file held back, then the files that match, then the rest.
  */
-export function groupSummary(files: LibraryFile[]): { rag: Rag; text: string } {
+export function groupSummary(files: LibraryFile[]): {
+  meaning: StatusMeaning;
+  text: string;
+} {
   const count = (status: LibraryStatus) =>
     files.filter((file) => file.status === status).length;
   const needing = count("needs_cleaning");
-  if (needing > 0) return { rag: "failed", text: `${needing} need cleaning` };
+  if (needing > 0) {
+    return { meaning: "todo", text: `${needing} need cleaning` };
+  }
   const cleaning = count("cleaning");
-  if (cleaning > 0) return { rag: "info", text: `${cleaning} cleaning` };
-  const held = count("cant_clean_yet");
-  if (held > 0) return { rag: "warning", text: `${held} can't clean yet` };
+  if (cleaning > 0) return { meaning: "doing", text: `${cleaning} cleaning` };
+  const held = files.filter((file) => file.status === "cant_clean_yet");
+  if (held.length > 0) {
+    return {
+      meaning: held.some((file) => fileMeaning(file) === "broken")
+        ? "broken"
+        : "attention",
+      text: `${held.length} can't clean yet`,
+    };
+  }
   const matching = count("matches");
-  if (matching > 0) return { rag: "healthy", text: `${matching} match` };
-  return { rag: "neutral", text: `${files.length} left alone` };
+  if (matching > 0) return { meaning: "done", text: `${matching} match` };
+  return { meaning: "idle", text: `${files.length} left alone` };
 }
 
 /**

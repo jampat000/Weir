@@ -1,4 +1,5 @@
 import type { useTriggerLibraryScan } from "../../lib/processing/library-mode-queries";
+import { StatusDot } from "../../components/panels/status-dot";
 import { errorMessage } from "../../lib/api/error-message";
 import type {
   LibraryModeSchedule,
@@ -49,9 +50,9 @@ export function LibraryScanStatus({
         title={sentence}
       >
         {running ? (
-          <i className="mm-live-pulse" aria-hidden="true" />
+          <i className="mm-live-pulse" data-status="doing" aria-hidden="true" />
         ) : (
-          <span className="mm-library-scan__dot" aria-hidden="true" />
+          <StatusDot meaning={scan ? "done" : "idle"} />
         )}
         <span>{when}</span>
         {scheduleBrief ? (
@@ -63,7 +64,8 @@ export function LibraryScanStatus({
       </span>
       {rescan.isError ? (
         <span
-          className="mm-library-scan__error"
+          className="mm-library-scan__error mm-status-text"
+          data-status="broken"
           role="alert"
           title={errorMessage(rescan.error, START_FAILED)}
           data-testid="library-scan-error"

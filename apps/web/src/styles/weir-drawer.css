@@ -199,8 +199,8 @@ body.mm-drawer-open {
   margin: 0;
   padding: 8px 12px;
   border-radius: var(--mm-radius-sm);
-  border: 1px solid var(--mm-warning-border);
-  background: var(--mm-status-failed-bg);
+  border: 1px solid color-mix(in srgb, var(--mm-st) 45%, transparent);
+  background: color-mix(in srgb, var(--mm-st) 13%, transparent);
   font-size: var(--mm-type-caption);
   line-height: 1.5;
   color: var(--mm-text1);

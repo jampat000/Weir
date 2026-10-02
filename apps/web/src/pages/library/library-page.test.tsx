@@ -330,8 +330,8 @@ describe("LibraryPage", () => {
     expect(screen.getByText("Northbound")).toBeInTheDocument();
     expect(screen.getByText("Sonarr · 2 files")).toBeInTheDocument();
     expect(screen.getByText("1 need cleaning")).toHaveAttribute(
-      "data-rag",
-      "failed",
+      "data-status",
+      "todo",
     );
     expect(
       screen.getByText(/back if everything that would change is cleaned/),
@@ -965,24 +965,24 @@ describe("LibraryPage", () => {
     },
   );
 
-  it("colours each count and each file by its status: red needs cleaning, blue cleaning, green matches, amber waiting, grey set aside", () => {
+  it("shows each count and each file by what its status means: needs cleaning waits, cleaning is under way, matches is done, held back needs a look, set aside is idle", () => {
     renderLibrary();
 
     const tone = (name: RegExp) =>
-      screen.getByRole("button", { name }).getAttribute("data-rag");
-    expect(tone(/Needs cleaning/)).toBe("failed");
-    expect(tone(/Cleaning \d/)).toBe("info");
-    expect(tone(/Matches rules/)).toBe("healthy");
-    expect(tone(/Can't clean/)).toBe("warning");
-    expect(tone(/Left alone/)).toBe("neutral");
+      screen.getByRole("button", { name }).getAttribute("data-status");
+    expect(tone(/Needs cleaning/)).toBe("todo");
+    expect(tone(/Cleaning \d/)).toBe("doing");
+    expect(tone(/Matches rules/)).toBe("done");
+    expect(tone(/Can't clean/)).toBe("attention");
+    expect(tone(/Left alone/)).toBe("idle");
     expect(tone(/^All/)).toBeNull();
 
     const rows = screen.getAllByTestId("library-row");
     const verdict = (row: HTMLElement) =>
       row.querySelector(".mm-library-verdict .mm-library-rag");
     expect(
-      new Set(rows.map((row) => verdict(row)?.getAttribute("data-rag"))),
-    ).toEqual(new Set(["failed", "healthy", "warning"]));
+      new Set(rows.map((row) => verdict(row)?.getAttribute("data-status"))),
+    ).toEqual(new Set(["todo", "done", "attention"]));
   });
 
   it("narrows can't clean yet to one reason, only while that status is chosen", () => {

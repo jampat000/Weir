@@ -27,7 +27,7 @@ import { errorMessage } from "../../lib/api/error-message";
 import { useAppDateFormatter } from "../../lib/ui/mm-format-date";
 import { plural } from "../../lib/ui/mm-plural";
 import { LibraryCleanOutcome } from "./library-clean-dialog";
-import { STATUS_RAG, statusNote, statusWords } from "./library-model";
+import { fileMeaning, statusNote, statusWords } from "./library-model";
 import { REMOVAL_IS_FINAL, removalIsRecoverable } from "./library-clean-model";
 import { TrackList, rulesKeep, toggled } from "./library-drawer-tracks";
 import { LibraryLeaveAlone, useLeaveAlone } from "./library-leave-alone";
@@ -63,11 +63,11 @@ function FileChips({
       ) : null}
       <Chip dot={false}>{formatBytes(file.size_bytes)}</Chip>
       {file.manager_kind ? (
-        <Chip tone="healthy">
+        <Chip meaning="done">
           {MANAGER_NAMES[file.manager_kind] ?? file.manager_kind}: matched
         </Chip>
       ) : null}
-      <Chip tone={STATUS_RAG[leftAlone ? "left_alone" : file.status]}>
+      <Chip meaning={leftAlone ? "idle" : fileMeaning(file)}>
         {leftAlone && file.status !== "left_alone"
           ? "Left alone"
           : statusWords(file)}
@@ -255,7 +255,7 @@ export function LibraryFileDrawer({
         </div>
 
         {clean.failure ? (
-          <p className="mm-drawer__failure" role="alert">
+          <p className="mm-drawer__failure" data-status="broken" role="alert">
             {clean.failure}
           </p>
         ) : null}

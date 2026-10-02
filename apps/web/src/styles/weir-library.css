@@ -96,20 +96,12 @@
   color: var(--mm-text2);
 }
 
-.mm-library-scan__dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--mm-status-healthy-text);
-}
-
 .mm-library-scan__error {
   max-width: 16rem;
   overflow: hidden;
   font-size: var(--mm-type-caption);
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--mm-status-failed-text);
 }
 
 /* The title block keeps the room for its whole eyebrow; the controls give way before it does. */
@@ -248,52 +240,16 @@
     color 0.15s ease;
 }
 
-/* The colour of a count and of the same files in the table (library-model's Rag): red needs cleaning, blue is being
-   cleaned, green matches, amber cannot be cleaned yet, grey is left alone. The words are the signal-text colours, which
-   are tuned for contrast in both themes, and the dot is the words' own colour. */
-[data-rag="healthy"] {
-  --rag: var(--mm-status-healthy-text);
-}
-
-[data-rag="failed"] {
-  --rag: var(--mm-status-failed-text);
-}
-
-[data-rag="warning"] {
-  --rag: var(--mm-status-warning-text);
-}
-
-[data-rag="info"] {
-  --rag: var(--mm-status-info-text);
-}
-
-[data-rag="neutral"] {
-  --rag: var(--mm-text2);
-}
-
-.mm-library-rag::before,
-.mm-library-chip[data-rag]::before {
-  display: inline-block;
-  width: 6px;
-  height: 6px;
+/* A status dot in the table or in a chip, with a gap to the words and sitting level with them. */
+.mm-library-rag .mm-status-dot,
+.mm-library-chip .mm-status-dot {
   margin-right: 6px;
-  border-radius: 50%;
-  background: var(--rag);
-  vertical-align: 1px;
-  content: "";
+  vertical-align: 0;
 }
 
-.mm-library-chip[data-rag]:not([data-empty]) b {
-  color: var(--rag);
-}
-
-/* A status with no files: a grey dot and a grey count, still a chip that can be chosen. */
-.mm-library-chip[data-empty]::before {
-  background: var(--mm-text3);
-}
-
-.mm-library-chip[data-empty] b {
-  color: var(--mm-text3);
+/* A count takes the colour of its status; a chosen chip keeps the chosen colour. */
+.mm-library-chip[data-status] b {
+  color: var(--mm-st);
 }
 
 .mm-library-chip b {
@@ -431,8 +387,8 @@
   margin: 0;
   padding: 10px 14px;
   border-radius: var(--mm-radius);
-  border: 1px solid var(--mm-warning-border);
-  background: var(--mm-status-failed-bg);
+  border: 1px solid color-mix(in srgb, var(--mm-st) 45%, transparent);
+  background: color-mix(in srgb, var(--mm-st) 13%, transparent);
   font-size: var(--mm-type-body);
   color: var(--mm-text1);
 }
@@ -516,7 +472,7 @@
 
 .mm-library-setup__confirm {
   padding: 0.75rem 0 0.75rem 0.9rem;
-  border-left: 2px solid var(--mm-status-warning-text);
+  border-left: 2px solid var(--mm-st);
   color: var(--mm-text2);
 }
 

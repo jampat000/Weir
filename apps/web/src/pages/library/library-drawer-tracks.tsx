@@ -36,7 +36,7 @@ export function TrackList({
         const keeping = kept ? kept.has(track.index) : rulesKeep(track);
         const row = (
           <>
-            <Chip tone={keeping ? "healthy" : "warning"} dot={false}>
+            <Chip meaning={keeping ? "done" : "idle"} dot={false}>
               {keeping ? "Keep" : "Remove"}
             </Chip>
             <span className="mm-drawer__track-name">

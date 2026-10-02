@@ -23,6 +23,7 @@ function DailyCleanWarning({
   return (
     <div
       className="mm-library-setup__confirm"
+      data-status="attention"
       role="alertdialog"
       aria-label="Switch on the daily clean"
     >

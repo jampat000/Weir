@@ -92,7 +92,7 @@ export function LibraryGroup({
             </span>
           </button>
         </span>
-        <StatusCell rag={summary.rag} words={summary.text} />
+        <StatusCell meaning={summary.meaning} words={summary.text} />
       </div>
       {folded
         ? null

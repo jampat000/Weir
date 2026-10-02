@@ -49,11 +49,6 @@
   background: color-mix(in srgb, var(--mm-primary) 8%, transparent);
 }
 
-/* What Weir would do with a file, or what a title's files come to, in the colour of its status. */
-.mm-library-rag {
-  color: var(--rag, var(--mm-text2));
-}
-
 .mm-library-group {
   display: contents;
 }

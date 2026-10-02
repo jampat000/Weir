@@ -121,7 +121,7 @@
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: var(--mm-accent);
+  background: var(--mm-st);
 }
 
 .mm-live-pulse::after {
@@ -129,7 +129,7 @@
   position: absolute;
   inset: 0;
   border-radius: 50%;
-  background: var(--mm-accent);
+  background: var(--mm-st);
   animation: mm-live-pulse 1.8s ease-out infinite;
 }
 
