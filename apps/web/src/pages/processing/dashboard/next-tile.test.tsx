@@ -12,7 +12,7 @@ function item(key: string, secondsAway: number, label: string): NextItem {
   return {
     key,
     label,
-    to: `/settings?tab=${key}`,
+    to: `/setup/performance/${key}`,
     at: NOW + secondsAway * 1000,
     intervalSeconds: 300,
   };
@@ -55,7 +55,7 @@ describe("the Next tile", () => {
     const then = within(screen.getByTestId("live-next-then"));
     expect(
       then.getByRole("link", { name: "then Cleanup: Leftover work files" }),
-    ).toHaveAttribute("href", "/settings?tab=cleanup");
+    ).toHaveAttribute("href", "/setup/performance/cleanup");
     expect(then.getAllByRole("listitem")[0]).toHaveTextContent("20 min");
     expect(then.getAllByRole("listitem")[1]).toHaveTextContent("1:00 pm");
   });

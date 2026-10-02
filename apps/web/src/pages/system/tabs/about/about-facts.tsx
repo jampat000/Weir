@@ -78,7 +78,7 @@ export function AboutFacts() {
             {mkvmerge && mkvmerge !== "not installed"
               ? "mkvmerge for MKV files, FFmpeg for the rest."
               : "FFmpeg. With mkvmerge installed, Weir would write MKV files with it."}{" "}
-            A workflow can be set to FFmpeg only in Settings › Workflows.
+            A workflow can be set to FFmpeg only in Setup › Workflows.
           </dd>
         </div>
         <div>
@@ -118,7 +118,7 @@ export function AboutFacts() {
               <dt>Worker slots</dt>
               <dd>
                 {runtime.data.in_process_processing_worker_count}. Files at
-                once, in Settings › Performance, decides how many run.
+                once, in Setup › Performance › Speed, decides how many run.
               </dd>
             </div>
             <div>

@@ -166,7 +166,7 @@ export function HistoryDetail({
       />
 
       <div className="mm-history-links">
-        {working ? <Link to="/">See it on Processing →</Link> : null}
+        {working ? <Link to="/">See it on the Dashboard →</Link> : null}
         <a href={processingFileLogDownloadPath(file.id)}>
           Download its record →
         </a>

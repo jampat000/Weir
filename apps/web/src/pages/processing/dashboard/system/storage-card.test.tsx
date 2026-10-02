@@ -32,7 +32,7 @@ describe("the Storage card", () => {
     expect(within(card).getByText("400 GB free")).toBeInTheDocument();
     expect(
       within(card).getByRole("link", { name: "Storage: Storage" }),
-    ).toHaveAttribute("href", "/settings?tab=libraries");
+    ).toHaveAttribute("href", "/setup/workflows");
   });
 
   it("shows a block for each drive: its room, when it fills, how busy it is and the room kept free", () => {

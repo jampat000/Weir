@@ -47,7 +47,7 @@ function FoundLibraryProblems({ row }: { row: SuggestedRow }) {
     <div className="space-y-1.5">
       <SetupCheckLines label={row.name} lines={lines} />
       <p className="text-xs text-mm-text3">
-        You can finish setup now and sort these out afterwards in Settings ›
+        You can finish setup now and sort these out afterwards in Setup ›
         Workflows.
       </p>
     </div>

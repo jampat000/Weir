@@ -9,6 +9,10 @@ import { parseAppTime } from "../../../lib/ui/mm-format-date";
 import { CLEANUP_JOBS } from "../../settings/tabs/cleanup/cleanup-jobs";
 import { shownBy, type Filter } from "../processing-filter";
 import { clockTime } from "../pipeline/pipeline-heading";
+import {
+  setupTabPath,
+  workflowEditorPath,
+} from "../../../lib/settings/setup-areas";
 
 const SECOND_MS = 1000;
 const MINUTE_MS = 60 * SECOND_MS;
@@ -43,7 +47,7 @@ type NextSources = {
 };
 
 function workflowPath(id: number): string {
-  return `/settings?tab=libraries&edit=${id}`;
+  return workflowEditorPath(id);
 }
 
 function scans(workflows: readonly ProcessingLibrary[]): NextItem[] {
@@ -91,7 +95,7 @@ function cleanups(jobs: readonly MaintenanceFamilyState[]): NextItem[] {
       {
         key: `cleanup-${job.family}`,
         label,
-        to: "/settings?tab=cleanup",
+        to: setupTabPath("cleanup"),
         at,
         intervalSeconds: job.interval_seconds ?? null,
       },

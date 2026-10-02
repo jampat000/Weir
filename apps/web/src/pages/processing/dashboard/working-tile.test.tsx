@@ -147,7 +147,7 @@ describe("the Working on now tile", () => {
     expect(tile).toHaveTextContent("new downloads wait 60s");
     expect(within(tile).getByRole("link", { name: "Change" })).toHaveAttribute(
       "href",
-      "/settings?tab=performance",
+      "/setup/performance",
     );
   });
 

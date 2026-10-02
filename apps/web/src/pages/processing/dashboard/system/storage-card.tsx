@@ -5,8 +5,9 @@ import { classNames } from "../../../../lib/ui/class-names";
 import { useFittingRows } from "../fit-rows";
 import { MoreCount } from "./more-count";
 import { driveBlocks, storageCount, type DriveBlock } from "./storage-model";
+import { setupTabPath } from "../../../../lib/settings/setup-areas";
 
-const STORAGE_PATH = "/settings?tab=libraries";
+const STORAGE_PATH = setupTabPath("workflows");
 
 function Drive({ block }: { block: DriveBlock }) {
   return (

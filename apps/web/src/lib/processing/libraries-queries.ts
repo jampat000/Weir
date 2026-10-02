@@ -130,7 +130,7 @@ export function useLibraryFolderChainQuery(
   });
 }
 
-/** The same folder chain for every library linked to one media manager connection (Settings › Media managers). */
+/** The same folder chain for every library linked to one media manager connection (Setup › Connections › Media managers). */
 export function useConnectionFolderChainQuery(connectionId: number) {
   return useQuery({
     queryKey: ["processing", "connection-folder-chain", connectionId] as const,

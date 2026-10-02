@@ -31,6 +31,7 @@ import { REMOVAL_IS_FINAL, removalIsRecoverable } from "./library-clean-model";
 import { TrackList, rulesKeep, toggled } from "./library-drawer-tracks";
 import { LibraryLeaveAlone, useLeaveAlone } from "./library-leave-alone";
 import { LibraryRedownload } from "./library-redownload";
+import { setupTabPath } from "../../lib/settings/setup-areas";
 
 const MANAGER_NAMES: Record<string, string> = {
   sonarr: "Sonarr",
@@ -209,7 +210,7 @@ export function LibraryFileDrawer({
               ) : (
                 <>
                   {"Decided by this workflow’s rules. "}
-                  <Link to={`/settings?tab=rules&library=${libraryId}`}>
+                  <Link to={`${setupTabPath("profiles")}?library=${libraryId}`}>
                     Edit the rules →
                   </Link>
                 </>

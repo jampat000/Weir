@@ -12,8 +12,9 @@ import {
   groupConnections,
 } from "./connections-card-model";
 import type { ConnectionTesting } from "./use-connection-testing";
+import { setupTabPath } from "../../../lib/settings/setup-areas";
 
-const MANAGERS_PATH = "/settings?tab=media-managers";
+const MANAGERS_PATH = setupTabPath("managers");
 const TEST_ALL_HINT =
   "Asks every connection that is switched on and shows each answer here.";
 

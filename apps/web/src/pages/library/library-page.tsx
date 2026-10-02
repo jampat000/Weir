@@ -89,8 +89,8 @@ function NoLibrary() {
   return (
     <div className="mm-page mm-library" data-testid="library-page">
       <p className="mm-library-empty">
-        No workflow is set up yet. Add one in Settings › Workflows, then come
-        back here and tell Weir which folders the files you already have sit in.
+        No workflow is set up yet. Add one in Setup › Workflows, then come back
+        here and tell Weir which folders the files you already have sit in.
       </p>
     </div>
   );

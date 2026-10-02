@@ -4,7 +4,7 @@ import type { ProcessingLibrary } from "./libraries-api";
 import { useProcessingLibrariesQuery } from "./libraries-queries";
 
 /**
- * A workflow's colour is taken from this palette by its place in Settings › Workflows, and round again after
+ * A workflow's colour is taken from this palette by its place in Setup › Workflows, and round again after
  * the sixth. They are the hues outside the status colours (green, amber, red). Deluno colours its libraries
  * from the same list in the same way, so a workflow wears one colour in both.
  */
@@ -18,7 +18,7 @@ export function hueAtPosition(position: number): number {
   return WORKFLOW_HUES[Math.max(0, position) % WORKFLOW_HUES.length];
 }
 
-/** The workflows in the order Settings › Workflows lists them. */
+/** The workflows in the order Setup › Workflows lists them. */
 export function inDisplayOrder(
   libraries: readonly ProcessingLibrary[],
 ): ProcessingLibrary[] {

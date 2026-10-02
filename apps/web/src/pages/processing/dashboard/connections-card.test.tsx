@@ -87,7 +87,7 @@ describe("the Connections card", () => {
     expect(card).toHaveTextContent("2/3 answering · 1 slow · 1 down");
     expect(
       within(card).getByRole("link", { name: "Manage: Connections" }),
-    ).toHaveAttribute("href", "/settings?tab=media-managers");
+    ).toHaveAttribute("href", "/setup/connections");
   });
 
   it("groups media managers and download clients, each with how many of those on are OK", () => {

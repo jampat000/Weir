@@ -20,7 +20,7 @@ function renderRow(
           entry={connectionEntry(overrides)}
           light={light}
           now={NOW}
-          to="/settings?tab=media-managers"
+          to="/setup/connections"
         />
       </ul>
     </MemoryRouter>,
@@ -79,7 +79,7 @@ describe("a connection's row", () => {
     expect(row).toHaveTextContent("12s ago · 84 ms");
     expect(row.querySelector("a")).toHaveAttribute(
       "href",
-      "/settings?tab=media-managers",
+      "/setup/connections",
     );
     expect(row.querySelector("a")).toHaveAttribute(
       "title",

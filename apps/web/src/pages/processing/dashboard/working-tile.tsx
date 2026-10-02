@@ -7,12 +7,13 @@ import type { Filter } from "../processing-filter";
 import type { WorkingItem } from "../processing-model";
 import { useFittingRows } from "./fit-rows";
 import { STEP_WORDS } from "./working-words";
+import { setupTabPath } from "../../../lib/settings/setup-areas";
 
 /** The most files the tile lists before saying how many more there are; how many show is up to its height. */
 const MOST_OPERATIONS = 4;
 
 /** Where a person changes how many files Weir works on at once, and how long a new download waits. */
-const PERFORMANCE_PATH = "/settings?tab=performance";
+const PERFORMANCE_PATH = setupTabPath("speed");
 
 /** What an empty tile says, for everything and for each kind of work it can be narrowed to. */
 const IDLE_WORDS: Record<Filter, string> = {

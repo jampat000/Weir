@@ -424,7 +424,7 @@ describe("ProcessingPage", () => {
         expect(tile).toHaveTextContent("new downloads wait 10s");
         expect(
           within(tile).getByRole("link", { name: "Change" }),
-        ).toHaveAttribute("href", "/settings?tab=performance");
+        ).toHaveAttribute("href", "/setup/performance");
       } finally {
         libraries.forEach((library, index) => {
           library.ready_after_seconds = before[index];
@@ -507,7 +507,7 @@ describe("ProcessingPage", () => {
       nextItems.push({
         key: "scan-1",
         label: "Look for new downloads in TV",
-        to: "/settings?tab=libraries&edit=1",
+        to: "/setup/workflows?edit=1",
         at: Date.parse("2026-08-18T10:00:42Z"),
         intervalSeconds: 300,
       });

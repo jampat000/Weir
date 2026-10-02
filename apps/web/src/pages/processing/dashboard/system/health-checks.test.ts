@@ -79,7 +79,7 @@ describe("workflowChecks", () => {
       title: "Movies needs a fix",
       why: "The output folder is missing.",
     });
-    expect(check.fix?.to).toBe("/settings?tab=libraries&edit=2");
+    expect(check.fix?.to).toBe("/setup/workflows?edit=2");
   });
 
   it("leaves a chain that is only being checked as neither passing nor failing", () => {
@@ -153,7 +153,7 @@ describe("connectionChecks", () => {
       title: "Radarr isn't answering",
       why: "Connection refused.",
     });
-    expect(check.fix?.to).toBe("/settings?tab=media-managers");
+    expect(check.fix?.to).toBe("/setup/connections");
   });
 
   it("warns on a connection that is slow, with how long it took", () => {
@@ -245,7 +245,7 @@ describe("storageChecks", () => {
   it("fails a drive with less free than Weir keeps free, and links to a workflow that writes there", () => {
     const [check] = storageChecks([drive({ free_bytes: 5_000_000_000 })], NOW);
     expect(check).toMatchObject({ tone: "bad", title: "D: is low on space" });
-    expect(check.fix?.to).toBe("/settings?tab=libraries&edit=3");
+    expect(check.fix?.to).toBe("/setup/workflows?edit=3");
   });
 
   it("warns on a drive that fills within a week", () => {

@@ -98,7 +98,7 @@ export function AppErrorScreen({
               className="text-sm font-medium text-mm-accent underline-offset-4 hover:underline"
               href="/"
             >
-              Go to Processing
+              Go to the Dashboard
             </a>
           </div>
           <details className="mt-5 text-sm text-mm-text2">

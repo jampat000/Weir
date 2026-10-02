@@ -113,7 +113,7 @@ beforeEach(() => {
       words: "Output folder missing · create it",
       fix: {
         label: "Fix it →",
-        to: "/settings?tab=libraries&edit=2",
+        to: "/setup/workflows?edit=2",
         note: "Opens it.",
       },
       again: { area: "workflows", key: "2" },
@@ -173,7 +173,7 @@ describe("the Health card", () => {
 
     expect(
       within(card).getByRole("link", { name: "Fix it → Movies needs a fix" }),
-    ).toHaveAttribute("href", "/settings?tab=libraries&edit=2");
+    ).toHaveAttribute("href", "/setup/workflows?edit=2");
   });
 
   it("looks at one check again, and says so while it does", () => {
@@ -205,7 +205,7 @@ describe("the Health card", () => {
     expect(drawer).toHaveTextContent("Keeps 20.00 GB free where it writes.");
     expect(
       within(drawer).getByRole("link", { name: "Open this workflow" }),
-    ).toHaveAttribute("href", "/settings?tab=libraries&edit=2");
+    ).toHaveAttribute("href", "/setup/workflows?edit=2");
 
     fireEvent.click(within(drawer).getByRole("button", { name: "Close" }));
     expect(screen.queryByRole("dialog")).toBeNull();

@@ -89,7 +89,7 @@ describe("the Health panel", () => {
     const panel = renderPanel();
 
     const link = within(panel).getByRole("link", { name: /Movies/ });
-    expect(link).toHaveAttribute("href", "/settings?tab=libraries&edit=2");
+    expect(link).toHaveAttribute("href", "/setup/workflows?edit=2");
     expect(link).toHaveTextContent("Weir only");
     expect(panel).toHaveTextContent("In sync");
   });

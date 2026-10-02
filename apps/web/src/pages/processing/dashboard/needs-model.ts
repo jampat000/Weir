@@ -10,6 +10,7 @@ import {
   workSourceOfJobKind,
 } from "../processing-model";
 import { fileReason, type FileReason } from "../file-reason";
+import { setupTabPath } from "../../../lib/settings/setup-areas";
 
 /** Past this many failed jobs the count reads "100+": the list behind the link has the rest. */
 export const FAILED_JOBS_LIMIT = 100;
@@ -134,7 +135,7 @@ function setupNeed(
     reason: "Add or switch on a workflow",
     detail:
       "Weir picks files up from a workflow's watched folder. Add one, or turn an existing workflow on.",
-    link: { label: "Set up a workflow", to: "/settings?tab=libraries" },
+    link: { label: "Set up a workflow", to: setupTabPath("workflows") },
   };
 }
 

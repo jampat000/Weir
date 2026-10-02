@@ -126,8 +126,8 @@ describe("what Weir does next on its own", () => {
       cleanupJobs: [cleanupJob({ next_run_at: iso(minutes(90)) })],
     });
 
-    expect(scan.to).toBe("/settings?tab=libraries&edit=7");
-    expect(cleanup.to).toBe("/settings?tab=cleanup");
+    expect(scan.to).toBe("/setup/workflows?edit=7");
+    expect(cleanup.to).toBe("/setup/performance/cleanup");
   });
 });
 

@@ -114,7 +114,7 @@ function DownloadClientConnectionRow({
 
 /**
  * Connecting to the chosen source: what is already connected, and the form to connect more. Uses the same
- * forms, tests and removal dialogs as Settings › Media managers, so a connection made here is the same one.
+ * forms, tests and removal dialogs as Setup › Connections › Media managers, so a connection made here is the same one.
  */
 export function WizardConnect({
   source,

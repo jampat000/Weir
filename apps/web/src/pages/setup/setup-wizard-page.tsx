@@ -165,7 +165,7 @@ function WizardForm({
           <h1 className="mm-auth-title">Set up Weir</h1>
           <p className="mm-auth-lead">
             A few basics to get Weir going. Everything here can be changed later
-            in Settings, and you can skip it for now.
+            in Setup, and you can skip it for now.
           </p>
 
           <div className="mm-quiet-stack mt-5">

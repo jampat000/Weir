@@ -20,8 +20,12 @@ import {
   type HealthUnit,
 } from "./health-model";
 import { useHealth } from "./use-health";
+import {
+  setupTabPath,
+  workflowEditorPath,
+} from "../../../lib/settings/setup-areas";
 
-const MANAGERS_PATH = "/settings?tab=media-managers";
+const MANAGERS_PATH = setupTabPath("managers");
 const ABOUT_PATH = "/system";
 /** The dashboard's System view, where Health is shown in full. */
 const SYSTEM_VIEW = "system";
@@ -132,7 +136,7 @@ export function HealthPanel({ workflows, workflowId }: HealthPanelProps) {
                 <li key={workflow.id} className="mm-health__row" data-fit="">
                   <Link
                     className="mm-health__name"
-                    to={`/settings?tab=libraries&edit=${workflow.id}`}
+                    to={workflowEditorPath(workflow.id)}
                   >
                     <b>{workflow.name}</b>
                     <small>

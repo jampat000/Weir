@@ -76,7 +76,7 @@ describe("what needs a person", () => {
     });
 
     expect(group.rows[0].title).toBe("Nothing to watch yet");
-    expect(group.rows[0].link?.to).toBe("/settings?tab=libraries");
+    expect(group.rows[0].link?.to).toBe("/setup/workflows");
     expect(buildNeeds({ ...healthy, workflows: undefined })).toEqual([]);
   });
 

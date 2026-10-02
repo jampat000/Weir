@@ -10,6 +10,7 @@ import { mmActionButtonClass } from "../../lib/ui/mm-control-roles";
 import type { LibrarySetupDraft } from "./library-setup-draft";
 import { AddFolder, FolderList } from "./library-setup-folders";
 import { KeepOriginalSettings } from "./library-setup-originals";
+import { setupTabPath } from "../../lib/settings/setup-areas";
 
 /** Switching the daily clean on always asks first, because it removes tracks without asking each time. */
 function DailyCleanWarning({
@@ -71,7 +72,7 @@ function RulesProfileField({
   return (
     <Field
       label="Rules profile"
-      hint="Decides which audio and subtitle tracks a clean keeps in this library. Create and edit profiles under Settings › Rules."
+      hint="Decides which audio and subtitle tracks a clean keeps in this library. Create and edit profiles under Setup › Rules › Profiles."
     >
       <select
         className="mm-input"
@@ -175,7 +176,7 @@ export function LibrarySetupForm({
           />
         ) : null}
         <p className="mm-library-setup__hint">
-          <Link className="mm-schedule-link" to="/settings?tab=schedule">
+          <Link className="mm-schedule-link" to={setupTabPath("schedule")}>
             Change the hours in Schedule
           </Link>
         </p>

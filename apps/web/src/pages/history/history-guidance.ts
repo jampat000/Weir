@@ -39,7 +39,7 @@ const BY_STATUS: Partial<Record<ProcessingFile["status"], Guidance>> = {
   },
   disabled: {
     title: "This workflow is switched off.",
-    next: "Turn the workflow on in Settings › Workflows before processing its files.",
+    next: "Turn the workflow on in Setup › Workflows before processing its files.",
   },
   cancelled: {
     title: "Its queued work was cancelled.",
