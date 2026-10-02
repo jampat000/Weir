@@ -52,8 +52,9 @@ public static class ActivityEndpoints
 
     /// <summary>
     /// Authenticate once with a short-lived connection, then stream <c>activity.latest</c> frames and, once a second at
-    /// most, a <c>processing.progress</c> frame with every file's live progress (#750), plus keepalives, without
-    /// holding the database.
+    /// most, a <c>processing.progress</c> frame with every file's live progress (#750), plus a
+    /// <c>connection.activity</c> frame whenever a media manager or download client is asked, answers, fails or calls Weir,
+    /// plus keepalives, without holding the database.
     /// </summary>
     public static async IAsyncEnumerable<string> LatestFramesAsync(
         Func<CancellationToken, Task<long?>> readLatestId,
@@ -124,6 +125,7 @@ internal sealed class ActivityEndpointHandlers
     private readonly ActivityHistoryStore _history;
     private readonly SuiteSettingsStore _suiteSettings;
     private readonly ActivityProgressFrames _progressFrames;
+    private readonly ConnectionActivityFrames _connectionFrames;
     private readonly IHostApplicationLifetime _lifetime;
     private readonly ArtworkPosterUrls _posters;
 
@@ -131,12 +133,14 @@ internal sealed class ActivityEndpointHandlers
         ActivityHistoryStore history,
         SuiteSettingsStore suiteSettings,
         ActivityProgressFrames progressFrames,
+        ConnectionActivityFrames connectionFrames,
         IHostApplicationLifetime lifetime,
         ArtworkPosterUrls posters)
     {
         _history = history ?? throw new ArgumentNullException(nameof(history));
         _suiteSettings = suiteSettings ?? throw new ArgumentNullException(nameof(suiteSettings));
         _progressFrames = progressFrames ?? throw new ArgumentNullException(nameof(progressFrames));
+        _connectionFrames = connectionFrames ?? throw new ArgumentNullException(nameof(connectionFrames));
         _lifetime = lifetime ?? throw new ArgumentNullException(nameof(lifetime));
         _posters = posters ?? throw new ArgumentNullException(nameof(posters));
     }
@@ -277,6 +281,7 @@ internal sealed class ActivityEndpointHandlers
         var database = request.Database;
         var notifier = ActivityNotifications.For(database);
         var progressFrames = _progressFrames;
+        var connectionFrames = _connectionFrames;
         var time = request.Time;
         var lifetime = _lifetime;
         var logger = request.LoggerFactory.CreateLogger("weir.platform.activity.router");
@@ -290,7 +295,7 @@ internal sealed class ActivityEndpointHandlers
             context.Response.Headers.CacheControl = "no-store, no-cache";
             context.Response.Headers.Connection = "keep-alive";
             context.Response.Headers["X-Accel-Buffering"] = "no";
-            // One write at a time: the two frame sources run concurrently, and a chunk must reach the client whole.
+            // One write at a time: the frame sources run concurrently, and a chunk must reach the client whole.
             var writeGate = new SemaphoreSlim(1, 1);
             async Task WriteFrameAsync(string chunk)
             {
@@ -324,7 +329,8 @@ internal sealed class ActivityEndpointHandlers
                     logger,
                     streamEndedToken));
                 var progressLoop = PumpAsync(progressFrames.ForAsync(time, streamEndedToken));
-                await Task.WhenAll(activityLoop, progressLoop).ConfigureAwait(false);
+                var connectionLoop = PumpAsync(connectionFrames.ForAsync(streamEndedToken));
+                await Task.WhenAll(activityLoop, progressLoop, connectionLoop).ConfigureAwait(false);
             }
             catch (OperationCanceledException) when (streamEndedToken.IsCancellationRequested)
             {

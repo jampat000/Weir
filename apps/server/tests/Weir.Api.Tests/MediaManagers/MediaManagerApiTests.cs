@@ -2,6 +2,7 @@ using System.Net;
 using System.Text.Json.Nodes;
 using Microsoft.Extensions.DependencyInjection;
 using Weir.Core.Configuration;
+using Weir.Infrastructure.ConnectionTraffic;
 using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.MediaManagers;
 using Weir.Api.Tests.Platform;
@@ -14,7 +15,18 @@ internal sealed class ScriptedManager : IManagerHttpHandlerFactory
 {
     private readonly Dictionary<(string Method, string Path), Func<HttpRequestMessage, Task<HttpResponseMessage>>> _routes = new();
 
+    private ConnectionActivityHub? _activity;
+    private TimeProvider _time = TimeProvider.System;
+
     public List<HttpRequestMessage> Requests { get; } = [];
+
+    /// <summary>Report the marked calls to <paramref name="activity"/>, as the real transport does.</summary>
+    public ScriptedManager ReportingTo(ConnectionActivityHub activity, TimeProvider time)
+    {
+        _activity = activity;
+        _time = time;
+        return this;
+    }
 
     public ScriptedManager Route(HttpMethod method, string path, Func<HttpRequestMessage, Task<HttpResponseMessage>> respond)
     {
@@ -25,7 +37,8 @@ internal sealed class ScriptedManager : IManagerHttpHandlerFactory
     public ScriptedManager Json(HttpMethod method, string path, string json, HttpStatusCode status = HttpStatusCode.OK) =>
         Route(method, path, _ => Task.FromResult(new HttpResponseMessage(status) { Content = new StringContent(json) }));
 
-    public HttpMessageHandler Handler(bool followRedirects, ManagerAddressPolicy policy = ManagerAddressPolicy.Local) => new Recording(this);
+    public HttpMessageHandler Handler(bool followRedirects, ManagerAddressPolicy policy = ManagerAddressPolicy.Local) =>
+        _activity is null ? new Recording(this) : new ConnectionActivityHandler(new Recording(this), _activity, _time);
 
     private sealed class Recording(ScriptedManager owner) : HttpMessageHandler
     {
@@ -143,7 +156,7 @@ public sealed class MediaManagerApiTests
         await using var _server = server;
         var row = await CreateAsync(client);
         Assert.Equal(
-            """{"id":1,"kind":"deluno","name":"Deluno on 192.0.2.10","nickname":null,"enabled":true,"base_url":"http://192.0.2.10:5099","api_key_is_saved":true,"webhook_secret_is_set":false,"webhook_url_path":"/api/v1/intake/webhook/deluno","unsigned_webhook_warning":"This connection accepts webhooks without a secret. Create a secret and add it to Deluno on 192.0.2.10.","last_test_ok":null,"last_test_at":null,"last_test_detail":null,"downloaded_scan_enabled":false,"lanes":[{"lane":"missing","enabled":false,"max_items_per_run":50,"retry_delay_minutes":1440,"schedule_enabled":false,"schedule_days":"","schedule_start":"00:00","schedule_end":"23:59","schedule_interval_seconds":3600},{"lane":"upgrade","enabled":false,"max_items_per_run":50,"retry_delay_minutes":1440,"schedule_enabled":false,"schedule_days":"","schedule_start":"00:00","schedule_end":"23:59","schedule_interval_seconds":3600}]}""",
+            """{"id":1,"kind":"deluno","name":"Deluno on 192.0.2.10","nickname":null,"enabled":true,"base_url":"http://192.0.2.10:5099","api_key_is_saved":true,"webhook_secret_is_set":false,"webhook_url_path":"/api/v1/intake/webhook/deluno","unsigned_webhook_warning":"This connection accepts webhooks without a secret. Create a secret and add it to Deluno on 192.0.2.10.","last_test_ok":null,"last_test_at":null,"last_test_detail":null,"last_answer_ms":null,"last_used_at":null,"downloaded_scan_enabled":false,"lanes":[{"lane":"missing","enabled":false,"max_items_per_run":50,"retry_delay_minutes":1440,"schedule_enabled":false,"schedule_days":"","schedule_start":"00:00","schedule_end":"23:59","schedule_interval_seconds":3600},{"lane":"upgrade","enabled":false,"max_items_per_run":50,"retry_delay_minutes":1440,"schedule_enabled":false,"schedule_days":"","schedule_start":"00:00","schedule_end":"23:59","schedule_interval_seconds":3600}]}""",
             row.ToJsonString());
         await CreateAsync(client, "radarr", "http://192.0.2.20:7878");
 

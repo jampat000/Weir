@@ -161,7 +161,7 @@ public sealed partial class ManagerSetupCheck
         WireValue? clients;
         try
         {
-            var client = new MediaManagerHttpClient(connection.BaseUrl, connection.ApiKey, _handlers, ManagerDialectRules.DescribeTimeout);
+            var client = new MediaManagerHttpClient(connection.BaseUrl, connection.ApiKey, _handlers, ManagerDialectRules.DescribeTimeout, connection.Reference);
             clients = await client.GetJsonAsync(ManagerSetupRules.DownloadClientPath, cancellationToken: cancellationToken).ConfigureAwait(false);
         }
         catch (Exception exception) when (exception is MediaManagerHttpException or MediaManagerUnreachableException)
@@ -195,7 +195,7 @@ public sealed partial class ManagerSetupCheck
         WireValue? clients;
         try
         {
-            var client = new MediaManagerHttpClient(connection.BaseUrl, connection.ApiKey, _handlers, ManagerDialectRules.DescribeTimeout);
+            var client = new MediaManagerHttpClient(connection.BaseUrl, connection.ApiKey, _handlers, ManagerDialectRules.DescribeTimeout, connection.Reference);
             mappings = await client.GetJsonAsync(ManagerSetupRules.RemotePathMappingPath, cancellationToken: cancellationToken).ConfigureAwait(false);
             clients = await client.GetJsonAsync(ManagerSetupRules.DownloadClientPath, cancellationToken: cancellationToken).ConfigureAwait(false);
         }
@@ -250,7 +250,7 @@ public sealed partial class ManagerSetupCheck
     {
         try
         {
-            var client = new MediaManagerHttpClient(connection.BaseUrl, connection.ApiKey, _handlers, ManagerDialectRules.DescribeTimeout);
+            var client = new MediaManagerHttpClient(connection.BaseUrl, connection.ApiKey, _handlers, ManagerDialectRules.DescribeTimeout, connection.Reference);
             return await client.GetJsonAsync(ManagerSetupRules.DownloadClientConfigPath, cancellationToken: cancellationToken).ConfigureAwait(false) is WireObject config &&
                    config.Get("enableCompletedDownloadHandling") is WireBool flag
                 ? flag.Value

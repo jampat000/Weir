@@ -9,6 +9,7 @@ using Weir.Core.Time;
 using Weir.Core.Workers;
 using Weir.Infrastructure.Activity;
 using Weir.Infrastructure.Auth;
+using Weir.Infrastructure.ConnectionTraffic;
 using Weir.Infrastructure.Notifications;
 using Weir.Infrastructure.Processing;
 using Weir.Infrastructure.Runtime;
@@ -37,6 +38,9 @@ public static class WeirPlatformServices
         services.TryAddSingleton(sp => ActivityNotifications.For(sp.GetRequiredService<SqliteDatabase>()));
         // One process-wide live-progress store, shared by every running pass and every open stream (#750).
         services.TryAddSingleton<LiveProgressStore>();
+        // What is happening on each media manager and download client connection, for the live Connections views.
+        services.TryAddSingleton<ConnectionUsageLedger>();
+        services.TryAddSingleton<ConnectionActivityHub>();
 
         // Auth, Activity, Notifications and Suite settings: instance stores over UnitOfWork, stateless
         // themselves, so one shared instance serves every request.

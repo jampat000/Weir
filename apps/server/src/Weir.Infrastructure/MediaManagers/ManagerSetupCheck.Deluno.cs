@@ -69,7 +69,7 @@ public sealed partial class ManagerSetupCheck
     {
         try
         {
-            var client = new MediaManagerHttpClient(connection.BaseUrl, connection.ApiKey, _handlers, ManagerDialectRules.DownloadDestinationsTimeout);
+            var client = new MediaManagerHttpClient(connection.BaseUrl, connection.ApiKey, _handlers, ManagerDialectRules.DownloadDestinationsTimeout, connection.Reference);
             var payload = await client
                 .GetJsonAsync(DelunoDestinationRules.DownloadDestinationsPath, [new("libraryId", libraryKey)], cancellationToken)
                 .ConfigureAwait(false);

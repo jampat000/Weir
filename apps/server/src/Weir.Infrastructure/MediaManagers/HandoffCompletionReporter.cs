@@ -9,6 +9,7 @@ using Weir.Core.Media;
 using Weir.Core.MediaManagers;
 using Weir.Core.Text;
 using Weir.Infrastructure.Activity;
+using Weir.Infrastructure.ConnectionTraffic;
 using Weir.Infrastructure.Processing;
 using Weir.Infrastructure.Sqlite;
 
@@ -103,6 +104,7 @@ public sealed partial class HandoffCompletionReporter
                 Content = new ByteArrayContent(WireJsonWriter.DumpsUtf8(body, WireJsonFormat.Response)),
             };
             request.Content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
+            ConnectionTag.Apply(request, target.Connection.Reference);
             foreach (var (header, value) in target.Headers)
             {
                 if (!string.Equals(header, "Content-Type", StringComparison.OrdinalIgnoreCase))

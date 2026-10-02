@@ -6,6 +6,7 @@ using Weir.Core.Json;
 using Weir.Core.MediaManagers;
 using Weir.Core.Net;
 using Weir.Core.Notifications;
+using Weir.Infrastructure.ConnectionTraffic;
 using Weir.Infrastructure.Http;
 
 namespace Weir.Infrastructure.MediaManagers;
@@ -47,13 +48,19 @@ public interface IManagerHttpHandlerFactory
 public sealed class SocketsManagerHttpHandlerFactory : IManagerHttpHandlerFactory, IDisposable
 {
     private readonly OutboundAddressGuard.HostResolver? _resolveHost;
-    private readonly Dictionary<(bool FollowRedirects, ManagerAddressPolicy Policy), SocketsHttpHandler> _handlers = [];
+    private readonly ConnectionActivityHub? _activity;
+    private readonly TimeProvider _time;
+    private readonly Dictionary<(bool FollowRedirects, ManagerAddressPolicy Policy), HttpMessageHandler> _handlers = [];
     private readonly Lock _lock = new();
 
     /// <param name="resolveHost">Overrides DNS resolution; tests use this to prove the policy against fixed answers.</param>
-    public SocketsManagerHttpHandlerFactory(OutboundAddressGuard.HostResolver? resolveHost = null)
+    /// <param name="activity">Where the calls marked with <see cref="ConnectionTag"/> are reported; none reports nothing.</param>
+    /// <param name="time">Times those calls.</param>
+    public SocketsManagerHttpHandlerFactory(OutboundAddressGuard.HostResolver? resolveHost = null, ConnectionActivityHub? activity = null, TimeProvider? time = null)
     {
         _resolveHost = resolveHost;
+        _activity = activity;
+        _time = time ?? TimeProvider.System;
     }
 
     public HttpMessageHandler Handler(bool followRedirects, ManagerAddressPolicy policy = ManagerAddressPolicy.Local)
@@ -71,10 +78,10 @@ public sealed class SocketsManagerHttpHandlerFactory : IManagerHttpHandlerFactor
         }
     }
 
-    private SocketsHttpHandler Build(bool followRedirects, ManagerAddressPolicy policy)
+    private HttpMessageHandler Build(bool followRedirects, ManagerAddressPolicy policy)
     {
         Func<NetAddress, bool> isAllowed = policy == ManagerAddressPolicy.Public ? OutboundAddressGuard.IsPublic : OutboundAddressGuard.IsLocalServiceAddress;
-        return new SocketsHttpHandler
+        var transport = new SocketsHttpHandler
         {
             UseCookies = false,
             AllowAutoRedirect = followRedirects,
@@ -83,6 +90,7 @@ public sealed class SocketsManagerHttpHandlerFactory : IManagerHttpHandlerFactor
             ConnectCallback = (context, cancellationToken) =>
                 OutboundAddressGuard.ConnectAsync(context, isAllowed, host => new ManagerAddressRefusedException(host), _resolveHost, cancellationToken),
         };
+        return _activity is null ? transport : new ConnectionActivityHandler(transport, _activity, _time);
     }
 
     public void Dispose()
@@ -117,9 +125,14 @@ public sealed class MediaManagerHttpClient
     private readonly string _apiKey;
     private readonly TimeSpan _timeout;
     private readonly IManagerHttpHandlerFactory _handlers;
+    private readonly ConnectionRef? _connection;
 
+    /// <summary>
+    /// A client for the manager at <paramref name="baseUrl"/>. <paramref name="connection"/> is the saved connection it talks
+    /// to, so its calls light that connection up; null for a manager that is not saved.
+    /// </summary>
     /// <exception cref="MediaManagerHttpException">The base URL is not a plain http(s) address.</exception>
-    public MediaManagerHttpClient(string baseUrl, string apiKey, IManagerHttpHandlerFactory handlers, TimeSpan? timeout = null)
+    public MediaManagerHttpClient(string baseUrl, string apiKey, IManagerHttpHandlerFactory handlers, TimeSpan? timeout = null, ConnectionRef? connection = null)
     {
         ArgumentNullException.ThrowIfNull(baseUrl);
         _handlers = handlers ?? throw new ArgumentNullException(nameof(handlers));
@@ -134,6 +147,7 @@ public sealed class MediaManagerHttpClient
 
         _apiKey = apiKey ?? string.Empty;
         _timeout = timeout ?? TimeSpan.FromSeconds(30);
+        _connection = connection;
     }
 
     /// <summary>The request URL: refuses an absolute path, prefixes a slash, appends urlencoded parameters.</summary>
@@ -212,6 +226,8 @@ public sealed class MediaManagerHttpClient
     {
         using (request)
         {
+            ConnectionTag.Apply(request, _connection);
+
             // Real Sonarr, Radarr and Deluno never redirect their own API; a manager base URL that does is either
             // misconfigured or is answering from somewhere Weir did not ask, and following it would carry the
             // X-Api-Key header to whatever host the redirect names.

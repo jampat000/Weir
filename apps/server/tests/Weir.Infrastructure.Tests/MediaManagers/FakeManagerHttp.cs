@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text;
 using Weir.Core.Json;
+using Weir.Infrastructure.ConnectionTraffic;
 using Weir.Infrastructure.MediaManagers;
 
 namespace Weir.Infrastructure.Tests.MediaManagers;
@@ -15,9 +16,10 @@ internal sealed record RecordedRequest(HttpMethod Method, Uri Uri, IReadOnlyDict
 
 /// <summary>
 /// A scripted media manager behind <see cref="IManagerHttpHandlerFactory"/>: answers by method and path, records every
-/// request, and can throw the transport failures a real network produces.
+/// request, and can throw the transport failures a real network produces. Given a <see cref="ConnectionActivityHub"/>, it
+/// reports the marked calls the way the real transport does.
 /// </summary>
-internal sealed class FakeManagerHttp : IManagerHttpHandlerFactory
+internal sealed class FakeManagerHttp(ConnectionActivityHub? activity = null, TimeProvider? time = null) : IManagerHttpHandlerFactory
 {
     private readonly List<(HttpMethod Method, string Path, Func<RecordedRequest, HttpResponseMessage> Respond)> _routes = [];
     private readonly Lock _lock = new();
@@ -62,7 +64,11 @@ internal sealed class FakeManagerHttp : IManagerHttpHandlerFactory
         }
     }
 
-    public HttpMessageHandler Handler(bool followRedirects, ManagerAddressPolicy policy = ManagerAddressPolicy.Local) => new RecordingHandler(this, followRedirects);
+    public HttpMessageHandler Handler(bool followRedirects, ManagerAddressPolicy policy = ManagerAddressPolicy.Local)
+    {
+        var recording = new RecordingHandler(this, followRedirects);
+        return activity is null ? recording : new ConnectionActivityHandler(recording, activity, time ?? TimeProvider.System);
+    }
 
     private sealed class RecordingHandler(FakeManagerHttp fake, bool followRedirects) : HttpMessageHandler
     {

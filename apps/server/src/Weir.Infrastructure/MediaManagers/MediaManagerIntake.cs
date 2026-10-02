@@ -8,6 +8,7 @@ using Weir.Core.MediaManagers;
 using Weir.Core.Processing;
 using Weir.Infrastructure.Activity;
 using Weir.Infrastructure.Artwork;
+using Weir.Infrastructure.ConnectionTraffic;
 using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.Processing;
 using Weir.Infrastructure.Processing.RemuxPass;
@@ -69,6 +70,7 @@ public sealed class MediaManagerIntake
     private readonly HandoffCompletionReporter _reporter;
     private readonly ArtworkSubjects _artwork;
     private readonly TimeProvider _time;
+    private readonly ConnectionActivityHub? _activity;
 
     public MediaManagerIntake(
         WeirOptions options,
@@ -80,7 +82,8 @@ public sealed class MediaManagerIntake
         FileSkipMarkerStore skipMarkers,
         HandoffCompletionReporter reporter,
         ArtworkSubjects artwork,
-        TimeProvider time)
+        TimeProvider time,
+        ConnectionActivityHub? activity = null)
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
         _connections = connections ?? throw new ArgumentNullException(nameof(connections));
@@ -92,6 +95,7 @@ public sealed class MediaManagerIntake
         _skipMarkers = skipMarkers ?? throw new ArgumentNullException(nameof(skipMarkers));
         _artwork = artwork ?? throw new ArgumentNullException(nameof(artwork));
         _time = time ?? throw new ArgumentNullException(nameof(time));
+        _activity = activity;
     }
 
     /// <summary>For tests: where fresh dedupe ids come from when a hand-off names none.</summary>
@@ -116,7 +120,10 @@ public sealed class MediaManagerIntake
     /// accepting unsigned webhooks (upgrades must not break), but there is nothing to attribute a webhook to
     /// when the kind was never set up in the first place.
     /// </remarks>
-    public async Task<MediaManagerIntakeIdentity> AuthoriseAsync(UnitOfWork uow, string sourceKey, string? presented)
+    public async Task<MediaManagerIntakeIdentity> AuthoriseAsync(UnitOfWork uow, string sourceKey, string? presented) =>
+        Heard(await IdentifyWebhookCallerAsync(uow, sourceKey, presented).ConfigureAwait(false));
+
+    private async Task<MediaManagerIntakeIdentity> IdentifyWebhookCallerAsync(UnitOfWork uow, string sourceKey, string? presented)
     {
         var connections = await _connectionStore.ListEnabledForKindAsync(uow, sourceKey).ConfigureAwait(false);
         var withSecret = connections.Where(connection => !string.IsNullOrEmpty(connection.WebhookSecretCiphertext)).ToList();
@@ -164,7 +171,10 @@ public sealed class MediaManagerIntake
     /// Returns who the secret proved, exactly as <see cref="AuthoriseAsync"/> does, so a caller with a specific
     /// hand-off in hand can refuse a secret that proves the wrong connection.
     /// </summary>
-    public async Task<MediaManagerIntakeIdentity> RequireSecretAsync(UnitOfWork uow, string? presented, string? sourceKey)
+    public async Task<MediaManagerIntakeIdentity> RequireSecretAsync(UnitOfWork uow, string? presented, string? sourceKey) =>
+        Heard(await IdentifySecretHolderAsync(uow, presented, sourceKey).ConfigureAwait(false));
+
+    private async Task<MediaManagerIntakeIdentity> IdentifySecretHolderAsync(UnitOfWork uow, string? presented, string? sourceKey)
     {
         var provided = WireStrings.Strip(presented ?? string.Empty);
         var rows = await _connectionStore.ListEnabledWithWebhookSecretAsync(uow).ConfigureAwait(false);
@@ -193,6 +203,17 @@ public sealed class MediaManagerIntake
         }
 
         throw new IntakeRefusedException(401, IntakeRules.MissingSecretDetail);
+    }
+
+    /// <summary>A caller that is attributed to a connection has just called Weir, so that connection lights up; one that cannot be attributed lights nothing.</summary>
+    private MediaManagerIntakeIdentity Heard(MediaManagerIntakeIdentity identity)
+    {
+        if (identity.ConnectionId is { } id)
+        {
+            _activity?.Publish(new ConnectionRef(ConnectionKind.MediaManager, id), ConnectionPhase.Answered, ConnectionDirection.Inbound, milliseconds: null);
+        }
+
+        return identity;
     }
 
     /// <summary>Every library's id, media type and watched folder, in display order.</summary>
