@@ -10,6 +10,10 @@ import { createMemoryRouter, RouterProvider } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { setupRoutes } from "../../app/setup-routes";
+import {
+  ShellHeaderProvider,
+  useHeaderTabsSlotRef,
+} from "../../components/shell/shell-header-context";
 
 // Each tab's own content is tested beside it; this file is about the area around it: which tab is showing, how
 // the address and the tab row follow each other, where the tab's buttons go, and when leaving asks first.
@@ -62,6 +66,20 @@ vi.mock("./tabs/alerts/alerts-tab", async () => {
   };
 });
 
+/** The shell's header, reduced to the place its tabs go. */
+function TitleLine() {
+  const slotRef = useHeaderTabsSlotRef();
+  return <div data-testid="title-line" ref={slotRef} />;
+}
+
+function stubWideWindow() {
+  vi.stubGlobal("matchMedia", () => ({
+    matches: true,
+    addEventListener: () => undefined,
+    removeEventListener: () => undefined,
+  }));
+}
+
 async function renderAt(entry: string) {
   const router = createMemoryRouter(
     [
@@ -82,6 +100,7 @@ const tabNames = () =>
 
 afterEach(() => {
   cleanup();
+  vi.unstubAllGlobals();
   alerts.unsaved = null;
 });
 
@@ -168,11 +187,37 @@ describe("a setup area", () => {
     expect(screen.getByText("First sign-in")).toBeInTheDocument();
   });
 
-  it("puts the open tab's button in the tab row, beside the tabs, not in the panel", async () => {
+  it("puts the open tab's button beside the tabs in a narrow window, not in the panel", async () => {
     await renderAt("/setup/connections/alerts");
 
     const add = await screen.findByRole("button", { name: "Add alert" });
-    expect(screen.getByTestId("setup-area-tabs")).toContainElement(add);
+    const row = screen.getByRole("navigation", { name: "Page tabs" })
+      .parentElement as HTMLElement;
+    expect(row).toContainElement(add);
+    expect(screen.getByRole("tabpanel")).not.toContainElement(add);
+  });
+
+  it("puts the tabs on the header's title line in a wide window, with the button in a row under it", async () => {
+    stubWideWindow();
+    const router = createMemoryRouter(setupRoutes(null), {
+      initialEntries: ["/setup/connections/alerts"],
+    });
+    render(
+      <ShellHeaderProvider>
+        <TitleLine />
+        <RouterProvider router={router} />
+      </ShellHeaderProvider>,
+    );
+
+    const add = await screen.findByRole("button", { name: "Add alert" });
+    expect(
+      within(screen.getByTestId("title-line")).getByRole("tablist", {
+        name: "Connections sections",
+      }),
+    ).toBeInTheDocument();
+    expect(add.closest(".mm-page-toolbar")).toHaveClass(
+      "mm-page-toolbar--buttons",
+    );
     expect(screen.getByRole("tabpanel")).not.toContainElement(add);
   });
 

@@ -1,8 +1,9 @@
-import { useRef, useState, useSyncExternalStore } from "react";
+import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { useLogoutMutation, useMeQuery } from "../../lib/auth/queries";
 import { useSystemReadinessQuery } from "../../lib/system/readiness-queries";
+import { useMediaQuery } from "../../lib/ui/use-media-query";
 import { useModalFocus } from "../../lib/ui/use-modal-focus";
 import { useNeedsYou } from "../../pages/processing/dashboard/use-needs-you";
 import { useWorkingCount } from "../../pages/processing/working-count";
@@ -19,21 +20,6 @@ import { SidebarUser } from "./sidebar-user";
 // the Processing lanes keep their room; a click on Collapse or Expand overrides it until a reload.
 // At 1100px and wider, including the common 1280px, every label stays readable (#697).
 const LAPTOP_WIDTH = "(min-width: 921px) and (max-width: 1099px)";
-
-function useMediaQuery(query: string): boolean {
-  return useSyncExternalStore(
-    (onChange) => {
-      if (typeof window.matchMedia !== "function") return () => undefined;
-      const list = window.matchMedia(query);
-      list.addEventListener("change", onChange);
-      return () => list.removeEventListener("change", onChange);
-    },
-    () =>
-      typeof window.matchMedia === "function" &&
-      window.matchMedia(query).matches,
-    () => false,
-  );
-}
 
 type AppSidebarProps = {
   /** The name the sidebar landmark answers to, so a screen reader says where the user is. */

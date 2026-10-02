@@ -292,6 +292,15 @@
   gap: 8px;
 }
 
+/* With the tabs on the title line the row holds only the page's buttons, at the right, and is there only while one is. */
+.mm-page-toolbar--buttons {
+  justify-content: flex-end;
+}
+
+.mm-page-toolbar--buttons:not(:has(button, a)) {
+  display: none;
+}
+
 /* The tab-owned buttons arrive through a portal into this element; it adds no box of its own, so they lay out as the
    row's own buttons. */
 .mm-page-toolbar__slot {

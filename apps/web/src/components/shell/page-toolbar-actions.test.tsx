@@ -15,6 +15,11 @@ const TABS = [
   { id: "two", label: "Two" },
 ] as const;
 
+/** The toolbar row: the tab list's landmark and the buttons' slot share it. */
+const row = () =>
+  screen.getByRole("navigation", { name: "Page tabs" })
+    .parentElement as HTMLElement;
+
 function renderRow(panel: ReactNode) {
   return render(
     <PageToolbarActionsProvider>
@@ -26,7 +31,6 @@ function renderRow(panel: ReactNode) {
         idPrefix="example-tab"
         panelId="example-panel"
         actions={<PageToolbarActionsSlot />}
-        dataTestId="row"
       />
       <section data-testid="panel">{panel}</section>
     </PageToolbarActionsProvider>,
@@ -42,7 +46,7 @@ describe("a tab's buttons in the toolbar row", () => {
     );
 
     const button = screen.getByRole("button", { name: "Do it" });
-    expect(screen.getByTestId("row")).toContainElement(button);
+    expect(row()).toContainElement(button);
     expect(screen.getByTestId("panel")).not.toContainElement(button);
   });
 
@@ -77,7 +81,6 @@ describe("a tab's buttons in the toolbar row", () => {
           idPrefix="example-tab"
           panelId="example-panel"
           actions={<PageToolbarActionsSlot />}
-          dataTestId="row"
         />
         <section data-testid="panel" />
       </PageToolbarActionsProvider>,
