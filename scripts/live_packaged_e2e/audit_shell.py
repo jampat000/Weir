@@ -104,19 +104,20 @@ class AuditShellMixin:
             f"{sidebar} › {tab} selected",
         )
 
-    def open_logs(self, show: str = "Events") -> None:
-        """System › Logs, Weir's own events; ``show`` is the label of one option in its Show choice."""
+    def open_logs(self, source: str | None = None) -> None:
+        """System › Logs, the one log of Weir's events, jobs and server log; ``source`` names a Source chip to press."""
 
         self.open_tab("System", "Logs")
-        choice = self.visible(
-            self.page.get_by_test_id("settings-history-show"), "Logs Show choice"
-        )
-        if show != "Events":
-            choice.select_option(label=show)
-        self.require(
-            (choice.locator("option:checked").text_content() or "").strip() == show,
-            f"Logs is not showing {show}",
-        )
+        self.visible(self.page.get_by_test_id("log-summary"), "Logs summary")
+        if source:
+            chip = self.page.get_by_role("group", name="Source").get_by_role(
+                "button", name=re.compile(rf"^{re.escape(source)}")
+            )
+            self.click(chip, f"press the {source} source chip")
+            self.require(
+                chip.get_attribute("aria-pressed") == "true",
+                f"the {source} source chip is not pressed",
+            )
 
     def tab_labels(self, tabs_test_id: str) -> list[str]:
         tabs = self.page.get_by_test_id(tabs_test_id).get_by_role("tab")
@@ -168,39 +169,42 @@ class AuditShellMixin:
 
     def history_activity(self) -> None:
         self.open_logs()
-        self.visible(self.page.get_by_test_id("activity-feed"), "Activity feed")
-        # Scoped to the filters: the Show choice above them is a select too.
-        filters = self.visible(
-            self.page.get_by_test_id("activity-filters"), "Activity filters"
-        )
-        selects = filters.locator("select")
-        self.require(selects.count() >= 2, "Activity filters are incomplete")
+        self.visible(self.page.get_by_test_id("log-feed"), "Log")
+        filters = self.visible(self.page.get_by_test_id("logs-controls"), "Log filters")
         self.require(
             self.page.get_by_text("All modules", exact=True).count() == 0,
-            "Activity still shows a Module filter",
+            "Logs still shows a Module filter",
         )
-        if selects.nth(0).locator("option").count() > 1:
-            selects.nth(0).select_option(index=1)
-        filters.get_by_placeholder("Search titles and details").fill("audit")
-        filters.locator('input[type="datetime-local"]').nth(0).fill("2026-01-01T00:00")
-        filters.locator('input[type="datetime-local"]').nth(1).fill("2026-12-31T23:59")
+        self.require(
+            self.page.get_by_role("button", name="Apply filters", exact=True).count() == 0,
+            "Logs still has an Apply button",
+        )
+        errors = filters.get_by_role("group", name="Level").get_by_role(
+            "button", name=re.compile(r"^Errors")
+        )
+        self.click(errors, "narrow the log to errors")
+        self.require(
+            errors.get_attribute("aria-pressed") == "true",
+            "the Errors level chip is not pressed",
+        )
+        filters.get_by_role("searchbox", name="Search the log").fill("audit")
+        self.click(filters.get_by_test_id("logs-when-picker"), "open the time picker")
         self.click(
-            filters.get_by_role("button", name="Apply filters", exact=True),
-            "apply Activity filters",
+            self.page.get_by_role("option", name="Custom range", exact=True),
+            "choose a custom range",
         )
-        self.visible(
-            self.page.get_by_test_id("activity-summary").get_by_text("matching your filters"),
-            "Activity active filter state",
-        )
-        # Exactly "Clear →": its neighbour "Clear all history →" deletes Activity.
+        range_fields = self.visible(self.page.get_by_test_id("logs-range"), "custom range")
+        range_fields.locator('input[type="datetime-local"]').nth(0).fill("2026-01-01T00:00")
+        range_fields.locator('input[type="datetime-local"]').nth(1).fill("2026-12-31T23:59")
         self.click(
-            filters.get_by_role("button", name="Clear →", exact=True),
-            "clear Activity filters",
+            self.page.get_by_role("button", name="Clear filters", exact=True),
+            "clear the log's filters",
         )
         self.page.wait_for_timeout(500)
         self.require(
-            not self.page.get_by_test_id("activity-summary").get_by_text("matching your filters").count(),
-            "Activity filters did not clear",
+            errors.get_attribute("aria-pressed") == "false",
+            "the log's filters did not clear",
         )
+        self.visible(self.page.get_by_test_id("logs-export"), "Log export menu")
         self.screenshot("history-activity")
-        self.record("Logs: Weir's own events, filters, and clear action")
+        self.record("Logs: one log of events, jobs and the server, its filters and its actions")

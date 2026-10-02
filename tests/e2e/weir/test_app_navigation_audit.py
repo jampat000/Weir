@@ -172,29 +172,31 @@ def test_signed_in_navigation_covers_main_screens_and_tabs(weir_shell: str) -> N
 
             open_logs(page)
             expect(page).to_have_url(re.compile(r".*/system\?tab=logs(?:$|[&#])"))
-            expect(page.get_by_test_id("activity-feed")).to_be_visible()
-            expect(page.get_by_test_id("activity-summary")).to_contain_text("Showing")
-            # Weir is one app: no Module filter.
+            expect(page.get_by_test_id("log-feed")).to_be_visible()
+            expect(page.get_by_test_id("log-summary")).to_contain_text("entries")
+            # Weir is one app: no Module filter, and no Apply button: a filter applies as it is chosen.
             expect(page.get_by_text("All modules", exact=True)).to_have_count(0)
+            expect(page.get_by_role("button", name="Apply filters", exact=True)).to_have_count(0)
 
-            open_logs(page, "Weir's jobs")
-            expect(page.get_by_test_id("processing-jobs-inspection-section")).to_be_visible()
+            # Events, jobs and the server log are one list, told apart by the Source chips.
+            open_logs(page, "Jobs")
+            expect(page).to_have_url(re.compile(r".*/system\?tab=logs&source=job"))
+            expect(page.get_by_test_id("log-feed")).to_be_visible()
 
-            open_logs(page, "Server log")
-            expect(page.get_by_test_id("suite-settings-logs")).to_be_visible()
-            expect(page.get_by_text("Showing now", exact=False)).to_be_visible()
-            expect(page.get_by_text("Matching events", exact=False)).to_be_visible()
+            open_logs(page, "Server")
+            expect(page.get_by_test_id("log-feed")).to_be_visible()
             expect(page.get_by_text("Server diagnostics", exact=True)).to_be_visible()
-            expect(page.get_by_text("System events", exact=True)).to_be_visible()
+            expect(page.get_by_test_id("logs-export")).to_be_visible()
 
-            # Addresses users may have saved (/activity and the Processing tabs) land on the same thing
-            # in its current place.
-            page.goto(f"{base}/activity", wait_until="domcontentloaded")
-            expect(page).to_have_url(re.compile(r".*/system\?tab=logs$"))
-            expect(page.get_by_test_id("activity-feed")).to_be_visible()
+            # The address Logs had for its server list lands on the Server source.
+            page.goto(f"{base}/system?tab=logs&show=server", wait_until="domcontentloaded")
+            server_chip = page.get_by_role("group", name="Source").get_by_role("button", name=re.compile(r"^Server"))
+            expect(server_chip).to_have_attribute("aria-pressed", "true")
+
+            # Addresses users may have saved (the Processing tabs) land on the same thing in its current place.
             for old_tab, new_address, section in (
-                ("jobs", r"/system\?tab=logs&show=jobs", "processing-jobs-inspection-section"),
-                ("files", r"/history", "history-page"),
+                ("jobs", r"/system\?tab=logs&show=jobs", "log-feed"),
+                ("files", r"/activity", "activity-page"),
                 ("libraries", r"/setup/workflows", "processing-libraries-section"),
                 ("audio-subtitles", r"/setup/rules", "processing-rule-set-workspace"),
                 ("schedules", r"/setup/workflows/schedule", "processing-schedules-section"),

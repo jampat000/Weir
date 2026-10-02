@@ -6,6 +6,8 @@ instance.
 
 from __future__ import annotations
 
+import re
+
 from .config import TIMEOUT_MS
 
 
@@ -125,11 +127,8 @@ class AuditSettingsMixin:
         self.visible(self.page.get_by_test_id("activity-page"), "Activity after a search")
         self.screenshot("activity")
 
-        self.open_logs("Weir's jobs")
-        self.visible(
-            self.page.get_by_test_id("processing-jobs-inspection-section"),
-            "Logs jobs list",
-        )
+        self.open_logs("Jobs")
+        self.visible(self.page.get_by_test_id("log-feed"), "Logs jobs list")
         self.screenshot("logs-jobs")
         self.record("Activity: every file and its record; Logs: Weir's jobs")
 
@@ -230,27 +229,24 @@ class AuditSettingsMixin:
             "configuration export is not JSON",
         )
 
-        self.open_logs("Server log")
-        logs = self.visible(
-            self.page.get_by_test_id("suite-settings-logs"), "server log panel"
-        )
+        self.open_logs("Server")
+        logs = self.visible(self.page.get_by_test_id("logs-card"), "server log panel")
         self.visible(
-            logs.get_by_text("Server diagnostics", exact=True),
+            self.page.get_by_text("Server diagnostics", exact=True),
             "server diagnostics disclosure",
         )
-        logs.get_by_placeholder(
-            "Search message, detail, traceback, logger, or source"
-        ).fill("audit")
-        # Scoped to the log panel: the Show choice above it is a select too.
-        level_select = logs.locator("select").first
-        if level_select.count():
-            level_select.select_option(index=1)
-        toggles = logs.get_by_role("radio")
-        if toggles.count() >= 2:
-            toggles.last.click()
-        refresh = logs.get_by_role("button", name="Refresh →", exact=True)
-        if refresh.count():
-            self.click(refresh, "refresh server log")
+        self.page.get_by_role("searchbox", name="Search the log").fill("audit")
+        self.click(
+            self.page.get_by_role("group", name="Level").get_by_role("button", name=re.compile(r"^Warnings")),
+            "narrow the log to warnings",
+        )
+        self.click(logs.get_by_test_id("logs-export"), "open the log export menu")
+        with self.page.expect_download(timeout=TIMEOUT_MS) as log_download:
+            self.page.get_by_role("menuitem", name=re.compile("Whole server log")).click()
+        self.require(
+            log_download.value.suggested_filename.endswith(".log"),
+            "the whole server log did not download as a .log file",
+        )
 
         self.open_tab("System", "Security")
         self.visible(

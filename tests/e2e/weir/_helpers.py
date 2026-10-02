@@ -68,14 +68,15 @@ def open_tab(page: Page, sidebar: str, tab: str) -> None:
     expect(selected).to_have_attribute("aria-selected", "true")
 
 
-def open_logs(page: Page, show: str = "Events") -> None:
-    """System › Logs: Weir's own events, its jobs and the server log. Each file's story is in Activity.
+def open_logs(page: Page, source: str | None = None) -> None:
+    """System › Logs: one log of Weir's events, its jobs and the server log. Each file's story is in Activity.
 
-    ``show`` is the label of one option in its Show choice.
+    ``source`` is the name of one Source chip to press: "Events", "Jobs" or "Server".
     """
 
     open_tab(page, "System", "Logs")
-    choice = page.get_by_test_id("settings-history-show")
-    if show != "Events":
-        choice.select_option(label=show)
-    expect(choice.locator("option:checked")).to_have_text(show)
+    expect(page.get_by_test_id("log-summary")).to_be_visible()
+    if source:
+        chip = page.get_by_role("group", name="Source").get_by_role("button", name=re.compile(rf"^{re.escape(source)}"))
+        chip.click()
+        expect(chip).to_have_attribute("aria-pressed", "true")
