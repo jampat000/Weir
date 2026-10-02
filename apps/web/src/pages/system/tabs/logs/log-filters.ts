@@ -31,10 +31,10 @@ export const LOG_SOURCES: readonly {
 ];
 
 /**
- * The level chips. A chip stands for the levels it names: "Info" is information and successes, so everything that is
- * not a problem has one chip, and the dot of a row says which of the two it is.
+ * What the level picker offers. A choice stands for the levels it names: "Info" is information and successes, so
+ * everything that is not a problem is one choice, and the dot of a row says which of the two it is.
  */
-export const LOG_LEVEL_CHIPS: readonly {
+export const LOG_LEVEL_CHOICES: readonly {
   value: string;
   label: string;
   levels: readonly SystemLogLevel[];
@@ -43,6 +43,21 @@ export const LOG_LEVEL_CHIPS: readonly {
   { value: "warning", label: "Warnings", levels: ["warning"] },
   { value: "info", label: "Info", levels: ["info", "success"] },
 ];
+
+/** The picker's choices that any of `levels` falls under. */
+export function levelChoicesFor(levels: readonly SystemLogLevel[]): string[] {
+  return LOG_LEVEL_CHOICES.filter((choice) =>
+    choice.levels.some((level) => levels.includes(level)),
+  ).map((choice) => choice.value);
+}
+
+/** The levels the chosen choices stand for. Choosing every choice is the same as choosing none: every level. */
+export function levelsForChoices(chosen: readonly string[]): SystemLogLevel[] {
+  if (chosen.length === LOG_LEVEL_CHOICES.length) return [];
+  return LOG_LEVEL_CHOICES.filter((choice) =>
+    chosen.includes(choice.value),
+  ).flatMap((choice) => choice.levels);
+}
 
 export const LOG_CATEGORY_LABELS: Record<SystemLogCategory, string> = {
   processing: "Processing",

@@ -4,18 +4,16 @@
  * card's list, its rows and what opens under them.
  */
 
-/* The source and level chips share a box, side by side, a little tighter than a page's own. */
+/* The source chips, a little tighter than a page's own. */
 .mm-logs-controls .mm-history-chips {
   display: flex;
-  gap: 8px;
 }
 
 .mm-logs-controls .mm-history-chips .mm-segmented {
   flex: none;
 }
 
-.mm-logs-controls .mm-segmented__option,
-.mm-log-toolbar .mm-segmented__option {
+.mm-logs-controls .mm-segmented__option {
   padding-inline: 8px;
 }
 
@@ -147,11 +145,6 @@
 
 .mm-log-dot--success {
   background: var(--mm-success);
-}
-
-/* On a chip the dot sits before the words. */
-.mm-segmented__option > .mm-log-dot {
-  margin-right: 6px;
 }
 
 .mm-log-row__text {

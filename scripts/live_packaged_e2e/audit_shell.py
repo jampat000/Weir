@@ -179,13 +179,16 @@ class AuditShellMixin:
             self.page.get_by_role("button", name="Apply filters", exact=True).count() == 0,
             "Logs still has an Apply button",
         )
-        errors = filters.get_by_role("group", name="Level").get_by_role(
-            "button", name=re.compile(r"^Errors")
+        level = self.page.get_by_test_id("logs-level-picker")
+        self.click(level, "open the level picker")
+        self.click(
+            self.page.get_by_role("option", name=re.compile(r"^Errors")),
+            "narrow the log to errors",
         )
-        self.click(errors, "narrow the log to errors")
+        self.click(level, "close the level picker")
         self.require(
-            errors.get_attribute("aria-pressed") == "true",
-            "the Errors level chip is not pressed",
+            level.inner_text().strip() == "Errors",
+            "the level picker does not say Errors",
         )
         filters.get_by_role("searchbox", name="Search the log").fill("audit")
         self.click(filters.get_by_test_id("logs-when-picker"), "open the time picker")
@@ -202,7 +205,7 @@ class AuditShellMixin:
         )
         self.page.wait_for_timeout(500)
         self.require(
-            errors.get_attribute("aria-pressed") == "false",
+            level.inner_text().strip() == "All levels",
             "the log's filters did not clear",
         )
         self.visible(self.page.get_by_test_id("logs-export"), "Log export menu")

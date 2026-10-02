@@ -5,8 +5,6 @@ export type LogChip = {
   label: ReactNode;
   /** How many rows choosing it would show; left out while that is not known. */
   count?: number;
-  /** The colour of the row dot it carries, for a chip that stands for a level. */
-  level?: string;
   /** Whether the chip is pressed. */
   pressed: boolean;
 };
@@ -42,12 +40,6 @@ export function LogChips({
           aria-pressed={chip.pressed}
           onClick={() => onToggle(chip.value)}
         >
-          {chip.level ? (
-            <span
-              className={`mm-log-dot mm-log-dot--${chip.level}`}
-              aria-hidden="true"
-            />
-          ) : null}
           {chip.label}
           {chip.count === undefined ? null : (
             <>

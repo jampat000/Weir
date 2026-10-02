@@ -9,7 +9,13 @@ import {
   vi,
 } from "vitest";
 
-import { NOW, logPage, renderLog, stubEventSource } from "./log-test-support";
+import {
+  NOW,
+  chooseLevels,
+  logPage,
+  renderLog,
+  stubEventSource,
+} from "./log-test-support";
 
 const mocks = vi.hoisted(() => ({
   fetchSystemLog: vi.fn(),
@@ -84,10 +90,28 @@ describe("the filters", () => {
     expect(chip("Source", /Events/)).toHaveTextContent("1");
     expect(chip("Source", /Jobs/)).toHaveTextContent("1");
     expect(chip("Source", /Server/)).toHaveTextContent("1");
-    expect(chip("Level", /Errors/)).toHaveTextContent("1");
-    expect(chip("Level", /Warnings/)).toHaveTextContent("1");
-    // Information and successes are one chip: everything that is not a problem.
-    expect(chip("Level", /Info/)).toHaveTextContent("1");
+    fireEvent.click(screen.getByTestId("logs-level-picker"));
+    expect(screen.getByRole("option", { name: "Errors · 1" })).toBeVisible();
+    expect(screen.getByRole("option", { name: "Warnings · 1" })).toBeVisible();
+    // Information and successes are one choice: everything that is not a problem.
+    expect(screen.getByRole("option", { name: "Info · 1" })).toBeVisible();
+  });
+
+  it("show a dot in each level's colour beside its choice", async () => {
+    await rendered();
+
+    fireEvent.click(screen.getByTestId("logs-level-picker"));
+
+    for (const [name, level] of [
+      ["Errors · 1", "error"],
+      ["Warnings · 1", "warning"],
+      ["Info · 1", "info"],
+    ]) {
+      const dot = screen
+        .getByRole("option", { name })
+        .querySelector(".mm-log-dot");
+      expect(dot).toHaveClass(`mm-log-dot--${level}`);
+    }
   });
 
   it("narrow to a source when its chip is pressed, and back to all with All", async () => {
@@ -126,28 +150,43 @@ describe("the filters", () => {
     expect(screen.getByTestId("location")).toHaveTextContent("?tab=logs");
   });
 
-  it("narrow to levels, the Info chip standing for information and successes together", async () => {
+  it("narrow to levels, the Info choice standing for information and successes together", async () => {
     await rendered();
+    const picker = screen.getByTestId("logs-level-picker");
+    expect(picker).toHaveTextContent("All levels");
 
-    fireEvent.click(chip("Level", /Errors/));
-    fireEvent.click(chip("Level", /Warnings/));
+    fireEvent.click(picker);
+    fireEvent.click(screen.getByRole("option", { name: /^Errors/ }));
+    expect(picker).toHaveTextContent("Errors");
+    fireEvent.click(screen.getByRole("option", { name: /^Warnings/ }));
     await waitFor(() =>
       expect(lastRequest()).toMatchObject({ level: ["error", "warning"] }),
     );
+    expect(picker).toHaveTextContent("2 levels");
 
-    fireEvent.click(chip("Level", /Info/));
+    fireEvent.click(screen.getByRole("option", { name: /^Errors/ }));
+    fireEvent.click(screen.getByRole("option", { name: /^Info/ }));
     await waitFor(() =>
       expect(lastRequest()).toMatchObject({
-        level: ["error", "warning", "info", "success"],
+        level: ["warning", "info", "success"],
       }),
     );
-    fireEvent.click(chip("Level", /Info/));
+    fireEvent.click(screen.getByRole("option", { name: /^Info/ }));
     await waitFor(() =>
-      expect(screen.getByTestId("location")).toHaveTextContent(
-        "level=error%2Cwarning",
-      ),
+      expect(screen.getByTestId("location")).toHaveTextContent("level=warning"),
     );
-    expect(chip("Level", /Info/)).toHaveAttribute("aria-pressed", "false");
+    expect(picker).toHaveTextContent("Warnings");
+  });
+
+  it("treat every level chosen as all levels", async () => {
+    await rendered("/system?tab=logs&level=error,warning");
+    const picker = screen.getByTestId("logs-level-picker");
+
+    fireEvent.click(picker);
+    fireEvent.click(screen.getByRole("option", { name: /^Info/ }));
+
+    await waitFor(() => expect(lastRequest()).toEqual({ limit: 50 }));
+    expect(picker).toHaveTextContent("All levels");
   });
 
   it("narrow to several categories at once, with how many rows each has", async () => {
@@ -262,7 +301,7 @@ describe("the filters", () => {
     });
     expect(lastRequest()).toHaveProperty("from");
     expect(chip("Source", /Jobs/)).toHaveAttribute("aria-pressed", "true");
-    expect(chip("Level", /Errors/)).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByTestId("logs-level-picker")).toHaveTextContent("Errors");
     expect(
       screen.getByRole("searchbox", { name: "Search the log" }),
     ).toHaveValue("ffmpeg");
@@ -271,7 +310,7 @@ describe("the filters", () => {
   it("keep the tab in the address while they change", async () => {
     await rendered();
 
-    fireEvent.click(chip("Level", /Errors/));
+    chooseLevels(/^Errors/);
 
     await waitFor(() =>
       expect(screen.getByTestId("location")).toHaveTextContent("tab=logs"),

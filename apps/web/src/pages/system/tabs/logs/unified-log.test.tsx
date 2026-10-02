@@ -9,7 +9,12 @@ import {
   vi,
 } from "vitest";
 
-import { logPage, renderLog, stubEventSource } from "./log-test-support";
+import {
+  chooseLevels,
+  logPage,
+  renderLog,
+  stubEventSource,
+} from "./log-test-support";
 
 const mocks = vi.hoisted(() => ({
   fetchSystemLog: vi.fn(),
@@ -131,7 +136,7 @@ describe("the list", () => {
       await screen.findByText("Nothing has been logged yet."),
     ).toBeInTheDocument();
 
-    fireEvent.click(chip("Level", /Errors/));
+    chooseLevels(/Errors/);
     expect(
       await screen.findByText("Nothing in the log matches these filters."),
     ).toBeInTheDocument();
@@ -169,7 +174,7 @@ describe("an address from before the three lists became one log", () => {
   it("is replaced by the source in the address once a filter is changed", async () => {
     await rendered("/system?tab=logs&show=jobs");
 
-    fireEvent.click(chip("Level", /Errors/));
+    chooseLevels(/Errors/);
 
     await waitFor(() =>
       expect(screen.getByTestId("location")).toHaveTextContent("source=job"),

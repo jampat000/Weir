@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 
 import { Panel } from "../../../../components/panels/panel";
 import { LoadError } from "../../../../components/shared/load-error";
@@ -14,7 +14,6 @@ import { useFitLevels } from "../../../../lib/ui/use-fit-levels";
 import { LogClearEvents } from "./log-clear-events";
 import { LogExportMenu } from "./log-export-menu";
 import { anyLogFilterSet, refineCount, type LogFilters } from "./log-filters";
-import type { CardFilters } from "./log-header-filters";
 import { LogList } from "./log-list";
 import { LogRange } from "./log-range";
 import { LogRefine } from "./log-refine";
@@ -50,7 +49,7 @@ function headerWraps(head: HTMLElement): boolean {
  * line on what the list holds, a way to refine it past what the header's filters can, Export, and Clear events.
  */
 export function LogCard({
-  moved,
+  movedPickers,
   filters,
   query,
   entries,
@@ -61,8 +60,8 @@ export function LogCard({
   onClearFilters,
   onRelated,
 }: {
-  /** The filters the shell's header had no room for. The pickers join this card's own header when it has the room, and a row above the list when not. */
-  moved: CardFilters;
+  /** The pickers, when the shell's header had no room for them; null while it holds them. They join this card's own header when it has the room, and a row above the list when not. */
+  movedPickers: ReactNode;
   filters: LogFilters;
   query: SystemLogQuery;
   entries: LogEntries;
@@ -90,11 +89,11 @@ export function LogCard({
   const headerFit = useFitLevels(
     summaryEl?.closest("header") ?? null,
     1,
-    `${summary}|${filtered}|${refining}|${canClear}|${moved.pickers !== null}`,
-    moved.pickers !== null,
+    `${summary}|${filtered}|${refining}|${canClear}|${movedPickers !== null}`,
+    movedPickers !== null,
     headerWraps,
   );
-  const pickersInRow = moved.pickers !== null && headerFit >= 1;
+  const pickersInRow = movedPickers !== null && headerFit >= 1;
 
   return (
     <>
@@ -131,8 +130,8 @@ export function LogCard({
         }
         aside={
           <>
-            {moved.pickers !== null && !pickersInRow ? (
-              <div className="mm-history-scope">{moved.pickers}</div>
+            {movedPickers !== null && !pickersInRow ? (
+              <div className="mm-history-scope">{movedPickers}</div>
             ) : null}
             {filtered ? (
               <button
@@ -164,10 +163,9 @@ export function LogCard({
           </>
         }
       >
-        {pickersInRow || moved.levels !== null ? (
+        {pickersInRow ? (
           <div className="mm-log-toolbar" data-testid="logs-toolbar">
-            {pickersInRow ? moved.pickers : null}
-            {moved.levels}
+            {movedPickers}
           </div>
         ) : null}
         {refineOpen || refining > 0 ? (

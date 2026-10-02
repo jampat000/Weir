@@ -4,6 +4,8 @@ import {
   EMPTY_LOG_FILTERS,
   anyLogFilterSet,
   filtersFromParams,
+  levelChoicesFor,
+  levelsForChoices,
   logQuery,
   paramsFromFilters,
   rangeFor,
@@ -203,6 +205,27 @@ describe("logQuery", () => {
       has_exception: true,
       from: "2026-10-02T11:00:00.000Z",
     });
+  });
+});
+
+describe("the level choices", () => {
+  it("stand for the levels they name, Info for information and successes", () => {
+    expect(levelsForChoices(["warning", "info"])).toEqual([
+      "warning",
+      "info",
+      "success",
+    ]);
+    expect(levelChoicesFor(["success"])).toEqual(["info"]);
+    expect(levelChoicesFor(["error", "warning", "info", "success"])).toEqual([
+      "error",
+      "warning",
+      "info",
+    ]);
+  });
+
+  it("are every level when none or all are chosen", () => {
+    expect(levelsForChoices([])).toEqual([]);
+    expect(levelsForChoices(["error", "warning", "info"])).toEqual([]);
   });
 });
 

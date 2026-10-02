@@ -24,9 +24,9 @@ export function UnifiedLog() {
       onSearch={setTyped}
       onChange={change}
     >
-      {(moved) => (
+      {(movedPickers) => (
         <LogCard
-          moved={moved}
+          movedPickers={movedPickers}
           filters={filters}
           query={query}
           entries={entries}

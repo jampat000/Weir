@@ -246,10 +246,13 @@ class AuditSettingsMixin:
             "server diagnostics disclosure",
         )
         self.page.get_by_role("searchbox", name="Search the log").fill("audit")
+        level = self.page.get_by_test_id("logs-level-picker")
+        self.click(level, "open the level picker")
         self.click(
-            self.page.get_by_role("group", name="Level").get_by_role("button", name=re.compile(r"^Warnings")),
+            self.page.get_by_role("option", name=re.compile(r"^Warnings")),
             "narrow the log to warnings",
         )
+        self.click(level, "close the level picker")
         self.click(logs.get_by_test_id("logs-export"), "open the log export menu")
         with self.page.expect_download(timeout=TIMEOUT_MS) as log_download:
             self.page.get_by_role("menuitem", name=re.compile("Whole server log")).click()

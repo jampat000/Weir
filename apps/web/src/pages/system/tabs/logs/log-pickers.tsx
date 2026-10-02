@@ -9,7 +9,10 @@ import type {
 } from "../../../../lib/system/system-log-api";
 import {
   LOG_CATEGORY_LABELS,
+  LOG_LEVEL_CHOICES,
   LOG_WHEN_OPTIONS,
+  levelChoicesFor,
+  levelsForChoices,
   type LogFilters,
   type LogWhen,
 } from "./log-filters";
@@ -23,9 +26,21 @@ function categorySummary(chosen: readonly SystemLogCategory[]): string {
   return `${chosen.length} categories`;
 }
 
+/** What the closed level picker says: nothing chosen is every level, one is named, several are counted. */
+function levelSummary(chosen: readonly string[]): string {
+  if (chosen.length === 0) return "All levels";
+  if (chosen.length === 1) {
+    return (
+      LOG_LEVEL_CHOICES.find((choice) => choice.value === chosen[0])?.label ??
+      chosen[0]
+    );
+  }
+  return `${chosen.length} levels`;
+}
+
 /**
- * The three pickers: what a row is about (several at once, with how many rows each has), its workflow, and how far back to
- * read. They sit on the header's title line when it has room for them, and at the top of the Log card when it has not.
+ * The four pickers: what a row is about and how serious it is (each several at once, with how many rows each choice has),
+ * its workflow, and how far back to read. They sit on the header's title line when it has room for them, and at the top of the Log card when it has not.
  */
 export function LogPickers({
   filters,
@@ -39,6 +54,7 @@ export function LogPickers({
 }) {
   const libraries = useProcessingLibrariesQuery();
   const categoryLabel = useId();
+  const levelLabel = useId();
   const workflowLabel = useId();
   const whenLabel = useId();
   const categoryOptions = CATEGORY_IDS.map((id) => ({
@@ -47,6 +63,22 @@ export function LogPickers({
       counts === undefined
         ? LOG_CATEGORY_LABELS[id]
         : `${LOG_CATEGORY_LABELS[id]} · ${counts.category[id].toLocaleString()}`,
+  }));
+  const chosenLevels = levelChoicesFor(filters.levels);
+  const levelOptions = LOG_LEVEL_CHOICES.map((choice) => ({
+    value: choice.value,
+    label:
+      counts === undefined
+        ? choice.label
+        : `${choice.label} · ${choice.levels
+            .reduce((sum, level) => sum + counts.level[level], 0)
+            .toLocaleString()}`,
+    marker: (
+      <span
+        className={`mm-log-dot mm-log-dot--${choice.value}`}
+        aria-hidden="true"
+      />
+    ),
   }));
   return (
     <>
@@ -63,6 +95,19 @@ export function LogPickers({
             onChange({ categories: next as SystemLogCategory[] })
           }
           ariaLabelledBy={categoryLabel}
+        />
+      </div>
+      <div className="mm-workflow-picker">
+        <span id={levelLabel} className="sr-only">
+          Level
+        </span>
+        <MmMultiListboxPicker
+          data-testid="logs-level-picker"
+          options={levelOptions}
+          values={chosenLevels}
+          summaryText={levelSummary(chosenLevels)}
+          onChange={(next) => onChange({ levels: levelsForChoices(next) })}
+          ariaLabelledBy={levelLabel}
         />
       </div>
       <div className="mm-workflow-picker">

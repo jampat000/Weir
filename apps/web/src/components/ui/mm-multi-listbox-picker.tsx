@@ -1,4 +1,4 @@
-import { useCallback, useId, useRef, useState } from "react";
+import { useCallback, useId, useRef, useState, type ReactNode } from "react";
 import {
   mmCheckboxControlClass,
   mmListboxPanelClass,
@@ -8,8 +8,11 @@ import { useCloseOnOutsideAndEscape } from "../../lib/ui/use-close-on-outside";
 import type { MmListboxOption } from "./mm-listbox-picker";
 import { useListboxKeyboardNav } from "./use-listbox-keyboard-nav";
 
+/** An option, optionally with a small mark (a coloured dot, say) drawn before its label. */
+export type MmMultiListboxOption = MmListboxOption & { marker?: ReactNode };
+
 type MmMultiListboxPickerProps = {
-  options: readonly MmListboxOption[];
+  options: readonly MmMultiListboxOption[];
   values: readonly string[];
   onChange: (next: string[]) => void;
   disabled?: boolean;
@@ -154,7 +157,14 @@ export function MmMultiListboxPicker({
                   className={mmCheckboxControlClass}
                   tabIndex={-1}
                 />
-                <span>{opt.label}</span>
+                {opt.marker ? (
+                  <span className="inline-flex items-center gap-2">
+                    {opt.marker}
+                    {opt.label}
+                  </span>
+                ) : (
+                  <span>{opt.label}</span>
+                )}
               </button>
             );
           })}

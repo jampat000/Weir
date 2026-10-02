@@ -1,4 +1,4 @@
-import { screen, within } from "@testing-library/react";
+import { screen } from "@testing-library/react";
 import {
   afterEach,
   beforeAll,
@@ -126,21 +126,19 @@ describe("where Logs' filters go when the title line is short of room", () => {
     const picker = await screen.findByTestId("logs-category-picker");
     const row = screen.getByTestId("logs-toolbar");
     expect(row).toContainElement(picker);
+    expect(row).toContainElement(screen.getByTestId("logs-level-picker"));
     expect(cardHeader()).not.toContainElement(picker);
-    expect(
-      within(row).queryByTestId("logs-level-chips"),
-    ).not.toBeInTheDocument();
   });
 
-  it("puts the level chips in the card's row once the pickers have left and the chips still do not fit", async () => {
-    chipsOverflowWhile(
-      () => inHeader('[data-testid="logs-level-chips"]') !== null,
-    );
+  it("keeps the level picker with the other pickers wherever they are", async () => {
+    chipsOverflowWhile(() => inHeader(".mm-history-scope") !== null);
     cardHeaderWrapsWhile(() => false);
     renderLog();
 
-    const row = await screen.findByTestId("logs-toolbar");
-    expect(within(row).getByTestId("logs-level-chips")).toBeInTheDocument();
-    expect(inHeader('[data-testid="logs-level-chips"]')).toBeNull();
+    const level = await screen.findByTestId("logs-level-picker");
+    expect(cardHeader()).toContainElement(level);
+    expect(level.closest(".mm-history-scope")).toBe(
+      screen.getByTestId("logs-category-picker").closest(".mm-history-scope"),
+    );
   });
 });

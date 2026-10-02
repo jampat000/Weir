@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { vi } from "vitest";
 
@@ -152,6 +152,16 @@ export function logPage(
     },
     ...overrides,
   };
+}
+
+/** Opens the level picker, toggles the options named, and closes it again. */
+export function chooseLevels(...names: (RegExp | string)[]): void {
+  const picker = screen.getByTestId("logs-level-picker");
+  fireEvent.click(picker);
+  for (const name of names) {
+    fireEvent.click(screen.getByRole("option", { name }));
+  }
+  fireEvent.click(picker);
 }
 
 /** Shows the address, so a test can say what a choice did to it. */
