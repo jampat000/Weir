@@ -8,6 +8,7 @@ type Query = { data?: unknown; isError?: boolean; error?: unknown };
 let overview: Query;
 let stats: Query;
 let backups: Query;
+let filesAtOnce: Query;
 const showHealth = vi.fn();
 
 vi.mock("../../../../lib/system/use-system-stats", () => ({
@@ -16,6 +17,9 @@ vi.mock("../../../../lib/system/use-system-stats", () => ({
 }));
 vi.mock("../../../../lib/settings/queries", () => ({
   useConfigurationBackupsQuery: () => backups,
+}));
+vi.mock("../../../../lib/processing/queries", () => ({
+  useProcessingFilesAtOnceQuery: () => filesAtOnce,
 }));
 
 const checks = { passing: 9, total: 10, need: 1 };
@@ -28,6 +32,7 @@ beforeEach(() => {
   overview = { data: testOverview };
   stats = { data: testStats };
   backups = { data: { items: [] } };
+  filesAtOnce = { data: { waiting: 3 } };
   showHealth.mockClear();
 });
 
@@ -98,6 +103,8 @@ describe("the This Weir card", () => {
       "Uptime",
       "Files at once",
       "Jobs today",
+      "Usage",
+      "Waiting",
       "Response",
       "Last backup",
       "Runs as",

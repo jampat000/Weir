@@ -106,6 +106,10 @@ export type FactsInput = {
   overview: SystemOverview;
   /** Passes running and the slots Weir has for them, from the newest reading; null before it arrives. */
   work: { running: number; slots: number } | null;
+  /** Weir's own share of the computer from the newest reading; either part is null where it could not be read. */
+  usage: { cpuPercent: number | null; memoryBytes: number | null } | null;
+  /** Files waiting for a free slot, or null before Weir has said. */
+  waiting: number | null;
   /** When the newest configuration backup was made, or null when there is none. */
   lastBackupAt: string | null;
   lastBackupBytes: number | null;
@@ -120,6 +124,8 @@ export type FactsInput = {
 export function weirFacts({
   overview,
   work,
+  usage,
+  waiting,
   lastBackupAt,
   lastBackupBytes,
   now,
@@ -179,6 +185,29 @@ export function weirFacts({
               `✗ ${failed.toLocaleString()}`,
             ]
           : undefined,
+    },
+    {
+      key: "usage",
+      label: "Usage",
+      short: "Usage",
+      value:
+        usage?.cpuPercent == null
+          ? "–"
+          : `${Math.round(usage.cpuPercent)}% CPU`,
+      sub:
+        usage?.memoryBytes == null ? "" : `${sizeWords(usage.memoryBytes)} RAM`,
+    },
+    {
+      key: "waiting",
+      label: "Waiting",
+      short: "Waiting",
+      value: waiting === null ? "–" : waiting.toLocaleString(),
+      sub:
+        waiting === null
+          ? ""
+          : waiting > 0
+            ? "for a free slot"
+            : "nothing queued",
     },
     {
       key: "backup",

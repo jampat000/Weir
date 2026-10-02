@@ -1,6 +1,7 @@
 import { CountUp } from "../../../../components/charts/count-up";
 import { loadErrorMessage } from "../../../../lib/api/error-message";
 import { useConfigurationBackupsQuery } from "../../../../lib/settings/queries";
+import { useProcessingFilesAtOnceQuery } from "../../../../lib/processing/queries";
 import {
   useSystemOverviewQuery,
   useSystemStatsQuery,
@@ -101,13 +102,14 @@ type ThisWeirCardProps = {
 
 /**
  * Dashboard › System: how well Weir is doing, as a ring of the checks that pass with how many need you, and beside it
- * tiles for what Weir is running as and doing: its version, uptime, files at once, jobs, answer time, last backup,
- * address and size. The tiles' room decides how many whole rows show, and the header says how many more there are.
+ * tiles for what Weir is running as and doing: its version, uptime, files at once, jobs, its own use of the
+ * computer, what is waiting, last backup, answer time, address and size. The tiles' room decides how many whole rows show, and the header says how many more there are.
  */
 export function ThisWeirCard({ checks, onShowHealth }: ThisWeirCardProps) {
   const overview = useSystemOverviewQuery();
   const stats = useSystemStatsQuery();
   const backups = useConfigurationBackupsQuery(true);
+  const filesAtOnce = useProcessingFilesAtOnceQuery();
   const now = useNow(TICK_MS);
   const newest = newestBackup(backups.data?.items ?? []);
   const facts = overview.data
@@ -116,6 +118,13 @@ export function ThisWeirCard({ checks, onShowHealth }: ThisWeirCardProps) {
         work: stats.data
           ? { running: stats.data.now.running, slots: stats.data.now.slots }
           : null,
+        usage: stats.data
+          ? {
+              cpuPercent: stats.data.now.weir_cpu_percent,
+              memoryBytes: stats.data.now.weir_memory_bytes,
+            }
+          : null,
+        waiting: filesAtOnce.data?.waiting ?? null,
         lastBackupAt: newest?.created_at ?? null,
         lastBackupBytes: newest?.size_bytes ?? null,
         now,

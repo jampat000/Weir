@@ -25,6 +25,8 @@ const facts = (changes: Partial<Parameters<typeof weirFacts>[0]> = {}) =>
     weirFacts({
       overview,
       work: { running: 2, slots: 4 },
+      usage: { cpuPercent: 3.4, memoryBytes: 265 * 1024 * 1024 },
+      waiting: 3,
       lastBackupAt: "2026-10-02T09:00:00Z",
       lastBackupBytes: 2048,
       now: NOW,
@@ -156,11 +158,40 @@ describe("the fact tiles", () => {
   });
 });
 
+describe("Weir's own use and its queue", () => {
+  it("shows Weir's share of the processor and its memory", () => {
+    expect(facts().usage).toMatchObject({ value: "3% CPU", sub: "265 MB RAM" });
+  });
+
+  it("shows a dash where a reading is missing, never a made-up zero", () => {
+    expect(
+      facts({ usage: { cpuPercent: null, memoryBytes: null } }).usage,
+    ).toMatchObject({ value: "–", sub: "" });
+    expect(facts({ waiting: null }).waiting).toMatchObject({
+      value: "–",
+      sub: "",
+    });
+  });
+
+  it("says how many files wait for a free slot, or that nothing is queued", () => {
+    expect(facts().waiting).toMatchObject({
+      value: "3",
+      sub: "for a free slot",
+    });
+    expect(facts({ waiting: 0 }).waiting).toMatchObject({
+      value: "0",
+      sub: "nothing queued",
+    });
+  });
+});
+
 describe("the order of the tiles", () => {
   it("puts what matters most first, so a short card shows the version, uptime, files at once and jobs", () => {
     const keys = weirFacts({
       overview,
       work: null,
+      usage: null,
+      waiting: null,
       lastBackupAt: null,
       lastBackupBytes: null,
       now: NOW,
@@ -171,6 +202,8 @@ describe("the order of the tiles", () => {
       "uptime",
       "files-at-once",
       "jobs",
+      "usage",
+      "waiting",
       "backup",
       "response",
       "address",
