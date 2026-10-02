@@ -18,6 +18,7 @@ internal sealed class SystemLogEventSource
 
     private static readonly string LevelSql = SystemLogSql.EventLevel("activity_events.result");
     private static readonly string CategorySql = SystemLogSql.EventCategory("activity_events.event_type");
+    private static readonly string AtSql = SystemLogSql.AtText("activity_events.created_at");
 
     public async Task<SystemLogSlice> ReadAsync(UnitOfWork uow, SystemLogRequest request)
     {
@@ -39,7 +40,7 @@ internal sealed class SystemLogEventSource
 
         var levels = await TallyAsync(uow, LevelSql, categoryOnly).ConfigureAwait(false);
         var categories = await TallyAsync(uow, CategorySql, levelOnly).ConfigureAwait(false);
-        var page = both.Copy().AddAfter("activity_events.created_at", "activity_events.id", SystemLogSource.Event, request.After);
+        var page = both.Copy().AddAfter(AtSql, "activity_events.id", SystemLogSource.Event, request.After, "activity_events.created_at");
         var parameters = page.Parameters.Append(("@take", (object?)request.Take)).ToArray();
         var rows = await uow.QueryAsync(
             $"SELECT {ActivityHistoryStore.Columns} FROM {Table}{page.WhereText} ORDER BY activity_events.created_at DESC, activity_events.id DESC LIMIT @take",

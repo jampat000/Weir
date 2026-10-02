@@ -9,6 +9,14 @@ namespace Weir.Infrastructure.SystemLog;
 /// </summary>
 internal static class SystemLogSql
 {
+    /// <summary>
+    /// A stored time as the fixed-shape text <c>2026-10-02 11:00:00.123456</c> (UTC). The columns hold more than one shape: with
+    /// and without a UTC offset, and with no fraction at all when it is zero, as older releases wrote an exact second. Shaping
+    /// them alike lets a time be compared and paged as plain text.
+    /// </summary>
+    public static string AtText(string column) =>
+        $"CASE WHEN substr({column}, 20, 1) = '.' THEN substr({column}, 1, 26) ELSE substr({column}, 1, 19) || '.000000' END";
+
     /// <summary>The level of an Activity event, from its <c>result</c> column.</summary>
     public static string EventLevel(string resultColumn)
     {

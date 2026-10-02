@@ -90,6 +90,30 @@ public sealed class SystemLogReaderTests : IDisposable
     }
 
     [Fact]
+    public async Task Events_stored_without_a_fraction_of_a_second_page_like_the_rest()
+    {
+        // Older releases wrote an exact second as 2026-10-02 11:00:00, with no fraction.
+        for (var index = 0; index < 5; index++)
+        {
+            await _store.Execute(
+                $"INSERT INTO activity_events (created_at, event_type, module, title, result) VALUES ('2026-10-02 11:00:00', 'auth.login_succeeded', 'auth', 'Event {index}', 'success')");
+        }
+
+        var seen = new List<string>();
+        SystemLogPosition? after = null;
+        do
+        {
+            var page = await Read(new SystemLogFilter(), after, limit: 2);
+            seen.AddRange(page.Rows.Select(row => row.Id));
+            after = SystemLogCursor.TryDecode(page.NextCursor, out var next) ? next : null;
+        }
+        while (after is not null);
+
+        Assert.Equal(5, seen.Count);
+        Assert.Equal(5, seen.Distinct().Count());
+    }
+
+    [Fact]
     public async Task Choosing_a_level_keeps_only_rows_of_that_level_from_every_source()
     {
         await AddEvent(minutesAgo: 5, "auth.login_failed", "Sign-in failed", result: "failed");

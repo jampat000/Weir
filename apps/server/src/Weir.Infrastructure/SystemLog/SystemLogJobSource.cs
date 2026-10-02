@@ -21,18 +21,10 @@ internal sealed class SystemLogJobSource
     private const int AtTextOrdinal = 15;
     private const int WorkflowOrdinal = 18;
 
-    /// <summary>
-    /// A job's time as the same fixed-shape text the Activity events use. The column holds two shapes, with and without a
-    /// UTC offset and with no fraction at all when it is zero, and both are UTC; shaping them alike lets the time be
-    /// compared and paged as plain text.
-    /// </summary>
-    private const string AtSql =
-        "CASE WHEN substr(updated_at, 20, 1) = '.' THEN substr(updated_at, 1, 26) ELSE substr(updated_at, 1, 19) || '.000000' END";
-
     private const string WorkflowSql = "CASE WHEN json_valid(payload_json) THEN json_extract(payload_json, '$.library_id') END";
 
     private static readonly string Selected =
-        $"WITH job_rows AS (SELECT {ProcessingJobStore.JobColumns}, {AtSql} AS at_text, " +
+        $"WITH job_rows AS (SELECT {ProcessingJobStore.JobColumns}, {SystemLogSql.AtText("updated_at")} AS at_text, " +
         $"{SystemLogSql.JobLevel("status", "last_error")} AS level, {SystemLogSql.JobCategory("job_kind")} AS category, " +
         $"{WorkflowSql} AS workflow_id FROM jobs) SELECT * FROM job_rows";
 
