@@ -10,6 +10,7 @@ import { Poster } from "../shared/poster";
 import { fileHistoryRetentionNote } from "../../lib/processing/file-history-retention";
 import { useAppDateFormatter } from "../../lib/ui/mm-format-date";
 import { DirectPlayLine } from "./direct-play-line";
+import { FileNowSection, type FileNow } from "./file-now-section";
 import { StoryPanelShell } from "./story-panel-shell";
 import type {
   ProcessingDirectPlay,
@@ -40,6 +41,8 @@ export interface FileStoryPanelProps {
   poster?: { url: string | null | undefined; workflow: string };
   /** Which of the operator's devices will play the file directly. Information only. */
   directPlay?: ProcessingDirectPlay[];
+  /** Where the file is on the Pipeline right now, when it is on it: shown above what has already happened to it. */
+  now?: FileNow;
   log: ProcessingFileLog | undefined;
   loading: boolean;
   error: string | null;
@@ -51,6 +54,7 @@ export function FileStoryPanel({
   fileName,
   poster,
   directPlay = [],
+  now,
   log,
   loading,
   error,
@@ -83,6 +87,7 @@ export function FileStoryPanel({
         full
         testId="file-story-direct-play"
       />
+      {now ? <FileNowSection now={now} /> : null}
       {loading ? (
         <p className="mm-story-panel__note">Loading…</p>
       ) : error ? (
@@ -91,7 +96,9 @@ export function FileStoryPanel({
         </p>
       ) : !log || log.entries.length === 0 ? (
         <p className="mm-story-panel__note">
-          Nothing yet. Weir hasn&apos;t worked on this file.
+          {now
+            ? "What Weir kept and removed shows here once it has finished."
+            : "Nothing yet. Weir hasn't worked on this file."}
         </p>
       ) : (
         log.entries.map((entry) => (

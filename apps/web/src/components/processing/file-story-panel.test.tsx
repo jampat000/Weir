@@ -1,4 +1,10 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from "@testing-library/react";
 import { expect, it, vi } from "vitest";
 
 import type { ProcessingFileLog } from "../../lib/processing/files-api";
@@ -186,4 +192,52 @@ it("tints the poster's tile for the file's workflow, and for a workflow that is 
       screen.getByRole("dialog").querySelector(".mm-tile") as HTMLElement
     ).style.getPropertyValue("--tile-hue"),
   ).toBe("205");
+});
+
+it("says where a file is now, with how far through it is, instead of saying nothing has happened", () => {
+  mount({
+    log: log({ entries: [] }),
+    now: {
+      stage: "Processing",
+      status: "39% · 16 s left",
+      working: true,
+      progress: 39,
+      facts: ["Speed 479× real time", "Removing 4 audio, 2 subtitles"],
+    },
+  });
+
+  const now = screen.getByRole("region", { name: "Right now" });
+  expect(now).toHaveTextContent("Processing");
+  expect(now).toHaveTextContent("39% · 16 s left");
+  expect(within(now).getByRole("progressbar")).toHaveAttribute(
+    "aria-valuenow",
+    "39",
+  );
+  expect(now).toHaveTextContent("Speed 479× real time");
+  expect(screen.queryByText(/Nothing yet/)).not.toBeInTheDocument();
+  expect(screen.getByText(/shows here once it has finished/)).toBeVisible();
+});
+
+it("leaves the bar out for a file that is only waiting", () => {
+  mount({
+    log: log({ entries: [] }),
+    now: {
+      stage: "Queued",
+      status: "Waiting its turn",
+      working: false,
+      progress: null,
+      facts: [],
+    },
+  });
+
+  expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
+});
+
+it("says nothing has happened to a file that is neither on the Pipeline nor has a history", () => {
+  mount({ log: log({ entries: [] }) });
+
+  expect(screen.getByText(/Nothing yet/)).toBeVisible();
+  expect(
+    screen.queryByRole("region", { name: "Right now" }),
+  ).not.toBeInTheDocument();
 });

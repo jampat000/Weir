@@ -7,7 +7,7 @@
  * second even though the file list itself only changes on a database write: the start of a pass, a stage
  * change, or its end.
  */
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import {
@@ -29,8 +29,10 @@ import { processingKeys } from "../../../lib/processing/query-keys";
 import { classNames } from "../../../lib/ui/class-names";
 import { useNow } from "../../../lib/ui/use-now";
 import { useLeavingCards } from "../leaving-cards";
+import { fileNowOf } from "../pipeline/file-now";
 import { JustFinishedShelf } from "../pipeline/just-finished-shelf";
 import { PipelineBoard } from "../pipeline/pipeline-board";
+import { buildPipelineCards } from "../pipeline/pipeline-cards";
 import { stackedBoardBudget } from "../pipeline/pipeline-layout";
 import { TODAY_DAYS, shownBy, type Filter } from "../processing-filter";
 import { prettyName } from "../processing-model";
@@ -123,6 +125,15 @@ export function LiveView({ filter, workflowId, layout }: LiveViewProps) {
     files.data?.files ?? NO_FILES,
   );
   const next = useNextItems(libraries.data, workflowId, filter);
+  // Where the open file is on the Pipeline, if it is on it or has just left it, worked out from the same lanes as the cards.
+  const storyId = storyFile?.id;
+  const storyNow = useMemo(() => {
+    if (storyId === undefined) return undefined;
+    const card = buildPipelineCards(lanes, leaving, "all", now).find(
+      (entry) => entry.file?.id === storyId,
+    );
+    return card ? fileNowOf(card) : undefined;
+  }, [lanes, leaving, now, storyId]);
 
   const openFile = useCallback(
     (file: ProcessingFile) => {
@@ -264,6 +275,7 @@ export function LiveView({ filter, workflowId, layout }: LiveViewProps) {
         open={storyFile !== null}
         fileName={storyFile ? prettyName(storyFile.name) : ""}
         poster={storyFile?.poster}
+        now={storyNow}
         log={fileLog.data}
         loading={fileLog.isPending}
         error={
