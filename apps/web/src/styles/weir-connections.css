@@ -309,7 +309,7 @@
 .mm-ctable__test {
   justify-self: center;
   width: 56px;
-  height: 22px;
+  height: var(--mm-control-height-row);
   padding: 0;
   border: 1px solid var(--mm-hairline);
   border-radius: 6px;

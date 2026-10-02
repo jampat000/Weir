@@ -3,7 +3,8 @@
  * (Test, Open, Run now, Retry); tertiary is a lower-emphasis helper (Show, Clear, row actions).
  * A destructive action is `danger` when it is the confirming button of a dialog (filled, so the choice is
  * unmistakable) and `danger-outline` when it sits among other buttons. An on/off choice uses `MmOnOffSwitch`,
- * not these classes.
+ * not these classes. A button is one of three heights (the scale in `weir-tokens.css`): `header` in a page's header,
+ * `card` inside a card (the default), `row` for an action on a row of a list or table.
  */
 
 const FOCUS_RING =
@@ -13,11 +14,17 @@ const FOCUS_RING =
 const DANGER_FOCUS_RING =
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mm-destructive/45 focus-visible:ring-offset-2 focus-visible:ring-offset-mm-card-bg";
 
-const actionBase =
-  "inline-flex min-h-[2.5rem] max-w-full items-center justify-center rounded-mm-control border px-4 py-2.5 text-sm font-semibold leading-snug tracking-normal transition-all duration-150 whitespace-normal text-center";
+const BUTTON_LAYOUT =
+  "inline-flex max-w-full items-center justify-center rounded-mm-control border leading-snug tracking-normal transition-all duration-150 whitespace-normal text-center";
 
-const tertiaryBase =
-  "inline-flex min-h-[2.25rem] max-w-full items-center justify-center rounded-mm-control border px-3 py-1.5 text-sm font-medium leading-snug tracking-normal transition-all duration-150 whitespace-normal text-center";
+export type MmActionSize = "header" | "card" | "row";
+
+/** A button's height is a minimum: a long label wraps and grows the button rather than clipping. */
+const BUTTON_SIZE: Record<MmActionSize, string> = {
+  header: "min-h-(--mm-control-height-page) px-3.5 py-1 text-sm",
+  card: "min-h-(--mm-control-height-sm) px-3.5 py-1 text-sm",
+  row: "min-h-(--mm-control-height-row) px-2.5 py-0.5 text-xs",
+};
 
 /**
  * Default class for ordinary editable text inputs (paths, titles, CSV tokens, etc.).
@@ -81,6 +88,50 @@ export const mmTechnicalMonoSmallClass =
 export type MmActionVariant =
   "primary" | "secondary" | "tertiary" | "danger" | "danger-outline";
 
+/** What each variant looks like and how it answers hover, focus and a disabled button. */
+const BUTTON_LOOK: Record<MmActionVariant, string> = {
+  primary: [
+    "font-semibold cursor-pointer border-mm-primary bg-mm-primary text-mm-on-accent shadow-[0_1px_2px_color-mix(in_srgb,var(--mm-primary)_35%,transparent)]",
+    "hover:border-mm-primary-bright hover:bg-mm-primary-bright hover:shadow-[0_4px_16px_color-mix(in_srgb,var(--mm-primary)_28%,transparent)] hover:-translate-y-px",
+    "active:translate-y-0 active:brightness-[0.97]",
+    FOCUS_RING,
+    "disabled:cursor-not-allowed disabled:border-mm-border disabled:bg-mm-button-quiet-bg disabled:text-mm-text3 disabled:opacity-80 disabled:shadow-none",
+    "disabled:hover:border-mm-border disabled:hover:bg-mm-button-quiet-bg disabled:hover:shadow-none disabled:hover:translate-y-0",
+  ].join(" "),
+  secondary: [
+    "font-semibold cursor-pointer border-mm-border bg-mm-button-secondary-bg text-mm-text",
+    "hover:border-[color-mix(in_srgb,var(--mm-primary)_55%,transparent)] hover:bg-mm-accent-soft hover:shadow-sm",
+    "active:brightness-[0.97]",
+    FOCUS_RING,
+    "disabled:cursor-not-allowed disabled:border-mm-border disabled:bg-transparent disabled:text-mm-text3 disabled:opacity-70 disabled:shadow-none",
+    "disabled:hover:border-mm-border disabled:hover:bg-transparent disabled:hover:shadow-none",
+  ].join(" "),
+  tertiary: [
+    "font-medium cursor-pointer border-mm-border bg-transparent text-mm-text2",
+    "hover:border-mm-border hover:bg-mm-card-bg/55 hover:text-mm-text1",
+    "active:brightness-[0.98]",
+    FOCUS_RING,
+    "disabled:cursor-not-allowed disabled:border-mm-border disabled:bg-transparent disabled:text-mm-text3 disabled:opacity-60",
+    "disabled:hover:border-mm-border disabled:hover:bg-transparent disabled:hover:text-mm-text3",
+  ].join(" "),
+  danger: [
+    "font-semibold cursor-pointer border-mm-destructive bg-mm-destructive text-mm-on-accent",
+    "hover:border-mm-status-failed-text hover:bg-mm-status-failed-text",
+    "active:brightness-[0.97]",
+    DANGER_FOCUS_RING,
+    "disabled:cursor-not-allowed disabled:border-mm-border disabled:bg-mm-button-quiet-bg disabled:text-mm-text3 disabled:opacity-80",
+    "disabled:hover:border-mm-border disabled:hover:bg-mm-button-quiet-bg",
+  ].join(" "),
+  "danger-outline": [
+    "font-semibold cursor-pointer border-[color-mix(in_srgb,var(--mm-destructive)_55%,var(--mm-border))] bg-transparent text-mm-status-failed-text",
+    "hover:border-mm-destructive hover:bg-mm-status-failed-bg",
+    "active:brightness-[0.97]",
+    DANGER_FOCUS_RING,
+    "disabled:cursor-not-allowed disabled:border-mm-border disabled:bg-transparent disabled:text-mm-text3 disabled:opacity-70",
+    "disabled:hover:border-mm-border disabled:hover:bg-transparent",
+  ].join(" "),
+};
+
 /**
  * The classes for one action button. A disabled button looks disabled from the element's own state,
  * so `<button disabled>` is the whole story. `disabled:hover:*` repeats each hover property: CSS
@@ -89,64 +140,8 @@ export type MmActionVariant =
  */
 export function mmActionButtonClass(opts: {
   variant: MmActionVariant;
+  size?: MmActionSize;
 }): string {
-  const { variant } = opts;
-
-  if (variant === "danger") {
-    return [
-      actionBase,
-      "cursor-pointer border-mm-destructive bg-mm-destructive text-mm-on-accent",
-      "hover:border-mm-status-failed-text hover:bg-mm-status-failed-text",
-      "active:brightness-[0.97]",
-      DANGER_FOCUS_RING,
-      "disabled:cursor-not-allowed disabled:border-mm-border disabled:bg-mm-button-quiet-bg disabled:text-mm-text3 disabled:opacity-80",
-      "disabled:hover:border-mm-border disabled:hover:bg-mm-button-quiet-bg",
-    ].join(" ");
-  }
-
-  if (variant === "danger-outline") {
-    return [
-      actionBase,
-      "cursor-pointer border-[color-mix(in_srgb,var(--mm-destructive)_55%,var(--mm-border))] bg-transparent text-mm-status-failed-text",
-      "hover:border-mm-destructive hover:bg-mm-status-failed-bg",
-      "active:brightness-[0.97]",
-      DANGER_FOCUS_RING,
-      "disabled:cursor-not-allowed disabled:border-mm-border disabled:bg-transparent disabled:text-mm-text3 disabled:opacity-70",
-      "disabled:hover:border-mm-border disabled:hover:bg-transparent",
-    ].join(" ");
-  }
-
-  if (variant === "tertiary") {
-    return [
-      tertiaryBase,
-      "cursor-pointer border-mm-border bg-transparent text-mm-text2",
-      "hover:border-mm-border hover:bg-mm-card-bg/55 hover:text-mm-text1",
-      "active:brightness-[0.98]",
-      FOCUS_RING,
-      "disabled:cursor-not-allowed disabled:border-mm-border disabled:bg-transparent disabled:text-mm-text3 disabled:opacity-60",
-      "disabled:hover:border-mm-border disabled:hover:bg-transparent disabled:hover:text-mm-text3",
-    ].join(" ");
-  }
-
-  if (variant === "primary") {
-    return [
-      actionBase,
-      "cursor-pointer border-mm-primary bg-mm-primary text-mm-on-accent shadow-[0_1px_2px_color-mix(in_srgb,var(--mm-primary)_35%,transparent)]",
-      "hover:border-mm-primary-bright hover:bg-mm-primary-bright hover:shadow-[0_4px_16px_color-mix(in_srgb,var(--mm-primary)_28%,transparent)] hover:-translate-y-px",
-      "active:translate-y-0 active:brightness-[0.97]",
-      FOCUS_RING,
-      "disabled:cursor-not-allowed disabled:border-mm-border disabled:bg-mm-button-quiet-bg disabled:text-mm-text3 disabled:opacity-80 disabled:shadow-none",
-      "disabled:hover:border-mm-border disabled:hover:bg-mm-button-quiet-bg disabled:hover:shadow-none disabled:hover:translate-y-0",
-    ].join(" ");
-  }
-
-  return [
-    actionBase,
-    "cursor-pointer border-mm-border bg-mm-button-secondary-bg text-mm-text",
-    "hover:border-[color-mix(in_srgb,var(--mm-primary)_55%,transparent)] hover:bg-mm-accent-soft hover:shadow-sm",
-    "active:brightness-[0.97]",
-    FOCUS_RING,
-    "disabled:cursor-not-allowed disabled:border-mm-border disabled:bg-transparent disabled:text-mm-text3 disabled:opacity-70 disabled:shadow-none",
-    "disabled:hover:border-mm-border disabled:hover:bg-transparent disabled:hover:shadow-none",
-  ].join(" ");
+  const { variant, size = "card" } = opts;
+  return [BUTTON_LAYOUT, BUTTON_SIZE[size], BUTTON_LOOK[variant]].join(" ");
 }

@@ -172,7 +172,7 @@
 
 .mm-choice-row button {
   min-width: 34px;
-  height: 30px;
+  height: calc(var(--mm-control-height-page) - 6px);
   padding: 0 10px;
   border: 0;
   border-radius: 8px;

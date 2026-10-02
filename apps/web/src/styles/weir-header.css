@@ -142,7 +142,7 @@
     > input:placeholder-shown
   ) {
   flex: none;
-  width: 36px;
+  width: var(--mm-control-height-page);
   min-width: 0;
 }
 
@@ -186,7 +186,7 @@
 
 .mm-header__slot .mm-segmented {
   box-sizing: border-box;
-  height: 2.375rem;
+  height: var(--mm-control-height-page);
 }
 
 .mm-header__slot .mm-segmented__option {

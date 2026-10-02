@@ -110,7 +110,7 @@ kbd {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  height: 36px;
+  height: var(--mm-control-height-page);
   box-sizing: border-box;
   padding: 0 14px;
   border: 1px solid var(--mm-hairline);
@@ -137,7 +137,7 @@ kbd {
 }
 
 .mm-head-control--icon {
-  width: 36px;
+  width: var(--mm-control-height-page);
   padding: 0;
 }
 

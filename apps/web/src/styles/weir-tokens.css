@@ -138,12 +138,14 @@
   /* A live trace line's colour, set per line from React (weir-live-trace.css), and a System card column's (weir-system-band.css). */
   --mm-trace-colour: var(--mm-primary);
   --mm-sy-colour: var(--mm-primary);
-  /* Control sizes: 40px is the field size, with smaller steps for secondary and quiet controls. */
+  /* Control heights are three steps. A page's header controls (buttons, pickers, search, choice groups, icon buttons)
+     and every field are the page height, the Dashboard picker's. A button inside a card is the sm height, and an action
+     on a row of a list or table is the row height. The plain and lg heights are the phone shell's and the sign-in form's. */
   --mm-control-height-lg: calc(40px * var(--mm-density-ui-scale));
-  --mm-control-height-sm: calc(32px * var(--mm-density-ui-scale));
-  --mm-control-height: calc(34px * var(--mm-density-ui-scale));
-  /* A page's own controls, the header's pickers and the System tabs' fields and buttons: the Dashboard's height. */
   --mm-control-height-page: 2.375rem;
+  --mm-control-height-sm: calc(32px * var(--mm-density-ui-scale));
+  --mm-control-height-row: calc(28px * var(--mm-density-ui-scale));
+  --mm-control-height: calc(34px * var(--mm-density-ui-scale));
   --mm-control-pad-x: calc(11px * var(--mm-density-ui-scale));
   --mm-control-pad-y: calc(7px * var(--mm-density-ui-scale));
 

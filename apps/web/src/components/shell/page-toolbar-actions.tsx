@@ -3,9 +3,6 @@ import { createPortal } from "react-dom";
 
 import { mmActionButtonClass } from "../../lib/ui/mm-control-roles";
 
-/** A button in the 40px toolbar row is shorter than one in a panel, so it sits inside the row instead of filling it. */
-const TOOLBAR_BUTTON_SIZE = "min-h-8! py-1.5!";
-
 /**
  * The element in a toolbar row where the open tab's own buttons go. Undefined outside a page with a toolbar
  * (as in a tab's own tests), where the buttons stay where they are written; null until the row has mounted.
@@ -67,7 +64,7 @@ export function PageToolbarAddButton({
     <PageToolbarAction>
       <button
         type="button"
-        className={`${mmActionButtonClass({ variant: "primary" })} ${TOOLBAR_BUTTON_SIZE}`}
+        className={mmActionButtonClass({ variant: "primary", size: "header" })}
         data-testid={dataTestId}
         disabled={disabled}
         onClick={onClick}

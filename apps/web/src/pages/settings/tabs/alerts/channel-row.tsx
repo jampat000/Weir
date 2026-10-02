@@ -77,7 +77,10 @@ export function ChannelRow({
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
-            className={mmActionButtonClass({ variant: "tertiary" })}
+            className={mmActionButtonClass({
+              variant: "tertiary",
+              size: "row",
+            })}
             disabled={testing || deleting}
             onClick={onTest}
           >
@@ -85,7 +88,10 @@ export function ChannelRow({
           </button>
           <button
             type="button"
-            className={mmActionButtonClass({ variant: "secondary" })}
+            className={mmActionButtonClass({
+              variant: "secondary",
+              size: "row",
+            })}
             disabled={deleting}
             onClick={onEdit}
           >
@@ -93,7 +99,10 @@ export function ChannelRow({
           </button>
           <button
             type="button"
-            className={mmActionButtonClass({ variant: "danger-outline" })}
+            className={mmActionButtonClass({
+              variant: "danger-outline",
+              size: "row",
+            })}
             disabled={deleting}
             aria-haspopup="dialog"
             onClick={onDelete}

@@ -277,7 +277,7 @@
 }
 
 .mm-need__button {
-  height: 28px;
+  height: var(--mm-control-height-row);
   padding: 0 12px;
   border: 1px solid var(--mm-hairline);
   border-radius: var(--mm-radius-control);

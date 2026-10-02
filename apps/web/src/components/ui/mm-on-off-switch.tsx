@@ -20,7 +20,7 @@ export function MmOnOffSwitch({
 }) {
   const control = (
     <div
-      className="inline-flex w-fit shrink-0 rounded-md border border-mm-border bg-mm-surface2/40 p-0.5"
+      className="inline-flex h-(--mm-control-height-page) w-fit shrink-0 rounded-md border border-mm-border bg-mm-surface2/40 p-0.5"
       role="radiogroup"
       aria-labelledby={id}
     >
@@ -36,7 +36,7 @@ export function MmOnOffSwitch({
             disabled={disabled}
             onClick={() => onChange(isOn)}
             className={[
-              "min-w-[3.25rem] rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+              "min-w-[3.25rem] rounded-md px-3 text-sm font-medium transition-colors",
               selected
                 ? "bg-mm-accent-soft text-mm-text1 shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--mm-primary)_35%,transparent)]"
                 : "text-mm-text2 hover:bg-mm-card-bg/70",

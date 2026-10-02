@@ -116,8 +116,11 @@ export function LibraryRow({
   rowRef,
 }: LibraryRowProps) {
   const badge = processingMediaTypeBadge(library);
-  const remove = mmActionButtonClass({ variant: "danger-outline" });
-  const secondary = mmActionButtonClass({ variant: "secondary" });
+  const remove = mmActionButtonClass({
+    variant: "danger-outline",
+    size: "row",
+  });
+  const secondary = mmActionButtonClass({ variant: "secondary", size: "row" });
   return (
     <tr
       ref={rowRef}

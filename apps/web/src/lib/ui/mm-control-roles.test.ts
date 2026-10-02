@@ -91,6 +91,27 @@ describe("mmActionButtonClass", () => {
     expect(classesFor("tertiary")).toContain("bg-transparent");
   });
 
+  it.each([
+    ["header", "min-h-(--mm-control-height-page)"],
+    ["card", "min-h-(--mm-control-height-sm)"],
+    ["row", "min-h-(--mm-control-height-row)"],
+  ] as const)(
+    "gives a %s button its step of the control scale",
+    (size, height) => {
+      expect(mmActionButtonClass({ variant: "secondary", size })).toContain(
+        height,
+      );
+    },
+  );
+
+  it("is card height unless a size is asked for, whatever the variant", () => {
+    for (const variant of VARIANTS) {
+      expect(mmActionButtonClass({ variant })).toContain(
+        "min-h-(--mm-control-height-sm)",
+      );
+    }
+  });
+
   it("draws a destructive action in the failure colour, filled or outlined", () => {
     expect(classesFor("danger")).toContain("bg-mm-destructive");
     expect(classesFor("danger")).not.toContain("bg-mm-primary");

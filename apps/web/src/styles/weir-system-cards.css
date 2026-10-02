@@ -44,7 +44,7 @@
 
 .mm-sy-btn {
   box-sizing: border-box;
-  height: 28px;
+  height: var(--mm-control-height-row);
   padding: 0 10px;
   border: 1px solid var(--mm-hairline);
   border-radius: 8px;
@@ -62,7 +62,7 @@
 
 /* The short button of a card's header, as Connections' Test all. */
 .mm-sy-btn--tall {
-  height: 24px;
+  height: var(--mm-control-height-row);
   padding: 0 10px;
   font-size: 12px;
   line-height: 22px;

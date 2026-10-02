@@ -43,7 +43,7 @@
 
 /* The button is a size smaller here, so the heading, the schedule and a backup all fit a short card. */
 .mm-sy-part__head .mm-sy-btn {
-  height: 24px;
+  height: var(--mm-control-height-row);
   line-height: 22px;
 }
 

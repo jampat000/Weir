@@ -21,7 +21,7 @@
   display: flex;
   align-items: center;
   box-sizing: border-box;
-  min-height: 2.375rem;
+  min-height: var(--mm-control-height-page);
   padding: 0 11.25px;
   overflow: hidden;
   border: 1px solid var(--mm-hairline);
@@ -173,7 +173,7 @@
   gap: 2px;
   box-sizing: border-box;
   width: max-content;
-  height: 2.375rem;
+  height: var(--mm-control-height-page);
   padding: 3px;
   border: 1px solid var(--mm-hairline);
   border-radius: var(--mm-radius-field);
@@ -212,7 +212,7 @@
 }
 
 .mm-head-control[data-icon-only="true"] {
-  width: 36px;
+  width: var(--mm-control-height-page);
   padding: 0;
 }
 

@@ -128,7 +128,7 @@
 .mm-panel__aside .mm-quiet-link {
   display: inline-flex;
   align-items: center;
-  height: 32px;
+  height: var(--mm-control-height-sm);
   padding: 0 12px;
   border: 1px solid var(--mm-hairline);
   border-radius: var(--mm-radius-control);

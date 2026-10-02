@@ -118,7 +118,10 @@ export function CleanupJobRow({
         <td data-label="Run now">
           <button
             type="button"
-            className={mmActionButtonClass({ variant: "tertiary" })}
+            className={mmActionButtonClass({
+              variant: "tertiary",
+              size: "row",
+            })}
             disabled={running}
             onClick={() =>
               job.destructive ? onRequestConfirm("run") : onRun()
