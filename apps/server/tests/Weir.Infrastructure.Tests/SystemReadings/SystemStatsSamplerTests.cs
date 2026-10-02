@@ -146,14 +146,22 @@ public sealed class SystemStatsSamplerTests
         Assert.Equal(2, _store.Snapshot().Now.Slots);
     }
 
-    [Fact]
-    public async Task When_the_workflows_cannot_be_read_the_drives_stay_as_they_were_and_readings_carry_on()
+    public static TheoryData<Exception> WorkflowReadFailures => new()
+    {
+        new SqliteException("database is locked", 5),
+        new IOException("the drive went away"),
+        new InvalidOperationException("the database is not open yet"),
+    };
+
+    [Theory]
+    [MemberData(nameof(WorkflowReadFailures))]
+    public async Task When_the_workflows_cannot_be_read_the_drives_stay_as_they_were_and_readings_carry_on(Exception failure)
     {
         var sampler = Sampler();
         using var streamOpen = _clients.Open();
         await sampler.RunDueWorkAsync(CancellationToken.None);
         var drivesBefore = _store.Snapshot().Drives;
-        _work.Failure = new SqliteException("database is locked", 5);
+        _work.Failure = failure;
 
         await AdvanceAndRunAsync(sampler, SystemStatsSampler.DriveInterval);
 

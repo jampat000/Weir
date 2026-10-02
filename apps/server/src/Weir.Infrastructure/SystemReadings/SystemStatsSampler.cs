@@ -1,4 +1,3 @@
-using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Weir.Infrastructure.Activity;
@@ -129,7 +128,9 @@ public sealed partial class SystemStatsSampler : BackgroundService
             _setup = await _work.ReadAsync(cancellationToken).ConfigureAwait(false);
             _store.SetDrives(_drives.Read(_setup.Folders));
         }
-        catch (Exception exception) when (exception is SqliteException or IOException or UnauthorizedAccessException)
+#pragma warning disable CA1031 // The drives are only for a screen: whatever goes wrong reading them is logged and tried again, never a reason to stop Weir.
+        catch (Exception exception) when (exception is not OperationCanceledException)
+#pragma warning restore CA1031
         {
             LogDrivesSkipped(_logger, exception);
         }
