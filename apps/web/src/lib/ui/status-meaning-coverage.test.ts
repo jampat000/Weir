@@ -198,7 +198,7 @@ const PRODUCTION_MEANINGS = {
       processed: "done",
       processing_failed: "broken",
       on_hold: "attention",
-      blocked_upstream: "attention",
+      blocked_upstream: "todo",
       passed_through: "attention",
       rejected: "attention",
       skipped: "idle",

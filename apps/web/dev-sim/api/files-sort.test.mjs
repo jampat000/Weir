@@ -14,7 +14,7 @@ const MEANING_RANK = {
   out_of_schedule: 1,
   processing: 2,
   on_hold: ATTENTION,
-  blocked_upstream: ATTENTION,
+  blocked_upstream: 1,
   passed_through: ATTENTION,
   rejected: ATTENTION,
   processing_failed: 4,

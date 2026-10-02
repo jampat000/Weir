@@ -24,7 +24,7 @@ const MEANING_OF_STATUS = Object.freeze({
   out_of_schedule: "todo",
   processing: "doing",
   on_hold: "attention",
-  blocked_upstream: "attention",
+  blocked_upstream: "todo",
   passed_through: "attention",
   rejected: "attention",
   processing_failed: "broken",

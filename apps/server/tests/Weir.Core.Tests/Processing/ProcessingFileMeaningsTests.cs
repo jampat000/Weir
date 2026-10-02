@@ -18,7 +18,7 @@ public sealed class ProcessingFileMeaningsTests
     [InlineData(ProcessingFileStatuses.OutOfSchedule, ProcessingFileMeaning.Todo)]
     [InlineData(ProcessingFileStatuses.Processing, ProcessingFileMeaning.Doing)]
     [InlineData(ProcessingFileStatuses.OnHold, ProcessingFileMeaning.Attention)]
-    [InlineData(ProcessingFileStatuses.BlockedUpstream, ProcessingFileMeaning.Attention)]
+    [InlineData(ProcessingFileStatuses.BlockedUpstream, ProcessingFileMeaning.Todo)]
     [InlineData(ProcessingFileStatuses.PassedThrough, ProcessingFileMeaning.Attention)]
     [InlineData(ProcessingFileStatuses.Rejected, ProcessingFileMeaning.Attention)]
     [InlineData(ProcessingFileStatuses.ProcessingFailed, ProcessingFileMeaning.Broken)]

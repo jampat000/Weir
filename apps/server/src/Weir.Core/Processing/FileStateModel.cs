@@ -92,7 +92,7 @@ public static class ProcessingFileMeanings
         [ProcessingFileStatuses.OutOfSchedule] = ProcessingFileMeaning.Todo,
         [ProcessingFileStatuses.Processing] = ProcessingFileMeaning.Doing,
         [ProcessingFileStatuses.OnHold] = ProcessingFileMeaning.Attention,
-        [ProcessingFileStatuses.BlockedUpstream] = ProcessingFileMeaning.Attention,
+        [ProcessingFileStatuses.BlockedUpstream] = ProcessingFileMeaning.Todo,
         [ProcessingFileStatuses.PassedThrough] = ProcessingFileMeaning.Attention,
         [ProcessingFileStatuses.Rejected] = ProcessingFileMeaning.Attention,
         [ProcessingFileStatuses.ProcessingFailed] = ProcessingFileMeaning.Broken,

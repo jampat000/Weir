@@ -82,9 +82,9 @@ const CLEAN_GROUPS: Record<LibraryClean["outcome"], ActivityGroup> = {
 };
 
 /**
- * What each state of a download means, whatever group it is listed under: a file waiting for its turn is still to do,
- * one Weir is writing is under way, one it handed back is done, and one that passed through, was rejected or is held
- * needs a look. Only a failure is broken.
+ * What each state of a download means, whatever group it is listed under: a file waiting for its turn, or for its media
+ * manager to take it, is still to do, one Weir is writing is under way, one it handed back is done, and one that passed
+ * through, was rejected or is held needs a look. Only a failure is broken.
  */
 export const FILE_MEANING: Record<ProcessingFileStatus, StatusMeaning> = {
   unprocessed: "todo",
@@ -93,7 +93,7 @@ export const FILE_MEANING: Record<ProcessingFileStatus, StatusMeaning> = {
   processed: "done",
   processing_failed: "broken",
   on_hold: "attention",
-  blocked_upstream: "attention",
+  blocked_upstream: "todo",
   passed_through: "attention",
   rejected: "attention",
   skipped: "idle",

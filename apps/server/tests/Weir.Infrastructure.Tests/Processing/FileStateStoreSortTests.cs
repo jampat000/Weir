@@ -58,8 +58,8 @@ public sealed class FileStateStoreSortTests
 
         Assert.Equal(
             [
-                "processed", "out_of_schedule", "unprocessed", "processing",
-                "blocked_upstream", "on_hold", "passed_through", "rejected",
+                "processed", "blocked_upstream", "out_of_schedule", "unprocessed",
+                "processing", "on_hold", "passed_through", "rejected",
                 "processing_failed", "cancelled", "disabled", "skipped",
             ],
             ascending.Select(path => path[..^".mkv".Length]));
