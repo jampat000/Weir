@@ -99,7 +99,7 @@ export function ContainerFold({ binding }: { binding: RuleSetBinding }) {
       on={countOn(CONTAINER_RULES.map((rule) => binding.draft[rule.name]))}
       of={CONTAINER_RULES.length}
     >
-      <div className="grid gap-3">
+      <div className="mm-rule-toggles">
         {CONTAINER_RULES.map((rule) => (
           <RuleToggle key={rule.name} binding={binding} {...rule} />
         ))}

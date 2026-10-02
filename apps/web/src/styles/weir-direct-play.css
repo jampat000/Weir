@@ -56,3 +56,54 @@
 .mm-direct-play__note {
   margin: 0.4rem 0 0;
 }
+
+/* Setup › Rules › Playback devices: one device per row, its source at the right. */
+.mm-device-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.mm-device {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 4px 14px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--mm-hairline);
+}
+
+.mm-device:first-child {
+  padding-top: 0;
+}
+
+.mm-device:last-child {
+  border-bottom: 0;
+}
+
+.mm-device__check {
+  width: 1rem;
+  height: 1rem;
+  margin-top: 2px;
+  accent-color: var(--mm-accent);
+}
+
+.mm-device__name {
+  display: block;
+  font-size: var(--mm-type-body);
+  font-weight: 500;
+  color: var(--mm-text1);
+}
+
+.mm-device__note,
+.mm-device__source {
+  margin: 2px 0 0;
+  font-size: var(--mm-type-caption);
+  line-height: 1.45;
+  color: var(--mm-text3);
+}
+
+.mm-device__source {
+  text-align: right;
+  overflow-wrap: anywhere;
+}

@@ -38,7 +38,7 @@ it("shows the device checklist open, with its save note", async () => {
   render(<DevicesTab />, { wrapper });
 
   expect(
-    await screen.findByRole("heading", { name: "Your playback devices" }),
+    await screen.findByRole("heading", { name: "Devices you watch on" }),
   ).toBeInTheDocument();
   expect(screen.getByLabelText("iPhone")).toBeVisible();
   expect(screen.getByTestId("settings-save-model")).toHaveTextContent(

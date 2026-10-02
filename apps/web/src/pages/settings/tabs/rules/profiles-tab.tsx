@@ -220,10 +220,10 @@ export function ProfilesTab() {
 
   return (
     <div className="mm-quiet-stack" data-testid="processing-rule-set-workspace">
-      <SaveModelNote model="explicit" />
       <QuietSection
         headingId="processing-rule-set-profiles-heading"
-        heading="Profiles"
+        heading="Track rules"
+        aside={<SaveModelNote model="explicit" />}
       >
         {!creating ? (
           <PageToolbarAddButton
