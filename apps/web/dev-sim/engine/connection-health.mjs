@@ -1,14 +1,14 @@
 /**
- * Whether each linked media manager and download client is answering, and how quickly. Weir asks every connection now
- * and then and writes down when it last asked and whether it answered; a scenario can make one stop answering for a
- * while, or answer slowly. Every call Weir makes to a connection, and every call one makes to Weir, goes through here
+ * Whether each linked media manager and download client is answering, and how quickly. Weir asks every media manager
+ * now and then and writes down when it last asked and whether it answered; a scenario can make one stop answering for
+ * a while, or answer slowly. Every call Weir makes to a connection, and every call one makes to Weir, goes through here
  * so the stream can say so (connection-activity.mjs).
  */
 import { CONNECTED_DETAIL, managerLabel } from "../fixtures/connections.mjs";
 import { fromWire, toWire, SECOND_MS } from "../wire-time.mjs";
 import { ConnectionActivity } from "./connection-activity.mjs";
 
-/** How often Weir asks each connection whether it is still there, at normal speed. */
+/** How often Weir asks each media manager whether it is still there, at normal speed. */
 const CHECK_EVERY_MS = 60 * SECOND_MS;
 /** How long before the session opened a connection that is down from the start last answered. */
 const SECONDS_SINCE_CHECK_WHEN_DOWN = 25;
@@ -155,10 +155,15 @@ export class ConnectionHealth {
     );
   }
 
-  /** Asks every connection whose turn has come, and ends the calls that have taken their time. @param {number} nowMs */
+  /**
+   * The heartbeat: asks every media manager whose turn has come, and ends the calls that have taken their time.
+   * Download clients have no heartbeat; they are asked only when a person tests one or Weir really calls it.
+   * @param {number} nowMs
+   */
   advance(nowMs) {
     this.activity.advance(nowMs);
     for (const { kind, connection } of this.#connections()) {
+      if (kind !== CONNECTION_KIND.MANAGER) continue;
       const key = keyOf(kind, connection.id);
       if (!this.#nextCheckAt.has(key)) {
         const lastAsked = fromWire(connection.last_test_at) ?? nowMs;

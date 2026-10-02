@@ -111,6 +111,21 @@ describe("what lights the connections without anyone testing them", () => {
     expect(own[calledBack]).toMatchObject({ phase: "answered", ms: null });
   });
 
+  it("asks every media manager about once a minute, and never a download client on its own", () => {
+    const { sim, frames, advance } = session({ scenario: SCENARIOS.quiet });
+
+    advance(3 * 60 * SECOND_MS);
+
+    const asked = frames.filter(({ phase }) => phase === "asked");
+    const askedManagers = new Set(
+      asked.filter(({ kind }) => kind === "media_manager").map(({ id }) => id),
+    );
+    expect(askedManagers).toEqual(
+      new Set(sim.store.managers.map(({ id }) => id)),
+    );
+    expect(asked.some(({ kind }) => kind === "download_client")).toBe(false);
+  });
+
   it("has a folder-chain check ask each manager and download client the chain names", () => {
     const { sim, frames } = session();
 
