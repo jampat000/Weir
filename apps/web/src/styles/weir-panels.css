@@ -350,7 +350,6 @@ a.mm-stat__label:hover {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .mm-bar-row__track i,
   .mm-segmented__option {
     transition: none;
   }
