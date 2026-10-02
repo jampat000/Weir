@@ -12,6 +12,7 @@ import {
   ROW_GAP_PX,
   ROW_PX,
 } from "../pipeline/pipeline-layout";
+import { shelfRowNeed } from "../pipeline/shelf-layout";
 
 /** The main area must be at least this wide, in rem, for the right column to sit beside the page. */
 export const SIDE_BY_SIDE_REM = 66;
@@ -92,6 +93,26 @@ const LOW_FLOOR_PX = 110;
 const LOW_ROOMY_PX = 260;
 /** The lower row takes at most this share of the grid, and at least LOW_ROOMY_PX. */
 const LOW_SHARE_CAP = 0.33;
+/** What Just finished's panel has around its row of tiles: its header, chips and padding, and the panel's borders, measured on the rendered panel. */
+const SHELF_CHROME_PX = 60;
+/** The panel's borders and the 14px the row's tiles keep either side: the tiles' box is the panel's width less this. */
+const SHELF_ROW_MARGIN_PX = 30;
+
+/**
+ * What Just finished would report for `lowNeed`, worked out from the grid's width alone, for the System view, which has
+ * no shelf of its own but shares Live's rows: its panel is the lower row's wider column (1.15 : 1 of the grid less the
+ * right column and a gap), and the need is its chrome and the shelf's row at that width. Live's measured number and this
+ * one agree, so no card moves when you switch between the two views.
+ */
+export function lowNeedOfGrid(gridWidth: number): number {
+  const right = Math.min(600, Math.max(340, gridWidth * 0.28));
+  const left = gridWidth - GRID_GAP_PX - right;
+  const panel = ((left - GRID_GAP_PX) * 1.15) / 2.15;
+  return (
+    SHELF_CHROME_PX + shelfRowNeed(Math.round(panel - SHELF_ROW_MARGIN_PX))
+  );
+}
+
 /** The height of the grid when nothing has been measured: a roomy page. */
 const ROOMY_PX = 1000;
 

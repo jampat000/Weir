@@ -11,6 +11,7 @@ import {
   LOW_COLUMNS,
   MIN_GRID_PX,
   gridRows,
+  lowNeedOfGrid,
   pageLayout,
 } from "./dashboard-layout";
 
@@ -192,5 +193,21 @@ describe("the shared page grid", () => {
     expect(gap).not.toBeNull();
     const rows = gridRows(1000);
     expect(rows.band + rows.board + rows.low + 2 * Number(gap?.[1])).toBe(1000);
+  });
+});
+
+describe("what the lower row needs, from the grid's width alone", () => {
+  it("gives the System view the rows Live has at the same size, as measured on the rendered Live view", () => {
+    const rowsAt = (width: number, height: number) =>
+      gridRows(height, { lowNeed: lowNeedOfGrid(width) }).template;
+
+    expect(rowsAt(1226.78, 676)).toBe("144px 328px 180px");
+    expect(rowsAt(1600.53, 964)).toBe("193px 448px 299px");
+    expect(rowsAt(2230, 1323)).toBe("360px 506px 433px");
+  });
+
+  it("grows with the room the lower row's wider panel has", () => {
+    expect(lowNeedOfGrid(2230)).toBeGreaterThan(lowNeedOfGrid(1600));
+    expect(lowNeedOfGrid(1600)).toBeGreaterThan(lowNeedOfGrid(1227));
   });
 });
