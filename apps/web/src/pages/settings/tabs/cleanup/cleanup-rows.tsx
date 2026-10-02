@@ -77,6 +77,7 @@ export function CleanupJobRow({
           enabled={state.enabled}
           disabled={!editable || saving}
           layout="control"
+          size="row"
           onChange={(on) => {
             if (on && job.destructive) {
               onRequestConfirm("enable");
@@ -199,7 +200,10 @@ export function DaysSettingRow({
           {dirty && inRange ? (
             <button
               type="button"
-              className={mmActionButtonClass({ variant: "secondary" })}
+              className={mmActionButtonClass({
+                variant: "secondary",
+                size: "row",
+              })}
               disabled={saving}
               onClick={() =>
                 void onSave(toBody(value), savedWords(value)).then(() =>
@@ -252,6 +256,7 @@ export function SwitchSettingRow({
           enabled={enabled}
           disabled={!editable || saving}
           layout="control"
+          size="row"
           onChange={onChange}
         />
       </td>

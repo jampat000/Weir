@@ -90,6 +90,12 @@
   font-weight: 500;
 }
 
+/* A field on a row of a table is the row's height, with the row's buttons. */
+.mm-quiet-table .mm-input {
+  min-height: var(--mm-control-height-row);
+  padding-block: 0.125rem;
+}
+
 .mm-quiet-table__sub {
   display: block;
   margin-top: 0.25rem;

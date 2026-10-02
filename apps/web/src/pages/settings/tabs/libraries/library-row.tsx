@@ -175,6 +175,7 @@ export function LibraryRow({
           disabled={!editable}
           onChange={() => actions.onToggle(library)}
           layout="control"
+          size="row"
         />
       </td>
       <td data-label="" className="mm-workflow-table__fit">
