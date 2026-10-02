@@ -1,7 +1,8 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { noteConnectionActivity } from "../../../lib/connections/connection-lights";
 import type { DownloadClientConnection } from "../../../lib/download-clients/download-clients-api";
 import type { ProcessingLibrary } from "../../../lib/processing/libraries-api";
 import type { CheckNow } from "./check-now";
@@ -22,6 +23,10 @@ const useHealth = vi.fn<
   (workflows: unknown, workflowId: number | null | undefined) => Health
 >(() => health);
 
+let fits = Number.MAX_SAFE_INTEGER;
+vi.mock("./fit-rows", () => ({
+  useFittingRows: () => [{ current: null }, fits],
+}));
 vi.mock("./use-health", () => ({
   useHealth: (workflows: unknown, workflowId: number | null | undefined) =>
     useHealth(workflows, workflowId),
@@ -56,6 +61,7 @@ beforeEach(() => {
   health.managers = [];
   health.downloadClients = [];
   health.tools = null;
+  fits = Number.MAX_SAFE_INTEGER;
   check.pending = false;
   check.notice = null;
   check.run = vi.fn();
@@ -121,7 +127,13 @@ describe("the Health panel", () => {
 
   it("names the manager a linked workflow is linked to", () => {
     health.managers = [
-      { id: 1, kind: "radarr", name: "Radarr on MEDIA-PC", enabled: true },
+      {
+        id: 1,
+        kind: "radarr",
+        name: "Radarr on MEDIA-PC",
+        enabled: true,
+        base_url: "http://localhost:7878",
+      },
     ] as Health["managers"];
     health.workflows = [
       {
@@ -142,15 +154,24 @@ describe("the Health panel", () => {
     expect(panel).toHaveTextContent("No workflow switched on.");
   });
 
-  it("shows each connection with how long ago it answered, or that it does not", () => {
+  it("shows each switched-on connection as a row: its name, what it is, when it last answered and how long that took", () => {
     health.managers = [
       {
         id: 1,
         kind: "radarr",
         name: "Radarr",
         enabled: true,
+        base_url: "http://localhost:7878",
         last_test_ok: true,
         last_test_at: secondsBefore(12),
+        last_answer_ms: 84,
+      },
+      {
+        id: 2,
+        kind: "sonarr",
+        name: "Sonarr",
+        enabled: false,
+        base_url: "http://localhost:8989",
       },
     ] as Health["managers"];
     health.downloadClients = [
@@ -159,13 +180,106 @@ describe("the Health panel", () => {
         kind: "qbittorrent",
         name: "qBittorrent",
         enabled: true,
+        base_url: "http://localhost:8080",
         last_test_ok: false,
       } as DownloadClientConnection,
     ];
     const panel = renderPanel();
 
-    expect(panel).toHaveTextContent("Radarr answered 12s ago");
-    expect(panel).toHaveTextContent("qBittorrent not answering");
+    const rows = within(panel).getAllByTestId("live-connection");
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toHaveTextContent("Radarr");
+    expect(rows[0]).toHaveTextContent("manager");
+    expect(rows[0]).toHaveTextContent("12s ago · 84 ms");
+    expect(rows[1]).toHaveTextContent("qBittorrent");
+    expect(rows[1]).toHaveTextContent("client");
+    expect(rows[1]).toHaveTextContent("not answering");
+    expect(panel).not.toHaveTextContent("Sonarr");
+  });
+
+  it("lights a connection's row while the stream says Weir is talking to it, and puts it out when the call ends", () => {
+    health.managers = [
+      {
+        id: 7,
+        kind: "radarr",
+        name: "Radarr",
+        enabled: true,
+        base_url: "http://localhost:7878",
+        last_test_ok: true,
+        last_test_at: secondsBefore(5),
+      },
+    ] as Health["managers"];
+    const panel = renderPanel();
+    const row = () => within(panel).getByTestId("live-connection");
+    const send = (phase: "asked" | "answered") =>
+      act(() =>
+        noteConnectionActivity({
+          kind: "media_manager",
+          id: 7,
+          phase,
+          direction: "outbound",
+          at: new Date(NOW).toISOString(),
+          ms: phase === "answered" ? 90 : null,
+        }),
+      );
+
+    send("asked");
+    expect(row()).toHaveClass("mm-conn--asking");
+    send("answered");
+
+    expect(row()).toHaveClass("mm-conn--answered");
+    expect(row()).toHaveTextContent("90 ms");
+  });
+
+  it("says nothing is connected rather than leaving the section empty", () => {
+    expect(renderPanel()).toHaveTextContent("Nothing connected.");
+  });
+
+  it("shows only the rows that fit, and says how many more there are with a link to the full detail", () => {
+    health.workflows = [movies, { ...movies, id: 3, name: "TV" }].map(
+      (workflow) => ({
+        workflow: { ...workflow, manager_connection_ids: [] },
+        verdict: { words: "In sync", tone: "healthy" as const },
+        why: null,
+        chain: undefined,
+      }),
+    );
+    health.managers = [1, 2, 3].map((id) => ({
+      id,
+      kind: "radarr",
+      name: `Radarr ${id}`,
+      enabled: true,
+      base_url: "http://localhost:7878",
+      last_test_ok: true,
+    })) as Health["managers"];
+    // Two headings, two workflows, three connections and the tools are eight units: five fit, so the last two rows do not.
+    fits = 5;
+    const panel = renderPanel();
+
+    expect(panel.querySelectorAll("[data-fit]")).toHaveLength(8);
+    const more = within(panel).getByRole("link", {
+      name: "2 more in the full detail",
+    });
+    expect(more).toHaveTextContent("2 more");
+    const { searchParams } = new URL(
+      more.getAttribute("href") ?? "",
+      "http://weir.test",
+    );
+    expect(searchParams.get("view")).toBe("system");
+  });
+
+  it("says nothing about more when every row fits", () => {
+    health.managers = [
+      {
+        id: 1,
+        kind: "radarr",
+        name: "Radarr",
+        enabled: true,
+        base_url: "http://localhost:7878",
+      },
+    ] as Health["managers"];
+
+    expect(renderPanel()).not.toHaveTextContent("more");
   });
 
   it("counts what to look at beside its title, and says all clear when nothing is", () => {
@@ -200,6 +314,7 @@ describe("the Health panel", () => {
         kind: "qbittorrent",
         name: "qBittorrent",
         enabled: true,
+        base_url: "http://localhost:8080",
         last_test_ok: false,
       } as DownloadClientConnection,
     ];

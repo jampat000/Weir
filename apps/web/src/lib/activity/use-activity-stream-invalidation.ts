@@ -2,9 +2,16 @@ import { useEffect } from "react";
 import { useQueryClient, type QueryKey } from "@tanstack/react-query";
 import { useSyncExternalStore } from "react";
 
+import {
+  CONNECTION_ACTIVITY_EVENT,
+  parseConnectionActivity,
+  type ConnectionActivityFrame,
+} from "../connections/connection-activity";
+
 type LatestPayload = { latest_event_id: number; activity_revision?: number };
 type ActivityLatestSubscriber = () => void;
 type LiveProgressSubscriber = () => void;
+type ConnectionActivitySubscriber = (frame: ConnectionActivityFrame) => void;
 
 /**
  * Never cancel a query that is already mid-flight just because a newer activity event arrived: the
@@ -36,6 +43,7 @@ const EMPTY_PROGRESS: Readonly<Record<string, LiveProgressEntry>> = {};
 let liveProgressByPath: Readonly<Record<string, LiveProgressEntry>> =
   EMPTY_PROGRESS;
 const progressSubscribers = new Set<LiveProgressSubscriber>();
+const connectionActivitySubscribers = new Set<ConnectionActivitySubscriber>();
 /** A progress frame arrived while the tab was hidden and has not been shown yet. */
 let progressChangedWhileHidden = false;
 
@@ -45,6 +53,14 @@ function emitActivityLatest(): void {
 
 function emitLiveProgress(): void {
   progressSubscribers.forEach((subscriber) => subscriber());
+}
+
+function hasSubscribers(): boolean {
+  return (
+    subscribers.size > 0 ||
+    progressSubscribers.size > 0 ||
+    connectionActivitySubscribers.size > 0
+  );
 }
 
 function tabIsHidden(): boolean {
@@ -151,7 +167,7 @@ function closeActivityStream(): void {
  */
 function onVisibilityChange(): void {
   if (tabIsHidden()) return;
-  if (subscribers.size > 0 || progressSubscribers.size > 0) {
+  if (hasSubscribers()) {
     ensureActivityStream();
   }
   if (progressChangedWhileHidden) {
@@ -196,12 +212,16 @@ function ensureActivityStream(): EventSource | null {
     }
     emitLiveProgress();
   });
+  source.addEventListener(CONNECTION_ACTIVITY_EVENT, (ev) => {
+    const frame = parseConnectionActivity((ev as MessageEvent<string>).data);
+    if (frame) connectionActivitySubscribers.forEach((fn) => fn(frame));
+  });
   return source;
 }
 
-/** Closes the shared connection once nobody — invalidation or live progress — still wants it. */
+/** Closes the shared connection once nobody — invalidation, live progress or connection lights — still wants it. */
 function closeIfNobodyIsWatching(): void {
-  if (subscribers.size === 0 && progressSubscribers.size === 0) {
+  if (!hasSubscribers()) {
     closeActivityStream();
     lastSeen = null;
     liveProgressByPath = EMPTY_PROGRESS;
@@ -229,6 +249,23 @@ function subscribeLiveProgress(subscriber: LiveProgressSubscriber): () => void {
 
   return () => {
     progressSubscribers.delete(subscriber);
+    closeIfNobodyIsWatching();
+  };
+}
+
+/**
+ * Calls `subscriber` with every `connection.activity` frame, on the one shared stream. A frame is a moment, not state:
+ * nothing is kept for a subscriber that arrives late, and nothing is replayed to it.
+ */
+export function subscribeConnectionActivity(
+  subscriber: ConnectionActivitySubscriber,
+): () => void {
+  connectionActivitySubscribers.add(subscriber);
+  watchVisibility();
+  ensureActivityStream();
+
+  return () => {
+    connectionActivitySubscribers.delete(subscriber);
     closeIfNobodyIsWatching();
   };
 }

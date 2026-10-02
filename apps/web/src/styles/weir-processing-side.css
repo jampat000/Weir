@@ -2,16 +2,23 @@
 
 /* ---- Health ---------------------------------------------------------------- */
 
-.mm-health__scroll {
+/* The panel's height decides how many whole rows show (fit-rows.ts hides the ones that do not fit), so the body does
+   not scroll, and the 16px under it is the host's margin, outside what is measured. */
+.mm-health__fit {
   display: flex;
   min-height: 0;
   flex: 1;
   flex-direction: column;
   gap: 16px;
-  padding: 0 18px 16px;
-  overflow-y: auto;
-  scrollbar-color: var(--mm-hairline) transparent;
-  scrollbar-width: thin;
+  margin-bottom: 16px;
+  padding: 0 18px;
+  overflow: hidden;
+}
+
+.mm-health__more {
+  font-size: 12px;
+  white-space: nowrap;
+  color: var(--mm-primary);
 }
 
 .mm-health__heading {

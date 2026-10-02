@@ -1,16 +1,16 @@
 /** What the Health panel says: each workflow's folder-chain verdict, whether each connection answers, and the tools. */
-import type { DownloadClientConnection } from "../../../lib/download-clients/download-clients-api";
+import {
+  needsALook,
+  type ConnectionEntry,
+} from "../../../lib/connections/connection-model";
 import {
   folderChainLines,
   readinessOf,
   type LibraryFolderChain,
   type Readiness,
 } from "../../../lib/processing/library-folder-chain-api";
-import type { MediaManagerConnection } from "../../../lib/media-managers/media-managers-api";
 import type { MediaTools } from "../../../lib/system/media-tools";
 import { toolVersion } from "../../../lib/system/media-tools";
-import { connectionTitle } from "../../../lib/ui/connection-title";
-import { parseAppTime } from "../../../lib/ui/mm-format-date";
 import type { MmStatusTone } from "../../../lib/ui/mm-status-tone";
 import { ago } from "../processing-words";
 
@@ -67,72 +67,32 @@ export function checkVerdict(check: {
   return check.isError ? UNCHECKED_VERDICT : CHECKING_VERDICT;
 }
 
-export type ConnectionPill = {
-  key: string;
-  name: string;
-  /** "answered 12s ago", "not answering" or "not tested yet": said in words, never by colour alone. */
-  state: string;
-  tone: MmStatusTone;
-};
-
-type Connection = {
-  enabled: boolean;
-  last_test_ok?: boolean | null;
-  last_test_at?: string | null;
-};
-
 const SECONDS_SHOWN_AS_SECONDS = 60;
 /** A check this fresh is just now: counting its seconds only flickers. */
 const JUST_NOW_SECONDS = 3;
 
-/** How long ago a check was: "just now", then to the second for the first minute ("12s ago"), then "4 min ago". */
-export function checkedAgo(
-  iso: string | null | undefined,
-  now: number,
-): string {
-  const at = parseAppTime(iso);
-  if (at == null) return "";
+/** How long ago something happened: "just now", then to the second for the first minute ("12s ago"), then "4 min ago". */
+export function checkedAgo(at: number | null, now: number): string {
+  if (at === null) return "";
   const seconds = Math.max(0, Math.round((now - at) / 1000));
   if (seconds < JUST_NOW_SECONDS) return "just now";
   return seconds < SECONDS_SHOWN_AS_SECONDS
     ? `${seconds}s ago`
-    : ago(iso as string, now);
+    : ago(new Date(at).toISOString(), now);
 }
 
-export function answering(
-  connection: Connection,
-  now: number,
-): Pick<ConnectionPill, "state" | "tone"> {
-  if (connection.last_test_ok === true) {
-    const when = checkedAgo(connection.last_test_at, now);
-    return {
-      state: when ? `answered ${when}` : "answering",
-      tone: "healthy",
-    };
-  }
-  if (connection.last_test_ok === false)
-    return { state: "not answering", tone: "failed" };
-  return { state: "not tested yet", tone: "neutral" };
-}
+/**
+ * What the Health panel's fitting sees, in the order it lists them: a heading, a row of a list, a note that stands in
+ * for a list with nothing in it, or the whole Tools section.
+ */
+export type HealthUnit = "heading" | "row" | "note" | "tools";
 
-/** The media managers and download clients that are switched on, each with whether it answered its last test. */
-export function connectionPills(
-  managers: readonly MediaManagerConnection[],
-  downloadClients: readonly DownloadClientConnection[],
-  now: number,
-): ConnectionPill[] {
-  const pill = (
-    kind: "manager" | "client",
-    connection: MediaManagerConnection | DownloadClientConnection,
-  ): ConnectionPill => ({
-    key: `${kind}-${connection.id}`,
-    name: connectionTitle(connection),
-    ...answering(connection, now),
-  });
-  return [
-    ...managers.filter((m) => m.enabled).map((m) => pill("manager", m)),
-    ...downloadClients.filter((c) => c.enabled).map((c) => pill("client", c)),
-  ];
+/** How many rows are left out when only the first `fits` units show. */
+export function rowsLeftOut(
+  units: readonly HealthUnit[],
+  fits: number,
+): number {
+  return units.slice(Math.max(0, fits)).filter((unit) => unit === "row").length;
 }
 
 const NOT_INSTALLED = "not installed";
@@ -188,15 +148,16 @@ export function healthSummary(
   return unverified > 0 ? `${unverified} not verified` : "all clear";
 }
 
-/** How many things in the panel need a look: a workflow that needs a fix, a connection or a tool that is down. */
+/** How many things in the panel need a look: a workflow that needs a fix, a connection that is down or slow, a tool that is down. */
 export function problemCount(parts: {
   workflows: readonly { verdict: WorkflowVerdict }[];
-  connections: readonly ConnectionPill[];
+  connections: readonly ConnectionEntry[];
   tools: readonly ToolRow[] | null;
 }): number {
   return (
     parts.workflows.filter((item) => isProblem(item.verdict.tone)).length +
-    parts.connections.filter((pill) => isProblem(pill.tone)).length +
+    parts.connections.filter((entry) => entry.enabled && needsALook(entry))
+      .length +
     (parts.tools ?? []).filter((tool) => isProblem(tool.tone)).length
   );
 }

@@ -1,7 +1,6 @@
 import { useState } from "react";
 
-import { useTestDownloadClientConnection } from "../../../lib/download-clients/queries";
-import { useTestMediaManagerConnection } from "../../../lib/media-managers/queries";
+import { useConnectionTest } from "../../../lib/connections/use-connection-test";
 import type { Health } from "./use-health";
 
 export type CheckNow = {
@@ -26,24 +25,22 @@ function noticeAfter(answers: readonly boolean[]): string {
 export function useCheckNow(
   health: Pick<Health, "managers" | "downloadClients" | "recheckFolders">,
 ): CheckNow {
-  const testManager = useTestMediaManagerConnection();
-  const testClient = useTestDownloadClientConnection();
+  const testConnection = useConnectionTest();
   const [pending, setPending] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
   const run = () => {
-    const answered = (test: Promise<{ ok: boolean }>) =>
-      test.then(
-        (result) => result.ok,
-        () => false,
-      );
     const tests = [
       ...health.managers
         .filter((manager) => manager.enabled)
-        .map((manager) => answered(testManager.mutateAsync(manager.id))),
+        .map((manager) =>
+          testConnection({ kind: "media_manager", id: manager.id }),
+        ),
       ...health.downloadClients
         .filter((client) => client.enabled)
-        .map((client) => answered(testClient.mutateAsync(client.id))),
+        .map((client) =>
+          testConnection({ kind: "download_client", id: client.id }),
+        ),
     ];
     setPending(true);
     setNotice(null);

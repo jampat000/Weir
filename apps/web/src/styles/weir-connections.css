@@ -1,0 +1,378 @@
+/*
+ * A media manager or download client as a row: its dot, and the light that shows while Weir talks to it. The Health
+ * panel's rows (.mm-conn-list) and the System card's (.mm-ctable) share the dot, the four resting states and the
+ * three lights. A row lights blue and its dot blinks while a call is out, flashes green when it is answered and
+ * red when it fails; the light is a class the page puts on and takes off again, and it never moves the row.
+ * Under a resize the dashboard's own rule gives every animation and transition no time (weir-processing-dashboard.css).
+ */
+
+.mm-conn {
+  box-sizing: border-box;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  transition:
+    border-color 0.3s,
+    box-shadow 0.3s;
+}
+
+.mm-conn__dot {
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--mm-success);
+}
+
+.mm-conn--slow .mm-conn__dot {
+  background: var(--mm-warning);
+}
+
+.mm-conn--down .mm-conn__dot {
+  background: var(--mm-destructive);
+}
+
+.mm-conn--off .mm-conn__dot,
+.mm-conn--untested .mm-conn__dot {
+  background: var(--mm-text3);
+}
+
+.mm-conn--asking {
+  border-color: color-mix(in srgb, var(--mm-info) 80%, transparent);
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--mm-info) 15%, transparent),
+    0 0 12px color-mix(in srgb, var(--mm-info) 35%, transparent);
+}
+
+.mm-conn--asking .mm-conn__dot {
+  background: var(--mm-info);
+  animation: mm-conn-blink 0.6s ease-in-out infinite;
+}
+
+.mm-conn--answered {
+  border-color: color-mix(in srgb, var(--mm-success) 70%, transparent);
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--mm-success) 14%, transparent),
+    0 0 12px color-mix(in srgb, var(--mm-success) 28%, transparent);
+}
+
+.mm-conn--answered .mm-conn__dot {
+  background: var(--mm-success);
+}
+
+.mm-conn--failed {
+  border-color: color-mix(in srgb, var(--mm-destructive) 70%, transparent);
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--mm-destructive) 16%, transparent),
+    0 0 12px color-mix(in srgb, var(--mm-destructive) 32%, transparent);
+}
+
+.mm-conn--failed .mm-conn__dot {
+  background: var(--mm-destructive);
+}
+
+@keyframes mm-conn-blink {
+  50% {
+    opacity: 0.25;
+  }
+}
+
+/* ---- The Health panel's rows ----------------------------------------------- */
+
+.mm-conn-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.mm-conn-list > .mm-conn {
+  flex: none;
+  height: 28px;
+  container-type: inline-size;
+}
+
+/* The role comes after the name and before the time; a narrow column gives it up before the name or the time. */
+@container (max-width: 349px) {
+  .mm-conn__role {
+    display: none;
+  }
+}
+
+.mm-conn__link {
+  display: flex;
+  height: 100%;
+  align-items: center;
+  gap: 10px;
+  padding: 0 8px;
+  font-size: 13px;
+  text-decoration: none;
+  color: inherit;
+}
+
+.mm-conn__link:focus-visible {
+  outline: 2px solid var(--mm-primary);
+  outline-offset: 1px;
+  border-radius: 8px;
+}
+
+.mm-conn__base,
+.mm-conn__role {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The nickname is what tells two of one kind apart, so the name gives way before it does. */
+.mm-conn__name {
+  display: flex;
+  min-width: 0;
+  flex: 0 1 auto;
+  font-weight: 600;
+  white-space: pre;
+  color: var(--mm-text1);
+}
+
+.mm-conn__nickname {
+  flex: none;
+}
+
+.mm-conn__role {
+  flex: 0 20 auto;
+  font-size: 12px;
+  color: var(--mm-text2);
+}
+
+.mm-conn__when {
+  flex: none;
+  margin-left: auto;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--mm-text2);
+}
+
+.mm-conn--slow .mm-conn__when {
+  color: var(--mm-status-warning-text);
+}
+
+.mm-conn--down .mm-conn__when {
+  color: var(--mm-status-failed-text);
+}
+
+.mm-conn--off {
+  opacity: 0.55;
+}
+
+/* ---- The System card ------------------------------------------------------- */
+
+.mm-ctable__line {
+  margin: 0;
+  padding: 0 18px 8px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--mm-text2);
+}
+
+.mm-ctable {
+  max-height: 30rem;
+  padding: 0 10px 12px;
+  overflow-y: auto;
+  scrollbar-color: var(--mm-hairline) transparent;
+  scrollbar-width: thin;
+}
+
+.mm-ctable__head,
+.mm-ctable__bar,
+.mm-ctable__row {
+  display: grid;
+  grid-template-columns: 8px minmax(0, 1fr) 116px;
+  align-items: center;
+  column-gap: 10px;
+  padding: 0 8px;
+}
+
+.mm-ctable__head {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  height: 20px;
+  background: var(--mm-card-bg);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--mm-text3);
+}
+
+.mm-ctable__head > span:last-child {
+  text-align: center;
+}
+
+.mm-ctable__empty {
+  padding: 8px;
+}
+
+.mm-ctable__bar {
+  height: 28px;
+  box-sizing: border-box;
+  margin: 10px 0 4px;
+  border: 1px solid var(--mm-hairline);
+  border-radius: 8px;
+  background: var(--mm-surface-2);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--mm-text1);
+}
+
+.mm-ctable__head + .mm-ctable__group > .mm-ctable__bar {
+  margin-top: 2px;
+}
+
+.mm-ctable__bar > span:first-child {
+  grid-column: 1 / 3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mm-ctable__badge {
+  grid-column: 3;
+  justify-self: center;
+  padding: 1px 7px;
+  border-radius: 6px;
+  background: var(--mm-surface-3);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: none;
+  white-space: nowrap;
+  color: var(--mm-text2);
+}
+
+.mm-ctable__bar--ok .mm-ctable__badge {
+  background: var(--mm-status-healthy-bg);
+  color: var(--mm-status-healthy-text);
+}
+
+.mm-ctable__bar--slow .mm-ctable__badge {
+  background: var(--mm-status-warning-bg);
+  color: var(--mm-status-warning-text);
+}
+
+.mm-ctable__bar--down .mm-ctable__badge {
+  background: var(--mm-status-failed-bg);
+  color: var(--mm-status-failed-text);
+}
+
+.mm-ctable__rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.mm-ctable__row {
+  height: 36px;
+  margin-bottom: 2px;
+  font-size: 13px;
+}
+
+.mm-ctable__row.mm-conn--down {
+  background: var(--mm-status-failed-bg);
+}
+
+.mm-ctable__name {
+  min-width: 0;
+}
+
+.mm-ctable__name > b,
+.mm-ctable__name > span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mm-ctable__name > b {
+  font-weight: 600;
+  color: var(--mm-text1);
+}
+
+.mm-ctable__name > span {
+  font-size: 11px;
+  color: var(--mm-text2);
+}
+
+.mm-conn--down .mm-ctable__name > span {
+  color: var(--mm-status-failed-text);
+}
+
+.mm-conn--slow .mm-ctable__name > span {
+  color: var(--mm-status-warning-text);
+}
+
+.mm-ctable__checked,
+.mm-ctable__test {
+  grid-column: 3;
+  grid-row: 1;
+}
+
+.mm-ctable__checked {
+  overflow: hidden;
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--mm-text2);
+}
+
+/* The Test button takes the place of the time on hover or focus. */
+.mm-ctable__test {
+  justify-self: center;
+  width: 56px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid var(--mm-hairline);
+  border-radius: 6px;
+  background: var(--mm-surface-2);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--mm-text1);
+  opacity: 0;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.mm-ctable__row:hover .mm-ctable__test,
+.mm-ctable__row:focus-within .mm-ctable__test {
+  opacity: 1;
+}
+
+.mm-ctable__row:hover .mm-ctable__checked,
+.mm-ctable__row:focus-within .mm-ctable__checked {
+  visibility: hidden;
+}
+
+.mm-ctable__test:hover:not(:disabled) {
+  border-color: var(--mm-primary);
+}
+
+.mm-ctable__test:focus-visible {
+  outline: 2px solid var(--mm-primary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mm-conn,
+  .mm-ctable__test {
+    transition: none;
+  }
+
+  .mm-conn--asking .mm-conn__dot {
+    animation: none;
+  }
+}

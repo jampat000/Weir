@@ -2,6 +2,7 @@ import { Link, useSearchParams } from "react-router-dom";
 
 import { Chip } from "../../../components/panels/chip";
 import { Panel } from "../../../components/panels/panel";
+import { useConnections } from "../../../lib/connections/use-connections";
 import type { ProcessingLibrary } from "../../../lib/processing/libraries-api";
 import {
   workflowBadgeLabel,
@@ -10,26 +11,43 @@ import {
 import { useNow } from "../../../lib/ui/use-now";
 import { firstSentence } from "../processing-model";
 import { CheckNowButton, useCheckNow } from "./check-now";
-import { connectionPills, healthSummary, problemCount } from "./health-model";
+import { ConnectionLiveRow } from "./connection-live-row";
+import { useFittingRows } from "./fit-rows";
+import {
+  healthSummary,
+  problemCount,
+  rowsLeftOut,
+  type HealthUnit,
+} from "./health-model";
 import { useHealth } from "./use-health";
 
 const MANAGERS_PATH = "/settings?tab=media-managers";
 const ABOUT_PATH = "/system";
 /** The dashboard's System view, where Health is shown in full. */
 const SYSTEM_VIEW = "system";
-/** Seconds are shown, so "answered 12s ago" moves once a second. */
+/** Seconds are shown, so "12s ago" moves once a second. */
 const TICK_MS = 1000;
 
+/**
+ * A part of the panel, for the panel's fitting. A section of rows makes its heading a unit of its own, and each row
+ * is another, so a heading is never left standing over rows that did not fit. A section that is `whole` shows or
+ * hides all together.
+ */
 function Section({
   title,
   children,
+  fitting = "by row",
 }: {
   title: string;
   children: React.ReactNode;
+  fitting?: "by row" | "whole";
 }) {
+  const whole = fitting === "whole";
   return (
-    <section aria-label={title}>
-      <h3 className="mm-health__heading">{title}</h3>
+    <section aria-label={title} data-fit={whole ? "" : undefined}>
+      <h3 className="mm-health__heading" data-fit={whole ? undefined : ""}>
+        {title}
+      </h3>
       {children}
     </section>
   );
@@ -43,32 +61,61 @@ type HealthPanelProps = {
 
 /**
  * How well Weir is set up to do its work: each workflow's folder chain with why it is not in sync, whether the
- * media managers and download clients answered, and the tools it writes with. Each part loads and fails on its
- * own. "Check now" reads the folders again and tests every connection; "Full detail" opens the System view.
+ * media managers and download clients answer, a row each that lights while Weir talks to it, and the tools it writes
+ * with. The panel's height decides how many whole rows show, and the header says how many more there are. Each part
+ * loads and fails on its own. "Check now" reads the folders again and tests every connection; "Full detail" opens
+ * the System view.
  */
 export function HealthPanel({ workflows, workflowId }: HealthPanelProps) {
   const health = useHealth(workflows, workflowId);
   const check = useCheckNow(health);
   const now = useNow(TICK_MS);
   const [search] = useSearchParams();
+  const [bodyRef, fits] = useFittingRows();
   const detail = new URLSearchParams(search);
   detail.set("view", SYSTEM_VIEW);
-  const connections = connectionPills(
+  const detailPath = `?${detail.toString()}`;
+  const { entries, lights } = useConnections(
     health.managers,
     health.downloadClients,
-    now,
   );
+  const connections = entries.filter((entry) => entry.enabled);
   const problems = problemCount({ ...health, connections });
+  const units: HealthUnit[] = [
+    "heading",
+    ...(health.workflows.length === 0
+      ? ["note" as const]
+      : health.workflows.map(() => "row" as const)),
+    "heading",
+    ...(connections.length === 0
+      ? ["note" as const]
+      : connections.map(() => "row" as const)),
+    "tools",
+  ];
+  const more = rowsLeftOut(units, fits);
   return (
     <Panel
       title="Health"
       count={healthSummary(problems, health.workflows)}
-      aside={<CheckNowButton check={check} />}
-      to={`?${detail.toString()}`}
+      aside={
+        <>
+          {more > 0 ? (
+            <Link
+              to={detailPath}
+              className="mm-health__more"
+              aria-label={`${more.toLocaleString()} more in the full detail`}
+            >
+              {more.toLocaleString()} more
+            </Link>
+          ) : null}
+          <CheckNowButton check={check} />
+        </>
+      }
+      to={detailPath}
       toLabel="Full detail"
       iconOnly
     >
-      <div data-testid="live-health" className="mm-health__scroll">
+      <div ref={bodyRef} data-testid="live-health" className="mm-health__fit">
         {check.notice ? (
           <p className="mm-health__notice" role="status">
             {check.notice}
@@ -76,11 +123,13 @@ export function HealthPanel({ workflows, workflowId }: HealthPanelProps) {
         ) : null}
         <Section title="Workflows">
           {health.workflows.length === 0 ? (
-            <p className="mm-health__empty">No workflow switched on.</p>
+            <p className="mm-health__empty" data-fit="">
+              No workflow switched on.
+            </p>
           ) : (
             <ul className="mm-health__list">
               {health.workflows.map(({ workflow, verdict, why }) => (
-                <li key={workflow.id} className="mm-health__row">
+                <li key={workflow.id} className="mm-health__row" data-fit="">
                   <Link
                     className="mm-health__name"
                     to={`/settings?tab=libraries&edit=${workflow.id}`}
@@ -105,23 +154,24 @@ export function HealthPanel({ workflows, workflowId }: HealthPanelProps) {
         </Section>
         <Section title="Connections">
           {connections.length === 0 ? (
-            <p className="mm-health__empty">Nothing connected.</p>
+            <p className="mm-health__empty" data-fit="">
+              Nothing connected.
+            </p>
           ) : (
-            <ul className="mm-health__pills">
-              {connections.map((pill) => (
-                <li key={pill.key}>
-                  <Link to={MANAGERS_PATH} className="mm-health__pill">
-                    <Chip tone={pill.tone}>
-                      {pill.name}{" "}
-                      <span className="mm-health__state">{pill.state}</span>
-                    </Chip>
-                  </Link>
-                </li>
+            <ul className="mm-conn-list">
+              {connections.map((entry) => (
+                <ConnectionLiveRow
+                  key={entry.key}
+                  entry={entry}
+                  light={lights.get(entry.key) ?? null}
+                  now={now}
+                  to={MANAGERS_PATH}
+                />
               ))}
             </ul>
           )}
         </Section>
-        <Section title="Tools">
+        <Section title="Tools" fitting="whole">
           {health.tools === null ? (
             <p className="mm-health__empty">Reading the tools…</p>
           ) : (

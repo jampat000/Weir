@@ -18,6 +18,14 @@ const health: Health = {
 const check: CheckNow = { run: vi.fn(), pending: false, notice: null };
 
 vi.mock("./use-health", () => ({ useHealth: () => health }));
+vi.mock("./use-connection-testing", () => ({
+  useConnectionTesting: () => ({
+    testing: new Set(),
+    test: vi.fn(),
+    testAll: vi.fn(),
+    allBusy: false,
+  }),
+}));
 vi.mock("./check-now", () => ({
   useCheckNow: () => check,
   CheckNowButton: () => <button type="button">Check now</button>,
@@ -152,14 +160,35 @@ describe("the full Health view", () => {
     );
   });
 
-  it("lists the connections with their details", () => {
+  it("lists the connections in their groups, with what each is, where it is and what its last test said", () => {
     renderDetail();
 
     const connections = screen.getByRole("region", { name: "Connections" });
-    expect(connections).toHaveTextContent("Radarr on MEDIA-PC");
-    expect(connections).toHaveTextContent("Media manager, Radarr");
-    expect(connections).toHaveTextContent("http://media-pc:7878");
-    expect(connections).toHaveTextContent("Connected.");
+    const group = within(connections).getByRole("region", {
+      name: "Media managers",
+    });
+    expect(group).toHaveTextContent("1/1 OK");
+    const row = within(group).getByTestId("system-connection");
+    expect(row).toHaveTextContent("Radarr on MEDIA-PC");
+    expect(row).toHaveTextContent("Radarr · http://media-pc:7878");
+    expect(row).toHaveAttribute("title", expect.stringContaining("Connected."));
+  });
+
+  it("still lists a connection that is switched off", () => {
+    health.downloadClients = [
+      {
+        id: 4,
+        kind: "sabnzbd",
+        name: "SABnzbd on NAS",
+        enabled: false,
+        base_url: "http://nas:8085",
+      },
+    ] as Health["downloadClients"];
+    renderDetail();
+
+    const group = screen.getByRole("region", { name: "Download clients" });
+    expect(group).toHaveTextContent("SABnzbd on NAS");
+    expect(group).toHaveTextContent("switched off");
   });
 
   it("lists the tools with their versions and what each reported", () => {

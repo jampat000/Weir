@@ -2,52 +2,19 @@ import { Link } from "react-router-dom";
 
 import { Chip } from "../../../components/panels/chip";
 import { Panel } from "../../../components/panels/panel";
+import { useConnections } from "../../../lib/connections/use-connections";
 import type { ProcessingLibrary } from "../../../lib/processing/libraries-api";
 import { useNow } from "../../../lib/ui/use-now";
 import { useCheckNow } from "./check-now";
-import { connectionDetails, diskRows } from "./health-detail-model";
+import { ConnectionsCard } from "./connections-card";
+import { diskRows } from "./health-detail-model";
 import { WorkflowsDetail } from "./health-detail-workflows";
+import { useConnectionTesting } from "./use-connection-testing";
 import { useHealth, type Health } from "./use-health";
 
-const MANAGERS_PATH = "/settings?tab=media-managers";
 const ABOUT_PATH = "/system";
-/** Seconds are shown, so "answered 12s ago" moves once a second. */
+/** Seconds are shown, so "checked 12s ago" moves once a second. */
 const TICK_MS = 1000;
-
-function ConnectionsDetail({ health, now }: { health: Health; now: number }) {
-  const connections = connectionDetails(
-    health.managers,
-    health.downloadClients,
-    now,
-  );
-  return (
-    <Panel title="Connections" to={MANAGERS_PATH} toLabel="Manage">
-      <div className="mm-health-detail__body">
-        {connections.length === 0 ? (
-          <p className="mm-health__empty">Nothing connected.</p>
-        ) : (
-          <ul className="mm-health-detail__rows">
-            {connections.map((connection) => (
-              <li key={connection.key} className="mm-health-detail__row">
-                <div className="mm-health-detail__row-head">
-                  <b>{connection.name}</b>
-                  <Chip tone={connection.tone}>{connection.state}</Chip>
-                </div>
-                <p className="mm-health__empty">
-                  {connection.role}, {connection.kind}
-                  {connection.address ? ` · ${connection.address}` : ""}
-                </p>
-                {connection.detail ? (
-                  <p className="mm-health__empty">{connection.detail}</p>
-                ) : null}
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-    </Panel>
-  );
-}
 
 function ToolsDetail({ tools }: { tools: Health["tools"] }) {
   return (
@@ -120,6 +87,11 @@ export function HealthDetail({ workflows, workflowId }: HealthDetailProps) {
   const health = useHealth(workflows, workflowId);
   const check = useCheckNow(health);
   const now = useNow(TICK_MS);
+  const { entries, lights } = useConnections(
+    health.managers,
+    health.downloadClients,
+  );
+  const testing = useConnectionTesting();
   const inScope = workflows.filter(
     (workflow) => workflowId == null || workflow.id === workflowId,
   );
@@ -133,7 +105,12 @@ export function HealthDetail({ workflows, workflowId }: HealthDetailProps) {
         />
       </div>
       <div className="mm-health-detail__side">
-        <ConnectionsDetail health={health} now={now} />
+        <ConnectionsCard
+          entries={entries}
+          lights={lights}
+          testing={testing}
+          now={now}
+        />
         <ToolsDetail tools={health.tools} />
         <DiskDetail
           workflows={inScope.filter((workflow) => workflow.enabled)}

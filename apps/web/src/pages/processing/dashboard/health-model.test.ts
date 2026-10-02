@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { DownloadClientConnection } from "../../../lib/download-clients/download-clients-api";
-import type { MediaManagerConnection } from "../../../lib/media-managers/media-managers-api";
+import { connectionEntry } from "../../../lib/connections/connection-fixtures";
 import type {
   FolderChainLine,
   LibraryFolderChain,
@@ -9,15 +8,14 @@ import type {
 import {
   chainVerdict,
   checkedAgo,
-  connectionPills,
   problemCount,
+  rowsLeftOut,
   toolRows,
   whyNotInSync,
 } from "./health-model";
 
 const NOW = Date.parse("2026-10-02T12:00:00Z");
-const secondsBefore = (seconds: number) =>
-  new Date(NOW - seconds * 1000).toISOString();
+const secondsBefore = (seconds: number) => NOW - seconds * 1000;
 
 function chain(
   ready: boolean,
@@ -97,32 +95,6 @@ describe("a workflow's folder-chain verdict", () => {
   });
 });
 
-function manager(
-  overrides: Partial<MediaManagerConnection>,
-): MediaManagerConnection {
-  return {
-    id: 1,
-    kind: "radarr",
-    name: "Radarr on MEDIA-PC",
-    enabled: true,
-    last_test_ok: true,
-    ...overrides,
-  } as MediaManagerConnection;
-}
-
-function client(
-  overrides: Partial<DownloadClientConnection>,
-): DownloadClientConnection {
-  return {
-    id: 1,
-    kind: "qbittorrent",
-    name: "qBittorrent on MEDIA-PC",
-    enabled: true,
-    last_test_ok: true,
-    ...overrides,
-  } as DownloadClientConnection;
-}
-
 describe("how long ago a check was", () => {
   it("counts seconds for the first minute, then minutes", () => {
     expect(checkedAgo(secondsBefore(12), NOW)).toBe("12s ago");
@@ -135,47 +107,6 @@ describe("how long ago a check was", () => {
 
   it("is empty when there was no check", () => {
     expect(checkedAgo(null, NOW)).toBe("");
-  });
-});
-
-describe("the connection pills", () => {
-  it("say in words whether each connection answered its last test, and how long ago", () => {
-    const pills = connectionPills(
-      [
-        manager({ id: 1, last_test_at: secondsBefore(12) }),
-        manager({ id: 2, name: "Sonarr", last_test_ok: false }),
-      ],
-      [client({ last_test_ok: null })],
-      NOW,
-    );
-
-    expect(pills.map((pill) => [pill.name, pill.state, pill.tone])).toEqual([
-      ["Radarr on MEDIA-PC", "answered 12s ago", "healthy"],
-      ["Sonarr", "not answering", "failed"],
-      ["qBittorrent on MEDIA-PC", "not tested yet", "neutral"],
-    ]);
-  });
-
-  it("say answering when a test passed but was never timed", () => {
-    const [pill] = connectionPills([manager({})], [], NOW);
-
-    expect(pill.state).toBe("answering");
-  });
-
-  it("leave out a connection that is switched off", () => {
-    expect(
-      connectionPills(
-        [manager({ enabled: false })],
-        [client({ enabled: false })],
-        NOW,
-      ),
-    ).toEqual([]);
-  });
-
-  it("carry a nickname after the name", () => {
-    const [pill] = connectionPills([manager({ nickname: "4K" })], [], NOW);
-
-    expect(pill.name).toBe("Radarr on MEDIA-PC · 4K");
   });
 });
 
@@ -224,22 +155,55 @@ describe("how many things need a look", () => {
           { verdict: { words: "In sync", tone: "healthy" } },
         ],
         connections: [
-          { key: "a", name: "Radarr", state: "not answering", tone: "failed" },
-          {
-            key: "b",
-            name: "Sonarr",
-            state: "not tested yet",
-            tone: "neutral",
-          },
+          connectionEntry({ state: "down" }),
+          connectionEntry({ key: "media_manager:2", state: "untested" }),
         ],
         tools: toolRows({ ffmpeg: "not installed", mkvmerge: "not installed" }),
       }),
     ).toBe(3);
   });
 
+  it("counts a connection that is slow, and leaves out one that is switched off", () => {
+    expect(
+      problemCount({
+        workflows: [],
+        connections: [
+          connectionEntry({ state: "slow" }),
+          connectionEntry({
+            key: "media_manager:2",
+            enabled: false,
+            state: "down",
+          }),
+        ],
+        tools: null,
+      }),
+    ).toBe(1);
+  });
+
   it("is nothing when all is well, or while the tools are still being read", () => {
     expect(problemCount({ workflows: [], connections: [], tools: null })).toBe(
       0,
     );
+  });
+});
+
+describe("how many rows the panel leaves out", () => {
+  const units = [
+    "heading",
+    "row",
+    "row",
+    "heading",
+    "row",
+    "row",
+    "tools",
+  ] as const;
+
+  it("counts the rows after the ones that fit, never the headings or the tools", () => {
+    expect(rowsLeftOut(units, 5)).toBe(1);
+    expect(rowsLeftOut(units, 1)).toBe(4);
+  });
+
+  it("is nothing when everything fits", () => {
+    expect(rowsLeftOut(units, Number.MAX_SAFE_INTEGER)).toBe(0);
   });
 });
