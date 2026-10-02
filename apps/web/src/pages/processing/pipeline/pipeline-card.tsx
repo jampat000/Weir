@@ -16,8 +16,12 @@ import { Poster } from "../../../components/shared/poster";
 import { classNames } from "../../../lib/ui/class-names";
 import { motionAllowed } from "../../../lib/ui/motion-allowed";
 import type { ProcessingFile } from "../../../lib/processing/files-api";
-import { baseName } from "../../../lib/format/path";
-import { CARD_ATTRIBUTE, DETAILS_ATTRIBUTE } from "./fit-details";
+import { FitText } from "../dashboard/system/fit-words";
+import {
+  CARD_ATTRIBUTE,
+  DETAILS_ATTRIBUTE,
+  KEEP_ATTRIBUTE,
+} from "./fit-details";
 import type {
   CardStatus,
   DetailLine,
@@ -35,9 +39,18 @@ export type CardPlace = {
   hidden: boolean;
 };
 
+/** The words after the bold lead, the lead's own space left to the lead's margin so every wording is measured as drawn. */
+function afterLead(words: string, lead: string | null): string {
+  return lead && words.startsWith(lead)
+    ? words.slice(lead.length).trimStart()
+    : words;
+}
+
+/** The status line says the fullest of its wordings that the card's width holds; the card's tooltip has them whole. */
 function StatusLine({ status }: { status: CardStatus }) {
   const lead =
     status.lead && status.text.startsWith(status.lead) ? status.lead : null;
+  const wordings = [status.text, ...(status.fits ?? [])];
   return (
     <span className={`mm-pipe__status mm-pipe__status--${status.tone}`}>
       {status.pulse ? (
@@ -45,7 +58,10 @@ function StatusLine({ status }: { status: CardStatus }) {
       ) : null}
       <span className="mm-pipe__status-text">
         {lead ? <b>{lead}</b> : null}
-        {lead ? status.text.slice(lead.length) : status.text}
+        <FitText
+          className="mm-pipe__status-rest"
+          words={wordings.map((words) => afterLead(words, lead))}
+        />
       </span>
     </span>
   );
@@ -68,17 +84,15 @@ function Detail({ line }: { line: DetailLine }) {
   );
 }
 
-function tooltip(card: Card): string {
-  const source = card.source === "library" ? "Library clean" : "Download";
-  return [
-    card.title,
-    source,
-    card.workflow,
-    baseName(card.path),
-    card.status.full,
-  ]
-    .filter(Boolean)
-    .join(" · ");
+/** The card's tooltip: its title, what is happening, then every fact it holds, a line each. */
+export function tooltip(card: Card): string {
+  return [card.title, card.status.text, ...card.fullFacts].join("\n");
+}
+
+/** What a screen reader says for a card: the same facts as the tooltip, as sentences. */
+export function spokenName(card: Card): string {
+  const facts = card.fullFacts.map((fact) => fact.replace(/\.$/, ""));
+  return [`${card.title}: ${card.status.text}`, ...facts].join(". ");
 }
 
 export function PipelineCardView({
@@ -110,7 +124,7 @@ export function PipelineCardView({
     className,
     style,
     title: tooltip(card),
-    "aria-label": `${card.title}: ${card.status.text}`,
+    "aria-label": spokenName(card),
     "aria-hidden": place?.hidden ? true : undefined,
     "data-stage": card.stage,
     [CARD_ATTRIBUTE]: "",
@@ -140,7 +154,10 @@ export function PipelineCardView({
           </span>
         ) : null}
         {card.details.length > 0 ? (
-          <span className="mm-pipe__details" {...{ [DETAILS_ATTRIBUTE]: "" }}>
+          <span
+            className="mm-pipe__details"
+            {...{ [DETAILS_ATTRIBUTE]: "", [KEEP_ATTRIBUTE]: card.keep }}
+          >
             {card.details.map((line, index) => (
               <Detail key={index} line={line} />
             ))}

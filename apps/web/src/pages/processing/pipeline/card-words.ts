@@ -19,6 +19,7 @@ import {
   ringFraction,
   ringState,
   timeLeft,
+  timeRemaining,
   workingFigures,
 } from "../processing-words";
 import { holdWords, outOfScheduleWords } from "../reason-words";
@@ -30,14 +31,16 @@ import type {
   DetailLine,
   DetailPart,
 } from "./pipeline-card-types";
+import {
+  SOURCE_LABEL,
+  arrivingNote,
+  identityFacts,
+  placeFact,
+  workingFacts,
+} from "./card-facts";
 import type { WorkingStage } from "./pipeline-stages";
 
 const DEFAULT_WORKFLOW = "Workflow";
-
-const SOURCE_LABEL: Record<WorkSource, string> = {
-  download: "Download",
-  library: "Library clean",
-};
 
 /** A bar that only says the pass is moving: no figure says how far it has got. */
 const MOVING_BAR: CardBar = { width: 35, waiting: true, moving: true };
@@ -85,12 +88,7 @@ export function incomingWords(item: ArrivingItem, now: number): CardWords {
   const fraction = ringFraction(item, left);
   const status: CardStatus = checking
     ? { text: "Checking now", tone: "info", pulse: true }
-    : {
-        text: waitingWords(item),
-        tone: "info",
-        pulse: false,
-        full: item.note || undefined,
-      };
+    : { text: waitingWords(item), tone: "info", pulse: false };
   const timing =
     ringState(left) === "counting" && left != null
       ? `${item.holdUntil != null ? "ready in" : "looks again in"} ${clock(left)}`
@@ -105,6 +103,11 @@ export function incomingWords(item: ArrivingItem, now: number): CardWords {
       factsLine(item.facts, timing),
       ...footer("download", workflow, item.path),
     ]),
+    fullFacts: [
+      arrivingNote(item, now),
+      item.facts,
+      ...identityFacts("download", workflow, item.path),
+    ].filter(Boolean),
   };
 }
 
@@ -124,13 +127,18 @@ export function queuedWords(item: WaitingItem, place: number): CardWords {
       text: item.note ? outOfScheduleWords(item.note) : "Waiting its turn",
       tone: "idle",
       pulse: false,
-      full: item.note ?? undefined,
     },
     bar: null,
     details: present([
       line,
       ...footer(item.source, item.libraryName, item.path),
     ]),
+    fullFacts: [
+      placeFact(place),
+      item.note ?? "",
+      item.source === "library" ? "" : item.facts,
+      ...identityFacts(item.source, item.libraryName, item.path),
+    ].filter(Boolean),
   };
 }
 
@@ -152,40 +160,53 @@ function analysingWords(item: WorkingItem): CardWords {
       factsLine(item.facts, running ? `running ${running}` : undefined),
       ...footer(item.source, item.libraryName, item.path),
     ]),
+    fullFacts: workingFullFacts(item),
+  };
+}
+
+/** A pass's own figures, then what it is, which workflow has it and the file's name. */
+function workingFullFacts(item: WorkingItem): string[] {
+  return [
+    ...workingFacts(item),
+    item.facts,
+    ...identityFacts(item.source, item.libraryName, item.path),
+  ].filter(Boolean);
+}
+
+/** A writing pass: its percent and, where the server has an estimate, how long it has to go, in fewer words as the card narrows. */
+function writingStatus(percent: number, etaSeconds: number | null): CardStatus {
+  const lead = `${Math.floor(percent)}%`;
+  const left = timeLeft(etaSeconds);
+  const base = { lead, tone: "info", pulse: false } as const;
+  if (!left) return { ...base, text: `${lead} writing`, fits: [lead] };
+  return {
+    ...base,
+    text: `${lead} · ${left}`,
+    fits: [`${lead} · ${timeRemaining(etaSeconds)}`, lead],
   };
 }
 
 function writingWords(item: WorkingItem, percent: number): CardWords {
   const figures = workingFigures(item);
-  const whole = Math.floor(percent);
   const removed = removedTrackWords(item);
   return {
-    status: {
-      text: `${whole}% writing`,
-      lead: `${whole}%`,
-      tone: "info",
-      pulse: false,
-    },
-    bar: { width: whole, waiting: false, moving: true },
+    status: writingStatus(percent, item.etaSeconds),
+    bar: { width: Math.floor(percent), waiting: false, moving: true },
+    // The most telling first, one fact a line so none is squeezed by another: the status line has the percent and
+    // the time left, then come the speed, what is being taken out, what the file is, how far through it the pass is,
+    // how fast it is read, how long it has run, and last the file's own name.
     details: present([
-      figures.through || item.etaSeconds != null
-        ? {
-            parts: figures.through ? [bold(figures.through)] : [],
-            right: timeLeft(item.etaSeconds) || undefined,
-          }
-        : null,
-      figures.reading || figures.running
-        ? {
-            parts: figures.reading ? ["Reading ", bold(figures.reading)] : [],
-            right: figures.running ? `running ${figures.running}` : undefined,
-          }
-        : null,
       figures.speed ? { parts: ["Speed ", bold(figures.speed)] } : null,
       removed.length > 0
         ? { parts: ["Removing ", bold(removed.join(", "))] }
         : null,
+      factsLine(item.facts),
+      figures.through ? { parts: [bold(figures.through)] } : null,
+      figures.reading ? { parts: ["Reading ", bold(figures.reading)] } : null,
+      figures.running ? { parts: ["Running ", bold(figures.running)] } : null,
       ...footer(item.source, item.libraryName, item.path),
     ]),
+    fullFacts: workingFullFacts(item),
   };
 }
 
@@ -217,6 +238,7 @@ function processingWords(item: WorkingItem): CardWords {
         : null,
       ...footer(item.source, item.libraryName, item.path),
     ]),
+    fullFacts: workingFullFacts(item),
   };
 }
 
@@ -229,6 +251,10 @@ export function deliveringWords(item: HandingItem | WorkingItem): CardWords {
     },
     bar: MOVING_BAR,
     details: footer(item.source, item.libraryName, item.path),
+    fullFacts: [
+      ...("facts" in item ? workingFacts(item) : []),
+      ...identityFacts(item.source, item.libraryName, item.path),
+    ],
   };
 }
 
@@ -258,6 +284,7 @@ export function deliveredWords(
     },
     bar: { width: 100, waiting: false, moving: false },
     details: footer(source, workflow, path),
+    fullFacts: identityFacts(source, workflow, path),
   };
 }
 
@@ -277,5 +304,7 @@ export function stoppedWords(
     },
     bar: null,
     details: present([{ parts: [reason] }, ...footer(source, workflow, path)]),
+    keep: 1,
+    fullFacts: [reason, ...identityFacts(source, workflow, path)],
   };
 }

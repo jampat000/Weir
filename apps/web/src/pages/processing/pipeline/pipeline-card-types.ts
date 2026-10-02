@@ -12,8 +12,8 @@ export type CardStatus = {
   pulse: boolean;
   /** The front of the text, drawn bold in the station's colour (a percentage, "✓ Delivered"). */
   lead?: string;
-  /** The server's own sentence behind the words, for the card's tooltip. */
-  full?: string;
+  /** Shorter wordings of `text`, the fullest first, for a card too narrow to say it whole. */
+  fits?: readonly string[];
 };
 
 /**
@@ -42,6 +42,10 @@ export type CardWords = {
   bar: CardBar | null;
   /** What matters at this stage, most telling first; a card shows as many whole lines as its height holds. */
   details: DetailLine[];
+  /** How many of the first detail lines the card never drops: it gives up a line of its title for them. */
+  keep?: number;
+  /** Everything the card knows, a sentence a fact, for its tooltip and accessible name. */
+  fullFacts: string[];
 };
 
 export type PipelineCard = CardWords & {

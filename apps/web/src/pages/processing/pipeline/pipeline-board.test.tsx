@@ -161,12 +161,56 @@ describe("the cards", () => {
   it("puts each file's card at its station and says what it is doing", () => {
     render(board(lanesOf([aWriting(1), aFile(2, "unprocessed")])));
 
-    const writing = cardNamed(/The Quiet Harbour S01E01: 42% writing/);
+    const writing = cardNamed(/The Quiet Harbour S01E01: 42% · 10 min left/);
     const waiting = cardNamed(/The Quiet Harbour S01E02: Waiting its turn/);
 
     expect(writing).toHaveAttribute("data-stage", "processing");
     expect(waiting).toHaveAttribute("data-stage", "queued");
     expect(within(writing).getByText("42%")).toBeInTheDocument();
+  });
+
+  it("says a working card's percent and time left in its status line", () => {
+    render(board(lanesOf([aWriting(1)])));
+
+    const writing = cardNamed(/The Quiet Harbour S01E01/);
+
+    expect(within(writing).getByText("42%")).toBeInTheDocument();
+    expect(writing.querySelector(".mm-pipe__status")).toHaveTextContent(
+      "42%· 10 min left",
+    );
+  });
+
+  it("carries every fact of a working card in its tooltip, a line each", () => {
+    render(
+      board(lanesOf([aWriting(1, { progress_removed_audio: ["fra", "deu"] })])),
+    );
+
+    const lines = cardNamed(/The Quiet Harbour S01E01/)
+      .getAttribute("title")
+      ?.split("\n");
+
+    expect(lines).toEqual(
+      expect.arrayContaining([
+        "The Quiet Harbour S01E01",
+        "42% · 10 min left",
+        "Speed 148× real time",
+        "Through the file 18:54 of 45:00",
+        "Running for 2 min 14 s",
+        "Removing 2 audio",
+        "Download · TV",
+        "The.Quiet.Harbour.S01E01.1080p.WEB-DL.mkv",
+      ]),
+    );
+  });
+
+  it("says every fact in a card's accessible name", () => {
+    render(board(lanesOf([aWriting(1)], [], new Map())));
+
+    expect(
+      cardNamed(
+        /42% · 10 min left\. Speed 148× real time\..*Running for 2 min 14 s\./,
+      ),
+    ).toBeInTheDocument();
   });
 
   it("opens the file's story when its card is clicked", () => {

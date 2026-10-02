@@ -77,14 +77,18 @@ export function ago(iso: string, now: number): string {
   return `${Math.round(seconds / 3600)} h ago`;
 }
 
-/** "0:41 left", "12 min left". */
-export function timeLeft(seconds: number | null): string {
+/** How long a pass has still to run, without saying so: "41 s", "12 min". */
+export function timeRemaining(seconds: number | null): string {
   if (seconds == null || !Number.isFinite(seconds) || seconds < 0) return "";
-  if (seconds < 90) return `${Math.round(seconds)} s left`;
+  if (seconds < 90) return `${Math.round(seconds)} s`;
   const minutes = Math.round(seconds / 60);
-  return minutes < 90
-    ? `${minutes} min left`
-    : `${Math.round(minutes / 60)} h left`;
+  return minutes < 90 ? `${minutes} min` : `${Math.round(minutes / 60)} h`;
+}
+
+/** "41 s left", "12 min left". */
+export function timeLeft(seconds: number | null): string {
+  const remaining = timeRemaining(seconds);
+  return remaining ? `${remaining} left` : "";
 }
 
 /**
@@ -204,4 +208,11 @@ export function workingFigures(item: WorkingItem): WorkingFigures {
         : null,
     running: elapsed >= 1 ? runningFor(elapsed) : null,
   };
+}
+
+/** A place in a line as a person says it: 0 is "1st", 10 is "11th", 21 is "22nd". */
+export function ordinal(index: number): string {
+  const place = index + 1;
+  const teens = place % 100 >= 11 && place % 100 <= 13;
+  return `${place}${teens ? "th" : (["th", "st", "nd", "rd"][place % 10] ?? "th")}`;
 }

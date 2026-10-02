@@ -157,7 +157,7 @@ describe("what a card says", () => {
 
     expect(card.status).toMatchObject({
       lead: "42%",
-      text: "42% writing",
+      text: "42% · 10 min left",
       pulse: false,
     });
     expect(card.bar).toEqual({ width: 42, waiting: false, moving: true });
@@ -169,7 +169,7 @@ describe("what a card says", () => {
     expect(written(card)).toContain("18:54 of 45:00");
     expect(written(card)).toContain("Reading");
     expect(written(card)).toContain("Speed 148×");
-    expect(written(card)).toContain("running 2 min 14 s");
+    expect(written(card)).toContain("Running 2 min 14 s");
     expect(written(card)).toContain("Download · TV");
     expect(written(card)).toContain(
       "The.Quiet.Harbour.S01E01.1080p.WEB-DL.mkv",
@@ -221,10 +221,8 @@ describe("what a card says", () => {
       }),
     ]);
 
-    expect(card.status).toMatchObject({
-      text: "Waiting to settle",
-      full: "Still being written.",
-    });
+    expect(card.status).toMatchObject({ text: "Waiting to settle" });
+    expect(card.fullFacts).toContain("Still being written.");
     expect(written(card)).toContain("ready in 0:30");
     expect(card.bar).toEqual({ width: 50, waiting: false, moving: false });
   });
@@ -252,6 +250,125 @@ describe("what a card says", () => {
     ]);
 
     expect(card.status).toMatchObject({ text: "Checking now", pulse: true });
+  });
+});
+
+describe("a working card always has its progress and time left in the status line", () => {
+  it("says the percent and the time left, then the same in fewer words, then the percent alone", () => {
+    const [card] = cardsFor([aWriting(1, { progress_percent: 81.4 })]);
+
+    expect(card.status).toMatchObject({
+      lead: "81%",
+      text: "81% · 10 min left",
+      fits: ["81% · 10 min", "81%"],
+    });
+  });
+
+  it("says the percent and that it is writing where the server has no estimate", () => {
+    const [card] = cardsFor([
+      aWriting(1, { progress_percent: 33, progress_eta_seconds: null }),
+    ]);
+
+    expect(card.status).toMatchObject({
+      text: "33% writing",
+      fits: ["33%"],
+    });
+  });
+});
+
+describe("which of a card's detail lines come first", () => {
+  it("puts speed, then what is removed, then the file's resolution and size, then its name, on a writing pass", () => {
+    const [card] = cardsFor([
+      aWriting(1, {
+        progress_removed_audio: ["fra"],
+        progress_removed_subtitles: ["fra", "deu"],
+      }),
+    ]);
+    const lines = card.details.map((line) =>
+      line.parts
+        .map((part) => (typeof part === "string" ? part : part.bold))
+        .join(""),
+    );
+
+    const at = (start: string) =>
+      lines.findIndex((line) => line.startsWith(start));
+    expect(at("Speed")).toBe(0);
+    expect(at("Removing 1 audio, 2 subtitles")).toBe(1);
+    expect(at("1080p")).toBe(2);
+    expect(at("The.Quiet.Harbour")).toBeGreaterThan(at("1080p"));
+    expect(at("Download · TV")).toBe(lines.length - 1);
+  });
+
+  it("puts a waiting file's resolution and size before its place in line, then its name", () => {
+    const [card] = cardsFor([aFile(1, "unprocessed")]);
+
+    expect(written(card).indexOf("1080p")).toBeLessThan(
+      written(card).indexOf("#1 in line"),
+    );
+    expect(written(card).indexOf("#1 in line")).toBeLessThan(
+      written(card).indexOf("The.Quiet.Harbour"),
+    );
+  });
+});
+
+describe("everything a card knows, for its tooltip and accessible name", () => {
+  it("holds all of what main's working card showed", () => {
+    const [card] = cardsFor([
+      aWriting(1, {
+        progress_removed_audio: ["fra"],
+        progress_removed_subtitles: ["fra", "deu"],
+      }),
+    ]);
+
+    expect(card.fullFacts).toEqual([
+      "Speed 148× real time",
+      expect.stringMatching(/^Reading \d/),
+      "Through the file 18:54 of 45:00",
+      "Running for 2 min 14 s",
+      "Removing 1 audio, 2 subtitles",
+      "1080p · H264 · 2.27 GB",
+      "Download · TV",
+      "The.Quiet.Harbour.S01E01.1080p.WEB-DL.mkv",
+    ]);
+  });
+
+  it("says where a waiting file stands in line, in words", () => {
+    const cards = cardsFor([aFile(1, "unprocessed"), aFile(2, "unprocessed")]);
+
+    expect(cards[0].fullFacts).toContain("1st in line");
+    expect(cards[1].fullFacts).toContain("2nd in line");
+  });
+
+  it("says a library clean is a library clean", () => {
+    const [card] = cardsFor([], [aCleanJob(7, "leased")]);
+
+    expect(card.fullFacts).toContain("Library clean · Movies");
+  });
+
+  it("gives an arriving file the whole sentence, with when Weir looks again", () => {
+    const lanes = lanesOf(
+      [aFile(1, "on_hold", { status_reason: "Still being written." })],
+      [],
+      new Map([[2, { at: NOW + 83_000, interval: 300 }]]),
+    );
+
+    const [card] = buildPipelineCards(lanes, [], "all", NOW);
+
+    expect(card.fullFacts[0]).toBe(
+      "Still being written. Weir looks again in 1:23.",
+    );
+  });
+
+  it("keeps a stopped file's reason, and asks its card not to drop that line", () => {
+    const [ended] = buildPipelineCards(
+      lanesOf([]),
+      [anEndedCard(1, { kind: "failed", at: "write", reason: "Out of space" })],
+      "all",
+      NOW,
+    );
+
+    expect(ended.keep).toBe(1);
+    expect(ended.fullFacts[0]).toBe("Out of space");
   });
 });
 

@@ -313,6 +313,11 @@ button.mm-pipe__card {
   -webkit-line-clamp: var(--pipe-title-lines, 2);
 }
 
+/* A card that must keep its first detail line gives its title's second line up for it (fit-details.ts). */
+.mm-pipe__card[data-pipeline-tight] .mm-pipe__title {
+  -webkit-line-clamp: 1;
+}
+
 .mm-pipe__status {
   display: flex;
   align-items: center;
@@ -325,13 +330,25 @@ button.mm-pipe__card {
   white-space: nowrap;
 }
 
+/* The bold lead and the words after it: those take what room is left, and which wording they say is measured to it. The
+   words ignore the pointer, so the card's own tooltip is the one that shows over them. */
 .mm-pipe__status-text {
+  display: flex;
   min-width: 0;
+  flex: 1 1 0;
+  gap: 0.3em;
+}
+
+.mm-pipe__status-rest {
+  min-width: 0;
+  flex: 1 1 0;
   overflow: hidden;
   text-overflow: ellipsis;
+  pointer-events: none;
 }
 
 .mm-pipe__status b {
+  flex: none;
   font-weight: 600;
   color: var(--pipe-st);
 }

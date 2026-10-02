@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 
 import type { FinishedFile } from "../../lib/activity/processing-outcome";
-import { finishedLine, finishedNote } from "./processing-words";
+import {
+  finishedLine,
+  finishedNote,
+  ordinal,
+  timeLeft,
+  timeRemaining,
+} from "./processing-words";
 
 function finished(overrides: Partial<FinishedFile> = {}): FinishedFile {
   return {
@@ -67,5 +73,35 @@ describe("what the Activity stream adds under an entry", () => {
       ),
     ).toBe("removed 2 audio tracks and 1 subtitle track");
     expect(finishedNote(library("Cleaned X.mkv."))).toBe("");
+  });
+});
+
+describe("how a place in line reads", () => {
+  it("says first, second, third and the rest with the right ending", () => {
+    expect([0, 1, 2, 3, 10, 11, 12, 20, 21].map(ordinal)).toEqual([
+      "1st",
+      "2nd",
+      "3rd",
+      "4th",
+      "11th",
+      "12th",
+      "13th",
+      "21st",
+      "22nd",
+    ]);
+  });
+});
+
+describe("how long a pass has still to run", () => {
+  it("says seconds under a minute and a half, then minutes, then hours", () => {
+    expect(timeRemaining(41)).toBe("41 s");
+    expect(timeRemaining(300)).toBe("5 min");
+    expect(timeRemaining(3 * 3600)).toBe("3 h");
+  });
+
+  it("adds that it is what is left, and says nothing for an estimate it does not have", () => {
+    expect(timeLeft(300)).toBe("5 min left");
+    expect(timeLeft(null)).toBe("");
+    expect(timeRemaining(null)).toBe("");
   });
 });
