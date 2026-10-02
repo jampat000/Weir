@@ -129,7 +129,6 @@
   display: grid;
   grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
   gap: var(--mm-panel-gap);
-  margin-top: var(--mm-panel-gap);
   align-items: start;
 }
 
