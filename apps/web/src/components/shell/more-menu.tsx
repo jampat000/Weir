@@ -20,6 +20,10 @@ type MoreMenuProps<Id extends string> = {
   onChoose: (id: Id) => void;
   /** Draws the button as the row's own tabs or chips are drawn. */
   buttonClassName: string;
+  /** The button's words: "More" at the end of a row of tabs or chips. */
+  label?: ReactNode;
+  /** Which edge of the button the menu lines up with: a menu at a card's right edge opens towards its left. */
+  align?: "start" | "end";
 };
 
 /** What the menu's arrow keys and Home and End do: the entry to focus next, or null for any other key. */
@@ -43,14 +47,17 @@ function entryAfterKey(
 }
 
 /**
- * "More ▾" at the end of a row of tabs or chips, opening a menu of the ones that did not fit. It is a menu button,
- * never drawn as a chosen one: the chosen tab or chip always has a place in the row.
+ * "More ▾" at the end of a row of tabs or chips, opening a menu of the ones that did not fit, or a small menu of another
+ * kind with its own words. It is a menu button, never drawn as a chosen one: the chosen tab or chip always has a place
+ * in the row.
  */
 export function MoreMenu<Id extends string>({
   menuLabel,
   folded,
   onChoose,
   buttonClassName,
+  label = "More",
+  align = "start",
 }: MoreMenuProps<Id>) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -111,7 +118,7 @@ export function MoreMenu<Id extends string>({
           setOpen(true);
         }}
       >
-        More
+        {label}
         <NavIconChevronDown className="mm-more__chevron" />
       </button>
       {open ? (
@@ -121,7 +128,7 @@ export function MoreMenu<Id extends string>({
           role="menu"
           tabIndex={-1}
           aria-label={menuLabel}
-          className="mm-more__menu"
+          className={`mm-more__menu${align === "end" ? " mm-more__menu--end" : ""}`}
           onKeyDown={onMenuKeyDown}
         >
           {folded.map(({ id, label }) => (

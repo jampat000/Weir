@@ -1,0 +1,89 @@
+/* Column headings that sort and move, the lift of whatever is dragged, and the small Columns menu on a table's card
+   header (components/shared/sortable-column-header.tsx, columns-menu.tsx, lib/ui/use-drag-reorder.ts). */
+
+.mm-col-head {
+  user-select: none;
+  touch-action: pan-y;
+}
+
+.mm-col-head[data-movable] {
+  cursor: grab;
+}
+
+.mm-col-head__sort {
+  display: inline-flex;
+  max-width: 100%;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  cursor: inherit;
+}
+
+.mm-col-head__sort:hover,
+.mm-col-head[aria-sort] .mm-col-head__sort {
+  color: var(--mm-text1);
+}
+
+.mm-col-head__sort:focus-visible,
+.mm-col-head:focus-visible {
+  outline: 2px solid var(--mm-accent);
+  outline-offset: 2px;
+}
+
+.mm-col-head__arrow {
+  flex: none;
+}
+
+/* What is held while it is dragged: the pointer reads as holding it, nothing is selected, and it is raised above what
+   it passes. A row is raised by its cells. */
+html.mm-dragging,
+html.mm-dragging * {
+  cursor: grabbing !important;
+  user-select: none;
+}
+
+tr[data-dragging] > *,
+[data-dragging]:is(td, th, [role="cell"], [role="columnheader"]) {
+  position: relative;
+  z-index: 3;
+  background: var(--mm-surface-2);
+  box-shadow: var(--mm-shadow-popover);
+}
+
+.mm-columns-button {
+  height: 28px;
+  margin-block: -4px;
+  padding: 0 10px;
+  border: 1px solid var(--mm-hairline);
+  border-radius: var(--mm-radius-control);
+  background: transparent;
+  color: var(--mm-text2);
+  font: 500 0.8125rem var(--mm-font);
+  cursor: pointer;
+}
+
+.mm-columns-button:hover,
+.mm-columns-button[aria-expanded="true"] {
+  background: var(--mm-surface-2);
+  color: var(--mm-text1);
+}
+
+/* The menu at a card's right edge opens towards its left, and its card stops clipping so it can reach past a short one. */
+.mm-more__menu--end {
+  right: 0;
+  left: auto;
+}
+
+.mm-panel:has(> .mm-panel__head .mm-columns-button) {
+  overflow: visible;
+}
+
+.mm-panel:has(> .mm-panel__head .mm-columns-button) > .mm-panel__body {
+  border-radius: 0 0 var(--mm-radius-panel) var(--mm-radius-panel);
+}
