@@ -1,8 +1,9 @@
 /**
  * Control roles across Weir. Primary commits (Save, Apply, Confirm); secondary runs a utility
  * (Test, Open, Run now, Retry); tertiary is a lower-emphasis helper (Show, Clear, row actions).
- * A destructive action is `danger` when it is the confirming button of a dialog (filled, so the choice is
- * unmistakable) and `danger-outline` when it sits among other buttons. An on/off choice uses `MmOnOffSwitch`,
+ * Red is for actions that remove, override or step outside normal running; Weir's routine work (cleaning, scans,
+ * cleanup runs) is never red. Such an action is `danger` when it is the confirming button of a dialog (filled, so the
+ * choice is unmistakable) and `danger-outline` when it sits among other buttons. An on/off choice uses `MmOnOffSwitch`,
  * not these classes. A button is one of three heights (the scale in `weir-tokens.css`): `header` in a page's header,
  * `card` inside a card (the default), `row` for an action on a row of a list or table.
  */

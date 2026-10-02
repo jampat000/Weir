@@ -19,6 +19,7 @@ import {
   ShellHeaderProvider,
   useHeaderSlotRef,
 } from "../../components/shell/shell-header-context";
+import { mmActionButtonClass } from "../../lib/ui/mm-control-roles";
 import { LibraryPage } from "./library-page";
 
 const libraries = [
@@ -530,6 +531,9 @@ describe("LibraryPage", () => {
 
     expect(screen.getByTestId("library-confirm-warnings")).toHaveTextContent(
       "This file is still shared with a download.",
+    );
+    expect(screen.getByTestId("library-confirm-confirm")).toHaveClass(
+      ...mmActionButtonClass({ variant: "primary" }).split(" "),
     );
     expect(clean).not.toHaveBeenCalledWith(
       expect.objectContaining({ confirm: true }),

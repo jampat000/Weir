@@ -35,6 +35,7 @@ the two disagree, that document wins.
   - warning or review needed: amber
   - failed or blocked: red
   - informational or queued: blue/neutral
+- Red is for actions that remove, override or step outside normal running; Weir's routine work (cleaning, scans, cleanup runs) is never red.
 - Badges and pills use the same shape everywhere. Today there are still more than one:
   `mm-quiet-badge` / `mm-quiet-state` (Settings, System, most tables) and `mm-activity-chip` /
   `mm-status-badge` (the events list in System › Logs). New work uses the `mm-quiet-*` family.

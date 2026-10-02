@@ -47,7 +47,6 @@ export function LibraryCleanConfirm({ flow }: { flow: LibraryClean }) {
         </>
       }
       confirmLabel={count === 1 ? "Yes, clean it" : "Yes, clean them"}
-      tone="danger"
       cancelLabel="Not now"
       busy={flow.confirmPending}
       busyLabel="Starting the clean…"

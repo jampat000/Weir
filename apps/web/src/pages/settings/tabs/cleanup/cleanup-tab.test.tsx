@@ -14,6 +14,7 @@ import type { MaintenanceState } from "../../../../lib/processing/maintenance-ap
 import * as maintenanceQueries from "../../../../lib/processing/maintenance-queries";
 import * as processingQueries from "../../../../lib/processing/queries";
 import * as settingsQueries from "../../../../lib/settings/queries";
+import { mmActionButtonClass } from "../../../../lib/ui/mm-control-roles";
 import { CleanupTab } from "./cleanup-tab";
 
 const mutate = vi.fn();
@@ -248,6 +249,9 @@ it("asks for confirmation before switching on a destructive job, then saves once
   );
   expect(dialog).toHaveTextContent(
     'Switch on "Cleaned copies nobody picked up"?',
+  );
+  expect(within(dialog).getByRole("button", { name: "Switch on" })).toHaveClass(
+    ...mmActionButtonClass({ variant: "primary" }).split(" "),
   );
   fireEvent.click(within(dialog).getByRole("button", { name: "Switch on" }));
 

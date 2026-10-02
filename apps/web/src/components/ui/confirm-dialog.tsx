@@ -36,7 +36,7 @@ export function ConfirmDialog({
   confirmDisabled?: boolean;
   /** A safe control to focus instead of the cancel button, such as the first choice being asked for. */
   initialFocus?: RefObject<HTMLElement | null>;
-  /** `danger` for an action that deletes or overwrites something: the confirming button is red and the cancel button stays neutral. */
+  /** `danger` for an action that removes, overrides or steps outside normal running: the confirming button is red and the cancel button stays neutral. Routine work stays `default`. */
   tone?: "default" | "danger";
   error?: string | null;
   testId: string;
