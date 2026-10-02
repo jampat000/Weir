@@ -5,6 +5,7 @@ import { Panel } from "../../../components/panels/panel";
 import type { ProcessingFile } from "../../../lib/processing/files-api";
 import { useProcessingLibrariesQuery } from "../../../lib/processing/libraries-queries";
 import type { Filter } from "../processing-filter";
+import { historyGroupPath } from "../../history/history-links";
 import { ProcessRejectedAgain } from "../../history/history-rejected-again";
 import { NeedFileActions, type NeedNotice } from "./needs-file-actions";
 import { NEEDS_A_LOOK_PATH, type NeedGroup, type NeedRow } from "./needs-model";
@@ -76,8 +77,11 @@ function Group({
           <NeedItem key={row.key} row={row} {...handlers} />
         ))}
       </ul>
-      {group.more > 0 ? (
-        <Link className="mm-need__link mm-needs__more" to={NEEDS_A_LOOK_PATH}>
+      {group.more > 0 && group.history ? (
+        <Link
+          className="mm-need__link mm-needs__more"
+          to={historyGroupPath(group.history, workflowId)}
+        >
           and {group.more.toLocaleString()} more in History →
         </Link>
       ) : null}

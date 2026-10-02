@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { ProcessingFile } from "../../lib/processing/files-api";
-import { historyFilePath } from "./history-links";
+import { historyFilePath, historyGroupPath } from "./history-links";
 
 const aFile = (status: ProcessingFile["status"]) =>
   ({ id: 41, status }) as ProcessingFile;
@@ -23,5 +23,20 @@ describe("the address of one file in History", () => {
     expect(
       historyFilePath(aFile("cancelled" as ProcessingFile["status"])),
     ).toBe("/history?file=41&within=all");
+  });
+});
+
+describe("the address of one group's view in History", () => {
+  it("shows the group", () => {
+    expect(historyGroupPath("failed")).toBe("/history?show=failed");
+    expect(historyGroupPath("needs")).toBe("/history?show=needs");
+    expect(historyGroupPath("skipped")).toBe("/history?show=skipped");
+  });
+
+  it("narrows to one workflow when there is one", () => {
+    expect(historyGroupPath("failed", 3)).toBe(
+      "/history?show=failed&library=3",
+    );
+    expect(historyGroupPath("failed", null)).toBe("/history?show=failed");
   });
 });

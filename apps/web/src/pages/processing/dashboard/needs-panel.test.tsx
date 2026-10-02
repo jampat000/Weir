@@ -167,6 +167,53 @@ describe("the Needs you panel when something does", () => {
     ).toHaveAttribute("href", "/history?show=failed");
   });
 
+  it("sends each group's 'and N more' to the History view of that kind of file", () => {
+    const failedMany = [1, 2, 3, 4, 5].map((id) =>
+      file({ id: 100 + id, relative_path: `Failed.${id}.mkv` }),
+    );
+    const heldMany = [1, 2, 3, 4, 5].map((id) =>
+      file({
+        id: 200 + id,
+        relative_path: `Held.${id}.mkv`,
+        status: "on_hold",
+        failure_class: null,
+        hold_until: null,
+      }),
+    );
+    const skippedMany = [1, 2, 3, 4, 5].map((id) =>
+      file({
+        id: 300 + id,
+        relative_path: `Skipped.${id}.mkv`,
+        status: "skipped",
+        failure_class: null,
+        status_reason: "Skipped because its path matches an exclude pattern.",
+      }),
+    );
+    needFiles.files = [...failedMany, ...heldMany, ...skippedMany];
+    renderPanel();
+
+    const more = screen
+      .getAllByRole("link", { name: "and 1 more in History →" })
+      .map((link) => link.getAttribute("href"));
+
+    expect(more).toEqual([
+      "/history?show=failed",
+      "/history?show=needs",
+      "/history?show=skipped",
+    ]);
+  });
+
+  it("keeps a workflow's own view when the panel is narrowed to it", () => {
+    needFiles.files = [1, 2, 3, 4, 5].map((id) =>
+      file({ id: 100 + id, library_id: 2, library_name: "Movies" }),
+    );
+    renderPanel({ workflowId: 2 });
+
+    expect(
+      screen.getByRole("link", { name: "and 1 more in History →" }),
+    ).toHaveAttribute("href", "/history?show=failed&library=2");
+  });
+
   it("groups files by what went wrong, each group titled in plain words", () => {
     needFiles.files = [stuckFile, rejected];
     renderPanel();

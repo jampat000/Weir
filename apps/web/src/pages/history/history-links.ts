@@ -1,11 +1,21 @@
 /** Addresses into History: one file in the group it belongs to, so a link lands on the file and not just on the page. */
 import type { ProcessingFile } from "../../lib/processing/files-api";
-import { historyGroupOf } from "./history-entries";
+import { historyGroupOf, type HistoryGroup } from "./history-entries";
 
 export const HISTORY_PATH = "/history";
 
 /** The period that has every file History keeps, so a file last touched long ago is still in the list. */
 const EVERYTHING_KEPT = "all";
+
+/** One group's view in History, narrowed to one workflow when there is one: "Failed" for the files that failed. */
+export function historyGroupPath(
+  group: HistoryGroup,
+  workflowId?: number | null,
+): string {
+  const params = new URLSearchParams({ show: group });
+  if (workflowId != null) params.set("library", String(workflowId));
+  return `${HISTORY_PATH}?${params}`;
+}
 
 /**
  * One file in History: its group's view with the file chosen, however long ago it was last touched. History's

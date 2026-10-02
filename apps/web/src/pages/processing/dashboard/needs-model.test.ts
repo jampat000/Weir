@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { ProcessingFile } from "../../../lib/processing/files-api";
 import type { ProcessingLibrary } from "../../../lib/processing/libraries-api";
+import { HISTORY_GROUPS } from "../../history/history-entries";
 import {
   FAILED_JOBS_LIMIT,
   FILES_SHOWN_PER_GROUP,
@@ -341,6 +342,47 @@ describe("the files that need a person", () => {
     expect(group.title).toBe("6 couldn't finish writing");
     expect(group.rows).toHaveLength(FILES_SHOWN_PER_GROUP);
     expect(group.more).toBe(2);
+  });
+
+  it("names the History view that has each group's files, and none for what is wrong with Weir itself", () => {
+    const groups = buildNeeds({
+      ...healthy,
+      workflows: [{ ...workflow, enabled: false } as ProcessingLibrary],
+      files: [
+        failedFile(1),
+        rejectedFile(2),
+        failedFile(3, { status: "on_hold", failure_class: null }),
+        failedFile(4, {
+          status: "skipped",
+          failure_class: null,
+          status_reason: "Skipped because its path matches an exclude pattern.",
+        }),
+      ],
+    });
+
+    expect(
+      Object.fromEntries(groups.map((group) => [group.key, group.history])),
+    ).toEqual({
+      weir: null,
+      "failed-writing": "failed",
+      stuck: "needs",
+      "rejected-language": "failed",
+      "skipped-by-rule": "skipped",
+    });
+  });
+
+  it("names a History view that exists for every group", () => {
+    const ids = HISTORY_GROUPS.map((group) => group.id);
+    const groups = buildNeeds({
+      ...healthy,
+      files: [
+        failedFile(1),
+        rejectedFile(2),
+        failedFile(3, { status: "on_hold" }),
+      ],
+    });
+
+    for (const group of groups) expect(ids).toContain(group.history);
   });
 
   it("narrows to one workflow's files, but still says what is wrong with Weir itself", () => {

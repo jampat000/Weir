@@ -6,6 +6,10 @@ import { plural } from "../../../lib/ui/mm-plural";
 import { shownBy, type Filter } from "../processing-filter";
 import { firstSentence, prettyName } from "../processing-model";
 import { fileReason, type FileReason } from "../file-reason";
+import {
+  historyGroupOf,
+  type HistoryGroup,
+} from "../../history/history-entries";
 import { setupTabPath } from "../../../lib/settings/setup-areas";
 
 /** Past this many failed jobs the count reads "100+": the list behind the link has the rest. */
@@ -45,6 +49,8 @@ export type NeedGroup = {
   rows: NeedRow[];
   /** How many more there are than the rows listed, so the group can say where the rest are. */
   more: number;
+  /** The History view that lists the group's files, where the rest are. None for what is wrong with Weir itself. */
+  history: HistoryGroup | null;
   /** The group's rejected files can all be processed again at once. */
   rejected: boolean;
 };
@@ -114,6 +120,7 @@ function fileGroups(files: readonly ProcessingFile[]): NeedGroup[] {
     title: `${files.length.toLocaleString()} ${reason.words}`,
     rows: files.slice(0, FILES_SHOWN_PER_GROUP).map(fileRow),
     more: Math.max(0, files.length - FILES_SHOWN_PER_GROUP),
+    history: historyGroupOf(files[0]),
     rejected: reason.rejected,
   }));
 }
@@ -188,6 +195,7 @@ function weirGroup(rows: NeedRow[]): NeedGroup[] {
       ),
       rows,
       more: 0,
+      history: null,
       rejected: false,
     },
   ];
