@@ -11,7 +11,7 @@
  *   Signal fills  --mm-success, --mm-warning, --mm-destructive, --mm-info (bars, dots, borders)
  *   Signal text   --mm-status-{healthy,warning,failed,info}-text, tuned to 4.5:1 on every surface
  *   Lanes         --mm-lane-{incoming,queued,analysing,processing,delivering}, with a -text twin for words
- *   Shape         --mm-radius-* (controls 10px, fields 12px, tiles 14px, panels 16px)
+ *   Shape         --mm-radius-* (controls 10px, fields 12px, tiles 14px, panels 14px)
  */
 
 :root {
@@ -102,7 +102,7 @@
   --mm-radius-control: 10px;
   --mm-radius-field: 12px;
   --mm-radius-tile: 14px;
-  --mm-radius-panel: 16px;
+  --mm-radius-panel: 14px;
   --mm-radius-pill: 999px;
   /* Main column: never wider than the pane. */
   --mm-main-max: min(100%, var(--mm-main-max-cap));
