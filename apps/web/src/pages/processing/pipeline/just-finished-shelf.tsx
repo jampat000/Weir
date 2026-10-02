@@ -157,6 +157,7 @@ export function JustFinishedShelf({
   return (
     <Panel
       title="Just finished"
+      className="mm-shelf-panel"
       controls={
         <ShelfFilter choices={choices} chosen={narrowedTo} onChoose={choose} />
       }

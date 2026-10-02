@@ -123,13 +123,13 @@
   margin-block: -6px;
 }
 
-/* A card with pickers in its header stops clipping, so a picker's list can reach past a short card's edge; its body
-   keeps the rounded corners. */
-:is(.mm-history-list, .mm-library-files) {
+/* A card with a picker or a More menu in its header stops clipping, so the list can reach past a short card's edge; its
+   body keeps the rounded corners. */
+:is(.mm-history-list, .mm-library-files, .mm-shelf-panel) {
   overflow: visible;
 }
 
-:is(.mm-history-list, .mm-library-files) > .mm-panel__body {
+:is(.mm-history-list, .mm-library-files, .mm-shelf-panel) > .mm-panel__body {
   border-radius: 0 0 var(--mm-radius-panel) var(--mm-radius-panel);
 }
 

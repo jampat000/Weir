@@ -105,6 +105,12 @@
   padding: 4px 8px;
 }
 
+/* The shelf is the last card on the page, so its More menu opens upwards, where there is room. */
+.mm-shelf-panel .mm-more__menu {
+  top: auto;
+  bottom: calc(100% + 8px);
+}
+
 .lsh-chip {
   height: 24px;
   padding: 0 10px;
