@@ -52,10 +52,10 @@ export const LOW_COLUMNS = "minmax(0, 1.15fr) minmax(0, 1fr)";
 
 /**
  * What sits around the Pipeline's lanes, measured on the rendered board: the panel's top border (1px) and header
- * (42px), the ribbon with the space under it (50px), the space under the lanes (10px) and the panel's bottom
- * border (1px).
+ * (44px, as tall as Deluno's card header), the ribbon with the space under it (50px), the space under the lanes
+ * (10px) and the panel's bottom border (1px).
  */
-export const BOARD_CHROME_PX = 104;
+export const BOARD_CHROME_PX = 106;
 /** The Pipeline's row at a comfortable size: its chrome, three rows of 86px cards and the "and N more" line. */
 export const BOARD_PX = BOARD_CHROME_PX + lanesHeight(cardSize(undefined));
 /** The least the Pipeline is given: its chrome, two rows of the smallest cards, one more, and the "and N more" line. */

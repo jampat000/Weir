@@ -115,6 +115,7 @@
   /* The one inset from the left edge of the main column: the header's title and the page's cards start at it. */
   --mm-page-inset: clamp(14px, 1.08vw, 26px);
   --mm-page-pad-x: var(--mm-page-inset);
+  /* The space above and below the page, inside the main column: Deluno's --content-pad-block. */
   --mm-page-pad-y: clamp(12px, 1vw, 20px);
   --mm-header-pad-x: var(--mm-page-inset);
   --mm-header-title-size: 26px;

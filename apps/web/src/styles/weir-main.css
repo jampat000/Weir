@@ -12,8 +12,7 @@
      off. With a zero minimum the column takes the width it is actually given and those wrappers
      scroll, which is what they are for. */
   min-width: 0;
-  padding: var(--mm-page-pad-y) var(--mm-page-pad-x)
-    calc(28px * var(--mm-density-ui-scale));
+  padding: var(--mm-page-pad-y) var(--mm-page-pad-x);
   position: relative;
   background: var(--mm-bg-main);
 }

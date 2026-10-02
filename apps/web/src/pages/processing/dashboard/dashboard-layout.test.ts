@@ -44,39 +44,39 @@ describe("the shared page grid", () => {
   });
 
   it("measures the Pipeline's chrome and keeps its comfortable row to three rows of 86px cards", () => {
-    expect(BOARD_CHROME_PX).toBe(104);
-    // 104 of chrome, three rows of 94px less the last gap, and the 22px line for "and N more".
-    expect(BOARD_PX).toBe(400);
+    expect(BOARD_CHROME_PX).toBe(106);
+    // 106 of chrome, three rows of 94px less the last gap, and the 22px line for "and N more".
+    expect(BOARD_PX).toBe(402);
   });
 
   it("gives a window with room for the band's 20% and the Pipeline's comfortable height what they ask for", () => {
-    // 780px of grid, less two 12px gaps: the band's 20% is 156px, the Pipeline's 400px, and the lower row has 200px.
+    // 780px of grid, less two 12px gaps: the band's 20% is 156px, the Pipeline's 402px, and the lower row has 198px.
     expect(gridRows(780)).toEqual({
       band: 156,
-      board: 400,
-      low: 200,
-      template: "156px 400px 200px",
+      board: 402,
+      low: 198,
+      template: "156px 402px 198px",
     });
   });
 
   it("gives way band first (never under 150px), then the Pipeline (never under three rows of 60px cards)", () => {
-    // 663px: the band keeps 150px, the Pipeline goes from 400px to 322px, the lower row gets what is left.
+    // 663px: the band keeps 150px, the Pipeline goes from 402px to 324px, the lower row gets what is left.
     expect(gridRows(663)).toEqual({
       band: 150,
-      board: 322,
-      low: 167,
-      template: "150px 322px 167px",
+      board: 324,
+      low: 165,
+      template: "150px 324px 165px",
     });
     expect(gridRows(700).band).toBeGreaterThanOrEqual(150);
   });
 
   it("gives the lower row way last, down to its floor", () => {
-    expect(gridRows(615)).toMatchObject({ band: 150, board: 322, low: 119 });
-    expect(gridRows(300)).toMatchObject({ band: 150, board: 322, low: 110 });
+    expect(gridRows(615)).toMatchObject({ band: 150, board: 324, low: 117 });
+    expect(gridRows(300)).toMatchObject({ band: 150, board: 324, low: 110 });
   });
 
   it("holds a page as tall as the three least rows and the gaps between them", () => {
-    expect(MIN_GRID_PX).toBe(150 + 322 + 110 + 24);
+    expect(MIN_GRID_PX).toBe(150 + 324 + 110 + 24);
     const least = gridRows(MIN_GRID_PX);
     expect(least.band + least.board + least.low + 24).toBe(MIN_GRID_PX);
   });
@@ -85,17 +85,17 @@ describe("the shared page grid", () => {
     // 956px: the band's 20% is 191px and takes spare up to 240px; the lower row keeps what is left.
     expect(gridRows(956)).toEqual({
       band: 240,
-      board: 400,
-      low: 292,
-      template: "240px 400px 292px",
+      board: 402,
+      low: 290,
+      template: "240px 402px 290px",
     });
     // A tall window: the lower row takes a third at most and the cards grow to the 130px step (36px a row).
     expect(gridRows(2000).board).toBe(BOARD_PX + 3 * (130 - 94));
     expect(gridRows(1315)).toEqual({
       band: 240,
-      board: 508,
-      low: 543,
-      template: "240px 508px 543px",
+      board: 510,
+      low: 541,
+      template: "240px 510px 541px",
     });
   });
 

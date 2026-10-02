@@ -19,6 +19,8 @@
   flex-shrink: 0;
   align-items: baseline;
   gap: 12px;
+  /* Deluno's card header is 44px whether or not it has a link or a count: 14px above, 10px below, a 20px line. */
+  min-height: 44px;
   padding: 14px 18px 10px;
 }
 
