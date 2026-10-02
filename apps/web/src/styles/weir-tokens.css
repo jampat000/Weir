@@ -9,8 +9,10 @@
  *   Text          --mm-text (also --mm-text1), --mm-text2 (muted), --mm-text3 (dim), --mm-text-disabled
  *   Brand colour  --mm-primary, --mm-primary-bright, --mm-primary-2 (--mm-accent* are the same colour)
  *   Signal fills  --mm-success, --mm-warning, --mm-destructive, --mm-info (bars, dots, borders)
- *   Signal text   --mm-status-{healthy,warning,failed,info}-text, tuned to 4.5:1 on every surface
- *   Lanes         --mm-lane-{incoming,queued,analysing,processing,delivering}, with a -text twin for words
+ *   Status        --mm-status-{done,todo,doing,attention,broken,idle}, one colour per meaning, and --mm-payoff (gold)
+                 for space-saved figures; lib/ui/status-tone.ts is how a component asks for them
+   Signal text   --mm-status-{healthy,warning,failed,info}-text, aliases of the status colours above
+ *   Lanes         --mm-lane-{incoming,queued,analysing,processing,delivering}: violet, teal, indigo, fuchsia and pink
  *   Shape         --mm-radius-* (controls 10px, fields 12px, tiles 14px, panels 14px)
  */
 
@@ -66,10 +68,26 @@
   --mm-warning: #fb8d2d;
   --mm-destructive: #ef4d4d;
   --mm-info: #41a7fb;
-  --mm-status-healthy-text: #25e475;
-  --mm-status-warning-text: #fb8d2d;
-  --mm-status-failed-text: #ff7b7b;
-  --mm-status-info-text: #41a7fb;
+  /* What a status means, in the colour of that meaning. Text-grade: each reads at 4.5:1 on a card and on a
+     card inside a panel, so the same colour paints the dot and the word. todo is a muted blue drawn as a ring. */
+  --mm-status-done: #25e475;
+  --mm-status-doing: #41a7fb;
+  --mm-status-todo: color-mix(
+    in srgb,
+    var(--mm-status-doing) 55%,
+    var(--mm-text2)
+  );
+  --mm-status-attention: #fb8d2d;
+  --mm-status-broken: #ff7b7b;
+  --mm-status-idle: var(--mm-text3);
+  /* Gold, for the figure of space saved: yellower and brighter than attention, and never a status. */
+  --mm-payoff: #f5d23a;
+  /* The colour of the status in scope: weir-status.css sets it from an element's data-status. */
+  --mm-st: var(--mm-status-idle);
+  --mm-status-healthy-text: var(--mm-status-done);
+  --mm-status-warning-text: var(--mm-status-attention);
+  --mm-status-failed-text: var(--mm-status-broken);
+  --mm-status-info-text: var(--mm-status-doing);
   --mm-status-healthy-bg: rgba(37, 228, 117, 0.12);
   --mm-status-warning-bg: rgba(251, 141, 45, 0.14);
   --mm-status-failed-bg: rgba(239, 77, 77, 0.14);
@@ -78,18 +96,12 @@
   --mm-warning-bg: var(--mm-status-warning-bg);
   --mm-warning-text: var(--mm-status-warning-text);
 
-  /* The five stations of the Pipeline. The fill colour paints bars, dots and edges; the -text twin is for
-     words set in the lane's colour, nudged until it reads at 4.5:1 on a card. */
+  /* The five stations of the Pipeline: a flow, not a status, so none is green, amber, red or the status blue. */
   --mm-lane-incoming: #9d65ec;
-  --mm-lane-queued: #2ad2f4;
-  --mm-lane-analysing: #41a7fb;
-  --mm-lane-processing: #24dbb0;
-  --mm-lane-delivering: #fbba37;
-  --mm-lane-incoming-text: #ab7bef;
-  --mm-lane-queued-text: #2ad2f4;
-  --mm-lane-analysing-text: #41a7fb;
-  --mm-lane-processing-text: #24dbb0;
-  --mm-lane-delivering-text: #fbba37;
+  --mm-lane-queued: #2ac4c0;
+  --mm-lane-analysing: #7c83f5;
+  --mm-lane-processing: #d96be0;
+  --mm-lane-delivering: #f06fb1;
 
   --mm-sidebar-w: 268px;
   --mm-sidebar-collapsed-w: 84px;
@@ -243,10 +255,11 @@ html[data-mm-theme="light"] {
   --mm-warning: #ab4705;
   --mm-destructive: #ce1212;
   --mm-info: #0872c9;
-  --mm-status-healthy-text: #046c4a;
-  --mm-status-warning-text: #7a5100;
-  --mm-status-failed-text: #b42318;
-  --mm-status-info-text: #1f5fb8;
+  --mm-status-done: #046c4a;
+  --mm-status-doing: #1f5fb8;
+  --mm-status-attention: #964200;
+  --mm-status-broken: #b42318;
+  --mm-payoff: #6b5c00;
   --mm-status-healthy-bg: rgba(15, 157, 110, 0.13);
   --mm-status-warning-bg: rgba(245, 158, 11, 0.13);
   --mm-status-failed-bg: rgba(239, 68, 68, 0.13);
@@ -254,15 +267,10 @@ html[data-mm-theme="light"] {
   --mm-warning-border: rgba(171, 71, 5, 0.42);
 
   --mm-lane-incoming: #9d65ec;
-  --mm-lane-queued: #10a8c6;
-  --mm-lane-analysing: #0872c9;
-  --mm-lane-processing: #1da58a;
-  --mm-lane-delivering: #e18b09;
-  --mm-lane-incoming-text: #7a2ee5;
-  --mm-lane-queued-text: #0a687b;
-  --mm-lane-analysing-text: #0761ab;
-  --mm-lane-processing-text: #136c5b;
-  --mm-lane-delivering-text: #895506;
+  --mm-lane-queued: #14a8a4;
+  --mm-lane-analysing: #5560e0;
+  --mm-lane-processing: #bb45c4;
+  --mm-lane-delivering: #d8478f;
 
   --mm-shadow-card:
     0 1px 2px rgba(15, 20, 30, 0.05), 0 4px 12px rgba(15, 20, 30, 0.04);
