@@ -12,9 +12,9 @@ Matroska and ffmpeg writes everything else, and each workflow can be set to use 
 everything instead. A workflow is one route a file takes: a watched folder, a work folder, an
 output folder and the rules that apply. The API still calls a workflow a "library", so existing
 integrations keep working. Around it, the platform provides history, logs, backups, updates and
-security. The first screen, **Processing**, shows every file Weir is working on right now, from
-the moment it arrives until its media manager has it back. **History**, **Library**, **Settings**
-and **System** sit beside it.
+security. The first screen, the **Dashboard**, shows every file Weir is working on right now, from
+the moment it arrives until its media manager has it back. **History**, **Library**, the **Setup** areas
+(Workflows, Connections, Rules, Performance) and **System** sit beside it.
 
 ## Runtime shape
 
@@ -64,7 +64,7 @@ refused and left unchanged.
 |-----------|---------------|
 | `src/app` | App-level router and providers |
 | `src/layouts` | Shell/navigation layout |
-| `src/pages` | Feature pages (Processing, History, Library, Settings, System), plus sign-in and setup |
+| `src/pages` | Feature pages (Dashboard, History, Library, Setup, System), plus sign-in and setup |
 | `src/lib` | API clients, query hooks, typed data helpers |
 | `src/components` | Reusable UI and brand components |
 

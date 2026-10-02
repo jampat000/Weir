@@ -24,7 +24,7 @@ About once an hour `ArtworkResolverTask` runs `ArtworkPruner`, which needs no ne
 
 ## Settings and tests
 
-- The Rules page's **Artwork** switch is `artwork_enabled` on `/api/v1/processing/metadata-provider` (on by default). Off stops new lookups and makes every `poster_url` null; stored images stay on disk.
+- The **Artwork** switch under Setup › Rules › Metadata & artwork is `artwork_enabled` on `/api/v1/processing/metadata-provider` (on by default). Off stops new lookups and makes every `poster_url` null; stored images stay on disk.
 - `WEIR_ARTWORK_GATEWAY_URL` points Weir at another gateway, or `off` for no lookups at all. The real service is a public address and must resolve to one; any other address is treated as a stand-in on this machine.
 - **No test reaches the real service.** The server and contract test harnesses set the variable to `off`, and the tests that need a gateway use a fake (`FakeGateway` in `tests/contract/support`, a scripted handler in the .NET tests).
 - TMDb requires its attribution text and logo wherever its data is used, and TheTVDB a link where its images show; System › About carries both.

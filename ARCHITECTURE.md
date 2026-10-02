@@ -74,7 +74,7 @@ Solution `apps/server/Weir.slnx`; details in [`apps/server/README.md`](apps/serv
 
 - `src/app`: app-level router and providers.
 - `src/layouts`: shell/navigation layout.
-- `src/pages`: feature pages (Processing, History, Library, Settings, System), plus sign-in and setup.
+- `src/pages`: feature pages (Dashboard, History, Library, Setup, System), plus sign-in and setup.
 - `src/lib`: API clients, query hooks, typed data helpers, and UI helpers.
 - `src/components`: reusable UI and brand components.
 - `src/styles`: design tokens and shell styling.

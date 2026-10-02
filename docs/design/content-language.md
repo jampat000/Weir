@@ -11,7 +11,7 @@ lives beside them:
 | Processing         | `apps/web/src/pages/processing/processing-page.tsx` | `weir-processing.css` |
 | History            | `apps/web/src/pages/history/history-page.tsx`    | `weir-history.css`   |
 | Library            | `apps/web/src/pages/library/library-page.tsx`    | `weir-library.css`   |
-| Settings           | `apps/web/src/pages/settings/settings-page.tsx`  | `weir-content.css` only |
+| Setup areas        | `apps/web/src/pages/settings/setup-area-layout.tsx`  | `weir-content.css` only |
 | System             | `apps/web/src/pages/system/system-page.tsx`      | `weir-content.css` only |
 
 All of them sit under `apps/web/src/styles/` and are imported by `apps/web/src/index.css`. Colours,

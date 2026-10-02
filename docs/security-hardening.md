@@ -35,7 +35,7 @@ This checklist defines the current practical hardening baseline for Weir.
 - `WEIR_METRICS_BEARER_TOKEN` can gate machine access to `/metrics` without requiring an operator browser session.
 - To rotate `WEIR_CREDENTIALS_SECRET`, set the new value as `WEIR_CREDENTIALS_SECRET`, add the old value to
   `WEIR_PREVIOUS_CREDENTIALS_SECRETS`, restart Weir, then re-save every media manager
-  connection (Settings › Media managers) and the TMDb metadata provider key (Settings › Rules). After every saved credential has been re-written with the new value, remove the old value from
+  connection (Setup › Connections › Media managers) and the TMDb metadata provider key (Setup › Rules › Metadata & artwork). After every saved credential has been re-written with the new value, remove the old value from
   `WEIR_PREVIOUS_CREDENTIALS_SECRETS` and restart again.
 
 ## Repository and dependency controls

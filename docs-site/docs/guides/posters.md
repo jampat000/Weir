@@ -19,7 +19,7 @@ Weir reads the title from the name by itself, so a file called `Nosferatu.1922.1
 
 ## Turn it off
 
-Under **Settings › Rules**, switch **Artwork** off. Weir stops looking anything up and shows initials everywhere. Posters it already holds stay on disk and come back if you switch Artwork on again.
+Under **Setup › Rules › Metadata & artwork**, switch **Artwork** off. Weir stops looking anything up and shows initials everywhere. Posters it already holds stay on disk and come back if you switch Artwork on again.
 
 Operators who never want Weir to contact the service can also start it with `WEIR_ARTWORK_GATEWAY_URL=off`.
 

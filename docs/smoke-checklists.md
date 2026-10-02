@@ -28,7 +28,7 @@ Use the Velopack setup exe from the release being validated.
 17. Restore that backup and confirm the app remains usable.
 18. Confirm System › About › Updates shows a meaningful status, even when no update is available.
 19. Right-click the tray icon and confirm `Check for updates` is present and reaches the current release status.
-20. In Settings › Workflows, open a workflow's editor and use `Browse` on a folder field to pick a local folder. Confirm each row shows its kind (Weir only, or Linked to a media manager), and that `Add workflow` asks which kind first.
+20. In Setup › Workflows, open a workflow's editor and use `Browse` on a folder field to pick a local folder. Confirm each row shows its kind (Weir only, or Linked to a media manager), and that `Add workflow` asks which kind first.
 21. Enter a UNC path (`\\server\share\folder`) manually and confirm it saves; a missing folder is a warning, not a save blocker.
 22. Open Library, pick the library from the title and confirm `Check again` runs.
 23. Quit Weir from the tray icon, and confirm `tray-host.log` in `C:\ProgramData\Weir` says the server host `stopped cleanly` within a few seconds, not `killing it`. Do the same after switching LAN access on or off from the tray menu.

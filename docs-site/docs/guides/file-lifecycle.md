@@ -67,17 +67,17 @@ until you deal with it, or reject the release. **Try again** on a failed file st
 whatever the limit.
 
 A failed copy that was half written stays in the work folder only if you switch on **Keep a failed
-file's half-written copy for a day** in Settings › Cleanup. **Leftover work files** removes it once it
+file's half-written copy for a day** in Setup › Performance › Cleanup. **Leftover work files** removes it once it
 is a day old. There is no job that deletes the downloads of failed files: remove one from History, where
 Weir asks first.
 
 ## How long a file's history is kept
 
 Everything Weir did to a file is in History. Weir keeps a file's history for as long as it still knows
-the file, then for **Keep a file's history for N days after it's gone** (set at the bottom of History,
-90 by default, 0 for ever). The days count from when Weir finds the file gone or forgotten, and a file
-that comes back before then keeps its history. System › Logs keeps Weir's own log and Activity
-separately, with their own settings.
+the file, then for **Keep a file's history for N days after it's gone** (set in System › Logs under
+**How long things are kept**, 90 by default, 0 for ever; History links to it). The days count from when Weir finds the file gone or forgotten, and a file
+that comes back before then keeps its history. The same place keeps Weir's own log and
+Activity, each with its own number of days.
 
 ## Changed your rules? Process rejected files again
 
@@ -111,9 +111,9 @@ Cleaning a file that's already in your library, in place, follows the same rule:
 cleaned version alongside the original first and only swaps it in once the new copy is confirmed
 good. It never leaves your library with a file half-replaced.
 
-You set this up on the **Library** page, not in Settings: each library has its own folders, its own
+You set this up on the **Library** page, not in Setup: each library has its own folders, its own
 rules profile (the workflow's until you choose another), the daily clean, and two checks made before
 each clean. One skips a file when cleaning it would make the media manager download it again. The
 other skips a file that is still seeding. **Files already in your library: keep the original after
 cleaning** moves the original into an originals folder instead of deleting it, so removed tracks can
-be recovered. Settings › Workflows is only about new downloads.
+be recovered. Setup › Workflows is only about new downloads.

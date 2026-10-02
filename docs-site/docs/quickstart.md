@@ -82,12 +82,12 @@ The setup wizard has three parts:
 - **Automatic backups**: whether Weir keeps a rolling copy of its configuration, and how often.
 
 If Weir cannot reach what you connect, it says so and you can go back or choose **Neither**. You can
-skip the wizard and set these later: workflows under **Settings › Workflows**, connections under
-**Settings › Media managers**, backups under **System › Backups**.
+skip the wizard and set these later: workflows under **Setup › Workflows**, connections under
+**Setup › Connections › Media managers**, backups under **System › Backups**.
 
 ## 4. Choose what to keep
 
-Under **Settings › Rules**, set the audio and subtitle rules your workflows use. For example, keep
+Under **Setup › Rules › Profiles**, set the audio and subtitle rules your workflows use. For example, keep
 English and Japanese audio, keep English subtitles, and drop commentary tracks.
 
 ## 5. Try it with a real file
@@ -98,7 +98,7 @@ of relying on filesystem notifications.
 
 Weir does not touch a new file straight away. It waits until the file has not changed for 60 seconds, by
 size or by last-changed time, so a download that is still arriving is left alone. Each workflow has its own
-wait under **Settings › Workflows › File readiness**, and its own **Minimum file size** (50 MB for a new
+wait under **Setup › Workflows › File readiness**, and its own **Minimum file size** (50 MB for a new
 workflow) under **Intake rules**: smaller files, such as samples, are skipped.
 
 - The file shows up on **Processing** while Weir works on it.

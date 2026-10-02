@@ -53,12 +53,15 @@ Defined in `src/app/router.tsx`.
 | `/login` | Sign in |
 | `/setup` | Create admin (first run, while no admin exists) |
 | `/setup-wizard` | Setup wizard: time zone, the first Movies and TV folders, automatic backups |
-| `/` | Processing, the first screen: what Weir is working on now |
+| `/` | Dashboard, the first screen: what Weir is working on now |
 | `/history` | History: every file Weir has touched |
 | `/library` | Library: files already in a library, and what Weir would do to each |
-| `/settings` | Settings: Libraries, Rules, Media managers, Performance, Cleanup, Schedule, Alerts (`?tab=`) |
+| `/setup/workflows`, `/setup/workflows/schedule` | Workflows: Workflows, Schedule |
+| `/setup/connections`, `/setup/connections/download-clients`, `/setup/connections/alerts` | Connections: Media managers, Download clients, Alerts |
+| `/setup/rules`, `/setup/rules/metadata`, `/setup/rules/devices` | Rules: Profiles, Metadata & artwork, Playback devices |
+| `/setup/performance`, `/setup/performance/cleanup`, `/setup/performance/timers` | Performance: Speed, Cleanup, Weir's timers |
 | `/system` | System: About, Backups, Security, Logs (`?tab=`) |
-| `/activity`, `/processing` | Redirects from 3.1 addresses (`src/app/legacy-redirects.tsx`) |
+| `/settings`, `/activity`, `/processing` | Redirects from earlier addresses (`src/app/legacy-redirects.tsx`); `/settings?tab=` lands on the matching setup tab |
 
 Everything under `/` needs a session and a finished or skipped setup wizard.
 
