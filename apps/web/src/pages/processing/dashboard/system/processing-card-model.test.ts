@@ -60,7 +60,7 @@ describe("the disk work column", () => {
     expect(disk()).toMatchObject({
       value: 6,
       unit: " MB/s",
-      sub: "writing · reading 20",
+      sub: ["writing · reading 20", "reading 20", "read 20"],
     });
   });
 
@@ -77,7 +77,7 @@ describe("the speed column", () => {
     expect(processingColumns(stats())[1]).toMatchObject({
       value: 148,
       unit: "×",
-      sub: "across 2 files",
+      sub: ["across 2 files", "2 files"],
     });
   });
 
@@ -86,7 +86,7 @@ describe("the speed column", () => {
       stats({ running: 0, processing_speed: 0 }),
     )[1];
     expect(idle.value).toBeNull();
-    expect(idle.sub).toBe("nothing running");
+    expect(idle.sub).toEqual(["nothing running", "idle"]);
   });
 
   it("draws the speeds the history holds, an idle second as zero", () => {

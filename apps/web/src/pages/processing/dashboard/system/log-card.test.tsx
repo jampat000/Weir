@@ -70,12 +70,65 @@ describe("the Log card", () => {
     log.counts = { errors: 1, warnings: 1 };
     const card = renderCard();
 
+    fireEvent.click(within(card).getByRole("button", { name: "All" }));
     const rows = within(card).getAllByTestId("system-log-line");
     expect(rows).toHaveLength(3);
     expect(rows[0]).toHaveTextContent("Error");
     expect(rows[0]).toHaveTextContent("Disk is full.");
     expect(rows[0]).toHaveTextContent("t-10000");
     expect(card).toHaveTextContent("1 error · 1 warning today");
+  });
+
+  it("starts on the problems when there have been any today, so the information does not bury them", () => {
+    log.lines = [
+      line("info", "Scan finished.", 5),
+      line("error", "Disk is full.", 10),
+      line("warning", "Radarr was slow.", 60),
+    ];
+    log.counts = { errors: 1, warnings: 1 };
+    const card = renderCard();
+
+    expect(
+      within(card).getByRole("button", { name: "Problems" }),
+    ).toHaveAttribute("aria-pressed", "true");
+    expect(within(card).getAllByTestId("system-log-line")).toHaveLength(2);
+    expect(card).not.toHaveTextContent("Scan finished.");
+  });
+
+  it("starts on everything when today has had no errors or warnings", () => {
+    log.lines = [line("info", "Scan finished.", 5)];
+    const card = renderCard();
+
+    expect(within(card).getByRole("button", { name: "All" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(card).toHaveTextContent("Scan finished.");
+  });
+
+  it("keeps a choice the person made when the counts change", () => {
+    log.lines = [line("info", "Scan finished.", 5)];
+    const card = renderCard();
+    fireEvent.click(within(card).getByRole("button", { name: "Errors" }));
+
+    expect(
+      within(card).getByRole("button", { name: "Errors" }),
+    ).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("marks each line with its level, so a warning and an error stand out from information", () => {
+    log.lines = [
+      line("error", "Disk is full.", 10),
+      line("warning", "Radarr was slow.", 60),
+      line("info", "Scan finished.", 120),
+    ];
+    const card = renderCard();
+
+    const [error, warning, info] =
+      within(card).getAllByTestId("system-log-line");
+    expect(error).toHaveClass("mm-sy-log--error");
+    expect(warning).toHaveClass("mm-sy-log--warning");
+    expect(info).toHaveClass("mm-sy-log--info");
   });
 
   it("narrows the list to errors, or to warnings, with the switch", () => {

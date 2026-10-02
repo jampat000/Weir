@@ -99,13 +99,40 @@
 
 /* ---- Log ------------------------------------------------------------------- */
 
+/* The summary beside the title is a block, so it is as wide as the room the title leaves and its words fit it. */
+.mm-sy-count {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+/* The switch, smaller than a page's, with how many lines are left out at the far end. */
+.mm-sy-line--switch {
+  align-items: center;
+  gap: 8px;
+}
+
+.mm-sy-line--switch .mm-segmented {
+  flex-wrap: nowrap;
+  padding: 2px;
+}
+
+.mm-sy-line--switch .mm-segmented__option {
+  height: 24px;
+  padding: 0 9px;
+  font-size: 12px;
+}
+
+/* A line says its level by its colour: information is quiet, a warning is amber and an error red, each with an accent. */
 .mm-sy-log {
   display: grid;
   grid-template-columns: 78px 62px minmax(0, 1fr);
   align-items: baseline;
   gap: 10px;
-  padding: 4px 8px;
+  padding: 4px 8px 4px 6px;
   border-bottom: 1px solid var(--mm-hairline);
+  border-left: 3px solid transparent;
   font-size: 12px;
 }
 
@@ -125,19 +152,39 @@
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--mm-text2);
-}
-
-.mm-sy-log__level--error {
-  color: var(--mm-status-failed-text);
-}
-
-.mm-sy-log__level--warning {
-  color: var(--mm-status-warning-text);
+  color: var(--mm-text3);
 }
 
 .mm-sy-log__message {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.mm-sy-log--info .mm-sy-log__message {
+  color: var(--mm-text2);
+}
+
+.mm-sy-log--warning {
+  border-left-color: var(--mm-warning);
+  background: var(--mm-status-warning-bg);
+}
+
+.mm-sy-log--error {
+  border-left-color: var(--mm-destructive);
+  background: var(--mm-status-failed-bg);
+}
+
+.mm-sy-log--warning .mm-sy-log__level {
+  color: var(--mm-status-warning-text);
+}
+
+.mm-sy-log--error .mm-sy-log__level {
+  color: var(--mm-status-failed-text);
+}
+
+.mm-sy-log--warning .mm-sy-log__message,
+.mm-sy-log--error .mm-sy-log__message {
+  font-weight: 500;
+  color: var(--mm-text1);
 }

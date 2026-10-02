@@ -22,6 +22,7 @@ function check(
     tone,
     title: id,
     why: "",
+    words: "",
     checkedAt,
     fix: null,
     again: { area, key: null },

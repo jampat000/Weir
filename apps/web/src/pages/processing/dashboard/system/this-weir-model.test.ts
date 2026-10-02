@@ -110,10 +110,11 @@ describe("the fact tiles", () => {
     ).toMatchObject({ sub: "none failed", tone: "good" });
   });
 
-  it("shows the median answer and what 95% of answers beat", () => {
-    expect(facts().answers).toMatchObject({
+  it("shows the median response and what 95% of responses beat", () => {
+    expect(facts().response).toMatchObject({
+      label: "Response",
       value: "6 ms",
-      sub: "95% under 20 ms",
+      sub: "p95 20 ms",
     });
   });
 
@@ -123,7 +124,7 @@ describe("the fact tiles", () => {
       facts({ lastBackupAt: null, lastBackupBytes: null }).backup,
     ).toMatchObject({
       value: "None yet",
-      sub: "back up in Backups",
+      sub: "none made",
     });
   });
 
@@ -144,6 +145,51 @@ describe("the fact tiles", () => {
   it("shows the size of Weir's data and how many browsers are open", () => {
     expect(facts().data.value).toBe("5.0 MB");
     expect(facts().browsers.value).toBe("2");
+  });
+});
+
+describe("the order of the tiles", () => {
+  it("puts what matters most first, so a short card shows the version, uptime, files at once and jobs", () => {
+    const keys = weirFacts({
+      overview,
+      work: null,
+      lastBackupAt: null,
+      lastBackupBytes: null,
+      now: NOW,
+    }).map((fact) => fact.key);
+
+    expect(keys).toEqual([
+      "version",
+      "uptime",
+      "files-at-once",
+      "jobs",
+      "backup",
+      "response",
+      "address",
+      "runs-as",
+      "data",
+      "browsers",
+    ]);
+  });
+
+  it("gives each tile a short name for a card whose tiles are one line", () => {
+    const all = Object.values(facts());
+
+    expect(all.every((fact) => fact.short.length <= 9)).toBe(true);
+    expect(facts()["files-at-once"]).toMatchObject({
+      label: "Files at once",
+      short: "Files",
+    });
+    expect(facts().jobs).toMatchObject({ label: "Jobs today", short: "Jobs" });
+  });
+
+  it("offers a computer's first name where its whole name may not fit, but never for an address of numbers", () => {
+    expect(
+      facts({
+        overview: { ...overview, address: "http://media-pc.home.lan:9347/" },
+      }).address,
+    ).toMatchObject({ value: "media-pc.home.lan", valueShort: "media-pc" });
+    expect(facts().address.valueShort).toBeUndefined();
   });
 });
 

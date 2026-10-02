@@ -2,12 +2,14 @@ import { describe, expect, it } from "vitest";
 
 import {
   PULSE_MS,
+  defaultFilter,
   emptyLogWords,
   isFresh,
   levelOf,
   lineFromEntry,
   lineFromFrame,
   logSummary,
+  logSummaryWords,
   mergeLines,
   shownLines,
   todayCounts,
@@ -118,6 +120,12 @@ describe("shownLines", () => {
     expect(shownLines(lines, "all")).toHaveLength(3);
   });
 
+  it("shows the errors and warnings together for Problems, leaving the information out", () => {
+    expect(shownLines(lines, "problems").map((entry) => entry.message)).toEqual(
+      ["e", "w"],
+    );
+  });
+
   it("shows only errors, or only warnings", () => {
     expect(shownLines(lines, "error").map((entry) => entry.message)).toEqual([
       "e",
@@ -125,6 +133,17 @@ describe("shownLines", () => {
     expect(shownLines(lines, "warning").map((entry) => entry.message)).toEqual([
       "w",
     ]);
+  });
+});
+
+describe("defaultFilter", () => {
+  it("is the problems when there have been errors or warnings today", () => {
+    expect(defaultFilter({ errors: 2, warnings: 0 })).toBe("problems");
+    expect(defaultFilter({ errors: 0, warnings: 1 })).toBe("problems");
+  });
+
+  it("is everything when today has had none", () => {
+    expect(defaultFilter({ errors: 0, warnings: 0 })).toBe("all");
   });
 });
 
@@ -181,7 +200,16 @@ describe("the card's words", () => {
     );
   });
 
+  it("narrows the summary by the day, then the warnings, and never leaves out the errors", () => {
+    expect(logSummaryWords({ errors: 2, warnings: 0 })).toEqual([
+      "2 errors · 0 warnings today",
+      "2 errors · 0 warnings",
+      "2 errors",
+    ]);
+  });
+
   it("says what an empty list means for each switch", () => {
+    expect(emptyLogWords("problems")).toBe("No errors or warnings in the log.");
     expect(emptyLogWords("all")).toBe("Nothing has been logged yet.");
     expect(emptyLogWords("error")).toBe("No errors in the log.");
     expect(emptyLogWords("warning")).toBe("No warnings in the log.");

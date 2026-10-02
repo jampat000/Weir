@@ -13,7 +13,7 @@ function column(value: number | null) {
       value={value}
       figure={whole}
       unit="%"
-      sub="16 cores · Weir 3%"
+      sub={["16 cores · Weir 3%", "Weir 3%"]}
     >
       <i data-testid="trace" />
     </TraceColumn>

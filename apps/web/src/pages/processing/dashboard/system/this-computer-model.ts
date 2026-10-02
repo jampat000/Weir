@@ -6,6 +6,7 @@ import type {
   SystemNow,
   SystemStats,
 } from "../../../../lib/system/system-stats-types";
+import { narrowing, type Words } from "./fit-words";
 import {
   gigabytes,
   machineUpWords,
@@ -29,7 +30,8 @@ export type ComputerColumn = {
   /** Writes the figure as it counts. */
   figure: (value: number) => string;
   unit: string;
-  sub: string;
+  /** The line of detail, in words that narrow with the room (the fullest first), the least important part dropped first. */
+  sub: Words;
   samples: TraceSample[];
   scale: ComputerScale;
   /** Writes a value of the trace for its readout. */
@@ -53,41 +55,61 @@ export function diskMegabytes(
   return megabytes(read + write);
 }
 
-const joined = (parts: readonly (string | null)[]) =>
-  parts.filter(Boolean).join(" · ");
+/** The parts that have a reading, as the words of a line that narrows as the least important is dropped. */
+function detail(
+  parts: readonly { text: string | null; matters: number }[],
+): Words {
+  return narrowing(
+    parts.flatMap((part) =>
+      part.text === null ? [] : [{ text: part.text, matters: part.matters }],
+    ),
+  );
+}
 
-function cpuSub(now: SystemNow): string {
-  return joined([
-    `${now.cores} cores`,
-    now.weir_cpu_percent === null
-      ? null
-      : `Weir ${Math.round(now.weir_cpu_percent)}%`,
-    now.tools_cpu_percent === null
-      ? null
-      : `ffmpeg ${Math.round(now.tools_cpu_percent)}%`,
+/** Weir's own share and the tools' matter most (what is using the machine); how many cores it has matters least. */
+function cpuSub(now: SystemNow): Words {
+  return detail([
+    { text: `${now.cores} cores`, matters: 1 },
+    {
+      text:
+        now.weir_cpu_percent === null
+          ? null
+          : `Weir ${Math.round(now.weir_cpu_percent)}%`,
+      matters: 2,
+    },
+    {
+      text:
+        now.tools_cpu_percent === null
+          ? null
+          : `ffmpeg ${Math.round(now.tools_cpu_percent)}%`,
+      matters: 3,
+    },
   ]);
 }
 
-function memorySub(now: SystemNow): string {
-  return joined([
-    now.memory_total_bytes === null
-      ? null
-      : `of ${gigabytes(now.memory_total_bytes).toFixed(1)} GB`,
-    `Weir ${formatBytes(now.weir_memory_bytes)}`,
+function memorySub(now: SystemNow): Words {
+  return detail([
+    {
+      text:
+        now.memory_total_bytes === null
+          ? null
+          : `of ${gigabytes(now.memory_total_bytes).toFixed(1)} GB`,
+      matters: 1,
+    },
+    { text: `Weir ${formatBytes(now.weir_memory_bytes)}`, matters: 2 },
   ]);
 }
 
-function diskSub(now: SystemNow): string {
+function diskSub(now: SystemNow): Words {
   const { disk_read_bytes_per_sec: read, disk_write_bytes_per_sec: write } =
     now;
-  if (read === null || write === null) return "not available";
-  return joined([
-    `read ${rateFigure(megabytes(read))}`,
-    `write ${rateFigure(megabytes(write))}`,
-    now.disk_busy_percent === null
-      ? null
-      : `${Math.round(now.disk_busy_percent)}% busy`,
-  ]);
+  if (read === null || write === null) return ["not available"];
+  const reads = rateFigure(megabytes(read));
+  const writes = rateFigure(megabytes(write));
+  const split = [`read ${reads} · write ${writes}`, `R ${reads} · W ${writes}`];
+  if (now.disk_busy_percent === null) return split;
+  const busy = `${Math.round(now.disk_busy_percent)}% busy`;
+  return [`${split[0]} · ${busy}`, ...split, busy];
 }
 
 /** The three columns, CPU, memory and disk, each with its reading now and its last ten minutes. */

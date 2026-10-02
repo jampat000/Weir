@@ -32,12 +32,23 @@ import { useBackUpNow } from "./use-back-up-now";
 
 /** The next-backup countdown moves by minutes, so a minute is as often as it is worked out again. */
 const TICK_MS = 60_000;
-/** The parts of the card that are measured whole: the backups heading, the tools and the updates. */
-const WHOLE_PARTS = 3;
 
-function BackupLine({ row, when }: { row: BackupRow; when: string }) {
+function BackupLine({
+  row,
+  when,
+  fit = false,
+}: {
+  row: BackupRow;
+  when: string;
+  /** The row is a part of its own that the card's height may leave out. */
+  fit?: boolean;
+}) {
   return (
-    <li className="mm-sy-backup" data-fit="" data-testid="system-backup">
+    <li
+      className="mm-sy-backup"
+      data-fit={fit ? "" : undefined}
+      data-testid="system-backup"
+    >
       <span className="mm-sy-backup__dot" aria-hidden="true" />
       <span>{when}</span>
       <span className="mm-sy-backup__size">{row.size}</span>
@@ -106,9 +117,11 @@ function UpdateLines() {
           <span>
             Running <b>{facts.current}</b>
           </span>
-          <span>
-            Latest <b>{facts.latest}</b>
-          </span>
+          {facts.upToDate ? null : (
+            <span>
+              Latest <b>{facts.latest}</b>
+            </span>
+          )}
           <Link to={ABOUT_PATH} className="mm-sy-update__state">
             <Chip tone={facts.tone}>{facts.state}</Chip>
           </Link>
@@ -119,8 +132,9 @@ function UpdateLines() {
 }
 
 /**
- * Dashboard › System: the backup schedule, the newest backups with "Back up now" and when the next one runs, the
- * tools Weir writes with and where updating stands. The card's height decides how many whole parts show.
+ * Dashboard › System: the backup schedule with "Back up now" and when the next one runs, the newest backup, where
+ * updating stands and the tools Weir writes with, one line each, then the older backups. The card's height decides
+ * how many whole parts show, and the header says how many rows the rest come to.
  */
 export function BackupsCard() {
   const settings = useAppSettingsQuery();
@@ -158,8 +172,13 @@ export function BackupsCard() {
         now,
       )
     : "";
-  const units = rows.length + WHOLE_PARTS;
-  const more = units - Math.min(fits, units);
+  const [latest, ...earlier] = rows;
+  // The parts in the order they are measured, each worth the rows it holds: the heading, the newest backup, the
+  // updates, the tools, and the older backups, which come last so they are what a short card leaves out.
+  const parts = [1, latest ? 1 : 0, 1, 1, earlier.length].filter(
+    (rowCount) => rowCount > 0,
+  );
+  const more = parts.slice(fits).reduce((sum, rowCount) => sum + rowCount, 0);
   return (
     <Panel
       title="Backups and tools"
@@ -201,17 +220,35 @@ export function BackupsCard() {
         {rows.length === 0 && backups.isSuccess ? (
           <p className="mm-sy-note">No backup has been made yet.</p>
         ) : null}
-        <ul className="mm-sy-list">
-          {rows.map((row) => (
+        {latest ? (
+          <ul className="mm-sy-list">
             <BackupLine
-              key={row.id}
-              row={row}
-              when={whenWords(row.at, now, format)}
+              row={latest}
+              when={whenWords(latest.at, now, format)}
+              fit
             />
-          ))}
-        </ul>
+          </ul>
+        ) : null}
         <UpdateLines />
         <ToolLines />
+        {earlier.length > 0 ? (
+          <section
+            className="mm-sy-part mm-sy-part--earlier"
+            aria-label="Earlier backups"
+            data-fit=""
+          >
+            <h3 className="mm-sy-part__title">Earlier backups</h3>
+            <ul className="mm-sy-list">
+              {earlier.map((row) => (
+                <BackupLine
+                  key={row.id}
+                  row={row}
+                  when={whenWords(row.at, now, format)}
+                />
+              ))}
+            </ul>
+          </section>
+        ) : null}
       </div>
     </Panel>
   );

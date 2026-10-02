@@ -12,6 +12,8 @@ import type { SystemDrive } from "../../../../lib/system/system-stats-types";
 import { plural } from "../../../../lib/ui/mm-plural";
 import type { ToolRow } from "../health-model";
 import type { WorkflowHealth } from "../use-health";
+import { problemWords } from "./health-words";
+import { fullInWords } from "./system-words";
 import {
   ABOUT_PATH,
   BACKUPS_PATH,
@@ -49,7 +51,10 @@ export type HealthCheck = {
   area: HealthArea;
   tone: CheckTone;
   title: string;
+  /** Why, in a sentence or two: the row's tooltip, and for a workflow what its Details say too. */
   why: string;
+  /** Why, in a few words, as the row says it on one line. */
+  words: string;
   /** When it was last looked at, in ms since the epoch. */
   checkedAt: number | null;
   fix: CheckFix | null;
@@ -92,6 +97,10 @@ export function workflowChecks(
         tone === "ok"
           ? "Its folders and connections are in sync."
           : (why ?? verdict.words),
+      words:
+        tone === "ok"
+          ? "Folders and connections in sync"
+          : problemWords(why ?? verdict.words),
       checkedAt: item.checkedAt,
       fix:
         tone === "warn" || tone === "idle"
@@ -117,15 +126,17 @@ function connectionCheck(entry: ConnectionEntry): HealthCheck {
   );
   const took =
     entry.answerMs === null ? "" : ` in ${answerWords(entry.answerMs)}`;
+  const down =
+    entry.detail ||
+    "Weir could not reach it. Check its address and that it is running.";
   switch (entry.state) {
     case "down":
       return {
         ...base,
         tone: "bad",
         title: `${entry.name} isn't answering`,
-        why:
-          entry.detail ||
-          "Weir could not reach it. Check its address and that it is running.",
+        why: down,
+        words: problemWords(down),
         fix,
       };
     case "slow":
@@ -134,6 +145,7 @@ function connectionCheck(entry: ConnectionEntry): HealthCheck {
         tone: "warn",
         title: `${entry.name} is slow to answer`,
         why: `Its last answer came${took}.`,
+        words: `Slow to answer${took}`,
         fix,
       };
     case "untested":
@@ -142,6 +154,7 @@ function connectionCheck(entry: ConnectionEntry): HealthCheck {
         tone: "idle",
         title: entry.name,
         why: "Weir has not tested it yet.",
+        words: "Not tested yet",
         fix: null,
       };
     default:
@@ -150,6 +163,7 @@ function connectionCheck(entry: ConnectionEntry): HealthCheck {
         tone: "ok",
         title: entry.name,
         why: `Answering${took}.`,
+        words: `Answering${took}`,
         fix: null,
       };
   }
@@ -180,6 +194,7 @@ export function toolChecks(
         tone: "bad",
         title: `${tool.name} is missing`,
         why: "Weir cannot process files without it.",
+        words: "Needed to process files",
         fix: link(ABOUT_PATH, "Opens System, where the tools are listed."),
       };
     }
@@ -189,6 +204,7 @@ export function toolChecks(
         tone: "note",
         title: `${tool.name} is not installed`,
         why: "It is optional: Weir writes with FFmpeg where it is missing.",
+        words: "Optional · FFmpeg writes instead",
         fix: null,
       };
     }
@@ -197,6 +213,7 @@ export function toolChecks(
       tone: "ok",
       title: tool.name,
       why: tool.banner,
+      words: `Version ${tool.version}`,
       fix: null,
     };
   });
@@ -224,6 +241,7 @@ function driveCheck(drive: SystemDrive, checkedAt: number | null): HealthCheck {
       tone: "bad",
       title: `${drive.name} is low on space`,
       why: `${free} free. Weir keeps ${formatBytes(drive.keep_free_bytes)} free here, so it holds new files until there is room.`,
+      words: `${free} free · keeps ${formatBytes(drive.keep_free_bytes)}`,
       fix,
     };
   }
@@ -233,6 +251,7 @@ function driveCheck(drive: SystemDrive, checkedAt: number | null): HealthCheck {
       tone: "warn",
       title: `${drive.name} fills up soon`,
       why: `${free} free. At this pace it is full in about ${plural(Math.max(1, Math.round(drive.full_in_days)), "day", "days")}.`,
+      words: `${free} free · full in ${fullInWords(drive.full_in_days)}`,
       fix,
     };
   }
@@ -241,6 +260,7 @@ function driveCheck(drive: SystemDrive, checkedAt: number | null): HealthCheck {
     tone: "ok",
     title: drive.name,
     why: `${free} free.`,
+    words: `${free} free`,
     fix: null,
   };
 }
@@ -282,6 +302,7 @@ export function backupChecks(
         ...base,
         tone: "warn",
         why: "Automatic backups are off, so your settings are saved only when you back up by hand.",
+        words: "Automatic backups off",
         fix,
       },
     ];
@@ -296,11 +317,23 @@ export function backupChecks(
           backups.lastBackupAt === null
             ? "No backup has been made yet."
             : "The last backup is older than the schedule allows.",
+        words:
+          backups.lastBackupAt === null
+            ? "No backup yet"
+            : "Last backup is overdue",
         fix,
       },
     ];
   }
-  return [{ ...base, tone: "ok", why: "Backing up on schedule.", fix: null }];
+  return [
+    {
+      ...base,
+      tone: "ok",
+      why: "Backing up on schedule.",
+      words: "On schedule",
+      fix: null,
+    },
+  ];
 }
 
 export type WeirFacts = {
@@ -328,6 +361,7 @@ export function weirChecks(weir: WeirFacts | null): HealthCheck[] {
           tone: "bad",
           title: "A background worker has stopped",
           why: weir.stoppedWorkers[0],
+          words: problemWords(weir.stoppedWorkers[0]),
           fix: link(ABOUT_PATH, "Opens System."),
         }
       : {
@@ -336,6 +370,7 @@ export function weirChecks(weir: WeirFacts | null): HealthCheck[] {
           tone: "ok",
           title: "Background workers",
           why: "Every worker is running.",
+          words: "All running",
           fix: null,
         };
   if (weir.updateVersion === null) return [workers];
@@ -347,6 +382,7 @@ export function weirChecks(weir: WeirFacts | null): HealthCheck[] {
       tone: "note",
       title: `Weir ${weir.updateVersion} is out`,
       why: "A newer version is ready to install.",
+      words: "Ready to install",
       fix: link(ABOUT_PATH, "Opens System, where updates are installed."),
     },
   ];

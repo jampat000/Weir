@@ -17,10 +17,10 @@ type HealthCheckRowProps = {
 };
 
 /**
- * One check: a dot, what it is and why in a sentence or two, and what can be done about it: "Fix it →" to the screen
- * that sets it, "Check again", and for a workflow "Details". A problem says why in two lines and which area it is
- * in and when it was last looked at beneath; a check that is fine is one tight row with that on its right, and its
- * "Check again" shows when the row is pointed at.
+ * One check: a dot, what it is and why in a few words, and what can be done about it: "Fix it →" to the screen that
+ * sets it, "Check again", and for a workflow "Details". Why is one line, the whole sentence being its tooltip (and, for
+ * a workflow, what Details say). A problem has the area it is in and when it was last looked at beneath; a check
+ * that is fine is one tight row with that on its right, and its "Check again" shows when the row is pointed at.
  */
 export function HealthCheckRow({
   check,
@@ -46,7 +46,7 @@ export function HealthCheckRow({
       <span className="mm-sy-check__text">
         <b title={check.title}>{check.title}</b>
         <span className="mm-sy-check__why" title={check.why}>
-          {check.why}
+          {check.words}
         </span>
         {problem ? (
           <em className="mm-sy-check__meta">

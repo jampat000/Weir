@@ -1,6 +1,7 @@
 import type { CSSProperties, ReactNode } from "react";
 
 import { CountUp } from "../../../../components/charts/count-up";
+import { FitText, type Words } from "./fit-words";
 
 type TraceColumnProps = {
   /** The column's colour, a design token: the swatch glows in it and its trace is drawn in it. */
@@ -10,7 +11,8 @@ type TraceColumnProps = {
   value: number | null;
   figure: (value: number) => string;
   unit: string;
-  sub: string;
+  /** A line of detail, the fullest words first: the one that fits the column's width is shown, the first as its tooltip. */
+  sub: Words;
   /** The trace that fills the rest of the column. */
   children: ReactNode;
 };
@@ -49,9 +51,7 @@ export function TraceColumn({
           </>
         )}
       </span>
-      <span className="mm-sy-col__sub" title={sub}>
-        {sub}
-      </span>
+      <FitText words={sub} className="mm-sy-col__sub" />
       {children}
     </div>
   );

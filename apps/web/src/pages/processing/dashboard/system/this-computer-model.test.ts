@@ -72,15 +72,25 @@ describe("the CPU column", () => {
     expect(column("cpu")).toMatchObject({
       value: 37.4,
       unit: "%",
-      sub: "16 cores · Weir 3% · ffmpeg 41%",
       scale: { kind: "percent" },
     });
+    expect(column("cpu").sub[0]).toBe("16 cores · Weir 3% · ffmpeg 41%");
+  });
+
+  it("drops the cores first for a narrower column, then Weir's share, and last of all says one share alone", () => {
+    expect(column("cpu").sub).toEqual([
+      "16 cores · Weir 3% · ffmpeg 41%",
+      "Weir 3% · ffmpeg 41%",
+      "ffmpeg 41%",
+      "Weir 3%",
+      "16 cores",
+    ]);
   });
 
   it("leaves out a share the machine cannot read", () => {
     expect(
       column("cpu", { weir_cpu_percent: null, tools_cpu_percent: null }).sub,
-    ).toBe("16 cores");
+    ).toEqual(["16 cores"]);
   });
 
   it("traces the history at each point's own time", () => {
@@ -95,8 +105,15 @@ describe("the memory column", () => {
     expect(column("memory")).toMatchObject({
       value: 11,
       unit: " GB",
-      sub: "of 32.0 GB · Weir 255 MB",
     });
+  });
+
+  it("drops the total first for a narrower column, keeping Weir's own share", () => {
+    expect(column("memory").sub).toEqual([
+      "of 32.0 GB · Weir 255 MB",
+      "Weir 255 MB",
+      "of 32.0 GB",
+    ]);
   });
 });
 
@@ -105,9 +122,17 @@ describe("the disk column", () => {
     expect(column("disk")).toMatchObject({
       value: 16,
       unit: " MB/s",
-      sub: "read 4.0 · write 12 · 18% busy",
       scale: { kind: "rate" },
     });
+  });
+
+  it("drops the busy time, then the words, for a narrower column, and lastly says only how busy", () => {
+    expect(column("disk").sub).toEqual([
+      "read 4.0 · write 12 · 18% busy",
+      "read 4.0 · write 12",
+      "R 4.0 · W 12",
+      "18% busy",
+    ]);
   });
 
   it("says it is not available where the machine gives no disk figures", () => {
@@ -117,7 +142,7 @@ describe("the disk column", () => {
       disk_busy_percent: null,
     });
     expect(unreadable.value).toBeNull();
-    expect(unreadable.sub).toBe("not available");
+    expect(unreadable.sub).toEqual(["not available"]);
   });
 
   it("is a gap, not a made-up zero, when either of the two cannot be read", () => {

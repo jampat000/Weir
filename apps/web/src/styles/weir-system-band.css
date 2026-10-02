@@ -137,7 +137,7 @@
 
 .mm-sy-weir {
   display: grid;
-  grid-template-columns: 4.6rem minmax(0, 1fr);
+  grid-template-columns: fit-content(5.8rem) minmax(0, 1fr);
   gap: 10px;
   align-items: center;
   min-height: 0;
@@ -145,7 +145,7 @@
 
 .mm-sy-ringbox {
   display: grid;
-  min-width: 0;
+  min-width: 4.6rem;
   justify-items: center;
   align-content: center;
   gap: 4px;
@@ -225,6 +225,17 @@
   filter: brightness(1.15);
 }
 
+/* The arrow goes where the pill has no room for it; "N need you" is still the whole of what it says. */
+@container mm-sy-band (max-width: 300px) {
+  .mm-sy-needs {
+    padding-inline: 5px;
+  }
+
+  .mm-sy-needs__arrow {
+    display: none;
+  }
+}
+
 .mm-sy-needs--good {
   border-color: color-mix(in srgb, var(--mm-success) 45%, transparent);
   background: var(--mm-status-healthy-bg);
@@ -241,10 +252,14 @@
   overflow: hidden;
 }
 
-/* The tiles scroll a whole row at a time; the height the component sets is whole rows, so no row is cut through. */
+/*
+ * The tiles are few and wide: 6.6rem is the room the longest name ("Files at once") needs with its padding, so a card
+ * has two columns where it is wide enough for two and three where it is wide enough for three, and no word in a tile
+ * is ever cut. They scroll a whole row at a time; the height the component sets is whole rows, so no row is cut through.
+ */
 .mm-sy-facts {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(4.9rem, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(6.6rem, 1fr));
   grid-auto-rows: 42px;
   gap: 5px;
   align-content: start;
@@ -267,6 +282,7 @@
 
 .mm-sy-fact {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto auto auto;
   align-content: center;
   min-width: 0;
@@ -277,16 +293,17 @@
   scroll-snap-align: start;
 }
 
-.mm-sy-fact span,
-.mm-sy-fact b,
-.mm-sy-fact em {
+.mm-sy-fact__label,
+.mm-sy-fact__value,
+.mm-sy-fact__sub {
+  display: block;
+  min-width: 0;
   overflow: hidden;
   line-height: 1.2;
-  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.mm-sy-fact span {
+.mm-sy-fact__label {
   font-size: 9px;
   font-weight: 600;
   letter-spacing: 0.08em;
@@ -294,25 +311,75 @@
   color: var(--mm-text3);
 }
 
-.mm-sy-fact b {
+.mm-sy-fact__short {
+  display: none;
+}
+
+.mm-sy-fact__value {
   font-size: 13px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   color: var(--mm-text1);
 }
 
-.mm-sy-fact em {
+.mm-sy-fact__sub {
   font-size: 10.5px;
-  font-style: normal;
   color: var(--mm-text2);
 }
 
-.mm-sy-fact em.mm-sy-fact--good {
+.mm-sy-fact[data-tone="good"] .mm-sy-fact__sub {
   color: var(--mm-status-healthy-text);
 }
 
-.mm-sy-fact em.mm-sy-fact--bad {
+.mm-sy-fact[data-tone="bad"] .mm-sy-fact__sub {
   color: var(--mm-status-failed-text);
+}
+
+/*
+ * A band too short for three lines of tile (two rows would be all it held) makes each tile one line: its short name
+ * at the left and the reading at the right, with the line under it left to the tooltip. Four of these fit where two
+ * of the tall ones did, so the four most useful facts all show. A reading that is not good says so in its colour.
+ */
+@container mm-sy-band (max-height: 188px) {
+  .mm-sy-facts {
+    grid-template-columns: minmax(0, 1fr);
+    grid-auto-rows: 20px;
+    gap: 4px;
+  }
+
+  .mm-sy-fact {
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-rows: auto;
+    align-items: center;
+    column-gap: 6px;
+    padding: 0 6px;
+  }
+
+  .mm-sy-fact__label {
+    font-size: 8.5px;
+    letter-spacing: 0.05em;
+  }
+
+  .mm-sy-fact__label > .mm-sy-fact__long:not(:last-child) {
+    display: none;
+  }
+
+  .mm-sy-fact__short {
+    display: block;
+  }
+
+  .mm-sy-fact__value {
+    font-size: 12px;
+    text-align: right;
+  }
+
+  .mm-sy-fact__sub {
+    display: none;
+  }
+
+  .mm-sy-fact[data-tone="bad"] .mm-sy-fact__value {
+    color: var(--mm-status-failed-text);
+  }
 }
 
 /* ---- This computer and Processing: traces side by side -------------------- */
@@ -391,10 +458,11 @@
 }
 
 .mm-sy-col__sub {
+  display: block;
+  min-width: 0;
   overflow: hidden;
   font-size: 11px;
   line-height: 14px;
-  text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--mm-text2);
 }
@@ -412,6 +480,10 @@
 
   .mm-sy-col__figure small {
     font-size: 9.5px;
+  }
+
+  .mm-sy-col__sub {
+    font-size: 10px;
   }
 }
 
@@ -433,7 +505,7 @@
   display: none;
   flex-wrap: wrap;
   gap: 5px;
-  height: 24px;
+  height: 27px;
   padding-top: 6px;
   overflow: hidden;
 }

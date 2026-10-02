@@ -10,6 +10,11 @@ import type { ConnectionTesting } from "./use-connection-testing";
 
 const NOW = Date.parse("2026-10-02T12:00:00Z");
 
+let fits = Number.MAX_SAFE_INTEGER;
+vi.mock("./fit-rows", () => ({
+  useFittingRows: () => [{ current: null }, fits],
+}));
+
 const radarr = connectionEntry({
   name: "Radarr on MEDIA-PC",
   checkedAt: NOW - 12_000,
@@ -201,6 +206,21 @@ describe("the Connections card", () => {
       );
     },
   );
+
+  it("says how many connections the card's height left out, not counting the group bars", () => {
+    fits = 2;
+    const card = renderCard([radarr, flaky, qbittorrent, sabnzbd]);
+
+    // The units are a bar, two rows, a bar and two rows; the first bar and one row fit.
+    expect(within(card).getByTestId("system-more")).toHaveTextContent("3 more");
+  });
+
+  it("says nothing is left out when every row fits", () => {
+    fits = Number.MAX_SAFE_INTEGER;
+    const card = renderCard([radarr, flaky, qbittorrent, sabnzbd]);
+
+    expect(within(card).queryByTestId("system-more")).toBeNull();
+  });
 
   it("says nothing is connected when there is nothing to list", () => {
     const card = renderCard([]);

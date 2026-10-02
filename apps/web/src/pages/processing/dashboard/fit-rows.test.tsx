@@ -52,6 +52,25 @@ describe("fitting a tile's rows to its height", () => {
     expect(rows.map((row) => row.style.visibility)).toEqual(["", ""]);
   });
 
+  it("leaves out a heading whose first row does not fit, so a heading is never the last thing shown", () => {
+    const { host, rows } = hostWithRows(100, [40, 80, 120]);
+    rows[1].setAttribute("data-fit", "with-next");
+
+    expect(fitRows(host)).toBe(1);
+    expect(rows.map((row) => row.style.visibility)).toEqual([
+      "",
+      "hidden",
+      "hidden",
+    ]);
+  });
+
+  it("shows a heading with the row after it when that fits", () => {
+    const { host, rows } = hostWithRows(100, [40, 80, 90]);
+    rows[1].setAttribute("data-fit", "with-next");
+
+    expect(fitRows(host)).toBe(3);
+  });
+
   it("shows a hidden row again when the tile has grown", () => {
     const { host, rows } = hostWithRows(100, [40, 160]);
     fitRows(host);

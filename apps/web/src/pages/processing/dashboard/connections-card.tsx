@@ -2,6 +2,8 @@ import { Panel } from "../../../components/panels/panel";
 import type { ConnectionLight } from "../../../lib/connections/connection-lights";
 import type { ConnectionEntry } from "../../../lib/connections/connection-model";
 import { classNames } from "../../../lib/ui/class-names";
+import { useFittingRows } from "./fit-rows";
+import { MoreCount } from "./system/more-count";
 import {
   checkedWords,
   connectionSub,
@@ -34,6 +36,7 @@ function ConnectionRow({ entry, light, testing, now }: ConnectionRowProps) {
         shown && `mm-conn--${shown}`,
       )}
       title={connectionTooltip(entry)}
+      data-fit=""
       data-testid="system-connection"
     >
       <span className="mm-conn__dot" aria-hidden="true" />
@@ -78,27 +81,37 @@ export function ConnectionsCard({
   now,
 }: ConnectionsCardProps) {
   const groups = groupConnections(entries);
+  const [listRef, fits] = useFittingRows();
+  // The bars and rows in the order they are measured: each group's bar, then its rows. Only a row counts as left out.
+  const units = groups.flatMap((group) => [
+    false,
+    ...group.rows.map(() => true),
+  ]);
+  const more = units.slice(fits).filter(Boolean).length;
   const testable = entries.filter((entry) => entry.testable);
   return (
     <Panel
       title="Connections"
       aside={
-        <button
-          type="button"
-          className="mm-health__action"
-          title={TEST_ALL_HINT}
-          aria-label="Test all connections"
-          disabled={testing.allBusy || testable.length === 0}
-          onClick={() => void testing.testAll(entries)}
-        >
-          {testing.allBusy ? "Testing…" : "Test all"}
-        </button>
+        <>
+          <MoreCount count={more} />
+          <button
+            type="button"
+            className="mm-health__action"
+            title={TEST_ALL_HINT}
+            aria-label="Test all connections"
+            disabled={testing.allBusy || testable.length === 0}
+            onClick={() => void testing.testAll(entries)}
+          >
+            {testing.allBusy ? "Testing…" : "Test all"}
+          </button>
+        </>
       }
       to={MANAGERS_PATH}
       toLabel="Manage"
     >
       <p className="mm-ctable__line">{connectionsLine(entries)}</p>
-      <div className="mm-ctable">
+      <div ref={listRef} className="mm-ctable">
         <div className="mm-ctable__head" aria-hidden="true">
           <span />
           <span>Connection</span>
@@ -116,7 +129,10 @@ export function ConnectionsCard({
             aria-label={group.title}
             className="mm-ctable__group"
           >
-            <h3 className={`mm-ctable__bar mm-ctable__bar--${group.tone}`}>
+            <h3
+              className={`mm-ctable__bar mm-ctable__bar--${group.tone}`}
+              data-fit="with-next"
+            >
               <span>{group.title}</span>
               <span className="mm-ctable__badge">{group.badge}</span>
             </h3>

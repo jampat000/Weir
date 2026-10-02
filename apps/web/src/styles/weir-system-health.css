@@ -158,14 +158,15 @@
   color: var(--mm-text2);
 }
 
+/* Why is a few words on one line; the sentence it was made from is the tooltip. */
 .mm-sy-check__why {
-  display: -webkit-box;
+  display: block;
   overflow: hidden;
   font-size: 12px;
   line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: var(--mm-text2);
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
 }
 
 .mm-sy-check__meta {
@@ -199,12 +200,6 @@
 .mm-sy-check--idle,
 .mm-sy-check--note {
   padding-block: 6px;
-}
-
-.mm-sy-check--ok .mm-sy-check__why,
-.mm-sy-check--idle .mm-sy-check__why,
-.mm-sy-check--note .mm-sy-check__why {
-  -webkit-line-clamp: 1;
 }
 
 .mm-sy-check__when {

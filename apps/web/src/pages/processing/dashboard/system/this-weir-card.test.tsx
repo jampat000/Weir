@@ -98,7 +98,7 @@ describe("the This Weir card", () => {
       "Uptime",
       "Files at once",
       "Jobs today",
-      "Answers in",
+      "Response",
       "Last backup",
       "Runs as",
       "Address",

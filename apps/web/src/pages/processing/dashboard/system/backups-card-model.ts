@@ -80,6 +80,8 @@ export type UpdateFacts = {
   latest: string;
   state: string;
   tone: MmStatusTone;
+  /** What is running is the newest, so there is no newer version to name. */
+  upToDate: boolean;
 };
 
 const NO_VERSION = "—";
@@ -95,11 +97,26 @@ export function updateFacts(
   };
   if (status.status === "update_available") {
     return state?.downloaded
-      ? { ...base, state: "Downloaded and ready", tone: "info" }
-      : { ...base, state: "Update available", tone: "warning" };
+      ? {
+          ...base,
+          state: "Downloaded and ready",
+          tone: "info",
+          upToDate: false,
+        }
+      : {
+          ...base,
+          state: "Update available",
+          tone: "warning",
+          upToDate: false,
+        };
   }
   if (status.status === "up_to_date") {
-    return { ...base, state: "Up to date", tone: "healthy" };
+    return { ...base, state: "Up to date", tone: "healthy", upToDate: true };
   }
-  return { ...base, state: "Could not check", tone: "neutral" };
+  return {
+    ...base,
+    state: "Could not check",
+    tone: "neutral",
+    upToDate: false,
+  };
 }

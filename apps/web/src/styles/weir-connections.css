@@ -176,12 +176,13 @@
   color: var(--mm-text2);
 }
 
+/* The rows that fit the card's height show whole and the header says how many more there are (fit-rows.ts). */
 .mm-ctable {
-  max-height: 30rem;
-  padding: 0 10px 12px;
-  overflow-y: auto;
-  scrollbar-color: var(--mm-hairline) transparent;
-  scrollbar-width: thin;
+  min-height: 0;
+  flex: 1 1 0;
+  margin-bottom: 10px;
+  padding: 0 10px;
+  overflow: hidden;
 }
 
 .mm-ctable__head,

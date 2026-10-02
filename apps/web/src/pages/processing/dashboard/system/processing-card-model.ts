@@ -3,6 +3,7 @@ import type { TraceSample } from "../../../../components/charts/live-trace-math"
 import { seriesOf } from "../../../../lib/system/system-stats-model";
 import type { SystemStats } from "../../../../lib/system/system-stats-types";
 import { plural } from "../../../../lib/ui/mm-plural";
+import type { Words } from "./fit-words";
 import { megabytes, rateFigure, sizeWords } from "./system-words";
 
 /** The window the card's finished-work figures cover, in minutes: the same ten minutes the traces show. */
@@ -31,7 +32,8 @@ export type ProcessingColumn = {
   /** Writes the figure as it counts. */
   figure: (value: number) => string;
   unit: string;
-  sub: string;
+  /** The line of detail, in words that narrow with the room, the fullest first. */
+  sub: Words;
   lines: TraceLine[];
   floorTop: number;
   /** Writes a value of the trace for its readout. */
@@ -56,7 +58,10 @@ export function processingColumns(stats: SystemStats): ProcessingColumn[] {
       value: megabytes(now.processing_write_bytes_per_sec),
       figure: rateFigure,
       unit: " MB/s",
-      sub: `writing · reading ${rateFigure(megabytes(now.processing_read_bytes_per_sec))}`,
+      sub: (() => {
+        const read = rateFigure(megabytes(now.processing_read_bytes_per_sec));
+        return [`writing · reading ${read}`, `reading ${read}`, `read ${read}`];
+      })(),
       lines: [
         {
           key: "read",
@@ -87,8 +92,11 @@ export function processingColumns(stats: SystemStats): ProcessingColumn[] {
       unit: "×",
       sub:
         now.running === 0
-          ? "nothing running"
-          : `across ${plural(now.running, "file", "files")}`,
+          ? ["nothing running", "idle"]
+          : [
+              `across ${plural(now.running, "file", "files")}`,
+              plural(now.running, "file", "files"),
+            ],
       lines: [
         {
           key: "speed",

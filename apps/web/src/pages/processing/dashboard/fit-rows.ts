@@ -7,8 +7,12 @@
  */
 import { useLayoutEffect, useRef, useState, type RefObject } from "react";
 
-/** Rows mark themselves with this attribute: `data-fit=""`. */
+/**
+ * Rows mark themselves with this attribute: `data-fit=""`. A row that is a heading for the rows after it says
+ * `data-fit="with-next"`, and is left out when the row after it is, so a heading is never the last thing shown.
+ */
 const FIT_ATTRIBUTE = "data-fit";
+const WITH_NEXT = "with-next";
 
 /** How far a row may run past the tile before it no longer fits, in px: sub-pixel rounding, not a line. */
 const FIT_TOLERANCE_PX = 0.5;
@@ -31,6 +35,9 @@ export function fitRows(host: HTMLElement, enabled = true): number {
     if (row.getBoundingClientRect().bottom - padding > limit + FIT_TOLERANCE_PX)
       break;
     fits++;
+  }
+  while (fits > 0 && rows[fits - 1].getAttribute(FIT_ATTRIBUTE) === WITH_NEXT) {
+    fits--;
   }
   rows.forEach((row, index) => {
     row.style.visibility = index < fits ? "" : "hidden";

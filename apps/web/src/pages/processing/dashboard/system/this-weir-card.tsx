@@ -8,6 +8,7 @@ import {
 import { classNames } from "../../../../lib/ui/class-names";
 import { useNow } from "../../../../lib/ui/use-now";
 import { BandCard, BandNote } from "./band-card";
+import { FitText } from "./fit-words";
 import { MoreCount } from "./more-count";
 import {
   newestBackup,
@@ -20,7 +21,7 @@ import { useWholeRows } from "./use-whole-rows";
 
 /** Once a second, so the uptime ticks. */
 const TICK_MS = 1000;
-/** A fact tile's height, and the gap between tiles: whole rows of these fill the tiles' room. */
+/** A fact tile's height, and the gap between tiles, as the grid sets them (weir-system-band.css) in a card tall enough for three lines: whole rows of these fill the tiles' room. */
 const TILE_PX = 42;
 const TILE_GAP_PX = 5;
 /** The ring's circle: r 32 in a 76 viewBox, so its length is 2πr. */
@@ -59,17 +60,30 @@ function Ring({
   );
 }
 
+/**
+ * One fact: its name, the reading, and a short line under it. A card too short for three lines makes a tile one line,
+ * its short name and the reading, and keeps the line under it for the tooltip. Nothing in a tile is cut with an
+ * ellipsis: its words are short, and a reading that has a shorter form (a long computer name) says that where it
+ * would not fit.
+ */
 function FactTile({ fact }: { fact: Fact }) {
+  const reading = fact.valueShort
+    ? [fact.value, fact.valueShort]
+    : [fact.value];
   return (
     <div
       className="mm-sy-fact"
-      title={`${fact.label}: ${fact.value} ${fact.sub}`}
+      data-tone={fact.tone}
+      title={`${fact.label}: ${fact.value}${fact.sub ? ` · ${fact.sub}` : ""}`}
     >
-      <span>{fact.label}</span>
-      <b>{fact.value}</b>
-      <em className={fact.tone ? `mm-sy-fact--${fact.tone}` : undefined}>
-        {fact.sub}
-      </em>
+      <span className="mm-sy-fact__label">
+        <span className="mm-sy-fact__long">{fact.label}</span>
+        {fact.short === fact.label ? null : (
+          <span className="mm-sy-fact__short">{fact.short}</span>
+        )}
+      </span>
+      <FitText words={reading} className="mm-sy-fact__value" />
+      <span className="mm-sy-fact__sub">{fact.sub}</span>
     </div>
   );
 }
@@ -133,7 +147,8 @@ export function ThisWeirCard({ checks, onShowHealth }: ThisWeirCardProps) {
                 className="mm-sy-needs"
                 onClick={onShowHealth}
               >
-                {ring.needYou.toLocaleString()} need you →
+                {ring.needYou.toLocaleString()} need you{" "}
+                <span className="mm-sy-needs__arrow">→</span>
               </button>
             ) : (
               <span className="mm-sy-needs mm-sy-needs--good">All good</span>

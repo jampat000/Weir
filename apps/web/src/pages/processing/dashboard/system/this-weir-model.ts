@@ -13,7 +13,11 @@ export type FactTone = "good" | "bad";
 export type Fact = {
   key: string;
   label: string;
+  /** The label in a card too short for tiles of three lines, where a tile is one line: a word or two. */
+  short: string;
   value: string;
+  /** What the value says where it has to be shorter to fit, when it can be. */
+  valueShort?: string;
   sub: string;
   tone?: FactTone;
 };
@@ -43,9 +47,9 @@ export function ringFigures({ passing, total, need }: RingChecks): RingFigures {
 }
 
 const RUNS_AS_WORDS: Record<RunsAs, { value: string; sub: string }> = {
-  service: { value: "Service", sub: "in the background" },
-  app: { value: "App", sub: "while signed in" },
-  docker: { value: "Docker", sub: "in a container" },
+  service: { value: "Service", sub: "background" },
+  app: { value: "App", sub: "signed in" },
+  docker: { value: "Docker", sub: "container" },
 };
 
 const UPDATE_WORDS: Record<SystemOverview["update"]["status"], string> = {
@@ -54,7 +58,7 @@ const UPDATE_WORDS: Record<SystemOverview["update"]["status"], string> = {
   update_available: "update ready",
   downloaded: "update ready",
   not_published: "no release yet",
-  unavailable: "cannot check",
+  unavailable: "can't check",
 };
 
 function updateFact(
@@ -71,19 +75,26 @@ function updateFact(
   };
 }
 
-/** How the server's own answers read: the median to the millisecond, and what nearly all requests beat. */
-function answersFact(
+/** How quickly the server answers: the median to the millisecond, and what nearly all requests beat (p95). */
+function responseFact(
   requests: SystemOverview["requests"],
 ): Pick<Fact, "value" | "sub"> {
   return {
     value: `${Math.round(requests.median_ms)} ms`,
-    sub: `95% under ${Math.round(requests.p95_ms)} ms`,
+    sub: `p95 ${Math.round(requests.p95_ms)} ms`,
   };
 }
 
 function backupSub(at: string | null, bytes: number | null): string {
-  if (at === null) return "back up in Backups";
+  if (at === null) return "none made";
   return bytes === null ? "" : sizeWords(bytes);
+}
+
+/** The first part of a computer's name, before any dot: "media-pc" of "media-pc.home.lan"; an address of numbers stays whole. */
+function shortHost(host: string): string | undefined {
+  if (/^[\d.]+$/.test(host) || host.startsWith("[")) return undefined;
+  const first = host.split(".")[0];
+  return first && first !== host ? first : undefined;
 }
 
 export type FactsInput = {
@@ -96,7 +107,11 @@ export type FactsInput = {
   now: number;
 };
 
-/** The fact tiles, in the order they read. Every one is a reading; none is made up. */
+/**
+ * The fact tiles, most useful first, so the whole rows a short card has room for are the ones that matter: what Weir is
+ * and how long it has been up, what it is doing, whether it is safe, then how it answers and where it lives. Every one
+ * is a reading; none is made up.
+ */
 export function weirFacts({
   overview,
   work,
@@ -115,12 +130,14 @@ export function weirFacts({
     {
       key: "version",
       label: "Version",
+      short: "Version",
       value: overview.version,
       ...updateFact(overview.update),
     },
     {
       key: "uptime",
       label: "Uptime",
+      short: "Uptime",
       value: uptimeWords(uptimeSeconds),
       sub:
         overview.restarts_this_week > 0
@@ -131,39 +148,51 @@ export function weirFacts({
     {
       key: "files-at-once",
       label: "Files at once",
+      short: "Files",
       value: work ? `${work.running} / ${work.slots}` : "–",
       sub: work && work.running > 0 ? "running" : "idle",
     },
     {
       key: "jobs",
       label: "Jobs today",
+      short: "Jobs",
       value: `${overview.jobs_today.run.toLocaleString()} run`,
       sub: failed > 0 ? `${failed.toLocaleString()} failed` : "none failed",
       tone: failed > 0 ? "bad" : "good",
     },
-    { key: "answers", label: "Answers in", ...answersFact(overview.requests) },
     {
       key: "backup",
       label: "Last backup",
+      short: "Backup",
       value: lastBackupAt ? ago(lastBackupAt, now) : "None yet",
       sub: backupSub(lastBackupAt, lastBackupBytes),
     },
-    { key: "runs-as", label: "Runs as", ...runsAs },
+    {
+      key: "response",
+      label: "Response",
+      short: "Response",
+      ...responseFact(overview.requests),
+    },
     {
       key: "address",
       label: "Address",
+      short: "Address",
       value: host || "–",
+      valueShort: shortHost(host),
       sub: port ? `port ${port}` : "",
     },
+    { key: "runs-as", label: "Runs as", short: "Runs as", ...runsAs },
     {
       key: "data",
       label: "Data",
+      short: "Data",
       value: sizeWords(overview.data_bytes),
-      sub: "settings, history",
+      sub: "on disk",
     },
     {
       key: "browsers",
       label: "Browsers",
+      short: "Browsers",
       value: overview.browsers_live.toLocaleString(),
       sub: "open now",
     },

@@ -8,13 +8,15 @@ import { useNow } from "../../../../lib/ui/use-now";
 import { useFittingRows } from "../fit-rows";
 import {
   LOG_FILTERS,
+  defaultFilter,
   emptyLogWords,
   isFresh,
-  logSummary,
+  logSummaryWords,
   shownLines,
   type LogFilter,
   type LogLine,
 } from "./log-card-model";
+import { FitText } from "./fit-words";
 import { MoreCount } from "./more-count";
 import { SERVER_LOG_PATH } from "./system-paths";
 import { useSystemLog } from "./use-system-log";
@@ -41,7 +43,11 @@ function LogRow({
 }) {
   return (
     <li
-      className={classNames("mm-sy-log", fresh && "mm-sy-log--new")}
+      className={classNames(
+        "mm-sy-log",
+        `mm-sy-log--${line.level}`,
+        fresh && "mm-sy-log--new",
+      )}
       data-fit=""
       data-testid="system-log-line"
     >
@@ -70,7 +76,8 @@ export function LogCard() {
   const log = useSystemLog();
   const clock = useAppClockSecondsFormatter();
   const now = useNow(TICK_MS);
-  const [filter, setFilter] = useState<LogFilter>("all");
+  const [picked, setPicked] = useState<LogFilter | null>(null);
+  const filter = picked ?? defaultFilter(log.counts);
   const [listRef, fits] = useFittingRows();
   const shown = shownLines(log.lines, filter);
   const drawn = shown.slice(0, MOST_LINES_DRAWN);
@@ -78,23 +85,30 @@ export function LogCard() {
   return (
     <Panel
       title="Log"
-      aside={
-        <SegmentedControl
-          ariaLabel="Show"
-          options={LOG_FILTERS}
-          value={filter}
-          onChange={setFilter}
-        />
+      count={
+        log.loading ? (
+          ""
+        ) : (
+          <FitText
+            words={logSummaryWords(log.counts)}
+            className="mm-sy-count"
+          />
+        )
       }
       to={SERVER_LOG_PATH}
       toLabel="Full log"
       dataTestId="system-log"
       className="mm-sy-card"
     >
-      <p className="mm-sy-line">
-        <span>{log.loading ? "" : logSummary(log.counts)}</span>
+      <div className="mm-sy-line mm-sy-line--switch">
+        <SegmentedControl
+          ariaLabel="Show"
+          options={LOG_FILTERS}
+          value={filter}
+          onChange={setPicked}
+        />
         <MoreCount count={more} />
-      </p>
+      </div>
       <div ref={listRef} className="mm-sy-fit">
         {log.failed ? (
           <p className="mm-sy-note">

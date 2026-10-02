@@ -15,9 +15,17 @@ export type WholeRows = {
 
 type Measure = { height: number | undefined; hidden: number };
 
+/** A length in px, or `fallback` where the style does not say one ("auto", "normal", or an environment that does not lay out). */
+function pixels(length: string, fallback: number): number {
+  const value = Number.parseFloat(length);
+  return /px$/.test(length) && Number.isFinite(value) ? value : fallback;
+}
+
 /**
  * Sizes a grid of fixed-height tiles to the whole rows its room holds, measured before paint and whenever the room
- * changes size or the fonts arrive; `tiles` is how many it holds.
+ * changes size or the fonts arrive; `tiles` is how many it holds. The rows are as tall, and as far apart, as the
+ * grid's own style says (`grid-auto-rows`, `row-gap`), so a card can set smaller tiles in a shorter band; `rowPx` and
+ * `gapPx` stand where the style does not say.
  */
 export function useWholeRows(
   tiles: number,
@@ -37,10 +45,13 @@ export function useWholeRows(
     let live = true;
     const fit = () => {
       if (!live) return;
-      const rows = wholeRows(room.clientHeight, rowPx, gapPx);
-      const columns = columnsOf(getComputedStyle(grid).gridTemplateColumns);
+      const style = getComputedStyle(grid);
+      const row = pixels(style.gridAutoRows, rowPx);
+      const gap = pixels(style.rowGap, gapPx);
+      const rows = wholeRows(room.clientHeight, row, gap);
+      const columns = columnsOf(style.gridTemplateColumns);
       const next = {
-        height: rowsHeight(rows, rowPx, gapPx),
+        height: rowsHeight(rows, row, gap),
         hidden: tilesBeyond(tiles, rows, columns),
       };
       setMeasure((current) =>

@@ -94,6 +94,55 @@ describe("workflowChecks", () => {
   });
 });
 
+describe("a check's few words", () => {
+  it("says a workflow problem in the compact Dashboard style, keeping the sentence", () => {
+    const sentence =
+      "Weir could not reach Radarr (4K) at http://localhost:7879. Check the address is right, and that the app is running and reachable from this machine.";
+    const [check] = workflowChecks([
+      workflowHealth({
+        id: 2,
+        name: "4K Movies",
+        verdict: { words: "Needs a fix", tone: "warning" },
+        why: sentence,
+      }),
+    ]);
+
+    expect(check.words).toBe("Radarr (4K) not answering · check address");
+    expect(check.why).toBe(sentence);
+  });
+
+  it("says a drive that fills soon, or is low, in a few words", () => {
+    const drive = (changes: Partial<SystemDrive>) =>
+      storageChecks(
+        [
+          {
+            name: "D:",
+            path: "D:\\",
+            total_bytes: 1000 * 1024 ** 3,
+            free_bytes: 500 * 1024 ** 3,
+            weir_bytes: 0,
+            keep_free_bytes: 20 * 1024 ** 3,
+            full_in_days: null,
+            read_bytes_per_sec: null,
+            write_bytes_per_sec: null,
+            busy_percent: null,
+            workflows: [],
+            ...changes,
+          },
+        ],
+        NOW,
+      )[0];
+
+    expect(drive({ full_in_days: 2 }).words).toBe(
+      "500 GB free · full in ~2 days",
+    );
+    expect(drive({ free_bytes: 10 * 1024 ** 3 }).words).toBe(
+      "10.00 GB free · keeps 20.00 GB",
+    );
+    expect(drive({}).words).toBe("500 GB free");
+  });
+});
+
 describe("connectionChecks", () => {
   it("fails a connection that is not answering, with what its test said", () => {
     const [check] = connectionChecks([

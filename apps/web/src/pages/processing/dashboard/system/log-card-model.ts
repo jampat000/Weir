@@ -5,7 +5,8 @@ import { plural } from "../../../../lib/ui/mm-plural";
 import { dayKey } from "./system-time";
 
 export type LogLevel = "error" | "warning" | "info";
-export type LogFilter = "all" | "error" | "warning";
+/** What the switch shows: errors and warnings together, everything, or one level. */
+export type LogFilter = "problems" | "all" | "error" | "warning";
 
 export type LogLine = {
   /** The same line read twice has the same key, so a line is listed once. */
@@ -24,6 +25,7 @@ export const PULSE_MS = 1500;
 export const MOST_LOG_LINES = 250;
 
 export const LOG_FILTERS: readonly { value: LogFilter; label: string }[] = [
+  { value: "problems", label: "Problems" },
   { value: "all", label: "All" },
   { value: "error", label: "Errors" },
   { value: "warning", label: "Warnings" },
@@ -98,9 +100,22 @@ export function shownLines(
   lines: readonly LogLine[],
   filter: LogFilter,
 ): LogLine[] {
-  return filter === "all"
-    ? [...lines]
-    : lines.filter((line) => line.level === filter);
+  switch (filter) {
+    case "all":
+      return [...lines];
+    case "problems":
+      return lines.filter((line) => line.level !== "info");
+    default:
+      return lines.filter((line) => line.level === filter);
+  }
+}
+
+/**
+ * What the switch shows until a person picks: the problems when there have been any today, since they are what the
+ * card is for and the information that fills the log would bury them, else everything.
+ */
+export function defaultFilter(counts: LogCounts): LogFilter {
+  return counts.errors + counts.warnings > 0 ? "problems" : "all";
 }
 
 /** Whether a line has just arrived and should still pulse. */
@@ -129,8 +144,19 @@ export function logSummary(counts: LogCounts): string {
   return `${plural(counts.errors, "error", "errors")} · ${plural(counts.warnings, "warning", "warnings")} today`;
 }
 
+/** The summary in words that narrow with the room: the day goes first, then the warnings, never the errors. */
+export function logSummaryWords(counts: LogCounts): string[] {
+  const errors = plural(counts.errors, "error", "errors");
+  return [
+    logSummary(counts),
+    `${errors} · ${plural(counts.warnings, "warning", "warnings")}`,
+    errors,
+  ];
+}
+
 const NOTHING_AT_ALL = "Nothing has been logged yet.";
 const NOTHING_AT_LEVEL: Record<Exclude<LogFilter, "all">, string> = {
+  problems: "No errors or warnings in the log.",
   error: "No errors in the log.",
   warning: "No warnings in the log.",
 };

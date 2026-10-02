@@ -72,6 +72,7 @@ function item(
     tone,
     title: id,
     why: `${id} why`,
+    words: `${id} words`,
     checkedAt: NOW - 12_000,
     fix: null,
     again: { area, key: null },
@@ -108,7 +109,8 @@ beforeEach(() => {
   checks.checks = [
     item("movies", "workflows", "warn", {
       title: "Movies needs a fix",
-      why: "The output folder is missing.",
+      why: "The output folder D:/Movies does not exist. Create it, or point this workflow at one that does.",
+      words: "Output folder missing · create it",
       fix: {
         label: "Fix it →",
         to: "/settings?tab=libraries&edit=2",
@@ -142,7 +144,10 @@ describe("the Health card", () => {
     expect(rows).toHaveLength(4);
     expect(rows[0]).toHaveTextContent(RADARR);
     expect(rows[1]).toHaveTextContent("Movies needs a fix");
-    expect(rows[1]).toHaveTextContent("The output folder is missing.");
+    expect(rows[1]).toHaveTextContent("Output folder missing · create it");
+    expect(within(rows[1]).getByTitle(/does not exist/)).toHaveTextContent(
+      "Output folder missing · create it",
+    );
     expect(rows[1]).toHaveTextContent("checked 12s ago");
     expect(rows[2]).toHaveClass("mm-sy-check--ok");
   });
