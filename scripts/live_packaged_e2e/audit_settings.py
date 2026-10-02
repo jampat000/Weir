@@ -13,7 +13,7 @@ class AuditSettingsMixin:
     def settings_tabs(self) -> None:
         expected = {
             "Workflows": {
-                "Workflows": "processing-libraries-section",
+                "File paths": "processing-libraries-section",
                 "Schedule": "processing-schedules-section",
             },
             "Connections": {
@@ -56,7 +56,7 @@ class AuditSettingsMixin:
         self.record("setup areas: every tab of Workflows, Connections, Rules and Performance")
 
     def workflow_and_schedule_checks(self, tab: str) -> None:
-        if tab == "Workflows":
+        if tab == "File paths":
             self.visible(
                 self.page.get_by_test_id("workflow-kind-badge").first,
                 "each workflow says whether it is Weir only or linked to a media manager",

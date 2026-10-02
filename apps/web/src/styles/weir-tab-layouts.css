@@ -154,15 +154,9 @@
   }
 }
 
-/* Settings › Libraries: where a library comes from, and its folders in the code face they are typed in. */
+/* Settings › Libraries: where a library comes from. */
 .mm-library-source {
   display: block;
-}
-
-.mm-library-path {
-  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
-  font-size: 0.8125rem;
-  overflow-wrap: anywhere;
 }
 
 /* Settings › Rules: which profile, its name, and who uses it, on one line. */

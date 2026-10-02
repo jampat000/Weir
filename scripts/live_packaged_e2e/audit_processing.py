@@ -197,7 +197,7 @@ class AuditProcessingMixin:
         for sidebar, first, first_id, second, second_param, second_id in (
             (
                 "Workflows",
-                "Workflows",
+                "File paths",
                 "processing-libraries-section",
                 "Schedule",
                 "/setup/workflows/schedule",

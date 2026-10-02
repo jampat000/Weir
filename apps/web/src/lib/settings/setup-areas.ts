@@ -66,7 +66,7 @@ export const SETUP_AREAS: readonly SetupArea[] = [
     "Workflows",
     "Where your media is, how each folder is cleaned, and when",
     [
-      ["workflows", "Workflows"],
+      ["workflows", "File paths"],
       ["schedule", "Schedule"],
     ],
   ),

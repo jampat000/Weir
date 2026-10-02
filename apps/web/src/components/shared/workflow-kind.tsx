@@ -6,14 +6,23 @@ import {
 } from "../../lib/processing/workflow-kind";
 
 /** The kind of a workflow as a badge; linked ones read as connected, Weir-only ones as plain. */
-export function WorkflowKindBadge({ kind }: { kind: WorkflowKind }) {
+export function WorkflowKindBadge({
+  kind,
+  className,
+}: {
+  kind: WorkflowKind;
+  className?: string;
+}) {
+  const label = workflowBadgeLabel(kind);
   return (
     <Chip
       tone={kind.kind === "linked" ? "info" : "neutral"}
       dot={false}
+      className={className}
+      title={label}
       data-testid="workflow-kind-badge"
     >
-      {workflowBadgeLabel(kind)}
+      {label}
     </Chip>
   );
 }

@@ -56,7 +56,7 @@ Defined in `src/app/router.tsx`.
 | `/` | Dashboard, the first screen: what Weir is working on now |
 | `/history` | History: every file Weir has touched |
 | `/library` | Library: files already in a library, and what Weir would do to each |
-| `/setup/workflows`, `/setup/workflows/schedule` | Workflows: Workflows, Schedule |
+| `/setup/workflows`, `/setup/workflows/schedule` | Workflows: File paths, Schedule |
 | `/setup/connections`, `/setup/connections/download-clients`, `/setup/connections/alerts` | Connections: Media managers, Download clients, Alerts |
 | `/setup/rules`, `/setup/rules/metadata`, `/setup/rules/devices` | Rules: Profiles, Metadata & artwork, Playback devices |
 | `/setup/performance`, `/setup/performance/cleanup`, `/setup/performance/timers` | Performance: Speed, Cleanup, Weir's timers |

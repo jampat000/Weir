@@ -1,0 +1,215 @@
+import { Chip } from "../../../../components/panels/chip";
+import { ReorderHandle } from "../../../../components/shared/reorder-handle";
+import type { ReorderHandleProps } from "../../../../components/shared/use-row-reorder";
+import { WorkflowKindBadge } from "../../../../components/shared/workflow-kind";
+import { MmOnOffSwitch } from "../../../../components/ui/mm-on-off-switch";
+import type { MediaManagerConnection } from "../../../../lib/media-managers/media-managers-api";
+import {
+  processingMediaTypeBadge,
+  type ProcessingLibrary,
+} from "../../../../lib/processing/libraries-api";
+import {
+  workflowKindNote,
+  workflowKindOf,
+} from "../../../../lib/processing/workflow-kind";
+import { mmActionButtonClass } from "../../../../lib/ui/mm-control-roles";
+import { OutputFolderCell, WatchedFolderCell } from "./library-paths";
+
+export type LibraryRowActions = {
+  onToggle: (library: ProcessingLibrary) => void;
+  onEdit: (library: ProcessingLibrary) => void;
+  onUnlink: (library: ProcessingLibrary) => void;
+  onRemove: (library: ProcessingLibrary) => void;
+  unlinking: boolean;
+};
+
+/**
+ * The kind of workflow, said the same way on every page: Weir only, or linked to a media manager (and kept in
+ * step with it when it came from one). The manager's own last word shows when it did not answer.
+ */
+function WorkflowSource({
+  library,
+  connections,
+}: {
+  library: ProcessingLibrary;
+  connections: MediaManagerConnection[];
+}) {
+  const kind = workflowKindOf(library, connections);
+  const note = workflowKindNote(kind);
+  const unreachable = library.manager_coverage === "unreachable";
+  const lastWord = library.manager_connection_ids
+    .map((id) => connections.find((c) => c.id === id)?.last_test_detail)
+    .find((detail) => detail);
+  return (
+    <>
+      <span className="mm-library-source">
+        <WorkflowKindBadge kind={kind} className="mm-workflow-table__badge" />
+      </span>
+      <span
+        className="mm-quiet-table__sub mm-workflow-table__note"
+        title={note}
+      >
+        {note}
+      </span>
+      {library.discovered_from_connection_id ? (
+        <span className="mm-quiet-table__sub">Kept in step with it.</span>
+      ) : null}
+      {unreachable ? (
+        <span className="mm-quiet-table__sub mm-status-text--failed">
+          {lastWord ?? "Its media manager did not answer the last check."}
+        </span>
+      ) : null}
+    </>
+  );
+}
+
+/** Where the workflow stands in the order that decides which one takes a file; a grip moves it when it can be changed. */
+function PriorityCell({
+  position,
+  name,
+  handle,
+  hintId,
+}: {
+  position: number;
+  name: string;
+  handle: ReorderHandleProps | null;
+  hintId: string;
+}) {
+  return (
+    <td data-label="Priority" className="mm-workflow-table__fit">
+      <div className="mm-priority">
+        {handle ? (
+          <ReorderHandle
+            label={`Move ${name}`}
+            describedBy={hintId}
+            handle={handle}
+          />
+        ) : null}
+        <span className="mm-priority__number">{position}</span>
+      </div>
+    </td>
+  );
+}
+
+export type LibraryRowProps = {
+  library: ProcessingLibrary;
+  /** One for the workflow that takes a file first. */
+  position: number;
+  ruleSetName: string | undefined;
+  connections: MediaManagerConnection[];
+  editable: boolean;
+  actions: LibraryRowActions;
+  /** The grip, or null when the order cannot be changed. */
+  handle: ReorderHandleProps | null;
+  /** The id of the text that says how to use the grip. */
+  hintId: string;
+  grabbed: boolean;
+  rowRef: (row: HTMLTableRowElement | null) => void;
+};
+
+export function LibraryRow({
+  library,
+  position,
+  ruleSetName,
+  connections,
+  editable,
+  actions,
+  handle,
+  hintId,
+  grabbed,
+  rowRef,
+}: LibraryRowProps) {
+  const badge = processingMediaTypeBadge(library);
+  const tertiary = mmActionButtonClass({ variant: "tertiary" });
+  const secondary = mmActionButtonClass({ variant: "secondary" });
+  return (
+    <tr
+      ref={rowRef}
+      data-testid={`processing-library-${library.id}`}
+      data-grabbed={grabbed || undefined}
+    >
+      <PriorityCell
+        position={position}
+        name={library.name}
+        handle={handle}
+        hintId={hintId}
+      />
+      <th
+        scope="row"
+        className="mm-quiet-table__name mm-workflow-table__workflow"
+      >
+        <div className="mm-workflow-name">
+          <span className="mm-workflow-name__text" title={library.name}>
+            {library.name}
+          </span>
+          {badge ? <Chip dot={false}>{badge}</Chip> : null}
+        </div>
+        {library.active_job_count > 0 ? (
+          <span className="mm-quiet-table__sub">
+            {library.active_job_count} in progress
+          </span>
+        ) : null}
+      </th>
+      <td data-label="Kind" className="mm-workflow-table__kind">
+        <WorkflowSource library={library} connections={connections} />
+      </td>
+      <td data-label="Watches" className="mm-workflow-table__path">
+        <WatchedFolderCell library={library} />
+      </td>
+      <td data-label="Cleans into" className="mm-workflow-table__path">
+        <OutputFolderCell library={library} />
+      </td>
+      <td
+        data-label="Rules"
+        className="mm-workflow-table__rules"
+        title={ruleSetName}
+      >
+        {ruleSetName ?? (
+          <span className="mm-quiet-table__sub">Default rules</span>
+        )}
+      </td>
+      <td data-label="On" className="mm-workflow-table__fit">
+        <MmOnOffSwitch
+          id={`processing-library-enabled-${library.id}`}
+          label={`${library.name} enabled`}
+          enabled={library.enabled}
+          disabled={!editable}
+          onChange={() => actions.onToggle(library)}
+          layout="control"
+        />
+      </td>
+      <td data-label="" className="mm-workflow-table__fit">
+        <div className="mm-workflow-actions">
+          <button
+            type="button"
+            className={secondary}
+            onClick={() => actions.onEdit(library)}
+            disabled={!editable}
+          >
+            Edit
+          </button>
+          {library.discovered_from_connection_id ? (
+            <button
+              type="button"
+              className={secondary}
+              onClick={() => actions.onUnlink(library)}
+              disabled={actions.unlinking}
+            >
+              Unlink
+            </button>
+          ) : null}
+          <button
+            type="button"
+            className={tertiary}
+            onClick={() => actions.onRemove(library)}
+            disabled={!editable}
+            aria-haspopup="dialog"
+            data-testid={`processing-library-remove-${library.id}`}
+          >
+            Remove
+          </button>
+        </div>
+      </td>
+    </tr>
+  );
+}

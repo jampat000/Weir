@@ -10,6 +10,7 @@ export function QuietSection({
   headingId,
   heading,
   level = 2,
+  count,
   aside,
   children,
   id,
@@ -18,6 +19,8 @@ export function QuietSection({
   headingId: string;
   heading: string;
   level?: 2 | 3;
+  /** A quiet line after the heading. */
+  count?: ReactNode;
   aside?: ReactNode;
   children: ReactNode;
   id?: string;
@@ -28,6 +31,7 @@ export function QuietSection({
       title={heading}
       headingId={headingId}
       headingLevel={level}
+      count={count}
       aside={aside}
       padded
       id={id}

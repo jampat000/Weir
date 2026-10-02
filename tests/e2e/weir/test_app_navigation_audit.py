@@ -23,7 +23,7 @@ SETUP_AREAS = (
         "Workflows",
         "/setup/workflows",
         (
-            ("Workflows", "/setup/workflows", "processing-libraries-section"),
+            ("File paths", "/setup/workflows", "processing-libraries-section"),
             ("Schedule", "/setup/workflows/schedule", "processing-schedules-section"),
         ),
     ),

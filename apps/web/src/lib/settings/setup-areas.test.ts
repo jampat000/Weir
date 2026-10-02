@@ -18,7 +18,7 @@ describe("setup areas", () => {
         area.tabs.map((tab) => tab.label),
       ]),
     ).toEqual([
-      ["Workflows", ["Workflows", "Schedule"]],
+      ["Workflows", ["File paths", "Schedule"]],
       ["Connections", ["Media managers", "Download clients", "Alerts"]],
       ["Rules", ["Profiles", "Playback devices"]],
       ["Performance", ["Speed", "Cleanup", "Weir's timers"]],

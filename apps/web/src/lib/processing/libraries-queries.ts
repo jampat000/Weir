@@ -186,8 +186,9 @@ export function useReorderProcessingLibraries() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (ids: number[]) => reorderProcessingLibraries(ids),
+    // Settles once the list is read again, so a list held in its new order is not shown in the old one first.
     onSuccess: () =>
-      void qc.invalidateQueries({ queryKey: processingKeys.libraries }),
+      qc.invalidateQueries({ queryKey: processingKeys.libraries }),
   });
 }
 

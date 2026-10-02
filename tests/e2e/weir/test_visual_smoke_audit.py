@@ -206,6 +206,8 @@ def test_setup_and_system_tabs_render(weir_shell: str) -> None:
             for label in _SETUP_AREA_LABELS:
                 open_sidebar(page, label)
                 expect(page.get_by_test_id("suite-settings-page")).to_be_visible()
+                # The previous area's tabs stay until this one has drawn, so count them only once its title shows.
+                expect(page.get_by_role("heading", level=1, name=label, exact=True)).to_be_visible()
                 area_tabs = page.get_by_test_id("setup-area-tabs").get_by_role("tab")
                 for index in range(area_tabs.count()):
                     area_tab = area_tabs.nth(index)
