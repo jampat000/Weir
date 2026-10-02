@@ -55,9 +55,7 @@ describe("Check now", () => {
 
     expect(result.current.pending).toBe(true);
     await waitFor(() =>
-      expect(result.current.notice).toBe(
-        "Folders and 1 connection checked: all answered.",
-      ),
+      expect(result.current.notice).toBe("Checked · all answered."),
     );
     expect(result.current.pending).toBe(false);
   });
@@ -70,9 +68,7 @@ describe("Check now", () => {
     act(() => result.current.run());
 
     await waitFor(() =>
-      expect(result.current.notice).toBe(
-        "Folders and 2 connections checked: 2 did not answer.",
-      ),
+      expect(result.current.notice).toBe("Checked · 2 didn't answer."),
     );
   });
 

@@ -136,9 +136,7 @@ describe("the Working on now tile", () => {
   it("says nothing is being cleaned when nothing is", () => {
     renderTile();
 
-    expect(
-      screen.getByText("Nothing is being cleaned right now."),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Nothing being cleaned.")).toBeInTheDocument();
     expect(screen.queryByTestId("live-working")).toBeNull();
   });
 

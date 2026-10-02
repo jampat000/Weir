@@ -157,7 +157,7 @@ describe("what a card says", () => {
 
     expect(card.status).toMatchObject({
       lead: "42%",
-      text: "42% · writing · 148×",
+      text: "42% writing · 148×",
       pulse: false,
     });
     expect(card.bar).toEqual({ width: 42, waiting: false, moving: true });
@@ -168,7 +168,7 @@ describe("what a card says", () => {
 
     expect(written(card)).toContain("18:54 of 45:00");
     expect(written(card)).toContain("Reading");
-    expect(written(card)).toContain("running for 2 min 14 s");
+    expect(written(card)).toContain("running 2 min 14 s");
     expect(written(card)).toContain("Download · TV");
     expect(written(card)).toContain(
       "The.Quiet.Harbour.S01E01.1080p.WEB-DL.mkv",
@@ -181,7 +181,7 @@ describe("what a card says", () => {
   it("names a library clean for what it is, with no percent to claim", () => {
     const [card] = cardsFor([], [aCleanJob(7, "leased")]);
 
-    expect(card.status.text).toBe("Cleaning in place");
+    expect(card.status.text).toBe("Cleaning");
     expect(card.bar).toEqual({ width: 35, waiting: true, moving: true });
     expect(written(card)).toContain("Library clean · Movies");
   });
@@ -220,9 +220,26 @@ describe("what a card says", () => {
       }),
     ]);
 
-    expect(card.status.text).toBe("Still being written");
+    expect(card.status).toMatchObject({
+      text: "Waiting to settle",
+      full: "Still being written.",
+    });
     expect(written(card)).toContain("ready in 0:30");
     expect(card.bar).toEqual({ width: 50, waiting: false, moving: false });
+  });
+
+  it("says what kind of hold an arriving file is on in a few words, whatever sentence the server gave", () => {
+    const heldFor = (reason: string) =>
+      cardsFor([aFile(1, "on_hold", { status_reason: reason })])[0].status.text;
+
+    expect(heldFor("This file changed too recently. Weir waits 60s.")).toBe(
+      "Waiting to settle",
+    );
+    expect(
+      heldFor("Weir could not open this file for reading — it is locked."),
+    ).toBe("Can't open it yet");
+    expect(heldFor("Something Weir has no short word for.")).toBe("On hold");
+    expect(heldFor("")).toBe("Waiting");
   });
 
   it("says Weir is checking an arriving file once its wait is over", () => {
@@ -233,7 +250,7 @@ describe("what a card says", () => {
       }),
     ]);
 
-    expect(card.status).toMatchObject({ text: "Checking it now", pulse: true });
+    expect(card.status).toMatchObject({ text: "Checking now", pulse: true });
   });
 });
 
@@ -264,7 +281,7 @@ describe("cards of files that have just ended", () => {
         anEndedCard(1, {
           kind: "failed",
           at: "write",
-          reason: "ffmpeg stopped.",
+          reason: "Writing stopped · original kept",
         }),
       ],
       "all",
@@ -274,9 +291,9 @@ describe("cards of files that have just ended", () => {
     expect(ended).toMatchObject({
       stage: "processing",
       end: "failed",
-      status: { text: "Failed at Write", tone: "bad" },
+      status: { text: "Couldn't finish", tone: "bad" },
     });
-    expect(written(ended)).toContain("ffmpeg stopped.");
+    expect(written(ended)).toContain("Writing stopped · original kept");
   });
 
   it("shows a rejected file as a decision, not a failure", () => {

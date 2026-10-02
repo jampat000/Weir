@@ -9,8 +9,8 @@
 import { useEffect, useMemo, useState } from "react";
 
 import type { ProcessingFile } from "../../lib/processing/files-api";
+import { fileReason } from "./file-reason";
 import {
-  firstSentence,
   type HandingItem,
   type WaitingItem,
   type WorkingItem,
@@ -66,9 +66,6 @@ export const NO_LEAVING_CARDS: LeavingState = {
   departures: [],
 };
 
-const NOT_FINISHED_REASON = "Weir could not finish this file.";
-const REJECTED_REASON = "Weir rejected this file.";
-
 /** Rejections come from the checks and the plan, so a card that ended that way never gets past Plan. */
 function rejectedAt(step: FlowStepId): FlowStepId {
   return step === "checking" ? "checking" : "plan";
@@ -97,7 +94,7 @@ export function outcomeFor(
       return {
         kind: "rejected",
         at: rejectedAt(step),
-        reason: firstSentence(file.status_reason) || REJECTED_REASON,
+        reason: fileReason(file).short,
       };
     case "processing_failed":
       return failed(file, step);
@@ -110,7 +107,7 @@ function failed(file: ProcessingFile, step: FlowStepId): LeavingOutcome {
   return {
     kind: "failed",
     at: step,
-    reason: firstSentence(file.status_reason) || NOT_FINISHED_REASON,
+    reason: fileReason(file).short,
   };
 }
 

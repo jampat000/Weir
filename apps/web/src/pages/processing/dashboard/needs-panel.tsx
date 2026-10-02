@@ -24,7 +24,7 @@ function NeedItem({
   onOpen,
 }: { row: NeedRow } & RowHandlers) {
   return (
-    <li className="mm-need">
+    <li className="mm-need" title={row.detail}>
       <b className="mm-need__title">{row.title}</b>
       {row.file ? (
         <small className="mm-need__workflow">{row.file.library_name}</small>
@@ -101,7 +101,7 @@ function AllClear() {
         <path d="m5 12 5 5 9-10" />
       </svg>
       <b>All clear</b>
-      <span>Nothing needs you right now.</span>
+      <span>Nothing needs you.</span>
     </p>
   );
 }

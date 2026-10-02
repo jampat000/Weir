@@ -123,7 +123,7 @@ export function WorkingTile({
       }
     >
       {working.length === 0 ? (
-        <p className="mm-stat__idle">Nothing is being cleaned right now.</p>
+        <p className="mm-stat__idle">Nothing being cleaned.</p>
       ) : (
         <ul className="mm-ops" data-testid="live-working">
           {shown.map((item) => (

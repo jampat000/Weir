@@ -67,7 +67,6 @@ function endedCard(ended: LeavingCard): PipelineCard {
     stageOfStep(outcome.at),
     stoppedWords(
       outcome.kind,
-      outcome.at,
       outcome.reason,
       ended.source,
       ended.libraryName,

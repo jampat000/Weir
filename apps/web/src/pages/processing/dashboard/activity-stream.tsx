@@ -19,8 +19,7 @@ const RECENT_EVENTS = 80;
 /** The most lines drawn: the panel's height decides how many whole ones show, and this bounds what is measured. */
 const MOST_LINES = 40;
 const LOG_PATH = "/system?tab=logs";
-const NOTHING_YET =
-  "Nothing has happened yet. What Weir does shows up here as it works.";
+const NOTHING_YET = "Nothing yet. What Weir does appears here.";
 
 function Sentence({ parts }: { parts: readonly StreamPart[] }) {
   return parts.map((part, index) =>

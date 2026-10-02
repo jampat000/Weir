@@ -12,6 +12,8 @@ export type CardStatus = {
   pulse: boolean;
   /** The front of the text, drawn bold in the station's colour (a percentage, "✓ Delivered"). */
   lead?: string;
+  /** The server's own sentence behind the words, for the card's tooltip. */
+  full?: string;
 };
 
 /**

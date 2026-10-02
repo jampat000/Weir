@@ -4,11 +4,11 @@ import { plural } from "../ui/mm-plural";
 export const FILE_HISTORY_MAX_DAYS = 3650;
 
 /**
- * How long a file's history lasts, in one sentence: while Weir still knows the file, then for the chosen
- * number of days after it is gone or forgotten. 0 means until someone removes it.
+ * How long a file's history lasts: while Weir still knows the file, then for the chosen number of days after
+ * it is gone or forgotten. 0 means until someone removes it.
  */
 export function fileHistoryRetentionNote(days: number): string {
   return days > 0
-    ? `Weir keeps this history while it still knows the file, then for ${plural(days, "day", "days")} after the file is gone.`
-    : "Weir keeps this history until you remove it.";
+    ? `Kept while the file exists, then ${plural(days, "day", "days")}.`
+    : "Kept until you remove it.";
 }

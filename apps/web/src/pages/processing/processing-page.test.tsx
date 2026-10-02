@@ -453,11 +453,9 @@ describe("ProcessingPage", () => {
 
       const tile = screen.getByRole("region", { name: "Next" });
       expect(tile).toHaveTextContent("Paused");
-      expect(tile).toHaveTextContent(
-        "Files already being written finish; nothing new starts until you resume.",
-      );
+      expect(tile).toHaveTextContent("Running files finish first.");
       expect(screen.getByTestId("pipeline-board")).toHaveTextContent(
-        "Paused. Nothing new starts until you resume.",
+        "Paused · nothing new starts.",
       );
     });
 
@@ -612,7 +610,7 @@ describe("ProcessingPage", () => {
       rerenderLive(view);
 
       expect(screen.getByTestId("pipeline-board")).toHaveTextContent(
-        "The new file would not play.",
+        "Couldn't finish · original kept",
       );
     });
 

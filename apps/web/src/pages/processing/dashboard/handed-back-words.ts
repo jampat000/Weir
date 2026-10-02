@@ -9,7 +9,8 @@ import {
 
 const MINUTE_MS = 60_000;
 
-export const NOTHING_HANDED_BACK = "Nothing finished in the last 2 hours.";
+export const NOTHING_HANDED_BACK = "Nothing in the last 2 hours";
+const NOTHING_FINISHED_SENTENCE = "Nothing finished in the last 2 hours.";
 
 const TONE_WORDS: Record<HandedBackTone, string> = {
   ok: "cleaned",
@@ -77,7 +78,7 @@ export function handedBackSentence(
   total: number,
   partial: boolean,
 ): string {
-  if (total === 0) return NOTHING_HANDED_BACK;
+  if (total === 0) return NOTHING_FINISHED_SENTENCE;
   const tail = partial ? ". The oldest of them are not in the chart." : ".";
   return `${plural(total, "file", "files")} finished in the last 2 hours: ${toneCounts(handed.totals)}${tail}`;
 }

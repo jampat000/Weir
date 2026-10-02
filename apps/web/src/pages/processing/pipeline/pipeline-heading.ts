@@ -32,11 +32,9 @@ export function allDoneBy(
   return now + Math.max(...remaining.map((seconds) => seconds ?? 0)) * 1000;
 }
 
-/** What follows "Pipeline" in the heading: "8 in progress · all done by about 2:28 pm". */
+/** What follows "Pipeline" in the heading: "8 in progress · done by 2:28 pm". */
 export function pipelineCount(inProgress: number, doneBy?: number): string {
-  if (inProgress <= 0) return "nothing in progress right now";
+  if (inProgress <= 0) return "nothing in progress";
   const base = `${inProgress.toLocaleString()} in progress`;
-  return doneBy === undefined
-    ? base
-    : `${base} · all done by about ${clockTime(doneBy)}`;
+  return doneBy === undefined ? base : `${base} · done by ${clockTime(doneBy)}`;
 }

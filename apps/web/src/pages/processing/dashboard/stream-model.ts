@@ -21,7 +21,7 @@ import {
 import type { ActivityEventItem } from "../../../lib/api/types";
 import { parseAppTime } from "../../../lib/ui/mm-format-date";
 import { prettyName } from "../processing-model";
-import { ago, finishedLine } from "../processing-words";
+import { ago, finishedNote } from "../processing-words";
 
 /** The most lines the stream keeps; the box scrolls inside. */
 export const STREAM_ROWS = 20;
@@ -59,9 +59,9 @@ const OUTCOME_WORDS: Record<
 > = {
   cleaned: { tail: " cleaned", tone: "success" },
   already: { tail: " was already right", tone: "info" },
-  passed: { tail: " was passed through unchanged", tone: "warning" },
+  passed: { tail: " passed through", tone: "warning" },
   rejected: { tail: " was rejected", tone: "warning" },
-  failed: { tail: " could not be finished", tone: "error" },
+  failed: { tail: " couldn't finish", tone: "error" },
 };
 
 function historyPath(relativePath: string): string {
@@ -78,7 +78,7 @@ function finishedRow(ev: ActivityEventItem, file: FinishedFile): StreamRow {
       { bold: prettyName(file.relativePath) },
       library ? " cleaned in place" : outcome.tail,
     ],
-    note: finishedLine(file),
+    note: finishedNote(file),
     tone: outcome.tone,
     at: ev.created_at,
     to: historyPath(file.relativePath),
@@ -99,7 +99,7 @@ function handbackRow(ev: ActivityEventItem): StreamRow {
       `${by} ${imported ? "imported" : "did not import"} `,
       { bold: prettyName(path) },
     ],
-    note: imported ? "Handed back" : "Handed back, not imported",
+    note: "Handed back",
     tone: imported ? "success" : "warning",
     at: ev.created_at,
     to: path ? historyPath(path) : LOG_PATH,

@@ -20,9 +20,10 @@ type NeedFileActionsProps = {
   onOpen?: (file: ProcessingFile) => void;
 };
 
-const CHECK_AGAIN_FAILED = "That workflow could not be checked again.";
-const CHECK_AGAIN_DONE =
-  "Weir is checking this workflow again and will queue the file when it is ready.";
+const CHECK_AGAIN_FAILED = "Couldn't check that workflow.";
+const CHECK_AGAIN_DONE = "Checking this workflow again.";
+const QUEUE_FAILED = "Couldn't queue that file.";
+const QUEUED_AGAIN = "Queued again.";
 
 /** A held or skipped file is not tried: its workflow is asked to look again. */
 function asksWorkflowAgain(file: ProcessingFile): boolean {
@@ -98,12 +99,9 @@ export function NeedFileActions({
       return;
     }
     requeue.mutate(file.id, {
-      onSuccess: (result) => report(result.detail, false),
-      onError: (error) =>
-        report(
-          errorMessage(error, "That file could not be queued again."),
-          true,
-        ),
+      onSuccess: (result) =>
+        report(result.requeued > 0 ? QUEUED_AGAIN : result.detail, false),
+      onError: (error) => report(errorMessage(error, QUEUE_FAILED), true),
     });
   };
   return (

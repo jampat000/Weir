@@ -34,7 +34,7 @@ export function chainVerdict(chain: LibraryFolderChain): WorkflowVerdict {
   return { words: READINESS_WORDS[readiness], tone: READINESS_TONE[readiness] };
 }
 
-const NOTHING_NAMED = "Open this workflow to see what needs a fix.";
+const NOTHING_NAMED = "Open it to see what to fix.";
 
 /**
  * The one line that says why a workflow is not in sync: the first problem in its chain, else the first line
@@ -54,7 +54,7 @@ const CHECKING_VERDICT: WorkflowVerdict = {
   tone: "neutral",
 };
 const UNCHECKED_VERDICT: WorkflowVerdict = {
-  words: "Could not check",
+  words: "Couldn't check",
   tone: "neutral",
 };
 

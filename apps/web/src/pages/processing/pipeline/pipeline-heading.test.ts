@@ -7,9 +7,7 @@ describe("the heading", () => {
   it("says how many are in progress and when they should all be done", () => {
     const at = new Date(2026, 9, 2, 14, 28).getTime();
 
-    expect(pipelineCount(8, at)).toBe(
-      "8 in progress · all done by about 2:28 pm",
-    );
+    expect(pipelineCount(8, at)).toBe("8 in progress · done by 2:28 pm");
   });
 
   it("leaves the time out when none can be given", () => {
@@ -17,7 +15,7 @@ describe("the heading", () => {
   });
 
   it("says plainly that nothing is in progress", () => {
-    expect(pipelineCount(0)).toBe("nothing in progress right now");
+    expect(pipelineCount(0)).toBe("nothing in progress");
   });
 
   it("reads the clock the way people say it", () => {

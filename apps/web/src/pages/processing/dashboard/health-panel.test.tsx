@@ -99,6 +99,26 @@ describe("the Health panel", () => {
     expect(panel).toHaveTextContent("The output folder is missing.");
   });
 
+  it("keeps the line to the first sentence of the problem, with the whole of it as a tooltip", () => {
+    const whole =
+      "Radarr does not say where Transmission saves its downloads. Weir cannot verify they land in D:/Downloads. Connect it under Settings.";
+    health.workflows = [
+      {
+        workflow: { ...movies, manager_connection_ids: [] },
+        verdict: { words: "Not verified", tone: "neutral" },
+        why: whole,
+        chain: undefined,
+      },
+    ];
+    const panel = renderPanel();
+
+    const line = panel.querySelector(".mm-health__why");
+    expect(line).toHaveTextContent(
+      /^Radarr does not say where Transmission saves its downloads\.$/,
+    );
+    expect(line).toHaveAttribute("title", whole);
+  });
+
   it("names the manager a linked workflow is linked to", () => {
     health.managers = [
       { id: 1, kind: "radarr", name: "Radarr on MEDIA-PC", enabled: true },
@@ -119,7 +139,7 @@ describe("the Health panel", () => {
   it("says no workflow is on, rather than leaving the section empty", () => {
     const panel = renderPanel();
 
-    expect(panel).toHaveTextContent("No workflow is switched on.");
+    expect(panel).toHaveTextContent("No workflow switched on.");
   });
 
   it("shows each connection with how long ago it answered, or that it does not", () => {

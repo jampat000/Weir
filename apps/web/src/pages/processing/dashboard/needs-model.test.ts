@@ -95,9 +95,10 @@ describe("what needs a person", () => {
 
     expect(group.rows).toHaveLength(1);
     expect(group.rows[0].title).toBe("Background work has stopped");
-    expect(group.rows[0].reason).toBe(
-      "No worker has taken a job for 20 minutes.",
-    );
+    expect(group.rows[0]).toMatchObject({
+      reason: "Not responding · restart Weir",
+      detail: "No worker has taken a job for 20 minutes.",
+    });
   });
 
   it("counts failed jobs, and stops counting at the limit", () => {
@@ -121,7 +122,7 @@ describe("what needs a person", () => {
 });
 
 describe("the files that need a person", () => {
-  it("gives each file a row with its name, its reason and the file itself for its actions", () => {
+  it("gives each file a row with its name, a few words on why, the server's sentence and the file itself", () => {
     const [group] = buildNeeds({
       ...healthy,
       files: [
@@ -133,17 +134,33 @@ describe("the files that need a person", () => {
 
     expect(group.rows[0]).toMatchObject({
       title: "Ember and Ash S01E02",
-      reason: "The new file would not play.",
+      reason: "Writing stopped · original kept",
+      detail: "The new file would not play.",
       file: { id: 2 },
     });
   });
 
   it("says what is true when a file has no reason of its own", () => {
-    const [group] = buildNeeds({ ...healthy, files: [failedFile(1)] });
+    const [group] = buildNeeds({
+      ...healthy,
+      files: [failedFile(1, { failure_class: null })],
+    });
 
-    expect(group.rows[0].reason).toBe(
-      "Weir could not finish this file. The original is untouched.",
-    );
+    expect(group.rows[0]).toMatchObject({
+      reason: "Couldn't finish · original kept",
+      detail: undefined,
+    });
+  });
+
+  it("says the kind of stop in a few words, whatever the server's sentence", () => {
+    const reasons = (failureClass: string | null) =>
+      buildNeeds({
+        ...healthy,
+        files: [failedFile(1, { failure_class: failureClass })],
+      })[0].rows[0].reason;
+
+    expect(reasons("preflight")).toBe("A check failed · original kept");
+    expect(reasons("guardrail")).toBe("Safety stop · original kept");
   });
 
   it("titles each group by how many files share a reason, in plain words", () => {
@@ -165,12 +182,12 @@ describe("the files that need a person", () => {
     });
 
     expect(groups.map((group) => group.title)).toEqual([
-      "1 failed while writing",
-      "1 did not pass the checks",
-      "1 stopped to keep the original safe",
-      "1 failed",
+      "1 couldn't finish writing",
+      "1 didn't pass the checks",
+      "1 stopped by a safety check",
+      "1 couldn't finish",
       "2 not in a language you keep",
-      "1 turned down by your rules",
+      "1 rejected by your rules",
       "1 rejected for a replacement",
     ]);
   });
@@ -205,9 +222,7 @@ describe("the files that need a person", () => {
 
     const groups = buildNeeds({ ...healthy, files: [routine, byRule] });
 
-    expect(groups.map((group) => group.title)).toEqual([
-      "1 skipped by a workflow rule",
-    ]);
+    expect(groups.map((group) => group.title)).toEqual(["1 skipped by a rule"]);
     expect(groups[0].rows[0].file?.id).toBe(1);
   });
 
@@ -259,7 +274,7 @@ describe("the files that need a person", () => {
 
     const [group] = buildNeeds({ ...healthy, files });
 
-    expect(group.title).toBe("6 failed while writing");
+    expect(group.title).toBe("6 couldn't finish writing");
     expect(group.rows).toHaveLength(FILES_SHOWN_PER_GROUP);
     expect(group.more).toBe(2);
   });

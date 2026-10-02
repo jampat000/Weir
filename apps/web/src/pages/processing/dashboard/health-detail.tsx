@@ -24,9 +24,7 @@ function ConnectionsDetail({ health, now }: { health: Health; now: number }) {
     <Panel title="Connections" to={MANAGERS_PATH} toLabel="Manage">
       <div className="mm-health-detail__body">
         {connections.length === 0 ? (
-          <p className="mm-health__empty">
-            No media manager or download client is connected.
-          </p>
+          <p className="mm-health__empty">Nothing connected.</p>
         ) : (
           <ul className="mm-health-detail__rows">
             {connections.map((connection) => (
@@ -86,9 +84,7 @@ function DiskDetail({
     <Panel title="Disk space">
       <div className="mm-health-detail__body">
         <p className="mm-health__empty" data-testid="health-disk-note">
-          Weir does not report how much room is left on a drive. It keeps at
-          least the amount below free where a workflow writes, and holds a file
-          that would leave less until there is room.
+          Weir holds a file that would leave less than this free.
         </p>
         <ul className="mm-health-detail__rows">
           {diskRows(workflows).map((row) => (

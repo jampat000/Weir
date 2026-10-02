@@ -59,8 +59,8 @@ describe("the Next tile", () => {
   it("says nothing is scheduled, and why, when nothing has a timer", () => {
     const tile = renderTile([]);
 
-    expect(tile).toHaveTextContent("nothing is scheduled");
-    expect(tile).toHaveTextContent("Nothing is waiting on a timer.");
+    expect(tile).toHaveTextContent("nothing scheduled");
+    expect(tile).toHaveTextContent("Switch on a workflow or a cleanup job.");
   });
 
   it("reads Paused, and that work already running finishes, while paused", () => {
@@ -72,7 +72,7 @@ describe("the Next tile", () => {
     expect(tile).toHaveTextContent("Paused");
     expect(tile).toHaveTextContent("nothing new starts");
     expect(tile).not.toHaveTextContent("Look for new downloads");
-    expect(tile).toHaveTextContent("Files already being written finish");
+    expect(tile).toHaveTextContent("Running files finish first");
   });
 
   it('lists only the "then" lines that fit the tile, whole ones', () => {

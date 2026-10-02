@@ -84,15 +84,14 @@ export function FileStoryPanel({
         testId="file-story-direct-play"
       />
       {loading ? (
-        <p className="mm-story-panel__note">Reading the record…</p>
+        <p className="mm-story-panel__note">Loading…</p>
       ) : error ? (
         <p className="mm-story-panel__note mm-status-text--failed" role="alert">
           {error}
         </p>
       ) : !log || log.entries.length === 0 ? (
         <p className="mm-story-panel__note">
-          Weir has not worked on this file yet, so there is nothing to tell. Its
-          story starts the first time it is processed.
+          Nothing yet. Weir hasn&apos;t worked on this file.
         </p>
       ) : (
         log.entries.map((entry) => (
@@ -110,7 +109,7 @@ export function FileStoryPanel({
               <p className="mm-story-panel__note">{entry.title}</p>
             )}
             <details className="mm-story-pass__detail">
-              <summary>Show the technical detail</summary>
+              <summary>Technical detail</summary>
               <pre>{JSON.stringify(entry.detail, null, 2)}</pre>
             </details>
           </section>

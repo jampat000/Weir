@@ -65,9 +65,9 @@ describe("what Weir does next on its own", () => {
       "cleanup-work_temp_stale_sweep",
       "clean-2",
     ]);
-    expect(items[0].label).toBe("Look for new downloads in TV");
-    expect(items[2].label).toBe("Cleanup: Leftover work files");
-    expect(items[3].label).toBe("Clean the Movies library");
+    expect(items[0].label).toBe("Scan TV downloads");
+    expect(items[2].label).toBe("Clear leftover files");
+    expect(items[3].label).toBe("Clean Movies library");
   });
 
   it("leaves out what is switched off or has no time, rather than guessing", () => {

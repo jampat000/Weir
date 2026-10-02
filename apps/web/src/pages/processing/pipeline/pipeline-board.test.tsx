@@ -67,9 +67,9 @@ describe("the heading and the stations", () => {
   it("says nothing is in progress when nothing is", () => {
     render(board(lanesOf([])));
 
-    expect(progressLine()).toHaveTextContent("nothing in progress right now");
+    expect(progressLine()).toHaveTextContent("nothing in progress");
     expect(
-      screen.getByText(/Nothing is being cleaned right now/),
+      screen.getByText(/Nothing in progress\. New downloads appear here/),
     ).toBeInTheDocument();
   });
 
@@ -77,7 +77,7 @@ describe("the heading and the stations", () => {
     render(board(lanesOf([]), { paused: true }));
 
     expect(
-      screen.getByText("Paused. Nothing new starts until you resume."),
+      screen.getByText("Paused · nothing new starts."),
     ).toBeInTheDocument();
   });
 
@@ -85,7 +85,7 @@ describe("the heading and the stations", () => {
     render(board(lanesOf([aWriting(1, { progress_eta_seconds: 600 })])));
 
     expect(progressLine()?.textContent).toMatch(
-      /^1 in progress · all done by about \d{1,2}:\d{2} [ap]m$/,
+      /^1 in progress · done by \d{1,2}:\d{2} [ap]m$/,
     );
   });
 
@@ -161,7 +161,7 @@ describe("the cards", () => {
   it("puts each file's card at its station and says what it is doing", () => {
     render(board(lanesOf([aWriting(1), aFile(2, "unprocessed")])));
 
-    const writing = cardNamed(/The Quiet Harbour S01E01: 42% · writing/);
+    const writing = cardNamed(/The Quiet Harbour S01E01: 42% writing/);
     const waiting = cardNamed(/The Quiet Harbour S01E02: Waiting its turn/);
 
     expect(writing).toHaveAttribute("data-stage", "processing");
@@ -185,7 +185,7 @@ describe("the cards", () => {
     expect(screen.queryByRole("button")).toBeNull();
     expect(
       screen.getByRole("group", {
-        name: /Paper Lanterns \(2023\): Cleaning in place/,
+        name: /Paper Lanterns \(2023\): Cleaning/,
       }),
     ).toBeInTheDocument();
   });
@@ -275,16 +275,18 @@ describe("a file that has just ended", () => {
           anEndedCard(1, {
             kind: "failed",
             at: "write",
-            reason: "ffmpeg stopped.",
+            reason: "Writing stopped · original kept",
           }),
         ],
       }),
     );
 
-    const card = cardNamed(/Failed at Write/);
+    const card = cardNamed(/Couldn't finish/);
     expect(card).toHaveClass("mm-pipe__card--failed");
     expect(card).toHaveAttribute("data-stage", "processing");
-    expect(within(card).getByText("ffmpeg stopped.")).toBeInTheDocument();
+    expect(
+      within(card).getByText("Writing stopped · original kept"),
+    ).toBeInTheDocument();
   });
 
   it("hands its tile over for the flight to the shelf when the hold ends, and not before", () => {

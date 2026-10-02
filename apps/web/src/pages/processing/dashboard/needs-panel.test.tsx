@@ -16,7 +16,11 @@ import type { ProcessingLibrary } from "../../../lib/processing/libraries-api";
 import { NeedsPanel } from "./needs-panel";
 
 type RequeueHandlers = {
-  onSuccess: (result: { detail: string }) => void;
+  onSuccess: (result: {
+    detail: string;
+    requeued: number;
+    skipped: number;
+  }) => void;
   onError: (error: unknown) => void;
 };
 
@@ -149,20 +153,21 @@ describe("the Needs you panel when something does", () => {
     renderPanel();
 
     expect(
-      screen.getByRole("region", { name: "1 failed while writing" }),
+      screen.getByRole("region", { name: "1 couldn't finish writing" }),
     ).toHaveTextContent("Ember and Ash S01E02");
     expect(
       screen.getByRole("region", { name: "1 not in a language you keep" }),
     ).toHaveTextContent("Old Film (2019)");
   });
 
-  it("gives a file its reason and its workflow", () => {
+  it("gives a file a few words on why, its workflow and the server's sentence as a tooltip", () => {
     needFiles.files = [stuckFile];
     renderPanel();
 
     const row = screen.getByTestId("live-needs");
-    expect(row).toHaveTextContent("The new file would not play.");
+    expect(row).toHaveTextContent("Writing stopped · original kept");
     expect(row).toHaveTextContent("TV");
+    expect(screen.getByTitle("The new file would not play.")).toBeVisible();
   });
 
   it("offers Process all again beside the rejected files only, for the workflow the panel is narrowed to", () => {
@@ -170,7 +175,7 @@ describe("the Needs you panel when something does", () => {
     renderPanel({ workflowId: 1 });
 
     const failedGroup = screen.getByRole("region", {
-      name: "1 failed while writing",
+      name: "1 couldn't finish writing",
     });
     const rejectedGroup = screen.getByRole("region", {
       name: "1 not in a language you keep",
@@ -260,9 +265,29 @@ describe("trying a file again", () => {
     expect(screen.getByRole("button", { name: "Queueing…" })).toBeDisabled();
   });
 
-  it("says what the server answered when it is queued", () => {
+  it("says in two words that it is queued", () => {
     requeue.mutate = vi.fn((_id: number, handlers: RequeueHandlers) =>
-      handlers.onSuccess({ detail: "Queued this file again." }),
+      handlers.onSuccess({
+        detail: "Queued again by hand. It starts as soon as there is room.",
+        requeued: 1,
+        skipped: 0,
+      }),
+    );
+    needFiles.files = [stuckFile];
+    renderPanel();
+
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+
+    expect(screen.getByRole("status")).toHaveTextContent("Queued again.");
+  });
+
+  it("gives the server's reason when it would not queue the file", () => {
+    requeue.mutate = vi.fn((_id: number, handlers: RequeueHandlers) =>
+      handlers.onSuccess({
+        detail: "The original of this file is no longer in the watched folder.",
+        requeued: 0,
+        skipped: 1,
+      }),
     );
     needFiles.files = [stuckFile];
     renderPanel();
@@ -270,7 +295,7 @@ describe("trying a file again", () => {
     fireEvent.click(screen.getByRole("button", { name: "Try again" }));
 
     expect(screen.getByRole("status")).toHaveTextContent(
-      "Queued this file again.",
+      "The original of this file is no longer in the watched folder.",
     );
   });
 
@@ -284,7 +309,7 @@ describe("trying a file again", () => {
     fireEvent.click(screen.getByRole("button", { name: "Try again" }));
 
     expect(screen.getByRole("alert")).toHaveTextContent(
-      "That file could not be queued again.",
+      "Couldn't queue that file.",
     );
   });
 });
@@ -315,14 +340,14 @@ describe("asking a workflow to look again at a held or skipped file", () => {
   it("says that the workflow is being checked again", () => {
     needFiles.files = [held];
     checkAgain.mutate = vi.fn((_vars: unknown, handlers: RequeueHandlers) =>
-      handlers.onSuccess({ detail: "" }),
+      handlers.onSuccess({ detail: "", requeued: 0, skipped: 0 }),
     );
     renderPanel();
 
     fireEvent.click(screen.getByRole("button", { name: "Check again" }));
 
     expect(screen.getByRole("status")).toHaveTextContent(
-      "Weir is checking this workflow again",
+      "Checking this workflow again",
     );
   });
 });

@@ -54,9 +54,8 @@ import { useStillWhileResizing } from "./use-still-while-resizing";
 /** The space under the lanes inside the board, in px. */
 const LANES_BOTTOM_PX = 10;
 
-const NOTHING_IN_PROGRESS =
-  "Nothing is being cleaned right now. New downloads show up here within seconds.";
-const PAUSED = "Paused. Nothing new starts until you resume.";
+const NOTHING_IN_PROGRESS = "Nothing in progress. New downloads appear here.";
+const PAUSED = "Paused · nothing new starts.";
 
 function Station({ stage, count }: { stage: PipelineStage; count: number }) {
   return (

@@ -3,9 +3,8 @@ import { Link } from "react-router-dom";
 import { Panel } from "../../../components/panels/panel";
 import { lineWords, waitFraction, type NextItem } from "./next-model";
 
-const NOTHING_SCHEDULED =
-  "Nothing is waiting on a timer. Turn on a workflow or a cleanup job to see it here.";
-const PAUSED = "Processing is paused. Nothing new starts until you resume.";
+const NOTHING_SCHEDULED = "Nothing scheduled. Switch on a workflow or cleanup.";
+const PAUSED = "Paused · nothing new starts.";
 
 type TimersPanelProps = {
   /** What Weir does on its own, soonest first. */

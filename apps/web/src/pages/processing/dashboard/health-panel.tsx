@@ -8,6 +8,7 @@ import {
   workflowKindOf,
 } from "../../../lib/processing/workflow-kind";
 import { useNow } from "../../../lib/ui/use-now";
+import { firstSentence } from "../processing-model";
 import { CheckNowButton, useCheckNow } from "./check-now";
 import { connectionPills, healthSummary, problemCount } from "./health-model";
 import { useHealth } from "./use-health";
@@ -75,7 +76,7 @@ export function HealthPanel({ workflows, workflowId }: HealthPanelProps) {
         ) : null}
         <Section title="Workflows">
           {health.workflows.length === 0 ? (
-            <p className="mm-health__empty">No workflow is switched on.</p>
+            <p className="mm-health__empty">No workflow switched on.</p>
           ) : (
             <ul className="mm-health__list">
               {health.workflows.map(({ workflow, verdict, why }) => (
@@ -92,7 +93,11 @@ export function HealthPanel({ workflows, workflowId }: HealthPanelProps) {
                     </small>
                   </Link>
                   <Chip tone={verdict.tone}>{verdict.words}</Chip>
-                  {why ? <p className="mm-health__why">{why}</p> : null}
+                  {why ? (
+                    <p className="mm-health__why" title={why}>
+                      {firstSentence(why)}
+                    </p>
+                  ) : null}
                 </li>
               ))}
             </ul>
@@ -100,9 +105,7 @@ export function HealthPanel({ workflows, workflowId }: HealthPanelProps) {
         </Section>
         <Section title="Connections">
           {connections.length === 0 ? (
-            <p className="mm-health__empty">
-              No media manager or download client is connected.
-            </p>
+            <p className="mm-health__empty">Nothing connected.</p>
           ) : (
             <ul className="mm-health__pills">
               {connections.map((pill) => (

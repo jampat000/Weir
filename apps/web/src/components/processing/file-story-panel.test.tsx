@@ -104,16 +104,14 @@ it("shows a rejection as a Rejected step with its reason, not as Could not finis
 
 it("keeps the technical detail behind a disclosure, never leading", () => {
   mount();
-  const summary = screen.getByText("Show the technical detail");
+  const summary = screen.getByText("Technical detail");
   expect(summary.closest("details")).not.toHaveAttribute("open");
 });
 
 it("says how long a file's history is kept once the file is gone", () => {
   mount();
   expect(
-    screen.getByText(
-      "Weir keeps this history while it still knows the file, then for 90 days after the file is gone.",
-    ),
+    screen.getByText("Kept while the file exists, then 90 days."),
   ).toBeInTheDocument();
 });
 
@@ -137,9 +135,7 @@ it("takes focus when it opens", () => {
 
 it("explains an empty record rather than showing nothing", () => {
   mount({ log: log({ entries: [] }) });
-  expect(
-    screen.getByText(/has not worked on this file yet/),
-  ).toBeInTheDocument();
+  expect(screen.getByText(/hasn.t worked on this file/)).toBeInTheDocument();
 });
 
 it("shows a failure to load", () => {

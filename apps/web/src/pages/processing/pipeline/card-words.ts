@@ -21,7 +21,8 @@ import {
   timeLeft,
   workingFigures,
 } from "../processing-words";
-import { FLOW_STEPS, type FlowStepId } from "../stage-flow-model";
+import { holdWords, outOfScheduleWords } from "../reason-words";
+import type { FlowStepId } from "../stage-flow-model";
 import type {
   CardBar,
   CardStatus,
@@ -42,7 +43,6 @@ const SOURCE_LABEL: Record<WorkSource, string> = {
 const MOVING_BAR: CardBar = { width: 35, waiting: true, moving: true };
 
 const bold = (text: string): DetailPart => ({ bold: text });
-const withoutFinalStop = (text: string) => text.replace(/\.$/, "");
 
 /** "Download · Movies": where the file came from and which workflow has it. */
 function sourceLine(source: WorkSource, workflow: string): DetailLine {
@@ -84,15 +84,12 @@ export function incomingWords(item: ArrivingItem, now: number): CardWords {
   const checking = ringState(left) === "checking";
   const fraction = ringFraction(item, left);
   const status: CardStatus = checking
-    ? {
-        text: item.upstream ? "Checking again now" : "Checking it now",
-        tone: "info",
-        pulse: true,
-      }
+    ? { text: "Checking now", tone: "info", pulse: true }
     : {
-        text: withoutFinalStop(item.note) || "Not ready yet",
+        text: waitingWords(item),
         tone: "info",
         pulse: false,
+        full: item.note || undefined,
       };
   const timing =
     ringState(left) === "counting" && left != null
@@ -111,6 +108,12 @@ export function incomingWords(item: ArrivingItem, now: number): CardWords {
   };
 }
 
+/** What an arriving file waits for, in a few words: a media manager still importing it, or the kind of hold it is on. */
+function waitingWords(item: ArrivingItem): string {
+  if (item.upstream) return "Still importing";
+  return item.note ? holdWords(item.note) : "Waiting";
+}
+
 export function queuedWords(item: WaitingItem, place: number): CardWords {
   const line = factsLine(
     item.source === "library" ? "" : item.facts,
@@ -118,9 +121,10 @@ export function queuedWords(item: WaitingItem, place: number): CardWords {
   );
   return {
     status: {
-      text: item.note ? withoutFinalStop(item.note) : "Waiting its turn",
+      text: item.note ? outOfScheduleWords(item.note) : "Waiting its turn",
       tone: "idle",
       pulse: false,
+      full: item.note ?? undefined,
     },
     bar: null,
     details: present([
@@ -131,21 +135,21 @@ export function queuedWords(item: WaitingItem, place: number): CardWords {
 }
 
 const ANALYSING_TEXT: Partial<Record<FlowStepId, string>> = {
-  checking: "Checking the file",
-  plan: "Planning what to keep",
+  checking: "Checking file",
+  plan: "Planning tracks",
 };
 
 function analysingWords(item: WorkingItem): CardWords {
   const running = workingFigures(item).running;
   return {
     status: {
-      text: ANALYSING_TEXT[item.step] ?? "Checking the file",
+      text: ANALYSING_TEXT[item.step] ?? "Checking file",
       tone: "info",
       pulse: true,
     },
     bar: MOVING_BAR,
     details: present([
-      factsLine(item.facts, running ? `running for ${running}` : undefined),
+      factsLine(item.facts, running ? `running ${running}` : undefined),
       ...footer(item.source, item.libraryName, item.path),
     ]),
   };
@@ -157,7 +161,7 @@ function writingWords(item: WorkingItem, percent: number): CardWords {
   const removed = removedTrackWords(item);
   return {
     status: {
-      text: [`${whole}%`, "writing", figures.speed].filter(Boolean).join(" · "),
+      text: [`${whole}% writing`, figures.speed].filter(Boolean).join(" · "),
       lead: `${whole}%`,
       tone: "info",
       pulse: false,
@@ -173,9 +177,7 @@ function writingWords(item: WorkingItem, percent: number): CardWords {
       figures.reading || figures.running
         ? {
             parts: figures.reading ? ["Reading ", bold(figures.reading)] : [],
-            right: figures.running
-              ? `running for ${figures.running}`
-              : undefined,
+            right: figures.running ? `running ${figures.running}` : undefined,
           }
         : null,
       removed.length > 0
@@ -188,10 +190,8 @@ function writingWords(item: WorkingItem, percent: number): CardWords {
 
 /** What a pass says while it has no percentage to show. */
 function unmeasuredProcessingText(item: WorkingItem): string {
-  if (item.step === "verify") return "Verifying the new file";
-  return item.source === "library"
-    ? "Cleaning in place"
-    : "Writing the new copy";
+  if (item.step === "verify") return "Verifying";
+  return item.source === "library" ? "Cleaning" : "Writing copy";
 }
 
 function processingWords(item: WorkingItem): CardWords {
@@ -212,7 +212,7 @@ function processingWords(item: WorkingItem): CardWords {
     bar: MOVING_BAR,
     details: present([
       item.source === "download"
-        ? factsLine(item.facts, running ? `running for ${running}` : undefined)
+        ? factsLine(item.facts, running ? `running ${running}` : undefined)
         : null,
       ...footer(item.source, item.libraryName, item.path),
     ]),
@@ -222,10 +222,7 @@ function processingWords(item: WorkingItem): CardWords {
 export function deliveringWords(item: HandingItem | WorkingItem): CardWords {
   return {
     status: {
-      text:
-        item.source === "library"
-          ? "Swapping it into place"
-          : "Final checks, then handing back",
+      text: item.source === "library" ? "Replacing file" : "Handing back",
       tone: "info",
       pulse: true,
     },
@@ -242,10 +239,6 @@ export function workingWords(
   if (stage === "analysing") return analysingWords(item);
   return stage === "processing" ? processingWords(item) : deliveringWords(item);
 }
-
-const STEP_LABEL = new Map<FlowStepId, string>(
-  FLOW_STEPS.map((step) => [step.id, step.label]),
-);
 
 export const DELIVERED_LEAD = "✓ Delivered";
 
@@ -267,19 +260,17 @@ export function deliveredWords(
   };
 }
 
-/** A card whose file stopped: the step it stopped at, and why. A rejection is a decision, so it is not drawn as a failure. */
+/** A card whose file stopped, in the station it stopped at, with a few words on why. A rejection is a decision, so it is not drawn as a failure. */
 export function stoppedWords(
   kind: "failed" | "rejected",
-  at: FlowStepId,
   reason: string,
   source: WorkSource,
   workflow: string,
   path: string,
 ): CardWords {
-  const step = STEP_LABEL.get(at) ?? "the last step";
   return {
     status: {
-      text: kind === "failed" ? `Failed at ${step}` : "Rejected",
+      text: kind === "failed" ? "Couldn't finish" : "Rejected",
       tone: kind === "failed" ? "bad" : "warn",
       pulse: false,
     },

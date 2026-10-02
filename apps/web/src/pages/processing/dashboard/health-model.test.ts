@@ -70,7 +70,7 @@ describe("why a workflow is not in sync", () => {
 
   it("sends the person to the workflow when the chain is not ready but names nothing", () => {
     expect(whyNotInSync(chain(false, [ok]))).toBe(
-      "Open this workflow to see what needs a fix.",
+      "Open it to see what to fix.",
     );
   });
 });

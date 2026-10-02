@@ -47,13 +47,13 @@ describe("TimersPanel", () => {
 
   it("says so when nothing is on a timer", () => {
     show({ items: [] });
-    expect(screen.getByText(/Nothing is waiting on a timer/)).toBeVisible();
+    expect(screen.getByText(/Nothing scheduled/)).toBeVisible();
     expect(screen.queryByRole("listitem")).toBeNull();
   });
 
   it("says that nothing new starts while paused, and still lists the timers", () => {
     show({ paused: true });
-    expect(screen.getByText(/Processing is paused/)).toBeVisible();
+    expect(screen.getByText(/Paused · nothing new starts/)).toBeVisible();
     expect(screen.getAllByRole("listitem")).toHaveLength(2);
   });
 });

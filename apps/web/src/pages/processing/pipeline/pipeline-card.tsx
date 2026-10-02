@@ -70,7 +70,13 @@ function Detail({ line }: { line: DetailLine }) {
 
 function tooltip(card: Card): string {
   const source = card.source === "library" ? "Library clean" : "Download";
-  return [card.title, source, card.workflow, baseName(card.path)]
+  return [
+    card.title,
+    source,
+    card.workflow,
+    baseName(card.path),
+    card.status.full,
+  ]
     .filter(Boolean)
     .join(" · ");
 }

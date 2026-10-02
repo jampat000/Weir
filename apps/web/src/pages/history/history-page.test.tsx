@@ -256,9 +256,7 @@ describe("HistoryPage", () => {
 
     expect(
       await screen.findByTestId("history-retention-note"),
-    ).toHaveTextContent(
-      "Weir keeps this history while it still knows the file, then for 45 days after the file is gone.",
-    );
+    ).toHaveTextContent("Kept while the file exists, then 45 days.");
   });
 
   it("says a file's history is kept until it is removed when the days are 0", async () => {
@@ -272,7 +270,7 @@ describe("HistoryPage", () => {
 
     expect(
       await screen.findByTestId("history-retention-note"),
-    ).toHaveTextContent("Weir keeps this history until you remove it.");
+    ).toHaveTextContent("Kept until you remove it.");
   });
 
   it("counts every file under the chip it belongs to", () => {

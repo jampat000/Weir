@@ -41,8 +41,7 @@ const EVENT_LABELS: Record<string, string> = {
   "processing.failure_cleanup_sweep_completed":
     "Cleanup after failed processing finished",
   "processing.handback_outcome": "What happened to a cleaned copy",
-  "processing.unclaimed_handback_cleanup_completed":
-    "Cleanup of copies nobody picked up finished",
+  "processing.unclaimed_handback_cleanup_completed": "Unclaimed copies cleared",
 };
 
 /** Routine processing events: one fixed title, a compact row. */

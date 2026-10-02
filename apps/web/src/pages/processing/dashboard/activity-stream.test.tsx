@@ -74,9 +74,7 @@ describe("the activity stream panel", () => {
     renderStream();
 
     expect(
-      screen.getByText(
-        "Nothing has happened yet. What Weir does shows up here as it works.",
-      ),
+      screen.getByText("Nothing yet. What Weir does appears here."),
     ).toBeInTheDocument();
     expect(screen.queryByTestId("live-stream")).toBeNull();
   });

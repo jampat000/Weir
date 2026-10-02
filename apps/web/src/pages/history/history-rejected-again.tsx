@@ -40,9 +40,7 @@ export function ProcessRejectedAgain({
         }
       },
       onError: (error) =>
-        setNotice(
-          errorMessage(error, "Weir could not count the rejected files."),
-        ),
+        setNotice(errorMessage(error, "Couldn't count the rejected files.")),
     });
   }
 
@@ -50,7 +48,11 @@ export function ProcessRejectedAgain({
     processAgain.mutate(libraryId, {
       onSuccess: (result) => {
         setAsking(null);
-        setNotice(result.detail);
+        setNotice(
+          result.requeued > 0
+            ? queuedNotice(result.requeued, result.skipped)
+            : result.detail,
+        );
       },
     });
   }
@@ -107,6 +109,12 @@ export function ProcessRejectedAgain({
   );
 }
 
+/** What a bulk queue did, counted: "Queued 3 files.", or "Queued 3 files · 1 skipped." */
+function queuedNotice(queued: number, skipped: number): string {
+  const done = `Queued ${plural(queued, "file", "files")}`;
+  return skipped > 0 ? `${done} · ${skipped} skipped.` : `${done}.`;
+}
+
 /** What happens to the rejected files whose original is gone. */
 function skippedSentence(gone: number): string {
   return `${plural(gone, "other rejected file is", "other rejected files are")} skipped, because ${gone === 1 ? "its original is" : "their originals are"} no longer in the watched folder.`;
@@ -114,10 +122,8 @@ function skippedSentence(gone: number): string {
 
 /** Why the button did nothing: there is nothing rejected, or every original is gone. */
 function nothingToProcess(summary: RejectedFilesSummary): string {
-  if (summary.rejected === 0) {
-    return "There are no rejected files to process again.";
-  }
+  if (summary.rejected === 0) return "No rejected files.";
   return summary.rejected === 1
-    ? "The one rejected file cannot be processed again: its original is no longer in the watched folder."
-    : `None of the ${summary.rejected.toLocaleString()} rejected files can be processed again: their originals are no longer in the watched folder.`;
+    ? "Original gone · can't process again."
+    : "Originals gone · can't process again.";
 }

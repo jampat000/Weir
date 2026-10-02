@@ -52,7 +52,7 @@ function scans(workflows: readonly ProcessingLibrary[]): NextItem[] {
     return [
       {
         key: `scan-${workflow.id}`,
-        label: `Look for new downloads in ${workflow.name}`,
+        label: `Scan ${workflow.name} downloads`,
         to: workflowPath(workflow.id),
         at,
         intervalSeconds: workflow.scan_interval_seconds,
@@ -68,7 +68,7 @@ function libraryCleans(runs: readonly LibraryCleanRun[]): NextItem[] {
     return [
       {
         key: `clean-${run.libraryId}`,
-        label: `Clean the ${run.libraryName} library`,
+        label: `Clean ${run.libraryName} library`,
         to: "/library",
         at,
         intervalSeconds: DAY_SECONDS,
@@ -80,14 +80,14 @@ function libraryCleans(runs: readonly LibraryCleanRun[]): NextItem[] {
 function cleanups(jobs: readonly MaintenanceFamilyState[]): NextItem[] {
   return jobs.flatMap((job) => {
     const at = parseAppTime(job.next_run_at);
-    const name = CLEANUP_JOBS.find(
+    const label = CLEANUP_JOBS.find(
       (known) => known.family === job.family,
-    )?.name;
-    if (!job.enabled || at === null || !name) return [];
+    )?.timerLabel;
+    if (!job.enabled || at === null || !label) return [];
     return [
       {
         key: `cleanup-${job.family}`,
-        label: `Cleanup: ${name}`,
+        label,
         to: "/settings?tab=cleanup",
         at,
         intervalSeconds: job.interval_seconds ?? null,

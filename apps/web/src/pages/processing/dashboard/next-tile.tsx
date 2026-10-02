@@ -31,22 +31,15 @@ function pausedParts(): TileParts {
         <StatUnit>nothing new starts</StatUnit>
       </>
     ),
-    body: (
-      <p className="mm-stat__idle">
-        Files already being written finish; nothing new starts until you resume.
-      </p>
-    ),
+    body: <p className="mm-stat__idle">Running files finish first.</p>,
   };
 }
 
 function nothingScheduledParts(): TileParts {
   return {
-    figure: <StatUnit>nothing is scheduled</StatUnit>,
+    figure: <StatUnit>nothing scheduled</StatUnit>,
     body: (
-      <p className="mm-stat__idle">
-        Nothing is waiting on a timer. Turn on a workflow or a cleanup job to
-        see it here.
-      </p>
+      <p className="mm-stat__idle">Switch on a workflow or a cleanup job.</p>
     ),
   };
 }

@@ -25,9 +25,9 @@ export function finishedLine(item: FinishedFile): string {
     case "already":
       return "Already clean";
     case "passed":
-      return "Passed through untouched · Weir could not process it";
+      return "Couldn't finish · passed through";
     case "failed":
-      return "Could not be finished · the original is untouched";
+      return "Couldn't finish · original kept";
     default: {
       const removed = removedTrackWords(item);
       const saved = item.savedBytes
@@ -38,6 +38,23 @@ export function finishedLine(item: FinishedFile): string {
         : saved;
     }
   }
+}
+
+/** What a library clean's own entry says it removed: "removed 2 audio tracks and 1 subtitle track". */
+const LIBRARY_REMOVED = /: (removed [^.]+)\./;
+
+/**
+ * What the Activity stream adds under an entry whose own words already say how it ended: the part of
+ * {@link finishedLine} that is news, never a sentence that tells the story again.
+ */
+export function finishedNote(item: FinishedFile): string {
+  if (item.kind === "rejected") return "By your rules";
+  if (item.source === "library") {
+    return LIBRARY_REMOVED.exec(item.sentence ?? "")?.[1] ?? "";
+  }
+  if (item.kind === "passed") return "Couldn't finish it";
+  if (item.kind === "failed") return "Original kept";
+  return finishedLine(item);
 }
 
 /** A moment younger than this is "just now". */

@@ -66,7 +66,7 @@ describe("the activity stream", () => {
 
     expect(sentenceOf(rows[0])).toContain("was rejected");
     expect(rows[0].tone).toBe("warning");
-    expect(sentenceOf(rows[1])).toContain("could not be finished");
+    expect(sentenceOf(rows[1])).toContain("couldn't finish");
     expect(rows[1].tone).toBe("error");
   });
 

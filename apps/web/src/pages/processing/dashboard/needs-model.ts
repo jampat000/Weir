@@ -1,12 +1,10 @@
 /** What needs a person, as groups of rows: each says what is wrong, why, and where to go or what to do about it. */
-import {
-  REJECTED_BY_RULES,
-  type ProcessingFile,
-} from "../../../lib/processing/files-api";
+import type { ProcessingFile } from "../../../lib/processing/files-api";
 import type { ProcessingLibrary } from "../../../lib/processing/libraries-api";
 import type { SystemReadiness } from "../../../lib/api/types";
 import { plural } from "../../../lib/ui/mm-plural";
 import { firstSentence, prettyName } from "../processing-model";
+import { fileReason, type FileReason } from "../file-reason";
 
 /** Past this many failed jobs the count reads "100+": the list behind the link has the rest. */
 export const FAILED_JOBS_LIMIT = 100;
@@ -24,12 +22,14 @@ export const NEEDS_FILE_STATUSES = [
 
 /** Where the files that need a look are listed: History's failed and rejected files. */
 export const NEEDS_A_LOOK_PATH = "/history?show=failed";
-const NO_REASON = "Weir could not finish this file. The original is untouched.";
 
 export type NeedRow = {
   key: string;
   title: string;
+  /** A few words on why: what kind of stop it is. */
   reason: string;
+  /** The server's own sentence, for the row's tooltip. */
+  detail?: string;
   /** The file a row is about, which has the file's own actions. */
   file?: ProcessingFile;
   /** Where to read more or fix it, for a row that is not a file. */
@@ -46,8 +46,6 @@ export type NeedGroup = {
   /** The group's rejected files can all be processed again at once. */
   rejected: boolean;
 };
-
-type FileReason = { key: string; words: string; rejected: boolean };
 
 /**
  * How the server words a skip for one of the workflow's own rules: its path, size or dates. Any other skip is
@@ -70,70 +68,12 @@ export function waitsOnAPerson(file: ProcessingFile): boolean {
   }
 }
 
-/** What the rules say when the audio left nothing in a language the workflow keeps. */
-const LANGUAGE_REJECTION = /language|audio tracks/i;
-
-/** What went wrong with a file, in the words a group is titled with. */
-function fileReason(file: ProcessingFile): FileReason {
-  if (file.status === "rejected") {
-    if (LANGUAGE_REJECTION.test(file.status_reason)) {
-      return {
-        key: "rejected-language",
-        words: "not in a language you keep",
-        rejected: true,
-      };
-    }
-    return file.failure_class === REJECTED_BY_RULES
-      ? {
-          key: "rejected-rules",
-          words: "turned down by your rules",
-          rejected: true,
-        }
-      : {
-          key: "rejected-replacement",
-          words: "rejected for a replacement",
-          rejected: true,
-        };
-  }
-  if (file.status === "on_hold") {
-    return { key: "stuck", words: "stuck", rejected: false };
-  }
-  if (file.status === "skipped") {
-    return {
-      key: "skipped-by-rule",
-      words: "skipped by a workflow rule",
-      rejected: false,
-    };
-  }
-  switch (file.failure_class) {
-    case "execution":
-      return {
-        key: "failed-writing",
-        words: "failed while writing",
-        rejected: false,
-      };
-    case "preflight":
-      return {
-        key: "failed-checks",
-        words: "did not pass the checks",
-        rejected: false,
-      };
-    case "guardrail":
-      return {
-        key: "failed-guardrail",
-        words: "stopped to keep the original safe",
-        rejected: false,
-      };
-    default:
-      return { key: "failed", words: "failed", rejected: false };
-  }
-}
-
 function fileRow(file: ProcessingFile): NeedRow {
   return {
     key: `file-${file.id}`,
     title: prettyName(file.relative_path),
-    reason: firstSentence(file.status_reason) || NO_REASON,
+    reason: fileReason(file).short,
+    detail: firstSentence(file.status_reason) || undefined,
     file,
   };
 }
@@ -186,7 +126,8 @@ function setupNeed(
   return {
     key: "setup",
     title: "Nothing to watch yet",
-    reason:
+    reason: "Add or switch on a workflow",
+    detail:
       "Weir picks files up from a workflow's watched folder. Add one, or turn an existing workflow on.",
     link: { label: "Set up a workflow", to: "/settings?tab=libraries" },
   };
@@ -200,7 +141,8 @@ function workerNeeds(
     .map((worker) => ({
       key: `worker-${worker.module}`,
       title: "Background work has stopped",
-      reason: worker.detail,
+      reason: "Not responding · restart Weir",
+      detail: worker.detail,
       link: { label: "Open jobs", to: "/system?tab=history&show=jobs" },
     }));
 }
@@ -212,7 +154,7 @@ function failedJobsNeed(count: number): NeedRow | null {
   return {
     key: "failed-jobs",
     title: count === 1 ? "1 job failed" : `${shown} jobs failed`,
-    reason: "Each one says what went wrong and what to do next.",
+    reason: "Each says what to do next",
     link: {
       label: "Review failed jobs",
       to: "/system?tab=history&show=jobs&status=failed",

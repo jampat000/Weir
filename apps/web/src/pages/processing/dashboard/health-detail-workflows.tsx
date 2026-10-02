@@ -38,9 +38,7 @@ function WorkflowDetail({
         {chain ? (
           <FolderChainSections chain={chain} />
         ) : (
-          <p className="mm-health__empty">
-            The folder check has not answered yet.
-          </p>
+          <p className="mm-health__empty">Folder check pending.</p>
         )}
       </div>
       <p className="mm-health-detail__links">
@@ -83,7 +81,7 @@ export function WorkflowsDetail({
           </p>
         ) : null}
         {health.workflows.length === 0 ? (
-          <p className="mm-health__empty">No workflow is switched on.</p>
+          <p className="mm-health__empty">No workflow switched on.</p>
         ) : (
           <ul className="mm-health-detail__workflows">
             {health.workflows.map((item) => (

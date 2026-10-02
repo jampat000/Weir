@@ -11,6 +11,8 @@ const DAY = 86400;
 export const CLEANUP_JOBS: {
   family: MaintenanceFamily;
   name: string;
+  /** The job as a timer reads on the Dashboard: a few words. */
+  timerLabel: string;
   enabledField:
     "work_temp_stale_sweep_enabled" | "unclaimed_handback_cleanup_enabled";
   intervalField:
@@ -22,6 +24,7 @@ export const CLEANUP_JOBS: {
   {
     family: "work_temp_stale_sweep",
     name: "Leftover work files",
+    timerLabel: "Clear leftover files",
     enabledField: "work_temp_stale_sweep_enabled",
     intervalField: "work_temp_stale_sweep_interval_seconds",
     destructive: false,
@@ -30,6 +33,7 @@ export const CLEANUP_JOBS: {
     // #652: Weir's own cleaned copies that no media manager imported in time. Off until a person switches it on.
     family: "unclaimed_handbacks",
     name: "Cleaned copies nobody picked up",
+    timerLabel: "Clear unclaimed copies",
     enabledField: "unclaimed_handback_cleanup_enabled",
     intervalField: "unclaimed_handback_cleanup_interval_seconds",
     destructive: true,

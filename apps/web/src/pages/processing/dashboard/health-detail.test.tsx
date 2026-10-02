@@ -148,7 +148,7 @@ describe("the full Health view", () => {
     renderDetail();
 
     expect(screen.getByTestId("health-workflow")).toHaveTextContent(
-      "The folder check has not answered yet.",
+      "Folder check pending.",
     );
   });
 
@@ -175,7 +175,7 @@ describe("the full Health view", () => {
     renderDetail();
 
     expect(screen.getByTestId("health-disk-note")).toHaveTextContent(
-      "Weir does not report how much room is left on a drive.",
+      "Weir holds a file that would leave less than this free.",
     );
     const disk = screen.getByRole("region", { name: "Disk space" });
     expect(disk).toHaveTextContent("Keeps 20.00 GB free");

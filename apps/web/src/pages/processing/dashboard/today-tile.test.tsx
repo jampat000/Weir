@@ -134,7 +134,7 @@ describe("the Today tile", () => {
   it("says in the chart itself when nothing finished, and draws no such line when something did", () => {
     const tile = renderTile();
     expect(tile.querySelector(".mm-today-chart__empty")).toHaveTextContent(
-      "Nothing finished in the last 2 hours",
+      "Nothing in the last 2 hours",
     );
 
     cleanup();

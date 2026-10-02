@@ -113,7 +113,7 @@ it("says a single skipped file in the singular", async () => {
   ).toBeInTheDocument();
 });
 
-it("processes them again once confirmed, and reports what the server answered", async () => {
+it("processes them again once confirmed, and counts what it queued", async () => {
   vi.spyOn(api, "fetchRejectedFilesSummary").mockResolvedValue({
     rejected: 3,
     ready: 3,
@@ -130,11 +130,7 @@ it("processes them again once confirmed, and reports what the server answered", 
 
   fireEvent.click(await screen.findByTestId(`${CONFIRM}-confirm`));
 
-  expect(
-    await screen.findByText(
-      "Queued 3 files again. They start as capacity frees up.",
-    ),
-  ).toBeInTheDocument();
+  expect(await screen.findByText("Queued 3 files.")).toBeInTheDocument();
   expect(processAgain).toHaveBeenCalledWith(4);
   expect(screen.queryByTestId(CONFIRM)).not.toBeInTheDocument();
 });
@@ -184,9 +180,7 @@ it("says there is nothing to process again when no file is rejected", async () =
 
   pressProcessAllAgain();
 
-  expect(
-    await screen.findByText("There are no rejected files to process again."),
-  ).toBeInTheDocument();
+  expect(await screen.findByText("No rejected files.")).toBeInTheDocument();
   expect(screen.queryByTestId(CONFIRM)).not.toBeInTheDocument();
 });
 
@@ -200,9 +194,7 @@ it("says so, without asking, when every rejected file has lost its original", as
   pressProcessAllAgain();
 
   expect(
-    await screen.findByText(
-      "None of the 4 rejected files can be processed again: their originals are no longer in the watched folder.",
-    ),
+    await screen.findByText("Originals gone · can't process again."),
   ).toBeInTheDocument();
   expect(screen.queryByTestId(CONFIRM)).not.toBeInTheDocument();
 });
@@ -217,9 +209,7 @@ it("says the one rejected file cannot be processed again when its original is go
   pressProcessAllAgain();
 
   expect(
-    await screen.findByText(
-      "The one rejected file cannot be processed again: its original is no longer in the watched folder.",
-    ),
+    await screen.findByText("Original gone · can't process again."),
   ).toBeInTheDocument();
 });
 
