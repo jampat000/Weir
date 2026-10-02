@@ -121,10 +121,16 @@
     display: block;
   }
 
-  /* The three buttons are 369px wide at the default text size. */
+  /* The three buttons are 369px wide at the default text size. The switch is as wide as they are, not as wide as
+     the room it was measured in. */
   @container (min-width: 24.7rem) {
     .mm-dash-controls__switch {
       display: block;
+    }
+
+    .mm-dash-controls__switch .mm-segmented {
+      width: fit-content;
+      max-width: 100%;
     }
 
     .mm-dash-controls__compact {
