@@ -301,66 +301,6 @@ a.mm-stat__label:hover {
   background: var(--mm-surface-2);
 }
 
-/* ---- Bar-list row (components/panels/bar-list-row.tsx) ------------------- */
-
-.mm-bar-row {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 5px 10px;
-  margin: -3px -4px;
-  padding: 3px 4px;
-  border-radius: 6px;
-  font-size: var(--mm-type-body);
-  color: var(--mm-text2);
-  text-decoration: none;
-}
-
-a.mm-bar-row:hover {
-  background: var(--mm-surface-2);
-}
-
-.mm-bar-row__label {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.mm-bar-row__value {
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  color: var(--mm-text1);
-}
-
-.mm-bar-row__track {
-  grid-column: 1 / -1;
-  height: 6px;
-  overflow: hidden;
-  border-radius: 9px;
-  background: var(--mm-surface-3);
-}
-
-.mm-bar-row__track i {
-  display: block;
-  height: 100%;
-  border-radius: 9px;
-  background: var(--mm-bar-color);
-  transition:
-    width 0.7s cubic-bezier(0.2, 0.8, 0.2, 1),
-    box-shadow 0.3s;
-}
-
-.mm-bar-row--empty {
-  color: var(--mm-text3);
-}
-
-.mm-bar-row--empty .mm-bar-row__value {
-  color: var(--mm-text3);
-}
-
-.mm-bar-row--lit .mm-bar-row__track i {
-  box-shadow: 0 0 12px var(--mm-bar-color);
-}
-
 /* ---- Segmented control (components/panels/segmented-control.tsx) --------- */
 
 .mm-segmented {

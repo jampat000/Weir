@@ -17,8 +17,7 @@
 }
 
 /* The quiet line that explains something, under a field or on its own. */
-.mm-field__hint,
-.mm-caption-note {
+.mm-field__hint {
   font-size: var(--mm-type-caption);
   line-height: 1.45;
   color: var(--mm-text3);

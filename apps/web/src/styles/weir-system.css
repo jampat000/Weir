@@ -42,18 +42,6 @@
   width: 11rem;
 }
 
-/* A destructive action reads as one before it is pressed: the outline and the words are the failure colour. */
-.mm-system .mm-sys-btn--danger {
-  border-color: color-mix(in srgb, var(--mm-destructive) 55%, var(--mm-border));
-  color: var(--mm-status-failed-text);
-}
-
-.mm-system .mm-sys-btn--danger:hover:not(:disabled) {
-  border-color: var(--mm-destructive);
-  background: color-mix(in srgb, var(--mm-destructive) 12%, transparent);
-  color: var(--mm-status-failed-text);
-}
-
 /* Cards in rows of two, each row as tall as its taller card, so a pair lines up top and bottom and nothing hangs
    below its neighbour. A card's content stays at its top. */
 .mm-sys-stack {
@@ -259,14 +247,6 @@
   font-weight: 600;
   letter-spacing: var(--mm-tracking-eyebrow);
   text-transform: uppercase;
-}
-
-/* The network's state sits where the time zone's picker does, so the notes under them start on one line. */
-.mm-this-pc__state {
-  display: flex;
-  align-items: center;
-  min-height: var(--mm-control-height-page);
-  margin: 0;
 }
 
 .mm-system .mm-schedule-zone {

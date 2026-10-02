@@ -129,7 +129,6 @@
   --mm-type-body: 0.84375rem; /* 13.5px: rows and body copy */
   --mm-type-panel: 1rem; /* 16px: panel and card headings */
   --mm-type-title: 1.5rem; /* 24px: page title */
-  --mm-type-figure: 1.75rem; /* 28px: hero figures and stat values */
   --mm-tracking-eyebrow: 0.14em;
   /* Layout-only, set per instance from React; no colour or font is introduced here. */
   --mm-bar-color: var(

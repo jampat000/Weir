@@ -95,17 +95,6 @@
   border-top: 1px solid var(--mm-hairline);
 }
 
-/* A filter above a list: its label, then the control, stacked. */
-.mm-filter-field {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  gap: 0.25rem;
-  color: var(--mm-text2);
-  font-size: 0.875rem;
-  line-height: 1.25rem;
-}
-
 /* The only control the quiet body carries: a text link, never a button chrome. */
 .mm-quiet-link {
   padding: 0;
