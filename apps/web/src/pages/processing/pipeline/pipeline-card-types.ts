@@ -27,6 +27,8 @@ export type DetailPart = string | { bold: string };
 
 export type DetailLine = {
   parts: DetailPart[];
+  /** Briefer wordings of the whole line's left text, the fullest first, for a card too narrow to say it whole. */
+  fits?: readonly string[];
   /** The quiet text at the right of the line. */
   right?: string;
   /** The file's own name: small and monospaced. */

@@ -465,3 +465,51 @@ describe("cards of files that have just ended", () => {
     ]);
   });
 });
+
+describe("the words a status falls back on in a narrow card", () => {
+  const status = (file: ReturnType<typeof aFile>) => cardsFor([file])[0].status;
+
+  it("are a whole briefer word, never the front of the wording cut off", () => {
+    expect(status(aFile(1, "unprocessed"))).toMatchObject({
+      text: "Waiting its turn",
+      fits: ["Waiting"],
+    });
+    expect(
+      status(aFile(2, "processing", { progress_stage: "checking" })),
+    ).toMatchObject({ text: "Checking file", fits: ["Checking", "Check"] });
+    expect(
+      status(aFile(3, "processing", { progress_stage: "handing_back" })),
+    ).toMatchObject({ text: "Handing back", fits: ["Handing"] });
+  });
+
+  it("are left out of a status that is one word already", () => {
+    expect(
+      status(aFile(1, "processing", { progress_stage: "planning" })).fits,
+    ).toBeUndefined();
+  });
+});
+
+describe("the briefer wordings of a card's detail lines", () => {
+  it("drop the facts from the end, a card narrower than the line losing the file's size first", () => {
+    const [card] = cardsFor([aWriting(1)]);
+    const facts = card.details.find((line) =>
+      line.parts.some(
+        (part) => typeof part !== "string" && part.bold.includes("2.27 GB"),
+      ),
+    );
+
+    expect(facts?.fits).toEqual(["1080p · H264", "1080p", "H264", "2.27 GB"]);
+  });
+
+  it("count the tracks being removed where the card cannot name them", () => {
+    const [card] = cardsFor([
+      aWriting(1, {
+        progress_removed_audio: ["fra"],
+        progress_removed_subtitles: ["fra", "deu"],
+      }),
+    ]);
+    const removing = card.details.find((line) => line.parts[0] === "Removing ");
+
+    expect(removing?.fits).toEqual(["Removing 3 tracks"]);
+  });
+});

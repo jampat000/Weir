@@ -4,6 +4,8 @@
  * out rather than guessed, and a detail line never says what the status line already says.
  */
 import { baseName } from "../../../lib/format/path";
+import { narrowing } from "../../../lib/ui/fit-text";
+import { plural } from "../../../lib/ui/mm-plural";
 import {
   arrivingDeadline,
   secondsLeft,
@@ -27,6 +29,7 @@ import type { FlowStepId } from "../stage-flow-model";
 import type {
   CardBar,
   CardStatus,
+  CardTone,
   CardWords,
   DetailLine,
   DetailPart,
@@ -47,6 +50,33 @@ const MOVING_BAR: CardBar = { width: 35, waiting: true, moving: true };
 
 const bold = (text: string): DetailPart => ({ bold: text });
 
+/** More facts than a probe ever measures, so that the first of them always matters most. */
+const FACTS_COUNT = 10;
+
+/** The briefer words a status falls back on in a card too narrow for its wording, never the front of a longer one cut off. */
+const BRIEFLY: Readonly<Record<string, readonly string[]>> = {
+  "Checking now": ["Checking", "Check"],
+  "Checking file": ["Checking", "Check"],
+  "Still importing": ["Importing"],
+  "Waiting to settle": ["Waiting"],
+  "Looking again later": ["Later"],
+  "Can't open it yet": ["Can't open"],
+  "Can't write output": ["Can't write"],
+  "Waiting for space": ["No space"],
+  "Waiting its turn": ["Waiting"],
+  "Outside its hours": ["Closed"],
+  "Writing copy": ["Writing"],
+  "Replacing file": ["Replacing"],
+  "Handing back": ["Handing"],
+  "Couldn't finish": ["Failed"],
+};
+
+/** A status that is words alone, with the briefer words it falls back on where it has them. */
+function said(text: string, tone: CardTone, pulse: boolean): CardStatus {
+  const briefly = BRIEFLY[text];
+  return briefly ? { text, tone, pulse, fits: briefly } : { text, tone, pulse };
+}
+
 /** "Download · Movies": where the file came from and which workflow has it. */
 function sourceLine(source: WorkSource, workflow: string): DetailLine {
   return { parts: [bold(SOURCE_LABEL[source]), ` · ${workflow}`] };
@@ -61,7 +91,22 @@ function fileLine(path: string): DetailLine | null {
 /** The facts the last probe measured, with a quiet remark at the right. Nothing when both are empty. */
 function factsLine(facts: string, right?: string): DetailLine | null {
   if (!facts && !right) return null;
-  return { parts: facts ? [bold(facts)] : [], right };
+  if (!facts) return { parts: [], right };
+  // The first fact matters most ("1080p"), the last least ("2.27 GB"): a narrow card drops from the end.
+  const [, ...fits] = narrowing(
+    facts
+      .split(" · ")
+      .map((text, index) => ({ text, matters: FACTS_COUNT - index })),
+  );
+  return { parts: [bold(facts)], fits, right };
+}
+
+/** What a pass is taking out, with the count of tracks alone for a card too narrow to name them. */
+function removingLine(removed: string[], tracks: number): DetailLine {
+  return {
+    parts: ["Removing ", bold(removed.join(", "))],
+    fits: [`Removing ${plural(tracks, "track", "tracks")}`],
+  };
 }
 
 function present(lines: ReadonlyArray<DetailLine | null>): DetailLine[] {
@@ -86,9 +131,9 @@ export function incomingWords(item: ArrivingItem, now: number): CardWords {
   const left = secondsLeft(arrivingDeadline(item), now);
   const checking = ringState(left) === "checking";
   const fraction = ringFraction(item, left);
-  const status: CardStatus = checking
-    ? { text: "Checking now", tone: "info", pulse: true }
-    : { text: waitingWords(item), tone: "info", pulse: false };
+  const status = checking
+    ? said("Checking now", "info", true)
+    : said(waitingWords(item), "info", false);
   const timing =
     ringState(left) === "counting" && left != null
       ? `${item.holdUntil != null ? "ready in" : "looks again in"} ${clock(left)}`
@@ -123,11 +168,11 @@ export function queuedWords(item: WaitingItem, place: number): CardWords {
     `#${place} in line`,
   );
   return {
-    status: {
-      text: item.note ? outOfScheduleWords(item.note) : "Waiting its turn",
-      tone: "idle",
-      pulse: false,
-    },
+    status: said(
+      item.note ? outOfScheduleWords(item.note) : "Waiting its turn",
+      "idle",
+      false,
+    ),
     bar: null,
     details: present([
       line,
@@ -150,11 +195,7 @@ const ANALYSING_TEXT: Partial<Record<FlowStepId, string>> = {
 function analysingWords(item: WorkingItem): CardWords {
   const running = workingFigures(item).running;
   return {
-    status: {
-      text: ANALYSING_TEXT[item.step] ?? "Checking file",
-      tone: "info",
-      pulse: true,
-    },
+    status: said(ANALYSING_TEXT[item.step] ?? "Checking file", "info", true),
     bar: MOVING_BAR,
     details: present([
       factsLine(item.facts, running ? `running ${running}` : undefined),
@@ -198,7 +239,7 @@ function writingWords(item: WorkingItem, percent: number): CardWords {
     details: present([
       figures.speed ? { parts: ["Speed ", bold(figures.speed)] } : null,
       removed.length > 0
-        ? { parts: ["Removing ", bold(removed.join(", "))] }
+        ? removingLine(removed, item.removedAudio + item.removedSubtitles)
         : null,
       factsLine(item.facts),
       figures.through ? { parts: [bold(figures.through)] } : null,
@@ -226,11 +267,7 @@ function processingWords(item: WorkingItem): CardWords {
   }
   const running = workingFigures(item).running;
   return {
-    status: {
-      text: unmeasuredProcessingText(item),
-      tone: "info",
-      pulse: true,
-    },
+    status: said(unmeasuredProcessingText(item), "info", true),
     bar: MOVING_BAR,
     details: present([
       item.source === "download"
@@ -244,11 +281,11 @@ function processingWords(item: WorkingItem): CardWords {
 
 export function deliveringWords(item: HandingItem | WorkingItem): CardWords {
   return {
-    status: {
-      text: item.source === "library" ? "Replacing file" : "Handing back",
-      tone: "info",
-      pulse: true,
-    },
+    status: said(
+      item.source === "library" ? "Replacing file" : "Handing back",
+      "info",
+      true,
+    ),
     bar: MOVING_BAR,
     details: footer(item.source, item.libraryName, item.path),
     fullFacts: [
@@ -297,11 +334,11 @@ export function stoppedWords(
   path: string,
 ): CardWords {
   return {
-    status: {
-      text: kind === "failed" ? "Couldn't finish" : "Rejected",
-      tone: kind === "failed" ? "bad" : "warn",
-      pulse: false,
-    },
+    status: said(
+      kind === "failed" ? "Couldn't finish" : "Rejected",
+      kind === "failed" ? "bad" : "warn",
+      false,
+    ),
     bar: null,
     details: present([{ parts: [reason] }, ...footer(source, workflow, path)]),
     keep: 1,

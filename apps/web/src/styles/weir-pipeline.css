@@ -447,7 +447,10 @@ button.mm-pipe__card {
   white-space: nowrap;
 }
 
+/* The facts take the room the remark at the right leaves, and say as much of themselves as fits it (card-words.ts). */
 .mm-pipe__detail > span:first-child {
+  min-width: 0;
+  flex: 1 1 0;
   overflow: hidden;
   text-overflow: ellipsis;
 }

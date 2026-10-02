@@ -49,9 +49,11 @@ function Operation({
       : Math.round(Math.min(100, Math.max(0, item.percent)));
   const content = (
     <>
-      <span className="mm-op__text">
-        <b>{item.name}</b>
-        <span> · {STEP_WORDS[item.step]}</span>
+      <span className="mm-op__text flex gap-1">
+        <b className="min-w-0 truncate" title={item.name}>
+          {item.name}
+        </b>{" "}
+        <span className="shrink-0">· {STEP_WORDS[item.step]}</span>
       </span>
       <span className="mm-op__right">
         {percent === null ? "" : `${percent}%`}

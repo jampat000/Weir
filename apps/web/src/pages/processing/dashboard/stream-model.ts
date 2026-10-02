@@ -19,6 +19,7 @@ import {
   type FinishedFile,
 } from "../../../lib/activity/processing-outcome";
 import type { ActivityEventItem } from "../../../lib/api/types";
+import { narrowing } from "../../../lib/ui/fit-text";
 import { parseAppTime } from "../../../lib/ui/mm-format-date";
 import { prettyName } from "../processing-model";
 import { ago, finishedNote } from "../processing-words";
@@ -177,4 +178,19 @@ export function streamWhen(iso: string, now: number): string {
     month: "short",
     day: "numeric",
   });
+}
+
+/**
+ * What a line's quiet note says, the fullest first: how many times, what it was, and when. A narrow line drops the
+ * least telling part first (the count, then the later details of what it was) and ends with when it was.
+ */
+export function noteWords(row: StreamRow, now: number): string[] {
+  const details = row.note.split(" · ").filter(Boolean);
+  return narrowing([
+    ...(row.times > 1
+      ? [{ text: `${row.times.toLocaleString()} times`, matters: 1 }]
+      : []),
+    ...details.map((text, index) => ({ text, matters: 100 - index })),
+    { text: streamWhen(row.at, now), matters: 1000 },
+  ]);
 }

@@ -25,6 +25,7 @@ import {
 import type {
   CardStatus,
   DetailLine,
+  DetailPart,
   PipelineCard as Card,
 } from "./pipeline-card-types";
 import { TILE_ATTRIBUTE } from "./use-delivery-flight";
@@ -67,16 +68,50 @@ function StatusLine({ status }: { status: CardStatus }) {
   );
 }
 
+const partText = (part: DetailPart) =>
+  typeof part === "string" ? part : part.bold;
+
+/** A line that has briefer wordings says the fullest the card's width holds, its lead plain and the rest bold. */
+function FittingParts({
+  parts,
+  fits,
+}: {
+  parts: readonly DetailPart[];
+  fits: readonly string[];
+}) {
+  const lead = typeof parts[0] === "string" ? parts[0] : "";
+  return (
+    <FitText
+      className="block"
+      words={[parts.map(partText).join(""), ...fits]}
+      format={(words) =>
+        lead && words.startsWith(lead) ? (
+          <>
+            {lead}
+            <b>{words.slice(lead.length)}</b>
+          </>
+        ) : (
+          <b>{words}</b>
+        )
+      }
+    />
+  );
+}
+
 function Detail({ line }: { line: DetailLine }) {
   return (
     <span className="mm-pipe__detail">
       <span className={line.mono ? "mm-pipe__file" : undefined}>
-        {line.parts.map((part, index) =>
-          typeof part === "string" ? (
-            <span key={index}>{part}</span>
-          ) : (
-            <b key={index}>{part.bold}</b>
-          ),
+        {line.fits ? (
+          <FittingParts parts={line.parts} fits={line.fits} />
+        ) : (
+          line.parts.map((part, index) =>
+            typeof part === "string" ? (
+              <span key={index}>{part}</span>
+            ) : (
+              <b key={index}>{part.bold}</b>
+            ),
+          )
         )}
       </span>
       <span>{line.right}</span>

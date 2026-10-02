@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import type { ActivityEventItem } from "../../../lib/api/types";
-import { STREAM_ROWS, buildStream, streamWhen } from "./stream-model";
+import {
+  STREAM_ROWS,
+  buildStream,
+  noteWords,
+  streamWhen,
+} from "./stream-model";
 
 let nextId = 100;
 
@@ -211,5 +216,34 @@ describe("when a line happened", () => {
 
   it("is empty for a time that cannot be read", () => {
     expect(streamWhen("", now)).toBe("");
+  });
+});
+
+describe("a line's note in the room it has", () => {
+  const now = Date.parse("2026-08-18T10:00:00Z");
+  const row = (note: string, times = 1) => ({
+    ...buildStream([event({ title: "x" })]).rows[0],
+    note,
+    times,
+    at: "2026-08-18T09:58:00Z",
+  });
+
+  it("drops the later details of what happened first, and ends with when", () => {
+    expect(
+      noteWords(row("Saved 342 MB · removed 3 audio, 8 subtitles"), now),
+    ).toEqual([
+      "Saved 342 MB · removed 3 audio, 8 subtitles · 2 min ago",
+      "Saved 342 MB · 2 min ago",
+      "2 min ago",
+      "Saved 342 MB",
+      "removed 3 audio, 8 subtitles",
+    ]);
+  });
+
+  it("drops how many times before anything else", () => {
+    expect(noteWords(row("Handed back", 3), now).slice(0, 2)).toEqual([
+      "3 times · Handed back · 2 min ago",
+      "Handed back · 2 min ago",
+    ]);
   });
 });

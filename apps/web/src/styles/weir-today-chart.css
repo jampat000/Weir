@@ -118,7 +118,7 @@
   left: 3px;
   right: var(--today-span-room, 84px);
   display: grid;
-  gap: 6px;
+  gap: 3px;
   pointer-events: none;
 }
 
@@ -126,8 +126,8 @@
   display: flex;
   min-width: 0;
   align-items: center;
-  gap: 4px;
-  padding: 0 3px;
+  gap: 2px;
+  padding: 0 2px;
   border-radius: 3px;
   background: color-mix(in srgb, var(--mm-card-bg) 78%, transparent);
 }

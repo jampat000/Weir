@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { Panel } from "../../../components/panels/panel";
 import { useActivityRecentQuery } from "../../../lib/activity/queries";
 import { classNames } from "../../../lib/ui/class-names";
+import { FitText } from "../../../lib/ui/fit-text";
 import { motionAllowed } from "../../../lib/ui/motion-allowed";
 import { ACTIVITY_PATH } from "../../activity/activity-links";
 import { ACTIVITY_MODULE_OF_WORK, type Filter } from "../processing-filter";
@@ -11,7 +12,7 @@ import { useFittingRows } from "./fit-rows";
 import { StreamIcon } from "./stream-icons";
 import {
   buildStream,
-  streamWhen,
+  noteWords,
   type StreamPart,
   type StreamRow,
 } from "./stream-model";
@@ -63,12 +64,7 @@ function Line({
           <span className="mm-stream__what">
             <Sentence parts={row.parts} />
           </span>
-          <span className="mm-stream__note">
-            {row.times > 1 ? `${row.times.toLocaleString()} times · ` : ""}
-            {row.note}
-            {row.note ? " · " : ""}
-            <time dateTime={row.at}>{streamWhen(row.at, now)}</time>
-          </span>
+          <FitText className="mm-stream__note" words={noteWords(row, now)} />
         </span>
       </Link>
     </li>
