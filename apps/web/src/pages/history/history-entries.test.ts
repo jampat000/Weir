@@ -10,6 +10,8 @@ import {
   historyGroupOf,
   inGroup,
   retryableFailures,
+  waitsOnAPerson,
+  HISTORY_GROUPS,
 } from "./history-entries";
 
 function file(partial: Partial<ProcessingFile>): ProcessingFile {
@@ -64,7 +66,7 @@ function clean(partial: Partial<LibraryClean>): LibraryClean {
 }
 
 describe("history groups", () => {
-  it("puts a file that waits on a person under Needs you", () => {
+  it("puts a file a manager still has under On hold", () => {
     expect(historyGroupOf(file({ status: "blocked_upstream" }))).toBe("needs");
   });
 
@@ -76,7 +78,7 @@ describe("history groups", () => {
     ).toBe("failed");
   });
 
-  it("moves on_hold into Needs you rather than In progress", () => {
+  it("moves on_hold into On hold rather than In progress", () => {
     expect(historyGroupOf(file({ status: "on_hold" }))).toBe("needs");
   });
 
@@ -149,6 +151,61 @@ describe("hasRejectedFiles", () => {
     expect([hasRejectedFiles(rejected), hasRejectedFiles(failed)]).toEqual([
       true,
       false,
+    ]);
+  });
+});
+
+describe("the files that wait on a person", () => {
+  const skippedBy = (reason: string) =>
+    file({ status: "skipped", status_reason: reason });
+
+  it("are the failed and rejected ones, a hold with no clock on it, and a skip by one of the workflow's rules", () => {
+    expect(waitsOnAPerson(file({ status: "processing_failed" }))).toBe(true);
+    expect(waitsOnAPerson(file({ status: "rejected" }))).toBe(true);
+    expect(waitsOnAPerson(file({ status: "on_hold", hold_until: null }))).toBe(
+      true,
+    );
+    expect(
+      waitsOnAPerson(
+        skippedBy("Skipped because its path matches an exclude pattern."),
+      ),
+    ).toBe(true);
+  });
+
+  it("leave out a hold that is counting down, a routine skip and a file Weir is still working on", () => {
+    expect(
+      waitsOnAPerson(
+        file({ status: "on_hold", hold_until: "2026-08-19T05:00:00" }),
+      ),
+    ).toBe(false);
+    expect(waitsOnAPerson(skippedBy("Not a video file."))).toBe(false);
+    expect(waitsOnAPerson(file({ status: "unprocessed" }))).toBe(false);
+    expect(waitsOnAPerson(file({ status: "processed" }))).toBe(false);
+  });
+
+  it("make up the Needs you view, whichever group each is in, and never a library clean", () => {
+    const failed = downloadEntry(file({ status: "processing_failed" }));
+    const held = downloadEntry(file({ status: "on_hold" }));
+    const finished = downloadEntry(file({ status: "processed" }));
+    const cleanFailed = cleanEntry(clean({ outcome: "failed" }));
+
+    expect(
+      [failed, held, finished, cleanFailed].filter((entry) =>
+        inGroup(entry, "attention"),
+      ),
+    ).toEqual([failed, held]);
+  });
+
+  it("have a chip of their own, named Needs you, apart from the files that are on hold", () => {
+    expect(HISTORY_GROUPS.map((group) => group.label)).toEqual([
+      "All",
+      "In progress",
+      "Finished",
+      "Needs you",
+      "On hold",
+      "Skipped",
+      "Failed",
+      "Kept",
     ]);
   });
 });

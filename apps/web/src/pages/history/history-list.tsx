@@ -58,6 +58,7 @@ const GROUP_TONE: Record<HistoryGroup, MmStatusTone> = {
   all: "neutral",
   working: "info",
   finished: "healthy",
+  attention: "warning",
   needs: "warning",
   skipped: "neutral",
   failed: "failed",

@@ -1,6 +1,7 @@
 import { forwardRef, type Ref } from "react";
 import { Link, useLocation } from "react-router-dom";
 
+import { historyGroupPath } from "../../pages/history/history-links";
 import { NavGlyph } from "./nav-icons";
 import { NAV_GROUPS, type NavBadgeKind, type NavItem } from "./nav-model";
 
@@ -10,6 +11,14 @@ type Badges = Readonly<Record<NavBadgeKind, number>>;
 const BADGE_WORDS: Record<NavBadgeKind, string> = {
   working: "working",
   "needs-you": "need you",
+};
+
+/**
+ * Where an item goes while its badge shows, where that is not the item's own page: the files that need you are
+ * listed in History's Needs you view, and the badge counts exactly those.
+ */
+const BADGE_TARGETS: Partial<Record<NavBadgeKind, string>> = {
+  "needs-you": historyGroupPath("attention"),
 };
 
 const BADGE_TEST_IDS: Record<NavBadgeKind, string> = {
@@ -28,10 +37,11 @@ const SidebarLink = forwardRef<HTMLAnchorElement, SidebarLinkProps>(
   function SidebarLink({ item, current, count, onNavigate }, ref) {
     const badge = item.badge && count > 0 ? item.badge : null;
     const words = badge ? `${count} ${BADGE_WORDS[badge]}` : null;
+    const target = (badge && BADGE_TARGETS[badge]) || item.to;
     return (
       <Link
         ref={ref}
-        to={item.to}
+        to={target}
         className="mm-sidebar-link"
         aria-current={current ? "page" : undefined}
         aria-label={words ? `${item.label}, ${words}` : undefined}

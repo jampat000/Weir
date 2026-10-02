@@ -108,14 +108,16 @@ def test_signed_in_navigation_covers_main_screens_and_tabs(weir_shell: str) -> N
             open_sidebar(page, "History")
             expect(page).to_have_url(re.compile(r".*/history(?:$|[?#])"))
             expect(page.get_by_test_id("history-page")).to_be_visible()
-            # A skip is its own neutral group rather than counting as Failed, on_hold sits under Needs you,
-            # and Kept lists the files the owner chose to keep without processing.
+            # Needs you is every file waiting on a person, as the sidebar's badge counts them, in whichever group it
+            # is; a skip is its own neutral group rather than counting as Failed, on_hold sits under On hold, and
+            # Kept lists the files the owner chose to keep without processing.
             expect(page.get_by_role("group", name="Show").get_by_role("button")).to_have_text(
                 [
                     re.compile(r"^All\s"),
                     re.compile(r"^In progress\s"),
                     re.compile(r"^Finished\s"),
                     re.compile(r"^Needs you\s"),
+                    re.compile(r"^On hold\s"),
                     re.compile(r"^Skipped\s"),
                     re.compile(r"^Failed\s"),
                     re.compile(r"^Kept\s"),

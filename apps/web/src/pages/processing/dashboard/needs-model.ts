@@ -8,6 +8,7 @@ import { firstSentence, prettyName } from "../processing-model";
 import { fileReason, type FileReason } from "../file-reason";
 import {
   historyGroupOf,
+  waitsOnAPerson,
   type HistoryGroup,
 } from "../../history/history-entries";
 import { setupTabPath } from "../../../lib/settings/setup-areas";
@@ -55,27 +56,6 @@ export type NeedGroup = {
   rejected: boolean;
 };
 
-/**
- * How the server words a skip for one of the workflow's own rules: its path, size or dates. Any other skip is
- * Weir deciding a file is not for it, which needs nobody.
- */
-const SKIPPED_BY_RULE = /^skipped because/i;
-
-/** Whether a file waits on a person: a failure, a rejection, a hold with no clock on it, or a skip by a rule. */
-export function waitsOnAPerson(file: ProcessingFile): boolean {
-  switch (file.status) {
-    case "processing_failed":
-    case "rejected":
-      return true;
-    case "on_hold":
-      return !file.hold_until;
-    case "skipped":
-      return SKIPPED_BY_RULE.test(file.status_reason);
-    default:
-      return false;
-  }
-}
-
 function fileRow(file: ProcessingFile): NeedRow {
   return {
     key: `file-${file.id}`,
@@ -99,13 +79,13 @@ const GROUP_ORDER = [
   "skipped-by-rule",
 ];
 
-/** Files that share a reason, grouped and put in {@link GROUP_ORDER}. */
+/** Files that wait on a person and share a reason, grouped and put in {@link GROUP_ORDER}. */
 function fileGroups(files: readonly ProcessingFile[]): NeedGroup[] {
   const groups = new Map<
     string,
     { reason: FileReason; files: ProcessingFile[] }
   >();
-  for (const file of files.filter(waitsOnAPerson)) {
+  for (const file of files) {
     const reason = fileReason(file);
     const group = groups.get(reason.key) ?? { reason, files: [] };
     group.files.push(file);
@@ -182,12 +162,15 @@ function failedJobsNeed({ count, capped }: FailedJobs): NeedRow | null {
   };
 }
 
+/** The key of the group that holds what is wrong with Weir itself rather than with any file. */
+export const WEIR_GROUP_KEY = "weir";
+
 /** What is wrong with Weir itself rather than with a file: no workflow, stopped work, failed jobs. */
 function weirGroup(rows: NeedRow[]): NeedGroup[] {
   if (rows.length === 0) return [];
   return [
     {
-      key: "weir",
+      key: WEIR_GROUP_KEY,
       title: plural(
         rows.length,
         "thing to fix in Weir",
@@ -213,6 +196,23 @@ type NeedSources = {
   files: readonly ProcessingFile[];
 };
 
+/**
+ * The files that wait on a person, for the workflow and kind of work chosen. Every file in the list came in as a
+ * download: a library's files are cleaned from the job queue, with no file row.
+ */
+export function waitingFiles(
+  files: readonly ProcessingFile[],
+  workflowId: number | null | undefined,
+  filter: Filter,
+): ProcessingFile[] {
+  if (!shownBy(filter, { source: "download" })) return [];
+  return files.filter(
+    (file) =>
+      waitsOnAPerson(file) &&
+      (workflowId == null || file.library_id === workflowId),
+  );
+}
+
 /** Everything that needs a person, most urgent first: Weir itself, then failed files, then the rest. */
 export function buildNeeds({
   workflows,
@@ -222,17 +222,12 @@ export function buildNeeds({
   filter,
   files,
 }: NeedSources): NeedGroup[] {
-  const inWorkflow = (file: ProcessingFile) =>
-    workflowId == null || file.library_id === workflowId;
   const weirRows = [
     setupNeed(workflows),
     ...workerNeeds(readiness),
     failedJobsNeed(failedJobs),
   ].filter((row): row is NeedRow => row !== null);
-  // Every file in the list came in as a download: a library's files are cleaned from the job queue, with no file row.
-  const fileRows = shownBy(filter, { source: "download" })
-    ? files.filter(inWorkflow)
-    : [];
+  const fileRows = waitingFiles(files, workflowId, filter);
   return [...weirGroup(weirRows), ...fileGroups(fileRows)];
 }
 

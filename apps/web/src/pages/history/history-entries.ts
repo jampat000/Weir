@@ -28,16 +28,25 @@ export const cleanEntry = (clean: LibraryClean): HistoryEntry => ({
 /**
  * The ways History sorts an entry, in the order the chips read. "kept" is not an entry group at all — a kept
  * file has no `files` row left to be one (#786 review of #785) — but it lives in the same chip row and count
- * pattern, since removing a title to keep it is still something History did with it.
+ * pattern, since removing a title to keep it is still something History did with it. "attention" is not one group
+ * either: it is every file that waits on a person, whichever group it is in, as the sidebar's badge counts them.
  */
 export type HistoryGroup =
-  "all" | "working" | "finished" | "needs" | "skipped" | "failed" | "kept";
+  | "all"
+  | "working"
+  | "finished"
+  | "attention"
+  | "needs"
+  | "skipped"
+  | "failed"
+  | "kept";
 
 export const HISTORY_GROUPS: { id: HistoryGroup; label: string }[] = [
   { id: "all", label: "All" },
   { id: "working", label: "In progress" },
   { id: "finished", label: "Finished" },
-  { id: "needs", label: "Needs you" },
+  { id: "attention", label: "Needs you" },
+  { id: "needs", label: "On hold" },
   { id: "skipped", label: "Skipped" },
   { id: "failed", label: "Failed" },
   { id: "kept", label: "Kept" },
@@ -79,6 +88,27 @@ export function historyGroupOf(file: ProcessingFile): HistoryGroup | null {
   return null;
 }
 
+/**
+ * How the server words a skip for one of the workflow's own rules: its path, size or dates. Any other skip is
+ * Weir deciding a file is not for it, which needs nobody.
+ */
+const SKIPPED_BY_RULE = /^skipped because/i;
+
+/** Whether a file waits on a person: a failure, a rejection, a hold with no clock on it, or a skip by a rule. */
+export function waitsOnAPerson(file: ProcessingFile): boolean {
+  switch (file.status) {
+    case "processing_failed":
+    case "rejected":
+      return true;
+    case "on_hold":
+      return !file.hold_until;
+    case "skipped":
+      return SKIPPED_BY_RULE.test(file.status_reason);
+    default:
+      return false;
+  }
+}
+
 export function entryGroup(entry: HistoryEntry): HistoryGroup | null {
   return entry.kind === "download"
     ? historyGroupOf(entry.file)
@@ -86,7 +116,11 @@ export function entryGroup(entry: HistoryEntry): HistoryGroup | null {
 }
 
 export function inGroup(entry: HistoryEntry, group: HistoryGroup): boolean {
-  return group === "all" || entryGroup(entry) === group;
+  if (group === "all") return true;
+  if (group === "attention") {
+    return entry.kind === "download" && waitsOnAPerson(entry.file);
+  }
+  return entryGroup(entry) === group;
 }
 
 /** When the entry last changed: a download's last state change, or when the clean finished. */

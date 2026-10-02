@@ -35,6 +35,8 @@ import { HistoryKeptList } from "./history-kept-list";
 import { HistoryList } from "./history-list";
 import { ProcessRejectedAgain } from "./history-rejected-again";
 import { HistoryRetentionNote } from "./history-retention-note";
+import { HistoryWeirNeeds } from "./history-weir-needs";
+import { useHistoryAttention } from "./use-history-attention";
 
 /** "min ago" moves on its own between refreshes. */
 const TICK_MS = 15_000;
@@ -88,6 +90,14 @@ function selectedEntry(
   return chosen ?? entries[0] ?? null;
 }
 
+/** What an empty list says: that nothing needs a person, that nothing has been handled yet, or that nothing matches. */
+function emptyWords(group: HistoryGroup, handled: number): string {
+  if (group === "attention") return "No file is waiting on you.";
+  return handled === 0
+    ? "Nothing yet. Every file Weir picks up will be listed here, from the moment it arrives."
+    : "No file matches. Try All, or look further back.";
+}
+
 /**
  * History: every file Weir has handled, new downloads and library cleans alike, what it was, what
  * Weir did, and what came out. A place of its own because a file's story is neither a Processing lane
@@ -111,6 +121,10 @@ export function HistoryPage() {
     path_contains: params.get("q") ?? undefined,
   };
   const files = useFileHistoryQuery({ ...query, limit: FILES_LIMIT });
+  const attention = useHistoryAttention(
+    libraryId ?? null,
+    params.get("q") ?? "",
+  );
   const cleans = useLibraryCleansQuery(query);
   const libraries = useProcessingLibrariesQuery();
   const kept = useKeptFilesQuery();
@@ -120,7 +134,10 @@ export function HistoryPage() {
     () => historyEntries(files.data?.files ?? [], cleans.data?.cleans ?? []),
     [files.data, cleans.data],
   );
-  const shown = all.filter((entry) => inGroup(entry, group));
+  const needsYou = group === "attention";
+  const shown = needsYou
+    ? attention.entries
+    : all.filter((entry) => inGroup(entry, group));
   const counts = {
     ...(Object.fromEntries(
       HISTORY_GROUPS.map((g) => [
@@ -128,6 +145,8 @@ export function HistoryPage() {
         all.filter((entry) => inGroup(entry, g.id)).length,
       ]),
     ) as Record<HistoryGroup, number>),
+    // The Needs you count is the sidebar badge's, from the same source, whichever period is chosen.
+    attention: attention.count,
     // A kept file has no `files` row left to count as an entry (#786 review of #785), so its count comes from
     // the kept-files list instead of the entry-based counting every other chip uses.
     kept: kept.data?.files.length ?? 0,
@@ -183,6 +202,8 @@ export function HistoryPage() {
         </div>
       ) : null}
 
+      {needsYou ? <HistoryWeirNeeds rows={attention.weir} /> : null}
+
       {cappedAtLimit ? (
         <p className="mm-history-note" role="status">
           Showing the newest {FILES_LIMIT.toLocaleString()} downloads. Narrow
@@ -214,16 +235,12 @@ export function HistoryPage() {
             />
           </Panel>
         )
-      ) : files.isError ? (
+      ) : !needsYou && files.isError ? (
         <LoadError thing="your file history" error={files.error} />
-      ) : files.isLoading ? (
+      ) : !needsYou && files.isLoading ? (
         <PanelLoading label="Reading history…" />
       ) : shown.length === 0 ? (
-        <p className="mm-history-empty">
-          {all.length === 0
-            ? "Nothing yet. Every file Weir picks up will be listed here, from the moment it arrives."
-            : "No file matches. Try All, or look further back."}
-        </p>
+        <p className="mm-history-empty">{emptyWords(group, all.length)}</p>
       ) : (
         <div className="mm-history-body">
           <Panel

@@ -214,6 +214,31 @@ describe("AppShell", () => {
     expect(screen.queryByTestId("nav-history-needs-you")).toBeNull();
   });
 
+  it("opens History's Needs you view from History while files need you, and History itself when none do", () => {
+    counts.needsYou = 3;
+    const { unmount } = renderShell("/");
+    expect(
+      screen.getByRole("link", { name: "History, 3 need you" }),
+    ).toHaveAttribute("href", "/history?show=attention");
+    unmount();
+
+    counts.needsYou = 0;
+    renderShell("/");
+    expect(screen.getByRole("link", { name: "History" })).toHaveAttribute(
+      "href",
+      "/history",
+    );
+  });
+
+  it("keeps the Dashboard's link on the Dashboard while files are working", () => {
+    counts.working = 2;
+    renderShell("/library", <Route path="library" element={<div />} />);
+
+    expect(
+      screen.getByRole("link", { name: "Dashboard, 2 working" }),
+    ).toHaveAttribute("href", "/");
+  });
+
   it("collapses to icons when asked, and expands again", () => {
     renderShell("/");
     const sidebar = document.getElementById("mm-primary-sidebar");

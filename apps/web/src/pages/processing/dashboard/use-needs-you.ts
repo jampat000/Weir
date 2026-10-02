@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 
+import type { ProcessingFile } from "../../../lib/processing/files-api";
 import { useActivityStreamInvalidations } from "../../../lib/activity/use-activity-stream-invalidation";
 import { useProcessingJobsInspectionQuery } from "../../../lib/processing/jobs-inspection/queries";
 import { useProcessingLibrariesQuery } from "../../../lib/processing/libraries-queries";
@@ -10,9 +11,12 @@ import { useNeedsFiles } from "./needs-files";
 import {
   FAILED_JOBS_LIMIT,
   buildNeeds,
+  WEIR_GROUP_KEY,
   failedJobsOf,
   needCount,
+  waitingFiles,
   type NeedGroup,
+  type NeedRow,
 } from "./needs-model";
 
 const FAILED_JOBS_KEYS = [
@@ -25,6 +29,10 @@ export type NeedsYou = {
   groups: NeedGroup[];
   /** How many things wait on a person: each file and each problem with Weir counts once. */
   count: number;
+  /** Every file that waits on a person, newest first, past the rows each group lists. */
+  files: ProcessingFile[];
+  /** What is wrong with Weir itself, which no file is. */
+  weir: NeedRow[];
 };
 
 /**
@@ -62,6 +70,11 @@ export function useNeedsYou(
       filter,
       files,
     });
-    return { groups, count: needCount(groups) };
+    return {
+      groups,
+      count: needCount(groups),
+      files: waitingFiles(files, workflowId, filter),
+      weir: groups.find((group) => group.key === WEIR_GROUP_KEY)?.rows ?? [],
+    };
   }, [workflowList, workflowId, filter, readinessData, failedJobRows, files]);
 }

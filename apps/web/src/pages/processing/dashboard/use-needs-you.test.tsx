@@ -120,4 +120,28 @@ describe("what needs a person, for the panel, the Today tile and the sidebar", (
 
     expect(result.current.count).toBe(2);
   });
+
+  it("lists every file that waits on a person, past the rows a group shows, and leaves out one that only waits its turn", () => {
+    needFiles.files = [
+      ...[1, 2, 3, 4, 5, 6].map((id) => file({ id })),
+      file({ id: 7, status: "on_hold", hold_until: "2026-10-02T12:00:00Z" }),
+    ];
+
+    const { result } = renderHook(() => useNeedsYou(null));
+
+    expect(result.current.files.map((entry) => entry.id)).toEqual([
+      1, 2, 3, 4, 5, 6,
+    ]);
+    expect(result.current.count).toBe(6);
+  });
+
+  it("lists what is wrong with Weir itself apart from the files, and counts it with them", () => {
+    failedJobs.jobs = [{ id: 1 }];
+    needFiles.files = [file({ id: 1 })];
+
+    const { result } = renderHook(() => useNeedsYou(null));
+
+    expect(result.current.weir.map((row) => row.key)).toEqual(["failed-jobs"]);
+    expect(result.current.count).toBe(2);
+  });
 });

@@ -88,13 +88,15 @@ class AuditSettingsMixin:
         self.open_sidebar("History")
         self.visible(self.page.get_by_test_id("history-page"), "History page")
         chips = self.page.get_by_role("group", name="Show").get_by_role("button")
-        # A skip is its own neutral group rather than counting as Failed, on_hold sits under Needs you,
-        # and Kept lists the files the owner chose to keep without processing.
+        # Needs you is every file waiting on a person, as the sidebar's badge counts them, in whichever group it
+        # is; a skip is its own neutral group rather than counting as Failed, on_hold sits under On hold, and
+        # Kept lists the files the owner chose to keep without processing.
         expected_chip_labels = [
             "All",
             "In progress",
             "Finished",
             "Needs you",
+            "On hold",
             "Skipped",
             "Failed",
             "Kept",

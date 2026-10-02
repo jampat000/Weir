@@ -8,6 +8,8 @@ import type {
 } from "../../lib/processing/files-api";
 import type { KeptFile } from "../../lib/processing/kept-files-api";
 import type { LibraryClean } from "../../lib/processing/library-cleans-api";
+import type { NeedRow } from "../processing/dashboard/needs-model";
+import { historyEntries, type HistoryEntry } from "./history-entries";
 import { HistoryPage } from "./history-page";
 import { historyFilePath } from "./history-links";
 
@@ -27,6 +29,11 @@ const keptQueryState: {
   isError: boolean;
   error: unknown;
 } = { isLoading: false, isError: false, error: null };
+const attention: { entries: HistoryEntry[]; weir: NeedRow[]; count: number } = {
+  entries: [],
+  weir: [],
+  count: 0,
+};
 const me = { role: "admin" };
 const requeue = vi.fn();
 const requeueFiles = vi.fn();
@@ -105,6 +112,9 @@ vi.mock("../../lib/processing/kept-files-queries", () => ({
 }));
 vi.mock("../../lib/auth/queries", () => ({
   useMeQuery: () => ({ data: me }),
+}));
+vi.mock("./use-history-attention", () => ({
+  useHistoryAttention: () => attention,
 }));
 vi.mock("./history-retention-note", () => ({
   HistoryRetentionNote: () => <div data-testid="history-retention" />,
@@ -197,6 +207,9 @@ describe("HistoryPage", () => {
     fetchLog.mockReset();
     cleans.cleans = [];
     kept.files = [];
+    attention.entries = [];
+    attention.weir = [];
+    attention.count = 0;
     filesQueryState.isLoading = false;
     filesQueryState.isError = false;
     filesQueryState.error = null;
@@ -303,6 +316,83 @@ describe("HistoryPage", () => {
     expect(
       within(chips).getByRole("button", { name: /Failed\s*1/ }),
     ).toBeInTheDocument();
+  });
+
+  describe("the Needs you view, which is what the sidebar's badge counts", () => {
+    const chips = () => screen.getByRole("group", { name: "Show" });
+
+    it("has a chip between Finished and On hold, counting what the badge counts", () => {
+      attention.count = 7;
+      renderPage();
+
+      const names = within(chips())
+        .getAllByRole("button")
+        .map((chip) => chip.textContent?.replace(/\s+/g, " ").trim());
+
+      expect(names).toEqual([
+        "All 2",
+        "In progress 0",
+        "Finished 1",
+        "Needs you 7",
+        "On hold 0",
+        "Skipped 0",
+        "Failed 1",
+        "Kept 0",
+      ]);
+    });
+
+    it("lists the files waiting on a person, whatever their age, and what is wrong with Weir above them", () => {
+      const waiting = file({
+        id: 40,
+        relative_path: "Old/Old.And.Stuck.mkv",
+        status: "on_hold",
+        updated_at: "2025-01-01T03:00:00",
+      });
+      attention.entries = historyEntries([waiting], []);
+      attention.weir = [
+        {
+          key: "worker-p",
+          title: "Background work has stopped",
+          reason: "Not responding · restart Weir",
+          link: { label: "Open jobs", to: "/system?tab=history&show=jobs" },
+        },
+      ];
+      attention.count = 2;
+      renderPage("/history?show=attention");
+
+      expect(
+        within(chips()).getByRole("button", { name: /Needs you\s*2/ }),
+      ).toHaveAttribute("aria-pressed", "true");
+      expect(screen.getByTestId("history-weir-needs")).toHaveTextContent(
+        "Background work has stopped",
+      );
+      expect(
+        within(screen.getByTestId("history-weir-needs")).getByRole("link", {
+          name: "Open jobs →",
+        }),
+      ).toHaveAttribute("href", "/system?tab=history&show=jobs");
+      expect(screen.getByTestId("history-detail")).toHaveTextContent(
+        "Old.And.Stuck.mkv",
+      );
+    });
+
+    it("says no file is waiting when none is, and shows no Weir list when nothing is wrong with Weir", () => {
+      renderPage("/history?show=attention");
+
+      expect(
+        screen.getByText("No file is waiting on you."),
+      ).toBeInTheDocument();
+      expect(screen.queryByTestId("history-weir-needs")).toBeNull();
+    });
+
+    it("shows Weir's own problems only in its own view", () => {
+      attention.weir = [
+        { key: "worker-p", title: "Background work has stopped", reason: "x" },
+      ];
+      renderPage("/history?show=failed");
+
+      expect(screen.queryByTestId("history-weir-needs")).toBeNull();
+    });
   });
 
   it("shows what the open file kept and removed, and why", async () => {
