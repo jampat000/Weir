@@ -124,6 +124,29 @@ describe("the heading and the stations", () => {
       screen.getByRole("group", { name: "Delivering: 0" }),
     ).toBeInTheDocument();
   });
+
+  it("shows a station's count as a bare number, and leaves it out where there is none", () => {
+    render(board(lanesOf([aFile(2, "unprocessed"), aFile(3, "unprocessed")])));
+
+    expect(screen.getByRole("group", { name: "Queued: 2" })).toHaveTextContent(
+      /^Queued2$/,
+    );
+    expect(
+      screen.getByRole("group", { name: "Delivering: 0" }),
+    ).toHaveTextContent(/^Delivering$/);
+  });
+
+  it("gives each station a tooltip with its name and its count in full, for a ribbon too narrow to show them", () => {
+    render(board(lanesOf([aFile(2, "unprocessed"), aWriting(5)])));
+
+    expect(screen.getByRole("group", { name: "Queued: 1" })).toHaveAttribute(
+      "title",
+      "Queued: 1 file",
+    );
+    expect(
+      screen.getByRole("group", { name: "Delivering: 0" }),
+    ).toHaveAttribute("title", "Delivering: no files");
+  });
 });
 
 describe("the cards", () => {

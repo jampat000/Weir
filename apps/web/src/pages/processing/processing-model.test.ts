@@ -296,6 +296,28 @@ describe("buildLanes", () => {
       "file-2",
     ]);
   });
+
+  it("keeps running passes in the same order, whatever order the server lists their files in", () => {
+    const running = (id: number) =>
+      file({
+        id,
+        status: "processing",
+        progress_status: "processing",
+        progress_percent: 40,
+      });
+    const lanes = buildLanes(
+      [running(10), running(9), running(100)],
+      [],
+      NAMES,
+      AGES,
+    );
+
+    expect(lanes.working.map((item) => item.key)).toEqual([
+      "file-9",
+      "file-10",
+      "file-100",
+    ]);
+  });
 });
 
 describe("mergeWorkingFiles", () => {

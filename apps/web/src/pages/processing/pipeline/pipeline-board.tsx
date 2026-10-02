@@ -22,6 +22,7 @@ import { Link } from "react-router-dom";
 import { Panel } from "../../../components/panels/panel";
 import type { ProcessingFile } from "../../../lib/processing/files-api";
 import { classNames } from "../../../lib/ui/class-names";
+import { plural } from "../../../lib/ui/mm-plural";
 import { useElementSize } from "../../../lib/ui/use-element-size";
 import { useRemPx } from "../../../lib/ui/use-rem-px";
 import type { LeavingCard } from "../leaving-cards";
@@ -62,11 +63,18 @@ const NOTHING_IN_PROGRESS_WORDS: Record<Filter, string> = {
 };
 const PAUSED = "Paused · nothing new starts.";
 
+/** The station's tooltip: its name and its count in full, for a ribbon that is too narrow to show them whole. */
+function stationTitle(stage: PipelineStage, count: number): string {
+  const files = count === 0 ? "no files" : plural(count, "file", "files");
+  return `${STAGE_LABEL[stage]}: ${files}`;
+}
+
 function Station({ stage, count }: { stage: PipelineStage; count: number }) {
   return (
     <div
       role="group"
       aria-label={`${STAGE_LABEL[stage]}: ${count}`}
+      title={stationTitle(stage, count)}
       data-stage={stage}
       className={classNames(
         "mm-pipe__station",
@@ -79,9 +87,11 @@ function Station({ stage, count }: { stage: PipelineStage; count: number }) {
         </span>
         <span className="mm-pipe__station-text">
           <span className="mm-pipe__station-name">{STAGE_LABEL[stage]}</span>
-          <span className="mm-pipe__station-count">
-            {count === 0 ? "none" : `${count.toLocaleString()} here`}
-          </span>
+          {count === 0 ? null : (
+            <span className="mm-pipe__station-count">
+              {count.toLocaleString()}
+            </span>
+          )}
         </span>
       </span>
     </div>

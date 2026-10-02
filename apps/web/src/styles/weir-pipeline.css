@@ -63,6 +63,7 @@
 /* The ribbon: one arrow-shaped bar, each station a tinted segment with its icon, name and count. */
 .mm-pipe__stations {
   position: relative;
+  container: mm-ribbon / inline-size;
   display: grid;
   grid-template-columns: repeat(var(--pipe-n), 1fr);
   padding: 0 12px 10px;
@@ -161,6 +162,15 @@
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   text-overflow: ellipsis;
+}
+
+/* A ribbon too narrow for every station's icon and name gives up the icons, all together, so the name stays whole;
+   what is left of a station's width is its count's, which its tooltip has in full. 800px is five stations of the
+   icon, the name "Processing" and the padding, with a digit's room to spare. */
+@container mm-ribbon (max-width: 800px) {
+  .mm-pipe__dot {
+    display: none;
+  }
 }
 
 .mm-pipe__station--empty {

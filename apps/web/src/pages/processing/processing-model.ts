@@ -351,7 +351,16 @@ export function buildLanes(
     (a, b) =>
       (arrivingDeadline(a) ?? Infinity) - (arrivingDeadline(b) ?? Infinity),
   );
+  // A running pass keeps its place. The server lists files by when they were last seen, which moves while they run,
+  // and two cards that trade rows glide through one another.
+  lanes.working.sort(byKey);
+  lanes.handing.sort(byKey);
   return lanes;
+}
+
+/** Orders items by their key, the numbers in it as numbers: "file-9" before "file-10". */
+function byKey(a: { key: string }, b: { key: string }): number {
+  return a.key.localeCompare(b.key, undefined, { numeric: true });
 }
 
 /** How many cards the Working lane holds for these files and jobs, before the page's own filter. */
