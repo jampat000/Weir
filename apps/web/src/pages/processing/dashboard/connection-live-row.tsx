@@ -1,9 +1,14 @@
 import { Link } from "react-router-dom";
 
-import type { ConnectionLight } from "../../../lib/connections/connection-lights";
+import { StatusDot } from "../../../components/panels/status-dot";
+import {
+  connectionRowMeaning,
+  type ConnectionLight,
+} from "../../../lib/connections/connection-lights";
 import {
   answerWords,
   connectionNameWords,
+  needsALook,
   type ConnectionEntry,
   type ConnectionState,
 } from "../../../lib/connections/connection-model";
@@ -51,16 +56,13 @@ export function ConnectionLiveRow({
 }: ConnectionLiveRowProps) {
   return (
     <li
-      className={classNames(
-        "mm-conn",
-        `mm-conn--${entry.state}`,
-        light && `mm-conn--${light}`,
-      )}
+      className={classNames("mm-conn", light && "mm-conn--lit")}
+      data-status={connectionRowMeaning(entry.state, light)}
       data-fit=""
       data-testid="live-connection"
     >
       <Link to={to} className="mm-conn__link" title={entry.name}>
-        <span className="mm-conn__dot" aria-hidden="true" />
+        <StatusDot meaning={connectionRowMeaning(entry.state, light)} />
         <span className="sr-only">{entry.name}</span>
         <FitText
           className="mm-conn__name"
@@ -69,7 +71,12 @@ export function ConnectionLiveRow({
           ariaHidden
         />
         <span className="mm-conn__role">{ROLE_WORDS[entry.kind]}</span>
-        <span className="mm-conn__when">
+        <span
+          className={classNames(
+            "mm-conn__when",
+            needsALook(entry) && "mm-status-text",
+          )}
+        >
           <span className="sr-only">{STATE_WORDS[entry.state]}. </span>
           <time
             dateTime={

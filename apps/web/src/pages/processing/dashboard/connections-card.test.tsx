@@ -120,16 +120,16 @@ describe("the Connections card", () => {
     const card = renderCard([radarr, flaky]);
 
     const rows = within(card).getAllByTestId("system-connection");
-    expect(rows[0]).toHaveClass("mm-conn--slow");
+    expect(rows[0]).toHaveAttribute("data-status", "attention");
     expect(rows[0]).toHaveTextContent("Radarr · slow: 2.4 s");
-    expect(rows[1]).toHaveClass("mm-conn--ok");
+    expect(rows[1]).toHaveAttribute("data-status", "done");
   });
 
   it("tints a connection that is down and gives its reason", () => {
     const card = renderCard([qbittorrent]);
 
     const row = within(card).getByTestId("system-connection");
-    expect(row).toHaveClass("mm-conn--down");
+    expect(row).toHaveAttribute("data-status", "broken");
     expect(row).toHaveTextContent("Weir could not reach qBittorrent.");
   });
 
@@ -187,25 +187,27 @@ describe("the Connections card", () => {
     );
 
     const row = within(card).getByTestId("system-connection");
-    expect(row).toHaveClass("mm-conn--asking");
+    expect(row).toHaveAttribute("data-status", "doing");
     expect(row).toHaveTextContent("testing…");
     expect(within(row).queryByRole("button")).toBeNull();
   });
 
-  it.each<ConnectionLight>(["asking", "answered", "failed"])(
-    "wears the %s light the stream gives a row",
-    (light) => {
-      const card = renderCard(
-        [radarr],
-        testingWith(),
-        new Map([[radarr.key, light]]),
-      );
+  it.each<[ConnectionLight, string]>([
+    ["asking", "doing"],
+    ["answered", "done"],
+    ["failed", "broken"],
+  ])("wears the %s light the stream gives a row", (light, meaning) => {
+    const card = renderCard(
+      [radarr],
+      testingWith(),
+      new Map([[radarr.key, light]]),
+    );
 
-      expect(within(card).getByTestId("system-connection")).toHaveClass(
-        `mm-conn--${light}`,
-      );
-    },
-  );
+    expect(within(card).getByTestId("system-connection")).toHaveAttribute(
+      "data-status",
+      meaning,
+    );
+  });
 
   it("says how many connections the card's height left out, not counting the group bars", () => {
     fits = 2;

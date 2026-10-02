@@ -9,10 +9,33 @@ import { subscribeConnectionActivity } from "../activity/use-activity-stream-inv
 import { motionAllowed } from "../ui/motion-allowed";
 import { parseAppTime } from "../ui/mm-format-date";
 import type { ConnectionActivityFrame } from "./connection-activity";
-import { connectionKey, type ConnectionAnswer } from "./connection-model";
+import type { StatusMeaning } from "../ui/status-meaning";
+import {
+  CONNECTION_STATE_MEANING,
+  connectionKey,
+  type ConnectionAnswer,
+  type ConnectionState,
+} from "./connection-model";
 
 /** `asking` is blue and blinking while a call is out; a call that ends flashes green or red. */
 export type ConnectionLight = "asking" | "answered" | "failed";
+
+export const CONNECTION_LIGHT_MEANING: Record<ConnectionLight, StatusMeaning> =
+  {
+    asking: "doing",
+    answered: "done",
+    failed: "broken",
+  };
+
+/** What a connection's row shows: the light while one is on, else what its state is. */
+export function connectionRowMeaning(
+  state: ConnectionState,
+  light: ConnectionLight | null,
+): StatusMeaning {
+  return light
+    ? CONNECTION_LIGHT_MEANING[light]
+    : CONNECTION_STATE_MEANING[state];
+}
 
 /** How long a green or red flash stays. */
 export const FLASH_MS = 1400;

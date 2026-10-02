@@ -23,7 +23,6 @@ const MIGRATE_ME: readonly string[] = [
   "pages/system/tabs/about/update-section.tsx",
   "styles/weir-activity-detail.css",
   "styles/weir-auth.css",
-  "styles/weir-connections.css",
   "styles/weir-dialogs.css",
   "styles/weir-direct-play.css",
   "styles/weir-drawer.css",
@@ -51,7 +50,17 @@ const MIGRATE_ME: readonly string[] = [
 
 const NOT_A_STATUS: Readonly<Record<string, string>> = {};
 
-const RETIRED_STATUS_CLASSES: readonly string[] = [];
+const RETIRED_STATUS_CLASSES: readonly string[] = [
+  "mm-conn__dot",
+  "mm-conn--ok",
+  "mm-conn--slow",
+  "mm-conn--down",
+  "mm-conn--untested",
+  "mm-conn--asking",
+  "mm-conn--answered",
+  "mm-conn--failed",
+  "mm-ctable__bar--",
+];
 
 const RAW_HEX_IN_STYLESHEETS: readonly string[] = [
   "styles/weir-activity-detail.css",

@@ -234,10 +234,10 @@ describe("the Health panel", () => {
       );
 
     send("asked");
-    expect(row()).toHaveClass("mm-conn--asking");
+    expect(row()).toHaveAttribute("data-status", "doing");
     send("answered");
 
-    expect(row()).toHaveClass("mm-conn--answered");
+    expect(row()).toHaveAttribute("data-status", "done");
     expect(row()).toHaveTextContent("90 ms");
   });
 

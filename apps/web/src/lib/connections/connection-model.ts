@@ -13,9 +13,19 @@ import {
 } from "../media-managers/media-managers-api";
 import { connectionTitle } from "../ui/connection-title";
 import { parseAppTime } from "../ui/mm-format-date";
+import type { StatusMeaning } from "../ui/status-meaning";
 import type { ConnectionKind } from "./connection-activity";
 
 export type ConnectionState = "ok" | "slow" | "down" | "off" | "untested";
+
+export const CONNECTION_STATE_MEANING: Record<ConnectionState, StatusMeaning> =
+  {
+    ok: "done",
+    slow: "attention",
+    down: "broken",
+    off: "idle",
+    untested: "idle",
+  };
 
 /** An answer that took this long or longer is slow. */
 export const SLOW_ANSWER_MS = 2000;

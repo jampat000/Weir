@@ -75,29 +75,34 @@ describe("the groups", () => {
   });
 
   it.each([
-    ["is green when everything answers", [manager(1)], "ok"],
+    ["is done when everything answers", [manager(1)], "done"],
     [
-      "is amber when one is slow",
+      "needs attention when one is slow",
       [manager(1), manager(2, { state: "slow" })],
-      "slow",
+      "attention",
     ],
     [
-      "is red when one is down, even if another is slow",
+      "is broken when one is down, even if another is slow",
       [manager(1, { state: "slow" }), manager(2, { state: "down" })],
-      "down",
+      "broken",
     ],
     [
-      "is neutral when one has not been tested and none has a problem",
+      "is idle when one has not been tested and none has a problem",
       [manager(1), manager(2, { state: "untested" })],
-      "untested",
+      "idle",
     ],
     [
-      "is green when the only one with a problem is switched off",
+      "is done when the only one with a problem is switched off",
       [manager(1), manager(2, { state: "down", enabled: false })],
-      "ok",
+      "done",
     ],
-  ])("badge %s", (_, entries, tone) => {
-    expect(groupConnections(entries)[0].tone).toBe(tone);
+    [
+      "is idle when every connection is switched off",
+      [manager(1, { state: "off", enabled: false })],
+      "idle",
+    ],
+  ])("badge %s", (_, entries, meaning) => {
+    expect(groupConnections(entries)[0].meaning).toBe(meaning);
   });
 });
 

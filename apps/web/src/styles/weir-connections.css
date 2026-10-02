@@ -1,8 +1,9 @@
 /*
- * A media manager or download client as a row: its dot, and the light that shows while Weir talks to it. The Health
- * panel's rows (.mm-conn-list) and the System card's (.mm-ctable) share the dot, the four resting states and the
- * three lights. A row lights blue and its dot blinks while a call is out, flashes green when it is answered and
- * red when it fails; the light is a class the page puts on and takes off again, and it never moves the row.
+ * A media manager or download client as a row: its status dot, and the light that shows while Weir talks to it. The
+ * Health panel's rows (.mm-conn-list) and the System card's (.mm-ctable) share the dot and the light. The row's
+ * data-status is its resting state, or the light's while one is on: a row lights blue and its dot blinks while a call
+ * is out, flashes green when it is answered and red when it fails; the light is a class the page puts on and takes
+ * off again, and it never moves the row.
  * Under a resize the dashboard's own rule gives every animation and transition no time (weir-processing-dashboard.css).
  */
 
@@ -14,59 +15,15 @@
     box-shadow 0.3s;
 }
 
-.mm-conn__dot {
-  width: 8px;
-  height: 8px;
-  flex: none;
-  border-radius: 50%;
-  background: var(--mm-success);
-}
-
-.mm-conn--slow .mm-conn__dot {
-  background: var(--mm-warning);
-}
-
-.mm-conn--down .mm-conn__dot {
-  background: var(--mm-destructive);
-}
-
-.mm-conn--off .mm-conn__dot,
-.mm-conn--untested .mm-conn__dot {
-  background: var(--mm-text3);
-}
-
-.mm-conn--asking {
-  border-color: color-mix(in srgb, var(--mm-info) 80%, transparent);
+.mm-conn--lit {
+  border-color: color-mix(in srgb, var(--mm-st) 75%, transparent);
   box-shadow:
-    0 0 0 2px color-mix(in srgb, var(--mm-info) 15%, transparent),
-    0 0 12px color-mix(in srgb, var(--mm-info) 35%, transparent);
+    0 0 0 2px color-mix(in srgb, var(--mm-st) 15%, transparent),
+    0 0 12px color-mix(in srgb, var(--mm-st) 32%, transparent);
 }
 
-.mm-conn--asking .mm-conn__dot {
-  background: var(--mm-info);
+.mm-conn--lit[data-status="doing"] .mm-status-dot {
   animation: mm-conn-blink 0.6s ease-in-out infinite;
-}
-
-.mm-conn--answered {
-  border-color: color-mix(in srgb, var(--mm-success) 70%, transparent);
-  box-shadow:
-    0 0 0 2px color-mix(in srgb, var(--mm-success) 14%, transparent),
-    0 0 12px color-mix(in srgb, var(--mm-success) 28%, transparent);
-}
-
-.mm-conn--answered .mm-conn__dot {
-  background: var(--mm-success);
-}
-
-.mm-conn--failed {
-  border-color: color-mix(in srgb, var(--mm-destructive) 70%, transparent);
-  box-shadow:
-    0 0 0 2px color-mix(in srgb, var(--mm-destructive) 16%, transparent),
-    0 0 12px color-mix(in srgb, var(--mm-destructive) 32%, transparent);
-}
-
-.mm-conn--failed .mm-conn__dot {
-  background: var(--mm-destructive);
 }
 
 @keyframes mm-conn-blink {
@@ -146,14 +103,6 @@
   color: var(--mm-text2);
 }
 
-.mm-conn--slow .mm-conn__when {
-  color: var(--mm-status-warning-text);
-}
-
-.mm-conn--down .mm-conn__when {
-  color: var(--mm-status-failed-text);
-}
-
 .mm-conn--off {
   opacity: 0.55;
 }
@@ -219,21 +168,6 @@
   color: var(--mm-text2);
 }
 
-.mm-ctable__bar--ok .mm-ctable__badge {
-  background: var(--mm-status-healthy-bg);
-  color: var(--mm-status-healthy-text);
-}
-
-.mm-ctable__bar--slow .mm-ctable__badge {
-  background: var(--mm-status-warning-bg);
-  color: var(--mm-status-warning-text);
-}
-
-.mm-ctable__bar--down .mm-ctable__badge {
-  background: var(--mm-status-failed-bg);
-  color: var(--mm-status-failed-text);
-}
-
 .mm-ctable__rows {
   list-style: none;
 }
@@ -244,8 +178,8 @@
   font-size: 0.875rem;
 }
 
-.mm-ctable__row.mm-conn--down {
-  background: var(--mm-status-failed-bg);
+.mm-ctable__row[data-status="broken"] {
+  background: color-mix(in srgb, var(--mm-st) 12%, transparent);
 }
 
 .mm-ctable__name {
@@ -270,12 +204,8 @@
   color: var(--mm-text2);
 }
 
-.mm-conn--down .mm-ctable__name > span {
-  color: var(--mm-status-failed-text);
-}
-
-.mm-conn--slow .mm-ctable__name > span {
-  color: var(--mm-status-warning-text);
+.mm-ctable__name--problem > span {
+  color: var(--mm-st);
 }
 
 .mm-ctable__checked,
@@ -336,7 +266,7 @@
     transition: none;
   }
 
-  .mm-conn--asking .mm-conn__dot {
+  .mm-conn--lit .mm-status-dot {
     animation: none;
   }
 }

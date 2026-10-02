@@ -1,7 +1,12 @@
 import { Panel } from "../../../components/panels/panel";
-import type { ConnectionLight } from "../../../lib/connections/connection-lights";
+import { StatusDot } from "../../../components/panels/status-dot";
+import {
+  connectionRowMeaning,
+  type ConnectionLight,
+} from "../../../lib/connections/connection-lights";
 import {
   connectionNameWords,
+  needsALook,
   type ConnectionEntry,
 } from "../../../lib/connections/connection-model";
 import { classNames } from "../../../lib/ui/class-names";
@@ -32,20 +37,27 @@ type ConnectionRowProps = {
 function ConnectionRow({ entry, light, testing, now }: ConnectionRowProps) {
   const busy = testing.testing.has(entry.key);
   const shown = busy ? "asking" : light;
+  const meaning = connectionRowMeaning(entry.state, shown);
   return (
     <li
       className={classNames(
         "mm-conn",
         "mm-ctable__row",
-        `mm-conn--${entry.state}`,
-        shown && `mm-conn--${shown}`,
+        entry.state === "off" && "mm-conn--off",
+        shown && "mm-conn--lit",
       )}
+      data-status={meaning}
       title={connectionTooltip(entry)}
       data-fit=""
       data-testid="system-connection"
     >
-      <span className="mm-conn__dot" aria-hidden="true" />
-      <span className="mm-ctable__name">
+      <StatusDot meaning={meaning} />
+      <span
+        className={classNames(
+          "mm-ctable__name",
+          needsALook(entry) && "mm-ctable__name--problem",
+        )}
+      >
         <b>
           <FitText
             className="block"
@@ -140,12 +152,14 @@ export function ConnectionsCard({
             aria-label={group.title}
             className="mm-ctable__group"
           >
-            <h3
-              className={`mm-ctable__bar mm-ctable__bar--${group.tone}`}
-              data-fit="with-next"
-            >
+            <h3 className="mm-ctable__bar" data-fit="with-next">
               <span>{group.title}</span>
-              <span className="mm-ctable__badge">{group.badge}</span>
+              <span
+                className="mm-ctable__badge mm-status-pill"
+                data-status={group.meaning}
+              >
+                {group.badge}
+              </span>
             </h3>
             <ul className="mm-ctable__rows">
               {group.rows.map((entry) => (

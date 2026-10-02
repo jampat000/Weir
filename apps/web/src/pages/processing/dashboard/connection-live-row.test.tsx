@@ -116,18 +116,22 @@ describe("a connection's row", () => {
   it("says the state in words as well as in the colour of its dot", () => {
     const row = renderRow({ state: "slow", checkedAt: NOW, answerMs: 2400 });
 
-    expect(row).toHaveClass("mm-conn--slow");
+    expect(row).toHaveAttribute("data-status", "attention");
     expect(row.querySelector(".mm-conn__when .sr-only")).toHaveTextContent(
       "slow to answer",
     );
   });
 
-  it.each<ConnectionLight>(["asking", "answered", "failed"])(
-    "wears the %s light",
-    (light) => {
-      expect(renderRow({}, light)).toHaveClass(`mm-conn--${light}`);
-    },
-  );
+  it.each<[ConnectionLight, string]>([
+    ["asking", "doing"],
+    ["answered", "done"],
+    ["failed", "broken"],
+  ])("wears the %s light", (light, meaning) => {
+    const row = renderRow({}, light);
+
+    expect(row).toHaveClass("mm-conn--lit");
+    expect(row).toHaveAttribute("data-status", meaning);
+  });
 
   it("wears no light when none is on", () => {
     const row = renderRow();

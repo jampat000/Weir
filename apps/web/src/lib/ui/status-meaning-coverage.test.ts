@@ -1,8 +1,14 @@
 import { describe, expect, it } from "vitest";
 
 import type { FinishedKind } from "../activity/processing-outcome";
-import type { ConnectionPhase } from "../connections/connection-activity";
-import type { ConnectionState } from "../connections/connection-model";
+import {
+  CONNECTION_LIGHT_MEANING,
+  type ConnectionLight,
+} from "../connections/connection-lights";
+import {
+  CONNECTION_STATE_MEANING,
+  type ConnectionState,
+} from "../connections/connection-model";
 import type { ProcessingDirectPlayVerdict } from "../processing/files-api";
 import type { Readiness } from "../processing/library-folder-chain-api";
 import type { SystemLogLevel } from "../system/system-log-api";
@@ -12,7 +18,6 @@ import type { LogLevel } from "../../pages/processing/dashboard/system/log-card-
 import type { TaskState } from "../../pages/processing/dashboard/system/tasks-card-model";
 import type { CheckTone } from "../../pages/processing/dashboard/system/health-checks";
 import type { AreaTone } from "../../pages/processing/dashboard/system/health-card-model";
-import type { GroupTone } from "../../pages/processing/dashboard/connections-card-model";
 import type { FactTone } from "../../pages/processing/dashboard/system/this-weir-model";
 import type { HandedBackTone } from "../../pages/processing/handed-back-model";
 import type { StepState } from "../../pages/processing/stage-flow-model";
@@ -48,17 +53,11 @@ const VOCABULARIES = {
     off: "idle",
     untested: "idle",
   } satisfies Record<ConnectionState, StatusMeaning>,
-  connectionPhase: {
-    asked: "doing",
+  connectionLight: {
+    asking: "doing",
     answered: "done",
     failed: "broken",
-  } satisfies Record<ConnectionPhase, StatusMeaning>,
-  connectionGroup: {
-    ok: "done",
-    slow: "attention",
-    down: "broken",
-    untested: "idle",
-  } satisfies Record<GroupTone, StatusMeaning>,
+  } satisfies Record<ConnectionLight, StatusMeaning>,
   readiness: {
     ready: "done",
     not_verified: "attention",
@@ -130,6 +129,14 @@ const VOCABULARIES = {
   } satisfies Record<MmStatusTone, StatusMeaning>,
 };
 
+/* The mappings the screens really use. Each must say what its table above says. */
+const PRODUCTION_MAPS: Partial<
+  Record<keyof typeof VOCABULARIES, Record<string, StatusMeaning>>
+> = {
+  connectionState: CONNECTION_STATE_MEANING,
+  connectionLight: CONNECTION_LIGHT_MEANING,
+};
+
 describe("the meaning of every state a model can produce", () => {
   it.each(Object.entries(VOCABULARIES))(
     "%s: every state has a status meaning",
@@ -137,6 +144,13 @@ describe("the meaning of every state a model can produce", () => {
       for (const meaning of Object.values(states)) {
         expect(STATUS_MEANINGS).toContain(meaning);
       }
+    },
+  );
+
+  it.each(Object.entries(PRODUCTION_MAPS))(
+    "%s: the screens give every state the meaning decided here",
+    (name, used) => {
+      expect(used).toEqual(VOCABULARIES[name as keyof typeof VOCABULARIES]);
     },
   );
 

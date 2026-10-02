@@ -1,20 +1,20 @@
 /** What the System card says about connections: the groups they sit in, how each group fares, and each row's words. */
 import type { ConnectionKind } from "../../../lib/connections/connection-activity";
 import {
+  CONNECTION_STATE_MEANING,
   type ConnectionEntry,
   type ConnectionState,
 } from "../../../lib/connections/connection-model";
+import type { StatusMeaning } from "../../../lib/ui/status-meaning";
 import { checkedAgo } from "./health-model";
-
-/** How a group fares, worst first: any connection down, else any slow, else any not yet tested, else all answering. */
-export type GroupTone = "down" | "slow" | "untested" | "ok";
 
 export type ConnectionGroup = {
   kind: ConnectionKind;
   title: string;
   /** The group's rows, the worst of them first. */
   rows: ConnectionEntry[];
-  tone: GroupTone;
+  /** How the group fares: that of its worst switched-on connection, or idle when none is on. */
+  meaning: StatusMeaning;
   /** "4/5 OK": the answering ones of those that are switched on. */
   badge: string;
 };
@@ -47,11 +47,9 @@ const byWorstThenName = (a: ConnectionEntry, b: ConnectionEntry) =>
 const switchedOn = (entries: readonly ConnectionEntry[]) =>
   entries.filter((entry) => entry.enabled);
 
-function toneOf(entries: readonly ConnectionEntry[]): GroupTone {
-  const states = new Set(switchedOn(entries).map((entry) => entry.state));
-  if (states.has("down")) return "down";
-  if (states.has("slow")) return "slow";
-  return states.has("untested") ? "untested" : "ok";
+function meaningOf(entries: readonly ConnectionEntry[]): StatusMeaning {
+  const [worst] = switchedOn(entries).sort(byWorstThenName);
+  return worst ? CONNECTION_STATE_MEANING[worst.state] : "idle";
 }
 
 /** The connections in their groups, the worst of each group first; a group with nothing in it is left out. */
@@ -69,7 +67,7 @@ export function groupConnections(
         kind,
         title: GROUP_TITLES[kind],
         rows,
-        tone: toneOf(rows),
+        meaning: meaningOf(rows),
         badge: `${answering}/${switchedOn(rows).length} OK`,
       },
     ];
