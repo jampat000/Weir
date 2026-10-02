@@ -94,10 +94,10 @@ export function ConnectionsCard({
   return (
     <Panel
       title="Connections"
-      note={
+      count={
         <FitText
           words={connectionsLineWords(entries)}
-          className="mm-ctable__note"
+          className="mm-sy-count"
         />
       }
       aside={
@@ -119,11 +119,6 @@ export function ConnectionsCard({
       toLabel="Manage"
     >
       <div ref={listRef} className="mm-ctable">
-        <div className="mm-ctable__head" aria-hidden="true">
-          <span />
-          <span>Connection</span>
-          <span>Checked</span>
-        </div>
         {groups.length === 0 ? (
           <p className="mm-health__empty mm-ctable__empty">
             Nothing connected yet. Add a media manager or a download client and

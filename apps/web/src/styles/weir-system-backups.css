@@ -75,10 +75,11 @@
   color: var(--mm-text2);
 }
 
-/* Tools and updates read as one line each: the part's name, then what it says. */
+/* Tools and updates read as one line each: the part's name, then what it says, on one baseline. The name's column is
+   as wide as the longest name, "Updates". */
 .mm-sy-part--inline {
-  grid-template-columns: 56px minmax(0, 1fr);
-  align-items: center;
+  grid-template-columns: 64px minmax(0, 1fr);
+  align-items: baseline;
   gap: 4px 8px;
   padding-bottom: 4px;
 }

@@ -168,14 +168,6 @@
 
 /* ---- The System card ------------------------------------------------------- */
 
-/* The line under the title: a block, so it has the width its words are fitted to. */
-.mm-ctable__note {
-  display: block;
-  min-width: 0;
-  overflow: hidden;
-  white-space: nowrap;
-}
-
 /* The rows that fit the card's height show whole and the header says how many more there are (fit-rows.ts). */
 .mm-ctable {
   min-height: 0;
@@ -185,7 +177,6 @@
   overflow: hidden;
 }
 
-.mm-ctable__head,
 .mm-ctable__bar,
 .mm-ctable__row {
   display: grid;
@@ -193,23 +184,6 @@
   align-items: center;
   column-gap: 10px;
   padding: 0 8px;
-}
-
-.mm-ctable__head {
-  position: sticky;
-  top: 0;
-  z-index: 2;
-  height: 20px;
-  background: var(--mm-card-bg);
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--mm-text3);
-}
-
-.mm-ctable__head > span:last-child {
-  text-align: center;
 }
 
 .mm-ctable__empty {
@@ -230,7 +204,7 @@
   color: var(--mm-text1);
 }
 
-.mm-ctable__head + .mm-ctable__group > .mm-ctable__bar {
+.mm-ctable__group:first-child > .mm-ctable__bar {
   margin-top: 2px;
 }
 
