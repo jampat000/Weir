@@ -4,7 +4,16 @@ import type { ReactNode } from "react";
 import { afterEach, expect, it, vi } from "vitest";
 
 import * as api from "../../lib/processing/kept-files-api";
+import { useTableColumns } from "../../lib/ui/use-table-columns";
+import { KEPT_COLUMNS } from "./activity-columns";
 import { ActivityKeptList } from "./activity-kept-list";
+
+function KeptListWithColumns(
+  props: Omit<Parameters<typeof ActivityKeptList>[0], "columns">,
+) {
+  const columns = useTableColumns(KEPT_COLUMNS);
+  return <ActivityKeptList {...props} columns={columns} />;
+}
 
 function wrapper({ children }: { children: ReactNode }) {
   const client = new QueryClient({
@@ -27,7 +36,7 @@ afterEach(() => {
 });
 
 it("says nothing is kept right now when the list is empty", () => {
-  render(<ActivityKeptList files={[]} editable onProcessed={vi.fn()} />, {
+  render(<KeptListWithColumns files={[]} editable onProcessed={vi.fn()} />, {
     wrapper,
   });
 
@@ -36,7 +45,7 @@ it("says nothing is kept right now when the list is empty", () => {
 
 it("does not offer Process again to someone who cannot edit", () => {
   render(
-    <ActivityKeptList
+    <KeptListWithColumns
       files={[keptFile]}
       editable={false}
       onProcessed={vi.fn()}
@@ -57,7 +66,11 @@ it("processing a kept file again reports the server's own message", async () => 
   });
   const onProcessed = vi.fn();
   render(
-    <ActivityKeptList files={[keptFile]} editable onProcessed={onProcessed} />,
+    <KeptListWithColumns
+      files={[keptFile]}
+      editable
+      onProcessed={onProcessed}
+    />,
     { wrapper },
   );
 
@@ -76,7 +89,7 @@ it("shows the server's refusal when processing a kept file again fails", async (
     new Error("Weir has no kept file with that id."),
   );
   render(
-    <ActivityKeptList files={[keptFile]} editable onProcessed={vi.fn()} />,
+    <KeptListWithColumns files={[keptFile]} editable onProcessed={vi.fn()} />,
     { wrapper },
   );
 

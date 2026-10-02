@@ -142,6 +142,9 @@ export interface ProcessingFilesPage {
   limit: number;
 }
 
+/** The ways the file list sorts: by the file's path, by what happened to it, or by when it last changed. */
+export type ProcessingFilesSort = "file" | "status" | "when";
+
 export interface ProcessingFilesQuery {
   library_id?: number;
   /** Several statuses join as one comma-separated value; the server splits them (#781). */
@@ -149,6 +152,9 @@ export interface ProcessingFilesQuery {
   path_contains?: string;
   within_days?: number;
   limit?: number;
+  /** Newest change first when not given. */
+  sort?: ProcessingFilesSort;
+  direction?: "asc" | "desc";
 }
 
 export const processingFilesPath = () => "/api/v1/processing/files";

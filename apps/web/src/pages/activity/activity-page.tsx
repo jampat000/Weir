@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
 import { Panel } from "../../components/panels/panel";
+import { ColumnsMenu } from "../../components/shared/columns-menu";
 import { LoadError } from "../../components/shared/load-error";
 import { PanelLoading } from "../../components/shared/page-loading";
 import { useCanEdit } from "../../lib/auth/can-edit";
@@ -13,7 +14,9 @@ import {
 import { useKeptFilesQuery } from "../../lib/processing/kept-files-queries";
 import { useProcessingLibrariesQuery } from "../../lib/processing/libraries-queries";
 import { mmActionButtonClass } from "../../lib/ui/mm-control-roles";
+import { useTableColumns } from "../../lib/ui/use-table-columns";
 import { useNow } from "../../lib/ui/use-now";
+import { ACTIVITY_COLUMNS, KEPT_COLUMNS } from "./activity-columns";
 import { ActivityCleanDetail } from "./activity-clean-detail";
 import { ActivityDetail } from "./activity-detail";
 import {
@@ -22,6 +25,7 @@ import {
   activityEntries,
   inGroup,
   retryableFailures,
+  sortActivityEntries,
   type ActivityEntry,
   type ActivityGroup,
 } from "./activity-entries";
@@ -122,7 +126,14 @@ export function ActivityPage() {
     library_id: libraryId,
     path_contains: params.get("q") ?? undefined,
   };
-  const files = useFileHistoryQuery({ ...query, limit: FILES_LIMIT });
+  const fileColumns = useTableColumns(ACTIVITY_COLUMNS);
+  const keptColumns = useTableColumns(KEPT_COLUMNS);
+  const sort = fileColumns.sort;
+  const files = useFileHistoryQuery({
+    ...query,
+    limit: FILES_LIMIT,
+    ...(sort ? { sort: sort.id, direction: sort.direction } : {}),
+  });
   const attention = useActivityAttention(
     libraryId ?? null,
     params.get("q") ?? "",
@@ -137,9 +148,10 @@ export function ActivityPage() {
     [files.data, cleans.data],
   );
   const needsYou = group === "attention";
-  const shown = needsYou
-    ? attention.entries
-    : all.filter((entry) => inGroup(entry, group));
+  const shown = sortActivityEntries(
+    needsYou ? attention.entries : all.filter((entry) => inGroup(entry, group)),
+    sort,
+  );
   const counts = {
     ...(Object.fromEntries(
       ACTIVITY_GROUPS.map((g) => [
@@ -154,6 +166,7 @@ export function ActivityPage() {
     kept: kept.data?.files.length ?? 0,
   };
   const selected = selectedEntry(shown, selectedFileId, selectedCleanId);
+  const isNewestFirst = sort?.id === "when" && sort.direction === "desc";
   const cappedAtLimit =
     group !== "kept" && (files.data?.returned ?? 0) >= FILES_LIMIT;
 
@@ -207,8 +220,10 @@ export function ActivityPage() {
 
       {cappedAtLimit ? (
         <p className="mm-history-note" role="status">
-          Showing the newest {FILES_LIMIT.toLocaleString()} downloads. Narrow
-          the search or the period to see more.
+          Showing the {isNewestFirst ? "newest" : "first"}{" "}
+          {FILES_LIMIT.toLocaleString()} downloads
+          {isNewestFirst ? "" : " in this order"}. Narrow the search or the
+          period to see more.
         </p>
       ) : null}
 
@@ -228,10 +243,16 @@ export function ActivityPage() {
             title="Kept files"
             className="mm-history-list"
             count={`${(kept.data?.files.length ?? 0).toLocaleString()} kept`}
-            aside={pickersAside}
+            aside={
+              <>
+                {pickersAside}
+                <ColumnsMenu table={keptColumns} />
+              </>
+            }
           >
             <ActivityKeptList
               files={kept.data?.files ?? []}
+              columns={keptColumns}
               editable={editable}
               onProcessed={setRemovedNotice}
             />
@@ -256,10 +277,16 @@ export function ActivityPage() {
             title="Files"
             count={`${shown.length.toLocaleString()} shown`}
             className="mm-history-list"
-            aside={pickersAside}
+            aside={
+              <>
+                {pickersAside}
+                <ColumnsMenu table={fileColumns} />
+              </>
+            }
           >
             <ActivityList
               entries={shown}
+              columns={fileColumns}
               selectedKey={selected?.key ?? null}
               now={now}
               onPick={pickEntry}

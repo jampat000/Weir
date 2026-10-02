@@ -142,11 +142,11 @@
   border-bottom: 1px solid var(--mm-hairline);
 }
 
-.mm-history-table th:nth-child(2) {
+.mm-history-table th[data-col="status"] {
   width: 38%;
 }
 
-.mm-history-table th:nth-child(3) {
+.mm-history-table th[data-col="when"] {
   width: 120px;
 }
 
@@ -278,8 +278,9 @@
     box-shadow: none;
   }
 
-  .mm-history-table td:first-child {
+  .mm-history-table td[data-col="file"] {
     grid-column: 1 / -1;
+    order: -1;
   }
 
   .mm-history-table tr.is-selected {

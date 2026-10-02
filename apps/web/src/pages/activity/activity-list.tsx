@@ -1,12 +1,17 @@
+import { Fragment, type ReactNode } from "react";
+
 import { Chip } from "../../components/panels/chip";
 import { FileName } from "../../components/shared/file-name";
 import { Poster } from "../../components/shared/poster";
+import { SortableColumnHeader } from "../../components/shared/sortable-column-header";
 import { formatBytes } from "../../lib/format/bytes";
 import {
   processingFileStatusLabel,
   type ProcessingFile,
 } from "../../lib/processing/files-api";
 import type { LibraryClean } from "../../lib/processing/library-cleans-api";
+import type { TableColumns } from "../../lib/ui/use-table-columns";
+import type { ActivityColumnId } from "./activity-columns";
 import {
   entryMeaning,
   entryPath,
@@ -55,73 +60,105 @@ function entryIsSelected(entry: ActivityEntry, selectedKey: string | null) {
   return selectedKey !== null && entry.key === selectedKey;
 }
 
+function EntryRow({
+  entry,
+  order,
+  selected,
+  now,
+  onPick,
+}: {
+  entry: ActivityEntry;
+  order: readonly ActivityColumnId[];
+  selected: boolean;
+  now: number;
+  onPick: (entry: ActivityEntry) => void;
+}) {
+  const cells: Record<ActivityColumnId, ReactNode> = {
+    file: (
+      <td data-col="file">
+        <button
+          type="button"
+          className="mm-history-file"
+          onClick={() => onPick(entry)}
+          title={entryPath(entry)}
+        >
+          <span className="mm-history-file__poster">
+            <Poster
+              url={posterUrlOf(entry)}
+              title={prettyName(entryPath(entry))}
+              workflow={libraryNameOf(entry)}
+            />
+          </span>
+          <span className="mm-history-file__text">
+            <FileName
+              path={entryPath(entry)}
+              className="mm-history-file__name"
+            />
+            <span className="mm-history-file__sub">{subLine(entry)}</span>
+          </span>
+        </button>
+      </td>
+    ),
+    status: (
+      <td data-col="status">
+        <Chip meaning={entryMeaning(entry)} className="mm-history-what">
+          {entry.kind === "download"
+            ? whatWeirDid(entry.file)
+            : CLEAN_OUTCOME_WORDS[entry.clean.outcome]}
+        </Chip>
+      </td>
+    ),
+    when: (
+      <td data-col="when" className="mm-history-when">
+        {agoWords(entryTime(entry), now)}
+      </td>
+    ),
+  };
+  return (
+    <tr
+      className={selected ? "is-selected" : undefined}
+      aria-current={selected ? "true" : undefined}
+    >
+      {order.map((id) => (
+        <Fragment key={id}>{cells[id]}</Fragment>
+      ))}
+    </tr>
+  );
+}
+
 export function ActivityList({
   entries,
+  columns,
   selectedKey,
   now,
   onPick,
 }: {
   entries: ActivityEntry[];
+  columns: TableColumns<ActivityColumnId>;
   selectedKey: string | null;
   now: number;
   onPick: (entry: ActivityEntry) => void;
 }) {
   return (
-    <table className="mm-history-table">
+    <table className="mm-history-table" {...columns.tableProps}>
       <thead>
         <tr>
-          <th scope="col">File</th>
-          <th scope="col">What happened</th>
-          <th scope="col">When</th>
+          {columns.order.map((id) => (
+            <SortableColumnHeader key={id} heading={columns.heading(id)} />
+          ))}
         </tr>
       </thead>
       <tbody>
-        {entries.map((entry) => {
-          const selected = entryIsSelected(entry, selectedKey);
-          return (
-            <tr
-              key={entry.key}
-              className={selected ? "is-selected" : undefined}
-              aria-current={selected ? "true" : undefined}
-            >
-              <td>
-                <button
-                  type="button"
-                  className="mm-history-file"
-                  onClick={() => onPick(entry)}
-                  title={entryPath(entry)}
-                >
-                  <span className="mm-history-file__poster">
-                    <Poster
-                      url={posterUrlOf(entry)}
-                      title={prettyName(entryPath(entry))}
-                      workflow={libraryNameOf(entry)}
-                    />
-                  </span>
-                  <span className="mm-history-file__text">
-                    <FileName
-                      path={entryPath(entry)}
-                      className="mm-history-file__name"
-                    />
-                    <span className="mm-history-file__sub">
-                      {subLine(entry)}
-                    </span>
-                  </span>
-                </button>
-              </td>
-              <td>
-                <Chip meaning={entryMeaning(entry)} className="mm-history-what">
-                  {entry.kind === "download"
-                    ? whatWeirDid(entry.file)
-                    : CLEAN_OUTCOME_WORDS[entry.clean.outcome]}
-                </Chip>
-              </td>
-              <td className="mm-history-when">
-                {agoWords(entryTime(entry), now)}
-              </td>
-            </tr>
-          );
-        })}
+        {entries.map((entry) => (
+          <EntryRow
+            key={entry.key}
+            entry={entry}
+            order={columns.order}
+            selected={entryIsSelected(entry, selectedKey)}
+            now={now}
+            onPick={onPick}
+          />
+        ))}
       </tbody>
     </table>
   );

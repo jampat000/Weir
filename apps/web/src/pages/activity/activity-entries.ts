@@ -4,6 +4,13 @@ import type {
 } from "../../lib/processing/files-api";
 import type { LibraryClean } from "../../lib/processing/library-cleans-api";
 import type { StatusMeaning } from "../../lib/ui/status-meaning";
+import {
+  meaningRank,
+  sortRows,
+  type SortValue,
+  type TableSort,
+} from "../../lib/ui/table-columns";
+import type { ActivityColumnId } from "./activity-columns";
 import { serverMs } from "./activity-model";
 
 /**
@@ -178,6 +185,24 @@ export function activityEntries(
   return [...files.map(downloadEntry), ...cleans.map(cleanEntry)].sort(
     (a, b) => serverMs(entryTime(b)) - serverMs(entryTime(a)),
   );
+}
+
+/** What each column of Activity's list sorts by: the file's path, what happened by its meaning, and when it last changed. */
+const ENTRY_SORT_VALUES: Record<
+  ActivityColumnId,
+  (entry: ActivityEntry) => SortValue
+> = {
+  file: entryPath,
+  status: (entry) => meaningRank(entryMeaning(entry)),
+  when: (entry) => serverMs(entryTime(entry)),
+};
+
+/** The entries in the order a heading sorts them. The server sorts the downloads the same way before it pages them. */
+export function sortActivityEntries(
+  entries: readonly ActivityEntry[],
+  sort: TableSort<ActivityColumnId> | null,
+): ActivityEntry[] {
+  return sortRows(entries, sort, ENTRY_SORT_VALUES);
 }
 
 /** Whether any listed download was rejected: what "Process all again" is offered for. */

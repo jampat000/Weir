@@ -5,7 +5,16 @@ import type { ProcessingFile } from "../../lib/processing/files-api";
 import type { LibraryClean } from "../../lib/processing/library-cleans-api";
 import { WithWorkflows } from "../../test/with-workflows";
 import { cleanEntry, downloadEntry } from "./activity-entries";
+import { useTableColumns } from "../../lib/ui/use-table-columns";
+import { ACTIVITY_COLUMNS } from "./activity-columns";
 import { ActivityList } from "./activity-list";
+
+function ListWithColumns(
+  props: Omit<Parameters<typeof ActivityList>[0], "columns">,
+) {
+  const columns = useTableColumns(ACTIVITY_COLUMNS);
+  return <ActivityList {...props} columns={columns} />;
+}
 
 const NOW = Date.parse("2026-10-02T10:00:00Z");
 
@@ -33,7 +42,7 @@ const clean = {
 function renderList() {
   render(
     <WithWorkflows>
-      <ActivityList
+      <ListWithColumns
         entries={[downloadEntry(download), cleanEntry(clean)]}
         selectedKey={null}
         now={NOW}
