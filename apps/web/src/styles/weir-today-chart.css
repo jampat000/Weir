@@ -132,6 +132,11 @@
   background: color-mix(in srgb, var(--mm-card-bg) 78%, transparent);
 }
 
+.cs-legend .mm-status-dot {
+  width: 6px;
+  height: 6px;
+}
+
 .cs-legend__words {
   min-width: 0;
   flex: 1 1 0;
