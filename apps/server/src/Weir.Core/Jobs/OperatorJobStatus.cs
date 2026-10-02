@@ -53,15 +53,15 @@ public static class OperatorJobStatus
         switch (status)
         {
             case "pending":
-                return ($"{label} has queued this work{subject}.", "No action is needed. Weir will start it when the required worker capacity is available.", technical);
+                return ($"Queued{subject}.", "Nothing to do. It starts when a worker is free.", technical);
             case "leased":
-                return ($"{label} is working on this job{subject}.", "No action is needed unless it stays here beyond the normal processing time; then open the job record.", technical);
+                return ($"Running{subject}.", "Nothing to do. If it stays here too long, open the job record.", technical);
             case "completed":
-                return ($"{label} finished this job{subject}.", "No action is needed. Open the processing record if you want the detailed outcome.", technical);
+                return ($"Finished{subject}.", "Nothing to do. Open the processing record for the outcome.", technical);
             case "cancelled":
-                return ($"This {label} job was cancelled before a worker started it{subject}.", "No action is needed. If the file still exists and should be processed, start it again from Files.", technical);
+                return ($"Cancelled before it started{subject}.", "Nothing to do. To process the file anyway, start it again from Files.", technical);
             case "handler_ok_finalize_failed":
-                return ($"The {label} work completed{subject}, but Weir could not finish saving the job result.", "Use Recover result below. Weir will not run the media work again.", technical);
+                return ($"The work finished{subject}, but its result could not be saved.", "Use Recover result below. The media work won't run again.", technical);
         }
 
         if (lower.Contains("database is locked", StringComparison.Ordinal) || lower.Contains("database table is locked", StringComparison.Ordinal))
@@ -107,10 +107,10 @@ public static class OperatorJobStatus
 
         if (status is "failed" or "error")
         {
-            return ($"{label} could not finish this job{subject}.", "Open the related Files or Jobs screen for the explanation, fix the cause, and start it again.", technical);
+            return ($"Couldn't finish this job{subject}.", "See Files or Jobs for why, fix it, then start it again.", technical);
         }
 
-        return ($"{label} needs a review for this job{subject}.", "Open the related Jobs screen to inspect the current status.", technical);
+        return ($"Needs a review{subject}.", "Open the Jobs screen to inspect it.", technical);
     }
 
     private static WireObject ParsePayload(string? raw)

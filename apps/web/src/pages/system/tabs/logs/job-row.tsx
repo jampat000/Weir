@@ -91,13 +91,13 @@ export function JobRow({
       <td data-label="What happened" className="min-w-76 max-w-md break-words">
         <p className="text-sm text-mm-text1">
           {pausedPending
-            ? "This job is safely waiting because Weir is paused."
+            ? "Waiting · Weir is paused."
             : job.operator_message || "This job needs a review."}
         </p>
         <p className="mt-1 text-xs text-mm-text3">
           <span className="font-semibold text-mm-text2">Next step:</span>{" "}
           {pausedPending
-            ? "No action is required. Use Resume at the top of the page when you want queued work to continue."
+            ? "Nothing to do. Resume at the top to continue."
             : job.next_action || "Open the related screen to inspect the job."}
         </p>
         <details className="mt-2 text-xs text-mm-text3">

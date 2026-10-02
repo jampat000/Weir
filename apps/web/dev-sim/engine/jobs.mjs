@@ -115,28 +115,28 @@ function operatorWords(job) {
   switch (job.status) {
     case JOB_STATUS.PENDING:
       return [
-        `Weir has queued this work${subject}.`,
-        "No action is needed. Weir will start it when the required worker capacity is available.",
+        `Queued${subject}.`,
+        "Nothing to do. It starts when a worker is free.",
       ];
     case JOB_STATUS.LEASED:
       return [
-        `Weir is working on this job${subject}.`,
-        "No action is needed unless it stays here beyond the normal processing time; then open the job record.",
+        `Running${subject}.`,
+        "Nothing to do. If it stays here too long, open the job record.",
       ];
     case JOB_STATUS.COMPLETED:
       return [
-        `Weir finished this job${subject}.`,
-        "No action is needed. Open the processing record if you want the detailed outcome.",
+        `Finished${subject}.`,
+        "Nothing to do. Open the processing record for the outcome.",
       ];
     case JOB_STATUS.CANCELLED:
       return [
-        `This Weir job was cancelled before a worker started it${subject}.`,
-        "No action is needed. If the file still exists and should be processed, start it again from Files.",
+        `Cancelled before it started${subject}.`,
+        "Nothing to do. To process the file anyway, start it again from Files.",
       ];
     default:
       return [
-        `Weir could not finish this job${subject}.`,
-        "Open the related Files or Jobs screen for the explanation, fix the cause, and start it again.",
+        `Couldn't finish this job${subject}.`,
+        "See Files or Jobs for why, fix it, then start it again.",
       ];
   }
 }

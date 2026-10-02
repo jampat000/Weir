@@ -140,9 +140,7 @@ export function JobsSection() {
         padded
         bodyClassName="space-y-4"
       >
-        <p className="mm-quiet-note">
-          Current and recent work, with a clear next step when you need to act.
-        </p>
+        <p className="mm-quiet-note">Current and recent work.</p>
         <label className="block min-w-0 max-w-xl">
           <span id={filterLabelId} className="text-sm text-mm-text2">
             Show jobs
@@ -183,9 +181,7 @@ export function JobsSection() {
               No jobs match this view
             </p>
             <p className="mt-1 text-xs text-mm-text2">
-              Nothing matches this filter yet. Try{" "}
-              <strong className="text-mm-text2">Recent work</strong> for the
-              latest rows.
+              Try <strong className="text-mm-text2">Recent work</strong>.
             </p>
           </div>
         ) : null}
@@ -214,7 +210,7 @@ export function JobsSection() {
         ) : null}
 
         <p className="text-xs text-mm-text2">
-          Full detail on each outcome is in the{" "}
+          More in the{" "}
           <Link to="/system?tab=history" className="text-mm-accent underline">
             Activity log
           </Link>
