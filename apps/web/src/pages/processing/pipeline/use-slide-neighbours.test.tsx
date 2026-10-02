@@ -30,6 +30,9 @@ function Row({
   );
 }
 
+/** Lets the commit's own work finish: the tiles slide once every effect of the commit has run. */
+const settled = () => act(async () => {});
+
 /** Each tile sits at its place in the order, one tile width apart. */
 function layOutInOrder() {
   vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(
@@ -66,11 +69,12 @@ describe("the tiles on the shelf when one is added", () => {
     expect(animate).not.toHaveBeenCalled();
   });
 
-  it("slide from where they were to where they are, and the new tile does not", () => {
+  it("slide from where they were to where they are, and the new tile does not", async () => {
     const row = createRef<HTMLUListElement>();
     const view = render(<Row keys={["a", "b"]} row={row} />);
 
     view.rerender(<Row keys={["n", "a", "b"]} row={row} />);
+    await settled();
 
     expect(animate).toHaveBeenCalledTimes(2);
     expect(animate.mock.calls[0][0]).toEqual([
@@ -92,7 +96,7 @@ describe("the tiles on the shelf when one is added", () => {
     expect(animate).not.toHaveBeenCalled();
   });
 
-  it("slide from where they stood when a slot last opened, not from before it", () => {
+  it("slide from where they stood when a slot last opened, not from before it", async () => {
     const row = createRef<HTMLUListElement>();
     const view = render(<Row keys={["a", "b"]} row={row} />);
 
@@ -102,6 +106,7 @@ describe("the tiles on the shelf when one is added", () => {
       document.dispatchEvent(new Event(SLOTS_CHANGED_EVENT));
     });
     view.rerender(<Row keys={["n", "a", "b"]} row={row} />);
+    await settled();
 
     expect(animate.mock.calls[0][0]).toEqual([
       { transform: `translateX(${-TILE_PX}px)` },
@@ -109,12 +114,26 @@ describe("the tiles on the shelf when one is added", () => {
     ]);
   });
 
-  it("do not slide while the window is being resized", () => {
+  it("do not slide while the window is being resized", async () => {
     const row = createRef<HTMLUListElement>();
     const view = render(<Row keys={["a", "b"]} row={row} />);
     document.body.classList.add(RESIZING_CLASS);
 
     view.rerender(<Row keys={["n", "a", "b"]} row={row} />);
+    await settled();
+
+    expect(animate).not.toHaveBeenCalled();
+  });
+
+  it("do not slide for a tile whose slot is closed by another effect of the same commit", async () => {
+    const row = createRef<HTMLUListElement>();
+    const view = render(<Row keys={["a", "b"]} row={row} />);
+
+    // The tile for a file still on its way is added and its slot closed in one commit, after the row's own effect
+    // has run: it takes no room, so nothing beside it moves.
+    view.rerender(<Row keys={["n", "a", "b"]} row={row} />);
+    pushed = -TILE_PX;
+    await settled();
 
     expect(animate).not.toHaveBeenCalled();
   });

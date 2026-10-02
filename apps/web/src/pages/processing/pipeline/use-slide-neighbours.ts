@@ -27,6 +27,29 @@ function leftsOf(host: HTMLElement): Map<string, number> {
   return lefts;
 }
 
+/** Slides each tile that was somewhere else in `before` from there to where it is now. */
+function slideFrom(host: HTMLElement, before: ReadonlyMap<string, number>) {
+  if (!host.isConnected) return;
+  const now = leftsOf(host);
+  for (const tile of host.querySelectorAll<HTMLElement>(
+    `[${TILE_KEY_ATTRIBUTE}]`,
+  )) {
+    const key = tile.getAttribute(TILE_KEY_ATTRIBUTE) ?? "";
+    const was = before.get(key);
+    const left = now.get(key) ?? 0;
+    if (
+      was !== undefined &&
+      Math.abs(was - left) > MOVED_PX &&
+      typeof tile.animate === "function"
+    ) {
+      tile.animate(
+        [{ transform: `translateX(${was - left}px)` }, { transform: "none" }],
+        { duration: SLIDE_MS, easing: SLIDE_EASING },
+      );
+    }
+  }
+}
+
 /**
  * When a tile is added to the shelf or taken from it, the tiles that stay slide to their new places instead of
  * jumping: each is moved back to where it was and let go. Nothing slides while the window is being resized, which
@@ -50,31 +73,13 @@ export function useSlideNeighbours(
       reordered &&
       motionAllowed() &&
       !document.body.classList.contains(RESIZING_CLASS);
-    const now = leftsOf(host);
-    if (slide) {
-      for (const tile of host.querySelectorAll<HTMLElement>(
-        `[${TILE_KEY_ATTRIBUTE}]`,
-      )) {
-        const key = tile.getAttribute(TILE_KEY_ATTRIBUTE) ?? "";
-        const before = lefts.current.get(key);
-        const left = now.get(key) ?? 0;
-        if (
-          before !== undefined &&
-          Math.abs(before - left) > MOVED_PX &&
-          typeof tile.animate === "function"
-        ) {
-          tile.animate(
-            [
-              { transform: `translateX(${before - left}px)` },
-              { transform: "none" },
-            ],
-            { duration: SLIDE_MS, easing: SLIDE_EASING },
-          );
-        }
-      }
-    }
-    lefts.current = now;
+    const before = lefts.current;
+    lefts.current = leftsOf(host);
     lastOrder.current = order;
+    // The tiles are measured once the whole commit is done: a tile added for a file still on its way is put in a
+    // closed slot by another effect of the same commit, and the tiles beside it must not slide for a slot that
+    // takes no room.
+    if (slide) queueMicrotask(() => slideFrom(host, before));
   }, [row, order, tileWidth]);
   useLayoutEffect(() => {
     const note = () => {
