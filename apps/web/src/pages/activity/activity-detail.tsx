@@ -11,7 +11,7 @@ import {
   type ProcessingFile,
   type ProcessingFileLogEntry,
 } from "../../lib/processing/files-api";
-import { fileHistoryRetentionNote } from "../../lib/processing/file-history-retention";
+import { fileActivityRetentionNote } from "../../lib/processing/file-activity-retention";
 import { useProcessingFileLogQuery } from "../../lib/processing/files-queries";
 import { useProcessingLibrariesQuery } from "../../lib/processing/libraries-queries";
 import {
@@ -176,7 +176,7 @@ export function ActivityDetail({
           className="mm-history-record-meta"
           data-testid="activity-retention-note"
         >
-          {fileHistoryRetentionNote(record.data.retention_days)}
+          {fileActivityRetentionNote(record.data.retention_days)}
         </p>
       ) : null}
     </section>

@@ -24,7 +24,7 @@ const WHAT_A_BACKUP_HOLDS =
 
 /**
  * When Weir backs up its own settings. The choices are drafts until Save, which appears once one has changed: they
- * share one save with how long history is kept, so nothing here is applied on its own.
+ * share one save with how long things are kept, so nothing here is applied on its own.
  */
 export function BackupScheduleSection({
   form,

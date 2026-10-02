@@ -1,7 +1,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
-import { FILE_HISTORY_MAX_DAYS } from "../../../../lib/processing/file-history-retention";
+import { FILE_ACTIVITY_MAX_DAYS } from "../../../../lib/processing/file-activity-retention";
 import { processingKeys } from "../../../../lib/processing/query-keys";
 import {
   useProcessingOperatorSettingsQuery,
@@ -25,7 +25,7 @@ export function useFileActivityRetention() {
     shown.trim() !== "" &&
     Number.isInteger(days) &&
     days >= 0 &&
-    days <= FILE_HISTORY_MAX_DAYS;
+    days <= FILE_ACTIVITY_MAX_DAYS;
 
   return {
     /** "unreadable" when the server would not say, "loading" until it has, otherwise "ready". */
@@ -40,7 +40,7 @@ export function useFileActivityRetention() {
     dirty: draft !== null && days !== savedDays,
     saving: saveMutation.isPending,
     error: saveMutation.isError ? saveMutation.error : null,
-    maxDays: FILE_HISTORY_MAX_DAYS,
+    maxDays: FILE_ACTIVITY_MAX_DAYS,
     /** Saves the number; `onSaved` runs once the server has taken it. */
     save: (onSaved: () => void) =>
       saveMutation.mutate(

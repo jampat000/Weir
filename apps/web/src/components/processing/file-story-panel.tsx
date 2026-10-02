@@ -7,7 +7,7 @@
  */
 
 import { Poster } from "../shared/poster";
-import { fileHistoryRetentionNote } from "../../lib/processing/file-history-retention";
+import { fileActivityRetentionNote } from "../../lib/processing/file-activity-retention";
 import { useAppDateFormatter } from "../../lib/ui/mm-format-date";
 import { DirectPlayLine } from "./direct-play-line";
 import { FileNowSection, type FileNow } from "./file-now-section";
@@ -64,7 +64,7 @@ export function FileStoryPanel({
 
   if (!open) return null;
 
-  const retention = log ? fileHistoryRetentionNote(log.retention_days) : null;
+  const retention = log ? fileActivityRetentionNote(log.retention_days) : null;
 
   return (
     <StoryPanelShell
