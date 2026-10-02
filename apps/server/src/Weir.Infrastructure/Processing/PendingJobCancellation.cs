@@ -13,7 +13,7 @@ namespace Weir.Infrastructure.Processing;
 public sealed record PendingJobCancelResult(JobActionOutcome Outcome, HandoffLedgerRow? EndedHandoff = null);
 
 /// <summary>
-/// Cancelling one queued job from the Jobs screen (<c>POST /processing/jobs/{id}/cancel-pending</c>). Only a pending job can
+/// Cancelling one queued job from the jobs list in System › Logs (<c>POST /processing/jobs/{id}/cancel-pending</c>). Only a pending job can
 /// be cancelled, and its dedupe key becomes a tombstone so a later enqueue may reuse it.
 /// <para>
 /// Cancelling changes more than the job row (#643): otherwise the file would read "Waiting" for ever or be queued again by

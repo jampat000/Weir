@@ -2,7 +2,7 @@ namespace Weir.Core.Processing;
 
 /// <summary>
 /// The two intake settings a workflow holds on its own: how long a new file must stay unchanged before Weir starts on it,
-/// and the smallest file it takes. Settings › Performance holds neither.
+/// and the smallest file it takes. Setup › Performance › Speed holds neither.
 /// </summary>
 public static class LibraryIntake
 {

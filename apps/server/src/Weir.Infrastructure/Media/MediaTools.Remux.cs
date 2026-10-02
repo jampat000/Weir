@@ -47,7 +47,7 @@ public sealed partial class MediaTools
     /// produced.
     /// </param>
     /// <param name="keepOnFailure">
-    /// Settings › Performance "Keep failed work files": a copy that fails is left in the work folder to look at, not
+    /// Setup › Performance › Cleanup "Keep a failed file's half-written copy for a day": a copy that fails is left in the work folder to look at, not
     /// deleted. A cancelled write is removed either way.
     /// </param>
     /// <param name="cancellationToken">Cancellation.</param>
@@ -99,7 +99,7 @@ public sealed partial class MediaTools
         }
         catch (Exception failure)
         {
-            // "Keep failed work files" (Settings › Performance): a copy that failed stays in the work folder for a person
+            // "Keep a failed file's half-written copy for a day" (Setup › Performance › Cleanup): a copy that failed stays in the work folder for a person
             // to look at, until the leftover-work-file sweep finds it a day later. A cancelled write is never kept.
             if (keepOnFailure && failure is not OperationCanceledException && File.Exists(tmpPath))
             {

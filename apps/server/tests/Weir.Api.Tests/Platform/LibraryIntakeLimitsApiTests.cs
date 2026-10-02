@@ -5,7 +5,7 @@ namespace Weir.Api.Tests.Platform;
 
 /// <summary>
 /// A workflow's wait and minimum size over real HTTP: each is the workflow's own value, a new workflow starts at 60 seconds and
-/// 50 MB, and Settings › Performance holds neither.
+/// 50 MB, and Setup › Performance › Speed holds neither.
 /// </summary>
 public sealed class LibraryIntakeLimitsApiTests
 {

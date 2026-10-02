@@ -153,7 +153,7 @@ public sealed partial class ManagerSetupCheck
     private static bool IsDeluno(MediaManagerConnectionRecord row) => string.Equals(row.Kind, "deluno", StringComparison.OrdinalIgnoreCase);
 
     private static string MissingCredentialsText(string label) =>
-        $"{label} has no address or API key saved, so Weir cannot check it. Add them under Settings → Media managers.";
+        $"{label} has no address or API key saved, so Weir cannot check it. Add them under Setup › Connections › Media managers.";
 
     private async Task<ManagerFolderSuggestion> SuggestArrFoldersAsync(
         long connectionId, ManagerConnection connection, string mediaScope, CancellationToken cancellationToken)

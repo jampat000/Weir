@@ -25,7 +25,7 @@ public sealed partial class ConfigurationBundleStore
     private const string RuleSetsTable = "rule_sets";
     private const string LibrariesTable = "libraries";
 
-    /// <summary>The space to keep free: a workflow's own now, Settings › Performance's in a backup made before that.</summary>
+    /// <summary>The space to keep free: a workflow's own now, Setup › Performance › Speed's in a backup made before that.</summary>
     private const string FreeSpaceColumn = "minimum_free_disk_space_mb";
 
     private readonly SuiteSettingsStore _suiteSettings;

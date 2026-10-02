@@ -151,7 +151,7 @@ public sealed partial class RemuxPassHandler
         var waits = data.Get("minimum_age_waits") is WireInteger counted ? (long)counted.Value : 0;
         if (waits >= MaxMinimumAgeWaits)
         {
-            var stopped = "This file has kept changing, so Weir has stopped looking at it. When the copy has finished, use Check again from Files.";
+            var stopped = "This file has kept changing, so Weir has stopped looking at it. When the copy has finished, use Check again from History.";
             result.Set("reason", stopped).Set("preflight_reason", stopped).Set("failure_operator_message", stopped);
             _logger.LogWarning("A file was still changing after {Waits} looks, so Weir stopped looking: job {JobId}.", waits, jobId);
             return;

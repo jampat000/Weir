@@ -3,7 +3,7 @@ using System.Net;
 namespace Weir.Api.Tests.Platform;
 
 /// <summary>
-/// The space to keep free is each workflow's own setting, no longer one value in Settings › Performance: a workflow reports
+/// The space to keep free is each workflow's own setting, no longer one value in Setup › Performance › Speed: a workflow reports
 /// and saves it, and Performance accepts the old field without acting on it.
 /// </summary>
 public sealed class WorkflowFreeSpaceApiTests

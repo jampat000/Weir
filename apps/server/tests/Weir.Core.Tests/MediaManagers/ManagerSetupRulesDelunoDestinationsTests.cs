@@ -293,7 +293,7 @@ public sealed class ManagerSetupRulesDelunoDestinationsTests
         var fix = result.Lines[0];
         Assert.Equal(SetupCheckLine.Unverified, fix.State);
         Assert.Equal(
-            "The API key Weir uses for Deluno can't read where downloads go. Give it the Imports permission: in Deluno, open System › API Access and create a key with Media automation access (it includes Imports), then save that key under Settings › Media managers in Weir.",
+            "The API key Weir uses for Deluno can't read where downloads go. Give it the Imports permission: in Deluno, open System › API Access and create a key with Media automation access (it includes Imports), then save that key under Setup › Connections › Media managers in Weir.",
             fix.Text);
         Assert.True(result.Lines.Count > 1);
     }

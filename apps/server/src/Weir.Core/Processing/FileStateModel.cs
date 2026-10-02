@@ -28,7 +28,7 @@ public static class ProcessingFileStatuses
     /// manager accepted that the release is bad. With no manager involved, the rules themselves left nothing to keep.</summary>
     public const string Rejected = "rejected";
 
-    /// <summary>Terminal: someone cancelled the file's queued pass before Weir started on it, from the Jobs screen or through
+    /// <summary>Terminal: someone cancelled the file's queued pass before Weir started on it, from the jobs list in System › Logs or through
     /// the media manager that handed it over (#643). The original is untouched, and a scan leaves it alone until the file
     /// changes or someone queues it again.</summary>
     public const string Cancelled = "cancelled";
@@ -60,10 +60,10 @@ public static class ProcessingFileStatuses
 public static class CancelledFileReasons
 {
     public const string InWeir =
-        "Cancelled from the Jobs screen before Weir started on it. The original is untouched; queue it again from Files to process it.";
+        "Cancelled from the jobs list in System › Logs before Weir started on it. The original is untouched; queue it again from History to process it.";
 
     public const string ByManager =
-        "The media manager cancelled this hand-off before Weir started on it. The original is untouched; queue it again from Files to process it.";
+        "The media manager cancelled this hand-off before Weir started on it. The original is untouched; queue it again from History to process it.";
 }
 
 /// <summary>One <c>files</c> row.</summary>

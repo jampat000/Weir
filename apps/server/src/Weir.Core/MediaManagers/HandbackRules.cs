@@ -39,7 +39,7 @@ public static class HandbackRules
     /// <summary>How long an unclaimed copy waits before the Cleanup job may remove it, unless a person changes it.</summary>
     public const int DefaultUnclaimedWindowDays = 14;
 
-    /// <summary>The shortest and longest wait Settings › Cleanup offers.</summary>
+    /// <summary>The shortest and longest wait Setup › Performance › Cleanup offers.</summary>
     public const int MinUnclaimedWindowDays = 1;
 
     public const int MaxUnclaimedWindowDays = 365;
@@ -133,7 +133,7 @@ public static class HandbackRules
 
     public static string UnsignedNote(string manager) =>
         $"Weir kept its copy, because {manager}'s messages to Weir carry no webhook secret, so Weir cannot be sure this one came from {manager}. " +
-        "Set a webhook secret for it on the Media managers page and Weir will tidy up after its imports.";
+        "Set a webhook secret for it in Setup › Connections › Media managers and Weir will tidy up after its imports.";
 
     public static string NotImportedNote(string manager, string? reason) =>
         string.IsNullOrWhiteSpace(reason)

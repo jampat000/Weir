@@ -5,7 +5,7 @@ using Weir.Infrastructure.Sqlite;
 namespace Weir.Infrastructure.Http;
 
 /// <summary>
-/// Delivers job notifications to the channels on Settings › Alerts.
+/// Delivers job notifications to the channels on Setup › Connections › Alerts.
 /// </summary>
 /// <remarks>
 /// Every job reports itself as module <c>processing</c>, which would make "File processing finished" and "Any job

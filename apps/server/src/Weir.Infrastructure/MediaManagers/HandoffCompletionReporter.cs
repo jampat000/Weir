@@ -181,7 +181,7 @@ public sealed partial class HandoffCompletionReporter
         {
             detail.Set(
                 "next_action",
-                $"Check that {name} is running and that its address and API key are right on the Media managers settings page.");
+                $"Check that {name} is running and that its address and API key are right in Setup › Connections › Media managers.");
         }
 
         return SqliteActivityWriter.RecordAsync(uow, new ActivityEventDraft(

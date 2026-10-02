@@ -14,7 +14,7 @@ namespace Weir.Infrastructure.Jobs;
 
 /// <summary>
 /// Handles <c>processing.unclaimed_handback_cleanup.v1</c> (#652): removes Weir's own hand-back copies that no media manager
-/// claimed within the window set in Settings › Cleanup (14 days unless a person changes it). Off until a person switches
+/// claimed within the window set in Setup › Performance › Cleanup (14 days unless a person changes it). Off until a person switches
 /// it on.
 /// </summary>
 /// <remarks>

@@ -39,11 +39,11 @@ def test_ready_ok_after_lifespan_startup(client) -> None:
     assert response.headers.get("Cache-Control", "").startswith("no-store")
 
 
-def test_unknown_upgrade_api_browser_landing_redirects_to_settings(client) -> None:
+def test_unknown_upgrade_api_browser_landing_redirects_to_system_about(client) -> None:
     response = client.get(f"{API}/suite/upgrade-now")
 
     assert response.status_code == 303
-    assert response.headers["location"] == "/settings"
+    assert response.headers["location"] == "/system?tab=about"
 
 
 def test_regular_unknown_api_path_still_returns_json_404(client) -> None:
@@ -54,7 +54,7 @@ def test_regular_unknown_api_path_still_returns_json_404(client) -> None:
 
 
 def test_packaged_app_routes_refresh_to_react_shell(client) -> None:
-    response = client.get("/settings", headers={"Accept": "text/html"})
+    response = client.get("/setup/workflows", headers={"Accept": "text/html"})
 
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]

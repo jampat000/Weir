@@ -48,9 +48,9 @@ internal sealed class ProcessingOperatorSettingsEndpointHandlers
         .Set("runner_cost_4k", OperatorSettingsRules.ClampRunnerCost(row.RunnerCost4K))
         .Set("runner_budget_enabled", row.RunnerBudgetEnabled)
         .Set("work_temp_stale_sweep_enabled", row.WorkTempStaleSweepEnabled)
-        // Null: the interval the environment gives. Settings › Cleanup shows the one in force from /processing/maintenance.
+        // Null: the interval the environment gives. Setup › Performance › Cleanup shows the one in force from /processing/maintenance.
         .Set("work_temp_stale_sweep_interval_seconds", row.WorkTempStaleSweepIntervalSeconds is { } sweepEvery ? WireValue.Of(sweepEvery) : WireValue.Null)
-        // #652: Settings › Cleanup › Unclaimed hand-backs. Off until a person switches it on; a null interval is six hours.
+        // #652: Setup › Performance › Cleanup › Unclaimed hand-backs. Off until a person switches it on; a null interval is six hours.
         .Set("unclaimed_handback_cleanup_enabled", row.UnclaimedHandbackCleanupEnabled)
         .Set("unclaimed_handback_window_days", OperatorSettingsRules.ClampUnclaimedHandbackWindowDays(row.UnclaimedHandbackWindowDays))
         .Set("unclaimed_handback_cleanup_interval_seconds", row.UnclaimedHandbackCleanupIntervalSeconds is { } unclaimedEvery ? WireValue.Of(unclaimedEvery) : WireValue.Null)

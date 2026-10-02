@@ -17,7 +17,7 @@ public static class AudioRejectionExplanation
     public const string Lead = "Rejected: ";
 
     private const string AudioChoiceSetting = "\"How to choose audio\"";
-    private const string RulesScreen = "Settings › Rules";
+    private const string RulesScreen = "Setup › Rules › Profiles";
     private const string UndeterminedLanguage = "und";
 
     /// <summary>

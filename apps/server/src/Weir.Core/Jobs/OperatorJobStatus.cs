@@ -59,7 +59,7 @@ public static class OperatorJobStatus
             case "completed":
                 return ($"Finished{subject}.", "Nothing to do. Open the processing record for the outcome.", technical);
             case "cancelled":
-                return ($"Cancelled before it started{subject}.", "Nothing to do. To process the file anyway, start it again from Files.", technical);
+                return ($"Cancelled before it started{subject}.", "Nothing to do. To process the file anyway, start it again from History.", technical);
             case "handler_ok_finalize_failed":
                 return ($"The work finished{subject}, but its result could not be saved.", "Use Recover result below. The media work won't run again.", technical);
         }
@@ -90,14 +90,14 @@ public static class OperatorJobStatus
 
         if (lower.Contains("legacy processing dry_run", StringComparison.Ordinal) || lower.Contains("legacy weir dry_run", StringComparison.Ordinal))
         {
-            return ($"This job was created with an older processing mode{subject}.", "Remove the old entry from the Files list, then let the next scan create a current job.", technical);
+            return ($"This job was created with an older processing mode{subject}.", "Remove the old entry from History, then let the next scan create a current job.", technical);
         }
 
         if (lower.Contains("modified too recently", StringComparison.Ordinal)
             || lower.Contains("changed too recently", StringComparison.Ordinal)
             || lower.Contains("still being written", StringComparison.Ordinal))
         {
-            return ($"Weir is waiting for this file to finish changing{subject}.", "Wait for the copy or import to finish, then use Check again from Files.", technical);
+            return ($"Weir is waiting for this file to finish changing{subject}.", "Wait for the copy or import to finish, then use Check again from History.", technical);
         }
 
         if (lower.Contains("no retainable audio", StringComparison.Ordinal))
@@ -110,7 +110,7 @@ public static class OperatorJobStatus
             return ($"Couldn't finish this job{subject}.", "See Files or Jobs for why, fix it, then start it again.", technical);
         }
 
-        return ($"Needs a review{subject}.", "Open the Jobs screen to inspect it.", technical);
+        return ($"Needs a review{subject}.", "Open the jobs list in System › Logs to inspect it.", technical);
     }
 
     private static WireObject ParsePayload(string? raw)

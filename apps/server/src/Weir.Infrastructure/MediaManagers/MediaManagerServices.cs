@@ -38,7 +38,7 @@ public static class MediaManagerServices
         services.AddWeirArtwork();
         services.TryAddSingleton<MediaManagerIntake>();
         services.TryAddSingleton<HandoffCompletionReporter>();
-        // Cancelling one queued job from the Jobs screen (#745 part 5): the ledger, the report and the file
+        // Cancelling one queued job from the jobs list in System › Logs (#745 part 5): the ledger, the report and the file
         // state it touches, constructor-injected instead of passed in on every call.
         services.TryAddSingleton<PendingJobCancellation>();
         // #652: what a manager said about a file Weir handed back, and the one rule that releases Weir's copy.

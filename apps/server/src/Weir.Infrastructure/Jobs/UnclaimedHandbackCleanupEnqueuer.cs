@@ -7,7 +7,7 @@ namespace Weir.Infrastructure.Jobs;
 /// <summary>
 /// The unclaimed hand-back cleanup on a timer (#652): one row per scope, deduped per scope, like the work file sweep.
 /// Enabled by <c>operator_settings.unclaimed_handback_cleanup_enabled</c>, which is off until a person switches it on; the
-/// interval is the one saved in Settings › Cleanup, or six hours.
+/// interval is the one saved in Setup › Performance › Cleanup, or six hours.
 /// </summary>
 public sealed class UnclaimedHandbackCleanupEnqueuer : IPeriodicEnqueuer
 {

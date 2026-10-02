@@ -2212,7 +2212,7 @@ export interface paths {
     };
     /**
      * Get Suite Update Status
-     * @description Read-only update check for the signed-in Settings page.
+     * @description Read-only update check for the System › About tab.
      */
     get: operations["get_suite_update_status_api_v1_suite_update_status_get"];
     put?: never;
@@ -3841,7 +3841,7 @@ export interface components {
       window_days?: number;
       /**
        * Interval Seconds
-       * @description How often this job runs: the interval saved in Settings › Cleanup, else the environment's.
+       * @description How often this job runs: the interval saved in Setup › Performance › Cleanup, else the environment's.
        */
       interval_seconds?: number;
       /** Last Completed At */
@@ -5345,7 +5345,7 @@ export interface components {
       max_attempts: number;
       /**
        * Max Concurrent Files
-       * @description The most files this workflow runs at once, as a share of "Files at once" in Settings › Performance. 0 means no limit of its own. It cannot be more than Performance's Files at once: a save that asks for more is refused.
+       * @description The most files this workflow runs at once, as a share of "Files at once" in Setup › Performance › Speed. 0 means no limit of its own. It cannot be more than that Files at once: a save that asks for more is refused.
        * @default 0
        */
       max_concurrent_files: number;
@@ -5703,7 +5703,7 @@ export interface components {
       minimum_free_disk_space_mb: number;
       /**
        * Effective Max Concurrent Files
-       * @description The most files this workflow is held to now: its own limit, and never more than Files at once in Settings › Performance, even if that was lowered after this was set.
+       * @description The most files this workflow is held to now: its own limit, and never more than Files at once in Setup › Performance › Speed, even if that was lowered after this was set.
        */
       effective_max_concurrent_files: number;
       /**
@@ -5800,7 +5800,7 @@ export interface components {
       max_attempts: number;
       /**
        * Max Concurrent Files
-       * @description The most files this workflow runs at once, as a share of "Files at once" in Settings › Performance. 0 means no limit of its own. It cannot be more than Performance's Files at once: a save that asks for more is refused.
+       * @description The most files this workflow runs at once, as a share of "Files at once" in Setup › Performance › Speed. 0 means no limit of its own. It cannot be more than that Files at once: a save that asks for more is refused.
        * @default 0
        */
       max_concurrent_files: number;
@@ -6093,7 +6093,7 @@ export interface components {
       work_temp_stale_sweep_enabled: boolean;
       /**
        * Work Temp Stale Sweep Interval Seconds
-       * @description How often the leftover-work-file sweep runs, set in Settings › Cleanup. Null keeps the environment's interval.
+       * @description How often the leftover-work-file sweep runs, set in Setup › Performance › Cleanup. Null keeps the environment's interval.
        */
       work_temp_stale_sweep_interval_seconds?: number | null;
       /**
@@ -6108,7 +6108,7 @@ export interface components {
       unclaimed_handback_window_days: number;
       /**
        * Unclaimed Handback Cleanup Interval Seconds
-       * @description How often the unclaimed hand-back cleanup runs, set in Settings › Cleanup. Null keeps six hours.
+       * @description How often the unclaimed hand-back cleanup runs, set in Setup › Performance › Cleanup. Null keeps six hours.
        */
       unclaimed_handback_cleanup_interval_seconds?: number | null;
     };

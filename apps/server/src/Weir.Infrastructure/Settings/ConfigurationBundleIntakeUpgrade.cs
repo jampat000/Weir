@@ -6,7 +6,7 @@ namespace Weir.Infrastructure.Settings;
 
 /// <summary>
 /// Brings a backup written before a workflow's wait and minimum size lived on the workflow alone up to the current shape.
-/// Such a workflow row has three waits and a minimum size that may be empty, meaning "use Settings › Performance"; the
+/// Such a workflow row has three waits and a minimum size that may be empty, meaning "use Setup › Performance › Speed"; the
 /// backup's own Performance section says what that was.
 /// </summary>
 internal static class ConfigurationBundleIntakeUpgrade

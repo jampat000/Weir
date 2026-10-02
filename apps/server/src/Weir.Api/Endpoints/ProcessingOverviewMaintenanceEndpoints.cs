@@ -65,7 +65,7 @@ internal sealed class ProcessingOverviewMaintenanceEndpointHandlers
     }
 
     /// <summary>
-    /// One family, with how often it runs and when it next does (Settings › Cleanup). The next run comes from the family's
+    /// One family, with how often it runs and when it next does (Setup › Performance › Cleanup). The next run comes from the family's
     /// own timer, so it is null while the family is switched off; the interval is the one in force either way.
     /// </summary>
     private static WireObject FamilyOut(MaintenanceFamilyState state, TimeSpan interval, DateTimeOffset? nextRunAt) => new WireObject()

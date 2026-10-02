@@ -123,7 +123,7 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandler : IJobHandler
             if (library is null)
             {
                 var label = request.MediaScope == ProcessingMediaScopes.Tv ? "TV" : "Movies";
-                throw new InvalidOperationException($"No workflow covers {label}. Add one in Settings › Workflows, then queue this work again.");
+                throw new InvalidOperationException($"No workflow covers {label}. Add one in Setup › Workflows, then queue this work again.");
             }
 
             var (paths, pathError) = WatchedFolderScanOps.ResolvePathRuntimeForLibrary(library, _options.WeirHome);

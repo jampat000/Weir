@@ -13,7 +13,7 @@ namespace Weir.Infrastructure.Jobs;
 /// <para>A family is only timed when this server has a handler for its job kind, so the queue never fills with
 /// work no worker here can run.</para>
 /// <para>Each timer checks the family's switch and interval every <see cref="DefaultRecheck"/>, so a change in
-/// Settings › Cleanup applies without a restart: a family switched on runs at once, one switched off stops, and a
+/// Setup › Performance › Cleanup applies without a restart: a family switched on runs at once, one switched off stops, and a
 /// new interval counts from its last run.</para>
 /// </remarks>
 public sealed class PeriodicEnqueueService : BackgroundService
@@ -88,7 +88,7 @@ public sealed class PeriodicEnqueueService : BackgroundService
     /// <summary>
     /// One family's timer: while switched on, enqueue when due (at once the first time), then every interval; two seconds
     /// after a failure. The switch and the interval are read again before every wait, and no wait is longer than the
-    /// recheck, so a change in Settings › Cleanup applies without a restart.
+    /// recheck, so a change in Setup › Performance › Cleanup applies without a restart.
     /// </summary>
     internal async Task RunAsync(IPeriodicEnqueuer enqueuer, CancellationToken stoppingToken)
     {
