@@ -107,10 +107,10 @@ public static class OperatorJobStatus
 
         if (status is "failed" or "error")
         {
-            return ($"Couldn't finish this job{subject}.", "See Files or Jobs for why, fix it, then start it again.", technical);
+            return ($"Couldn't finish this job{subject}.", "Read the error below, fix the cause, then use Try again in Activity.", technical);
         }
 
-        return ($"Needs a review{subject}.", "Open the jobs list in System › Logs to inspect it.", technical);
+        return ($"Needs a review{subject}.", "Open it in System › Logs to see why.", technical);
     }
 
     private static WireObject ParsePayload(string? raw)

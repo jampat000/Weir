@@ -22,6 +22,14 @@ public sealed class OperatorJobStatusTests
         Assert.Contains("Check again from Activity", status.NextAction, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void A_failed_job_points_at_its_error_and_at_Try_again_in_Activity()
+    {
+        var status = OperatorJobStatus.Build("processing", "remux", "failed", "ffmpeg exited with code 1", payloadJson: null);
+
+        Assert.Equal("Read the error below, fix the cause, then use Try again in Activity.", status.NextAction);
+    }
+
     [Theory]
     [InlineData(CancelledFileReasons.InWeir)]
     [InlineData(CancelledFileReasons.ByManager)]

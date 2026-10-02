@@ -134,7 +134,7 @@ describe("an open row", () => {
       within(row).getByText("Couldn't finish this job for heat.mkv."),
     ).toBeInTheDocument();
     expect(
-      within(row).getByText(/See Files or Jobs for why/),
+      within(row).getByText(/Read the error below, fix the cause/),
     ).toBeInTheDocument();
     expect(within(row).getByText("#7")).toBeInTheDocument();
     expect(within(row).getByText("3 of 3")).toBeInTheDocument();

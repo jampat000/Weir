@@ -136,7 +136,7 @@ function operatorWords(job) {
     default:
       return [
         `Couldn't finish this job${subject}.`,
-        "See Files or Jobs for why, fix it, then start it again.",
+        "Read the error below, fix the cause, then use Try again in Activity.",
       ];
   }
 }
