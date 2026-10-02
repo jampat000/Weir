@@ -41,6 +41,7 @@ public static class WeirPlatformServices
         // What is happening on each media manager and download client connection, for the live Connections views.
         services.TryAddSingleton<ConnectionUsageLedger>();
         services.TryAddSingleton<ConnectionActivityHub>();
+        services.TryAddSingleton<ActivityStreamClients>();
 
         // Auth, Activity, Notifications and Suite settings: instance stores over UnitOfWork, stateless
         // themselves, so one shared instance serves every request.

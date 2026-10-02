@@ -126,6 +126,7 @@ internal sealed class ActivityEndpointHandlers
     private readonly SuiteSettingsStore _suiteSettings;
     private readonly ActivityProgressFrames _progressFrames;
     private readonly ConnectionActivityFrames _connectionFrames;
+    private readonly ActivityStreamClients _streamClients;
     private readonly IHostApplicationLifetime _lifetime;
     private readonly ArtworkPosterUrls _posters;
 
@@ -134,6 +135,7 @@ internal sealed class ActivityEndpointHandlers
         SuiteSettingsStore suiteSettings,
         ActivityProgressFrames progressFrames,
         ConnectionActivityFrames connectionFrames,
+        ActivityStreamClients streamClients,
         IHostApplicationLifetime lifetime,
         ArtworkPosterUrls posters)
     {
@@ -141,6 +143,7 @@ internal sealed class ActivityEndpointHandlers
         _suiteSettings = suiteSettings ?? throw new ArgumentNullException(nameof(suiteSettings));
         _progressFrames = progressFrames ?? throw new ArgumentNullException(nameof(progressFrames));
         _connectionFrames = connectionFrames ?? throw new ArgumentNullException(nameof(connectionFrames));
+        _streamClients = streamClients ?? throw new ArgumentNullException(nameof(streamClients));
         _lifetime = lifetime ?? throw new ArgumentNullException(nameof(lifetime));
         _posters = posters ?? throw new ArgumentNullException(nameof(posters));
     }
@@ -282,6 +285,7 @@ internal sealed class ActivityEndpointHandlers
         var notifier = ActivityNotifications.For(database);
         var progressFrames = _progressFrames;
         var connectionFrames = _connectionFrames;
+        var streamClients = _streamClients;
         var time = request.Time;
         var lifetime = _lifetime;
         var logger = request.LoggerFactory.CreateLogger("weir.platform.activity.router");
@@ -290,6 +294,7 @@ internal sealed class ActivityEndpointHandlers
             // A stream that outlived the server stopping would hold the shutdown up for as long as a browser keeps it open.
             using var streamEnded = CancellationTokenSource.CreateLinkedTokenSource(context.RequestAborted, lifetime.ApplicationStopping);
             var streamEndedToken = streamEnded.Token;
+            using var streamOpen = streamClients.Open();
             context.Response.StatusCode = StatusCodes.Status200OK;
             context.Response.ContentType = "text/event-stream; charset=utf-8";
             context.Response.Headers.CacheControl = "no-store, no-cache";
