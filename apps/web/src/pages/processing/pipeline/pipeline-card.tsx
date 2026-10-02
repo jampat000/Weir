@@ -16,7 +16,7 @@ import { Poster } from "../../../components/shared/poster";
 import { classNames } from "../../../lib/ui/class-names";
 import { motionAllowed } from "../../../lib/ui/motion-allowed";
 import type { ProcessingFile } from "../../../lib/processing/files-api";
-import { FitText } from "../dashboard/system/fit-words";
+import { FitText } from "../../../lib/ui/fit-text";
 import {
   CARD_ATTRIBUTE,
   DETAILS_ATTRIBUTE,

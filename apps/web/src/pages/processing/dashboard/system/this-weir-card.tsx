@@ -9,7 +9,7 @@ import {
 import { classNames } from "../../../../lib/ui/class-names";
 import { useNow } from "../../../../lib/ui/use-now";
 import { BandCard, BandNote } from "./band-card";
-import { FitText } from "./fit-words";
+import { FitText } from "../../../../lib/ui/fit-text";
 import { MoreCount } from "./more-count";
 import {
   newestBackup,

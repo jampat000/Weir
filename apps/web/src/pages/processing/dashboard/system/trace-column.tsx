@@ -1,7 +1,7 @@
 import type { CSSProperties, ReactNode } from "react";
 
 import { CountUp } from "../../../../components/charts/count-up";
-import { FitText, type Words } from "./fit-words";
+import { FitText, type Words } from "../../../../lib/ui/fit-text";
 
 type TraceColumnProps = {
   /** The column's colour, a design token: the swatch glows in it and its trace is drawn in it. */

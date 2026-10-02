@@ -6,10 +6,7 @@ import {
   useAppDateFormatter,
   parseAppTime,
 } from "../../lib/ui/mm-format-date";
-import {
-  canvasMeasure,
-  lineWords,
-} from "../../pages/processing/pipeline/caption-fit";
+import { canvasMeasure, lineWords } from "../../lib/ui/measure-text";
 import { Chip } from "../panels/chip";
 import { pausePillWords } from "./pause-words";
 

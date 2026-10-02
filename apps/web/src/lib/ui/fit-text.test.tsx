@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { FitText, narrowing } from "./fit-words";
+import { FitText, narrowing } from "./fit-text";
 
 describe("words that narrow", () => {
   const parts = [

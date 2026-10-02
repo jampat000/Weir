@@ -6,7 +6,7 @@ import type {
   SystemNow,
   SystemStats,
 } from "../../../../lib/system/system-stats-types";
-import { narrowing, type Words } from "./fit-words";
+import { narrowing, type Words } from "../../../../lib/ui/fit-text";
 import {
   gigabytes,
   machineUpWords,

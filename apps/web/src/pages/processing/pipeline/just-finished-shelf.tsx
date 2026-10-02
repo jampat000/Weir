@@ -20,7 +20,8 @@ import type { FinishedFile } from "../../../lib/activity/processing-outcome";
 import { useElementSize } from "../../../lib/ui/use-element-size";
 import type { Filter } from "../processing-filter";
 import { useFinishedAnnouncement } from "../use-finished-files";
-import { canvasMeasure, statusFont, type MeasureText } from "./caption-fit";
+import { canvasMeasure, type MeasureText } from "../../../lib/ui/measure-text";
+import { statusFont } from "./status-line";
 import {
   shelfFit,
   shelfRowNeed,

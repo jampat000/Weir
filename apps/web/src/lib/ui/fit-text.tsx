@@ -2,11 +2,11 @@
  * A line of words that is never cut: it says the fullest of the words it is given that fits its box, and the whole of
  * them is its tooltip. How wide a line is comes from laying it out, in the box's own type, beside the box, so the
  * letter-spacing, the tabular figures and the case of a card's type are all counted. Which of the words fit is
- * decided by the caption-fit helper the poster captions use.
+ * decided by the measured-words helper the poster captions use.
  */
 import { useLayoutEffect, useRef, useState } from "react";
 
-import { lineWords, type MeasureText } from "../../pipeline/caption-fit";
+import { lineWords, type MeasureText } from "./measure-text";
 
 /** Words, the fullest first and the shortest last. */
 export type Words = readonly string[];

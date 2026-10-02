@@ -1,5 +1,5 @@
 import type { HandedBack } from "../handed-back-model";
-import { FitText } from "./system/fit-words";
+import { FitText } from "../../../lib/ui/fit-text";
 import { TONES, legendWords } from "./handed-back-words";
 
 type TodayLegendProps = {

@@ -2,7 +2,7 @@
 import type { TraceSample } from "../../../../components/charts/live-trace-math";
 import { seriesOf } from "../../../../lib/system/system-stats-model";
 import type { SystemStats } from "../../../../lib/system/system-stats-types";
-import type { Words } from "./fit-words";
+import type { Words } from "../../../../lib/ui/fit-text";
 import { megabytes, rateFigure, sizeWords } from "./system-words";
 
 /** The window the card's finished-work figures cover, in minutes: the same ten minutes the traces show. */

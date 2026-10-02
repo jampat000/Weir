@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { lineWords, type MeasureText } from "./caption-fit";
+import { lineWords, type MeasureText } from "./measure-text";
 
 /** Every character is 6px wide, so a line's width is easy to see. */
 const SIX_PX: MeasureText = (text) => text.length * 6;

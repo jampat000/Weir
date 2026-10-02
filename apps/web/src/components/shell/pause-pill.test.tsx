@@ -12,15 +12,10 @@ vi.mock("../../lib/ui/mm-format-date", async (importActual) => ({
   useAppDateFormatter: () => () => "2 Oct, 10:00 pm",
   useAppClockFormatter: () => () => "10:00 pm",
 }));
-vi.mock(
-  "../../pages/processing/pipeline/caption-fit",
-  async (importActual) => ({
-    ...(await importActual<
-      typeof import("../../pages/processing/pipeline/caption-fit")
-    >()),
-    canvasMeasure: () => (text: string) => text.length * SIX_PX_A_CHARACTER,
-  }),
-);
+vi.mock("../../lib/ui/measure-text", async (importActual) => ({
+  ...(await importActual<typeof import("../../lib/ui/measure-text")>()),
+  canvasMeasure: () => (text: string) => text.length * SIX_PX_A_CHARACTER,
+}));
 
 const timed: PauseState = {
   paused: true,

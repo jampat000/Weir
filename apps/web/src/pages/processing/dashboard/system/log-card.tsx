@@ -16,7 +16,7 @@ import {
   type LogFilter,
   type LogLine,
 } from "./log-card-model";
-import { FitText } from "./fit-words";
+import { FitText } from "../../../../lib/ui/fit-text";
 import { MoreCount } from "./more-count";
 import { SERVER_LOG_PATH } from "./system-paths";
 import { useSystemLog } from "./use-system-log";

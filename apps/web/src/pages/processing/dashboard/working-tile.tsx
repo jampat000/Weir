@@ -6,7 +6,7 @@ import { IN_PROGRESS_PATH } from "../pipeline/pipeline-stages";
 import type { Filter } from "../processing-filter";
 import type { WorkingItem } from "../processing-model";
 import { useFittingRows } from "./fit-rows";
-import { FitText } from "./system/fit-words";
+import { FitText } from "../../../lib/ui/fit-text";
 import { STEP_WORDS, moreWords, waitWords } from "./working-words";
 import { setupTabPath } from "../../../lib/settings/setup-areas";
 
