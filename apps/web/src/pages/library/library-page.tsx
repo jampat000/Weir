@@ -22,6 +22,8 @@ import {
 } from "../../lib/processing/library-mode-queries";
 import { useProcessingLibrariesQuery } from "../../lib/processing/libraries-queries";
 import { processingKeys } from "../../lib/processing/query-keys";
+import { useFitLevels } from "../../lib/ui/use-fit-levels";
+import { useMediaQuery } from "../../lib/ui/use-media-query";
 import { useDebouncedValue } from "../../lib/ui/use-debounced-value";
 import { useNow } from "../../lib/ui/use-now";
 import { LibraryCleanActions } from "./library-clean-actions";
@@ -44,6 +46,7 @@ import {
 import { LibraryPager } from "./library-pager";
 import { LibraryPicker } from "./library-picker";
 import { LibraryCheckAgain, LibraryScanStatus } from "./library-scan-status";
+import { LibrarySetupButton } from "./library-setup-button";
 import { LibrarySetupPanel } from "./library-setup-panel";
 import { LibrarySetupPrompt } from "./library-setup-prompt";
 import { LibraryTable } from "./library-table";
@@ -151,6 +154,15 @@ export function LibraryPage(): React.ReactElement {
   const setupSettings = useLibrarySettingsQuery(chosenId, Boolean(chosen));
   const overview = useLibraryOverviewQuery(chosenId, Boolean(chosen));
   const rescan = useTriggerLibraryScan(chosenId);
+  // The header gives its controls' words up for marks, a level at a time, until the chips show whole. Under 1280px the
+  // chips have a line of their own, so there is nothing to gain.
+  const [chipsRow, setChipsRow] = useState<HTMLDivElement | null>(null);
+  const fit = useFitLevels(
+    chipsRow,
+    3,
+    `${JSON.stringify(overview.data?.totals.by_status)}|${filter.status}|${search !== ""}`,
+    useMediaQuery("(min-width: 1280px)"),
+  );
   const files = useLibraryFilesQuery(chosenId, filters, Boolean(chosen));
   const flow = useLibraryClean(chosenId, (request) => {
     if (request.source === "selection") setSelected(new Set());
@@ -246,12 +258,18 @@ export function LibraryPage(): React.ReactElement {
       overview={overview.data}
       filter={filter}
       onFilter={chooseFilter}
+      fit={fit}
+      onRow={setChipsRow}
     />
   );
   const header = (
     <>
       <ShellHeaderSlot>
-        <div className="mm-library-controls" data-testid="library-controls">
+        <div
+          className="mm-library-controls"
+          data-testid="library-controls"
+          data-fit={fit}
+        >
           <LibraryPicker
             libraries={libraries.data ?? []}
             chosenId={chosen.id}
@@ -265,15 +283,12 @@ export function LibraryPage(): React.ReactElement {
       </ShellHeaderSlot>
       {needsSetup ? null : (
         <PageToolbarButtons>
-          <LibraryCheckAgain scan={scan} rescan={rescan} />
+          <LibraryCheckAgain scan={scan} rescan={rescan} iconOnly={fit >= 1} />
           {savedSetup ? (
-            <button
-              type="button"
-              className="mm-head-control"
-              onClick={() => setSetupOpen(true)}
-            >
-              Library setup
-            </button>
+            <LibrarySetupButton
+              iconOnly={fit >= 3}
+              onOpen={() => setSetupOpen(true)}
+            />
           ) : null}
         </PageToolbarButtons>
       )}

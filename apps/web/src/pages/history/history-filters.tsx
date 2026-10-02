@@ -5,6 +5,9 @@ import { MmListboxPicker } from "../../components/ui/mm-listbox-picker";
 import { ShellHeaderSlot } from "../../components/shell/shell-header-context";
 import type { ProcessingLibrary } from "../../lib/processing/libraries-api";
 import { HISTORY_GROUPS, type HistoryGroup } from "./history-entries";
+import { HeaderSearch } from "../../components/shell/header-search";
+import { useFitLevels } from "../../lib/ui/use-fit-levels";
+import { useMediaQuery } from "../../lib/ui/use-media-query";
 import { useChipRow } from "../../lib/ui/use-chip-row";
 
 /** How far back History looks, as the server's within_days. */
@@ -44,6 +47,14 @@ export function HistoryFilters({
 }) {
   const [search, setSearch] = useState(query);
   const { setRow, scrolls } = useChipRow(group);
+  // Short of room, the search is a magnifier before the chips scroll. Under 1280px they have a line of their own.
+  const [chipsRow, setChipsRow] = useState<HTMLDivElement | null>(null);
+  const fit = useFitLevels(
+    chipsRow,
+    1,
+    `${group}|${search !== ""}|${JSON.stringify(counts)}`,
+    useMediaQuery("(min-width: 1280px)"),
+  );
   const workflowLabel = useId();
   const periodLabel = useId();
   return (
@@ -57,20 +68,24 @@ export function HistoryFilters({
             setParam("q", search.trim());
           }}
         >
-          <input
-            className="mm-input"
-            type="search"
-            aria-label="Find a file"
+          <HeaderSearch
+            label="Find a file"
             placeholder="Find a file"
+            className="mm-history-search-box"
+            collapsed={fit >= 1}
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             onBlur={() => setParam("q", search.trim())}
-            onKeyDown={(event) => {
-              if (event.key === "Escape") event.currentTarget.blur();
-            }}
           />
         </form>
-        <div className="mm-history-chips" data-scrolls={scrolls} ref={setRow}>
+        <div
+          className="mm-history-chips"
+          data-scrolls={scrolls}
+          ref={(row) => {
+            setRow(row);
+            setChipsRow(row);
+          }}
+        >
           <SegmentedControl
             ariaLabel="Show"
             value={group}

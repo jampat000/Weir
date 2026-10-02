@@ -18,13 +18,14 @@
   min-width: 0;
 }
 
+/* The form only carries the search's submit; the box in it is a flex item of the controls themselves. */
 .mm-history-search {
-  flex: 0 100 260px;
-  min-width: 6.5rem;
+  display: contents;
 }
 
-.mm-history-search .mm-input {
-  width: 100%;
+.mm-history-search-box {
+  flex: 0 100 260px;
+  min-width: 6.5rem;
 }
 
 /* The group keeps its own look and scrolls in a box a few pixels bigger than it, so its border and the focus ring are

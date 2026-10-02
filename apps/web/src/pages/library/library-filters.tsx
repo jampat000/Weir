@@ -3,6 +3,7 @@ import type {
   LibraryProblemKind,
   LibraryTotals,
 } from "../../lib/processing/library-mode-api";
+import { HeaderSearch } from "../../components/shell/header-search";
 import { useChipRow } from "../../lib/ui/use-chip-row";
 import {
   LIBRARY_STATUSES,
@@ -150,26 +151,39 @@ export function LibraryFilters({
   overview,
   filter,
   onFilter,
+  fit,
+  onRow,
 }: {
   search: string;
   onSearch: (value: string) => void;
   overview: LibraryOverview | undefined;
   filter: LibraryFilter;
   onFilter: (filter: LibraryFilter) => void;
+  /** How many of the header's controls have given up their words (see useFitLevels): 1 shortens the search, 2 makes it a mark. */
+  fit: number;
+  /** Hands the page the chips' scrolling box, which is what it measures to fit the controls. */
+  onRow: (row: HTMLDivElement | null) => void;
 }) {
   const totals = overview?.totals;
   const { setRow, scrolls } = useChipRow(filter.status ?? "all");
   return (
     <>
-      <input
-        type="search"
-        className="mm-input mm-library-search"
+      <HeaderSearch
+        label="Search this workflow"
         placeholder="Search"
-        aria-label="Search this workflow"
+        className={`mm-library-search${fit >= 1 ? " mm-library-search--short" : ""}`}
+        collapsed={fit >= 2}
         value={search}
         onChange={(event) => onSearch(event.target.value)}
       />
-      <div className="mm-library-chips-box" data-scrolls={scrolls} ref={setRow}>
+      <div
+        className="mm-library-chips-box"
+        data-scrolls={scrolls}
+        ref={(row) => {
+          setRow(row);
+          onRow(row);
+        }}
+      >
         <div className="mm-library-chips" role="group" aria-label="Show">
           {CHIPS.map((chip) => {
             const count = totals ? chip.count(totals) : null;

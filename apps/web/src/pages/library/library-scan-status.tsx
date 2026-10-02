@@ -77,6 +77,7 @@ export function LibraryScanStatus({
 
 const REFRESH_ICON = (
   <svg
+    className="mm-library-mark"
     viewBox="0 0 24 24"
     width="16"
     height="16"
@@ -93,28 +94,32 @@ const REFRESH_ICON = (
 );
 
 /**
- * Counts this library again. On the header's title line a header with little room shows only the refresh mark; the
- * words are still its name and its tooltip.
+ * Counts this library again. A header with little room shows only the refresh mark; the words are still its name and its
+ * tooltip.
  */
 export function LibraryCheckAgain({
   scan,
   rescan,
+  iconOnly = false,
 }: {
   scan: LibraryScanInfo | null;
   rescan: Rescan;
+  /** Where the header is short of room: the refresh mark alone, still named and tooltipped "Check again". */
+  iconOnly?: boolean;
 }) {
   const label = rescan.isPending ? "Starting a check…" : "Check again";
   return (
     <button
       type="button"
-      className="mm-head-control mm-library-refresh"
+      className="mm-head-control"
+      data-icon-only={iconOnly}
       aria-label={label}
       title={label}
       disabled={rescan.isPending || Boolean(scan?.running)}
       onClick={() => rescan.mutate()}
     >
       {REFRESH_ICON}
-      <span className="mm-library-refresh__label">{label}</span>
+      <span className="mm-library-words">{label}</span>
     </button>
   );
 }

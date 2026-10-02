@@ -139,8 +139,11 @@
 .mm-library-search {
   flex: 0 1000 260px;
   min-width: 5rem;
-  padding-inline: 10px;
-  font-size: 13px;
+}
+
+/* At its smallest the clear mark would take room from the one word the box has to show. */
+.mm-library-search--short input::-webkit-search-cancel-button {
+  display: none;
 }
 
 .mm-library-chips-box {
@@ -189,34 +192,36 @@
   }
 }
 
-/* "Check again" is refresh mark alone where the header is short: the search is at its compact width first, then this,
-   and only then do the counts scroll. */
-.mm-library-refresh svg {
+/* Where the chips do not fit, the controls beside them give up their words for a mark, a level at a time (lib/ui/
+   use-fit-levels.ts): Check again, then the search, then Library setup, and only then do the chips scroll. */
+.mm-library-mark {
   display: none;
 }
 
-@container mm-header (max-width: 1700px) {
-  .mm-library-refresh {
-    width: 36px;
-    padding: 0;
-  }
+/* The last resort before the chips scroll: the picker is only as wide as a workflow's name needs, and the chips and the title sit closer. */
+.mm-library-controls[data-fit="3"] .mm-library-picker {
+  --picker-w: 6.5rem;
+}
 
-  .mm-library-refresh svg {
-    display: block;
-  }
+.mm-library-controls[data-fit="3"] .mm-library-chips .mm-library-chip {
+  padding-inline: 8px;
+}
 
-  .mm-library-refresh__label {
-    display: none;
-  }
+.mm-header__slot:has(.mm-library-controls[data-fit="3"]) {
+  margin-left: 0;
+}
 
-  .mm-library-search {
-    flex-basis: 5rem;
-  }
+.mm-head-control[data-icon-only="true"] {
+  width: 36px;
+  padding: 0;
+}
 
-  /* The clear mark would take room from the one word the box has to show. */
-  .mm-library-search::-webkit-search-cancel-button {
-    display: none;
-  }
+.mm-head-control[data-icon-only="true"] .mm-library-mark {
+  display: block;
+}
+
+.mm-head-control[data-icon-only="true"] .mm-library-words {
+  display: none;
 }
 
 /* Where the header cannot hold the title and all of this, they take a row of their own under the title. */

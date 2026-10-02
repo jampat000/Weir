@@ -112,6 +112,78 @@
   min-height: 0;
 }
 
+/* The search in the slot (components/shell/header-search.tsx). Short of room it is a magnifier, a control's height square,
+   until it is focused or holds a search; it is the same input throughout, so nothing typed or focused moves. */
+.mm-header-search {
+  position: relative;
+  display: block;
+  min-width: 0;
+}
+
+.mm-header-search > .mm-input {
+  width: 100%;
+  padding-inline: 10px;
+  font-size: 13px;
+}
+
+.mm-header-search__mark {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: none;
+  width: 16px;
+  height: 16px;
+  margin: -8px 0 0 -8px;
+  color: var(--mm-text2);
+  pointer-events: none;
+}
+
+.mm-header-search[data-collapsed="true"]:not(:focus-within):has(
+    > input:placeholder-shown
+  ) {
+  flex: none;
+  width: 36px;
+  min-width: 0;
+}
+
+.mm-header-search[data-collapsed="true"]:not(:focus-within):has(
+    > input:placeholder-shown
+  )
+  > input {
+  padding: 0;
+  color: transparent;
+  cursor: pointer;
+}
+
+.mm-header-search[data-collapsed="true"]:not(:focus-within):has(
+    > input:placeholder-shown
+  )
+  > input::placeholder {
+  color: transparent;
+}
+
+.mm-header-search[data-collapsed="true"]:not(:focus-within):has(
+    > input:placeholder-shown
+  )
+  > input::-webkit-search-cancel-button {
+  display: none;
+}
+
+.mm-header-search[data-collapsed="true"]:not(:focus-within):has(
+    > input:placeholder-shown
+  )
+  > .mm-header-search__mark {
+  display: block;
+}
+
+/* Opened, it takes the room a search needs, and the chips beside it give way. */
+.mm-header-search[data-collapsed="true"]:is(
+    :focus-within,
+    :has(> input:not(:placeholder-shown))
+  ) {
+  flex: 0 0 11rem;
+}
+
 .mm-header__slot .mm-segmented {
   box-sizing: border-box;
   height: 2.375rem;

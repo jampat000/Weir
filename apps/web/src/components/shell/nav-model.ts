@@ -83,9 +83,9 @@ export const NAV_GROUPS: readonly NavGroup[] = [
       {
         id: "library",
         label: "Library",
-        eyebrow: "Your files, and what Weir would do",
+        eyebrow: "Your files",
         eyebrowNote:
-          "The files already on your storage, and what Weir would do to each",
+          "Your files, and what Weir would do: the files already on your storage, and what Weir would do to each",
         to: "/library",
         icon: "library",
         isCurrent: onPath("/library"),
