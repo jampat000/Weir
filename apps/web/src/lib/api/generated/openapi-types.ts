@@ -93,7 +93,7 @@ export interface paths {
     };
     /**
      * Get Activity Stream
-     * @description Authenticated SSE freshness signal for activity-backed pages.
+     * @description Authenticated SSE stream for activity-backed pages. Frames: activity.latest (the newest Activity event id and revision), processing.progress (every file's live progress, at most once a second), and connection.activity (one thing that happened on a media manager or download client connection: see ConnectionActivityFrame; each connection sends at most one frame per phase every 250 ms, and always the phase it ends on).
      */
     get: operations["get_activity_stream_api_v1_activity_stream_get"];
     put?: never;
@@ -2564,6 +2564,45 @@ export interface components {
       /** Csrf Token */
       csrf_token: string;
     };
+    /**
+     * ConnectionActivityFrame
+     * @description The data of a connection.activity frame on GET /activity/stream: one thing that happened on a media manager or download client connection.
+     */
+    ConnectionActivityFrame: {
+      /**
+       * At
+       * Format: date-time
+       * @description When it happened.
+       */
+      at: string;
+      /**
+       * Direction
+       * @description outbound: Weir called the connection. inbound: the connection called Weir (a hand-off, webhook or outcome).
+       * @enum {string}
+       */
+      direction: "outbound" | "inbound";
+      /**
+       * Id
+       * @description The connection's id, in the list its kind names.
+       */
+      id: number;
+      /**
+       * Kind
+       * @enum {string}
+       */
+      kind: "media_manager" | "download_client";
+      /**
+       * Ms
+       * @description How long an outbound call took; null while it is still asked, and for an inbound call.
+       */
+      ms: number | null;
+      /**
+       * Phase
+       * @description asked: Weir started a call. answered: the connection replied, or called Weir. failed: it did not reply, or refused Weir or was broken.
+       * @enum {string}
+       */
+      phase: "asked" | "answered" | "failed";
+    };
     /** CsrfOut */
     CsrfOut: {
       /**
@@ -2825,6 +2864,16 @@ export interface components {
       last_test_at?: string | null;
       /** Last Test Detail */
       last_test_detail?: string | null;
+      /**
+       * Last Answer Ms
+       * @description How long the last call to this connection took, in milliseconds: a connection test or any real call. Null until Weir has made one.
+       */
+      last_answer_ms?: number | null;
+      /**
+       * Last Used At
+       * @description When Weir last talked to this connection, or it last called Weir. Null until that has happened.
+       */
+      last_used_at?: string | null;
     };
     /** DownloadClientConnectionTestIn */
     DownloadClientConnectionTestIn: {
@@ -3935,12 +3984,22 @@ export interface components {
       kind: "radarr" | "sonarr" | "deluno" | "native";
       /** Lanes */
       lanes?: components["schemas"]["MediaManagerSearchLaneOut"][];
+      /**
+       * Last Answer Ms
+       * @description How long the last call to this connection took, in milliseconds: a connection test or any real call. Null until Weir has made one.
+       */
+      last_answer_ms?: number | null;
       /** Last Test At */
       last_test_at?: string | null;
       /** Last Test Detail */
       last_test_detail?: string | null;
       /** Last Test Ok */
       last_test_ok?: boolean | null;
+      /**
+       * Last Used At
+       * @description When Weir last talked to this connection, or it last called Weir. Null until that has happened.
+       */
+      last_used_at?: string | null;
       /**
        * Name
        * @description The connection's name: its kind and the host in its address, set by Weir.

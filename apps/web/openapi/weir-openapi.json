@@ -483,6 +483,72 @@
         "title": "ConfigurationBundleImportIn",
         "type": "object"
       },
+      "ConnectionActivityFrame": {
+        "description": "The data of a connection.activity frame on GET /activity/stream: one thing that happened on a media manager or download client connection.",
+        "properties": {
+          "at": {
+            "description": "When it happened.",
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "direction": {
+            "description": "outbound: Weir called the connection. inbound: the connection called Weir (a hand-off, webhook or outcome).",
+            "enum": [
+              "outbound",
+              "inbound"
+            ],
+            "title": "Direction",
+            "type": "string"
+          },
+          "id": {
+            "description": "The connection's id, in the list its kind names.",
+            "title": "Id",
+            "type": "integer"
+          },
+          "kind": {
+            "enum": [
+              "media_manager",
+              "download_client"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "ms": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "How long an outbound call took; null while it is still asked, and for an inbound call.",
+            "title": "Ms"
+          },
+          "phase": {
+            "description": "asked: Weir started a call. answered: the connection replied, or called Weir. failed: it did not reply, or refused Weir or was broken.",
+            "enum": [
+              "asked",
+              "answered",
+              "failed"
+            ],
+            "title": "Phase",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "id",
+          "phase",
+          "direction",
+          "at",
+          "ms"
+        ],
+        "title": "ConnectionActivityFrame",
+        "type": "object"
+      },
       "CsrfOut": {
         "properties": {
           "csrf_token": {
@@ -1040,6 +1106,32 @@
               }
             ],
             "title": "Last Test Detail"
+          },
+          "last_answer_ms": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "How long the last call to this connection took, in milliseconds: a connection test or any real call. Null until Weir has made one.",
+            "title": "Last Answer Ms"
+          },
+          "last_used_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When Weir last talked to this connection, or it last called Weir. Null until that has happened.",
+            "title": "Last Used At"
           }
         },
         "required": [
@@ -3481,6 +3573,19 @@
             "title": "Lanes",
             "type": "array"
           },
+          "last_answer_ms": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "How long the last call to this connection took, in milliseconds: a connection test or any real call. Null until Weir has made one.",
+            "title": "Last Answer Ms"
+          },
           "last_test_at": {
             "anyOf": [
               {
@@ -3514,6 +3619,19 @@
               }
             ],
             "title": "Last Test Ok"
+          },
+          "last_used_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When Weir last talked to this connection, or it last called Weir. Null until that has happened.",
+            "title": "Last Used At"
           },
           "name": {
             "description": "The connection's name: its kind and the host in its address, set by Weir.",
@@ -11360,7 +11478,7 @@
     },
     "/api/v1/activity/stream": {
       "get": {
-        "description": "Authenticated SSE freshness signal for activity-backed pages.",
+        "description": "Authenticated SSE stream for activity-backed pages. Frames: activity.latest (the newest Activity event id and revision), processing.progress (every file's live progress, at most once a second), and connection.activity (one thing that happened on a media manager or download client connection: see ConnectionActivityFrame; each connection sends at most one frame per phase every 250 ms, and always the phase it ends on).",
         "operationId": "get_activity_stream_api_v1_activity_stream_get",
         "responses": {
           "200": {
