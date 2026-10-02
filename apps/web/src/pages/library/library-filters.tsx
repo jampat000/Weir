@@ -53,8 +53,8 @@ type Chip = {
 };
 
 /**
- * The chips, in the order a person reads them: every file, then one for each status. Each file is in exactly one status,
- * so the five add up to All. The words are short; the tooltip says what each one means.
+ * The chips, in the order a person reads them: every file, then one for each status that has files. Each file is in
+ * exactly one status, so the five add up to All. The words are short; the tooltip says what each one means.
  */
 const CHIPS: Chip[] = [
   {
@@ -177,6 +177,9 @@ export function LibraryFilters({
               chip.id === "all"
                 ? filter.status === null
                 : filter.status === chip.id;
+            // A status with no files has no chip, unless it is the one chosen, so the filter never vanishes from under you.
+            // The rest keep their places in the order above, and a chip is back in its own place when its count is not 0.
+            if (chip.id !== "all" && !selected && !count) return null;
             return (
               <button
                 key={chip.id}

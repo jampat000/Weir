@@ -1001,4 +1001,79 @@ describe("LibraryPage", () => {
     fireEvent.click(screen.getByRole("button", { name: /^All/ }));
     expect(lastFilters.at(-1)?.problem).toBeUndefined();
   });
+
+  describe("a status with no files", () => {
+    const withCounts = (by_status: Partial<typeof totals.by_status>) => {
+      overviewResult = {
+        ...overviewResult,
+        totals: {
+          ...totals,
+          by_status: { ...totals.by_status, ...by_status },
+        },
+      };
+    };
+    const chips = () =>
+      within(screen.getByRole("group", { name: "Show" }))
+        .getAllByRole("button")
+        .map((chip) => chip.textContent);
+
+    it("has no chip, and the ones with files keep their places in order", () => {
+      withCounts({ cleaning: 0, left_alone: 0 });
+      renderLibrary();
+
+      expect(chips()).toEqual([
+        "All 14",
+        "Needs cleaning 9",
+        "Matches rules 2",
+        "Can't clean yet 1",
+      ]);
+    });
+
+    it("keeps the chosen status at zero, so the filter never vanishes from under you", () => {
+      withCounts({ cleaning: 0, left_alone: 0 });
+      renderLibrary("/library?show=left_alone");
+
+      expect(chips()).toEqual([
+        "All 14",
+        "Needs cleaning 9",
+        "Matches rules 2",
+        "Can't clean yet 1",
+        "Left alone 0",
+      ]);
+      expect(
+        screen.getByRole("button", { name: /Left alone/ }),
+      ).toHaveAttribute("aria-pressed", "true");
+    });
+
+    it("comes back in its own place when a scan finds files for it", () => {
+      withCounts({ cleaning: 0, left_alone: 0 });
+      const first = renderLibrary();
+      expect(chips()).not.toContain("Cleaning 3");
+      first.unmount();
+
+      withCounts({ cleaning: 3, left_alone: 0 });
+      renderLibrary();
+
+      expect(chips()).toEqual([
+        "All 14",
+        "Needs cleaning 9",
+        "Cleaning 3",
+        "Matches rules 2",
+        "Can't clean yet 1",
+      ]);
+    });
+
+    it("shows only All when nothing is in any status", () => {
+      withCounts({
+        needs_cleaning: 0,
+        cleaning: 0,
+        matches: 0,
+        cant_clean_yet: 0,
+        left_alone: 0,
+      });
+      renderLibrary();
+
+      expect(chips()).toEqual(["All 14"]);
+    });
+  });
 });
