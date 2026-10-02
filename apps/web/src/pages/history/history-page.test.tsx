@@ -9,6 +9,7 @@ import type {
 import type { KeptFile } from "../../lib/processing/kept-files-api";
 import type { LibraryClean } from "../../lib/processing/library-cleans-api";
 import { HistoryPage } from "./history-page";
+import { historyFilePath } from "./history-links";
 
 const files: {
   files: ProcessingFile[];
@@ -224,6 +225,31 @@ describe("HistoryPage", () => {
         "Weir couldn't load your file history. Reload the page to try again.",
       ),
     ).toBeInTheDocument();
+  });
+
+  it("lands on the file a link from Needs you names, in its group, though it is not the newest there", () => {
+    const held = file({
+      id: 7,
+      relative_path: "Held/The.Held.One.mkv",
+      status: "on_hold",
+      status_reason: "Waiting for the file to finish being written.",
+      updated_at: "2026-07-01T03:00:00",
+    });
+    files.files = [
+      file({
+        id: 8,
+        relative_path: "Held/Newer.Held.mkv",
+        status: "on_hold",
+        updated_at: "2026-08-19T03:00:00",
+      }),
+      held,
+    ];
+
+    renderPage(historyFilePath(held));
+
+    expect(screen.getByTestId("history-detail")).toHaveTextContent(
+      "The.Held.One.mkv",
+    );
   });
 
   it("ends the page with how long file history is kept", () => {

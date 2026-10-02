@@ -244,7 +244,51 @@ describe("the Needs you panel when something does", () => {
 
     expect(
       screen.getByRole("link", { name: "Open in History →" }),
-    ).toHaveAttribute("href", "/history?q=Ember.and.Ash.S01E02.mkv");
+    ).toHaveAttribute("href", "/history?show=failed&file=9&within=all");
+  });
+
+  describe("a file that is decided in History", () => {
+    const held = file({
+      id: 31,
+      status: "on_hold",
+      failure_class: null,
+      hold_until: null,
+      status_reason: "Waiting for the file to finish being written.",
+    });
+    const skipped = file({
+      id: 32,
+      status: "skipped",
+      failure_class: null,
+      status_reason: "Skipped because its path matches an exclude pattern.",
+    });
+
+    it.each([
+      ["held", held, "/history?show=needs&file=31&within=all"],
+      ["skipped", skipped, "/history?show=skipped&file=32&within=all"],
+      ["rejected", rejected, "/history?show=failed&file=12&within=all"],
+    ])(
+      "has an Open in History action for a %s file, beside its story",
+      (_kind, decided, href) => {
+        needFiles.files = [decided];
+        renderPanel({ onOpen: vi.fn() });
+
+        expect(
+          screen.getByRole("link", { name: "Open in History →" }),
+        ).toHaveAttribute("href", href);
+        expect(
+          screen.getByRole("button", { name: "Open →" }),
+        ).toBeInTheDocument();
+      },
+    );
+
+    it("leaves a failed file with its own actions and its story", () => {
+      needFiles.files = [stuckFile];
+      renderPanel({ onOpen: vi.fn() });
+
+      expect(
+        screen.queryByRole("link", { name: "Open in History →" }),
+      ).toBeNull();
+    });
   });
 
   it("links a problem with Weir itself to where it is fixed", () => {

@@ -6,6 +6,7 @@ import {
   useProcessingCheckLibraryAgain,
   useRequeueProcessingFile,
 } from "../../../lib/processing/files-queries";
+import { historyFilePath } from "../../history/history-links";
 import { useFileRemoval } from "../../history/use-file-removal";
 
 export type NeedNotice = { text: string; failed: boolean };
@@ -24,6 +25,18 @@ const CHECK_AGAIN_FAILED = "Couldn't check that workflow.";
 const CHECK_AGAIN_DONE = "Checking this workflow again.";
 const QUEUE_FAILED = "Couldn't queue that file.";
 const QUEUED_AGAIN = "Queued again.";
+
+/**
+ * A held, skipped or rejected file is decided in History: Choose tracks, why it is held, Pass through unchanged and
+ * Process now are there, so its row goes straight to it.
+ */
+function isDecidedInHistory(file: ProcessingFile): boolean {
+  return (
+    file.status === "on_hold" ||
+    file.status === "skipped" ||
+    file.status === "rejected"
+  );
+}
 
 /** A held or skipped file is not tried: its workflow is asked to look again. */
 function asksWorkflowAgain(file: ProcessingFile): boolean {
@@ -66,7 +79,8 @@ function removeLabel(removal: { checking: boolean; removing: boolean }) {
 
 /**
  * What a person can do about one file that needs them: try it again, remove it (asking first, in History's
- * own dialog, what to do with the file), or open its story.
+ * own dialog, what to do with the file), open its story, and for a file that is held, skipped or rejected open it
+ * in History, where it is decided.
  */
 export function NeedFileActions({
   file,
@@ -135,11 +149,9 @@ export function NeedFileActions({
         >
           Open →
         </button>
-      ) : (
-        <Link
-          className="mm-need__link"
-          to={`/history?q=${encodeURIComponent(file.relative_path)}`}
-        >
+      ) : null}
+      {onOpen && !isDecidedInHistory(file) ? null : (
+        <Link className="mm-need__link" to={historyFilePath(file)}>
           Open in History →
         </Link>
       )}
