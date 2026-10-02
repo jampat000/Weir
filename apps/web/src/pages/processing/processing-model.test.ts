@@ -562,9 +562,7 @@ describe("words and numbers", () => {
     expect(finishedLine(base)).toBe(
       "Saved 318 MB · removed 4 audio, 6 subtitles",
     );
-    expect(finishedLine({ ...base, kind: "already" })).toBe(
-      "Already right · nothing to change",
-    );
+    expect(finishedLine({ ...base, kind: "already" })).toBe("Already clean");
     expect(
       finishedLine({
         ...base,

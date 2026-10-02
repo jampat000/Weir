@@ -19,7 +19,7 @@ import type { FinishedFile } from "../../../lib/activity/processing-outcome";
 import { useElementSize } from "../../../lib/ui/use-element-size";
 import type { Filter } from "../processing-filter";
 import { useFinishedAnnouncement } from "../use-finished-files";
-import { canvasMeasure, captionFont, type MeasureText } from "./caption-fit";
+import { canvasMeasure, statusFont, type MeasureText } from "./caption-fit";
 import {
   shelfFit,
   shelfRowNeed,
@@ -123,13 +123,13 @@ export function JustFinishedShelf({
     }
   }, [shelfSize.width, shelfSize.height, onHeightNeed]);
   const [measured, setMeasured] = useState<MeasureText | null>(null);
-  // Lines are measured in the caption's own font, read before paint and again when the fonts arrive.
+  // The status line is measured in its own font, read before paint and again when the fonts arrive.
   useLayoutEffect(() => {
     const host = box.current;
     if (!host) return undefined;
     let live = true;
     const read = () => {
-      if (live) setMeasured(() => canvasMeasure(captionFont(host)));
+      if (live) setMeasured(() => canvasMeasure(statusFont(host)));
     };
     read();
     void document.fonts?.ready.then(read);

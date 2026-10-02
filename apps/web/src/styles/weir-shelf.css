@@ -74,7 +74,6 @@
   background: var(--pipe-surface-3);
   box-shadow: 0 8px 24px hsl(0 0% 0% / 0.35);
   font-size: 13px;
-  transition: box-shadow 0.5s;
 }
 
 .mm-shelf__art .mm-tile {
@@ -82,12 +81,6 @@
   padding-bottom: 0;
   border-radius: 10px;
   font-size: inherit;
-}
-
-.mm-shelf__item--fresh .mm-shelf__art {
-  box-shadow:
-    0 0 0 2px var(--pipe-success),
-    0 0 26px color-mix(in srgb, var(--pipe-success) 45%, transparent);
 }
 
 /* The chips that narrow the shelf to a workflow, as Deluno's shelf draws them. */
@@ -137,25 +130,29 @@
   outline-offset: 2px;
 }
 
-/* The workflow the file belongs to, across the foot of its poster. --aw is the poster's width, and the poster is 2:3. */
+/* The workflow the file belongs to, a pill as wide as its name centred on the foot of its poster. --aw is the poster's width, and the poster is 2:3. */
 .lsh-tag {
   position: absolute;
   top: calc(var(--aw, 80px) * 1.5 - 24px);
-  right: 6px;
-  left: 6px;
+  left: 50%;
   z-index: 2;
-  padding: 3px 6px;
+  width: max-content;
+  max-width: calc(var(--aw, 80px) - 12px);
+  box-sizing: border-box;
+  padding: 3px 8px;
   overflow: hidden;
-  border-radius: 6px;
+  border-radius: 999px;
   background: hsl(222 40% 6% / 0.82);
   backdrop-filter: blur(4px);
   font-size: 10px;
   font-weight: 600;
   line-height: 1.3;
   color: hsl(220 18% 96%);
+  text-align: center;
   text-decoration: none;
   text-overflow: ellipsis;
   white-space: nowrap;
+  transform: translateX(-50%);
 }
 
 .lsh-tag:hover {
@@ -177,6 +174,8 @@
   top: calc(var(--aw, 80px) * 1.5 - 10px);
   right: 6px;
   left: 6px;
+  width: auto;
+  max-width: none;
   height: 4px;
   padding: 0;
   overflow: visible;
@@ -188,6 +187,7 @@
   line-height: 0;
   color: transparent;
   text-decoration: none;
+  transform: none;
 }
 
 .mm-shelf__item[data-size="small"] .lsh-tag::after {
@@ -209,55 +209,84 @@
   visibility: hidden;
 }
 
-/* How much the file shrank by, at the foot of its tile on the right, above the workflow's tag when it has one. */
-.mm-shelf__saved {
-  position: absolute;
-  right: 5px;
-  bottom: 5px;
-  padding: 1px 5px;
-  border-radius: 5px;
-  background: hsl(150 90% 25% / 0.92);
-  font-size: 10px;
-  font-weight: 700;
-  line-height: 1.3;
-  color: #fff;
-  white-space: nowrap;
-}
-
-.mm-shelf__item:has(.lsh-tag) .mm-shelf__saved {
-  bottom: 30px;
-}
-
+/*
+ * The caption under a tile: fixed slots, centred on the poster and as wide as it, so the lines of every tile in the
+ * row stand level whatever the file's words. The title on one line, with an ellipsis where it is long, then how the
+ * file came out, in the tone of its outcome after a dot, and in the full caption what was removed and when in the
+ * muted colour; a slot with nothing to say keeps its place. Every line is --shelf-line tall, with 2px between slots
+ * and 6px from the poster. The heights are CAPTION_PX and FULL_CAPTION_PX (shelf-layout.ts).
+ */
 .mm-shelf__caption {
-  display: block;
+  --shelf-line: 15px;
+  display: flex;
   width: var(--shelf-tile-w, 80px);
-  margin-top: 6px;
-  overflow: hidden;
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 1.2;
-  color: var(--pipe-foreground);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  flex-direction: column;
+  gap: 2px;
+  margin: 6px 0 0;
+  padding: 0;
+  text-align: center;
 }
 
-.mm-shelf__caption small {
+.mm-shelf__line {
   display: block;
+  height: var(--shelf-line);
+  flex: none;
+  margin: 0;
+  padding: 0;
   overflow: hidden;
   font-size: 12px;
   font-weight: 500;
+  line-height: var(--shelf-line);
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mm-shelf__title {
+  font-weight: 600;
+  color: var(--pipe-foreground);
+}
+
+.mm-shelf__muted {
   color: var(--pipe-muted);
+}
+
+.mm-shelf__status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  font-weight: 600;
+  color: var(--pipe-muted);
+}
+
+.mm-shelf__status::before {
+  width: 6px;
+  height: 6px;
+  flex: none;
+  border-radius: 50%;
+  background: currentColor;
+  content: "";
+}
+
+.mm-shelf__status > span {
+  min-width: 0;
+  overflow: hidden;
   text-overflow: ellipsis;
 }
 
-/*
- * The full caption: the title, what was done on two lines (the second ends in an ellipsis rather than a third line
- * growing the caption) and the saving with when. Its height is FULL_CAPTION_PX (shelf-layout.ts).
- */
-.mm-shelf__caption--full .mm-shelf__outcome {
-  display: -webkit-box;
-  height: 2.4em;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  white-space: normal;
+.mm-shelf__status--good {
+  color: var(--pipe-success);
+}
+
+.mm-shelf__status--neutral {
+  color: var(--pipe-muted);
+}
+
+.mm-shelf__status--warn {
+  color: var(--pipe-warning);
+}
+
+.mm-shelf__status--bad {
+  color: var(--pipe-destructive);
 }

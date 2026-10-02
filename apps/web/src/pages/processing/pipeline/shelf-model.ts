@@ -3,12 +3,7 @@ import { formatBytes } from "../../../lib/format/bytes";
 import { parseAppTime } from "../../../lib/ui/mm-format-date";
 import type { Filter } from "../processing-filter";
 import { prettyName } from "../processing-model";
-import {
-  ago,
-  finishedLine,
-  isJustNow,
-  removedTrackWords,
-} from "../processing-words";
+import { ago, finishedLine, removedTrackWords } from "../processing-words";
 import { shownBy } from "./pipeline-cards";
 
 /** The workflow's name for a file whose entry names no workflow. */
@@ -16,6 +11,15 @@ const UNKNOWN_WORKFLOW = "Workflow";
 
 /** The most tiles the shelf holds: the room it has decides how many of them show. */
 export const SHELF_LIMIT = 12;
+
+/** How a finished file stands, in the shelf's red, amber, green and grey. */
+export type StatusTone = "good" | "neutral" | "warn" | "bad";
+
+/** The words one caption line can say, fullest first: the first that fits the line is shown, the last always is (cut by an ellipsis if need be). */
+export type LineWords = readonly string[];
+
+/** The caption's status line: its tone, and the words it can say. */
+export type TileStatus = { tone: StatusTone; words: LineWords };
 
 /** One finished file as a tile on the Just finished shelf. */
 export type ShelfTile = {
@@ -26,24 +30,18 @@ export type ShelfTile = {
   workflow: string;
   /** Whether the workflow is known: an unknown one is tinted but not named on the tile. */
   workflowKnown: boolean;
-  /** What the file shrank by, "−318 MB"; nothing when no sizes were recorded. */
-  saved: string | null;
-  /** The same without its sign, "318 MB", for sentences. */
-  savedAmount: string | null;
-  /** What was done to it, in a few words: "2 audio, 4 subtitles removed". */
+  /** The caption's status line: how the file came out, "12 GB saved", "Already clean". */
+  status: TileStatus;
+  /** The full caption's detail line: what was removed, "−1 audio · −7 subs", then "−8 tracks"; null where there is nothing to say. */
+  detail: LineWords | null;
+  /** What was done to it, in a few words, for the tile's name. */
   what: string;
-  /**
-   * What the full caption says of the outcome, which it may wrap over two lines: what was removed for a file that was
-   * cleaned, and the outcome's whole sentence ("Already right · nothing to change") for any other.
-   */
-  outcome: string;
+  /** What the file shrank by, "318 MB", for the tile's name; nothing when no sizes were recorded. */
+  savedAmount: string | null;
+  /** The full caption's last line: "just now", "3 min ago". */
   ago: string;
-  /** The full caption's last line: "−318 MB · 3 min ago", the badge's own words, or just when, where no saving was recorded. */
-  savedAgo: string;
-  /** It finished a moment ago, so the tile wears the ring. */
-  fresh: boolean;
   /** The whole sentence, for the tooltip. */
-  detail: string;
+  sentence: string;
   item: FinishedFile;
 };
 
@@ -65,7 +63,7 @@ export type ShelfScope = {
 };
 
 const SHORT_WHAT: Partial<Record<FinishedFile["kind"], string>> = {
-  already: "Already right",
+  already: "Already clean",
   passed: "Passed through unchanged",
   rejected: "Rejected",
   failed: "Could not be finished",
@@ -79,6 +77,50 @@ function whatWasDone(item: FinishedFile): string {
     SHORT_WHAT[item.kind] ??
     (item.source === "library" ? "Cleaned in place" : "Cleaned")
   );
+}
+
+const GIB = 1024 ** 3;
+const MIB = 1024 ** 2;
+
+/** A saving in the few characters a caption has: one decimal for GB, whole MB, "1.2 GB", "221 MB". */
+export function savedSize(bytes: number): string {
+  if (bytes >= GIB) return `${(bytes / GIB).toFixed(1)} GB`;
+  const mb = Math.round(bytes / MIB);
+  return mb >= 1024 ? "1.0 GB" : `${Math.max(1, mb)} MB`;
+}
+
+/** How a file stands, for the caption's status line: a cleaned file's saving, and a word for any other outcome. */
+function statusOf(item: FinishedFile): TileStatus {
+  switch (item.kind) {
+    case "already":
+      return { tone: "neutral", words: ["Already clean"] };
+    case "passed":
+      return { tone: "warn", words: ["Passed through"] };
+    case "rejected":
+      return { tone: "warn", words: ["Rejected"] };
+    case "failed":
+      return { tone: "bad", words: ["Couldn't finish"] };
+    default: {
+      if (!item.savedBytes) return { tone: "good", words: ["Cleaned"] };
+      const size = savedSize(item.savedBytes);
+      return { tone: "good", words: [`${size} saved`, size] };
+    }
+  }
+}
+
+/** What was taken out of a cleaned file, the minus meaning removed: "−1 audio · −7 subs", then "−8 tracks". */
+function detailOf(item: FinishedFile): LineWords | null {
+  if (item.kind !== "cleaned") return null;
+  const { removedAudio: audio, removedSubtitles: subs } = item;
+  if (audio === 0 && subs === 0) {
+    return item.source === "library" ? ["Cleaned in place"] : null;
+  }
+  const parts = [
+    audio > 0 ? `−${audio} audio` : null,
+    subs > 0 ? `−${subs} ${subs === 1 ? "sub" : "subs"}` : null,
+  ].filter(Boolean);
+  const tracks = audio + subs;
+  return [parts.join(" · "), `−${tracks} ${tracks === 1 ? "track" : "tracks"}`];
 }
 
 function isToday(iso: string, now: number): boolean {
@@ -96,23 +138,18 @@ function tileOf(
   const workflow =
     item.libraryId == null ? undefined : names.get(item.libraryId);
   const savedAmount = item.savedBytes ? formatBytes(item.savedBytes) : null;
-  const saved = savedAmount ? `−${savedAmount}` : null;
-  const what = whatWasDone(item);
-  const when = ago(item.finishedAt, now);
   return {
     key: String(item.id),
     path: item.relativePath,
     title: prettyName(item.relativePath),
     workflow: workflow || UNKNOWN_WORKFLOW,
     workflowKnown: Boolean(workflow),
-    saved,
+    status: statusOf(item),
+    detail: detailOf(item),
+    what: whatWasDone(item),
     savedAmount,
-    what,
-    outcome: item.kind === "cleaned" ? what : finishedLine(item),
-    ago: when,
-    savedAgo: [saved, when].filter(Boolean).join(" · "),
-    fresh: isJustNow(item.finishedAt, now),
-    detail: finishedLine(item),
+    ago: ago(item.finishedAt, now),
+    sentence: finishedLine(item),
     item,
   };
 }

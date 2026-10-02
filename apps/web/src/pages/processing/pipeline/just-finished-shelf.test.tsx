@@ -58,19 +58,16 @@ const tiles = () =>
     .map((item) => within(item).getByRole("button").getAttribute("aria-label"));
 
 describe("Just finished", () => {
-  it("shows each file as a tile with its title, what it shrank by, what was removed and how long ago", () => {
+  it("shows each file as a tile with its title and how it came out, and names what was removed and how long ago", () => {
     render(shelf([finished(1)]));
 
     const tile = screen.getByRole("button", {
-      name: "The Quiet Harbour S01E01 (TV): 2 audio, 4 subtitles removed, 3 min ago",
+      name: "The Quiet Harbour S01E01 (TV): 2 audio, 4 subtitles removed, saved 318 MB, 3 min ago",
     });
-    expect(within(tile).getByText("−318 MB")).toBeInTheDocument();
     expect(
       within(tile).getByText("The Quiet Harbour S01E01"),
     ).toBeInTheDocument();
-    expect(
-      within(tile).getByText("2 audio, 4 subtitles removed · 3 min ago"),
-    ).toBeInTheDocument();
+    expect(within(tile).getByText("318 MB saved")).toBeInTheDocument();
   });
 
   it("tags each tile with its workflow, and the tag goes to that workflow in the library", () => {
@@ -121,19 +118,6 @@ describe("Just finished", () => {
     fireEvent.click(screen.getByRole("button", { name: /S01E01/ }));
 
     expect(onOpen).toHaveBeenCalledWith(item);
-  });
-
-  it("puts the ring on a file that has only just finished", () => {
-    render(
-      shelf([
-        finished(1, { finishedAt: new Date(NOW - 5_000).toISOString() }),
-        finished(2),
-      ]),
-    );
-
-    const [fresh, older] = screen.getAllByRole("listitem");
-    expect(fresh).toHaveClass("mm-shelf__item--fresh");
-    expect(older).not.toHaveClass("mm-shelf__item--fresh");
   });
 
   it("honours the filter", () => {
@@ -329,55 +313,51 @@ describe("the size of the tiles", () => {
     ).toBe("58px");
   });
 
-  it("dresses a full-size poster with the saved badge and the workflow's whole tag", () => {
+  it("dresses a full-size poster with the workflow's tag, and nothing else on the art", () => {
     rowOf(200, 570);
 
     render(shelf(files));
 
     const first = screen.getAllByRole("listitem")[0];
     expect(first).toHaveAttribute("data-size", "full");
-    expect(within(first).getByText("−318 MB")).toBeInTheDocument();
     expect(within(first).getByRole("link", { name: "TV" })).toHaveClass(
       "lsh-tag",
     );
-    expect(
-      screen.getByRole("button", {
-        name: "The Quiet Harbour S01E01 (TV): 2 audio, 4 subtitles removed, 3 min ago",
-      }),
-    ).toBeInTheDocument();
+    expect(first.querySelector(".mm-shelf__art")?.children).toHaveLength(1);
   });
 
-  describe("the caption's tier", () => {
+  describe("the caption's lines", () => {
     const captionOf = (index: number) =>
       screen
         .getAllByRole("listitem")
-        [index].querySelector(".mm-shelf__caption");
+        [index].querySelector<HTMLElement>(".mm-shelf__caption");
+    const linesOf = (index: number) =>
+      [...(captionOf(index)?.querySelectorAll(".mm-shelf__line") ?? [])].map(
+        (line) => line.textContent,
+      );
 
     it("is the full caption where the posters have the height the five-tile rule lets them use, and the room for it", () => {
-      // 570px wide: 102px posters, 153px of art, 64px of caption and 12px of padding: 229px.
-      rowOf(229, 570);
+      // 570px wide: 102px posters, 153px of art, 72px of caption and 12px of padding: 237px.
+      rowOf(237, 570);
 
       render(shelf(files));
 
-      const caption = captionOf(0);
-      expect(caption).toHaveClass("mm-shelf__caption--full");
-      expect(caption?.firstChild?.textContent).toBe("The Quiet Harbour S01E01");
-      expect(
-        [...(caption?.querySelectorAll("small") ?? [])].map(
-          (line) => line.textContent,
-        ),
-      ).toEqual(["2 audio, 4 subtitles removed", "−318 MB · 3 min ago"]);
+      expect(captionOf(0)).toHaveAttribute("data-tier", "full");
+      expect(linesOf(0)).toEqual([
+        "The Quiet Harbour S01E01",
+        "318 MB saved",
+        "−2 audio · −4 subs",
+        "3 min ago",
+      ]);
     });
 
-    it("is the compact caption a pixel short of that, with the tiles the same size", () => {
-      rowOf(228, 570);
+    it("is the compact caption, the title and how it came out, a pixel short of that, with the tiles the same size", () => {
+      rowOf(236, 570);
 
       render(shelf(files));
 
-      expect(captionOf(0)).not.toHaveClass("mm-shelf__caption--full");
-      expect(captionOf(0)).toHaveTextContent(
-        "The Quiet Harbour S01E012 audio, 4 subtitles removed · 3 min ago",
-      );
+      expect(captionOf(0)).toHaveAttribute("data-tier", "compact");
+      expect(linesOf(0)).toEqual(["The Quiet Harbour S01E01", "318 MB saved"]);
       expect(
         document
           .querySelector<HTMLElement>(".mm-shelf__row")
@@ -385,17 +365,60 @@ describe("the size of the tiles", () => {
       ).toBe("102px");
     });
 
-    it("leaves the poster without the saved badge when the full caption says the saving", () => {
-      rowOf(229, 570);
+    it("says the saving exactly once", () => {
+      rowOf(237, 570);
 
       render(shelf(files));
 
-      expect(screen.queryByText("−318 MB")).not.toBeInTheDocument();
-      expect(screen.getAllByText("−318 MB · 3 min ago")).toHaveLength(5);
+      expect(screen.getAllByText(/318 MB/)).toHaveLength(5);
+      expect(screen.queryByText("318 MB")).not.toBeInTheDocument();
     });
 
-    it("says the outcome's own words for a file nothing was removed from, and only when for one that saved nothing", () => {
-      rowOf(229, 570);
+    it("keeps four slots on every tile, an empty one where there is nothing to say, so the lines stand level across the row", () => {
+      rowOf(237, 570);
+
+      render(
+        shelf([
+          finished(1),
+          finished(2, { kind: "already", savedBytes: null }),
+          finished(3, { kind: "failed", savedBytes: null }),
+        ]),
+      );
+
+      expect([0, 1, 2].map(linesOf)).toEqual([
+        [
+          "The Quiet Harbour S01E01",
+          "318 MB saved",
+          "−2 audio · −4 subs",
+          "3 min ago",
+        ],
+        ["The Quiet Harbour S01E02", "Already clean", "", "3 min ago"],
+        ["The Quiet Harbour S01E03", "Couldn't finish", "", "3 min ago"],
+      ]);
+    });
+
+    it("tones the status line red, amber, green or grey for the outcome", () => {
+      rowOf(237, 570);
+
+      render(
+        shelf([
+          finished(1),
+          finished(2, { kind: "already", savedBytes: null }),
+          finished(3, { kind: "rejected", savedBytes: null }),
+          finished(4, { kind: "failed", savedBytes: null }),
+        ]),
+      );
+
+      const toneOf = (index: number) =>
+        captionOf(index)?.querySelector(".mm-shelf__status")?.className;
+      expect(toneOf(0)).toContain("mm-shelf__status--good");
+      expect(toneOf(1)).toContain("mm-shelf__status--neutral");
+      expect(toneOf(2)).toContain("mm-shelf__status--warn");
+      expect(toneOf(3)).toContain("mm-shelf__status--bad");
+    });
+
+    it("says 'Already clean' in the name and tooltip of a file nothing was changed in, and on its status line", () => {
+      rowOf(237, 570);
 
       render(
         shelf([
@@ -409,69 +432,66 @@ describe("the size of the tiles", () => {
       );
 
       expect(
-        screen.getByText("Already right · nothing to change"),
-      ).toBeInTheDocument();
-      expect(screen.getByText("3 min ago")).toBeInTheDocument();
-    });
-
-    it("keeps the saving alone where it and when do not fit the poster, and the time stays in the tile's name", () => {
-      rowOf(229, 570);
-
-      // 5px a character, and 6px where there is a dot: "−318 MB · 3 min ago" is 114px, wider than the 102px poster.
-      render(
-        shelf(files, {
-          measureText: (text) => text.length * (text.includes("·") ? 6 : 5),
+        screen.getByRole("button", {
+          name: "The Quiet Harbour S01E01 (TV): Already clean, 3 min ago",
         }),
-      );
-
-      const caption = captionOf(0);
-      expect(
-        [...(caption?.querySelectorAll("small") ?? [])].map(
-          (line) => line.textContent,
-        ),
-      ).toEqual(["2 audio, 4 subtitles removed", "−318 MB"]);
-      expect(
-        screen.getAllByRole("button", { name: /S01E01/ })[0],
-      ).toHaveAccessibleName(
-        "The Quiet Harbour S01E01 (TV): 2 audio, 4 subtitles removed, 3 min ago",
-      );
+      ).toHaveAttribute("title", expect.stringContaining("Already clean"));
+      expect(linesOf(0)[1]).toBe("Already clean");
     });
 
-    it("falls back to the compact caption, and the poster's badge, for a tile that cannot say even its saving", () => {
-      rowOf(229, 570);
+    it("keeps the bare saving where 'saved' does not fit after the dot", () => {
+      rowOf(237, 570);
 
-      render(shelf(files, { measureText: (text) => text.length * 20 }));
+      // 8px a character: "318 MB saved" is 96px, wider than the 90px the 102px poster leaves after the dot.
+      render(shelf(files, { measureText: (text) => text.length * 8 }));
 
-      expect(captionOf(0)).not.toHaveClass("mm-shelf__caption--full");
-      expect(screen.getAllByText("−318 MB")).toHaveLength(5);
+      expect(linesOf(0)[1]).toBe("318 MB");
     });
 
-    it("is the compact caption on posters too small for the badge, however much room there is", () => {
+    it("counts the tracks removed where the two kinds do not fit the poster's width", () => {
+      rowOf(237, 570);
+
+      // 8px a character: "−2 audio · −4 subs" is 144px, wider than the 102px poster.
+      render(shelf(files, { measureText: (text) => text.length * 8 }));
+
+      expect(linesOf(0)[2]).toBe("−6 tracks");
+    });
+
+    it("is the compact caption on posters too small for the tag, however much room there is", () => {
       // 300px wide holds five 48px posters, narrower than a poster that can wear a full caption.
       rowOf(400, 300);
 
       render(shelf(files));
 
-      expect(captionOf(0)).not.toHaveClass("mm-shelf__caption--full");
-      expect(captionOf(0)).toHaveTextContent("2 audio, 4 subtitles removed");
+      expect(captionOf(0)).toHaveAttribute("data-tier", "compact");
+      expect(linesOf(0)).toHaveLength(2);
+    });
+
+    it("leaves the tiles bare where the row is too short for any caption", () => {
+      rowOf(100, 570);
+
+      render(shelf(files));
+
+      expect(captionOf(0)).toBeNull();
     });
   });
 
-  describe("on posters too small for the badge and the tag", () => {
-    it("takes the badge off the poster and puts the saving in the tile's name and tooltip", () => {
+  describe("on posters too small for the tag", () => {
+    it("puts the workflow in the tile's name and tooltip, with the saving, and draws a strip in its colour", () => {
       rowOf(100, 570);
 
       render(shelf(files));
 
       const first = screen.getAllByRole("listitem")[0];
       expect(first).toHaveAttribute("data-size", "small");
-      expect(first.querySelector(".mm-shelf__saved")).toBeNull();
-      expect(screen.queryByText("−318 MB")).not.toBeInTheDocument();
       const open = within(first).getByRole("button");
       expect(open).toHaveAccessibleName(
         "The Quiet Harbour S01E01 (TV): 2 audio, 4 subtitles removed, saved 318 MB, 3 min ago",
       );
       expect(open).toHaveAttribute("title", expect.stringContaining("318 MB"));
+      expect(within(first).getByRole("link", { name: "TV" })).toHaveClass(
+        "lsh-tag",
+      );
     });
 
     it("keeps the workflow's tag as a link to its library, named and tinted for the workflow", () => {

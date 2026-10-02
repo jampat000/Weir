@@ -3,23 +3,24 @@
  * are drawn: a row too narrow for one more simply shows one fewer.
  */
 
-/**
- * The caption (the title and what happened) under a tile, measured on the rendered shelf: two 14.4px lines and the 6px
- * above them, 34.8px, taken up to a whole pixel.
- */
-export const CAPTION_PX = 35;
-/**
- * The full caption: four lines of the same type, the title, two for what was done (or why nothing was) and the saving
- * with when, and the 6px above them, 63.6px, taken up to a whole pixel.
- */
-export const FULL_CAPTION_PX = 64;
+/** The height of every line of a caption (weir-shelf.css: --shelf-line). */
+export const CAPTION_LINE_PX = 15;
+/** The space between a tile's poster and its title, and between slots. */
+const CAPTION_GAP_PX = 6;
+const SLOT_GAP_PX = 2;
+/** The compact caption under a tile: the title and the status line, with 2px between them and 6px above them: 38px. */
+export const CAPTION_PX = CAPTION_GAP_PX + 2 * CAPTION_LINE_PX + SLOT_GAP_PX;
+/** The full caption: the compact one and the detail and when lines, each 2px after the one before: 72px. */
+export const FULL_CAPTION_PX = CAPTION_PX + 2 * (CAPTION_LINE_PX + SLOT_GAP_PX);
 /** The space between tiles. */
 export const TILE_GAP_PX = 12;
 /** The padding round the row, which the tiles do not use (the row's own padding: 7 above, 5 below and either side). */
 const ROW_PAD_Y = 12;
 const ROW_PAD_X = 10;
-/** A row at least this tall has room for a caption under each tile. */
-const CAPTION_MIN_ROW_PX = 130;
+/** The least art a tile has under a caption: 64px wide, the narrowest that wears the workflow's tag (FULL_DECORATIONS_MIN_PX). */
+const CAPTIONED_ART_PX = 96;
+/** A row at least this tall (inside its padding) has room for a caption under each tile, and the art above it. */
+const CAPTION_MIN_ROW_PX = CAPTIONED_ART_PX + CAPTION_PX;
 const MIN_ART_PX = 36;
 /** The narrowest a tile gets, however many must stand in the row: 2:3 under the least art. */
 const MIN_TILE_WIDTH_PX = Math.floor(MIN_ART_PX / 1.5);
@@ -27,9 +28,9 @@ const MIN_TILE_WIDTH_PX = Math.floor(MIN_ART_PX / 1.5);
 const MAX_ART_PX = 255;
 
 /**
- * What goes under each tile. The compact caption is the title and what happened; the full one gives what was done two
- * lines and adds the saving and when, and is chosen only where the posters have all the height the five-tile rule lets
- * them use and room for it as well. A row too short for either shows tiles alone.
+ * What goes under each tile. The compact caption is the title and how the file came out; the full one adds what was
+ * done and when, and is chosen only where the posters have all the height the five-tile rule lets them use and room
+ * for it as well. A row too short for either shows tiles alone.
  */
 export type CaptionTier = "none" | "compact" | "full";
 
@@ -103,18 +104,17 @@ export function shelfRowNeed(rowWidth: number): number {
 }
 
 /**
- * A poster narrower than this is too small for its decorations: the saved-space badge and the workflow's tag
- * would cover a third of the art or more (measured: the badge is 54px by 15px, the tag 19px tall and the poster's
- * width less 12px, so together they take 30% of a 64px poster and 36% of a 56px one).
+ * A poster narrower than this is too small for the workflow's tag, whose name would cover a third of the art or more
+ * (the tag is 19px tall and as wide as its name, up to the poster's width less 12px).
  */
 export const FULL_DECORATIONS_MIN_PX = 64;
 
 export type PosterSize = "small" | "full";
 
 /**
- * How a poster of this width is dressed. A "full" poster wears the saved badge and the workflow's whole tag; a
- * "small" one wears a slim strip in its workflow's colour, and what the badge and the tag say goes into the
- * tile's tooltip and name. Not measured yet, it is "full".
+ * How a poster of this width is dressed. A "full" poster wears the workflow's name in a tag; a "small" one wears a
+ * slim strip in its workflow's colour, and the name goes into the tile's tooltip and name. Not measured yet, it is
+ * "full".
  */
 export function posterSize(width: number | null): PosterSize {
   return width !== null && width < FULL_DECORATIONS_MIN_PX ? "small" : "full";

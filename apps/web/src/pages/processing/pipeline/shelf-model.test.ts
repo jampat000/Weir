@@ -40,51 +40,96 @@ function shelf(items: FinishedFile[], scope: ShelfScope = EVERYTHING) {
 }
 
 describe("the shelf's tiles", () => {
-  it("say the title, what the file shrank by, what was removed and how long ago", () => {
+  it("say the title, how the file came out, what was done and how long ago", () => {
     const [tile] = shelf([finished(1)]).tiles;
 
     expect(tile).toMatchObject({
       title: "The Quiet Harbour S01E01",
-      saved: "−318 MB",
-      what: "2 audio, 4 subtitles removed",
+      status: { tone: "good", words: ["318 MB saved", "318 MB"] },
+      detail: ["−2 audio · −4 subs", "−6 tracks"],
       ago: "3 min ago",
       workflow: "TV",
       workflowKnown: true,
-      fresh: false,
     });
   });
 
-  it("give the full caption the outcome in words and the saving with when", () => {
+  it("colour each outcome as red, amber, green or grey, and say it in a word where there is no saving", () => {
     const { tiles } = shelf([
       finished(1),
       finished(2, { savedBytes: null, removedAudio: 0, removedSubtitles: 0 }),
-      finished(3, {
-        kind: "already",
-        savedBytes: null,
-        removedAudio: 0,
-        removedSubtitles: 0,
-      }),
-      finished(4, {
-        kind: "rejected",
-        savedBytes: null,
-        sentence: "Rejected · no English audio",
-      }),
+      finished(3, { kind: "already", savedBytes: null }),
+      finished(4, { kind: "rejected", savedBytes: null }),
+      finished(5, { kind: "passed", savedBytes: null }),
+      finished(6, { kind: "failed", savedBytes: null }),
     ]);
 
-    expect(tiles.map((tile) => [tile.outcome, tile.savedAgo])).toEqual([
-      ["2 audio, 4 subtitles removed", "−318 MB · 3 min ago"],
-      ["Cleaned", "3 min ago"],
-      ["Already right · nothing to change", "3 min ago"],
-      ["Rejected · no English audio", "3 min ago"],
+    expect(tiles.map((tile) => [tile.status.tone, tile.status.words])).toEqual([
+      ["good", ["318 MB saved", "318 MB"]],
+      ["good", ["Cleaned"]],
+      ["neutral", ["Already clean"]],
+      ["warn", ["Rejected"]],
+      ["warn", ["Passed through"]],
+      ["bad", ["Couldn't finish"]],
     ]);
   });
 
-  it("wear the ring while the file has only just finished", () => {
+  it("say a saving with one decimal for GB and whole MB, and no sign", () => {
+    const saved = (bytes: number) =>
+      shelf([finished(1, { savedBytes: bytes })]).tiles[0].status.words;
+
+    expect(saved(1.24 * 1024 ** 3)).toEqual(["1.2 GB saved", "1.2 GB"]);
+    expect(saved(221.4 * 1024 ** 2)).toEqual(["221 MB saved", "221 MB"]);
+    expect(saved(12.6 * 1024 ** 2)).toEqual(["13 MB saved", "13 MB"]);
+    expect(saved(1023.9 * 1024 ** 2)).toEqual(["1.0 GB saved", "1.0 GB"]);
+    expect(saved(10 * 1024 ** 3)).toEqual(["10.0 GB saved", "10.0 GB"]);
+  });
+
+  it("say what was removed from a cleaned file, a minus meaning removed, and nothing where nothing was", () => {
+    const detail = (overrides: Partial<FinishedFile>) =>
+      shelf([finished(1, overrides)]).tiles[0].detail;
+
+    expect(detail({ removedAudio: 1, removedSubtitles: 7 })).toEqual([
+      "−1 audio · −7 subs",
+      "−8 tracks",
+    ]);
+    expect(detail({ removedAudio: 0, removedSubtitles: 1 })).toEqual([
+      "−1 sub",
+      "−1 track",
+    ]);
+    expect(detail({ removedAudio: 3, removedSubtitles: 0 })).toEqual([
+      "−3 audio",
+      "−3 tracks",
+    ]);
+    expect(detail({ removedAudio: 0, removedSubtitles: 0 })).toBeNull();
+    expect(
+      detail({ source: "library", removedAudio: 0, removedSubtitles: 0 }),
+    ).toEqual(["Cleaned in place"]);
+  });
+
+  it("leave the detail slot empty for a file that was not cleaned", () => {
+    const { tiles } = shelf([
+      finished(1, { kind: "already", savedBytes: null }),
+      finished(2, { kind: "rejected", savedBytes: null }),
+      finished(3, { kind: "passed", savedBytes: null }),
+      finished(4, { kind: "failed", savedBytes: null }),
+    ]);
+
+    expect(tiles.map((tile) => tile.detail)).toEqual([null, null, null, null]);
+  });
+
+  it("say the saving once, in the status line", () => {
+    const [tile] = shelf([finished(1)]).tiles;
+
+    expect(tile.status.words).toEqual(["318 MB saved", "318 MB"]);
+    expect(tile.detail?.join(" ")).not.toMatch(/MB/);
+    expect(tile.ago).not.toMatch(/MB/);
+  });
+
+  it("say how long ago the file finished", () => {
     const [tile] = shelf([
       finished(1, { finishedAt: new Date(NOW - 10_000).toISOString() }),
     ]).tiles;
 
-    expect(tile.fresh).toBe(true);
     expect(tile.ago).toBe("just now");
   });
 
@@ -107,10 +152,10 @@ describe("the shelf's tiles", () => {
 
     expect(tiles.map((tile) => tile.what)).toEqual([
       "Cleaned",
-      "Already right",
+      "Already clean",
       "Cleaned in place",
     ]);
-    expect(tiles.every((tile) => tile.saved === null)).toBe(true);
+    expect(tiles.every((tile) => tile.savedAmount === null)).toBe(true);
   });
 
   it("do not name a workflow that is not known", () => {

@@ -1,10 +1,11 @@
 /**
  * The tiles of the Just finished shelf. A tile is the title's poster (or its initials on its workflow's
- * colour where there is none), with how much the file shrank by at its foot and, under that, the workflow's
- * name, which goes to that workflow in the library. On a poster too small to carry them (see posterSize) the
- * badge and the name give way to a slim strip in the workflow's colour, and go into the tile's tooltip and name.
- * The tile of a file that has just been delivered arrives with a ring and flies in from the Pipeline (see
- * delivery-flight).
+ * colour where there is none) with the workflow's name in a tag across its foot, and under it a caption of
+ * fixed slots, centred, so the lines of every tile in the row stand level: the title (two lines), how the file
+ * came out in red, amber, green or grey, and, where the posters are big enough, what was removed and when. On a poster too
+ * small for the tag (see posterSize) it gives way to a slim strip in the workflow's colour, and its name goes
+ * into the tile's tooltip and name. The tile of a file that has just been delivered arrives with a ring and
+ * flies in from the Pipeline (see delivery-flight).
  */
 import type { CSSProperties, ReactElement, RefObject } from "react";
 import { Link } from "react-router-dom";
@@ -14,11 +15,7 @@ import type { FinishedFile } from "../../../lib/activity/processing-outcome";
 import { useWorkflowHues } from "../../../lib/processing/workflow-hues";
 import { classNames } from "../../../lib/ui/class-names";
 import { SHELF_TILE_ATTRIBUTE } from "./delivery-flight";
-import {
-  fullCaptionLines,
-  type FullCaptionLines,
-  type MeasureText,
-} from "./caption-fit";
+import { STATUS_MARK_PX, lineWords, type MeasureText } from "./caption-fit";
 import { posterSize, type CaptionTier } from "./shelf-layout";
 import type { ShelfTile } from "./shelf-model";
 import { useOpenSlots } from "./shelf-slots";
@@ -31,36 +28,32 @@ const FITS_ANYTHING: MeasureText = () => 0;
 function Tile({
   tile,
   caption,
-  lines,
+  status,
+  detail,
   small,
   onOpen,
 }: {
   tile: ShelfTile;
-  /** What goes under the tile: the full caption only where `lines` could be drawn for it. */
+  /** What goes under the tile. */
   caption: CaptionTier;
-  /** What the full caption says of this tile; null where it will not fit and the caption is the compact one. */
-  lines: FullCaptionLines | null;
-  /** The poster is too small for the saved badge and the workflow's whole tag. */
+  /** What the status line says at this width. */
+  status: string;
+  /** What the detail line says at this width, or nothing. */
+  detail: string | null;
+  /** The poster is too small for the workflow's whole tag. */
   small: boolean;
   onOpen: (item: FinishedFile) => void;
 }) {
   const hues = useWorkflowHues();
-  const tier = caption === "full" && lines === null ? "compact" : caption;
   const when = tile.ago ? `, ${tile.ago}` : "";
   const workflow = tile.workflowKnown ? ` (${tile.workflow})` : "";
   const library = tile.item.libraryId;
-  const hiddenSaving = small ? tile.savedAmount : null;
-  const savedInName = hiddenSaving ? `, saved ${hiddenSaving}` : "";
-  const savedInTip =
-    hiddenSaving && !tile.detail.includes(hiddenSaving) ? hiddenSaving : null;
+  const saved = tile.savedAmount ? `, saved ${tile.savedAmount}` : "";
   return (
     <li
       {...{ [TILE_KEY_ATTRIBUTE]: tile.key }}
       data-size={small ? "small" : "full"}
-      className={classNames(
-        "mm-shelf__item",
-        tile.fresh && "mm-shelf__item--fresh",
-      )}
+      className="mm-shelf__item"
     >
       <button
         type="button"
@@ -68,13 +61,12 @@ function Tile({
         title={[
           tile.title,
           tile.workflowKnown ? tile.workflow : null,
-          savedInTip && `Saved ${savedInTip}`,
-          tile.detail,
+          tile.sentence,
           tile.ago,
         ]
           .filter(Boolean)
           .join(" · ")}
-        aria-label={`${tile.title}${workflow}: ${tile.what}${savedInName}${when}`}
+        aria-label={`${tile.title}${workflow}: ${tile.what}${saved}${when}`}
         onClick={() => onOpen(tile.item)}
       >
         <span
@@ -86,26 +78,29 @@ function Tile({
             title={tile.title}
             workflow={tile.workflow}
           />
-          {tile.saved && !small && tier !== "full" ? (
-            <span className="mm-shelf__saved">{tile.saved}</span>
-          ) : null}
         </span>
-        {tier === "full" && lines ? (
-          <span className="mm-shelf__caption mm-shelf__caption--full">
-            {tile.title}
-            <small className="mm-shelf__outcome">{lines.outcome}</small>
-            <small>{lines.last}</small>
+        {caption === "none" ? null : (
+          <span className="mm-shelf__caption" data-tier={caption}>
+            <span className="mm-shelf__line mm-shelf__title">{tile.title}</span>
+            <span
+              className={classNames(
+                "mm-shelf__line",
+                "mm-shelf__status",
+                `mm-shelf__status--${tile.status.tone}`,
+              )}
+            >
+              <span>{status}</span>
+            </span>
+            {caption === "full" ? (
+              <>
+                <span className="mm-shelf__line mm-shelf__muted">{detail}</span>
+                <span className="mm-shelf__line mm-shelf__muted">
+                  {tile.ago}
+                </span>
+              </>
+            ) : null}
           </span>
-        ) : null}
-        {tier === "compact" ? (
-          <span className="mm-shelf__caption">
-            {tile.title}
-            <small>
-              {tile.what}
-              {tile.ago ? ` · ${tile.ago}` : ""}
-            </small>
-          </span>
-        ) : null}
+        )}
       </button>
       {tile.workflowKnown && library != null ? (
         <Link
@@ -164,10 +159,21 @@ export function ShelfTiles({
           key={tile.key}
           tile={tile}
           caption={caption}
-          lines={
-            caption === "full" && tileWidth !== null
-              ? fullCaptionLines(tile, tileWidth, measure ?? FITS_ANYTHING)
-              : null
+          status={
+            tileWidth === null
+              ? tile.status.words[0]
+              : lineWords(
+                  tile.status.words,
+                  tileWidth - STATUS_MARK_PX,
+                  measure ?? FITS_ANYTHING,
+                )
+          }
+          detail={
+            tile.detail === null
+              ? null
+              : tileWidth === null
+                ? tile.detail[0]
+                : lineWords(tile.detail, tileWidth, measure ?? FITS_ANYTHING)
           }
           small={small}
           onOpen={onOpen}

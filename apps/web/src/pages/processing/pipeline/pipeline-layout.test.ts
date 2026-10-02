@@ -108,8 +108,8 @@ describe("the detail lines a card has room for", () => {
 
 describe("the shelf's tiles", () => {
   it("are sized from the row's height, exactly 2:3, with a caption only when the row is tall enough", () => {
-    // 190px of row less 12px of padding and a 35px caption = 143px of art, 95px wide.
-    expect(shelfFit(190)).toEqual({ caption: "compact", width: 95 });
+    // 190px of row less 12px of padding and a 38px caption = 140px of art, 93px wide.
+    expect(shelfFit(190)).toEqual({ caption: "compact", width: 93 });
     expect(shelfFit(100)).toEqual({ caption: "none", width: 58 });
     expect(shelfFit(10).width).toBe(24);
     expect(shelfFit(2000).width).toBe(170);
@@ -117,11 +117,11 @@ describe("the shelf's tiles", () => {
 
   it("shows at least five whole tiles across, by making the tiles narrower, never wider than their height allows", () => {
     expect(SHELF_MIN_TILES).toBe(5);
-    // A tall row of 570px: 250px of row would give 135px tiles, but five must stand across.
+    // A tall row of 570px: 250px of row would give 133px tiles, but five must stand across.
     const tall = shelfFit(250, 570);
     expect(tall.width).toBe(102);
     expect(tilesAcross(570, tall.width)).toBeGreaterThanOrEqual(5);
-    expect(shelfFit(250).width).toBe(135);
+    expect(shelfFit(250).width).toBe(133);
     // A short row already holds smaller tiles than five need: the height decides.
     expect(shelfFit(100, 570)).toEqual(shelfFit(100));
     // The tile stays exactly 2:3 and is never stretched: its height is one and a half times its width, within its row.
@@ -137,10 +137,10 @@ describe("the shelf's tiles", () => {
   });
 
   it("need the height of the art the five-tile rule leaves them, plus the caption and the row's padding", () => {
-    // 570px wide: 102px tiles, 153px of art, the 64px full caption and 12px of padding.
-    expect(shelfRowNeed(570)).toBe(229);
+    // 570px wide: 102px tiles, 153px of art, the 72px full caption and 12px of padding.
+    expect(shelfRowNeed(570)).toBe(237);
     // A row too wide for the rule to bind: the tallest tile is 255px of art.
-    expect(shelfRowNeed(3000)).toBe(255 + 64 + 12);
+    expect(shelfRowNeed(3000)).toBe(255 + 72 + 12);
     // Tiles too small for the full caption, and with no room for any: the least art and the padding.
     expect(shelfRowNeed(100)).toBe(36 + 12);
   });
@@ -165,20 +165,20 @@ describe("the shelf's tiles", () => {
   });
 
   it("have the compact caption, and need no more than their art and it, where the tiles are too small for the full one", () => {
-    // 300px wide holds five 48px tiles: 72px of art, a 35px caption (the row is too short for one) and 12px of padding.
+    // 300px wide holds five 48px tiles: 72px of art, a 38px caption (the row is too short for one) and 12px of padding.
     expect(shelfFit(10_000, 300).caption).toBe("compact");
     expect(shelfRowNeed(300)).toBe(12 + 72);
     expect(shelfFit(shelfRowNeed(300), 300).width).toBe(48);
   });
 
   it("have the full caption under tiles 64px wide and up, and not under narrower ones", () => {
-    expect(FULL_CAPTION_PX).toBe(64);
+    expect(FULL_CAPTION_PX).toBe(72);
     // 64px tiles take five across 368px: 5 * 64 + 4 * 12 + 10 = 378.
     expect(shelfFit(10_000, 378).caption).toBe("full");
     expect(shelfFit(10_000, 377).caption).toBe("compact");
   });
 
-  it("dresses a poster fully from 64px wide, and thinly below that: a small one has no room for the badge and the tag", () => {
+  it("dresses a poster fully from 64px wide, and thinly below that: a small one has no room for the tag", () => {
     expect(FULL_DECORATIONS_MIN_PX).toBe(64);
     expect(posterSize(64)).toBe("full");
     expect(posterSize(102)).toBe("full");
