@@ -117,7 +117,7 @@ export function ActiveSessionsSection({ enabled }: { enabled: boolean }) {
         others.length > 0 ? (
           <button
             type="button"
-            className={`${mmActionButtonClass({ variant: "secondary" })} mm-sys-btn mm-sys-btn--danger`}
+            className={`${mmActionButtonClass({ variant: "danger-outline" })} mm-sys-btn`}
             disabled={revokeOthers.isPending}
             onClick={signOutOthers}
           >

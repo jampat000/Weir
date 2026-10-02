@@ -75,6 +75,7 @@ export function BackupsTab({
           description="This cannot be undone."
           confirmLabel="Replace settings"
           cancelLabel="Keep current settings"
+          tone="danger"
           testId="restore-configuration-dialog"
           onCancel={actions.cancelRestore}
           onConfirm={actions.confirmRestore}
