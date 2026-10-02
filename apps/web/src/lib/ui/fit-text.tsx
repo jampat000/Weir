@@ -4,7 +4,7 @@
  * letter-spacing, the tabular figures and the case of a card's type are all counted. Which of the words fit is
  * decided by the measured-words helper the poster captions use.
  */
-import { useLayoutEffect, useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
 import { lineWords, type MeasureText } from "./measure-text";
 
@@ -35,6 +35,14 @@ export function narrowing(
     .filter((part) => part.text !== kept[0]?.text)
     .sort((a, b) => b.matters - a.matters);
   return [...words, ...others.map((part) => part.text)];
+}
+
+/** A name in words that narrow with the room by dropping its last word, whole words only: "Check media managers", "Check media", "Check". */
+export function nameWords(name: string): string[] {
+  const words = name.split(" ").filter(Boolean);
+  return words.map((_, index) =>
+    words.slice(0, words.length - index).join(" "),
+  );
 }
 
 /** Measures text as `box` sets it: in a twin of the box, laid out out of sight beside it, and as wide as the text is. */
@@ -69,6 +77,10 @@ type FitTextProps = {
   className?: string;
   /** What the line says whole; the fullest words when not given. */
   title?: string;
+  /** Hides the line from screen readers, for words that are said to them another way. */
+  ariaHidden?: boolean;
+  /** Draws the words that are said, where they are not plain text: a bold figure after a lead, say. */
+  format?: (words: string) => ReactNode;
 };
 
 /**
@@ -76,7 +88,13 @@ type FitTextProps = {
  * box changes size, the fonts arrive or the words change. Where the box has no width to measure the fullest words
  * show. Its CSS must give it a width of its own, as a grid or flex item or a block does, not one that follows its text.
  */
-export function FitText({ words, className, title }: FitTextProps) {
+export function FitText({
+  words,
+  className,
+  title,
+  ariaHidden,
+  format,
+}: FitTextProps) {
   const boxRef = useRef<HTMLSpanElement | null>(null);
   const [chosen, setChosen] = useState(0);
   const wordsKey = words.join("\u0000");
@@ -103,8 +121,15 @@ export function FitText({ words, className, title }: FitTextProps) {
     return () => observer?.disconnect();
   }, [wordsKey]);
   return (
-    <span ref={boxRef} className={className} title={title ?? words[0]}>
-      {words[Math.min(chosen, words.length - 1)]}
+    <span
+      ref={boxRef}
+      className={className}
+      title={title ?? words[0]}
+      aria-hidden={ariaHidden}
+    >
+      {format
+        ? format(words[Math.min(chosen, words.length - 1)])
+        : words[Math.min(chosen, words.length - 1)]}
     </span>
   );
 }

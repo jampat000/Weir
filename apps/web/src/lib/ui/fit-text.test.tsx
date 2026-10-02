@@ -1,7 +1,18 @@
 import { render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { FitText, narrowing } from "./fit-text";
+import { FitText, nameWords, narrowing } from "./fit-text";
+
+describe("a name that narrows", () => {
+  it("drops its last word at a time, never part of one", () => {
+    expect(nameWords("Check media managers")).toEqual([
+      "Check media managers",
+      "Check media",
+      "Check",
+    ]);
+    expect(nameWords("Scan")).toEqual(["Scan"]);
+  });
+});
 
 describe("words that narrow", () => {
   const parts = [

@@ -34,14 +34,20 @@ export function canvasMeasure(font: string): MeasureText | null {
   };
 }
 
+/** The fullest of the words that fit a line `room` px wide, or undefined where none does. */
+export function fittingWords(
+  words: readonly string[],
+  room: number,
+  measure: MeasureText,
+): string | undefined {
+  return words.find((candidate) => measure(candidate) <= room - LINE_MARGIN_PX);
+}
+
 /** The words for a line `room` px wide: the fullest that fit, else the shortest. */
 export function lineWords(
   words: readonly string[],
   room: number,
   measure: MeasureText,
 ): string {
-  return (
-    words.find((candidate) => measure(candidate) <= room - LINE_MARGIN_PX) ??
-    words[words.length - 1]
-  );
+  return fittingWords(words, room, measure) ?? words[words.length - 1];
 }
