@@ -9,7 +9,6 @@ import {
 } from "./fixtures/connections.mjs";
 import {
   initialDirectPlayDevices,
-  initialMetadataProvider,
   initialOperatorSettings,
   initialSuiteSettings,
   initialUpdateSettings,
@@ -78,7 +77,6 @@ export function createStore({
     suite: initialSuiteSettings(),
     operator: initialOperatorSettings(),
     updateSettings: initialUpdateSettings(),
-    metadataProvider: initialMetadataProvider(),
     directPlay: initialDirectPlayDevices(),
     session: {
       signedIn: true,

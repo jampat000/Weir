@@ -41,7 +41,6 @@ export const processingKeys = {
   operatorSettings: ["processing", "operator-settings"] as const,
   runtimeSettings: ["processing", "runtime-settings"] as const,
   maintenance: ["processing", "maintenance"] as const,
-  metadataProvider: ["processing", "metadata-provider"] as const,
   directPlayDevices: ["processing", "direct-play-devices"] as const,
   libraries: ["processing", "libraries"] as const,
   ruleSets: ["processing", "rule-sets"] as const,

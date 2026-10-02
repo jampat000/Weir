@@ -12,14 +12,8 @@ function countOn(values: boolean[]): number {
   return values.filter(Boolean).length;
 }
 
-/** Keep the title's original spoken language as well; it needs a metadata provider to know it. */
-export function OriginalLanguageFold({
-  binding,
-  providerName,
-}: {
-  binding: RuleSetBinding;
-  providerName: string;
-}) {
+/** Keep the title's original spoken language as well; Weir looks it up for each title itself. */
+export function OriginalLanguageFold({ binding }: { binding: RuleSetBinding }) {
   const { draft, change, disabled } = binding;
   return (
     <RuleFold
@@ -32,11 +26,7 @@ export function OriginalLanguageFold({
         binding={binding}
         name="keep_original_language"
         label="Keep the original language"
-        detail={
-          providerName
-            ? `Uses ${providerName.toUpperCase()} when it can identify the title.`
-            : "Requires a metadata provider, set up in Setup › Rules › Metadata & artwork."
-        }
+        detail="Weir looks up each title's original language itself."
       />
       {draft.keep_original_language ? (
         <div className="mm-rule-indent space-y-3">

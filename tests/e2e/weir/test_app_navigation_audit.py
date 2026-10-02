@@ -41,7 +41,6 @@ SETUP_AREAS = (
         "/setup/rules",
         (
             ("Profiles", "/setup/rules", "processing-rule-set-workspace"),
-            ("Metadata & artwork", "/setup/rules/metadata", "processing-metadata-tab"),
             ("Playback devices", "/setup/rules/devices", "processing-direct-play-section"),
         ),
     ),

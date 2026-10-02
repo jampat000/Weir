@@ -4,6 +4,7 @@ import { Navigate, type RouteObject } from "react-router-dom";
 import {
   SETUP_AREAS,
   type SetupArea,
+  type SetupAreaId,
   type SetupTabId,
 } from "../lib/settings/setup-areas";
 
@@ -37,10 +38,6 @@ const SETUP_TAB_PAGES: Record<SetupTabId, () => Promise<TabComponent>> = {
     Component: (await import("../pages/settings/tabs/rules/profiles-tab"))
       .ProfilesTab,
   }),
-  metadata: async () => ({
-    Component: (await import("../pages/settings/tabs/rules/metadata-tab"))
-      .MetadataTab,
-  }),
   devices: async () => ({
     Component: (await import("../pages/settings/tabs/rules/devices-tab"))
       .DevicesTab,
@@ -57,6 +54,11 @@ const SETUP_TAB_PAGES: Record<SetupTabId, () => Promise<TabComponent>> = {
     Component: (await import("../pages/settings/tabs/performance/timers-tab"))
       .TimersTab,
   }),
+};
+
+/** Tabs a setup area used to have, by area. Their addresses lead to the area, so a bookmark does not land on Not found. */
+const RETIRED_TABS: Partial<Record<SetupAreaId, readonly string[]>> = {
+  rules: ["metadata"],
 };
 
 /**
@@ -87,6 +89,10 @@ function routesForArea(area: SetupArea, errorElement: ReactNode): RouteObject {
         path: tab.id,
         lazy: SETUP_TAB_PAGES[tab.id],
         errorElement,
+      })),
+      ...(RETIRED_TABS[area.id] ?? []).map((tabId): RouteObject => ({
+        path: tabId,
+        element: <Navigate to={area.path} replace />,
       })),
     ],
   };

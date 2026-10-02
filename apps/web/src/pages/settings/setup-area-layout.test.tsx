@@ -33,9 +33,6 @@ vi.mock("./tabs/media-managers/download-clients-tab", () => ({
 vi.mock("./tabs/rules/profiles-tab", () => ({
   ProfilesTab: () => <div>Profiles content</div>,
 }));
-vi.mock("./tabs/rules/metadata-tab", () => ({
-  MetadataTab: () => <div>Metadata content</div>,
-}));
 vi.mock("./tabs/rules/devices-tab", () => ({
   DevicesTab: () => <div>Devices content</div>,
 }));
@@ -119,11 +116,7 @@ describe("a setup area", () => {
       "Connections sections",
       ["Media managers", "Download clients", "Alerts"],
     ],
-    [
-      "/setup/rules",
-      "Rules sections",
-      ["Profiles", "Metadata & artwork", "Playback devices"],
-    ],
+    ["/setup/rules", "Rules sections", ["Profiles", "Playback devices"]],
     [
       "/setup/performance",
       "Performance sections",
@@ -141,12 +134,19 @@ describe("a setup area", () => {
   });
 
   it("opens the tab the address names, so a bookmark lands where it was made", async () => {
-    await renderAt("/setup/rules/metadata");
+    await renderAt("/setup/rules/devices");
 
     expect(
-      screen.getByRole("tab", { name: "Metadata & artwork" }),
+      screen.getByRole("tab", { name: "Playback devices" }),
     ).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByRole("tabpanel")).toHaveTextContent("Metadata content");
+    expect(screen.getByRole("tabpanel")).toHaveTextContent("Devices content");
+  });
+
+  it("sends the address of the retired Metadata & artwork tab to the area's first tab", async () => {
+    const router = await renderAt("/setup/rules/metadata");
+
+    expect(router.state.location.pathname).toBe("/setup/rules");
+    expect(screen.getByRole("tabpanel")).toHaveTextContent("Profiles content");
   });
 
   it("moves to a tab through the address, so Back and Forward follow it", async () => {

@@ -7,7 +7,6 @@ import * as authQueries from "../../../../lib/auth/queries";
 import * as librariesApi from "../../../../lib/processing/libraries-api";
 import * as ruleSetsApi from "../../../../lib/processing/rule-sets-api";
 import type { ProcessingRuleSet } from "../../../../lib/processing/rule-sets-api";
-import * as providerApi from "../../../../lib/processing/metadata-provider-api";
 import { ProfilesTab } from "./profiles-tab";
 
 const ruleSet: ProcessingRuleSet = {
@@ -79,13 +78,6 @@ function stubEditableProfile() {
     data: { role: "operator" },
   } as ReturnType<typeof authQueries.useMeQuery>);
   vi.spyOn(ruleSetsApi, "fetchProcessingRuleSets").mockResolvedValue([ruleSet]);
-  vi.spyOn(providerApi, "fetchProcessingMetadataProvider").mockResolvedValue({
-    provider: "",
-    base_url: "https://api.themoviedb.org/3",
-    key_configured: false,
-    known_providers: ["tmdb"],
-    artwork_enabled: true,
-  });
 }
 
 it("lays the profile out as audio, subtitles, original language and cleanup, with track ordering on request", async () => {
@@ -220,6 +212,20 @@ it("saves every edited rule with the profile", async () => {
   expect(sentRuleSet).not.toHaveProperty("updated_at");
 });
 
+it("says Weir looks up each title's original language itself, with no provider or key to set up", async () => {
+  stubEditableProfile();
+
+  render(<ProfilesTab />, { wrapper });
+
+  await screen.findByRole("heading", { name: "Audio" });
+
+  expect(
+    screen.getByText("Weir looks up each title's original language itself."),
+  ).toBeInTheDocument();
+  expect(screen.queryByText(/provider/i)).not.toBeInTheDocument();
+  expect(screen.queryByText(/API key/i)).not.toBeInTheDocument();
+});
+
 it("shows a load error when the profiles fail to load", async () => {
   vi.spyOn(authQueries, "useMeQuery").mockReturnValue({
     data: { role: "operator" },
@@ -227,13 +233,6 @@ it("shows a load error when the profiles fail to load", async () => {
   vi.spyOn(ruleSetsApi, "fetchProcessingRuleSets").mockRejectedValue(
     new Error("network down"),
   );
-  vi.spyOn(providerApi, "fetchProcessingMetadataProvider").mockResolvedValue({
-    provider: "",
-    base_url: "https://api.themoviedb.org/3",
-    key_configured: false,
-    known_providers: ["tmdb"],
-    artwork_enabled: true,
-  });
 
   render(<ProfilesTab />, { wrapper });
 
@@ -250,13 +249,6 @@ it("asks before switching profiles with unsaved edits, and keeps them when told 
     ruleSet,
     { ...ruleSet, id: 5, name: "TV shows", used_by_library_count: 0 },
   ]);
-  vi.spyOn(providerApi, "fetchProcessingMetadataProvider").mockResolvedValue({
-    provider: "",
-    base_url: "https://api.themoviedb.org/3",
-    key_configured: false,
-    known_providers: ["tmdb"],
-    artwork_enabled: true,
-  });
 
   render(<ProfilesTab />, { wrapper });
 

@@ -41,13 +41,32 @@ describe("the simulated artwork", () => {
     expect(reply.status).toBe(404);
   });
 
-  it("takes every address away once artwork is switched off", () => {
-    const { sim } = simWithOneFile();
-    sim.store.metadataProvider.artwork_enabled = false;
+  it("answers the deprecated metadata-provider settings the way the server does, and ignores a save", () => {
+    const { sim } = createTestSim();
 
-    const { body } = ask(sim, "GET", "/api/v1/processing/files");
+    const saved = ask(sim, "PUT", "/api/v1/processing/metadata-provider", {
+      provider: "tmdb",
+      api_key: "a-key",
+      artwork_enabled: false,
+    });
+    const read = ask(sim, "GET", "/api/v1/processing/metadata-provider");
 
-    expect(body.files[0].poster_url).toBeNull();
+    for (const reply of [saved, read])
+      expect(reply.body).toEqual({
+        provider: "deluno-gateway",
+        base_url: null,
+        key_configured: false,
+        known_providers: ["deluno-gateway"],
+        artwork_enabled: true,
+      });
+  });
+
+  it("says the metadata service answers when the deprecated test is run", () => {
+    const { sim } = createTestSim();
+
+    const { body } = ask(sim, "POST", "/api/v1/processing/metadata-provider/test");
+
+    expect(body.status).toBe("matched");
   });
 
   it("puts the address on the entries a finished file wrote", () => {

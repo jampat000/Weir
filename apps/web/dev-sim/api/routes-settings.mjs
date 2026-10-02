@@ -2,6 +2,7 @@
 import {
   initialDirectPlayDevices,
   maintenanceFamilies,
+  metadataProvider,
 } from "../fixtures/settings.mjs";
 import { shaped } from "../openapi/skeleton.mjs";
 import { addBackup } from "../store.mjs";
@@ -57,18 +58,12 @@ export function registerSettingsRoutes(router) {
     schemaName: "UpdateSettingsOut",
     record: (sim) => sim.store.updateSettings,
   });
-  registerSingleton(router, {
-    path: "/api/v1/processing/metadata-provider",
-    schemaName: "MetadataProviderOut",
-    record: (sim) => sim.store.metadataProvider,
-  });
-  router.post("/api/v1/processing/metadata-provider/test", ({ sim }) => ({
-    status: sim.store.metadataProvider.key_configured
-      ? "matched"
-      : "not_configured",
-    detail: sim.store.metadataProvider.key_configured
-      ? "The provider answered."
-      : "No provider is set up.",
+  // Deprecated: nothing is saved, and what is sent is ignored, as on the server.
+  router.get("/api/v1/processing/metadata-provider", () => metadataProvider());
+  router.put("/api/v1/processing/metadata-provider", () => metadataProvider());
+  router.post("/api/v1/processing/metadata-provider/test", () => ({
+    status: "matched",
+    detail: "Weir reached Deluno's metadata service.",
   }));
 
   router.get("/api/v1/processing/direct-play/devices", ({ sim }) =>

@@ -11,14 +11,7 @@ const SINTEL = {
 };
 
 function artwork() {
-  let on = true;
-  const instance = new Artwork({ titles: [SINTEL], isEnabled: () => on });
-  return {
-    instance,
-    switchOff: () => {
-      on = false;
-    },
-  };
+  return { instance: new Artwork({ titles: [SINTEL] }) };
 }
 
 describe("the simulation's artwork", () => {
@@ -33,13 +26,6 @@ describe("the simulation's artwork", () => {
 
     expect(instance.urlFor(null)).toBeNull();
     expect(instance.urlFor("movie-nothing-1999")).toBeNull();
-  });
-
-  it("gives no address once artwork is switched off in Settings", () => {
-    const { instance, switchOff } = artwork();
-    switchOff();
-
-    expect(instance.urlFor(SINTEL.id)).toBeNull();
   });
 
   it("draws a poster for a title whose real one has not arrived", () => {

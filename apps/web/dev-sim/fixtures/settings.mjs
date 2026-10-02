@@ -88,12 +88,13 @@ export function updateStatus() {
   });
 }
 
-export function initialMetadataProvider() {
+/** What the deprecated metadata-provider settings always say: Weir needs nothing set up to look titles up. */
+export function metadataProvider() {
   return shaped("MetadataProviderOut", {
-    provider: "",
-    base_url: "",
+    provider: "deluno-gateway",
+    base_url: null,
     key_configured: false,
-    known_providers: ["tmdb"],
+    known_providers: ["deluno-gateway"],
     artwork_enabled: true,
   });
 }

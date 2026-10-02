@@ -242,12 +242,11 @@ export function weirTasks(context) {
       label: "Configuration backup check",
       create: () => backupTask(context),
     });
-  if (store.metadataProvider.artwork_enabled)
-    wanted.push({
-      key: TASK_KEY.ARTWORK,
-      label: "Look up artwork",
-      create: () => lookupTask(context, () => ARTWORK_SECONDS),
-    });
+  wanted.push({
+    key: TASK_KEY.ARTWORK,
+    label: "Look up artwork",
+    create: () => lookupTask(context, () => ARTWORK_SECONDS),
+  });
   wanted.push({
     key: TASK_KEY.UPDATE,
     label: "Check for updates",

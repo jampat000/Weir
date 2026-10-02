@@ -1,4 +1,4 @@
-/* Settings › Rules: a profile's layout, its switches, the track-order editor and the provider form. */
+/* Settings › Rules: a profile's layout, its switches and the track-order editor. */
 
 .mm-profile-body {
   margin-top: 1rem;
@@ -130,17 +130,6 @@
   color: var(--mm-text2);
   font-size: 0.75rem;
   line-height: 1rem;
-}
-
-.mm-provider-clear-key {
-  display: flex;
-  align-items: center;
-  align-self: flex-end;
-  gap: 0.5rem;
-  padding: 0.5rem 0;
-  color: var(--mm-text2);
-  font-size: 0.875rem;
-  line-height: 1.25rem;
 }
 
 /* Settings › Rules › Try on a file. */

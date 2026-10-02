@@ -7,7 +7,6 @@ export type SetupTabId =
   | "download-clients"
   | "alerts"
   | "profiles"
-  | "metadata"
   | "devices"
   | "speed"
   | "cleanup"
@@ -87,7 +86,6 @@ export const SETUP_AREAS: readonly SetupArea[] = [
     "What to keep and what to take out of every file",
     [
       ["profiles", "Profiles"],
-      ["metadata", "Metadata & artwork"],
       ["devices", "Playback devices"],
     ],
   ),

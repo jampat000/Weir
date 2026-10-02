@@ -23,7 +23,6 @@ class AuditSettingsMixin:
             },
             "Rules": {
                 "Profiles": "processing-rule-set-workspace",
-                "Metadata & artwork": "processing-metadata-tab",
                 "Playback devices": "processing-direct-play-section",
             },
             "Performance": {

@@ -9,20 +9,18 @@ export class Artwork {
   #titles = new Map();
   /** The posters fetched from the metadata service so far; every other title is drawn. @type {Map<string, import("./gateway-posters.mjs").PosterImage>} */
   #fetched = new Map();
-  #isEnabled;
 
   /**
-   * @param {{ titles: readonly (import("./poster-id.mjs").PosterTitle & { id: string })[], isEnabled: () => boolean }} options `isEnabled` says whether artwork is switched on in Settings.
+   * @param {{ titles: readonly (import("./poster-id.mjs").PosterTitle & { id: string })[] }} options
    */
-  constructor({ titles, isEnabled }) {
+  constructor({ titles }) {
     for (const { id, title, year } of titles)
       this.#titles.set(id, { title, year });
-    this.#isEnabled = isEnabled;
   }
 
-  /** The address of a title's poster, or null when it has none or artwork is switched off. @param {string | null | undefined} id */
+  /** The address of a title's poster, or null when it has none. @param {string | null | undefined} id */
   urlFor(id) {
-    return id && this.#isEnabled() && this.#titles.has(id)
+    return id && this.#titles.has(id)
       ? `${POSTER_PATH}/${id}`
       : null;
   }

@@ -20,7 +20,7 @@ describe("setup areas", () => {
     ).toEqual([
       ["Workflows", ["Workflows", "Schedule"]],
       ["Connections", ["Media managers", "Download clients", "Alerts"]],
-      ["Rules", ["Profiles", "Metadata & artwork", "Playback devices"]],
+      ["Rules", ["Profiles", "Playback devices"]],
       ["Performance", ["Speed", "Cleanup", "Weir's timers"]],
     ]);
   });
@@ -44,7 +44,6 @@ describe("setup areas", () => {
       "/setup/workflows/schedule",
       "/setup/connections/download-clients",
       "/setup/connections/alerts",
-      "/setup/rules/metadata",
       "/setup/rules/devices",
       "/setup/performance/cleanup",
       "/setup/performance/timers",

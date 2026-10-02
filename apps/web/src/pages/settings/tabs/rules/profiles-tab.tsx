@@ -19,7 +19,6 @@ import {
   useProcessingRuleSetsQuery,
   useUpdateProcessingRuleSet,
 } from "../../../../lib/processing/libraries-queries";
-import { useProcessingMetadataProviderQuery } from "../../../../lib/processing/metadata-provider-queries";
 import { mmActionButtonClass } from "../../../../lib/ui/mm-control-roles";
 import { plural } from "../../../../lib/ui/mm-plural";
 import { SaveModelNote } from "../../save-model-note";
@@ -98,7 +97,6 @@ export function ProfilesTab() {
   const createRuleSet = useCreateProcessingRuleSet();
   const updateRuleSet = useUpdateProcessingRuleSet();
   const deleteRuleSet = useDeleteProcessingRuleSet();
-  const provider = useProcessingMetadataProviderQuery();
   const editable = canEdit(me.data?.role);
 
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -142,10 +140,10 @@ export function ProfilesTab() {
   useUnsavedChanges(dirtyThing);
   const { confirmLeave, dialog: leaveDialog } = useLeaveConfirmation();
 
-  if (ruleSets.isPending || provider.isPending || me.isPending) {
+  if (ruleSets.isPending || me.isPending) {
     return <PageLoading label="Loading profiles" />;
   }
-  if (ruleSets.isError || provider.isError) {
+  if (ruleSets.isError) {
     return <SettingsLoadError what="profiles" />;
   }
 
@@ -253,7 +251,6 @@ export function ProfilesTab() {
           <div className="mm-profile-body space-y-5">
             <ProfileRules
               binding={binding}
-              providerName={provider.data?.provider === "tmdb" ? "tmdb" : ""}
               editable={editable}
               resetKey={String(switches)}
             />

@@ -42,10 +42,7 @@ export function createSim({
   const startedAt = now();
   const store = createStore({ scenario, startedAt });
   const libraryFiles = new LibraryFiles(startedAt);
-  const artwork = new Artwork({
-    titles: posterTitles(),
-    isEnabled: () => store.metadataProvider.artwork_enabled,
-  });
+  const artwork = new Artwork({ titles: posterTitles() });
   const engine = new Engine({
     rng: createRng(seed),
     speed,
