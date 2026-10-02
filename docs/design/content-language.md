@@ -14,7 +14,7 @@ lives beside them:
 | Setup areas        | `apps/web/src/pages/settings/setup-area-layout.tsx`  | `weir-content.css` only |
 | System             | `apps/web/src/pages/system/system-page.tsx`      | `weir-content.css` only |
 
-All of them sit under `apps/web/src/styles/` and are imported by `apps/web/src/index.css`. Colours,
+All of them sit under `apps/web/src/styles/` and are imported by `apps/web/src/styles/weir.css`, which `main.tsx` loads after `index.css`. Colours,
 type sizes and spacing come from `weir-tokens.css` only.
 
 ---
@@ -112,7 +112,7 @@ waiting." and so on). A loading or failed load uses the same slot.
 Read this before debugging a style that does nothing.
 
 `apps/web/src/index.css` starts with `@import "tailwindcss"`, and Tailwind v4 emits every utility
-inside `@layer utilities`. The `weir-*.css` files are imported after it and are unlayered. Cascade
+inside `@layer utilities`. The `weir-*.css` files are loaded after it (through `styles/weir.css`, deliberately outside Tailwind's own processing, see the comment there) and are unlayered. Cascade
 layers are resolved before specificity, and an unlayered declaration outranks a declaration in any
 layer. So a Tailwind utility on an element that also carries a `weir-*` class never applies to a
 property that class sets, and fails silently.

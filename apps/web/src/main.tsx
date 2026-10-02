@@ -14,6 +14,7 @@ import {
   followSystemAppTheme,
 } from "./lib/ui/app-theme";
 import "./index.css";
+import "./styles/weir.css";
 
 applyAppThemeToDocument(currentAppTheme());
 followSystemAppTheme();
