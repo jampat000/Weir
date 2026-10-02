@@ -71,6 +71,11 @@ const BAND_MAX_PX = 200;
 const BAND_SHARE = 0.2;
 /** Spare height goes to the band, up to this tall. */
 const BAND_GROWN_MAX_PX = 240;
+/**
+ * A lower row that has what it needs gives the band spare height beyond BAND_GROWN_MAX_PX, once the Pipeline's cards
+ * are at their tallest, up to this. The band's tiles list only whole rows, so they list more and the chart grows.
+ */
+export const BAND_TALL_MAX_PX = 360;
 const LOW_MIN_PX = 180;
 /**
  * Once the band and the Pipeline are at their least, the lower row gives way too, down to this: the window is that
@@ -117,7 +122,7 @@ export type GridNeeds = {
  *
  * Spare height is shared once the lower row has what it needs. Told what the lower row can use (`lowNeed`, the
  * shelf's posters being capped by width rather than by height), the lower row keeps that much, at least 180px, and
- * gives the rest first to the Pipeline, whose cards grow up to the 130px step, then to the band, up to 240px; what
+ * gives the rest first to the Pipeline, whose cards grow up to the 130px step, then to the band, up to 360px; what
  * neither can take stays with the lower row. A lower row at or under its need gives nothing. Not told, the band
  * takes spare up to 240px while the lower row keeps 260px, and the lower row takes at most a third of the grid (at
  * least 260px): the rest grows the Pipeline's cards. Unmeasured, it is a roomy page.
@@ -137,8 +142,8 @@ export function gridRows(
     board = Math.max(BOARD_MIN_PX, avail - band - LOW_MIN_PX);
   }
   let low = avail - band - board;
-  const growBand = (keep: number) => {
-    const grow = Math.min(low - keep, BAND_GROWN_MAX_PX - band);
+  const growBand = (keep: number, max: number) => {
+    const grow = Math.min(low - keep, max - band);
     if (grow > 0) {
       band += grow;
       low -= grow;
@@ -152,12 +157,12 @@ export function gridRows(
     }
   };
   if (lowNeed === undefined) {
-    growBand(LOW_ROOMY_PX);
+    growBand(LOW_ROOMY_PX, BAND_GROWN_MAX_PX);
     growBoard(Math.max(LOW_ROOMY_PX, Math.round(avail * LOW_SHARE_CAP)));
   } else {
     const keep = Math.max(LOW_MIN_PX, lowNeed);
     growBoard(keep);
-    growBand(keep);
+    growBand(keep, BAND_TALL_MAX_PX);
   }
   band = Math.round(band);
   board = Math.round(board);

@@ -19,6 +19,7 @@ import type { FinishedFile } from "../../../lib/activity/processing-outcome";
 import { useElementSize } from "../../../lib/ui/use-element-size";
 import type { Filter } from "../processing-filter";
 import { useFinishedAnnouncement } from "../use-finished-files";
+import { canvasMeasure, captionFont, type MeasureText } from "./caption-fit";
 import {
   shelfFit,
   shelfRowNeed,
@@ -54,6 +55,8 @@ export type JustFinishedShelfProps = {
    * space under the tiles, which the page can give to something else.
    */
   onHeightNeed?: (px: number) => void;
+  /** Measures a line in the caption's font, in place of the canvas the page measures with. */
+  measureText?: MeasureText;
 };
 
 export function JustFinishedShelf({
@@ -66,6 +69,7 @@ export function JustFinishedShelf({
   count,
   onOpen,
   onHeightNeed,
+  measureText,
 }: JustFinishedShelfProps): ReactElement {
   const [chosen, setChosen] = useState<number | null>(readShelfWorkflow);
   const chips = useMemo(
@@ -118,6 +122,21 @@ export function JustFinishedShelf({
       );
     }
   }, [shelfSize.width, shelfSize.height, onHeightNeed]);
+  const [measured, setMeasured] = useState<MeasureText | null>(null);
+  // Lines are measured in the caption's own font, read before paint and again when the fonts arrive.
+  useLayoutEffect(() => {
+    const host = box.current;
+    if (!host) return undefined;
+    let live = true;
+    const read = () => {
+      if (live) setMeasured(() => canvasMeasure(captionFont(host)));
+    };
+    read();
+    void document.fonts?.ready.then(read);
+    return () => {
+      live = false;
+    };
+  }, []);
   const countWords =
     picked === null && count !== undefined && !shelf.latest
       ? count
@@ -141,6 +160,7 @@ export function JustFinishedShelf({
             tilesShown={fit?.across ?? null}
             caption={fit?.caption ?? "compact"}
             tileWidth={fit?.width ?? null}
+            measure={measureText ?? measured}
             boxRef={box}
             onOpen={onOpen}
           />

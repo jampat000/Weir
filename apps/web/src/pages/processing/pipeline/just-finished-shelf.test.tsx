@@ -411,6 +411,38 @@ describe("the size of the tiles", () => {
       expect(screen.getByText("3 min ago")).toBeInTheDocument();
     });
 
+    it("keeps the saving alone where it and when do not fit the poster, and the time stays in the tile's name", () => {
+      rowOf(229, 570);
+
+      // 5px a character, and 6px where there is a dot: "−318 MB · 3 min ago" is 114px, wider than the 102px poster.
+      render(
+        shelf(files, {
+          measureText: (text) => text.length * (text.includes("·") ? 6 : 5),
+        }),
+      );
+
+      const caption = captionOf(0);
+      expect(
+        [...(caption?.querySelectorAll("small") ?? [])].map(
+          (line) => line.textContent,
+        ),
+      ).toEqual(["2 audio, 4 subtitles removed", "−318 MB"]);
+      expect(
+        screen.getAllByRole("button", { name: /S01E01/ })[0],
+      ).toHaveAccessibleName(
+        "The Quiet Harbour S01E01 (TV): 2 audio, 4 subtitles removed, 3 min ago",
+      );
+    });
+
+    it("falls back to the compact caption, and the poster's badge, for a tile that cannot say even its saving", () => {
+      rowOf(229, 570);
+
+      render(shelf(files, { measureText: (text) => text.length * 20 }));
+
+      expect(captionOf(0)).not.toHaveClass("mm-shelf__caption--full");
+      expect(screen.getAllByText("−318 MB")).toHaveLength(5);
+    });
+
     it("is the compact caption on posters too small for the badge, however much room there is", () => {
       // 300px wide holds five 48px posters, narrower than a poster that can wear a full caption.
       rowOf(400, 300);

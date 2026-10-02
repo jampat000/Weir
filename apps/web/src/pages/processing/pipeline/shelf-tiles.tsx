@@ -13,24 +13,37 @@ import { Poster, workflowHue } from "../../../components/shared/poster";
 import type { FinishedFile } from "../../../lib/activity/processing-outcome";
 import { classNames } from "../../../lib/ui/class-names";
 import { SHELF_TILE_ATTRIBUTE } from "./delivery-flight";
+import {
+  fullCaptionLines,
+  type FullCaptionLines,
+  type MeasureText,
+} from "./caption-fit";
 import { posterSize, type CaptionTier } from "./shelf-layout";
 import type { ShelfTile } from "./shelf-model";
 import { useOpenSlots } from "./shelf-slots";
 import { TILE_KEY_ATTRIBUTE, useSlideNeighbours } from "./use-slide-neighbours";
 import { useTileArrivals } from "./use-tile-arrivals";
 
+/** Where text cannot be measured, as in a test, everything is taken to fit. */
+const FITS_ANYTHING: MeasureText = () => 0;
+
 function Tile({
   tile,
   caption,
+  lines,
   small,
   onOpen,
 }: {
   tile: ShelfTile;
+  /** What goes under the tile: the full caption only where `lines` could be drawn for it. */
   caption: CaptionTier;
+  /** What the full caption says of this tile; null where it will not fit and the caption is the compact one. */
+  lines: FullCaptionLines | null;
   /** The poster is too small for the saved badge and the workflow's whole tag. */
   small: boolean;
   onOpen: (item: FinishedFile) => void;
 }) {
+  const tier = caption === "full" && lines === null ? "compact" : caption;
   const when = tile.ago ? `, ${tile.ago}` : "";
   const workflow = tile.workflowKnown ? ` (${tile.workflow})` : "";
   const library = tile.item.libraryId;
@@ -71,18 +84,18 @@ function Tile({
             title={tile.title}
             workflow={tile.workflow}
           />
-          {tile.saved && !small && caption !== "full" ? (
+          {tile.saved && !small && tier !== "full" ? (
             <span className="mm-shelf__saved">{tile.saved}</span>
           ) : null}
         </span>
-        {caption === "full" ? (
+        {tier === "full" && lines ? (
           <span className="mm-shelf__caption mm-shelf__caption--full">
             {tile.title}
-            <small className="mm-shelf__outcome">{tile.outcome}</small>
-            <small>{tile.savedAgo}</small>
+            <small className="mm-shelf__outcome">{lines.outcome}</small>
+            <small>{lines.last}</small>
           </span>
         ) : null}
-        {caption === "compact" ? (
+        {tier === "compact" ? (
           <span className="mm-shelf__caption">
             {tile.title}
             <small>
@@ -112,6 +125,7 @@ export function ShelfTiles({
   tilesShown,
   caption,
   tileWidth,
+  measure,
   boxRef,
   onOpen,
 }: {
@@ -121,6 +135,8 @@ export function ShelfTiles({
   caption: CaptionTier;
   /** The tile width the shelf's height allows; unset until it is measured. */
   tileWidth: number | null;
+  /** Measures a line in the caption's font, to see what fits under a poster; null where it cannot be measured. */
+  measure: MeasureText | null;
   boxRef: RefObject<HTMLUListElement | null>;
   onOpen: (item: FinishedFile) => void;
 }): ReactElement {
@@ -146,6 +162,11 @@ export function ShelfTiles({
           key={tile.key}
           tile={tile}
           caption={caption}
+          lines={
+            caption === "full" && tileWidth !== null
+              ? fullCaptionLines(tile, tileWidth, measure ?? FITS_ANYTHING)
+              : null
+          }
           small={small}
           onOpen={onOpen}
         />

@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import tokens from "../../../styles/weir-tokens.css?raw";
 import {
   BOARD_CHROME_PX,
+  BAND_TALL_MAX_PX,
   BOARD_PX,
   GRID_AREAS,
   GRID_COLUMNS,
@@ -120,15 +121,26 @@ describe("the shared page grid", () => {
       });
     });
 
-    it("leaves what neither takes with the lower row", () => {
+    it("gives the band spare height beyond 240px, once the Pipeline's cards are at their tallest", () => {
+      expect(BAND_TALL_MAX_PX).toBe(360);
+      // 1315px: the Pipeline takes its 108px, the band 160px (200 to 360px), and the lower row keeps 425px.
       expect(gridRows(1315, { lowNeed: 300 })).toEqual({
-        band: 240,
+        band: 360,
         board: 506,
-        low: 545,
-        template: "240px 506px 545px",
+        low: 425,
+        template: "360px 506px 425px",
       });
-      // The same rows as without the need, where the third cap already gave the cards all they can take.
-      expect(gridRows(1315, { lowNeed: 300 })).toEqual(gridRows(1315));
+      // Not told, the band stops at 240px as it did.
+      expect(gridRows(1315)).toMatchObject({ band: 240, board: 506, low: 545 });
+    });
+
+    it("leaves what neither takes with the lower row", () => {
+      expect(gridRows(1800, { lowNeed: 300 })).toEqual({
+        band: 360,
+        board: 506,
+        low: 910,
+        template: "360px 506px 910px",
+      });
     });
 
     it("changes nothing for a lower row already at or under its need", () => {
