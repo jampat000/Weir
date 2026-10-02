@@ -1,5 +1,5 @@
 /**
- * How a Settings panel saves: every change on its own the moment it is made, or nothing until Save.
+ * How a setup panel saves: every change on its own the moment it is made, or nothing until Save.
  * Each panel says which at its top, so nobody has to guess whether leaving loses anything.
  */
 export type SaveModel = "instant" | "explicit";

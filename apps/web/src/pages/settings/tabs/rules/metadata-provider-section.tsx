@@ -13,13 +13,13 @@ import {
   mmActionButtonClass,
   mmCheckboxControlClass,
 } from "../../../../lib/ui/mm-control-roles";
-import { ArtworkSetting } from "./artwork-setting";
+import { SaveModelNote } from "../../save-model-note";
 
 type ProviderName = "" | "tmdb";
 
 export type ProviderDraft = ReturnType<typeof useProviderDraft>;
 
-/** The provider form, kept by the Rules tab because the original-language rule names the provider too. */
+/** The provider form: what is typed in it, until it is saved or tested. */
 export function useProviderDraft(
   saved: ProcessingMetadataProvider | undefined,
 ) {
@@ -132,11 +132,13 @@ export function MetadataProviderSection({
         </>
       }
     >
-      <ArtworkSetting saved={saved} editable={editable} />
-      <p className="mm-quiet-note mt-4">
-        Only needed by profiles that keep a title&apos;s original language. Weir
-        falls back safely when metadata is unavailable.
-      </p>
+      <div className="mm-quiet-stack">
+        <SaveModelNote model="explicit" />
+        <p className="mm-quiet-note">
+          Only needed by profiles that keep a title&apos;s original language.
+          Weir falls back safely when metadata is unavailable.
+        </p>
+      </div>
 
       {open ? (
         <div className="mt-5 border-t border-mm-border pt-5">

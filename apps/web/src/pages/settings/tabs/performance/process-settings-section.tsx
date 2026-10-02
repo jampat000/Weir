@@ -22,7 +22,7 @@ import { SettingsLoadError } from "../../settings-load-error";
 const FILES_AT_ONCE = Array.from({ length: 10 }, (_, i) => i + 1);
 
 /**
- * Settings › Performance: how hard Weir works. The cleanup switches are on Cleanup, each beside its own timer.
+ * Setup › Performance: how hard Weir works. The cleanup switches are on Cleanup, each beside its own timer.
  */
 export function ProcessSettingsSection() {
   const me = useMeQuery();

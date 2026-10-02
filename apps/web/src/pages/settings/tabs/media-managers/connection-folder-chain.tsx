@@ -16,6 +16,7 @@ import {
   useConnectionFolderChainQuery,
   useProcessingLibrariesQuery,
 } from "../../../../lib/processing/libraries-queries";
+import { workflowEditorPath } from "../../../../lib/settings/setup-areas";
 
 function libraryName(
   libraries: { id: number; name: string }[] | undefined,
@@ -78,7 +79,7 @@ export function ConnectionFolderChain({
             </span>{" "}
             <Link
               className="mm-quiet-link"
-              to={`/settings?tab=libraries&edit=${entry.library_id}`}
+              to={workflowEditorPath(entry.library_id)}
             >
               See its folder chain
             </Link>

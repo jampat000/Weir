@@ -151,7 +151,7 @@ it("offers From a media manager only when one is connected", async () => {
   ).toBeDisabled();
   expect(
     choice.getByRole("link", { name: /Connect Deluno, Sonarr or Radarr/ }),
-  ).toHaveAttribute("href", "/settings?tab=media-managers");
+  ).toHaveAttribute("href", "/setup/connections");
 });
 
 it("fills a new workflow's folders in from the media manager and links it, saving only on Save", async () => {
@@ -415,7 +415,7 @@ it("opens a workflow's editor from a link on another page", async () => {
   ]);
 
   render(<LibrariesTab />, {
-    wrapper: wrapperAt("/settings?tab=libraries&edit=4"),
+    wrapper: wrapperAt("/setup/workflows?edit=4"),
   });
 
   const form = await screen.findByTestId("processing-library-form");
@@ -430,7 +430,7 @@ it("opens the add choice already on the media manager it was linked from", async
   vi.spyOn(api, "fetchProcessingLibraries").mockResolvedValue([library()]);
 
   render(<LibrariesTab />, {
-    wrapper: wrapperAt("/settings?tab=libraries&addFrom=6"),
+    wrapper: wrapperAt("/setup/workflows?addFrom=6"),
   });
 
   const choice = within(await screen.findByTestId("add-workflow-choice"));

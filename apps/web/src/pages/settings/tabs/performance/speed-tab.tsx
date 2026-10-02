@@ -1,7 +1,7 @@
 import { ProcessSettingsSection } from "./process-settings-section";
 
-/** Settings › Performance: how hard Weir works. */
-export function PerformanceTab() {
+/** Setup › Performance › Speed: how hard Weir works. */
+export function SpeedTab() {
   return (
     <div className="mm-quiet-stack">
       <ProcessSettingsSection />

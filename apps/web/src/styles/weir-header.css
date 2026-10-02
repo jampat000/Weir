@@ -292,6 +292,12 @@
   gap: 8px;
 }
 
+/* The tab-owned buttons arrive through a portal into this element; it adds no box of its own, so they lay out as the
+   row's own buttons. */
+.mm-page-toolbar__slot {
+  display: contents;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .mm-page-tabs__tab {
     transition: none;

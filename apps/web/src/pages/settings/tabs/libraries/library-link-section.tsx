@@ -12,6 +12,7 @@ import {
 } from "../../../../lib/processing/workflow-story";
 import { connectionTitle } from "../../../../lib/ui/connection-title";
 import { mmActionButtonClass } from "../../../../lib/ui/mm-control-roles";
+import { setupTabPath } from "../../../../lib/settings/setup-areas";
 
 /**
  * Whether a workflow is Weir only or linked to a media manager, and how to change that. Weir only is a
@@ -108,7 +109,7 @@ function WeirOnlyOptions({
     return (
       <p className="mm-quiet-note">
         Link a media manager if one hands this workflow its downloads.{" "}
-        <Link className="mm-quiet-link" to="/settings?tab=media-managers">
+        <Link className="mm-quiet-link" to={setupTabPath("managers")}>
           Connect Deluno, Sonarr or Radarr
         </Link>{" "}
         first.

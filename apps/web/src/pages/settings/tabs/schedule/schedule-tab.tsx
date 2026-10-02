@@ -15,7 +15,6 @@ import { useLeaveConfirmation, useUnsavedChanges } from "../../unsaved-changes";
 import { LibraryHoursEditor, LibraryHoursRow } from "./library-hours";
 import { effectiveGrid } from "./schedule-model";
 import { savedZone, TimeZoneRow } from "./time-zone-row";
-import { TimersSection } from "./timers-section";
 
 /** Often enough that "open until" and "it is 14:32 there" stay true while the page is open. */
 const CLOCK_TICK_MS = 30_000;
@@ -113,10 +112,7 @@ function LibrariesSection({
   );
 }
 
-/**
- * Settings › Schedule: the time zone, a week per library with its hours editor below, and when
- * Weir's own jobs run.
- */
+/** Setup › Workflows › Schedule: the time zone, and a week per workflow with its hours editor below. */
 export function ScheduleTab() {
   const me = useMeQuery();
   const settings = useAppSettingsQuery();
@@ -150,7 +146,6 @@ export function ScheduleTab() {
         now={now}
         editable={editable}
       />
-      <TimersSection headingId={`${ids}-timers`} settings={settings.data} />
     </div>
   );
 }

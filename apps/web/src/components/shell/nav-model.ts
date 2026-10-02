@@ -1,10 +1,5 @@
-import {
-  SETTINGS_SECTIONS,
-  settingsSectionFromSearch,
-  settingsSectionPath,
-  type SettingsSectionId,
-} from "../../lib/settings/settings-sections";
 import type { NavGlyphName } from "./nav-icons";
+import { SETUP_AREAS, type SetupAreaId } from "../../lib/settings/setup-areas";
 
 /** Where the person is: the part of the address the side menu reads. */
 export type NavPlace = { pathname: string; search: string };
@@ -30,33 +25,28 @@ export type NavGroup = Readonly<{
   items: readonly NavItem[];
 }>;
 
-const SETTINGS_ICONS: Record<SettingsSectionId, NavGlyphName> = {
-  libraries: "workflows",
+const SETUP_ICONS: Record<SetupAreaId, NavGlyphName> = {
+  workflows: "workflows",
+  connections: "managers",
   rules: "rules",
-  "media-managers": "managers",
   performance: "performance",
-  schedule: "schedule",
-  cleanup: "cleanup",
-  alerts: "alerts",
 };
 
 const onPath = (prefix: string) => (place: NavPlace) =>
   place.pathname === prefix || place.pathname.startsWith(`${prefix}/`);
 
-const settingsItems: readonly NavItem[] = SETTINGS_SECTIONS.map((section) => ({
-  id: `settings-${section.id}`,
-  label: section.label,
-  eyebrow: section.eyebrow,
-  to: settingsSectionPath(section.id),
-  icon: SETTINGS_ICONS[section.id],
-  isCurrent: (place) =>
-    onPath("/settings")(place) &&
-    settingsSectionFromSearch(place.search) === section.id,
+const setupItems: readonly NavItem[] = SETUP_AREAS.map((area) => ({
+  id: `setup-${area.id}`,
+  label: area.label,
+  eyebrow: area.eyebrow,
+  to: area.path,
+  icon: SETUP_ICONS[area.id],
+  isCurrent: onPath(area.path),
 }));
 
 /**
- * The whole side menu. Setup lists Settings' sections as items of their own, so the menu is the one
- * way between them and Settings has no tab row of its own; each keeps its `/settings?tab=…` address.
+ * The whole side menu. Setup lists the four setup areas as items of their own; each area has its own tab row,
+ * so the menu is the way between areas and the tabs are the way within one.
  */
 export const NAV_GROUPS: readonly NavGroup[] = [
   {
@@ -98,7 +88,7 @@ export const NAV_GROUPS: readonly NavGroup[] = [
       },
     ],
   },
-  { id: "setup", label: "Setup", items: settingsItems },
+  { id: "setup", label: "Setup", items: setupItems },
   {
     id: "weir",
     label: "Weir",

@@ -9,10 +9,12 @@ describe("pageMeta", () => {
     ["/history", "", "History"],
     ["/library", "", "Library"],
     ["/system", "?tab=logs", "System"],
-    ["/settings", "", "Workflows"],
-    ["/settings", "?tab=rules", "Rules"],
-    ["/settings", "?tab=media-managers&library=2", "Media managers"],
-    ["/settings", "?tab=notifications", "Alerts"],
+    ["/setup/workflows", "", "Workflows"],
+    ["/setup/workflows/schedule", "", "Workflows"],
+    ["/setup/connections", "?library=2", "Connections"],
+    ["/setup/connections/alerts", "", "Connections"],
+    ["/setup/rules/metadata", "", "Rules"],
+    ["/setup/performance/timers", "", "Performance"],
   ])("titles %s%s as %s", (pathname, search, title) => {
     expect(pageMeta({ pathname, search })).toMatchObject({
       title,

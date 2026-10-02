@@ -35,8 +35,8 @@ function ArrInstructions({ name }: { name: string }) {
       >
         {name} picks up what Weir cleans through a remote path mapping from a
         workflow&apos;s watched folder to its output folder. Open that workflow
-        under Settings → Workflows: its editor shows the exact values to enter
-        and checks that {name} has them.
+        under Setup › Workflows: its editor shows the exact values to enter and
+        checks that {name} has them.
       </p>
       <p
         className="mb-3 text-mm-text2"

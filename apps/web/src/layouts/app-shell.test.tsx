@@ -112,13 +112,10 @@ describe("AppShell", () => {
       ["Dashboard", "/"],
       ["History", "/history"],
       ["Library", "/library"],
-      ["Workflows", "/settings"],
-      ["Rules", "/settings?tab=rules"],
-      ["Media managers", "/settings?tab=media-managers"],
-      ["Performance", "/settings?tab=performance"],
-      ["Schedule", "/settings?tab=schedule"],
-      ["Cleanup", "/settings?tab=cleanup"],
-      ["Alerts", "/settings?tab=alerts"],
+      ["Workflows", "/setup/workflows"],
+      ["Connections", "/setup/connections"],
+      ["Rules", "/setup/rules"],
+      ["Performance", "/setup/performance"],
       ["System", "/system"],
     ]);
   });
@@ -158,24 +155,24 @@ describe("AppShell", () => {
     expect(current()).toEqual([]);
   });
 
-  it("marks the Settings section the address names, not Settings as a whole", () => {
-    const pages = <Route path="settings" element={<div>Settings</div>} />;
+  it("marks the setup area the address names, whichever of its tabs is open", () => {
+    const pages = <Route path="setup/*" element={<div>Setup</div>} />;
     const current = () =>
       within(primaryNav())
         .getAllByRole("link")
         .filter((link) => link.getAttribute("aria-current") === "page")
         .map((link) => link.textContent);
 
-    const { unmount } = renderShell("/settings", pages);
+    const { unmount } = renderShell("/setup/workflows", pages);
     expect(current()).toEqual(["Workflows"]);
     unmount();
 
-    const second = renderShell("/settings?tab=schedules", pages);
-    expect(current()).toEqual(["Schedule"]);
+    const second = renderShell("/setup/workflows/schedule", pages);
+    expect(current()).toEqual(["Workflows"]);
     second.unmount();
 
-    renderShell("/settings?tab=alerts&library=3", pages);
-    expect(current()).toEqual(["Alerts"]);
+    renderShell("/setup/connections/alerts?library=3", pages);
+    expect(current()).toEqual(["Connections"]);
   });
 
   it("shows how many files the Working lane holds beside the Dashboard, and nothing when none are", () => {
@@ -341,17 +338,19 @@ describe("the shell's header", () => {
     ).toBeInTheDocument();
   });
 
-  it("titles a Settings section by its name, with the section's own eyebrow", () => {
+  it("titles a setup area by its name, with the area's own eyebrow, on any of its tabs", () => {
     renderShell(
-      "/settings?tab=media-managers",
-      <Route path="settings" element={<div>Settings</div>} />,
+      "/setup/connections/alerts",
+      <Route path="setup/*" element={<div>Setup</div>} />,
     );
 
     expect(
-      screen.getByRole("heading", { level: 1, name: "Media managers" }),
+      screen.getByRole("heading", { level: 1, name: "Connections" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByText("The apps Weir hands cleaned files back to"),
+      screen.getByText(
+        "The apps Weir hands cleaned files back to, and who it tells",
+      ),
     ).toBeInTheDocument();
   });
 

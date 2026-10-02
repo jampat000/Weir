@@ -38,6 +38,7 @@ import {
   LibraryOutputGroup,
 } from "./library-output-groups";
 import type { LibraryFormBinding } from "./library-settings";
+import { setupTabPath } from "../../../../lib/settings/setup-areas";
 
 /** When the library may run, read from the schedule that owns its hours. */
 function runHoursText(library: ProcessingLibrary | undefined): string {
@@ -103,7 +104,7 @@ export function LibraryEditor({
       <SidePanel
         open
         title={library ? "Edit workflow" : "Add workflow"}
-        eyebrow="Settings · Workflows"
+        eyebrow="Setup · Workflows"
         subtitle={
           library
             ? "Changes take effect on the next scan; nothing already running is disturbed."
@@ -181,11 +182,11 @@ export function LibraryEditor({
               .
             </p>
           ) : null}
-          {/* The hours are drawn in Settings › Schedule beside every other library's week, so the two never disagree. */}
+          {/* The hours are drawn in Setup › Workflows › Schedule beside every other library's week, so the two never disagree. */}
           <QuietFieldGroup title="When this workflow may run">
             <p className="mm-quiet-note" data-testid="processing-library-hours">
               {runHoursText(library)}
-              <Link className="mm-schedule-link" to="/settings?tab=schedule">
+              <Link className="mm-schedule-link" to={setupTabPath("schedule")}>
                 Change the hours in Schedule
               </Link>
             </p>

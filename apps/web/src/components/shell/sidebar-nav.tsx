@@ -65,7 +65,7 @@ type SidebarNavProps = {
 
 /**
  * The side menu: groups under quiet headings, each item a link. The current page is named for a
- * screen reader with `aria-current`, which the address's query decides for Settings' sections.
+ * screen reader with `aria-current`, which the address's path decides for a setup area and whichever of its tabs is open.
  */
 export function SidebarNav({
   badges,

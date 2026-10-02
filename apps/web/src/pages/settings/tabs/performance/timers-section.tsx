@@ -6,7 +6,8 @@ import { useProcessingMaintenanceQuery } from "../../../../lib/processing/mainte
 import type { AppSettings } from "../../../../lib/settings/types";
 import { useAppDateFormatter } from "../../../../lib/ui/mm-format-date";
 import { CLEANUP_JOBS, everyWords } from "../cleanup/cleanup-jobs";
-import { backupWords } from "./schedule-model";
+import { backupWords } from "../schedule/schedule-model";
+import { setupTabPath } from "../../../../lib/settings/setup-areas";
 
 const UNKNOWN = "—";
 const NOT_YET = "Not yet";
@@ -89,7 +90,7 @@ export function TimersSection({
                     {job.name}
                     <Link
                       className="mm-quiet-table__sub mm-schedule-link"
-                      to="/settings?tab=cleanup"
+                      to={setupTabPath("cleanup")}
                     >
                       Change in Cleanup
                     </Link>

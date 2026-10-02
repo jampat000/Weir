@@ -8,9 +8,6 @@ export type NavGlyphName =
   | "rules"
   | "managers"
   | "performance"
-  | "schedule"
-  | "cleanup"
-  | "alerts"
   | "system";
 
 const GLYPH_PATHS: Record<NavGlyphName, ReactNode> = {
@@ -61,21 +58,6 @@ const GLYPH_PATHS: Record<NavGlyphName, ReactNode> = {
       <path d="M5 12h14" />
       <path d="M8 8l8 8" />
       <path d="M16 8l-8 8" />
-    </>
-  ),
-  schedule: (
-    <>
-      <path d="M7 7V4" />
-      <path d="M17 7V4" />
-      <rect x="4" y="6" width="16" height="14" rx="2" />
-      <path d="M4 11h16" />
-    </>
-  ),
-  cleanup: <path d="M3 7h7l2 2h9v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />,
-  alerts: (
-    <>
-      <path d="M10.268 21a2 2 0 0 0 3.464 0" />
-      <path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326" />
     </>
   ),
   system: (

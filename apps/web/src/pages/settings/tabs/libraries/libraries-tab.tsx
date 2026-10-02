@@ -45,7 +45,7 @@ type Editing =
     };
 
 /**
- * Settings › Libraries: add, edit, reorder, switch on and off, and remove the libraries Weir
+ * Setup › Workflows › Workflows: add, edit, reorder, switch on and off, and remove the libraries Weir
  * watches. A library is a row, so a fourth one is ordinary rather than a schema change (ADR-0014).
  * The list's own switches and arrows save at once; the editor saves only on its Save.
  */

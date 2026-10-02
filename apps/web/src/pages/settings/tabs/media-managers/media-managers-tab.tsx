@@ -1,19 +1,18 @@
 import { useState } from "react";
 
 import { PageLoading } from "../../../../components/shared/page-loading";
+import { PageToolbarAddButton } from "../../../../components/shell/page-toolbar-actions";
 import type { MediaManagerConnection } from "../../../../lib/media-managers/media-managers-api";
 import { useMediaManagerConnectionsQuery } from "../../../../lib/media-managers/queries";
-import { mmActionButtonClass } from "../../../../lib/ui/mm-control-roles";
 import { useAppDateFormatter } from "../../../../lib/ui/mm-format-date";
 import { SaveModelNote } from "../../save-model-note";
 import { SettingsLoadError } from "../../settings-load-error";
 import { AddConnectionForm } from "./add-connection-form";
 import { ConnectionCard } from "./connection-card";
-import { DownloadClientsSection } from "./download-clients-section";
 import { NewConnectionSecretPrompt } from "./new-connection-secret-prompt";
 import { WeirOnlyWorkflows } from "./weir-only-workflows";
 
-/** Settings: the media managers that send files to Weir. */
+/** Setup › Connections › Media managers: the media managers that send files to Weir. */
 export function MediaManagersTab() {
   const connections = useMediaManagerConnectionsQuery();
   const fmt = useAppDateFormatter();
@@ -41,7 +40,7 @@ export function MediaManagersTab() {
       {connections.data.length === 0 && !adding ? (
         <p className="mm-quiet-note">
           Nothing is connected yet, so no files are reaching Weir. Add a media
-          manager below to get started.
+          manager to get started.
         </p>
       ) : null}
 
@@ -67,29 +66,15 @@ export function MediaManagersTab() {
           }}
         />
       ) : (
-        <div>
-          <button
-            type="button"
-            data-testid="media-manager-add"
-            className={mmActionButtonClass({ variant: "primary" })}
-            onClick={() => {
-              setJustCreated(null);
-              setAdding(true);
-            }}
-          >
-            Add a media manager
-          </button>
-        </div>
+        <PageToolbarAddButton
+          label="Add media manager"
+          dataTestId="media-manager-add"
+          onClick={() => {
+            setJustCreated(null);
+            setAdding(true);
+          }}
+        />
       )}
-
-      <p className="mm-quiet-note">
-        Some installs have no media manager at all — just Weir and a download
-        client. Connect one below and Weir can suggest a watched folder from it
-        too. This connection is for suggestions only: Weir only ever reads the
-        download client&apos;s own settings, never changes them, and a folder
-        you type yourself always wins.
-      </p>
-      <DownloadClientsSection />
     </div>
   );
 }

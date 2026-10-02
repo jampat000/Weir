@@ -1,4 +1,5 @@
 import { QuietSection } from "../../../../components/shared/quiet-section";
+import { PageToolbarAddButton } from "../../../../components/shell/page-toolbar-actions";
 import { Chip } from "../../../../components/panels/chip";
 import { WorkflowKindSummary } from "../../../../components/shared/workflow-kind";
 import { MmOnOffSwitch } from "../../../../components/ui/mm-on-off-switch";
@@ -198,22 +199,14 @@ export function LibraryListSection({
   actions: LibraryRowActions;
 }) {
   return (
-    <QuietSection
-      headingId="processing-libraries-heading"
-      heading="Workflows"
-      aside={
-        editable ? (
-          <button
-            type="button"
-            className="mm-quiet-link"
-            onClick={onAdd}
-            data-testid="processing-library-add"
-          >
-            Add workflow →
-          </button>
-        ) : null
-      }
-    >
+    <QuietSection headingId="processing-libraries-heading" heading="Workflows">
+      {editable ? (
+        <PageToolbarAddButton
+          label="Add workflow"
+          onClick={onAdd}
+          dataTestId="processing-library-add"
+        />
+      ) : null}
       <p className="mm-quiet-note">
         A workflow is the path new files take: a folder Weir watches, and a
         folder it writes cleaned files to. It is either{" "}

@@ -4,12 +4,11 @@ import type { ReactNode } from "react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
 import * as authQueries from "../../../../lib/auth/queries";
-import * as directPlayApi from "../../../../lib/processing/direct-play-api";
 import * as librariesApi from "../../../../lib/processing/libraries-api";
 import * as ruleSetsApi from "../../../../lib/processing/rule-sets-api";
 import type { ProcessingRuleSet } from "../../../../lib/processing/rule-sets-api";
 import * as providerApi from "../../../../lib/processing/metadata-provider-api";
-import { RulesTab } from "./rules-tab";
+import { ProfilesTab } from "./profiles-tab";
 
 const ruleSet: ProcessingRuleSet = {
   id: 4,
@@ -69,10 +68,6 @@ function wrapper({ children }: { children: ReactNode }) {
 // The tab lists the libraries using each profile; unstubbed, that is a real request to the test host.
 beforeEach(() => {
   vi.spyOn(librariesApi, "fetchProcessingLibraries").mockResolvedValue([]);
-  vi.spyOn(directPlayApi, "fetchDirectPlayDevices").mockResolvedValue({
-    customised: false,
-    devices: [],
-  });
 });
 
 afterEach(() => {
@@ -96,7 +91,7 @@ function stubEditableProfile() {
 it("lays the profile out as audio, subtitles, original language and cleanup, with track ordering on request", async () => {
   stubEditableProfile();
 
-  render(<RulesTab />, { wrapper });
+  render(<ProfilesTab />, { wrapper });
 
   expect(
     await screen.findByRole("heading", { name: "Audio" }),
@@ -106,7 +101,6 @@ it("lays the profile out as audio, subtitles, original language and cleanup, wit
   ).toBeInTheDocument();
   expect(screen.getByText("Original language")).toBeInTheDocument();
   expect(screen.getByText("Also remove")).toBeInTheDocument();
-  expect(screen.getByText("Metadata provider")).toBeInTheDocument();
 
   const orderedSections = [
     "Audio",
@@ -128,20 +122,6 @@ it("lays the profile out as audio, subtitles, original language and cleanup, wit
   expect(screen.getByDisplayValue(">=5.1")).toBeInTheDocument();
 });
 
-it("offers the devices you play on below the profiles", async () => {
-  stubEditableProfile();
-
-  render(<RulesTab />, { wrapper });
-
-  const devices = await screen.findByTestId("processing-direct-play-section");
-  expect(devices).toHaveTextContent("Your playback devices");
-  expect(
-    screen
-      .getByRole("heading", { name: "Profiles" })
-      .compareDocumentPosition(devices),
-  ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
-});
-
 it("saves every edited rule with the profile", async () => {
   stubEditableProfile();
   const update = vi
@@ -152,7 +132,7 @@ it("saves every edited rule with the profile", async () => {
       remove_images: true,
     });
 
-  render(<RulesTab />, { wrapper });
+  render(<ProfilesTab />, { wrapper });
 
   await screen.findByRole("heading", { name: "Audio" });
 
@@ -240,44 +220,6 @@ it("saves every edited rule with the profile", async () => {
   expect(sentRuleSet).not.toHaveProperty("updated_at");
 });
 
-it("saves the metadata provider and reports whether it answered", async () => {
-  stubEditableProfile();
-  const saveProvider = vi
-    .spyOn(providerApi, "putProcessingMetadataProvider")
-    .mockResolvedValue({
-      provider: "tmdb",
-      base_url: "https://api.themoviedb.org/3",
-      key_configured: true,
-      known_providers: ["tmdb"],
-      artwork_enabled: true,
-    });
-  const testProvider = vi
-    .spyOn(providerApi, "testProcessingMetadataProvider")
-    .mockResolvedValue({
-      status: "matched",
-      detail: "TMDb answered successfully.",
-    });
-
-  render(<RulesTab />, { wrapper });
-
-  fireEvent.click(await screen.findByRole("button", { name: "Configure →" }));
-  fireEvent.change(screen.getByRole("combobox", { name: "Provider" }), {
-    target: { value: "tmdb" },
-  });
-  fireEvent.change(screen.getByLabelText("API key"), {
-    target: { value: "secret" },
-  });
-  fireEvent.click(screen.getByRole("button", { name: "Save and test" }));
-
-  await waitFor(() => {
-    expect(saveProvider).toHaveBeenCalledWith(
-      expect.objectContaining({ provider: "tmdb", api_key: "secret" }),
-    );
-    expect(testProvider).toHaveBeenCalled();
-    expect(screen.getByText("TMDb answered successfully.")).toBeInTheDocument();
-  });
-});
-
 it("shows a load error when the profiles fail to load", async () => {
   vi.spyOn(authQueries, "useMeQuery").mockReturnValue({
     data: { role: "operator" },
@@ -293,7 +235,7 @@ it("shows a load error when the profiles fail to load", async () => {
     artwork_enabled: true,
   });
 
-  render(<RulesTab />, { wrapper });
+  render(<ProfilesTab />, { wrapper });
 
   expect(await screen.findByTestId("settings-load-error")).toHaveTextContent(
     "Weir couldn’t load your profiles.",
@@ -316,7 +258,7 @@ it("asks before switching profiles with unsaved edits, and keeps them when told 
     artwork_enabled: true,
   });
 
-  render(<RulesTab />, { wrapper });
+  render(<ProfilesTab />, { wrapper });
 
   const nameField = await screen.findByPlaceholderText("English feature films");
   fireEvent.change(nameField, { target: { value: "Feature films (edited)" } });

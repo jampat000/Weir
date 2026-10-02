@@ -1,5 +1,5 @@
 /**
- * What a Settings panel shows when its data did not arrive, so a failed load never looks like
+ * What a setup panel shows when its data did not arrive, so a failed load never looks like
  * "nothing set up yet". `what` completes "Weir couldn't load your …", e.g. "media managers".
  */
 export function SettingsLoadError({ what }: { what: string }) {

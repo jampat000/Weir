@@ -546,10 +546,21 @@ describe("SettingsMediaManagersTab", () => {
     await screen.findByText(/Nothing is connected yet/i);
 
     expect(screen.getByTestId("media-manager-add")).toHaveTextContent(
-      "Add a media manager",
+      "Add media manager",
     );
     fireEvent.click(screen.getByTestId("media-manager-add"));
     expect(screen.getByText("Which media manager is it?")).toBeInTheDocument();
+  });
+
+  it("leaves download clients to their own tab", async () => {
+    vi.spyOn(api, "fetchMediaManagerConnections").mockResolvedValue([]);
+    render(<MediaManagersTab />, { wrapper });
+    await screen.findByText(/Nothing is connected yet/i);
+
+    expect(
+      screen.queryByTestId("suite-settings-download-clients"),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId("download-client-add")).not.toBeInTheDocument();
   });
 
   describe("after adding a media manager", () => {

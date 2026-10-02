@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 
 import { PageLoading } from "../../../../components/shared/page-loading";
 import {
-  QuietDisclosure,
+  QuietSection,
   quietActionRowClass,
 } from "../../../../components/shared/quiet-section";
 import { canEdit } from "../../../../lib/auth/can-edit";
@@ -94,20 +94,20 @@ export function PlaybackDevicesSection() {
   };
 
   return (
-    // Nothing here is a setting — it is a reference table of what each device can play, and it was
-    // taking half of Running. Folded away until someone asks for it.
-    <QuietDisclosure
-      title="Your playback devices"
-      summaryWhenClosed="Reference"
+    <QuietSection
+      headingId="processing-direct-play-heading"
+      heading="Your playback devices"
       data-testid="processing-direct-play-section"
     >
-      <SaveModelNote model="explicit" />
-      <p className="mm-quiet-note">
-        Tick the devices you watch on. Each file then shows whether it can
-        Direct Play on them, meaning your media server can play it as it is,
-        without converting it. Information only: Weir never changes a file
-        because of this.
-      </p>
+      <div className="mm-quiet-stack">
+        <SaveModelNote model="explicit" />
+        <p className="mm-quiet-note">
+          Tick the devices you watch on. Each file then shows whether it can
+          Direct Play on them, meaning your media server can play it as it is,
+          without converting it. Information only: Weir never changes a file
+          because of this.
+        </p>
+      </div>
       {q.data.customised ? (
         <p
           className="mm-quiet-note mt-2"
@@ -178,6 +178,6 @@ export function PlaybackDevicesSection() {
           {save.isPending ? "Saving…" : "Save devices"}
         </button>
       </div>
-    </QuietDisclosure>
+    </QuietSection>
   );
 }

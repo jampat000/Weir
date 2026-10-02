@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 
 import { PageLoading } from "../../../../components/shared/page-loading";
 import { QuietSection } from "../../../../components/shared/quiet-section";
+import { PageToolbarAddButton } from "../../../../components/shell/page-toolbar-actions";
 import { ConfirmDialog } from "../../../../components/ui/confirm-dialog";
 import { errorMessage } from "../../../../lib/api/error-message";
 import { canEdit } from "../../../../lib/auth/can-edit";
@@ -24,11 +25,6 @@ import { plural } from "../../../../lib/ui/mm-plural";
 import { SaveModelNote } from "../../save-model-note";
 import { SettingsLoadError } from "../../settings-load-error";
 import { useLeaveConfirmation, useUnsavedChanges } from "../../unsaved-changes";
-import {
-  MetadataProviderSection,
-  useProviderDraft,
-} from "./metadata-provider-section";
-import { PlaybackDevicesSection } from "./playback-devices-section";
 import { ProfileBar } from "./profile-bar";
 import { ProfileRules } from "./profile-rules";
 import type { RuleSetBinding } from "./rule-set-fields";
@@ -94,11 +90,8 @@ function ProfileActions({
   );
 }
 
-/**
- * Settings › Rules: the reusable profiles that decide which tracks a file keeps, and the devices
- * you play on.
- */
-export function RulesTab() {
+/** Setup › Rules › Profiles: the reusable profiles that decide which tracks a file keeps. */
+export function ProfilesTab() {
   const me = useMeQuery();
   const ruleSets = useProcessingRuleSetsQuery();
   const libraries = useProcessingLibrariesQuery();
@@ -106,7 +99,6 @@ export function RulesTab() {
   const updateRuleSet = useUpdateProcessingRuleSet();
   const deleteRuleSet = useDeleteProcessingRuleSet();
   const provider = useProcessingMetadataProviderQuery();
-  const providerDraft = useProviderDraft(provider.data);
   const editable = canEdit(me.data?.role);
 
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -234,19 +226,14 @@ export function RulesTab() {
       <QuietSection
         headingId="processing-rule-set-profiles-heading"
         heading="Profiles"
-        aside={
-          !creating ? (
-            <button
-              type="button"
-              className="mm-quiet-link"
-              disabled={!editable}
-              onClick={() => confirmLeave(dirtyThing, startNewProfile)}
-            >
-              New profile →
-            </button>
-          ) : null
-        }
       >
+        {!creating ? (
+          <PageToolbarAddButton
+            label="New profile"
+            disabled={!editable}
+            onClick={() => confirmLeave(dirtyThing, startNewProfile)}
+          />
+        ) : null}
         <ProfileBar
           ruleSets={rows}
           selectedId={selectedId}
@@ -266,7 +253,7 @@ export function RulesTab() {
           <div className="mm-profile-body space-y-5">
             <ProfileRules
               binding={binding}
-              providerName={providerDraft.name}
+              providerName={provider.data?.provider === "tmdb" ? "tmdb" : ""}
               editable={editable}
               resetKey={String(switches)}
             />
@@ -281,14 +268,6 @@ export function RulesTab() {
           </div>
         )}
       </QuietSection>
-
-      <MetadataProviderSection
-        saved={provider.data}
-        draft={providerDraft}
-        editable={editable}
-      />
-
-      <PlaybackDevicesSection />
 
       {confirmingRemove && selectedRuleSet ? (
         <ConfirmDialog

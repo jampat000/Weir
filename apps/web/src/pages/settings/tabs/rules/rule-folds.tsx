@@ -35,7 +35,7 @@ export function OriginalLanguageFold({
         detail={
           providerName
             ? `Uses ${providerName.toUpperCase()} when it can identify the title.`
-            : "Requires the metadata provider configured below."
+            : "Requires a metadata provider, set up in Setup › Rules › Metadata & artwork."
         }
       />
       {draft.keep_original_language ? (

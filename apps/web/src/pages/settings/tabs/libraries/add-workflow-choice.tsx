@@ -20,6 +20,7 @@ import {
 import { connectionTitle } from "../../../../lib/ui/connection-title";
 import { mmActionButtonClass } from "../../../../lib/ui/mm-control-roles";
 import type { LibraryForm } from "./library-form";
+import { setupTabPath } from "../../../../lib/settings/setup-areas";
 
 /** What the editor opens with: a blank workflow or the one filled in, and the workflow it fills in when it is one. */
 export type WorkflowStart = {
@@ -162,7 +163,7 @@ export function AddWorkflowChoice({
                     Nothing is connected yet.{" "}
                     <Link
                       className="mm-quiet-link"
-                      to="/settings?tab=media-managers"
+                      to={setupTabPath("managers")}
                     >
                       Connect Deluno, Sonarr or Radarr
                     </Link>{" "}

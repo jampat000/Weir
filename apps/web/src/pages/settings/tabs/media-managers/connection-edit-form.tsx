@@ -79,7 +79,7 @@ function changesFrom(
 
 /**
  * Address and API key, edited in place. Nothing is sent until Save; Cancel asks first when
- * anything changed, through the same guard every Settings panel with a Save/Cancel pair uses.
+ * anything changed, through the same guard every setup panel with a Save/Cancel pair uses.
  */
 export function ConnectionEditForm({
   connection,

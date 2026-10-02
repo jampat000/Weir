@@ -11,12 +11,14 @@ import { AppHydrateFallback } from "./hydrate-fallback";
 import {
   LegacyActivityRedirect,
   LegacyProcessingRedirect,
+  LegacySettingsRedirect,
 } from "./legacy-redirects";
+import { setupRoutes } from "./setup-routes";
 
 const routeErrorElement = <RouteErrorScreen />;
 
-// Five places: the Dashboard (/), History, Library, Settings and System. Addresses bookmarked from an
-// installed release that no longer exist redirect to where their page lives now
+// Five places: the Dashboard (/), History, Library, the four setup areas (/setup/...) and System. Addresses
+// bookmarked from an installed release that no longer exist redirect to where their page lives now
 // (legacy-redirects.tsx); anything older gets the Not found page.
 const router = createBrowserRouter([
   {
@@ -96,12 +98,10 @@ const router = createBrowserRouter([
                 element: <LegacyProcessingRedirect />,
                 errorElement: routeErrorElement,
               },
+              ...setupRoutes(routeErrorElement),
               {
                 path: "settings",
-                lazy: async () => ({
-                  Component: (await import("../pages/settings/settings-page"))
-                    .SettingsPage,
-                }),
+                element: <LegacySettingsRedirect />,
                 errorElement: routeErrorElement,
               },
               {

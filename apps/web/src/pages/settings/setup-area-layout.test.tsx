@@ -1,0 +1,255 @@
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from "@testing-library/react";
+import { createMemoryRouter, RouterProvider } from "react-router-dom";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+import { setupRoutes } from "../../app/setup-routes";
+
+// Each tab's own content is tested beside it; this file is about the area around it: which tab is showing, how
+// the address and the tab row follow each other, where the tab's buttons go, and when leaving asks first.
+vi.mock("./tabs/libraries/libraries-tab", () => ({
+  LibrariesTab: () => <div>Workflows content</div>,
+}));
+vi.mock("./tabs/schedule/schedule-tab", () => ({
+  ScheduleTab: () => <div>Schedule content</div>,
+}));
+vi.mock("./tabs/media-managers/media-managers-tab", () => ({
+  MediaManagersTab: () => <div>Media managers content</div>,
+}));
+vi.mock("./tabs/media-managers/download-clients-tab", () => ({
+  DownloadClientsTab: () => <div>Download clients content</div>,
+}));
+vi.mock("./tabs/rules/profiles-tab", () => ({
+  ProfilesTab: () => <div>Profiles content</div>,
+}));
+vi.mock("./tabs/rules/metadata-tab", () => ({
+  MetadataTab: () => <div>Metadata content</div>,
+}));
+vi.mock("./tabs/rules/devices-tab", () => ({
+  DevicesTab: () => <div>Devices content</div>,
+}));
+vi.mock("./tabs/performance/speed-tab", () => ({
+  SpeedTab: () => <div>Speed content</div>,
+}));
+vi.mock("./tabs/cleanup/cleanup-tab", () => ({
+  CleanupTab: () => <div>Cleanup content</div>,
+}));
+vi.mock("./tabs/performance/timers-tab", () => ({
+  TimersTab: () => <div>Timers content</div>,
+}));
+// Alerts stands in for any tab with an edit not yet saved, and with a button for the toolbar.
+const alerts = vi.hoisted(() => ({ unsaved: null as string | null }));
+vi.mock("./tabs/alerts/alerts-tab", async () => {
+  const { useUnsavedChanges } = await import("./unsaved-changes");
+  const { PageToolbarAddButton } =
+    await import("../../components/shell/page-toolbar-actions");
+  return {
+    AlertsTab: () => {
+      useUnsavedChanges(alerts.unsaved);
+      return (
+        <div>
+          Alerts content
+          <PageToolbarAddButton label="Add alert" onClick={() => undefined} />
+        </div>
+      );
+    },
+  };
+});
+
+async function renderAt(entry: string) {
+  const router = createMemoryRouter(
+    [
+      ...setupRoutes(null),
+      { path: "/history", element: <div>History page</div> },
+    ],
+    { initialEntries: [entry] },
+  );
+  render(<RouterProvider router={router} />);
+  await screen.findByRole("tablist");
+  return router;
+}
+
+const tabNames = () =>
+  within(screen.getByRole("tablist"))
+    .getAllByRole("tab")
+    .map((tab) => tab.textContent);
+
+afterEach(() => {
+  cleanup();
+  alerts.unsaved = null;
+});
+
+describe("a setup area", () => {
+  it.each([
+    ["/setup/workflows", "Workflows sections", ["Workflows", "Schedule"]],
+    [
+      "/setup/connections",
+      "Connections sections",
+      ["Media managers", "Download clients", "Alerts"],
+    ],
+    [
+      "/setup/rules",
+      "Rules sections",
+      ["Profiles", "Metadata & artwork", "Playback devices"],
+    ],
+    [
+      "/setup/performance",
+      "Performance sections",
+      ["Speed", "Cleanup", "Weir's timers"],
+    ],
+  ])("opens %s on a tab row of its own tabs", async (address, name, tabs) => {
+    await renderAt(address);
+
+    expect(screen.getByRole("tablist", { name })).toBeInTheDocument();
+    expect(tabNames()).toEqual(tabs);
+    expect(screen.getAllByRole("tab")[0]).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+  });
+
+  it("opens the tab the address names, so a bookmark lands where it was made", async () => {
+    await renderAt("/setup/rules/metadata");
+
+    expect(
+      screen.getByRole("tab", { name: "Metadata & artwork" }),
+    ).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tabpanel")).toHaveTextContent("Metadata content");
+  });
+
+  it("moves to a tab through the address, so Back and Forward follow it", async () => {
+    const router = await renderAt("/setup/connections");
+
+    fireEvent.click(screen.getByRole("tab", { name: "Download clients" }));
+    expect(await screen.findByText("Download clients content")).toBeVisible();
+    expect(router.state.location.pathname).toBe(
+      "/setup/connections/download-clients",
+    );
+
+    await act(() => router.navigate(-1));
+    expect(router.state.location.pathname).toBe("/setup/connections");
+    expect(await screen.findByText("Media managers content")).toBeVisible();
+
+    await act(() => router.navigate(1));
+    expect(await screen.findByText("Download clients content")).toBeVisible();
+  });
+
+  it("names the panel after the open tab", async () => {
+    await renderAt("/setup/performance/cleanup");
+
+    expect(screen.getByRole("tabpanel", { name: "Cleanup" })).toHaveTextContent(
+      "Cleanup content",
+    );
+  });
+
+  it("sends a first tab's own name back to the area's address", async () => {
+    const router = await renderAt("/setup/connections/managers");
+
+    expect(router.state.location.pathname).toBe("/setup/connections");
+    expect(await screen.findByText("Media managers content")).toBeVisible();
+  });
+
+  it("leaves /setup itself to the first sign-in", () => {
+    const router = createMemoryRouter(
+      [
+        { path: "/setup", element: <div>First sign-in</div> },
+        ...setupRoutes(null),
+      ],
+      { initialEntries: ["/setup"] },
+    );
+    render(<RouterProvider router={router} />);
+
+    expect(screen.getByText("First sign-in")).toBeInTheDocument();
+  });
+
+  it("puts the open tab's button in the tab row, beside the tabs, not in the panel", async () => {
+    await renderAt("/setup/connections/alerts");
+
+    const add = await screen.findByRole("button", { name: "Add alert" });
+    expect(screen.getByTestId("setup-area-tabs")).toContainElement(add);
+    expect(screen.getByRole("tabpanel")).not.toContainElement(add);
+  });
+
+  it("takes the button away when another tab opens", async () => {
+    await renderAt("/setup/connections/alerts");
+    await screen.findByRole("button", { name: "Add alert" });
+
+    fireEvent.click(screen.getByRole("tab", { name: "Media managers" }));
+
+    expect(await screen.findByText("Media managers content")).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Add alert" })).toBeNull();
+  });
+});
+
+describe("with unsaved changes in a tab", () => {
+  it("asks before moving to another tab, and stays when told to", async () => {
+    alerts.unsaved = "the Discord alert";
+    const router = await renderAt("/setup/connections/alerts");
+
+    fireEvent.click(screen.getByRole("tab", { name: "Media managers" }));
+
+    expect(screen.getByTestId("settings-unsaved-changes")).toHaveTextContent(
+      "You have unsaved changes to the Discord alert. Leave without saving?",
+    );
+    fireEvent.click(screen.getByTestId("settings-unsaved-changes-cancel"));
+    expect(router.state.location.pathname).toBe("/setup/connections/alerts");
+    expect(screen.getByText(/Alerts content/)).toBeInTheDocument();
+  });
+
+  it("moves on once the person chooses to leave without saving", async () => {
+    alerts.unsaved = "the Discord alert";
+    const router = await renderAt("/setup/connections/alerts");
+
+    fireEvent.click(screen.getByRole("tab", { name: "Media managers" }));
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("settings-unsaved-changes-confirm"));
+    });
+
+    expect(router.state.location.pathname).toBe("/setup/connections");
+    expect(await screen.findByText("Media managers content")).toBeVisible();
+  });
+
+  it("asks before moving to another area", async () => {
+    alerts.unsaved = "the Discord alert";
+    const router = await renderAt("/setup/connections/alerts");
+
+    await act(() => router.navigate("/setup/rules"));
+
+    expect(router.state.location.pathname).toBe("/setup/connections/alerts");
+    expect(screen.getByTestId("settings-unsaved-changes")).toBeInTheDocument();
+  });
+
+  it("asks before leaving setup for another page", async () => {
+    alerts.unsaved = "the Discord alert";
+    const router = await renderAt("/setup/connections/alerts");
+
+    await act(() => router.navigate("/history"));
+
+    expect(router.state.location.pathname).toBe("/setup/connections/alerts");
+    expect(screen.getByTestId("settings-unsaved-changes")).toBeInTheDocument();
+  });
+
+  it("does not ask when only the query changes, as when a link opens an editor", async () => {
+    alerts.unsaved = "the Discord alert";
+    const router = await renderAt("/setup/connections/alerts");
+
+    await act(() => router.navigate("/setup/connections/alerts?edit=2"));
+
+    expect(screen.queryByTestId("settings-unsaved-changes")).toBeNull();
+  });
+
+  it("does not ask when nothing is unsaved", async () => {
+    const router = await renderAt("/setup/connections/alerts");
+
+    await act(() => router.navigate("/setup/rules"));
+
+    expect(router.state.location.pathname).toBe("/setup/rules");
+    expect(await screen.findByText("Profiles content")).toBeVisible();
+  });
+});

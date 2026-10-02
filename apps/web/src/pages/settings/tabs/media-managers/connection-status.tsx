@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import type { MediaManagerConnection } from "../../../../lib/media-managers/media-managers-api";
 import { useProcessingLibrariesQuery } from "../../../../lib/processing/libraries-queries";
 import { connectionTitle } from "../../../../lib/ui/connection-title";
+import { workflowFromManagerPath } from "../../../../lib/settings/setup-areas";
 
 type Formatter = (iso: string | null) => string;
 
@@ -136,7 +137,7 @@ export function FedWorkflows({
           {" "}
           <Link
             className="mm-quiet-link"
-            to={`/settings?tab=libraries&addFrom=${connection.id}`}
+            to={workflowFromManagerPath(connection.id)}
           >
             Add a workflow from {connectionTitle(connection)}
           </Link>

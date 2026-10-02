@@ -1,19 +1,19 @@
 import { useState } from "react";
 
 import { PageLoading } from "../../../../components/shared/page-loading";
+import { PageToolbarAddButton } from "../../../../components/shell/page-toolbar-actions";
 import type { DownloadClientConnection } from "../../../../lib/download-clients/download-clients-api";
 import { useDownloadClientConnectionsQuery } from "../../../../lib/download-clients/queries";
 import { connectionTitle } from "../../../../lib/ui/connection-title";
-import { mmActionButtonClass } from "../../../../lib/ui/mm-control-roles";
 import { useAppDateFormatter } from "../../../../lib/ui/mm-format-date";
 import { SettingsLoadError } from "../../settings-load-error";
 import { AddDownloadClientForm } from "./add-download-client-form";
 import { DownloadClientCard } from "./download-client-card";
 
 /**
- * Settings: bare download clients (SABnzbd, NZBGet, qBittorrent, Deluge, Transmission) Weir can read a
+ * Bare download clients (SABnzbd, NZBGet, qBittorrent, Deluge, Transmission) Weir can read a
  * watched-folder suggestion from. Composes the list and the add form; the intro paragraph lives in the
- * parent tab, next to the media managers it sits below.
+ * tab that holds it.
  */
 export function DownloadClientsSection() {
   const connections = useDownloadClientConnectionsQuery();
@@ -34,8 +34,8 @@ export function DownloadClientsSection() {
       {connections.data.length === 0 && !adding ? (
         <p className="mm-quiet-note">
           No download client is connected. Weir can still suggest watched
-          folders from Sonarr, Radarr or Deluno above; add one below only if you
-          run a bare download client Weir should read instead.
+          folders from Sonarr, Radarr or Deluno under Media managers; add one
+          only if you run a bare download client Weir should read instead.
         </p>
       ) : null}
 
@@ -64,19 +64,14 @@ export function DownloadClientsSection() {
           }}
         />
       ) : (
-        <div>
-          <button
-            type="button"
-            data-testid="download-client-add"
-            className={mmActionButtonClass({ variant: "primary" })}
-            onClick={() => {
-              setJustCreated(null);
-              setAdding(true);
-            }}
-          >
-            Add a download client
-          </button>
-        </div>
+        <PageToolbarAddButton
+          label="Add download client"
+          dataTestId="download-client-add"
+          onClick={() => {
+            setJustCreated(null);
+            setAdding(true);
+          }}
+        />
       )}
     </div>
   );

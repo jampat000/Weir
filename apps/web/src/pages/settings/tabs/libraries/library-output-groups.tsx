@@ -82,8 +82,8 @@ function MostFilesAtOnceSetting({ binding }: { binding: LibraryFormBinding }) {
     hint = (
       <span role="alert" data-testid="workflow-limited-by-total">
         Weir runs {total} files at once in total, so this workflow is limited to{" "}
-        {total}. Choose {total} or fewer, or raise Files at once in Settings ›
-        Performance.
+        {total}. Choose {total} or fewer, or raise Files at once in Setup ›
+        Performance › Speed.
       </span>
     );
   }

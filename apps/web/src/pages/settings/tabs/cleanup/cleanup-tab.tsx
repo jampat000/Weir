@@ -74,7 +74,7 @@ function useRunNow(onNotice: (notice: string | null) => void) {
 }
 
 /**
- * Settings › Cleanup: the small jobs that keep Weir's folders tidy, each with its own
+ * Setup › Performance › Cleanup: the small jobs that keep Weir's folders tidy, each with its own
  * switch and timer, and the choice that decides what the leftover-work-file job leaves alone. A change applies within half a minute, with no restart: Weir's timers read the
  * switch and the interval again every 30 seconds.
  */

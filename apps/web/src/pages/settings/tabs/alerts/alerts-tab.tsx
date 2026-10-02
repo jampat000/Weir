@@ -2,6 +2,7 @@ import { useState } from "react";
 
 import { Panel } from "../../../../components/panels/panel";
 import { PageLoading } from "../../../../components/shared/page-loading";
+import { PageToolbarAddButton } from "../../../../components/shell/page-toolbar-actions";
 import {
   QuietFieldGroup,
   QuietSection,
@@ -94,18 +95,13 @@ export function AlertsTab() {
         level={3}
         headingId="suite-settings-notifications-heading"
         heading="Alerts"
-        aside={
-          !adding && editingId === null ? (
-            <button
-              type="button"
-              className="mm-quiet-link"
-              onClick={() => setAdding(true)}
-            >
-              Add an alert →
-            </button>
-          ) : null
-        }
       >
+        {!adding && editingId === null ? (
+          <PageToolbarAddButton
+            label="Add alert"
+            onClick={() => setAdding(true)}
+          />
+        ) : null}
         <p className="mm-quiet-note">
           Tick what each alert should hear about; a change saves straight away.
           Use &ldquo;Send test&rdquo; before relying on a new alert.
