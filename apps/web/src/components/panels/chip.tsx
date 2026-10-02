@@ -35,7 +35,10 @@ export function Chip({
     );
   }
   return (
-    <span className={classNames("mm-chip mm-chip--neutral", className)} {...rest}>
+    <span
+      className={classNames("mm-chip mm-chip--neutral", className)}
+      {...rest}
+    >
       {children}
     </span>
   );
