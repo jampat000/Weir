@@ -56,11 +56,11 @@ function WorkflowSource({
       ) : null}
       {unreachable ? (
         <span
-          className="mm-quiet-table__sub mm-status-text inline-flex items-center gap-1.5"
+          className="mm-quiet-table__sub mm-status-text"
           data-status="broken"
           title={lastWord}
         >
-          <StatusDot meaning="broken" />
+          <StatusDot className="mr-1.5 align-middle" meaning="broken" />
           <span aria-hidden="true">Not answering</span>
           <span className="sr-only">{lastWord}</span>
         </span>

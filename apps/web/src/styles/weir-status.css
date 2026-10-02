@@ -43,7 +43,8 @@
   box-shadow: inset 0 0 0 1.5px var(--mm-st);
 }
 
-.mm-status-text,
+/* The word's class is doubled so it outranks a rule that colours the element it marks (a definition's value, a cell). */
+.mm-status-text.mm-status-text,
 .mm-status-pill {
   color: var(--mm-st);
 }

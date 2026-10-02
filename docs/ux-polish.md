@@ -66,6 +66,13 @@ the meanings are `StatusMeaning` in `apps/web/src/lib/ui/status-meaning.ts`, and
   component uses an old status colour, a hex colour or a raw palette colour.
 - The Pipeline's lanes (Incoming, Queued, Analysing, Processing, Delivering) are a flow, not a status: violet, teal,
   indigo, fuchsia and pink, never green, amber, red or the status blue.
+- A reading that is a measure, not a state (a drive's used space, the CPU and memory traces) uses a neutral or lane hue,
+  never a status colour, until it crosses a line that matters: a drive with less room than a workflow keeps free is
+  `attention` wherever it shows.
+- Decided for Health, Setup and System: Not verified and a connection that is slow are `attention`; a workflow Weir
+  could not check, or a notice that Weir could not read something, is `broken`; an update waiting to be installed is
+  `todo`, one that could not be checked for is `attention`; a restart count is `attention`; a schedule window that is
+  closed is `idle`; a track the rules would drop is `todo`.
 - Buttons are separate from statuses. Red is for actions that remove, override or step outside normal running; Weir's
   routine work, cleaning included, is never red. Blue is the primary action.
 
