@@ -28,6 +28,10 @@ export type WorkflowHealth = {
   why: string | null;
   /** The whole chain, for the views that list every line. */
   chain: LibraryFolderChain | undefined;
+  /** When the chain was last read, in ms since the epoch. Null before the first answer. */
+  checkedAt: number | null;
+  /** Reads this workflow's chain again. */
+  recheck: () => Promise<unknown>;
 };
 
 export type Health = {
@@ -97,6 +101,8 @@ export function useHealth(
       verdict: checkVerdict(chain),
       why: chain.data ? whyNotInSync(chain.data) : null,
       chain: chain.data,
+      checkedAt: chain.dataUpdatedAt > 0 ? chain.dataUpdatedAt : null,
+      recheck: () => chain.refetch(),
     };
   });
   return {

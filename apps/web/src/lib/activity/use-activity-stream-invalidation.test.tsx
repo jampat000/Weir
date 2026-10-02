@@ -6,6 +6,8 @@ import type { ReactNode } from "react";
 import { activityKeys } from "./query-keys";
 import {
   subscribeConnectionActivity,
+  subscribeSystemLog,
+  subscribeSystemTasks,
   useActivityStreamInvalidations,
   useLiveProgress,
 } from "./use-activity-stream-invalidation";
@@ -595,6 +597,106 @@ describe("subscribeConnectionActivity", () => {
     expect(src.closed).toBe(false);
     stop();
 
+    expect(src.closed).toBe(true);
+  });
+});
+
+describe("subscribeSystemTasks and subscribeSystemLog", () => {
+  afterEach(() => {
+    FakeEventSource.instances = [];
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+    document.dispatchEvent(new Event("visibilitychange"));
+  });
+
+  const tasksFrame = JSON.stringify([
+    {
+      key: "scan-1",
+      label: "Scan Movies",
+      running: true,
+      last_run_at: null,
+      last_ok: null,
+      last_error: null,
+      next_run_at: null,
+      interval_seconds: null,
+    },
+  ]);
+  const logFrame = JSON.stringify({
+    at: "2026-10-02T12:00:00Z",
+    level: "WARNING",
+    message: "Radarr was slow.",
+  });
+
+  it("hands the task list of every system.tasks frame to its subscriber, on the one shared stream", () => {
+    vi.stubGlobal(
+      "EventSource",
+      FakeEventSource as unknown as typeof EventSource,
+    );
+    const seen: unknown[] = [];
+    const connections = subscribeConnectionActivity(() => undefined);
+    const stop = subscribeSystemTasks((tasks) => seen.push(tasks));
+
+    expect(FakeEventSource.instances).toHaveLength(1);
+    FakeEventSource.instances[0].emit("system.tasks", tasksFrame);
+
+    expect(seen).toEqual([
+      [expect.objectContaining({ key: "scan-1", running: true })],
+    ]);
+    stop();
+    connections();
+  });
+
+  it("hands every system.log frame to its subscriber", () => {
+    vi.stubGlobal(
+      "EventSource",
+      FakeEventSource as unknown as typeof EventSource,
+    );
+    const seen: unknown[] = [];
+    const stop = subscribeSystemLog((frame) => seen.push(frame));
+
+    FakeEventSource.instances[0].emit("system.log", logFrame);
+
+    expect(seen).toEqual([
+      {
+        at: "2026-10-02T12:00:00Z",
+        level: "WARNING",
+        message: "Radarr was slow.",
+      },
+    ]);
+    stop();
+  });
+
+  it("ignores a frame it cannot read", () => {
+    vi.stubGlobal(
+      "EventSource",
+      FakeEventSource as unknown as typeof EventSource,
+    );
+    const tasks: unknown[] = [];
+    const lines: unknown[] = [];
+    const stopTasks = subscribeSystemTasks((value) => tasks.push(value));
+    const stopLog = subscribeSystemLog((value) => lines.push(value));
+
+    FakeEventSource.instances[0].emit("system.tasks", "not json");
+    FakeEventSource.instances[0].emit("system.log", "{}");
+
+    expect(tasks).toEqual([]);
+    expect(lines).toEqual([]);
+    stopTasks();
+    stopLog();
+  });
+
+  it("keeps the stream open until the last of them leaves", () => {
+    vi.stubGlobal(
+      "EventSource",
+      FakeEventSource as unknown as typeof EventSource,
+    );
+    const stopTasks = subscribeSystemTasks(() => undefined);
+    const stopLog = subscribeSystemLog(() => undefined);
+    const src = FakeEventSource.instances[0];
+
+    stopTasks();
+    expect(src.closed).toBe(false);
+    stopLog();
     expect(src.closed).toBe(true);
   });
 });

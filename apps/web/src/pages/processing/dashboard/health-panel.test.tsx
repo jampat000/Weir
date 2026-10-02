@@ -9,6 +9,8 @@ import type { CheckNow } from "./check-now";
 import { HealthPanel } from "./health-panel";
 import type { Health } from "./use-health";
 
+const noRecheck = async () => undefined;
+
 const NOW = Date.parse("2026-10-02T12:00:00Z");
 
 const health: Health = {
@@ -80,6 +82,8 @@ describe("the Health panel", () => {
         verdict: { words: "In sync", tone: "healthy" },
         why: null,
         chain: undefined,
+        checkedAt: null,
+        recheck: noRecheck,
       },
     ];
     const panel = renderPanel();
@@ -97,6 +101,8 @@ describe("the Health panel", () => {
         verdict: { words: "Needs a fix", tone: "warning" },
         why: "The output folder is missing.",
         chain: undefined,
+        checkedAt: null,
+        recheck: noRecheck,
       },
     ];
     const panel = renderPanel();
@@ -114,6 +120,8 @@ describe("the Health panel", () => {
         verdict: { words: "Not verified", tone: "neutral" },
         why: whole,
         chain: undefined,
+        checkedAt: null,
+        recheck: noRecheck,
       },
     ];
     const panel = renderPanel();
@@ -141,6 +149,8 @@ describe("the Health panel", () => {
         verdict: { words: "In sync", tone: "healthy" },
         why: null,
         chain: undefined,
+        checkedAt: null,
+        recheck: noRecheck,
       },
     ];
     const panel = renderPanel();
@@ -242,6 +252,8 @@ describe("the Health panel", () => {
         verdict: { words: "In sync", tone: "healthy" as const },
         why: null,
         chain: undefined,
+        checkedAt: null,
+        recheck: noRecheck,
       }),
     );
     health.managers = [1, 2, 3].map((id) => ({
@@ -293,6 +305,8 @@ describe("the Health panel", () => {
         verdict: { words: "Not verified", tone: "neutral" },
         why: "Radarr does not say where Transmission saves its downloads.",
         chain: undefined,
+        checkedAt: null,
+        recheck: noRecheck,
       },
     ];
 
@@ -306,6 +320,8 @@ describe("the Health panel", () => {
         verdict: { words: "Needs a fix", tone: "warning" },
         why: "It is missing.",
         chain: undefined,
+        checkedAt: null,
+        recheck: noRecheck,
       },
     ];
     health.downloadClients = [

@@ -49,8 +49,10 @@ export function whyNotInSync(chain: LibraryFolderChain): string | null {
   return named?.text ?? NOTHING_NAMED;
 }
 
+/** What a workflow's verdict says while its folder check has not answered. */
+export const CHECKING_WORDS = "Checking…";
 const CHECKING_VERDICT: WorkflowVerdict = {
-  words: "Checking…",
+  words: CHECKING_WORDS,
   tone: "neutral",
 };
 const UNCHECKED_VERDICT: WorkflowVerdict = {

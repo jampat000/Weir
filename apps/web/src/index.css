@@ -33,6 +33,10 @@
 @import "./styles/weir-today-chart.css";
 @import "./styles/weir-processing-side.css";
 @import "./styles/weir-processing-stream.css";
+@import "./styles/weir-system-cards.css";
+@import "./styles/weir-system-health.css";
+@import "./styles/weir-system-lists.css";
+@import "./styles/weir-system-backups.css";
 @import "./styles/weir-system-band.css";
 @import "./styles/weir-live-trace.css";
 @import "./styles/weir-connections.css";

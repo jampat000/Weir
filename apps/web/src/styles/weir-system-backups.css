@@ -1,0 +1,124 @@
+/* The System view's Backups and tools card. */
+
+.mm-sy-part {
+  display: grid;
+  gap: 6px;
+  padding: 0 18px 12px;
+}
+
+.mm-sy-part__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.mm-sy-part__title {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--mm-text2);
+}
+
+.mm-sy-part__line {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0;
+  font-size: 12px;
+  white-space: nowrap;
+  color: var(--mm-text2);
+}
+
+.mm-sy-part__line > span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mm-sy-backup {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 3px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--mm-surface-2) 60%, transparent);
+  font-size: 12px;
+}
+
+.mm-sy-backup__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--mm-success);
+}
+
+.mm-sy-backup__size {
+  font-variant-numeric: tabular-nums;
+  color: var(--mm-text2);
+}
+
+/* Tools and updates read as one line each: the part's name, then what it says. */
+.mm-sy-part--inline {
+  grid-template-columns: 64px minmax(0, 1fr);
+  align-items: baseline;
+  gap: 4px 10px;
+  padding-bottom: 8px;
+}
+
+.mm-sy-inline-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.mm-sy-tool {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 12.5px;
+}
+
+.mm-sy-tool > span:nth-child(2) {
+  font-variant-numeric: tabular-nums;
+  color: var(--mm-text2);
+}
+
+.mm-sy-tool__mark {
+  font-weight: 700;
+}
+
+.mm-sy-tool__mark--healthy {
+  color: var(--mm-success);
+}
+
+.mm-sy-tool__mark--failed {
+  color: var(--mm-destructive);
+}
+
+.mm-sy-tool__mark--neutral {
+  color: var(--mm-text3);
+}
+
+.mm-sy-update {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 12px;
+  font-size: 12.5px;
+  color: var(--mm-text2);
+}
+
+.mm-sy-update b {
+  color: var(--mm-text1);
+}
+
+.mm-sy-update__state {
+  text-decoration: none;
+}

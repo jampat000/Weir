@@ -12,12 +12,24 @@ import {
   parseSystemStatsFrame,
 } from "../system/system-stats-frame";
 import type { SystemStatsFrame } from "../system/system-stats-types";
+import {
+  SYSTEM_LOG_EVENT,
+  parseSystemLogFrame,
+  type SystemLogFrame,
+} from "../system/system-log-frame";
+import {
+  SYSTEM_TASKS_EVENT,
+  parseSystemTasksFrame,
+  type SystemTask,
+} from "../system/system-tasks-frame";
 
 type LatestPayload = { latest_event_id: number; activity_revision?: number };
 type ActivityLatestSubscriber = () => void;
 type LiveProgressSubscriber = () => void;
 type ConnectionActivitySubscriber = (frame: ConnectionActivityFrame) => void;
 type SystemStatsSubscriber = (frame: SystemStatsFrame) => void;
+type SystemTasksSubscriber = (tasks: SystemTask[]) => void;
+type SystemLogSubscriber = (frame: SystemLogFrame) => void;
 
 /**
  * Never cancel a query that is already mid-flight just because a newer activity event arrived: the
@@ -51,6 +63,8 @@ let liveProgressByPath: Readonly<Record<string, LiveProgressEntry>> =
 const progressSubscribers = new Set<LiveProgressSubscriber>();
 const connectionActivitySubscribers = new Set<ConnectionActivitySubscriber>();
 const systemStatsSubscribers = new Set<SystemStatsSubscriber>();
+const systemTasksSubscribers = new Set<SystemTasksSubscriber>();
+const systemLogSubscribers = new Set<SystemLogSubscriber>();
 /** A progress frame arrived while the tab was hidden and has not been shown yet. */
 let progressChangedWhileHidden = false;
 
@@ -67,7 +81,9 @@ function hasSubscribers(): boolean {
     subscribers.size > 0 ||
     progressSubscribers.size > 0 ||
     connectionActivitySubscribers.size > 0 ||
-    systemStatsSubscribers.size > 0
+    systemStatsSubscribers.size > 0 ||
+    systemTasksSubscribers.size > 0 ||
+    systemLogSubscribers.size > 0
   );
 }
 
@@ -228,6 +244,14 @@ function ensureActivityStream(): EventSource | null {
     const frame = parseSystemStatsFrame((ev as MessageEvent<string>).data);
     if (frame) systemStatsSubscribers.forEach((fn) => fn(frame));
   });
+  source.addEventListener(SYSTEM_TASKS_EVENT, (ev) => {
+    const tasks = parseSystemTasksFrame((ev as MessageEvent<string>).data);
+    if (tasks) systemTasksSubscribers.forEach((fn) => fn(tasks));
+  });
+  source.addEventListener(SYSTEM_LOG_EVENT, (ev) => {
+    const frame = parseSystemLogFrame((ev as MessageEvent<string>).data);
+    if (frame) systemLogSubscribers.forEach((fn) => fn(frame));
+  });
   return source;
 }
 
@@ -295,6 +319,40 @@ export function subscribeSystemStats(
 
   return () => {
     systemStatsSubscribers.delete(subscriber);
+    closeIfNobodyIsWatching();
+  };
+}
+
+/**
+ * Calls `subscriber` with the whole task list each time `system.tasks` says a task started or ended, on the one shared
+ * stream. A frame is a moment, so nothing is replayed to a late subscriber.
+ */
+export function subscribeSystemTasks(
+  subscriber: SystemTasksSubscriber,
+): () => void {
+  systemTasksSubscribers.add(subscriber);
+  watchVisibility();
+  ensureActivityStream();
+
+  return () => {
+    systemTasksSubscribers.delete(subscriber);
+    closeIfNobodyIsWatching();
+  };
+}
+
+/**
+ * Calls `subscriber` with every `system.log` frame, a warning or error as Weir writes it, on the one shared stream.
+ * A frame is a moment, so nothing is replayed to a late subscriber.
+ */
+export function subscribeSystemLog(
+  subscriber: SystemLogSubscriber,
+): () => void {
+  systemLogSubscribers.add(subscriber);
+  watchVisibility();
+  ensureActivityStream();
+
+  return () => {
+    systemLogSubscribers.delete(subscriber);
     closeIfNobodyIsWatching();
   };
 }

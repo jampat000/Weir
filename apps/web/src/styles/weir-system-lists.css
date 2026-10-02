@@ -1,0 +1,143 @@
+/* The System view's Scheduled tasks and Log cards. */
+
+.mm-sy-task {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr) 112px 64px;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 8px;
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.mm-sy-list > .mm-sy-task:nth-child(odd) {
+  background: color-mix(in srgb, var(--mm-surface-2) 60%, transparent);
+}
+
+.mm-sy-task--head {
+  flex: none;
+  margin: 0 10px;
+  padding: 0 8px 4px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--mm-text3);
+}
+
+.mm-sy-task--head > span:nth-child(n + 3) {
+  text-align: right;
+}
+
+.mm-sy-task__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--mm-success);
+}
+
+.mm-sy-task--failed .mm-sy-task__dot {
+  background: var(--mm-destructive);
+}
+
+.mm-sy-task--never .mm-sy-task__dot {
+  background: var(--mm-text3);
+}
+
+.mm-sy-task--running .mm-sy-task__dot {
+  background: var(--mm-info);
+  animation: mm-sy-blink 0.8s ease-in-out infinite;
+}
+
+.mm-sy-task__name {
+  min-width: 0;
+}
+
+.mm-sy-task__name > b {
+  display: block;
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--mm-text1);
+}
+
+.mm-sy-task__why {
+  display: block;
+  overflow: hidden;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--mm-status-failed-text);
+}
+
+.mm-sy-task__result,
+.mm-sy-task__next {
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+  color: var(--mm-text2);
+}
+
+.mm-sy-task__next b {
+  font-weight: 600;
+  color: var(--mm-text1);
+}
+
+.mm-sy-task__running {
+  color: var(--mm-info);
+}
+
+.mm-sy-task__mark {
+  color: var(--mm-success);
+}
+
+.mm-sy-task--failed .mm-sy-task__mark {
+  color: var(--mm-destructive);
+}
+
+/* ---- Log ------------------------------------------------------------------- */
+
+.mm-sy-log {
+  display: grid;
+  grid-template-columns: 78px 62px minmax(0, 1fr);
+  align-items: baseline;
+  gap: 10px;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--mm-hairline);
+  font-size: 12px;
+}
+
+.mm-sy-log--new {
+  animation: mm-sy-pulse-row 1.2s ease;
+}
+
+.mm-sy-log__time {
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--mm-text3);
+}
+
+.mm-sy-log__level {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--mm-text2);
+}
+
+.mm-sy-log__level--error {
+  color: var(--mm-status-failed-text);
+}
+
+.mm-sy-log__level--warning {
+  color: var(--mm-status-warning-text);
+}
+
+.mm-sy-log__message {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

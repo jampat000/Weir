@@ -1,0 +1,292 @@
+/* The System view's Health card: the ribbon of areas, the checks and a workflow's folder chain in its slide-over. */
+
+.mm-sy-card--flash {
+  animation: mm-sy-ring 1.2s ease;
+}
+
+/* The areas as a ribbon of chevrons, each tinted by --tone. */
+.mm-sy-areas {
+  display: flex;
+  flex: none;
+  padding: 0 12px 10px;
+}
+
+.mm-sy-area {
+  position: relative;
+  box-sizing: border-box;
+  display: flex;
+  min-width: 0;
+  flex: 1 1 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: 0 -10px 0 0;
+  padding: 9px 12px 9px 20px;
+  overflow: hidden;
+  border: 0;
+  background: color-mix(in srgb, var(--tone) 12%, transparent);
+  clip-path: polygon(
+    0 0,
+    calc(100% - 14px) 0,
+    100% 50%,
+    calc(100% - 14px) 100%,
+    0 100%,
+    14px 50%
+  );
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--mm-text1);
+  cursor: pointer;
+}
+
+.mm-sy-area:first-child {
+  padding-left: 12px;
+  border-radius: 9px 0 0 9px;
+  clip-path: polygon(
+    0 0,
+    calc(100% - 14px) 0,
+    100% 50%,
+    calc(100% - 14px) 100%,
+    0 100%
+  );
+}
+
+.mm-sy-area:last-child {
+  margin-right: 0;
+  border-radius: 0 9px 9px 0;
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%, 14px 50%);
+}
+
+.mm-sy-area:focus-visible {
+  outline: 2px solid var(--mm-primary);
+  outline-offset: -2px;
+}
+
+.mm-sy-area--on {
+  background: color-mix(in srgb, var(--tone) 30%, transparent);
+  box-shadow: inset 0 -2px 0 var(--tone);
+}
+
+.mm-sy-area__name {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mm-sy-area__dot {
+  color: var(--tone);
+}
+
+.mm-sy-area__count {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--mm-text2);
+}
+
+.mm-sy-area__count b {
+  color: var(--mm-text1);
+}
+
+.mm-sy-area--checking::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    100deg,
+    transparent 30%,
+    color-mix(in srgb, white 12%, transparent) 50%,
+    transparent 70%
+  );
+  animation: mm-sy-sheen 1.4s linear;
+}
+
+.mm-sy-check {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 8px;
+  border-bottom: 1px solid var(--mm-hairline);
+  border-radius: 8px;
+}
+
+.mm-sy-check__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--mm-success);
+}
+
+.mm-sy-check--bad .mm-sy-check__dot {
+  background: var(--mm-destructive);
+}
+
+.mm-sy-check--warn .mm-sy-check__dot {
+  background: var(--mm-warning);
+}
+
+.mm-sy-check--idle .mm-sy-check__dot {
+  background: var(--mm-text3);
+}
+
+.mm-sy-check--note .mm-sy-check__dot {
+  background: var(--mm-info);
+}
+
+.mm-sy-check__text {
+  min-width: 0;
+}
+
+.mm-sy-check__text > b {
+  display: block;
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--mm-text1);
+}
+
+.mm-sy-check--ok .mm-sy-check__text > b,
+.mm-sy-check--idle .mm-sy-check__text > b {
+  font-weight: 500;
+  color: var(--mm-text2);
+}
+
+.mm-sy-check__why {
+  display: -webkit-box;
+  overflow: hidden;
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--mm-text2);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.mm-sy-check__meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 3px;
+  font-size: 11px;
+  font-style: normal;
+  color: var(--mm-text3);
+}
+
+.mm-sy-check__meta i {
+  padding: 1px 7px;
+  border-radius: 6px;
+  background: var(--mm-surface-3);
+  font-size: 10.5px;
+  font-style: normal;
+  font-weight: 600;
+  color: var(--mm-text2);
+}
+
+.mm-sy-check__actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* A check that is fine is one tight row: what it is and a line of why, with when it was looked at on its right. */
+.mm-sy-check--ok,
+.mm-sy-check--idle,
+.mm-sy-check--note {
+  padding-block: 6px;
+}
+
+.mm-sy-check--ok .mm-sy-check__why,
+.mm-sy-check--idle .mm-sy-check__why,
+.mm-sy-check--note .mm-sy-check__why {
+  -webkit-line-clamp: 1;
+}
+
+.mm-sy-check__when {
+  margin-right: 6px;
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--mm-text3);
+}
+
+/* "Check again" on a row that is fine shows when the row is pointed at or reached by keyboard, and while it runs. */
+.mm-sy-btn--quiet:not(:disabled) {
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.mm-sy-check:hover .mm-sy-btn--quiet,
+.mm-sy-check:focus-within .mm-sy-btn--quiet {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .mm-sy-btn--quiet:not(:disabled) {
+    opacity: 1;
+  }
+}
+
+@container (max-width: 560px) {
+  .mm-sy-check {
+    grid-template-columns: 10px minmax(0, 1fr);
+  }
+
+  .mm-sy-check__actions {
+    grid-column: 2;
+    flex-wrap: wrap;
+  }
+}
+
+/* ---- A workflow's folder chain, in its slide-over ------------------------------ */
+
+.mm-sy-detail {
+  display: grid;
+  gap: 14px;
+  padding: 16px 24px 24px;
+}
+
+.mm-sy-detail__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px 12px;
+  font-size: 12px;
+  color: var(--mm-text2);
+}
+
+.mm-sy-detail__note,
+.mm-sy-detail__why {
+  margin: 0;
+  font-size: 13px;
+  color: var(--mm-text2);
+}
+
+.mm-sy-detail__chain {
+  display: grid;
+  gap: 16px;
+}
+
+.mm-sy-detail__links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin: 0;
+  font-size: 13px;
+}
+
+.mm-sy-detail__links a {
+  font-weight: 500;
+  color: var(--mm-primary);
+  text-decoration: none;
+}
+
+.mm-sy-detail__links a:hover {
+  color: var(--mm-primary-bright);
+}
