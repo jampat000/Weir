@@ -9,6 +9,7 @@ import { registerMachineRoutes } from "./routes-machine.mjs";
 import { registerNetworkAccessRoutes } from "./routes-network-access.mjs";
 import { registerPauseRoutes } from "./routes-pause.mjs";
 import { registerSettingsRoutes } from "./routes-settings.mjs";
+import { registerSystemLogRoutes } from "./system-log.mjs";
 import { registerSystemRoutes } from "./routes-system.mjs";
 import { registerWorkRoutes } from "./routes-work.mjs";
 import { registerWorkflowRoutes } from "./routes-workflows.mjs";
@@ -19,6 +20,7 @@ export function buildRouter() {
   registerAuthRoutes(router);
   registerArtworkRoutes(router);
   registerSystemRoutes(router);
+  registerSystemLogRoutes(router);
   registerMachineRoutes(router);
   registerNetworkAccessRoutes(router);
   registerPauseRoutes(router);

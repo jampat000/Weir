@@ -9,7 +9,7 @@ const LEVEL_BY_RESULT = {
 };
 const INFORMATION = "Information";
 
-function lineFor(event) {
+export function lineFor(event) {
   const level = LEVEL_BY_RESULT[event.result] ?? INFORMATION;
   const subject = event.relativePath
     ? ` ${event.relativePath.split(/[\\/]/).pop()}`
