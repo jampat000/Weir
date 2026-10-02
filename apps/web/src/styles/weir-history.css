@@ -6,7 +6,7 @@
 /*
  * What narrows the list sits in the header's slot, on the title line after the title: the search, the kinds of file,
  * then the two pickers at the right, just before Pause. The header's title block gives its eyebrow's room first (the
- * eyebrow is hidden), then the search gives up its width, then the pickers take their compact width, and
+ * eyebrow is cut with an ellipsis, always one line), then the search gives up its width, then the pickers take their compact width, and
  * the chips scroll sideways inside their own box when they still do not fit. The sizes follow the header's own width,
  * which is not the window's: the menu takes a different share of it open and collapsed.
  */
@@ -112,13 +112,6 @@
   @container mm-header (max-width: 1620px) {
     .mm-history-scope .mm-input {
       width: 150px;
-    }
-  }
-
-  /* The eyebrow is shown whole or not at all: where the controls need its room, a few words of it would only look cut. */
-  @container mm-header (max-width: 2000px) {
-    .mm-header:has(.mm-history-controls) .mm-header__eyebrow {
-      visibility: hidden;
     }
   }
 }

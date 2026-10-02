@@ -137,16 +137,10 @@
 }
 
 /* The title line holds the title and its picker whole, then the status and buttons; the eyebrow gives up its room
-   first, and is shown whole or not at all. */
+   first (the eyebrow is cut with an ellipsis, always one line). */
 .mm-header:has(.mm-library-title) .mm-header__titles {
   flex-shrink: 100;
   min-width: 16rem;
-}
-
-@container mm-header (max-width: 1250px) {
-  .mm-header:has(.mm-library-title) .mm-header__eyebrow {
-    visibility: hidden;
-  }
 }
 
 /* Where the header is short, the next run is left to the tooltip. */

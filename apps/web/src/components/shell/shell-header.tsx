@@ -59,7 +59,11 @@ export function ShellHeader({ menuOpen, onToggleMenu }: ShellHeaderProps) {
         <span>Menu</span>
       </button>
       <div className="mm-header__titles">
-        {eyebrow ? <p className="mm-header__eyebrow">{eyebrow}</p> : null}
+        {eyebrow ? (
+          <p className="mm-header__eyebrow" title={eyebrow}>
+            {eyebrow}
+          </p>
+        ) : null}
         <div className="mm-header__line">
           <Title className="mm-header__title">{meta.title}</Title>
           <div className="mm-header__tabs" ref={tabsSlotRef} />
