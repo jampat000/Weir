@@ -11,8 +11,10 @@ import {
   bucketWords,
   scaleLabel,
   spanLabel,
+  toneCounts,
 } from "./handed-back-words";
 import { TodayChartReadout } from "./today-chart-readout";
+import { TodayLegend } from "./today-legend";
 import {
   CHART_HEIGHT,
   CHART_WIDTH,
@@ -67,6 +69,11 @@ export function TodayChart({ handed, now }: TodayChartProps) {
     <div
       ref={chartRef}
       className="mm-today-chart"
+      title={
+        handed.totals.all > 0
+          ? `Last 2 hours: ${toneCounts(handed.totals)}`
+          : undefined
+      }
       role="slider"
       tabIndex={0}
       aria-label="Files finished, five minutes to a point"
@@ -138,6 +145,7 @@ export function TodayChart({ handed, now }: TodayChartProps) {
             </span>
           );
         })}
+        <TodayLegend totals={handed.totals} />
         <span className="cs-end cs-now">{span}</span>
         {pointed !== null && dot ? (
           <TodayChartReadout

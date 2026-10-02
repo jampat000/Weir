@@ -115,6 +115,55 @@
   right: 8px;
 }
 
+/* The split of the two hours, along the bottom edge beside the time span: a count for each tone, in Just finished's colours. */
+.cs-legend {
+  position: absolute;
+  bottom: 0;
+  left: 3px;
+  right: var(--today-span-room, 84px);
+  display: grid;
+  gap: 6px;
+  pointer-events: none;
+}
+
+.cs-legend__part {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 4px;
+  padding: 0 3px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--mm-card-bg) 78%, transparent);
+}
+
+.cs-legend__dot {
+  width: 6px;
+  height: 6px;
+  flex: none;
+  border-radius: 50%;
+}
+
+.cs-legend__dot--ok {
+  background: var(--mm-status-healthy-text);
+}
+
+.cs-legend__dot--same {
+  background: var(--mm-status-info-text);
+}
+
+.cs-legend__dot--warn {
+  background: var(--mm-status-warning-text);
+}
+
+.cs-legend__words {
+  min-width: 0;
+  flex: 1 1 0;
+  overflow: hidden;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .cs-cursor {
   position: absolute;
   top: 0;

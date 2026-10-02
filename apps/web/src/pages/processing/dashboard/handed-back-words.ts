@@ -17,7 +17,14 @@ const TONE_WORDS: Record<HandedBackTone, string> = {
   same: "already clean",
   warn: "need a look",
 };
-const TONES = ["ok", "same", "warn"] as const;
+export const TONES = ["ok", "same", "warn"] as const;
+
+/** How a count of each tone reads in the legend, the fullest first: a narrow legend says "10 clean", then "10". */
+const LEGEND_WORDS: Record<HandedBackTone, readonly string[]> = {
+  ok: ["cleaned"],
+  same: ["already clean", "clean"],
+  warn: ["need a look"],
+};
 
 /** When a bucket's five minutes were, in words: "In the last 5 min", "35–40 min ago". */
 function bucketWhen(from: number, now: number): string {
@@ -36,6 +43,12 @@ export function toneCounts(counts: Record<HandedBackTone, number>): string {
   return TONES.filter((tone) => counts[tone] > 0)
     .map((tone) => `${counts[tone].toLocaleString()} ${TONE_WORDS[tone]}`)
     .join(", ");
+}
+
+/** One tone's count for the legend under the chart, from the fullest words to the bare number: "10 already clean", "10". */
+export function legendWords(tone: HandedBackTone, count: number): string[] {
+  const number = count.toLocaleString();
+  return [...LEGEND_WORDS[tone].map((words) => `${number} ${words}`), number];
 }
 
 /** What finished in one bucket: "3 cleaned, 1 already clean", or "nothing". */

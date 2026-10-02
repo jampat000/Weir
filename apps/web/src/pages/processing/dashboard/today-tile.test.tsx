@@ -51,11 +51,14 @@ vi.mock("../use-handed-back", () => ({
   useHandedBack: () => summary.value,
 }));
 
-function finishedAt(minutesAgo: number) {
+function finishedAt(
+  minutesAgo: number,
+  kind: "cleaned" | "already" | "failed" = "cleaned",
+) {
   return {
     id: minutesAgo,
     source: "download" as const,
-    kind: "cleaned" as const,
+    kind,
     relativePath: "Heat.mkv",
     libraryId: 1,
     savedBytes: null,
@@ -212,6 +215,65 @@ describe("the Today tile", () => {
     expect(tile).toHaveTextContent("4 files");
     expect(tile).toHaveTextContent("2 files");
     expect(tile).toHaveTextContent("2 h ago – now");
+  });
+});
+
+describe("the split of the last two hours, under the chart", () => {
+  const LEGEND = '[data-testid="today-legend"]';
+
+  it("counts the files cleaned, already clean and needing a look, in that order", () => {
+    const handed = handedBack(
+      [
+        finishedAt(3),
+        finishedAt(4),
+        finishedAt(5),
+        finishedAt(6, "already"),
+        finishedAt(7, "failed"),
+        finishedAt(8, "failed"),
+      ],
+      NOW,
+    );
+    summary.value = { handed, total: handed.totals.all, partial: false };
+    const tile = renderTile();
+
+    const parts = Array.from(tile.querySelectorAll(`${LEGEND} > span`));
+
+    expect(parts.map((part) => part.textContent)).toEqual([
+      "3 cleaned",
+      "1 already clean",
+      "2 need a look",
+    ]);
+    expect(parts.map((part) => part.querySelector("i")?.className)).toEqual([
+      "cs-legend__dot cs-legend__dot--ok",
+      "cs-legend__dot cs-legend__dot--same",
+      "cs-legend__dot cs-legend__dot--warn",
+    ]);
+  });
+
+  it("leaves out a way of ending that no file had", () => {
+    const handed = handedBack([finishedAt(3), finishedAt(7, "failed")], NOW);
+    summary.value = { handed, total: handed.totals.all, partial: false };
+    const tile = renderTile();
+
+    expect(tile.querySelector(LEGEND)).toHaveTextContent(
+      "1 cleaned1 need a look",
+    );
+  });
+
+  it("draws no legend when nothing finished", () => {
+    expect(renderTile().querySelector(LEGEND)).toBeNull();
+  });
+
+  it("puts the same split in words in the chart's tooltip", () => {
+    const handed = handedBack([finishedAt(3), finishedAt(7, "failed")], NOW);
+    summary.value = { handed, total: handed.totals.all, partial: false };
+    const tile = renderTile();
+
+    expect(
+      within(tile).getByRole("slider", {
+        name: "Files finished, five minutes to a point",
+      }),
+    ).toHaveAttribute("title", "Last 2 hours: 1 cleaned, 1 need a look");
   });
 });
 

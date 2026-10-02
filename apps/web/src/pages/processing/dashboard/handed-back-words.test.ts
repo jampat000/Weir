@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import { handedBack, type HandedBackBucket } from "../handed-back-model";
-import { bucketReadout, scaleLabel, spanLabel } from "./handed-back-words";
+import {
+  bucketReadout,
+  legendWords,
+  scaleLabel,
+  spanLabel,
+} from "./handed-back-words";
 
 const NOW = Date.parse("2026-08-18T10:00:00Z");
 
@@ -50,5 +55,17 @@ describe("the pointer's readout", () => {
     expect(bucketReadout(bucket(NOW, { ok: 2, warn: 1 }), clock)).toBe(
       "at 10h · 2 cleaned, 1 need a look",
     );
+  });
+});
+
+describe("the legend under the chart", () => {
+  it("says a count in words, then in fewer, then as the bare number", () => {
+    expect(legendWords("ok", 82)).toEqual(["82 cleaned", "82"]);
+    expect(legendWords("same", 10)).toEqual([
+      "10 already clean",
+      "10 clean",
+      "10",
+    ]);
+    expect(legendWords("warn", 1_250)).toEqual(["1,250 need a look", "1,250"]);
   });
 });
