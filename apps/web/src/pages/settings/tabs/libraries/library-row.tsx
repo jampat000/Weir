@@ -1,3 +1,5 @@
+import { Fragment, type ReactNode } from "react";
+
 import { Chip } from "../../../../components/panels/chip";
 import { StatusDot } from "../../../../components/panels/status-dot";
 import { ReorderHandle } from "../../../../components/shared/reorder-handle";
@@ -15,6 +17,10 @@ import {
 } from "../../../../lib/processing/workflow-kind";
 import { mmActionButtonClass } from "../../../../lib/ui/mm-control-roles";
 import { OutputFolderCell, WatchedFolderCell } from "./library-paths";
+import {
+  WORKFLOW_COLUMN_CLASS,
+  type WorkflowColumnId,
+} from "./workflow-columns";
 
 export type LibraryRowActions = {
   onToggle: (library: ProcessingLibrary) => void;
@@ -82,7 +88,11 @@ function PriorityCell({
   hintId: string;
 }) {
   return (
-    <td data-label="Priority" className="mm-workflow-table__fit">
+    <td
+      data-col="priority"
+      data-label="Priority"
+      className={WORKFLOW_COLUMN_CLASS.priority}
+    >
       <div className="mm-priority">
         {handle ? (
           <ReorderHandle
@@ -99,6 +109,8 @@ function PriorityCell({
 
 export type LibraryRowProps = {
   library: ProcessingLibrary;
+  /** The columns in the order the table shows them. */
+  order: readonly WorkflowColumnId[];
   /** One for the workflow that takes a file first. */
   position: number;
   ruleSetName: string | undefined;
@@ -115,6 +127,7 @@ export type LibraryRowProps = {
 
 export function LibraryRow({
   library,
+  order,
   position,
   ruleSetName,
   connections,
@@ -131,21 +144,20 @@ export function LibraryRow({
     size: "row",
   });
   const secondary = mmActionButtonClass({ variant: "secondary", size: "row" });
-  return (
-    <tr
-      ref={rowRef}
-      data-testid={`processing-library-${library.id}`}
-      data-grabbed={grabbed || undefined}
-    >
+  const cells: Record<WorkflowColumnId, ReactNode> = {
+    priority: (
       <PriorityCell
         position={position}
         name={library.name}
         handle={handle}
         hintId={hintId}
       />
+    ),
+    workflow: (
       <th
         scope="row"
-        className="mm-quiet-table__name mm-workflow-table__workflow"
+        data-col="workflow"
+        className={`mm-quiet-table__name ${WORKFLOW_COLUMN_CLASS.workflow}`}
       >
         <div className="mm-workflow-name">
           <span className="mm-workflow-name__text" title={library.name}>
@@ -159,25 +171,48 @@ export function LibraryRow({
           </span>
         ) : null}
       </th>
-      <td data-label="Kind" className="mm-workflow-table__kind">
+    ),
+    kind: (
+      <td
+        data-col="kind"
+        data-label="Kind"
+        className={WORKFLOW_COLUMN_CLASS.kind}
+      >
         <WorkflowSource library={library} connections={connections} />
       </td>
-      <td data-label="Watches" className="mm-workflow-table__path">
+    ),
+    watches: (
+      <td
+        data-col="watches"
+        data-label="Watches"
+        className={WORKFLOW_COLUMN_CLASS.watches}
+      >
         <WatchedFolderCell library={library} />
       </td>
-      <td data-label="Cleans into" className="mm-workflow-table__path">
+    ),
+    cleans: (
+      <td
+        data-col="cleans"
+        data-label="Cleans into"
+        className={WORKFLOW_COLUMN_CLASS.cleans}
+      >
         <OutputFolderCell library={library} />
       </td>
+    ),
+    rules: (
       <td
+        data-col="rules"
         data-label="Rules"
-        className="mm-workflow-table__rules"
+        className={WORKFLOW_COLUMN_CLASS.rules}
         title={ruleSetName}
       >
         {ruleSetName ?? (
           <span className="mm-quiet-table__sub">Default rules</span>
         )}
       </td>
-      <td data-label="On" className="mm-workflow-table__fit">
+    ),
+    on: (
+      <td data-col="on" data-label="On" className={WORKFLOW_COLUMN_CLASS.on}>
         <MmOnOffSwitch
           id={`processing-library-enabled-${library.id}`}
           label={`${library.name} enabled`}
@@ -188,7 +223,13 @@ export function LibraryRow({
           size="row"
         />
       </td>
-      <td data-label="" className="mm-workflow-table__fit">
+    ),
+    actions: (
+      <td
+        data-col="actions"
+        data-label=""
+        className={WORKFLOW_COLUMN_CLASS.actions}
+      >
         <div className="mm-workflow-actions">
           <button
             type="button"
@@ -220,6 +261,17 @@ export function LibraryRow({
           </button>
         </div>
       </td>
+    ),
+  };
+  return (
+    <tr
+      ref={rowRef}
+      data-testid={`processing-library-${library.id}`}
+      data-grabbed={grabbed || undefined}
+    >
+      {order.map((id) => (
+        <Fragment key={id}>{cells[id]}</Fragment>
+      ))}
     </tr>
   );
 }

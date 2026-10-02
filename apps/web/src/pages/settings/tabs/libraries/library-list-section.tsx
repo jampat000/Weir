@@ -1,6 +1,8 @@
 import { useId } from "react";
 
 import { QuietSection } from "../../../../components/shared/quiet-section";
+import { ColumnsMenu } from "../../../../components/shared/columns-menu";
+import { SortableColumnHeader } from "../../../../components/shared/sortable-column-header";
 import { useRowReorder } from "../../../../components/shared/use-row-reorder";
 import { PageToolbarAddButton } from "../../../../components/shell/page-toolbar-actions";
 import type { MediaManagerConnection } from "../../../../lib/media-managers/media-managers-api";
@@ -11,8 +13,10 @@ import {
   workflowKindOf,
 } from "../../../../lib/processing/workflow-kind";
 import { plural } from "../../../../lib/ui/mm-plural";
+import { useTableColumns } from "../../../../lib/ui/use-table-columns";
 import { SaveModelNote } from "../../save-model-note";
 import { LibraryRow, type LibraryRowActions } from "./library-row";
+import { WORKFLOW_COLUMN_CLASS, WORKFLOW_COLUMNS } from "./workflow-columns";
 
 const PRIORITY_HINT =
   "Drag the grip to change a workflow's priority. From the keyboard, press Alt with the up or down arrow, or press Space to pick it up, the arrow keys to move it and Space to drop it.";
@@ -41,6 +45,7 @@ export function LibraryListSection({
   actions: LibraryRowActions;
 }) {
   const hintId = useId();
+  const columns = useTableColumns(WORKFLOW_COLUMNS);
   const reorder = useRowReorder({
     ids: libraries.map((library) => library.id),
     nameOf: (id) => libraries.find((library) => library.id === id)?.name ?? "",
@@ -67,7 +72,12 @@ export function LibraryListSection({
           </span>
         )
       }
-      aside={<SaveModelNote model="instant" />}
+      aside={
+        <>
+          <SaveModelNote model="instant" />
+          <ColumnsMenu table={columns} />
+        </>
+      }
     >
       {editable ? (
         <PageToolbarAddButton
@@ -89,38 +99,19 @@ export function LibraryListSection({
           <div className="mm-quiet-table-wrap mt-3">
             <table
               className="mm-quiet-table mm-workflow-table"
-              data-reordering={reorder.grabbedId !== null || undefined}
+              {...columns.tableProps}
             >
               <thead>
                 <tr>
-                  <th
-                    scope="col"
-                    className="mm-workflow-table__fit"
-                    title={PRIORITY_MEANING}
-                  >
-                    Priority
-                  </th>
-                  <th scope="col" className="mm-workflow-table__workflow">
-                    Workflow
-                  </th>
-                  <th scope="col" className="mm-workflow-table__kind">
-                    Kind
-                  </th>
-                  <th scope="col" className="mm-workflow-table__path">
-                    Watches
-                  </th>
-                  <th scope="col" className="mm-workflow-table__path">
-                    Cleans into
-                  </th>
-                  <th scope="col" className="mm-workflow-table__rules">
-                    Rules
-                  </th>
-                  <th scope="col" className="mm-workflow-table__fit">
-                    On
-                  </th>
-                  <th scope="col" className="mm-workflow-table__fit">
-                    <span className="sr-only">Actions</span>
-                  </th>
+                  {columns.order.map((id) => (
+                    <SortableColumnHeader
+                      key={id}
+                      heading={columns.heading(id)}
+                      className={WORKFLOW_COLUMN_CLASS[id]}
+                      title={id === "priority" ? PRIORITY_MEANING : undefined}
+                      hideLabel={id === "actions"}
+                    />
+                  ))}
                 </tr>
               </thead>
               <tbody>
@@ -128,6 +119,7 @@ export function LibraryListSection({
                   <LibraryRow
                     key={library.id}
                     library={library}
+                    order={columns.order}
                     position={index + 1}
                     ruleSetName={
                       ruleSets.find((set) => set.id === library.rule_set_id)

@@ -34,6 +34,7 @@ export function SortableColumnHeader<Id extends string>({
   heading,
   as = "th",
   className,
+  title,
   hideLabel = false,
   children,
 }: {
@@ -41,6 +42,8 @@ export function SortableColumnHeader<Id extends string>({
   /** `div` for a grid of role-based cells, which has no `th`. */
   as?: "th" | "div";
   className?: string;
+  /** Said on hover: what the column means, when its heading cannot. */
+  title?: string;
   /** Says the column's name to a screen reader only, for a column of checkboxes or buttons. */
   hideLabel?: boolean;
   /** Draws the heading's words instead of the column's label, which is still what is announced. */
@@ -64,6 +67,7 @@ export function SortableColumnHeader<Id extends string>({
       data-col={column.id}
       data-movable={movable || undefined}
       className={classNames("mm-col-head", className)}
+      title={title}
       onPointerDown={heading.onPointerDown}
       onKeyDown={heading.onKeyDown}
       tabIndex={!sortable && movable ? 0 : undefined}

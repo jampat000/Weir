@@ -47,15 +47,6 @@
   color: var(--mm-accent);
 }
 
-.mm-workflow-table[data-reordering] {
-  cursor: grabbing;
-  user-select: none;
-}
-
-.mm-workflow-table[data-reordering] .mm-reorder-handle {
-  cursor: grabbing;
-}
-
 .mm-workflow-table tr[data-grabbed] > * {
   background: var(--mm-surface-2);
 }

@@ -173,3 +173,26 @@ it("leaves the order alone for a viewer", async () => {
     screen.queryByRole("button", { name: /^Move / }),
   ).not.toBeInTheDocument();
 });
+
+it("lets the columns be moved but never sorts the rows, whose order is the priority", async () => {
+  asOperator();
+  vi.spyOn(api, "fetchProcessingLibraries").mockResolvedValue(threeWorkflows());
+
+  render(<LibrariesTab />, { wrapper });
+  await screen.findAllByTestId(/^processing-library-\d$/);
+
+  const headings = () =>
+    screen.getAllByRole("columnheader").map((header) => header.textContent);
+  expect(headings().slice(0, 3)).toEqual(["Priority", "Workflow", "Kind"]);
+  expect(
+    screen.getByRole("columnheader", { name: "Kind" }).querySelector("button"),
+  ).toBeNull();
+
+  fireEvent.keyDown(screen.getByRole("columnheader", { name: "Kind" }), {
+    key: "ArrowLeft",
+    altKey: true,
+  });
+
+  expect(headings().slice(0, 3)).toEqual(["Priority", "Kind", "Workflow"]);
+  expect(namesInOrder()).toEqual(["Movies", "TV", "Kids"]);
+});

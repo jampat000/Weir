@@ -1,6 +1,5 @@
 import {
   useCallback,
-  useEffect,
   useLayoutEffect,
   useRef,
   useState,
@@ -8,8 +7,8 @@ import {
   type PointerEvent,
 } from "react";
 
-/** A row is held by the pointer, which drops it where it is released, or by the keyboard, which holds it until dropped. */
-type Grab = { id: number; via: "pointer" | "keyboard" };
+import { moved, sameOrder } from "../../lib/ui/drag-geometry";
+import { useDragReorder } from "../../lib/ui/use-drag-reorder";
 
 type ReorderOptions = {
   /** The rows' ids in their saved order. */
@@ -43,16 +42,6 @@ export type RowReorder = {
 
 const PRIMARY_BUTTON = 0;
 
-function moved(order: readonly number[], id: number, index: number): number[] {
-  const rest = order.filter((other) => other !== id);
-  rest.splice(index, 0, id);
-  return rest;
-}
-
-function sameOrder(a: readonly number[], b: readonly number[]): boolean {
-  return a.length === b.length && a.every((id, index) => id === b[index]);
-}
-
 function directionOf(key: string): -1 | 0 | 1 {
   if (key === "ArrowUp") return -1;
   return key === "ArrowDown" ? 1 : 0;
@@ -60,7 +49,8 @@ function directionOf(key: string): -1 | 0 | 1 {
 
 /**
  * Reordering rows by dragging a handle, or from the keyboard, saved when the row is dropped.
- * Pointer: press the handle and move; the row takes the place the pointer is over, and Escape puts it back.
+ * Pointer: press the handle and move; the row follows the pointer, the others slide out of its way, and it settles
+ * into the place it is dropped in. Escape puts it back.
  * Keyboard: Alt with the up or down arrow moves the row and saves at once; Space or Enter picks it up, the
  * arrows move it, Space or Enter drops it and saves, and Escape puts it back. Each keyboard move is announced.
  */
@@ -69,102 +59,54 @@ export function useRowReorder({
   nameOf,
   onCommit,
 }: ReorderOptions): RowReorder {
-  const [draft, setDraft] = useState<number[] | null>(null);
-  const [grab, setGrab] = useState<Grab | null>(null);
+  const [heldByKeyboard, setHeldByKeyboard] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const [announcement, setAnnouncement] = useState("");
 
-  const draftOrder = useRef<number[] | null>(null);
   const startOrder = useRef<readonly number[]>(ids);
   const rows = useRef(new Map<number, HTMLElement>());
   const handles = useRef(new Map<number, HTMLElement>());
   /** The handle to focus once a move has put its row in a new place, which takes focus from it. */
   const focusAfterMove = useRef<number | null>(null);
 
-  const place = useCallback((next: number[] | null) => {
-    draftOrder.current = next;
-    setDraft(next);
-  }, []);
+  const save = useCallback(
+    (order: number[], refocus: number | null, clear: () => void) => {
+      setSaving(true);
+      void onCommit(order).finally(() => {
+        focusAfterMove.current = refocus;
+        clear();
+        setSaving(false);
+      });
+    },
+    [onCommit],
+  );
+
+  const drag = useDragReorder<number>({
+    axis: "y",
+    ids,
+    elementsOf: (id) => {
+      const row = rows.current.get(id);
+      return row ? [row] : [];
+    },
+    threshold: 0,
+    onDrop: (order, clear) => save(order, null, clear),
+  });
 
   const announcePlace = (id: number, order: readonly number[], what: string) =>
     setAnnouncement(
       `${nameOf(id)} ${what} position ${order.indexOf(id) + 1} of ${order.length}.`,
     );
 
-  const save = useCallback(
-    (order: number[], refocus: number | null) => {
-      setSaving(true);
-      void onCommit(order).finally(() => {
-        focusAfterMove.current = refocus;
-        place(null);
-        setSaving(false);
-      });
-    },
-    [onCommit, place],
-  );
-
-  const pickUp = (id: number, via: Grab["via"]) => {
-    startOrder.current = ids;
-    place([...ids]);
-    setGrab({ id, via });
+  const releaseKeyboardHold = (outcome: "drop" | "cancel") => {
+    const final = drag.current();
+    const refocus = heldByKeyboard;
+    setHeldByKeyboard(null);
+    if (outcome === "cancel" || sameOrder(final, startOrder.current)) {
+      drag.restore();
+      return;
+    }
+    save([...final], refocus, drag.clear);
   };
-
-  const release = useCallback(
-    (outcome: "drop" | "cancel") => {
-      const final = draftOrder.current;
-      const refocus = grab?.via === "keyboard" ? grab.id : null;
-      setGrab(null);
-      if (
-        outcome === "cancel" ||
-        !final ||
-        sameOrder(final, startOrder.current)
-      ) {
-        place(null);
-        return;
-      }
-      save(final, refocus);
-    },
-    [grab, place, save],
-  );
-
-  /** Where the held row belongs: after every other row whose middle is above the pointer. */
-  const indexAt = useCallback((id: number, pointerY: number): number => {
-    const order = draftOrder.current ?? [];
-    return order.filter((other) => {
-      const row = rows.current.get(other);
-      if (other === id || !row) return false;
-      const box = row.getBoundingClientRect();
-      return box.top + box.height / 2 < pointerY;
-    }).length;
-  }, []);
-
-  const heldByPointer = grab?.via === "pointer" ? grab.id : null;
-  useEffect(() => {
-    if (heldByPointer === null) return;
-    const follow = (event: globalThis.PointerEvent) => {
-      const current = draftOrder.current;
-      if (!current) return;
-      const index = indexAt(heldByPointer, event.clientY);
-      if (current.indexOf(heldByPointer) !== index) {
-        place(moved(current, heldByPointer, index));
-      }
-    };
-    const drop = () => release("drop");
-    const cancel = () => release("cancel");
-    const cancelOnEscape = (event: globalThis.KeyboardEvent) => {
-      if (event.key === "Escape") cancel();
-    };
-    window.addEventListener("pointermove", follow);
-    window.addEventListener("pointerup", drop);
-    window.addEventListener("pointercancel", cancel);
-    window.addEventListener("keydown", cancelOnEscape);
-    return () => {
-      window.removeEventListener("pointermove", follow);
-      window.removeEventListener("pointerup", drop);
-      window.removeEventListener("pointercancel", cancel);
-      window.removeEventListener("keydown", cancelOnEscape);
-    };
-  }, [heldByPointer, indexAt, release, place]);
 
   useLayoutEffect(() => {
     const id = focusAfterMove.current;
@@ -192,39 +134,40 @@ export function useRowReorder({
   const onKeyDown = (id: number) => (event: KeyboardEvent<HTMLElement>) => {
     if (saving) return;
     const by = directionOf(event.key);
-    const held = grab?.id === id && grab.via === "keyboard";
+    const held = heldByKeyboard === id;
     if (by !== 0 && event.altKey && !held) {
       event.preventDefault();
       const next = oneStep(id, by, ids);
       if (!next) return;
-      place(next);
+      drag.show(next);
       announcePlace(id, next, "moved to");
-      save(next, id);
+      save(next, id, drag.clear);
     } else if (by !== 0 && held) {
       event.preventDefault();
-      const next = oneStep(id, by, draftOrder.current ?? ids);
+      const next = oneStep(id, by, drag.current());
       if (!next) return;
-      place(next);
+      drag.show(next);
       announcePlace(id, next, "moved to");
     } else if (event.key === " " || event.key === "Enter") {
       event.preventDefault();
       if (held) {
-        announcePlace(id, draftOrder.current ?? ids, "dropped at");
-        release("drop");
+        announcePlace(id, drag.current(), "dropped at");
+        releaseKeyboardHold("drop");
         return;
       }
-      pickUp(id, "keyboard");
+      startOrder.current = ids;
+      setHeldByKeyboard(id);
       announcePlace(id, ids, "picked up at");
     } else if (held && event.key === "Escape") {
       event.preventDefault();
       setAnnouncement(`${nameOf(id)} put back.`);
-      release("cancel");
+      releaseKeyboardHold("cancel");
     }
   };
 
   return {
-    orderedIds: draft ?? ids,
-    grabbedId: grab?.id ?? null,
+    orderedIds: drag.order,
+    grabbedId: drag.heldId ?? heldByKeyboard,
     announcement,
     rowRef: (id) => (row) => {
       if (row) rows.current.set(id, row);
@@ -235,19 +178,18 @@ export function useRowReorder({
         if (handle) handles.current.set(id, handle);
         else handles.current.delete(id);
       },
-      "aria-pressed": grab?.id === id && grab.via === "keyboard",
+      "aria-pressed": heldByKeyboard === id,
       onPointerDown: (event) => {
         if (saving || event.button !== PRIMARY_BUTTON) return;
         event.preventDefault();
-        event.currentTarget.focus();
-        pickUp(id, "pointer");
+        drag.press(id, event);
       },
       onKeyDown: onKeyDown(id),
       onBlur: () => {
         // A move that puts the row elsewhere in the table takes focus from the handle for a moment; that is not
         // the person leaving it.
-        if (grab?.via === "keyboard" && focusAfterMove.current === null) {
-          release("cancel");
+        if (heldByKeyboard === id && focusAfterMove.current === null) {
+          releaseKeyboardHold("cancel");
         }
       },
     }),

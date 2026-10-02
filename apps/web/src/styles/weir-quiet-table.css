@@ -8,6 +8,10 @@
 .mm-quiet-table-wrap {
   position: relative;
   overflow-x: auto;
+  /* Room at both sides for what reaches past a cell's edge: a focus ring on the first column, the shadow of a held row.
+     The negative margin gives the width back, so the table is as wide as it was. */
+  margin-inline: -8px;
+  padding-inline: 8px;
   /* A table stacks into rows by the room its panel gives it, which the side menu and the panel's padding
      both take from, rather than by the window's width. */
   container-type: inline-size;
