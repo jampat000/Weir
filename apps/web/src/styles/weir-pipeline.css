@@ -142,15 +142,25 @@
   white-space: nowrap;
 }
 
+/* On a narrow station the count gives way first and the stage's name stays whole, as on Deluno's. */
 .mm-pipe__station-name {
+  flex: 0 0 auto;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
   font-size: 13px;
   font-weight: 600;
+  text-overflow: ellipsis;
 }
 
 .mm-pipe__station-count {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
   font-size: 12px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
+  text-overflow: ellipsis;
 }
 
 .mm-pipe__station--empty {
