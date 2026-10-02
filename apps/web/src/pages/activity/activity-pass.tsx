@@ -1,22 +1,26 @@
 import { Chip } from "../../components/panels/chip";
 import type { ProcessingFileLogEntry } from "../../lib/processing/files-api";
-import { agoWords, tracksFromRecord, type HistoryTrack } from "./history-model";
+import {
+  agoWords,
+  tracksFromRecord,
+  type ActivityTrack,
+} from "./activity-model";
 
 /**
  * What Weir kept and removed is the point of the page, so it reads first and plainly: a heading with
  * the two counts, each track in full text with a Kept or Removed label, and why a track went under
  * its name.
  */
-function TrackSet({ tracks }: { tracks: HistoryTrack[] }) {
+function TrackSet({ tracks }: { tracks: ActivityTrack[] }) {
   const keptCount = tracks.filter((t) => t.kept).length;
   const removedCount = tracks.length - keptCount;
   return (
     <section
       className="mm-history-trackset"
-      aria-labelledby="history-tracks-heading"
-      data-testid="history-tracks"
+      aria-labelledby="activity-tracks-heading"
+      data-testid="activity-tracks"
     >
-      <h3 id="history-tracks-heading" className="mm-history-trackset__head">
+      <h3 id="activity-tracks-heading" className="mm-history-trackset__head">
         Tracks
         <Chip tone="healthy">{keptCount} kept</Chip>
         <Chip tone={removedCount > 0 ? "failed" : "neutral"}>

@@ -8,9 +8,9 @@ import type {
 } from "../../lib/processing/files-api";
 import type { KeptFile } from "../../lib/processing/kept-files-api";
 import type { LibraryClean } from "../../lib/processing/library-cleans-api";
-import { historyEntries, type HistoryEntry } from "./history-entries";
-import { HistoryPage } from "./history-page";
-import { historyFilePath } from "./history-links";
+import { activityEntries, type ActivityEntry } from "./activity-entries";
+import { ActivityPage } from "./activity-page";
+import { activityFilePath } from "./activity-links";
 
 const files: {
   files: ProcessingFile[];
@@ -28,7 +28,7 @@ const keptQueryState: {
   isError: boolean;
   error: unknown;
 } = { isLoading: false, isError: false, error: null };
-const attention: { entries: HistoryEntry[]; count: number } = {
+const attention: { entries: ActivityEntry[]; count: number } = {
   entries: [],
   count: 0,
 };
@@ -111,13 +111,13 @@ vi.mock("../../lib/processing/kept-files-queries", () => ({
 vi.mock("../../lib/auth/queries", () => ({
   useMeQuery: () => ({ data: me }),
 }));
-vi.mock("./use-history-attention", () => ({
-  useHistoryAttention: () => attention,
+vi.mock("./use-activity-attention", () => ({
+  useActivityAttention: () => attention,
 }));
-vi.mock("./history-retention-note", () => ({
-  HistoryRetentionNote: () => <div data-testid="history-retention" />,
+vi.mock("./activity-retention-note", () => ({
+  ActivityRetentionNote: () => <div data-testid="activity-retention" />,
 }));
-vi.mock("./history-rejected-again", () => ({
+vi.mock("./activity-rejected-again", () => ({
   ProcessRejectedAgain: ({
     libraryId,
     libraryName,
@@ -177,20 +177,20 @@ function file(partial: Partial<ProcessingFile>): ProcessingFile {
   };
 }
 
-function renderPage(entry = "/history") {
+function renderPage(entry = "/activity") {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
   return render(
     <QueryClientProvider client={client}>
       <MemoryRouter initialEntries={[entry]}>
-        <HistoryPage />
+        <ActivityPage />
       </MemoryRouter>
     </QueryClientProvider>,
   );
 }
 
-describe("HistoryPage", () => {
+describe("ActivityPage", () => {
   beforeEach(() => {
     requeue.mockReset();
     me.role = "admin";
@@ -225,14 +225,14 @@ describe("HistoryPage", () => {
     ];
   });
 
-  it("says its file history could not load, through the shared load-error wording", () => {
+  it("says its file activity could not load, through the shared load-error wording", () => {
     filesQueryState.isError = true;
     filesQueryState.error = new Error("boom");
     renderPage();
 
     expect(
       screen.getByText(
-        "Weir couldn't load your file history. Reload the page to try again.",
+        "Weir couldn't load your file activity. Reload the page to try again.",
       ),
     ).toBeInTheDocument();
   });
@@ -255,43 +255,43 @@ describe("HistoryPage", () => {
       held,
     ];
 
-    renderPage(historyFilePath(held));
+    renderPage(activityFilePath(held));
 
-    expect(screen.getByTestId("history-detail")).toHaveTextContent(
+    expect(screen.getByTestId("activity-detail")).toHaveTextContent(
       "The.Held.One.mkv",
     );
   });
 
-  it("ends the page with how long file history is kept", () => {
+  it("ends the page with how long file activity is kept", () => {
     renderPage();
-    expect(screen.getByTestId("history-retention")).toBeInTheDocument();
+    expect(screen.getByTestId("activity-retention")).toBeInTheDocument();
   });
 
-  it("tells, under a file, how long its history is kept once the file is gone", async () => {
+  it("tells, under a file, how long its activity is kept once the file is gone", async () => {
     fetchLog.mockResolvedValue({
       file_id: 1,
       relative_path: "",
       retention_days: 45,
       entries: [],
     });
-    renderPage("/history?file=1");
+    renderPage("/activity?file=1");
 
     expect(
-      await screen.findByTestId("history-retention-note"),
+      await screen.findByTestId("activity-retention-note"),
     ).toHaveTextContent("Kept while the file exists, then 45 days.");
   });
 
-  it("says a file's history is kept until it is removed when the days are 0", async () => {
+  it("says a file's activity is kept until it is removed when the days are 0", async () => {
     fetchLog.mockResolvedValue({
       file_id: 1,
       relative_path: "",
       retention_days: 0,
       entries: [],
     });
-    renderPage("/history?file=1");
+    renderPage("/activity?file=1");
 
     expect(
-      await screen.findByTestId("history-retention-note"),
+      await screen.findByTestId("activity-retention-note"),
     ).toHaveTextContent("Kept until you remove it.");
   });
 
@@ -345,20 +345,20 @@ describe("HistoryPage", () => {
         status: "on_hold",
         updated_at: "2025-01-01T03:00:00",
       });
-      attention.entries = historyEntries([waiting], []);
+      attention.entries = activityEntries([waiting], []);
       attention.count = 1;
-      renderPage("/history?show=attention");
+      renderPage("/activity?show=attention");
 
       expect(
         within(chips()).getByRole("button", { name: /Needs you\s*1/ }),
       ).toHaveAttribute("aria-pressed", "true");
-      expect(screen.getByTestId("history-detail")).toHaveTextContent(
+      expect(screen.getByTestId("activity-detail")).toHaveTextContent(
         "Old.And.Stuck.mkv",
       );
     });
 
     it("says no file is waiting when none is", () => {
-      renderPage("/history?show=attention");
+      renderPage("/activity?show=attention");
 
       expect(
         screen.getByText("No file is waiting on you."),
@@ -399,9 +399,9 @@ describe("HistoryPage", () => {
         },
       ],
     });
-    renderPage("/history?file=1");
-    const detail = await screen.findByTestId("history-detail");
-    const trackset = await within(detail).findByTestId("history-tracks");
+    renderPage("/activity?file=1");
+    const detail = await screen.findByTestId("activity-detail");
+    const trackset = await within(detail).findByTestId("activity-tracks");
     expect(within(trackset).getByText("2 kept")).toBeInTheDocument();
     expect(within(trackset).getByText("2 removed")).toBeInTheDocument();
     expect(within(trackset).getAllByText("Removed")).toHaveLength(2);
@@ -444,18 +444,18 @@ describe("HistoryPage", () => {
     });
 
     it("says a linked workflow's copy is waiting for its media manager to import it", async () => {
-      renderPage("/history?file=1");
+      renderPage("/activity?file=1");
 
-      expect(await screen.findByTestId("history-handback")).toHaveTextContent(
+      expect(await screen.findByTestId("activity-handback")).toHaveTextContent(
         "for your media manager to import",
       );
     });
 
     it("says a Weir-only workflow's copy is in the output folder, with nothing left to wait for", async () => {
       libraries[0].manager_connection_ids = [];
-      renderPage("/history?file=1");
+      renderPage("/activity?file=1");
 
-      const story = await screen.findByTestId("history-handback");
+      const story = await screen.findByTestId("activity-handback");
       expect(story).toHaveTextContent("Cleaned copy");
       expect(story).toHaveTextContent(
         "The cleaned copy is in the output folder, at /ready/tv/Northbound.S08E09.mkv.",
@@ -466,8 +466,8 @@ describe("HistoryPage", () => {
 
   it("says a file's record could not load, through the shared load-error wording", async () => {
     fetchLog.mockRejectedValue(new Error("boom"));
-    renderPage("/history?file=1");
-    const detail = await screen.findByTestId("history-detail");
+    renderPage("/activity?file=1");
+    const detail = await screen.findByTestId("activity-detail");
 
     expect(
       await within(detail).findByText(
@@ -484,8 +484,8 @@ describe("HistoryPage", () => {
       entries: [],
     });
     requeue.mockResolvedValue({ detail: "Queued again." });
-    renderPage("/history?file=2");
-    const detail = screen.getByTestId("history-detail");
+    renderPage("/activity?file=2");
+    const detail = screen.getByTestId("activity-detail");
     expect(
       within(detail).getByText("Weir gave up on this file."),
     ).toBeInTheDocument();
@@ -512,9 +512,9 @@ describe("HistoryPage", () => {
         next_retry_at: "2026-08-19T04:05:00",
       }),
     ];
-    renderPage("/history?file=2");
+    renderPage("/activity?file=2");
 
-    const detail = screen.getByTestId("history-detail");
+    const detail = screen.getByTestId("activity-detail");
     expect(
       within(detail).getByText("This attempt failed, and Weir will try again."),
     ).toBeInTheDocument();
@@ -531,8 +531,8 @@ describe("HistoryPage", () => {
       entries: [],
     });
     processNow.mockResolvedValue({});
-    renderPage("/history?file=2");
-    const detail = screen.getByTestId("history-detail");
+    renderPage("/activity?file=2");
+    const detail = screen.getByTestId("activity-detail");
     const passThrough = within(detail).getByRole("button", {
       name: "Pass through unchanged",
     });
@@ -568,8 +568,8 @@ describe("HistoryPage", () => {
       entries: [],
     });
     requeue.mockResolvedValue({ detail: "Queued 1 file again." });
-    renderPage("/history?file=1");
-    const detail = screen.getByTestId("history-detail");
+    renderPage("/activity?file=1");
+    const detail = screen.getByTestId("activity-detail");
 
     fireEvent.click(
       within(detail).getByRole("button", { name: "Process again" }),
@@ -587,7 +587,7 @@ describe("HistoryPage", () => {
       file({ id: 2, status: "processing_failed" }),
       file({ id: 3, status: "skipped" }),
     ];
-    renderPage("/history?show=failed");
+    renderPage("/activity?show=failed");
 
     const retryAll = screen.getByRole("button", {
       name: "Try the 2 failed files again",
@@ -599,16 +599,16 @@ describe("HistoryPage", () => {
 
   it("offers Process all again under Failed when a rejected file is listed", () => {
     files.files = [file({ id: 1, status: "rejected" })];
-    renderPage("/history?show=failed");
+    renderPage("/activity?show=failed");
 
     expect(screen.getByTestId("process-rejected-again")).toHaveTextContent(
       "all|no name",
     );
   });
 
-  it("hands Process all again the workflow History is narrowed to", () => {
+  it("hands Process all again the workflow Activity is narrowed to", () => {
     files.files = [file({ id: 1, status: "rejected" })];
-    renderPage("/history?show=failed&library=1");
+    renderPage("/activity?show=failed&library=1");
 
     expect(screen.getByTestId("process-rejected-again")).toHaveTextContent(
       "1|TV",
@@ -617,7 +617,7 @@ describe("HistoryPage", () => {
 
   it("does not offer Process all again when only failed files are listed", () => {
     files.files = [file({ id: 1, status: "processing_failed" })];
-    renderPage("/history?show=failed");
+    renderPage("/activity?show=failed");
 
     expect(
       screen.queryByTestId("process-rejected-again"),
@@ -636,7 +636,7 @@ describe("HistoryPage", () => {
   it("does not offer Process all again to someone who cannot edit", () => {
     me.role = "viewer";
     files.files = [file({ id: 1, status: "rejected" })];
-    renderPage("/history?show=failed");
+    renderPage("/activity?show=failed");
 
     expect(
       screen.queryByTestId("process-rejected-again"),
@@ -695,9 +695,9 @@ describe("HistoryPage", () => {
       retention_days: 90,
       entries: [],
     });
-    renderPage("/history?file=1");
+    renderPage("/activity?file=1");
 
-    const lead = within(screen.getByTestId("history-detail")).getByText(
+    const lead = within(screen.getByTestId("activity-detail")).getByText(
       (_, element) => element?.className === "mm-history-detail__lead",
     );
     expect(lead.textContent).toBe(reason);
@@ -738,7 +738,7 @@ describe("HistoryPage", () => {
         },
       ],
     });
-    renderPage("/history?file=1");
+    renderPage("/activity?file=1");
 
     const story = await screen.findByRole("list", { name: "What happened" });
     expect(within(story).getByText("Rejected")).toBeInTheDocument();
@@ -763,9 +763,9 @@ describe("HistoryPage", () => {
       retention_days: 90,
       entries: [],
     });
-    renderPage("/history?file=1");
+    renderPage("/activity?file=1");
 
-    const lead = within(screen.getByTestId("history-detail")).getByText(
+    const lead = within(screen.getByTestId("activity-detail")).getByText(
       (_, element) => element?.className === "mm-history-detail__lead",
     );
     expect(lead.textContent).toBe(
@@ -836,7 +836,7 @@ describe("HistoryPage", () => {
       detail:
         "Weir is checking this file's workflow now and will queue it once it is ready.",
     });
-    renderPage("/history?show=kept");
+    renderPage("/activity?show=kept");
 
     expect(await screen.findByTestId("kept-file-row-7")).toBeInTheDocument();
     expect(screen.getByText("Movies")).toBeInTheDocument();
@@ -852,8 +852,8 @@ describe("HistoryPage", () => {
     expect(processKeptAgain).toHaveBeenCalledWith(7);
   });
 
-  it("says nothing is kept right now instead of showing an empty history pane", () => {
-    renderPage("/history?show=kept");
+  it("says nothing is kept right now instead of showing an empty activity pane", () => {
+    renderPage("/activity?show=kept");
 
     expect(
       screen.getByText("No files are kept right now."),
@@ -863,7 +863,7 @@ describe("HistoryPage", () => {
   it("says its kept files could not load, through the shared load-error wording", () => {
     keptQueryState.isError = true;
     keptQueryState.error = new Error("boom");
-    renderPage("/history?show=kept");
+    renderPage("/activity?show=kept");
 
     expect(
       screen.getByText(

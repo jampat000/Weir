@@ -13,9 +13,9 @@ const OUTCOME_LEAD: Record<LibraryClean["outcome"], string> = {
 /**
  * A library clean in full (#695): what it did to a file already in the library, read from the Activity
  * event the clean wrote. There is no further record to open and nothing to queue again from here — a
- * clean is re-run from the library it belongs to, not from History.
+ * clean is re-run from the library it belongs to, not from Activity.
  */
-export function HistoryCleanDetail({ clean }: { clean: LibraryClean }) {
+export function ActivityCleanDetail({ clean }: { clean: LibraryClean }) {
   const { sectionRef, titleRef } = useNarrowDetailFocus(clean.id);
   const formatWhen = useAppDateFormatter();
 
@@ -23,12 +23,12 @@ export function HistoryCleanDetail({ clean }: { clean: LibraryClean }) {
     <section
       ref={sectionRef}
       className="mm-history-detail"
-      aria-labelledby="history-detail-title"
-      data-testid="history-detail"
+      aria-labelledby="activity-detail-title"
+      data-testid="activity-detail"
     >
       <p className="mm-history-detail__eyebrow">{clean.library_name}</p>
       <h2
-        id="history-detail-title"
+        id="activity-detail-title"
         ref={titleRef}
         tabIndex={-1}
         className="mm-history-detail__title"

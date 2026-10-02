@@ -160,12 +160,12 @@ export function LiveView({ filter, workflowId, layout }: LiveViewProps) {
         openFile(match);
         return;
       }
-      // Older than the files list reaches, or a library file: open its history instead.
+      // Older than the files list reaches, or a library file: open its activity instead.
       const path = encodeURIComponent(item.relativePath);
       void navigate(
         item.source === "library"
           ? `/library?path=${path}`
-          : `/history?q=${path}`,
+          : `/activity?q=${path}`,
       );
     },
     [files.data, navigate, openFile],

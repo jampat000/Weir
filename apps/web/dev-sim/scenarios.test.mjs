@@ -268,7 +268,7 @@ describe("what a person can do about the files that wait on them", () => {
     ).toContain(held.id);
   });
 
-  it("lets a file held by a path rule be removed from History", () => {
+  it("lets a file held by a path rule be removed from Activity", () => {
     const { sim } = sessionOf(SCENARIO.BUSY);
     const [skipped] = filesOf(sim, STATUS.SKIPPED);
 

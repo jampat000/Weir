@@ -36,7 +36,7 @@ const sentenceOf = (row: { parts: (string | { bold: string })[] }) =>
     .join("");
 
 describe("the activity stream", () => {
-  it("words a cleaned file from its own outcome and links to its story in History", () => {
+  it("words a cleaned file from its own outcome and links to its story in Activity", () => {
     const { rows } = buildStream([
       pass({
         outcome: "live_output_written",
@@ -50,7 +50,7 @@ describe("the activity stream", () => {
     expect(sentenceOf(rows[0])).toBe("The Quiet Harbour S01E06 cleaned");
     expect(rows[0].tone).toBe("success");
     expect(rows[0].note).toBe("Saved 319 MB · removed 2 audio");
-    expect(rows[0].to).toBe("/history?q=The.Quiet.Harbour.S01E06.mkv");
+    expect(rows[0].to).toBe("/activity?q=The.Quiet.Harbour.S01E06.mkv");
   });
 
   it("words a file that needed nothing changed as already clean", () => {

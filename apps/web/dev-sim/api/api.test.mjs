@@ -341,7 +341,7 @@ describe("what a person can do to a file", () => {
     ]);
   });
 
-  it("removes a file from History and keeps it listed as kept when asked to", () => {
+  it("removes a file from Activity and keeps it listed as kept when asked to", () => {
     const { sim } = createTestSim({ withHistory: true });
     const done = [...sim.engine.files.values()].find(
       (file) => file.status === "processed",

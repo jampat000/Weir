@@ -36,8 +36,8 @@ describe("StatTile", () => {
         <StatTile
           label="Today"
           figure="12"
-          to="/history"
-          linkName="History: Today"
+          to="/activity"
+          linkName="Activity: Today"
         >
           body
         </StatTile>
@@ -45,8 +45,8 @@ describe("StatTile", () => {
     );
 
     expect(
-      screen.getByRole("link", { name: "History: Today" }),
-    ).toHaveAttribute("href", "/history");
+      screen.getByRole("link", { name: "Activity: Today" }),
+    ).toHaveAttribute("href", "/activity");
   });
 
   it("leaves the label plain text when there is nowhere to go", () => {

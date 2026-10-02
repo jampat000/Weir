@@ -1,6 +1,6 @@
 /**
  * What Weir decides to do with a simulated file: which tracks go, how big the result is, and whether the rules turn
- * it away. The words match the planner's own, so History reads the way it does against a real server.
+ * it away. The words match the planner's own, so Activity reads the way it does against a real server.
  */
 import { FOREIGN_AUDIO, SUBTITLE_LANGUAGES } from "./catalogue.mjs";
 

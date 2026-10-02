@@ -6,7 +6,7 @@ describe("pageMeta", () => {
   it.each([
     ["/", "", "Dashboard"],
     ["/", "?view=system&workflow=2", "Dashboard"],
-    ["/history", "", "History"],
+    ["/activity", "", "Activity"],
     ["/library", "", "Library"],
     ["/system", "?tab=logs", "System"],
     ["/setup/workflows", "", "Workflows"],

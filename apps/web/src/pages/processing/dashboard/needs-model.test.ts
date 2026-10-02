@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { ProcessingFile } from "../../../lib/processing/files-api";
 import type { ProcessingLibrary } from "../../../lib/processing/libraries-api";
-import { HISTORY_GROUPS } from "../../history/history-entries";
+import { ACTIVITY_GROUPS } from "../../activity/activity-entries";
 import {
   FAILED_JOBS_LIMIT,
   FILES_SHOWN_PER_GROUP,
@@ -334,7 +334,7 @@ describe("the files that need a person", () => {
     expect(groups.map((group) => group.rejected)).toEqual([false, true]);
   });
 
-  it("lists a few files per group and counts the rest, which History has", () => {
+  it("lists a few files per group and counts the rest, which Activity has", () => {
     const files = [1, 2, 3, 4, 5, 6].map((id) => failedFile(id));
 
     const [group] = buildNeeds({ ...healthy, files });
@@ -344,7 +344,7 @@ describe("the files that need a person", () => {
     expect(group.more).toBe(2);
   });
 
-  it("names the History view that has each group's files, and none for what is wrong with Weir itself", () => {
+  it("names the Activity view that has each group's files, and none for what is wrong with Weir itself", () => {
     const groups = buildNeeds({
       ...healthy,
       workflows: [{ ...workflow, enabled: false } as ProcessingLibrary],
@@ -361,7 +361,7 @@ describe("the files that need a person", () => {
     });
 
     expect(
-      Object.fromEntries(groups.map((group) => [group.key, group.history])),
+      Object.fromEntries(groups.map((group) => [group.key, group.activity])),
     ).toEqual({
       weir: null,
       "failed-writing": "failed",
@@ -371,8 +371,8 @@ describe("the files that need a person", () => {
     });
   });
 
-  it("names a History view that exists for every group", () => {
-    const ids = HISTORY_GROUPS.map((group) => group.id);
+  it("names a Activity view that exists for every group", () => {
+    const ids = ACTIVITY_GROUPS.map((group) => group.id);
     const groups = buildNeeds({
       ...healthy,
       files: [
@@ -382,7 +382,7 @@ describe("the files that need a person", () => {
       ],
     });
 
-    for (const group of groups) expect(ids).toContain(group.history);
+    for (const group of groups) expect(ids).toContain(group.activity);
   });
 
   it("narrows to one workflow's files, but still says what is wrong with Weir itself", () => {

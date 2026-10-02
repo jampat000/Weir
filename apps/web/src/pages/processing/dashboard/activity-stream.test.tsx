@@ -93,7 +93,7 @@ describe("the activity stream panel", () => {
 
     const list = screen.getByTestId("live-stream");
     const link = within(list).getByRole("link");
-    expect(link).toHaveAttribute("href", "/history?q=Heat.1995.mkv");
+    expect(link).toHaveAttribute("href", "/activity?q=Heat.1995.mkv");
     expect(link).toHaveTextContent("Heat (1995) cleaned");
     expect(within(link).getByText("Heat (1995)").tagName).toBe("B");
     expect(link).toHaveTextContent("2 min ago");
@@ -112,7 +112,7 @@ describe("the activity stream panel", () => {
     );
   });
 
-  it("says it is live when nothing was left out, and links to the whole log", () => {
+  it("says it is live when nothing was left out, and links to the Activity page", () => {
     feed.items = [passEvent(3, "Heat.1995.mkv")];
     renderStream();
 
@@ -120,7 +120,7 @@ describe("the activity stream panel", () => {
     expect(panel).toHaveTextContent("as it happens");
     expect(
       within(panel).getByRole("link", { name: "All activity: Activity" }),
-    ).toHaveAttribute("href", "/system?tab=logs");
+    ).toHaveAttribute("href", "/activity");
   });
 
   it("lets a line that arrives while the page is open glow once, but not the ones already there", () => {
@@ -164,7 +164,7 @@ describe("the activity stream panel", () => {
       name: "All activity: Activity",
     });
     expect(more).toHaveTextContent("3 more");
-    expect(more).toHaveAttribute("href", "/system?tab=logs");
+    expect(more).toHaveAttribute("href", "/activity");
   });
 
   it("says nothing about more when every line fits", () => {

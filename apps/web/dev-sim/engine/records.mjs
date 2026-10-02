@@ -1,6 +1,6 @@
 /**
- * What Weir writes down when a pass ends: the Activity entry's detail and the plain-language story History tells
- * from it. Field names are the server's, so every History and Processing screen reads them as it would from a real
+ * What Weir writes down when a pass ends: the Activity event's detail and the plain-language story the Activity page tells
+ * from it. Field names are the server's, so every Dashboard and Activity screen reads them as it would from a real
  * Weir.
  */
 import { VERDICT } from "./plan.mjs";

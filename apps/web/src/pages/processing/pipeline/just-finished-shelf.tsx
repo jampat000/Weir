@@ -160,8 +160,8 @@ export function JustFinishedShelf({
         <ShelfFilter choices={choices} chosen={narrowedTo} onChoose={choose} />
       }
       description={countWords}
-      to="/history"
-      toLabel="History"
+      to="/activity"
+      toLabel="Activity"
     >
       <div className="mm-shelf" data-testid="just-finished-shelf">
         <div ref={shelfRef} className="mm-shelf__rows">

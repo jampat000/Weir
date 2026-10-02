@@ -6,7 +6,7 @@ import {
   useForgetProcessingFile,
   useProcessingFileRemoveOptions,
 } from "../../lib/processing/files-queries";
-import { HistoryRemoveDialog } from "./history-remove-dialog";
+import { ActivityRemoveDialog } from "./activity-remove-dialog";
 
 type FileRemoval = {
   /** Asks what removing this file would do, then removes it or opens the dialog that asks the person. */
@@ -20,8 +20,8 @@ type FileRemoval = {
 };
 
 /**
- * Removing one title from History (#785): a title whose file is still in the watched folder asks first, in
- * {@link HistoryRemoveDialog}, whether to delete it, keep it, try it again or only drop it from the list; any other
+ * Removing one title from Activity (#785): a title whose file is still in the watched folder asks first, in
+ * {@link ActivityRemoveDialog}, whether to delete it, keep it, try it again or only drop it from the list; any other
  * title is simply forgotten. The file's own screen and every other place that offers "Remove" share this flow.
  */
 export function useFileRemoval({
@@ -108,7 +108,7 @@ export function useFileRemoval({
     checking: removeOptions.isPending,
     removing: forget.isPending,
     dialog: dialogOptions ? (
-      <HistoryRemoveDialog
+      <ActivityRemoveDialog
         fileName={fileName}
         options={dialogOptions}
         busy={forget.isPending}

@@ -4,13 +4,13 @@ import { SegmentedControl } from "../../components/panels/segmented-control";
 import { MmListboxPicker } from "../../components/ui/mm-listbox-picker";
 import { ShellHeaderSlot } from "../../components/shell/shell-header-context";
 import type { ProcessingLibrary } from "../../lib/processing/libraries-api";
-import { HISTORY_GROUPS, type HistoryGroup } from "./history-entries";
+import { ACTIVITY_GROUPS, type ActivityGroup } from "./activity-entries";
 import { HeaderSearch } from "../../components/shell/header-search";
 import { useFitLevels } from "../../lib/ui/use-fit-levels";
 import { useMediaQuery } from "../../lib/ui/use-media-query";
 import { useChipRow } from "../../lib/ui/use-chip-row";
 
-/** How far back History looks, as the server's within_days. */
+/** How far back Activity looks, as the server's within_days. */
 export const PERIODS: { id: string; label: string; days?: number }[] = [
   { id: "1", label: "Today", days: 1 },
   { id: "7", label: "Last 7 days", days: 7 },
@@ -28,7 +28,7 @@ export type SetParam = (name: string, value: string | null) => void;
  * chips scroll sideways inside their own box if they still do not fit. In a window too narrow for that line they take
  * a row under the title.
  */
-export function HistoryFilters({
+export function ActivityFilters({
   query,
   group,
   counts,
@@ -38,8 +38,8 @@ export function HistoryFilters({
   setParam,
 }: {
   query: string;
-  group: HistoryGroup;
-  counts: Record<HistoryGroup, number>;
+  group: ActivityGroup;
+  counts: Record<ActivityGroup, number>;
   libraryId: number | undefined;
   periodId: string;
   libraries: ProcessingLibrary[];
@@ -59,7 +59,7 @@ export function HistoryFilters({
   const periodLabel = useId();
   return (
     <ShellHeaderSlot>
-      <div className="mm-history-controls" data-testid="history-filters">
+      <div className="mm-history-controls" data-testid="activity-filters">
         <form
           className="mm-history-search"
           role="search"
@@ -89,7 +89,7 @@ export function HistoryFilters({
           <SegmentedControl
             ariaLabel="Show"
             value={group}
-            options={HISTORY_GROUPS.map((g) => ({
+            options={ACTIVITY_GROUPS.map((g) => ({
               value: g.id,
               label: (
                 <>

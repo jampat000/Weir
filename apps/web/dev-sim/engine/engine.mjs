@@ -50,7 +50,7 @@ export class Engine {
   };
   /** Bumped on every change a database write would make; the stream sends it so open screens refresh. */
   revision = 0;
-  /** Files a person chose to remove from History but keep on disk: the file, and how the kept-files list shows it. */
+  /** Files a person chose to remove from Activity but keep on disk: the file, and how the kept-files list shows it. */
   kept =
     /** @type {{ file: import("./file.mjs").SimFile, listing: Record<string, unknown> }[]} */ ([]);
 
@@ -443,7 +443,7 @@ export class Engine {
     return this.#cleans.dueTimes(nowMs);
   }
 
-  /** Library cleans recorded so far, newest first, for History. */
+  /** Library cleans recorded so far, newest first, for Activity. */
   get cleanRecords() {
     return this.#cleans.records;
   }

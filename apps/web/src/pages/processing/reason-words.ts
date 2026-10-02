@@ -1,6 +1,6 @@
 /**
  * The few words a card shows for a reason the server wrote as a sentence. The sentence stays where there is room
- * for it (the card's tooltip, History, the file's story); a card says what kind of wait or stop it is.
+ * for it (the card's tooltip, Activity, the file's story); a card says what kind of wait or stop it is.
  *
  * The server words each reason in full and does not label its kind, so the kind is read from the wording it
  * uses. A reason none of these recognise reads as the plain state ("On hold"), never as a guess.

@@ -48,7 +48,7 @@ vi.mock("../lib/system/readiness-queries", () => ({
   }),
 }));
 
-// The Dashboard entry says how many cards the Working lane is showing; History says how many files
+// The Dashboard entry says how many cards the Working lane is showing; Activity says how many files
 // need someone.
 const counts = { working: 0, needsYou: 0 };
 vi.mock("../pages/processing/working-count", () => ({
@@ -90,14 +90,14 @@ describe("AppShell", () => {
     readiness.isError = false;
   });
 
-  it("opens on the Dashboard; there is no Home, Processing or Activity entry", () => {
+  it("opens on the Dashboard; there is no Home, Processing or History entry", () => {
     renderShell("/");
 
     expect(screen.getByRole("link", { name: "Dashboard" })).toHaveAttribute(
       "href",
       "/",
     );
-    for (const retired of ["Home", "Processing", "Activity"]) {
+    for (const retired of ["Home", "Processing", "History"]) {
       expect(
         screen.queryByRole("link", { name: retired }),
       ).not.toBeInTheDocument();
@@ -115,7 +115,7 @@ describe("AppShell", () => {
     // stops matching its destination fails rather than quietly misleading someone.
     expect(items).toEqual([
       ["Dashboard", "/"],
-      ["History", "/history"],
+      ["Activity", "/activity"],
       ["Library", "/library"],
       ["Workflows", "/setup/workflows"],
       ["Connections", "/setup/connections"],
@@ -203,33 +203,33 @@ describe("AppShell", () => {
     expect(screen.getByRole("link", { name: "Dashboard" })).toBeInTheDocument();
   });
 
-  it("shows how many files need you beside History, and nothing when none do", () => {
+  it("shows how many files need you beside Activity, and nothing when none do", () => {
     counts.needsYou = 3;
     const { unmount } = renderShell("/");
-    const history = screen.getByRole("link", { name: "History, 3 need you" });
+    const activity = screen.getByRole("link", { name: "Activity, 3 need you" });
     expect(
-      within(history).getByTestId("nav-history-needs-you"),
+      within(activity).getByTestId("nav-activity-needs-you"),
     ).toHaveTextContent("3");
     unmount();
 
     counts.needsYou = 0;
     renderShell("/");
-    expect(screen.queryByTestId("nav-history-needs-you")).toBeNull();
+    expect(screen.queryByTestId("nav-activity-needs-you")).toBeNull();
   });
 
-  it("opens History's Needs you view from History while files need you, and History itself when none do", () => {
+  it("opens Activity's Needs you view from Activity while files need you, and Activity itself when none do", () => {
     counts.needsYou = 3;
     const { unmount } = renderShell("/");
     expect(
-      screen.getByRole("link", { name: "History, 3 need you" }),
-    ).toHaveAttribute("href", "/history?show=attention");
+      screen.getByRole("link", { name: "Activity, 3 need you" }),
+    ).toHaveAttribute("href", "/activity?show=attention");
     unmount();
 
     counts.needsYou = 0;
     renderShell("/");
-    expect(screen.getByRole("link", { name: "History" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Activity" })).toHaveAttribute(
       "href",
-      "/history",
+      "/activity",
     );
   });
 

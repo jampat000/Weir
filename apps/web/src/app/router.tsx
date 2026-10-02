@@ -9,7 +9,7 @@ import { RequireAuth } from "./require-auth";
 import { RequireSetupWizard } from "./require-setup-wizard";
 import { AppHydrateFallback } from "./hydrate-fallback";
 import {
-  LegacyActivityRedirect,
+  LegacyHistoryRedirect,
   LegacyProcessingRedirect,
   LegacySettingsRedirect,
 } from "./legacy-redirects";
@@ -17,7 +17,7 @@ import { setupRoutes } from "./setup-routes";
 
 const routeErrorElement = <RouteErrorScreen />;
 
-// Five places: the Dashboard (/), History, Library, the four setup areas (/setup/...) and System. Addresses
+// Five places: the Dashboard (/), Activity, Library, the four setup areas (/setup/...) and System. Addresses
 // bookmarked from an installed release that no longer exist redirect to where their page lives now
 // (legacy-redirects.tsx); anything older gets the Not found page.
 const router = createBrowserRouter([
@@ -72,10 +72,10 @@ const router = createBrowserRouter([
               },
               {
                 // Every file Weir has touched: what it was, what Weir did and what came out.
-                path: "history",
+                path: "activity",
                 lazy: async () => ({
-                  Component: (await import("../pages/history/history-page"))
-                    .HistoryPage,
+                  Component: (await import("../pages/activity/activity-page"))
+                    .ActivityPage,
                 }),
                 errorElement: routeErrorElement,
               },
@@ -89,8 +89,8 @@ const router = createBrowserRouter([
                 errorElement: routeErrorElement,
               },
               {
-                path: "activity",
-                element: <LegacyActivityRedirect />,
+                path: "history",
+                element: <LegacyHistoryRedirect />,
                 errorElement: routeErrorElement,
               },
               {

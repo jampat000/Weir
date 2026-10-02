@@ -12,7 +12,7 @@ import { plural } from "../../lib/ui/mm-plural";
 
 /**
  * "Process all again": after the rules change, every rejected file whose original is still in its watched folder goes
- * back to work in one step. It covers the whole rejected set (of the workflow History is narrowed to, if any), not just
+ * back to work in one step. It covers the whole rejected set (of the workflow Activity is narrowed to, if any), not just
  * the rows listed for the period on screen, and the dialog says so along with how many files that is.
  */
 export function ProcessRejectedAgain({
@@ -58,7 +58,7 @@ export function ProcessRejectedAgain({
   }
 
   return (
-    <div className="mm-history-bulk" data-testid="history-process-rejected">
+    <div className="mm-history-bulk" data-testid="activity-process-rejected">
       <button
         type="button"
         className={mmActionButtonClass({ variant: "secondary" })}
@@ -75,13 +75,13 @@ export function ProcessRejectedAgain({
       ) : null}
       {asking ? (
         <ConfirmDialog
-          testId="history-process-rejected-confirm"
+          testId="activity-process-rejected-confirm"
           title={`Process ${plural(asking.ready, "rejected file", "rejected files")} again with your current rules?`}
           description={
             <>
               <p>
                 This covers every rejected file in {scope}, not only the ones
-                History is listing now. Anything your rules still turn down is
+                Activity is listing now. Anything your rules still turn down is
                 rejected again.
               </p>
               {asking.rejected > asking.ready ? (

@@ -5,6 +5,7 @@ import { Panel } from "../../../components/panels/panel";
 import { useActivityRecentQuery } from "../../../lib/activity/queries";
 import { classNames } from "../../../lib/ui/class-names";
 import { motionAllowed } from "../../../lib/ui/motion-allowed";
+import { ACTIVITY_PATH } from "../../activity/activity-links";
 import { ACTIVITY_MODULE_OF_WORK, type Filter } from "../processing-filter";
 import { useFittingRows } from "./fit-rows";
 import { StreamIcon } from "./stream-icons";
@@ -19,7 +20,6 @@ import {
 const RECENT_EVENTS = 80;
 /** The most lines drawn: the panel's height decides how many whole ones show, and this bounds what is measured. */
 const MOST_LINES = 40;
-const LOG_PATH = "/system?tab=logs";
 
 /** What an empty list says, for everything and for each kind of work it can be narrowed to. */
 const NOTHING_YET_WORDS: Record<Filter, string> = {
@@ -117,7 +117,7 @@ export function ActivityStream({
           ? `${stream.routine.toLocaleString()} routine left out`
           : "as it happens"
       }
-      to={LOG_PATH}
+      to={ACTIVITY_PATH}
       toLabel="All activity"
       toText={more > 0 ? `${more.toLocaleString()} more` : undefined}
     >

@@ -147,12 +147,12 @@ describe("Just finished", () => {
     );
   });
 
-  it("links on to History", () => {
+  it("links on to Activity", () => {
     render(shelf([finished(1)]));
 
     expect(
-      screen.getByRole("link", { name: "History: Just finished" }),
-    ).toHaveAttribute("href", "/history");
+      screen.getByRole("link", { name: "Activity: Just finished" }),
+    ).toHaveAttribute("href", "/activity");
   });
 });
 
@@ -220,7 +220,7 @@ describe("Just finished's workflow chips", () => {
     expect(tiles()).toEqual([expect.stringContaining("S01E02")]);
   });
 
-  it("sits the chips in the panel's header, between the title and the History link", () => {
+  it("sits the chips in the panel's header, between the title and the Activity link", () => {
     render(shelf([finished(1)]));
 
     const header = screen
@@ -232,7 +232,7 @@ describe("Just finished's workflow chips", () => {
     ).toBeInTheDocument();
     expect(
       within(header as HTMLElement).getByRole("link", {
-        name: "History: Just finished",
+        name: "Activity: Just finished",
       }),
     ).toBeInTheDocument();
   });

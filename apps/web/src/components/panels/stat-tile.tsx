@@ -9,7 +9,7 @@ type StatTileProps = {
   figure: ReactNode;
   /** Makes the label a link to where the figure comes from. */
   to?: string;
-  /** The link's accessible name, so it is not just the label: "History: Today". */
+  /** The link's accessible name, so it is not just the label: "Activity: Today". */
   linkName?: string;
   /** The body under the figure, for a tile that measures how many of its rows fit. */
   bodyRef?: Ref<HTMLDivElement>;

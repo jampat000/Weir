@@ -101,7 +101,7 @@ export function WorkingTile({
     <StatTile
       label="Working on now"
       to={IN_PROGRESS_PATH}
-      linkName="Working on now: every file in History"
+      linkName="Working on now: every file in Activity"
       bodyRef={bodyRef}
       aside={
         <span className="mm-aside">
@@ -109,7 +109,7 @@ export function WorkingTile({
             <span className="mm-aside__more">
               <Link
                 to={IN_PROGRESS_PATH}
-                aria-label={`${more.toLocaleString()} more in History`}
+                aria-label={`${more.toLocaleString()} more in Activity`}
               >
                 <FitText
                   className="mm-aside__more-words"

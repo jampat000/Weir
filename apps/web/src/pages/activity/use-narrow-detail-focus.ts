@@ -6,7 +6,7 @@ const NARROW_DETAIL_WIDTH = "(max-width: 1099.98px)";
 /**
  * Scrolls a narrow-width detail panel into view and focuses its title whenever `id` changes, so picking
  * a row has a visible result even when the detail sits below the list rather than beside it (#687). Skips
- * the page's first render, so loading History never steals focus from wherever the browser put it.
+ * the page's first render, so loading Activity never steals focus from wherever the browser put it.
  */
 export function useNarrowDetailFocus(id: string | number) {
   const sectionRef = useRef<HTMLElement>(null);

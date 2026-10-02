@@ -858,7 +858,7 @@ export interface paths {
     };
     /**
      * Get Processing File Remove Options
-     * @description What History's remove dialog should offer for this title (#785), read before it is shown.
+     * @description What Activity's remove dialog should offer for this title (#785), read before it is shown.
      */
     get: operations["get_processing_file_remove_options_api_v1_files__file_id__remove_options_get"];
     put?: never;
@@ -881,7 +881,7 @@ export interface paths {
     post?: never;
     /**
      * Delete Processing File
-     * @description History's "Remove from list" (#785). `resolution` chooses what happens to a failed or rejected file whose original is still in the watched folder: `delete` asks a manager to remove the download and search again, or Weir deletes it itself; `keep` leaves the file but skips it until it changes; `retry` queues it again. Anything else is always a plain remove.
+     * @description Activity's "Remove from list" (#785). `resolution` chooses what happens to a failed or rejected file whose original is still in the watched folder: `delete` asks a manager to remove the download and search again, or Weir deletes it itself; `keep` leaves the file but skips it until it changes; `retry` queues it again. Anything else is always a plain remove.
      */
     delete: operations["delete_processing_file_api_v1_files__file_id__delete"];
     options?: never;
@@ -898,7 +898,7 @@ export interface paths {
     };
     /**
      * Get Processing Kept Files
-     * @description Every file kept without processing again from History's remove dialog (#785).
+     * @description Every file kept without processing again from Activity's remove dialog (#785).
      */
     get: operations["get_processing_kept_files_api_v1_processing_kept_files_get"];
     put?: never;
@@ -4562,7 +4562,7 @@ export interface components {
     };
     /**
      * ProcessingFileForgetIn
-     * @description History's remove dialog (#785). `resolution` is only meaningful for a failed or rejected file whose
+     * @description Activity's remove dialog (#785). `resolution` is only meaningful for a failed or rejected file whose
      *     original is still in the watched folder (see ProcessingFileRemoveOptionsOut); anything else is always a plain
      *     remove, whatever `resolution` asks for. `confirm_size_bytes` and `confirm_modified_at` are the file's current
      *     details as `remove-options` reported them (#786 follow-up): required for `delete` or `keep` on a title whose
@@ -4584,7 +4584,7 @@ export interface components {
     };
     /**
      * ProcessingFileRemoveOptionsOut
-     * @description What History's remove dialog should offer for one title, read before it is shown (#785).
+     * @description What Activity's remove dialog should offer for one title, read before it is shown (#785).
      */
     ProcessingFileRemoveOptionsOut: {
       /** Requires Choice */
@@ -4614,7 +4614,7 @@ export interface components {
     };
     /**
      * ProcessingKeptFileOut
-     * @description One file kept without processing again from History's remove dialog (#785).
+     * @description One file kept without processing again from Activity's remove dialog (#785).
      */
     ProcessingKeptFileOut: {
       /** Id */
@@ -4757,7 +4757,7 @@ export interface components {
       id: number;
       /**
        * Kind
-       * @description Which kind of History entry this is: always a download here.
+       * @description Which kind of Activity entry this is: always a download here.
        * @constant
        */
       kind: "download";
@@ -5264,7 +5264,7 @@ export interface components {
     };
     /**
      * ProcessingLibraryCleanOut
-     * @description What the newest library clean did to one file, as History lists it.
+     * @description What the newest library clean did to one file, as Activity lists it.
      */
     ProcessingLibraryCleanOut: {
       /**
@@ -5305,7 +5305,7 @@ export interface components {
     };
     /**
      * ProcessingLibraryCleansOut
-     * @description Library cleans for History, newest first, one per file.
+     * @description Library cleans for Activity, newest first, one per file.
      */
     ProcessingLibraryCleansOut: {
       /** Cleans */

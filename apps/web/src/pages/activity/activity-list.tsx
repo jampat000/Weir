@@ -10,13 +10,13 @@ import {
 import type { LibraryClean } from "../../lib/processing/library-cleans-api";
 import {
   entryGroup,
-  type HistoryGroup,
+  type ActivityGroup,
   entryPath,
   entryTime,
-  type HistoryEntry,
-} from "./history-entries";
+  type ActivityEntry,
+} from "./activity-entries";
 import { prettyName } from "../processing/processing-model";
-import { agoWords, importedLabel } from "./history-model";
+import { agoWords, importedLabel } from "./activity-model";
 
 /** What Weir did, in a few words, for the list. */
 function whatWeirDid(file: ProcessingFile): string {
@@ -35,18 +35,18 @@ const CLEAN_OUTCOME_WORDS: Record<LibraryClean["outcome"], string> = {
 };
 
 /** The poster of a download; a clean in a library has none. */
-function posterUrlOf(entry: HistoryEntry): string | null | undefined {
+function posterUrlOf(entry: ActivityEntry): string | null | undefined {
   return entry.kind === "download" ? entry.file.poster_url : null;
 }
 
-function libraryNameOf(entry: HistoryEntry): string {
+function libraryNameOf(entry: ActivityEntry): string {
   return entry.kind === "library_clean"
     ? entry.clean.library_name
     : entry.file.library_name;
 }
 
 /** The library name and, for a download, its size. */
-function subLine(entry: HistoryEntry): string {
+function subLine(entry: ActivityEntry): string {
   if (entry.kind === "library_clean") return entry.clean.library_name;
   return [entry.file.library_name, formatBytes(entry.file.size_bytes)]
     .filter(Boolean)
@@ -54,7 +54,7 @@ function subLine(entry: HistoryEntry): string {
 }
 
 /** The chip's colour for where an entry stands. A skip is Weir deciding a file is not for it, so it stays neutral. */
-const GROUP_TONE: Record<HistoryGroup, MmStatusTone> = {
+const GROUP_TONE: Record<ActivityGroup, MmStatusTone> = {
   all: "neutral",
   working: "info",
   finished: "healthy",
@@ -65,20 +65,20 @@ const GROUP_TONE: Record<HistoryGroup, MmStatusTone> = {
   kept: "neutral",
 };
 
-function entryIsSelected(entry: HistoryEntry, selectedKey: string | null) {
+function entryIsSelected(entry: ActivityEntry, selectedKey: string | null) {
   return selectedKey !== null && entry.key === selectedKey;
 }
 
-export function HistoryList({
+export function ActivityList({
   entries,
   selectedKey,
   now,
   onPick,
 }: {
-  entries: HistoryEntry[];
+  entries: ActivityEntry[];
   selectedKey: string | null;
   now: number;
-  onPick: (entry: HistoryEntry) => void;
+  onPick: (entry: ActivityEntry) => void;
 }) {
   return (
     <table className="mm-history-table">

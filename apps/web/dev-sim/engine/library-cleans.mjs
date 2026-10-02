@@ -29,7 +29,7 @@ export class CleanRuns {
   #nextAt = 0;
   #nextRecordId = 1;
   #rotation = 0;
-  /** What History lists: the newest clean of each file, newest first. */
+  /** What Activity lists: the newest clean of each file, newest first. */
   records = /** @type {Record<string, any>[]} */ ([]);
 
   /**

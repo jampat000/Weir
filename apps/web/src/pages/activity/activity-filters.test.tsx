@@ -6,12 +6,12 @@ import {
   useHeaderSlotRef,
 } from "../../components/shell/shell-header-context";
 import type { ProcessingLibrary } from "../../lib/processing/libraries-api";
-import { HISTORY_GROUPS, type HistoryGroup } from "./history-entries";
-import { HistoryFilters } from "./history-filters";
+import { ACTIVITY_GROUPS, type ActivityGroup } from "./activity-entries";
+import { ActivityFilters } from "./activity-filters";
 
 const COUNTS = Object.fromEntries(
-  HISTORY_GROUPS.map((g, index) => [g.id, index + 1]),
-) as Record<HistoryGroup, number>;
+  ACTIVITY_GROUPS.map((g, index) => [g.id, index + 1]),
+) as Record<ActivityGroup, number>;
 
 const LIBRARIES = [
   { id: 4, name: "Movies" },
@@ -28,7 +28,7 @@ function renderFilters(setParam = vi.fn()) {
   render(
     <ShellHeaderProvider>
       <HeaderSlot />
-      <HistoryFilters
+      <ActivityFilters
         query=""
         group="all"
         counts={COUNTS}
@@ -42,7 +42,7 @@ function renderFilters(setParam = vi.fn()) {
   return setParam;
 }
 
-describe("HistoryFilters in the header", () => {
+describe("ActivityFilters in the header", () => {
   it("puts the search, the kinds of file and both pickers on the title line, in the header's slot", () => {
     renderFilters();
 
@@ -55,7 +55,7 @@ describe("HistoryFilters in the header", () => {
       within(chips)
         .getAllByRole("button")
         .map((chip) => chip.textContent),
-    ).toEqual(HISTORY_GROUPS.map((g) => `${g.label} ${COUNTS[g.id]}`));
+    ).toEqual(ACTIVITY_GROUPS.map((g) => `${g.label} ${COUNTS[g.id]}`));
     expect(within(slot).getByLabelText("Workflow")).toBeInTheDocument();
     expect(within(slot).getByLabelText("How far back")).toBeInTheDocument();
   });

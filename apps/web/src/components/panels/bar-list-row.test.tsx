@@ -51,15 +51,15 @@ describe("BarListRow", () => {
           value="3"
           fraction={0.2}
           color="red"
-          to="/history?show=failed"
-          linkName="Rejected: 3, show in History"
+          to="/activity?show=failed"
+          linkName="Rejected: 3, show in Activity"
         />
       </MemoryRouter>,
     );
 
     expect(
-      screen.getByRole("link", { name: "Rejected: 3, show in History" }),
-    ).toHaveAttribute("href", "/history?show=failed");
+      screen.getByRole("link", { name: "Rejected: 3, show in Activity" }),
+    ).toHaveAttribute("href", "/activity?show=failed");
   });
 
   it("is plain text when it has nowhere to go", () => {

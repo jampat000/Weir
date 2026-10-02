@@ -46,7 +46,7 @@ function ArrInstructions({ name }: { name: string }) {
         Connect, add a <strong>Webhook</strong>, tick <strong>On Import</strong>{" "}
         and <strong>On Upgrade</strong>, and use the address below with method
         POST. Add a header named <code>X-Webhook-Secret</code> holding the
-        secret. History then says &ldquo;Imported by {name}&rdquo;, and Weir
+        secret. Activity then says &ldquo;Imported by {name}&rdquo;, and Weir
         removes its own copy once {name} has taken it, only when that copy is
         still exactly as Weir wrote it.
       </p>

@@ -6,13 +6,13 @@ import {
   downloadEntry,
   entryGroup,
   hasRejectedFiles,
-  historyEntries,
-  historyGroupOf,
+  activityEntries,
+  activityGroupOf,
   inGroup,
   retryableFailures,
   waitsOnAPerson,
-  HISTORY_GROUPS,
-} from "./history-entries";
+  ACTIVITY_GROUPS,
+} from "./activity-entries";
 
 function file(partial: Partial<ProcessingFile>): ProcessingFile {
   return {
@@ -65,32 +65,34 @@ function clean(partial: Partial<LibraryClean>): LibraryClean {
   };
 }
 
-describe("history groups", () => {
+describe("activity groups", () => {
   it("puts a file a manager still has under On hold", () => {
-    expect(historyGroupOf(file({ status: "blocked_upstream" }))).toBe("needs");
+    expect(activityGroupOf(file({ status: "blocked_upstream" }))).toBe("needs");
   });
 
   it("puts a file Weir gave up on under Failed, whatever it failed on and however often", () => {
     expect(
-      historyGroupOf(
+      activityGroupOf(
         file({ status: "processing_failed", failure_attempts: 5 }),
       ),
     ).toBe("failed");
   });
 
   it("moves on_hold into On hold rather than In progress", () => {
-    expect(historyGroupOf(file({ status: "on_hold" }))).toBe("needs");
+    expect(activityGroupOf(file({ status: "on_hold" }))).toBe("needs");
   });
 
   it("gives a skip its own neutral group rather than counting it as failed", () => {
-    expect(historyGroupOf(file({ status: "skipped" }))).toBe("skipped");
+    expect(activityGroupOf(file({ status: "skipped" }))).toBe("skipped");
   });
 
   it("sorts the rest by what is happening to them", () => {
-    expect(historyGroupOf(file({ status: "unprocessed" }))).toBe("working");
-    expect(historyGroupOf(file({ status: "passed_through" }))).toBe("finished");
-    expect(historyGroupOf(file({ status: "rejected" }))).toBe("failed");
-    expect(historyGroupOf(file({ status: "disabled" }))).toBeNull();
+    expect(activityGroupOf(file({ status: "unprocessed" }))).toBe("working");
+    expect(activityGroupOf(file({ status: "passed_through" }))).toBe(
+      "finished",
+    );
+    expect(activityGroupOf(file({ status: "rejected" }))).toBe("failed");
+    expect(activityGroupOf(file({ status: "disabled" }))).toBeNull();
   });
 });
 
@@ -114,9 +116,9 @@ describe("inGroup", () => {
   });
 });
 
-describe("historyEntries", () => {
+describe("activityEntries", () => {
   it("lists downloads and cleans together, newest change first", () => {
-    const entries = historyEntries(
+    const entries = activityEntries(
       [file({ id: 1, updated_at: "2026-08-19T03:00:00" })],
       [clean({ id: 1, recorded_at: "2026-08-19T05:00:00" })],
     );
@@ -129,7 +131,7 @@ describe("historyEntries", () => {
 
 describe("retryableFailures", () => {
   it("keeps only the failed downloads, leaving out a failed clean or any other status", () => {
-    const entries = historyEntries(
+    const entries = activityEntries(
       [
         file({ id: 1, status: "processing_failed" }),
         file({ id: 2, status: "skipped" }),
@@ -142,8 +144,8 @@ describe("retryableFailures", () => {
 
 describe("hasRejectedFiles", () => {
   it("is true only when a listed download was rejected", () => {
-    const rejected = historyEntries([file({ id: 1, status: "rejected" })], []);
-    const failed = historyEntries(
+    const rejected = activityEntries([file({ id: 1, status: "rejected" })], []);
+    const failed = activityEntries(
       [file({ id: 2, status: "processing_failed" })],
       [clean({ id: 1, outcome: "failed" })],
     );
@@ -197,7 +199,7 @@ describe("the files that wait on a person", () => {
   });
 
   it("have a chip of their own, named Needs you, apart from the files that are on hold", () => {
-    expect(HISTORY_GROUPS.map((group) => group.label)).toEqual([
+    expect(ACTIVITY_GROUPS.map((group) => group.label)).toEqual([
       "All",
       "In progress",
       "Finished",

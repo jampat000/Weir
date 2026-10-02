@@ -5,8 +5,8 @@ import { Panel } from "../../../components/panels/panel";
 import type { ProcessingFile } from "../../../lib/processing/files-api";
 import { useProcessingLibrariesQuery } from "../../../lib/processing/libraries-queries";
 import type { Filter } from "../processing-filter";
-import { historyGroupPath } from "../../history/history-links";
-import { ProcessRejectedAgain } from "../../history/history-rejected-again";
+import { activityGroupPath } from "../../activity/activity-links";
+import { ProcessRejectedAgain } from "../../activity/activity-rejected-again";
 import { NeedFileActions, type NeedNotice } from "./needs-file-actions";
 import { useFittingRows } from "./fit-rows";
 import {
@@ -84,13 +84,13 @@ function Group({
           <NeedItem key={row.key} row={row} {...handlers} />
         ))}
       </ul>
-      {group.more > 0 && group.history ? (
+      {group.more > 0 && group.activity ? (
         <Link
           className="mm-need__link mm-needs__more"
-          to={historyGroupPath(group.history, workflowId)}
+          to={activityGroupPath(group.activity, workflowId)}
           data-fit=""
         >
-          and {group.more.toLocaleString()} more in History →
+          and {group.more.toLocaleString()} more in Activity →
         </Link>
       ) : null}
     </section>
@@ -131,7 +131,7 @@ type NeedsPanelProps = {
   workflowId?: number | null;
   /** Narrows the panel to one kind of work; both when left out. */
   filter?: Filter;
-  /** Opens a file's story. Without it, Open goes to the file in History. */
+  /** Opens a file's story. Without it, Open goes to the file in Activity. */
   onOpen?: (file: ProcessingFile) => void;
 };
 
@@ -169,7 +169,7 @@ export function NeedsPanel({
         )
       }
       to={NEEDS_A_LOOK_PATH}
-      toLabel="History"
+      toLabel="Activity"
       toText={left > 0 ? `${left.toLocaleString()} more` : undefined}
     >
       {notice ? (

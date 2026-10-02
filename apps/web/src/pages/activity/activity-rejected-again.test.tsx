@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { afterEach, expect, it, vi } from "vitest";
 
 import * as api from "../../lib/processing/rejected-files-api";
-import { ProcessRejectedAgain } from "./history-rejected-again";
+import { ProcessRejectedAgain } from "./activity-rejected-again";
 
 function wrapper({ children }: { children: ReactNode }) {
   const client = new QueryClient({
@@ -25,7 +25,7 @@ function renderButton(
   );
 }
 
-const CONFIRM = "history-process-rejected-confirm";
+const CONFIRM = "activity-process-rejected-confirm";
 
 function pressProcessAllAgain() {
   fireEvent.click(screen.getByRole("button", { name: "Process all again" }));
@@ -53,7 +53,7 @@ it("asks how many rejected files it would process again before doing anything", 
   expect(processAgain).not.toHaveBeenCalled();
 });
 
-it("says the count covers every workflow when History is not narrowed to one", async () => {
+it("says the count covers every workflow when Activity is not narrowed to one", async () => {
   vi.spyOn(api, "fetchRejectedFilesSummary").mockResolvedValue({
     rejected: 2,
     ready: 2,
@@ -67,7 +67,7 @@ it("says the count covers every workflow when History is not narrowed to one", a
   ).toBeInTheDocument();
 });
 
-it("counts only the workflow History is narrowed to, and says which", async () => {
+it("counts only the workflow Activity is narrowed to, and says which", async () => {
   const summary = vi
     .spyOn(api, "fetchRejectedFilesSummary")
     .mockResolvedValue({ rejected: 2, ready: 2 });

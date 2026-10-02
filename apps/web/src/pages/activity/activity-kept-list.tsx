@@ -61,12 +61,12 @@ function KeptFileRow({
 }
 
 /**
- * The files someone chose to keep without processing again from History's remove dialog (#786 review of #785),
- * listed under History's "Kept" chip since a title someone removed from the rest of the list is where they will
+ * The files someone chose to keep without processing again from Activity's remove dialog (#786 review of #785),
+ * listed under Activity's "Kept" chip since a title someone removed from the rest of the list is where they will
  * look for it. "Process again" clears the marker and asks Weir to look at its library now, exactly as if the file
  * had just appeared.
  */
-export function HistoryKeptList({
+export function ActivityKeptList({
   files,
   editable,
   onProcessed,

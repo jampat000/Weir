@@ -1,6 +1,6 @@
 /**
  * Media tracks in words: "Audio 2 · French · 5.1 E-AC-3", "Subtitle 1 · English · PGS image". Every screen that
- * names a track goes through here, so a file reads the same on Library, History and Choose tracks.
+ * names a track goes through here, so a file reads the same on Library, Activity and Choose tracks.
  */
 import { PROCESSING_STREAM_LANGUAGE_OPTIONS } from "../processing/stream-language-options";
 

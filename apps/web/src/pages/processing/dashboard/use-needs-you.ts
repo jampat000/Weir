@@ -26,7 +26,7 @@ export type NeedsYou = {
   groups: NeedGroup[];
   /**
    * Every file that waits on a person, newest first, past the rows each group lists. Its length is the number the
-   * sidebar's badge, History's Needs you chip, the Today tile and the panel's header all show; what is wrong with
+   * sidebar's badge, Activity's Needs you chip, the Today tile and the panel's header all show; what is wrong with
    * Weir itself is a group of its own and is not counted in it.
    */
   files: ProcessingFile[];
@@ -43,7 +43,7 @@ export function useNeedsYou(
 ): NeedsYou {
   const workflows = useProcessingLibrariesQuery();
   const readiness = useSystemReadinessQuery();
-  // Leaves out a file the owner has since removed from History: this is about current problems, not a
+  // Leaves out a file the owner has since removed from Activity: this is about current problems, not a
   // record of every failure Weir has ever seen (System › Jobs keeps that).
   const failedJobs = useProcessingJobsInspectionQuery(
     "failed",

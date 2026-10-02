@@ -3,35 +3,35 @@ import type {
   ProcessingFileStatus,
 } from "../../lib/processing/files-api";
 import type { LibraryClean } from "../../lib/processing/library-cleans-api";
-import { serverMs } from "./history-model";
+import { serverMs } from "./activity-model";
 
 /**
- * One row in History: a new download Weir processed, or a file it cleaned where it sits in a library (#695). Both are
- * listed together, so History is the one place to look for what happened to a file.
+ * One row in Activity: a new download Weir processed, or a file it cleaned where it sits in a library (#695). Both are
+ * listed together, so Activity is the one place to look for what happened to a file.
  */
-export type HistoryEntry =
+export type ActivityEntry =
   | { kind: "download"; key: string; file: ProcessingFile }
   | { kind: "library_clean"; key: string; clean: LibraryClean };
 
-export const downloadEntry = (file: ProcessingFile): HistoryEntry => ({
+export const downloadEntry = (file: ProcessingFile): ActivityEntry => ({
   kind: "download",
   key: `download-${file.id}`,
   file,
 });
 
-export const cleanEntry = (clean: LibraryClean): HistoryEntry => ({
+export const cleanEntry = (clean: LibraryClean): ActivityEntry => ({
   kind: "library_clean",
   key: `clean-${clean.id}`,
   clean,
 });
 
 /**
- * The ways History sorts an entry, in the order the chips read. "kept" is not an entry group at all — a kept
+ * The ways Activity sorts an entry, in the order the chips read. "kept" is not an entry group at all — a kept
  * file has no `files` row left to be one (#786 review of #785) — but it lives in the same chip row and count
- * pattern, since removing a title to keep it is still something History did with it. "attention" is not one group
+ * pattern, since removing a title to keep it is still something Activity did with it. "attention" is not one group
  * either: it is every file that waits on a person, whichever group it is in, as the sidebar's badge counts them.
  */
-export type HistoryGroup =
+export type ActivityGroup =
   | "all"
   | "working"
   | "finished"
@@ -41,7 +41,7 @@ export type HistoryGroup =
   | "failed"
   | "kept";
 
-export const HISTORY_GROUPS: { id: HistoryGroup; label: string }[] = [
+export const ACTIVITY_GROUPS: { id: ActivityGroup; label: string }[] = [
   { id: "all", label: "All" },
   { id: "working", label: "In progress" },
   { id: "finished", label: "Finished" },
@@ -67,7 +67,7 @@ const FAILED: readonly ProcessingFileStatus[] = [
   "rejected",
 ];
 
-const CLEAN_GROUPS: Record<LibraryClean["outcome"], HistoryGroup> = {
+const CLEAN_GROUPS: Record<LibraryClean["outcome"], ActivityGroup> = {
   cleaned: "finished",
   skipped: "skipped",
   failed: "failed",
@@ -79,7 +79,7 @@ const CLEAN_GROUPS: Record<LibraryClean["outcome"], HistoryGroup> = {
  * which is not a failure. A library that is off or a cancelled pass is neither working nor finished, so it only shows
  * under All.
  */
-export function historyGroupOf(file: ProcessingFile): HistoryGroup | null {
+export function activityGroupOf(file: ProcessingFile): ActivityGroup | null {
   if (NEEDS.includes(file.status)) return "needs";
   if (WORKING.includes(file.status)) return "working";
   if (FINISHED.includes(file.status)) return "finished";
@@ -109,13 +109,13 @@ export function waitsOnAPerson(file: ProcessingFile): boolean {
   }
 }
 
-export function entryGroup(entry: HistoryEntry): HistoryGroup | null {
+export function entryGroup(entry: ActivityEntry): ActivityGroup | null {
   return entry.kind === "download"
-    ? historyGroupOf(entry.file)
+    ? activityGroupOf(entry.file)
     : CLEAN_GROUPS[entry.clean.outcome];
 }
 
-export function inGroup(entry: HistoryEntry, group: HistoryGroup): boolean {
+export function inGroup(entry: ActivityEntry, group: ActivityGroup): boolean {
   if (group === "all") return true;
   if (group === "attention") {
     return entry.kind === "download" && waitsOnAPerson(entry.file);
@@ -124,37 +124,37 @@ export function inGroup(entry: HistoryEntry, group: HistoryGroup): boolean {
 }
 
 /** When the entry last changed: a download's last state change, or when the clean finished. */
-export function entryTime(entry: HistoryEntry): string {
+export function entryTime(entry: ActivityEntry): string {
   return entry.kind === "download"
     ? entry.file.updated_at
     : entry.clean.recorded_at;
 }
 
-export function entryPath(entry: HistoryEntry): string {
+export function entryPath(entry: ActivityEntry): string {
   return entry.kind === "download"
     ? entry.file.relative_path
     : entry.clean.relative_path;
 }
 
 /** Both kinds together, newest change first, so what just happened is at the top. */
-export function historyEntries(
+export function activityEntries(
   files: ProcessingFile[],
   cleans: LibraryClean[],
-): HistoryEntry[] {
+): ActivityEntry[] {
   return [...files.map(downloadEntry), ...cleans.map(cleanEntry)].sort(
     (a, b) => serverMs(entryTime(b)) - serverMs(entryTime(a)),
   );
 }
 
 /** Whether any listed download was rejected: what "Process all again" is offered for. */
-export function hasRejectedFiles(entries: HistoryEntry[]): boolean {
+export function hasRejectedFiles(entries: ActivityEntry[]): boolean {
   return entries.some(
     (entry) => entry.kind === "download" && entry.file.status === "rejected",
   );
 }
 
 /** The failed downloads that "Try again" can queue: a failed library clean is cleaned again from Library. */
-export function retryableFailures(entries: HistoryEntry[]): ProcessingFile[] {
+export function retryableFailures(entries: ActivityEntry[]): ProcessingFile[] {
   return entries.flatMap((entry) =>
     entry.kind === "download" && entry.file.status === "processing_failed"
       ? [entry.file]

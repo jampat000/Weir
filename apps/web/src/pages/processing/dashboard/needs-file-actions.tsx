@@ -6,8 +6,8 @@ import {
   useProcessingCheckLibraryAgain,
   useRequeueProcessingFile,
 } from "../../../lib/processing/files-queries";
-import { historyFilePath } from "../../history/history-links";
-import { useFileRemoval } from "../../history/use-file-removal";
+import { activityFilePath } from "../../activity/activity-links";
+import { useFileRemoval } from "../../activity/use-file-removal";
 
 export type NeedNotice = { text: string; failed: boolean };
 
@@ -17,7 +17,7 @@ type NeedFileActionsProps = {
   mediaScope: "movie" | "tv";
   /** Says what an action did. The row may be gone by then, so the panel shows it. */
   onNotice: (notice: NeedNotice) => void;
-  /** Opens the file's story. Without it the file is opened in History. */
+  /** Opens the file's story. Without it the file is opened in Activity. */
   onOpen?: (file: ProcessingFile) => void;
 };
 
@@ -27,10 +27,10 @@ const QUEUE_FAILED = "Couldn't queue that file.";
 const QUEUED_AGAIN = "Queued again.";
 
 /**
- * A held, skipped or rejected file is decided in History: Choose tracks, why it is held, Pass through unchanged and
+ * A held, skipped or rejected file is decided in Activity: Choose tracks, why it is held, Pass through unchanged and
  * Process now are there, so its row goes straight to it.
  */
-function isDecidedInHistory(file: ProcessingFile): boolean {
+function isDecidedInActivity(file: ProcessingFile): boolean {
   return (
     file.status === "on_hold" ||
     file.status === "skipped" ||
@@ -78,9 +78,9 @@ function removeLabel(removal: { checking: boolean; removing: boolean }) {
 }
 
 /**
- * What a person can do about one file that needs them: try it again, remove it (asking first, in History's
+ * What a person can do about one file that needs them: try it again, remove it (asking first, in Activity's
  * own dialog, what to do with the file), open its story, and for a file that is held, skipped or rejected open it
- * in History, where it is decided.
+ * in Activity, where it is decided.
  */
 export function NeedFileActions({
   file,
@@ -150,9 +150,9 @@ export function NeedFileActions({
           Open →
         </button>
       ) : null}
-      {onOpen && !isDecidedInHistory(file) ? null : (
-        <Link className="mm-need__link" to={historyFilePath(file)}>
-          Open in History →
+      {onOpen && !isDecidedInActivity(file) ? null : (
+        <Link className="mm-need__link" to={activityFilePath(file)}>
+          Open in Activity →
         </Link>
       )}
       {removal.dialog}

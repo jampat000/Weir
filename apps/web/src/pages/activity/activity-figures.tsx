@@ -1,6 +1,6 @@
 import { formatBytes } from "../../lib/format/bytes";
 import type { ProcessingFile } from "../../lib/processing/files-api";
-import { tookWords, type DetailSizes } from "./history-model";
+import { tookWords, type DetailSizes } from "./activity-model";
 
 const UNKNOWN = "—";
 
@@ -50,7 +50,7 @@ export function WorkingFigures({ file }: { file: ProcessingFile }) {
 /** Before, after and saved: always all three, since a gap reads as "Weir does not know". */
 export function SizeFigures({ sizes }: { sizes: DetailSizes }) {
   return (
-    <div className="mm-history-sizes" data-testid="history-sizes">
+    <div className="mm-history-sizes" data-testid="activity-sizes">
       <dl className="mm-history-figures">
         <div>
           <dt>Before</dt>

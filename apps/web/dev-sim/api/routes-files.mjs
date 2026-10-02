@@ -1,4 +1,4 @@
-/** The files Weir has picked up: the list Processing and History read, and what a person can do to one file. */
+/** The files Weir has picked up: the list Processing and Activity read, and what a person can do to one file. */
 import { needsAttention, STATUS } from "../engine/file.mjs";
 import { JOB_KIND } from "../engine/jobs.mjs";
 import { logEntryFor } from "../engine/records.mjs";

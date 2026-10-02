@@ -27,7 +27,7 @@ export function useFinishedFiles(
   const workflow = workflowId === null ? {} : { library_id: workflowId };
   const withPasses = shownBy(filter, { source: "download" });
   const withCleans = shownBy(filter, { source: "library" });
-  // A download whose title the owner has since removed from History drops out here; a library clean has no
+  // A download whose title the owner has since removed from Activity drops out here; a library clean has no
   // such removal, and library files are not in known_files_only's reckoning, so its query never asks for it.
   const passes = useActivityRecentQuery(
     {

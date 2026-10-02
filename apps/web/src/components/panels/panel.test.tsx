@@ -63,26 +63,26 @@ describe("Panel", () => {
   });
 
   it("links to where its subject is managed, naming the panel in the link", () => {
-    renderPanel({ to: "/history", toLabel: "History" });
+    renderPanel({ to: "/activity", toLabel: "Activity" });
 
-    const link = screen.getByRole("link", { name: "History: Just finished" });
-    expect(link).toHaveAttribute("href", "/history");
-    expect(link).toHaveTextContent("History");
+    const link = screen.getByRole("link", { name: "Activity: Just finished" });
+    expect(link).toHaveAttribute("href", "/activity");
+    expect(link).toHaveTextContent("Activity");
   });
 
   it("keeps the link's name when it shows only an arrow", () => {
-    renderPanel({ to: "/history", toLabel: "History", iconOnly: true });
+    renderPanel({ to: "/activity", toLabel: "Activity", iconOnly: true });
 
-    const link = screen.getByRole("link", { name: "History: Just finished" });
-    expect(link).not.toHaveTextContent("History");
+    const link = screen.getByRole("link", { name: "Activity: Just finished" });
+    expect(link).not.toHaveTextContent("Activity");
   });
 
   it("shows other words than the link's name when asked, and keeps the name for a screen reader", () => {
-    renderPanel({ to: "/history", toLabel: "History", toText: "3 more" });
+    renderPanel({ to: "/activity", toLabel: "Activity", toText: "3 more" });
 
-    const link = screen.getByRole("link", { name: "History: Just finished" });
+    const link = screen.getByRole("link", { name: "Activity: Just finished" });
     expect(link).toHaveTextContent("3 more");
-    expect(link).not.toHaveTextContent("History");
+    expect(link).not.toHaveTextContent("Activity");
   });
 
   it("has no link when it is given nowhere to go", () => {

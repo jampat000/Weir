@@ -16,7 +16,7 @@ type PanelProps = {
   description?: string;
   /** Where the panel's subject is managed. Without it the header has no link. */
   to?: string;
-  /** The link's words, named with the panel's title for a screen reader: "History: Just finished". */
+  /** The link's words, named with the panel's title for a screen reader: "Activity: Just finished". */
   toLabel?: string;
   /** What the link shows when that is not its name, such as "3 more" for a link that leads to the rest. */
   toText?: string;

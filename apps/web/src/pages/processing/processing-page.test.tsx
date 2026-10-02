@@ -175,7 +175,7 @@ vi.mock("./dashboard/needs-panel", () => ({
 vi.mock("./dashboard/health-panel", () => ({
   HealthPanel: () => <div data-testid="health-panel" />,
 }));
-vi.mock("../history/history-rejected-again", () => ({
+vi.mock("../activity/activity-rejected-again", () => ({
   ProcessRejectedAgain: () => <button type="button">Process all again</button>,
 }));
 

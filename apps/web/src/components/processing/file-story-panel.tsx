@@ -79,7 +79,7 @@ export function FileStoryPanel({
           />
         ) : undefined
       }
-      backdropLabel="Close file history"
+      backdropLabel="Close file activity"
       onClose={onClose}
     >
       <DirectPlayLine

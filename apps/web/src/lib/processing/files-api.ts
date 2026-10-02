@@ -175,7 +175,7 @@ export async function fetchProcessingFiles(
 }
 
 /**
- * History's remove dialog (#785): what to offer for one title before it is shown, and the choice a person made.
+ * Activity's remove dialog (#785): what to offer for one title before it is shown, and the choice a person made.
  * "remove" (the default) is today's plain forget; the other three only apply to a title `remove-options` says
  * `requires_choice` for.
  */

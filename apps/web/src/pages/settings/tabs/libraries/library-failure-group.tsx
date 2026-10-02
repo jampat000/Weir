@@ -68,7 +68,7 @@ export function LibraryFailureGroup({
   return (
     <QuietDisclosure
       title="When a file fails"
-      detail="Weir tries a failed file again on its own, up to the limit below. A file it gives up on shows as Failed in History, with the reason."
+      detail="Weir tries a failed file again on its own, up to the limit below. A file it gives up on shows as Failed in Activity, with the reason."
     >
       <div className="mm-editor-grid">
         <TextSetting

@@ -8,7 +8,7 @@ import {
   detailSizes,
   sizesFromRecord,
   tracksFromRecord,
-} from "./history-model";
+} from "./activity-model";
 
 function file(partial: Partial<ProcessingFile>): ProcessingFile {
   return {

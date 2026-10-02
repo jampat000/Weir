@@ -7,15 +7,15 @@ import { shownBy, type Filter } from "../processing-filter";
 import { firstSentence, prettyName } from "../processing-model";
 import { fileReason, type FileReason } from "../file-reason";
 import {
-  historyGroupOf,
+  activityGroupOf,
   waitsOnAPerson,
-  type HistoryGroup,
-} from "../../history/history-entries";
+  type ActivityGroup,
+} from "../../activity/activity-entries";
 import { setupTabPath } from "../../../lib/settings/setup-areas";
 
 /** Past this many failed jobs the count reads "100+": the list behind the link has the rest. */
 export const FAILED_JOBS_LIMIT = 100;
-/** How many files a group lists; the rest are counted in one line that leads to History. */
+/** How many files a group lists; the rest are counted in one line that leads to Activity. */
 export const FILES_SHOWN_PER_GROUP = 4;
 /** How many files that may wait on a person are read. */
 export const NEEDS_FILES_READ = 200;
@@ -27,8 +27,8 @@ export const NEEDS_FILE_STATUSES = [
   "skipped",
 ] as const;
 
-/** Where the files that need a look are listed: History's failed and rejected files. */
-export const NEEDS_A_LOOK_PATH = "/history?show=failed";
+/** Where the files that need a look are listed: Activity's failed and rejected files. */
+export const NEEDS_A_LOOK_PATH = "/activity?show=failed";
 
 export type NeedRow = {
   key: string;
@@ -50,8 +50,8 @@ export type NeedGroup = {
   rows: NeedRow[];
   /** How many more there are than the rows listed, so the group can say where the rest are. */
   more: number;
-  /** The History view that lists the group's files, where the rest are. None for what is wrong with Weir itself. */
-  history: HistoryGroup | null;
+  /** The Activity view that lists the group's files, where the rest are. None for what is wrong with Weir itself. */
+  activity: ActivityGroup | null;
   /** The group's rejected files can all be processed again at once. */
   rejected: boolean;
 };
@@ -100,7 +100,7 @@ function fileGroups(files: readonly ProcessingFile[]): NeedGroup[] {
     title: `${files.length.toLocaleString()} ${reason.words}`,
     rows: files.slice(0, FILES_SHOWN_PER_GROUP).map(fileRow),
     more: Math.max(0, files.length - FILES_SHOWN_PER_GROUP),
-    history: historyGroupOf(files[0]),
+    activity: activityGroupOf(files[0]),
     rejected: reason.rejected,
   }));
 }
@@ -132,7 +132,7 @@ function workerNeeds(
       title: "Background work has stopped",
       reason: "Not responding · restart Weir",
       detail: worker.detail,
-      link: { label: "Open jobs", to: "/system?tab=history&show=jobs" },
+      link: { label: "Open jobs", to: "/system?tab=logs&show=jobs" },
     }));
 }
 
@@ -157,7 +157,7 @@ function failedJobsNeed({ count, capped }: FailedJobs): NeedRow | null {
     reason: "Each says what to do next",
     link: {
       label: "Review failed jobs",
-      to: "/system?tab=history&show=jobs&status=failed",
+      to: "/system?tab=logs&show=jobs&status=failed",
     },
   };
 }
@@ -178,7 +178,7 @@ function weirGroup(rows: NeedRow[]): NeedGroup[] {
       ),
       rows,
       more: 0,
-      history: null,
+      activity: null,
       rejected: false,
     },
   ];
@@ -243,7 +243,7 @@ export function needUnits(groups: readonly NeedGroup[]): NeedUnit[] {
   return groups.flatMap((group): NeedUnit[] => [
     { kind: "heading" },
     ...group.rows.map((): NeedUnit => ({ kind: "row" })),
-    ...(group.more > 0 && group.history
+    ...(group.more > 0 && group.activity
       ? [{ kind: "rest", files: group.more } as const]
       : []),
   ]);

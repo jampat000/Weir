@@ -7,7 +7,7 @@ import {
 import { describe, expect, it } from "vitest";
 
 import {
-  LegacyActivityRedirect,
+  LegacyHistoryRedirect,
   LegacyProcessingRedirect,
   LegacySettingsRedirect,
 } from "./legacy-redirects";
@@ -22,7 +22,7 @@ function landOn(entry: string): string {
     [
       { path: "/settings", element: <LegacySettingsRedirect /> },
       { path: "/processing", element: <LegacyProcessingRedirect /> },
-      { path: "/activity", element: <LegacyActivityRedirect /> },
+      { path: "/history", element: <LegacyHistoryRedirect /> },
       { path: "*", element: <Where /> },
     ],
     { initialEntries: [entry] },
@@ -75,7 +75,7 @@ describe("/processing", () => {
   it.each([
     ["/processing", "/"],
     ["/processing?tab=overview", "/"],
-    ["/processing?tab=files", "/history"],
+    ["/processing?tab=files", "/activity"],
     ["/processing?tab=libraries", "/setup/workflows"],
     ["/processing?tab=audio-subtitles", "/setup/rules"],
     ["/processing?tab=schedules", "/setup/workflows/schedule"],
@@ -86,15 +86,34 @@ describe("/processing", () => {
     expect(landOn(entry)).toBe(target);
   });
 
-  it("carries a saved filter to History", () => {
+  it("carries a saved filter to Activity", () => {
     expect(landOn("/processing?tab=files&status=failed")).toBe(
-      "/history?status=failed",
+      "/activity?status=failed",
     );
   });
 });
 
-describe("/activity", () => {
-  it("lands on System's Logs", () => {
-    expect(landOn("/activity")).toBe("/system?tab=logs");
+describe("/history", () => {
+  it.each([
+    ["/history", "/activity"],
+    ["/history?show=attention", "/activity?show=attention"],
+    ["/history?show=failed&library=2", "/activity?show=failed&library=2"],
+    ["/history?q=Heat.1995.mkv", "/activity?q=Heat.1995.mkv"],
+    [
+      "/history?show=failed&file=9&within=all",
+      "/activity?show=failed&file=9&within=all",
+    ],
+  ])("%s lands on %s", (entry, target) => {
+    expect(landOn(entry)).toBe(target);
+  });
+
+  it("keeps the fragment of the address", () => {
+    expect(landOn("/history?file=3#story")).toBe("/activity?file=3#story");
+  });
+
+  it("keeps a search with encoded characters as it was written", () => {
+    expect(landOn("/history?q=Se%C3%B1or%20X%2B")).toBe(
+      "/activity?q=Se%C3%B1or%20X%2B",
+    );
   });
 });

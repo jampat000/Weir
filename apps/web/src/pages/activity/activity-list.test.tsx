@@ -4,8 +4,8 @@ import { expect, it, vi } from "vitest";
 import type { ProcessingFile } from "../../lib/processing/files-api";
 import type { LibraryClean } from "../../lib/processing/library-cleans-api";
 import { WithWorkflows } from "../../test/with-workflows";
-import { cleanEntry, downloadEntry } from "./history-entries";
-import { HistoryList } from "./history-list";
+import { cleanEntry, downloadEntry } from "./activity-entries";
+import { ActivityList } from "./activity-list";
 
 const NOW = Date.parse("2026-10-02T10:00:00Z");
 
@@ -33,7 +33,7 @@ const clean = {
 function renderList() {
   render(
     <WithWorkflows>
-      <HistoryList
+      <ActivityList
         entries={[downloadEntry(download), cleanEntry(clean)]}
         selectedKey={null}
         now={NOW}

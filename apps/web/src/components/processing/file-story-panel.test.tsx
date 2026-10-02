@@ -114,7 +114,7 @@ it("keeps the technical detail behind a disclosure, never leading", () => {
   expect(summary.closest("details")).not.toHaveAttribute("open");
 });
 
-it("says how long a file's history is kept once the file is gone", () => {
+it("says how long a file's activity is kept once the file is gone", () => {
   mount();
   expect(
     screen.getByText("Kept while the file exists, then 90 days."),
@@ -129,7 +129,7 @@ it("closes on Escape", () => {
 
 it("closes from the backdrop and the close button", () => {
   const { onClose } = mount();
-  fireEvent.click(screen.getByRole("button", { name: "Close file history" }));
+  fireEvent.click(screen.getByRole("button", { name: "Close file activity" }));
   fireEvent.click(screen.getByRole("button", { name: "Close" }));
   expect(onClose).toHaveBeenCalledTimes(2);
 });
@@ -233,7 +233,7 @@ it("leaves the bar out for a file that is only waiting", () => {
   expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
 });
 
-it("says nothing has happened to a file that is neither on the Pipeline nor has a history", () => {
+it("says nothing has happened to a file that is neither on the Pipeline nor has any activity", () => {
   mount({ log: log({ entries: [] }) });
 
   expect(screen.getByText(/Nothing yet/)).toBeVisible();

@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 
 export type NavGlyphName =
   | "processing"
-  | "history"
+  | "activity"
   | "library"
   | "workflows"
   | "rules"
@@ -18,7 +18,7 @@ const GLYPH_PATHS: Record<NavGlyphName, ReactNode> = {
       <path d="M4 20h6v-3H4z" />
     </>
   ),
-  history: (
+  activity: (
     <>
       <path d="M4 14h5l3-8 3 12 2-4h3" />
       <path d="M4 20h16" />

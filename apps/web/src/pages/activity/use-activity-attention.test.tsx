@@ -2,7 +2,7 @@ import { renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ProcessingFile } from "../../lib/processing/files-api";
-import { useHistoryAttention } from "./use-history-attention";
+import { useActivityAttention } from "./use-activity-attention";
 
 const needs: { files: ProcessingFile[] } = { files: [] };
 const asked: (number | null | undefined)[] = [];
@@ -33,9 +33,9 @@ beforeEach(() => {
   asked.length = 0;
 });
 
-describe("History's Needs you view", () => {
+describe("Activity's Needs you view", () => {
   it("lists the files newest first, whatever their age", () => {
-    const { result } = renderHook(() => useHistoryAttention(null, ""));
+    const { result } = renderHook(() => useActivityAttention(null, ""));
 
     expect(result.current.entries.map((entry) => entry.key)).toEqual([
       "download-2",
@@ -44,7 +44,7 @@ describe("History's Needs you view", () => {
   });
 
   it("counts every file the badge's own source holds, whatever the search", () => {
-    const { result } = renderHook(() => useHistoryAttention(null, "new.show"));
+    const { result } = renderHook(() => useActivityAttention(null, "new.show"));
 
     expect(result.current.count).toBe(2);
     expect(result.current.entries).toHaveLength(1);
@@ -52,7 +52,7 @@ describe("History's Needs you view", () => {
 
   it("narrows the files to a search, ignoring case", () => {
     const { result } = renderHook(() =>
-      useHistoryAttention(null, " new.show "),
+      useActivityAttention(null, " new.show "),
     );
 
     expect(result.current.entries.map((entry) => entry.key)).toEqual([
@@ -61,7 +61,7 @@ describe("History's Needs you view", () => {
   });
 
   it("asks for the workflow it is narrowed to", () => {
-    renderHook(() => useHistoryAttention(3, ""));
+    renderHook(() => useActivityAttention(3, ""));
 
     expect(new Set(asked)).toEqual(new Set([3]));
   });

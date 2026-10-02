@@ -4690,7 +4690,7 @@
       },
       "ProcessingFileForgetIn": {
         "additionalProperties": false,
-        "description": "History's remove dialog (#785). `resolution` is only meaningful for a failed or rejected file whose\noriginal is still in the watched folder (see ProcessingFileRemoveOptionsOut); anything else is always a plain\nremove, whatever `resolution` asks for. `confirm_size_bytes` and `confirm_modified_at` are the file's current\ndetails as `remove-options` reported them (#786 follow-up): required for `delete` or `keep` on a title whose\n`fingerprint_recorded` is false, ignored otherwise.",
+        "description": "Activity's remove dialog (#785). `resolution` is only meaningful for a failed or rejected file whose\noriginal is still in the watched folder (see ProcessingFileRemoveOptionsOut); anything else is always a plain\nremove, whatever `resolution` asks for. `confirm_size_bytes` and `confirm_modified_at` are the file's current\ndetails as `remove-options` reported them (#786 follow-up): required for `delete` or `keep` on a title whose\n`fingerprint_recorded` is false, ignored otherwise.",
         "properties": {
           "csrf_token": {
             "minLength": 1,
@@ -4740,7 +4740,7 @@
         "type": "object"
       },
       "ProcessingFileRemoveOptionsOut": {
-        "description": "What History's remove dialog should offer for one title, read before it is shown (#785).",
+        "description": "What Activity's remove dialog should offer for one title, read before it is shown (#785).",
         "properties": {
           "requires_choice": {
             "title": "Requires Choice",
@@ -4824,7 +4824,7 @@
         "type": "object"
       },
       "ProcessingKeptFileOut": {
-        "description": "One file kept without processing again from History's remove dialog (#785).",
+        "description": "One file kept without processing again from Activity's remove dialog (#785).",
         "properties": {
           "id": {
             "title": "Id",
@@ -5121,7 +5121,7 @@
           },
           "kind": {
             "const": "download",
-            "description": "Which kind of History entry this is: always a download here.",
+            "description": "Which kind of Activity entry this is: always a download here.",
             "title": "Kind",
             "type": "string"
           },
@@ -6235,7 +6235,7 @@
         "type": "object"
       },
       "ProcessingLibraryCleanOut": {
-        "description": "What the newest library clean did to one file, as History lists it.",
+        "description": "What the newest library clean did to one file, as Activity lists it.",
         "properties": {
           "detail": {
             "description": "What happened, in the clean's own words.",
@@ -6322,7 +6322,7 @@
         "type": "object"
       },
       "ProcessingLibraryCleansOut": {
-        "description": "Library cleans for History, newest first, one per file.",
+        "description": "Library cleans for Activity, newest first, one per file.",
         "properties": {
           "cleans": {
             "items": {
@@ -14657,7 +14657,7 @@
     },
     "/api/v1/processing/files/{file_id}/remove-options": {
       "get": {
-        "description": "What History's remove dialog should offer for this title (#785), read before it is shown.",
+        "description": "What Activity's remove dialog should offer for this title (#785), read before it is shown.",
         "operationId": "get_processing_file_remove_options_api_v1_files__file_id__remove_options_get",
         "parameters": [
           {
@@ -14702,7 +14702,7 @@
     },
     "/api/v1/processing/files/{file_id}": {
       "delete": {
-        "description": "History's \"Remove from list\" (#785). `resolution` chooses what happens to a failed or rejected file whose original is still in the watched folder: `delete` asks a manager to remove the download and search again, or Weir deletes it itself; `keep` leaves the file but skips it until it changes; `retry` queues it again. Anything else is always a plain remove.",
+        "description": "Activity's \"Remove from list\" (#785). `resolution` chooses what happens to a failed or rejected file whose original is still in the watched folder: `delete` asks a manager to remove the download and search again, or Weir deletes it itself; `keep` leaves the file but skips it until it changes; `retry` queues it again. Anything else is always a plain remove.",
         "operationId": "delete_processing_file_api_v1_files__file_id__delete",
         "parameters": [
           {
@@ -14763,7 +14763,7 @@
     },
     "/api/v1/processing/kept-files": {
       "get": {
-        "description": "Every file kept without processing again from History's remove dialog (#785).",
+        "description": "Every file kept without processing again from Activity's remove dialog (#785).",
         "operationId": "get_processing_kept_files_api_v1_processing_kept_files_get",
         "responses": {
           "200": {

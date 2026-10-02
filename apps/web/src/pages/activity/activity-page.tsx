@@ -14,28 +14,28 @@ import { useKeptFilesQuery } from "../../lib/processing/kept-files-queries";
 import { useProcessingLibrariesQuery } from "../../lib/processing/libraries-queries";
 import { mmActionButtonClass } from "../../lib/ui/mm-control-roles";
 import { useNow } from "../../lib/ui/use-now";
-import { HistoryCleanDetail } from "./history-clean-detail";
-import { HistoryDetail } from "./history-detail";
+import { ActivityCleanDetail } from "./activity-clean-detail";
+import { ActivityDetail } from "./activity-detail";
 import {
-  HISTORY_GROUPS,
+  ACTIVITY_GROUPS,
   hasRejectedFiles,
-  historyEntries,
+  activityEntries,
   inGroup,
   retryableFailures,
-  type HistoryEntry,
-  type HistoryGroup,
-} from "./history-entries";
+  type ActivityEntry,
+  type ActivityGroup,
+} from "./activity-entries";
 import {
   DEFAULT_PERIOD,
-  HistoryFilters,
+  ActivityFilters,
   PERIODS,
   type SetParam,
-} from "./history-filters";
-import { HistoryKeptList } from "./history-kept-list";
-import { HistoryList } from "./history-list";
-import { ProcessRejectedAgain } from "./history-rejected-again";
-import { HistoryRetentionNote } from "./history-retention-note";
-import { useHistoryAttention } from "./use-history-attention";
+} from "./activity-filters";
+import { ActivityKeptList } from "./activity-kept-list";
+import { ActivityList } from "./activity-list";
+import { ProcessRejectedAgain } from "./activity-rejected-again";
+import { ActivityRetentionNote } from "./activity-retention-note";
+import { useActivityAttention } from "./use-activity-attention";
 
 /** "min ago" moves on its own between refreshes. */
 const TICK_MS = 15_000;
@@ -77,10 +77,10 @@ function RetryFailed({ failed }: { failed: { id: number }[] }) {
 
 /** The chosen entry, from either `?file=` (a download) or `?clean=` (a library clean). */
 function selectedEntry(
-  entries: HistoryEntry[],
+  entries: ActivityEntry[],
   fileId: number | null,
   cleanId: number | null,
-): HistoryEntry | null {
+): ActivityEntry | null {
   const chosen = entries.find(
     (entry) =>
       (entry.kind === "download" && entry.file.id === fileId) ||
@@ -90,7 +90,7 @@ function selectedEntry(
 }
 
 /** What an empty list says: that nothing needs a person, that nothing has been handled yet, or that nothing matches. */
-function emptyWords(group: HistoryGroup, handled: number): string {
+function emptyWords(group: ActivityGroup, handled: number): string {
   if (group === "attention") return "No file is waiting on you.";
   return handled === 0
     ? "Nothing yet. Every file Weir picks up will be listed here, from the moment it arrives."
@@ -98,14 +98,14 @@ function emptyWords(group: HistoryGroup, handled: number): string {
 }
 
 /**
- * History: every file Weir has handled, new downloads and library cleans alike, what it was, what
+ * Activity: every file Weir has handled, new downloads and library cleans alike, what it was, what
  * Weir did, and what came out. A place of its own because a file's story is neither a Processing lane
  * nor a system log: System › Logs keeps Weir's own events, and this keeps the files (#695).
  */
-export function HistoryPage() {
+export function ActivityPage() {
   const [params, setParams] = useSearchParams();
-  const group = (HISTORY_GROUPS.find((g) => g.id === params.get("show"))?.id ??
-    "all") as HistoryGroup;
+  const group = (ACTIVITY_GROUPS.find((g) => g.id === params.get("show"))?.id ??
+    "all") as ActivityGroup;
   const period =
     PERIODS.find((p) => p.id === params.get("within")) ?? DEFAULT_PERIOD;
   const libraryId = Number(params.get("library")) || undefined;
@@ -120,7 +120,7 @@ export function HistoryPage() {
     path_contains: params.get("q") ?? undefined,
   };
   const files = useFileHistoryQuery({ ...query, limit: FILES_LIMIT });
-  const attention = useHistoryAttention(
+  const attention = useActivityAttention(
     libraryId ?? null,
     params.get("q") ?? "",
   );
@@ -130,7 +130,7 @@ export function HistoryPage() {
   const editable = useCanEdit();
 
   const all = useMemo(
-    () => historyEntries(files.data?.files ?? [], cleans.data?.cleans ?? []),
+    () => activityEntries(files.data?.files ?? [], cleans.data?.cleans ?? []),
     [files.data, cleans.data],
   );
   const needsYou = group === "attention";
@@ -139,11 +139,11 @@ export function HistoryPage() {
     : all.filter((entry) => inGroup(entry, group));
   const counts = {
     ...(Object.fromEntries(
-      HISTORY_GROUPS.map((g) => [
+      ACTIVITY_GROUPS.map((g) => [
         g.id,
         all.filter((entry) => inGroup(entry, g.id)).length,
       ]),
-    ) as Record<HistoryGroup, number>),
+    ) as Record<ActivityGroup, number>),
     // The Needs you count is the sidebar badge's, from the same source, whichever period is chosen.
     attention: attention.count,
     // A kept file has no `files` row left to count as an entry (#786 review of #785), so its count comes from
@@ -162,7 +162,7 @@ export function HistoryPage() {
     setParams(next, { replace: true });
   };
 
-  const pickEntry = (entry: HistoryEntry) => {
+  const pickEntry = (entry: ActivityEntry) => {
     setRemovedNotice(null);
     const next = new URLSearchParams(params);
     if (entry.kind === "download") {
@@ -176,8 +176,8 @@ export function HistoryPage() {
   };
 
   return (
-    <div className="mm-page" data-testid="history-page">
-      <HistoryFilters
+    <div className="mm-page" data-testid="activity-page">
+      <ActivityFilters
         query={params.get("q") ?? ""}
         group={group}
         counts={counts}
@@ -225,7 +225,7 @@ export function HistoryPage() {
             className="mm-history-list"
             count={`${(kept.data?.files.length ?? 0).toLocaleString()} kept`}
           >
-            <HistoryKeptList
+            <ActivityKeptList
               files={kept.data?.files ?? []}
               editable={editable}
               onProcessed={setRemovedNotice}
@@ -233,9 +233,9 @@ export function HistoryPage() {
           </Panel>
         )
       ) : !needsYou && files.isError ? (
-        <LoadError thing="your file history" error={files.error} />
+        <LoadError thing="your file activity" error={files.error} />
       ) : !needsYou && files.isLoading ? (
-        <PanelLoading label="Reading history…" />
+        <PanelLoading label="Reading activity…" />
       ) : shown.length === 0 ? (
         <p className="mm-history-empty">{emptyWords(group, all.length)}</p>
       ) : (
@@ -245,7 +245,7 @@ export function HistoryPage() {
             count={`${shown.length.toLocaleString()} shown`}
             className="mm-history-list"
           >
-            <HistoryList
+            <ActivityList
               entries={shown}
               selectedKey={selected?.key ?? null}
               now={now}
@@ -253,19 +253,19 @@ export function HistoryPage() {
             />
           </Panel>
           {selected?.kind === "download" ? (
-            <HistoryDetail
+            <ActivityDetail
               file={selected.file}
               now={now}
               editable={editable}
               onRemoved={setRemovedNotice}
             />
           ) : selected?.kind === "library_clean" ? (
-            <HistoryCleanDetail clean={selected.clean} />
+            <ActivityCleanDetail clean={selected.clean} />
           ) : null}
         </div>
       )}
 
-      <HistoryRetentionNote />
+      <ActivityRetentionNote />
     </div>
   );
 }

@@ -22,7 +22,7 @@ function runtimeSettings(sim) {
     processing_analyze_duration_seconds: 10,
     configuration_note: "These are set when Weir starts.",
     visibility_note:
-      "Anything that needs a person's attention appears on Processing and in History.",
+      "Anything that needs a person's attention appears on Processing and in Activity.",
   });
 }
 

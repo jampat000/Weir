@@ -39,8 +39,8 @@ export type FinishedFile = {
 };
 
 /**
- * A rejection worded as History words it: "Rejected: <why> <what became of the file>". The reason and what became
- * of the file are the ones the pass recorded, so this reads the same as the file's entry in History.
+ * A rejection worded as Activity words it: "Rejected: <why> <what became of the file>". The reason and what became
+ * of the file are the ones the pass recorded, so this reads the same as the file's entry in Activity.
  */
 function rejectionSentence(detail: ActivityDetail): string {
   const reason = [

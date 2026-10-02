@@ -10,7 +10,7 @@ const DEFAULT_PAGE = 100;
 const FILES_ABOUT = "files";
 const WEIR_ABOUT = "weir";
 
-/** Whether an entry about a file is still worth showing: the file has not been removed from History. */
+/** Whether an entry about a file is still worth showing: the file has not been removed from Activity. */
 function aboutKnownFile(sim, event) {
   if (
     event.relativePath === null ||

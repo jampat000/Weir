@@ -71,7 +71,7 @@ vi.mock("./needs-files", () => ({
       (file) => workflowId == null || file.library_id === workflowId,
     ),
 }));
-vi.mock("../../history/history-rejected-again", () => ({
+vi.mock("../../activity/activity-rejected-again", () => ({
   ProcessRejectedAgain: (props: { libraryId?: number }) => {
     rejectedAgain(props);
     return <button type="button">Process all again</button>;
@@ -160,7 +160,7 @@ describe("the Needs you panel narrowed to one kind of work", () => {
 });
 
 describe("the Needs you panel when something does", () => {
-  it("shows an amber count in its header and links to the files in History", () => {
+  it("shows an amber count in its header and links to the files in Activity", () => {
     failedJobs.jobs = [{ id: 1 }];
     needFiles.files = [stuckFile];
     const panel = renderPanel();
@@ -169,11 +169,11 @@ describe("the Needs you panel when something does", () => {
       "mm-needs__count",
     );
     expect(
-      within(panel).getByRole("link", { name: "History: Needs you" }),
-    ).toHaveAttribute("href", "/history?show=failed");
+      within(panel).getByRole("link", { name: "Activity: Needs you" }),
+    ).toHaveAttribute("href", "/activity?show=failed");
   });
 
-  it("sends each group's 'and N more' to the History view of that kind of file", () => {
+  it("sends each group's 'and N more' to the Activity view of that kind of file", () => {
     const failedMany = [1, 2, 3, 4, 5].map((id) =>
       file({ id: 100 + id, relative_path: `Failed.${id}.mkv` }),
     );
@@ -199,13 +199,13 @@ describe("the Needs you panel when something does", () => {
     renderPanel();
 
     const more = screen
-      .getAllByRole("link", { name: "and 1 more in History →" })
+      .getAllByRole("link", { name: "and 1 more in Activity →" })
       .map((link) => link.getAttribute("href"));
 
     expect(more).toEqual([
-      "/history?show=failed",
-      "/history?show=needs",
-      "/history?show=skipped",
+      "/activity?show=failed",
+      "/activity?show=needs",
+      "/activity?show=skipped",
     ]);
   });
 
@@ -217,10 +217,10 @@ describe("the Needs you panel when something does", () => {
     const panel = renderPanel();
 
     const more = within(panel).getByRole("link", {
-      name: "History: Needs you",
+      name: "Activity: Needs you",
     });
     expect(more).toHaveTextContent("2 more");
-    expect(more).toHaveAttribute("href", "/history?show=failed");
+    expect(more).toHaveAttribute("href", "/activity?show=failed");
   });
 
   it("keeps the header link's own name when every row fits", () => {
@@ -228,8 +228,8 @@ describe("the Needs you panel when something does", () => {
     const panel = renderPanel();
 
     expect(
-      within(panel).getByRole("link", { name: "History: Needs you" }),
-    ).toHaveTextContent("History");
+      within(panel).getByRole("link", { name: "Activity: Needs you" }),
+    ).toHaveTextContent("Activity");
   });
 
   it("keeps a workflow's own view when the panel is narrowed to it", () => {
@@ -239,8 +239,8 @@ describe("the Needs you panel when something does", () => {
     renderPanel({ workflowId: 2 });
 
     expect(
-      screen.getByRole("link", { name: "and 1 more in History →" }),
-    ).toHaveAttribute("href", "/history?show=failed&library=2");
+      screen.getByRole("link", { name: "and 1 more in Activity →" }),
+    ).toHaveAttribute("href", "/activity?show=failed&library=2");
   });
 
   it("groups files by what went wrong, each group titled in plain words", () => {
@@ -314,16 +314,16 @@ describe("the Needs you panel when something does", () => {
     expect(onOpen).toHaveBeenCalledWith(stuckFile);
   });
 
-  it("opens the file in History when the page has no story to show", () => {
+  it("opens the file in Activity when the page has no story to show", () => {
     needFiles.files = [stuckFile];
     renderPanel();
 
     expect(
-      screen.getByRole("link", { name: "Open in History →" }),
-    ).toHaveAttribute("href", "/history?show=failed&file=9&within=all");
+      screen.getByRole("link", { name: "Open in Activity →" }),
+    ).toHaveAttribute("href", "/activity?show=failed&file=9&within=all");
   });
 
-  describe("a file that is decided in History", () => {
+  describe("a file that is decided in Activity", () => {
     const held = file({
       id: 31,
       status: "on_hold",
@@ -339,17 +339,17 @@ describe("the Needs you panel when something does", () => {
     });
 
     it.each([
-      ["held", held, "/history?show=needs&file=31&within=all"],
-      ["skipped", skipped, "/history?show=skipped&file=32&within=all"],
-      ["rejected", rejected, "/history?show=failed&file=12&within=all"],
+      ["held", held, "/activity?show=needs&file=31&within=all"],
+      ["skipped", skipped, "/activity?show=skipped&file=32&within=all"],
+      ["rejected", rejected, "/activity?show=failed&file=12&within=all"],
     ])(
-      "has an Open in History action for a %s file, beside its story",
+      "has an Open in Activity action for a %s file, beside its story",
       (_kind, decided, href) => {
         needFiles.files = [decided];
         renderPanel({ onOpen: vi.fn() });
 
         expect(
-          screen.getByRole("link", { name: "Open in History →" }),
+          screen.getByRole("link", { name: "Open in Activity →" }),
         ).toHaveAttribute("href", href);
         expect(
           screen.getByRole("button", { name: "Open →" }),
@@ -362,7 +362,7 @@ describe("the Needs you panel when something does", () => {
       renderPanel({ onOpen: vi.fn() });
 
       expect(
-        screen.queryByRole("link", { name: "Open in History →" }),
+        screen.queryByRole("link", { name: "Open in Activity →" }),
       ).toBeNull();
     });
   });
@@ -382,7 +382,7 @@ describe("the Needs you panel when something does", () => {
 
     expect(
       screen.getByRole("link", { name: "Review failed jobs →" }),
-    ).toHaveAttribute("href", "/system?tab=history&show=jobs&status=failed");
+    ).toHaveAttribute("href", "/system?tab=logs&show=jobs&status=failed");
   });
 });
 
@@ -513,14 +513,14 @@ describe("removing a file", () => {
       ...partial,
     }) as ProcessingFileRemoveOptions;
 
-  it("opens History's remove dialog when the file is still in the watched folder", async () => {
+  it("opens Activity's remove dialog when the file is still in the watched folder", async () => {
     removeOptions.mockResolvedValue(choice());
     needFiles.files = [stuckFile];
     renderPanel();
 
     fireEvent.click(screen.getByRole("button", { name: "Remove…" }));
 
-    expect(await screen.findByTestId("history-remove-dialog")).toBeVisible();
+    expect(await screen.findByTestId("activity-remove-dialog")).toBeVisible();
     expect(forget).not.toHaveBeenCalled();
   });
 
@@ -531,9 +531,9 @@ describe("removing a file", () => {
     fireEvent.click(screen.getByRole("button", { name: "Remove…" }));
 
     fireEvent.click(
-      await screen.findByTestId("history-remove-dialog-choice-keep"),
+      await screen.findByTestId("activity-remove-dialog-choice-keep"),
     );
-    fireEvent.click(screen.getByTestId("history-remove-dialog-confirm"));
+    fireEvent.click(screen.getByTestId("activity-remove-dialog-confirm"));
 
     await waitFor(() =>
       expect(forget).toHaveBeenCalledWith({
@@ -553,7 +553,7 @@ describe("removing a file", () => {
     fireEvent.click(screen.getByRole("button", { name: "Remove…" }));
 
     await waitFor(() => expect(forget).toHaveBeenCalledWith({ id: 9 }));
-    expect(screen.queryByTestId("history-remove-dialog")).toBeNull();
+    expect(screen.queryByTestId("activity-remove-dialog")).toBeNull();
   });
 
   it("says when Weir could not tell what removing would do", async () => {

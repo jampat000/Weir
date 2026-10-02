@@ -173,9 +173,9 @@ describe("the Working on now tile", () => {
 
     expect(
       screen.getByRole("link", {
-        name: "Working on now: every file in History",
+        name: "Working on now: every file in Activity",
       }),
-    ).toHaveAttribute("href", "/history?show=working");
+    ).toHaveAttribute("href", "/activity?show=working");
   });
 
   describe("with more files than the tile has room for", () => {
@@ -183,8 +183,8 @@ describe("the Working on now tile", () => {
       renderTile({ working: many(6) });
 
       expect(rowsOf()).toHaveLength(4);
-      const more = screen.getByRole("link", { name: "2 more in History" });
-      expect(more).toHaveAttribute("href", "/history?show=working");
+      const more = screen.getByRole("link", { name: "2 more in Activity" });
+      expect(more).toHaveAttribute("href", "/activity?show=working");
       expect(more).toHaveTextContent("2 more");
     });
 
@@ -203,7 +203,7 @@ describe("the Working on now tile", () => {
         ),
       ).toEqual(["", "", "hidden", "hidden"]);
       expect(
-        screen.getByRole("link", { name: "3 more in History" }),
+        screen.getByRole("link", { name: "3 more in Activity" }),
       ).toBeInTheDocument();
     });
 
@@ -219,7 +219,7 @@ describe("the Working on now tile", () => {
         ),
       ).toEqual(["", "", "", ""]);
       expect(
-        screen.getByRole("link", { name: "1 more in History" }),
+        screen.getByRole("link", { name: "1 more in Activity" }),
       ).toBeInTheDocument();
     });
 
@@ -227,7 +227,7 @@ describe("the Working on now tile", () => {
       renderTile({ working: many(2) });
 
       expect(
-        screen.queryByRole("link", { name: /more in History/ }),
+        screen.queryByRole("link", { name: /more in Activity/ }),
       ).toBeNull();
     });
   });

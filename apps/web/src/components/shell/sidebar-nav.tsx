@@ -1,7 +1,7 @@
 import { forwardRef, type Ref } from "react";
 import { Link, useLocation } from "react-router-dom";
 
-import { historyGroupPath } from "../../pages/history/history-links";
+import { activityGroupPath } from "../../pages/activity/activity-links";
 import { NavGlyph } from "./nav-icons";
 import { NAV_GROUPS, type NavBadgeKind, type NavItem } from "./nav-model";
 
@@ -15,15 +15,15 @@ const BADGE_WORDS: Record<NavBadgeKind, string> = {
 
 /**
  * Where an item goes while its badge shows, where that is not the item's own page: the files that need you are
- * listed in History's Needs you view, and the badge counts exactly those.
+ * listed in Activity's Needs you view, and the badge counts exactly those.
  */
 const BADGE_TARGETS: Partial<Record<NavBadgeKind, string>> = {
-  "needs-you": historyGroupPath("attention"),
+  "needs-you": activityGroupPath("attention"),
 };
 
 const BADGE_TEST_IDS: Record<NavBadgeKind, string> = {
   working: "nav-processing-working",
-  "needs-you": "nav-history-needs-you",
+  "needs-you": "nav-activity-needs-you",
 };
 
 type SidebarLinkProps = {

@@ -11,7 +11,7 @@ import type {
   ProcessingFile,
   ProcessingFileRemoveOptions,
 } from "../../lib/processing/files-api";
-import { HistoryFileActions } from "./history-file-actions";
+import { ActivityFileActions } from "./activity-file-actions";
 
 const forget = vi.fn().mockResolvedValue(undefined);
 const removeOptions = vi.fn<() => Promise<ProcessingFileRemoveOptions>>();
@@ -96,11 +96,11 @@ function file(partial: Partial<ProcessingFile> = {}): ProcessingFile {
 
 function renderActions(partial: Partial<ProcessingFile> = {}) {
   render(
-    <HistoryFileActions file={file(partial)} editable onRemoved={vi.fn()} />,
+    <ActivityFileActions file={file(partial)} editable onRemoved={vi.fn()} />,
   );
 }
 
-describe("HistoryFileActions remove dialog", () => {
+describe("ActivityFileActions remove dialog", () => {
   beforeEach(() => {
     forget.mockReset().mockResolvedValue(undefined);
     removeOptions.mockReset();
@@ -116,7 +116,7 @@ describe("HistoryFileActions remove dialog", () => {
 
     await waitFor(() => expect(forget).toHaveBeenCalledWith({ id: 7 }));
     expect(
-      screen.queryByTestId("history-remove-dialog"),
+      screen.queryByTestId("activity-remove-dialog"),
     ).not.toBeInTheDocument();
   });
 
@@ -127,7 +127,7 @@ describe("HistoryFileActions remove dialog", () => {
     fireEvent.click(screen.getByRole("button", { name: "Remove from list" }));
 
     expect(
-      await screen.findByTestId("history-remove-dialog"),
+      await screen.findByTestId("activity-remove-dialog"),
     ).toBeInTheDocument();
     expect(screen.getByText("Delete the file")).toBeInTheDocument();
     expect(
@@ -185,10 +185,10 @@ describe("HistoryFileActions remove dialog", () => {
     renderActions();
     fireEvent.click(screen.getByRole("button", { name: "Remove from list" }));
     fireEvent.click(
-      await screen.findByTestId("history-remove-dialog-choice-keep"),
+      await screen.findByTestId("activity-remove-dialog-choice-keep"),
     );
 
-    fireEvent.click(screen.getByTestId("history-remove-dialog-confirm"));
+    fireEvent.click(screen.getByTestId("activity-remove-dialog-confirm"));
 
     await waitFor(() =>
       expect(forget).toHaveBeenCalledWith({ id: 7, resolution: "keep" }),
@@ -201,11 +201,11 @@ describe("HistoryFileActions remove dialog", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Remove from list" }));
 
-    await screen.findByTestId("history-remove-dialog");
+    await screen.findByTestId("activity-remove-dialog");
     for (const radio of screen.getAllByRole("radio")) {
       expect(radio).not.toBeChecked();
     }
-    expect(screen.getByTestId("history-remove-dialog-confirm")).toBeDisabled();
+    expect(screen.getByTestId("activity-remove-dialog-confirm")).toBeDisabled();
     expect(screen.getAllByRole("radio")[0]).toHaveFocus();
   });
 
@@ -213,15 +213,15 @@ describe("HistoryFileActions remove dialog", () => {
     removeOptions.mockResolvedValue(removeOptionsResult());
     renderActions();
     fireEvent.click(screen.getByRole("button", { name: "Remove from list" }));
-    await screen.findByTestId("history-remove-dialog");
+    await screen.findByTestId("activity-remove-dialog");
 
     fireEvent.keyDown(document.activeElement ?? document.body, {
       key: "Enter",
     });
-    fireEvent.click(screen.getByTestId("history-remove-dialog-confirm"));
+    fireEvent.click(screen.getByTestId("activity-remove-dialog-confirm"));
 
     expect(forget).not.toHaveBeenCalled();
-    expect(screen.getByTestId("history-remove-dialog")).toBeInTheDocument();
+    expect(screen.getByTestId("activity-remove-dialog")).toBeInTheDocument();
   });
 
   it("enables Remove once a choice is made and sends exactly that resolution", async () => {
@@ -229,10 +229,10 @@ describe("HistoryFileActions remove dialog", () => {
     renderActions();
     fireEvent.click(screen.getByRole("button", { name: "Remove from list" }));
     fireEvent.click(
-      await screen.findByTestId("history-remove-dialog-choice-retry"),
+      await screen.findByTestId("activity-remove-dialog-choice-retry"),
     );
 
-    const remove = screen.getByTestId("history-remove-dialog-confirm");
+    const remove = screen.getByTestId("activity-remove-dialog-confirm");
     expect(remove).toBeEnabled();
     fireEvent.click(remove);
 
@@ -253,17 +253,17 @@ describe("HistoryFileActions remove dialog", () => {
     renderActions();
     fireEvent.click(screen.getByRole("button", { name: "Remove from list" }));
     fireEvent.click(
-      await screen.findByTestId("history-remove-dialog-choice-delete"),
+      await screen.findByTestId("activity-remove-dialog-choice-delete"),
     );
 
-    fireEvent.click(screen.getByTestId("history-remove-dialog-confirm"));
+    fireEvent.click(screen.getByTestId("activity-remove-dialog-confirm"));
 
     expect(
       await screen.findByText(
         "Radarr did not accept the rejection, so nothing was removed.",
       ),
     ).toBeInTheDocument();
-    expect(screen.getByTestId("history-remove-dialog")).toBeInTheDocument();
+    expect(screen.getByTestId("activity-remove-dialog")).toBeInTheDocument();
   });
 
   it("shows the file's current details to confirm for a title with no recorded fingerprint", async () => {
@@ -279,7 +279,7 @@ describe("HistoryFileActions remove dialog", () => {
     fireEvent.click(screen.getByRole("button", { name: "Remove from list" }));
 
     const unconfirmed = await screen.findByTestId(
-      "history-remove-dialog-unconfirmed",
+      "activity-remove-dialog-unconfirmed",
     );
     expect(within(unconfirmed).getByText(/3\.91 GB/)).toBeInTheDocument();
     expect(
@@ -295,9 +295,9 @@ describe("HistoryFileActions remove dialog", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Remove from list" }));
 
-    await screen.findByTestId("history-remove-dialog");
+    await screen.findByTestId("activity-remove-dialog");
     expect(
-      screen.queryByTestId("history-remove-dialog-unconfirmed"),
+      screen.queryByTestId("activity-remove-dialog-unconfirmed"),
     ).not.toBeInTheDocument();
   });
 
@@ -312,10 +312,10 @@ describe("HistoryFileActions remove dialog", () => {
     renderActions();
     fireEvent.click(screen.getByRole("button", { name: "Remove from list" }));
     fireEvent.click(
-      await screen.findByTestId("history-remove-dialog-choice-delete"),
+      await screen.findByTestId("activity-remove-dialog-choice-delete"),
     );
 
-    fireEvent.click(screen.getByTestId("history-remove-dialog-confirm"));
+    fireEvent.click(screen.getByTestId("activity-remove-dialog-confirm"));
 
     await waitFor(() =>
       expect(forget).toHaveBeenCalledWith({
@@ -340,10 +340,10 @@ describe("HistoryFileActions remove dialog", () => {
     renderActions();
     fireEvent.click(screen.getByRole("button", { name: "Remove from list" }));
     fireEvent.click(
-      await screen.findByTestId("history-remove-dialog-choice-remove"),
+      await screen.findByTestId("activity-remove-dialog-choice-remove"),
     );
 
-    fireEvent.click(screen.getByTestId("history-remove-dialog-confirm"));
+    fireEvent.click(screen.getByTestId("activity-remove-dialog-confirm"));
 
     await waitFor(() =>
       expect(forget).toHaveBeenCalledWith({

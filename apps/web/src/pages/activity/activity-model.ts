@@ -40,8 +40,8 @@ export function tookWords(seconds: number | null | undefined): string | null {
   return `${Math.floor(minutes / 60)} h ${minutes % 60} min`;
 }
 
-/** One track as History lists it: what it is, and what happened to it. */
-export type HistoryTrack = {
+/** One track as Activity lists it: what it is, and what happened to it. */
+export type ActivityTrack = {
   kind: "Audio" | "Subtitle" | "Other";
   what: string;
   kept: boolean;
@@ -71,7 +71,7 @@ function splitLine(line: unknown): string[] {
 
 /**
  * The planner describes a track the way ffprobe does ("fre eac3 6 ch (stream 2)"). Put it the way the
- * rest of History reads ("French 5.1 E-AC-3"): language named, channels as a layout, codec spelled out,
+ * rest of Activity reads ("French 5.1 E-AC-3"): language named, channels as a layout, codec spelled out,
  * stream numbers dropped.
  */
 export function readableTrack(text: string): string {
@@ -117,8 +117,8 @@ function splitRemoval(line: string): { what: string; why: string } {
  */
 export function tracksFromRecord(
   detail: Record<string, unknown>,
-): HistoryTrack[] {
-  const tracks: HistoryTrack[] = [];
+): ActivityTrack[] {
+  const tracks: ActivityTrack[] = [];
   for (const what of splitLine(detail.audio_after)) {
     tracks.push({ kind: "Audio", what, kept: true, why: "" });
   }
@@ -153,7 +153,7 @@ export function sizesFromRecord(detail: Record<string, unknown>): {
   return { before, after, saved: Math.max(0, before - after) };
 }
 
-/** A file's sizes as History shows them: always all three, with "not written" rather than a gap. */
+/** A file's sizes as Activity shows them: always all three, with "not written" rather than a gap. */
 export type DetailSizes = {
   before: number | null;
   /** Null when Weir wrote no new copy of the file. */
@@ -200,7 +200,7 @@ export function detailSizes(
   };
 }
 
-/** What became of the copy Weir handed back, as History tells it. */
+/** What became of the copy Weir handed back, as Activity tells it. */
 export type HandbackStory = {
   heading: string;
   sentence: string;

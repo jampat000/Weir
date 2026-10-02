@@ -89,7 +89,7 @@ async function renderAt(entry: string) {
   const router = createMemoryRouter(
     [
       ...setupRoutes(null),
-      { path: "/history", element: <div>History page</div> },
+      { path: "/activity", element: <div>Activity page</div> },
     ],
     { initialEntries: [entry] },
   );
@@ -282,7 +282,7 @@ describe("with unsaved changes in a tab", () => {
     alerts.unsaved = "the Discord alert";
     const router = await renderAt("/setup/connections/alerts");
 
-    await act(() => router.navigate("/history"));
+    await act(() => router.navigate("/activity"));
 
     expect(router.state.location.pathname).toBe("/setup/connections/alerts");
     expect(screen.getByTestId("settings-unsaved-changes")).toBeInTheDocument();

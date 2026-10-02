@@ -2,7 +2,7 @@ import { apiFetch, readJson, requireOk } from "../api/client";
 import type { Schema } from "../api/types";
 import { withQuery } from "./files-api";
 
-/** What the newest library clean did to one file (#695): History lists these beside the downloads. */
+/** What the newest library clean did to one file (#695): Activity lists these beside the downloads. */
 export type LibraryClean = Schema<"ProcessingLibraryCleanOut">;
 export type LibraryCleansPage = Schema<"ProcessingLibraryCleansOut">;
 

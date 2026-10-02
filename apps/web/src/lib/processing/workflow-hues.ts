@@ -28,7 +28,7 @@ export function inDisplayOrder(
 export interface WorkflowHues {
   /** The hue of the workflow with this id; the neutral hue when there is none or it is not in the list. */
   forId: (id: number | null | undefined) => number;
-  /** The same by name, where only the name is known (a history row, a shelf tile, a story). */
+  /** The same by name, where only the name is known (a activity row, a shelf tile, a story). */
   forName: (name: string | null | undefined) => number;
 }
 

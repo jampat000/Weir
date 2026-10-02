@@ -18,7 +18,7 @@ export type WorkingStage = Extract<
 >;
 
 /** Where the files in progress are listed: "and N more" on the Pipeline and on Working on now lead here. */
-export const IN_PROGRESS_PATH = "/history?show=working";
+export const IN_PROGRESS_PATH = "/activity?show=working";
 
 export const STAGE_LABEL: Record<PipelineStage, string> = {
   incoming: "Incoming",

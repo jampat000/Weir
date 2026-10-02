@@ -18,17 +18,17 @@ import {
   workflowKindName,
   type WorkflowKind,
 } from "../../lib/processing/workflow-kind";
-import { historyGroupOf } from "./history-entries";
-import { HistoryFileActions } from "./history-file-actions";
-import { SizeFigures, WorkingFigures } from "./history-figures";
-import { fileGuidance } from "./history-guidance";
+import { activityGroupOf } from "./activity-entries";
+import { ActivityFileActions } from "./activity-file-actions";
+import { SizeFigures, WorkingFigures } from "./activity-figures";
+import { fileGuidance } from "./activity-guidance";
 import {
   detailSizes,
   handbackStory,
   latestPass,
   tookWords,
-} from "./history-model";
-import { PassRecord } from "./history-pass";
+} from "./activity-model";
+import { PassRecord } from "./activity-pass";
 import { useNarrowDetailFocus } from "./use-narrow-detail-focus";
 
 /** The kind of workflow the file belongs to; null until the workflows are known, so nothing is said wrongly meanwhile. */
@@ -57,7 +57,7 @@ function Guidance({ file, now }: { file: ProcessingFile; now: number }) {
       {handedBack ? (
         <div
           className={`mm-history-next mm-history-handback is-${handedBack.tone}`}
-          data-testid="history-handback"
+          data-testid="activity-handback"
         >
           <p className="mm-history-next__title">{handedBack.heading}</p>
           <p className="mm-history-note">{handedBack.sentence}</p>
@@ -89,9 +89,9 @@ function RecordSection({
   if (!pass) {
     return (
       <p className="mm-history-note">
-        {file.status === "processing" || historyGroupOf(file) === "working"
+        {file.status === "processing" || activityGroupOf(file) === "working"
           ? "Weir has not finished processing this file yet. What it kept and removed shows here once it has."
-          : "Weir has no record of what it did to this file. Records older than the History setting are removed."}
+          : "Weir has no record of what it did to this file. Records older than the File activity setting are removed."}
       </p>
     );
   }
@@ -99,7 +99,7 @@ function RecordSection({
 }
 
 /** One file in full: what happened to it, what to do next, and what the last pass kept and removed. */
-export function HistoryDetail({
+export function ActivityDetail({
   file,
   now,
   editable,
@@ -122,12 +122,12 @@ export function HistoryDetail({
     <section
       ref={sectionRef}
       className="mm-history-detail"
-      aria-labelledby="history-detail-title"
-      data-testid="history-detail"
+      aria-labelledby="activity-detail-title"
+      data-testid="activity-detail"
     >
       <p className="mm-history-detail__eyebrow">{file.library_name}</p>
       <h2
-        id="history-detail-title"
+        id="activity-detail-title"
         ref={titleRef}
         tabIndex={-1}
         className="mm-history-detail__title"
@@ -142,9 +142,9 @@ export function HistoryDetail({
       <Guidance file={file} now={now} />
       <DirectPlayLine
         directPlay={file.direct_play}
-        testId="history-direct-play"
+        testId="activity-direct-play"
       />
-      <HistoryFileActions
+      <ActivityFileActions
         key={file.id}
         file={file}
         editable={editable}
@@ -174,7 +174,7 @@ export function HistoryDetail({
       {record.data ? (
         <p
           className="mm-history-record-meta"
-          data-testid="history-retention-note"
+          data-testid="activity-retention-note"
         >
           {fileHistoryRetentionNote(record.data.retention_days)}
         </p>

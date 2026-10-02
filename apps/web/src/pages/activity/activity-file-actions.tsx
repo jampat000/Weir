@@ -33,11 +33,11 @@ const CONCLUDED: readonly ProcessingFileStatus[] = [
 ];
 
 /**
- * Every action for the file open in History. Each shows only where it can do something: a running file cannot be
+ * Every action for the file open in Activity. Each shows only where it can do something: a running file cannot be
  * started earlier, and a button that looked like it worked would be worse than no button. Every action disables the
  * whole row while it runs and shows what it is doing, so nothing looks like it did nothing (#699).
  */
-export function HistoryFileActions({
+export function ActivityFileActions({
   file,
   editable,
   onRemoved,
@@ -163,7 +163,7 @@ export function HistoryFileActions({
   );
 
   return (
-    <div className="mm-history-actions" data-testid="history-file-actions">
+    <div className="mm-history-actions" data-testid="activity-file-actions">
       <div className="mm-history-actions__row">
         {status === "processing_failed"
           ? button(
@@ -284,7 +284,7 @@ export function HistoryFileActions({
       </div>
       {confirmingPassThrough ? (
         <ConfirmDialog
-          testId="history-pass-through-confirm"
+          testId="activity-pass-through-confirm"
           title="Pass this file through unchanged?"
           description={PASS_THROUGH_EXPLAINED}
           confirmLabel="Pass through unchanged"

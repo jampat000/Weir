@@ -64,8 +64,8 @@ const OUTCOME_WORDS: Record<
   failed: { tail: " couldn't finish", tone: "error" },
 };
 
-function historyPath(relativePath: string): string {
-  return `/history?q=${encodeURIComponent(relativePath)}`;
+function activityPath(relativePath: string): string {
+  return `/activity?q=${encodeURIComponent(relativePath)}`;
 }
 
 function finishedRow(ev: ActivityEventItem, file: FinishedFile): StreamRow {
@@ -81,7 +81,7 @@ function finishedRow(ev: ActivityEventItem, file: FinishedFile): StreamRow {
     note: finishedNote(file),
     tone: outcome.tone,
     at: ev.created_at,
-    to: historyPath(file.relativePath),
+    to: activityPath(file.relativePath),
     times: 1,
   };
 }
@@ -102,7 +102,7 @@ function handbackRow(ev: ActivityEventItem): StreamRow {
     note: "Handed back",
     tone: imported ? "success" : "warning",
     at: ev.created_at,
-    to: path ? historyPath(path) : LOG_PATH,
+    to: path ? activityPath(path) : LOG_PATH,
     times: 1,
   };
 }
@@ -117,7 +117,7 @@ function logRow(ev: ActivityEventItem): StreamRow {
     note: display.summary,
     tone: display.tone,
     at: ev.created_at,
-    to: file ? historyPath(file) : LOG_PATH,
+    to: file ? activityPath(file) : LOG_PATH,
     times: 1,
   };
 }

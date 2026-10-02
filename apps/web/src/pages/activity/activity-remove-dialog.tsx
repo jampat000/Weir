@@ -10,7 +10,7 @@ import type {
 import { useAppDateFormatter } from "../../lib/ui/mm-format-date";
 
 /** The four choices offered when a title's file is still in the watched folder (#785). */
-type HistoryRemoveChoice = Extract<
+type ActivityRemoveChoice = Extract<
   ProcessingFileRemovalResolution,
   "remove" | "delete" | "keep" | "retry"
 >;
@@ -22,7 +22,7 @@ type HistoryRemoveChoice = Extract<
  */
 function choices(
   options: ProcessingFileRemoveOptions,
-): { value: HistoryRemoveChoice; label: string; detail: string }[] {
+): { value: ActivityRemoveChoice; label: string; detail: string }[] {
   const manager = options.manager_label;
   return [
     {
@@ -59,17 +59,17 @@ function choices(
 }
 
 /**
- * History's remove dialog for a failed or rejected title whose file is still in the watched folder (#785):
+ * Activity's remove dialog for a failed or rejected title whose file is still in the watched folder (#785):
  * delete the download (naming whichever manager will do it, or saying Weir will delete it itself), keep it
  * without processing it again, try it again, or just remove it from the list. A title that does not qualify for
- * this — finished, or its file already gone — keeps the plain confirm in {@link HistoryFileActions} instead of
+ * this — finished, or its file already gone — keeps the plain confirm in {@link ActivityFileActions} instead of
  * this dialog. When `options.fingerprint_recorded` is false (a title that failed or was rejected before Weir
  * started recording one, #786 follow-up), the file Weir means is shown plainly so the owner can check it before
  * choosing delete or keep — "remove" needs no such check, since it never touches the file. Nothing is chosen when
  * the dialog opens, Remove stays disabled until something is, and focus starts on the first choice, so nothing
  * happens to the file unless the person picks what should (#838).
  */
-export function HistoryRemoveDialog({
+export function ActivityRemoveDialog({
   fileName,
   options,
   busy,
@@ -82,17 +82,18 @@ export function HistoryRemoveDialog({
   busy: boolean;
   error: string | null;
   onCancel: () => void;
-  onConfirm: (resolution: HistoryRemoveChoice) => void;
+  onConfirm: (resolution: ActivityRemoveChoice) => void;
 }) {
-  const [choice, setChoice] = useState<HistoryRemoveChoice | null>(null);
+  const [choice, setChoice] = useState<ActivityRemoveChoice | null>(null);
   const firstChoice = useRef<HTMLInputElement>(null);
   const formatDate = useAppDateFormatter();
 
   return (
     <ConfirmDialog
-      testId="history-remove-dialog"
-      title={`Remove "${fileName}" from History?`}
+      testId="activity-remove-dialog"
+      title={`Remove "${fileName}" from Activity?`}
       confirmLabel="Remove"
+      tone="danger"
       cancelLabel="Cancel"
       busy={busy}
       busyLabel="Removing…"
@@ -111,7 +112,7 @@ export function HistoryRemoveDialog({
           {!options.fingerprint_recorded ? (
             <div
               className="mb-3"
-              data-testid="history-remove-dialog-unconfirmed"
+              data-testid="activity-remove-dialog-unconfirmed"
             >
               <p className="font-medium">
                 <FileName path={fileName} />
@@ -130,13 +131,13 @@ export function HistoryRemoveDialog({
           {choices(options).map((opt, index) => (
             <label
               key={opt.value}
-              data-testid={`history-remove-dialog-choice-${opt.value}`}
+              data-testid={`activity-remove-dialog-choice-${opt.value}`}
               className={`mm-dialog-choice${choice === opt.value ? " mm-dialog-choice--chosen" : ""}`}
             >
               <input
                 ref={index === 0 ? firstChoice : undefined}
                 type="radio"
-                name="history-remove-resolution"
+                name="activity-remove-resolution"
                 value={opt.value}
                 checked={choice === opt.value}
                 onChange={() => setChoice(opt.value)}
