@@ -34,7 +34,8 @@ export function MediaToolsSection() {
         <div>
           <dt>FFmpeg</dt>
           <dd
-            className={ffmpegMissing ? "mm-status-text--failed" : undefined}
+            className={ffmpegMissing ? "mm-status-text" : undefined}
+            data-status={ffmpegMissing ? "broken" : undefined}
             title={
               ffmpegMissing ? "Nothing can be processed without it." : ffmpeg
             }

@@ -29,7 +29,11 @@ export function SignInSection() {
           <div key={row.label}>
             <dt>{row.label}</dt>
             <dd title={row.detail}>
-              {row.tone ? <Chip tone={row.tone}>{row.value}</Chip> : row.value}
+              {row.meaning ? (
+                <Chip meaning={row.meaning}>{row.value}</Chip>
+              ) : (
+                row.value
+              )}
             </dd>
           </div>
         ))}

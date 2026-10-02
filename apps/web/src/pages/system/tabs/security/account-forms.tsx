@@ -90,12 +90,12 @@ export function ChangeUsernameForm() {
         disabled={busy}
       />
       {changeUsername.isError ? (
-        <p className="mm-status-text--failed text-sm" role="alert">
+        <p className="mm-status-text text-sm" data-status="broken" role="alert">
           {errorMessage(changeUsername.error, "Could not change the username.")}
         </p>
       ) : null}
       {missing ? (
-        <p className="mm-status-text--failed text-sm" role="alert">
+        <p className="mm-status-text text-sm" data-status="broken" role="alert">
           {missing}
         </p>
       ) : null}
@@ -163,7 +163,8 @@ export function ChangePasswordForm() {
       {changePassword.isSuccess ? (
         <div className="space-y-3">
           <p
-            className="mm-status-text--healthy text-sm font-semibold"
+            className="mm-status-text text-sm font-semibold"
+            data-status="done"
             role="status"
           >
             Password changed. Sign in again with your new password.
@@ -207,12 +208,20 @@ export function ChangePasswordForm() {
             />
           </div>
           {changePassword.isError ? (
-            <p className="mm-status-text--failed text-sm" role="alert">
+            <p
+              className="mm-status-text text-sm"
+              data-status="broken"
+              role="alert"
+            >
               {errorMessage(changePassword.error, "Could not change password.")}
             </p>
           ) : null}
           {validationError ? (
-            <p className="mm-status-text--failed text-sm" role="alert">
+            <p
+              className="mm-status-text text-sm"
+              data-status="broken"
+              role="alert"
+            >
               {validationError}
             </p>
           ) : null}

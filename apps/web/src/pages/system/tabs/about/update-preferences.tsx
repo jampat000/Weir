@@ -133,12 +133,20 @@ export function UpdatePreferences() {
         </select>
       </SettingRow>
       {save.isError ? (
-        <p className="mm-status-text--failed mm-sys-note" role="alert">
+        <p
+          className="mm-status-text mm-sys-note"
+          data-status="broken"
+          role="alert"
+        >
           {errorMessage(save.error, "Could not save update settings.")}
         </p>
       ) : null}
       {saved ? (
-        <p className="mm-status-text--healthy mm-sys-note" role="status">
+        <p
+          className="mm-status-text mm-sys-note"
+          data-status="done"
+          role="status"
+        >
           Update settings saved.
         </p>
       ) : null}

@@ -2,11 +2,11 @@ import type {
   NetworkAccessStatus,
   NetworkScope,
 } from "../../../../lib/settings/types";
-import type { MmStatusTone } from "../../../../lib/ui/mm-status-tone";
+import type { StatusMeaning } from "../../../../lib/ui/status-meaning";
 
 /** What the network access line says: a status pill, a few words after it, and whether trying again can help. */
 export type NetworkAccessLine = {
-  tone: MmStatusTone;
+  meaning: StatusMeaning;
   label: string;
   /** The addresses other devices type; empty unless Weir is reachable. */
   addresses: readonly string[];
@@ -35,12 +35,12 @@ export function describeNetworkAccess(
     return status.firewall === "allowed"
       ? {
           ...none,
-          tone: "info",
+          meaning: "doing",
           label: "Restarting Weir for your network…",
         }
       : {
           ...none,
-          tone: "warning",
+          meaning: "attention",
           label: `Waiting for approval on ${status.machine_name}`,
           note: "Approve the Windows prompt on that PC. Weir restarts for your network once you do.",
         };
@@ -48,14 +48,14 @@ export function describeNetworkAccess(
   if (status.pending_scope === "this_pc_only") {
     return {
       ...none,
-      tone: "info",
+      meaning: "doing",
       label: "Restarting Weir for this PC only…",
     };
   }
   if (status.state === "allowed") {
     return {
       ...none,
-      tone: "healthy",
+      meaning: "done",
       label: "Reachable from your network:",
       addresses: status.addresses,
     };
@@ -63,10 +63,10 @@ export function describeNetworkAccess(
   if (status.state === "blocked") {
     return {
       ...none,
-      tone: "failed",
+      meaning: "broken",
       label: "Blocked by Windows Firewall",
       canRetry: true,
     };
   }
-  return { ...none, tone: "neutral", label: "This PC only" };
+  return { ...none, meaning: "idle", label: "This PC only" };
 }

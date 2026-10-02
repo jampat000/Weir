@@ -6,16 +6,13 @@ import type { RunsAs } from "../../../../lib/system/system-stats-types";
 import { useSystemOverviewQuery } from "../../../../lib/system/use-system-stats";
 import { useUpdateStatusQuery } from "../../../../lib/settings/queries";
 import type { AppSettings } from "../../../../lib/settings/types";
+import { updateMeaning } from "../../../../lib/settings/update-status";
 import { useSystemReadinessQuery } from "../../../../lib/system/readiness-queries";
 import {
   sizeWords,
   splitAddress,
 } from "../../../processing/dashboard/system/system-words";
-import {
-  installTypeLabel,
-  updateStatusLabel,
-  updateStatusTone,
-} from "./update-words";
+import { installTypeLabel, updateStatusLabel } from "./update-words";
 
 const SETUP_WIZARD_PATH = "/setup-wizard";
 
@@ -84,7 +81,7 @@ export function ThisWeirSection({ settings }: { settings: AppSettings }) {
               {update?.current_version ?? machine?.version ?? "Checking…"}
             </span>
             {update ? (
-              <Chip tone={updateStatusTone(update.status)}>
+              <Chip meaning={updateMeaning(update.status)}>
                 {updateStatusLabel(update.status)}
               </Chip>
             ) : null}
@@ -117,7 +114,8 @@ export function ThisWeirSection({ settings }: { settings: AppSettings }) {
       </dl>
       {machine?.machine_name_looks_generated ? (
         <p
-          className="mm-status-text--warning mm-sys-note"
+          className="mm-status-text mm-sys-note"
+          data-status="attention"
           data-testid="about-hostname-tip"
         >
           Set <code>hostname:</code> in your compose file so Weir shows your

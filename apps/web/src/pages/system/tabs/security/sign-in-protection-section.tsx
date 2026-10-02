@@ -49,11 +49,8 @@ function ProtectionRows({ protections }: { protections: Protection[] }) {
       {protections.map((protection) => (
         <li
           key={protection.label}
-          className={
-            protection.needsAttention
-              ? "mm-protection mm-protection--attention"
-              : "mm-protection"
-          }
+          className="mm-protection"
+          data-status={protection.needsAttention ? "attention" : "done"}
         >
           <Mark attention={protection.needsAttention} />
           <span className="mm-protection__name">{protection.label}</span>
@@ -93,7 +90,7 @@ export function SignInProtectionSection({
       {overview ? (
         <>
           {attention.length > 0 ? (
-            <div className="mm-protection__attention">
+            <div className="mm-protection__attention" data-status="attention">
               <ProtectionRows protections={attention} />
               {note ? <p className="mm-protection__advice">{note}</p> : null}
             </div>

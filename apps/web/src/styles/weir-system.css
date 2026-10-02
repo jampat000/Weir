@@ -128,7 +128,7 @@
   padding: 0.75rem 1rem;
   border: 1px solid var(--mm-border);
   border-radius: 0.75rem;
-  background: var(--mm-status-healthy-bg);
+  background: color-mix(in srgb, var(--mm-st) 12%, transparent);
 }
 
 /* Where a Windows update's mode, startup check and interval sit under the status line. */
@@ -444,7 +444,7 @@
 }
 
 .mm-protection__mark {
-  color: var(--mm-status-healthy-text);
+  color: var(--mm-st);
 }
 
 .mm-protection__name {
@@ -461,17 +461,16 @@
 .mm-protection__attention {
   margin-bottom: 8px;
   padding: 2px 12px 10px;
-  border: 1px solid color-mix(in srgb, var(--mm-warning) 45%, transparent);
+  border: 1px solid color-mix(in srgb, var(--mm-st) 45%, transparent);
   border-radius: var(--mm-radius-control);
-  background: var(--mm-status-warning-bg);
+  background: color-mix(in srgb, var(--mm-st) 14%, transparent);
 }
 
-.mm-protection--attention .mm-protection__mark,
-.mm-protection--attention .mm-protection__value {
-  color: var(--mm-status-warning-text);
+.mm-protection[data-status="attention"] .mm-protection__value {
+  color: var(--mm-st);
 }
 
-.mm-protection--attention .mm-protection__name {
+.mm-protection[data-status="attention"] .mm-protection__name {
   font-weight: 600;
 }
 

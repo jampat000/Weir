@@ -60,9 +60,9 @@ export function UpdateReadyNotice() {
   if (!state?.downloaded) return null;
 
   return (
-    <div className="mm-update-ready">
+    <div className="mm-update-ready" data-status="todo">
       <div className="min-w-0">
-        <p className="mm-status-text--healthy text-sm font-semibold">
+        <p className="mm-status-text text-sm font-semibold">
           Update ready to install
           {state.pending_version ? ` — v${state.pending_version}` : ""}
         </p>
@@ -70,12 +70,20 @@ export function UpdateReadyNotice() {
           The update has been downloaded. Restart Weir to apply it.
         </p>
         {applyUpdate.isError ? (
-          <p className="mm-status-text--failed mt-1 text-xs" role="alert">
+          <p
+            className="mm-status-text mt-1 text-xs"
+            data-status="broken"
+            role="alert"
+          >
             {errorMessage(applyUpdate.error, "Could not signal restart.")}
           </p>
         ) : null}
         {applyUpdate.isSuccess ? (
-          <p className="mm-status-text--healthy mt-1 text-xs" role="status">
+          <p
+            className="mm-status-text mt-1 text-xs"
+            data-status="doing"
+            role="status"
+          >
             Weir is restarting to finish the update. This page will reload by
             itself.
           </p>

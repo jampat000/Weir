@@ -157,12 +157,20 @@ export function BackupListSection({
         </table>
       )}
       {resultMessage ? (
-        <p className="mm-status-text--healthy mm-sys-note" role="status">
+        <p
+          className="mm-status-text mm-sys-note"
+          data-status="done"
+          role="status"
+        >
           {resultMessage}
         </p>
       ) : null}
       {resultProblem ? (
-        <p className="mm-status-text--failed mm-sys-note" role="alert">
+        <p
+          className="mm-status-text mm-sys-note"
+          data-status="broken"
+          role="alert"
+        >
           {resultProblem}
         </p>
       ) : null}

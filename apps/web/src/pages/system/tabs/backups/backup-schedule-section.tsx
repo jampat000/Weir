@@ -12,7 +12,7 @@ import {
   DEFAULT_BACKUP_TIME,
   type SystemSettingsForm,
 } from "../../use-system-settings-form";
-import { backupFreshness } from "./backup-freshness";
+import { BACKUP_FRESHNESS_MEANING, backupFreshness } from "./backup-freshness";
 
 const BACKUP_INTERVAL_HOURS = [6, 12, 24, 48, 72, 168] as const;
 const HOURS_PER_WEEK = 168;
@@ -100,7 +100,7 @@ export function BackupScheduleSection({
           <span className="mm-sys-value">
             {formatDate(settings.configuration_backup_last_run_at)}
             {freshness ? (
-              <Chip tone={freshness === "overdue" ? "warning" : "healthy"}>
+              <Chip meaning={BACKUP_FRESHNESS_MEANING[freshness]}>
                 {freshness === "overdue" ? "Overdue" : "Up to date"}
               </Chip>
             ) : null}
@@ -121,14 +121,19 @@ export function BackupScheduleSection({
           ) : null}
           {failed ? (
             <p
-              className="mm-status-text--failed text-sm"
+              className="mm-status-text text-sm"
+              data-status="broken"
               role="alert"
               data-testid="suite-settings-backup-save-error"
             >
               {errorMessage(save.error, "Could not save.")}
             </p>
           ) : saved && !schedule.dirty ? (
-            <p className="mm-status-text--healthy text-sm" role="status">
+            <p
+              className="mm-status-text text-sm"
+              data-status="done"
+              role="status"
+            >
               Backup schedule saved.
             </p>
           ) : null}

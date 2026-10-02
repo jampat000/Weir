@@ -1,6 +1,6 @@
 import type { CurrentSession } from "../../../../lib/api/types";
 import type { SecurityOverview } from "../../../../lib/settings/types";
-import type { MmStatusTone } from "../../../../lib/ui/mm-status-tone";
+import type { StatusMeaning } from "../../../../lib/ui/status-meaning";
 import { plural } from "../../../../lib/ui/mm-plural";
 
 const LOADING = "Loading...";
@@ -22,8 +22,8 @@ export function formatSessionTimeout(minutes: number): string {
 export type SignInRow = {
   label: string;
   value: string;
-  /** Set when the value is a state, which then shows as a pill in this tone. */
-  tone?: MmStatusTone;
+  /** Set when the value is a state, which then shows as a pill of this meaning. */
+  meaning?: StatusMeaning;
   /** What the value means, as a hover note. */
   detail?: string;
 };
@@ -36,7 +36,7 @@ function browserRow(
     return {
       label: "This browser",
       value: sessionFailed ? "Unavailable" : LOADING,
-      tone: sessionFailed ? "failed" : "neutral",
+      meaning: sessionFailed ? "broken" : "doing",
       detail: sessionFailed
         ? "Could not read the current sign-in session."
         : "Checking the current sign-in session.",
@@ -46,13 +46,13 @@ function browserRow(
     ? {
         label: "This browser",
         value: "Trusted",
-        tone: "healthy",
+        meaning: "done",
         detail: "Long-lived sign-in for this device",
       }
     : {
         label: "This browser",
         value: "Standard",
-        tone: "neutral",
+        meaning: "idle",
         detail: "Normal sign-in lifetime",
       };
 }

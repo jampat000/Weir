@@ -678,8 +678,8 @@ describe("SystemPage", () => {
     const pill = within(
       screen.getByTestId("suite-settings-release-status"),
     ).getByText("Unavailable");
-    expect(pill.className).not.toContain("healthy");
-    expect(pill.className).toContain("failed");
+    expect(pill).not.toHaveAttribute("data-status", "done");
+    expect(pill).toHaveAttribute("data-status", "attention");
   });
 
   function seededUpdateClient(overrides: {

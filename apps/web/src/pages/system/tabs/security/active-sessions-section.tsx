@@ -48,9 +48,9 @@ function SessionsTable({
             <th scope="row">
               <span className="mm-sys-table__who">
                 {session.client_label || "Browser session"}
-                {session.current ? <Chip tone="info">This browser</Chip> : null}
+                {session.current ? <Chip dot={false}>This browser</Chip> : null}
                 {session.trusted_device ? (
-                  <Chip tone="healthy">Trusted</Chip>
+                  <Chip meaning="done">Trusted</Chip>
                 ) : null}
               </span>
             </th>

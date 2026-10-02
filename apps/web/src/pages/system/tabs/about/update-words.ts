@@ -1,5 +1,3 @@
-import type { MmStatusTone } from "../../../../lib/ui/mm-status-tone";
-
 /** How this install got here, in words a reader outside engineering recognises. */
 export function installTypeLabel(installType: string): string {
   switch (installType) {
@@ -27,11 +25,4 @@ const STATUS_LABELS: Readonly<Record<string, string>> = {
 /** What a status pill says about the update check. */
 export function updateStatusLabel(status: string): string {
   return STATUS_LABELS[status] ?? sentenceCase(status.replaceAll("_", " "));
-}
-
-/** A failed check reads as a failure, not a quiet success; only "up to date" reads as healthy. */
-export function updateStatusTone(status: string): MmStatusTone {
-  if (status === "update_available") return "warning";
-  if (status === "up_to_date") return "healthy";
-  return "failed";
 }

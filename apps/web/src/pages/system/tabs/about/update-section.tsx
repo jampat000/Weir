@@ -8,8 +8,9 @@ import {
   useUpdateStatusQuery,
 } from "../../../../lib/settings/queries";
 import type { UpdateStatus } from "../../../../lib/settings/types";
+import { updateMeaning } from "../../../../lib/settings/update-status";
 import { mmActionButtonClass } from "../../../../lib/ui/mm-control-roles";
-import { updateStatusLabel, updateStatusTone } from "./update-words";
+import { updateStatusLabel } from "./update-words";
 import { UpdatePreferences } from "./update-preferences";
 import { UpdateReadyNotice } from "./update-ready-notice";
 
@@ -106,7 +107,7 @@ function ReleaseStatus({
         title={status.summary}
         data-testid="suite-settings-release-status"
       >
-        <Chip tone={updateStatusTone(status.status)}>
+        <Chip meaning={updateMeaning(status.status)}>
           {updateStatusLabel(status.status)}
         </Chip>
         <span>{version ?? status.summary}</span>
@@ -171,7 +172,7 @@ export function UpdateSection() {
   if (!status) {
     return (
       <Panel title="Updates" headingLevel={3} padded>
-        <p className="text-sm text-mm-status-failed-text" role="alert">
+        <p className="mm-status-text text-sm" data-status="broken" role="alert">
           {errorMessage(
             updateStatusQ.error,
             "Could not check for updates right now.",

@@ -34,7 +34,7 @@ describe("intendedScope", () => {
 describe("describeNetworkAccess", () => {
   it("offers no retry and no address while only this PC can reach Weir", () => {
     expect(describeNetworkAccess(status())).toMatchObject({
-      tone: "neutral",
+      meaning: "idle",
       label: "This PC only",
       addresses: [],
       canRetry: false,
@@ -51,7 +51,7 @@ describe("describeNetworkAccess", () => {
     );
 
     expect(line).toMatchObject({
-      tone: "healthy",
+      meaning: "done",
       addresses: ["http://10.1.1.196:9347"],
     });
   });
@@ -59,7 +59,7 @@ describe("describeNetworkAccess", () => {
   it("offers a retry when the firewall blocks", () => {
     expect(
       describeNetworkAccess(status({ state: "blocked", scope: "network" })),
-    ).toMatchObject({ tone: "failed", canRetry: true });
+    ).toMatchObject({ meaning: "broken", canRetry: true });
   });
 
   it("waits for approval while the firewall still has to be asked", () => {
@@ -68,6 +68,7 @@ describe("describeNetworkAccess", () => {
     );
 
     expect(line.label).toBe("Waiting for approval on MEDIA-PC");
+    expect(line.meaning).toBe("attention");
     expect(line.note).not.toBeNull();
   });
 
@@ -75,8 +76,11 @@ describe("describeNetworkAccess", () => {
     expect(
       describeNetworkAccess(
         status({ pending_scope: "network", firewall: "allowed" }),
-      ).label,
-    ).toBe("Restarting Weir for your network…");
+      ),
+    ).toMatchObject({
+      label: "Restarting Weir for your network…",
+      meaning: "doing",
+    });
   });
 
   it("restarts for this PC only when that is what is pending", () => {

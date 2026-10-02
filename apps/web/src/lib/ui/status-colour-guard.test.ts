@@ -18,13 +18,11 @@ const MIGRATE_ME: readonly string[] = [
   "lib/ui/mm-control-roles.ts",
   "pages/settings/tabs/libraries/library-import-section.tsx",
   "pages/settings/tabs/rules/rules-preview-panel.tsx",
-  "pages/system/tabs/about/update-section.tsx",
   "styles/weir-auth.css",
   "styles/weir-dialogs.css",
   "styles/weir-panels.css",
   "styles/weir-shell.css",
   "styles/weir-sidebar-nav.css",
-  "styles/weir-system.css",
   "styles/weir-tab-layouts.css",
 ];
 
@@ -40,6 +38,7 @@ const RETIRED_STATUS_CLASSES: readonly string[] = [
   "mm-conn--answered",
   "mm-conn--failed",
   "mm-ctable__bar--",
+  "mm-protection--attention",
   "mm-log-dot",
   "mm-log-row--error",
   "mm-log-row--warning",

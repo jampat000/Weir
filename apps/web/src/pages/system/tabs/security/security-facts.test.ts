@@ -48,7 +48,7 @@ describe("currentSignInRows", () => {
       "Signs out after",
       "Trusted devices",
     ]);
-    expect(rows[0]).toMatchObject({ value: "Trusted", tone: "healthy" });
+    expect(rows[0]).toMatchObject({ value: "Trusted", meaning: "done" });
     expect(rows[1].value).toBe("7 days idle · at most 30 days");
     expect(rows[2]).toMatchObject({
       value: "30 days",
@@ -59,14 +59,14 @@ describe("currentSignInRows", () => {
   it("falls back to the server's policy until the session has loaded", () => {
     const rows = currentSignInRows(undefined, overview, false);
 
-    expect(rows[0]).toMatchObject({ value: "Loading...", tone: "neutral" });
+    expect(rows[0]).toMatchObject({ value: "Loading...", meaning: "doing" });
     expect(rows[1].value).toBe("1 day idle · at most 7 days");
   });
 
   it("says when the session could not be read", () => {
     expect(currentSignInRows(undefined, undefined, true)[0]).toMatchObject({
       value: "Unavailable",
-      tone: "failed",
+      meaning: "broken",
     });
   });
 });

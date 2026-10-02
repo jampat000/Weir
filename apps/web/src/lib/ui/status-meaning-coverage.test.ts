@@ -42,6 +42,10 @@ import {
 } from "../../pages/library/library-model";
 import type { LibraryStatus } from "../../pages/library/library-model";
 import {
+  BACKUP_FRESHNESS_MEANING,
+  type BackupFreshness,
+} from "../../pages/system/tabs/backups/backup-freshness";
+import {
   TASK_MEANING,
   type TaskState,
 } from "../../pages/processing/dashboard/system/tasks-card-model";
@@ -127,6 +131,13 @@ const PRODUCTION_MEANINGS = {
       warning: "attention",
       error: "broken",
     } satisfies Record<SystemLogLevel, StatusMeaning>,
+  },
+  backupFreshness: {
+    used: BACKUP_FRESHNESS_MEANING,
+    expected: {
+      up_to_date: "done",
+      overdue: "attention",
+    } satisfies Record<BackupFreshness, StatusMeaning>,
   },
   updateStatus: {
     used: updateStatuses(),

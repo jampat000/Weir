@@ -94,7 +94,7 @@ export function NetworkAccessSetting({ editable }: { editable: boolean }) {
         title={status.summary}
         data-testid="network-access-status"
       >
-        <Chip tone={line.tone}>{line.label}</Chip>
+        <Chip meaning={line.meaning}>{line.label}</Chip>
         {line.addresses.map((address) => (
           <span key={address} className="inline-flex items-center gap-2">
             <code>{address}</code>
@@ -119,7 +119,7 @@ export function NetworkAccessSetting({ editable }: { editable: boolean }) {
       ) : null}
       {line.note ? <p className="mm-sys-note">{line.note}</p> : null}
       {change.isError && !confirming ? (
-        <p className="mm-status-text--failed text-sm" role="alert">
+        <p className="mm-status-text text-sm" data-status="broken" role="alert">
           {errorMessage(change.error, "Weir couldn't change who can reach it.")}
         </p>
       ) : null}
