@@ -2,6 +2,7 @@ import { act, render, renderHook, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { WithWorkflows } from "../../../test/with-workflows";
 import type { FinishedFile } from "../../../lib/activity/processing-outcome";
 import type { LeavingCard } from "../leaving-cards";
 import type { Lanes } from "../processing-model";
@@ -43,21 +44,23 @@ function setReducedMotion(reduce: boolean) {
 
 function page(lanes: Lanes, leaving: LeavingCard[]) {
   return (
-    <MemoryRouter>
-      <PipelineBoard
-        lanes={lanes}
-        leaving={leaving}
-        filter="all"
-        now={NOW}
-        onOpen={vi.fn()}
-      />
-      <JustFinishedShelf
-        items={[finished]}
-        filter="all"
-        now={NOW}
-        onOpen={vi.fn()}
-      />
-    </MemoryRouter>
+    <WithWorkflows>
+      <MemoryRouter>
+        <PipelineBoard
+          lanes={lanes}
+          leaving={leaving}
+          filter="all"
+          now={NOW}
+          onOpen={vi.fn()}
+        />
+        <JustFinishedShelf
+          items={[finished]}
+          filter="all"
+          now={NOW}
+          onOpen={vi.fn()}
+        />
+      </MemoryRouter>
+    </WithWorkflows>
   );
 }
 
@@ -260,27 +263,31 @@ describe("a delivered file's poster", () => {
   it("is simply on the shelf when the file has no tile there", () => {
     placePosters();
     const { rerender } = render(
-      <MemoryRouter>
-        <PipelineBoard
-          lanes={lanesOf([])}
-          leaving={[delivered]}
-          filter="all"
-          now={NOW}
-          onOpen={vi.fn()}
-        />
-      </MemoryRouter>,
+      <WithWorkflows>
+        <MemoryRouter>
+          <PipelineBoard
+            lanes={lanesOf([])}
+            leaving={[delivered]}
+            filter="all"
+            now={NOW}
+            onOpen={vi.fn()}
+          />
+        </MemoryRouter>
+      </WithWorkflows>,
     );
 
     rerender(
-      <MemoryRouter>
-        <PipelineBoard
-          lanes={lanesOf([])}
-          leaving={[]}
-          filter="all"
-          now={NOW}
-          onOpen={vi.fn()}
-        />
-      </MemoryRouter>,
+      <WithWorkflows>
+        <MemoryRouter>
+          <PipelineBoard
+            lanes={lanesOf([])}
+            leaving={[]}
+            filter="all"
+            now={NOW}
+            onOpen={vi.fn()}
+          />
+        </MemoryRouter>
+      </WithWorkflows>,
     );
 
     expect(ghost()).toBeNull();
@@ -288,26 +295,30 @@ describe("a delivered file's poster", () => {
 
   it("is shown on the shelf if the board goes away before the hold ends", () => {
     const ofBoard = () => (
-      <MemoryRouter>
-        <PipelineBoard
-          lanes={lanesOf([])}
-          leaving={[delivered]}
-          filter="all"
-          now={NOW}
-          onOpen={vi.fn()}
-        />
-      </MemoryRouter>
+      <WithWorkflows>
+        <MemoryRouter>
+          <PipelineBoard
+            lanes={lanesOf([])}
+            leaving={[delivered]}
+            filter="all"
+            now={NOW}
+            onOpen={vi.fn()}
+          />
+        </MemoryRouter>
+      </WithWorkflows>
     );
     const board = render(ofBoard());
     render(
-      <MemoryRouter>
-        <JustFinishedShelf
-          items={[finished]}
-          filter="all"
-          now={NOW}
-          onOpen={vi.fn()}
-        />
-      </MemoryRouter>,
+      <WithWorkflows>
+        <MemoryRouter>
+          <JustFinishedShelf
+            items={[finished]}
+            filter="all"
+            now={NOW}
+            onOpen={vi.fn()}
+          />
+        </MemoryRouter>
+      </WithWorkflows>,
     );
     // The page ticks every second, so the board looks again and finds the shelf's tile.
     board.rerender(ofBoard());
@@ -394,21 +405,23 @@ describe("the shelf's slot for a delivered file", () => {
       relativePath: "Other.mkv",
     };
     const both = (leaving: LeavingCard[]) => (
-      <MemoryRouter>
-        <PipelineBoard
-          lanes={lanesOf([])}
-          leaving={leaving}
-          filter="all"
-          now={NOW}
-          onOpen={vi.fn()}
-        />
-        <JustFinishedShelf
-          items={[finished, other]}
-          filter="all"
-          now={NOW}
-          onOpen={vi.fn()}
-        />
-      </MemoryRouter>
+      <WithWorkflows>
+        <MemoryRouter>
+          <PipelineBoard
+            lanes={lanesOf([])}
+            leaving={leaving}
+            filter="all"
+            now={NOW}
+            onOpen={vi.fn()}
+          />
+          <JustFinishedShelf
+            items={[finished, other]}
+            filter="all"
+            now={NOW}
+            onOpen={vi.fn()}
+          />
+        </MemoryRouter>
+      </WithWorkflows>
     );
     placePosters();
 

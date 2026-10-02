@@ -2,6 +2,7 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { WithWorkflows } from "../../../test/with-workflows";
 import type { FinishedFile } from "../../../lib/activity/processing-outcome";
 import { JustFinishedShelf } from "./just-finished-shelf";
 import { NOW } from "./pipeline-fixtures";
@@ -36,16 +37,18 @@ function shelf(
   props: Partial<React.ComponentProps<typeof JustFinishedShelf>> = {},
 ) {
   return (
-    <MemoryRouter>
-      <JustFinishedShelf
-        items={items}
-        filter="all"
-        now={NOW}
-        workflowNames={WORKFLOW_NAMES}
-        onOpen={vi.fn()}
-        {...props}
-      />
-    </MemoryRouter>
+    <WithWorkflows>
+      <MemoryRouter>
+        <JustFinishedShelf
+          items={items}
+          filter="all"
+          now={NOW}
+          workflowNames={WORKFLOW_NAMES}
+          onOpen={vi.fn()}
+          {...props}
+        />
+      </MemoryRouter>
+    </WithWorkflows>
   );
 }
 
@@ -482,7 +485,7 @@ describe("the size of the tiles", () => {
       expect(tag).toHaveClass("lsh-tag");
       expect(tag).toHaveAttribute("href", "/library?library=2");
       expect(tag).toHaveAttribute("title", "Open TV in the library");
-      expect(tag.style.getPropertyValue("--tile-hue")).toMatch(/^\d+$/);
+      expect(tag.style.getPropertyValue("--tile-hue")).toBe("265");
     });
 
     it("leaves a file that saved nothing with a name that says nothing of it", () => {

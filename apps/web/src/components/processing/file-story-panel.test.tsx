@@ -1,7 +1,8 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { expect, it, vi } from "vitest";
 
 import type { ProcessingFileLog } from "../../lib/processing/files-api";
+import { WithWorkflows } from "../../test/with-workflows";
 import { FileStoryPanel } from "./file-story-panel";
 
 vi.mock("../../lib/settings/queries", () => ({
@@ -46,15 +47,17 @@ function mount(
 ) {
   const onClose = vi.fn();
   render(
-    <FileStoryPanel
-      open
-      fileName="Arrival.mkv"
-      log={log()}
-      loading={false}
-      error={null}
-      onClose={onClose}
-      {...props}
-    />,
+    <WithWorkflows>
+      <FileStoryPanel
+        open
+        fileName="Arrival.mkv"
+        log={log()}
+        loading={false}
+        error={null}
+        onClose={onClose}
+        {...props}
+      />
+    </WithWorkflows>,
   );
   return { onClose };
 }
@@ -170,4 +173,21 @@ it("shows no poster for a file whose panel was given none", () => {
   mount();
 
   expect(screen.queryByRole("img")).toBeNull();
+});
+
+it("tints the poster's tile for the file's workflow, and for a workflow that is gone", () => {
+  mount({ poster: { url: null, workflow: "TV" } });
+  expect(
+    (
+      screen.getByRole("dialog").querySelector(".mm-tile") as HTMLElement
+    ).style.getPropertyValue("--tile-hue"),
+  ).toBe("265");
+  cleanup();
+
+  mount({ poster: { url: null, workflow: "Films" } });
+  expect(
+    (
+      screen.getByRole("dialog").querySelector(".mm-tile") as HTMLElement
+    ).style.getPropertyValue("--tile-hue"),
+  ).toBe("205");
 });

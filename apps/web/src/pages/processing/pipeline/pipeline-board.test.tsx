@@ -2,6 +2,7 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { WithWorkflows } from "../../../test/with-workflows";
 import type { LeavingCard } from "../leaving-cards";
 import type { Lanes } from "../processing-model";
 import type { Filter } from "../processing-filter";
@@ -35,16 +36,18 @@ function board(
   overrides: Partial<PipelineBoardProps> = {},
 ): React.ReactElement {
   return (
-    <MemoryRouter>
-      <PipelineBoard
-        lanes={lanes}
-        leaving={NOTHING_ENDED}
-        filter="all"
-        now={NOW}
-        onOpen={vi.fn()}
-        {...overrides}
-      />
-    </MemoryRouter>
+    <WithWorkflows>
+      <MemoryRouter>
+        <PipelineBoard
+          lanes={lanes}
+          leaving={NOTHING_ENDED}
+          filter="all"
+          now={NOW}
+          onOpen={vi.fn()}
+          {...overrides}
+        />
+      </MemoryRouter>
+    </WithWorkflows>
   );
 }
 
@@ -142,6 +145,17 @@ describe("the cards", () => {
       "/api/v1/artwork/posters/tv-harbour-2019",
     );
     expect(within(without).queryByRole("img")).toBeNull();
+  });
+
+  it("tints a card's tile for its workflow's place in Settings", () => {
+    render(board(lanesOf([aFile(1, "unprocessed", { poster_url: null })])));
+
+    const [card] = screen.getAllByRole("button");
+    expect(
+      (card.querySelector(".mm-tile") as HTMLElement).style.getPropertyValue(
+        "--tile-hue",
+      ),
+    ).toBe("265");
   });
 
   it("puts each file's card at its station and says what it is doing", () => {

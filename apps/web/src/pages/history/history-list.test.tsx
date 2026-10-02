@@ -3,6 +3,7 @@ import { expect, it, vi } from "vitest";
 
 import type { ProcessingFile } from "../../lib/processing/files-api";
 import type { LibraryClean } from "../../lib/processing/library-cleans-api";
+import { WithWorkflows } from "../../test/with-workflows";
 import { cleanEntry, downloadEntry } from "./history-entries";
 import { HistoryList } from "./history-list";
 
@@ -31,12 +32,14 @@ const clean = {
 
 function renderList() {
   render(
-    <HistoryList
-      entries={[downloadEntry(download), cleanEntry(clean)]}
-      selectedKey={null}
-      now={NOW}
-      onPick={vi.fn()}
-    />,
+    <WithWorkflows>
+      <HistoryList
+        entries={[downloadEntry(download), cleanEntry(clean)]}
+        selectedKey={null}
+        now={NOW}
+        onPick={vi.fn()}
+      />
+    </WithWorkflows>,
   );
 }
 
@@ -56,4 +59,20 @@ it("shows the initials for a clean in a library, which has no poster of its own"
   const [, row] = screen.getAllByRole("row").slice(1);
   expect(within(row).queryByRole("img")).toBeNull();
   expect(within(row).getByText("D")).toBeInTheDocument();
+});
+
+it("tints each row's tile for its workflow's place in Settings", () => {
+  renderList();
+
+  const [download, clean] = screen.getAllByRole("row").slice(1);
+  expect(
+    (download.querySelector(".mm-tile") as HTMLElement).style.getPropertyValue(
+      "--tile-hue",
+    ),
+  ).toBe("265");
+  expect(
+    (clean.querySelector(".mm-tile") as HTMLElement).style.getPropertyValue(
+      "--tile-hue",
+    ),
+  ).toBe("205");
 });

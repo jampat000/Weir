@@ -9,8 +9,9 @@
 import type { CSSProperties, ReactElement, RefObject } from "react";
 import { Link } from "react-router-dom";
 
-import { Poster, workflowHue } from "../../../components/shared/poster";
+import { Poster } from "../../../components/shared/poster";
 import type { FinishedFile } from "../../../lib/activity/processing-outcome";
+import { useWorkflowHues } from "../../../lib/processing/workflow-hues";
 import { classNames } from "../../../lib/ui/class-names";
 import { SHELF_TILE_ATTRIBUTE } from "./delivery-flight";
 import {
@@ -43,6 +44,7 @@ function Tile({
   small: boolean;
   onOpen: (item: FinishedFile) => void;
 }) {
+  const hues = useWorkflowHues();
   const tier = caption === "full" && lines === null ? "compact" : caption;
   const when = tile.ago ? `, ${tile.ago}` : "";
   const workflow = tile.workflowKnown ? ` (${tile.workflow})` : "";
@@ -109,7 +111,7 @@ function Tile({
         <Link
           to={`/library?library=${library}`}
           className="lsh-tag"
-          style={{ ["--tile-hue" as string]: workflowHue(tile.workflow) }}
+          style={{ ["--tile-hue" as string]: hues.forId(library) }}
           title={`Open ${tile.workflow} in the library`}
           onClick={(event) => event.stopPropagation()}
         >

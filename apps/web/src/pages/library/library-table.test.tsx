@@ -2,6 +2,7 @@ import { render, screen, within } from "@testing-library/react";
 import { expect, it, vi } from "vitest";
 
 import type { LibraryFile } from "../../lib/processing/library-mode-api";
+import { WithWorkflows } from "../../test/with-workflows";
 import { LibraryTable } from "./library-table";
 
 function file(path: string, overrides: Partial<LibraryFile> = {}): LibraryFile {
@@ -18,15 +19,17 @@ function file(path: string, overrides: Partial<LibraryFile> = {}): LibraryFile {
 
 function renderTable(groups: [string, LibraryFile[]][]) {
   render(
-    <LibraryTable
-      libraryName="Movies"
-      groups={groups}
-      compact={false}
-      openPath={null}
-      selected={new Set()}
-      onToggle={vi.fn()}
-      onOpen={vi.fn()}
-    />,
+    <WithWorkflows>
+      <LibraryTable
+        libraryName="Movies"
+        groups={groups}
+        compact={false}
+        openPath={null}
+        selected={new Set()}
+        onToggle={vi.fn()}
+        onOpen={vi.fn()}
+      />
+    </WithWorkflows>,
   );
 }
 
@@ -57,4 +60,17 @@ it("shows the initials on a group none of whose files has a poster", () => {
   const group = screen.getAllByRole("rowgroup")[0];
   expect(within(group).queryByRole("img")).toBeNull();
   expect(within(group).getByText("D")).toBeInTheDocument();
+});
+
+it("tints a group's tile for the library's place in Settings", () => {
+  renderTable([
+    ["Detour", [file("Detour (1945)/a.mkv", { poster_url: null })]],
+  ]);
+
+  const [group] = screen.getAllByRole("rowgroup");
+  expect(
+    (group.querySelector(".mm-tile") as HTMLElement).style.getPropertyValue(
+      "--tile-hue",
+    ),
+  ).toBe("205");
 });

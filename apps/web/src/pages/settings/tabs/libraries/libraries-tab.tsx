@@ -14,6 +14,7 @@ import {
   useUnlinkDiscoveredProcessingLibrary,
   useUpdateProcessingLibrary,
 } from "../../../../lib/processing/libraries-queries";
+import { inDisplayOrder } from "../../../../lib/processing/workflow-hues";
 import { SaveModelNote } from "../../save-model-note";
 import { SettingsLoadError } from "../../settings-load-error";
 import { AddWorkflowChoice, type WorkflowStart } from "./add-workflow-choice";
@@ -80,9 +81,7 @@ export function LibrariesTab() {
   if (libraries.isPending) return <PageLoading label="Loading workflows" />;
   if (libraries.isError) return <SettingsLoadError what="workflows" />;
 
-  const rows = [...libraries.data].sort(
-    (a, b) => a.display_order - b.display_order,
-  );
+  const rows = inDisplayOrder(libraries.data);
   const managers = connections.data ?? [];
 
   /** Runs a change, clearing the last notice first and saying why if it fails. */

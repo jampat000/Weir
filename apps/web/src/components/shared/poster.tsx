@@ -1,16 +1,6 @@
 import { useState, type CSSProperties } from "react";
 
-/** The hue range of a workflow's tint: the full colour wheel. */
-const HUE_DEGREES = 360;
-
-/** A workflow's own hue, the same every time, so every file of a workflow wears the same colour. */
-export function workflowHue(workflow: string): number {
-  let hash = 0;
-  for (const character of workflow) {
-    hash = (hash * 31 + (character.codePointAt(0) ?? 0)) >>> 0;
-  }
-  return hash % HUE_DEGREES;
-}
+import { useWorkflowHues } from "../../lib/processing/workflow-hues";
 
 const IGNORED_WORDS = /^(the|a|an|of)$/i;
 const EPISODE_CODE = /^S\d+E\d+$/i;
@@ -31,7 +21,8 @@ function initialsOf(title: string): string {
 
 /**
  * A title's poster, 2:3, filling the box it is put in. Until the image has loaded, and wherever there is none
- * (no `url`, or the image fails), it is the title's initials on the colour of the workflow that has the file.
+ * (no `url`, or the image fails), it is the title's initials on the colour of the workflow that has the file
+ * (`workflow` is its name; see useWorkflowHues).
  */
 export function Poster({
   url,
@@ -44,8 +35,9 @@ export function Poster({
   workflow: string;
 }) {
   const [failedUrl, setFailedUrl] = useState<string | null>(null);
+  const hues = useWorkflowHues();
   const style: CSSProperties = {
-    ["--tile-hue" as string]: workflowHue(workflow),
+    ["--tile-hue" as string]: hues.forName(workflow),
   };
   return (
     <span className="mm-tile" style={style}>
