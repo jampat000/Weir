@@ -91,7 +91,7 @@ describe("what needs a person, for the panel, the Today tile and the sidebar", (
     expect(result.current.count).toBe(0);
   });
 
-  it("counts for each kind of work only what belongs to it, so the Today tile and the panel agree", () => {
+  it("counts a kind of work's own files, and always what is wrong with Weir itself, so the Today tile and the panel agree", () => {
     failedJobs.jobs = [
       { id: 1, job_kind: "processing.file.remux_pass.v1" },
       { id: 2, job_kind: "processing.library.clean.v1" },
@@ -105,11 +105,11 @@ describe("what needs a person, for the panel, the Today tile and the sidebar", (
       renderHook(() => useNeedsYou(null, filter)).result.current.count;
 
     expect(counts("all")).toBe(4);
-    expect(counts("download")).toBe(3);
-    expect(counts("library")).toBe(1);
+    expect(counts("download")).toBe(4);
+    expect(counts("library")).toBe(2);
   });
 
-  it("counts only the chosen workflow's files, and none of what is wrong with Weir itself", () => {
+  it("counts only the chosen workflow's files, and still what is wrong with Weir itself", () => {
     failedJobs.jobs = [{ id: 1 }];
     needFiles.files = [
       file({ id: 1, library_id: 1 }),
@@ -118,6 +118,6 @@ describe("what needs a person, for the panel, the Today tile and the sidebar", (
 
     const { result } = renderHook(() => useNeedsYou(2));
 
-    expect(result.current.count).toBe(1);
+    expect(result.current.count).toBe(2);
   });
 });

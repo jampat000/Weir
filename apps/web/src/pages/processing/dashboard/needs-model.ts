@@ -4,11 +4,7 @@ import type { ProcessingLibrary } from "../../../lib/processing/libraries-api";
 import type { SystemReadiness } from "../../../lib/api/types";
 import { plural } from "../../../lib/ui/mm-plural";
 import { shownBy, type Filter } from "../processing-filter";
-import {
-  firstSentence,
-  prettyName,
-  workSourceOfJobKind,
-} from "../processing-model";
+import { firstSentence, prettyName } from "../processing-model";
 import { fileReason, type FileReason } from "../file-reason";
 import { setupTabPath } from "../../../lib/settings/setup-areas";
 
@@ -153,28 +149,16 @@ function workerNeeds(
     }));
 }
 
-/** The failed jobs that count for the page's filter, and whether the list they were counted from was full. */
+/** The failed jobs, and whether the list they were counted from was full. */
 export type FailedJobs = {
   count: number;
   /** The server returns at most {@link FAILED_JOBS_LIMIT} jobs, so there may be more than were counted. */
   capped: boolean;
 };
 
-/**
- * The failed jobs among `jobs` that belong to the chosen kind of work. A job of neither kind is Weir's own
- * housekeeping and only counts on Everything.
- */
-export function failedJobsFor(
-  jobs: readonly { job_kind: string }[],
-  filter: Filter,
-): FailedJobs {
-  const belongs = (jobKind: string) => {
-    const source = workSourceOfJobKind(jobKind);
-    return source !== null && shownBy(filter, { source });
-  };
-  const kept =
-    filter === "all" ? jobs : jobs.filter((job) => belongs(job.job_kind));
-  return { count: kept.length, capped: jobs.length >= FAILED_JOBS_LIMIT };
+/** Every failed job counts, of any kind of work: a job that fails is Weir's own trouble, not one workflow's. */
+export function failedJobsOf(jobs: readonly unknown[]): FailedJobs {
+  return { count: jobs.length, capped: jobs.length >= FAILED_JOBS_LIMIT };
 }
 
 function failedJobsNeed({ count, capped }: FailedJobs): NeedRow | null {
@@ -211,11 +195,11 @@ function weirGroup(rows: NeedRow[]): NeedGroup[] {
 
 type NeedSources = {
   workflows: readonly ProcessingLibrary[] | undefined;
-  /** Narrows the groups to one workflow's files. What is wrong with Weir itself is not any one workflow's. */
+  /** Narrows the files to one workflow's. What is wrong with Weir itself is not any one workflow's, and always shows. */
   workflowId: number | null | undefined;
   readiness: Pick<SystemReadiness, "worker_health"> | undefined;
   failedJobs: FailedJobs;
-  /** The kind of work the page is narrowed to. Weir's own set-up and stopped work show on Everything only. */
+  /** The kind of work the page is narrowed to, which narrows the files. What is wrong with Weir itself always shows. */
   filter: Filter;
   /** The failed, rejected, held and skipped files; only those that wait on a person are listed. */
   files: readonly ProcessingFile[];
@@ -232,15 +216,11 @@ export function buildNeeds({
 }: NeedSources): NeedGroup[] {
   const inWorkflow = (file: ProcessingFile) =>
     workflowId == null || file.library_id === workflowId;
-  const weirRows =
-    workflowId == null
-      ? [
-          ...(filter === "all"
-            ? [setupNeed(workflows), ...workerNeeds(readiness)]
-            : []),
-          failedJobsNeed(failedJobs),
-        ].filter((row): row is NeedRow => row !== null)
-      : [];
+  const weirRows = [
+    setupNeed(workflows),
+    ...workerNeeds(readiness),
+    failedJobsNeed(failedJobs),
+  ].filter((row): row is NeedRow => row !== null);
   // Every file in the list came in as a download: a library's files are cleaned from the job queue, with no file row.
   const fileRows = shownBy(filter, { source: "download" })
     ? files.filter(inWorkflow)

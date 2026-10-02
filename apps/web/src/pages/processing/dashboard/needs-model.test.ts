@@ -6,7 +6,7 @@ import {
   FAILED_JOBS_LIMIT,
   FILES_SHOWN_PER_GROUP,
   buildNeeds,
-  failedJobsFor,
+  failedJobsOf,
   needCount,
 } from "./needs-model";
 
@@ -126,7 +126,7 @@ describe("what needs a person", () => {
   });
 });
 
-describe("the failed jobs of one kind of work", () => {
+describe("the failed jobs", () => {
   const jobs = [
     { job_kind: "processing.file.remux_pass.v1" },
     { job_kind: "processing.watched_folder.remux_scan_dispatch.v1" },
@@ -134,26 +134,18 @@ describe("the failed jobs of one kind of work", () => {
     { job_kind: "processing.work_temp_stale_sweep.v1" },
   ];
 
-  it("counts every job on Everything, housekeeping included", () => {
-    expect(failedJobsFor(jobs, "all").count).toBe(4);
-  });
-
-  it("counts the passes and scans of new downloads", () => {
-    expect(failedJobsFor(jobs, "download").count).toBe(2);
-  });
-
-  it("counts a library's own jobs", () => {
-    expect(failedJobsFor(jobs, "library").count).toBe(1);
+  it("counts every one, of any kind of work, housekeeping included", () => {
+    expect(failedJobsOf(jobs).count).toBe(4);
   });
 
   it("says the count may be short when the server's list was full", () => {
     const full = Array.from({ length: FAILED_JOBS_LIMIT }, () => jobs[0]);
 
-    expect(failedJobsFor(full, "download")).toEqual({
+    expect(failedJobsOf(full)).toEqual({
       count: FAILED_JOBS_LIMIT,
       capped: true,
     });
-    expect(failedJobsFor(jobs, "download").capped).toBe(false);
+    expect(failedJobsOf(jobs).capped).toBe(false);
   });
 });
 
@@ -165,8 +157,9 @@ describe("what needs a person, for one kind of work", () => {
     failedJobs: { count: 2, capped: false },
     files: [failedFile(1), rejectedFile(2)],
   };
+  const weirRows = ["setup", "worker-p", "failed-jobs"];
 
-  it("keeps new downloads' files and failed jobs, and leaves Weir's own set-up and stopped work for Everything", () => {
+  it("keeps new downloads' files, and still says what is wrong with Weir itself", () => {
     const groups = buildNeeds({ ...trouble, filter: "download" });
 
     expect(groups.map((group) => group.key)).toEqual([
@@ -174,23 +167,20 @@ describe("what needs a person, for one kind of work", () => {
       "failed-writing",
       "rejected-language",
     ]);
-    expect(groups[0].rows.map((row) => row.key)).toEqual(["failed-jobs"]);
+    expect(groups[0].rows.map((row) => row.key)).toEqual(weirRows);
   });
 
-  it("has no files for library cleaning, whose files are cleaned from the job queue", () => {
+  it("has no files for library cleaning, whose files are cleaned from the job queue, but still says what is wrong with Weir itself", () => {
     const groups = buildNeeds({ ...trouble, filter: "library" });
 
     expect(groups.map((group) => group.key)).toEqual(["weir"]);
-    expect(needCount(groups)).toBe(1);
+    expect(groups[0].rows.map((row) => row.key)).toEqual(weirRows);
+    expect(needCount(groups)).toBe(3);
   });
 
-  it("is clear for library cleaning when none of its jobs failed", () => {
+  it("is clear for library cleaning when nothing is wrong with Weir", () => {
     expect(
-      buildNeeds({
-        ...trouble,
-        filter: "library",
-        failedJobs: { count: 0, capped: false },
-      }),
+      buildNeeds({ ...healthy, files: trouble.files, filter: "library" }),
     ).toEqual([]);
   });
 });
@@ -353,9 +343,11 @@ describe("the files that need a person", () => {
     expect(group.more).toBe(2);
   });
 
-  it("narrows to one workflow's files, and leaves out what is wrong with Weir itself", () => {
+  it("narrows to one workflow's files, but still says what is wrong with Weir itself", () => {
     const groups = buildNeeds({
       ...healthy,
+      workflows: [{ ...workflow, enabled: false } as ProcessingLibrary],
+      readiness: { worker_health: [worker("p", "degraded", "x")] },
       workflowId: 2,
       failedJobs: { count: 3, capped: false },
       files: [
@@ -365,8 +357,16 @@ describe("the files that need a person", () => {
       ],
     });
 
-    expect(groups).toHaveLength(1);
-    expect(groups[0].rows.map((row) => row.file?.id)).toEqual([2]);
+    expect(groups.map((group) => group.key)).toEqual([
+      "weir",
+      "failed-writing",
+    ]);
+    expect(groups[0].rows.map((row) => row.key)).toEqual([
+      "setup",
+      "worker-p",
+      "failed-jobs",
+    ]);
+    expect(groups[1].rows.map((row) => row.file?.id)).toEqual([2]);
   });
 
   it("puts what blocks everything first and the rejected files last", () => {

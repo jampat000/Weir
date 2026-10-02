@@ -211,7 +211,7 @@ describe("the Needs you panel when something does", () => {
     });
   });
 
-  it("narrows to one workflow's files and leaves out what is wrong with Weir itself", () => {
+  it("narrows to one workflow's files, but still says what is wrong with Weir itself", () => {
     failedJobs.jobs = [{ id: 1 }];
     const movie = file({
       id: 20,
@@ -222,8 +222,8 @@ describe("the Needs you panel when something does", () => {
     needFiles.files = [stuckFile, movie];
     const panel = renderPanel({ workflowId: 2 });
 
-    expect(panel).toHaveTextContent("1 to look at");
-    expect(panel).not.toHaveTextContent("1 job failed");
+    expect(panel).toHaveTextContent("2 to look at");
+    expect(panel).toHaveTextContent("1 job failed");
     expect(panel).toHaveTextContent("Old Film (2019)");
     expect(panel).not.toHaveTextContent("Ember and Ash");
   });

@@ -10,7 +10,7 @@ import { useNeedsFiles } from "./needs-files";
 import {
   FAILED_JOBS_LIMIT,
   buildNeeds,
-  failedJobsFor,
+  failedJobsOf,
   needCount,
   type NeedGroup,
 } from "./needs-model";
@@ -28,9 +28,9 @@ export type NeedsYou = {
 };
 
 /**
- * What needs a person, narrowed to one workflow or across all of them, and to one kind of work or both. The
- * Needs you panel, the Today tile's count and the sidebar's badge all read this, so they cannot disagree; they
- * share its queries.
+ * What needs a person: the files, narrowed to one workflow or across all of them, and to one kind of work or both,
+ * and what is wrong with Weir itself, which no narrowing hides. The Needs you panel, the Today tile's count and the
+ * sidebar's badge all read this, so they cannot disagree; they share its queries.
  */
 export function useNeedsYou(
   workflowId: number | null | undefined,
@@ -58,7 +58,7 @@ export function useNeedsYou(
       workflows: workflowList,
       workflowId,
       readiness: readinessData,
-      failedJobs: failedJobsFor(failedJobRows ?? [], filter),
+      failedJobs: failedJobsOf(failedJobRows ?? []),
       filter,
       files,
     });
