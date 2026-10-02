@@ -8,6 +8,7 @@ import pytest
 
 from tests.contract.libraries import _helpers as h
 from tests.contract.support.client import API
+from tests.contract.support.polling import wait_until
 
 RULE_SETS = f"{API}/processing/rule-sets"
 MAINTENANCE = f"{API}/processing/maintenance"
@@ -84,6 +85,34 @@ def test_maintenance_unclaimed_handback_cleanup_can_be_run_by_hand(admin) -> Non
     assert r.status_code == 200, r.text
     assert r.json()["queued"] is True
     assert r.json()["detail"]
+
+
+def _completed_runs(admin, job_kind: str) -> int:
+    r = admin.get(f"{API}/processing/jobs/inspection", params={"status": "completed", "limit": 100})
+    assert r.status_code == 200, r.text
+    return sum(1 for job in r.json()["jobs"] if job["job_kind"] == job_kind)
+
+
+@pytest.mark.parametrize(
+    ("family", "job_kind"),
+    [
+        ("work_temp_stale_sweep", "processing.work_temp_stale_sweep.v1"),
+        ("unclaimed_handbacks", "processing.unclaimed_handback_cleanup.v1"),
+    ],
+)
+def test_maintenance_run_now_runs_every_time_it_is_pressed(
+    server_factory, client_factory, family: str, job_kind: str
+) -> None:
+    # Workers on, so each run is carried out, and the cleanup timers off, so only the presses below queue a run.
+    admin = h.signed_in_admin(server_factory(env={"WEIR_PROCESSING_WORKER_COUNT": "1"}), client_factory)
+    before = _completed_runs(admin, job_kind)
+    for run in (1, 2):
+        r = admin.post_csrf(f"{MAINTENANCE}/run", {"family": family, "media_scope": "movie"})
+        assert r.status_code == 200, r.text
+        wait_until(
+            lambda run=run: _completed_runs(admin, job_kind) >= before + run,
+            what=f"run {run} of {family} to finish",
+        )
 
 
 def test_maintenance_has_no_failed_download_cleanup_any_more(admin) -> None:

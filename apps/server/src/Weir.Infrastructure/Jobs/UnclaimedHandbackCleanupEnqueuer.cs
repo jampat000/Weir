@@ -33,7 +33,7 @@ public sealed class UnclaimedHandbackCleanupEnqueuer : IPeriodicEnqueuer
         WorkTempStaleSweepEnqueuer.OperatorSettingIntervalAsync(_store, "unclaimed_handback_cleanup_interval_seconds", Interval, cancellationToken);
 
     public Task EnqueueOnceAsync(CancellationToken cancellationToken) =>
-        _store.EnqueueOrGetAsync(
+        _store.EnqueueNextRunAsync(
             _scope == "tv" ? PeriodicJobKinds.UnclaimedHandbackCleanupDedupeKeyTv : PeriodicJobKinds.UnclaimedHandbackCleanupDedupeKeyMovie,
             PeriodicJobKinds.UnclaimedHandbackCleanup,
             WireJsonWriter.Dumps(new WireObject().Set("media_scope", _scope).Set("trigger", "scheduled"), WireJsonFormat.Compact),

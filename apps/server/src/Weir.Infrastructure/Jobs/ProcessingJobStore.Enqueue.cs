@@ -28,6 +28,38 @@ public sealed partial class ProcessingJobStore
             cancellationToken);
     }
 
+    /// <summary>
+    /// Queue a job that runs again and again under one key, one run at a time: a run still pending or leased under
+    /// <paramref name="dedupeKey"/> is returned as it is, and a finished run gives its key up, keeping its row as history,
+    /// so a new run is queued.
+    /// </summary>
+    /// <exception cref="ArgumentException">The job kind is retired or not a <c>processing.*</c> kind.</exception>
+    public Task<ProcessingJob> EnqueueNextRunAsync(
+        string dedupeKey,
+        string jobKind,
+        string? payloadJson = null,
+        CancellationToken cancellationToken = default)
+    {
+        JobKindGuard.ValidateEnqueueJobKind(jobKind);
+        ArgumentNullException.ThrowIfNull(dedupeKey);
+        return InTransactionAsync(
+            (connection, transaction) =>
+            {
+                if (GetByDedupeKey(connection, transaction, dedupeKey) is { } last && ProcessingJobStatus.Terminal.Contains(last.Status))
+                {
+                    Execute(
+                        connection,
+                        transaction,
+                        "UPDATE jobs SET dedupe_key = @dedupe WHERE id = @id",
+                        ("@dedupe", JobQueueRules.TombstoneFinishedDedupeKey(last.DedupeKey, last.Id)),
+                        ("@id", last.Id));
+                }
+
+                return EnqueueOrGet(connection, transaction, dedupeKey, jobKind, payloadJson, JobQueueRules.DefaultMaxAttempts, runnerCost: null, priority: 0);
+            },
+            cancellationToken);
+    }
+
     internal ProcessingJob EnqueueOrGet(
         SqliteConnection connection,
         SqliteTransaction transaction,
