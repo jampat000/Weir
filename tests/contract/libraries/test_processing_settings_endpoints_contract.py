@@ -217,83 +217,51 @@ def test_reject_support_for_a_viewer_and_unknown_connections(viewer) -> None:
     assert unknown.json()["reason"]
 
 
-# --- metadata provider ------------------------------------------------------------------------------
+# --- metadata provider (deprecated: kept answering for older clients) -------------------------------
 
 
 def test_metadata_provider_needs_a_session(client) -> None:
     assert client.get(METADATA).status_code == 401
 
 
-def test_metadata_provider_shape_and_permissions(admin, viewer) -> None:
+def test_metadata_provider_always_describes_the_metadata_service(admin, viewer) -> None:
     r = viewer.get(METADATA)
     assert r.status_code == 200, r.text
-    body = r.json()
-    assert set(body) >= {"provider", "base_url", "key_configured", "known_providers", "artwork_enabled"}
-    assert "tmdb" in body["known_providers"]
-    assert isinstance(body["key_configured"], bool)
-    assert body["artwork_enabled"] is True
-    assert body["base_url"]
+    assert r.json() == {
+        "provider": "deluno-gateway",
+        "base_url": None,
+        "key_configured": False,
+        "known_providers": ["deluno-gateway"],
+        "artwork_enabled": True,
+    }
 
+
+def test_a_metadata_provider_save_is_accepted_and_ignored(admin, viewer) -> None:
     assert viewer.put_csrf(METADATA, {"provider": "tmdb", "base_url": "https://x.example"}).status_code == 403
-    assert admin.put_csrf(METADATA, {"provider": "imdb"}).status_code == 422
     assert admin.put_csrf(METADATA, {"provider": "tmdb", "surprise": True}).status_code == 422
+    assert admin.put_csrf(METADATA, {"provider": "", "artwork_enabled": "maybe"}).status_code == 422
 
+    saved = admin.put_csrf(
+        METADATA,
+        {"provider": "tmdb", "base_url": "https://tmdb.example/3", "api_key": "secret-key", "artwork_enabled": False},
+    )
 
-def test_metadata_provider_cleared_reports_not_configured_without_asking_anyone(admin, viewer) -> None:
-    saved = admin.put_csrf(METADATA, {"provider": "", "base_url": "", "api_key": ""})
     assert saved.status_code == 200, saved.text
-    assert saved.json()["provider"] == ""
+    assert saved.json() == admin.get(METADATA).json()
+    assert saved.json()["provider"] == "deluno-gateway"
     assert saved.json()["key_configured"] is False
-    # An empty base URL falls back to the default provider address.
-    assert saved.json()["base_url"]
+    assert saved.json()["artwork_enabled"] is True
+    assert "secret-key" not in saved.text
 
+
+def test_the_metadata_provider_test_says_when_the_metadata_service_is_switched_off(admin, viewer) -> None:
     assert viewer.post_csrf(f"{METADATA}/test", {}).status_code == 403
-    tested = admin.post_csrf(f"{METADATA}/test", {})
+
+    tested = admin.post_csrf(f"{METADATA}/test", {"provider": "tmdb", "artwork_enabled": True})
+
     assert tested.status_code == 200, tested.text
     assert tested.json()["status"] == "not_configured"
     assert tested.json()["detail"]
-
-
-def test_the_artwork_switch_round_trips_and_a_save_that_leaves_it_out_keeps_it(admin, viewer) -> None:
-    assert viewer.put_csrf(METADATA, {"provider": "", "artwork_enabled": False}).status_code == 403
-    assert admin.put_csrf(METADATA, {"provider": "", "artwork_enabled": "maybe"}).status_code == 422
-
-    off = admin.put_csrf(METADATA, {"provider": "", "artwork_enabled": False})
-    assert off.status_code == 200, off.text
-    assert off.json()["artwork_enabled"] is False
-
-    kept = admin.put_csrf(METADATA, {"provider": ""})
-    assert kept.json()["artwork_enabled"] is False
-    assert viewer.get(METADATA).json()["artwork_enabled"] is False
-
-    on = admin.put_csrf(METADATA, {"provider": "", "artwork_enabled": True})
-    assert on.json()["artwork_enabled"] is True
-    assert admin.post_csrf(f"{METADATA}/test", {"artwork_enabled": True}).status_code == 200
-
-
-def test_a_save_without_a_key_keeps_the_stored_key_and_the_artwork_switch_saves_on_its_own(admin) -> None:
-    saved = admin.put_csrf(
-        METADATA, {"provider": "tmdb", "base_url": "https://tmdb.example/3", "api_key": "secret-key"}
-    )
-    assert saved.status_code == 200, saved.text
-    assert saved.json()["key_configured"] is True
-
-    switched = admin.put_csrf(
-        METADATA, {"provider": "tmdb", "base_url": "https://tmdb.example/3", "artwork_enabled": False}
-    )
-    assert switched.status_code == 200, switched.text
-    assert switched.json()["key_configured"] is True
-    assert switched.json()["provider"] == "tmdb"
-    assert switched.json()["base_url"] == "https://tmdb.example/3"
-    assert switched.json()["artwork_enabled"] is False
-
-    resaved = admin.put_csrf(METADATA, {"provider": "tmdb", "base_url": "https://tmdb.example/3"})
-    assert resaved.json()["key_configured"] is True
-    assert resaved.json()["artwork_enabled"] is False
-
-    cleared = admin.put_csrf(METADATA, {"provider": "", "base_url": "", "api_key": "", "artwork_enabled": True})
-    assert cleared.json()["key_configured"] is False
-    assert cleared.json()["artwork_enabled"] is True
 
 
 # --- Direct Play devices ----------------------------------------------------------------------------

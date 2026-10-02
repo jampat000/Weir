@@ -1,5 +1,6 @@
-"""Posters: a file's title is looked up once through the metadata service, the image is served from Weir, and the
-Artwork switch turns it all off. The metadata service is a fake; no test reaches the real one."""
+"""Posters: a file's title is looked up once through the metadata service and the image is served from Weir. There is no
+setting for it; the metadata-provider routes only remain for older clients. The metadata service is a fake; no test
+reaches the real one."""
 
 from __future__ import annotations
 
@@ -172,7 +173,7 @@ def test_a_busy_service_is_left_alone_for_as_long_as_it_asked(
     assert poster_url_of(admin, "First Film (2010)/First.Film.2010.mkv") is None
 
 
-def test_switching_artwork_off_hides_posters_and_stops_lookups_and_on_brings_them_back(
+def test_a_save_to_the_old_artwork_setting_changes_nothing_and_lookups_carry_on(
     start: Callable[[], ServerUnderTest], fake_gateway: FakeGateway, client_factory: Callable[..., WeirClient]
 ) -> None:
     fake_gateway.knows("nosferatu", "nosferatu.jpg")
@@ -183,25 +184,28 @@ def test_switching_artwork_off_hides_posters_and_stops_lookups_and_on_brings_the
     admin = h.signed_in_admin(server, client_factory)
     wait_for_poster(admin, first)
 
-    off = admin.put_csrf(METADATA, {"provider": "", "artwork_enabled": False})
-    assert off.status_code == 200, off.text
-    assert off.json()["artwork_enabled"] is False
-    assert poster_url_of(admin, first) is None
+    saved = admin.put_csrf(METADATA, {"provider": "", "artwork_enabled": False})
+    assert saved.status_code == 200, saved.text
+    assert saved.json()["artwork_enabled"] is True
+    assert wait_for_poster(admin, first)
 
     second = "Metropolis (1927)/Metropolis.1927.1080p.mkv"
     seed_file(server, second)
     admin = h.signed_in_admin(server, client_factory)
-    never_within(
-        lambda: fake_gateway.searches_for("metropolis"),
-        seconds=TWO_PASSES_S,
-        what="a lookup while Artwork is off",
-    )
-    assert poster_url_of(admin, second) is None
-
-    on = admin.put_csrf(METADATA, {"provider": "", "artwork_enabled": True})
-    assert on.status_code == 200, on.text
-    assert wait_for_poster(admin, first)
     assert wait_for_poster(admin, second)
+
+
+def test_the_old_metadata_provider_test_asks_whether_the_metadata_service_answers(
+    start: Callable[[], ServerUnderTest], fake_gateway: FakeGateway, client_factory: Callable[..., WeirClient]
+) -> None:
+    server = start()
+    admin = h.signed_in_admin(server, client_factory)
+
+    tested = admin.post_csrf(f"{METADATA}/test", {})
+
+    assert tested.status_code == 200, tested.text
+    assert tested.json()["status"] == "matched"
+    assert [request.path for request in fake_gateway.requests] == ["/health"]
 
 
 def test_the_files_list_always_names_the_poster_field(

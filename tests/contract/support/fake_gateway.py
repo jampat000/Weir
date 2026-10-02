@@ -1,12 +1,12 @@
 """A fake metadata gateway: Deluno's metadata service played by a local HTTP server.
 
-Weir asks it for a title's poster (``GET /metadata/search``) and then for the image
-(``GET /artwork/w342/{file}``). The fake records every request, answers only titles a test taught it, and
+Weir asks it about a title (``GET /metadata/search``), which names the poster and the original language, and
+then for the image (``GET /artwork/w342/{file}``); the settings test asks ``GET /health``. The fake records every request, answers only titles a test taught it, and
 can answer "busy" the way the real service does when it is over its limit. No contract test reaches the
 real service: a server under test is pointed here with ``WEIR_ARTWORK_GATEWAY_URL``, and every other
 server runs with it ``off``.
 
-    gateway.knows("nosferatu", "nosferatu.jpg", tmdb_id=653)
+    gateway.knows("nosferatu", "nosferatu.jpg", tmdb_id=653, original_language="de")
     server_factory(env={"WEIR_ARTWORK_GATEWAY_URL": gateway.base_url})
     gateway.searches()
 """
@@ -30,6 +30,7 @@ IMAGE_BYTES = bytes([0xFF, 0xD8, 0xFF, 0xE0, 1, 2, 3, 4, 5])
 class _Title:
     poster_file: str
     tmdb_id: int
+    original_language: str
 
 
 class FakeGateway:
@@ -47,10 +48,10 @@ class FakeGateway:
 
     # --- scripting ------------------------------------------------------------------------------
 
-    def knows(self, title: str, poster_file: str, *, tmdb_id: int = 1) -> None:
+    def knows(self, title: str, poster_file: str, *, tmdb_id: int = 1, original_language: str = "en") -> None:
         """Answer a search for ``title`` (any letter case) with one result whose poster is ``poster_file``."""
 
-        known = _Title(poster_file, tmdb_id)
+        known = _Title(poster_file, tmdb_id, original_language)
         with self._lock:
             self._titles[title.lower()] = known
             self._by_id[tmdb_id] = known
@@ -109,6 +110,7 @@ class FakeGateway:
             "provider": "tmdb",
             "providerId": str(found.tmdb_id),
             "title": request.query["query"][0],
+            "originalLanguage": found.original_language,
             "posterUrl": f"{self.base_url}/artwork/w780/{found.poster_file}",
         }
         return 200, {}, json.dumps({"provider": "deluno-broker", "resultCount": 1, "results": [result]}).encode()
@@ -135,7 +137,9 @@ class FakeGateway:
                 with gateway._lock:
                     gateway.requests.append(request)
                 headers: dict[str, str] = {"Content-Type": "application/json"}
-                if split.path == "/metadata/search":
+                if split.path == "/health":
+                    status, payload = 200, json.dumps({"service": "deluno-metadata-gateway", "status": "ok"}).encode()
+                elif split.path == "/metadata/search":
                     status, extra, payload = gateway._answer_search(request)
                     headers.update(extra)
                 elif split.path.startswith("/artwork/w342/") and split.path.rsplit("/", 1)[-1] in gateway._images:

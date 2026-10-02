@@ -130,38 +130,3 @@ def test_the_hardware_report_needs_a_session_and_then_answers(client) -> None:
     assert "available_methods" in body
     assert "selectable_vendors" in body
     assert body["detail"]
-
-
-def test_the_metadata_provider_never_returns_the_key(admin) -> None:
-    """The key is write-only. A screen can say one is configured without being able to leak it."""
-
-    assert admin.get(f"{API}/processing/metadata-provider").status_code == 200
-
-    saved = admin.put_csrf(
-        f"{API}/processing/metadata-provider",
-        {"provider": "tmdb", "base_url": "https://metadata.example.workers.dev", "api_key": "a-secret-key"},
-    )
-
-    assert saved.status_code == 200, saved.text
-    body = saved.json()
-    assert body["key_configured"] is True
-    assert "a-secret-key" not in saved.text
-    assert body["base_url"] == "https://metadata.example.workers.dev"
-    assert "a-secret-key" not in admin.get(f"{API}/processing/metadata-provider").text
-
-
-def test_the_metadata_provider_key_survives_a_save_that_omits_it(admin) -> None:
-    """Saving the address must not require re-typing a secret the screen cannot show back."""
-
-    admin.put_csrf(
-        f"{API}/processing/metadata-provider",
-        {"provider": "tmdb", "base_url": "https://one.example.com", "api_key": "k"},
-    )
-
-    body = admin.put_csrf(
-        f"{API}/processing/metadata-provider",
-        {"provider": "tmdb", "base_url": "https://two.example.com"},
-    ).json()
-
-    assert body["key_configured"] is True
-    assert body["base_url"] == "https://two.example.com"

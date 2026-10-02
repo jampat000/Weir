@@ -1718,9 +1718,17 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Get Metadata Provider */
+    /**
+     * Get Metadata Provider
+     * @deprecated
+     * @description Deprecated. Weir gets titles' posters and original languages from Deluno's metadata service by itself, so there is nothing to set. The route still answers so older clients keep working: provider is always deluno-gateway, base_url null, key_configured false and artwork_enabled true.
+     */
     get: operations["get_metadata_provider_api_v1_processing_metadata_provider_get"];
-    /** Put Metadata Provider */
+    /**
+     * Put Metadata Provider
+     * @deprecated
+     * @description Deprecated. Weir gets titles' posters and original languages from Deluno's metadata service by itself, so there is nothing to set. The route still answers so older clients keep working: what is sent is checked for shape and then ignored, and the answer is the same as the GET.
+     */
     put: operations["put_metadata_provider_api_v1_processing_metadata_provider_put"];
     post?: never;
     delete?: never;
@@ -1740,7 +1748,8 @@ export interface paths {
     put?: never;
     /**
      * Post Metadata Provider Test
-     * @description Ask the provider a real question, so a saved connection is proven rather than assumed.
+     * @deprecated
+     * @description Deprecated. Weir gets titles' posters and original languages from Deluno's metadata service by itself, so there is nothing to set. The route still answers so older clients keep working: it checks that Deluno's metadata service answers its health check, and what is sent is ignored.
      */
     post: operations["post_metadata_provider_test_api_v1_processing_metadata_provider_test_post"];
     delete?: never;
@@ -2446,7 +2455,7 @@ export interface components {
       module: string;
       /**
        * Poster Url
-       * @description Where Weir serves this file's poster (/api/v1/artwork/posters/{id}). Null until one is found, when the title has none, or while Artwork is off.
+       * @description Where Weir serves this file's poster (/api/v1/artwork/posters/{id}). Null until one is found, when the title has none, or when an administrator has turned the metadata service off.
        */
       poster_url?: string | null;
       /**
@@ -3247,7 +3256,7 @@ export interface components {
       path: string;
       /**
        * Poster Url
-       * @description Where Weir serves this file's poster (/api/v1/artwork/posters/{id}). Null until one is found, when the title has none, or while Artwork is off.
+       * @description Where Weir serves this file's poster (/api/v1/artwork/posters/{id}). Null until one is found, when the title has none, or when an administrator has turned the metadata service off.
        */
       poster_url?: string | null;
       /** Problem Kind */
@@ -4225,16 +4234,17 @@ export interface components {
     MetadataProviderIn: {
       /**
        * Api Key
-       * @description Omit to leave the stored key untouched. An empty string clears it.
+       * @description Ignored. Weir no longer uses a key of its own.
        */
       api_key?: string | null;
       /**
        * Artwork Enabled
-       * @description Omit to leave the Artwork switch as it is.
+       * @description Ignored. Artwork is always on unless an administrator turns the metadata service off with WEIR_ARTWORK_GATEWAY_URL=off.
        */
       artwork_enabled?: boolean | null;
       /**
        * Base Url
+       * @description Ignored.
        * @default
        */
       base_url: string;
@@ -4242,34 +4252,33 @@ export interface components {
       csrf_token: string;
       /**
        * Provider
-       * @description Empty clears the connection.
+       * @description Ignored.
        * @default
-       * @enum {string}
        */
-      provider: "" | "tmdb";
+      provider: string;
     };
     /** MetadataProviderOut */
     MetadataProviderOut: {
       /**
        * Artwork Enabled
-       * @description Whether Weir looks posters up through Deluno's metadata service and shows them. On by default.
+       * @description Always true: Weir looks posters up through Deluno's metadata service and shows them.
        */
       artwork_enabled: boolean;
       /**
        * Base Url
-       * @description Where Weir asks. Configurable so a cache or gateway in front of the provider works.
+       * @description Always null: the address of Deluno's metadata service is not a setting.
        */
-      base_url: string;
+      base_url: string | null;
       /**
        * Key Configured
-       * @description Whether a key is stored. The key itself is never returned.
+       * @description Always false: Weir needs no key.
        */
       key_configured: boolean;
       /** Known Providers */
       known_providers?: string[];
       /**
        * Provider
-       * @description The configured provider, or empty when there is none.
+       * @description Always deluno-gateway.
        */
       provider: string;
     };
@@ -4581,7 +4590,7 @@ export interface components {
       relative_path: string;
       /**
        * Poster Url
-       * @description Where Weir serves this file's poster (/api/v1/artwork/posters/{id}). Null until one is found, when the title has none, or while Artwork is off.
+       * @description Where Weir serves this file's poster (/api/v1/artwork/posters/{id}). Null until one is found, when the title has none, or when an administrator has turned the metadata service off.
        */
       poster_url?: string | null;
       /** Size Bytes */
@@ -4745,7 +4754,7 @@ export interface components {
       output_collision_reason?: string | null;
       /**
        * Poster Url
-       * @description Where Weir serves this file's poster (/api/v1/artwork/posters/{id}). Null until one is found, when the title has none, or while Artwork is off.
+       * @description Where Weir serves this file's poster (/api/v1/artwork/posters/{id}). Null until one is found, when the title has none, or when an administrator has turned the metadata service off.
        */
       poster_url?: string | null;
       /**
@@ -5244,7 +5253,7 @@ export interface components {
       outcome: "cleaned" | "skipped" | "failed";
       /**
        * Poster Url
-       * @description Where Weir serves this file's poster (/api/v1/artwork/posters/{id}). Null until one is found, when the title has none, or while Artwork is off.
+       * @description Where Weir serves this file's poster (/api/v1/artwork/posters/{id}). Null until one is found, when the title has none, or when an administrator has turned the metadata service off.
        */
       poster_url?: string | null;
       /**
