@@ -1,0 +1,318 @@
+"""System › Logs: Weir's events, jobs and server log as one list, filtered, counted, paged and exported."""
+
+from __future__ import annotations
+
+import csv
+import io
+import json
+from datetime import UTC, datetime, timedelta
+from typing import Any
+
+import pytest
+
+from tests.contract.support import seed
+from tests.contract.support.client import API, WeirClient
+from tests.contract.system import _helpers as h
+
+LOG = f"{API}/system/log"
+EXPORT = f"{API}/system/log/export"
+
+# Signing in and starting the server write rows of their own at the real time; everything seeded here is two days
+# back, and each request is held to that day so it sees only what the test put there.
+SEEDED_AT = (datetime.now(UTC) - timedelta(days=2)).replace(microsecond=0)
+WINDOW = {"from": (SEEDED_AT - timedelta(hours=1)).isoformat(), "to": (SEEDED_AT + timedelta(hours=1)).isoformat()}
+
+
+def _at(minutes: int) -> datetime:
+    return SEEDED_AT + timedelta(minutes=minutes)
+
+
+def _log_line(at: datetime, level: str, logger: str, message: str, **extra: Any) -> str:
+    entry = {
+        "timestamp": at.strftime("%Y-%m-%dT%H:%M:%S.%f") + "Z",
+        "level": level,
+        "logger": logger,
+        "message": message,
+        "source": None,
+        "detail": None,
+        "correlation_id": None,
+        "job_id": None,
+        **extra,
+    }
+    return json.dumps(entry)
+
+
+def _event(
+    conn,
+    at: datetime,
+    event_type: str,
+    title: str,
+    *,
+    result: str,
+    trigger: str | None = None,
+    library_id: int | None = None,
+    relative_path: str | None = None,
+) -> None:
+    conn.execute(
+        'INSERT INTO activity_events (created_at, event_type, module, title, result, "trigger", library_id, relative_path) '
+        "VALUES (?, ?, 'processing', ?, ?, ?, ?, ?)",
+        (seed.utc_text(at), event_type, title, result, trigger, library_id, relative_path),
+    )
+
+
+def _job(
+    conn,
+    at: datetime,
+    key: str,
+    kind: str,
+    status: str,
+    *,
+    last_error: str | None = None,
+    library_id: int | None = None,
+):
+    payload = json.dumps({"library_id": library_id}) if library_id is not None else None
+    conn.execute(
+        "INSERT INTO jobs (dedupe_key, job_kind, payload_json, status, attempt_count, max_attempts, last_error, "
+        "created_at, updated_at) VALUES (?, ?, ?, ?, 1, 3, ?, ?, ?)",
+        (key, kind, payload, status, last_error, seed.utc_text(at), seed.utc_text(at)),
+    )
+    return int(conn.execute("SELECT last_insert_rowid()").fetchone()[0])
+
+
+@pytest.fixture(scope="module", autouse=True)
+def _seeded(server) -> dict[str, int]:
+    h.seed_users(server)
+    logs = server.home / "logs"
+    logs.mkdir(parents=True, exist_ok=True)
+    with seed.stopped(server) as conn:
+        conn.execute("DELETE FROM jobs")
+        library_id = int(conn.execute("SELECT id FROM libraries ORDER BY id LIMIT 1").fetchone()[0])
+        _event(conn, _at(10), "auth.login_succeeded", "Signed in", result="success", trigger="manual")
+        _event(
+            conn,
+            _at(11),
+            "library.scan_completed",
+            "Movies scanned",
+            result="success",
+            trigger="scheduled",
+            library_id=library_id,
+        )
+        _event(conn, _at(12), "auth.login_failed", "Sign-in failed", result="failed", trigger="manual")
+        _event(
+            conn,
+            _at(13),
+            "processing.file_remux_pass_completed",
+            "Heat processed",
+            result="success",
+            library_id=library_id,
+            relative_path="Heat/heat.mkv",
+        )
+        failed = _job(
+            conn,
+            _at(20),
+            "contract:failed",
+            "processing.file.remux_pass.v1",
+            "failed",
+            last_error="ffmpeg stopped",
+            library_id=library_id,
+        )
+        _job(conn, _at(21), "contract:queued", "processing.file.remux_pass.v1", "pending", library_id=library_id)
+        _job(conn, _at(22), "contract:cleanup", "processing.work_temp_stale_sweep.v1", "completed")
+        _job(conn, _at(23), "contract:routine-scan", "processing.watched_folder.remux_scan_dispatch.v1", "completed")
+        # Written while the server is stopped, since it holds its log open while it runs.
+        with (logs / "weir.log").open("a", encoding="utf-8") as log:
+            warning = _log_line(
+                _at(30), "WARNING", "weir.platform.suite_settings.backups", "The backup folder is nearly full"
+            )
+            error = _log_line(
+                _at(31),
+                "ERROR",
+                "weir.processing",
+                "The pass stopped",
+                job_id=str(failed),
+                traceback="System.InvalidOperationException: ffmpeg stopped",
+            )
+            log.write(f"{warning}\n{error}\n")
+    return {"library_id": library_id, "failed_job": failed}
+
+
+@pytest.fixture
+def viewer(server, client_factory) -> WeirClient:
+    return h.signed_in_viewer(server, client_factory)
+
+
+def _titles(body: dict[str, Any]) -> list[str]:
+    return [item["title"] for item in body["items"]]
+
+
+def _get(client: WeirClient, **params: Any) -> dict[str, Any]:
+    r = client.get(LOG, params={**WINDOW, **params})
+    assert r.status_code == 200, r.text
+    return r.json()
+
+
+def test_the_log_needs_a_session(client) -> None:
+    assert client.get(LOG).status_code == 401
+    assert client.get(EXPORT).status_code == 401
+
+
+def test_the_log_is_one_newest_first_list_of_every_source(admin) -> None:
+    body = _get(admin)
+
+    assert set(body) == {"items", "next_cursor", "total", "counts"}
+    assert [item["source"] for item in body["items"]] == [
+        "server",
+        "server",
+        "job",
+        "job",
+        "job",
+        "event",
+        "event",
+        "event",
+    ]
+    times = [item["at"] for item in body["items"]]
+    assert times == sorted(times, reverse=True)
+    assert body["total"] == 8
+    assert body["next_cursor"] is None
+    assert "Heat processed" not in _titles(body), "an event about one file is Activity's, not the log's"
+    assert "Check watched folders" not in " ".join(item["detail"] or "" for item in body["items"])
+
+
+def test_every_row_carries_the_record_of_its_source(admin, _seeded) -> None:
+    body = _get(admin)
+
+    by_source = {item["source"]: item for item in body["items"]}
+    event, job, line = by_source["event"], by_source["job"], by_source["server"]
+    assert event["event"]["event_type"] and event["job"] is None and event["server"] is None
+    assert job["job"]["id"] and job["event"] is None and job["server"] is None
+    assert line["server"]["logger"] and line["event"] is None and line["job"] is None
+    failed = next(item for item in body["items"] if item["id"] == f"job:{_seeded['failed_job']}")
+    assert failed["level"] == "error"
+    assert failed["category"] == "processing"
+    assert failed["job"]["last_error"] == "ffmpeg stopped"
+    assert failed["workflow"]["id"] == _seeded["library_id"]
+    assert failed["workflow"]["name"]
+
+
+def test_counts_are_what_each_choice_would_show_with_the_other_filters_applied(admin) -> None:
+    body = _get(admin, source="event", level="error")
+
+    assert body["total"] == 1
+    assert _titles(body) == ["Sign-in failed"]
+    assert body["counts"]["source"] == {"event": 1, "job": 1, "server": 1}
+    assert body["counts"]["level"]["error"] == 1
+    assert body["counts"]["level"]["success"] == 2
+    assert body["counts"]["category"]["sign_in"] == 1
+    assert set(body["counts"]["category"]) == {
+        "processing",
+        "scans",
+        "cleanup",
+        "library",
+        "connections",
+        "backups",
+        "sign_in",
+        "updates",
+        "weir",
+    }
+
+
+def test_the_filters_narrow_every_source_together(admin, _seeded) -> None:
+    errors = _get(admin, level="error")
+    cleanup = _get(admin, category="cleanup")
+    backups = _get(admin, q="backup folder")
+    workflow = _get(admin, workflow=_seeded["library_id"])
+    several = _get(admin, level="error,warning")
+
+    assert {item["source"] for item in errors["items"]} == {"event", "job", "server"}
+    assert all(item["level"] == "error" for item in errors["items"])
+    assert [item["source"] for item in cleanup["items"]] == ["job"]
+    assert [item["source"] for item in backups["items"]] == ["server"]
+    assert {item["source"] for item in workflow["items"]} == {"event", "job"}
+    assert all(item["workflow"]["id"] == _seeded["library_id"] for item in workflow["items"])
+    assert {item["level"] for item in several["items"]} == {"error", "warning"}
+
+
+def test_a_filter_only_some_sources_have_leaves_the_others_out(admin) -> None:
+    assert {item["source"] for item in _get(admin, trigger="manual")["items"]} == {"event"}
+    assert {item["source"] for item in _get(admin, status="failed")["items"]} == {"job"}
+    assert {item["source"] for item in _get(admin, has_exception="true")["items"]} == {"server"}
+
+
+def test_everything_about_one_job_is_its_row_and_the_lines_written_while_it_ran(admin, _seeded) -> None:
+    body = _get(admin, job=_seeded["failed_job"])
+
+    assert sorted(item["source"] for item in body["items"]) == ["job", "server"]
+
+
+def test_a_finished_routine_scan_is_left_out_unless_its_status_is_asked_for(admin) -> None:
+    assert len(_get(admin, source="job")["items"]) == 3
+    completed = _get(admin, status="completed")
+    assert {item["job"]["job_kind"] for item in completed["items"]} == {
+        "processing.work_temp_stale_sweep.v1",
+        "processing.watched_folder.remux_scan_dispatch.v1",
+    }
+
+
+def test_a_cursor_walks_every_row_exactly_once(admin) -> None:
+    everything = [item["id"] for item in _get(admin, limit=100)["items"]]
+    walked: list[str] = []
+    cursor: str | None = None
+    for _ in range(20):
+        page = _get(admin, limit=3, **({"cursor": cursor} if cursor else {}))
+        walked += [item["id"] for item in page["items"]]
+        assert page["total"] == len(everything)
+        cursor = page["next_cursor"]
+        if cursor is None:
+            break
+
+    assert walked == everything
+
+
+@pytest.mark.parametrize(
+    "params",
+    [
+        {"source": "disk"},
+        {"level": "fatal"},
+        {"category": "misc"},
+        {"status": "stuck"},
+        {"limit": 0},
+        {"limit": 101},
+        {"workflow": 0},
+        {"from": "yesterday"},
+        {"cursor": "nonsense"},
+        {"result": "great"},
+        {"has_exception": "maybe"},
+    ],
+)
+def test_a_filter_the_log_does_not_understand_is_refused(admin, params: dict[str, Any]) -> None:
+    r = admin.get(LOG, params=params)
+
+    assert r.status_code == 422, r.text
+    assert r.json()["detail"]
+
+
+def test_a_viewer_can_read_the_log(viewer) -> None:
+    r = viewer.get(LOG, params=WINDOW)
+
+    assert r.status_code == 200
+    assert r.json()["total"] == 8
+
+
+def test_the_log_exports_as_a_spreadsheet_or_as_json_for_the_same_filters(admin) -> None:
+    as_csv = admin.get(EXPORT, params={**WINDOW, "level": "error", "format": "csv"})
+    as_json = admin.get(EXPORT, params={**WINDOW, "source": "job", "format": "json"})
+
+    assert as_csv.status_code == 200, as_csv.text
+    assert "attachment" in as_csv.headers["content-disposition"]
+    rows = list(csv.DictReader(io.StringIO(as_csv.text)))
+    assert [row["source"] for row in rows] == ["server", "job", "event"]
+    assert {row["level"] for row in rows} == {"error"}
+    assert as_json.status_code == 200
+    assert [row["source"] for row in as_json.json()] == ["job", "job", "job"]
+    assert admin.get(EXPORT, params={"format": "xml"}).status_code == 422
+
+
+def test_the_three_lists_the_log_replaces_are_still_served(admin) -> None:
+    assert admin.get(f"{API}/activity/recent", params={"about": "weir"}).status_code == 200
+    assert admin.get(f"{API}/processing/jobs/inspection").status_code == 200
+    assert admin.get(f"{API}/suite/logs").status_code == 200
