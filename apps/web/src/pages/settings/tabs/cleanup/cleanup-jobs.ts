@@ -7,6 +7,9 @@ const MINUTE = 60;
 const HOUR = 3600;
 const DAY = 86400;
 
+/** An interval the server has not reported yet reads as hourly, the jobs' own default. */
+export const DEFAULT_INTERVAL_SECONDS = HOUR;
+
 /** The cleanup jobs Weir times, in words a person uses, with the setting each one's switch and timer save to. */
 export const CLEANUP_JOBS: {
   family: MaintenanceFamily;
