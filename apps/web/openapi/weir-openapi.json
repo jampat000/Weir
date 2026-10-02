@@ -10370,6 +10370,234 @@
         "title": "SuiteUpdateStatusOut",
         "type": "object"
       },
+      "SystemLogFrame": {
+        "description": "The data of a system.log frame on GET /activity/stream: one warning or error Weir just wrote to its log. GET /suite/logs has what was logged before the stream opened.",
+        "properties": {
+          "at": {
+            "description": "When it was logged.",
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "level": {
+            "description": "The level, as the log file names it.",
+            "enum": [
+              "WARNING",
+              "ERROR",
+              "CRITICAL"
+            ],
+            "title": "Level",
+            "type": "string"
+          },
+          "message": {
+            "description": "What the log line says.",
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "at",
+          "level",
+          "message"
+        ],
+        "title": "SystemLogFrame",
+        "type": "object"
+      },
+      "SystemOverviewChecksOut": {
+        "description": "How many of Weir's own checks pass. They are read from what Weir already knows, without testing anything: the database, the workers and the folder watcher, each switched-on media manager and download client (it passes unless its last test failed), and the media tools (ffmpeg and ffprobe are found).",
+        "properties": {
+          "passing": {
+            "description": "How many pass.",
+            "minimum": 0,
+            "title": "Passing",
+            "type": "integer"
+          },
+          "total": {
+            "description": "How many checks there are.",
+            "minimum": 0,
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "passing",
+          "total"
+        ],
+        "title": "SystemOverviewChecksOut",
+        "type": "object"
+      },
+      "SystemOverviewJobsOut": {
+        "description": "The jobs that finished since the day began in Weir's time zone. A watched-folder scan that found nothing wrong is left out, as it is from the Jobs list.",
+        "properties": {
+          "failed": {
+            "description": "How many of those failed.",
+            "minimum": 0,
+            "title": "Failed",
+            "type": "integer"
+          },
+          "run": {
+            "description": "How many jobs finished, worked or not.",
+            "minimum": 0,
+            "title": "Run",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "run",
+          "failed"
+        ],
+        "title": "SystemOverviewJobsOut",
+        "type": "object"
+      },
+      "SystemOverviewOut": {
+        "description": "The facts System shows about this copy of Weir. Nothing here asks a media manager, a download client or GitHub: the update status is the last answer Weir kept, and the size of the data folder is measured at most once a minute.",
+        "properties": {
+          "address": {
+            "description": "Where a browser reaches Weir: this computer's own name when it listens on every interface, localhost when only this computer can connect, otherwise the address it was told to bind.",
+            "title": "Address",
+            "type": "string"
+          },
+          "browsers_live": {
+            "description": "How many browsers hold the Activity stream open right now.",
+            "minimum": 0,
+            "title": "Browsers Live",
+            "type": "integer"
+          },
+          "checks": {
+            "$ref": "#/components/schemas/SystemOverviewChecksOut"
+          },
+          "data_bytes": {
+            "description": "How much room Weir's own data takes: every file under its home folder.",
+            "minimum": 0,
+            "title": "Data Bytes",
+            "type": "integer"
+          },
+          "jobs_today": {
+            "$ref": "#/components/schemas/SystemOverviewJobsOut"
+          },
+          "requests": {
+            "$ref": "#/components/schemas/SystemOverviewRequestsOut"
+          },
+          "restarts_this_week": {
+            "description": "How many times the server was restarted in the last seven days. The first start of an install is not a restart.",
+            "minimum": 0,
+            "title": "Restarts This Week",
+            "type": "integer"
+          },
+          "runs_as": {
+            "description": "How this copy was started: by the system as a service, by a person as an app, or inside a container.",
+            "enum": [
+              "service",
+              "app",
+              "docker"
+            ],
+            "title": "Runs As",
+            "type": "string"
+          },
+          "started_at": {
+            "description": "When the server started.",
+            "format": "date-time",
+            "title": "Started At",
+            "type": "string"
+          },
+          "update": {
+            "$ref": "#/components/schemas/SystemOverviewUpdateOut"
+          },
+          "uptime_seconds": {
+            "description": "Whole seconds since the server started.",
+            "minimum": 0,
+            "title": "Uptime Seconds",
+            "type": "integer"
+          },
+          "version": {
+            "description": "The version of Weir that is running.",
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "version",
+          "update",
+          "uptime_seconds",
+          "started_at",
+          "runs_as",
+          "address",
+          "data_bytes",
+          "browsers_live",
+          "requests",
+          "jobs_today",
+          "restarts_this_week",
+          "checks"
+        ],
+        "title": "SystemOverviewOut",
+        "type": "object"
+      },
+      "SystemOverviewRequestsOut": {
+        "description": "How Weir has been answering requests. Event streams, which stay open for as long as a browser watches, are not timed.",
+        "properties": {
+          "errors_today": {
+            "description": "How many requests failed on the server (a 5xx answer) since the day began in Weir's time zone.",
+            "minimum": 0,
+            "title": "Errors Today",
+            "type": "integer"
+          },
+          "median_ms": {
+            "description": "The median time to answer over the last fifteen minutes, in milliseconds; zero when nothing was asked.",
+            "minimum": 0,
+            "title": "Median Ms",
+            "type": "number"
+          },
+          "p95_ms": {
+            "description": "The time within which nineteen answers in twenty came, over the last fifteen minutes, in milliseconds; zero when nothing was asked.",
+            "minimum": 0,
+            "title": "P95 Ms",
+            "type": "number"
+          }
+        },
+        "required": [
+          "median_ms",
+          "p95_ms",
+          "errors_today"
+        ],
+        "title": "SystemOverviewRequestsOut",
+        "type": "object"
+      },
+      "SystemOverviewUpdateOut": {
+        "description": "Whether a newer Weir exists, as far as Weir last found out.",
+        "properties": {
+          "latest_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The newest published version, or the one the tray has downloaded and is waiting to install; null when none is known.",
+            "title": "Latest Version"
+          },
+          "status": {
+            "description": "checking: nothing learned yet. up_to_date. update_available. downloaded: the tray holds an update waiting to install. not_published: no release exists yet. unavailable: the release list could not be reached.",
+            "enum": [
+              "checking",
+              "up_to_date",
+              "update_available",
+              "downloaded",
+              "not_published",
+              "unavailable"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "latest_version"
+        ],
+        "title": "SystemOverviewUpdateOut",
+        "type": "object"
+      },
       "SystemStatsDriveOut": {
         "additionalProperties": false,
         "description": "One drive that holds a workflow's folders. A network share has free space only: its activity is null.",
@@ -10922,6 +11150,101 @@
           "processing_speed"
         ],
         "title": "SystemStatsPointOut",
+        "type": "object"
+      },
+      "SystemTaskOut": {
+        "description": "One task Weir runs on its own: its last run, its next run, and whether it is running now. The same list arrives on the Activity stream as a system.tasks frame, whose data is an array of these, each time a run starts or ends or a task comes or goes.",
+        "properties": {
+          "interval_seconds": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "How often it runs, when that is a fixed time.",
+            "title": "Interval Seconds"
+          },
+          "key": {
+            "description": "A stable id: a task's own name, scan-{workflow id} for a workflow's periodic scan, library-clean-{workflow id} for its scheduled scan and clean, or the name of a cleanup.",
+            "title": "Key",
+            "type": "string"
+          },
+          "label": {
+            "description": "What the task does, in words, with its workflow's name when it belongs to one: Scan Movies, Clean Movies library.",
+            "title": "Label",
+            "type": "string"
+          },
+          "last_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Why the last run failed, in a sentence; null when it worked or has not run.",
+            "title": "Last Error"
+          },
+          "last_ok": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Whether the last run worked; null until one has finished.",
+            "title": "Last Ok"
+          },
+          "last_run_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When the last run finished; null until one has.",
+            "title": "Last Run At"
+          },
+          "next_run_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When the next run is due, as far as Weir knows; null when none is planned.",
+            "title": "Next Run At"
+          },
+          "running": {
+            "description": "A run is under way.",
+            "title": "Running",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "key",
+          "label",
+          "running",
+          "last_run_at",
+          "last_ok",
+          "last_error",
+          "next_run_at",
+          "interval_seconds"
+        ],
+        "title": "SystemTaskOut",
         "type": "object"
       },
       "ThemeIn": {
@@ -12032,7 +12355,7 @@
     },
     "/api/v1/activity/stream": {
       "get": {
-        "description": "Authenticated SSE stream for activity-backed pages. Frames: activity.latest (the newest Activity event id and revision), processing.progress (every file's live progress, at most once a second), connection.activity (one thing that happened on a media manager or download client connection: see ConnectionActivityFrame; each connection sends at most one frame per phase every 250 ms, and always the phase it ends on), and system.stats (the machine's newest reading, once a second: see SystemStatsFrame).",
+        "description": "Authenticated SSE stream for activity-backed pages. Frames: activity.latest (the newest Activity event id and revision), processing.progress (every file's live progress, at most once a second), connection.activity (one thing that happened on a media manager or download client connection: see ConnectionActivityFrame; each connection sends at most one frame per phase every 250 ms, and always the phase it ends on), system.stats (the machine's newest reading, once a second: see SystemStatsFrame), system.tasks (every scheduled task, each time a run starts or ends or a task comes or goes: see SystemTaskOut), and system.log (one for each new warning or error Weir logs: see SystemLogFrame).",
         "operationId": "get_activity_stream_api_v1_activity_stream_get",
         "responses": {
           "200": {
@@ -17987,6 +18310,28 @@
         ]
       }
     },
+    "/api/v1/system/overview": {
+      "get": {
+        "description": "The facts System shows about this copy of Weir: version and update, uptime, how it runs, where it listens, the size of its data, how fast it answers, the jobs it ran today, restarts this week and how many checks pass. Each comes from a store Weir already keeps.",
+        "operationId": "get_system_overview_api_v1_system_overview_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SystemOverviewOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get System Overview",
+        "tags": [
+          "system-overview"
+        ]
+      }
+    },
     "/api/v1/system/readiness": {
       "get": {
         "description": "Detailed startup and worker diagnostics for signed-in operators.",
@@ -18088,6 +18433,32 @@
         "summary": "Get System Stats",
         "tags": [
           "system-stats"
+        ]
+      }
+    },
+    "/api/v1/system/tasks": {
+      "get": {
+        "description": "Every task Weir runs on its own: each workflow's periodic scan and scheduled library clean, the cleanups, configuration backup checks, history pruning and the rest, each with its last result and next run. The same list arrives on the Activity stream as a system.tasks frame.",
+        "operationId": "get_system_tasks_api_v1_system_tasks_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SystemTaskOut"
+                  },
+                  "title": "Response Get System Tasks",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get System Tasks",
+        "tags": [
+          "system-overview"
         ]
       }
     },

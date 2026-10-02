@@ -93,7 +93,7 @@ export interface paths {
     };
     /**
      * Get Activity Stream
-     * @description Authenticated SSE stream for activity-backed pages. Frames: activity.latest (the newest Activity event id and revision), processing.progress (every file's live progress, at most once a second), connection.activity (one thing that happened on a media manager or download client connection: see ConnectionActivityFrame; each connection sends at most one frame per phase every 250 ms, and always the phase it ends on), and system.stats (the machine's newest reading, once a second: see SystemStatsFrame).
+     * @description Authenticated SSE stream for activity-backed pages. Frames: activity.latest (the newest Activity event id and revision), processing.progress (every file's live progress, at most once a second), connection.activity (one thing that happened on a media manager or download client connection: see ConnectionActivityFrame; each connection sends at most one frame per phase every 250 ms, and always the phase it ends on), system.stats (the machine's newest reading, once a second: see SystemStatsFrame), system.tasks (every scheduled task, each time a run starts or ends or a task comes or goes: see SystemTaskOut), and system.log (one for each new warning or error Weir logs: see SystemLogFrame).
      */
     get: operations["get_activity_stream_api_v1_activity_stream_get"];
     put?: never;
@@ -2263,6 +2263,26 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/system/overview": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get System Overview
+     * @description The facts System shows about this copy of Weir: version and update, uptime, how it runs, where it listens, the size of its data, how fast it answers, the jobs it ran today, restarts this week and how many checks pass. Each comes from a store Weir already keeps.
+     */
+    get: operations["get_system_overview_api_v1_system_overview_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/system/readiness": {
     parameters: {
       query?: never;
@@ -2335,6 +2355,26 @@ export interface paths {
      * @description The machine's load now and over the last ten minutes, Weir's own share of it and the tools', and the drives the workflows use. A field is null where it cannot be read. The same readings arrive on the Activity stream as system.stats frames: see SystemStatsFrame.
      */
     get: operations["get_system_stats_api_v1_system_stats_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/system/tasks": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get System Tasks
+     * @description Every task Weir runs on its own: each workflow's periodic scan and scheduled library clean, the cleanups, configuration backup checks, history pruning and the rest, each with its last result and next run. The same list arrives on the Activity stream as a system.tasks frame.
+     */
+    get: operations["get_system_tasks_api_v1_system_tasks_get"];
     put?: never;
     post?: never;
     delete?: never;
@@ -7395,6 +7435,157 @@ export interface components {
       windows_installer_url?: string | null;
     };
     /**
+     * SystemLogFrame
+     * @description The data of a system.log frame on GET /activity/stream: one warning or error Weir just wrote to its log. GET /suite/logs has what was logged before the stream opened.
+     */
+    SystemLogFrame: {
+      /**
+       * At
+       * Format: date-time
+       * @description When it was logged.
+       */
+      at: string;
+      /**
+       * Level
+       * @description The level, as the log file names it.
+       * @enum {string}
+       */
+      level: "WARNING" | "ERROR" | "CRITICAL";
+      /**
+       * Message
+       * @description What the log line says.
+       */
+      message: string;
+    };
+    /**
+     * SystemOverviewChecksOut
+     * @description How many of Weir's own checks pass. They are read from what Weir already knows, without testing anything: the database, the workers and the folder watcher, each switched-on media manager and download client (it passes unless its last test failed), and the media tools (ffmpeg and ffprobe are found).
+     */
+    SystemOverviewChecksOut: {
+      /**
+       * Passing
+       * @description How many pass.
+       */
+      passing: number;
+      /**
+       * Total
+       * @description How many checks there are.
+       */
+      total: number;
+    };
+    /**
+     * SystemOverviewJobsOut
+     * @description The jobs that finished since the day began in Weir's time zone. A watched-folder scan that found nothing wrong is left out, as it is from the Jobs list.
+     */
+    SystemOverviewJobsOut: {
+      /**
+       * Failed
+       * @description How many of those failed.
+       */
+      failed: number;
+      /**
+       * Run
+       * @description How many jobs finished, worked or not.
+       */
+      run: number;
+    };
+    /**
+     * SystemOverviewOut
+     * @description The facts System shows about this copy of Weir. Nothing here asks a media manager, a download client or GitHub: the update status is the last answer Weir kept, and the size of the data folder is measured at most once a minute.
+     */
+    SystemOverviewOut: {
+      /**
+       * Address
+       * @description Where a browser reaches Weir: this computer's own name when it listens on every interface, localhost when only this computer can connect, otherwise the address it was told to bind.
+       */
+      address: string;
+      /**
+       * Browsers Live
+       * @description How many browsers hold the Activity stream open right now.
+       */
+      browsers_live: number;
+      checks: components["schemas"]["SystemOverviewChecksOut"];
+      /**
+       * Data Bytes
+       * @description How much room Weir's own data takes: every file under its home folder.
+       */
+      data_bytes: number;
+      jobs_today: components["schemas"]["SystemOverviewJobsOut"];
+      requests: components["schemas"]["SystemOverviewRequestsOut"];
+      /**
+       * Restarts This Week
+       * @description How many times the server was restarted in the last seven days. The first start of an install is not a restart.
+       */
+      restarts_this_week: number;
+      /**
+       * Runs As
+       * @description How this copy was started: by the system as a service, by a person as an app, or inside a container.
+       * @enum {string}
+       */
+      runs_as: "service" | "app" | "docker";
+      /**
+       * Started At
+       * Format: date-time
+       * @description When the server started.
+       */
+      started_at: string;
+      update: components["schemas"]["SystemOverviewUpdateOut"];
+      /**
+       * Uptime Seconds
+       * @description Whole seconds since the server started.
+       */
+      uptime_seconds: number;
+      /**
+       * Version
+       * @description The version of Weir that is running.
+       */
+      version: string;
+    };
+    /**
+     * SystemOverviewRequestsOut
+     * @description How Weir has been answering requests. Event streams, which stay open for as long as a browser watches, are not timed.
+     */
+    SystemOverviewRequestsOut: {
+      /**
+       * Errors Today
+       * @description How many requests failed on the server (a 5xx answer) since the day began in Weir's time zone.
+       */
+      errors_today: number;
+      /**
+       * Median Ms
+       * @description The median time to answer over the last fifteen minutes, in milliseconds; zero when nothing was asked.
+       */
+      median_ms: number;
+      /**
+       * P95 Ms
+       * @description The time within which nineteen answers in twenty came, over the last fifteen minutes, in milliseconds; zero when nothing was asked.
+       */
+      p95_ms: number;
+    };
+    /**
+     * SystemOverviewUpdateOut
+     * @description Whether a newer Weir exists, as far as Weir last found out.
+     */
+    SystemOverviewUpdateOut: {
+      /**
+       * Latest Version
+       * @description The newest published version, or the one the tray has downloaded and is waiting to install; null when none is known.
+       */
+      latest_version: string | null;
+      /**
+       * Status
+       * @description checking: nothing learned yet. up_to_date. update_available. downloaded: the tray holds an update waiting to install. not_published: no release exists yet. unavailable: the release list could not be reached.
+       * @enum {string}
+       */
+      status:
+        | "checking"
+        | "up_to_date"
+        | "update_available"
+        | "downloaded"
+        | "not_published"
+        | "unavailable";
+    };
+    /**
      * SystemStatsDriveOut
      * @description One drive that holds a workflow's folders. A network share has free space only: its activity is null.
      */
@@ -7682,6 +7873,52 @@ export interface components {
        * @description How fast the files being processed are written.
        */
       processing_write_bytes_per_sec: number;
+    };
+    /**
+     * SystemTaskOut
+     * @description One task Weir runs on its own: its last run, its next run, and whether it is running now. The same list arrives on the Activity stream as a system.tasks frame, whose data is an array of these, each time a run starts or ends or a task comes or goes.
+     */
+    SystemTaskOut: {
+      /**
+       * Interval Seconds
+       * @description How often it runs, when that is a fixed time.
+       */
+      interval_seconds: number | null;
+      /**
+       * Key
+       * @description A stable id: a task's own name, scan-{workflow id} for a workflow's periodic scan, library-clean-{workflow id} for its scheduled scan and clean, or the name of a cleanup.
+       */
+      key: string;
+      /**
+       * Label
+       * @description What the task does, in words, with its workflow's name when it belongs to one: Scan Movies, Clean Movies library.
+       */
+      label: string;
+      /**
+       * Last Error
+       * @description Why the last run failed, in a sentence; null when it worked or has not run.
+       */
+      last_error: string | null;
+      /**
+       * Last Ok
+       * @description Whether the last run worked; null until one has finished.
+       */
+      last_ok: boolean | null;
+      /**
+       * Last Run At
+       * @description When the last run finished; null until one has.
+       */
+      last_run_at: string | null;
+      /**
+       * Next Run At
+       * @description When the next run is due, as far as Weir knows; null when none is planned.
+       */
+      next_run_at: string | null;
+      /**
+       * Running
+       * @description A run is under way.
+       */
+      running: boolean;
     };
     /** ThemeIn */
     ThemeIn: {
@@ -12146,6 +12383,26 @@ export interface operations {
       };
     };
   };
+  get_system_overview_api_v1_system_overview_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["SystemOverviewOut"];
+        };
+      };
+    };
+  };
   authenticated_readiness_api_v1_system_readiness_get: {
     parameters: {
       query?: never;
@@ -12235,6 +12492,26 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["SystemStatsOut"];
+        };
+      };
+    };
+  };
+  get_system_tasks_api_v1_system_tasks_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["SystemTaskOut"][];
         };
       };
     };
