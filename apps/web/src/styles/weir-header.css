@@ -19,8 +19,10 @@
   display: none;
 }
 
+/* At least 300px wide, as Deluno's is, so the page's own controls start at the same place in both products
+   whatever the eyebrow says. Never wider than the header on a phone. */
 .mm-header__titles {
-  min-width: 0;
+  min-width: min(300px, 100%);
 }
 
 .mm-header__eyebrow {
