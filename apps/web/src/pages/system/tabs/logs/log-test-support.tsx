@@ -60,7 +60,8 @@ export const JOB_ROW: SystemLogRow = {
     lease_expires_at: null,
     last_error: "ffmpeg stopped unexpectedly",
     operator_message: "Couldn't finish this job for heat.mkv.",
-    next_action: "Read the error below, fix the cause, then use Try again in Activity.",
+    next_action:
+      "Read the error below, fix the cause, then use Try again in Activity.",
     technical_detail: "ffmpeg stopped unexpectedly",
     payload_json:
       '{"library_id": 1, "relative_media_path": "Heat (1995)/heat.mkv"}',
