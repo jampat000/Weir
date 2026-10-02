@@ -154,6 +154,27 @@ export async function fetchLibraryFiles(
   return readJson<LibraryFilesResult>(r);
 }
 
+const NO_FILES_IN_ANY_STATUS: LibraryTotals["by_status"] = {
+  needs_cleaning: 0,
+  cleaning: 0,
+  matches: 0,
+  cant_clean_yet: 0,
+  left_alone: 0,
+};
+
+/**
+ * An overview with a count for every status. A server that does not report the per-status counts, such as an older one,
+ * counts no file in any status rather than leaving the page to read a count that is not there.
+ */
+export function withStatusCounts(overview: LibraryOverview): LibraryOverview {
+  const { totals } = overview;
+  if (!totals || totals.by_status) return overview;
+  return {
+    ...overview,
+    totals: { ...totals, by_status: NO_FILES_IN_ANY_STATUS },
+  };
+}
+
 /** #568's Overview: totals and every breakdown, aggregated on the server. */
 export async function fetchLibraryOverview(
   libraryId: number,
@@ -161,7 +182,7 @@ export async function fetchLibraryOverview(
   const path = `/api/v1/processing/libraries/${libraryId}/library-overview`;
   const r = await apiFetch(path);
   await requireOk(path, r, "Could not load this workflow's overview");
-  return readJson<LibraryOverview>(r);
+  return withStatusCounts(await readJson<LibraryOverview>(r));
 }
 
 /** Parses the structured 400 the API returns when removal needs confirming. Rethrows anything else. */
