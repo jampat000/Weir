@@ -34,6 +34,19 @@ describe("Chip", () => {
     expect(container.querySelector(".mm-chip__dot")).toBeNull();
   });
 
+  it("draws a meaning as its status pill, with the dot of that meaning", () => {
+    const { container } = render(<Chip meaning="todo">Waiting</Chip>);
+
+    const chip = screen.getByText("Waiting");
+    expect(chip).toHaveClass("mm-chip", "mm-status-pill");
+    expect(chip).not.toHaveClass("mm-chip--neutral");
+    expect(chip).toHaveAttribute("data-status", "todo");
+    expect(container.querySelector(".mm-status-dot")).toHaveAttribute(
+      "data-status",
+      "todo",
+    );
+  });
+
   it("passes through attributes such as a test id", () => {
     render(
       <Chip tone="failed" data-testid="status">
@@ -42,5 +55,18 @@ describe("Chip", () => {
     );
 
     expect(screen.getByTestId("status")).toHaveTextContent("Can't reach Weir");
+  });
+
+  it("draws a meaning as its status pill, with the dot of that meaning", () => {
+    const { container } = render(<Chip meaning="todo">Waiting</Chip>);
+
+    const chip = screen.getByText("Waiting");
+    expect(chip).toHaveClass("mm-chip", "mm-status-pill");
+    expect(chip).not.toHaveClass("mm-chip--neutral");
+    expect(chip).toHaveAttribute("data-status", "todo");
+    expect(container.querySelector(".mm-status-dot")).toHaveAttribute(
+      "data-status",
+      "todo",
+    );
   });
 });
