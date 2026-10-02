@@ -88,6 +88,41 @@ it("saves the metadata provider and reports whether it answered", async () => {
   });
 });
 
+it("keeps a provider address that is typed but not saved when the artwork switch is changed", async () => {
+  stubProvider();
+  const saveArtwork = vi
+    .spyOn(providerApi, "putProcessingMetadataProvider")
+    .mockResolvedValue({
+      provider: "",
+      base_url: "https://api.themoviedb.org/3",
+      key_configured: false,
+      known_providers: ["tmdb"],
+      artwork_enabled: false,
+    });
+
+  render(<MetadataTab />, { wrapper });
+
+  fireEvent.click(await screen.findByRole("button", { name: "Configure →" }));
+  fireEvent.change(screen.getByRole("combobox", { name: "Provider" }), {
+    target: { value: "tmdb" },
+  });
+  fireEvent.change(screen.getByLabelText("Provider or gateway URL"), {
+    target: { value: "https://tmdb.example/3" },
+  });
+  fireEvent.click(screen.getByRole("radio", { name: "Off" }));
+
+  await waitFor(() => expect(saveArtwork).toHaveBeenCalled());
+  await waitFor(() =>
+    expect(screen.getByRole("radio", { name: "Off" })).toBeChecked(),
+  );
+  expect(screen.getByLabelText("Provider or gateway URL")).toHaveValue(
+    "https://tmdb.example/3",
+  );
+  expect(screen.getByRole("combobox", { name: "Provider" })).toHaveValue(
+    "tmdb",
+  );
+});
+
 it("shows a load error when the metadata settings fail to load", async () => {
   vi.spyOn(authQueries, "useMeQuery").mockReturnValue({
     data: { role: "operator" },

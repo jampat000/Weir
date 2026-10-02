@@ -28,13 +28,18 @@ export function useProviderDraft(
   const [key, setKey] = useState("");
   const [clearKey, setClearKey] = useState(false);
 
+  // Only a change to the provider itself resets what is typed: saving the artwork switch also replaces `saved`,
+  // and must not wipe a draft that has not been saved.
+  const savedProvider = saved?.provider;
+  const savedBaseUrl = saved?.base_url;
+  const keyConfigured = saved?.key_configured;
   useEffect(() => {
-    if (!saved) return;
-    setName(saved.provider === "tmdb" ? "tmdb" : "");
-    setBaseUrl(saved.base_url);
+    if (savedProvider === undefined || savedBaseUrl === undefined) return;
+    setName(savedProvider === "tmdb" ? "tmdb" : "");
+    setBaseUrl(savedBaseUrl);
     setKey("");
     setClearKey(false);
-  }, [saved]);
+  }, [savedProvider, savedBaseUrl, keyConfigured]);
 
   return {
     name,
