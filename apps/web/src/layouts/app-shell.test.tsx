@@ -55,7 +55,10 @@ vi.mock("../pages/processing/working-count", () => ({
   useWorkingCount: () => counts.working,
 }));
 vi.mock("../pages/processing/dashboard/use-needs-you", () => ({
-  useNeedsYou: () => ({ groups: [], count: counts.needsYou }),
+  useNeedsYou: () => ({
+    groups: [],
+    files: Array.from({ length: counts.needsYou }),
+  }),
 }));
 
 function renderShell(

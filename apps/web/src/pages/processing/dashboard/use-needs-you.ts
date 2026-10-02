@@ -11,12 +11,9 @@ import { useNeedsFiles } from "./needs-files";
 import {
   FAILED_JOBS_LIMIT,
   buildNeeds,
-  WEIR_GROUP_KEY,
   failedJobsOf,
-  needCount,
   waitingFiles,
   type NeedGroup,
-  type NeedRow,
 } from "./needs-model";
 
 const FAILED_JOBS_KEYS = [
@@ -27,18 +24,18 @@ const STREAM_THROTTLE_MS = 3_000;
 
 export type NeedsYou = {
   groups: NeedGroup[];
-  /** How many things wait on a person: each file and each problem with Weir counts once. */
-  count: number;
-  /** Every file that waits on a person, newest first, past the rows each group lists. */
+  /**
+   * Every file that waits on a person, newest first, past the rows each group lists. Its length is the number the
+   * sidebar's badge, History's Needs you chip, the Today tile and the panel's header all show; what is wrong with
+   * Weir itself is a group of its own and is not counted in it.
+   */
   files: ProcessingFile[];
-  /** What is wrong with Weir itself, which no file is. */
-  weir: NeedRow[];
 };
 
 /**
  * What needs a person: the files, narrowed to one workflow or across all of them, and to one kind of work or both,
- * and what is wrong with Weir itself, which no narrowing hides. The Needs you panel, the Today tile's count and the
- * sidebar's badge all read this, so they cannot disagree; they share its queries.
+ * and, in the groups, what is wrong with Weir itself, which no narrowing hides. The Needs you panel, the Today tile's
+ * count and the sidebar's badge all read this, so they cannot disagree; they share its queries.
  */
 export function useNeedsYou(
   workflowId: number | null | undefined,
@@ -72,9 +69,7 @@ export function useNeedsYou(
     });
     return {
       groups,
-      count: needCount(groups),
       files: waitingFiles(files, workflowId, filter),
-      weir: groups.find((group) => group.key === WEIR_GROUP_KEY)?.rows ?? [],
     };
   }, [workflowList, workflowId, filter, readinessData, failedJobRows, files]);
 }

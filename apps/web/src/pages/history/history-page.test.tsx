@@ -8,7 +8,6 @@ import type {
 } from "../../lib/processing/files-api";
 import type { KeptFile } from "../../lib/processing/kept-files-api";
 import type { LibraryClean } from "../../lib/processing/library-cleans-api";
-import type { NeedRow } from "../processing/dashboard/needs-model";
 import { historyEntries, type HistoryEntry } from "./history-entries";
 import { HistoryPage } from "./history-page";
 import { historyFilePath } from "./history-links";
@@ -29,9 +28,8 @@ const keptQueryState: {
   isError: boolean;
   error: unknown;
 } = { isLoading: false, isError: false, error: null };
-const attention: { entries: HistoryEntry[]; weir: NeedRow[]; count: number } = {
+const attention: { entries: HistoryEntry[]; count: number } = {
   entries: [],
-  weir: [],
   count: 0,
 };
 const me = { role: "admin" };
@@ -208,7 +206,6 @@ describe("HistoryPage", () => {
     cleans.cleans = [];
     kept.files = [];
     attention.entries = [];
-    attention.weir = [];
     attention.count = 0;
     filesQueryState.isLoading = false;
     filesQueryState.isError = false;
@@ -341,7 +338,7 @@ describe("HistoryPage", () => {
       ]);
     });
 
-    it("lists the files waiting on a person, whatever their age, and what is wrong with Weir above them", () => {
+    it("lists the files waiting on a person, whatever their age", () => {
       const waiting = file({
         id: 40,
         relative_path: "Old/Old.And.Stuck.mkv",
@@ -349,49 +346,23 @@ describe("HistoryPage", () => {
         updated_at: "2025-01-01T03:00:00",
       });
       attention.entries = historyEntries([waiting], []);
-      attention.weir = [
-        {
-          key: "worker-p",
-          title: "Background work has stopped",
-          reason: "Not responding · restart Weir",
-          link: { label: "Open jobs", to: "/system?tab=history&show=jobs" },
-        },
-      ];
-      attention.count = 2;
+      attention.count = 1;
       renderPage("/history?show=attention");
 
       expect(
-        within(chips()).getByRole("button", { name: /Needs you\s*2/ }),
+        within(chips()).getByRole("button", { name: /Needs you\s*1/ }),
       ).toHaveAttribute("aria-pressed", "true");
-      expect(screen.getByTestId("history-weir-needs")).toHaveTextContent(
-        "Background work has stopped",
-      );
-      expect(
-        within(screen.getByTestId("history-weir-needs")).getByRole("link", {
-          name: "Open jobs →",
-        }),
-      ).toHaveAttribute("href", "/system?tab=history&show=jobs");
       expect(screen.getByTestId("history-detail")).toHaveTextContent(
         "Old.And.Stuck.mkv",
       );
     });
 
-    it("says no file is waiting when none is, and shows no Weir list when nothing is wrong with Weir", () => {
+    it("says no file is waiting when none is", () => {
       renderPage("/history?show=attention");
 
       expect(
         screen.getByText("No file is waiting on you."),
       ).toBeInTheDocument();
-      expect(screen.queryByTestId("history-weir-needs")).toBeNull();
-    });
-
-    it("shows Weir's own problems only in its own view", () => {
-      attention.weir = [
-        { key: "worker-p", title: "Background work has stopped", reason: "x" },
-      ];
-      renderPage("/history?show=failed");
-
-      expect(screen.queryByTestId("history-weir-needs")).toBeNull();
     });
   });
 

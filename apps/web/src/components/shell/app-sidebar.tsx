@@ -43,7 +43,7 @@ export function AppSidebar({
   const logout = useLogoutMutation();
   const readiness = useSystemReadinessQuery();
   const working = useWorkingCount();
-  const { count: needsYou } = useNeedsYou(null);
+  const needsYou = useNeedsYou(null).files.length;
   const firstPlace = useRef<HTMLAnchorElement>(null);
   const drawer = useModalFocus<HTMLElement>({
     open: drawerOpen,

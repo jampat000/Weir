@@ -27,7 +27,7 @@ type TodayTileProps = {
  */
 export function TodayTile({ filter, now, workflowId = null }: TodayTileProps) {
   const figures = useTodayFigures(workflowId, filter, now);
-  const { count: needsALook } = useNeedsYou(workflowId, filter);
+  const needsALook = useNeedsYou(workflowId, filter).files.length;
   const { handed, total, partial } = useHandedBack(filter, now, workflowId);
   return (
     <StatTile

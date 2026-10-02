@@ -8,7 +8,6 @@ import {
   FILES_SHOWN_PER_GROUP,
   buildNeeds,
   failedJobsOf,
-  needCount,
 } from "./needs-model";
 
 const workflow = {
@@ -176,7 +175,6 @@ describe("what needs a person, for one kind of work", () => {
 
     expect(groups.map((group) => group.key)).toEqual(["weir"]);
     expect(groups[0].rows.map((row) => row.key)).toEqual(weirRows);
-    expect(needCount(groups)).toBe(3);
   });
 
   it("is clear for library cleaning when nothing is wrong with Weir", () => {
@@ -421,15 +419,5 @@ describe("the files that need a person", () => {
     }).map((group) => group.key);
 
     expect(keys).toEqual(["weir", "failed-writing", "rejected-language"]);
-  });
-
-  it("counts every file and every problem once, including the ones past a group's rows", () => {
-    const groups = buildNeeds({
-      ...healthy,
-      failedJobs: { count: 1, capped: false },
-      files: [1, 2, 3, 4, 5, 6].map((id) => failedFile(id)),
-    });
-
-    expect(needCount(groups)).toBe(7);
   });
 });

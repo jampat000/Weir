@@ -44,7 +44,7 @@ vi.mock("./use-needs-you", () => ({
   useNeedsYou: (workflowId: number | null, filter: Filter) => {
     figuresAsked.push(workflowId);
     filtersAsked.push(filter);
-    return { groups: [], count: needsYou.count };
+    return { groups: [], files: Array.from({ length: needsYou.count }) };
   },
 }));
 vi.mock("../use-handed-back", () => ({

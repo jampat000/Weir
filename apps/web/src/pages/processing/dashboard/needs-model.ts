@@ -163,7 +163,7 @@ function failedJobsNeed({ count, capped }: FailedJobs): NeedRow | null {
 }
 
 /** The key of the group that holds what is wrong with Weir itself rather than with any file. */
-export const WEIR_GROUP_KEY = "weir";
+const WEIR_GROUP_KEY = "weir";
 
 /** What is wrong with Weir itself rather than with a file: no workflow, stopped work, failed jobs. */
 function weirGroup(rows: NeedRow[]): NeedGroup[] {
@@ -229,9 +229,4 @@ export function buildNeeds({
   ].filter((row): row is NeedRow => row !== null);
   const fileRows = waitingFiles(files, workflowId, filter);
   return [...weirGroup(weirRows), ...fileGroups(fileRows)];
-}
-
-/** How many things need a person: each file and each problem with Weir counts once. */
-export function needCount(groups: readonly NeedGroup[]): number {
-  return groups.reduce((sum, group) => sum + group.rows.length + group.more, 0);
 }

@@ -137,7 +137,8 @@ export function NeedsPanel({
   onOpen,
 }: NeedsPanelProps) {
   const workflows = useProcessingLibrariesQuery().data;
-  const { groups, count } = useNeedsYou(workflowId, filter);
+  const { groups, files } = useNeedsYou(workflowId, filter);
+  const count = files.length;
   const [notice, setNotice] = useState<NeedNotice | null>(null);
   const mediaScopes = new Map(
     (workflows ?? []).map((workflow) => [workflow.id, workflow.media_type]),

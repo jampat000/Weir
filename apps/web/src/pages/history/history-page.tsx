@@ -35,7 +35,6 @@ import { HistoryKeptList } from "./history-kept-list";
 import { HistoryList } from "./history-list";
 import { ProcessRejectedAgain } from "./history-rejected-again";
 import { HistoryRetentionNote } from "./history-retention-note";
-import { HistoryWeirNeeds } from "./history-weir-needs";
 import { useHistoryAttention } from "./use-history-attention";
 
 /** "min ago" moves on its own between refreshes. */
@@ -201,8 +200,6 @@ export function HistoryPage() {
           ) : null}
         </div>
       ) : null}
-
-      {needsYou ? <HistoryWeirNeeds rows={attention.weir} /> : null}
 
       {cappedAtLimit ? (
         <p className="mm-history-note" role="status">

@@ -107,7 +107,10 @@ vi.mock("../../lib/processing/queries", () => ({
   }),
 }));
 vi.mock("./dashboard/use-needs-you", () => ({
-  useNeedsYou: () => ({ groups: [], count: needsYou.count }),
+  useNeedsYou: () => ({
+    groups: [],
+    files: Array.from({ length: needsYou.count }),
+  }),
 }));
 vi.mock("../../lib/processing/jobs-inspection/queries", () => ({
   useProcessingJobsInspectionQuery: (filter: string) => ({

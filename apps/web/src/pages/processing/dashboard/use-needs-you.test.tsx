@@ -49,7 +49,7 @@ beforeEach(() => {
 });
 
 describe("what needs a person, for the panel, the Today tile and the sidebar", () => {
-  it("counts the failed, held, skipped and rejected files and the problems with Weir in one number", () => {
+  it("counts the failed, held, skipped and rejected files, and leaves the problems with Weir out of that number", () => {
     failedJobs.jobs = [{ id: 1 }];
     needFiles.files = [
       file({ id: 1 }),
@@ -69,7 +69,7 @@ describe("what needs a person, for the panel, the Today tile and the sidebar", (
 
     const { result } = renderHook(() => useNeedsYou(null));
 
-    expect(result.current.count).toBe(5);
+    expect(result.current.files).toHaveLength(4);
   });
 
   it("counts what the groups hold, including the files past the rows a group lists", () => {
@@ -78,7 +78,7 @@ describe("what needs a person, for the panel, the Today tile and the sidebar", (
     const { result } = renderHook(() => useNeedsYou(null));
 
     expect(result.current.groups).toHaveLength(1);
-    expect(result.current.count).toBe(6);
+    expect(result.current.files).toHaveLength(6);
   });
 
   it("leaves a file that only waits its turn out of the count", () => {
@@ -88,10 +88,10 @@ describe("what needs a person, for the panel, the Today tile and the sidebar", (
 
     const { result } = renderHook(() => useNeedsYou(null));
 
-    expect(result.current.count).toBe(0);
+    expect(result.current.files).toHaveLength(0);
   });
 
-  it("counts a kind of work's own files, and always what is wrong with Weir itself, so the Today tile and the panel agree", () => {
+  it("counts a kind of work's own files, whatever is wrong with Weir itself, so the Today tile and the panel agree", () => {
     failedJobs.jobs = [
       { id: 1, job_kind: "processing.file.remux_pass.v1" },
       { id: 2, job_kind: "processing.library.clean.v1" },
@@ -102,14 +102,14 @@ describe("what needs a person, for the panel, the Today tile and the sidebar", (
     needFiles.files = [file({ id: 1 }), file({ id: 2 })];
 
     const counts = (filter: "all" | "download" | "library") =>
-      renderHook(() => useNeedsYou(null, filter)).result.current.count;
+      renderHook(() => useNeedsYou(null, filter)).result.current.files.length;
 
-    expect(counts("all")).toBe(4);
-    expect(counts("download")).toBe(4);
-    expect(counts("library")).toBe(2);
+    expect(counts("all")).toBe(2);
+    expect(counts("download")).toBe(2);
+    expect(counts("library")).toBe(0);
   });
 
-  it("counts only the chosen workflow's files, and still what is wrong with Weir itself", () => {
+  it("counts only the chosen workflow's files", () => {
     failedJobs.jobs = [{ id: 1 }];
     needFiles.files = [
       file({ id: 1, library_id: 1 }),
@@ -118,7 +118,7 @@ describe("what needs a person, for the panel, the Today tile and the sidebar", (
 
     const { result } = renderHook(() => useNeedsYou(2));
 
-    expect(result.current.count).toBe(2);
+    expect(result.current.files).toHaveLength(1);
   });
 
   it("lists every file that waits on a person, past the rows a group shows, and leaves out one that only waits its turn", () => {
@@ -132,16 +132,18 @@ describe("what needs a person, for the panel, the Today tile and the sidebar", (
     expect(result.current.files.map((entry) => entry.id)).toEqual([
       1, 2, 3, 4, 5, 6,
     ]);
-    expect(result.current.count).toBe(6);
   });
 
-  it("lists what is wrong with Weir itself apart from the files, and counts it with them", () => {
+  it("groups what is wrong with Weir itself apart from the files, and does not count it with them", () => {
     failedJobs.jobs = [{ id: 1 }];
     needFiles.files = [file({ id: 1 })];
 
     const { result } = renderHook(() => useNeedsYou(null));
 
-    expect(result.current.weir.map((row) => row.key)).toEqual(["failed-jobs"]);
-    expect(result.current.count).toBe(2);
+    expect(result.current.groups.map((group) => group.key)).toEqual([
+      "weir",
+      "failed-writing",
+    ]);
+    expect(result.current.files).toHaveLength(1);
   });
 });

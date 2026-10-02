@@ -2,14 +2,9 @@ import { renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ProcessingFile } from "../../lib/processing/files-api";
-import type { NeedRow } from "../processing/dashboard/needs-model";
 import { useHistoryAttention } from "./use-history-attention";
 
-const needs: { files: ProcessingFile[]; weir: NeedRow[]; count: number } = {
-  files: [],
-  weir: [],
-  count: 0,
-};
+const needs: { files: ProcessingFile[] } = { files: [] };
 const asked: (number | null | undefined)[] = [];
 
 vi.mock("../processing/dashboard/use-needs-you", () => ({
@@ -35,8 +30,6 @@ beforeEach(() => {
     aFile(1, "Old.Show.S01E01.mkv", "2025-01-01T00:00:00"),
     aFile(2, "New.Show.S01E02.mkv", "2026-08-19T00:00:00"),
   ];
-  needs.weir = [];
-  needs.count = 2;
   asked.length = 0;
 });
 
@@ -50,14 +43,11 @@ describe("History's Needs you view", () => {
     ]);
   });
 
-  it("takes its count, and what is wrong with Weir, from the badge's own source", () => {
-    needs.count = 3;
-    needs.weir = [{ key: "worker-p", title: "Stopped", reason: "x" }];
+  it("counts every file the badge's own source holds, whatever the search", () => {
+    const { result } = renderHook(() => useHistoryAttention(null, "new.show"));
 
-    const { result } = renderHook(() => useHistoryAttention(null, ""));
-
-    expect(result.current.count).toBe(3);
-    expect(result.current.weir).toEqual(needs.weir);
+    expect(result.current.count).toBe(2);
+    expect(result.current.entries).toHaveLength(1);
   });
 
   it("narrows the files to a search, ignoring case", () => {

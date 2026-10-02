@@ -159,7 +159,7 @@ describe("the Needs you panel when something does", () => {
     needFiles.files = [stuckFile];
     const panel = renderPanel();
 
-    expect(within(panel).getByText("2 to look at")).toHaveClass(
+    expect(within(panel).getByText("1 to look at")).toHaveClass(
       "mm-needs__count",
     );
     expect(
@@ -269,7 +269,7 @@ describe("the Needs you panel when something does", () => {
     needFiles.files = [stuckFile, movie];
     const panel = renderPanel({ workflowId: 2 });
 
-    expect(panel).toHaveTextContent("2 to look at");
+    expect(panel).toHaveTextContent("1 to look at");
     expect(panel).toHaveTextContent("1 job failed");
     expect(panel).toHaveTextContent("Old Film (2019)");
     expect(panel).not.toHaveTextContent("Ember and Ash");
@@ -336,6 +336,15 @@ describe("the Needs you panel when something does", () => {
         screen.queryByRole("link", { name: "Open in History →" }),
       ).toBeNull();
     });
+  });
+
+  it("counts only files in its header, and gives what is wrong with Weir its own heading", () => {
+    failedJobs.jobs = [{ id: 1 }, { id: 2 }];
+    needFiles.files = [stuckFile];
+    const panel = renderPanel();
+
+    expect(within(panel).getByText("1 to look at")).toBeInTheDocument();
+    expect(panel).toHaveTextContent("1 thing to fix in Weir");
   });
 
   it("links a problem with Weir itself to where it is fixed", () => {
