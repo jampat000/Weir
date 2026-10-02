@@ -1,8 +1,8 @@
-import type { HTMLAttributes } from "react";
+import type { ComponentProps } from "react";
 
 import type { MmStatusTone } from "../../lib/ui/mm-status-tone";
 
-type ChipProps = HTMLAttributes<HTMLSpanElement> & {
+type ChipProps = ComponentProps<"span"> & {
   tone?: MmStatusTone;
   /** The coloured dot before the words. It is decoration: the words always say the state too. */
   dot?: boolean;

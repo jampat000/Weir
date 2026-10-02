@@ -16,9 +16,11 @@ vi.mock("../../lib/pause/pause-queries", () => ({
 vi.mock("../../lib/system/readiness-queries", () => ({
   useSystemReadinessQuery: () => ({ isError: readiness.isError }),
 }));
-vi.mock("../../lib/ui/mm-format-date", () => ({
+vi.mock("../../lib/ui/mm-format-date", async (importActual) => ({
+  ...(await importActual<typeof import("../../lib/ui/mm-format-date")>()),
   useAppDateFormatter: () => (iso: string | null | undefined) =>
     `4:20 pm (${iso})`,
+  useAppClockFormatter: () => () => "4:20 pm",
 }));
 
 describe("HeaderStatus", () => {
@@ -45,7 +47,7 @@ describe("HeaderStatus", () => {
 
     const pill = screen.getByTestId("pause-badge");
     expect(pill).toHaveTextContent(
-      "Paused until 4:20 pm (2026-08-26T16:20:00Z)",
+      "Paused · until 4:20 pm (2026-08-26T16:20:00Z)",
     );
     expect(pill).toHaveAttribute("title", pause.reason);
   });
@@ -56,7 +58,7 @@ describe("HeaderStatus", () => {
     render(<HeaderStatus />);
 
     expect(screen.getByTestId("pause-badge")).toHaveTextContent(
-      "Paused until you resume",
+      "Paused · until you resume",
     );
   });
 
