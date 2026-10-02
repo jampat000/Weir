@@ -32,6 +32,20 @@ export const mmSelectFieldClass = `${mmNativeFieldShell} mt-1 cursor-pointer`;
  *  something looks alike; it draws its own chevron in markup, so the well comes without the mark. */
 export const mmPickerTriggerClass = `${mmNativeFieldShell} mm-input--opens mt-1 cursor-pointer text-left`;
 
+/** The trigger as the Dashboard's pickers draw it: a field's height with the label at the left and the chevron at the
+ *  right, in the focused field's colours while its list is open. */
+export function mmPickerTriggerSurface(open: boolean): string {
+  return [
+    mmPickerTriggerClass,
+    "flex min-h-[2.5rem] items-center justify-between gap-2",
+    open
+      ? "border-mm-input-border-focus !shadow-[inset_0_1px_3px_rgba(0,0,0,0.22),inset_0_1px_0_rgba(255,255,255,0.04),0_0_0_2px_var(--mm-input-focus-ring)]"
+      : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
 /** Checkbox control — used for multi-option rows and standalone toggles. */
 export const mmCheckboxControlClass =
   "mt-0.5 h-4 w-4 shrink-0 rounded border-mm-border text-mm-primary accent-mm-primary " +

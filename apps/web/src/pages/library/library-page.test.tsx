@@ -15,6 +15,10 @@ import type {
   LibraryOverview,
   LibrarySettings,
 } from "../../lib/processing/library-mode-api";
+import {
+  ShellHeaderProvider,
+  useHeaderSlotRef,
+} from "../../components/shell/shell-header-context";
 import { LibraryPage } from "./library-page";
 
 const libraries = [
@@ -188,6 +192,28 @@ function renderLibrary(address = "/library") {
     <QueryClientProvider client={client}>
       <MemoryRouter initialEntries={[address]}>
         <LibraryPage />
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
+}
+
+/** The shell's header, reduced to the slot a page's own controls go in. */
+function HeaderSlot() {
+  const slotRef = useHeaderSlotRef();
+  return <div data-testid="header-slot" ref={slotRef} />;
+}
+
+function renderInShell(address = "/library") {
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  return render(
+    <QueryClientProvider client={client}>
+      <MemoryRouter initialEntries={[address]}>
+        <ShellHeaderProvider>
+          <HeaderSlot />
+          <LibraryPage />
+        </ShellHeaderProvider>
       </MemoryRouter>
     </QueryClientProvider>,
   );
@@ -791,5 +817,66 @@ describe("LibraryPage", () => {
     renderLibrary("/library?library=1");
 
     expect(screen.getByTestId("library-picker")).toHaveTextContent("TV");
+  });
+
+  it("puts the picker, the search and the counts on the header's title line, and none of them in the Files card", () => {
+    renderInShell();
+
+    const slot = screen.getByTestId("header-slot");
+    const controls = within(slot).getByTestId("library-controls");
+    expect(
+      [...controls.children].map((c) => c.getAttribute("data-testid")),
+    ).toEqual(["library-picker", null, null]);
+    expect(
+      within(slot).getByRole("searchbox", { name: "Search this workflow" }),
+    ).toBeInTheDocument();
+    expect(
+      within(within(slot).getByRole("group", { name: "Show" }))
+        .getAllByRole("button")
+        .map((chip) => chip.textContent),
+    ).toEqual([
+      "Would change 10",
+      "Matches your rules 3",
+      "Weir will not touch 1",
+      "Cleaned 2",
+      "Left alone 1",
+    ]);
+
+    const card = screen.getByRole("region", { name: "Files" });
+    expect(within(card).queryByRole("searchbox")).not.toBeInTheDocument();
+    expect(
+      within(card).queryByRole("group", { name: "Show" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("keeps Compact rows and what cleaning would give back in the Files card's header", () => {
+    renderInShell();
+
+    const card = screen.getByRole("region", { name: "Files" });
+    const compact = within(card).getByRole("button", { name: "Compact rows" });
+    expect(compact.closest("header")).toBe(card.querySelector("header"));
+    expect(
+      within(card.querySelector("header")!).getByText(/back if everything/),
+    ).toBeInTheDocument();
+
+    fireEvent.click(compact);
+
+    expect(compact).toHaveAttribute("aria-pressed", "true");
+    expect(localStorage.getItem("weir-library-compact")).toBe("1");
+  });
+
+  it("asks the server for what is typed in the header's search", async () => {
+    renderInShell();
+
+    fireEvent.change(
+      screen.getByRole("searchbox", { name: "Search this workflow" }),
+      {
+        target: { value: "harbour" },
+      },
+    );
+
+    await waitFor(() =>
+      expect(lastFilters.at(-1)).toMatchObject({ q: "harbour" }),
+    );
   });
 });

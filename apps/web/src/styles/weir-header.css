@@ -105,6 +105,22 @@
   display: none;
 }
 
+/* Every control a page puts in the slot is the height of the "All workflows" picker below, and the header centres them
+   on one line: a field, and the group of choices with its choices inside it. */
+.mm-header__slot .mm-input {
+  height: 2.375rem;
+  min-height: 0;
+}
+
+.mm-header__slot .mm-segmented {
+  box-sizing: border-box;
+  height: 2.375rem;
+}
+
+.mm-header__slot .mm-segmented__option {
+  height: auto;
+}
+
 /* The Dashboard's controls, on Live only: the workflow picker, then the kind of work. System puts nothing in the
    header's slot. Where there is room the kind of work is a three-button switch; where there is not, the same choice
    as a picker. The room is whatever the header has left after the picker, which the control's own box measures, so

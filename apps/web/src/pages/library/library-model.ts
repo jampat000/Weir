@@ -145,3 +145,19 @@ export function scanned(generatedAt: number | null, now: number): string {
     ? `checked ${hours} h ago`
     : `checked ${Math.round(hours / 24)} days ago`;
 }
+
+/**
+ * What cleaning would win back. Never claims there is nothing to reclaim when Weir simply could not
+ * measure it: some files carry no per-track size for the scan to add up.
+ */
+export function savingLine(totals: LibraryTotals | undefined): string {
+  if (totals && totals.estimated_bytes_saved > 0) {
+    return `About ${formatBytes(totals.estimated_bytes_saved)} back if everything that would change is cleaned`;
+  }
+  if (totals && totals.would_change > 0) {
+    const tracks =
+      totals.total_removed_audio_tracks + totals.total_removed_subtitle_tracks;
+    return `${tracks} tracks would come out; these files do not say how big each one is`;
+  }
+  return "Nothing to reclaim here at the moment";
+}

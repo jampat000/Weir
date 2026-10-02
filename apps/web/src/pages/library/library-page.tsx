@@ -1,7 +1,7 @@
 /**
  * Library: the files already on your storage, and what Weir would do to each (library mode, #505/#568).
- * The title is the picker; one row of chips holds the numbers and the filters together, because a count
- * nobody can act on is decoration; the table groups files by title and season, a page at a time. Every number
+ * The header holds the workflow picker, the search, and one row of chips that carries the numbers and the filters
+ * together, because a count nobody can act on is decoration; the table groups files by title and season, a page at a time. Every number
  * comes from the library scan on the server; nothing is counted in the browser.
  */
 import { useCallback, useMemo, useRef, useState } from "react";
@@ -11,7 +11,7 @@ import { Panel } from "../../components/panels/panel";
 import { ApiEntryError } from "../../components/shared/api-entry-error";
 import { PageLoading } from "../../components/shared/page-loading";
 import { PageToolbarButtons } from "../../components/shell/page-toolbar";
-import { ShellHeaderTabs } from "../../components/shell/shell-header-context";
+import { ShellHeaderSlot } from "../../components/shell/shell-header-context";
 import { useActivityStreamInvalidations } from "../../lib/activity/use-activity-stream-invalidation";
 import type { LibraryFileFilters } from "../../lib/processing/library-mode-api";
 import {
@@ -27,19 +27,23 @@ import { LibraryCleanActions } from "./library-clean-actions";
 import { LibraryCleanConfirm } from "./library-clean-dialog";
 import { LibraryFileDrawer } from "./library-file-drawer";
 import { readLastLibrary, saveLastLibrary } from "./last-library";
-import { filesCount, groupFiles, headerLead } from "./library-model";
+import {
+  LibraryFilters,
+  NO_FILTER,
+  type LibraryFilter,
+} from "./library-filters";
+import {
+  filesCount,
+  groupFiles,
+  headerLead,
+  savingLine,
+} from "./library-model";
 import { LibraryPager } from "./library-pager";
 import { LibraryPicker } from "./library-picker";
 import { LibraryScanStatus } from "./library-scan-status";
 import { LibrarySetupPanel } from "./library-setup-panel";
 import { LibrarySetupPrompt } from "./library-setup-prompt";
 import { LibraryTable } from "./library-table";
-import {
-  LibraryToolbar,
-  NO_FILTER,
-  savingLine,
-  type LibraryFilter,
-} from "./library-toolbar";
 import { useLibraryClean, type CleanRequest } from "./use-library-clean";
 
 const PAGE_SIZE = 200;
@@ -213,16 +217,40 @@ export function LibraryPage(): React.ReactElement {
   // A library with no folders has nothing to check yet: setting it up is the page.
   const savedSetup = setupSettings.data;
   const needsSetup = savedSetup?.library_folders.length === 0;
+  const filterControls = (
+    <LibraryFilters
+      search={search}
+      onSearch={(value) =>
+        showRows(() => {
+          setSearch(value);
+          setPage(1);
+        })
+      }
+      overview={overview.data}
+      filter={filter}
+      onFilter={(next) =>
+        showRows(() => {
+          setFilter(next);
+          setPage(1);
+        })
+      }
+    />
+  );
   const header = (
     <>
-      <ShellHeaderTabs>
-        <LibraryPicker
-          libraries={libraries.data ?? []}
-          chosenId={chosen.id}
-          onPick={pick}
-          countFor={(id) => (id === chosen.id ? (totals?.files ?? null) : null)}
-        />
-      </ShellHeaderTabs>
+      <ShellHeaderSlot>
+        <div className="mm-library-controls" data-testid="library-controls">
+          <LibraryPicker
+            libraries={libraries.data ?? []}
+            chosenId={chosen.id}
+            onPick={pick}
+            countFor={(id) =>
+              id === chosen.id ? (totals?.files ?? null) : null
+            }
+          />
+          {needsSetup ? null : filterControls}
+        </div>
+      </ShellHeaderSlot>
       {needsSetup ? null : (
         <PageToolbarButtons>
           <LibraryScanStatus
@@ -276,34 +304,27 @@ export function LibraryPage(): React.ReactElement {
       <Panel
         title="Files"
         description={lead}
-        aside={<p className="mm-library-saving">{savingLine(totals)}</p>}
+        aside={
+          <>
+            <p className="mm-library-saving">{savingLine(totals)}</p>
+            <button
+              type="button"
+              className="mm-library-chip mm-library-density"
+              aria-pressed={compact}
+              title="Fit more files on the screen"
+              onClick={() => {
+                setCompact(!compact);
+                saveCompact(!compact);
+              }}
+            >
+              Compact rows
+            </button>
+          </>
+        }
         count={
           totals ? <span title={lead}>{filesCount(totals)}</span> : undefined
         }
       >
-        <LibraryToolbar
-          search={search}
-          onSearch={(value) =>
-            showRows(() => {
-              setSearch(value);
-              setPage(1);
-            })
-          }
-          overview={overview.data}
-          filter={filter}
-          onFilter={(next) =>
-            showRows(() => {
-              setFilter(next);
-              setPage(1);
-            })
-          }
-          compact={compact}
-          onCompact={(next) => {
-            setCompact(next);
-            saveCompact(next);
-          }}
-        />
-
         <LibraryCleanActions
           selected={selected}
           selectedSaving={selectedSaving}

@@ -1,10 +1,10 @@
-import { formatBytes } from "../../lib/format/bytes";
 import type {
   LibraryFileClassification,
   LibraryOverview,
   LibraryTotals,
   LibraryProblemKind,
 } from "../../lib/processing/library-mode-api";
+import { useChipRow } from "../history/use-chip-row";
 import { PROBLEM_LABELS } from "./library-model";
 
 export type LibraryState = "cleaned" | "left_alone";
@@ -72,22 +72,6 @@ const STATE_CHIPS: {
 
 const UNKNOWN_COUNT = "—";
 
-/**
- * What cleaning would win back. Never claims there is nothing to reclaim when Weir simply could not
- * measure it: some files carry no per-track size for the scan to add up.
- */
-export function savingLine(totals: LibraryTotals | undefined): string {
-  if (totals && totals.estimated_bytes_saved > 0) {
-    return `About ${formatBytes(totals.estimated_bytes_saved)} back if everything that would change is cleaned`;
-  }
-  if (totals && totals.would_change > 0) {
-    const tracks =
-      totals.total_removed_audio_tracks + totals.total_removed_subtitle_tracks;
-    return `${tracks} tracks would come out; these files do not say how big each one is`;
-  }
-  return "Nothing to reclaim here at the moment";
-}
-
 function ProblemSelect({
   overview,
   filter,
@@ -125,91 +109,88 @@ function ProblemSelect({
   );
 }
 
-export function LibraryToolbar({
+/**
+ * What narrows the Files table: the search, then the counts that are also the filters. They sit on the header's title
+ * line after the library picker (see LibraryHeaderControls), where the search gives up room first, then the chips
+ * scroll sideways inside their own box if they still do not fit.
+ */
+export function LibraryFilters({
   search,
   onSearch,
   overview,
   filter,
   onFilter,
-  compact,
-  onCompact,
 }: {
   search: string;
   onSearch: (value: string) => void;
   overview: LibraryOverview | undefined;
   filter: LibraryFilter;
   onFilter: (filter: LibraryFilter) => void;
-  compact: boolean;
-  onCompact: (compact: boolean) => void;
 }) {
   const totals = overview?.totals;
+  const { setRow, scrolls } = useChipRow(
+    filter.classification ?? filter.state ?? "",
+  );
   return (
-    <div className="mm-library-toolbar">
+    <>
       <input
         type="search"
         className="mm-input mm-library-search"
-        placeholder="Search this workflow"
+        placeholder="Search"
         aria-label="Search this workflow"
         value={search}
         onChange={(event) => onSearch(event.target.value)}
       />
-      <div className="mm-library-chips" role="group" aria-label="Show">
-        {CHIPS.map((chip) => (
-          <button
-            key={chip.id}
-            type="button"
-            className="mm-library-chip"
-            title={chip.hint}
-            aria-pressed={filter.classification === chip.id}
-            onClick={() =>
-              onFilter({
-                ...NO_FILTER,
-                classification:
-                  filter.classification === chip.id ? null : chip.id,
-              })
-            }
-          >
-            {chip.label}{" "}
-            <b>
-              {totals ? chip.count(totals).toLocaleString() : UNKNOWN_COUNT}
-            </b>
-          </button>
-        ))}
-        {STATE_CHIPS.map((chip) => (
-          <button
-            key={chip.id}
-            type="button"
-            className="mm-library-chip"
-            title={chip.hint}
-            aria-pressed={filter.state === chip.id}
-            onClick={() =>
-              onFilter({
-                ...NO_FILTER,
-                state: filter.state === chip.id ? null : chip.id,
-              })
-            }
-          >
-            {chip.label}{" "}
-            <b>
-              {totals ? chip.count(totals).toLocaleString() : UNKNOWN_COUNT}
-            </b>
-          </button>
-        ))}
-        <ProblemSelect
-          overview={overview}
-          filter={filter}
-          onFilter={onFilter}
-        />
+      <div className="mm-library-chips-box" data-scrolls={scrolls} ref={setRow}>
+        <div className="mm-library-chips" role="group" aria-label="Show">
+          {CHIPS.map((chip) => (
+            <button
+              key={chip.id}
+              type="button"
+              className="mm-library-chip"
+              title={chip.hint}
+              aria-pressed={filter.classification === chip.id}
+              onClick={() =>
+                onFilter({
+                  ...NO_FILTER,
+                  classification:
+                    filter.classification === chip.id ? null : chip.id,
+                })
+              }
+            >
+              {chip.label}{" "}
+              <b>
+                {totals ? chip.count(totals).toLocaleString() : UNKNOWN_COUNT}
+              </b>
+            </button>
+          ))}
+          {STATE_CHIPS.map((chip) => (
+            <button
+              key={chip.id}
+              type="button"
+              className="mm-library-chip"
+              title={chip.hint}
+              aria-pressed={filter.state === chip.id}
+              onClick={() =>
+                onFilter({
+                  ...NO_FILTER,
+                  state: filter.state === chip.id ? null : chip.id,
+                })
+              }
+            >
+              {chip.label}{" "}
+              <b>
+                {totals ? chip.count(totals).toLocaleString() : UNKNOWN_COUNT}
+              </b>
+            </button>
+          ))}
+          <ProblemSelect
+            overview={overview}
+            filter={filter}
+            onFilter={onFilter}
+          />
+        </div>
       </div>
-      <button
-        type="button"
-        className="mm-library-chip"
-        aria-pressed={compact}
-        title="Fit more files on the screen"
-        onClick={() => onCompact(!compact)}
-      >
-        Compact rows
-      </button>
-    </div>
+    </>
   );
 }
