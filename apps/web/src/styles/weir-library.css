@@ -275,7 +275,7 @@
   color: inherit;
 }
 
-/* On a narrow card the header's status, saving line and Compact rows take a line under the title and its count. */
+/* On a narrow card the header's status, saving line and Columns menu take a line under the title and its count. */
 @media (max-width: 900px) {
   .mm-library-files > .mm-panel__head {
     flex-wrap: wrap;
@@ -286,18 +286,6 @@
     flex: 1 1 100%;
     justify-content: flex-start;
   }
-
-  .mm-library-density {
-    margin-block: 0;
-  }
-}
-
-/* The one control on the Files card's header, after what cleaning would give back; it keeps its own edge. It is shorter
-   than the other chips and sits in the header's own padding, so the card's header stays 44px tall like every card's. */
-.mm-library-density {
-  height: 28px;
-  margin-block: -4px;
-  border-color: var(--mm-hairline);
 }
 
 .mm-library-problem {

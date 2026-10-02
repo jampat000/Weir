@@ -7,7 +7,8 @@
 .mm-library-table {
   container: mm-library-table / inline-size;
   min-width: 0;
-  /* The columns every row shares, so a checkbox, a poster and a title start at the same x on every row. */
+  /* The columns every row shares, so a checkbox and a title start at the same x on every row. The grid itself is set by
+     the table from the order of its columns (--lib-cols, and --lib-cols-narrow for what is left of it when it is narrow). */
   --lib-check: 28px;
   --lib-poster: 26px;
   --lib-gap: 10px;
@@ -16,9 +17,7 @@
 
 .mm-library-row {
   display: grid;
-  grid-template-columns:
-    var(--lib-check) var(--lib-poster) minmax(0, 2.8fr) minmax(0, 2fr)
-    minmax(0, 1.2fr) minmax(0, 1.2fr) 5.5rem 5rem;
+  grid-template-columns: var(--lib-cols);
   align-items: center;
   gap: var(--lib-gap);
   min-height: var(--lib-row-height);
@@ -79,19 +78,14 @@
   cursor: default;
 }
 
-/* What a row is about: the poster and the text beside it start at the second column; a file nested under a title has
-   no poster and starts at the text column, in line with the title's own text. */
+/* What a row is about: the poster and the text beside it; a file nested under a title has no poster and starts where
+   the title's text does. */
 .mm-library-identity {
-  grid-column: 2 / 4;
   min-width: 0;
 }
 
 .mm-library-identity--file {
-  grid-column: 3;
-}
-
-.mm-library-identity--group {
-  grid-column: 2 / 4;
+  padding-inline-start: calc(var(--lib-poster) + var(--lib-gap));
 }
 
 .mm-library-open {
@@ -217,34 +211,9 @@
   white-space: nowrap;
 }
 
-/* Compact rows: the one density choice that changes what fits rather than how big everything is. */
-.mm-library-table--compact {
-  --lib-poster: 18px;
-  --lib-row-height: 44px;
-}
-
-.mm-library-table--compact .mm-library-row {
-  padding-block: 4px;
-  font-size: var(--mm-type-caption);
-}
-
-.mm-library-table--compact .mm-library-row--head {
-  padding-block: 0;
-}
-
-.mm-library-table--compact .mm-library-line {
-  font-size: var(--mm-type-caption);
-}
-
-.mm-library-table--compact .mm-library-subline {
-  font-size: var(--mm-type-eyebrow);
-}
-
 @container mm-library-table (max-width: 860px) {
   .mm-library-row {
-    grid-template-columns:
-      var(--lib-check) var(--lib-poster) minmax(0, 2.4fr) minmax(0, 2fr)
-      5.5rem;
+    grid-template-columns: var(--lib-cols-narrow);
   }
 
   .mm-library-tracks,
@@ -253,24 +222,26 @@
   }
 }
 
+/* Narrower still, each row is two lines whatever order the columns are in: the box, the name and the size, and the
+   verdict under the name. */
 @container mm-library-table (max-width: 620px) {
   .mm-library-row {
-    grid-template-columns:
-      var(--lib-check) var(--lib-poster) minmax(0, 1fr)
-      5.5rem;
+    grid-template-columns: var(--lib-check) minmax(0, 1fr) 5.5rem;
   }
 
-  /* The verdict drops under the name; the size stays on the name's line. */
+  .mm-library-identity {
+    grid-area: 1 / 2;
+  }
+
   .mm-library-verdict {
-    grid-row: 2;
-    grid-column: 3 / -1;
+    grid-area: 2 / 2 / auto / -1;
+    padding-inline-start: calc(var(--lib-poster) + var(--lib-gap));
     white-space: normal;
     font-size: var(--mm-type-caption);
   }
 
   .mm-library-num {
-    grid-row: 1;
-    grid-column: 4;
+    grid-area: 1 / 3;
   }
 
   .mm-library-row--head .mm-library-verdict {

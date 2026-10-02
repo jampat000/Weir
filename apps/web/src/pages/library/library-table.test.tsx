@@ -3,7 +3,17 @@ import { expect, it, vi } from "vitest";
 
 import type { LibraryFile } from "../../lib/processing/library-mode-api";
 import { WithWorkflows } from "../../test/with-workflows";
+import { useTableColumns } from "../../lib/ui/use-table-columns";
+import { LIBRARY_COLUMNS } from "./library-columns";
 import { LibraryTable } from "./library-table";
+
+type TableProps = Omit<Parameters<typeof LibraryTable>[0], "columns">;
+
+/** The table with the columns a page would give it. */
+function TableWithColumns(props: TableProps) {
+  const columns = useTableColumns(LIBRARY_COLUMNS);
+  return <LibraryTable {...props} columns={columns} />;
+}
 
 function file(path: string, overrides: Partial<LibraryFile> = {}): LibraryFile {
   return {
@@ -23,10 +33,9 @@ function file(path: string, overrides: Partial<LibraryFile> = {}): LibraryFile {
 function renderTable(groups: [string, LibraryFile[]][]) {
   render(
     <WithWorkflows>
-      <LibraryTable
+      <TableWithColumns
         libraryName="Movies"
         groups={groups}
-        compact={false}
         openPath={null}
         selected={new Set()}
         onToggle={vi.fn()}
@@ -86,10 +95,9 @@ function renderSelectable(
   const onOpen = vi.fn();
   render(
     <WithWorkflows>
-      <LibraryTable
+      <TableWithColumns
         libraryName="TV"
         groups={groups}
-        compact={false}
         openPath={null}
         selected={new Set(selected)}
         onToggle={onToggle}

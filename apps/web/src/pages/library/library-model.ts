@@ -38,7 +38,7 @@ export function groupOf(file: LibraryFile): string {
   return parent ?? parts[0] ?? "Files";
 }
 
-/** Files grouped by title, titles in alphabetical order, files in the order the server sent them. */
+/** Files grouped by title, titles in the order the server first sent one of their files, and the files in its order. */
 export function groupFiles(files: LibraryFile[]): [string, LibraryFile[]][] {
   const byTitle = new Map<string, LibraryFile[]>();
   for (const file of files) {
@@ -47,7 +47,7 @@ export function groupFiles(files: LibraryFile[]): [string, LibraryFile[]][] {
     if (list) list.push(file);
     else byTitle.set(key, [file]);
   }
-  return [...byTitle.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+  return [...byTitle.entries()];
 }
 
 /**

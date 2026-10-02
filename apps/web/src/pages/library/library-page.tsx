@@ -27,6 +27,9 @@ import { processingKeys } from "../../lib/processing/query-keys";
 import { useMediaQuery } from "../../lib/ui/use-media-query";
 import { useDebouncedValue } from "../../lib/ui/use-debounced-value";
 import { useNow } from "../../lib/ui/use-now";
+import { ColumnsMenu } from "../../components/shared/columns-menu";
+import type { TableSort } from "../../lib/ui/table-columns";
+import { useTableColumns } from "../../lib/ui/use-table-columns";
 import { LibraryCleanActions } from "./library-clean-actions";
 import { LibraryCleanConfirm } from "./library-clean-dialog";
 import { LibraryFileDrawer } from "./library-file-drawer";
@@ -46,6 +49,11 @@ import {
   headerLead,
   savingLine,
 } from "./library-model";
+import {
+  LIBRARY_COLUMNS,
+  LIBRARY_SORT_KEYS,
+  type LibraryColumnId,
+} from "./library-columns";
 import { LibraryPager } from "./library-pager";
 import { LibraryPicker } from "./library-picker";
 import { LibraryCheckAgain, LibraryScanStatus } from "./library-scan-status";
@@ -72,36 +80,19 @@ const SEARCH_SHORTENED = 1;
 const SETUP_AS_MARK = 3;
 const PICKER_IN_CARD = 4;
 
-/** Compact rows are this browser's choice, like a zoom level: nothing about the library changes. */
-const COMPACT_KEY = "weir-library-compact";
-
-function readCompact(): boolean {
-  try {
-    return localStorage.getItem(COMPACT_KEY) === "1";
-  } catch {
-    return false;
-  }
-}
-
-function saveCompact(compact: boolean): void {
-  try {
-    localStorage.setItem(COMPACT_KEY, compact ? "1" : "0");
-  } catch {
-    // A browser that will not remember the choice is no reason to refuse it.
-  }
-}
-
 function fileFilters(
   filter: LibraryFilter,
   query: string,
   page: number,
+  sort: TableSort<LibraryColumnId> | null,
 ): LibraryFileFilters {
   return {
     ...(filter.status ? { status: filter.status } : {}),
     ...(filter.problem ? { problem: filter.problem } : {}),
     ...(query ? { q: query } : {}),
-    sort: "path",
-    direction: "asc",
+    ...(sort && sort.id !== "select"
+      ? { sort: LIBRARY_SORT_KEYS[sort.id], direction: sort.direction }
+      : {}),
     page,
     page_size: PAGE_SIZE,
   };
@@ -133,8 +124,14 @@ export function LibraryPage(): React.ReactElement {
   // A selection belongs to the page it was made on: anything that changes the rows on screen clears it.
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [openPath, setOpenPath] = useState<string | null>(params.get("path"));
-  const [compact, setCompact] = useState(readCompact);
   const [setupOpen, setSetupOpen] = useState(false);
+  // A new sort starts at the first page, and what was selected belongs to rows that are no longer on screen.
+  const columns = useTableColumns(LIBRARY_COLUMNS, {
+    onSortChange: () => {
+      setPage(1);
+      setSelected(new Set());
+    },
+  });
   const now = useNow(CLOCK_TICK_MS);
   const query = useDebouncedValue(search.trim(), SEARCH_DEBOUNCE_MS);
   const tableTop = useRef<HTMLDivElement>(null);
@@ -159,9 +156,10 @@ export function LibraryPage(): React.ReactElement {
     throttleMs: REFRESH_THROTTLE_MS,
   });
 
+  const sort = columns.sort;
   const filters = useMemo(
-    () => fileFilters(filter, query, page),
-    [filter, query, page],
+    () => fileFilters(filter, query, page, sort),
+    [filter, query, page, sort],
   );
   const setupSettings = useLibrarySettingsQuery(chosenId, Boolean(chosen));
   const overview = useLibraryOverviewQuery(chosenId, Boolean(chosen));
@@ -362,18 +360,7 @@ export function LibraryPage(): React.ReactElement {
               rescan={rescan}
             />
             <p className="mm-library-saving">{savingLine(totals)}</p>
-            <button
-              type="button"
-              className="mm-library-chip mm-library-density"
-              aria-pressed={compact}
-              title="Fit more files on the screen"
-              onClick={() => {
-                setCompact(!compact);
-                saveCompact(!compact);
-              }}
-            >
-              Compact rows
-            </button>
+            <ColumnsMenu table={columns} />
           </>
         }
         count={
@@ -405,7 +392,7 @@ export function LibraryPage(): React.ReactElement {
             <LibraryTable
               libraryName={chosen.name}
               groups={groups}
-              compact={compact}
+              columns={columns}
               openPath={openPath}
               selected={selected}
               onToggle={toggle}

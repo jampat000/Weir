@@ -4,9 +4,12 @@ import { Poster } from "../../components/shared/poster";
 import { NavIconChevronDown } from "../../components/shell/nav-icons";
 import type { LibraryFile } from "../../lib/processing/library-mode-api";
 import { plural } from "../../lib/ui/mm-plural";
+import type { LibraryColumnId } from "./library-columns";
 import {
   CheckCell,
+  EmptyCell,
   NestedFileRow,
+  OrderedCells,
   StatusCell,
   sourceName,
 } from "./library-file-row";
@@ -28,6 +31,7 @@ export function LibraryGroup({
   title,
   rows,
   libraryName,
+  order,
   openPath,
   selected,
   onToggle,
@@ -36,6 +40,7 @@ export function LibraryGroup({
   title: string;
   rows: LibraryFile[];
   libraryName: string;
+  order: readonly LibraryColumnId[];
   openPath: string | null;
   selected: Set<string>;
   onToggle: (path: string) => void;
@@ -57,42 +62,60 @@ export function LibraryGroup({
   return (
     <div role="rowgroup" className="mm-library-group">
       <div role="row" className="mm-library-row mm-library-row--title">
-        <CheckCell
-          label={`Select all ${plural(rows.length, "file", "files")} of ${title}`}
-          checked={allChosen}
-          indeterminate={chosen > 0 && !allChosen}
-          disabled={cleanable.length === 0}
-          onChange={toggleAll}
-        />
-        <span
-          role="cell"
-          className="mm-library-identity mm-library-identity--group"
-        >
-          <button
-            type="button"
-            className="mm-library-open"
-            aria-expanded={!folded}
-            onClick={() => setFolded(!folded)}
-          >
-            <span className="mm-library-poster">
-              <Poster
-                url={rows.find((row) => row.poster_url)?.poster_url}
-                title={title}
-                workflow={libraryName}
+        <OrderedCells
+          order={order}
+          cells={{
+            select: (
+              <CheckCell
+                label={`Select all ${plural(rows.length, "file", "files")} of ${title}`}
+                checked={allChosen}
+                indeterminate={chosen > 0 && !allChosen}
+                disabled={cleanable.length === 0}
+                onChange={toggleAll}
               />
-            </span>
-            <span className="mm-library-lines">
-              <span className="mm-library-line mm-library-line--title">
-                <span className="mm-library-line__text" title={title}>
-                  {title}
-                </span>
-                <NavIconChevronDown className="mm-library-fold" />
+            ),
+            title: (
+              <span
+                role="cell"
+                data-col="title"
+                className="mm-library-identity"
+              >
+                <button
+                  type="button"
+                  className="mm-library-open"
+                  aria-expanded={!folded}
+                  onClick={() => setFolded(!folded)}
+                >
+                  <span className="mm-library-poster">
+                    <Poster
+                      url={rows.find((row) => row.poster_url)?.poster_url}
+                      title={title}
+                      workflow={libraryName}
+                    />
+                  </span>
+                  <span className="mm-library-lines">
+                    <span className="mm-library-line mm-library-line--title">
+                      <span className="mm-library-line__text" title={title}>
+                        {title}
+                      </span>
+                      <NavIconChevronDown className="mm-library-fold" />
+                    </span>
+                    <span className="mm-library-subline">
+                      {groupMeta(rows)}
+                    </span>
+                  </span>
+                </button>
               </span>
-              <span className="mm-library-subline">{groupMeta(rows)}</span>
-            </span>
-          </button>
-        </span>
-        <StatusCell meaning={summary.meaning} words={summary.text} />
+            ),
+            status: (
+              <StatusCell meaning={summary.meaning} words={summary.text} />
+            ),
+            audio: <EmptyCell column="audio" />,
+            subtitles: <EmptyCell column="subtitles" />,
+            size: <EmptyCell column="size" />,
+            saved: <EmptyCell column="saved" />,
+          }}
+        />
       </div>
       {folded
         ? null
@@ -100,6 +123,7 @@ export function LibraryGroup({
             <NestedFileRow
               key={file.path}
               file={file}
+              order={order}
               open={openPath === file.path}
               selected={selected.has(file.path)}
               onToggle={onToggle}

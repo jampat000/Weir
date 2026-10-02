@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 
 import { Poster } from "../../components/shared/poster";
 import { formatBytes } from "../../lib/format/bytes";
@@ -7,6 +7,7 @@ import { classNames } from "../../lib/ui/class-names";
 import type { LibraryFile } from "../../lib/processing/library-mode-api";
 import { StatusDot } from "../../components/panels/status-dot";
 import type { StatusMeaning } from "../../lib/ui/status-meaning";
+import { LIBRARY_CELL_CLASS, type LibraryColumnId } from "./library-columns";
 import { fileMeaning, statusNote, statusWords } from "./library-model";
 
 const MANAGER_NAMES: Record<string, string> = {
@@ -34,7 +35,7 @@ export function CheckCell({
   onChange: () => void;
 }) {
   return (
-    <span role="cell" className="mm-library-select">
+    <span role="cell" data-col="select" className="mm-library-select">
       {/* The label is the target: a 24px square around a box drawn at the text's own size. */}
       <label className="mm-library-check-target">
         <input
@@ -69,6 +70,7 @@ export function StatusCell({
   return (
     <span
       role="cell"
+      data-col="status"
       className="mm-library-verdict"
       title={note ? `${words} (${note})` : words}
     >
@@ -81,28 +83,60 @@ export function StatusCell({
   );
 }
 
-/** What Weir would do with a file and the figures that go with it: the cells every file row ends with. */
-function FileFigures({ file }: { file: LibraryFile }) {
+/** A cell with nothing to say in its column, which keeps the others under their headings. */
+export function EmptyCell({ column }: { column: LibraryColumnId }) {
+  return (
+    <span
+      role="cell"
+      data-col={column}
+      className={LIBRARY_CELL_CLASS[column]}
+    />
+  );
+}
+
+/** What Weir would do with a file and the figures that go with it, each in the column it belongs to. */
+function figureCells(
+  file: LibraryFile,
+): Record<Exclude<LibraryColumnId, "select" | "title">, ReactNode> {
   const audio = file.audio_summary ?? `${file.audio_track_count}`;
   const subtitles = file.subtitle_summary ?? `${file.subtitle_track_count}`;
-  return (
-    <>
+  return {
+    status: (
       <StatusCell
         meaning={fileMeaning(file)}
         words={statusWords(file)}
         note={statusNote(file)}
       />
-      <span role="cell" className="mm-library-tracks" title={audio}>
-        {audio}
-      </span>
-      <span role="cell" className="mm-library-tracks" title={subtitles}>
-        {subtitles}
-      </span>
-      <span role="cell" className="mm-library-num">
-        {formatBytes(file.size_bytes)}
-      </span>
+    ),
+    audio: (
       <span
         role="cell"
+        data-col="audio"
+        className="mm-library-tracks"
+        title={audio}
+      >
+        {audio}
+      </span>
+    ),
+    subtitles: (
+      <span
+        role="cell"
+        data-col="subtitles"
+        className="mm-library-tracks"
+        title={subtitles}
+      >
+        {subtitles}
+      </span>
+    ),
+    size: (
+      <span role="cell" data-col="size" className="mm-library-num">
+        {formatBytes(file.size_bytes)}
+      </span>
+    ),
+    saved: (
+      <span
+        role="cell"
+        data-col="saved"
         className={classNames(
           "mm-library-num mm-library-back",
           file.estimated_bytes_saved > 0 && "mm-payoff",
@@ -112,12 +146,24 @@ function FileFigures({ file }: { file: LibraryFile }) {
           ? formatBytes(file.estimated_bytes_saved)
           : "—"}
       </span>
-    </>
-  );
+    ),
+  };
+}
+
+/** A row's cells in the table's column order. */
+export function OrderedCells({
+  order,
+  cells,
+}: {
+  order: readonly LibraryColumnId[];
+  cells: Record<LibraryColumnId, ReactNode>;
+}) {
+  return order.map((id) => <Fragment key={id}>{cells[id]}</Fragment>);
 }
 
 type FileRowProps = {
   file: LibraryFile;
+  order: readonly LibraryColumnId[];
   open: boolean;
   selected: boolean;
   checkLabel: string;
@@ -127,12 +173,13 @@ type FileRowProps = {
 
 function FileRowFrame({
   file,
+  order,
   open,
   selected,
   checkLabel,
   onToggle,
-  children,
-}: Omit<FileRowProps, "onOpen"> & { children: ReactNode }) {
+  identity,
+}: Omit<FileRowProps, "onOpen"> & { identity: ReactNode }) {
   return (
     <div
       role="row"
@@ -141,14 +188,21 @@ function FileRowFrame({
       }`}
       data-testid="library-row"
     >
-      <CheckCell
-        label={checkLabel}
-        checked={selected}
-        disabled={file.status !== "needs_cleaning"}
-        onChange={() => onToggle(file.path)}
+      <OrderedCells
+        order={order}
+        cells={{
+          select: (
+            <CheckCell
+              label={checkLabel}
+              checked={selected}
+              disabled={file.status !== "needs_cleaning"}
+              onChange={() => onToggle(file.path)}
+            />
+          ),
+          title: identity,
+          ...figureCells(file),
+        }}
       />
-      {children}
-      <FileFigures file={file} />
     </div>
   );
 }
@@ -158,6 +212,7 @@ export function SingleFileRow({
   file,
   title,
   libraryName,
+  order,
   open,
   selected,
   onToggle,
@@ -167,49 +222,52 @@ export function SingleFileRow({
   return (
     <FileRowFrame
       file={file}
+      order={order}
       open={open}
       selected={selected}
       checkLabel={`Select ${title}`}
       onToggle={onToggle}
-    >
-      <span role="cell" className="mm-library-identity">
-        <button
-          type="button"
-          className="mm-library-open"
-          onClick={() => onOpen(file.path)}
-        >
-          <span className="mm-library-poster">
-            <Poster
-              url={file.poster_url}
-              title={title}
-              workflow={libraryName}
-            />
-          </span>
-          <span className="mm-library-lines">
-            <span className="mm-library-line" title={title}>
-              {title}
+      identity={
+        <span role="cell" data-col="title" className="mm-library-identity">
+          <button
+            type="button"
+            className="mm-library-open"
+            onClick={() => onOpen(file.path)}
+          >
+            <span className="mm-library-poster">
+              <Poster
+                url={file.poster_url}
+                title={title}
+                workflow={libraryName}
+              />
             </span>
-            <span className="mm-library-subline">
-              <span className="mm-library-subline__name" title={file.path}>
-                {baseName(file.path)}
+            <span className="mm-library-lines">
+              <span className="mm-library-line" title={title}>
+                {title}
               </span>
-              {source ? (
-                <span className="mm-library-subline__source">
-                  <span aria-hidden="true">&middot; </span>
-                  {source}
+              <span className="mm-library-subline">
+                <span className="mm-library-subline__name" title={file.path}>
+                  {baseName(file.path)}
                 </span>
-              ) : null}
+                {source ? (
+                  <span className="mm-library-subline__source">
+                    <span aria-hidden="true">&middot; </span>
+                    {source}
+                  </span>
+                ) : null}
+              </span>
             </span>
-          </span>
-        </button>
-      </span>
-    </FileRowFrame>
+          </button>
+        </span>
+      }
+    />
   );
 }
 
 /** One of several files under a title: no poster of its own, its name where the title's text starts. */
 export function NestedFileRow({
   file,
+  order,
   open,
   selected,
   onToggle,
@@ -219,25 +277,28 @@ export function NestedFileRow({
   return (
     <FileRowFrame
       file={file}
+      order={order}
       open={open}
       selected={selected}
       checkLabel={`Select ${name}`}
       onToggle={onToggle}
-    >
-      <span
-        role="cell"
-        className="mm-library-identity mm-library-identity--file"
-      >
-        <button
-          type="button"
-          className="mm-library-open"
-          onClick={() => onOpen(file.path)}
+      identity={
+        <span
+          role="cell"
+          data-col="title"
+          className="mm-library-identity mm-library-identity--file"
         >
-          <span className="mm-library-line" title={file.path}>
-            {name}
-          </span>
-        </button>
-      </span>
-    </FileRowFrame>
+          <button
+            type="button"
+            className="mm-library-open"
+            onClick={() => onOpen(file.path)}
+          >
+            <span className="mm-library-line" title={file.path}>
+              {name}
+            </span>
+          </button>
+        </span>
+      }
+    />
   );
 }

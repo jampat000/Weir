@@ -1,6 +1,6 @@
 /**
  * The library this browser last picked, so opening Library without `?library=` lands where the person
- * was. Like the compact-rows choice, it belongs to the browser, not to Weir.
+ * was. Like the column layout, it belongs to the browser, not to Weir.
  */
 const LAST_LIBRARY_KEY = "weir-library-last";
 

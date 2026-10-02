@@ -1,33 +1,28 @@
+import type { CSSProperties } from "react";
+
+import { SortableColumnHeader } from "../../components/shared/sortable-column-header";
 import type { LibraryFile } from "../../lib/processing/library-mode-api";
+import type { TableColumns } from "../../lib/ui/use-table-columns";
 import { SingleFileRow } from "./library-file-row";
+import {
+  LIBRARY_CELL_CLASS,
+  libraryGrid,
+  type LibraryColumnId,
+} from "./library-columns";
 import { LibraryGroup } from "./library-group";
 
-function HeadRow() {
+function HeadRow({ columns }: { columns: TableColumns<LibraryColumnId> }) {
   return (
     <div role="row" className="mm-library-row mm-library-row--head">
-      {/* The cell stays in the grid and only its word is hidden: an sr-only cell leaves the grid and
-          slides every heading one column left of its values. */}
-      <span role="columnheader">
-        <span className="sr-only">Select</span>
-      </span>
-      <span role="columnheader" className="mm-library-identity">
-        Title
-      </span>
-      <span role="columnheader" className="mm-library-verdict">
-        What Weir would do
-      </span>
-      <span role="columnheader" className="mm-library-tracks">
-        Audio
-      </span>
-      <span role="columnheader" className="mm-library-tracks">
-        Subtitles
-      </span>
-      <span role="columnheader" className="mm-library-num">
-        Size
-      </span>
-      <span role="columnheader" className="mm-library-num mm-library-back">
-        Back
-      </span>
+      {columns.order.map((id) => (
+        <SortableColumnHeader
+          key={id}
+          as="div"
+          heading={columns.heading(id)}
+          className={LIBRARY_CELL_CLASS[id]}
+          hideLabel={id === "select"}
+        />
+      ))}
     </div>
   );
 }
@@ -36,7 +31,7 @@ function HeadRow() {
 export function LibraryTable({
   libraryName,
   groups,
-  compact,
+  columns,
   openPath,
   selected,
   onToggle,
@@ -44,19 +39,22 @@ export function LibraryTable({
 }: {
   libraryName: string;
   groups: [string, LibraryFile[]][];
-  compact: boolean;
+  columns: TableColumns<LibraryColumnId>;
   openPath: string | null;
   selected: Set<string>;
   onToggle: (path: string) => void;
   onOpen: (path: string) => void;
 }) {
+  const { order } = columns;
   return (
     <div
-      className={`mm-library-table${compact ? " mm-library-table--compact" : ""}`}
+      {...columns.tableProps}
+      className="mm-library-table"
       role="table"
       aria-label={`Files in ${libraryName}`}
+      style={libraryGrid(order) as CSSProperties}
     >
-      <HeadRow />
+      <HeadRow columns={columns} />
       {groups.map(([title, rows]) =>
         rows.length === 1 ? (
           <div key={title} role="rowgroup" className="mm-library-group">
@@ -64,6 +62,7 @@ export function LibraryTable({
               file={rows[0]}
               title={title}
               libraryName={libraryName}
+              order={order}
               open={openPath === rows[0].path}
               selected={selected.has(rows[0].path)}
               onToggle={onToggle}
@@ -76,6 +75,7 @@ export function LibraryTable({
             title={title}
             rows={rows}
             libraryName={libraryName}
+            order={order}
             openPath={openPath}
             selected={selected}
             onToggle={onToggle}

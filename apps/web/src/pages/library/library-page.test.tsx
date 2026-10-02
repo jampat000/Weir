@@ -873,20 +873,84 @@ describe("LibraryPage", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("keeps Compact rows and what cleaning would give back in the Files card's header", () => {
+  it("keeps the Columns menu and what cleaning would give back in the Files card's header", () => {
     renderInShell();
 
     const card = screen.getByRole("region", { name: "Files" });
-    const compact = within(card).getByRole("button", { name: "Compact rows" });
-    expect(compact.closest("header")).toBe(card.querySelector("header"));
+    const columns = within(card).getByRole("button", { name: "Columns" });
+    expect(columns.closest("header")).toBe(card.querySelector("header"));
     expect(
       within(card.querySelector("header")!).getByText(/back if everything/),
     ).toBeInTheDocument();
+    expect(
+      within(card).queryByRole("button", { name: "Compact rows" }),
+    ).not.toBeInTheDocument();
+  });
 
-    fireEvent.click(compact);
+  it("asks the server for the files by title until a heading is clicked", () => {
+    renderInShell();
 
-    expect(compact).toHaveAttribute("aria-pressed", "true");
-    expect(localStorage.getItem("weir-library-compact")).toBe("1");
+    expect(lastFilters.at(-1)).toMatchObject({
+      sort: "title",
+      direction: "asc",
+    });
+  });
+
+  it("sorts the whole library by a heading on the server, from the first page, and reverses on a second click", async () => {
+    renderInShell();
+
+    fireEvent.click(screen.getByRole("button", { name: "Size" }));
+    await waitFor(() =>
+      expect(lastFilters.at(-1)).toMatchObject({
+        sort: "size",
+        direction: "desc",
+        page: 1,
+      }),
+    );
+    expect(screen.getByRole("columnheader", { name: "Size" })).toHaveAttribute(
+      "aria-sort",
+      "descending",
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Size" }));
+    await waitFor(() =>
+      expect(lastFilters.at(-1)).toMatchObject({
+        sort: "size",
+        direction: "asc",
+      }),
+    );
+  });
+
+  it("sorts by the status column in the server's own words", async () => {
+    renderInShell();
+
+    fireEvent.click(screen.getByRole("button", { name: "What Weir would do" }));
+
+    await waitFor(() =>
+      expect(lastFilters.at(-1)).toMatchObject({ sort: "status" }),
+    );
+  });
+
+  it("remembers the sort in this browser, and puts it back with Reset columns", async () => {
+    const view = renderInShell();
+    fireEvent.click(screen.getByRole("button", { name: "Back" }));
+    await waitFor(() =>
+      expect(lastFilters.at(-1)).toMatchObject({ sort: "saved" }),
+    );
+    view.unmount();
+
+    renderInShell();
+    expect(lastFilters.at(-1)).toMatchObject({ sort: "saved" });
+
+    fireEvent.click(screen.getByRole("button", { name: "Columns" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Reset columns" }));
+    await waitFor(() =>
+      expect(lastFilters.at(-1)).toMatchObject({
+        sort: "title",
+        direction: "asc",
+      }),
+    );
+    expect(localStorage.getItem("weir-table:library-files")).toBeNull();
   });
 
   it("asks the server for what is typed in the header's search", async () => {
