@@ -118,9 +118,9 @@
 }
 
 /* The search and the counts that are also the filters sit in the header's slot, between the title and the status. The
-   search gives up its width first, then the chips scroll sideways inside their own box, edges fading while there is
-   more than shows. The sizes follow the header's own width, which is not the window's: the menu takes a different
-   share of it open and collapsed. */
+   search gives up its width first, then the picker leaves for the Files card, then the last chips fold into "More"
+   (components/shell/title-line-fit.ts). The sizes follow the header's own width, which is not the window's: the menu
+   takes a different share of it open and collapsed. */
 .mm-library-controls {
   display: flex;
   flex: 1 1 auto;
@@ -146,24 +146,8 @@
 }
 
 .mm-library-chips-box {
-  position: relative;
   flex: 0 1 auto;
   min-width: 0;
-  margin: -4px;
-  padding: 4px;
-  overflow-x: auto;
-  overflow-y: hidden;
-  scrollbar-width: none;
-}
-
-.mm-library-chips-box[data-scrolls="true"] {
-  mask-image: linear-gradient(
-    to right,
-    transparent,
-    #000 8px,
-    #000 calc(100% - 8px),
-    transparent
-  );
 }
 
 .mm-library-chips {
@@ -190,22 +174,18 @@
   }
 }
 
-/* Where the chips do not fit, the controls beside them give up their words for a mark, a level at a time (lib/ui/
-   use-fit-levels.ts): Check again, then the search, then Library setup, and only then do the chips scroll. */
+/* Where the chips do not fit, the controls beside them give up their words for a mark, a step at a time (components/
+   shell/title-line-fit.ts): Check again, then the search, then Library setup. */
 .mm-library-mark {
   display: none;
 }
 
-/* The last resort before the chips scroll: the picker is only as wide as a workflow's name needs, and the chips and the title sit closer. */
-.mm-library-controls[data-fit="3"] .mm-library-picker {
-  --picker-w: 6.5rem;
-}
-
-.mm-library-controls[data-fit="3"] .mm-library-chips .mm-library-chip {
+/* The last step before the picker leaves: the chips and the title sit closer. */
+.mm-library-controls[data-tight] .mm-library-chips .mm-library-chip {
   padding-inline: 8px;
 }
 
-.mm-header__slot:has(.mm-library-controls[data-fit="3"]) {
+.mm-header__slot:has(.mm-library-controls[data-tight]) {
   margin-left: 0;
 }
 
@@ -235,7 +215,7 @@
   }
 }
 
-/* Under the title the chips scroll in the line the search shares; on a phone they have a line of their own. */
+/* On a phone the chips have a line of their own. */
 @media (max-width: 920px) {
   .mm-library-controls {
     flex-wrap: wrap;

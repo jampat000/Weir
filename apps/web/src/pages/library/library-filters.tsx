@@ -4,7 +4,8 @@ import type {
   LibraryTotals,
 } from "../../lib/processing/library-mode-api";
 import { HeaderSearch } from "../../components/shell/header-search";
-import { useChipRow } from "../../lib/ui/use-chip-row";
+import { MoreMenu } from "../../components/shell/more-menu";
+import { foldedChipIndexes } from "../../components/shell/title-line-fit";
 import {
   LIBRARY_STATUSES,
   PROBLEM_LABELS,
@@ -102,6 +103,9 @@ const CHIPS: Chip[] = [
   },
 ];
 
+/** How many chips the row holds. */
+export const LIBRARY_CHIP_COUNT = CHIPS.length;
+
 const UNKNOWN_COUNT = "—";
 
 /**
@@ -143,8 +147,8 @@ export function LibraryReasonSelect({
 
 /**
  * What narrows the Files table: the search, then the counts that are also the filters. They sit on the header's title
- * line after the library picker (see the library page's header), where the search gives up room first, then the chips
- * scroll sideways inside their own box if they still do not fit.
+ * line after the library picker (see the library page's header), where the search gives up room first, then the last
+ * chips fold into a "More" menu: every status stays reachable, whole, and nothing scrolls.
  */
 export function LibraryFilters({
   search,
@@ -153,6 +157,7 @@ export function LibraryFilters({
   filter,
   onFilter,
   fit,
+  folded,
   onRow,
 }: {
   search: string;
@@ -162,11 +167,29 @@ export function LibraryFilters({
   onFilter: (filter: LibraryFilter) => void;
   /** How many of the header's controls have given up their words (see useFitLevels): 1 shortens the search, 2 makes it a mark. */
   fit: number;
-  /** Hands the page the chips' scrolling box, which is what it measures to fit the controls. */
+  /** How many chips, from the last, are folded into the "More" menu. */
+  folded: number;
+  /** Hands the page the chips' box, which is what it measures to fit the controls. */
   onRow: (row: HTMLDivElement | null) => void;
 }) {
   const totals = overview?.totals;
-  const { setRow, scrolls } = useChipRow(filter.status ?? "all");
+  const isChosen = (chip: Chip) =>
+    chip.id === "all" ? filter.status === null : filter.status === chip.id;
+  const hidden = foldedChipIndexes(
+    CHIPS.length,
+    folded,
+    CHIPS.findIndex(isChosen),
+  );
+  const countText = (chip: Chip) =>
+    totals ? chip.count(totals).toLocaleString() : UNKNOWN_COUNT;
+  const choose = (chip: Chip) =>
+    onFilter({
+      // A second click on the chosen one is the same as All; All is the way back.
+      status:
+        chip.id === "all" || isChosen(chip) ? null : (chip.id as LibraryStatus),
+      problem: null,
+    });
+  const foldedChips = CHIPS.filter((_, index) => hidden.has(index));
   return (
     <>
       <HeaderSearch
@@ -177,46 +200,47 @@ export function LibraryFilters({
         value={search}
         onChange={(event) => onSearch(event.target.value)}
       />
-      <div
-        className="mm-library-chips-box"
-        data-scrolls={scrolls}
-        ref={(row) => {
-          setRow(row);
-          onRow(row);
-        }}
-      >
+      <div className="mm-library-chips-box" ref={onRow}>
         <div className="mm-library-chips" role="group" aria-label="Show">
-          {CHIPS.map((chip) => {
-            const count = totals ? chip.count(totals) : null;
-            const selected =
-              chip.id === "all"
-                ? filter.status === null
-                : filter.status === chip.id;
-            return (
+          {CHIPS.map((chip, index) =>
+            hidden.has(index) ? null : (
               <button
                 key={chip.id}
                 type="button"
                 className="mm-library-chip"
                 data-rag={chip.rag}
-                data-empty={count === 0 ? "" : undefined}
+                data-empty={totals && chip.count(totals) === 0 ? "" : undefined}
                 title={chip.hint}
-                aria-pressed={selected}
-                onClick={() =>
-                  onFilter({
-                    // A second click on the chosen one is the same as All; All is the way back.
-                    status:
-                      chip.id === "all" || selected
-                        ? null
-                        : (chip.id as LibraryStatus),
-                    problem: null,
-                  })
-                }
+                aria-pressed={isChosen(chip)}
+                onClick={() => choose(chip)}
               >
-                {chip.label}{" "}
-                <b>{count === null ? UNKNOWN_COUNT : count.toLocaleString()}</b>
+                {chip.label} <b>{countText(chip)}</b>
               </button>
-            );
-          })}
+            ),
+          )}
+          {foldedChips.length > 0 ? (
+            <MoreMenu
+              menuLabel="More statuses"
+              folded={foldedChips.map((chip) => ({
+                id: chip.id,
+                label: (
+                  <>
+                    {chip.label}{" "}
+                    <span className="mm-segmented__count">
+                      {countText(chip)}
+                    </span>
+                  </>
+                ),
+              }))}
+              onChoose={(id) => {
+                const chip = foldedChips.find(
+                  (candidate) => candidate.id === id,
+                );
+                if (chip) choose(chip);
+              }}
+              buttonClassName="mm-library-chip"
+            />
+          ) : null}
         </div>
       </div>
     </>

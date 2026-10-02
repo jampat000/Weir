@@ -5,6 +5,7 @@
  * comes from the library scan on the server; nothing is counted in the browser.
  */
 import { useCallback, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useSearchParams } from "react-router-dom";
 
 import { Panel } from "../../components/panels/panel";
@@ -12,6 +13,7 @@ import { ApiEntryError } from "../../components/shared/api-entry-error";
 import { PageLoading } from "../../components/shared/page-loading";
 import { PageToolbarButtons } from "../../components/shell/page-toolbar";
 import { ShellHeaderSlot } from "../../components/shell/shell-header-context";
+import { useTitleLineFit } from "../../components/shell/title-line-fit";
 import { useActivityStreamInvalidations } from "../../lib/activity/use-activity-stream-invalidation";
 import type { LibraryFileFilters } from "../../lib/processing/library-mode-api";
 import {
@@ -22,7 +24,6 @@ import {
 } from "../../lib/processing/library-mode-queries";
 import { useProcessingLibrariesQuery } from "../../lib/processing/libraries-queries";
 import { processingKeys } from "../../lib/processing/query-keys";
-import { useFitLevels } from "../../lib/ui/use-fit-levels";
 import { useMediaQuery } from "../../lib/ui/use-media-query";
 import { useDebouncedValue } from "../../lib/ui/use-debounced-value";
 import { useNow } from "../../lib/ui/use-now";
@@ -31,6 +32,7 @@ import { LibraryCleanConfirm } from "./library-clean-dialog";
 import { LibraryFileDrawer } from "./library-file-drawer";
 import { readLastLibrary, saveLastLibrary } from "./last-library";
 import {
+  LIBRARY_CHIP_COUNT,
   LibraryFilters,
   LibraryReasonSelect,
   NO_FILTER,
@@ -60,6 +62,15 @@ const SEARCH_DEBOUNCE_MS = 300;
 const REFRESH_THROTTLE_MS = 5_000;
 /** "Checked 5 min ago" counts in minutes, so it only needs to move once a minute. */
 const CLOCK_TICK_MS = 60_000;
+
+/**
+ * What gives way, in order, when the title line is short of room: the search shortens and Check again becomes a mark,
+ * the search becomes a mark, Library setup becomes a mark, then the workflow picker moves into the Files card's header.
+ * The chips fold into "More" only after all of that.
+ */
+const SEARCH_SHORTENED = 1;
+const SETUP_AS_MARK = 3;
+const PICKER_IN_CARD = 4;
 
 /** Compact rows are this browser's choice, like a zoom level: nothing about the library changes. */
 const COMPACT_KEY = "weir-library-compact";
@@ -155,15 +166,17 @@ export function LibraryPage(): React.ReactElement {
   const setupSettings = useLibrarySettingsQuery(chosenId, Boolean(chosen));
   const overview = useLibraryOverviewQuery(chosenId, Boolean(chosen));
   const rescan = useTriggerLibraryScan(chosenId);
-  // The header gives its controls' words up for marks, a level at a time, until the chips show whole. Under 1280px the
-  // chips have a line of their own, so there is nothing to gain.
+  // The header gives up its controls' words, then its picker, then the last chips, until what is left shows whole.
   const [chipsRow, setChipsRow] = useState<HTMLDivElement | null>(null);
-  const fit = useFitLevels(
-    chipsRow,
-    3,
-    `${JSON.stringify(overview.data?.totals.by_status)}|${filter.status}|${search !== ""}`,
-    useMediaQuery("(min-width: 1280px)"),
-  );
+  const [pickerSlot, setPickerSlot] = useState<HTMLDivElement | null>(null);
+  const sharesTitleLine = useMediaQuery("(min-width: 921px)");
+  const steps = pickerSlot ? PICKER_IN_CARD : SETUP_AS_MARK;
+  const { stage, folded } = useTitleLineFit({
+    row: chipsRow,
+    stages: sharesTitleLine ? steps : 0,
+    chips: LIBRARY_CHIP_COUNT,
+    refit: `${JSON.stringify(overview.data?.totals.by_status)}|${filter.status}|${search !== ""}|${pickerSlot !== null}`,
+  });
   const files = useLibraryFilesQuery(chosenId, filters, Boolean(chosen));
   const flow = useLibraryClean(chosenId, (request) => {
     if (request.source === "selection") setSelected(new Set());
@@ -247,6 +260,15 @@ export function LibraryPage(): React.ReactElement {
       else address.delete("show");
       setParams(address, { replace: true });
     });
+  const pickerInCard = pickerSlot !== null && stage >= PICKER_IN_CARD;
+  const picker = (
+    <LibraryPicker
+      libraries={libraries.data ?? []}
+      chosenId={chosen.id}
+      onPick={pick}
+      countFor={(id) => (id === chosen.id ? (totals?.files ?? null) : null)}
+    />
+  );
   const filterControls = (
     <LibraryFilters
       search={search}
@@ -259,7 +281,8 @@ export function LibraryPage(): React.ReactElement {
       overview={overview.data}
       filter={filter}
       onFilter={chooseFilter}
-      fit={fit}
+      fit={stage}
+      folded={folded}
       onRow={setChipsRow}
     />
   );
@@ -269,25 +292,23 @@ export function LibraryPage(): React.ReactElement {
         <div
           className="mm-library-controls"
           data-testid="library-controls"
-          data-fit={fit}
+          data-tight={stage >= SETUP_AS_MARK ? "" : undefined}
         >
-          <LibraryPicker
-            libraries={libraries.data ?? []}
-            chosenId={chosen.id}
-            onPick={pick}
-            countFor={(id) =>
-              id === chosen.id ? (totals?.files ?? null) : null
-            }
-          />
+          {pickerInCard ? null : picker}
           {needsSetup ? null : filterControls}
         </div>
+        {pickerInCard ? createPortal(picker, pickerSlot) : null}
       </ShellHeaderSlot>
       {needsSetup ? null : (
         <PageToolbarButtons>
-          <LibraryCheckAgain scan={scan} rescan={rescan} iconOnly={fit >= 1} />
+          <LibraryCheckAgain
+            scan={scan}
+            rescan={rescan}
+            iconOnly={stage >= SEARCH_SHORTENED}
+          />
           {savedSetup ? (
             <LibrarySetupButton
-              iconOnly={fit >= 3}
+              iconOnly={stage >= SETUP_AS_MARK}
               onOpen={() => setSetupOpen(true)}
             />
           ) : null}
@@ -328,6 +349,7 @@ export function LibraryPage(): React.ReactElement {
         description={lead}
         aside={
           <>
+            <div ref={setPickerSlot} className="contents" />
             <LibraryReasonSelect
               overview={overview.data}
               filter={filter}
