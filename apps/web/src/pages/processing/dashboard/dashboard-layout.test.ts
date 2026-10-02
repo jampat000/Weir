@@ -45,22 +45,22 @@ describe("the shared page grid", () => {
 
   it("measures the Pipeline's chrome and keeps its comfortable row to three rows of 86px cards", () => {
     expect(BOARD_CHROME_PX).toBe(106);
-    // 106 of chrome, three rows of 94px less the last gap, and the 22px line for "and N more".
-    expect(BOARD_PX).toBe(402);
+    // Deluno's mockup's comfortable journey row, the same constant in both products.
+    expect(BOARD_PX).toBe(398);
   });
 
   it("gives a window with room for the band's 20% and the Pipeline's comfortable height what they ask for", () => {
-    // 780px of grid, less two 12px gaps: the band's 20% is 156px, the Pipeline's 402px, and the lower row has 198px.
+    // 780px of grid, less two 12px gaps: the band's 20% is 156px, the Pipeline's 398px, and the lower row has 202px.
     expect(gridRows(780)).toEqual({
       band: 156,
-      board: 402,
-      low: 198,
-      template: "156px 402px 198px",
+      board: 398,
+      low: 202,
+      template: "156px 398px 202px",
     });
   });
 
   it("gives way band first (never under 150px), then the Pipeline (never under three rows of 60px cards)", () => {
-    // 663px: the band keeps 150px, the Pipeline goes from 402px to 324px, the lower row gets what is left.
+    // 663px: the band keeps 150px, the Pipeline goes from 398px to 324px, the lower row gets what is left.
     expect(gridRows(663)).toEqual({
       band: 150,
       board: 324,
@@ -85,17 +85,17 @@ describe("the shared page grid", () => {
     // 956px: the band's 20% is 191px and takes spare up to 240px; the lower row keeps what is left.
     expect(gridRows(956)).toEqual({
       band: 240,
-      board: 402,
-      low: 290,
-      template: "240px 402px 290px",
+      board: 398,
+      low: 294,
+      template: "240px 398px 294px",
     });
     // A tall window: the lower row takes a third at most and the cards grow to the 130px step (36px a row).
     expect(gridRows(2000).board).toBe(BOARD_PX + 3 * (130 - 94));
     expect(gridRows(1315)).toEqual({
       band: 240,
-      board: 510,
-      low: 541,
-      template: "240px 510px 541px",
+      board: 506,
+      low: 545,
+      template: "240px 506px 545px",
     });
   });
 

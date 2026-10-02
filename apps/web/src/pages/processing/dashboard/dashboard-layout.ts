@@ -11,8 +11,6 @@ import {
   PIPELINE_ROWS,
   ROW_GAP_PX,
   ROW_PX,
-  cardSize,
-  lanesHeight,
 } from "../pipeline/pipeline-layout";
 
 /** The main area must be at least this wide, in rem, for the right column to sit beside the page. */
@@ -56,8 +54,11 @@ export const LOW_COLUMNS = "minmax(0, 1.15fr) minmax(0, 1fr)";
  * (10px) and the panel's bottom border (1px).
  */
 export const BOARD_CHROME_PX = 106;
-/** The Pipeline's row at a comfortable size: its chrome, three rows of 86px cards and the "and N more" line. */
-export const BOARD_PX = BOARD_CHROME_PX + lanesHeight(cardSize(undefined));
+/**
+ * The Pipeline's row at a comfortable size, Deluno's mockup's 398px (its JOURNEY_PX), kept as the same constant rather
+ * than worked out from the chrome so the two products share their rows at every height.
+ */
+export const BOARD_PX = 398;
 /** The least the Pipeline is given: its chrome, two rows of the smallest cards, one more, and the "and N more" line. */
 const BOARD_MIN_PX =
   BOARD_CHROME_PX +
