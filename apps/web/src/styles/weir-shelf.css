@@ -304,8 +304,8 @@
   text-overflow: ellipsis;
 }
 
-/* A status line with no words, the tiny caption where nothing fits beside the dot, is the dot alone, centred. */
-.mm-shelf__status > span:empty {
+/* Where the word fits only without the dot, the line is the word alone, centred. */
+.mm-shelf__status[data-bare]::before {
   display: none;
 }
 

@@ -19,7 +19,8 @@ export type LineWords = readonly string[];
 
 /**
  * The caption's status line: its tone, and the words it can say. `short` is what the line says under a poster with no
- * room for a title: the briefest words, and last of all nothing, which leaves the dot alone.
+ * room for a title, and what it falls back on where `words` do not fit: the briefest words, the last of them always a
+ * word and never nothing.
  */
 export type TileStatus = {
   tone: StatusTone;
@@ -88,9 +89,6 @@ function whatWasDone(item: FinishedFile): string {
 const GIB = 1024 ** 3;
 const MIB = 1024 ** 2;
 
-/** The last of a status line's short words: nothing, so that the line is the dot alone. */
-const DOT_ALONE = "";
-
 /** A saving in the few characters a caption has: one decimal for GB, whole MB, "1.2 GB", "221 MB". */
 export function savedSize(bytes: number): string {
   if (bytes >= GIB) return `${(bytes / GIB).toFixed(1)} GB`;
@@ -105,39 +103,39 @@ function statusOf(item: FinishedFile): TileStatus {
       return {
         tone: "neutral",
         words: ["Already clean"],
-        short: ["Clean", DOT_ALONE],
+        short: ["Clean"],
       };
     case "passed":
       return {
         tone: "warn",
         words: ["Passed through"],
-        short: ["Passed", DOT_ALONE],
+        short: ["Passed"],
       };
     case "rejected":
       return {
         tone: "warn",
         words: ["Rejected"],
-        short: ["Rejected", DOT_ALONE],
+        short: ["Rejected"],
       };
     case "failed":
       return {
         tone: "bad",
         words: ["Couldn't finish"],
-        short: ["Failed", DOT_ALONE],
+        short: ["Failed"],
       };
     default: {
       if (!item.savedBytes) {
         return {
           tone: "good",
           words: ["Cleaned"],
-          short: ["Cleaned", DOT_ALONE],
+          short: ["Cleaned", "Done"],
         };
       }
       const size = savedSize(item.savedBytes);
       return {
         tone: "good",
         words: [`${size} saved`, size],
-        short: [size, DOT_ALONE],
+        short: [size],
       };
     }
   }

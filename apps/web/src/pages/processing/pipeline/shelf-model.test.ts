@@ -73,7 +73,7 @@ describe("the shelf's tiles", () => {
     ]);
   });
 
-  it("have the briefest words for a poster with no room for a title, and the dot alone where those do not fit", () => {
+  it("have the briefest words for a poster with no room for a title, the last of them always a word", () => {
     const { tiles } = shelf([
       finished(1, { savedBytes: 1.24 * 1024 ** 3 }),
       finished(2, { savedBytes: null, removedAudio: 0, removedSubtitles: 0 }),
@@ -84,12 +84,12 @@ describe("the shelf's tiles", () => {
     ]);
 
     expect(tiles.map((tile) => tile.status.short)).toEqual([
-      ["1.2 GB", ""],
-      ["Cleaned", ""],
-      ["Clean", ""],
-      ["Rejected", ""],
-      ["Passed", ""],
-      ["Failed", ""],
+      ["1.2 GB"],
+      ["Cleaned", "Done"],
+      ["Clean"],
+      ["Rejected"],
+      ["Passed"],
+      ["Failed"],
     ]);
   });
 

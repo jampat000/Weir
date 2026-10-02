@@ -4,7 +4,7 @@
  * fixed slots, centred, so the lines of every tile in the row stand level: the title (two lines), how the file
  * came out in red, amber, green or grey, and, where the posters are big enough, what was removed and when. Where
  * the row has room for no more than one line, the caption is that status line alone, in the fewest words that fit
- * under the poster or the dot by itself; the rest is in the tile's tooltip and name. On a poster too small for the
+ * under the poster, the dot left out where only the word fits; the rest is in the tile's tooltip and name. On a poster too small for the
  * tag (see posterSize) it gives way to a slim strip in the workflow's colour, and its name goes into the tile's
  * tooltip and name. The tile of a file that has just been delivered arrives with a ring and
  * flies in from the Pipeline (see delivery-flight).
@@ -17,7 +17,11 @@ import type { FinishedFile } from "../../../lib/activity/processing-outcome";
 import { useWorkflowHues } from "../../../lib/processing/workflow-hues";
 import { classNames } from "../../../lib/ui/class-names";
 import { SHELF_TILE_ATTRIBUTE } from "./delivery-flight";
-import { lineWords, type MeasureText } from "../../../lib/ui/measure-text";
+import {
+  fittingWords,
+  lineWords,
+  type MeasureText,
+} from "../../../lib/ui/measure-text";
 import { STATUS_MARK_PX } from "./status-line";
 import { posterSize, type CaptionTier } from "./shelf-layout";
 import type { ShelfTile, TileStatus } from "./shelf-model";
@@ -28,17 +32,27 @@ import { useTileArrivals } from "./use-tile-arrivals";
 /** Where text cannot be measured, as in a test, everything is taken to fit. */
 const FITS_ANYTHING: MeasureText = () => 0;
 
-/** What the status line says under a poster `width` wide: its short words in the tiny caption, its fuller ones otherwise. */
-function statusWords(
+/** What the status line says, and whether the dot before it is left out to make room for the words. */
+type StatusLine = { words: string; bare: boolean };
+
+/**
+ * What the status line says under a poster `width` wide: its short words in the tiny caption, its fuller ones then the
+ * short ones otherwise. The fullest that fits beside the dot is said; where none does the dot goes, so that the line is
+ * always a word, and never the dot alone or a word cut off.
+ */
+function statusLine(
   status: TileStatus,
   caption: CaptionTier,
   width: number | null,
   measure: MeasureText,
-): string {
-  const words = caption === "tiny" ? status.short : status.words;
-  return width === null
-    ? words[0]
-    : lineWords(words, width - STATUS_MARK_PX, measure);
+): StatusLine {
+  const words =
+    caption === "tiny" ? status.short : [...status.words, ...status.short];
+  if (width === null) return { words: words[0], bare: false };
+  const beside = fittingWords(words, width - STATUS_MARK_PX, measure);
+  return beside === undefined
+    ? { words: lineWords(words, width, measure), bare: true }
+    : { words: beside, bare: false };
 }
 
 function Tile({
@@ -53,7 +67,7 @@ function Tile({
   /** What goes under the tile. */
   caption: CaptionTier;
   /** What the status line says at this width. */
-  status: string;
+  status: StatusLine;
   /** What the detail line says at this width, or nothing. */
   detail: string | null;
   /** The poster is too small for the workflow's whole tag. */
@@ -108,8 +122,9 @@ function Tile({
                 "mm-shelf__status",
                 `mm-shelf__status--${tile.status.tone}`,
               )}
+              data-bare={status.bare || undefined}
             >
-              <span>{status}</span>
+              <span>{status.words}</span>
             </span>
             {caption === "full" ? (
               <>
@@ -179,7 +194,7 @@ export function ShelfTiles({
           key={tile.key}
           tile={tile}
           caption={caption}
-          status={statusWords(
+          status={statusLine(
             tile.status,
             caption,
             tileWidth,

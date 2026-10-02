@@ -507,15 +507,45 @@ describe("the size of the tiles", () => {
       expect(linesOf(0)).toEqual(["318 MB"]);
     });
 
-    it("is the dot alone where not even the shortest words fit under the poster", () => {
+    it("leaves the dot out and keeps the word where the word fits only without it", () => {
       rowOf(100, 570);
 
-      render(shelf(files, { measureText: (text) => text.length * 8 }));
+      // 7px a character: "318 MB" is 42px and "Saved" 35px, wider than the 33px a 44px poster leaves after the dot, and under the 44px without it.
+      render(shelf(files, { measureText: (text) => text.length * 7 }));
 
-      expect(linesOf(0)).toEqual([""]);
+      const status = captionOf(0)?.querySelector(".mm-shelf__status");
+      expect(linesOf(0)).toEqual(["318 MB"]);
+      expect(status).toHaveAttribute("data-bare");
+      expect(status?.className).toContain("mm-shelf__status--good");
+    });
+
+    it("keeps the dot beside a word that fits with it, and never says nothing", () => {
+      rowOf(100, 570);
+
+      render(shelf(files, { measureText: (text) => text.length * 4 }));
       expect(
-        captionOf(0)?.querySelector(".mm-shelf__status")?.className,
-      ).toContain("mm-shelf__status--good");
+        captionOf(0)?.querySelector(".mm-shelf__status"),
+      ).not.toHaveAttribute("data-bare");
+    });
+
+    it("says a word for a cleaned file with no saving where its own word does not fit", () => {
+      rowOf(100, 570);
+
+      // 5px a character: "Cleaned" is 35px and "Done" 20px, against the 33px a 44px poster leaves after the dot.
+      render(
+        shelf(
+          [
+            finished(1, {
+              savedBytes: null,
+              removedAudio: 0,
+              removedSubtitles: 0,
+            }),
+          ],
+          { measureText: (text) => text.length * 5 },
+        ),
+      );
+
+      expect(linesOf(0)).toEqual(["Done"]);
     });
 
     it("keeps the title and the full words in the tooltip and name of a tile with the line alone", () => {
