@@ -18,8 +18,15 @@ export type StatusTone = "good" | "neutral" | "warn" | "bad";
 /** The words one caption line can say, fullest first: the first that fits the line is shown, the last always is (cut by an ellipsis if need be). */
 export type LineWords = readonly string[];
 
-/** The caption's status line: its tone, and the words it can say. */
-export type TileStatus = { tone: StatusTone; words: LineWords };
+/**
+ * The caption's status line: its tone, and the words it can say. `short` is what the line says under a poster with no
+ * room for a title: the briefest words, and last of all nothing, which leaves the dot alone.
+ */
+export type TileStatus = {
+  tone: StatusTone;
+  words: LineWords;
+  short: LineWords;
+};
 
 /** One finished file as a tile on the Just finished shelf. */
 export type ShelfTile = {
@@ -82,6 +89,9 @@ function whatWasDone(item: FinishedFile): string {
 const GIB = 1024 ** 3;
 const MIB = 1024 ** 2;
 
+/** The last of a status line's short words: nothing, so that the line is the dot alone. */
+const DOT_ALONE = "";
+
 /** A saving in the few characters a caption has: one decimal for GB, whole MB, "1.2 GB", "221 MB". */
 export function savedSize(bytes: number): string {
   if (bytes >= GIB) return `${(bytes / GIB).toFixed(1)} GB`;
@@ -93,17 +103,43 @@ export function savedSize(bytes: number): string {
 function statusOf(item: FinishedFile): TileStatus {
   switch (item.kind) {
     case "already":
-      return { tone: "neutral", words: ["Already clean"] };
+      return {
+        tone: "neutral",
+        words: ["Already clean"],
+        short: ["Clean", DOT_ALONE],
+      };
     case "passed":
-      return { tone: "warn", words: ["Passed through"] };
+      return {
+        tone: "warn",
+        words: ["Passed through"],
+        short: ["Passed", DOT_ALONE],
+      };
     case "rejected":
-      return { tone: "warn", words: ["Rejected"] };
+      return {
+        tone: "warn",
+        words: ["Rejected"],
+        short: ["Rejected", DOT_ALONE],
+      };
     case "failed":
-      return { tone: "bad", words: ["Couldn't finish"] };
+      return {
+        tone: "bad",
+        words: ["Couldn't finish"],
+        short: ["Failed", DOT_ALONE],
+      };
     default: {
-      if (!item.savedBytes) return { tone: "good", words: ["Cleaned"] };
+      if (!item.savedBytes) {
+        return {
+          tone: "good",
+          words: ["Cleaned"],
+          short: ["Cleaned", DOT_ALONE],
+        };
+      }
       const size = savedSize(item.savedBytes);
-      return { tone: "good", words: [`${size} saved`, size] };
+      return {
+        tone: "good",
+        words: [`${size} saved`, size],
+        short: [size, DOT_ALONE],
+      };
     }
   }
 }

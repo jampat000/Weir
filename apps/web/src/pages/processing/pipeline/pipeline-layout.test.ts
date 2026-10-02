@@ -13,6 +13,7 @@ import {
 import {
   CAPTION_PX,
   FULL_CAPTION_PX,
+  TINY_CAPTION_PX,
   FULL_DECORATIONS_MIN_PX,
   posterSize,
   SHELF_MIN_TILES,
@@ -110,7 +111,10 @@ describe("the shelf's tiles", () => {
   it("are sized from the row's height, exactly 2:3, with a caption only when the row is tall enough", () => {
     // 190px of row less 12px of padding and a 38px caption = 140px of art, 93px wide.
     expect(shelfFit(190)).toEqual({ caption: "compact", width: 93 });
-    expect(shelfFit(100)).toEqual({ caption: "none", width: 58 });
+    // 100px of row less 12px of padding and a 21px caption = 67px of art, 44px wide.
+    expect(shelfFit(100)).toEqual({ caption: "tiny", width: 44 });
+    // 60px of row less 12px of padding has no room for the least art and a line under it.
+    expect(shelfFit(60)).toEqual({ caption: "none", width: 32 });
     expect(shelfFit(10).width).toBe(24);
     expect(shelfFit(2000).width).toBe(170);
   });
@@ -129,7 +133,25 @@ describe("the shelf's tiles", () => {
     // Captions follow the row's height.
     expect(shelfFit(250, 570).caption).toBe("full");
     expect(shelfFit(200, 570).caption).toBe("compact");
-    expect(shelfFit(100, 570).caption).toBe("none");
+    expect(shelfFit(100, 570).caption).toBe("tiny");
+    expect(shelfFit(60, 570).caption).toBe("none");
+  });
+
+  it("have the tiny caption, a single status line, where the row has no room for the compact one", () => {
+    expect(TINY_CAPTION_PX).toBe(21);
+    // The compact caption needs 96px of art and 38px under it, 134px inside the padding: 146px of row.
+    expect(shelfFit(146).caption).toBe("compact");
+    expect(shelfFit(145).caption).toBe("tiny");
+    // The tiny one needs the least art, 36px, and 21px under it, 57px inside the padding: 69px of row.
+    expect(shelfFit(69).caption).toBe("tiny");
+    expect(shelfFit(68).caption).toBe("none");
+  });
+
+  it("make the art a line shorter where the tiny caption stands under it", () => {
+    // 100px of row less 12px of padding and 21px for the line: 67px of art. Without a line it would be 88px.
+    expect(shelfFit(100).width).toBe(44);
+    expect(shelfFit(60).width).toBe(32);
+    expect(shelfFit(100, 570)).toEqual(shelfFit(100));
   });
 
   it("never makes a tile narrower than the least art, however narrow the row", () => {
@@ -141,8 +163,8 @@ describe("the shelf's tiles", () => {
     expect(shelfRowNeed(570)).toBe(237);
     // A row too wide for the rule to bind: the tallest tile is 255px of art.
     expect(shelfRowNeed(3000)).toBe(255 + 72 + 12);
-    // Tiles too small for the full caption, and with no room for any: the least art and the padding.
-    expect(shelfRowNeed(100)).toBe(36 + 12);
+    // Tiles too small for the full caption: the least art, the tiny caption and the padding.
+    expect(shelfRowNeed(100)).toBe(36 + 21 + 12);
   });
 
   it("need the height at which the full caption shows, and the tiles have long stopped growing", () => {
@@ -164,11 +186,15 @@ describe("the shelf's tiles", () => {
     }
   });
 
-  it("have the compact caption, and need no more than their art and it, where the tiles are too small for the full one", () => {
-    // 300px wide holds five 48px tiles: 72px of art, a 38px caption (the row is too short for one) and 12px of padding.
-    expect(shelfFit(10_000, 300).caption).toBe("compact");
-    expect(shelfRowNeed(300)).toBe(12 + 72);
-    expect(shelfFit(shelfRowNeed(300), 300).width).toBe(48);
+  it("need no more than their art and the tiny caption, where the tiles are too small for the full one", () => {
+    // 300px wide holds five 48px tiles: 72px of art, a 21px line and 12px of padding.
+    expect(shelfRowNeed(300)).toBe(12 + 72 + 21);
+    expect(shelfFit(shelfRowNeed(300), 300)).toEqual({
+      caption: "tiny",
+      width: 48,
+    });
+    // A row tall enough for the compact caption gives them that, at the same width.
+    expect(shelfFit(10_000, 300)).toEqual({ caption: "compact", width: 48 });
   });
 
   it("have the full caption under tiles 64px wide and up, and not under narrower ones", () => {

@@ -25,6 +25,14 @@ describe("what a caption line says in the room it has", () => {
     expect(lineWords(REMOVED, 20, SIX_PX)).toBe("−8 tracks");
   });
 
+  it("falls back to no words at all, the dot alone, where even the shortest do not fit", () => {
+    const short = ["221 MB", ""];
+
+    expect(lineWords(short, 37, SIX_PX)).toBe("221 MB");
+    expect(lineWords(short, 36, SIX_PX)).toBe("");
+    expect(lineWords(short, 0, SIX_PX)).toBe("");
+  });
+
   it("says a single set of words as it is, whatever the room", () => {
     expect(lineWords(["Rejected"], 200, SIX_PX)).toBe("Rejected");
     expect(lineWords(["Rejected"], 20, SIX_PX)).toBe("Rejected");

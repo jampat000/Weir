@@ -2,9 +2,11 @@
  * The tiles of the Just finished shelf. A tile is the title's poster (or its initials on its workflow's
  * colour where there is none) with the workflow's name in a tag across its foot, and under it a caption of
  * fixed slots, centred, so the lines of every tile in the row stand level: the title (two lines), how the file
- * came out in red, amber, green or grey, and, where the posters are big enough, what was removed and when. On a poster too
- * small for the tag (see posterSize) it gives way to a slim strip in the workflow's colour, and its name goes
- * into the tile's tooltip and name. The tile of a file that has just been delivered arrives with a ring and
+ * came out in red, amber, green or grey, and, where the posters are big enough, what was removed and when. Where
+ * the row has room for no more than one line, the caption is that status line alone, in the fewest words that fit
+ * under the poster or the dot by itself; the rest is in the tile's tooltip and name. On a poster too small for the
+ * tag (see posterSize) it gives way to a slim strip in the workflow's colour, and its name goes into the tile's
+ * tooltip and name. The tile of a file that has just been delivered arrives with a ring and
  * flies in from the Pipeline (see delivery-flight).
  */
 import type { CSSProperties, ReactElement, RefObject } from "react";
@@ -17,13 +19,26 @@ import { classNames } from "../../../lib/ui/class-names";
 import { SHELF_TILE_ATTRIBUTE } from "./delivery-flight";
 import { STATUS_MARK_PX, lineWords, type MeasureText } from "./caption-fit";
 import { posterSize, type CaptionTier } from "./shelf-layout";
-import type { ShelfTile } from "./shelf-model";
+import type { ShelfTile, TileStatus } from "./shelf-model";
 import { useOpenSlots } from "./shelf-slots";
 import { TILE_KEY_ATTRIBUTE, useSlideNeighbours } from "./use-slide-neighbours";
 import { useTileArrivals } from "./use-tile-arrivals";
 
 /** Where text cannot be measured, as in a test, everything is taken to fit. */
 const FITS_ANYTHING: MeasureText = () => 0;
+
+/** What the status line says under a poster `width` wide: its short words in the tiny caption, its fuller ones otherwise. */
+function statusWords(
+  status: TileStatus,
+  caption: CaptionTier,
+  width: number | null,
+  measure: MeasureText,
+): string {
+  const words = caption === "tiny" ? status.short : status.words;
+  return width === null
+    ? words[0]
+    : lineWords(words, width - STATUS_MARK_PX, measure);
+}
 
 function Tile({
   tile,
@@ -81,7 +96,11 @@ function Tile({
         </span>
         {caption === "none" ? null : (
           <span className="mm-shelf__caption" data-tier={caption}>
-            <span className="mm-shelf__line mm-shelf__title">{tile.title}</span>
+            {caption === "tiny" ? null : (
+              <span className="mm-shelf__line mm-shelf__title">
+                {tile.title}
+              </span>
+            )}
             <span
               className={classNames(
                 "mm-shelf__line",
@@ -159,15 +178,12 @@ export function ShelfTiles({
           key={tile.key}
           tile={tile}
           caption={caption}
-          status={
-            tileWidth === null
-              ? tile.status.words[0]
-              : lineWords(
-                  tile.status.words,
-                  tileWidth - STATUS_MARK_PX,
-                  measure ?? FITS_ANYTHING,
-                )
-          }
+          status={statusWords(
+            tile.status,
+            caption,
+            tileWidth,
+            measure ?? FITS_ANYTHING,
+          )}
           detail={
             tile.detail === null
               ? null

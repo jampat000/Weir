@@ -304,13 +304,13 @@ describe("the size of the tiles", () => {
 
     render(shelf(files));
 
-    // 100px of row gives 58px tiles: eight stand across 570px.
-    expect(tiles()).toHaveLength(8);
+    // 100px of row less 12px of padding and the 21px line under each tile gives 44px tiles: nine stand across 570px.
+    expect(tiles()).toHaveLength(9);
     expect(
       document
         .querySelector<HTMLElement>(".mm-shelf__row")
         ?.style.getPropertyValue("--shelf-tile-w"),
-    ).toBe("58px");
+    ).toBe("44px");
   });
 
   it("dresses a full-size poster with the workflow's tag, and nothing else on the art", () => {
@@ -467,8 +467,57 @@ describe("the size of the tiles", () => {
       expect(linesOf(0)).toHaveLength(2);
     });
 
-    it("leaves the tiles bare where the row is too short for any caption", () => {
+    it("is the status line alone, in the shortest words that fit, where the row has room for one line and no more", () => {
+      // 100px of row: 44px posters, with 21px under each for the line.
       rowOf(100, 570);
+
+      // 4px a character: "318 MB" is 24px, which fits the 33px a 44px poster leaves after the dot.
+      render(shelf(files, { measureText: (text) => text.length * 4 }));
+
+      expect(captionOf(0)).toHaveAttribute("data-tier", "tiny");
+      expect(linesOf(0)).toEqual(["318 MB"]);
+    });
+
+    it("is the dot alone where not even the shortest words fit under the poster", () => {
+      rowOf(100, 570);
+
+      render(shelf(files, { measureText: (text) => text.length * 8 }));
+
+      expect(linesOf(0)).toEqual([""]);
+      expect(
+        captionOf(0)?.querySelector(".mm-shelf__status")?.className,
+      ).toContain("mm-shelf__status--good");
+    });
+
+    it("keeps the title and the full words in the tooltip and name of a tile with the line alone", () => {
+      rowOf(100, 570);
+
+      render(
+        shelf(
+          [
+            finished(1, {
+              kind: "rejected",
+              savedBytes: null,
+              removedAudio: 0,
+              removedSubtitles: 0,
+            }),
+          ],
+          {
+            measureText: (text) => text.length * 4,
+          },
+        ),
+      );
+
+      expect(linesOf(0)).toEqual(["Rejected"]);
+      expect(
+        screen.getByRole("button", {
+          name: "The Quiet Harbour S01E01 (TV): Rejected, 3 min ago",
+        }),
+      ).toHaveAttribute("title", expect.stringContaining("The Quiet Harbour"));
+    });
+
+    it("leaves the tiles bare where the row is too short for even the line", () => {
+      rowOf(60, 570);
 
       render(shelf(files));
 

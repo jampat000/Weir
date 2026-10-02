@@ -10,6 +10,8 @@ const CAPTION_GAP_PX = 6;
 const SLOT_GAP_PX = 2;
 /** The compact caption under a tile: the title and the status line, with 2px between them and 6px above them: 38px. */
 export const CAPTION_PX = CAPTION_GAP_PX + 2 * CAPTION_LINE_PX + SLOT_GAP_PX;
+/** The tiny caption under a tile: the status line alone, 6px under the poster: 21px. */
+export const TINY_CAPTION_PX = CAPTION_GAP_PX + CAPTION_LINE_PX;
 /** The full caption: the compact one and the detail and when lines, each 2px after the one before: 72px. */
 export const FULL_CAPTION_PX = CAPTION_PX + 2 * (CAPTION_LINE_PX + SLOT_GAP_PX);
 /** The space between tiles. */
@@ -22,6 +24,8 @@ const CAPTIONED_ART_PX = 96;
 /** A row at least this tall (inside its padding) has room for a caption under each tile, and the art above it. */
 const CAPTION_MIN_ROW_PX = CAPTIONED_ART_PX + CAPTION_PX;
 const MIN_ART_PX = 36;
+/** A row at least this tall (inside its padding) has room for the tiny caption under the least art. */
+const TINY_MIN_ROW_PX = MIN_ART_PX + TINY_CAPTION_PX;
 /** The narrowest a tile gets, however many must stand in the row: 2:3 under the least art. */
 const MIN_TILE_WIDTH_PX = Math.floor(MIN_ART_PX / 1.5);
 /** No tile grows taller than this, however tall the row. */
@@ -30,9 +34,24 @@ const MAX_ART_PX = 255;
 /**
  * What goes under each tile. The compact caption is the title and how the file came out; the full one adds what was
  * done and when, and is chosen only where the posters have all the height the five-tile rule lets them use and room
- * for it as well. A row too short for either shows tiles alone.
+ * for it as well. Where the row is too short for the compact one, the tiny caption is how the file came out alone,
+ * in the fewest words that fit under the poster. A row too short for even that shows tiles alone.
  */
-export type CaptionTier = "none" | "compact" | "full";
+export type CaptionTier = "none" | "tiny" | "compact" | "full";
+
+/** The height a tier's caption takes under the poster. */
+const CAPTION_HEIGHT_PX: Record<CaptionTier, number> = {
+  none: 0,
+  tiny: TINY_CAPTION_PX,
+  compact: CAPTION_PX,
+  full: FULL_CAPTION_PX,
+};
+
+/** The caption a row of `inner` px (inside its padding) can hold, short of the full one. */
+function captionFor(inner: number): CaptionTier {
+  if (inner >= CAPTION_MIN_ROW_PX) return "compact";
+  return inner >= TINY_MIN_ROW_PX ? "tiny" : "none";
+}
 
 export type ShelfFit = {
   caption: CaptionTier;
@@ -62,7 +81,8 @@ const artOf = (width: number) => Math.max(MIN_ART_PX, Math.ceil(width * 1.5));
  * the row's measured width (when it is known). Tiles stay exactly 2:3: a narrower tile is also shorter, never
  * stretched, and none is narrower than the least art allows. A row with the height for the widest tile it allows,
  * the full caption under it, and a tile wide enough to wear one (FULL_DECORATIONS_MIN_PX) gets the full caption;
- * otherwise the compact one where the row is tall enough, and none where it is not.
+ * otherwise the compact one where the row is tall enough, the tiny one where it is tall enough for that, and none
+ * where it is not.
  */
 export function shelfFit(rowHeight: number, rowWidth = 0): ShelfFit {
   const inner = rowHeight - ROW_PAD_Y;
@@ -74,14 +94,14 @@ export function shelfFit(rowHeight: number, rowWidth = 0): ShelfFit {
   ) {
     return { caption: "full", width: widest };
   }
-  const compact = inner >= CAPTION_MIN_ROW_PX;
+  const caption = captionFor(inner);
   const art = Math.max(
     MIN_ART_PX,
-    Math.min(MAX_ART_PX, inner - (compact ? CAPTION_PX : 0)),
+    Math.min(MAX_ART_PX, inner - CAPTION_HEIGHT_PX[caption]),
   );
   const byHeight = Math.floor(art / 1.5);
   return {
-    caption: compact ? "compact" : "none",
+    caption,
     width: widest === null ? byHeight : Math.min(byHeight, widest),
   };
 }
@@ -89,8 +109,8 @@ export function shelfFit(rowHeight: number, rowWidth = 0): ShelfFit {
 /**
  * The height of a row of `rowWidth` px at which its tiles stop growing: the `SHELF_MIN_TILES` rule has capped them by
  * width, and a taller row would only leave empty space under them. It is the tile's art (1.5 times its width), the
- * caption it would wear there (the full one, when the tile is wide enough for it) and the row's padding. The page
- * gives a row this tall at most while something else can use the rest.
+ * caption it would wear there (the full one when the tile is wide enough for it, the tiny one when not) and the row's
+ * padding. The page gives a row this tall at most while something else can use the rest.
  */
 export function shelfRowNeed(rowWidth: number): number {
   const width = widestTile(rowWidth);
@@ -98,9 +118,7 @@ export function shelfRowNeed(rowWidth: number): number {
   if (width >= FULL_DECORATIONS_MIN_PX) {
     return ROW_PAD_Y + art + FULL_CAPTION_PX;
   }
-  return (
-    ROW_PAD_Y + art + (art + CAPTION_PX >= CAPTION_MIN_ROW_PX ? CAPTION_PX : 0)
-  );
+  return ROW_PAD_Y + art + TINY_CAPTION_PX;
 }
 
 /**

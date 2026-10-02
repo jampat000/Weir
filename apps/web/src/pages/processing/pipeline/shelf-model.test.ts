@@ -73,6 +73,26 @@ describe("the shelf's tiles", () => {
     ]);
   });
 
+  it("have the briefest words for a poster with no room for a title, and the dot alone where those do not fit", () => {
+    const { tiles } = shelf([
+      finished(1, { savedBytes: 1.24 * 1024 ** 3 }),
+      finished(2, { savedBytes: null, removedAudio: 0, removedSubtitles: 0 }),
+      finished(3, { kind: "already", savedBytes: null }),
+      finished(4, { kind: "rejected", savedBytes: null }),
+      finished(5, { kind: "passed", savedBytes: null }),
+      finished(6, { kind: "failed", savedBytes: null }),
+    ]);
+
+    expect(tiles.map((tile) => tile.status.short)).toEqual([
+      ["1.2 GB", ""],
+      ["Cleaned", ""],
+      ["Clean", ""],
+      ["Rejected", ""],
+      ["Passed", ""],
+      ["Failed", ""],
+    ]);
+  });
+
   it("say a saving with one decimal for GB and whole MB, and no sign", () => {
     const saved = (bytes: number) =>
       shelf([finished(1, { savedBytes: bytes })]).tiles[0].status.words;

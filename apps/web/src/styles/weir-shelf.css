@@ -214,7 +214,8 @@
  * row stand level whatever the file's words. The title on one line, with an ellipsis where it is long, then how the
  * file came out, in the tone of its outcome after a dot, and in the full caption what was removed and when in the
  * muted colour; a slot with nothing to say keeps its place. Every line is --shelf-line tall, with 2px between slots
- * and 6px from the poster. The heights are CAPTION_PX and FULL_CAPTION_PX (shelf-layout.ts).
+ * and 6px from the poster. The heights are TINY_CAPTION_PX, CAPTION_PX and FULL_CAPTION_PX (shelf-layout.ts); the
+ * tiny caption is the status line alone.
  */
 .mm-shelf__caption {
   --shelf-line: 15px;
@@ -273,6 +274,11 @@
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* A status line with no words, the tiny caption where nothing fits beside the dot, is the dot alone, centred. */
+.mm-shelf__status > span:empty {
+  display: none;
 }
 
 .mm-shelf__status--good {
