@@ -74,6 +74,7 @@ function FactTile({ fact }: { fact: Fact }) {
     <div
       className="mm-sy-fact"
       data-tone={fact.tone}
+      data-alert={fact.alert ? "" : undefined}
       title={`${fact.label}: ${fact.value}${fact.sub ? ` · ${fact.sub}` : ""}`}
     >
       <span className="mm-sy-fact__label">
@@ -83,6 +84,9 @@ function FactTile({ fact }: { fact: Fact }) {
         )}
       </span>
       <FitText words={reading} className="mm-sy-fact__value" />
+      {fact.alert ? (
+        <FitText words={fact.alert} className="mm-sy-fact__alert" />
+      ) : null}
       <span className="mm-sy-fact__sub">{fact.sub}</span>
     </div>
   );

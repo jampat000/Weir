@@ -335,10 +335,14 @@
   color: var(--mm-status-failed-text);
 }
 
+.mm-sy-fact__alert {
+  display: none;
+}
+
 /*
  * A band too short for three lines of tile (two rows would be all it held) makes each tile one line: its short name
  * at the left and the reading at the right, with the line under it left to the tooltip. Four of these fit where two
- * of the tall ones did, so the four most useful facts all show. A reading that is not good says so in its colour.
+ * of the tall ones did, so the four most useful facts all show. A reading that is not good keeps its few warning words.
  */
 @container mm-sy-band (max-height: 188px) {
   .mm-sy-facts {
@@ -377,7 +381,16 @@
     display: none;
   }
 
-  .mm-sy-fact[data-tone="bad"] .mm-sy-fact__value {
+  .mm-sy-fact[data-alert] {
+    grid-template-columns: auto auto minmax(0, 1fr);
+  }
+
+  .mm-sy-fact__alert {
+    display: block;
+    text-align: right;
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
     color: var(--mm-status-failed-text);
   }
 }

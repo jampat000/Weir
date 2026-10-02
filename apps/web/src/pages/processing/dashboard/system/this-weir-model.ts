@@ -20,6 +20,11 @@ export type Fact = {
   valueShort?: string;
   sub: string;
   tone?: FactTone;
+  /**
+   * What a one-line tile still says of a reading that is not good, beside the value, since its line under it is hidden:
+   * its words, then shorter ones for a narrow tile.
+   */
+  alert?: readonly string[];
 };
 
 export type RingFigures = {
@@ -144,6 +149,13 @@ export function weirFacts({
           ? plural(overview.restarts_this_week, "restart", "restarts")
           : "no restarts",
       tone: overview.restarts_this_week > 0 ? "bad" : "good",
+      alert:
+        overview.restarts_this_week > 0
+          ? [
+              plural(overview.restarts_this_week, "restart", "restarts"),
+              `↻ ${overview.restarts_this_week.toLocaleString()}`,
+            ]
+          : undefined,
     },
     {
       key: "files-at-once",
@@ -157,8 +169,16 @@ export function weirFacts({
       label: "Jobs today",
       short: "Jobs",
       value: `${overview.jobs_today.run.toLocaleString()} run`,
+      valueShort: overview.jobs_today.run.toLocaleString(),
       sub: failed > 0 ? `${failed.toLocaleString()} failed` : "none failed",
       tone: failed > 0 ? "bad" : "good",
+      alert:
+        failed > 0
+          ? [
+              `${failed.toLocaleString()} failed`,
+              `✗ ${failed.toLocaleString()}`,
+            ]
+          : undefined,
     },
     {
       key: "backup",

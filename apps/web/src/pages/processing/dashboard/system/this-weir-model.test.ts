@@ -108,6 +108,14 @@ describe("the fact tiles", () => {
       facts({ overview: { ...overview, jobs_today: { run: 5, failed: 0 } } })
         .jobs,
     ).toMatchObject({ sub: "none failed", tone: "good" });
+    expect(
+      facts({ overview: { ...overview, jobs_today: { run: 5, failed: 0 } } })
+        .jobs.alert,
+    ).toBeUndefined();
+  });
+
+  it("keeps a failed count beside the jobs a one-line tile shows", () => {
+    expect(facts().jobs.alert).toEqual(["2 failed", "✗ 2"]);
   });
 
   it("shows the median response and what 95% of responses beat", () => {

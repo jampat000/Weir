@@ -19,7 +19,7 @@ function lineFor(event) {
     level,
     logger: `weir.${event.type.split(".")[0]}`,
     component: event.type.split(".")[0],
-    message: `${event.title}${subject}`,
+    message: `${event.result === "failed" ? event.title.replace(/ finished$/, " failed") : event.title}${subject}`,
     detail: null,
     traceback: null,
     correlation_id: null,
