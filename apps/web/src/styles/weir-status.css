@@ -1,0 +1,59 @@
+/*
+ * The one recipe for a status. `data-status` names a meaning (lib/ui/status-meaning.ts) and sets --mm-st to its
+ * colour for that element and everything inside it. The dot, word and pill below draw it; a stylesheet that needs
+ * the colour for something else (a bar, a stripe) reads var(--mm-st) and never picks a colour of its own.
+ * Last in the cascade, so a leftover per-feature colour rule cannot outrank it.
+ */
+[data-status="done"] {
+  --mm-st: var(--mm-status-done);
+}
+
+[data-status="todo"] {
+  --mm-st: var(--mm-status-todo);
+}
+
+[data-status="doing"] {
+  --mm-st: var(--mm-status-doing);
+}
+
+[data-status="attention"] {
+  --mm-st: var(--mm-status-attention);
+}
+
+[data-status="broken"] {
+  --mm-st: var(--mm-status-broken);
+}
+
+[data-status="idle"] {
+  --mm-st: var(--mm-status-idle);
+}
+
+.mm-status-dot {
+  display: inline-block;
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--mm-st);
+}
+
+/* Waiting for its turn: the doing blue, not yet filled in. */
+.mm-status-dot[data-status="todo"] {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--mm-st);
+}
+
+.mm-status-text,
+.mm-status-pill {
+  color: var(--mm-st);
+}
+
+/* A pill's size, shape and edge (currentColor) come from the component that wears it (.mm-chip). */
+.mm-status-pill {
+  background: color-mix(in srgb, var(--mm-st) 14%, transparent);
+}
+
+/* Space saved: a figure, never a status. */
+.mm-payoff {
+  color: var(--mm-payoff);
+}
