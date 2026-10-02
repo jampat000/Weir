@@ -45,11 +45,10 @@ def _connection_frames(stream: SseReader, connection_id: int, count: int) -> lis
 
 
 def _opened(stream: SseReader) -> None:
-    """Read the two frames every stream opens with, so it is certainly listening when the test acts."""
+    """Read the frames every stream opens with, so it is certainly listening when the test acts."""
 
     assert stream.next_block() == ["retry: 5000"]
-    event, _ = stream.next_event()
-    assert event == "activity.latest"
+    stream.next_event_named("activity.latest")
 
 
 def _add_manager(operator: WeirClient, fake: FakeManager) -> int:

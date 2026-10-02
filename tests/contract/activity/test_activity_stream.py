@@ -29,8 +29,8 @@ def test_activity_stream_authenticated_emits_latest_format(server, admin: WeirCl
         assert stream.response.headers["x-accel-buffering"] == "no"
 
         assert stream.next_block() == ["retry: 5000"]
-        event, data = stream.next_event()
-        assert event == "activity.latest"
+        # The system.stats frame is sent at once too, so the frame is looked for by name.
+        data = stream.next_event_named("activity.latest")
         assert set(data) == {"latest_event_id", "activity_revision"}
         assert data["latest_event_id"] == _latest_activity_id(admin)
         assert isinstance(data["activity_revision"], int)
@@ -40,7 +40,7 @@ def test_activity_stream_emits_a_newer_id_and_revision_after_a_new_event(
     server, admin: WeirClient, client_factory
 ) -> None:
     with open_stream(server, admin) as stream:
-        _event, first = stream.next_event()
+        first = stream.next_event_named("activity.latest")
         # Signing in again records an Activity event while the stream is open. The stream holds no
         # database session, so the write is not blocked by it.
         other = client_factory(server)
@@ -48,10 +48,9 @@ def test_activity_stream_emits_a_newer_id_and_revision_after_a_new_event(
         latest = _latest_activity_id(admin)
         assert latest > first["latest_event_id"]
 
-        event, data = stream.next_event()
+        data = stream.next_event_named("activity.latest")
         while data["latest_event_id"] < latest:
-            event, data = stream.next_event()
-        assert event == "activity.latest"
+            data = stream.next_event_named("activity.latest")
         assert data["latest_event_id"] == latest
         assert data["activity_revision"] > first["activity_revision"]
 
