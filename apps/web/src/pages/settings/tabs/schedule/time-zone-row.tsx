@@ -88,7 +88,11 @@ export function TimeZoneRow({
         {twoDigits(clock.minute)}. Every time across Weir is in this zone.
       </p>
       {save.isError ? (
-        <p className="mm-status-text--failed mt-2 text-sm" role="alert">
+        <p
+          className="mm-status-text mt-2 text-sm"
+          data-status="broken"
+          role="alert"
+        >
           {errorMessage(save.error, "The time zone could not be saved.")}
         </p>
       ) : null}

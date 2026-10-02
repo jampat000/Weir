@@ -64,7 +64,11 @@ export function LibraryFolderChain({
             Checking this workflow&apos;s folders…
           </p>
         ) : chain.isError ? (
-          <p className="mm-quiet-note mm-status-text--warning" role="alert">
+          <p
+            className="mm-quiet-note mm-status-text"
+            data-status="broken"
+            role="alert"
+          >
             Weir could not check this workflow&apos;s folder chain just now. Try
             Check again in a moment.
           </p>

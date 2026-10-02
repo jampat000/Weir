@@ -10,9 +10,8 @@ export type TestResult = { ok: boolean; error: string | null };
 function TestOutcome({ result }: { result: TestResult }) {
   return (
     <p
-      className={`mm-quiet-table__sub ${
-        result.ok ? "mm-status-text--healthy" : "mm-status-text--failed"
-      }`}
+      className="mm-quiet-table__sub mm-status-text"
+      data-status={result.ok ? "done" : "broken"}
       role="alert"
     >
       {result.ok
@@ -52,7 +51,7 @@ export function ChannelRow({
       <th scope="row" className="mm-quiet-table__name">
         <span>{channel.label}</span>
         <Chip dot={false}>{channel.provider}</Chip>
-        {!channel.enabled ? <Chip tone="warning">Disabled</Chip> : null}
+        {!channel.enabled ? <Chip meaning="idle">Disabled</Chip> : null}
         <span className="mm-quiet-table__sub font-mono">
           {maskWebhookUrl(channel.url)}
         </span>

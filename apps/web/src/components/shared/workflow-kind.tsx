@@ -5,7 +5,7 @@ import {
   type WorkflowKind,
 } from "../../lib/processing/workflow-kind";
 
-/** The kind of a workflow as a badge; linked ones read as connected, Weir-only ones as plain. */
+/** The kind of a workflow as a plain badge: what it is, not how it is doing. */
 export function WorkflowKindBadge({
   kind,
   className,
@@ -16,7 +16,6 @@ export function WorkflowKindBadge({
   const label = workflowBadgeLabel(kind);
   return (
     <Chip
-      tone={kind.kind === "linked" ? "info" : "neutral"}
       dot={false}
       className={className}
       title={label}

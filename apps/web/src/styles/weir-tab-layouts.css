@@ -12,10 +12,6 @@
   color: var(--mm-text3);
 }
 
-.mm-cleanup-what--warn {
-  color: var(--mm-status-warning-text);
-}
-
 .mm-cleanup-every {
   width: 10rem;
 }

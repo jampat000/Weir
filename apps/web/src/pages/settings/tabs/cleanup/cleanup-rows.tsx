@@ -3,6 +3,7 @@ import { useState } from "react";
 import { MmOnOffSwitch } from "../../../../components/ui/mm-on-off-switch";
 import type { MaintenanceFamilyState } from "../../../../lib/processing/maintenance-api";
 import type { ProcessingOperatorSettingsPutBody } from "../../../../lib/processing/types";
+import { classNames } from "../../../../lib/ui/class-names";
 import { mmActionButtonClass } from "../../../../lib/ui/mm-control-roles";
 import { useAppDateFormatter } from "../../../../lib/ui/mm-format-date";
 import type { CleanupConfirmAction } from "./cleanup-confirm-dialog";
@@ -63,9 +64,11 @@ export function CleanupJobRow({
       <th scope="row" className="mm-quiet-table__name">
         <span>{job.name}</span>
         <span
-          className={`mm-cleanup-what${
-            job.destructive ? " mm-cleanup-what--warn" : ""
-          }`}
+          className={classNames(
+            "mm-cleanup-what",
+            job.destructive && "mm-status-text",
+          )}
+          data-status={job.destructive ? "attention" : undefined}
         >
           {state.description}
         </span>

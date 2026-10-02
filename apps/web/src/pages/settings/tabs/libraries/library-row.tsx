@@ -1,4 +1,5 @@
 import { Chip } from "../../../../components/panels/chip";
+import { StatusDot } from "../../../../components/panels/status-dot";
 import { ReorderHandle } from "../../../../components/shared/reorder-handle";
 import type { ReorderHandleProps } from "../../../../components/shared/use-row-reorder";
 import { WorkflowKindBadge } from "../../../../components/shared/workflow-kind";
@@ -55,10 +56,12 @@ function WorkflowSource({
       ) : null}
       {unreachable ? (
         <span
-          className="mm-quiet-table__sub mm-status-text--failed"
+          className="mm-quiet-table__sub mm-status-text inline-flex items-center gap-1.5"
+          data-status="broken"
           title={lastWord}
         >
-          <span aria-hidden="true">● Not answering</span>
+          <StatusDot meaning="broken" />
+          <span aria-hidden="true">Not answering</span>
           <span className="sr-only">{lastWord}</span>
         </span>
       ) : null}

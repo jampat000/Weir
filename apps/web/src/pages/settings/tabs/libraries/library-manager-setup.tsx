@@ -217,7 +217,11 @@ export function LibraryManagerSetup({
         {setup.isLoading ? (
           <p className="mm-quiet-note">Reading your media managers…</p>
         ) : setup.isError ? (
-          <p className="mm-quiet-note mm-status-text--warning" role="alert">
+          <p
+            className="mm-quiet-note mm-status-text"
+            data-status="broken"
+            role="alert"
+          >
             Weir could not read your media managers just now. Reopen this editor
             in a moment.
           </p>

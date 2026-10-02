@@ -220,7 +220,8 @@ export function LibraryEditor({
           ) : null}
           {saveAll.isError ? (
             <p
-              className="mm-status-text--failed mt-4 text-sm"
+              className="mm-status-text mt-4 text-sm"
+              data-status="broken"
               role="alert"
               data-testid="processing-library-save-error"
             >

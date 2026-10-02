@@ -58,7 +58,7 @@ function TrackRow({ track }: { track: ProcessingRulesPreviewTrack }) {
           : NOTHING}
       </td>
       <td data-label="Action">
-        <Chip tone={kept ? "healthy" : "failed"} dot={false}>
+        <Chip meaning={kept ? "idle" : "todo"} dot={false}>
           {kept ? "Keep" : "Drop"}
         </Chip>
       </td>
@@ -89,7 +89,7 @@ export function RulesPreviewResults({
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2 text-sm">
-        <Chip tone={result.remux_required ? "warning" : "healthy"}>
+        <Chip meaning={result.remux_required ? "todo" : "done"}>
           {result.remux_required
             ? "Weir would rewrite this file"
             : "Already matches these rules — no changes needed"}

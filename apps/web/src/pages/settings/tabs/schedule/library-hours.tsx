@@ -62,14 +62,16 @@ function RightNow({
       return <span>Any time</span>;
     case "never":
       return (
-        <span className="mm-status-text--warning">
+        <span className="mm-status-text" data-status="attention">
           Never: no hours are chosen
         </span>
       );
     case "open":
       return (
         <span>
-          <span className="mm-status-text--healthy">Open</span>
+          <span className="mm-status-text" data-status="done">
+            Open
+          </span>
           {state.until ? (
             <span className="mm-quiet-table__sub">until {state.until}</span>
           ) : null}
@@ -78,7 +80,9 @@ function RightNow({
     case "closed":
       return (
         <span>
-          <span className="mm-status-text--warning">Closed</span>
+          <span className="mm-status-text" data-status="idle">
+            Closed
+          </span>
           <span className="mm-quiet-table__sub">opens {state.opens}</span>
         </span>
       );
@@ -120,7 +124,11 @@ function ScanNowButton({
             : "Scan now"}
       </button>
       {queueScan.isError ? (
-        <span className="mm-status-text--failed block text-xs" role="alert">
+        <span
+          className="mm-status-text block text-xs"
+          data-status="broken"
+          role="alert"
+        >
           {errorMessage(queueScan.error, "The scan could not be queued.")}
         </span>
       ) : null}
@@ -239,7 +247,11 @@ export function LibraryHoursEditor({
         disabled={!editable || update.isPending}
       />
       {update.isError ? (
-        <p className="mm-status-text--failed mt-2 text-sm" role="alert">
+        <p
+          className="mm-status-text mt-2 text-sm"
+          data-status="broken"
+          role="alert"
+        >
           {errorMessage(update.error, "These hours could not be saved.")}
         </p>
       ) : null}

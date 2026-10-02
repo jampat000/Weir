@@ -1,7 +1,10 @@
 import type { ReactNode } from "react";
 
 import { Chip } from "../../../../components/panels/chip";
-import type { MmStatusTone } from "../../../../lib/ui/mm-status-tone";
+import {
+  CONNECTION_STATE_MEANING,
+  type ConnectionState,
+} from "../../../../lib/connections/connection-model";
 
 /** What the health chip reads from a media manager or a download client. */
 type TestedConnection = {
@@ -22,16 +25,16 @@ export function lastResult(connection: TestedConnection): boolean | null {
 function health(
   connection: TestedConnection,
   unchecked: string,
-): { words: string; tone: MmStatusTone } {
-  if (!connection.enabled) return { words: "Off", tone: "neutral" };
+): { words: string; state: ConnectionState } {
+  if (!connection.enabled) return { words: "Off", state: "off" };
   const result = lastResult(connection);
-  if (result === null) return { words: unchecked, tone: "neutral" };
+  if (result === null) return { words: unchecked, state: "untested" };
   return result
-    ? { words: "Answering", tone: "healthy" }
-    : { words: "Not answering", tone: "failed" };
+    ? { words: "Answering", state: "ok" }
+    : { words: "Not answering", state: "down" };
 }
 
-/** Whether the connection answers, or that it is switched off, as one chip in the status tones every other good or bad word in Weir uses. */
+/** Whether the connection answers, or that it is switched off, as one chip in the colours every other good or bad word in Weir uses. */
 export function ConnectionHealthChip({
   connection,
   unchecked,
@@ -40,8 +43,8 @@ export function ConnectionHealthChip({
   /** What an enabled connection that has never been checked is called. */
   unchecked: string;
 }) {
-  const { words, tone } = health(connection, unchecked);
-  return <Chip tone={tone}>{words}</Chip>;
+  const { words, state } = health(connection, unchecked);
+  return <Chip meaning={CONNECTION_STATE_MEANING[state]}>{words}</Chip>;
 }
 
 /**
@@ -73,7 +76,7 @@ export function ConnectionStatusLine({
         </span>
       </span>
       {connection.enabled && failed && connection.last_test_detail ? (
-        <p className="mm-conn-row__problem mm-status-text--failed">
+        <p className="mm-conn-row__problem mm-status-text" data-status="broken">
           {connection.last_test_detail}
         </p>
       ) : null}

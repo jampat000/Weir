@@ -137,7 +137,7 @@ export function WizardConnect({
   }
   if (connections.failed) {
     return (
-      <p className="mm-status-text--failed text-sm" role="alert">
+      <p className="mm-status-text text-sm" data-status="broken" role="alert">
         Weir could not load what is connected. Reload the page, or choose
         &ldquo;Neither&rdquo; and pick the folders yourself.
       </p>

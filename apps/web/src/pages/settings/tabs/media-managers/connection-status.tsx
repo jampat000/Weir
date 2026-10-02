@@ -55,7 +55,8 @@ export function UnsignedWebhookBanner({
   const names = joinNames(unsigned.map(connectionTitle));
   return (
     <p
-      className="mm-conn-banner mm-status-text--warning"
+      className="mm-conn-banner mm-status-text"
+      data-status="attention"
       role="alert"
       data-testid="media-manager-unsigned-webhook-warning"
     >

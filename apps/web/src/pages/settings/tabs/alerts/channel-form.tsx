@@ -136,7 +136,7 @@ export function ChannelForm({
       </label>
 
       {saveError ? (
-        <p className="mm-status-text--failed text-sm" role="alert">
+        <p className="mm-status-text text-sm" data-status="broken" role="alert">
           {saveError}
         </p>
       ) : null}

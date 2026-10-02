@@ -142,13 +142,21 @@ export function ConnectionCard({
       <ConnectionFolderChain connectionId={connection.id} />
 
       {test.isError ? (
-        <p className="mm-status-text--failed mt-2 text-sm" role="alert">
+        <p
+          className="mm-status-text mt-2 text-sm"
+          data-status="broken"
+          role="alert"
+        >
           {errorMessage(test.error, TEST_FAILURE)}
         </p>
       ) : null}
 
       {update.isError ? (
-        <p className="mm-status-text--failed mt-2 text-sm" role="alert">
+        <p
+          className="mm-status-text mt-2 text-sm"
+          data-status="broken"
+          role="alert"
+        >
           {errorMessage(update.error, TOGGLE_FAILURE)}
         </p>
       ) : null}

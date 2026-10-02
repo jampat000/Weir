@@ -240,7 +240,8 @@ export function RulesPreviewPanel({
         {preview.error ? (
           <p
             role="alert"
-            className="text-sm font-medium text-mm-status-failed-text"
+            className="mm-status-text text-sm font-medium"
+            data-status="broken"
           >
             {preview.error}
           </p>

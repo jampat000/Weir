@@ -131,7 +131,7 @@ it("keeps a workflow whose manager does not answer as short as the rest, with it
   render(<LibrariesTab />, { wrapper });
 
   const cell = within(await screen.findByTestId("processing-library-1"));
-  const status = cell.getByText("● Not answering");
+  const status = cell.getByText("Not answering");
   expect(status).toHaveAttribute("aria-hidden", "true");
   expect(status.parentElement).toHaveAttribute("title", sentence);
   expect(cell.getByText(sentence)).toHaveClass("sr-only");

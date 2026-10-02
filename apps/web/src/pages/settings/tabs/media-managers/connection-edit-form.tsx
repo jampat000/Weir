@@ -174,7 +174,7 @@ export function ConnectionEditForm({
       ) : null}
 
       {update.isError ? (
-        <p className="mm-status-text--failed text-sm" role="alert">
+        <p className="mm-status-text text-sm" data-status="broken" role="alert">
           {errorMessage(update.error, SAVE_FAILURE)}
         </p>
       ) : null}

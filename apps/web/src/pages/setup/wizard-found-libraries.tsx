@@ -28,7 +28,8 @@ function FoundLibraryProblems({ row }: { row: SuggestedRow }) {
   if (row.check.problem) {
     return (
       <p
-        className="mm-status-text--failed text-sm"
+        className="mm-status-text text-sm"
+        data-status="broken"
         data-testid={`setup-wizard-found-${row.mediaType}-problem`}
       >
         {row.check.problem}
@@ -38,7 +39,7 @@ function FoundLibraryProblems({ row }: { row: SuggestedRow }) {
   const lines = attentionLines(row.check);
   if (lines.length === 0) {
     return (
-      <p className="mm-status-text--healthy text-sm">
+      <p className="mm-status-text text-sm" data-status="done">
         ✓ These folders check out.
       </p>
     );
@@ -144,7 +145,7 @@ export function WizardFoundLibraries({
   if (status.isError) {
     return (
       <div className="space-y-2" role="alert">
-        <p className="mm-status-text--failed text-sm">
+        <p className="mm-status-text text-sm" data-status="broken">
           Weir could not ask what you connected for its folders just now.
         </p>
         <button

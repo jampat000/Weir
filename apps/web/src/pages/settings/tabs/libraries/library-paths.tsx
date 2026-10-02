@@ -33,7 +33,8 @@ export function OutputFolderCell({ library }: { library: ProcessingLibrary }) {
   if (!library.watched_folder) return <Remark>Cleans in place</Remark>;
   return (
     <span
-      className="mm-quiet-table__sub mm-status-text--warning mm-folder-remark"
+      className="mm-quiet-table__sub mm-status-text mm-folder-remark"
+      data-status="attention"
       title={`Needs a folder to clean files into${library.enabled ? "" : ", so it is off"}.`}
     >
       Needs an output folder

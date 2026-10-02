@@ -211,7 +211,11 @@ export function AddWorkflowChoice({
         ) : null}
 
         {suggestions.isError ? (
-          <p className="mm-status-text--failed text-sm" role="alert">
+          <p
+            className="mm-status-text text-sm"
+            data-status="broken"
+            role="alert"
+          >
             {errorMessage(
               suggestions.error,
               "Weir could not ask that media manager for its folders. Choose Local folders, or try again.",

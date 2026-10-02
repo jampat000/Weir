@@ -131,7 +131,9 @@ export function ConnectionSetup({
       <summary className="mm-conn-setup__summary [&::-webkit-details-marker]:hidden">
         <span>How to point {connectionTitle(connection)} at Weir</span>
         {connection.unsigned_webhook_warning !== null ? (
-          <span className="mm-status-text--warning">Needs a secret</span>
+          <span className="mm-status-text" data-status="attention">
+            Needs a secret
+          </span>
         ) : null}
         <span className="mm-quiet-link group-open:hidden">Show →</span>
         <span className="mm-quiet-link hidden group-open:inline">Hide →</span>
@@ -165,7 +167,11 @@ export function ConnectionSetup({
         ) : null}
 
         {!confirmingReplace && secret.isError ? (
-          <p className="mm-status-text--failed mt-2 text-xs" role="alert">
+          <p
+            className="mm-status-text mt-2 text-xs"
+            data-status="broken"
+            role="alert"
+          >
             {errorMessage(secret.error, SECRET_FAILURE)}
           </p>
         ) : null}

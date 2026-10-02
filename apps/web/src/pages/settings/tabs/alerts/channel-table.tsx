@@ -96,7 +96,11 @@ export function ChannelTable({
   return (
     <>
       {toggleError ? (
-        <p className="mm-status-text--failed mt-2 text-sm" role="alert">
+        <p
+          className="mm-status-text mt-2 text-sm"
+          data-status="broken"
+          role="alert"
+        >
           {toggleError}
         </p>
       ) : null}

@@ -149,7 +149,11 @@ function ProcessSettingsForm({
         {save.isPending ? "Saving…" : "Save performance settings"}
       </button>
       {save.isError ? (
-        <span className="mm-status-text--failed text-sm" role="alert">
+        <span
+          className="mm-status-text text-sm"
+          data-status="broken"
+          role="alert"
+        >
           {errorMessage(save.error, "Save failed.")}
         </span>
       ) : null}
