@@ -9,7 +9,7 @@ lives beside them:
 | Screen             | Page component                                   | Screen stylesheet    |
 | ------------------ | ------------------------------------------------ | -------------------- |
 | Processing         | `apps/web/src/pages/processing/processing-page.tsx` | `weir-processing.css` |
-| History            | `apps/web/src/pages/history/history-page.tsx`    | `weir-history.css`   |
+| Activity           | `apps/web/src/pages/activity/activity-page.tsx`  | `weir-history.css`   |
 | Library            | `apps/web/src/pages/library/library-page.tsx`    | `weir-library.css`   |
 | Setup areas        | `apps/web/src/pages/settings/setup-area-layout.tsx`  | `weir-content.css` only |
 | System             | `apps/web/src/pages/system/system-page.tsx`      | `weir-content.css` only |
@@ -33,7 +33,7 @@ Where the screens stand:
 | Screen                 | Lead                                                                                  |
 | ---------------------- | ------------------------------------------------------------------------------------- |
 | Processing             | Its own lead: the live lanes in `weir-processing.css` (Arriving, Waiting, Working, Handing back, Just finished). |
-| History                | None. The file list and the chosen file, divided by a hairline.                        |
+| Activity               | None. The file list and the chosen file, divided by a hairline.                        |
 | Library                | None. The title is the library picker; a row of chips carries the counts and filters. |
 | Settings               | None. Settings has no "now".                                                           |
 | System › Logs › Events | `.mm-lead` with a `.mm-lead-caption`.                                                   |

@@ -102,7 +102,7 @@ wait under **Setup › Workflows › File readiness**, and its own **Minimum fil
 workflow) under **Intake rules**: smaller files, such as samples, are skipped.
 
 - The file shows up on **Processing** while Weir works on it.
-- Once it's done, it shows up in **History**, and the cleaned copy is in the output folder.
+- Once it's done, it shows up in **Activity**, and the cleaned copy is in the output folder.
 
 Already have a library you want to clean up? Open **Library** and pick the workflow from the title.
 A library with no folders yet shows **Set up this library**: add the folders your files sit in and
@@ -116,7 +116,7 @@ clean and what happens to the original file after a clean.
 | Problem | Try this |
 | --- | --- |
 | Files sit in the watched folder and nothing happens | In Docker, check the path in Weir is the path **inside the container**, not the path on the host. Weir can take up to five minutes to notice a file. |
-| "Permission denied" in a file's History | Set `WEIR_PUID` / `WEIR_PGID` to the user that owns your media folders. See [Docker deployment](deployment/docker). |
+| "Permission denied" in a file's Activity | Set `WEIR_PUID` / `WEIR_PGID` to the user that owns your media folders. See [Docker deployment](deployment/docker). |
 | Can't open Weir | Check the container is running and you're using the right port. Weir's health check is at `http://your-server-ip:9347/health`. |
 
 ## Next steps

@@ -5,7 +5,7 @@ title: Posters
 
 # Posters
 
-Weir shows a poster beside each title it lists: on the Pipeline, in **Just finished**, in History, on the Library page and at the top of a file's story. When it has no poster for a title, it shows the title's initials instead.
+Weir shows a poster beside each title it lists: on the Pipeline, in **Just finished**, in Activity, on the Library page and at the top of a file's story. When it has no poster for a title, it shows the title's initials instead.
 
 ## How it finds them
 

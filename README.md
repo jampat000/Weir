@@ -52,7 +52,7 @@ Weir removes them, so every file ends up with just the tracks you chose.
 
 Beyond the cleaning itself:
 
-- **History** keeps a record of every file Weir handled: which tracks it kept and removed, and why a file was held or skipped.
+- **Activity** keeps a record of every file Weir handled: which tracks it kept and removed, and why a file was held or skipped.
 - **Library** lists the files already on your storage, library by library. You can open any file and choose its tracks yourself when the rules don't fit it.
 - **Schedules** set the hours each workflow may start work, so cleaning a large library can wait for the night.
 - **Alerts** go to Discord or any webhook when a file finishes or fails.
@@ -67,13 +67,13 @@ Everything Weir needs comes with it, including ffmpeg and MKVToolNix. There's no
 
 ## Screenshots
 
-| Processing: every file as it is worked on | History: what Weir did to a file, track by track |
+| Processing: every file as it is worked on | Activity: what Weir did to a file, track by track |
 | --- | --- |
-| ![Processing](docs/assets/screenshots/processing.png) | ![History of one file](docs/assets/screenshots/history-detail.png) |
+| ![Processing](docs/assets/screenshots/processing.png) | ![Activity of one file](docs/assets/screenshots/history-detail.png) |
 
-| History | Library: the files already on your storage |
+| Activity | Library: the files already on your storage |
 | --- | --- |
-| ![History](docs/assets/screenshots/history.png) | ![Library](docs/assets/screenshots/library.png) |
+| ![Activity](docs/assets/screenshots/history.png) | ![Library](docs/assets/screenshots/library.png) |
 
 | Setup › Rules › Profiles | Setup › Workflows › Schedule |
 | --- | --- |
@@ -257,7 +257,7 @@ More in the [Windows guide](https://jampat000.github.io/Weir/docs/deployment/win
 3. **Choose what to keep.** Under **Setup › Rules › Profiles**, set the audio and subtitle languages each workflow keeps.
 4. **Try it.** Put a file in a watched folder. Weir usually notices within seconds. On network shares
    and in Docker it can take up to five minutes, because Weir falls back to checking on a timer.
-   The file shows up on **Processing** while it's being worked on, and in **History** once it's done.
+   The file shows up on **Processing** while it's being worked on, and in **Activity** once it's done.
 
 To clean a library you already have, open **Library**, pick the library from the title and press
 **Check again**. Weir shows you what it would remove and how much space that frees before it changes
@@ -345,7 +345,7 @@ What changed in each version: [release notes](https://github.com/jampat000/Weir/
 | Problem | Try this |
 | --- | --- |
 | Files sit in the watched folder and nothing happens | Check the path in Weir is the path **inside the container** (`/media/...`, not `/srv/media/...`). In Docker, Weir may take up to five minutes to notice a file. |
-| "Permission denied" in a file's History | Set `WEIR_PUID` / `WEIR_PGID` to the user that owns your media folders |
+| "Permission denied" in a file's Activity | Set `WEIR_PUID` / `WEIR_PGID` to the user that owns your media folders |
 | Can't open Weir | Check the container is running (`docker ps`) and you're using the right port. Weir's health check is at `http://your-server-ip:9347/health` |
 | Logged out after every restart | You're setting `WEIR_SESSION_SECRET` to a different value each time. Remove it and let Weir manage it |
 

@@ -47,7 +47,7 @@ says where a setting lives and what actually happens when it is saved.
   folder is looked at again shortly after the wait ends, not only at the next periodic scan. A file
   Weir gives up on, because it ran out of attempts or the failure is not one the workflow retries, is
   one state: Failed, with the reason. What happens next is "When retries run out": hand the original
-  back, keep it until someone acts, or reject the release. History's remove dialog and "Try again"
+  back, keep it until someone acts, or reject the release. Activity's remove dialog and "Try again"
   work on a failed file the same way whichever it was.
 - Rules: audio and subtitle handling is a named rule set a workflow points at, so two workflows can
   share one. Deleting a rule set a workflow still uses is refused rather than silently stripping that
@@ -87,7 +87,7 @@ says where a setting lives and what actually happens when it is saved.
 - Cleanup: holds the leftover-work-file sweep, "Keep a failed file's half-written copy for a day" (a failed
   copy stays in the work folder until it is a day old, at which point the sweep removes it; a restart
   removes it no sooner) and the cleaned-copies-nobody-picked-up job. There is no cleanup of the
-  downloads of failed files: a failed download is handled from History's remove dialog and by the
+  downloads of failed files: a failed download is handled from Activity's remove dialog and by the
   workflow's "When retries run out".
 - System › Logs: "Keep a file's history for N days after it's gone" (0 keeps it for ever) is saved to the database
   and enforced by an hourly job. A file's history is kept for as long as Weir still knows the file, then

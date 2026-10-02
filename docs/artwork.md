@@ -1,6 +1,6 @@
 # Posters and original languages
 
-Weir shows a poster for the files it lists (Pipeline cards, the Just finished shelf, History, the Library page and a file's story). It gets them from Deluno's metadata service, which needs no key, and never from the browser: the web app only ever asks Weir for `/api/v1/artwork/posters/{id}`. The same lookup tells Weir the original language of each title, which a profile's *Keep the original language* rule uses. There is nothing to set up for either.
+Weir shows a poster for the files it lists (Pipeline cards, the Just finished shelf, Activity, the Library page and a file's story). It gets them from Deluno's metadata service, which needs no key, and never from the browser: the web app only ever asks Weir for `/api/v1/artwork/posters/{id}`. The same lookup tells Weir the original language of each title, which a profile's *Keep the original language* rule uses. There is nothing to set up for either.
 
 ## Where a file's title comes from
 

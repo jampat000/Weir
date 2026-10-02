@@ -14,7 +14,7 @@ const features = [
       'The first screen. Every file Weir is working on, from the moment it lands in a watched folder until your media manager has the cleaned copy.',
   },
   {
-    title: 'History',
+    title: 'Activity',
     description:
       'Every file Weir has touched: what it was, which tracks it kept and removed, and what came out. When something goes wrong, the reason is here.',
   },
@@ -39,11 +39,11 @@ const screenshots = [
     alt: "Weir's Processing screen",
   },
   {
-    title: 'History',
+    title: 'Activity',
     caption:
       'Every file Weir has touched: what it was, what Weir did, and what came out.',
     src: '/img/history.png',
-    alt: "Weir's History screen",
+    alt: "Weir's Activity screen",
   },
 ];
 

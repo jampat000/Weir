@@ -48,7 +48,7 @@ def ensure_signed_in(page: Page, base_url: str) -> None:
 
 
 def open_sidebar(page: Page, label: str) -> None:
-    # A link that carries a count is named for it ("Processing, 2 working", "History, 1 need you").
+    # A link that carries a count is named for it ("Processing, 2 working", "Activity, 1 need you").
     page.get_by_role("link", name=re.compile(rf"^{re.escape(label)}(?:,|$)")).click()
 
 
@@ -69,7 +69,7 @@ def open_tab(page: Page, sidebar: str, tab: str) -> None:
 
 
 def open_logs(page: Page, show: str = "Events") -> None:
-    """System › Logs: Weir's own events, its jobs and the server log. Each file's story is in History.
+    """System › Logs: Weir's own events, its jobs and the server log. Each file's story is in Activity.
 
     ``show`` is the label of one option in its Show choice.
     """

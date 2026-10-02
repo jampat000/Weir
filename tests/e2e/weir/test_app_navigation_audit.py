@@ -78,19 +78,19 @@ def test_signed_in_navigation_covers_main_screens_and_tabs(weir_shell: str) -> N
 
             ensure_signed_in(page, base)
 
-            # The Dashboard (the landing screen) and History, Library, each setup area, then System.
+            # The Dashboard (the landing screen) and Activity, Library, each setup area, then System.
             primary = page.get_by_role("navigation", name="Primary")
             # The labels, not the links: the Dashboard link also carries its "1 working" badge while a file runs.
             expect(primary.locator(".mm-sidebar-link-label")).to_have_text(
                 [
                     "Dashboard",
-                    "History",
+                    "Activity",
                     "Library",
                     *[label for label, _, _ in SETUP_AREAS],
                     "System",
                 ]
             )
-            for retired in ("Home", "Processing", "Activity"):
+            for retired in ("Home", "Processing", "History"):
                 expect(page.get_by_role("link", name=retired, exact=True)).to_have_count(0)
 
             open_sidebar(page, "Dashboard")
@@ -104,9 +104,9 @@ def test_signed_in_navigation_covers_main_screens_and_tabs(weir_shell: str) -> N
             expect(page.get_by_test_id("processing-page")).to_be_visible()
 
             # Every file Weir has touched, with what it kept and removed.
-            open_sidebar(page, "History")
-            expect(page).to_have_url(re.compile(r".*/history(?:$|[?#])"))
-            expect(page.get_by_test_id("history-page")).to_be_visible()
+            open_sidebar(page, "Activity")
+            expect(page).to_have_url(re.compile(r".*/activity(?:$|[?#])"))
+            expect(page.get_by_test_id("activity-page")).to_be_visible()
             # Needs you is every file waiting on a person, as the sidebar's badge counts them, in whichever group it
             # is; a skip is its own neutral group rather than counting as Failed, on_hold sits under On hold, and
             # Kept lists the files the owner chose to keep without processing.
@@ -122,6 +122,11 @@ def test_signed_in_navigation_covers_main_screens_and_tabs(weir_shell: str) -> N
                     re.compile(r"^Kept\s"),
                 ]
             )
+
+            # History was this page's name: an old link or bookmark lands here with its filters.
+            page.goto(f"{base}/history?show=failed&within=all", wait_until="domcontentloaded")
+            expect(page).to_have_url(re.compile(r".*/activity\?show=failed&within=all$"))
+            expect(page.get_by_test_id("activity-page")).to_be_visible()
 
             open_sidebar(page, "Library")
             expect(page).to_have_url(re.compile(r".*/library(?:$|[?#])"))

@@ -21,7 +21,7 @@ Use the Velopack setup exe from the release being validated.
     - Choose Deluno, Sonarr / Radarr or a download client, connect it, and confirm it tests as connected and the Movies and TV workflows are offered with folders filled in, each with its kind badge.
     - Confirm an unreachable address says so and leaves Neither available.
     - Confirm `Finish setup` saves the time zone, the ticked workflows (linked to the media manager when there is one) and the automatic backup schedule, and that What's next no longer offers to connect a media manager.
-13. Confirm the side menu shows Processing and History under Live, Library under Your library, Workflows, Rules, Media managers, Performance, Schedule, Cleanup and Alerts under Setup, and System under Weir, and that Processing is the first screen.
+13. Confirm the side menu shows Processing and Activity under Live, Library under Your library, Workflows, Rules, Media managers, Performance, Schedule, Cleanup and Alerts under Setup, and System under Weir, and that Processing is the first screen.
 14. Confirm each Setup item opens its own Settings section, with the section name as the page title and no row of tabs on the page.
 15. Confirm System shows the tabs About, Backups, Security and Logs.
 16. In System › Backups, use **Export or restore now** to download a configuration backup.
@@ -73,7 +73,7 @@ both `linux/amd64` and `linux/arm64` when hardware for both is available.
 8. Confirm the setup wizard opens.
 9. Complete or skip the setup wizard and confirm System › About can reopen it.
 10. Confirm `/health` returns healthy while the container is running.
-11. Drop a file into a watched folder and confirm Processing shows it without a manual page reload, and that it then appears in History.
+11. Drop a file into a watched folder and confirm Processing shows it without a manual page reload, and that it then appears in Activity.
 12. Confirm System › Logs shows application and runtime events, not developer build noise.
 13. Confirm System › Backups can export and restore a configuration backup against the mounted volume.
 14. Stop and restart the container with the same volume.

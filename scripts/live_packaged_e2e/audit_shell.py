@@ -11,7 +11,7 @@ from .config import BASE_URL
 
 class AuditShellMixin:
     def open_sidebar(self, label: str) -> None:
-        # A link that carries a count is named for it ("Processing, 2 working", "History, 1 need you").
+        # A link that carries a count is named for it ("Processing, 2 working", "Activity, 1 need you").
         link = self.page.get_by_role("link", name=re.compile(rf"^{re.escape(label)}(?:,|$)"))
         self.click(link, f"open {label} from primary navigation")
 
@@ -129,15 +129,15 @@ class AuditShellMixin:
             self.page.get_by_role("heading", name="Dashboard", exact=True),
             "Dashboard heading",
         )
-        # The landing page is the Dashboard, every file's story is History, and the
-        # 3.1 Activity page is System › Logs. Each setup area is an entry of its own.
+        # The landing page is the Dashboard, every file's story is Activity, and the
+        # events are System › Logs. Each setup area is an entry of its own.
         primary = self.page.get_by_role("navigation", name="Primary")
         labels = [text.strip() for text in primary.locator(".mm-sidebar-link-label").all_text_contents()]
         self.require(
             labels
             == [
                 "Dashboard",
-                "History",
+                "Activity",
                 "Library",
                 "Workflows",
                 "Rules",

@@ -1,4 +1,4 @@
-"""``AuditSettingsMixin``: the setup areas, History and Logs jobs, and every System tab except
+"""``AuditSettingsMixin``: the setup areas, Activity and Logs jobs, and every System tab except
 Alerts and Media managers (those are ``AuditNotificationsMixin``). Assumes ``AuditCore`` and
 ``AuditShellMixin`` (``open_sidebar``, ``open_tab``, ``open_logs``, ``tab_labels``) in the same
 instance.
@@ -82,10 +82,10 @@ class AuditSettingsMixin:
                 "no library weeks on Schedule",
             )
 
-    def history_and_jobs(self) -> None:
-        # History: every file Weir has touched, with the open file's record beside the list.
-        self.open_sidebar("History")
-        self.visible(self.page.get_by_test_id("history-page"), "History page")
+    def activity_and_jobs(self) -> None:
+        # Activity: every file Weir has touched, with the open file's record beside the list.
+        self.open_sidebar("Activity")
+        self.visible(self.page.get_by_test_id("activity-page"), "Activity page")
         chips = self.page.get_by_role("group", name="Show").get_by_role("button")
         # Needs you is every file waiting on a person, as the sidebar's badge counts them, in whichever group it
         # is; a skip is its own neutral group rather than counting as Failed, on_hold sits under On hold, and
@@ -107,23 +107,23 @@ class AuditSettingsMixin:
                 text.startswith(label)
                 for text, label in zip(chip_texts, expected_chip_labels)
             ),
-            f"History shows {chip_texts!r}, not {expected_chip_labels!r} in order",
+            f"Activity shows {chip_texts!r}, not {expected_chip_labels!r} in order",
         )
         # A fresh install has no files, so assert whichever of the two states is real, and never
         # that the page rendered nothing at all.
-        if self.page.get_by_test_id("history-detail").count():
-            self.visible(self.page.get_by_test_id("history-detail"), "History open file")
+        if self.page.get_by_test_id("activity-detail").count():
+            self.visible(self.page.get_by_test_id("activity-detail"), "Activity open file")
         else:
             self.require(
                 self.page.get_by_text("Nothing yet.", exact=False).count() > 0
                 or self.page.get_by_text("No file matches", exact=False).count() > 0,
-                "History showed neither files nor its empty state",
+                "Activity showed neither files nor its empty state",
             )
         search = self.page.get_by_role("searchbox", name="Find a file")
         search.fill("audit")
         search.press("Enter")
-        self.visible(self.page.get_by_test_id("history-page"), "History after a search")
-        self.screenshot("history")
+        self.visible(self.page.get_by_test_id("activity-page"), "Activity after a search")
+        self.screenshot("activity")
 
         self.open_logs("Weir's jobs")
         self.visible(
@@ -131,7 +131,7 @@ class AuditSettingsMixin:
             "Logs jobs list",
         )
         self.screenshot("logs-jobs")
-        self.record("History: every file and its record; Logs: Weir's jobs")
+        self.record("Activity: every file and its record; Logs: Weir's jobs")
 
     def system_instance_and_setup(self) -> None:
         self.open_sidebar("System")

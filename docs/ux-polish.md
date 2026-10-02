@@ -17,7 +17,7 @@ the two disagree, that document wins.
 - Page bodies are borderless: a heading, a hairline, then content. Dialogs are the only card-shaped surfaces.
 - Settings and System use one horizontal tab row each. It scrolls horizontally on narrow screens while keeping the tab-to-panel accessibility contract.
 - Settings groups follow the order someone sets Weir up in, and are grouped by user task, not backend implementation.
-- Processing is the first screen: what Weir is working on right now and anything that needs a person. A file's full story belongs in History; Weir's own events belong in System › Logs.
+- Processing is the first screen: what Weir is working on right now and anything that needs a person. A file's full story belongs in Activity; Weir's own events belong in System › Logs.
 - The document is the page scroll owner. Do not trap signed-in pages inside a fixed-height nested scrolling pane.
 - Nothing scrolls sideways at any width. Tables and lanes restack instead.
 - Empty states are compact, aligned with the surrounding layout, and say what to do next.
@@ -39,7 +39,7 @@ the two disagree, that document wins.
 ## Screen-specific baseline
 
 - Processing shows live work, not just navigation: what is arriving, waiting, working, handing back and just finished, and anything blocking it.
-- History shows every file Weir has touched. A file's processing record can show before/after file details, size saved, languages, subtitles and removals, the plan, output validation, source cleanup and duration, with the raw payload behind a further `<details>`.
+- Activity shows every file Weir has touched. A file's processing record can show before/after file details, size saved, languages, subtitles and removals, the plan, output validation, source cleanup and duration, with the raw payload behind a further `<details>`.
 - Library shows the files already in a library and what Weir would do to each. The library is picked from the title.
 - System › Logs is live, filterable, searchable, color-coded, and readable at scale.
 - Folder path inputs support `Browse` where technically possible and accept manual local, Docker, and UNC-style paths.
