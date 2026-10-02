@@ -124,7 +124,7 @@ public sealed class JobsInspectionStore
 
     // Timestamps go through the strict ISO reader in SqliteValues rather than ProcessingJobStore.ReadJob's parser: the two
     // differ on unusual stored text, and the inspection API keeps its existing output and errors.
-    private static ProcessingJob Read(SqliteDataReader reader) => new(
+    internal static ProcessingJob Read(SqliteDataReader reader) => new(
         reader.GetInt64(0),
         reader.GetString(1),
         reader.GetString(2),

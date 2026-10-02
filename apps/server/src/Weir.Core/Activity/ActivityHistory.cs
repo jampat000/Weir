@@ -204,7 +204,7 @@ public static class ActivityHistory
     /// or <c>\n</c>; quotes inside are doubled. A field that a spreadsheet would read as a formula is written
     /// as text first (<see cref="AsSpreadsheetText"/>).
     /// </summary>
-    private static void AppendCsvLine(StringBuilder builder, IReadOnlyList<string> fields)
+    public static void AppendCsvLine(StringBuilder builder, IReadOnlyList<string> fields)
     {
         for (var index = 0; index < fields.Count; index++)
         {

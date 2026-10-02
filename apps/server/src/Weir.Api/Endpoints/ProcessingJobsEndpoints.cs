@@ -8,7 +8,6 @@ using Weir.Core.Jobs;
 using Weir.Core.Json;
 using Weir.Core.MediaManagers;
 using Weir.Core.Processing;
-using Weir.Core.Time;
 using Weir.Core.Validation;
 using Weir.Infrastructure.Activity;
 using Weir.Infrastructure.Jobs;
@@ -63,27 +62,6 @@ internal sealed class ProcessingJobsEndpointHandlers
         _libraries = libraries ?? throw new ArgumentNullException(nameof(libraries));
     }
 
-    private static WireObject JobOut(ProcessingJob job)
-    {
-        var (message, nextAction, technicalDetail) = OperatorJobStatus.Build("processing", job.JobKind, job.Status, job.LastError, job.PayloadJson);
-        return new WireObject()
-            .Set("id", job.Id)
-            .Set("dedupe_key", job.DedupeKey)
-            .Set("job_kind", job.JobKind)
-            .Set("status", job.Status)
-            .Set("attempt_count", job.AttemptCount)
-            .Set("max_attempts", job.MaxAttempts)
-            .Set("lease_owner", job.LeaseOwner)
-            .Set("lease_expires_at", job.LeaseExpiresAt is { } lease ? Timestamp.FromDateTimeOffset(lease).ToWireText() : null)
-            .Set("last_error", job.LastError)
-            .Set("operator_message", message)
-            .Set("next_action", nextAction)
-            .Set("technical_detail", technicalDetail)
-            .Set("payload_json", job.PayloadJson)
-            .Set("created_at", Timestamp.FromDateTimeOffset(job.CreatedAt).ToWireText())
-            .Set("updated_at", Timestamp.FromDateTimeOffset(job.UpdatedAt).ToWireText());
-    }
-
     public async Task<ApiResult> GetInspectionAsync(ApiRequest request)
     {
         await request.RequireUserAsync().ConfigureAwait(false);
@@ -106,7 +84,7 @@ internal sealed class ProcessingJobsEndpointHandlers
         var uow = await request.DbAsync().ConfigureAwait(false);
         var (rows, defaultRecentSlice) = await _jobsInspection.ListAsync(uow, limit, statuses.Count > 0 ? statuses : null, knownFilesOnly).ConfigureAwait(false);
         return ApiRoutes.Ok(new WireObject()
-            .Set("jobs", new WireArray(rows.Select(r => (WireValue)JobOut(r))))
+            .Set("jobs", new WireArray(rows.Select(r => (WireValue)ProcessingJobWire.Out(r))))
             .Set("default_recent_slice", defaultRecentSlice));
     }
 

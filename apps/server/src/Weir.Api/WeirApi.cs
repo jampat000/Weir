@@ -136,6 +136,7 @@ public static class WeirApi
             endpoints.MapSystemEndpoints();
             endpoints.MapSystemStatsEndpoints();
             endpoints.MapSystemOverviewEndpoints();
+            endpoints.MapSystemLogEndpoints();
             endpoints.MapOpenApiEndpoint();
             endpoints.MapMetricsEndpoint();
             endpoints.MapAuthEndpoints();

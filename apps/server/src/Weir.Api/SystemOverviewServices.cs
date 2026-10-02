@@ -4,6 +4,7 @@ using Weir.Api.Endpoints;
 using Weir.Core.Configuration;
 using Weir.Infrastructure.Http;
 using Weir.Infrastructure.Runtime;
+using Weir.Infrastructure.SystemLog;
 
 namespace Weir.Api;
 
@@ -25,6 +26,8 @@ public static class SystemOverviewServices
         services.TryAddSingleton<SystemOverviewEndpointHandlers>();
         services.TryAddSingleton<SystemTasksFrames>();
         services.TryAddSingleton<SystemLogFrames>();
+        services.TryAddSingleton<SystemLogReader>();
+        services.TryAddSingleton<SystemLogEndpointHandlers>();
         return services;
     }
 }

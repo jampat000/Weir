@@ -2256,6 +2256,46 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/system/log": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get System Log
+     * @description Weir's events, its jobs and its server log as one list, newest first, with a cursor for the next page and the counts the filter chips show. Events are Weir's own (a file's story is on Activity); a finished watched-folder scan is left out unless a job status is asked for.
+     */
+    get: operations["get_system_log_api_v1_system_log_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/system/log/export": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get System Log Export
+     * @description The log for the same filters as a file, newest first: a spreadsheet (csv) or the rows as the API returns them (json).
+     */
+    get: operations["get_system_log_export_api_v1_system_log_export_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/system/media-tools": {
     parameters: {
       query?: never;
@@ -7522,6 +7562,36 @@ export interface components {
       /** Windows Installer Url */
       windows_installer_url?: string | null;
     };
+    /** @description How many rows each category would show with every other filter applied. */
+    SystemLogCategoryCountsOut: {
+      /** backups */
+      backups: number;
+      /** cleanup */
+      cleanup: number;
+      /** connections */
+      connections: number;
+      /** library */
+      library: number;
+      /** processing */
+      processing: number;
+      /** scans */
+      scans: number;
+      /** sign_in */
+      sign_in: number;
+      /** updates */
+      updates: number;
+      /** weir */
+      weir: number;
+    };
+    /**
+     * SystemLogCountsOut
+     * @description What each filter choice would show: every count has all the other filters applied but not its own, so a chip says how many rows choosing it gives. Level and category counts cover the sources the filters name.
+     */
+    SystemLogCountsOut: {
+      category: components["schemas"]["SystemLogCategoryCountsOut"];
+      level: components["schemas"]["SystemLogLevelCountsOut"];
+      source: components["schemas"]["SystemLogSourceCountsOut"];
+    };
     /**
      * SystemLogFrame
      * @description The data of a system.log frame on GET /activity/stream: one warning or error Weir just wrote to its log. GET /suite/logs has what was logged before the stream opened.
@@ -7544,6 +7614,120 @@ export interface components {
        * @description What the log line says.
        */
       message: string;
+    };
+    /** @description How many rows each level would show with every other filter applied. */
+    SystemLogLevelCountsOut: {
+      /** error */
+      error: number;
+      /** info */
+      info: number;
+      /** success */
+      success: number;
+      /** warning */
+      warning: number;
+    };
+    /**
+     * SystemLogOut
+     * @description One page of System › Logs, newest first.
+     */
+    SystemLogOut: {
+      counts: components["schemas"]["SystemLogCountsOut"];
+      /** Items */
+      items: components["schemas"]["SystemLogRowOut"][];
+      /**
+       * Next Cursor
+       * @description Pass as cursor for the next page; null on the last.
+       */
+      next_cursor: string | null;
+      /**
+       * Total
+       * @description Rows the filters match, across every page.
+       */
+      total: number;
+    };
+    /**
+     * SystemLogRowOut
+     * @description One thing that happened, whichever source recorded it. Exactly one of event, job and server holds the source's own record; the other two are null.
+     */
+    SystemLogRowOut: {
+      /**
+       * At
+       * Format: date-time
+       * @description When it happened.
+       */
+      at: string;
+      /**
+       * Category
+       * @description What it is about.
+       * @enum {string}
+       */
+      category:
+        | "processing"
+        | "scans"
+        | "cleanup"
+        | "library"
+        | "connections"
+        | "backups"
+        | "sign_in"
+        | "updates"
+        | "weir";
+      /**
+       * Detail
+       * @description A quieter second line.
+       */
+      detail: string | null;
+      /** Event */
+      event: components["schemas"]["ActivityEventItemOut"] | null;
+      /**
+       * Id
+       * @description The source and the row's number in it, such as event:41.
+       */
+      id: string;
+      /** Job */
+      job: components["schemas"]["ProcessingJobInspectionRow"] | null;
+      /**
+       * Level
+       * @description How it went.
+       * @enum {string}
+       */
+      level: "error" | "warning" | "info" | "success";
+      /** Server */
+      server: components["schemas"]["SuiteLogEntryOut"] | null;
+      /**
+       * Source
+       * @description Where the row came from.
+       * @enum {string}
+       */
+      source: "event" | "job" | "server";
+      /**
+       * Title
+       * @description One line in plain words.
+       */
+      title: string;
+      /** Workflow */
+      workflow: components["schemas"]["SystemLogWorkflowOut"] | null;
+    };
+    /** @description How many rows each source would show with every other filter applied. */
+    SystemLogSourceCountsOut: {
+      /** event */
+      event: number;
+      /** job */
+      job: number;
+      /** server */
+      server: number;
+    };
+    /**
+     * SystemLogWorkflowOut
+     * @description The workflow a row belongs to.
+     */
+    SystemLogWorkflowOut: {
+      /** Id */
+      id: number;
+      /**
+       * Name
+       * @description Null once the workflow has been deleted.
+       */
+      name: string | null;
     };
     /**
      * SystemOverviewChecksOut
@@ -12478,6 +12662,122 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["DirectoryBrowseOut"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_system_log_api_v1_system_log_get: {
+    parameters: {
+      query?: {
+        /** @description Where rows come from: event, job, server. Repeat it or separate with commas. None means all. */
+        source?: string | null;
+        /** @description How rows went: error, warning, info, success. Repeat it or separate with commas. */
+        level?: string | null;
+        /** @description What rows are about: processing, scans, cleanup, library, connections, backups, sign_in, updates, weir. Repeat it or separate with commas. */
+        category?: string | null;
+        /** @description A workflow's id. Leaves out the server log, whose lines belong to no workflow. */
+        workflow?: number | null;
+        /** @description Words to find in a row's text. */
+        q?: string | null;
+        /** @description Only rows at or after this time (ISO 8601; without an offset it is UTC). */
+        from?: string | null;
+        /** @description Only rows at or before this time (ISO 8601; without an offset it is UTC). */
+        to?: string | null;
+        /** @description One job's id: its row, the events that name it and the server lines written while it ran. */
+        job?: number | null;
+        /** @description An Activity event type. Only events have one, so this leaves out jobs and server lines. */
+        event_type?: string | null;
+        /** @description An Activity event's result: success, skipped, warning, retrying, running, failed. Only events have one. */
+        result?: string | null;
+        /** @description Why an Activity event happened: manual, scheduled, startup, worker, retry, system, webhook, folder_change. Only events have one. */
+        trigger?: string | null;
+        /** @description Job statuses: pending, leased, completed, failed, cancelled, handler_ok_finalize_failed. Repeat it or separate with commas. Only jobs have one; asking for any also shows finished watched-folder scans, which are otherwise left out. */
+        status?: string | null;
+        /** @description Only server lines that carry an exception (true) or none (false). Only the server log has them. */
+        has_exception?: boolean | null;
+        /** @description Where the page starts: the next_cursor of the page before. */
+        cursor?: string | null;
+        limit?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["SystemLogOut"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_system_log_export_api_v1_system_log_export_get: {
+    parameters: {
+      query?: {
+        format?: string;
+        /** @description Where rows come from: event, job, server. Repeat it or separate with commas. None means all. */
+        source?: string | null;
+        /** @description How rows went: error, warning, info, success. Repeat it or separate with commas. */
+        level?: string | null;
+        /** @description What rows are about: processing, scans, cleanup, library, connections, backups, sign_in, updates, weir. Repeat it or separate with commas. */
+        category?: string | null;
+        /** @description A workflow's id. Leaves out the server log, whose lines belong to no workflow. */
+        workflow?: number | null;
+        /** @description Words to find in a row's text. */
+        q?: string | null;
+        /** @description Only rows at or after this time (ISO 8601; without an offset it is UTC). */
+        from?: string | null;
+        /** @description Only rows at or before this time (ISO 8601; without an offset it is UTC). */
+        to?: string | null;
+        /** @description One job's id: its row, the events that name it and the server lines written while it ran. */
+        job?: number | null;
+        /** @description An Activity event type. Only events have one, so this leaves out jobs and server lines. */
+        event_type?: string | null;
+        /** @description An Activity event's result: success, skipped, warning, retrying, running, failed. Only events have one. */
+        result?: string | null;
+        /** @description Why an Activity event happened: manual, scheduled, startup, worker, retry, system, webhook, folder_change. Only events have one. */
+        trigger?: string | null;
+        /** @description Job statuses: pending, leased, completed, failed, cancelled, handler_ok_finalize_failed. Repeat it or separate with commas. Only jobs have one; asking for any also shows finished watched-folder scans, which are otherwise left out. */
+        status?: string | null;
+        /** @description Only server lines that carry an exception (true) or none (false). Only the server log has them. */
+        has_exception?: boolean | null;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
         };
       };
       /** @description Validation Error */

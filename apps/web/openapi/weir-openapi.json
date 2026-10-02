@@ -10536,6 +10536,81 @@
         "title": "SuiteUpdateStatusOut",
         "type": "object"
       },
+      "SystemLogCategoryCountsOut": {
+        "additionalProperties": false,
+        "description": "How many rows each category would show with every other filter applied.",
+        "properties": {
+          "backups": {
+            "title": "backups",
+            "type": "integer"
+          },
+          "cleanup": {
+            "title": "cleanup",
+            "type": "integer"
+          },
+          "connections": {
+            "title": "connections",
+            "type": "integer"
+          },
+          "library": {
+            "title": "library",
+            "type": "integer"
+          },
+          "processing": {
+            "title": "processing",
+            "type": "integer"
+          },
+          "scans": {
+            "title": "scans",
+            "type": "integer"
+          },
+          "sign_in": {
+            "title": "sign_in",
+            "type": "integer"
+          },
+          "updates": {
+            "title": "updates",
+            "type": "integer"
+          },
+          "weir": {
+            "title": "weir",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "processing",
+          "scans",
+          "cleanup",
+          "library",
+          "connections",
+          "backups",
+          "sign_in",
+          "updates",
+          "weir"
+        ],
+        "type": "object"
+      },
+      "SystemLogCountsOut": {
+        "description": "What each filter choice would show: every count has all the other filters applied but not its own, so a chip says how many rows choosing it gives. Level and category counts cover the sources the filters name.",
+        "properties": {
+          "category": {
+            "$ref": "#/components/schemas/SystemLogCategoryCountsOut"
+          },
+          "level": {
+            "$ref": "#/components/schemas/SystemLogLevelCountsOut"
+          },
+          "source": {
+            "$ref": "#/components/schemas/SystemLogSourceCountsOut"
+          }
+        },
+        "required": [
+          "source",
+          "level",
+          "category"
+        ],
+        "title": "SystemLogCountsOut",
+        "type": "object"
+      },
       "SystemLogFrame": {
         "description": "The data of a system.log frame on GET /activity/stream: one warning or error Weir just wrote to its log. GET /suite/logs has what was logged before the stream opened.",
         "properties": {
@@ -10567,6 +10642,255 @@
           "message"
         ],
         "title": "SystemLogFrame",
+        "type": "object"
+      },
+      "SystemLogLevelCountsOut": {
+        "additionalProperties": false,
+        "description": "How many rows each level would show with every other filter applied.",
+        "properties": {
+          "error": {
+            "title": "error",
+            "type": "integer"
+          },
+          "info": {
+            "title": "info",
+            "type": "integer"
+          },
+          "success": {
+            "title": "success",
+            "type": "integer"
+          },
+          "warning": {
+            "title": "warning",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "error",
+          "warning",
+          "info",
+          "success"
+        ],
+        "type": "object"
+      },
+      "SystemLogOut": {
+        "description": "One page of System › Logs, newest first.",
+        "properties": {
+          "counts": {
+            "$ref": "#/components/schemas/SystemLogCountsOut"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SystemLogRowOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Pass as cursor for the next page; null on the last.",
+            "title": "Next Cursor"
+          },
+          "total": {
+            "description": "Rows the filters match, across every page.",
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor",
+          "total",
+          "counts"
+        ],
+        "title": "SystemLogOut",
+        "type": "object"
+      },
+      "SystemLogRowOut": {
+        "description": "One thing that happened, whichever source recorded it. Exactly one of event, job and server holds the source's own record; the other two are null.",
+        "properties": {
+          "at": {
+            "description": "When it happened.",
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "category": {
+            "description": "What it is about.",
+            "enum": [
+              "processing",
+              "scans",
+              "cleanup",
+              "library",
+              "connections",
+              "backups",
+              "sign_in",
+              "updates",
+              "weir"
+            ],
+            "title": "Category",
+            "type": "string"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A quieter second line.",
+            "title": "Detail"
+          },
+          "event": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ActivityEventItemOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Event"
+          },
+          "id": {
+            "description": "The source and the row's number in it, such as event:41.",
+            "title": "Id",
+            "type": "string"
+          },
+          "job": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProcessingJobInspectionRow"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job"
+          },
+          "level": {
+            "description": "How it went.",
+            "enum": [
+              "error",
+              "warning",
+              "info",
+              "success"
+            ],
+            "title": "Level",
+            "type": "string"
+          },
+          "server": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SuiteLogEntryOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Server"
+          },
+          "source": {
+            "description": "Where the row came from.",
+            "enum": [
+              "event",
+              "job",
+              "server"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "title": {
+            "description": "One line in plain words.",
+            "title": "Title",
+            "type": "string"
+          },
+          "workflow": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SystemLogWorkflowOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workflow"
+          }
+        },
+        "required": [
+          "id",
+          "source",
+          "at",
+          "level",
+          "category",
+          "workflow",
+          "title",
+          "detail",
+          "event",
+          "job",
+          "server"
+        ],
+        "title": "SystemLogRowOut",
+        "type": "object"
+      },
+      "SystemLogSourceCountsOut": {
+        "additionalProperties": false,
+        "description": "How many rows each source would show with every other filter applied.",
+        "properties": {
+          "event": {
+            "title": "event",
+            "type": "integer"
+          },
+          "job": {
+            "title": "job",
+            "type": "integer"
+          },
+          "server": {
+            "title": "server",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "event",
+          "job",
+          "server"
+        ],
+        "type": "object"
+      },
+      "SystemLogWorkflowOut": {
+        "description": "The workflow a row belongs to.",
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null once the workflow has been deleted.",
+            "title": "Name"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "SystemLogWorkflowOut",
         "type": "object"
       },
       "SystemOverviewChecksOut": {
@@ -18513,6 +18837,566 @@
         "summary": "Get System Directories",
         "tags": [
           "system"
+        ]
+      }
+    },
+    "/api/v1/system/log": {
+      "get": {
+        "description": "Weir's events, its jobs and its server log as one list, newest first, with a cursor for the next page and the counts the filter chips show. Events are Weir's own (a file's story is on Activity); a finished watched-folder scan is left out unless a job status is asked for.",
+        "operationId": "get_system_log_api_v1_system_log_get",
+        "parameters": [
+          {
+            "description": "Where rows come from: event, job, server. Repeat it or separate with commas. None means all.",
+            "in": "query",
+            "name": "source",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Source"
+            }
+          },
+          {
+            "description": "How rows went: error, warning, info, success. Repeat it or separate with commas.",
+            "in": "query",
+            "name": "level",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Level"
+            }
+          },
+          {
+            "description": "What rows are about: processing, scans, cleanup, library, connections, backups, sign_in, updates, weir. Repeat it or separate with commas.",
+            "in": "query",
+            "name": "category",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Category"
+            }
+          },
+          {
+            "description": "A workflow's id. Leaves out the server log, whose lines belong to no workflow.",
+            "in": "query",
+            "name": "workflow",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Workflow"
+            }
+          },
+          {
+            "description": "Words to find in a row's text.",
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 200,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          },
+          {
+            "description": "Only rows at or after this time (ISO 8601; without an offset it is UTC).",
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "From"
+            }
+          },
+          {
+            "description": "Only rows at or before this time (ISO 8601; without an offset it is UTC).",
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "To"
+            }
+          },
+          {
+            "description": "One job's id: its row, the events that name it and the server lines written while it ran.",
+            "in": "query",
+            "name": "job",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Job"
+            }
+          },
+          {
+            "description": "An Activity event type. Only events have one, so this leaves out jobs and server lines.",
+            "in": "query",
+            "name": "event_type",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 64,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Event Type"
+            }
+          },
+          {
+            "description": "An Activity event's result: success, skipped, warning, retrying, running, failed. Only events have one.",
+            "in": "query",
+            "name": "result",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Result"
+            }
+          },
+          {
+            "description": "Why an Activity event happened: manual, scheduled, startup, worker, retry, system, webhook, folder_change. Only events have one.",
+            "in": "query",
+            "name": "trigger",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Trigger"
+            }
+          },
+          {
+            "description": "Job statuses: pending, leased, completed, failed, cancelled, handler_ok_finalize_failed. Repeat it or separate with commas. Only jobs have one; asking for any also shows finished watched-folder scans, which are otherwise left out.",
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "description": "Only server lines that carry an exception (true) or none (false). Only the server log has them.",
+            "in": "query",
+            "name": "has_exception",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Has Exception"
+            }
+          },
+          {
+            "description": "Where the page starts: the next_cursor of the page before.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SystemLogOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get System Log",
+        "tags": [
+          "system-log"
+        ]
+      }
+    },
+    "/api/v1/system/log/export": {
+      "get": {
+        "description": "The log for the same filters as a file, newest first: a spreadsheet (csv) or the rows as the API returns them (json).",
+        "operationId": "get_system_log_export_api_v1_system_log_export_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "format",
+            "required": false,
+            "schema": {
+              "default": "csv",
+              "pattern": "^(csv|json)$",
+              "title": "Format",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Where rows come from: event, job, server. Repeat it or separate with commas. None means all.",
+            "in": "query",
+            "name": "source",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Source"
+            }
+          },
+          {
+            "description": "How rows went: error, warning, info, success. Repeat it or separate with commas.",
+            "in": "query",
+            "name": "level",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Level"
+            }
+          },
+          {
+            "description": "What rows are about: processing, scans, cleanup, library, connections, backups, sign_in, updates, weir. Repeat it or separate with commas.",
+            "in": "query",
+            "name": "category",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Category"
+            }
+          },
+          {
+            "description": "A workflow's id. Leaves out the server log, whose lines belong to no workflow.",
+            "in": "query",
+            "name": "workflow",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Workflow"
+            }
+          },
+          {
+            "description": "Words to find in a row's text.",
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 200,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          },
+          {
+            "description": "Only rows at or after this time (ISO 8601; without an offset it is UTC).",
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "From"
+            }
+          },
+          {
+            "description": "Only rows at or before this time (ISO 8601; without an offset it is UTC).",
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "To"
+            }
+          },
+          {
+            "description": "One job's id: its row, the events that name it and the server lines written while it ran.",
+            "in": "query",
+            "name": "job",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Job"
+            }
+          },
+          {
+            "description": "An Activity event type. Only events have one, so this leaves out jobs and server lines.",
+            "in": "query",
+            "name": "event_type",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 64,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Event Type"
+            }
+          },
+          {
+            "description": "An Activity event's result: success, skipped, warning, retrying, running, failed. Only events have one.",
+            "in": "query",
+            "name": "result",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Result"
+            }
+          },
+          {
+            "description": "Why an Activity event happened: manual, scheduled, startup, worker, retry, system, webhook, folder_change. Only events have one.",
+            "in": "query",
+            "name": "trigger",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Trigger"
+            }
+          },
+          {
+            "description": "Job statuses: pending, leased, completed, failed, cancelled, handler_ok_finalize_failed. Repeat it or separate with commas. Only jobs have one; asking for any also shows finished watched-folder scans, which are otherwise left out.",
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "description": "Only server lines that carry an exception (true) or none (false). Only the server log has them.",
+            "in": "query",
+            "name": "has_exception",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Has Exception"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get System Log Export",
+        "tags": [
+          "system-log"
         ]
       }
     },
