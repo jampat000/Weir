@@ -48,13 +48,16 @@ function localInputToIso(value: string): string | undefined {
   return Number.isNaN(parsed.valueOf()) ? undefined : parsed.toISOString();
 }
 
+/** What the server is asked for: the filters and the page size, in the server's words. */
+export type ActivityLogQuery = ActivityRecentFilters & { limit: number };
+
 /**
  * What the server is asked for. `about: "weir"` keeps Weir's own events; a file's story is on History,
  * so the log never shows an entry about one file.
  */
 export function activityLogQuery(
   applied: ActivityLogFilters,
-): ActivityRecentFilters & { limit: number } {
+): ActivityLogQuery {
   return {
     limit: 100,
     about: "weir",
@@ -76,15 +79,4 @@ export function anyFilterSet(applied: ActivityLogFilters): boolean {
     applied.trigger ||
     applied.result,
   );
-}
-
-/** How many of the filters behind "More filters" are set, so a closed panel still says so. */
-export function extraFilterCount(applied: ActivityLogFilters): number {
-  return [
-    applied.eventType,
-    applied.result,
-    applied.trigger,
-    applied.from,
-    applied.to,
-  ].filter(Boolean).length;
 }

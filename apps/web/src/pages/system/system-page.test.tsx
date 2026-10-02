@@ -215,19 +215,11 @@ function renderSettings(
 
 async function renderSettingsWithSupportConfig(
   me: UserPublic,
-  supportConfig: {
-    showCard: boolean;
-    showPlaceholder: boolean;
-    supportUrl: string | null;
-  },
+  supportUrl: string | null,
   overrides?: { updateStatus?: UpdateStatus },
 ) {
   vi.resetModules();
-  vi.doMock("../../lib/support", () => ({
-    SHOW_SUPPORT_CARD: supportConfig.showCard,
-    SHOW_SUPPORT_URL_PLACEHOLDER: supportConfig.showPlaceholder,
-    SUPPORT_URL: supportConfig.supportUrl,
-  }));
+  vi.doMock("../../lib/support", () => ({ SUPPORT_URL: supportUrl }));
 
   const { SystemPage: SettingsPageWithMockedSupport } =
     await import("./system-page");
@@ -290,93 +282,52 @@ describe("SystemPage", () => {
     expect(screen.getByTestId("suite-settings-global")).toBeTruthy();
   });
 
-  it("shows development support guidance in System without a button when URL is missing", () => {
-    renderSettings(operatorMe, { initialEntries: ["/system?tab=backups"] });
+  it("shows no support link, and no developer note, when the build has no support URL", async () => {
+    await renderSettingsWithSupportConfig(operatorMe, null);
+
     expect(
       screen.queryByTestId("suite-settings-support"),
     ).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("tab", { name: "About" }));
-    expect(screen.getByTestId("suite-settings-support")).toBeInTheDocument();
-    expect(
-      screen.getByText("Weir is free to use. Support is optional."),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        "If Weir saves you time or keeps your downloads clean, you can support ongoing development.",
-      ),
-    ).toBeInTheDocument();
-    expect(screen.getByText(/Development note: set/i)).toBeInTheDocument();
-    expect(screen.getByText("VITE_SUPPORT_URL")).toBeInTheDocument();
-    expect(
-      screen.queryByRole("link", { name: "Support Weir" }),
-    ).not.toBeInTheDocument();
-    expect(screen.queryByText(/supporter licence/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/VITE_SUPPORT_URL/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Development note/i)).not.toBeInTheDocument();
   });
 
-  it("shows the Support settings destination and button when a valid support URL is configured", async () => {
-    await renderSettingsWithSupportConfig(operatorMe, {
-      showCard: true,
-      showPlaceholder: false,
-      supportUrl: "https://example.com/support",
-    });
+  it("shows one small support link in About's footer when a valid support URL is configured", async () => {
+    await renderSettingsWithSupportConfig(
+      operatorMe,
+      "https://example.com/support",
+    );
 
-    fireEvent.click(screen.getByRole("tab", { name: "About" }));
-
-    expect(screen.getByTestId("suite-settings-support")).toBeInTheDocument();
-    expect(
-      screen.getByText("Weir is free to use. Support is optional."),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        "If Weir saves you time or keeps your downloads clean, you can support ongoing development.",
-      ),
-    ).toBeInTheDocument();
     expect(
       screen.getByRole("link", { name: "Support Weir →" }),
     ).toHaveAttribute("href", "https://example.com/support");
-    expect(screen.queryByText("VITE_SUPPORT_URL")).not.toBeInTheDocument();
     expect(screen.queryByText(/supporter licence/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/feature limits/i)).not.toBeInTheDocument();
   });
 
-  it("hides the Support settings destination in production when the support URL is missing or invalid", async () => {
-    await renderSettingsWithSupportConfig(operatorMe, {
-      showCard: false,
-      showPlaceholder: false,
-      supportUrl: null,
-    });
-
+  it("shows viewers the retention numbers with no way to save them", () => {
+    renderSettings(viewerMe, { initialEntries: ["/system?tab=logs"] });
     expect(
-      screen.queryByRole("tab", { name: "Support" }),
-    ).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("tab", { name: "About" }));
+      screen.getByTestId("suite-settings-activity-retention"),
+    ).toBeDisabled();
     expect(
-      screen.queryByTestId("suite-settings-support"),
+      screen.queryByTestId("suite-settings-save-logs"),
     ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole("link", { name: "Support Weir" }),
-    ).not.toBeInTheDocument();
-    expect(screen.queryByText("VITE_SUPPORT_URL")).not.toBeInTheDocument();
-    expect(screen.queryByText(/supporter licence/i)).not.toBeInTheDocument();
-  });
-
-  it("hides save for viewers", () => {
-    renderSettings(viewerMe, { initialEntries: ["/system?tab=history"] });
-    expect(screen.getByTestId("suite-settings-save-logs")).toBeDisabled();
   });
 
   it("shows configuration backup + export for operators", () => {
     renderSettings(operatorMe, { initialEntries: ["/system?tab=backups"] });
     expect(screen.getByTestId("suite-settings-backup-restore")).toBeTruthy();
     expect(
-      screen.getByRole("button", { name: "Download configuration now" }),
+      screen.getByRole("button", { name: "Download settings" }),
     ).toBeEnabled();
     expect(
-      screen.getByRole("button", { name: "Restore from file..." }),
+      screen.getByRole("button", { name: "Restore from file…" }),
     ).toBeEnabled();
+    // Nothing has changed, so there is no Save to press yet.
     expect(
-      screen.getByRole("button", { name: "Save backup schedule" }),
-    ).toBeDisabled();
+      screen.queryByRole("button", { name: "Save schedule" }),
+    ).not.toBeInTheDocument();
   });
 
   it("backs up now and shows the result beside the export buttons", async () => {
@@ -424,7 +375,7 @@ describe("SystemPage", () => {
     });
 
     fireEvent.click(
-      screen.getByRole("button", { name: "Restore this backup →" }),
+      screen.getByRole("button", { name: /^Restore the backup taken/ }),
     );
 
     const dialog = await screen.findByTestId("restore-configuration-dialog");
@@ -519,35 +470,31 @@ describe("SystemPage", () => {
 
     renderSettings(operatorMe, { initialEntries: ["/system?tab=backups"] });
 
-    fireEvent.change(screen.getByLabelText("Minimum time between runs"), {
+    fireEvent.change(screen.getByLabelText("Every"), {
       target: { value: "12" },
     });
-    fireEvent.change(screen.getByLabelText("Preferred backup time"), {
+    fireEvent.change(screen.getByLabelText("At"), {
       target: { value: "03:30" },
     });
-    fireEvent.click(
-      screen.getByRole("button", { name: "Save backup schedule" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "Save schedule" }));
 
     await waitFor(() => {
       expect(putAppSettingsSpy).toHaveBeenCalledTimes(1);
     });
     await waitFor(() => {
       expect(
-        screen.getByRole("button", { name: "Save backup schedule" }),
-      ).toBeDisabled();
+        screen.queryByRole("button", { name: "Save schedule" }),
+      ).not.toBeInTheDocument();
     });
 
-    fireEvent.change(screen.getByLabelText("Minimum time between runs"), {
+    fireEvent.change(screen.getByLabelText("Every"), {
       target: { value: "24" },
     });
-    fireEvent.change(screen.getByLabelText("Preferred backup time"), {
+    fireEvent.change(screen.getByLabelText("At"), {
       target: { value: "04:15" },
     });
 
-    const saveButton = screen.getByRole("button", {
-      name: "Save backup schedule",
-    });
+    const saveButton = screen.getByRole("button", { name: "Save schedule" });
     expect(saveButton).toBeEnabled();
     fireEvent.click(saveButton);
 
@@ -572,7 +519,7 @@ describe("SystemPage", () => {
     renderSettings(operatorMe);
 
     const name = screen.getByTestId("about-machine-name");
-    expect(name).toHaveTextContent("Weir on RIG");
+    expect(name).toHaveTextContent("RIG");
     expect(within(name).queryByRole("textbox")).not.toBeInTheDocument();
     expect(screen.queryByTestId("about-hostname-tip")).not.toBeInTheDocument();
   });
@@ -592,9 +539,10 @@ describe("SystemPage", () => {
       "aria-selected",
       "true",
     );
-    // The time zone moved to Setup › Workflows › Schedule, beside the times it governs.
-    expect(screen.queryByText("Time zone")).not.toBeInTheDocument();
-    expect(screen.getByText("Setup wizard")).toBeInTheDocument();
+    expect(screen.getByText("Time zone")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Open setup wizard" }),
+    ).toBeInTheDocument();
     // Housekeeping is a file-processing job, so it lives under Settings, not here.
     expect(screen.queryByText("Housekeeping")).not.toBeInTheDocument();
     expect(
@@ -607,16 +555,13 @@ describe("SystemPage", () => {
 
     // How long history is kept sits with the history it governs.
     fireEvent.click(screen.getByRole("tab", { name: "Logs" }));
-    expect(screen.getByText("System log retention (days)")).toBeInTheDocument();
-    expect(
-      screen.getByText("Keep Activity history for (days)"),
-    ).toBeInTheDocument();
-    fireEvent.change(screen.getByTestId("settings-history-show"), {
-      target: { value: "log" },
-    });
-    expect(screen.getByText("Search logs")).toBeInTheDocument();
+    expect(screen.getByText("System log")).toBeInTheDocument();
+    expect(screen.getByLabelText("Events")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("settings-history-show"));
+    fireEvent.click(screen.getByRole("option", { name: "Server log" }));
+    expect(screen.getByText("System events")).toBeInTheDocument();
     // Retention stays in view whichever of History's lists you are reading: it governs all of them.
-    expect(screen.getByText("System log retention (days)")).toBeInTheDocument();
+    expect(screen.getByText("System log")).toBeInTheDocument();
   });
 
   it("keeps every retention setting in one panel under Logs: log days, Activity days and file history days", () => {
@@ -634,15 +579,41 @@ describe("SystemPage", () => {
     const panel = screen
       .getByRole("heading", { name: "How long things are kept" })
       .closest("section") as HTMLElement;
+    expect(within(panel).getByLabelText("System log")).toHaveValue(30);
+    expect(within(panel).getByLabelText("Events")).toHaveValue(90);
+    expect(within(panel).getByLabelText("File activity")).toHaveValue(45);
+  });
+
+  it("holds the time zone on About, and saves a different one chosen there", async () => {
+    const putAppSettingsSpy = vi
+      .spyOn(settingsApi, "putAppSettings")
+      .mockImplementation(async (body) => ({
+        ...minimalAppSettings,
+        app_timezone: body.app_timezone,
+      }));
+    renderSettings(operatorMe);
+
     expect(
-      within(panel).getByText("System log retention (days)"),
+      screen.getByRole("heading", { name: "This PC" }),
     ).toBeInTheDocument();
     expect(
-      within(panel).getByText("Keep Activity history for (days)"),
+      screen.getByText(/Every time across Weir is in this zone./),
     ).toBeInTheDocument();
+    // Nothing is chosen that differs from what is saved, so there is no Save yet.
     expect(
-      within(panel).getByLabelText("Keep a file’s history for"),
-    ).toHaveValue(45);
+      screen.queryByTestId("schedule-save-timezone"),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Time zone" }));
+    fireEvent.click(screen.getByRole("option", { name: /Sydney/ }));
+    fireEvent.click(screen.getByTestId("schedule-save-timezone"));
+
+    await waitFor(() => {
+      expect(putAppSettingsSpy).toHaveBeenCalledTimes(1);
+    });
+    expect(putAppSettingsSpy.mock.calls[0]?.[0]).toMatchObject({
+      app_timezone: expect.stringContaining("Sydney"),
+    });
   });
 
   it("opens System when an old address asks for the upgrade tab", () => {
@@ -913,5 +884,71 @@ describe("SystemPage", () => {
       "href",
       "/login",
     );
+  });
+
+  it("asks for the missing fields instead of leaving the account buttons disabled", () => {
+    renderSettings(operatorMe);
+    fireEvent.click(screen.getByRole("tab", { name: "Security" }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Change password" }));
+    expect(
+      screen.getByText("Fill in all three password fields."),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Change username" }));
+    expect(
+      screen.getByText("Enter the new username and your current password."),
+    ).toBeInTheDocument();
+  });
+
+  it("puts the account's two forms in one card, with each password's eye inside its field", () => {
+    renderSettings(operatorMe);
+    fireEvent.click(screen.getByRole("tab", { name: "Security" }));
+
+    const account = screen.getByTestId("suite-security-account");
+    expect(
+      within(account).getByRole("heading", { name: "Change username" }),
+    ).toBeInTheDocument();
+    expect(
+      within(account).getByRole("heading", { name: "Change password" }),
+    ).toBeInTheDocument();
+    const eye = within(account).getByRole("button", { name: "Show password" });
+    expect(eye.parentElement).toContainElement(
+      screen.getByPlaceholderText("Enter current password"),
+    );
+  });
+
+  it("saves an update choice as it is made, with no Save button", async () => {
+    const putUpdateSettings = vi
+      .spyOn(settingsApi, "putUpdateSettings")
+      .mockImplementation(async (body) => ({
+        mode: body.mode,
+        check_on_startup: body.check_on_startup ?? true,
+        check_interval_minutes: body.check_interval_minutes ?? 60,
+      }));
+    const qc = seededUpdateClient({
+      updateStatus: windowsUpdateAvailableStatus,
+      updateSettings: {
+        mode: "NotifyOnly",
+        check_on_startup: true,
+        check_interval_minutes: 60,
+      },
+    });
+    render(wrap(<SystemPage />, qc));
+
+    fireEvent.click(screen.getByRole("button", { name: "Auto" }));
+
+    await waitFor(() => {
+      expect(putUpdateSettings).toHaveBeenCalledWith({
+        mode: "Auto",
+        check_on_startup: true,
+        check_interval_minutes: 60,
+      });
+    });
+    expect(
+      screen.queryByRole("button", { name: "Save" }),
+    ).not.toBeInTheDocument();
+    expect(
+      await screen.findByText("Update settings saved."),
+    ).toBeInTheDocument();
   });
 });

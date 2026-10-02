@@ -241,45 +241,14 @@
   border-top: 1px solid var(--mm-border);
 }
 
-/* The filters sit in a panel; `.mm-activity-filters` is the hook the narrow-screen collapse below hangs off. */
-.mm-activity-filters__grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(11.5rem, 1fr));
-  gap: 0.65rem 0.75rem;
-}
-
-.mm-activity-filters__search {
-  grid-column: span 2;
-}
-
-.mm-activity-filters__toggle {
-  display: none;
-}
-
-@media (max-width: 640px) {
-  .mm-activity-filters__search {
-    grid-column: 1 / -1;
-  }
-
-  .mm-activity-filters__toggle {
-    display: inline-flex;
-  }
-
-  .mm-activity-filters[data-expanded="false"] .mm-activity-filters__extra {
-    display: none;
-  }
-}
-
-.mm-activity-filters__actions {
-  display: flex;
-  flex-wrap: wrap;
+/* The status under Events' title: the live dot, then what the list holds, in the card header's quiet line. */
+.mm-activity-status {
+  display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  margin-top: 0.8rem;
 }
 
-/* The summary line leads the page now (rule 1), so its old flex row and text rule
- * are gone; the live dot is all that is left of it. */
+/* The dot that says the list is live, before the status line in the Events card's header. */
 .mm-activity-summary__live {
   width: 0.5rem;
   height: 0.5rem;

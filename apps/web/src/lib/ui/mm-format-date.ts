@@ -90,3 +90,27 @@ export function useAppDateFormatter(): (
     [tz],
   );
 }
+
+/** Formats a server timestamp as a day, "2 Oct", in the time zone chosen in System › About, or the browser's. */
+export function useAppDayFormatter(): (
+  iso: string | null | undefined,
+) => string {
+  const tz = useAppTimeZone();
+
+  return useCallback(
+    (iso: string | null | undefined): string => {
+      if (!iso) return "—";
+      try {
+        return new Intl.DateTimeFormat(undefined, {
+          day: "numeric",
+          month: "short",
+          timeZone: tz,
+        }).format(parseAppDate(iso));
+      } catch {
+        // An unreadable timestamp or an unknown timezone: show what the server sent.
+        return iso;
+      }
+    },
+    [tz],
+  );
+}

@@ -1,26 +1,4 @@
-/* Page-neutral primitives for the body of every page: the lead, quiet sections, field groups, links and notes. Colours, type sizes and spacing come from weir-tokens.css. */
-
-/* ── The lead ────────────────────────────────────────────────────────────────
- * A summary block at the top of a page, with a caption line under it. */
-.mm-lead {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  gap: 1.4rem;
-  container: mm-lead / inline-size;
-}
-
-/* One line under the lead: what it means on the left, the takeaway on the right. */
-.mm-lead-caption {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  gap: 0.35rem 1.5rem;
-  margin: 0;
-  color: var(--mm-text3);
-  font-size: var(--mm-type-caption);
-  line-height: 1.45;
-}
+/* Page-neutral primitives for the body of every page: quiet sections, field groups, links and notes. Colours, type sizes and spacing come from weir-tokens.css. */
 
 /* ── The page body ───────────────────────────────────────────────────────────
  * What a page puts under the header: panels (components/panels/panel.tsx) one under another. The stack

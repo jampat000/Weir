@@ -1,75 +1,94 @@
-import { useRef } from "react";
-
-import {
-  QuietFieldGroup,
-  QuietSection,
-  quietActionRowClass,
-} from "../../../../components/shared/quiet-section";
+import { Chip } from "../../../../components/panels/chip";
+import { Panel } from "../../../../components/panels/panel";
+import { quietActionRowClass } from "../../../../components/shared/quiet-section";
 import { SettingRow } from "../../../../components/shared/settings-group";
+import { MmOnOffSwitch } from "../../../../components/ui/mm-on-off-switch";
 import { errorMessage } from "../../../../lib/api/error-message";
+import type { AppSettings } from "../../../../lib/settings/types";
 import { mmActionButtonClass } from "../../../../lib/ui/mm-control-roles";
 import { useAppDateFormatter } from "../../../../lib/ui/mm-format-date";
+import { useNow } from "../../../../lib/ui/use-now";
 import {
   DEFAULT_BACKUP_TIME,
   type SystemSettingsForm,
 } from "../../use-system-settings-form";
+import { backupFreshness } from "./backup-freshness";
 
 const BACKUP_INTERVAL_HOURS = [6, 12, 24, 48, 72, 168] as const;
 const HOURS_PER_WEEK = 168;
+/** How often "overdue" is worked out again while the page is open. */
+const CLOCK_TICK_MS = 60_000;
 
-function ScheduleGroup({
+const WHAT_A_BACKUP_HOLDS =
+  "A backup holds your workflows, rules, schedule and time zone, plus your media managers and alerts. Media managers and alerts come back without their API keys and webhook addresses; enter those again after restoring. It does not include your sign-in or file history.";
+
+/**
+ * When Weir backs up its own settings. The choices are drafts until Save, which appears once one has changed: they
+ * share one save with how long history is kept, so nothing here is applied on its own.
+ */
+export function BackupScheduleSection({
   form,
-  lastRunAt,
+  settings,
   onSave,
   saved,
 }: {
   form: SystemSettingsForm;
-  lastRunAt: string | null;
+  settings: AppSettings;
   onSave: () => void;
   saved: boolean;
 }) {
   const formatDate = useAppDateFormatter();
+  const now = useNow(CLOCK_TICK_MS);
   const { backupSchedule: schedule, save } = form;
+  const freshness = backupFreshness(settings, now);
+  const failed = save.isError && form.lastSaveTarget === "backup";
+
   return (
-    <QuietFieldGroup
-      title="Scheduled snapshots"
-      detail="Weir keeps the latest five configuration snapshots using the same restore-safe JSON format."
+    <Panel
+      title="Schedule"
+      headingId="suite-settings-backup-heading"
+      headingLevel={3}
+      padded
+      note={
+        <span title={WHAT_A_BACKUP_HOLDS}>
+          Workflows, rules and settings. Keys and passwords aren&apos;t
+          included.
+        </span>
+      }
     >
       <div className="mm-setgroup__rows">
-        <SettingRow
-          label="Back up by itself"
-          hint="Keeps the latest five, in the same file you can download below."
-          htmlFor="backup-scheduled"
-        >
-          <input
-            id="backup-scheduled"
-            type="checkbox"
-            className="h-4 w-4 accent-mm-accent"
-            checked={schedule.enabled}
-            disabled={save.isPending}
-            onChange={(e) => schedule.setEnabled(e.target.checked)}
-          />
+        <SettingRow label="Back up automatically">
+          <span className="mm-sys-switch">
+            <MmOnOffSwitch
+              id="backup-scheduled"
+              label="Back up automatically"
+              layout="control"
+              enabled={schedule.enabled}
+              disabled={save.isPending}
+              onChange={schedule.setEnabled}
+            />
+          </span>
         </SettingRow>
-        <SettingRow label="Minimum time between runs" htmlFor="backup-interval">
+        <SettingRow label="Every" htmlFor="backup-interval">
           <select
             id="backup-interval"
-            className="mm-input mm-cleanup-every"
+            className="mm-input mm-sys-field"
             value={schedule.intervalHours}
             disabled={save.isPending}
             onChange={(e) => schedule.setIntervalHours(Number(e.target.value))}
           >
             {BACKUP_INTERVAL_HOURS.map((h) => (
               <option key={h} value={h}>
-                {h === HOURS_PER_WEEK ? "Every 7 days" : `Every ${h} hours`}
+                {h === HOURS_PER_WEEK ? "7 days" : `${h} hours`}
               </option>
             ))}
           </select>
         </SettingRow>
-        <SettingRow label="Preferred backup time" htmlFor="backup-time">
+        <SettingRow label="At" htmlFor="backup-time">
           <input
             id="backup-time"
             type="time"
-            className="mm-input mm-cleanup-every"
+            className="mm-input mm-sys-field"
             value={schedule.time}
             disabled={save.isPending}
             onChange={(e) =>
@@ -77,166 +96,44 @@ function ScheduleGroup({
             }
           />
         </SettingRow>
-        <SettingRow label="Last automatic backup">
-          <span className="text-sm text-mm-text2">{formatDate(lastRunAt)}</span>
+        <SettingRow label="Last backup">
+          <span className="mm-sys-value">
+            {formatDate(settings.configuration_backup_last_run_at)}
+            {freshness ? (
+              <Chip tone={freshness === "overdue" ? "warning" : "healthy"}>
+                {freshness === "overdue" ? "Overdue" : "Up to date"}
+              </Chip>
+            ) : null}
+          </span>
         </SettingRow>
       </div>
-      <div className={quietActionRowClass}>
-        <button
-          type="button"
-          className={mmActionButtonClass({ variant: "secondary" })}
-          disabled={!schedule.dirty || save.isPending}
-          onClick={onSave}
-        >
-          {save.isPending ? "Saving…" : "Save backup schedule"}
-        </button>
-        {save.isError && form.lastSaveTarget === "backup" ? (
-          <p
-            className="mm-status-text--failed text-sm"
-            role="alert"
-            data-testid="suite-settings-backup-save-error"
-          >
-            {errorMessage(save.error, "Could not save.")}
-          </p>
-        ) : saved ? (
-          <p className="mm-status-text--healthy text-sm" role="status">
-            Backup schedule saved.
-          </p>
-        ) : null}
-      </div>
-    </QuietFieldGroup>
-  );
-}
-
-function ExportGroup({
-  disabled,
-  onBackUpNow,
-  onDownload,
-  onChooseFile,
-  resultMessage,
-  resultProblem,
-}: {
-  disabled: boolean;
-  onBackUpNow: () => void;
-  onDownload: () => void;
-  onChooseFile: (file: File) => void;
-  resultMessage: string | null;
-  resultProblem: string | null;
-}) {
-  const fileInput = useRef<HTMLInputElement>(null);
-  return (
-    <QuietFieldGroup
-      title="Export or restore now"
-      detail="Write a snapshot right away, download a full settings file, or restore a Weir configuration JSON from disk."
-    >
-      <div className="flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          className={mmActionButtonClass({ variant: "primary" })}
-          disabled={disabled}
-          onClick={onBackUpNow}
-        >
-          Back up now
-        </button>
-        <button
-          type="button"
-          className={mmActionButtonClass({ variant: "secondary" })}
-          disabled={disabled}
-          onClick={onDownload}
-        >
-          Download configuration now
-        </button>
-        <button
-          type="button"
-          className={mmActionButtonClass({ variant: "tertiary" })}
-          disabled={disabled}
-          onClick={() => fileInput.current?.click()}
-        >
-          Restore from file...
-        </button>
-        <input
-          ref={fileInput}
-          type="file"
-          accept="application/json,.json"
-          className="hidden"
-          aria-label="Choose configuration JSON file to restore"
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            // Cleared first, so choosing the same file again still fires a change.
-            e.target.value = "";
-            if (file) onChooseFile(file);
-          }}
-        />
-      </div>
-      {resultMessage ? (
-        <p className="mm-status-text--healthy mt-2 text-sm" role="status">
-          {resultMessage}
-        </p>
+      {schedule.dirty || failed || saved ? (
+        <div className={quietActionRowClass}>
+          {schedule.dirty ? (
+            <button
+              type="button"
+              className={`${mmActionButtonClass({ variant: "primary" })} mm-sys-btn`}
+              disabled={save.isPending}
+              onClick={onSave}
+            >
+              {save.isPending ? "Saving…" : "Save schedule"}
+            </button>
+          ) : null}
+          {failed ? (
+            <p
+              className="mm-status-text--failed text-sm"
+              role="alert"
+              data-testid="suite-settings-backup-save-error"
+            >
+              {errorMessage(save.error, "Could not save.")}
+            </p>
+          ) : saved && !schedule.dirty ? (
+            <p className="mm-status-text--healthy text-sm" role="status">
+              Backup schedule saved.
+            </p>
+          ) : null}
+        </div>
       ) : null}
-      {resultProblem ? (
-        <p className="mm-status-text--failed mt-2 text-sm" role="alert">
-          {resultProblem}
-        </p>
-      ) : null}
-    </QuietFieldGroup>
-  );
-}
-
-/**
- * What to back up and when, and a download or restore right now. Two actions with two scopes,
- * each closed by its own row: the group's heading and hairline say which button belongs to which.
- */
-export function BackupSettingsSection({
-  form,
-  lastRunAt,
-  busy,
-  onSaveSchedule,
-  scheduleSaved,
-  onBackUpNow,
-  onDownload,
-  onChooseFile,
-  resultMessage,
-  resultProblem,
-}: {
-  form: SystemSettingsForm;
-  lastRunAt: string | null;
-  busy: boolean;
-  onSaveSchedule: () => void;
-  scheduleSaved: boolean;
-  onBackUpNow: () => void;
-  onDownload: () => void;
-  onChooseFile: (file: File) => void;
-  resultMessage: string | null;
-  resultProblem: string | null;
-}) {
-  return (
-    <QuietSection
-      level={3}
-      headingId="suite-settings-backup-heading"
-      heading="Backup and restore"
-    >
-      <p className="mm-quiet-note">
-        A backup holds your workflows, rules, schedule and time zone, plus your
-        media managers and alerts. Media managers and alerts come back without
-        their API keys and webhook addresses; enter those again after restoring.
-        It does not include your sign-in or file history.
-      </p>
-      <div className="mt-6 grid gap-10">
-        <ScheduleGroup
-          form={form}
-          lastRunAt={lastRunAt}
-          onSave={onSaveSchedule}
-          saved={scheduleSaved}
-        />
-        <ExportGroup
-          disabled={busy || form.save.isPending}
-          onBackUpNow={onBackUpNow}
-          onDownload={onDownload}
-          onChooseFile={onChooseFile}
-          resultMessage={resultMessage}
-          resultProblem={resultProblem}
-        />
-      </div>
-    </QuietSection>
+    </Panel>
   );
 }

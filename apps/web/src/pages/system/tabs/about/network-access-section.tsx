@@ -1,5 +1,4 @@
 import { Chip } from "../../../../components/panels/chip";
-import { QuietSection } from "../../../../components/shared/quiet-section";
 import { useNetworkAccessQuery } from "../../../../lib/settings/queries";
 import type { NetworkAccessState } from "../../../../lib/settings/types";
 import type { MmStatusTone } from "../../../../lib/ui/mm-status-tone";
@@ -13,7 +12,7 @@ function stateTone(state: NetworkAccessState): MmStatusTone {
 function stateLabel(state: NetworkAccessState): string {
   switch (state) {
     case "allowed":
-      return "Reachable";
+      return "Your network";
     case "blocked":
       return "Blocked";
     case "this_pc_only":
@@ -23,13 +22,25 @@ function stateLabel(state: NetworkAccessState): string {
   }
 }
 
+/** Where to change it, in the words the tray menu uses. The server's longer sentence is the hover note. */
+function stateAdvice(state: NetworkAccessState): string {
+  switch (state) {
+    case "allowed":
+      return "Change it from the tray icon → Only allow this PC.";
+    case "blocked":
+      return "Windows Firewall is blocking it. Fix it from the tray icon.";
+    default:
+      return "Change it from the tray icon → Allow other devices.";
+  }
+}
+
 /**
- * System › About: whether other devices on the network can reach Weir. Windows package only — the server
- * reports "not_applicable" everywhere else (Docker, a bare source install), and this renders nothing there,
- * rather than a card that never applies. Independent of every other card on the page: its own query, loads
- * and fails on its own.
+ * The network half of System › About's "This PC" card: whether other devices on the network can reach Weir.
+ * Windows package only — the server reports "not_applicable" everywhere else (Docker, a bare source install), and
+ * this renders nothing there, rather than a half that never applies. Independent of everything else on the page:
+ * its own query, loads and fails on its own.
  */
-export function NetworkAccessSection() {
+export function NetworkAccessHalf({ labelId }: { labelId: string }) {
   const query = useNetworkAccessQuery();
   const status = query.data;
 
@@ -38,25 +49,30 @@ export function NetworkAccessSection() {
   }
 
   return (
-    <QuietSection
-      level={3}
-      headingId="about-network-access-heading"
-      heading="Network access"
+    <section
+      className="mm-this-pc__half"
+      aria-labelledby={labelId}
       data-testid="about-network-access"
     >
-      {query.isLoading ? (
-        <p className="mm-quiet-note">Checking…</p>
-      ) : status ? (
-        <p
-          className="mt-1 flex items-center gap-2 text-base font-semibold text-mm-text1"
-          data-testid="about-network-access-status"
-        >
-          <Chip tone={stateTone(status.state)}>{stateLabel(status.state)}</Chip>
-          {status.summary}
-        </p>
-      ) : (
-        <p className="mm-quiet-note">Could not check network access.</p>
-      )}
-    </QuietSection>
+      <h4 id={labelId} className="mm-this-pc__label">
+        Network
+      </h4>
+      <div title={status?.summary} data-testid="about-network-access-status">
+        {query.isLoading ? (
+          <p className="mm-sys-note">Checking…</p>
+        ) : status ? (
+          <>
+            <p className="mm-this-pc__state">
+              <Chip tone={stateTone(status.state)}>
+                {stateLabel(status.state)}
+              </Chip>
+            </p>
+            <p className="mm-sys-note">{stateAdvice(status.state)}</p>
+          </>
+        ) : (
+          <p className="mm-sys-note">Could not check network access.</p>
+        )}
+      </div>
+    </section>
   );
 }

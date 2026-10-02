@@ -17,7 +17,12 @@ import {
   vi,
 } from "vitest";
 import type { ActivityEventItem } from "../../../../lib/api/types";
+import {
+  ACTIVITY_RESULT_LABELS,
+  ACTIVITY_TRIGGER_LABELS,
+} from "../../../../lib/activity/activity-runs";
 import { ActivityLog } from "./activity-log";
+import { LogsHeader } from "./logs-header-controls";
 
 const mocks = vi.hoisted(() => ({
   useActivityRecentQuery: vi.fn(),
@@ -38,6 +43,7 @@ vi.mock("../../../../lib/activity/use-activity-stream-invalidation", () => ({
 
 vi.mock("../../../../lib/ui/mm-format-date", () => ({
   useAppDateFormatter: () => (iso: string) => iso,
+  useAppDayFormatter: () => (iso: string) => iso,
 }));
 
 vi.mock("../../../../lib/auth/queries", () => ({
@@ -115,12 +121,20 @@ function renderLog() {
   const tree = () => (
     <QueryClientProvider client={client}>
       <MemoryRouter>
-        <ActivityLog />
+        <LogsHeader view="activity" onView={() => undefined}>
+          <ActivityLog />
+        </LogsHeader>
       </MemoryRouter>
     </QueryClientProvider>
   );
   const view = render(tree());
   return { ...view, rerenderLog: () => view.rerender(tree()) };
+}
+
+/** Opens one of the header's pickers by its name and chooses an option. */
+function choose(picker: string, option: string) {
+  fireEvent.click(screen.getByRole("button", { name: picker }));
+  fireEvent.click(screen.getByRole("option", { name: option }));
 }
 
 function lastQueryFilters(): Record<string, unknown> {
@@ -166,11 +180,17 @@ describe("ActivityLog", () => {
     renderLog();
 
     expect(screen.getByTestId("activity-summary")).toHaveTextContent(
-      "Showing 1 of 1 event · live",
+      "1 event · live",
     );
-    expect(screen.getByDisplayValue("All events")).toBeInTheDocument();
-    expect(screen.getByDisplayValue("Any reason")).toBeInTheDocument();
-    expect(screen.getByDisplayValue("Any result")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Event" })).toHaveTextContent(
+      "All events",
+    );
+    expect(
+      screen.getByRole("button", { name: "Why it happened" }),
+    ).toHaveTextContent("Any cause");
+    expect(screen.getByRole("button", { name: "Result" })).toHaveTextContent(
+      "Any result",
+    );
     expect(
       screen.getAllByText("Temporary files cleanup finished").length,
     ).toBeGreaterThan(0);
@@ -195,7 +215,6 @@ describe("ActivityLog", () => {
 
     renderLog();
 
-    fireEvent.click(screen.getByRole("button", { name: "Apply filters" }));
     expect(
       screen.getByText("No activity matched the current filters."),
     ).toBeInTheDocument();
@@ -308,13 +327,8 @@ describe("ActivityLog", () => {
     mocks.useActivityRecentQuery.mockReturnValue(recentResult([]));
     renderLog();
 
-    fireEvent.change(screen.getByDisplayValue("Any reason"), {
-      target: { value: "scheduled" },
-    });
-    fireEvent.change(screen.getByDisplayValue("Any result"), {
-      target: { value: "failed" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Apply filters" }));
+    choose("Why it happened", ACTIVITY_TRIGGER_LABELS.scheduled);
+    choose("Result", ACTIVITY_RESULT_LABELS.failed);
 
     expect(lastQueryFilters()).toMatchObject({
       trigger: "scheduled",
@@ -327,7 +341,7 @@ describe("ActivityLog", () => {
     mocks.useActivityRecentQuery.mockReturnValue(recentResult([]));
     renderLog();
 
-    fireEvent.click(screen.getByRole("button", { name: "Last night →" }));
+    choose("When", "Last night");
 
     const filters = lastQueryFilters();
     const from = new Date(String(filters.date_from));
@@ -405,7 +419,7 @@ describe("ActivityLog", () => {
     expect(failures).toHaveTextContent("2 repeated failures");
   });
 
-  it("states how far back history goes, with the oldest entry", () => {
+  it("says on one line how far back history goes", () => {
     mocks.useActivityRecentQuery.mockReturnValue(
       recentResult([], {
         retention_days: 90,
@@ -414,12 +428,9 @@ describe("ActivityLog", () => {
     );
     renderLog();
 
-    expect(screen.getByTestId("activity-retention")).toHaveTextContent(
-      "History goes back 90 days (oldest entry 2026-06-19T00:00:00Z).",
+    expect(screen.getByTestId("activity-summary")).toHaveTextContent(
+      "0 events · live · back to 2026-06-19T00:00:00Z",
     );
-    expect(
-      screen.getByRole("link", { name: "Change how long history is kept" }),
-    ).toHaveAttribute("href", "/system?tab=history#activity-retention");
   });
 
   it("says history is kept until cleared when retention is 0", () => {
@@ -428,8 +439,8 @@ describe("ActivityLog", () => {
     );
     renderLog();
 
-    expect(screen.getByTestId("activity-retention")).toHaveTextContent(
-      "History is kept until you clear it.",
+    expect(screen.getByTestId("activity-summary")).toHaveTextContent(
+      "0 events · live · kept until cleared",
     );
   });
 
@@ -447,11 +458,8 @@ describe("ActivityLog", () => {
       .mockImplementation(() => undefined);
     renderLog();
 
-    fireEvent.change(screen.getByDisplayValue("Any reason"), {
-      target: { value: "scheduled" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Apply filters" }));
-    fireEvent.click(screen.getByRole("button", { name: "Export CSV →" }));
+    choose("Why it happened", ACTIVITY_TRIGGER_LABELS.scheduled);
+    fireEvent.click(screen.getByRole("button", { name: "Export CSV" }));
 
     await waitFor(() => expect(click).toHaveBeenCalled());
     expect(mocks.fetchActivityExport).toHaveBeenCalledWith(
@@ -462,7 +470,7 @@ describe("ActivityLog", () => {
       "limit",
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Export JSON →" }));
+    fireEvent.click(screen.getByRole("button", { name: "Export JSON" }));
     await waitFor(() =>
       expect(mocks.fetchActivityExport).toHaveBeenCalledWith(
         "json",
@@ -488,9 +496,7 @@ describe("ActivityLog", () => {
     });
     renderLog();
 
-    fireEvent.click(
-      screen.getByRole("button", { name: "Clear all history →" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "Clear all history" }));
     const dialog = await screen.findByTestId(
       "activity-clear-all-history-dialog",
     );
@@ -533,9 +539,7 @@ describe("ActivityLog", () => {
     });
     renderLog();
 
-    fireEvent.click(
-      screen.getByRole("button", { name: "Clear all history →" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "Clear all history" }));
     const dialog = await screen.findByTestId(
       "activity-clear-all-history-dialog",
     );
@@ -556,7 +560,7 @@ describe("ActivityLog", () => {
     renderLog();
 
     expect(
-      screen.queryByRole("button", { name: "Clear all history →" }),
+      screen.queryByRole("button", { name: "Clear all history" }),
     ).not.toBeInTheDocument();
   });
 

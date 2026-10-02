@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
 import { PageLoading } from "../../components/shared/page-loading";
@@ -71,7 +72,9 @@ export function SystemPage() {
   const me = useMeQuery();
   const settingsQ = useAppSettingsQuery();
   const form = useSystemSettingsForm(settingsQ.data);
-  const blocker = useUnsavedChangesGuard(form.isDirty);
+  // The time zone is picked and saved on its own, so About tells the page when a pick is waiting for its Save.
+  const [zoneUnsaved, setZoneUnsaved] = useState(false);
+  const blocker = useUnsavedChangesGuard(form.isDirty || zoneUnsaved);
   // The address is the tab, so Back, Forward and the side menu move between tabs too.
   const tab = systemTabFrom(searchParams.get("tab"));
   const editable = canEdit(me.data?.role);
@@ -105,21 +108,25 @@ export function SystemPage() {
         dataTestId="system-section-tabs"
       />
       <WorkspacePanel id="system-panel" labelledBy={`system-tab-${tab}`}>
-        {tab === "about" ? (
-          <AboutTab settings={settings} />
-        ) : tab === "backups" ? (
-          <BackupsTab form={form} editable={editable} settings={settings} />
-        ) : tab === "security" ? (
-          <div className="mm-quiet-stack">
+        <div className="mm-system">
+          {tab === "about" ? (
+            <AboutTab
+              settings={settings}
+              editable={editable}
+              onTimeZoneUnsavedChange={setZoneUnsaved}
+            />
+          ) : tab === "backups" ? (
+            <BackupsTab form={form} editable={editable} settings={settings} />
+          ) : tab === "security" ? (
             <SecurityTab />
-          </div>
-        ) : (
-          <LogsTab
-            form={form}
-            editable={editable}
-            savedLogDays={settings.log_retention_days}
-          />
-        )}
+          ) : (
+            <LogsTab
+              form={form}
+              editable={editable}
+              savedLogDays={settings.log_retention_days}
+            />
+          )}
+        </div>
       </WorkspacePanel>
       {blocker.state === "blocked" ? (
         <ConfirmDialog

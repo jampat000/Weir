@@ -153,9 +153,9 @@ def test_signed_in_navigation_covers_main_screens_and_tabs(weir_shell: str) -> N
                 ["About", "Backups", "Security", "Logs"]
             )
             expect(page.get_by_test_id("suite-settings-global")).to_be_visible()
-            expect(page.get_by_text("Setup wizard", exact=True)).to_be_visible()
-            # The time zone lives in Setup › Workflows › Schedule, beside the times it governs.
-            expect(page.get_by_text("Time zone", exact=True)).to_have_count(0)
+            expect(page.get_by_test_id("suite-settings-open-setup-wizard")).to_be_visible()
+            # The time zone is Weir-wide, so it is set here, in the "This PC" card.
+            expect(page.get_by_text("Time zone", exact=True)).to_be_visible()
             expect(page.get_by_text("Updates", exact=True)).to_be_visible()
             # There is no display density setting.
             expect(page.get_by_text("Display density", exact=False)).to_have_count(0)

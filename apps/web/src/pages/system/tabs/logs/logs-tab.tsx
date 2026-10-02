@@ -3,26 +3,13 @@ import { useSearchParams } from "react-router-dom";
 import type { SystemSettingsForm } from "../../use-system-settings-form";
 import { ActivityLog } from "./activity-log";
 import { JobsSection } from "./jobs-section";
+import { LogsHeader, logViewFrom, type LogView } from "./logs-header-controls";
 import { RetentionSection } from "./retention-section";
 import { ServerLog } from "./server-log";
 
-/** What Logs shows: one "Show" choice beside the list, never a second row of tabs. */
-type LogView = "activity" | "log" | "jobs";
-
-const LOG_VIEWS: { id: LogView; label: string }[] = [
-  { id: "activity", label: "Events" },
-  { id: "jobs", label: "Weir's jobs" },
-  { id: "log", label: "Server log" },
-];
-
-/** The address's `show`, or Events when it names nothing Logs has. */
-function logViewFrom(candidate: string | null): LogView {
-  return LOG_VIEWS.find((view) => view.id === candidate)?.id ?? "activity";
-}
-
 /**
- * System › Logs: Weir's own events, its jobs or its server log, with how long they are kept and how
- * to clear them beside them. A file's story is on History, not here.
+ * System › Logs: Weir's own events, its jobs or its server log, with how long they are kept beside them. The choice
+ * and the open list's filters are on the header's title line. A file's story is on History, not here.
  */
 export function LogsTab({
   form,
@@ -46,36 +33,21 @@ export function LogsTab({
   }
 
   return (
-    <div className="mm-quiet-stack" data-testid="settings-history">
-      <label className="mm-history-show">
-        <span>Show</span>
-        <select
-          className="mm-input"
-          data-testid="settings-history-show"
-          value={view}
-          onChange={(e) => showView(logViewFrom(e.target.value))}
-        >
-          {LOG_VIEWS.map((option) => (
-            <option key={option.id} value={option.id}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-      </label>
-      {view === "activity" ? (
-        <ActivityLog />
-      ) : view === "jobs" ? (
-        <JobsSection />
-      ) : (
-        <ServerLog />
-      )}
-      <div data-testid="suite-settings-retention" className="mm-quiet-stack">
-        <RetentionSection
-          form={form}
-          editable={editable}
-          savedLogDays={savedLogDays}
-        />
-      </div>
+    <div className="mm-sys-stack" data-testid="settings-history">
+      <LogsHeader view={view} onView={showView}>
+        {view === "activity" ? (
+          <ActivityLog />
+        ) : view === "jobs" ? (
+          <JobsSection />
+        ) : (
+          <ServerLog />
+        )}
+      </LogsHeader>
+      <RetentionSection
+        form={form}
+        editable={editable}
+        savedLogDays={savedLogDays}
+      />
     </div>
   );
 }

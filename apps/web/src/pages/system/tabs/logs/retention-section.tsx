@@ -1,12 +1,15 @@
-import {
-  QuietSection,
-  quietActionRowClass,
-} from "../../../../components/shared/quiet-section";
+import { useState, type ReactNode } from "react";
+
+import { Panel } from "../../../../components/panels/panel";
+import { quietActionRowClass } from "../../../../components/shared/quiet-section";
 import { errorMessage } from "../../../../lib/api/error-message";
 import { mmActionButtonClass } from "../../../../lib/ui/mm-control-roles";
 import { useScrollToHash } from "../../../../lib/ui/use-scroll-to-hash";
 import type { SystemSettingsForm } from "../../use-system-settings-form";
-import { FileHistoryRetentionSetting } from "./file-history-retention";
+import {
+  useFileHistoryRetention,
+  type FileHistoryRetention,
+} from "./use-file-history-retention";
 
 /** Where the retention panel is in System › Logs, so a link elsewhere can bring it into view. */
 const RETENTION_ANCHOR = "retention";
@@ -14,9 +17,79 @@ const RETENTION_ANCHOR = "retention";
 /** The address of the retention settings, for the pages whose records they govern. */
 export const RETENTION_PATH = `/system?tab=logs#${RETENTION_ANCHOR}`;
 
+const MAX_LOG_DAYS = 3650;
+
+/** One retention setting: what is kept, how many days, and a line on what the number does. */
+function RetentionRow({
+  inputId,
+  label,
+  help,
+  detail,
+  children,
+}: {
+  inputId: string;
+  label: string;
+  help: ReactNode;
+  /** The help in full, for a hover note. */
+  detail?: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className="mm-retention__row">
+      <label className="mm-retention__label" htmlFor={inputId}>
+        {label}
+      </label>
+      <span className="mm-retention__days">
+        {children}
+        <span>days</span>
+      </span>
+      <span className="mm-retention__help" title={detail}>
+        {help}
+      </span>
+    </div>
+  );
+}
+
+function FileHistoryRow({
+  fileHistory,
+  disabled,
+}: {
+  fileHistory: FileHistoryRetention;
+  disabled: boolean;
+}) {
+  const inputId = "retention-file-history";
+  if (fileHistory.status === "unreadable") {
+    return (
+      <p className="mm-status-text--failed mm-sys-note" role="alert">
+        Weir could not read how long a file&rsquo;s history is kept. Refresh the
+        page to try again.
+      </p>
+    );
+  }
+  return (
+    <RetentionRow
+      inputId={inputId}
+      label="File activity"
+      help="Kept after the file is gone. 0 keeps it for ever."
+      detail="While Weir still knows a file, its history is kept. This is how many days it is kept once the file is gone or forgotten. 0 keeps it for ever."
+    >
+      <input
+        id={inputId}
+        type="number"
+        min={0}
+        max={fileHistory.maxDays}
+        className="mm-input mm-retention__number"
+        value={fileHistory.shown}
+        disabled={disabled || fileHistory.status !== "ready"}
+        onChange={(e) => fileHistory.setDraft(e.target.value)}
+      />
+    </RetentionRow>
+  );
+}
+
 /**
- * How long everything Weir records is kept: the system log, Activity, and a file's history. The first two save
- * together; the file's history saves on its own.
+ * How long everything Weir records is kept: the system log, Activity, and a file's history. One form: the three
+ * numbers are edited together and saved by one button, which appears once one of them has changed.
  */
 export function RetentionSection({
   form,
@@ -28,28 +101,43 @@ export function RetentionSection({
   savedLogDays: number;
 }) {
   const { retention, save } = form;
-  const disabled = !editable || save.isPending;
+  const fileHistory = useFileHistoryRetention();
+  const [saved, setSaved] = useState(false);
+  const saving = save.isPending || fileHistory.saving;
+  const disabled = !editable || saving;
+  const dirty = retention.dirty || fileHistory.dirty;
+  const failed = save.isError && form.lastSaveTarget === "logs";
   useScrollToHash();
 
+  const saveAll = () => {
+    setSaved(false);
+    if (retention.dirty) {
+      form.saveFrom("logs", { onSaved: () => setSaved(true) });
+    }
+    if (fileHistory.dirty) fileHistory.save(() => setSaved(true));
+  };
+
   return (
-    <QuietSection
-      level={3}
+    <Panel
+      title="How long things are kept"
       headingId="suite-settings-log-retention-heading"
-      heading="How long things are kept"
+      headingLevel={3}
+      padded
       id={RETENTION_ANCHOR}
+      dataTestId="suite-settings-retention"
     >
-      <p className="mm-quiet-note">
-        How long Weir keeps its system log, how far back Activity goes, and how
-        long a file&rsquo;s history is kept.
-      </p>
-      <div className="mm-field-row mt-4">
-        <label className="mm-field mm-field--short">
-          <span className="mm-field__label">System log retention (days)</span>
+      <div className="mm-retention">
+        <RetentionRow
+          inputId="retention-system-log"
+          label="System log"
+          help="1 to 3650. Older entries are removed while Weir runs."
+        >
           <input
+            id="retention-system-log"
             type="number"
             min={1}
-            max={3650}
-            className="mm-input"
+            max={MAX_LOG_DAYS}
+            className="mm-input mm-retention__number"
             value={retention.logValue}
             disabled={disabled}
             onFocus={() => retention.setLogDraft(String(savedLogDays))}
@@ -57,24 +145,19 @@ export function RetentionSection({
             onBlur={() =>
               retention.setLogDraft(String(retention.finalizeLogDays()))
             }
-            aria-describedby="suite-general-log-retention-hint"
           />
-          <span
-            id="suite-general-log-retention-hint"
-            className="mm-field__hint"
-          >
-            1 to 3650 days. Older entries are removed while Weir runs.
-          </span>
-        </label>
-        <label className="mm-field mm-field--short" id="activity-retention">
-          <span className="mm-field__label">
-            Keep Activity history for (days)
-          </span>
+        </RetentionRow>
+        <RetentionRow
+          inputId="retention-activity"
+          label="Events"
+          help="0 keeps them until you clear them. Media files are never touched."
+        >
           <input
+            id="retention-activity"
             type="number"
             min={0}
-            max={3650}
-            className="mm-input"
+            max={MAX_LOG_DAYS}
+            className="mm-input mm-retention__number"
             value={retention.activityValue}
             disabled={disabled}
             data-testid="suite-settings-activity-retention"
@@ -84,37 +167,47 @@ export function RetentionSection({
                 String(retention.finalizeActivityDays() ?? ""),
               )
             }
-            aria-describedby="suite-general-activity-retention-hint"
           />
-          <span
-            id="suite-general-activity-retention-hint"
-            className="mm-field__hint"
-          >
-            0 keeps it until you clear it. Media files are never touched.
-          </span>
-        </label>
+        </RetentionRow>
+        <FileHistoryRow fileHistory={fileHistory} disabled={disabled} />
       </div>
-      {save.isError && form.lastSaveTarget === "logs" ? (
-        <p
-          className="mt-4 text-sm text-mm-status-failed-text"
-          role="alert"
-          data-testid="suite-settings-logs-save-error"
-        >
-          {errorMessage(save.error, "Could not save.")}
-        </p>
+      {dirty || failed || fileHistory.error || saved ? (
+        <div className={quietActionRowClass}>
+          {dirty ? (
+            <button
+              type="button"
+              className={`${mmActionButtonClass({ variant: "primary" })} mm-sys-btn`}
+              disabled={
+                !editable || saving || (fileHistory.dirty && !fileHistory.valid)
+              }
+              data-testid="suite-settings-save-logs"
+              onClick={saveAll}
+            >
+              {saving ? "Saving…" : "Save retention"}
+            </button>
+          ) : null}
+          {failed ? (
+            <p
+              className="mm-status-text--failed text-sm"
+              role="alert"
+              data-testid="suite-settings-logs-save-error"
+            >
+              {errorMessage(save.error, "Could not save.")}
+            </p>
+          ) : fileHistory.error ? (
+            <p className="mm-status-text--failed text-sm" role="alert">
+              {errorMessage(
+                fileHistory.error,
+                "That change could not be saved.",
+              )}
+            </p>
+          ) : saved && !dirty ? (
+            <p className="mm-status-text--healthy text-sm" role="status">
+              Retention saved.
+            </p>
+          ) : null}
+        </div>
       ) : null}
-      <div className={`${quietActionRowClass} mt-6`}>
-        <button
-          type="button"
-          className={mmActionButtonClass({ variant: "primary" })}
-          disabled={!editable || !retention.dirty || save.isPending}
-          data-testid="suite-settings-save-logs"
-          onClick={() => form.saveFrom("logs")}
-        >
-          {save.isPending ? "Saving…" : "Save retention"}
-        </button>
-      </div>
-      <FileHistoryRetentionSetting editable={editable} />
-    </QuietSection>
+    </Panel>
   );
 }

@@ -142,6 +142,8 @@
   --mm-control-height-lg: calc(40px * var(--mm-density-ui-scale));
   --mm-control-height-sm: calc(32px * var(--mm-density-ui-scale));
   --mm-control-height: calc(34px * var(--mm-density-ui-scale));
+  /* A page's own controls, the header's pickers and the System tabs' fields and buttons: the Dashboard's height. */
+  --mm-control-height-page: 2.375rem;
   --mm-control-pad-x: calc(11px * var(--mm-density-ui-scale));
   --mm-control-pad-y: calc(7px * var(--mm-density-ui-scale));
 

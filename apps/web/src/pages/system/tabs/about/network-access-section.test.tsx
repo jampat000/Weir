@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { NetworkAccessSection } from "./network-access-section";
+import { NetworkAccessHalf } from "./network-access-section";
 
 const mocks = vi.hoisted(() => ({
   useNetworkAccessQuery: vi.fn(),
@@ -11,12 +11,16 @@ vi.mock("../../../../lib/settings/queries", () => ({
   useNetworkAccessQuery: () => mocks.useNetworkAccessQuery(),
 }));
 
-describe("NetworkAccessSection", () => {
+function renderHalf() {
+  return render(<NetworkAccessHalf labelId="network-label" />);
+}
+
+describe("NetworkAccessHalf", () => {
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
-  it("says other devices can reach Weir, and how to limit it, when they are allowed in", () => {
+  it("says other devices can reach Weir, and where to limit it, when they are allowed in", () => {
     mocks.useNetworkAccessQuery.mockReturnValue({
       isLoading: false,
       data: {
@@ -26,16 +30,17 @@ describe("NetworkAccessSection", () => {
       },
     });
 
-    render(<NetworkAccessSection />);
+    renderHalf();
 
-    expect(screen.getByText("Reachable")).toBeInTheDocument();
-    expect(
-      screen.getByText(/Other devices on your network can reach Weir./),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Your network")).toBeInTheDocument();
     expect(screen.getByText(/Only allow this PC/)).toBeInTheDocument();
+    expect(screen.getByTestId("about-network-access-status")).toHaveAttribute(
+      "title",
+      expect.stringContaining("Other devices on your network can reach Weir."),
+    );
   });
 
-  it("says only this PC can reach Weir, and how to change that, before LAN access is allowed", () => {
+  it("says only this PC can reach Weir, and where to change that, before LAN access is allowed", () => {
     mocks.useNetworkAccessQuery.mockReturnValue({
       isLoading: false,
       data: {
@@ -45,18 +50,13 @@ describe("NetworkAccessSection", () => {
       },
     });
 
-    render(<NetworkAccessSection />);
+    renderHalf();
 
     expect(screen.getByText("This PC only")).toBeInTheDocument();
-    expect(
-      screen.getByText(/Only this PC can reach Weir./),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(/Allow other devices on your network/),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/Allow other devices/)).toBeInTheDocument();
   });
 
-  it("tells the operator to use the tray menu when Windows Firewall is blocking other devices", () => {
+  it("points at the tray menu when Windows Firewall is blocking other devices", () => {
     mocks.useNetworkAccessQuery.mockReturnValue({
       isLoading: false,
       data: {
@@ -66,13 +66,12 @@ describe("NetworkAccessSection", () => {
       },
     });
 
-    render(<NetworkAccessSection />);
+    renderHalf();
 
     expect(screen.getByText("Blocked")).toBeInTheDocument();
     expect(
-      screen.getByText(/Windows Firewall is blocking other devices./),
+      screen.getByText(/Windows Firewall is blocking it/),
     ).toBeInTheDocument();
-    expect(screen.getByText(/Use the Weir tray icon/)).toBeInTheDocument();
   });
 
   it("renders nothing on a build that does not manage its own firewall (Docker, source)", () => {
@@ -81,7 +80,7 @@ describe("NetworkAccessSection", () => {
       data: { state: "not_applicable", summary: "" },
     });
 
-    const { container } = render(<NetworkAccessSection />);
+    const { container } = renderHalf();
 
     expect(container).toBeEmptyDOMElement();
   });
@@ -92,7 +91,7 @@ describe("NetworkAccessSection", () => {
       data: undefined,
     });
 
-    render(<NetworkAccessSection />);
+    renderHalf();
 
     expect(screen.getByText("Checking…")).toBeInTheDocument();
   });

@@ -1,10 +1,25 @@
 import { LoadError } from "../../../../components/shared/load-error";
 import { Chip } from "../../../../components/panels/chip";
-import { QuietSection } from "../../../../components/shared/quiet-section";
+import { Panel } from "../../../../components/panels/panel";
 import type { useServerLogsQuery } from "../../../../lib/settings/queries";
-import type { ServerLogEntry } from "../../../../lib/settings/types";
+import type {
+  ServerLogEntry,
+  ServerLogs,
+} from "../../../../lib/settings/types";
+import { mmActionButtonClass } from "../../../../lib/ui/mm-control-roles";
 import { useAppDateFormatter } from "../../../../lib/ui/mm-format-date";
+import { plural } from "../../../../lib/ui/mm-plural";
 import { logLevelLabel, logLevelToneClass } from "./server-log-format";
+
+/** What the card's header says about the list: how much of it shows, and how much of it is trouble. */
+function logSummary(logs: ServerLogs | undefined): string {
+  if (!logs) return "";
+  return [
+    `Showing ${logs.items.length.toLocaleString()} of ${plural(logs.total, "event", "events")}`,
+    plural(logs.counts.error, "error", "errors"),
+    plural(logs.counts.warning, "warning", "warnings"),
+  ].join(" · ");
+}
 
 /** Where an entry came from, for someone tracing it; closed unless there is something to show. */
 function TechnicalDetails({ entry }: { entry: ServerLogEntry }) {
@@ -39,34 +54,63 @@ function TechnicalDetails({ entry }: { entry: ServerLogEntry }) {
 /** Recent server events, newest first, with their level and time. */
 export function LogListSection({
   logsQ,
+  filtered,
+  onClearFilters,
 }: {
   logsQ: ReturnType<typeof useServerLogsQuery>;
+  /** Whether any filter is set, which offers clearing them. */
+  filtered: boolean;
+  onClearFilters: () => void;
 }) {
   const formatDateTime = useAppDateFormatter();
   const entries = logsQ.data?.items ?? [];
 
   return (
-    <QuietSection
-      level={3}
+    <Panel
+      title="System events"
       headingId="suite-settings-logs-list-heading"
-      heading="System events"
+      headingLevel={3}
+      padded
+      aside={
+        <>
+          <button
+            type="button"
+            className={`${mmActionButtonClass({ variant: "secondary" })} mm-sys-btn`}
+            disabled={logsQ.isFetching}
+            onClick={() => void logsQ.refetch()}
+          >
+            {logsQ.isFetching ? "Refreshing…" : "Refresh"}
+          </button>
+          {filtered ? (
+            <button
+              type="button"
+              className={`${mmActionButtonClass({ variant: "secondary" })} mm-sys-btn`}
+              onClick={onClearFilters}
+            >
+              Clear filters
+            </button>
+          ) : null}
+        </>
+      }
+      count={
+        <span
+          title="Recent runtime events, warnings, and failures captured by Weir."
+          data-testid="suite-settings-log-summary"
+        >
+          {logSummary(logsQ.data)}
+        </span>
+      }
     >
-      <p className="mm-quiet-note">
-        Recent runtime events, warnings, and failures captured by Weir.
-      </p>
-
       {logsQ.isPending ? (
-        <p className="mm-quiet-note mt-4">Loading logs...</p>
+        <p className="mm-quiet-note">Loading logs...</p>
       ) : logsQ.isError ? (
-        <div className="mt-4">
-          <LoadError thing="the server log" error={logsQ.error} />
-        </div>
+        <LoadError thing="the server log" error={logsQ.error} />
       ) : entries.length === 0 ? (
-        <p className="mm-quiet-note mt-4">
+        <p className="mm-quiet-note">
           No system events matched the current filters.
         </p>
       ) : (
-        <div className="mm-quiet-table-wrap mt-4">
+        <div className="mm-quiet-table-wrap">
           <table className="mm-quiet-table">
             <thead>
               <tr>
@@ -105,6 +149,6 @@ export function LogListSection({
           </table>
         </div>
       )}
-    </QuietSection>
+    </Panel>
   );
 }

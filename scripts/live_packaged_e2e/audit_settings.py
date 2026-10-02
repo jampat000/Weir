@@ -177,11 +177,7 @@ class AuditSettingsMixin:
         )
 
         # Exercise the wizard's supported re-entry path, then leave it with the safe skip action so
-        # the disposable audit account remains usable. It folds away because it is run once.
-        self.click(
-            self.page.get_by_role("heading", name="Setup wizard", exact=True),
-            "open the Setup wizard group",
-        )
+        # the disposable audit account remains usable.
         self.click(
             self.page.get_by_test_id("suite-settings-open-setup-wizard"),
             "open setup wizard from System",
@@ -220,14 +216,14 @@ class AuditSettingsMixin:
         )
         self.require(
             self.page.get_by_role(
-                "button", name="Download configuration now", exact=True
+                "button", name="Download settings", exact=True
             ).count()
             > 0,
             "configuration download control missing",
         )
         with self.page.expect_download(timeout=TIMEOUT_MS) as download_info:
             self.page.get_by_role(
-                "button", name="Download configuration now", exact=True
+                "button", name="Download settings", exact=True
             ).click()
         self.require(
             download_info.value.suggested_filename.endswith(".json"),

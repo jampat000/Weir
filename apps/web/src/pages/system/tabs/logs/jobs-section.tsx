@@ -1,10 +1,9 @@
-import { useId, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
 
 import { Panel } from "../../../../components/panels/panel";
 import { LoadError } from "../../../../components/shared/load-error";
 import { MmJobsPagination } from "../../../../components/overview/mm-overview-cards";
-import { MmListboxPicker } from "../../../../components/ui/mm-listbox-picker";
 import { errorMessage } from "../../../../lib/api/error-message";
 import { canEdit } from "../../../../lib/auth/can-edit";
 import { useMeQuery } from "../../../../lib/auth/queries";
@@ -19,6 +18,7 @@ import type { ProcessingJobInspectionRow } from "../../../../lib/processing/jobs
 import { useAppDateFormatter } from "../../../../lib/ui/mm-format-date";
 import { JobRow } from "./job-row";
 import { JOBS_FILTER_OPTIONS, filterFromUrl } from "./jobs-labels";
+import { LogsPicker, LogsViewControls } from "./logs-header-controls";
 
 const PAGE_SIZE_OPTIONS = [20, 50, 100];
 const HEAD_CELL = "mm-jobs-table__head top-0 z-20 bg-mm-card-bg";
@@ -99,7 +99,6 @@ export function JobsSection() {
   const me = useMeQuery();
   const pause = usePauseQuery();
   const [searchParams] = useSearchParams();
-  const filterLabelId = useId();
   const urlFilter = filterFromUrl(searchParams.get("status"));
   const [filter, setFilter] = useState<ProcessingJobsInspectionFilter>(
     () => urlFilter ?? "recent",
@@ -129,94 +128,86 @@ export function JobsSection() {
   );
 
   return (
-    <section
-      className="mm-quiet-stack"
-      aria-labelledby="processing-jobs-inspection-heading"
-      data-testid="processing-jobs-inspection-section"
-    >
-      <Panel
-        title="Jobs"
-        headingId="processing-jobs-inspection-heading"
-        padded
-        bodyClassName="space-y-4"
+    <>
+      <LogsViewControls>
+        <LogsPicker
+          label="Show jobs"
+          wide
+          testId="processing-jobs-inspection-filter"
+          options={JOBS_FILTER_OPTIONS}
+          value={filter}
+          onChange={(value) => {
+            setFilter(value as ProcessingJobsInspectionFilter);
+            setPage(1);
+          }}
+        />
+      </LogsViewControls>
+      <section
+        aria-labelledby="processing-jobs-inspection-heading"
+        data-testid="processing-jobs-inspection-section"
       >
-        <p className="mm-quiet-note">Current and recent work.</p>
-        <label className="block min-w-0 max-w-xl">
-          <span id={filterLabelId} className="text-sm text-mm-text2">
-            Show jobs
-          </span>
-          <MmListboxPicker
-            className="mt-2"
-            data-testid="processing-jobs-inspection-filter"
-            ariaLabelledBy={filterLabelId}
-            placeholder="Select filter"
-            options={JOBS_FILTER_OPTIONS}
-            value={filter}
-            onChange={(value) => {
-              setFilter(value as ProcessingJobsInspectionFilter);
-              setPage(1);
-            }}
-          />
-        </label>
-        {q.isPending || me.isPending ? (
-          <p className="text-sm text-mm-text2">Loading jobs…</p>
-        ) : null}
-        {q.isError ? <LoadError thing="jobs" error={q.error} /> : null}
-        {cancel.isError ? (
-          <FailedLine
-            text={errorMessage(cancel.error, "Cancel failed.")}
-            testId="processing-jobs-inspection-cancel-error"
-          />
-        ) : null}
-        {recover.isError ? (
-          <FailedLine
-            text={errorMessage(recover.error, "Recovery failed.")}
-            testId="processing-jobs-inspection-recover-error"
-          />
-        ) : null}
-
-        {!q.isPending && !q.isError && jobs.length === 0 ? (
-          <div className="py-6" data-testid="processing-jobs-inspection-empty">
-            <p className="text-sm font-medium text-mm-text1">
-              No jobs match this view
-            </p>
-            <p className="mt-1 text-xs text-mm-text2">
-              Try <strong className="text-mm-text2">Recent work</strong>.
-            </p>
-          </div>
-        ) : null}
-
-        {!q.isPending && !q.isError && jobs.length > 0 ? (
-          <>
-            <JobsTable
-              jobs={pagedRows}
-              canAct={canEdit(me.data?.role)}
-              processingPaused={pause.data?.paused === true}
-              cancel={cancel}
-              recover={recover}
+        <Panel
+          title="Jobs"
+          headingId="processing-jobs-inspection-heading"
+          padded
+          bodyClassName="space-y-4"
+          count="Current and recent work"
+        >
+          {q.isPending || me.isPending ? (
+            <p className="text-sm text-mm-text2">Loading jobs…</p>
+          ) : null}
+          {q.isError ? <LoadError thing="jobs" error={q.error} /> : null}
+          {cancel.isError ? (
+            <FailedLine
+              text={errorMessage(cancel.error, "Cancel failed.")}
+              testId="processing-jobs-inspection-cancel-error"
             />
-            <MmJobsPagination
-              page={shownPage}
-              totalPages={totalPages}
-              onPageChange={setPage}
-              pageSize={pageSize}
-              onPageSizeChange={(size) => {
-                setPageSize(size);
-                setPage(1);
-              }}
-              pageSizeOptions={PAGE_SIZE_OPTIONS}
+          ) : null}
+          {recover.isError ? (
+            <FailedLine
+              text={errorMessage(recover.error, "Recovery failed.")}
+              testId="processing-jobs-inspection-recover-error"
             />
-          </>
-        ) : null}
+          ) : null}
 
-        <p className="text-xs text-mm-text2">
-          More in the{" "}
-          <Link to="/system?tab=history" className="text-mm-accent underline">
-            Activity log
-          </Link>
-          .
-        </p>
-      </Panel>
-    </section>
+          {!q.isPending && !q.isError && jobs.length === 0 ? (
+            <div
+              className="py-6"
+              data-testid="processing-jobs-inspection-empty"
+            >
+              <p className="text-sm font-medium text-mm-text1">
+                No jobs match this view
+              </p>
+              <p className="mt-1 text-xs text-mm-text2">
+                Try <strong className="text-mm-text2">Recent work</strong>.
+              </p>
+            </div>
+          ) : null}
+
+          {!q.isPending && !q.isError && jobs.length > 0 ? (
+            <>
+              <JobsTable
+                jobs={pagedRows}
+                canAct={canEdit(me.data?.role)}
+                processingPaused={pause.data?.paused === true}
+                cancel={cancel}
+                recover={recover}
+              />
+              <MmJobsPagination
+                page={shownPage}
+                totalPages={totalPages}
+                onPageChange={setPage}
+                pageSize={pageSize}
+                onPageSizeChange={(size) => {
+                  setPageSize(size);
+                  setPage(1);
+                }}
+                pageSizeOptions={PAGE_SIZE_OPTIONS}
+              />
+            </>
+          ) : null}
+        </Panel>
+      </section>
+    </>
   );
 }

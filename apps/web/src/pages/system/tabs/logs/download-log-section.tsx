@@ -1,10 +1,13 @@
 import { useState } from "react";
 
-import { QuietSection } from "../../../../components/shared/quiet-section";
+import { Panel } from "../../../../components/panels/panel";
 import { errorMessage } from "../../../../lib/api/error-message";
 import { fetchServerLogDownload } from "../../../../lib/settings/settings-api";
 import { mmActionButtonClass } from "../../../../lib/ui/mm-control-roles";
 import { saveBlobAs } from "../../../../lib/ui/save-file";
+
+const WHOLE_LOG_DETAIL =
+  "The list above shows the most recent matches. This downloads the whole server log as a file, for handing to someone helping with a problem.";
 
 /** The view above only shows the most recent matches; this hands over the whole file. */
 export function DownloadLogSection() {
@@ -26,30 +29,30 @@ export function DownloadLogSection() {
   };
 
   return (
-    <QuietSection
-      level={3}
+    <Panel
+      title="Download the whole log"
       headingId="suite-settings-logs-download-heading"
-      heading="Download the whole log"
-    >
-      <p className="mm-quiet-note">
-        The list above shows the most recent matches. This downloads the whole
-        server log as a file, for handing to someone helping with a problem.
-      </p>
-      <div className="mt-3">
+      headingLevel={3}
+      padded
+      aside={
         <button
           type="button"
-          className={mmActionButtonClass({ variant: "secondary" })}
+          className={`${mmActionButtonClass({ variant: "secondary" })} mm-sys-btn`}
           disabled={busy}
           onClick={() => void download()}
         >
           {busy ? "Downloading..." : "Download server log"}
         </button>
-      </div>
+      }
+    >
+      <p className="mm-quiet-note" title={WHOLE_LOG_DETAIL}>
+        The whole server log as one file, to hand to whoever is helping.
+      </p>
       {problem ? (
-        <p className="mm-status-text--failed mt-2 text-sm" role="alert">
+        <p className="mm-status-text--failed mm-sys-note" role="alert">
           {problem}
         </p>
       ) : null}
-    </QuietSection>
+    </Panel>
   );
 }

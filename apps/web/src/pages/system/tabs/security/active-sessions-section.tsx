@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { Chip } from "../../../../components/panels/chip";
 
+import { Chip } from "../../../../components/panels/chip";
+import { Panel } from "../../../../components/panels/panel";
 import { LoadError } from "../../../../components/shared/load-error";
-import { QuietSection } from "../../../../components/shared/quiet-section";
 import type { ActiveSession } from "../../../../lib/api/types";
 import {
   useActiveSessionsQuery,
@@ -11,6 +11,11 @@ import {
 } from "../../../../lib/auth/queries";
 import { mmActionButtonClass } from "../../../../lib/ui/mm-control-roles";
 import { useAppDateFormatter } from "../../../../lib/ui/mm-format-date";
+
+const SESSIONS_NOTE =
+  "Browsers signed in to Weir. Session tokens are never shown.";
+const SESSIONS_DETAIL =
+  "Review signed-in browsers and sign out anything you no longer recognize. Session tokens are never shown.";
 
 function SessionsTable({
   sessions,
@@ -23,48 +28,51 @@ function SessionsTable({
 }) {
   const formatDate = useAppDateFormatter();
   return (
-    <div className="mm-quiet-table-wrap mt-4">
-      <table className="mm-quiet-table" data-testid="active-sessions">
-        <thead>
-          <tr>
-            <th scope="col">Browser</th>
-            <th scope="col">Last seen</th>
-            <th scope="col">Expires</th>
-            <th scope="col">
-              <span className="sr-only">Sign out</span>
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {sessions.map((session) => (
-            <tr key={session.session_id}>
-              <th scope="row" className="mm-quiet-table__name">
-                <span>{session.client_label || "Browser session"}</span>
+    <table
+      className="mm-quiet-table mm-sys-table"
+      data-testid="active-sessions"
+    >
+      <thead>
+        <tr>
+          <th scope="col">Browser</th>
+          <th scope="col">Last seen</th>
+          <th scope="col">Expires</th>
+          <th scope="col">
+            <span className="sr-only">Sign out</span>
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        {sessions.map((session) => (
+          <tr key={session.session_id}>
+            <th scope="row">
+              <span className="mm-sys-table__who">
+                {session.client_label || "Browser session"}
                 {session.current ? <Chip tone="info">This browser</Chip> : null}
                 {session.trusted_device ? (
                   <Chip tone="healthy">Trusted</Chip>
                 ) : null}
-              </th>
-              <td data-label="Last seen">{formatDate(session.last_seen_at)}</td>
-              <td data-label="Expires">
-                {formatDate(session.absolute_expires_at)}
-              </td>
-              <td data-label="">
-                {/* Signing a session out is immediate and cannot be undone, so it is a real button. */}
+              </span>
+            </th>
+            <td>{formatDate(session.last_seen_at)}</td>
+            <td>{formatDate(session.absolute_expires_at)}</td>
+            <td>
+              {/* The browser in use is signed out from the user menu, so it has no button here. */}
+              {session.current ? null : (
                 <button
                   type="button"
-                  className={mmActionButtonClass({ variant: "tertiary" })}
-                  disabled={session.current || revoking}
+                  className={`${mmActionButtonClass({ variant: "secondary" })} mm-sys-btn`}
+                  disabled={revoking}
                   onClick={() => onRevoke(session.session_id)}
                 >
                   {revoking ? "Signing out…" : "Sign out"}
                 </button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+              )}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
   );
 }
 
@@ -99,42 +107,33 @@ export function ActiveSessionsSection({ enabled }: { enabled: boolean }) {
   };
 
   return (
-    <QuietSection
-      level={3}
+    <Panel
+      title="Active sessions"
       headingId="suite-security-sessions-heading"
-      heading="Active sessions"
+      headingLevel={3}
+      padded
+      note={<span title={SESSIONS_DETAIL}>{SESSIONS_NOTE}</span>}
       aside={
-        <button
-          type="button"
-          className="mm-quiet-link"
-          disabled={
-            revokeOthers.isPending || sessionsQ.isPending || others.length === 0
-          }
-          onClick={signOutOthers}
-        >
-          {revokeOthers.isPending
-            ? "Signing out…"
-            : "Sign out other sessions →"}
-        </button>
+        others.length > 0 ? (
+          <button
+            type="button"
+            className={`${mmActionButtonClass({ variant: "secondary" })} mm-sys-btn mm-sys-btn--danger`}
+            disabled={revokeOthers.isPending}
+            onClick={signOutOthers}
+          >
+            {revokeOthers.isPending
+              ? "Signing out…"
+              : "Sign out other sessions"}
+          </button>
+        ) : null
       }
     >
-      <p className="mm-quiet-note">
-        Review signed-in browsers and sign out anything you no longer recognize.
-        Session tokens are never shown.
-      </p>
-      {status ? (
-        <p className="mm-quiet-note mt-3" role="status">
-          {status}
-        </p>
-      ) : null}
       {sessionsQ.isError ? (
-        <div className="mt-4">
-          <LoadError thing="active sessions" error={sessionsQ.error} />
-        </div>
+        <LoadError thing="active sessions" error={sessionsQ.error} />
       ) : sessionsQ.isPending ? (
-        <p className="mm-quiet-note mt-4">Loading active sessions…</p>
+        <p className="mm-quiet-note">Loading active sessions…</p>
       ) : sessions.length === 0 ? (
-        <p className="mm-quiet-note mt-4">No active sessions were found.</p>
+        <p className="mm-quiet-note">No active sessions were found.</p>
       ) : (
         <SessionsTable
           sessions={sessions}
@@ -142,6 +141,11 @@ export function ActiveSessionsSection({ enabled }: { enabled: boolean }) {
           onRevoke={signOut}
         />
       )}
-    </QuietSection>
+      {status ? (
+        <p className="mm-sys-note" role="status">
+          {status}
+        </p>
+      ) : null}
+    </Panel>
   );
 }

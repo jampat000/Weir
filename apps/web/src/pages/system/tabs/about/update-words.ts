@@ -1,0 +1,37 @@
+import type { MmStatusTone } from "../../../../lib/ui/mm-status-tone";
+
+/** How this install got here, in words a reader outside engineering recognises. */
+export function installTypeLabel(installType: string): string {
+  switch (installType) {
+    case "windows":
+      return "Windows installer";
+    case "docker":
+      return "Docker";
+    case "source":
+      return "Built from source";
+    default:
+      return installType;
+  }
+}
+
+/** "up to date" -> "Up to date": status pills across Weir are sentence case. */
+function sentenceCase(text: string): string {
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+const STATUS_LABELS: Readonly<Record<string, string>> = {
+  up_to_date: "Up to date",
+  update_available: "Update ready",
+};
+
+/** What a status pill says about the update check. */
+export function updateStatusLabel(status: string): string {
+  return STATUS_LABELS[status] ?? sentenceCase(status.replaceAll("_", " "));
+}
+
+/** A failed check reads as a failure, not a quiet success; only "up to date" reads as healthy. */
+export function updateStatusTone(status: string): MmStatusTone {
+  if (status === "update_available") return "warning";
+  if (status === "up_to_date") return "healthy";
+  return "failed";
+}

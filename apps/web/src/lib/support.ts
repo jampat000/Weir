@@ -16,28 +16,7 @@ export function normalizeSupportUrl(
   }
 }
 
-export function shouldShowSupportPlaceholder(
-  isDev: boolean,
-  supportUrl: string | null,
-): boolean {
-  return isDev && supportUrl === null;
-}
-
-export function shouldShowSupportCard(
-  isDev: boolean,
-  supportUrl: string | null,
-): boolean {
-  return supportUrl !== null || shouldShowSupportPlaceholder(isDev, supportUrl);
-}
-
+/** Where to support Weir's development, when this build was given a link; otherwise nothing about it shows. */
 export const SUPPORT_URL = normalizeSupportUrl(
   import.meta.env.VITE_SUPPORT_URL,
-);
-export const SHOW_SUPPORT_URL_PLACEHOLDER = shouldShowSupportPlaceholder(
-  import.meta.env.DEV,
-  SUPPORT_URL,
-);
-export const SHOW_SUPPORT_CARD = shouldShowSupportCard(
-  import.meta.env.DEV,
-  SUPPORT_URL,
 );
