@@ -75,11 +75,11 @@ public sealed class ReconciliationServiceTests(ServerFixture fixture) : IClassFi
 
         await using (var database = await fixture.Server.StopForDatabaseAsync())
         {
-            ViewerAccount.Ensure(database.Connection);
+            SeededAccounts.EnsureViewer(database.Connection);
         }
 
         using var viewer = fixture.Server.CreateClient();
-        await viewer.LoginAsync(ViewerAccount.Username, ViewerAccount.Password);
+        await viewer.LoginAsync(SeededAccounts.ViewerUsername, SeededAccounts.ViewerPassword);
         JobsApi.Expect(await viewer.GetAsync(Report), HttpStatusCode.Forbidden);
     }
 

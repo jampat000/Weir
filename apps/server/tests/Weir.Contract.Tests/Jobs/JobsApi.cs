@@ -13,23 +13,6 @@ internal static class JobsApi
     private static readonly string[] AllStatuses =
         ["pending", "leased", "completed", "failed", "handler_ok_finalize_failed", "cancelled"];
 
-    // ProcessingLibraryOut fields that PUT /processing/libraries/{id} does not accept (it forbids extras).
-    private static readonly string[] LibraryReadOnlyFields =
-    [
-        "id",
-        "display_order",
-        "manager_coverage",
-        "manager_coverage_detail",
-        "discovered_from_connection_id",
-        "discovered_library_key",
-        "effective_max_concurrent_files",
-        "active_job_count",
-        "next_look_at",
-        "periodic_scan",
-        "next_scan_at",
-        "updated_at",
-    ];
-
     public static void Expect(WeirResponse response, HttpStatusCode status) =>
         Assert.True(response.Status == status, response.ToString());
 
@@ -74,11 +57,7 @@ internal static class JobsApi
         var path = $"{WeirClient.Api}/processing/libraries/{libraryId}";
         var current = await client.GetAsync(path);
         Expect(current, HttpStatusCode.OK);
-        var body = new JsonObject();
-        foreach (var (name, value) in current.Fields.Where(field => !LibraryReadOnlyFields.Contains(field.Key)))
-        {
-            body[name] = value?.DeepClone();
-        }
+        var body = LibraryBodies.Unchanged(current.Fields);
 
         foreach (var (name, value) in changes)
         {

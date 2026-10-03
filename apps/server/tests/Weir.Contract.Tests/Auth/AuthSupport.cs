@@ -11,27 +11,12 @@ namespace Weir.Contract.Tests.Auth;
 public static class AuthSupport
 {
     public const string SessionCookie = "weir_session";
-    public const string ViewerUsername = "bob";
-    public const string ViewerPassword = "viewer-password-here";
 
-    // Argon2id PHC strings (m=65536, t=3, p=1, 32-byte hash, 16-byte salt), the format users.password_hash holds.
-    public const string ViewerPasswordHash = "$argon2id$v=19$m=65536,t=3,p=1$EcJ710LJQO79Yp1EJYGJTw$voE4PjB0y5u5+mnoY4cQANEnKkWPG6VUFYBwLxTDy/g";
-    public const string AdminPasswordHash = "$argon2id$v=19$m=65536,t=3,p=1$CJlvLLyHD9vjw57xenosZQ$TVsrhsG8/sn4eKb33TmwEI47n9hHHfm62NI4etjvJ7k";
+    // Argon2id PHC string (m=65536, t=3, p=1, 32-byte hash, 16-byte salt), the format users.password_hash holds, for an account nobody signs in to.
     public const string UnusedPasswordHash = "$argon2id$v=19$m=65536,t=3,p=1$JDfarhm32MId/nK3lvQuWQ$LBjRvv2RMp0vfRF+ZnxBWLBRewotDO5Ior/7Q1c7dDI";
 
     private const int TicksPerMicrosecond = 10;
     private const int TokenBytes = 32;
-
-    /// <summary>Seeds the viewer <c>bob</c> while the server is stopped; the server comes back on a new port.</summary>
-    public static async Task EnsureViewerAsync(WeirServer server)
-    {
-        await using var database = await server.StopForDatabaseAsync();
-        var existing = SeedSql.Scalar(database.Connection, "SELECT COUNT(*) FROM users WHERE username = $name", ("$name", ViewerUsername));
-        if (Convert.ToInt64(existing, CultureInfo.InvariantCulture) == 0)
-        {
-            SeedSql.InsertUser(database.Connection, ViewerUsername, ViewerPasswordHash, "viewer");
-        }
-    }
 
     /// <summary>Fails with what the server actually answered unless the status is the expected one.</summary>
     public static void AssertStatus(HttpStatusCode expected, WeirResponse response) =>

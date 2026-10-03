@@ -11,12 +11,6 @@ public sealed class ConnectionsTests(NoWebhookSecretFixture fixture) : IClassFix
 {
     private const string Route = ManagerConnections.Route;
     private const string HealthPath = "/api/integrations/external/health";
-    private const string ViewerUsername = "bob";
-    private const string ViewerPassword = "viewer-password-here";
-
-    // Argon2id (PHC format, as users.password_hash holds it) of ViewerPassword: the suite has no hasher of its own.
-    private const string ViewerPasswordHash =
-        "$argon2id$v=19$m=65536,t=3,p=1$1FAZDPY1Q+jK6pqz4PUmDQ$xdxYW1ObpjuQPUugXzhpJTy8i3qLJQpca61EfWZ6gJI";
 
     private WeirServer Server => fixture.Server;
 
@@ -307,19 +301,19 @@ public sealed class ConnectionsTests(NoWebhookSecretFixture fixture) : IClassFix
         {
             var attempt = await probe.PostAsync($"{WeirClient.Api}/auth/login", new JsonObject
             {
-                ["username"] = ViewerUsername,
-                ["password"] = ViewerPassword,
+                ["username"] = SeededAccounts.ViewerUsername,
+                ["password"] = SeededAccounts.ViewerPassword,
                 ["csrf_token"] = await probe.CsrfTokenAsync(),
             });
             if (attempt.Status != HttpStatusCode.OK)
             {
                 await using var database = await Server.StopForDatabaseAsync();
-                SeedSql.InsertUser(database.Connection, ViewerUsername, ViewerPasswordHash);
+                SeededAccounts.EnsureViewer(database.Connection);
             }
         }
 
         using var viewer = Server.CreateClient();
-        await viewer.LoginAsync(ViewerUsername, ViewerPassword);
+        await viewer.LoginAsync(SeededAccounts.ViewerUsername, SeededAccounts.ViewerPassword);
 
         Assert.Equal(HttpStatusCode.Forbidden, (await viewer.GetAsync(Route)).Status);
     }

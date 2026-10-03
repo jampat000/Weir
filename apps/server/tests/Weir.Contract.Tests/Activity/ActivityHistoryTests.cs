@@ -91,7 +91,7 @@ public sealed class ActivityHistoryTests(ServerFixture fixture) : IClassFixture<
     {
         using var seeded = await SeededClientAsync();
         using var viewer = Server.CreateClient();
-        await viewer.LoginAsync(ActivityRows.ViewerUsername, ActivityRows.ViewerPassword);
+        await viewer.LoginAsync(SeededAccounts.ViewerUsername, SeededAccounts.ViewerPassword);
 
         var response = await viewer.PostWithCsrfAsync(
             $"{FileHistory}/remove", new JsonObject { ["relative_path"] = "Heat/heat.mkv" });

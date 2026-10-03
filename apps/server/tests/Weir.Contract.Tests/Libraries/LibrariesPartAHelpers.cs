@@ -6,55 +6,14 @@ using Weir.Contract.Tests.Harness;
 
 namespace Weir.Contract.Tests.Libraries;
 
-/// <summary>Stateless helpers the Processing and Library view contract tests share: seed rows, the viewer account, JSON reading.</summary>
+/// <summary>Stateless helpers the Processing and Library view contract tests share: seed rows and JSON reading.</summary>
 public static class LibrariesPartAHelpers
 {
     public const string Api = WeirClient.Api;
-    public const string ViewerUsername = "bob";
-    public const string ViewerPassword = "viewer-password-here";
-
-    // Argon2id of ViewerPassword with the parameters the server hashes with (time 3, memory 65536 KiB, 1 lane, 32-byte hash, 16-byte salt).
-    public const string ViewerPasswordHash =
-        "$argon2id$v=19$m=65536,t=3,p=1$cZEfIo+vjAv5H5CYLMWHBQ$obuh2fmT1pyZ+KXQdfTWQ6EWmnEQB9tMdsQMbsPabyE";
-
     public const string RemuxPassJobKind = "processing.file.remux_pass.v1";
     public const string RemuxPassCompletedEvent = "processing.file_remux_pass_completed";
 
     public static string Now() => SeedSql.UtcText(DateTime.UtcNow);
-
-    // --- accounts -------------------------------------------------------------------------------
-
-    /// <summary>Seeds the viewer when the install has none; the server restarts on a new port, so make clients afterwards.</summary>
-    public static async Task EnsureViewerAsync(WeirServer server)
-    {
-        await using var database = await server.StopForDatabaseAsync();
-        InsertViewerIfMissing(database.Connection);
-    }
-
-    public static void InsertViewerIfMissing(SqliteConnection connection)
-    {
-        var existing = SeedSql.Scalar(connection, "SELECT COUNT(*) FROM users WHERE username = $name", ("$name", ViewerUsername));
-        if (Convert.ToInt64(existing, CultureInfo.InvariantCulture) == 0)
-        {
-            SeedSql.InsertUser(connection, ViewerUsername, ViewerPasswordHash, "viewer");
-        }
-    }
-
-    public static async Task<WeirClient> SignedInViewerAsync(WeirServer server)
-    {
-        var client = server.CreateClient();
-        try
-        {
-            await client.LoginAsync(ViewerUsername, ViewerPassword);
-        }
-        catch
-        {
-            client.Dispose();
-            throw;
-        }
-
-        return client;
-    }
 
     // --- requests -------------------------------------------------------------------------------
 

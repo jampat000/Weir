@@ -81,7 +81,7 @@ public sealed class ProcessingEndpointsContractTests(ProcessingEndpointsContract
     [Fact]
     public async Task Files_list_shape()
     {
-        using var viewer = await SignedInViewerAsync(fixture.Server);
+        using var viewer = await SeededAccounts.SignInViewerAsync(fixture.Server);
         var response = await viewer.GetAsync(Files);
         response.ShouldBe(HttpStatusCode.OK);
         var body = response.Fields;
@@ -149,7 +149,7 @@ public sealed class ProcessingEndpointsContractTests(ProcessingEndpointsContract
     public async Task Requeue_one_file()
     {
         using var admin = await fixture.Server.CreateAdminClientAsync();
-        using var viewer = await SignedInViewerAsync(fixture.Server);
+        using var viewer = await SeededAccounts.SignInViewerAsync(fixture.Server);
         var target = await FileAsync(admin, "Requeue/one.mkv");
         var path = $"{Files}/{(long)target["id"]!}/requeue";
 
@@ -187,7 +187,7 @@ public sealed class ProcessingEndpointsContractTests(ProcessingEndpointsContract
     public async Task Bulk_requeue()
     {
         using var admin = await fixture.Server.CreateAdminClientAsync();
-        using var viewer = await SignedInViewerAsync(fixture.Server);
+        using var viewer = await SeededAccounts.SignInViewerAsync(fixture.Server);
         var bulk = $"{Files}/requeue";
         (await viewer.PostWithCsrfAsync(bulk, Obj(("path_contains", "BulkRequeue")))).ShouldBe(HttpStatusCode.Forbidden);
 
@@ -210,7 +210,7 @@ public sealed class ProcessingEndpointsContractTests(ProcessingEndpointsContract
     [Fact]
     public async Task Rejected_files_summary_counts_what_can_be_processed_again()
     {
-        using var viewer = await SignedInViewerAsync(fixture.Server);
+        using var viewer = await SeededAccounts.SignInViewerAsync(fixture.Server);
         var response = await viewer.GetAsync($"{Files}/rejected/summary");
         response.ShouldBe(HttpStatusCode.OK);
         var body = response.Fields;
@@ -225,7 +225,7 @@ public sealed class ProcessingEndpointsContractTests(ProcessingEndpointsContract
     public async Task Processing_all_rejected_files_again_is_for_operators_with_a_csrf_token()
     {
         using var admin = await fixture.Server.CreateAdminClientAsync();
-        using var viewer = await SignedInViewerAsync(fixture.Server);
+        using var viewer = await SeededAccounts.SignInViewerAsync(fixture.Server);
         var again = $"{Files}/rejected/process-again";
 
         (await viewer.PostWithCsrfAsync(again)).ShouldBe(HttpStatusCode.Forbidden);
@@ -236,7 +236,7 @@ public sealed class ProcessingEndpointsContractTests(ProcessingEndpointsContract
     [Fact]
     public async Task File_log()
     {
-        using var viewer = await SignedInViewerAsync(fixture.Server);
+        using var viewer = await SeededAccounts.SignInViewerAsync(fixture.Server);
         (await viewer.GetAsync($"{Files}/999999/log")).ShouldBe(HttpStatusCode.NotFound);
 
         var alpha = await FileAsync(viewer, "Alpha/alpha.mkv");
@@ -270,7 +270,7 @@ public sealed class ProcessingEndpointsContractTests(ProcessingEndpointsContract
     [Fact]
     public async Task Why_held()
     {
-        using var viewer = await SignedInViewerAsync(fixture.Server);
+        using var viewer = await SeededAccounts.SignInViewerAsync(fixture.Server);
         using var client = fixture.Server.CreateClient();
         (await client.GetAsync($"{Files}/1/why-held")).ShouldBe(HttpStatusCode.Unauthorized);
         (await viewer.GetAsync($"{Files}/999999/why-held")).ShouldBe(HttpStatusCode.NotFound);
@@ -313,7 +313,7 @@ public sealed class ProcessingEndpointsContractTests(ProcessingEndpointsContract
     {
         protected override void Seed(SqliteConnection connection)
         {
-            SeedSql.InsertUser(connection, ViewerUsername, ViewerPasswordHash, "viewer");
+            SeededAccounts.EnsureViewer(connection);
             var movies = LibraryIdNamed(connection, "Movies");
             var tv = LibraryIdNamed(connection, "TV");
             var alpha = InsertFile(

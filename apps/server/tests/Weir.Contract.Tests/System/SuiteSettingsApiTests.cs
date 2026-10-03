@@ -36,7 +36,7 @@ public sealed class SuiteSettingsApiTests(UsersFixture fixture) : IClassFixture<
     [Fact]
     public async Task Suite_settings_get_ok_for_viewer()
     {
-        using var viewer = await SystemPartBHelpers.SignedInViewerAsync(Server);
+        using var viewer = await SeededAccounts.SignInViewerAsync(Server);
 
         var response = await viewer.GetAsync(Settings);
 
@@ -166,7 +166,7 @@ public sealed class SuiteSettingsApiTests(UsersFixture fixture) : IClassFixture<
     [Fact]
     public async Task Suite_settings_put_viewer_forbidden()
     {
-        using var viewer = await SystemPartBHelpers.SignedInViewerAsync(Server);
+        using var viewer = await SeededAccounts.SignInViewerAsync(Server);
 
         var response = await viewer.PutWithCsrfAsync(Settings, RetentionBody());
 

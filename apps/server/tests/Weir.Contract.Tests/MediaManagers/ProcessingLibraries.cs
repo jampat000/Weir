@@ -21,18 +21,6 @@ internal static class ProcessingLibraries
 {
     private const string Route = $"{WeirClient.Api}/processing/libraries";
 
-    private static readonly string[] WritableFields =
-    [
-        "name", "media_type", "enabled", "watched_folder", "work_folder", "output_folder", "media_extensions_csv",
-        "exclude_markers_csv", "include_patterns_csv", "exclude_patterns_csv", "min_file_size_mb", "max_file_size_mb",
-        "rejected_file_action", "ready_after_seconds", "exclude_hidden", "top_level_only", "sidecar_patterns_csv",
-        "preserve_original_timestamps", "output_collision_policy", "ffmpeg_strictness", "scan_interval_seconds",
-        "ignore_size_changes", "skip_access_tests", "max_attempts", "retry_backoff_seconds", "retry_execution_failures",
-        "failure_policy", "retry_preflight_failures", "schedule_grid", "file_system_events_enabled", "schedule_enabled",
-        "schedule_hours_limited", "schedule_days", "schedule_start", "schedule_end", "max_concurrent_files", "priority",
-        "rule_set_id", "manager_connection_ids", "remove_original_after_success",
-    ];
-
     public static async Task<JsonArray> ListAsync(WeirClient client)
     {
         var listed = await client.GetAsync(Route);
@@ -59,11 +47,7 @@ internal static class ProcessingLibraries
     /// <summary>A PUT is a whole-library save, so this starts from the library as it is and changes only <paramref name="changes"/>.</summary>
     public static async Task<JsonObject> UpdateAsync(WeirClient client, JsonObject library, JsonObject changes)
     {
-        var body = new JsonObject();
-        foreach (var field in WritableFields.Where(library.ContainsKey))
-        {
-            body[field] = library[field]?.DeepClone();
-        }
+        var body = LibraryBodies.Unchanged(library);
 
         var saved = await client.PutWithCsrfAsync($"{Route}/{JsonFields.Id(library)}", JsonFields.Merge(body, changes));
         Assert.True(saved.Status == HttpStatusCode.OK, saved.ToString());

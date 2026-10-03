@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text.Json.Nodes;
+using Microsoft.Data.Sqlite;
 using Weir.Contract.Tests.Harness;
 using static Weir.Contract.Tests.SystemArea.SystemLogSeed;
 using static Weir.Contract.Tests.SystemArea.SystemPartBJson;
@@ -221,7 +222,7 @@ public sealed class SystemLogTests(SystemLogTests.SeededLogFixture fixture) : IC
     [Fact]
     public async Task A_viewer_can_read_the_log()
     {
-        using var viewer = await SystemPartBHelpers.SignedInViewerAsync(Server);
+        using var viewer = await SeededAccounts.SignInViewerAsync(Server);
 
         var response = await viewer.GetAsync(Log, Window);
 
@@ -263,9 +264,8 @@ public sealed class SystemLogTests(SystemLogTests.SeededLogFixture fixture) : IC
 
         public long FailedJob { get; private set; }
 
-        protected override Task SeedAsync(StoppedDatabase database)
+        protected override void Seed(SqliteConnection connection)
         {
-            var connection = database.Connection;
             SystemPartBHelpers.SeedUsers(connection);
             SeedSql.Execute(connection, "DELETE FROM jobs");
             LibraryId = Convert.ToInt64(SeedSql.Scalar(connection, "SELECT id FROM libraries ORDER BY id LIMIT 1"), System.Globalization.CultureInfo.InvariantCulture);
@@ -288,7 +288,6 @@ public sealed class SystemLogTests(SystemLogTests.SeededLogFixture fixture) : IC
                         ("job_id", FailedJob.ToString(System.Globalization.CultureInfo.InvariantCulture)),
                         ("traceback", "System.InvalidOperationException: ffmpeg stopped")),
                 ]);
-            return Task.CompletedTask;
         }
     }
 }

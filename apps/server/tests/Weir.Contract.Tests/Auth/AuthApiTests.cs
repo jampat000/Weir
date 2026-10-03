@@ -139,9 +139,9 @@ public sealed class AuthApiTests(ServerFixture fixture) : AliceTestBase(fixture)
     [Fact]
     public async Task Admin_ping_forbidden_for_viewer()
     {
-        await EnsureViewerAsync(Server);
+        await SeededAccounts.EnsureViewerAsync(Server);
         var session = NewSession();
-        await session.AttemptLoginAsync(ViewerUsername, ViewerPassword);
+        await session.AttemptLoginAsync(SeededAccounts.ViewerUsername, SeededAccounts.ViewerPassword);
 
         var response = await session.GetAsync($"{Api}/auth/admin/ping");
 

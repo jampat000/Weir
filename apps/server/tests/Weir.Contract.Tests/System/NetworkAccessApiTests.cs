@@ -11,7 +11,7 @@ namespace Weir.Contract.Tests.SystemArea;
 /// setting as not applicable and refuses a change with the reason. A Docker run says its port mapping decides.
 /// </summary>
 [ContractArea("system")]
-public sealed class NetworkAccessApiTests(SystemPartASeededServerFixture fixture) : IClassFixture<SystemPartASeededServerFixture>
+public sealed class NetworkAccessApiTests(UsersFixture fixture) : IClassFixture<UsersFixture>
 {
     private const string NetworkAccess = $"{WeirClient.Api}/suite/network-access";
 
@@ -47,7 +47,7 @@ public sealed class NetworkAccessApiTests(SystemPartASeededServerFixture fixture
     [Fact]
     public async Task A_viewer_can_read_the_state()
     {
-        using var viewer = await SystemPartAHelpers.SignedInViewerAsync(fixture.Server);
+        using var viewer = await SeededAccounts.SignInViewerAsync(fixture.Server);
         Assert.Equal(HttpStatusCode.OK, (await viewer.GetAsync(NetworkAccess)).Status);
     }
 
@@ -65,7 +65,7 @@ public sealed class NetworkAccessApiTests(SystemPartASeededServerFixture fixture
     [Fact]
     public async Task A_viewer_cannot_change_it()
     {
-        using var viewer = await SystemPartAHelpers.SignedInViewerAsync(fixture.Server);
+        using var viewer = await SeededAccounts.SignInViewerAsync(fixture.Server);
 
         var response = await viewer.PutWithCsrfAsync(NetworkAccess, Scope("network"));
 

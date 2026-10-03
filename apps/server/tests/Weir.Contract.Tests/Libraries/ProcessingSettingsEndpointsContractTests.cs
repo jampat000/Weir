@@ -55,7 +55,7 @@ public sealed partial class ProcessingSettingsEndpointsContractTests(LibrariesPa
     [Fact]
     public async Task Maintenance_state_shape()
     {
-        using var viewer = await LibrariesPartBViewer.SignInAsync(Server);
+        using var viewer = await SeededAccounts.SignInViewerAsync(Server);
 
         var response = await viewer.GetAsync(Maintenance);
 
@@ -75,7 +75,7 @@ public sealed partial class ProcessingSettingsEndpointsContractTests(LibrariesPa
     [Fact]
     public async Task Maintenance_run_needs_an_operator()
     {
-        using var viewer = await LibrariesPartBViewer.SignInAsync(Server);
+        using var viewer = await SeededAccounts.SignInViewerAsync(Server);
         var body = new JsonObject { ["family"] = "work_temp_stale_sweep", ["media_scope"] = "tv" };
 
         using var anonymous = Server.CreateClient();

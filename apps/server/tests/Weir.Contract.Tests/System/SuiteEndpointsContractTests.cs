@@ -36,7 +36,7 @@ public sealed partial class SuiteEndpointsContractTests(NoInternetUsersFixture f
     public async Task Suite_logs_shape()
     {
         using var admin = await Server.CreateAdminClientAsync();
-        using var viewer = await SystemPartBHelpers.SignedInViewerAsync(Server);
+        using var viewer = await SeededAccounts.SignInViewerAsync(Server);
 
         foreach (var client in new[] { admin, viewer })
         {
@@ -79,7 +79,7 @@ public sealed partial class SuiteEndpointsContractTests(NoInternetUsersFixture f
     public async Task Suite_metrics_shape()
     {
         using var admin = await Server.CreateAdminClientAsync();
-        using var viewer = await SystemPartBHelpers.SignedInViewerAsync(Server);
+        using var viewer = await SeededAccounts.SignInViewerAsync(Server);
 
         foreach (var client in new[] { admin, viewer })
         {
@@ -112,7 +112,7 @@ public sealed partial class SuiteEndpointsContractTests(NoInternetUsersFixture f
     [Fact]
     public async Task Configuration_backups_forbidden_for_viewer()
     {
-        using var viewer = await SystemPartBHelpers.SignedInViewerAsync(Server);
+        using var viewer = await SeededAccounts.SignInViewerAsync(Server);
 
         Assert.Equal(HttpStatusCode.Forbidden, (await viewer.GetAsync(Backups)).Status);
     }
@@ -167,7 +167,7 @@ public sealed partial class SuiteEndpointsContractTests(NoInternetUsersFixture f
     public async Task System_readiness_shape()
     {
         using var admin = await Server.CreateAdminClientAsync();
-        using var viewer = await SystemPartBHelpers.SignedInViewerAsync(Server);
+        using var viewer = await SeededAccounts.SignInViewerAsync(Server);
 
         foreach (var client in new[] { admin, viewer })
         {
@@ -215,7 +215,7 @@ public sealed partial class SuiteEndpointsContractTests(NoInternetUsersFixture f
     [Fact]
     public async Task Pause_readable_by_viewer_but_not_changeable()
     {
-        using var viewer = await SystemPartBHelpers.SignedInViewerAsync(Server);
+        using var viewer = await SeededAccounts.SignInViewerAsync(Server);
 
         var response = await viewer.GetAsync(Pause);
 
@@ -259,7 +259,7 @@ public sealed partial class SuiteEndpointsContractTests(NoInternetUsersFixture f
     [Fact]
     public async Task Security_overview_shape()
     {
-        using var viewer = await SystemPartBHelpers.SignedInViewerAsync(Server);
+        using var viewer = await SeededAccounts.SignInViewerAsync(Server);
 
         var response = await viewer.GetAsync(Security);
 

@@ -26,7 +26,7 @@ public sealed partial class ProcessingSettingsEndpointsContractTests
     public async Task Rule_set_round_trip()
     {
         using var admin = await Server.CreateAdminClientAsync();
-        using var viewer = await LibrariesPartBViewer.SignInAsync(Server);
+        using var viewer = await SeededAccounts.SignInViewerAsync(Server);
         Assert.Equal(HttpStatusCode.Forbidden, (await viewer.PostWithCsrfAsync(RuleSets, new JsonObject { ["name"] = "Viewer set" })).Status);
 
         var made = await admin.PostWithCsrfAsync(
@@ -103,7 +103,7 @@ public sealed partial class ProcessingSettingsEndpointsContractTests
     [Fact]
     public async Task Reject_support_for_a_viewer_and_unknown_connections()
     {
-        using var viewer = await LibrariesPartBViewer.SignInAsync(Server);
+        using var viewer = await SeededAccounts.SignInViewerAsync(Server);
 
         var response = await viewer.GetAsync($"{Api}/processing/reject-support");
         Status(response, HttpStatusCode.OK);
@@ -128,7 +128,7 @@ public sealed partial class ProcessingSettingsEndpointsContractTests
     [Fact]
     public async Task Metadata_provider_always_describes_the_metadata_service()
     {
-        using var viewer = await LibrariesPartBViewer.SignInAsync(Server);
+        using var viewer = await SeededAccounts.SignInViewerAsync(Server);
 
         var response = await viewer.GetAsync(Metadata);
 
@@ -148,7 +148,7 @@ public sealed partial class ProcessingSettingsEndpointsContractTests
     public async Task A_metadata_provider_save_is_accepted_and_ignored()
     {
         using var admin = await Server.CreateAdminClientAsync();
-        using var viewer = await LibrariesPartBViewer.SignInAsync(Server);
+        using var viewer = await SeededAccounts.SignInViewerAsync(Server);
         Assert.Equal(
             HttpStatusCode.Forbidden,
             (await viewer.PutWithCsrfAsync(Metadata, new JsonObject { ["provider"] = "tmdb", ["base_url"] = "https://x.example" })).Status);
@@ -181,7 +181,7 @@ public sealed partial class ProcessingSettingsEndpointsContractTests
     public async Task The_metadata_provider_test_says_when_the_metadata_service_is_switched_off()
     {
         using var admin = await Server.CreateAdminClientAsync();
-        using var viewer = await LibrariesPartBViewer.SignInAsync(Server);
+        using var viewer = await SeededAccounts.SignInViewerAsync(Server);
         Assert.Equal(HttpStatusCode.Forbidden, (await viewer.PostWithCsrfAsync($"{Metadata}/test", new JsonObject())).Status);
 
         var tested = await admin.PostWithCsrfAsync(
@@ -206,7 +206,7 @@ public sealed partial class ProcessingSettingsEndpointsContractTests
     public async Task Direct_play_devices_shape_and_permissions()
     {
         using var admin = await Server.CreateAdminClientAsync();
-        using var viewer = await LibrariesPartBViewer.SignInAsync(Server);
+        using var viewer = await SeededAccounts.SignInViewerAsync(Server);
 
         var response = await viewer.GetAsync(Devices);
 

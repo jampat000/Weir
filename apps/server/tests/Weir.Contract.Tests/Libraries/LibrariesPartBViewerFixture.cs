@@ -12,7 +12,7 @@ public sealed class LibrariesPartBViewerFixture : IAsyncLifetime
     public async Task InitializeAsync()
     {
         _server = await WeirServer.StartNewAsync();
-        await LibrariesPartBViewer.EnsureAsync(_server);
+        await SeededAccounts.EnsureViewerAsync(_server);
     }
 
     public async Task DisposeAsync()

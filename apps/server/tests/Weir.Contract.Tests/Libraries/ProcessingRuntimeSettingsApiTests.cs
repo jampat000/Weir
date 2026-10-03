@@ -67,8 +67,8 @@ public sealed class ProcessingRuntimeSettingsApiTests(ServerFixture fixture) : I
     [Fact]
     public async Task Processing_runtime_settings_viewer_forbidden()
     {
-        await EnsureViewerAsync(fixture.Server);
-        using var viewer = await SignedInViewerAsync(fixture.Server);
+        await SeededAccounts.EnsureViewerAsync(fixture.Server);
+        using var viewer = await SeededAccounts.SignInViewerAsync(fixture.Server);
 
         var response = await viewer.GetAsync(SettingsPath);
 

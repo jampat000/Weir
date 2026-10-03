@@ -25,13 +25,13 @@ public sealed class ProcessingJobsInspectionApiTests(ServerFixture fixture) : IC
         {
             SeedSql.Execute(database.Connection, "DELETE FROM jobs");
             write(database.Connection);
-            ViewerAccount.Ensure(database.Connection);
+            SeededAccounts.EnsureViewer(database.Connection);
         }
 
         var client = fixture.Server.CreateClient();
-        if (username == ViewerAccount.Username)
+        if (username == SeededAccounts.ViewerUsername)
         {
-            await client.LoginAsync(ViewerAccount.Username, ViewerAccount.Password);
+            await client.LoginAsync(SeededAccounts.ViewerUsername, SeededAccounts.ViewerPassword);
         }
         else
         {
@@ -202,7 +202,7 @@ public sealed class ProcessingJobsInspectionApiTests(ServerFixture fixture) : IC
     [Fact]
     public async Task Jobs_inspection_viewer_can_read()
     {
-        using var client = await ReseedAsync(SeedMixedStatusRows, ViewerAccount.Username);
+        using var client = await ReseedAsync(SeedMixedStatusRows, SeededAccounts.ViewerUsername);
 
         var response = await client.GetAsync($"{Inspection}?limit=5");
 
@@ -215,7 +215,7 @@ public sealed class ProcessingJobsInspectionApiTests(ServerFixture fixture) : IC
     {
         var jobId = 0;
         using var client = await ReseedAsync(
-            connection => jobId = JobRows.Insert(connection, "viewer-deny", Sweep), ViewerAccount.Username);
+            connection => jobId = JobRows.Insert(connection, "viewer-deny", Sweep), SeededAccounts.ViewerUsername);
 
         var response = await client.PostWithCsrfAsync($"{WeirClient.Api}/processing/jobs/{jobId}/cancel-pending");
 

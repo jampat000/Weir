@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text.Json.Nodes;
+using Microsoft.Data.Sqlite;
 using Weir.Contract.Tests.Harness;
 using static Weir.Contract.Tests.SystemArea.SystemLogSeed;
 
@@ -127,9 +128,8 @@ public sealed class SystemLogExportTests(SystemLogExportTests.SeededExportFixtur
 
     public sealed class SeededExportFixture : SeededServerFixture
     {
-        protected override Task SeedAsync(StoppedDatabase database)
+        protected override void Seed(SqliteConnection connection)
         {
-            var connection = database.Connection;
             SystemPartBHelpers.SeedUsers(connection);
             SeedSql.Execute(connection, "DELETE FROM jobs");
             SeedSql.Execute(connection, "BEGIN"); // one commit for all the rows, not one each
@@ -148,7 +148,6 @@ public sealed class SystemLogExportTests(SystemLogExportTests.SeededExportFixtur
             AppendToServerLog(
                 Server,
                 Enumerable.Range(0, ServerLines).Select(index => LogLine(SeededAt.AddSeconds(index), "INFO", "weir.processing", $"Line {index}")));
-            return Task.CompletedTask;
         }
     }
 }

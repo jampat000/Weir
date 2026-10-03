@@ -1,4 +1,5 @@
 using Microsoft.Data.Sqlite;
+using Weir.Contract.Tests.Harness;
 
 namespace Weir.Contract.Tests.Libraries;
 

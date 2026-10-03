@@ -5,14 +5,14 @@ namespace Weir.Contract.Tests.SystemArea;
 
 /// <summary>Directory browsing for folder pickers (GET <c>/api/v1/system/directories</c>).</summary>
 [ContractArea("system")]
-public sealed class LocalBrowseApiTests(SystemPartASeededServerFixture fixture) : IClassFixture<SystemPartASeededServerFixture>
+public sealed class LocalBrowseApiTests(UsersFixture fixture) : IClassFixture<UsersFixture>
 {
     private const string Directories = $"{WeirClient.Api}/system/directories";
 
     [Fact]
     public async Task System_directories_requires_operator()
     {
-        using var viewer = await SystemPartAHelpers.SignedInViewerAsync(fixture.Server);
+        using var viewer = await SeededAccounts.SignInViewerAsync(fixture.Server);
 
         var response = await viewer.GetAsync(Directories);
 

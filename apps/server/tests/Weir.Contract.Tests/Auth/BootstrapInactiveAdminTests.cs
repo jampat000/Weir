@@ -61,7 +61,7 @@ public sealed class BootstrapInactiveAdminTests
         try
         {
             await using var database = await server.StopForDatabaseAsync();
-            SeedSql.InsertUser(database.Connection, WeirClient.AdminUsername, AdminPasswordHash, "admin", active);
+            SeedSql.InsertUser(database.Connection, WeirClient.AdminUsername, SeededAccounts.AdminPasswordHash, "admin", active);
         }
         catch
         {

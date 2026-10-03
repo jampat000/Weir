@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text.Json.Nodes;
+using Weir.Contract.Tests.Harness;
 using static Weir.Contract.Tests.SystemArea.SystemPartBJson;
 
 namespace Weir.Contract.Tests.SystemArea;
@@ -25,7 +26,7 @@ public sealed partial class SuiteEndpointsContractTests
     [Fact]
     public async Task Notification_channels_forbidden_for_viewer()
     {
-        using var viewer = await SystemPartBHelpers.SignedInViewerAsync(Server);
+        using var viewer = await SeededAccounts.SignInViewerAsync(Server);
 
         Assert.Equal(HttpStatusCode.Forbidden, (await viewer.GetAsync(Channels)).Status);
         var created = await viewer.PostWithCsrfAsync(

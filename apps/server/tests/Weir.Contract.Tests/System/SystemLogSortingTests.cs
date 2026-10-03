@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Net;
 using System.Text.Json.Nodes;
+using Microsoft.Data.Sqlite;
 using Weir.Contract.Tests.Harness;
 using static Weir.Contract.Tests.SystemArea.SystemLogSeed;
 using static Weir.Contract.Tests.SystemArea.SystemLogSortModel;
@@ -320,9 +321,8 @@ public sealed class SystemLogSortingTests(SystemLogSortingTests.SeededSortingFix
     /// <summary>Twelve events, jobs and server lines that share levels, categories, workflows and instants, so every sort has ties.</summary>
     public sealed class SeededSortingFixture : SeededServerFixture
     {
-        protected override Task SeedAsync(StoppedDatabase database)
+        protected override void Seed(SqliteConnection connection)
         {
-            var connection = database.Connection;
             SystemPartBHelpers.SeedUsers(connection);
             SeedSql.Execute(connection, "DELETE FROM jobs");
             var workflows = new List<long>();
@@ -345,7 +345,6 @@ public sealed class SystemLogSortingTests(SystemLogSortingTests.SeededSortingFix
             }
 
             AppendToServerLog(Server, lines);
-            return Task.CompletedTask;
         }
     }
 }
