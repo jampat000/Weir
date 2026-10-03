@@ -75,3 +75,28 @@ test("missing feed files are tolerated when no packages disagree", () => {
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("a release candidate's package left behind is reported when the stable version is released", () => {
+  const dir = makeDir();
+  try {
+    writeFileSync(path.join(dir, "Weir-1.0.0-rc.2-full.nupkg"), "bytes");
+    writeFileSync(path.join(dir, "Weir-1.0.0-full.nupkg"), "bytes");
+    const problems = findOtherVersionAssets(dir, "1.0.0");
+    assert.equal(problems.length, 1);
+    assert.match(problems[0], /Weir-1\.0\.0-rc\.2-full\.nupkg/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("a directory holding only a release candidate's packages passes for that release candidate", () => {
+  const dir = makeDir();
+  try {
+    writeFileSync(path.join(dir, "Weir-1.0.0-rc.1-full.nupkg"), "bytes");
+    writeFileSync(path.join(dir, "releases.win.json"), '{"Assets":[{"Version":"1.0.0-rc.1","FileName":"Weir-1.0.0-rc.1-full.nupkg"}]}');
+    writeFileSync(path.join(dir, "RELEASES"), "﻿SHA1 Weir-1.0.0-rc.1-full.nupkg 123");
+    assert.deepEqual(findOtherVersionAssets(dir, "1.0.0-rc.1"), []);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

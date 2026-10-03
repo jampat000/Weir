@@ -61,7 +61,12 @@ public static class ReleaseCatalog
 {
     public const string Owner = "jampat000";
     public const string Repo = "Weir";
-    public const string LatestReleaseUrl = "https://api.github.com/repos/jampat000/Weir/releases/latest";
+
+    /// <summary>
+    /// The release list, not <c>/releases/latest</c>: that endpoint never returns a pre-release, so it would find nothing
+    /// while only pre-releases are published.
+    /// </summary>
+    public const string ReleasesUrl = "https://api.github.com/repos/jampat000/Weir/releases?per_page=30";
     public const string WindowsInstallerAssetName = "Weir-win-Setup.exe";
     public const string LegacyWindowsInstallerAssetName = "WeirSetup.exe";
 
@@ -88,45 +93,15 @@ public static class ReleaseCatalog
         return "v" + normalized;
     }
 
-    /// <summary>A comparable version key: leading numeric parts, each piece's digits concatenated.</summary>
-    public static IReadOnlyList<BigInteger>? ParseVersionKey(string? raw)
+    /// <summary>Reads the release list API's JSON into releases. Throws <see cref="WireValueException"/> for an unusable payload.</summary>
+    public static IReadOnlyList<GitHubReleaseRecord> CoerceReleaseListPayload(WireValue payload)
     {
-        var normalized = NormalizeReleaseVersion(raw);
-        if (normalized is null)
+        if (payload is not WireArray list)
         {
-            return null;
+            throw new WireValueException("Release API returned an unexpected response.");
         }
 
-        var parts = new List<BigInteger>();
-        foreach (var piece in normalized.Split('.'))
-        {
-            var digits = new string([.. piece.Where(char.IsDigit).Select(c => (char)('0' + (int)char.GetNumericValue(c)))]);
-            if (digits.Length == 0)
-            {
-                break;
-            }
-
-            parts.Add(BigInteger.Parse(digits, NumberStyles.None, CultureInfo.InvariantCulture));
-        }
-
-        return parts.Count > 0 ? parts : null;
-    }
-
-    /// <summary>Part by part; when one key is a prefix of the other, the shorter sorts first.</summary>
-    public static int CompareVersionKeys(IReadOnlyList<BigInteger> left, IReadOnlyList<BigInteger> right)
-    {
-        ArgumentNullException.ThrowIfNull(left);
-        ArgumentNullException.ThrowIfNull(right);
-        for (var i = 0; i < Math.Min(left.Count, right.Count); i++)
-        {
-            var cmp = left[i].CompareTo(right[i]);
-            if (cmp != 0)
-            {
-                return cmp;
-            }
-        }
-
-        return left.Count.CompareTo(right.Count);
+        return [.. list.Items.Select(CoerceReleasePayload)];
     }
 
     /// <summary>Reads the release API's JSON into a <see cref="GitHubReleaseRecord"/>. Throws <see cref="WireValueException"/> for an unusable payload.</summary>
@@ -204,9 +179,9 @@ public static class UpdateStatus
     public static WireObject FromRelease(string currentVersion, string installType, GitHubReleaseRecord release)
     {
         ArgumentNullException.ThrowIfNull(release);
-        var currentKey = ReleaseCatalog.ParseVersionKey(currentVersion);
-        var latestKey = ReleaseCatalog.ParseVersionKey(release.Version);
-        var updateAvailable = currentKey is not null && latestKey is not null && ReleaseCatalog.CompareVersionKeys(latestKey, currentKey) > 0;
+        var updateAvailable = SemanticVersion.TryParse(currentVersion, out var current)
+            && SemanticVersion.TryParse(release.Version, out var latest)
+            && latest > current;
         string status;
         string summary;
         if (release.Version.Length == 0)

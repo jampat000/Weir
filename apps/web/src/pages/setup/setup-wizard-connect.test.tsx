@@ -71,7 +71,7 @@ function managerConnection(
     kind: "deluno",
     name: "Deluno",
     enabled: true,
-    base_url: "http://10.1.1.51:5000",
+    base_url: "http://10.0.0.51:5000",
     api_key_is_saved: true,
     webhook_secret_is_set: false,
     webhook_url_path: "/api/v1/intake/webhook/deluno",
@@ -93,7 +93,7 @@ function clientConnection(
     kind: "sabnzbd",
     name: "SABnzbd",
     enabled: true,
-    base_url: "http://10.1.1.60:8080",
+    base_url: "http://10.0.0.60:8080",
     username: null,
     password_is_saved: false,
     api_key_is_saved: true,
@@ -262,7 +262,7 @@ describe("first run: connect Deluno first", () => {
 
     choose("Deluno");
     fireEvent.change(await screen.findByTestId("media-manager-base-url"), {
-      target: { value: "http://10.1.1.51:5000" },
+      target: { value: "http://10.0.0.51:5000" },
     });
     fireEvent.change(screen.getByTestId("media-manager-api-key"), {
       target: { value: "secret" },
@@ -273,7 +273,7 @@ describe("first run: connect Deluno first", () => {
     expect(create).toHaveBeenCalledWith(
       expect.objectContaining({
         kind: "deluno",
-        base_url: "http://10.1.1.51:5000",
+        base_url: "http://10.0.0.51:5000",
       }),
     );
     expect(test).toHaveBeenCalledWith(5);
@@ -299,7 +299,7 @@ describe("first run: connect Deluno first", () => {
   });
 
   it("badges each offered workflow with the Deluno it is linked to", async () => {
-    scenario.managers = [managerConnection({ name: "Deluno on SPARE-PC" })];
+    scenario.managers = [managerConnection({ name: "Deluno on MEDIA-PC" })];
     renderWizard();
 
     choose("Deluno");
@@ -309,7 +309,7 @@ describe("first run: connect Deluno first", () => {
       found
         .getAllByTestId("workflow-kind-badge")
         .map((badge) => badge.textContent),
-    ).toEqual(["Linked to Deluno on SPARE-PC", "Linked to Deluno on SPARE-PC"]);
+    ).toEqual(["Linked to Deluno on MEDIA-PC", "Linked to Deluno on MEDIA-PC"]);
   });
 
   it("saves the offered workflows into the empty ones, linked to Deluno, and drops the connect step from What's next", async () => {
@@ -719,7 +719,7 @@ describe("first run: connect a download client first", () => {
 
     it("names the connected Deluno a suggestion links to, though a download client was chosen", async () => {
       scenario.clients = [clientConnection({})];
-      scenario.managers = [managerConnection({ name: "Deluno on SPARE-PC" })];
+      scenario.managers = [managerConnection({ name: "Deluno on MEDIA-PC" })];
       scenario.suggestions = suggestionLinkedTo([5]);
       renderWizard();
 
@@ -727,13 +727,13 @@ describe("first run: connect a download client first", () => {
       const found = await foundLibraries();
 
       expect(found.getByTestId("workflow-kind-badge")).toHaveTextContent(
-        "Linked to Deluno on SPARE-PC",
+        "Linked to Deluno on MEDIA-PC",
       );
     });
 
     it("says a media manager was removed only when the linked connection no longer exists", async () => {
       scenario.clients = [clientConnection({})];
-      scenario.managers = [managerConnection({ name: "Deluno on SPARE-PC" })];
+      scenario.managers = [managerConnection({ name: "Deluno on MEDIA-PC" })];
       scenario.suggestions = suggestionLinkedTo([99]);
       renderWizard();
 
@@ -771,7 +771,7 @@ describe("first run: connect a download client first", () => {
 
     choose(/A download client/);
     fireEvent.change(await screen.findByTestId("download-client-base-url"), {
-      target: { value: "http://10.1.1.60:8080" },
+      target: { value: "http://10.0.0.60:8080" },
     });
     fireEvent.change(screen.getByTestId("download-client-api-key"), {
       target: { value: "key" },
@@ -782,7 +782,7 @@ describe("first run: connect a download client first", () => {
     expect(create).toHaveBeenCalledWith(
       expect.objectContaining({
         kind: "sabnzbd",
-        base_url: "http://10.1.1.60:8080",
+        base_url: "http://10.0.0.60:8080",
       }),
     );
   });

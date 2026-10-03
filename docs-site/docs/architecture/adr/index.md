@@ -14,7 +14,7 @@ Some ADR numbers are intentionally absent — those were reserved for drafts or 
 | ADR | Title | Status |
 |-----|-------|--------|
 | [ADR-0001](adr-0001) | Repository and application layout | Accepted; backend path updated by ADR-0017 |
-| [ADR-0002](adr-0002) | Database and Alembic (SQLite-first) | Accepted; Alembic replaced by numbered SQL migrations (ADR-0017) |
+| [ADR-0002](adr-0002) | Database and Alembic (SQLite-first) | Superseded by ADR-0017 (numbered SQL migrations in the .NET server) |
 | [ADR-0003](adr-0003) | Auth and session model | Accepted |
 | [ADR-0007](adr-0007) | Module-owned worker lanes (SQLite) | Accepted; superseded in part by ADR-0016 |
 | [ADR-0008](adr-0008) | WeirSettings aggregate for runtime configuration | Superseded by ADR-0017 |

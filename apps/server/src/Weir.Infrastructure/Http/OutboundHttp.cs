@@ -13,21 +13,25 @@ using Weir.Infrastructure.Notifications;
 
 namespace Weir.Infrastructure.Http;
 
-/// <summary>Fetches the latest GitHub release.</summary>
+/// <summary>Finds the newest GitHub release this install should be offered.</summary>
 public interface IReleaseCatalogClient
 {
-    /// <summary>Throws <see cref="ReleaseFetchException"/> for an HTTP error status, other exceptions for anything else.</summary>
-    Task<GitHubReleaseRecord> FetchLatestAsync(string userAgentVersion, CancellationToken cancellationToken);
+    /// <summary>
+    /// The newest published release by SemVer precedence, counting pre-releases only when <paramref name="currentVersion"/> is a
+    /// pre-release itself; null when none qualifies. Throws <see cref="ReleaseFetchException"/> for an HTTP error status, other
+    /// exceptions for anything else.
+    /// </summary>
+    Task<GitHubReleaseRecord?> FetchLatestAsync(string currentVersion, CancellationToken cancellationToken);
 }
 
 public sealed class GitHubReleaseCatalogClient : IReleaseCatalogClient
 {
-    public async Task<GitHubReleaseRecord> FetchLatestAsync(string userAgentVersion, CancellationToken cancellationToken)
+    public async Task<GitHubReleaseRecord?> FetchLatestAsync(string currentVersion, CancellationToken cancellationToken)
     {
         using var client = new HttpClient(new SocketsHttpHandler { AllowAutoRedirect = true }) { Timeout = TimeSpan.FromSeconds(5) };
-        using var request = new HttpRequestMessage(HttpMethod.Get, ReleaseCatalog.LatestReleaseUrl);
+        using var request = new HttpRequestMessage(HttpMethod.Get, ReleaseCatalog.ReleasesUrl);
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
-        request.Headers.TryAddWithoutValidation("User-Agent", $"Weir/{userAgentVersion}");
+        request.Headers.TryAddWithoutValidation("User-Agent", $"Weir/{currentVersion}");
         request.Headers.Add("X-GitHub-Api-Version", "2022-11-28");
         using var response = await client.SendAsync(request, cancellationToken).ConfigureAwait(false);
         if ((int)response.StatusCode >= 400)
@@ -36,7 +40,8 @@ public sealed class GitHubReleaseCatalogClient : IReleaseCatalogClient
         }
 
         var bytes = await response.Content.ReadAsByteArrayAsync(cancellationToken).ConfigureAwait(false);
-        return ReleaseCatalog.CoerceReleasePayload(WireJsonParser.ParseBytes(bytes));
+        var releases = ReleaseCatalog.CoerceReleaseListPayload(WireJsonParser.ParseBytes(bytes));
+        return ReleaseSelection.NewestFor(releases, currentVersion);
     }
 }
 

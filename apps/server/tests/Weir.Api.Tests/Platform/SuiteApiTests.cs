@@ -120,6 +120,21 @@ public sealed class SuiteApiTests
     }
 
     [Fact]
+    public async Task Update_status_reports_a_pre_release_version_exactly()
+    {
+        await using var server = await WeirTestServer.StartAsync(
+            [("WEIR_SESSION_SECRET", Secret), ("WEIR_PROCESSING_WORKER_COUNT", "0"), ("WEIR_VERSION", "1.0.0-rc.1")],
+            configureServices: services => services.AddSingleton<IReleaseCatalogClient>(new FakeReleaseCatalog()));
+        await TestDatabase.SeedAdminAsync(server);
+        var client = new ApiTestClient(server);
+        await client.SignInAsync();
+
+        var body = await Json(await client.GetAsync("/api/v1/suite/update-status"));
+
+        Assert.Equal("1.0.0-rc.1", body["current_version"]!.GetValue<string>());
+    }
+
+    [Fact]
     public async Task Logs_skip_entries_whose_timestamp_does_not_parse()
     {
         var (server, client) = await SignedInAdminAsync();
@@ -483,14 +498,14 @@ public sealed class SuiteApiTests
     {
         public bool NotFound { get; set; }
 
-        public Task<GitHubReleaseRecord> FetchLatestAsync(string userAgentVersion, CancellationToken cancellationToken)
+        public Task<GitHubReleaseRecord?> FetchLatestAsync(string currentVersion, CancellationToken cancellationToken)
         {
             if (NotFound)
             {
                 throw new ReleaseFetchException(404);
             }
 
-            return Task.FromResult(new GitHubReleaseRecord(
+            return Task.FromResult<GitHubReleaseRecord?>(new GitHubReleaseRecord(
                 "v1.2.3",
                 "1.2.3",
                 "Weir 1.2.3",
