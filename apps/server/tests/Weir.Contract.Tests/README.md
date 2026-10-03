@@ -31,22 +31,35 @@ Everything is in `Harness/`. Areas live in folders beside it (`Activity/`), one 
 - **`WeirServer`** starts one real server (`dotnet Weir.dll --host 127.0.0.1 --port <free port>`) with a fresh
   `WEIR_HOME`, waits for `/ready`, and stops it by killing only the process it started and that process's children.
   `StartNewAsync(environment)` makes a server; `RestartAsync` stops and starts it again on a new port (create
-  clients afterwards); `StopForDatabaseAsync()` stops it, opens the SQLite file, and restarts it when disposed.
-  Every server has its own folder and port, so test classes and areas run side by side.
+  clients afterwards); `StopForDatabaseAsync()` stops it, opens the SQLite file, and restarts it when disposed
+  (`StopForDatabaseAsync(restart: false)` leaves it stopped, to look at the file after a shutdown).
+  Every server has its own folder and port, so test classes and areas run side by side. The harness reaches a server
+  on `127.0.0.1`, the address it binds, and so do the fakes. `ServerStartGate` lets only as many servers start at
+  the same moment as the machine has processors (never fewer than two), so a small CI runner is not asked to start a
+  dozen at once; a server that is ready gives its place back. Disposing a server waits until nothing holds its
+  database files before it deletes the folder.
 - **`ServerEnvironment`** is the quiet default environment: no workers, no watcher, no periodic enqueue, high
-  sign-in limits, artwork off. Pass `environment` to add or override.
+  sign-in limits, artwork off. Pass `environment` to add or override. `ServerEnvironment.OperatorDefaults` is what
+  an installed Weir runs with instead (ten workers, the watcher, periodic scans, the work-file sweeps), for tests of
+  the whole product.
 - **`ServerFixture`** is the per-class server: `IClassFixture<ServerFixture>` gives a class one server for all its
-  tests. Derive from it and override `Environment` to give a class different settings.
+  tests. Derive from it and override `Environment` to give a class different settings. `SeededServerFixture` is the
+  same with rows seeded into the stopped database before the first test (override `Seed`).
 - **`WeirClient`** is a browser-like session (its own cookie jar) with CSRF and sign-in: `EnsureAdminAsync()`,
   `LoginAsync(...)`, `GetAsync(path, query...)`, `PostWithCsrfAsync/PutWithCsrfAsync/PatchWithCsrfAsync`
   (token in the body), `DeleteWithCsrfAsync` (token in `X-CSRF-Token`), `OpenStreamAsync` for SSE. Responses are
-  `WeirResponse` (`Status`, `Header(name)`, `Text`, `Fields`/`Elements` as JSON). A client sends no
+  `WeirResponse` (`Status`, `Header(name)`, `RawHeader(name)` as the server wrote it, `Text`, `Bytes` as sent (the
+  client does not decompress), `SetCookieValue(name)`, `Fields`/`Elements` as JSON). A client also has `HeadAsync`,
+  `OptionsAsync`, `AttemptLoginAsync` (returns whatever the server answers) and a cookie jar to read and change
+  (`Cookie`, `SetCookie`, `ClearCookies`). A client sends no
   `Origin` or `X-Requested-With` unless asked, like the Python client: `server.CreateClient(headers)` or
   `CreateAdminClientAsync(headers)` set headers for every request (a browser-like client passes both), and
   `RequestAsync`, `GetAsync(path, headers, query...)` and the `...WithCsrfAsync` methods take headers for one request.
-- **`SseReader`** reads a stream block by block: `NextBlockAsync`, `NextEventAsync`, `NextEventNamedAsync`.
+- **`SseReader`** reads a stream block by block: `NextBlockAsync`, `NextEventAsync`, `NextEventNamedAsync`. Event data is
+  any JSON (`JsonNode`). Each call fails after 10 seconds of silence unless it is given a longer `idleTimeout`.
 - **`StoppedDatabase` and `SeedSql`**: plain SQL against the shared schema for rows no API creates. `SeedSql.UtcText`
-  writes a timestamp the way the schema stores it.
+  writes a timestamp the way the schema stores it. `SeededAccounts` holds the admin `alice` and the viewer `bob`
+  with precomputed Argon2 hashes (the harness has no hasher); `LibraryBodies.Unchanged` is the body of a whole-library save.
 - **`Poll.UntilAsync`** waits for an outcome with a deadline; never sleep for a fixed time.
 - **`ServerLedger`** records every server this run started in the temp folder. The next run stops servers whose
   test run died before teardown; it never touches a server whose run is still alive, so runs side by side are safe.
