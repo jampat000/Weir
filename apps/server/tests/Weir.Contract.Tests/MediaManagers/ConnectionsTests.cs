@@ -62,10 +62,10 @@ public sealed class ConnectionsTests(NoWebhookSecretFixture fixture) : IClassFix
         using var admin = await OperatorAsync();
 
         var onAName = await ManagerConnections.CreateAsync(admin, Body("radarr", "http://nas:7878", name: "Anything"));
-        var onAnAddress = await ManagerConnections.CreateAsync(admin, Body("sonarr", "http://10.1.1.51:8989", name: "Anything"));
+        var onAnAddress = await ManagerConnections.CreateAsync(admin, Body("sonarr", "http://10.0.0.51:8989", name: "Anything"));
 
         Assert.Equal("Radarr on nas", (string)onAName.Fields["name"]!);
-        Assert.Equal("Sonarr on 10.1.1.51", (string)onAnAddress.Fields["name"]!);
+        Assert.Equal("Sonarr on 10.0.0.51", (string)onAnAddress.Fields["name"]!);
     }
 
     [Fact]
