@@ -9,7 +9,7 @@ list first.
 
 ## 4.x
 
-- **4.0.0** (YYYY-MM-DD). Weir matches Deluno's look, with a live Dashboard that shows files moving through the Pipeline, posters beside each title, a System view that reads this computer, one status for every library file, one Logs list, and Setup in four areas. History is now Activity, and old links still work. [notes](docs/release-notes/v4.0.0.md) · [release](https://github.com/jampat000/Weir/releases/tag/v4.0.0)
+- **4.0.0** (2026-10-03). Weir matches Deluno's look, with a live Dashboard that shows files moving through the Pipeline, posters beside each title, a System view that reads this computer, one status for every library file, one Logs list, and Setup in four areas. History is now Activity, and old links still work. [notes](docs/release-notes/v4.0.0.md) · [release](https://github.com/jampat000/Weir/releases/tag/v4.0.0)
 
 ## 3.x
 
