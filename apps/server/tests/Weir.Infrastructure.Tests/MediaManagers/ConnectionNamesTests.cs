@@ -46,11 +46,11 @@ public sealed class ConnectionNamesTests
 
         await fixture.Db(async uow =>
         {
-            await fixture.Connections.UpdateAsync(uow, row!, baseUrl: "http://10.1.1.9:8989");
+            await fixture.Connections.UpdateAsync(uow, row!, baseUrl: "http://10.0.0.9:8989");
             return 0;
         });
 
-        Assert.Equal(["Sonarr on 10.1.1.9"], await ManagerNamesAsync(fixture));
+        Assert.Equal(["Sonarr on 10.0.0.9"], await ManagerNamesAsync(fixture));
     }
 
     [Fact]
@@ -109,9 +109,9 @@ public sealed class ConnectionNamesTests
     {
         using var fixture = new DownloadClientFixture();
 
-        await fixture.AddConnectionAsync("qbittorrent", "http://10.1.1.51:8080");
+        await fixture.AddConnectionAsync("qbittorrent", "http://10.0.0.51:8080");
 
-        Assert.Equal(["qBittorrent on 10.1.1.51"], await ClientNamesAsync(fixture));
+        Assert.Equal(["qBittorrent on 10.0.0.51"], await ClientNamesAsync(fixture));
     }
 
     [Fact]
@@ -129,7 +129,7 @@ public sealed class ConnectionNamesTests
     {
         using var fixture = new DownloadClientFixture();
         await fixture.Store.Execute(
-            "INSERT INTO download_client_connections (kind, name, enabled, base_url) VALUES ('qbittorrent', 'Living room', 1, 'http://10.1.1.51:8080')");
+            "INSERT INTO download_client_connections (kind, name, enabled, base_url) VALUES ('qbittorrent', 'Living room', 1, 'http://10.0.0.51:8080')");
 
         await fixture.Db(async uow =>
         {
@@ -137,6 +137,6 @@ public sealed class ConnectionNamesTests
             return 0;
         });
 
-        Assert.Equal(["qBittorrent on 10.1.1.51"], await ClientNamesAsync(fixture));
+        Assert.Equal(["qBittorrent on 10.0.0.51"], await ClientNamesAsync(fixture));
     }
 }

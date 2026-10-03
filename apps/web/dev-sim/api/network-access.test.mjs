@@ -42,7 +42,7 @@ describe("the simulated network access", () => {
       state: "this_pc_only",
       pending_scope: "network",
       firewall: "blocked",
-      addresses: ["http://10.1.1.196:9347"],
+      addresses: ["http://10.0.0.196:9347"],
     });
     expect(body.summary).toBe(
       "Waiting for you to approve Windows Firewall on MEDIA-PC. Weir restarts for your network once you do.",

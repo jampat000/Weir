@@ -59,6 +59,22 @@ flowchart LR
   Processing --> Jobs["Durable jobs (jobs) + workers"]
 ```
 
+## Repository map
+
+| Folder | What it is for |
+| --- | --- |
+| `apps/server` | The .NET 10 server: API, SQLite, durable jobs, the remux pass. Builds `Weir` / `Weir.exe`. |
+| `apps/web` | The React and TypeScript web app the server serves, with its dev simulator and the committed OpenAPI contract. |
+| `apps/tray` | The Windows tray app that starts and watches the server. |
+| `docker` | The container entrypoint and the Docker deployment guide; the `Dockerfile` and `compose.yaml` are at the root. |
+| `packaging` | Windows installer build (Velopack) and brand assets. |
+| `docs` | Contracts, ADRs, release notes, runbooks and the agent documentation map; the index is [`docs/README.md`](docs/README.md). |
+| `docs-site` | The public documentation website (Docusaurus). |
+| `scripts` | Repository tooling, CI gates and release checks; see [`scripts/README.md`](scripts/README.md). |
+| `tests` | The contract suite and the E2E smoke, which judge a running server from outside. Python for now, moving to .NET in #892. |
+| `.github` | CI and release workflows, issue and pull request templates. |
+| `.githooks` | The pre-push hook that runs the local checks. |
+
 ## Server Map
 
 Solution `apps/server/Weir.slnx`; details in [`apps/server/README.md`](apps/server/README.md).

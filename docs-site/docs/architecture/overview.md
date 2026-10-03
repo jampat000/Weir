@@ -53,10 +53,10 @@ The server lives in `apps/server` (solution `Weir.slnx`).
 | `tests/` | xUnit tests for each project |
 
 The server records its schema revision in the `alembic_version` table, a name kept from the
-earlier Python backend, so older databases still open. The numbered SQL migrations in
+earlier Python backend, so databases Weir already created still open. The numbered SQL migrations in
 `Weir.Infrastructure/Migrations` are the only source of schema changes. On start, a database at an
 earlier revision is upgraded in place, in one transaction; a database from a newer release is
-refused and left unchanged.
+refused and left unchanged, as is any database Weir did not create.
 
 ## Frontend map
 
