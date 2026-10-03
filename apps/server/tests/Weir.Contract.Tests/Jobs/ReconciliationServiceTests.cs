@@ -20,29 +20,6 @@ public sealed class ReconciliationServiceTests(ServerFixture fixture) : IClassFi
         ["confirm"] = false,
     };
 
-    // A browser sends its Origin on every request, so the first-run account and the sign-in carry it too.
-    private static async Task SignInAsAdminFromBrowserAsync(WeirClient client, IReadOnlyDictionary<string, string> headers)
-    {
-        var status = await client.GetAsync($"{WeirClient.Api}/auth/bootstrap/status");
-        JobsApi.Expect(status, HttpStatusCode.OK);
-        if ((bool)status.Fields["bootstrap_allowed"]!)
-        {
-            JobsApi.Expect(await PostCredentialsAsync("bootstrap"), HttpStatusCode.OK);
-        }
-
-        JobsApi.Expect(await PostCredentialsAsync("login"), HttpStatusCode.OK);
-
-        async Task<WeirResponse> PostCredentialsAsync(string endpoint) => await client.PostAsync(
-            $"{WeirClient.Api}/auth/{endpoint}",
-            new JsonObject
-            {
-                ["username"] = WeirClient.AdminUsername,
-                ["password"] = WeirClient.AdminPassword,
-                ["csrf_token"] = await client.CsrfTokenAsync(),
-            },
-            headers);
-    }
-
     [Fact]
     public async Task Reconciliation_temp_artifact_repair_requires_confirmation()
     {
@@ -143,26 +120,24 @@ public sealed class ReconciliationServiceTests(ServerFixture fixture) : IClassFi
     {
         await using var server = await WeirServer.StartNewAsync(
             new Dictionary<string, string> { ["WEIR_TRUSTED_BROWSER_ORIGINS"] = TrustedOrigin });
-        using var trusted = server.CreateClient();
-        var fromBrowser = new Dictionary<string, string>
+        using var trusted = await server.CreateAdminClientAsync(new Dictionary<string, string>
         {
             ["Origin"] = TrustedOrigin,
             ["X-Requested-With"] = "XMLHttpRequest",
-        };
-        await SignInAsAdminFromBrowserAsync(trusted, fromBrowser);
+        });
         var token = await trusted.CsrfTokenAsync();
 
         var body = RepairBody();
         body["csrf_token"] = token;
         var evil = await trusted.PostAsync(
-            Repair, body, new Dictionary<string, string>(fromBrowser) { ["Origin"] = "http://evil.test" });
+            Repair, body, new Dictionary<string, string> { ["Origin"] = "http://evil.test" });
         JobsApi.Expect(evil, HttpStatusCode.Forbidden);
         var expected = new JsonObject { ["detail"] = "Origin not allowed." };
         Assert.True(JsonNode.DeepEquals(evil.Json, expected), evil.ToString());
 
         var allowedBody = RepairBody();
         allowedBody["csrf_token"] = token;
-        var allowed = await trusted.PostAsync(Repair, allowedBody, fromBrowser);
+        var allowed = await trusted.PostAsync(Repair, allowedBody);
         JobsApi.Expect(allowed, HttpStatusCode.BadRequest);
         Assert.Contains(ConfirmHint, (string)allowed.Fields["detail"]!);
     }
