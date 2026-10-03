@@ -13,8 +13,8 @@
 #
 # publish needs all five. It alone holds registry credentials, `packages: write` and
 # `contents: write`, so nothing reaches ghcr or the Releases page unless every check above passed.
-# It pushes only the version tag, smokes that image, publishes the GitHub Release, and only then
-# moves `latest`, so `latest` never points at an image that failed its smoke.
+# It pushes only the version tag, attests its provenance, smokes that image, publishes the GitHub Release,
+# and only then moves `latest`, so `latest` never points at an image that failed its smoke.
 # scripts/check-release-workflow-gates.mjs enforces that shape.
 name: Release
 
@@ -23,9 +23,12 @@ on:
     tags:
       - "v*"
 
+# One release per tag at a time, and a release that has started is never cancelled: stopping publish
+# halfway could leave the version tag on ghcr without its GitHub Release. A second run for the same
+# tag (a re-run, a re-pushed tag) waits for the first.
 concurrency:
   group: release-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 permissions:
   contents: read
@@ -60,7 +63,7 @@ jobs:
 
   windows-smoke:
     runs-on: windows-latest
-    timeout-minutes: 60
+    timeout-minutes: 25
     permissions:
       contents: read
       # For actions/attest-build-provenance below: it signs over OIDC (id-token) and records the
@@ -234,7 +237,7 @@ jobs:
   # What CI cannot have proven: the artefacts built here, and advisories published since CI ran.
   validate:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 15
     permissions:
       contents: read
     env:
@@ -327,7 +330,7 @@ jobs:
   # Actions cache (not a registry), so publish rebuilds from them instead of from scratch.
   docker-candidate:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 15
     permissions:
       contents: read
     env:
@@ -423,7 +426,7 @@ jobs:
   # amd64 job so its ~4 minutes under QEMU overlap everything else instead of following it.
   docker-arm64:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 25
     permissions:
       contents: read
     steps:
@@ -453,13 +456,17 @@ jobs:
 
   publish:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 30
     # Every gate. Without ci-passed a commit CI never passed could ship; without windows-smoke a Docker
     # image could reach ghcr for a release that has no Windows build.
     needs: [ci-passed, validate, windows-smoke, docker-candidate, docker-arm64]
     permissions:
       contents: write
       packages: write
+      # For actions/attest-build-provenance on the Docker image below (OIDC signing, then recording the
+      # attestation on the repo and next to the image in ghcr).
+      id-token: write
+      attestations: write
     env:
       WEIR_SESSION_SECRET: ${{ github.run_id }}-${{ github.job }}-${{ github.run_attempt }}-release-session-secret-32chars-min
     steps:
@@ -508,6 +515,7 @@ jobs:
       # Rebuilt from the layers docker-candidate and docker-arm64 cached. Only the version tag: `latest`
       # moves to it at the very end, once the image and the release are known good.
       - name: Publish release Docker image
+        id: push
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
         with:
           context: .
@@ -525,6 +533,16 @@ jobs:
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.version=${{ steps.version.outputs.plain }}
+
+      # The digest of the multi-architecture manifest list just pushed, so `gh attestation verify
+      # oci://ghcr.io/<owner>/weir:<version>` proves the image came from this repo's own release build, as
+      # it does for the Windows files.
+      - name: Attest provenance of the Docker image
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-name: ${{ steps.image.outputs.name }}
+          subject-digest: ${{ steps.push.outputs.digest }}
+          push-to-registry: true
 
       - name: Verify published Docker manifest
         env:

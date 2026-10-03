@@ -22,7 +22,7 @@ This is the canonical governance checklist for keeping Weir releases controlled 
 1. Confirm the working tree is clean.
 2. Confirm `main` is up to date with `origin/main`.
 3. Confirm `.github/workflows/ci.yml` still has the `ci-passed` job the ruleset requires (`node scripts/check-release-workflow-gates.mjs` checks it).
-4. Confirm Dependabot has no stale action-runtime holds that conflict with the workflow pins.
+4. Confirm `.github/dependabot.yml` has no `ignore` hold that conflicts with the workflow pins (version-update pull requests are off; the holds are kept as the record of why a major is not taken).
 5. Confirm open issues tagged `priority: critical` or `priority: high` are either fixed, intentionally deferred, or not release-blocking.
 6. Create `docs/release-notes/vX.Y.Z.md` (`vX.Y.Z-rc.N.md` for a release candidate) from `docs/release-notes/TEMPLATE.md` with plain-language user-facing notes.
 7. Run the release path from `docs/release.md`.
