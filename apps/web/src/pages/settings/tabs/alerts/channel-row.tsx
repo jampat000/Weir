@@ -71,25 +71,6 @@ export function ChannelRow({
         </span>
       </th>
     ),
-    ...Object.fromEntries(
-      events.map((event) => [
-        eventColumnId(event),
-        <td
-          data-label={eventLabel(event)}
-          data-col={eventColumnId(event)}
-          className="mm-alerts-cell"
-        >
-          <input
-            type="checkbox"
-            className={ALERT_CHECKBOX_CLASS}
-            aria-label={`${channel.label}: ${eventLabel(event)}`}
-            checked={channel.events.includes(event)}
-            disabled={toggling}
-            onChange={() => onToggleEvent(event)}
-          />
-        </td>,
-      ]),
-    ),
     [ALERT_ACTIONS_COLUMN]: (
       <td data-label="" data-col={ALERT_ACTIONS_COLUMN}>
         <div className="flex flex-wrap gap-2">
@@ -132,6 +113,24 @@ export function ChannelRow({
       </td>
     ),
   };
+  for (const event of events) {
+    cells[eventColumnId(event)] = (
+      <td
+        data-label={eventLabel(event)}
+        data-col={eventColumnId(event)}
+        className="mm-alerts-cell"
+      >
+        <input
+          type="checkbox"
+          className={ALERT_CHECKBOX_CLASS}
+          aria-label={`${channel.label}: ${eventLabel(event)}`}
+          checked={channel.events.includes(event)}
+          disabled={toggling}
+          onChange={() => onToggleEvent(event)}
+        />
+      </td>
+    );
+  }
   return (
     <tr>
       {order.map((id) => (
