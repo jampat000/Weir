@@ -9,7 +9,7 @@
     <PackageVersion Include="Microsoft.Extensions.Hosting.WindowsServices" Version="10.0.12" />
     <!-- IANA time zone names on Windows, where InvariantGlobalization leaves no ICU to map them. -->
     <PackageVersion Include="TimeZoneConverter" Version="7.2.0" />
-    <!-- Packaged live audit: drives a browser against a running Weir -->
+    <!-- Browser automation for the end-to-end tests and the packaged live audit -->
     <PackageVersion Include="Microsoft.Playwright" Version="1.63.0" />
     <!-- Tests -->
     <PackageVersion Include="Microsoft.AspNetCore.TestHost" Version="10.0.12" />
@@ -18,6 +18,5 @@
     <PackageVersion Include="xunit" Version="2.9.3" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="4.0.0" />
     <PackageVersion Include="coverlet.collector" Version="10.0.1" />
-    <PackageVersion Include="Microsoft.Playwright" Version="1.63.0" />
   </ItemGroup>
 </Project>
