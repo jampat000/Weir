@@ -57,17 +57,20 @@ const FACTS_COUNT = 10;
 const BRIEFLY: Readonly<Record<string, readonly string[]>> = {
   "Checking now": ["Checking", "Check"],
   "Checking file": ["Checking", "Check"],
-  "Still importing": ["Importing"],
+  "Still importing": ["Importing", "Import"],
   "Waiting to settle": ["Waiting"],
   "Looking again later": ["Later"],
-  "Can't open it yet": ["Can't open"],
+  "Can't open it yet": ["Can't open", "Locked"],
   "Can't write output": ["Can't write"],
   "Waiting for space": ["No space"],
   "Waiting its turn": ["Waiting"],
   "Outside its hours": ["Closed"],
   "Writing copy": ["Writing"],
+  Planning: ["Plan"],
+  Cleaning: ["Clean"],
+  Verifying: ["Verify"],
   "Replacing file": ["Replacing"],
-  "Handing back": ["Handing"],
+  "Handing back": ["Handing", "Moving"],
   "Couldn't finish": ["Failed"],
 };
 

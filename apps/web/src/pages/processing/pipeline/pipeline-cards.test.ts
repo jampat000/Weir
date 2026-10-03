@@ -479,12 +479,27 @@ describe("the words a status falls back on in a narrow card", () => {
     ).toMatchObject({ text: "Checking file", fits: ["Checking", "Check"] });
     expect(
       status(aFile(3, "processing", { progress_stage: "handing_back" })),
-    ).toMatchObject({ text: "Handing back", fits: ["Handing"] });
+    ).toMatchObject({ text: "Handing back", fits: ["Handing", "Moving"] });
+  });
+
+  it("end, for a file Weir cannot open, in a word short enough for the narrowest card", () => {
+    const held = aFile(1, "on_hold", {
+      status_reason:
+        "Weir could not open this file for reading — it is locked.",
+    });
+
+    expect(status(held).fits).toEqual(["Can't open", "Locked"]);
+  });
+
+  it("end, for a single verb, in its stem", () => {
+    expect(
+      status(aFile(1, "processing", { progress_stage: "planning" })).fits,
+    ).toEqual(["Plan"]);
   });
 
   it("are left out of a status that is one word already", () => {
     expect(
-      status(aFile(1, "processing", { progress_stage: "planning" })).fits,
+      status(aFile(1, "on_hold", { status_reason: "" })).fits,
     ).toBeUndefined();
   });
 });
