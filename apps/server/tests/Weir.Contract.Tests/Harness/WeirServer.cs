@@ -119,12 +119,12 @@ public sealed class WeirServer : IAsyncDisposable
         }
     }
 
-    /// <summary>Stops the server, opens its SQLite file for seeding or inspection, and restarts it when disposed.</summary>
-    public async Task<StoppedDatabase> StopForDatabaseAsync()
+    /// <summary>Stops the server, opens its SQLite file for seeding or inspection, and restarts it when disposed (or leaves it stopped when <paramref name="restart"/> is false).</summary>
+    public async Task<StoppedDatabase> StopForDatabaseAsync(bool restart = true)
     {
         var wasRunning = IsRunning;
         await StopAsync();
-        return await StoppedDatabase.OpenAsync(DatabasePath, wasRunning ? LaunchAsync : () => Task.CompletedTask);
+        return await StoppedDatabase.OpenAsync(DatabasePath, restart && wasRunning ? LaunchAsync : () => Task.CompletedTask);
     }
 
     public string LogText() => string.Join(Environment.NewLine, _logs.Select(log => log.Text()));
@@ -139,7 +139,7 @@ public sealed class WeirServer : IAsyncDisposable
 
         if (Environment.GetEnvironmentVariable(KeepDataVariable) != "1")
         {
-            Directory.Delete(Home, recursive: true);
+            await DataFolderCleanup.DeleteAsync(Home, DatabasePath);
         }
     }
 

@@ -25,13 +25,6 @@ public static class AuthSupport
     public static IReadOnlyDictionary<string, string> Headers(params (string Name, string Value)[] headers) =>
         headers.ToDictionary(header => header.Name, header => header.Value);
 
-    /// <summary>Stops the server and opens its database for reading; the server stays stopped until the test ends.</summary>
-    public static async Task<StoppedDatabase> StopForInspectionAsync(WeirServer server)
-    {
-        await server.StopAsync();
-        return await StoppedDatabase.OpenAsync(server.DatabasePath, () => Task.CompletedTask);
-    }
-
     public static string SetCookieHeader(WeirResponse response) => response.Header("Set-Cookie") ?? string.Empty;
 
     // --- sessions in SQLite ---------------------------------------------------------------------

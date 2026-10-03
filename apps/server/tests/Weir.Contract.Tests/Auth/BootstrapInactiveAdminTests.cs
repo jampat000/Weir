@@ -44,7 +44,7 @@ public sealed class BootstrapInactiveAdminTests
         Assert.Equal(HttpStatusCode.OK, (await session.AttemptLoginAsync("alice-again", "recovered-password-strong")).Status);
 
         List<Dictionary<string, object?>> admins;
-        await using (var database = await StopForInspectionAsync(server))
+        await using (var database = await server.StopForDatabaseAsync(restart: false))
         {
             admins = SeedSql.Rows(database.Connection, "SELECT username, is_active FROM users WHERE role = 'admin'");
         }

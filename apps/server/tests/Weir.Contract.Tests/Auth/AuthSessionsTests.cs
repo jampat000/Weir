@@ -117,7 +117,7 @@ public sealed class AuthSessionsTests(ServerFixture fixture) : AliceTestBase(fix
 
         long active;
         List<string> revokedIds;
-        await using (var database = await StopForInspectionAsync(server))
+        await using (var database = await server.StopForDatabaseAsync(restart: false))
         {
             active = Convert.ToInt64(SeedSql.Scalar(database.Connection, "SELECT COUNT(*) FROM user_sessions WHERE revoked_at IS NULL"), System.Globalization.CultureInfo.InvariantCulture);
             revokedIds = SeedSql.Rows(database.Connection, "SELECT id FROM user_sessions WHERE revoked_at IS NOT NULL").Select(row => (string)row["id"]!).ToList();
@@ -153,7 +153,7 @@ public sealed class AuthSessionsTests(ServerFixture fixture) : AliceTestBase(fix
         Assert.Equal(HttpStatusCode.OK, (await live.GetAsync($"{Api}/auth/me")).Status);
 
         List<Dictionary<string, object?>> rows;
-        await using (var database = await StopForInspectionAsync(server))
+        await using (var database = await server.StopForDatabaseAsync(restart: false))
         {
             rows = SeedSql.Rows(database.Connection, "SELECT id, revoked_at FROM user_sessions");
         }
@@ -195,7 +195,7 @@ public sealed class AuthSessionsTests(ServerFixture fixture) : AliceTestBase(fix
         Assert.Equal(HttpStatusCode.OK, (await SessionWithCookie(server, oldToken).GetAsync($"{Api}/auth/me")).Status);
 
         Dictionary<string, string> seen;
-        await using (var database = await StopForInspectionAsync(server))
+        await using (var database = await server.StopForDatabaseAsync(restart: false))
         {
             seen = SeedSql.Rows(database.Connection, "SELECT id, last_seen_at FROM user_sessions")
                 .ToDictionary(row => (string)row["id"]!, row => (string)row["last_seen_at"]!);
@@ -229,7 +229,7 @@ public sealed class AuthSessionsTests(ServerFixture fixture) : AliceTestBase(fix
         Assert.Equal(HttpStatusCode.OK, (await expired.GetAsync($"{Api}/auth/csrf")).Status);
 
         List<Dictionary<string, object?>> rows;
-        await using (var database = await StopForInspectionAsync(server))
+        await using (var database = await server.StopForDatabaseAsync(restart: false))
         {
             rows = SeedSql.Rows(database.Connection, "SELECT revoked_at FROM user_sessions WHERE id = $id", ("$id", sessionId));
         }
@@ -258,7 +258,7 @@ public sealed class AuthSessionsTests(ServerFixture fixture) : AliceTestBase(fix
         }
 
         List<string> ids;
-        await using (var database = await StopForInspectionAsync(server))
+        await using (var database = await server.StopForDatabaseAsync(restart: false))
         {
             ids = SeedSql.Rows(database.Connection, "SELECT id FROM user_sessions").Select(row => (string)row["id"]!).ToList();
         }
