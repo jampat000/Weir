@@ -169,7 +169,7 @@ public sealed class SystemEndpointsTests
     [Fact]
     public async Task Startup_creates_the_database_and_the_log_file()
     {
-        await using var server = await WeirTestServer.StartAsync();
+        await using var server = await WeirTestServer.StartAsync(freshDatabase: true);
         using (await server.Client.GetAsync("/health"))
         {
         }

@@ -14,6 +14,7 @@
   <ItemGroup>
     <Compile Include="..\Weir.Infrastructure.Tests\TestSupport\OsFacts.cs" Link="TestSupport\OsFacts.cs" />
     <Compile Include="..\Weir.Infrastructure.Tests\TestSupport\CheapPasswordHash.cs" Link="TestSupport\CheapPasswordHash.cs" />
+    <Compile Include="..\Weir.Infrastructure.Tests\TestSupport\MigratedDatabaseTemplate.cs" Link="TestSupport\MigratedDatabaseTemplate.cs" />
   </ItemGroup>
   <ItemGroup>
     <!-- A frozen fixture from an older release, shared with the infrastructure tests. -->

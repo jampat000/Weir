@@ -27,6 +27,7 @@ internal sealed class RecoverFixture : IDisposable
         Runtime = new RuntimeEnvironment(variables, OperatingSystem.IsWindows(), Home.Path, Home.Path);
         Options = WeirOptionsLoader.Load(Runtime);
         RuntimeDirectories.Ensure(Options);
+        MigratedDatabaseTemplate.CopyTo(Options.DbPath);
         Database = new SqliteDatabase(Options.DbPath);
         new SchemaMigrator(Database).EnsureAtHead();
         Users = new AuthStore();
