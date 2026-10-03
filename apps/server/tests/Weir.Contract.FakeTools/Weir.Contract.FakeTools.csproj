@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    A stand-in for ffprobe and ffmpeg, run as its own process by the server under test. The contract tests copy this
+    program's output into a folder twice, as ffprobe and ffmpeg, and point WEIR_FFMPEG_DIR at it (see FakeFfmpeg in
+    Weir.Contract.Tests). Which tool it plays is decided by the name it was started under.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+    <RootNamespace>Weir.Contract.FakeTools</RootNamespace>
+    <AssemblyName>Weir.Contract.FakeTools</AssemblyName>
+    <TieredPGO>false</TieredPGO>
+    <UseSystemResourceKeys>true</UseSystemResourceKeys>
+  </PropertyGroup>
+</Project>

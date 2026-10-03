@@ -7,6 +7,7 @@
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Weir.Api.Tests/Weir.Api.Tests.csproj" />
+    <Project Path="tests/Weir.Contract.FakeTools/Weir.Contract.FakeTools.csproj" />
     <Project Path="tests/Weir.Contract.Tests/Weir.Contract.Tests.csproj" />
     <Project Path="tests/Weir.Core.Tests/Weir.Core.Tests.csproj" />
     <Project Path="tests/Weir.Infrastructure.Tests/Weir.Infrastructure.Tests.csproj" />
