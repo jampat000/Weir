@@ -376,6 +376,8 @@ This starts the server and the web app together at `http://localhost:8782/`. See
 [local development](docs/local-development.md), [contributing](CONTRIBUTING.md) and
 [how releases are made](docs/release.md).
 
+For what each folder is for, see the [repository map](ARCHITECTURE.md#repository-map).
+
 ## Support Weir
 
 Weir is free. If it saves you time, the best ways to help are to star the repository, report bugs
