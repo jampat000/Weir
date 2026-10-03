@@ -491,6 +491,26 @@ describe("the words a status falls back on in a narrow card", () => {
     expect(status(held).fits).toEqual(["Can't open", "Locked"]);
   });
 
+  it("end, for a full drive or a folder Weir cannot write to, in two short words", () => {
+    const noSpace = aFile(1, "on_hold", {
+      status_reason:
+        "Weir has less than 20 GB free on the drive for the work folder, so it is waiting.",
+    });
+    const noWrite = aFile(2, "on_hold", {
+      status_reason:
+        "Weir cannot write to the output folder D:/Weir/hand-back/TV. Check that the folder exists.",
+    });
+
+    expect(status(noSpace)).toMatchObject({
+      text: "Waiting for space",
+      fits: ["No space", "Full"],
+    });
+    expect(status(noWrite)).toMatchObject({
+      text: "Can't write output",
+      fits: ["Can't write", "No write"],
+    });
+  });
+
   it("end, for a single verb, in its stem", () => {
     expect(
       status(aFile(1, "processing", { progress_stage: "planning" })).fits,
