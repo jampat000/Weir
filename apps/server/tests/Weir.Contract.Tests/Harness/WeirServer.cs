@@ -35,7 +35,7 @@ public sealed class WeirServer : IAsyncDisposable
 
     public string Home { get; }
 
-    public Uri BaseUrl { get; private set; } = new("http://localhost/");
+    public Uri BaseUrl { get; private set; } = new("http://127.0.0.1/");
 
     public string DatabasePath => Path.Combine(Home, "data", "weir.sqlite3");
 
@@ -146,7 +146,7 @@ public sealed class WeirServer : IAsyncDisposable
     private async Task LaunchAsync()
     {
         var port = FreePort();
-        BaseUrl = new Uri($"http://localhost:{port}/");
+        BaseUrl = new Uri($"http://127.0.0.1:{port}/");
         var log = new ServerLog(Path.Combine(Home, "contract-logs", $"server-{_logs.Count + 1}.log"));
         _logs.Add(log);
 
