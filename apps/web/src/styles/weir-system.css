@@ -424,7 +424,8 @@
 }
 
 /* The protections as a checklist: a tick for each that is in force, a warning for each that needs a person, and those
-   first, in a box of their own with what to do. */
+   first, in a box of their own with what to do. A value is a sentence, so it wraps onto a second line in whole words
+   rather than being cut, and the tick or warning stays level with the row's first line. */
 .mm-protection__list {
   list-style: none;
 }
@@ -432,7 +433,7 @@
 .mm-protection {
   display: grid;
   grid-template-columns: 16px minmax(0, 15rem) minmax(0, 1fr);
-  align-items: center;
+  align-items: start;
   gap: 10px;
   padding: 7px 0;
   border-bottom: 1px solid var(--mm-hairline);
@@ -444,6 +445,7 @@
 }
 
 .mm-protection__mark {
+  margin-block: calc((1lh - 16px) / 2);
   color: var(--mm-st);
 }
 
@@ -452,10 +454,7 @@
 }
 
 .mm-protection__value {
-  overflow: hidden;
   color: var(--mm-text3);
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .mm-protection__attention {

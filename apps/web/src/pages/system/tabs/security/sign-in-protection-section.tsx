@@ -54,9 +54,7 @@ function ProtectionRows({ protections }: { protections: Protection[] }) {
         >
           <Mark attention={protection.needsAttention} />
           <span className="mm-protection__name">{protection.label}</span>
-          <span className="mm-protection__value" title={protection.value}>
-            {protection.value}
-          </span>
+          <span className="mm-protection__value">{protection.value}</span>
         </li>
       ))}
     </ul>
