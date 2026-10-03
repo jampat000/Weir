@@ -145,6 +145,7 @@ public sealed class WeirServer : IAsyncDisposable
 
     private async Task LaunchAsync()
     {
+        using var startPlace = await ServerStartGate.EnterAsync();
         var port = FreePort();
         BaseUrl = new Uri($"http://127.0.0.1:{port}/");
         var log = new ServerLog(Path.Combine(Home, "contract-logs", $"server-{_logs.Count + 1}.log"));
