@@ -1,3 +1,5 @@
+using System.Buffers.Text;
+using System.Text;
 using Weir.Core.Paging;
 
 namespace Weir.Core.Tests.Paging;
@@ -75,6 +77,37 @@ public sealed class KeysetCursorTests
     public void A_cursor_longer_than_any_this_server_writes_is_not_accepted()
     {
         var cursor = KeysetCursor.Encode("when", SortDirection.Descending, [new string('x', 4000), 1L]);
+
+        Assert.False(KeysetCursor.TryDecode(cursor, "when", SortDirection.Descending, Shape, out _));
+    }
+
+    [Theory]
+    [InlineData("{\"sort\":\"when\",\"direction\":\"desc\",\"after\":[\"x\",1.5]}")]
+    [InlineData("{\"sort\":\"when\",\"direction\":\"desc\",\"after\":[\"x\",99999999999999999999]}")]
+    [InlineData("{\"sort\":\"when\",\"direction\":\"desc\",\"after\":\"x\"}")]
+    [InlineData("{\"sort\":\"when\",\"direction\":\"desc\",\"after\":[true,1]}")]
+    [InlineData("{\"sort\":5,\"direction\":\"desc\",\"after\":[\"x\",1]}")]
+    [InlineData("[1,2]")]
+    [InlineData("not json")]
+    public void A_cursor_that_is_not_the_shape_this_server_writes_is_not_accepted(string json)
+    {
+        var cursor = Base64Url.EncodeToString(Encoding.UTF8.GetBytes(json));
+
+        Assert.False(KeysetCursor.TryDecode(cursor, "when", SortDirection.Descending, Shape, out _));
+    }
+
+    [Fact]
+    public void A_cursor_nested_deeper_than_json_allows_is_not_accepted()
+    {
+        var cursor = Base64Url.EncodeToString(Encoding.UTF8.GetBytes(new string('[', 1500)));
+
+        Assert.False(KeysetCursor.TryDecode(cursor, "when", SortDirection.Descending, Shape, out _));
+    }
+
+    [Fact]
+    public void A_cursor_that_is_not_text_is_not_accepted()
+    {
+        var cursor = Base64Url.EncodeToString([0xFF, 0xFE, 0x00, 0x7B]);
 
         Assert.False(KeysetCursor.TryDecode(cursor, "when", SortDirection.Descending, Shape, out _));
     }
