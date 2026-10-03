@@ -38,6 +38,25 @@ type SystemLogSubscriber = (frame: SystemLogFrame) => void;
  */
 const INVALIDATE_OPTIONS = { cancelRefetch: false } as const;
 
+/**
+ * Marks these queries stale and reads them again. A read already in flight is kept rather than cancelled (#710), but it began
+ * before whatever made the data stale, so its answer can be missing that very change; once every such read has landed, the
+ * queries are read once more.
+ */
+export function invalidateLive(
+  qc: ReturnType<typeof useQueryClient>,
+  filters: { queryKey: QueryKey; exact?: boolean },
+): void {
+  const readingAlready = qc.isFetching(filters) > 0;
+  void qc.invalidateQueries(filters, INVALIDATE_OPTIONS);
+  if (!readingAlready) return;
+  const stopWatching = qc.getQueryCache().subscribe(() => {
+    if (qc.isFetching(filters) > 0) return;
+    stopWatching();
+    void qc.invalidateQueries(filters, INVALIDATE_OPTIONS);
+  });
+}
+
 /** How far a running pass has got, straight from the `processing.progress` stream frame (#750). */
 export type LiveProgressEntry = {
   relativePath: string;
@@ -392,9 +411,7 @@ export function useActivityStreamInvalidations(
     const invalidate = () => {
       lastRunAt = Date.now();
       trailingPending = false;
-      queryKeys.forEach((queryKey) => {
-        void qc.invalidateQueries({ queryKey, exact }, INVALIDATE_OPTIONS);
-      });
+      queryKeys.forEach((queryKey) => invalidateLive(qc, { queryKey, exact }));
     };
 
     const unsubscribe = subscribeActivityLatest(() => {

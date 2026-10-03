@@ -1,10 +1,15 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import {
+  QueryClient,
+  QueryClientProvider,
+  QueryObserver,
+} from "@tanstack/react-query";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ReactNode } from "react";
 
 import { activityKeys } from "./query-keys";
 import {
+  invalidateLive,
   subscribeConnectionActivity,
   subscribeSystemLog,
   subscribeSystemTasks,
@@ -698,5 +703,47 @@ describe("subscribeSystemTasks and subscribeSystemLog", () => {
     expect(src.closed).toBe(false);
     stopLog();
     expect(src.closed).toBe(true);
+  });
+});
+
+describe("invalidateLive", () => {
+  function watchedQuery(queryFn: () => Promise<number>) {
+    const qc = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    const observer = new QueryObserver(qc, { queryKey: ["live"], queryFn });
+    const stop = observer.subscribe(() => {});
+    return { qc, observer, stop };
+  }
+
+  it("reads again once a read already in flight lands, so a change that read began before is not lost", async () => {
+    let reads = 0;
+    let finishFirst: () => void = () => {};
+    const firstRead = new Promise<void>((resolve) => (finishFirst = resolve));
+    const { qc, observer, stop } = watchedQuery(async () => {
+      reads += 1;
+      if (reads === 1) await firstRead;
+      return reads;
+    });
+    await waitFor(() => expect(reads).toBe(1));
+
+    invalidateLive(qc, { queryKey: ["live"] });
+    finishFirst();
+
+    await waitFor(() => expect(observer.getCurrentResult().data).toBe(2));
+    stop();
+  });
+
+  it("reads once when nothing is in flight", async () => {
+    let reads = 0;
+    const { qc, observer, stop } = watchedQuery(async () => (reads += 1));
+    await waitFor(() => expect(observer.getCurrentResult().data).toBe(1));
+
+    invalidateLive(qc, { queryKey: ["live"] });
+
+    await waitFor(() => expect(observer.getCurrentResult().data).toBe(2));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(reads).toBe(2);
+    stop();
   });
 });

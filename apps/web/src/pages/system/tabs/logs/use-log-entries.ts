@@ -6,6 +6,7 @@ import {
 import { useEffect, useMemo, useState } from "react";
 
 import {
+  invalidateLive,
   subscribeSystemLog,
   useActivityStreamInvalidations,
 } from "../../../../lib/activity/use-activity-stream-invalidation";
@@ -61,10 +62,7 @@ function useLogStreamRefresh(): void {
       if (timer !== null) return;
       timer = window.setTimeout(() => {
         timer = null;
-        void queryClient.invalidateQueries(
-          { queryKey: systemKeys.logEntriesAll },
-          { cancelRefetch: false },
-        );
+        invalidateLive(queryClient, { queryKey: systemKeys.logEntriesAll });
       }, LIVE_THROTTLE_MS);
     });
     return () => {
