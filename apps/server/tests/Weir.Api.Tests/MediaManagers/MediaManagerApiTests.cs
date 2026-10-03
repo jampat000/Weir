@@ -649,6 +649,44 @@ public sealed class MediaManagerApiTests
     }
 
     [Fact]
+    public async Task A_release_folder_hand_off_completes_though_a_sample_beside_it_was_left_waiting_by_a_paused_scan()
+    {
+        var watched = Path.Join(Path.GetTempPath(), "weir-handoff-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(Path.Join(watched, "Film"));
+        await File.WriteAllTextAsync(Path.Join(watched, "Film", "film.mkv"), "12345");
+        await File.WriteAllTextAsync(Path.Join(watched, "Film", "film-sample.mkv"), "1");
+        try
+        {
+            var (server, _, _) = await StartAsync(("WEIR_MEDIA_MANAGER_WEBHOOK_SECRET", "s3cret"));
+            await using var _server = server;
+            await TestDatabase.ExecuteAsync(server, "UPDATE libraries SET watched_folder = $w WHERE media_type = 'movie'", ("$w", watched));
+            var manager = new ApiTestClient(server);
+            var secret = new Dictionary<string, string> { ["X-Webhook-Secret"] = "s3cret" };
+            var handoff = new { eventType = "deluno.processor-handoff", handoffId = "h1", libraryId = "lib-1", mediaType = "movies", sourcePath = Path.Join(watched, "Film"), callbackPath = "/api/integrations/processors/events" };
+            using (var queued = await manager.PostAsync("/api/v1/intake/webhook/deluno", handoff, secret))
+            {
+                Assert.Equal(HttpStatusCode.OK, queued.StatusCode);
+            }
+
+            // A watched-folder scan that ran while processing was paused recorded the sample as waiting; later the main file was processed.
+            await TestDatabase.ExecuteAsync(
+                server,
+                "INSERT INTO files (library_id, relative_path, status, status_reason) " +
+                "SELECT id, 'Film/film-sample.mkv', 'out_of_schedule', 'Processing is paused.' FROM libraries WHERE media_type = 'movie'");
+            await TestDatabase.ExecuteAsync(server, "UPDATE jobs SET status = 'completed'; UPDATE files SET status = 'processed' WHERE relative_path = 'Film/film.mkv'");
+
+            var status = await Json(await manager.GetAsync("/api/v1/intake/handoffs/deluno/h1", secret));
+
+            Assert.Equal("completed", status["state"]!.GetValue<string>());
+            Assert.Null(status["scheduledFor"]);
+        }
+        finally
+        {
+            Directory.Delete(watched, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task Hand_off_routes_without_any_secret_say_what_to_set()
     {
         var (server, _, _) = await StartAsync();
