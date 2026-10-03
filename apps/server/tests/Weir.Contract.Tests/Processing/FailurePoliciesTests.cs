@@ -68,8 +68,7 @@ public sealed class FailurePoliciesTests
         await scenario.DetectWithoutQueueingAsync(library, rel);
 
         await scenario.PostHandoffAsync("handoff-held-1", source);
-        // Four retries, each needing a scan and a remux, take well over a minute on a busy machine.
-        var row = await scenario.FailureAttemptsReachAsync(library, rel, 5, TimeSpan.FromSeconds(300));
+        var row = await scenario.FailureAttemptsReachAsync(library, rel, 5);
 
         Assert.Equal("processing_failed", (string)row["status"]!);
         Assert.Equal(5, (int)row["failure_attempts"]!);
