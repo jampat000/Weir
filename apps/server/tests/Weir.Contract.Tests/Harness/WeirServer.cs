@@ -62,12 +62,12 @@ public sealed class WeirServer : IAsyncDisposable
         return server;
     }
 
-    public WeirClient CreateClient() => new(BaseUrl);
+    public WeirClient CreateClient(IReadOnlyDictionary<string, string>? defaultHeaders = null) => new(BaseUrl, defaultHeaders);
 
     /// <summary>A client signed in as the admin, created through bootstrap the first time.</summary>
-    public async Task<WeirClient> CreateAdminClientAsync()
+    public async Task<WeirClient> CreateAdminClientAsync(IReadOnlyDictionary<string, string>? defaultHeaders = null)
     {
-        var client = CreateClient();
+        var client = CreateClient(defaultHeaders);
         try
         {
             await client.EnsureAdminAsync();

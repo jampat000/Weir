@@ -24,7 +24,8 @@ public sealed class WeirClient : IDisposable
     private readonly HttpClientHandler _handler;
     private readonly HttpClient _http;
 
-    public WeirClient(Uri baseAddress)
+    // defaultHeaders go on every request, such as Origin and X-Requested-With for a browser-like client; none by default.
+    public WeirClient(Uri baseAddress, IReadOnlyDictionary<string, string>? defaultHeaders = null)
     {
         _handler = new HttpClientHandler
         {
@@ -33,6 +34,10 @@ public sealed class WeirClient : IDisposable
             CookieContainer = new CookieContainer(),
         };
         _http = new HttpClient(_handler) { BaseAddress = baseAddress, Timeout = RequestTimeout };
+        foreach (var (name, value) in defaultHeaders ?? new Dictionary<string, string>())
+        {
+            _http.DefaultRequestHeaders.TryAddWithoutValidation(name, value);
+        }
     }
 
     public void Dispose()
@@ -46,6 +51,15 @@ public sealed class WeirClient : IDisposable
     public Task<WeirResponse> GetAsync(string path, params (string Name, object Value)[] query) =>
         SendAsync(HttpMethod.Get, WithQuery(path, query), content: null);
 
+    /// <summary>GET with extra headers for this request, which replace a default header of the same name.</summary>
+    public Task<WeirResponse> GetAsync(string path, IReadOnlyDictionary<string, string> headers, params (string Name, object Value)[] query) =>
+        SendAsync(HttpMethod.Get, WithQuery(path, query), content: null, headers);
+
+    /// <summary>Any method, with an optional JSON body and extra headers; the body is sent as given, without a CSRF token.</summary>
+    public Task<WeirResponse> RequestAsync(
+        HttpMethod method, string path, JsonNode? body = null, IReadOnlyDictionary<string, string>? headers = null) =>
+        SendAsync(method, path, JsonBody(body), headers);
+
     public Task<WeirResponse> PostAsync(string path, JsonNode? body = null, IReadOnlyDictionary<string, string>? headers = null) =>
         SendAsync(HttpMethod.Post, path, JsonBody(body), headers);
 
@@ -53,14 +67,17 @@ public sealed class WeirClient : IDisposable
         SendAsync(HttpMethod.Delete, path, content: null, headers);
 
     /// <summary>POST with a fresh <c>csrf_token</c> in the JSON body, the web app's shape.</summary>
-    public Task<WeirResponse> PostWithCsrfAsync(string path, JsonObject? body = null) =>
-        SendWithCsrfBodyAsync(HttpMethod.Post, path, body);
+    public Task<WeirResponse> PostWithCsrfAsync(
+        string path, JsonObject? body = null, IReadOnlyDictionary<string, string>? headers = null) =>
+        SendWithCsrfBodyAsync(HttpMethod.Post, path, body, headers);
 
-    public Task<WeirResponse> PutWithCsrfAsync(string path, JsonObject? body = null) =>
-        SendWithCsrfBodyAsync(HttpMethod.Put, path, body);
+    public Task<WeirResponse> PutWithCsrfAsync(
+        string path, JsonObject? body = null, IReadOnlyDictionary<string, string>? headers = null) =>
+        SendWithCsrfBodyAsync(HttpMethod.Put, path, body, headers);
 
-    public Task<WeirResponse> PatchWithCsrfAsync(string path, JsonObject? body = null) =>
-        SendWithCsrfBodyAsync(HttpMethod.Patch, path, body);
+    public Task<WeirResponse> PatchWithCsrfAsync(
+        string path, JsonObject? body = null, IReadOnlyDictionary<string, string>? headers = null) =>
+        SendWithCsrfBodyAsync(HttpMethod.Patch, path, body, headers);
 
     /// <summary>DELETE with the token in <c>X-CSRF-Token</c> (a DELETE has no body).</summary>
     public async Task<WeirResponse> DeleteWithCsrfAsync(string path) =>
@@ -124,7 +141,8 @@ public sealed class WeirClient : IDisposable
         [CsrfTokenField] = csrfToken,
     };
 
-    private async Task<WeirResponse> SendWithCsrfBodyAsync(HttpMethod method, string path, JsonObject? body)
+    private async Task<WeirResponse> SendWithCsrfBodyAsync(
+        HttpMethod method, string path, JsonObject? body, IReadOnlyDictionary<string, string>? headers)
     {
         var fields = body ?? new JsonObject();
         if (!fields.ContainsKey(CsrfTokenField))
@@ -132,7 +150,7 @@ public sealed class WeirClient : IDisposable
             fields[CsrfTokenField] = await CsrfTokenAsync();
         }
 
-        return await SendAsync(method, path, JsonBody(fields));
+        return await SendAsync(method, path, JsonBody(fields), headers);
     }
 
     private async Task<WeirResponse> SendAsync(
@@ -141,7 +159,7 @@ public sealed class WeirClient : IDisposable
         using var request = new HttpRequestMessage(method, path) { Content = content };
         foreach (var (name, value) in headers ?? new Dictionary<string, string>())
         {
-            request.Headers.Add(name, value);
+            request.Headers.TryAddWithoutValidation(name, value);
         }
 
         using var response = await _http.SendAsync(request);

@@ -40,7 +40,10 @@ Everything is in `Harness/`. Areas live in folders beside it (`Activity/`), one 
 - **`WeirClient`** is a browser-like session (its own cookie jar) with CSRF and sign-in: `EnsureAdminAsync()`,
   `LoginAsync(...)`, `GetAsync(path, query...)`, `PostWithCsrfAsync/PutWithCsrfAsync/PatchWithCsrfAsync`
   (token in the body), `DeleteWithCsrfAsync` (token in `X-CSRF-Token`), `OpenStreamAsync` for SSE. Responses are
-  `WeirResponse` (`Status`, `Header(name)`, `Text`, `Fields`/`Elements` as JSON).
+  `WeirResponse` (`Status`, `Header(name)`, `Text`, `Fields`/`Elements` as JSON). A client sends no
+  `Origin` or `X-Requested-With` unless asked, like the Python client: `server.CreateClient(headers)` or
+  `CreateAdminClientAsync(headers)` set headers for every request (a browser-like client passes both), and
+  `RequestAsync`, `GetAsync(path, headers, query...)` and the `...WithCsrfAsync` methods take headers for one request.
 - **`SseReader`** reads a stream block by block: `NextBlockAsync`, `NextEventAsync`, `NextEventNamedAsync`.
 - **`StoppedDatabase` and `SeedSql`**: plain SQL against the shared schema for rows no API creates. `SeedSql.UtcText`
   writes a timestamp the way the schema stores it.
