@@ -90,7 +90,7 @@ internal static class ManagerConnections
         probe.Start();
         try
         {
-            return $"http://localhost:{((IPEndPoint)probe.LocalEndpoint).Port}";
+            return $"http://127.0.0.1:{((IPEndPoint)probe.LocalEndpoint).Port}";
         }
         finally
         {

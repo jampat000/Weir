@@ -51,7 +51,7 @@ public sealed class CapabilitiesTests(NoWebhookSecretFixture fixture) : IClassFi
 
         var row = Assert.Single(rows)!.AsObject();
         Assert.Equal(JsonFields.Id(created), (int)row["connection_id"]!);
-        Assert.Equal($"Deluno on {new Uri(fake.BaseUrl).Host}", (string)row["label"]!);
+        Assert.Equal("Deluno on 127.0.0.1", (string)row["label"]!);
         Assert.Equal(["movie", "tv"], row["media_scopes"]!.AsArray().Select(scope => (string)scope!));
         Assert.True((bool)row["reports_import_queue"]!);
         // The honest part: Deluno cannot clear a folder for deletion, and says so up front.
@@ -75,7 +75,7 @@ public sealed class CapabilitiesTests(NoWebhookSecretFixture fixture) : IClassFi
         var row = (await admin.GetAsync(Route)).Elements[0]!.AsObject();
 
         Assert.False((bool)row["reachable"]!);
-        Assert.StartsWith($"Weir could not reach Deluno on {new Uri(baseUrl).Host}", (string)row["detail"]!);
+        Assert.StartsWith("Weir could not reach Deluno on 127.0.0.1", (string)row["detail"]!);
         // The static profile still stands, so the page can say what this manager is for.
         Assert.Equal(["movie", "tv"], row["media_scopes"]!.AsArray().Select(scope => (string)scope!));
     }
