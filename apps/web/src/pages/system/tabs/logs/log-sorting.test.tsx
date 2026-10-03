@@ -107,6 +107,31 @@ describe("the log's columns", () => {
     expect(screen.getAllByTestId("log-row")).toHaveLength(3);
   });
 
+  it("puts each row's day before its time when the rows are not in the order of time, and only its time when they are", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-02T12:00:00Z"));
+    await rendered();
+    const times = () =>
+      screen
+        .getAllByTestId("log-row")
+        .map((row) => row.querySelector('[data-col="time"]')?.textContent);
+    expect(times()).toEqual(["11:50:00 am", "11:45:00 am", "11:30:00 am"]);
+
+    mocks.fetchSystemLog.mockResolvedValue(logPage([...ALL_ROWS].reverse()));
+    fireEvent.click(within(logTable()).getByRole("button", { name: "Level" }));
+
+    await vi.waitFor(() =>
+      expect(times()).toEqual([
+        "Today 11:30:00 am",
+        "Today 11:45:00 am",
+        "Today 11:50:00 am",
+      ]),
+    );
+    expect(logTable().style.getPropertyValue("--log-cols")).toMatch(
+      /^10.25rem /,
+    );
+  });
+
   it("offers no sort on what a row says, but lets its column move", async () => {
     await rendered();
 

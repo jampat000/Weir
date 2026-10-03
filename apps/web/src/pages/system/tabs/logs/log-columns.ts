@@ -29,9 +29,13 @@ export const LOG_COLUMNS: TableColumnsConfig<LogColumnId> = {
   ],
 };
 
+/** The time column's room: a time of day alone, and a time with the day in front of it where no heading names the day. */
+const CLOCK_TRACK = "5.5rem";
+const DATED_CLOCK_TRACK = "10.25rem";
+
 /** Where each column sits in the row's grid, and how much room it takes. */
 const TRACKS: Record<LogColumnId, string> = {
-  time: "5.5rem",
+  time: CLOCK_TRACK,
   level: "3rem",
   source: "4rem",
   category: "6.5rem",
@@ -41,7 +45,7 @@ const TRACKS: Record<LogColumnId, string> = {
 
 /** The same, once the card is narrow: the workflow and the title have left the first line. */
 const NARROW_TRACKS: Partial<Record<LogColumnId, string>> = {
-  time: "5.5rem",
+  time: CLOCK_TRACK,
   level: "3rem",
   source: "auto",
   category: "minmax(0, 1fr)",
@@ -49,14 +53,27 @@ const NARROW_TRACKS: Partial<Record<LogColumnId, string>> = {
 
 const CHEVRON_TRACK = "0.875rem";
 
-/** The grid of every row and of the headings over them, for the order the columns are in. */
-export function logGrid(order: readonly LogColumnId[]): {
+/**
+ * The grid of every row and of the headings over them, for the order the columns are in. The time column is wider where
+ * each time carries its day.
+ */
+export function logGrid(
+  order: readonly LogColumnId[],
+  dated = false,
+): {
   "--log-cols": string;
   "--log-cols-narrow": string;
 } {
-  const narrow = order.flatMap((id) => NARROW_TRACKS[id] ?? []);
+  const time = dated ? DATED_CLOCK_TRACK : CLOCK_TRACK;
+  const track = (
+    id: LogColumnId,
+    tracks: Partial<Record<LogColumnId, string>>,
+  ) => (id === "time" ? time : tracks[id]);
+  const narrow = order.flatMap((id) => track(id, NARROW_TRACKS) ?? []);
   return {
-    "--log-cols": [...order.map((id) => TRACKS[id]), CHEVRON_TRACK].join(" "),
+    "--log-cols": [...order.map((id) => track(id, TRACKS)), CHEVRON_TRACK].join(
+      " ",
+    ),
     "--log-cols-narrow": [...narrow, CHEVRON_TRACK].join(" "),
   };
 }

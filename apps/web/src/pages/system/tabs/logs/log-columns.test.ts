@@ -40,6 +40,22 @@ describe("the log's grid", () => {
     );
   });
 
+  it("gives the time column room for a day in front of the time where no heading names the day", () => {
+    const order = ["time", "level", "title"] as const;
+
+    expect(logGrid(order)["--log-cols"]).toBe(
+      "5.5rem 3rem minmax(0, 1fr) 0.875rem",
+    );
+    expect(logGrid(order, true)["--log-cols"]).toBe(
+      "10.25rem 3rem minmax(0, 1fr) 0.875rem",
+    );
+    expect(
+      logGrid(["time", "level", "source", "category"], true)[
+        "--log-cols-narrow"
+      ],
+    ).toBe("10.25rem 3rem auto minmax(0, 1fr) 0.875rem");
+  });
+
   it("leaves out the workflow and the title once the card is narrow", () => {
     const grid = logGrid([
       "title",

@@ -31,11 +31,17 @@ const HEADING_DATE: Intl.DateTimeFormatOptions = {
   month: "long",
 };
 
-/** What names a day: "Today", "Yesterday", or "Friday 25 September", with the year when it is not this one. */
-export function dayHeading(
+const SHORT_DATE: Intl.DateTimeFormatOptions = {
+  day: "numeric",
+  month: "short",
+};
+
+/** A day by its key in the words of `date`: "Today", "Yesterday", or the date with the year when it is not this one. */
+function nameDay(
   key: string,
   now: number,
   timeZone: string | undefined,
+  date: Intl.DateTimeFormatOptions,
 ): string {
   if (key === dayKeyAt(now, timeZone)) return "Today";
   if (key === previousDayKeyAt(now, timeZone)) return "Yesterday";
@@ -45,11 +51,34 @@ export function dayHeading(
   const thisYear = Number(dayKeyAt(now, timeZone).slice(0, 4)) === year;
   try {
     return new Intl.DateTimeFormat(undefined, {
-      ...HEADING_DATE,
+      ...date,
       ...(thisYear ? {} : { year: "numeric" }),
       timeZone: "UTC",
     }).format(noon);
   } catch {
     return key;
   }
+}
+
+/** What names a day: "Today", "Yesterday", or "Friday 25 September", with the year when it is not this one. */
+export function dayHeading(
+  key: string,
+  now: number,
+  timeZone: string | undefined,
+): string {
+  return nameDay(key, now, timeZone, HEADING_DATE);
+}
+
+/**
+ * A row's time with its day in front, "Today 7:53:55 pm" or "2 Oct 7:53:55 pm", for a list with no day headings to say
+ * which day it is.
+ */
+export function datedClock(
+  ms: number,
+  now: number,
+  timeZone: string | undefined,
+  clock: (ms: number) => string,
+): string {
+  const day = nameDay(dayKeyAt(ms, timeZone), now, timeZone, SHORT_DATE);
+  return `${day} ${clock(ms)}`;
 }
