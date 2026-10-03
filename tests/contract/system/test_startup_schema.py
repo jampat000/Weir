@@ -1,4 +1,4 @@
-"""Schema checks at startup: the migrated schema's tables, and a server that refuses an unmigrated database."""
+"""Schema checks at startup: the migrated schema's tables, and a server that refuses a database it did not set up."""
 
 from __future__ import annotations
 
@@ -80,7 +80,7 @@ def test_head_schema_includes_arr_library_operator_settings_table(head_schema) -
 
 
 def test_api_startup_fails_without_migrations(server_factory) -> None:
-    """A data folder whose database has never been migrated: the server refuses to start and changes nothing."""
+    """A data folder whose database Weir never set up: the server refuses to start and changes nothing."""
 
     sut = server_factory(start=False)
     sut.db_path.parent.mkdir(parents=True, exist_ok=True)
