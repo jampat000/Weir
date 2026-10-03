@@ -21,12 +21,12 @@ describe("filtersFromParams", () => {
   it("reads every filter the address holds", () => {
     const filters = filtersFromParams(
       params(
-        "tab=logs&source=job,server&level=error,warning&category=processing,sign_in&workflow=3&when=today&q=disk+full&event_type=auth.login_failed&result=failed&trigger=manual&status=failed,pending&stack=1&job=41",
+        "tab=logs&source=job&level=error,warning&category=processing,sign_in&workflow=3&when=today&q=disk+full&event_type=auth.login_failed&result=failed&trigger=manual&status=failed,pending&stack=1&job=41",
       ),
     );
 
     expect(filters).toEqual({
-      sources: ["job", "server"],
+      source: "job",
       levels: ["error", "warning"],
       categories: ["processing", "sign_in"],
       workflow: 3,
@@ -54,7 +54,7 @@ describe("filtersFromParams", () => {
       ),
     );
 
-    expect(filters).toEqual({ ...EMPTY_LOG_FILTERS, sources: ["job"] });
+    expect(filters).toEqual({ ...EMPTY_LOG_FILTERS, source: "job" });
   });
 
   it.each([
@@ -64,9 +64,9 @@ describe("filtersFromParams", () => {
     ["server", "server"],
     ["log", "server"],
   ])("lands an older address's show=%s on the %s source", (show, source) => {
-    expect(filtersFromParams(params(`tab=logs&show=${show}`)).sources).toEqual([
+    expect(filtersFromParams(params(`tab=logs&show=${show}`)).source).toBe(
       source,
-    ]);
+    );
   });
 
   it("keeps a job status an older address asked for, and the Jobs source with it", () => {
@@ -74,21 +74,35 @@ describe("filtersFromParams", () => {
       params("tab=logs&show=jobs&status=failed"),
     );
 
-    expect(filters.sources).toEqual(["job"]);
+    expect(filters.source).toBe("job");
     expect(filters.statuses).toEqual(["failed"]);
   });
 
   it("lets the source in the address win over an older show", () => {
-    expect(
-      filtersFromParams(params("show=jobs&source=server")).sources,
-    ).toEqual(["server"]);
+    expect(filtersFromParams(params("show=jobs&source=server")).source).toBe(
+      "server",
+    );
+  });
+
+  it("shows all sources for an address that names several", () => {
+    for (const address of [
+      "source=event,job",
+      "source=job,server,event",
+      "source=event,job&show=server",
+    ]) {
+      expect(filtersFromParams(params(address)).source).toBeNull();
+    }
+  });
+
+  it("takes the one source it knows from an address that names others too", () => {
+    expect(filtersFromParams(params("source=disk,job")).source).toBe("job");
   });
 });
 
 describe("paramsFromFilters", () => {
   it("round-trips whatever the filters hold", () => {
     const filters: LogFilters = {
-      sources: ["event"],
+      source: "event",
       levels: ["error", "info", "success"],
       categories: ["scans"],
       workflow: 2,
@@ -182,7 +196,7 @@ describe("logQuery", () => {
     const query = logQuery(
       {
         ...EMPTY_LOG_FILTERS,
-        sources: ["event"],
+        source: "event",
         levels: ["error"],
         categories: ["sign_in"],
         workflow: 4,

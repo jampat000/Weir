@@ -93,7 +93,8 @@ const JOB_STATUSES = LOG_JOB_STATUSES.map((status) => status.value);
 
 /** Everything that narrows the log, as the page holds it. The address holds the same, so a view can be linked to. */
 export type LogFilters = {
-  sources: SystemLogSource[];
+  /** The one source the log is narrowed to; null is all of them. */
+  source: SystemLogSource | null;
   levels: SystemLogLevel[];
   categories: SystemLogCategory[];
   workflow: number | null;
@@ -113,7 +114,7 @@ export type LogFilters = {
 };
 
 export const EMPTY_LOG_FILTERS: LogFilters = {
-  sources: [],
+  source: null,
   levels: [],
   categories: [],
   workflow: null,
@@ -175,13 +176,22 @@ function numberParam(params: URLSearchParams, name: string): number | null {
   return Number.isInteger(value) && value > 0 ? value : null;
 }
 
+/**
+ * The source an address names. A link may name several, as the log once took them: one valid name is that source, and
+ * several or none is all of them, unless an older `show` says which list it meant.
+ */
+function sourceFromParams(params: URLSearchParams): SystemLogSource | null {
+  const named = listParam(params, "source", SOURCES);
+  if (named.length === 1) return named[0];
+  if (named.length > 1) return null;
+  return LEGACY_SHOW_SOURCES[params.get("show") ?? ""] ?? null;
+}
+
 /** The filters an address holds. An address from before the three lists became one log still lands where it meant. */
 export function filtersFromParams(params: URLSearchParams): LogFilters {
   const when = LOG_WHEN_OPTIONS.find((o) => o.value === params.get("when"));
-  const legacy = LEGACY_SHOW_SOURCES[params.get("show") ?? ""];
-  const sources = listParam(params, "source", SOURCES);
   return {
-    sources: sources.length === 0 && legacy ? [legacy] : sources,
+    source: sourceFromParams(params),
     levels: listParam(params, "level", LEVELS),
     categories: listParam(params, "category", CATEGORIES),
     workflow: numberParam(params, "workflow"),
@@ -205,8 +215,8 @@ export function paramsFromFilters(
 ): URLSearchParams {
   const params = new URLSearchParams(base);
   for (const name of LOG_PARAMS) params.delete(name);
+  if (filters.source) params.set("source", filters.source);
   const lists: [string, readonly string[]][] = [
-    ["source", filters.sources],
     ["level", filters.levels],
     ["category", filters.categories],
     ["status", filters.statuses],
@@ -268,7 +278,7 @@ export function logQuery(
   timeZone: string | undefined,
 ): SystemLogQuery {
   const query: SystemLogQuery = {};
-  if (filters.sources.length > 0) query.source = filters.sources;
+  if (filters.source !== null) query.source = [filters.source];
   if (filters.levels.length > 0) query.level = filters.levels;
   if (filters.categories.length > 0) query.category = filters.categories;
   if (filters.statuses.length > 0) query.status = filters.statuses;

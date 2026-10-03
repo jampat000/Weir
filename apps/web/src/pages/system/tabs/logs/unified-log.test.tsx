@@ -10,6 +10,7 @@ import {
 } from "vitest";
 
 import {
+  NOW,
   chooseLevels,
   logPage,
   renderLog,
@@ -82,6 +83,8 @@ function chip(group: string, name: RegExp | string) {
 
 describe("the list", () => {
   it("is one list of events, jobs and server lines under the day they fell on, newest first", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(NOW);
     await rendered();
 
     const rows = screen.getAllByTestId("log-row");

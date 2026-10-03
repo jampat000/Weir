@@ -114,39 +114,37 @@ describe("the filters", () => {
     }
   });
 
-  it("narrow to a source when its chip is pressed, and back to all with All", async () => {
+  it("choose one source at a time, and keep it when its chip is pressed again", async () => {
     await rendered();
+    const pressed = () =>
+      screen
+        .getAllByRole("button", { pressed: true })
+        .filter((button) => button.closest('[aria-label="Source"]'));
 
     fireEvent.click(chip("Source", /Jobs/));
     await waitFor(() =>
       expect(lastRequest()).toMatchObject({ source: ["job"] }),
     );
     expect(screen.getByTestId("location")).toHaveTextContent("source=job");
-    expect(chip("Source", /Jobs/)).toHaveAttribute("aria-pressed", "true");
-    expect(chip("Source", /All/)).toHaveAttribute("aria-pressed", "false");
 
     fireEvent.click(chip("Source", /Server/));
     await waitFor(() =>
-      expect(lastRequest()).toMatchObject({ source: ["job", "server"] }),
+      expect(lastRequest()).toMatchObject({ source: ["server"] }),
     );
+    expect(screen.getByTestId("location")).not.toHaveTextContent("job");
+    expect(pressed()).toHaveLength(1);
+    expect(chip("Source", /Server/)).toHaveAttribute("aria-pressed", "true");
+
+    const requests = mocks.fetchSystemLog.mock.calls.length;
+    fireEvent.click(chip("Source", /Server/));
+    expect(chip("Source", /Server/)).toHaveAttribute("aria-pressed", "true");
+    expect(mocks.fetchSystemLog.mock.calls.length).toBe(requests);
 
     fireEvent.click(chip("Source", /All/));
     await waitFor(() =>
       expect(chip("Source", /All/)).toHaveAttribute("aria-pressed", "true"),
     );
-    expect(screen.getByTestId("location")).toHaveTextContent("?tab=logs");
-  });
-
-  it("treat every source chosen as all of them", async () => {
-    await rendered();
-
-    fireEvent.click(chip("Source", /Events/));
-    fireEvent.click(chip("Source", /Jobs/));
-    fireEvent.click(chip("Source", /Server/));
-
-    await waitFor(() =>
-      expect(chip("Source", /All/)).toHaveAttribute("aria-pressed", "true"),
-    );
+    expect(pressed()).toHaveLength(1);
     expect(screen.getByTestId("location")).toHaveTextContent("?tab=logs");
   });
 

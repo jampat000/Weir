@@ -1,5 +1,9 @@
 import { useState, type ReactNode } from "react";
 
+import {
+  SegmentedControl,
+  type SegmentedOption,
+} from "../../../../components/panels/segmented-control";
 import { HeaderSearch } from "../../../../components/shell/header-search";
 import { ShellHeaderSlot } from "../../../../components/shell/shell-header-context";
 import { useTitleLineFit } from "../../../../components/shell/title-line-fit";
@@ -7,7 +11,6 @@ import type {
   SystemLogPage,
   SystemLogSource,
 } from "../../../../lib/system/system-log-api";
-import { LogChips, type LogChip } from "./log-chips";
 import { LOG_SOURCES, type LogFilters } from "./log-filters";
 import { LogPickers } from "./log-pickers";
 
@@ -17,36 +20,32 @@ const PICKERS_IN_CARD = 2;
 
 type Counts = SystemLogPage["counts"] | undefined;
 
-/** The source chips: All, then each source on its own, with how many rows choosing it shows. Choosing every source is All. */
-function sourceChips(filters: LogFilters, counts: Counts): LogChip[] {
+type SourceChoice = "all" | SystemLogSource;
+
+/** The source chips: All, then each source on its own, with how many rows choosing it shows. One is chosen, as on Activity. */
+function sourceOptions(counts: Counts): SegmentedOption<SourceChoice>[] {
   const all = counts
     ? Object.values(counts.source).reduce((sum, n) => sum + n, 0)
     : undefined;
-  return [
-    {
-      value: "all",
-      label: "All",
-      count: all,
-      pressed: filters.sources.length === 0,
-    },
+  const choices: { value: SourceChoice; label: string; count?: number }[] = [
+    { value: "all", label: "All", count: all },
     ...LOG_SOURCES.map((source) => ({
-      value: source.value,
-      label: source.label,
+      ...source,
       count: counts?.source[source.value],
-      pressed: filters.sources.includes(source.value),
     })),
   ];
-}
-
-/** Choosing every source is the same as choosing none: All. */
-function nextSources(
-  sources: readonly SystemLogSource[],
-  value: SystemLogSource,
-): SystemLogSource[] {
-  const next = sources.includes(value)
-    ? sources.filter((source) => source !== value)
-    : [...sources, value];
-  return next.length === LOG_SOURCES.length ? [] : next;
+  return choices.map(({ value, label, count }) => ({
+    value,
+    label:
+      count === undefined ? (
+        label
+      ) : (
+        <>
+          {label}{" "}
+          <span className="mm-segmented__count">{count.toLocaleString()}</span>
+        </>
+      ),
+  }));
 }
 
 /**
@@ -73,7 +72,7 @@ export function LogHeaderFilters({
   /** The Log card, given the pickers when they did not fit the header (null while the header holds them). */
   children: (movedPickers: ReactNode) => ReactNode;
 }) {
-  const chosen = filters.sources.join(",");
+  const chosen: SourceChoice = filters.source ?? "all";
   const [chipsRow, setChipsRow] = useState<HTMLDivElement | null>(null);
   const { stage } = useTitleLineFit({
     row: chipsRow,
@@ -100,18 +99,15 @@ export function LogHeaderFilters({
             onChange={(event) => onSearch(event.target.value)}
           />
           <div className="mm-history-chips" ref={setChipsRow}>
-            <LogChips
+            <SegmentedControl
               ariaLabel="Source"
               dataTestId="logs-source-chips"
-              chips={sourceChips(filters, counts)}
-              onToggle={(value) =>
-                onChange({
-                  sources:
-                    value === "all"
-                      ? []
-                      : nextSources(filters.sources, value as SystemLogSource),
-                })
-              }
+              value={chosen}
+              options={sourceOptions(counts)}
+              onChange={(next) => {
+                if (next !== chosen)
+                  onChange({ source: next === "all" ? null : next });
+              }}
             />
           </div>
           {stage < PICKERS_IN_CARD ? (
