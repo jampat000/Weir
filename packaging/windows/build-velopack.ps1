@@ -2,18 +2,18 @@ param(
   [switch]$SkipWebBuild,
   [switch]$SkipDotnetPublish,
   [switch]$SkipSmoke,
-  # When set, the previous release's full nupkg is fetched into $velopackOut before `vpk
-  # pack` runs, so vpk builds a delta package against it as well as the full one. Left empty for
-  # local builds and the PR-triggered windows-package-smoke job (ci-packaging.yml): neither ships
-  # anything, and a delta with no consumer is just a slower, network-dependent build. release.yml
-  # passes the repo URL so every real release gets a delta wherever a base release exists.
+  # When set together with -PreviousReleaseVersion, that release's full nupkg is fetched into
+  # $velopackOut before `vpk pack` runs, so vpk builds a delta package against it as well as the full
+  # one. Left empty for local builds and the PR-triggered windows-package-smoke job (ci-packaging.yml):
+  # neither ships anything, and a delta with no consumer is just a slower, network-dependent build.
+  # release.yml passes the repo URL so every real release gets a delta wherever a base release exists.
   [string]$PreviousReleaseRepoUrl = "",
 
-  # The previous release's bare version (e.g. "3.2.10"), when known. Lets the fetch above be served
-  # from release.yml's own actions/cache instead of a `vpk download` on every release: the cache is
-  # keyed on this exact version, so it can never serve a stale package (packaging/windows/vendor/
-  # previous-release, gitignored the same as the FFmpeg/MKVToolNix vendor folders). Left empty when
-  # the previous version is not known up front (local builds; the very first release).
+  # The delta base's bare version (e.g. "3.2.10" or "1.0.0-rc.1"): the newest published release older
+  # than the one being packed, chosen by release.yml (scripts/find-previous-release.mjs). Left empty when
+  # there is none (local builds; the very first release), which packs the full package alone. The base is
+  # kept in packaging/windows/vendor/previous-release (gitignored, the same as the FFmpeg/MKVToolNix
+  # vendor folders) keyed on this exact version, so it can never serve a stale package.
   [string]$PreviousReleaseVersion = ""
 )
 
@@ -327,9 +327,9 @@ if (-not (Test-Path -LiteralPath $vpkExe)) {
 # Fetch the previous release's full nupkg into $velopackOut first (build-velopack-previous-release.ps1),
 # so `vpk pack` (below) finds it there on its own and emits a delta nupkg alongside the full one at no
 # extra flag — --delta defaults to BestSpeed.
-if ($PreviousReleaseRepoUrl) {
+if ($PreviousReleaseRepoUrl -and $PreviousReleaseVersion) {
   Start-BuildPhase "Fetch previous release for delta"
-  Get-WeirPreviousReleaseFullNupkg -RepoUrl $PreviousReleaseRepoUrl -Version $PreviousReleaseVersion -OutputDir $velopackOut -VpkExePath $vpkExe
+  Get-WeirPreviousReleaseFullNupkg -RepoUrl $PreviousReleaseRepoUrl -Version $PreviousReleaseVersion -OutputDir $velopackOut
 }
 
 Start-BuildPhase "vpk pack"
@@ -351,7 +351,7 @@ $deltaPackages = @(Get-ChildItem -Path $velopackOut -Filter "*-delta.nupkg")
 if ($deltaPackages.Count -gt 0) {
   Write-Host "Delta package(s) built against the previous release: $($deltaPackages.Name -join ', ')"
 } elseif ($PreviousReleaseRepoUrl) {
-  Write-Host "No delta package was built (no previous full release was found to diff against); the full package is the fallback."
+  Write-Host "No delta package was built (no previous release to diff against); the full package is the fallback."
 }
 
 # The previous release's full nupkg, fetched above only so vpk could build the delta against it, is

@@ -86,8 +86,10 @@ if (/:\s*write\b|write-all/.test(releaseTop)) {
   throw new Error(`${RELEASE} grants write access at workflow level; only the publish job may have it.`);
 }
 
-// Prereleases (v*-*) never run the release at all.
-requireText(releaseTop, '    tags:\n      - "v*"\n      - "!v*-*"\n', `${RELEASE} on.push.tags`);
+// Every v* tag runs the release, pre-release tags included: scripts/check-release-version.mjs refuses a tag that
+// is not a SemVer version, and the publish job marks a tag with a pre-release part as a GitHub pre-release.
+requireText(releaseTop, '    tags:\n      - "v*"\n', `${RELEASE} on.push.tags`);
+rejectText(releaseTop, '"!v*-*"', RELEASE);
 
 const releaseJobs = jobIds(release);
 const publish = requireJob(release, "publish", RELEASE);
@@ -145,6 +147,9 @@ const latestAt = publish.indexOf(":latest");
 if (latestAt < 0 || latestAt < publish.indexOf("- name: Tag the published image latest")) {
   throw new Error(`${RELEASE} publish may name :latest only in its last step, after the GitHub Release exists.`);
 }
+
+// A tag with a pre-release part publishes a GitHub pre-release, never a normal release.
+requireText(publish, "prerelease: ${{ steps.version.outputs.prerelease }}", `${RELEASE} publish job`);
 
 // The tagged commit must be one ci.yml already passed on.
 const ciPassed = requireJob(release, "ci-passed", RELEASE);

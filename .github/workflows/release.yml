@@ -1,4 +1,5 @@
-# Tag-driven release: push tag v* (not a prerelease v*-*) -> CI proof, Windows installer, Docker image, GitHub Release.
+# Tag-driven release: push tag vX.Y.Z or vX.Y.Z-rc.N -> CI proof, Windows installer, Docker image, GitHub Release.
+# A tag with a pre-release part (v1.0.0-rc.1) publishes a GitHub pre-release; a plain vX.Y.Z publishes a normal release.
 #
 # Every job but publish starts at once and none of them can publish anything:
 #
@@ -21,7 +22,6 @@ on:
   push:
     tags:
       - "v*"
-      - "!v*-*"
 
 concurrency:
   group: release-${{ github.ref }}
@@ -86,17 +86,20 @@ jobs:
         shell: bash
         run: node scripts/check-release-version.mjs "$TAG"
 
-      # The delta base for `vpk pack` below. A 404 (no release published yet) is not an error: it
-      # leaves this empty, packaging/windows/build-velopack.ps1 skips the cache lookup, and `vpk
-      # download` itself already tolerates having nothing to fetch (docs/release.md).
+      # The delta base for `vpk pack` below: the newest published release that is OLDER than this one by
+      # SemVer precedence, pre-releases included (scripts/find-previous-release.mjs). Never "the latest
+      # release": that can be a pre-release or a newer version, and neither is a valid base. Empty when
+      # nothing older is published, and build-velopack.ps1 then packs the full package alone (docs/release.md).
       - name: Previous release version
         id: previous
         shell: bash
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
-          tag="$(gh api "repos/${{ github.repository }}/releases/latest" --jq .tag_name 2>/dev/null || true)"
-          echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
+          version="$(gh api --paginate "repos/${{ github.repository }}/releases?per_page=100" \
+            --jq '.[] | select(.draft | not) | .tag_name' \
+            | node scripts/find-previous-release.mjs "${{ steps.version.outputs.plain }}")"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
 
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
         with:
@@ -472,9 +475,14 @@ jobs:
         id: image
         run: echo "name=${REGISTRY}/$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
 
+      # scripts/check-release-version.mjs already refused anything but X.Y.Z or X.Y.Z-prerelease, so a hyphen
+      # in the version means a pre-release.
       - name: Normalize tag version
         id: version
-        run: echo "plain=${TAG#v}" >> "$GITHUB_OUTPUT"
+        run: |
+          plain="${TAG#v}"
+          echo "plain=$plain" >> "$GITHUB_OUTPUT"
+          if [[ "$plain" == *-* ]]; then echo "prerelease=true" >> "$GITHUB_OUTPUT"; else echo "prerelease=false" >> "$GITHUB_OUTPUT"; fi
 
       - name: Download Velopack release artifacts
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
@@ -563,11 +571,25 @@ jobs:
             weir-web-dist.zip
             windows-artifact/*
           body_path: release-notes.md
+          prerelease: ${{ steps.version.outputs.prerelease }}
 
       # Last, so `latest` only ever names an image that passed its smoke and has a published release. A copy of
       # the version's manifest list: both architectures, provenance and SBOM included, nothing rebuilt.
+      # A pre-release moves `latest` too, on purpose: pulling the image without a tag and the compose
+      # file's default tag have to resolve to a working image, and while no stable X.Y.Z is published the newest
+      # pre-release is the only image there is. Once a stable release exists `latest` stays on stable releases, so
+      # a later release candidate never replaces the image people run by default.
       - name: Tag the published image latest
         env:
           IMAGE: ${{ steps.image.outputs.name }}
           VERSION: ${{ steps.version.outputs.plain }}
-        run: docker buildx imagetools create --tag "$IMAGE:latest" "$IMAGE:$VERSION"
+          PRERELEASE: ${{ steps.version.outputs.prerelease }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          stable_tags="$(gh api --paginate "repos/${{ github.repository }}/releases?per_page=100" \
+            --jq '.[] | select((.draft | not) and (.prerelease | not)) | .tag_name')"
+          if [ "$PRERELEASE" = "true" ] && [ -n "$stable_tags" ]; then
+            echo "A stable release exists, so latest stays on the stable image."
+            exit 0
+          fi
+          docker buildx imagetools create --tag "$IMAGE:latest" "$IMAGE:$VERSION"
