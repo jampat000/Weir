@@ -66,6 +66,10 @@ public sealed class WeirClient : IDisposable
     public async Task<WeirResponse> DeleteWithCsrfAsync(string path) =>
         await DeleteAsync(path, new Dictionary<string, string> { [CsrfTokenHeader] = await CsrfTokenAsync() });
 
+    /// <summary>DELETE carrying <c>csrf_token</c> in a JSON body, the shape the library, rule-set and connection delete routes take.</summary>
+    public async Task<WeirResponse> DeleteWithCsrfBodyAsync(string path) =>
+        await SendAsync(HttpMethod.Delete, path, JsonBody(new JsonObject { [CsrfTokenField] = await CsrfTokenAsync() }));
+
     /// <summary>Opens a server-sent event stream; only the headers are read before this returns.</summary>
     public async Task<SseReader> OpenStreamAsync(string path)
     {
