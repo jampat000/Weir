@@ -181,14 +181,14 @@ class AuditShellMixin:
         )
         level = self.page.get_by_test_id("logs-level-picker")
         self.click(level, "open the level picker")
-        self.click(
-            self.page.get_by_role("option", name=re.compile(r"^Errors")),
-            "narrow the log to errors",
-        )
+        # The picker offers only the levels the log has entries for, so this takes the first of those.
+        first_level = self.visible(self.page.get_by_role("option").first, "a level the log has entries for")
+        chosen_level = first_level.inner_text().split(" · ")[0].strip()
+        self.click(first_level, "narrow the log to a level")
         self.click(level, "close the level picker")
         self.require(
-            level.inner_text().strip() == "Errors",
-            "the level picker does not say Errors",
+            level.inner_text().strip() == chosen_level,
+            f"the level picker does not say {chosen_level}",
         )
         filters.get_by_role("searchbox", name="Search the log").fill("audit")
         self.click(filters.get_by_test_id("logs-when-picker"), "open the time picker")

@@ -257,9 +257,10 @@ class AuditSettingsMixin:
         self.page.get_by_role("searchbox", name="Search the log").fill("audit")
         level = self.page.get_by_test_id("logs-level-picker")
         self.click(level, "open the level picker")
+        # The picker offers only the levels the log has entries for, so this takes the first of those.
         self.click(
-            self.page.get_by_role("option", name=re.compile(r"^Warnings")),
-            "narrow the log to warnings",
+            self.visible(self.page.get_by_role("option").first, "a level the log has entries for"),
+            "narrow the log to a level",
         )
         self.click(level, "close the level picker")
         self.click(logs.get_by_test_id("logs-export"), "open the log export menu")
