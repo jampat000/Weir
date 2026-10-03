@@ -14,7 +14,7 @@
 
 <p align="center">
   <a href="https://github.com/jampat000/Weir/actions/workflows/ci.yml"><img alt="Test" src="https://github.com/jampat000/Weir/actions/workflows/ci.yml/badge.svg"></a>
-  <a href="https://github.com/jampat000/Weir/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/jampat000/Weir?label=release"></a>
+  <a href="https://github.com/jampat000/Weir/releases"><img alt="Latest release" src="https://img.shields.io/github/v/release/jampat000/Weir?include_prereleases&label=release"></a>
   <a href="https://github.com/jampat000/Weir/pkgs/container/weir"><img alt="Docker" src="https://img.shields.io/badge/docker-ghcr.io%2Fjampat000%2Fweir-blue"></a>
   <a href="LICENSE"><img alt="License: AGPL-3.0" src="https://img.shields.io/badge/license-AGPL--3.0-green"></a>
 </p>
@@ -25,6 +25,8 @@
   <a href="#first-steps">First steps</a> ·
   <a href="https://jampat000.github.io/Weir/">Documentation</a>
 </p>
+
+> **Early days.** Weir is early, and it is in active, hard testing. Expect rough edges. If something is wrong or confusing, please report it on [GitHub issues](https://github.com/jampat000/Weir/issues).
 
 <!-- README_LOCKED_SECTION_START: project-note -->
 ## A note on this project
@@ -204,7 +206,7 @@ A folder layout that works well:
 | I want to… | Do this |
 | --- | --- |
 | Use a different port | Change the left number: `"8080:9347"` puts Weir at `http://your-server-ip:8080` |
-| Pin a version instead of `latest` | `image: ghcr.io/jampat000/weir:X.Y.Z`, with a version from [the releases page](https://github.com/jampat000/Weir/releases) |
+| Pin a version instead of `latest` | `image: ghcr.io/jampat000/weir:1.0.0-rc.1`, or any other version tag from [the releases page](https://github.com/jampat000/Weir/releases) |
 | Use HTTPS through a reverse proxy | Set `WEIR_TRUSTED_PROXY_IPS=<your proxy's IP>`. The sign-in cookie becomes HTTPS-only on its own once requests arrive over HTTPS; set `WEIR_SESSION_COOKIE_SECURE=true` only to force it. See [the reverse proxy guide](https://jampat000.github.io/Weir/docs/deployment/reverse-proxy) |
 | Protect saved API keys with their own secret | Set `WEIR_CREDENTIALS_SECRET` to a long random value (`openssl rand -hex 32`) **before** you add Sonarr or Radarr |
 | Use a GPU | See [hardware acceleration](docker/README.md#hardware-acceleration-and-device-passthrough). It's optional; Weir doesn't re-encode, so you usually don't need it |
@@ -216,7 +218,7 @@ Every Docker option is in [docker/README.md](docker/README.md).
 
 ## Install on Windows
 
-1. Download **`Weir-win-Setup.exe`** from the [latest release](https://github.com/jampat000/Weir/releases/latest).
+1. Download **`Weir-win-Setup.exe`** from the newest release on the [Releases page](https://github.com/jampat000/Weir/releases). While Weir is a pre-release, GitHub's "latest release" link does not show it, so start from the Releases page.
 2. Run it. You don't need admin rights.
 3. Weir asks which port to use the first time it starts. Keep **9347** unless something else uses it.
 4. Your browser opens Weir. Create your account.
@@ -338,7 +340,7 @@ every minute and imports the cleaned file as soon as it appears.
 Weir updates its database itself when it starts. Before a big upgrade, it's worth taking a backup
 in **System › Backups**.
 
-What changed in each version: [release notes](https://github.com/jampat000/Weir/releases).
+What changed in each version: the [release notes](https://github.com/jampat000/Weir/releases), and the [changelog](CHANGELOG.md).
 
 ## Something not working?
 
