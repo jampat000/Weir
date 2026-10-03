@@ -164,10 +164,17 @@
         "dependencies": {
           "Microsoft.Data.Sqlite": "[10.0.12, )",
           "Microsoft.NET.Test.Sdk": "[18.10.1, )",
+          "TimeZoneConverter": "[7.2.0, )",
           "coverlet.collector": "[10.0.1, )",
           "xunit": "[2.9.3, )",
           "xunit.runner.visualstudio": "[4.0.0, )"
         }
+      },
+      "TimeZoneConverter": {
+        "type": "CentralTransitive",
+        "requested": "[7.2.0, )",
+        "resolved": "7.2.0",
+        "contentHash": "4Poqu79dTmacVETqUJ53g3x4U21V/cmWPSlehdsVE4Q00akavvlRq+SRjcg/CmfO9ibOCjRl6TeUV7hkC5RC4w=="
       }
     }
   }
