@@ -8,6 +8,8 @@ whose source is in [`../docs-site/docs`](../docs-site/docs).
 
 - [`../README.md`](../README.md) - what Weir does, installing on Docker and Windows, first steps.
 - [`../docker/README.md`](../docker/README.md) - the full Docker reference: every variable, GPUs, file ownership, network shares.
+- [`install-windows.md`](install-windows.md) - installing, updating and removing Weir on Windows, step by step.
+- [`install-docker.md`](install-docker.md) - installing Weir with Docker, lining up folders with your download client and media manager, updating and backing up.
 - [`docker.md`](docker.md) - short summary of the Docker runtime.
 - [`ports.md`](ports.md) - the ports Weir and its development servers use.
 - [`deployment-model.md`](deployment-model.md) - the supported deployment model: one process, one database.
