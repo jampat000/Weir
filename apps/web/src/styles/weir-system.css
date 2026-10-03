@@ -570,15 +570,6 @@
   line-height: 1.4;
 }
 
-.mm-log-diagnostics__summary {
-  cursor: pointer;
-  list-style: none;
-}
-
-.mm-log-diagnostics__summary::-webkit-details-marker {
-  display: none;
-}
-
 .mm-log-diagnostics[open] .mm-log-diagnostics__show,
 .mm-log-diagnostics:not([open]) .mm-log-diagnostics__hide {
   display: none;

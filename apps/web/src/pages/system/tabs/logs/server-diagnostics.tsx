@@ -40,7 +40,7 @@ export function ServerDiagnostics() {
 
   return (
     <details className="mm-quiet-fold mm-log-diagnostics">
-      <summary className="mm-quiet-fold__head mm-log-diagnostics__summary">
+      <summary className="mm-quiet-fold__head">
         <span
           id="suite-settings-diagnostics-heading"
           className="mm-quiet-fold__title"
