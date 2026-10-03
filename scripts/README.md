@@ -40,7 +40,6 @@ work, not rewritten for its own sake. Scripts are named in kebab-case.
 | `pre-push.mjs` | The pre-push checks `.githooks/pre-push` runs: ruff, prettier, the dead-code guard and API types drift. |
 | `stop-dev-api-port.mjs` | Stops the dev API that this worktree's `npm run dev` started, and nothing else. |
 | `stop-dev-web-port.mjs` | Stops the dev Vite server that this worktree's `npm run dev` started, and nothing else. |
-| `apps/web/dev-sim/` | `npm run dev:sim` in `apps/web`: Vite against a mock of the Weir API that simulates files moving through Weir, for building and reviewing the web app without a server. Node (`.mjs`) like the other repository tooling; its tests run with the web app's (`docs/local-development.md`). |
 | `dev-reset-auth.mjs` | Clears a development database's users and sessions so `/setup` works again. |
 | `dev-ports.json` | The development and production ports every launcher and the Vite config read. |
 | `dev.ps1`, `dev-backend.ps1`, `dev-web.ps1`, `weir-env.ps1`, `dev-reset-auth.ps1`, `verify-local.ps1` | PowerShell dev launchers and checks. `npm run dev` in `apps/web` always starts the API and Vite together and cannot run the server alone; this trio stays for the API-only case (`verify-local.ps1`, manual API testing) and for two separate windows with separate logs. See `docs/local-development.md`. |
