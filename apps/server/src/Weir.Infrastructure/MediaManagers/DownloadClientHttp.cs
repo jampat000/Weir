@@ -3,6 +3,7 @@ using System.Text;
 using Weir.Core.Json;
 using Weir.Core.MediaManagers;
 using Weir.Core.Notifications;
+using Weir.Infrastructure.ConnectionTraffic;
 
 namespace Weir.Infrastructure.MediaManagers;
 
@@ -43,9 +44,14 @@ public sealed class DownloadClientHttpClient
     private readonly string _base;
     private readonly IManagerHttpHandlerFactory _handlers;
     private readonly TimeSpan _timeout;
+    private readonly ConnectionRef? _connection;
 
+    /// <summary>
+    /// A client for the download client at <paramref name="baseUrl"/>. <paramref name="connection"/> is the saved connection it
+    /// talks to, so its calls light that connection up; null for one that is not saved.
+    /// </summary>
     /// <exception cref="DownloadClientHttpException">The base URL is not a plain http(s) address.</exception>
-    public DownloadClientHttpClient(string baseUrl, IManagerHttpHandlerFactory handlers, TimeSpan? timeout = null)
+    public DownloadClientHttpClient(string baseUrl, IManagerHttpHandlerFactory handlers, TimeSpan? timeout = null, ConnectionRef? connection = null)
     {
         ArgumentNullException.ThrowIfNull(baseUrl);
         _handlers = handlers ?? throw new ArgumentNullException(nameof(handlers));
@@ -59,6 +65,7 @@ public sealed class DownloadClientHttpClient
         }
 
         _timeout = timeout ?? TimeSpan.FromSeconds(15);
+        _connection = connection;
     }
 
     public string Url(string path, IReadOnlyList<KeyValuePair<string, string>>? parameters = null)
@@ -70,7 +77,7 @@ public sealed class DownloadClientHttpClient
         }
 
         var url = _base + (path.StartsWith('/') ? path : "/" + path);
-        return parameters is { Count: > 0 } ? url + "?" + TmdbResponses.UrlEncode(parameters) : url;
+        return parameters is { Count: > 0 } ? url + "?" + QueryStrings.Encode(parameters) : url;
     }
 
     /// <summary>A JSON request body, matching how every JSON-RPC dialect here builds one.</summary>
@@ -103,6 +110,7 @@ public sealed class DownloadClientHttpClient
 
         using (request)
         {
+            ConnectionTag.Apply(request, _connection);
             using var client = new HttpClient(_handlers.Handler(followRedirects: false, ManagerAddressPolicy.Local), disposeHandler: false) { Timeout = _timeout };
             HttpResponseMessage response;
             try

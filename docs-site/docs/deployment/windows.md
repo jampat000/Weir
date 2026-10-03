@@ -70,6 +70,8 @@ LAN access is one saved choice, kept in the data folder (`C:\ProgramData\Weir\la
 - you say yes to the question Weir asks once, the first time it starts after installing (not on a `--silent`
   install, which skips it — see below): **"Allow Weir on your network?"**, with a single Windows admin (UAC) prompt;
 - you choose **Allow other devices on your network...** from the tray icon and approve the same admin prompt;
+- an admin chooses **Devices on my network** on **System › About**, which asks you to confirm and then raises the
+  same admin prompt on this PC;
 - a program runs `Weir.exe --allow-lan` (see [Unattended installs](#unattended-installs)).
 
 Saying yes creates one inbound firewall rule named **Weir**, scoped to the installed server
@@ -78,8 +80,8 @@ removes any block rule Windows itself created earlier for that program, for exam
 "blocked some features" prompt was cancelled or never seen. Declining leaves nothing changed, and Weir does not
 ask again automatically.
 
-Changing LAN access restarts Weir, and the tray says so when it is done. **Only allow this PC** in the tray menu
-turns LAN access off again: Weir restarts listening for this PC only. It leaves the firewall rule where it is,
+Changing LAN access restarts Weir, and the tray says so when it is done. **Only allow this PC** in the tray menu,
+or **This PC only** on **System › About**, turns LAN access off again: Weir restarts listening for this PC only. It leaves the firewall rule where it is,
 because with nothing listening for the network the rule lets nothing in, and removing it would need another admin
 prompt. Uninstalling Weir removes the rule when the uninstaller runs as administrator.
 
@@ -88,17 +90,22 @@ were: if Windows already allows Weir's server in (Weir's own **Weir** rule, or a
 someone clicked Allow on its own prompt), LAN access starts on, so devices that reach Weir today still do.
 Otherwise it starts off. Weir saves that answer and does not work it out again.
 
-**System › About** shows the current state plainly:
+**System › About** shows the current state and lets an admin change it, with **This PC only** and **Devices on my
+network** side by side and one line under them:
 
 | What it says | What it means |
 |---|---|
-| Only this PC can reach Weir | LAN access is off. Use the tray item **Allow other devices on your network...** to change it. |
-| Other devices on your network can reach Weir | LAN access is on and Windows Firewall lets the network you are on through. Use **Only allow this PC** to turn it off. |
-| Windows Firewall is blocking other devices | LAN access is on, but a block rule exists, or the allow rule is missing, disabled, or does not cover the network you are on (Public is never covered). **Allow other devices on your network...** fixes the rule. |
+| This PC only | LAN access is off. Choose **Devices on my network** to change it. |
+| Reachable from your network: `http://10.0.0.196:9347` | LAN access is on and Windows Firewall lets the network you are on through. The address is what another device types; **Copy** copies it. Choose **This PC only** to turn it off. |
+| Waiting for approval on your PC's name | You chose **Devices on my network** and Windows Firewall has no rule for Weir yet. Approve the Windows admin prompt on that PC. Weir restarts once you do. |
+| Blocked by Windows Firewall | LAN access is on, but a block rule exists, or the allow rule is missing, disabled, or does not cover the network you are on (Public is never covered), or the admin prompt was declined. **Try again** asks Windows once more. |
 
-This only appears on the Windows package: Docker and a bare source install manage their own network exposure and
-say nothing here. Docker and Linux are unchanged: the server listens on every interface inside the container or
-host, and you publish the port as usual.
+Choosing **Devices on my network** asks you to confirm first, because other devices on your network will be able to
+reach Weir's sign-in page. Only an admin can change it, and each change is recorded in **Activity**.
+
+The setting only works on the Windows package. Docker and a bare source install decide who can reach Weir with
+how they are started, so **System › About** says what decides it there and offers no choice. Docker and Linux are
+unchanged: the server listens on every interface inside the container or host, and you publish the port as usual.
 
 ### Unattended installs
 

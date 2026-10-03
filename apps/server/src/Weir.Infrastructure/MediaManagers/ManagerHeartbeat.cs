@@ -23,9 +23,9 @@ public static class ManagerHealthProbe
         ["native"] = "/api/integrations/external/health",
     };
 
-    /// <summary>Call the kind's health endpoint and describe the answer in plain words.</summary>
+    /// <summary>Call the kind's health endpoint and describe the answer in plain words. <paramref name="connection"/> is the saved connection being tested, so the call lights it up.</summary>
     public static async Task<(bool Ok, string Detail)> ProbeAsync(
-        IManagerHttpHandlerFactory handlers, string name, string kind, string baseUrl, string? apiKey, TimeSpan timeout, CancellationToken cancellationToken)
+        IManagerHttpHandlerFactory handlers, string name, string kind, string baseUrl, string? apiKey, TimeSpan timeout, ConnectionRef? connection, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(handlers);
         if (WireStrings.Strip(baseUrl).Length == 0)
@@ -36,7 +36,7 @@ public static class ManagerHealthProbe
         var path = HealthPaths.GetValueOrDefault(kind, "/api/integrations/external/health");
         try
         {
-            var client = new MediaManagerHttpClient(baseUrl, apiKey ?? string.Empty, handlers, timeout);
+            var client = new MediaManagerHttpClient(baseUrl, apiKey ?? string.Empty, handlers, timeout, connection);
             await client.HealthOkAsync(path, cancellationToken).ConfigureAwait(false);
         }
         catch (MediaManagerHttpException exception)
@@ -78,6 +78,8 @@ public sealed partial class ManagerHeartbeatTask(
 
     public string Name => "media-manager-heartbeat";
 
+    public string? Label => "Check media managers";
+
     public TimeSpan Interval => TimeSpan.FromMinutes(1);
 
     public bool RunAtStart => true;
@@ -98,7 +100,7 @@ public sealed partial class ManagerHeartbeatTask(
         foreach (var row in rows.Where(r => r.Enabled))
         {
             var apiKey = string.IsNullOrEmpty(row.ApiKeyCiphertext) ? null : connections.Cipher.Decrypt(row.ApiKeyCiphertext);
-            var (ok, detail) = await ManagerHealthProbe.ProbeAsync(handlers, row.Label, row.Kind, row.BaseUrl, apiKey, ProbeTimeout, cancellationToken)
+            var (ok, detail) = await ManagerHealthProbe.ProbeAsync(handlers, row.Label, row.Kind, row.BaseUrl, apiKey, ProbeTimeout, ConnectionRef.ForManager(row.Id), cancellationToken)
                 .ConfigureAwait(false);
             if (row.LastTestOk is { } before && before != ok)
             {

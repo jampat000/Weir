@@ -55,7 +55,7 @@ Weir should be easy for coding agents to inspect, modify, validate, and repair w
 ## Feedback loops to prefer
 
 - Server unit tests for service logic, schema behavior, file lifecycle, and worker decisions.
-- Web unit tests for query states, the Processing, History and Library screens, settings flows, and user-facing text.
+- Web unit tests for query states, the Processing, Activity and Library screens, settings flows, and user-facing text.
 - E2E smoke tests for sign-in, navigation, and live refresh.
 - Windows package smoke for installer, tray, startup, and upgrade behavior.
 - Docker smoke for container startup and health.

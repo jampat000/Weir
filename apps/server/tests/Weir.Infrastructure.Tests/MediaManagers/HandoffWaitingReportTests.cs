@@ -5,7 +5,7 @@ using Weir.Infrastructure.MediaManagers;
 namespace Weir.Infrastructure.Tests.MediaManagers;
 
 /// <summary>
-/// #652 item 5: when the manager is not answering, the hand-back report is kept, the file's History says Weir is waiting
+/// #652 item 5: when the manager is not answering, the hand-back report is kept, the file's Activity says Weir is waiting
 /// for it in plain words, and the report goes once the manager answers again (the heartbeat calls
 /// <see cref="HandoffCompletionReporter.SendWaitingReportsAsync"/>).
 /// </summary>

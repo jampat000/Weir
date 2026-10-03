@@ -1,4 +1,4 @@
-"""``AuditSettingsMixin``: the Settings tabs, History and Logs jobs, and every System tab except
+"""``AuditSettingsMixin``: the setup areas, Activity and Logs jobs, and every System tab except
 Alerts and Media managers (those are ``AuditNotificationsMixin``). Assumes ``AuditCore`` and
 ``AuditShellMixin`` (``open_sidebar``, ``open_tab``, ``open_logs``, ``tab_labels``) in the same
 instance.
@@ -6,110 +6,141 @@ instance.
 
 from __future__ import annotations
 
+import re
+
 from .config import TIMEOUT_MS
 
 
 class AuditSettingsMixin:
     def settings_tabs(self) -> None:
-        self.open_sidebar("Settings")
-        self.visible(self.page.get_by_test_id("suite-settings-page"), "Settings page")
         expected = {
-            "Workflows": "processing-libraries-section",
-            "Rules": "processing-rule-set-workspace",
-            "Media managers": "suite-settings-media-managers",
-            "Performance": "processing-process-settings",
-            "Cleanup": "processing-maintenance-section",
-            "Schedule": "processing-schedules-section",
-            "Alerts": "suite-settings-notifications",
+            "Workflows": {
+                "File paths": "processing-libraries-section",
+                "Schedule": "processing-schedules-section",
+            },
+            "Connections": {
+                "Media managers": "suite-settings-media-managers",
+                "Download clients": "suite-settings-download-clients-tab",
+                "Alerts": "suite-settings-notifications",
+            },
+            "Rules": {
+                "Profiles": "processing-rule-set-workspace",
+                "Playback devices": "processing-direct-play-section",
+            },
+            "Performance": {
+                "Speed": "processing-process-settings",
+                "Cleanup": "processing-maintenance-section",
+                "Weir's timers": "processing-timers-section",
+            },
         }
-        labels = self.tab_labels("settings-section-tabs")
-        self.require(labels == list(expected), f"Settings tabs are {labels}")
-        for tab, test_id in expected.items():
-            self.click(
-                self.page.get_by_role("tab", name=tab, exact=True),
-                f"open Settings {tab} tab",
+        # Each setup area is an entry of its own in the side menu, with its tabs across the top of the page.
+        for area, tabs in expected.items():
+            self.open_sidebar(area)
+            self.visible(self.page.get_by_test_id("suite-settings-page"), f"{area} page")
+            self.visible(
+                self.page.get_by_role("heading", level=1, name=area, exact=True),
+                f"{area} page title",
             )
-            self.visible(self.page.get_by_test_id(test_id), f"Settings {tab} panel")
+            self.require(
+                self.tab_labels("setup-area-tabs") == list(tabs),
+                f"{area} does not offer the tabs {list(tabs)}",
+            )
+            for tab, test_id in tabs.items():
+                self.open_tab(area, tab)
+                self.visible(self.page.get_by_test_id(test_id), f"{area} › {tab} panel")
+                self.workflow_and_schedule_checks(tab)
 
-            if tab == "Workflows":
-                self.visible(
-                    self.page.get_by_test_id("workflow-kind-badge").first,
-                    "each workflow says whether it is Weir only or linked to a media manager",
-                )
-                edit_buttons = self.page.get_by_role("button", name="Edit", exact=True)
-                if edit_buttons.count():
-                    self.click(edit_buttons.first, "open workflow editor")
-                    self.visible(
-                        self.page.get_by_test_id("processing-library-form"),
-                        "workflow form",
-                    )
-                    cancel = self.page.get_by_role("button", name="Cancel", exact=True)
-                    if cancel.count():
-                        self.click(cancel.last, "cancel workflow editor")
-            elif tab == "Schedule":
-                # A week per library, the time zone above them (canvas board 6).
-                self.visible(
-                    self.page.get_by_text("Time zone", exact=True),
-                    "time zone control",
-                )
-                self.require(
-                    self.page.get_by_test_id("schedule-library-row").count() > 0,
-                    "no library weeks on Schedule",
-                )
-
-        self.screenshot("settings")
-        self.record(
-            "Settings workflows, rules, media managers, performance, cleanup, schedule, and alerts tabs"
+        self.require(
+            not self.page.get_by_test_id("settings-section-tabs").count(),
+            "Settings still has a row of tabs of its own",
         )
+        self.screenshot("settings")
+        self.record("setup areas: every tab of Workflows, Connections, Rules and Performance")
 
-    def history_and_jobs(self) -> None:
-        # History: every file Weir has touched, with the open file's record beside the list.
-        self.open_sidebar("History")
-        self.visible(self.page.get_by_test_id("history-page"), "History page")
-        chips = self.page.get_by_role("group", name="Show").get_by_role("button")
-        # A skip is its own neutral group rather than counting as Failed, on_hold sits under Needs you,
-        # and Kept lists the files the owner chose to keep without processing.
+    def workflow_and_schedule_checks(self, tab: str) -> None:
+        if tab == "File paths":
+            self.visible(
+                self.page.get_by_test_id("workflow-kind-badge").first,
+                "each workflow says whether it is Weir only or linked to a media manager",
+            )
+            edit_buttons = self.page.get_by_role("button", name="Edit", exact=True)
+            if edit_buttons.count():
+                self.click(edit_buttons.first, "open workflow editor")
+                self.visible(
+                    self.page.get_by_test_id("processing-library-form"),
+                    "workflow form",
+                )
+                cancel = self.page.get_by_role("button", name="Cancel", exact=True)
+                if cancel.count():
+                    self.click(cancel.last, "cancel workflow editor")
+        elif tab == "Schedule":
+            # A week per library, which says where the time zone they are read in is changed.
+            self.visible(
+                self.page.get_by_role("link", name="Change the time zone", exact=True),
+                "link to the time zone in System › About",
+            )
+            self.require(
+                self.page.get_by_test_id("schedule-library-row").count() > 0,
+                "no library weeks on Schedule",
+            )
+
+    def activity_chip_labels(self) -> list[str]:
+        """Every kind-of-file chip on Activity in order, without counts: those on the title line, then the ones
+        folded into More, which is opened to read them and closed again."""
+        group = self.page.get_by_role("group", name="Show")
+        on_line = group.locator("button.mm-segmented__option:not(.mm-more__button)").all_inner_texts()
+        more = group.get_by_role("button", name="More")
+        folded: list[str] = []
+        if more.count():
+            self.click(more, "open the More kinds of file menu")
+            menu = self.page.get_by_role("menu", name="More kinds of file")
+            self.visible(menu, "More kinds of file menu")
+            folded = menu.get_by_role("menuitem").all_inner_texts()
+            self.page.keyboard.press("Escape")
+        return [re.sub(r"\s+[\d,]+$", "", text.strip()) for text in [*on_line, *folded]]
+
+    def activity_and_jobs(self) -> None:
+        # Activity: every file Weir has touched, with the open file's record beside the list.
+        self.open_sidebar("Activity")
+        self.visible(self.page.get_by_test_id("activity-page"), "Activity page")
+        # Needs you is every file waiting on a person, as the sidebar's badge counts them, in whichever group it
+        # is; a skip is its own neutral group rather than counting as Failed, on_hold sits under On hold, and
+        # Kept lists the files the owner chose to keep without processing.
         expected_chip_labels = [
             "All",
             "In progress",
             "Finished",
             "Needs you",
+            "On hold",
             "Skipped",
             "Failed",
             "Kept",
         ]
-        chip_texts = chips.all_inner_texts()
+        chip_labels = self.activity_chip_labels()
         self.require(
-            len(chip_texts) == len(expected_chip_labels)
-            and all(
-                text.startswith(label)
-                for text, label in zip(chip_texts, expected_chip_labels)
-            ),
-            f"History shows {chip_texts!r}, not {expected_chip_labels!r} in order",
+            chip_labels == expected_chip_labels,
+            f"Activity shows {chip_labels!r}, not {expected_chip_labels!r} in order",
         )
         # A fresh install has no files, so assert whichever of the two states is real, and never
         # that the page rendered nothing at all.
-        if self.page.get_by_test_id("history-detail").count():
-            self.visible(self.page.get_by_test_id("history-detail"), "History open file")
+        if self.page.get_by_test_id("activity-detail").count():
+            self.visible(self.page.get_by_test_id("activity-detail"), "Activity open file")
         else:
             self.require(
                 self.page.get_by_text("Nothing yet.", exact=False).count() > 0
                 or self.page.get_by_text("No file matches", exact=False).count() > 0,
-                "History showed neither files nor its empty state",
+                "Activity showed neither files nor its empty state",
             )
         search = self.page.get_by_role("searchbox", name="Find a file")
         search.fill("audit")
         search.press("Enter")
-        self.visible(self.page.get_by_test_id("history-page"), "History after a search")
-        self.screenshot("history")
+        self.visible(self.page.get_by_test_id("activity-page"), "Activity after a search")
+        self.screenshot("activity")
 
-        self.open_logs("Weir's jobs")
-        self.visible(
-            self.page.get_by_test_id("processing-jobs-inspection-section"),
-            "Logs jobs list",
-        )
+        self.open_logs("Jobs")
+        self.visible(self.page.get_by_test_id("log-feed"), "Logs jobs list")
         self.screenshot("logs-jobs")
-        self.record("History: every file and its record; Logs: Weir's jobs")
+        self.record("Activity: every file and its record; Logs: Weir's jobs")
 
     def system_instance_and_setup(self) -> None:
         self.open_sidebar("System")
@@ -123,7 +154,7 @@ class AuditSettingsMixin:
             self.page.get_by_test_id("suite-settings-global"), "System › About"
         )
         self.require(
-            self.page.get_by_text("What Weir works with", exact=True).count()
+            self.page.get_by_text("Media tools", exact=True).count()
             > 0,
             "runtime facts are missing from About",
         )
@@ -155,11 +186,7 @@ class AuditSettingsMixin:
         )
 
         # Exercise the wizard's supported re-entry path, then leave it with the safe skip action so
-        # the disposable audit account remains usable. It folds away because it is run once.
-        self.click(
-            self.page.get_by_role("heading", name="Setup wizard", exact=True),
-            "open the Setup wizard group",
-        )
+        # the disposable audit account remains usable.
         self.click(
             self.page.get_by_test_id("suite-settings-open-setup-wizard"),
             "open setup wizard from System",
@@ -198,41 +225,51 @@ class AuditSettingsMixin:
         )
         self.require(
             self.page.get_by_role(
-                "button", name="Download configuration now", exact=True
+                "button", name="Download settings", exact=True
             ).count()
             > 0,
             "configuration download control missing",
         )
         with self.page.expect_download(timeout=TIMEOUT_MS) as download_info:
             self.page.get_by_role(
-                "button", name="Download configuration now", exact=True
+                "button", name="Download settings", exact=True
             ).click()
         self.require(
             download_info.value.suggested_filename.endswith(".json"),
             "configuration export is not JSON",
         )
 
-        self.open_logs("Server log")
-        logs = self.visible(
-            self.page.get_by_test_id("suite-settings-logs"), "server log panel"
+        self.open_logs("Server")
+        logs = self.visible(self.page.get_by_test_id("logs-card"), "server log panel")
+        self.click(
+            self.page.get_by_role("button", name="Log settings", exact=True),
+            "open the Log settings",
         )
         self.visible(
-            logs.get_by_text("Server diagnostics", exact=True),
+            self.page.get_by_text("Server diagnostics", exact=True),
             "server diagnostics disclosure",
         )
-        logs.get_by_placeholder(
-            "Search message, detail, traceback, logger, or source"
-        ).fill("audit")
-        # Scoped to the log panel: the Show choice above it is a select too.
-        level_select = logs.locator("select").first
-        if level_select.count():
-            level_select.select_option(index=1)
-        toggles = logs.get_by_role("radio")
-        if toggles.count() >= 2:
-            toggles.last.click()
-        refresh = logs.get_by_role("button", name="Refresh →", exact=True)
-        if refresh.count():
-            self.click(refresh, "refresh server log")
+        self.visible(
+            self.page.get_by_text("How long things are kept", exact=True),
+            "how long things are kept",
+        )
+        self.page.keyboard.press("Escape")
+        self.page.get_by_role("searchbox", name="Search the log").fill("audit")
+        level = self.page.get_by_test_id("logs-level-picker")
+        self.click(level, "open the level picker")
+        # The picker offers only the levels the log has entries for, so this takes the first of those.
+        self.click(
+            self.visible(self.page.get_by_role("option").first, "a level the log has entries for"),
+            "narrow the log to a level",
+        )
+        self.click(level, "close the level picker")
+        self.click(logs.get_by_test_id("logs-export"), "open the log export menu")
+        with self.page.expect_download(timeout=TIMEOUT_MS) as log_download:
+            self.page.get_by_role("menuitem", name=re.compile("Whole server log")).click()
+        self.require(
+            log_download.value.suggested_filename.endswith(".log"),
+            "the whole server log did not download as a .log file",
+        )
 
         self.open_tab("System", "Security")
         self.visible(

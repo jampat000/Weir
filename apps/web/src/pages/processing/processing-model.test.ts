@@ -13,6 +13,7 @@ import {
   mergeWorkingFiles,
   prettyName,
   secondsLeft,
+  workSourceOfJobKind,
 } from "./processing-model";
 import {
   ago,
@@ -155,7 +156,7 @@ describe("buildLanes", () => {
     expect(lanes.arriving[0].upstream).toBe(false);
   });
 
-  it("counts a file Weir gave up on as stuck, not arriving", () => {
+  it("leaves a file Weir gave up on out of arriving", () => {
     const lanes = buildLanes(
       [file({ status: "processing_failed", failure_attempts: 3 })],
       [],
@@ -163,7 +164,6 @@ describe("buildLanes", () => {
       AGES,
     );
     expect(lanes.arriving).toHaveLength(0);
-    expect(lanes.stuck).toHaveLength(1);
   });
 
   it("shows a file the media manager is still importing as arriving, with no clock", () => {
@@ -239,7 +239,7 @@ describe("buildLanes", () => {
     expect(lanes.handing.map((item) => item.key)).toEqual(["file-2"]);
   });
 
-  it("counts a failed file as stuck and leaves finished files out", () => {
+  it("leaves failed and finished files out of the lanes", () => {
     const lanes = buildLanes(
       [
         file({ id: 1, status: "processing_failed" }),
@@ -249,7 +249,6 @@ describe("buildLanes", () => {
       NAMES,
       AGES,
     );
-    expect(lanes.stuck.map((f) => f.id)).toEqual([1]);
     expect(lanes.waiting).toHaveLength(0);
   });
 
@@ -295,6 +294,28 @@ describe("buildLanes", () => {
       "file-3",
       "file-1",
       "file-2",
+    ]);
+  });
+
+  it("keeps running passes in the same order, whatever order the server lists their files in", () => {
+    const running = (id: number) =>
+      file({
+        id,
+        status: "processing",
+        progress_status: "processing",
+        progress_percent: 40,
+      });
+    const lanes = buildLanes(
+      [running(10), running(9), running(100)],
+      [],
+      NAMES,
+      AGES,
+    );
+
+    expect(lanes.working.map((item) => item.key)).toEqual([
+      "file-9",
+      "file-10",
+      "file-100",
     ]);
   });
 });
@@ -564,9 +585,7 @@ describe("words and numbers", () => {
     expect(finishedLine(base)).toBe(
       "Saved 318 MB · removed 4 audio, 6 subtitles",
     );
-    expect(finishedLine({ ...base, kind: "already" })).toBe(
-      "Already right · nothing to change",
-    );
+    expect(finishedLine({ ...base, kind: "already" })).toBe("Already clean");
     expect(
       finishedLine({
         ...base,
@@ -671,5 +690,30 @@ describe("an arriving file's ring", () => {
     // A file with its own hold counts down to that, not to the next look.
     expect(arrivingDeadline(timed)).toBe(Date.parse("2026-08-18T10:00:30Z"));
     expect(timed.nextLook).toBeNull();
+  });
+});
+
+describe("which kind of work a job is", () => {
+  it("calls a file's pass and the scan of a watched folder new-download work", () => {
+    expect(workSourceOfJobKind("processing.file.remux_pass.v1")).toBe(
+      "download",
+    );
+    expect(
+      workSourceOfJobKind("processing.watched_folder.remux_scan_dispatch.v1"),
+    ).toBe("download");
+  });
+
+  it("calls a library's scan and clean library work", () => {
+    expect(workSourceOfJobKind(LIBRARY_CLEAN_JOB_KIND)).toBe("library");
+    expect(workSourceOfJobKind("processing.library.scan.v1")).toBe("library");
+  });
+
+  it("calls housekeeping neither", () => {
+    expect(
+      workSourceOfJobKind("processing.work_temp_stale_sweep.v1"),
+    ).toBeNull();
+    expect(
+      workSourceOfJobKind("processing.unclaimed_handback_cleanup.v1"),
+    ).toBeNull();
   });
 });

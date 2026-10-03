@@ -8,6 +8,13 @@
 .mm-quiet-table-wrap {
   position: relative;
   overflow-x: auto;
+  /* Room at both sides for what reaches past a cell's edge: a focus ring on the first column, the shadow of a held row.
+     The negative margin gives the width back, so the table is as wide as it was. */
+  margin-inline: -8px;
+  padding-inline: 8px;
+  /* A table stacks into rows by the room its panel gives it, which the side menu and the panel's padding
+     both take from, rather than by the window's width. */
+  container-type: inline-size;
 }
 
 .mm-quiet-table {
@@ -18,7 +25,7 @@
 
 .mm-quiet-table thead th {
   padding: 0 0.75rem 0.6rem;
-  border-bottom: 1px solid var(--mm-line);
+  border-bottom: 1px solid var(--mm-hairline);
   color: var(--mm-text3);
   font-size: var(--mm-type-eyebrow);
   font-weight: 600;
@@ -31,7 +38,7 @@
 .mm-quiet-table tbody th,
 .mm-quiet-table tbody td {
   padding: 0.85rem 0.75rem;
-  border-bottom: 1px solid var(--mm-border);
+  border-bottom: 1px solid var(--mm-hairline);
   color: var(--mm-text2);
   font-weight: 400;
   text-align: left;
@@ -65,10 +72,32 @@
   margin-right: 0.4rem;
 }
 
+/* A chip in a table cell wraps in a narrow column rather than running out of it. */
+.mm-quiet-table td .mm-chip {
+  height: auto;
+  min-height: 24px;
+  padding-top: 3px;
+  padding-bottom: 3px;
+  line-height: 1.25;
+  white-space: normal;
+}
+
+/* A chip beside a row's name keeps a gap from it and from the next chip. */
+.mm-quiet-table__name .mm-chip {
+  margin: 0 0 0 0.4rem;
+  vertical-align: 0.1em;
+}
+
 .mm-quiet-table__strong {
   display: block;
   color: var(--mm-text1);
   font-weight: 500;
+}
+
+/* A field on a row of a table is the row's height, with the row's buttons. */
+.mm-quiet-table .mm-input {
+  min-height: var(--mm-control-height-row);
+  padding-block: 0.125rem;
 }
 
 .mm-quiet-table__sub {
@@ -81,25 +110,7 @@
   overflow-wrap: anywhere;
 }
 
-.mm-quiet-badge {
-  display: inline-block;
-  margin: 0.1rem 0.3rem 0 0;
-  padding: 0 0.45rem;
-  border: 1px solid var(--mm-border);
-  border-radius: var(--mm-radius-pill);
-  color: var(--mm-text2);
-  font-size: 0.72rem;
-  font-weight: 500;
-  line-height: 1.6;
-  vertical-align: 0.05em;
-}
-
-.mm-quiet-badge--off {
-  border-color: var(--mm-warning-border);
-  color: var(--mm-status-warning-text);
-}
-
-@media (max-width: 760px) {
+@container (max-width: 760px) {
   .mm-quiet-table thead {
     position: absolute;
     width: 1px;
@@ -140,26 +151,12 @@
     font-size: var(--mm-type-caption);
   }
 
+  /* What a cell holds, however many parts, stays in the value column beside its label. */
+  .mm-quiet-table tbody td > * {
+    grid-column: 2;
+  }
+
   .mm-quiet-table__name {
     padding-bottom: 0.3rem;
   }
-}
-
-/* The jobs table keeps its header and Job column pinned while it scrolls sideways, and asks for room
- * for its five columns, only while it is a table: at 760px and below it stacks into rows, above. */
-@media (min-width: 761px) {
-  .mm-jobs-table {
-    min-width: 46rem;
-  }
-
-  .mm-jobs-table__head,
-  .mm-jobs-table__job {
-    position: sticky;
-  }
-}
-
-/* The kind of a workflow: linked to a media manager, or Weir only. */
-.mm-workflow-badge--linked {
-  border-color: var(--mm-accent-bright);
-  color: var(--mm-accent-bright);
 }

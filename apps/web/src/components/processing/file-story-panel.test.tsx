@@ -1,7 +1,14 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from "@testing-library/react";
 import { expect, it, vi } from "vitest";
 
 import type { ProcessingFileLog } from "../../lib/processing/files-api";
+import { WithWorkflows } from "../../test/with-workflows";
 import { FileStoryPanel } from "./file-story-panel";
 
 vi.mock("../../lib/settings/queries", () => ({
@@ -46,15 +53,17 @@ function mount(
 ) {
   const onClose = vi.fn();
   render(
-    <FileStoryPanel
-      open
-      fileName="Arrival.mkv"
-      log={log()}
-      loading={false}
-      error={null}
-      onClose={onClose}
-      {...props}
-    />,
+    <WithWorkflows>
+      <FileStoryPanel
+        open
+        fileName="Arrival.mkv"
+        log={log()}
+        loading={false}
+        error={null}
+        onClose={onClose}
+        {...props}
+      />
+    </WithWorkflows>,
   );
   return { onClose };
 }
@@ -101,16 +110,14 @@ it("shows a rejection as a Rejected step with its reason, not as Could not finis
 
 it("keeps the technical detail behind a disclosure, never leading", () => {
   mount();
-  const summary = screen.getByText("Show the technical detail");
+  const summary = screen.getByText("Technical detail");
   expect(summary.closest("details")).not.toHaveAttribute("open");
 });
 
-it("says how long a file's history is kept once the file is gone", () => {
+it("says how long a file's activity is kept once the file is gone", () => {
   mount();
   expect(
-    screen.getByText(
-      "Weir keeps this history while it still knows the file, then for 90 days after the file is gone.",
-    ),
+    screen.getByText("Kept while the file exists, then 90 days."),
   ).toBeInTheDocument();
 });
 
@@ -122,7 +129,7 @@ it("closes on Escape", () => {
 
 it("closes from the backdrop and the close button", () => {
   const { onClose } = mount();
-  fireEvent.click(screen.getByRole("button", { name: "Close file history" }));
+  fireEvent.click(screen.getByRole("button", { name: "Close file activity" }));
   fireEvent.click(screen.getByRole("button", { name: "Close" }));
   expect(onClose).toHaveBeenCalledTimes(2);
 });
@@ -134,9 +141,7 @@ it("takes focus when it opens", () => {
 
 it("explains an empty record rather than showing nothing", () => {
   mount({ log: log({ entries: [] }) });
-  expect(
-    screen.getByText(/has not worked on this file yet/),
-  ).toBeInTheDocument();
+  expect(screen.getByText(/hasn.t worked on this file/)).toBeInTheDocument();
 });
 
 it("shows a failure to load", () => {
@@ -150,4 +155,89 @@ it("shows a failure to load", () => {
 it("renders nothing while closed", () => {
   mount({ open: false });
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+});
+
+it("shows the title's poster beside the name, and the initials when it has none", () => {
+  mount({
+    poster: {
+      url: "/api/v1/artwork/posters/movie-arrival-2016",
+      workflow: "Films",
+    },
+  });
+
+  expect(screen.getByRole("img", { name: "Arrival.mkv" })).toHaveAttribute(
+    "src",
+    "/api/v1/artwork/posters/movie-arrival-2016",
+  );
+});
+
+it("shows no poster for a file whose panel was given none", () => {
+  mount();
+
+  expect(screen.queryByRole("img")).toBeNull();
+});
+
+it("tints the poster's tile for the file's workflow, and for a workflow that is gone", () => {
+  mount({ poster: { url: null, workflow: "TV" } });
+  expect(
+    (
+      screen.getByRole("dialog").querySelector(".mm-tile") as HTMLElement
+    ).style.getPropertyValue("--tile-hue"),
+  ).toBe("265");
+  cleanup();
+
+  mount({ poster: { url: null, workflow: "Films" } });
+  expect(
+    (
+      screen.getByRole("dialog").querySelector(".mm-tile") as HTMLElement
+    ).style.getPropertyValue("--tile-hue"),
+  ).toBe("205");
+});
+
+it("says where a file is now, with how far through it is, instead of saying nothing has happened", () => {
+  mount({
+    log: log({ entries: [] }),
+    now: {
+      stage: "Processing",
+      status: "39% · 16 s left",
+      working: true,
+      progress: 39,
+      facts: ["Speed 479× real time", "Removing 4 audio, 2 subtitles"],
+    },
+  });
+
+  const now = screen.getByRole("region", { name: "Right now" });
+  expect(now).toHaveTextContent("Processing");
+  expect(now).toHaveTextContent("39% · 16 s left");
+  expect(within(now).getByRole("progressbar")).toHaveAttribute(
+    "aria-valuenow",
+    "39",
+  );
+  expect(now).toHaveTextContent("Speed 479× real time");
+  expect(screen.queryByText(/Nothing yet/)).not.toBeInTheDocument();
+  expect(screen.getByText(/shows here once it has finished/)).toBeVisible();
+});
+
+it("leaves the bar out for a file that is only waiting", () => {
+  mount({
+    log: log({ entries: [] }),
+    now: {
+      stage: "Queued",
+      status: "Waiting its turn",
+      working: false,
+      progress: null,
+      facts: [],
+    },
+  });
+
+  expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
+});
+
+it("says nothing has happened to a file that is neither on the Pipeline nor has any activity", () => {
+  mount({ log: log({ entries: [] }) });
+
+  expect(screen.getByText(/Nothing yet/)).toBeVisible();
+  expect(
+    screen.queryByRole("region", { name: "Right now" }),
+  ).not.toBeInTheDocument();
 });

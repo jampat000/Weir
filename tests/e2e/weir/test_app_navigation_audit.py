@@ -6,7 +6,7 @@ import re
 import pytest
 from playwright.sync_api import expect, sync_playwright
 
-from ._helpers import ensure_signed_in, open_logs, open_sidebar, open_tab
+from ._helpers import activity_chip_labels, ensure_signed_in, open_logs, open_sidebar, open_tab
 
 pytestmark = [
     pytest.mark.weir_e2e,
@@ -16,15 +16,55 @@ pytestmark = [
     ),
 ]
 
-# Settings tab -> what it shows. Settings is about your media; Weir itself is System.
-SETTINGS_TABS = (
-    ("Workflows", "processing-libraries-section"),
-    ("Rules", "processing-rule-set-workspace"),
-    ("Media managers", "suite-settings-media-managers"),
-    ("Performance", "processing-process-settings"),
-    ("Cleanup", "processing-maintenance-section"),
-    ("Schedule", "processing-schedules-section"),
-    ("Alerts", "suite-settings-notifications"),
+# Setup area (an entry of its own in the side menu) -> its address, and each of its tabs with the address and the
+# content it shows. The first tab is at the area's own address. Weir itself is System, not Setup.
+SETUP_AREAS = (
+    (
+        "Workflows",
+        "/setup/workflows",
+        (
+            ("File paths", "/setup/workflows", "processing-libraries-section"),
+            ("Schedule", "/setup/workflows/schedule", "processing-schedules-section"),
+        ),
+    ),
+    (
+        "Connections",
+        "/setup/connections",
+        (
+            ("Media managers", "/setup/connections", "suite-settings-media-managers"),
+            ("Download clients", "/setup/connections/download-clients", "suite-settings-download-clients-tab"),
+            ("Alerts", "/setup/connections/alerts", "suite-settings-notifications"),
+        ),
+    ),
+    (
+        "Rules",
+        "/setup/rules",
+        (
+            ("Profiles", "/setup/rules", "processing-rule-set-workspace"),
+            ("Playback devices", "/setup/rules/devices", "processing-direct-play-section"),
+        ),
+    ),
+    (
+        "Performance",
+        "/setup/performance",
+        (
+            ("Speed", "/setup/performance", "processing-process-settings"),
+            ("Cleanup", "/setup/performance/cleanup", "processing-maintenance-section"),
+            ("Weir's timers", "/setup/performance/timers", "processing-timers-section"),
+        ),
+    ),
+)
+
+# Former Settings addresses, and the setup tab each one lands on.
+FORMER_SETTINGS_ADDRESSES = (
+    ("/settings", "/setup/workflows", "processing-libraries-section"),
+    ("/settings?tab=libraries", "/setup/workflows", "processing-libraries-section"),
+    ("/settings?tab=rules", "/setup/rules", "processing-rule-set-workspace"),
+    ("/settings?tab=media-managers", "/setup/connections", "suite-settings-media-managers"),
+    ("/settings?tab=performance", "/setup/performance", "processing-process-settings"),
+    ("/settings?tab=schedule", "/setup/workflows/schedule", "processing-schedules-section"),
+    ("/settings?tab=cleanup", "/setup/performance/cleanup", "processing-maintenance-section"),
+    ("/settings?tab=alerts", "/setup/connections/alerts", "suite-settings-notifications"),
 )
 
 
@@ -38,19 +78,25 @@ def test_signed_in_navigation_covers_main_screens_and_tabs(weir_shell: str) -> N
 
             ensure_signed_in(page, base)
 
-            # Five places: Processing (the landing screen), History, Library, Settings and System.
+            # The Dashboard (the landing screen) and Activity, Library, each setup area, then System.
             primary = page.get_by_role("navigation", name="Primary")
-            # The labels, not the links: the Processing link also carries its "1 working" badge while a file runs.
+            # The labels, not the links: the Dashboard link also carries its "1 working" badge while a file runs.
             expect(primary.locator(".mm-sidebar-link-label")).to_have_text(
-                ["Processing", "History", "Library", "Settings", "System"]
+                [
+                    "Dashboard",
+                    "Activity",
+                    "Library",
+                    *[label for label, _, _ in SETUP_AREAS],
+                    "System",
+                ]
             )
-            for retired in ("Home", "Dashboard", "Activity"):
+            for retired in ("Home", "Processing", "History"):
                 expect(page.get_by_role("link", name=retired, exact=True)).to_have_count(0)
 
-            open_sidebar(page, "Processing")
+            open_sidebar(page, "Dashboard")
             expect(page).to_have_url(re.compile(r".*/(?:$|[?#])"))
             expect(page.get_by_test_id("processing-page")).to_be_visible()
-            expect(page.get_by_role("heading", name="Processing", exact=True)).to_be_visible()
+            expect(page.get_by_role("heading", name="Dashboard", exact=True)).to_be_visible()
             # A retired address gets the not-found page, not a hidden alias.
             page.goto(f"{base}/dashboard", wait_until="domcontentloaded")
             expect(page.get_by_role("heading", name="This page doesn't exist.", exact=True)).to_be_visible()
@@ -58,35 +104,52 @@ def test_signed_in_navigation_covers_main_screens_and_tabs(weir_shell: str) -> N
             expect(page.get_by_test_id("processing-page")).to_be_visible()
 
             # Every file Weir has touched, with what it kept and removed.
-            open_sidebar(page, "History")
-            expect(page).to_have_url(re.compile(r".*/history(?:$|[?#])"))
-            expect(page.get_by_test_id("history-page")).to_be_visible()
-            # A skip is its own neutral group rather than counting as Failed, on_hold sits under Needs you,
-            # and Kept lists the files the owner chose to keep without processing.
-            expect(page.get_by_role("group", name="Show").get_by_role("button")).to_have_text(
-                [
-                    re.compile(r"^All\s"),
-                    re.compile(r"^In progress\s"),
-                    re.compile(r"^Finished\s"),
-                    re.compile(r"^Needs you\s"),
-                    re.compile(r"^Skipped\s"),
-                    re.compile(r"^Failed\s"),
-                    re.compile(r"^Kept\s"),
-                ]
-            )
+            open_sidebar(page, "Activity")
+            expect(page).to_have_url(re.compile(r".*/activity(?:$|[?#])"))
+            expect(page.get_by_test_id("activity-page")).to_be_visible()
+            # Needs you is every file waiting on a person, as the sidebar's badge counts them, in whichever group it
+            # is; a skip is its own neutral group rather than counting as Failed, on_hold sits under On hold, and
+            # Kept lists the files the owner chose to keep without processing.
+            # At Playwright's 1280x720 the last chips may have folded into More, so the whole set is the chips on the
+            # title line plus the menu's entries.
+            assert activity_chip_labels(page) == [
+                "All",
+                "In progress",
+                "Finished",
+                "Needs you",
+                "On hold",
+                "Skipped",
+                "Failed",
+                "Kept",
+            ]
+
+            # History was this page's name: an old link or bookmark lands here with its filters.
+            page.goto(f"{base}/history?show=failed&within=all", wait_until="domcontentloaded")
+            expect(page).to_have_url(re.compile(r".*/activity\?show=failed&within=all$"))
+            expect(page.get_by_test_id("activity-page")).to_be_visible()
 
             open_sidebar(page, "Library")
             expect(page).to_have_url(re.compile(r".*/library(?:$|[?#])"))
             expect(page.get_by_test_id("library-page")).to_be_visible()
 
-            open_sidebar(page, "Settings")
-            expect(page).to_have_url(re.compile(r".*/settings(?:$|[?#])"))
-            expect(page.get_by_test_id("suite-settings-page")).to_be_visible()
-            settings_tabs = page.get_by_test_id("settings-section-tabs").get_by_role("tab")
-            expect(settings_tabs).to_have_text([label for label, _ in SETTINGS_TABS])
-            for label, section in SETTINGS_TABS:
-                page.get_by_role("tab", name=label, exact=True).click()
-                expect(page.get_by_test_id(section)).to_be_visible()
+            # Each setup area has a row of tabs of its own: the side menu is the way between areas, the tabs are the
+            # way within one, and the header names the area showing. Every tab has its own address.
+            for label, address, tabs in SETUP_AREAS:
+                open_sidebar(page, label)
+                expect(page).to_have_url(re.compile(rf".*{address}$"))
+                expect(page.get_by_test_id("suite-settings-page")).to_be_visible()
+                expect(page.get_by_role("heading", level=1, name=label, exact=True)).to_be_visible()
+                expect(page.get_by_test_id("setup-area-tabs").get_by_role("tab")).to_have_text(
+                    [tab_label for tab_label, _, _ in tabs]
+                )
+                for tab_label, tab_address, section in tabs:
+                    page.get_by_role("tab", name=tab_label, exact=True).click()
+                    expect(page).to_have_url(re.compile(rf".*{tab_address}$"))
+                    expect(page.get_by_role("tab", name=tab_label, exact=True)).to_have_attribute(
+                        "aria-selected", "true"
+                    )
+                    expect(page.get_by_test_id(section)).to_be_visible()
+            expect(page.get_by_test_id("settings-section-tabs")).to_have_count(0)
 
             open_sidebar(page, "System")
             expect(page).to_have_url(re.compile(r".*/system(?:$|[?#])"))
@@ -95,9 +158,9 @@ def test_signed_in_navigation_covers_main_screens_and_tabs(weir_shell: str) -> N
                 ["About", "Backups", "Security", "Logs"]
             )
             expect(page.get_by_test_id("suite-settings-global")).to_be_visible()
-            expect(page.get_by_text("Setup wizard", exact=True)).to_be_visible()
-            # The time zone lives in Settings › Schedule, beside the times it governs.
-            expect(page.get_by_text("Time zone", exact=True)).to_have_count(0)
+            expect(page.get_by_test_id("suite-settings-open-setup-wizard")).to_be_visible()
+            # The time zone is Weir-wide, so it is set here, in the "This PC" card.
+            expect(page.get_by_text("Time zone", exact=True)).to_be_visible()
             expect(page.get_by_text("Updates", exact=True)).to_be_visible()
             # There is no display density setting.
             expect(page.get_by_text("Display density", exact=False)).to_have_count(0)
@@ -109,35 +172,51 @@ def test_signed_in_navigation_covers_main_screens_and_tabs(weir_shell: str) -> N
 
             open_logs(page)
             expect(page).to_have_url(re.compile(r".*/system\?tab=logs(?:$|[&#])"))
-            expect(page.get_by_test_id("activity-feed")).to_be_visible()
-            expect(page.get_by_test_id("activity-summary")).to_contain_text("Showing")
-            # Weir is one app: no Module filter.
+            expect(page.get_by_test_id("log-feed")).to_be_visible()
+            expect(page.get_by_test_id("log-summary")).to_contain_text("entries")
+            # Weir is one app: no Module filter, and no Apply button: a filter applies as it is chosen.
             expect(page.get_by_text("All modules", exact=True)).to_have_count(0)
+            expect(page.get_by_role("button", name="Apply filters", exact=True)).to_have_count(0)
 
-            open_logs(page, "Weir's jobs")
-            expect(page.get_by_test_id("processing-jobs-inspection-section")).to_be_visible()
+            # Events, jobs and the server log are one list, told apart by the Source chips.
+            open_logs(page, "Jobs")
+            expect(page).to_have_url(re.compile(r".*/system\?tab=logs&source=job"))
+            expect(page.get_by_test_id("log-feed")).to_be_visible()
 
-            open_logs(page, "Server log")
-            expect(page.get_by_test_id("suite-settings-logs")).to_be_visible()
-            expect(page.get_by_text("Showing now", exact=False)).to_be_visible()
-            expect(page.get_by_text("Matching events", exact=False)).to_be_visible()
-            expect(page.get_by_text("Server diagnostics", exact=True)).to_be_visible()
-            expect(page.get_by_text("System events", exact=True)).to_be_visible()
+            open_logs(page, "Server")
+            expect(page.get_by_test_id("log-feed")).to_be_visible()
+            expect(page.get_by_test_id("logs-export")).to_be_visible()
 
-            # Addresses users may have saved (/activity and the Processing tabs) land on the same thing
-            # in its current place.
-            page.goto(f"{base}/activity", wait_until="domcontentloaded")
-            expect(page).to_have_url(re.compile(r".*/system\?tab=logs$"))
-            expect(page.get_by_test_id("activity-feed")).to_be_visible()
+            # How long things are kept, and the server's counters, are in the Log settings the Log card opens.
+            expect(page.get_by_text("Server diagnostics", exact=True)).to_have_count(0)
+            page.get_by_role("button", name="Log settings", exact=True).click()
+            settings = page.get_by_role("dialog", name="Log settings")
+            expect(settings.get_by_text("Server diagnostics", exact=True)).to_be_visible()
+            expect(settings.get_by_text("How long things are kept", exact=True)).to_be_visible()
+            page.keyboard.press("Escape")
+            expect(settings).to_have_count(0)
+
+            # The address Logs had for its server list lands on the Server source.
+            page.goto(f"{base}/system?tab=logs&show=server", wait_until="domcontentloaded")
+            server_chip = page.get_by_role("group", name="Source").get_by_role("button", name=re.compile(r"^Server"))
+            expect(server_chip).to_have_attribute("aria-pressed", "true")
+
+            # Addresses users may have saved (the Processing tabs) land on the same thing in its current place.
             for old_tab, new_address, section in (
-                ("jobs", r"/system\?tab=logs&show=jobs", "processing-jobs-inspection-section"),
-                ("files", r"/history", "history-page"),
-                ("libraries", r"/settings\?tab=libraries", "processing-libraries-section"),
-                ("audio-subtitles", r"/settings\?tab=rules", "processing-rule-set-workspace"),
-                ("schedules", r"/settings\?tab=schedule", "processing-schedules-section"),
-                ("maintenance", r"/settings\?tab=cleanup", "processing-maintenance-section"),
+                ("jobs", r"/system\?tab=logs&source=job", "log-feed"),
+                ("files", r"/activity", "activity-page"),
+                ("libraries", r"/setup/workflows", "processing-libraries-section"),
+                ("audio-subtitles", r"/setup/rules", "processing-rule-set-workspace"),
+                ("schedules", r"/setup/workflows/schedule", "processing-schedules-section"),
+                ("maintenance", r"/setup/performance/cleanup", "processing-maintenance-section"),
             ):
                 page.goto(f"{base}/processing?tab={old_tab}", wait_until="domcontentloaded")
+                expect(page).to_have_url(re.compile(rf".*{new_address}$"))
+                expect(page.get_by_test_id(section)).to_be_visible()
+
+            # So do the Settings addresses, which are the setup areas now.
+            for old_address, new_address, section in FORMER_SETTINGS_ADDRESSES:
+                page.goto(f"{base}{old_address}", wait_until="domcontentloaded")
                 expect(page).to_have_url(re.compile(rf".*{new_address}$"))
                 expect(page.get_by_test_id(section)).to_be_visible()
         finally:

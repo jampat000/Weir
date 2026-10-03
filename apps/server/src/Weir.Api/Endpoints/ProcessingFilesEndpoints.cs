@@ -6,8 +6,8 @@ using Weir.Core.Auth;
 using Weir.Core.Jobs;
 using Weir.Core.Json;
 using Weir.Core.Processing;
-using Weir.Core.Time;
 using Weir.Core.Validation;
+using Weir.Infrastructure.Artwork;
 using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.MediaManagers;
 using Weir.Infrastructure.Processing;
@@ -56,6 +56,7 @@ internal sealed class ProcessingFilesEndpointHandlers
     private readonly ProcessingJobStore _jobs;
     private readonly LibraryStore _libraries;
     private readonly HistoryFileRemovalService _removal;
+    private readonly ArtworkPosterUrls _posters;
 
     public ProcessingFilesEndpointHandlers(
         FileStateStore files,
@@ -64,7 +65,8 @@ internal sealed class ProcessingFilesEndpointHandlers
         HandbackStore handback,
         ProcessingJobStore jobs,
         LibraryStore libraries,
-        HistoryFileRemovalService removal)
+        HistoryFileRemovalService removal,
+        ArtworkPosterUrls posters)
     {
         _files = files ?? throw new ArgumentNullException(nameof(files));
         _directPlay = directPlay ?? throw new ArgumentNullException(nameof(directPlay));
@@ -73,9 +75,10 @@ internal sealed class ProcessingFilesEndpointHandlers
         _jobs = jobs ?? throw new ArgumentNullException(nameof(jobs));
         _libraries = libraries ?? throw new ArgumentNullException(nameof(libraries));
         _removal = removal ?? throw new ArgumentNullException(nameof(removal));
+        _posters = posters ?? throw new ArgumentNullException(nameof(posters));
     }
 
-    private static WireObject FileOut(ProcessingFileRecord row, string libraryName, List<DirectPlayBadge> directPlay, LiveProgress? progress)
+    private static WireObject FileOut(ProcessingFileRecord row, string libraryName, List<DirectPlayBadge> directPlay, LiveProgress? progress, string? posterUrl)
     {
         return new WireObject()
             .Set("kind", HistoryEntryKinds.Download)
@@ -83,6 +86,7 @@ internal sealed class ProcessingFilesEndpointHandlers
             .Set("library_id", row.LibraryId)
             .Set("library_name", libraryName)
             .Set("relative_path", row.RelativePath)
+            .Set("poster_url", posterUrl)
             .Set("status", row.Status)
             .Set("status_reason", row.StatusReason)
             .Set("blocked_by_connection", row.BlockedByConnection)
@@ -127,32 +131,18 @@ internal sealed class ProcessingFilesEndpointHandlers
     {
         await request.RequireUserAsync().ConfigureAwait(false);
         var issues = new ValidationIssues();
-        long? libraryId = request.Query("library_id") is { } rawLibrary && FieldRules.TryInt(new WireString(rawLibrary), ["query", "library_id"], 1, null, issues, out var parsedLibrary)
-            ? (long)parsedLibrary
-            : null;
-        var fileStatuses = ParseFileStatuses(request.Query("file_status"), issues);
-        var pathContains = request.Query("path_contains");
-        long? withinDays = request.Query("within_days") is { } rawWithin && FieldRules.TryInt(new WireString(rawWithin), ["query", "within_days"], 1, 3650, issues, out var parsedWithin)
-            ? (long)parsedWithin
-            : null;
-        var limit = request.Query("limit") is { } rawLimit && FieldRules.TryInt(new WireString(rawLimit), ["query", "limit"], 1, 1000, issues, out var parsedLimit) ? (int)parsedLimit : 200;
+        var filter = ProcessingFilesQuery.Read(request, issues);
         issues.ThrowIfAny();
 
         var uow = await request.DbAsync().ConfigureAwait(false);
-        var filter = new ProcessingFileListFilter
-        {
-            LibraryId = libraryId,
-            Statuses = fileStatuses,
-            PathContains = pathContains,
-            Since = withinDays is { } days ? Timestamp.FromUtc(request.Time.GetUtcNow().AddDays(-days).UtcDateTime) : null,
-            Limit = limit,
-        };
-        var rows = await _files.ListAsync(uow, filter).ConfigureAwait(false);
+        var page = await _files.ListPageAsync(uow, filter).ConfigureAwait(false);
+        var rows = page.Rows;
         var libraryNames = await _files.LibraryNamesAsync(uow).ConfigureAwait(false);
         var knownDevices = DeviceProfileLoader.Load(request.Options.WeirHome);
         var devices = await _directPlay.SelectedProfilesAsync(uow, knownDevices).ConfigureAwait(false);
         var progressByPath = _liveProgress.Snapshot();
         var handbacks = await _handback.ForLibrariesAsync(uow, rows.Select(row => row.LibraryId)).ConfigureAwait(false);
+        var posters = await _posters.ForFilesAsync(uow, rows.Select(row => (row.LibraryId, row.RelativePath))).ConfigureAwait(false);
 
         var files = new List<WireValue>();
         foreach (var row in rows)
@@ -160,12 +150,13 @@ internal sealed class ProcessingFilesEndpointHandlers
             var libraryName = libraryNames.GetValueOrDefault(row.LibraryId, "Unknown workflow");
             var directPlay = DirectPlayService.ForRow(row, devices);
             progressByPath.TryGetValue(row.RelativePath, out var progress);
-            // #652: the copy Weir handed back, and what a media manager said about it, for History.
+            // #652: the copy Weir handed back, and what a media manager said about it, for Activity.
             handbacks.TryGetValue((row.LibraryId, row.RelativePath), out var handback);
-            files.Add(FileOut(row, libraryName, directPlay, progress).Set("handback", HandbackStore.ToOut(handback)));
+            posters.TryGetValue((row.LibraryId, row.RelativePath), out var posterUrl);
+            files.Add(FileOut(row, libraryName, directPlay, progress, posterUrl).Set("handback", HandbackStore.ToOut(handback)));
         }
 
-        var counts = await _files.StatusCountsAsync(uow, libraryId).ConfigureAwait(false);
+        var counts = await _files.StatusCountsAsync(uow, filter.LibraryId).ConfigureAwait(false);
         return ApiRoutes.Ok(new WireObject()
             .Set("files", new WireArray(files))
             .Set("status_counts", new WireObject().Also(dict =>
@@ -176,36 +167,12 @@ internal sealed class ProcessingFilesEndpointHandlers
                 }
             }))
             .Set("returned", files.Count)
-            .Set("limit", limit));
+            .Set("limit", filter.Limit)
+            .Set("next_cursor", page.NextCursor));
     }
 
     /// <summary>
-    /// <c>file_status</c> as one or more comma-separated statuses (#781): the Processing screen asks for every
-    /// currently-processing file in one uncapped, status-filtered page, separate from the ordinary paginated
-    /// list, so a running file can never be pushed off by the page limit. Null when the query omits the
-    /// parameter; an empty list (a blank value, or one made entirely of blanks) filters nothing, same as omitting it.
-    /// </summary>
-    private static List<string>? ParseFileStatuses(string? rawStatuses, ValidationIssues issues)
-    {
-        if (rawStatuses is null)
-        {
-            return null;
-        }
-
-        var statuses = new List<string>();
-        foreach (var token in rawStatuses.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-        {
-            if (FieldRules.TryLiteral(new WireString(token), ["query", "file_status"], ProcessingFileStatuses.All, issues, out var parsed))
-            {
-                statuses.Add(parsed);
-            }
-        }
-
-        return statuses;
-    }
-
-    /// <summary>
-    /// What History's remove dialog should offer for this title (#785), read before it is shown: whether it
+    /// What Activity's remove dialog should offer for this title (#785), read before it is shown: whether it
     /// qualifies for a choice at all (only a failed or rejected file whose original is still in the watched
     /// folder does), and when it does, which manager "delete" would ask — or that Weir would delete the file
     /// itself — and whether "keep" has a manager to tell it will not be imported.

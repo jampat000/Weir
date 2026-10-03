@@ -1,5 +1,5 @@
 import { Field } from "../../../../components/shared/field";
-import { QuietFieldGroup } from "../../../../components/shared/quiet-section";
+import { QuietDisclosure } from "../../../../components/shared/quiet-section";
 import type { ProcessingFailurePolicy } from "../../../../lib/processing/libraries-api";
 import type { useProcessingRejectSupportQuery } from "../../../../lib/processing/libraries-queries";
 import { FAILURE_POLICY_HINTS } from "./library-options";
@@ -66,11 +66,11 @@ export function LibraryFailureGroup({
   rejectSupport: ReturnType<typeof useProcessingRejectSupportQuery>;
 }) {
   return (
-    <QuietFieldGroup
+    <QuietDisclosure
       title="When a file fails"
-      detail="Weir tries a failed file again on its own, up to the limit below. A file it gives up on shows as Failed in History, with the reason."
+      detail="Weir tries a failed file again on its own, up to the limit below. A file it gives up on shows as Failed in Activity, with the reason."
     >
-      <div className="mm-field-row">
+      <div className="mm-editor-grid">
         <TextSetting
           binding={binding}
           name="max_attempts"
@@ -102,6 +102,6 @@ export function LibraryFailureGroup({
         />
       </div>
       <RetriesRunOutSetting binding={binding} rejectSupport={rejectSupport} />
-    </QuietFieldGroup>
+    </QuietDisclosure>
   );
 }

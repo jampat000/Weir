@@ -1,8 +1,8 @@
 # Weir — web app
 
-**React + TypeScript + Vite** app served by the .NET server (`apps/server`) on the same origin as the API. It uses the server's cookie session auth. **This directory is the source of truth** for Weir's UI: tokens, logo, the **Outfit** font, the shell and every screen.
+**React + TypeScript + Vite** app served by the .NET server (`apps/server`) on the same origin as the API. It uses the server's cookie session auth. **This directory is the source of truth** for Weir's UI: tokens, logo, the **Inter** and **JetBrains Mono** fonts (self-hosted through Fontsource), the shell and every screen.
 
-The version in the shell footer is the one the running server reports (`GET /api/v1/system/readiness`), not `package.json`.
+The version in the user menu at the foot of the side menu is the one the running server reports (`GET /api/v1/system/readiness`), not `package.json`.
 
 ## Stack
 
@@ -53,12 +53,15 @@ Defined in `src/app/router.tsx`.
 | `/login` | Sign in |
 | `/setup` | Create admin (first run, while no admin exists) |
 | `/setup-wizard` | Setup wizard: time zone, the first Movies and TV folders, automatic backups |
-| `/` | Processing, the first screen: what Weir is working on now |
-| `/history` | History: every file Weir has touched |
+| `/` | Dashboard, the first screen: what Weir is working on now |
+| `/activity` | Activity: every file Weir has touched |
 | `/library` | Library: files already in a library, and what Weir would do to each |
-| `/settings` | Settings: Libraries, Rules, Media managers, Performance, Cleanup, Schedule, Alerts (`?tab=`) |
+| `/setup/workflows`, `/setup/workflows/schedule` | Workflows: File paths, Schedule |
+| `/setup/connections`, `/setup/connections/download-clients`, `/setup/connections/alerts` | Connections: Media managers, Download clients, Alerts |
+| `/setup/rules`, `/setup/rules/metadata`, `/setup/rules/devices` | Rules: Profiles, Metadata & artwork, Playback devices |
+| `/setup/performance`, `/setup/performance/cleanup`, `/setup/performance/timers` | Performance: Speed, Cleanup, Weir's timers |
 | `/system` | System: About, Backups, Security, Logs (`?tab=`) |
-| `/activity`, `/processing` | Redirects from 3.1 addresses (`src/app/legacy-redirects.tsx`) |
+| `/settings`, `/history`, `/processing` | Redirects from earlier addresses (`src/app/legacy-redirects.tsx`); `/settings?tab=` lands on the matching setup tab |
 
 Everything under `/` needs a session and a finished or skipped setup wizard.
 

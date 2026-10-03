@@ -36,9 +36,14 @@ public static class JobQueueRules
     }
 
     /// <summary>Rewrites a cancelled job's dedupe key so the original key is free for a new enqueue.</summary>
-    public static string TombstoneCancelledDedupeKey(string original, long jobId)
+    public static string TombstoneCancelledDedupeKey(string original, long jobId) => Tombstone(original, "cancelled", jobId);
+
+    /// <summary>Rewrites a finished run's dedupe key so the next run of the same job can take the key.</summary>
+    public static string TombstoneFinishedDedupeKey(string original, long jobId) => Tombstone(original, "ran", jobId);
+
+    private static string Tombstone(string original, string why, long jobId)
     {
-        var suffix = $":cancelled:{jobId.ToString(CultureInfo.InvariantCulture)}";
+        var suffix = $":{why}:{jobId.ToString(CultureInfo.InvariantCulture)}";
         var text = original ?? string.Empty;
         var keep = Math.Max(0, DedupeKeyMaxLength - suffix.Length);
         var baseText = WireStrings.Slice(text, keep);

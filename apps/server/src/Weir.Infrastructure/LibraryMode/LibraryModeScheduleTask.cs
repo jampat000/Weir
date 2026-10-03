@@ -64,6 +64,8 @@ public sealed partial class LibraryModeScheduleTask : IPeriodicTask
     private readonly TimeProvider _time;
     private readonly SuiteSettingsStore _suiteSettings;
     private readonly ILogger<LibraryModeScheduleTask> _logger;
+    private readonly PeriodicTaskRegistry? _tasks;
+    private readonly HashSet<long> _announced = [];
 
     public LibraryModeScheduleTask(
         SqliteDatabase database,
@@ -73,8 +75,10 @@ public sealed partial class LibraryModeScheduleTask : IPeriodicTask
         LibraryStore libraries,
         TimeProvider time,
         SuiteSettingsStore suiteSettings,
-        ILogger<LibraryModeScheduleTask> logger)
+        ILogger<LibraryModeScheduleTask> logger,
+        PeriodicTaskRegistry? tasks = null)
     {
+        _tasks = tasks;
         _database = database ?? throw new ArgumentNullException(nameof(database));
         _jobs = jobs ?? throw new ArgumentNullException(nameof(jobs));
         _scans = scans ?? throw new ArgumentNullException(nameof(scans));
@@ -86,6 +90,8 @@ public sealed partial class LibraryModeScheduleTask : IPeriodicTask
     }
 
     public string Name => "processing-library-mode-schedule";
+
+    public string? Label => null;
 
     public TimeSpan Interval => TimeSpan.FromSeconds(30);
 
@@ -101,10 +107,13 @@ public sealed partial class LibraryModeScheduleTask : IPeriodicTask
         var uow = await UnitOfWork.OpenAsync(_database, cancellationToken).ConfigureAwait(false);
         await using (uow.ConfigureAwait(false))
         {
-            foreach (var library in await _libraries.ListAsync(uow, enabledOnly: true).ConfigureAwait(false))
+            var enabled = await _libraries.ListAsync(uow, enabledOnly: true).ConfigureAwait(false);
+            foreach (var library in enabled)
             {
                 var settings = await _librarySettings.GetAsync(uow, library.Id).ConfigureAwait(false);
-                if (await LibraryModeScheduling.NextRunAsync(uow, _suiteSettings, _scans, library, settings, now).ConfigureAwait(false) is not { } due || due > now)
+                var nextRunAt = await LibraryModeScheduling.NextRunAsync(uow, _suiteSettings, _scans, library, settings, now).ConfigureAwait(false);
+                AnnounceNextClean(library, nextRunAt);
+                if (nextRunAt is not { } due || due > now)
                 {
                     continue;
                 }
@@ -120,9 +129,45 @@ public sealed partial class LibraryModeScheduleTask : IPeriodicTask
                 var scheduledAt = now - due <= OnTime ? due : now;
                 await _scans.RequestScanAsync(uow, _jobs, library.Id, LibraryModeSchedule.Trigger, scheduledAt).ConfigureAwait(false);
                 LogScheduledScanQueued(library.Name);
+                AnnounceNextClean(library, scheduledAt + LibraryModeSchedule.Interval);
             }
 
+            ForgetDepartedLibraries(enabled.Select(library => library.Id));
             await uow.CommitAsync().ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>The task list shows a workflow's scheduled scan and clean while its schedule can run, and drops it otherwise.</summary>
+    private void AnnounceNextClean(ProcessingLibraryRecord library, DateTimeOffset? nextRunAt)
+    {
+        if (_tasks is null)
+        {
+            return;
+        }
+
+        if (nextRunAt is { } at)
+        {
+            _tasks.Plan(ScheduledJobTasks.LibraryCleanKey(library.Id), ScheduledJobTasks.LibraryCleanLabel(library.Name), at, LibraryModeSchedule.Interval);
+            _announced.Add(library.Id);
+        }
+        else
+        {
+            _tasks.Remove(ScheduledJobTasks.LibraryCleanKey(library.Id));
+            _announced.Remove(library.Id);
+        }
+    }
+
+    private void ForgetDepartedLibraries(IEnumerable<long> enabledIds)
+    {
+        if (_tasks is null)
+        {
+            return;
+        }
+
+        foreach (var id in _announced.Except(enabledIds).ToList())
+        {
+            _tasks.Remove(ScheduledJobTasks.LibraryCleanKey(id));
+            _announced.Remove(id);
         }
     }
 

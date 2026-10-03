@@ -9,6 +9,7 @@ import { useModalFocus } from "../../lib/ui/use-modal-focus";
 export function StoryPanelShell({
   eyebrow,
   title,
+  art,
   backdropLabel,
   className = "",
   testId,
@@ -17,6 +18,8 @@ export function StoryPanelShell({
 }: {
   eyebrow: string;
   title: string;
+  /** A picture at the start of the header, 2:3, such as the title's poster. */
+  art?: ReactNode;
   /** What the backdrop button says it closes, for a screen reader. */
   backdropLabel: string;
   className?: string;
@@ -44,6 +47,7 @@ export function StoryPanelShell({
         data-testid={testId}
       >
         <header className="mm-story-panel__head">
+          {art ? <div className="mm-story-panel__art">{art}</div> : null}
           <div className="mm-story-panel__titles">
             <p className="mm-story-panel__eyebrow">{eyebrow}</p>
             <h2 id={titleId} className="mm-story-panel__title" title={title}>

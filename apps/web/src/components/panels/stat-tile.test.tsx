@@ -1,0 +1,100 @@
+import { render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
+import { describe, expect, it } from "vitest";
+
+import { StatFitUnit, StatSide, StatTile, StatUnit } from "./stat-tile";
+
+describe("StatTile", () => {
+  it("shows the label, the aside, the figure with its words, and the body", () => {
+    render(
+      <MemoryRouter>
+        <StatTile
+          label="Today"
+          aside="3 need a look"
+          figure={
+            <>
+              12
+              <StatUnit>cleaned</StatUnit>
+              <StatSide>4.2 GB saved</StatSide>
+            </>
+          }
+        >
+          <p>Chart</p>
+        </StatTile>
+      </MemoryRouter>,
+    );
+
+    const tile = screen.getByRole("region", { name: "Today" });
+    expect(tile).toHaveTextContent("3 need a look");
+    expect(tile).toHaveTextContent("12cleaned4.2 GB saved");
+    expect(screen.getByText("Chart")).toBeInTheDocument();
+  });
+
+  it("makes the label a link, with its own name, when it is given a destination", () => {
+    render(
+      <MemoryRouter>
+        <StatTile
+          label="Today"
+          figure="12"
+          to="/activity"
+          linkName="Activity: Today"
+        >
+          body
+        </StatTile>
+      </MemoryRouter>,
+    );
+
+    expect(
+      screen.getByRole("link", { name: "Activity: Today" }),
+    ).toHaveAttribute("href", "/activity");
+  });
+
+  it("leaves the label plain text when there is nowhere to go", () => {
+    render(
+      <MemoryRouter>
+        <StatTile label="Today" figure="12">
+          body
+        </StatTile>
+      </MemoryRouter>,
+    );
+
+    expect(screen.queryByRole("link")).not.toBeInTheDocument();
+  });
+
+  it("omits the aside when it has none", () => {
+    const { container } = render(
+      <MemoryRouter>
+        <StatTile label="Today" figure="12">
+          body
+        </StatTile>
+      </MemoryRouter>,
+    );
+
+    expect(container.querySelector(".mm-stat__aside")).toBeNull();
+  });
+});
+
+describe("StatFitUnit", () => {
+  it("says its words to screen readers once, and shows them to the eye as a line that can be left out", () => {
+    render(
+      <StatTile
+        label="Today"
+        figure={
+          <>
+            12
+            <StatFitUnit>cleaned</StatFitUnit>
+            <StatSide>4.2 GB saved</StatSide>
+          </>
+        }
+      >
+        body
+      </StatTile>,
+    );
+
+    const shown = screen.getByTitle("cleaned");
+    expect(shown).toHaveAttribute("aria-hidden", "true");
+    expect(shown).toHaveTextContent("cleaned");
+    expect(screen.getAllByText("cleaned")).toHaveLength(2);
+    expect(screen.getAllByText("cleaned")[0]).toHaveClass("sr-only");
+  });
+});

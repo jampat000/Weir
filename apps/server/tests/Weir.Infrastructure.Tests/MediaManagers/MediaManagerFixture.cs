@@ -1,4 +1,6 @@
 using Weir.Core.Security;
+using Weir.Infrastructure.Artwork;
+using Weir.Infrastructure.ConnectionTraffic;
 using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.MediaManagers;
 using Weir.Infrastructure.Processing;
@@ -16,9 +18,11 @@ internal sealed class MediaManagerFixture : IDisposable
     {
         Store = new StoreFixture([("WEIR_CREDENTIALS_SECRET", CredentialsSecret), .. variables]);
         Cipher = new CredentialCipher(Store.Options.CredentialsSecret, Store.Options.SessionSecret, Store.Options.PreviousCredentialsSecrets, Store.Clock);
-        Http = new FakeManagerHttp();
+        Usage = new ConnectionUsageLedger();
+        Activity = new ConnectionActivityHub(Store.Clock, Usage);
+        Http = new FakeManagerHttp(Activity, Store.Clock);
         Ports = new HttpMediaManagerPorts(Http);
-        ConnectionStore = new MediaManagerConnectionStore();
+        ConnectionStore = new MediaManagerConnectionStore(Usage);
         Connections = new MediaManagerConnectionService(Store.Options, Cipher, Ports, ConnectionStore);
         Targets = new HandoffTargetStore();
         Files = new FileStateStore();
@@ -28,7 +32,8 @@ internal sealed class MediaManagerFixture : IDisposable
         Jobs = new ProcessingJobStore(Store.Database, Store.Clock);
         SkipMarkers = new FileSkipMarkerStore();
         Reporter = new HandoffCompletionReporter(Connections, ConnectionStore, Ledger, Targets, Libraries, Http);
-        Intake = new MediaManagerIntake(Store.Options, Connections, ConnectionStore, Ledger, Targets, Jobs, SkipMarkers, Reporter, Store.Clock);
+        Artwork = new ArtworkSubjects(new ArtworkLookupStore(), new ArtworkFileStore());
+        Intake = new MediaManagerIntake(Store.Options, Connections, ConnectionStore, Ledger, Targets, Jobs, SkipMarkers, Reporter, Artwork, Store.Clock, Activity);
         OperatorSettings = new OperatorSettingsStore();
         Cancellation = new PendingJobCancellation(Ledger, Reporter, Files);
     }
@@ -36,6 +41,10 @@ internal sealed class MediaManagerFixture : IDisposable
     public StoreFixture Store { get; }
 
     public CredentialCipher Cipher { get; }
+
+    public ConnectionUsageLedger Usage { get; }
+
+    public ConnectionActivityHub Activity { get; }
 
     public FakeManagerHttp Http { get; }
 
@@ -58,6 +67,8 @@ internal sealed class MediaManagerFixture : IDisposable
     public ProcessingJobStore Jobs { get; }
 
     public FileSkipMarkerStore SkipMarkers { get; }
+
+    public ArtworkSubjects Artwork { get; }
 
     public MediaManagerIntake Intake { get; }
 

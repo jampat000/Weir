@@ -5,63 +5,15 @@
  * separate "No Sonarr, Radarr or Deluno connection covers …" message stays in `LibraryManagerSetup`, above.
  */
 
-import { QuietFieldGroup } from "../../../../components/shared/quiet-section";
-import { SetupCheckLines } from "../../../../components/shared/setup-check-lines";
+import { QuietDisclosure } from "../../../../components/shared/quiet-section";
+import { FolderChainSections } from "../../../../components/shared/folder-chain-sections";
 import type { ProcessingMediaType } from "../../../../lib/processing/libraries-api";
-import {
-  READINESS_CLASSES,
-  READINESS_LABELS,
-  readinessOf,
-  type FolderChainLine,
-  type LibraryFolderChainDownloadClient,
-} from "../../../../lib/processing/library-folder-chain-api";
-import type { ProcessingManagerSetupItem } from "../../../../lib/processing/library-managers-api";
 import { useLibraryFolderChainQuery } from "../../../../lib/processing/libraries-queries";
 import { useDebouncedValue } from "../../../../lib/ui/use-debounced-value";
 import { FOLDER_CHECK_SETTLE_MS } from "./folder-check-settle";
 
-function ReadinessBadge({
-  ready,
-  lines,
-}: {
-  ready: boolean;
-  lines: FolderChainLine[];
-}) {
-  const readiness = readinessOf(ready, lines);
-  return (
-    <span className={`ml-2 text-xs ${READINESS_CLASSES[readiness]}`}>
-      {READINESS_LABELS[readiness]}
-    </span>
-  );
-}
-
-function ManagerSection({ item }: { item: ProcessingManagerSetupItem }) {
-  return (
-    <section aria-label={item.label} className="space-y-3">
-      <p className="text-sm font-medium text-mm-text1">
-        {item.label}
-        <ReadinessBadge ready={item.ready} lines={item.lines} />
-      </p>
-      <SetupCheckLines label={item.label} lines={item.lines} />
-    </section>
-  );
-}
-
-function DownloadClientSection({
-  item,
-}: {
-  item: LibraryFolderChainDownloadClient;
-}) {
-  return (
-    <section aria-label={item.label} className="space-y-3">
-      <p className="text-sm font-medium text-mm-text1">
-        {item.label}
-        <ReadinessBadge ready={item.ready} lines={item.lines} />
-      </p>
-      <SetupCheckLines label={item.label} lines={item.lines} />
-    </section>
-  );
-}
+const CHAIN_DETAIL =
+  "Whether Weir's own folders line up end to end, and whether each connected media manager will pick up what Weir writes.";
 
 export function LibraryFolderChain({
   libraryId,
@@ -96,66 +48,42 @@ export function LibraryFolderChain({
 
   if (libraryId === undefined) {
     return (
-      <QuietFieldGroup
-        title="Folder chain"
-        detail="Whether Weir's own folders line up, end to end, and whether each connected media manager will pick up what Weir writes."
-      >
+      <QuietDisclosure title="Folder chain" detail={CHAIN_DETAIL}>
         <p className="mm-quiet-note">
           Save this workflow first to check its folder chain.
         </p>
-      </QuietFieldGroup>
+      </QuietDisclosure>
     );
   }
 
   return (
-    <QuietFieldGroup
-      title="Folder chain"
-      detail="Whether Weir's own folders line up, end to end, and whether each connected media manager will pick up what Weir writes."
-      aside={
-        <button
-          type="button"
-          className="mm-quiet-link"
-          onClick={() => void chain.refetch()}
-          disabled={chain.isFetching}
-        >
-          {chain.isFetching ? "Checking…" : "Check again"}
-        </button>
-      }
-    >
+    <QuietDisclosure title="Folder chain" detail={CHAIN_DETAIL} defaultOpen>
       <div data-testid="library-folder-chain" className="space-y-6">
         {chain.isLoading ? (
           <p className="mm-quiet-note">
             Checking this workflow&apos;s folders…
           </p>
         ) : chain.isError ? (
-          <p className="mm-quiet-note mm-status-text--warning" role="alert">
+          <p
+            className="mm-quiet-note mm-status-text"
+            data-status="broken"
+            role="alert"
+          >
             Weir could not check this workflow&apos;s folder chain just now. Try
             Check again in a moment.
           </p>
         ) : chain.data ? (
-          <>
-            <section aria-label="Weir's own folders" className="space-y-3">
-              <p className="text-sm font-medium text-mm-text1">
-                Weir&apos;s own folders
-                <ReadinessBadge
-                  ready={chain.data.local.ready}
-                  lines={chain.data.local.lines}
-                />
-              </p>
-              <SetupCheckLines
-                label="Weir's own folders"
-                lines={chain.data.local.lines}
-              />
-            </section>
-            {chain.data.managers.map((item) => (
-              <ManagerSection key={item.connection_id} item={item} />
-            ))}
-            {chain.data.download_clients.map((item) => (
-              <DownloadClientSection key={item.connection_id} item={item} />
-            ))}
-          </>
+          <FolderChainSections chain={chain.data} />
         ) : null}
       </div>
-    </QuietFieldGroup>
+      <button
+        type="button"
+        className="mm-quiet-link mt-4"
+        onClick={() => void chain.refetch()}
+        disabled={chain.isFetching}
+      >
+        {chain.isFetching ? "Checking…" : "Check again"}
+      </button>
+    </QuietDisclosure>
   );
 }

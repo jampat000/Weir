@@ -325,7 +325,7 @@ def test_a_manager_kind_with_no_connection_at_all_is_refused(server_factory, cli
     refused = c.post(f"{API}/intake/webhook/radarr", json={"eventType": "Grab"})
     assert refused.status_code == 401, refused.text
     assert refused.json()["detail"] == (
-        "No Radarr is set up in Weir. Add it in Settings › Media managers, then send webhooks with its secret."
+        "No Radarr is set up in Weir. Add it in Setup › Connections › Media managers, then send webhooks with its secret."
     )
 
     c.ensure_admin()

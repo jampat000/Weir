@@ -11,7 +11,7 @@ internal static class DelunoDestinationNotices
 
     public static string NeedsImportsScope(string managerLabel) =>
         $"The API key Weir uses for {managerLabel} can't read where downloads go. Give it the Imports permission: " +
-        $"in Deluno, open {KeysMenu} and create a key with Media automation access (it includes Imports), then save that key under Settings › Media managers in Weir.";
+        $"in Deluno, open {KeysMenu} and create a key with Media automation access (it includes Imports), then save that key under Setup › Connections › Media managers in Weir.";
 
     public static string LibraryGone(string managerLabel) =>
         $"{managerLabel} no longer has the library this workflow came from, so Weir can't check where its downloads go. " +

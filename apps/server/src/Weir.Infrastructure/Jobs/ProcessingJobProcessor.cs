@@ -4,6 +4,7 @@ using Weir.Core.Jobs;
 using Weir.Core.Json;
 using Weir.Core.Observability;
 using Weir.Core.Time;
+using Weir.Infrastructure.Scheduling;
 
 namespace Weir.Infrastructure.Jobs;
 
@@ -24,6 +25,7 @@ public sealed class ProcessingJobProcessor
     private readonly IJobNotifications _notifications;
     private readonly TimeProvider _time;
     private readonly ILogger _logger;
+    private readonly PeriodicTaskRegistry? _tasks;
 
     public ProcessingJobProcessor(
         ProcessingJobStore queue,
@@ -32,7 +34,8 @@ public sealed class ProcessingJobProcessor
         IUnhandledJobFailureRecorder failureRecorder,
         IJobNotifications notifications,
         TimeProvider time,
-        ILogger<ProcessingJobProcessor> logger)
+        ILogger<ProcessingJobProcessor> logger,
+        PeriodicTaskRegistry? tasks = null)
     {
         _queue = queue ?? throw new ArgumentNullException(nameof(queue));
         _handlers = handlers ?? throw new ArgumentNullException(nameof(handlers));
@@ -41,6 +44,7 @@ public sealed class ProcessingJobProcessor
         _notifications = notifications ?? throw new ArgumentNullException(nameof(notifications));
         _time = time ?? throw new ArgumentNullException(nameof(time));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _tasks = tasks;
         Kinds = ClaimableKinds.For(handlers);
     }
 
@@ -120,12 +124,16 @@ public sealed class ProcessingJobProcessor
             return JobProcessOutcome.Processed;
         }
 
+        var taskKey = ScheduledJobTasks.KeyFor(context.JobKind, context.PayloadJson);
+        ReportRunStarted(taskKey);
         try
         {
             using (_logger.BeginScope(new Dictionary<string, object> { ["job_id"] = context.Id }))
             {
                 await RunHandlerWithLeaseRenewalAsync(handler, context, leaseSeconds, cancellationToken).ConfigureAwait(false);
             }
+
+            ReportRunEnded(taskKey, ok: true, why: null);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -143,6 +151,7 @@ public sealed class ProcessingJobProcessor
                 context.JobKind,
                 failure.Message,
                 failure.TechnicalDetail);
+            ReportRunEnded(taskKey, ok: false, failure.Why);
             if (exception is not AlreadyRecordedFailureException)
             {
                 // A handler that recorded its own failure has said it once already (#488).
@@ -215,6 +224,22 @@ public sealed class ProcessingJobProcessor
         }
 
         return JobProcessOutcome.Processed;
+    }
+
+    private void ReportRunStarted(string? taskKey)
+    {
+        if (taskKey is not null)
+        {
+            _tasks?.Begin(taskKey);
+        }
+    }
+
+    private void ReportRunEnded(string? taskKey, bool ok, string? why)
+    {
+        if (taskKey is not null)
+        {
+            _tasks?.End(taskKey, ok, why);
+        }
     }
 
     /// <summary>

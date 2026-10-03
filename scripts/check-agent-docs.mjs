@@ -46,7 +46,7 @@ const retiredUiTerms = [
   { label: "Settings › Support", pattern: /Settings\s*(?:›|→|->)\s*Support\b/ },
   { label: "Processing ›", pattern: /Processing\s*(?:›|→|->)/ },
   { label: "Home screen", pattern: / Home screen/ },
-  { label: "Activity page", pattern: /Activity page/ },
+  { label: "History page (now Activity)", pattern: /\bHistory (?:page|screen)\b|\b(?:in|from|on|to) History\b/ },
 ];
 
 let failures = 0;

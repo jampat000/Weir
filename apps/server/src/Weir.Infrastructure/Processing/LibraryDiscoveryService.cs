@@ -225,7 +225,7 @@ public sealed class LibraryDiscoveryService
             existingNames.Add(name);
 
             // A library with nowhere to hand files back arrives switched off: on, it would pick up
-            // downloads it could never deliver. Settings › Libraries says what it needs.
+            // downloads it could never deliver. Setup › Workflows says what it needs.
             var row = new ProcessingLibraryRecord
             {
                 Name = name,

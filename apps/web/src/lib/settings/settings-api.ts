@@ -19,6 +19,7 @@ import type {
   UpdateSettingsOut,
   UpdateSettingsPutBody,
   UpdateStateOut,
+  NetworkAccessPutBody,
   NetworkAccessStatus,
 } from "./types";
 
@@ -78,6 +79,20 @@ export async function fetchNetworkAccess(): Promise<NetworkAccessStatus> {
   const path = networkAccessPath();
   const r = await apiFetch(path);
   await requireOk(path, r, "Could not check network access");
+  return readJson<NetworkAccessStatus>(r);
+}
+
+/** Who can reach Weir over the network. The answer is the new state, with the change pending until the tray has carried it out. */
+export async function putNetworkAccess(
+  body: NetworkAccessPutBody,
+): Promise<NetworkAccessStatus> {
+  const path = networkAccessPath();
+  const r = await sendJson(
+    path,
+    "PUT",
+    body,
+    "Could not change network access",
+  );
   return readJson<NetworkAccessStatus>(r);
 }
 

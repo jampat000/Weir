@@ -1,9 +1,17 @@
 /** The last two hours of finished files, five minutes to a bucket, for the Processing toolbar. */
 import type { FinishedFile } from "../../lib/activity/processing-outcome";
 import { parseAppTime } from "../../lib/ui/mm-format-date";
+import type { StatusMeaning } from "../../lib/ui/status-meaning";
 
-/** How a handed-back file turned out, in the three tones Just finished uses for its dots. */
+/** How a handed-back file turned out: cleaned, already clean, or one that needs a look. */
 export type HandedBackTone = "ok" | "same" | "warn";
+
+/** What each turned out as means: cleaned and already clean are both done, and the rest need a look. */
+export const HANDED_BACK_MEANING: Record<HandedBackTone, StatusMeaning> = {
+  ok: "done",
+  same: "done",
+  warn: "attention",
+};
 
 export function handedBackTone(item: FinishedFile): HandedBackTone {
   if (

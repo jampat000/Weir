@@ -12,9 +12,9 @@ Matroska and ffmpeg writes everything else, and each workflow can be set to use 
 everything instead. A workflow is one route a file takes: a watched folder, a work folder, an
 output folder and the rules that apply. The API still calls a workflow a "library", so existing
 integrations keep working. Around it, the platform provides history, logs, backups, updates and
-security. The first screen, **Processing**, shows every file Weir is working on right now, from
-the moment it arrives until its media manager has it back. **History**, **Library**, **Settings**
-and **System** sit beside it.
+security. The first screen, the **Dashboard**, shows every file Weir is working on right now, from
+the moment it arrives until its media manager has it back. **Activity**, **Library**, the **Setup** areas
+(Workflows, Connections, Rules, Performance) and **System** sit beside it.
 
 ## Runtime shape
 
@@ -24,8 +24,8 @@ flowchart LR
   API --> Core["Weir.Core (records + rules)"]
   API --> Infra["Weir.Infrastructure (SQLite, filesystem, ffmpeg, jobs)"]
   Infra --> Processing["Processing (the application)"]
-  Infra --> History["History (activity records)"]
-  Infra --> Integrations["Media managers (Sonarr, Radarr, Deluno; TMDb metadata)"]
+  Infra --> Activity["Activity (event records)"]
+  Infra --> Integrations["Media managers (Sonarr, Radarr, Deluno) and Deluno's metadata service"]
   Infra --> DB["SQLite (numbered SQL migrations)"]
   Processing --> Jobs["Durable jobs (jobs) + workers"]
 ```
@@ -64,7 +64,7 @@ refused and left unchanged.
 |-----------|---------------|
 | `src/app` | App-level router and providers |
 | `src/layouts` | Shell/navigation layout |
-| `src/pages` | Feature pages (Processing, History, Library, Settings, System), plus sign-in and setup |
+| `src/pages` | Feature pages (Dashboard, Activity, Library, Setup, System), plus sign-in and setup |
 | `src/lib` | API clients, query hooks, typed data helpers |
 | `src/components` | Reusable UI and brand components |
 
@@ -74,7 +74,7 @@ refused and left unchanged.
 flowchart LR
   Enqueue["Enqueue request"] --> Jobs["jobs + workers"]
   Jobs --> Result["Job result (completed/failed/pending retry)"]
-  Result --> History["History + logs"]
+  Result --> Activity["Activity + logs"]
   Result --> Metrics["Runtime metrics / Prometheus"]
 ```
 

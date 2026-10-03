@@ -8,13 +8,14 @@ namespace Weir.Infrastructure.Processing.RemuxPass;
 public sealed partial class RemuxPassRunner
 {
     /// <summary>
-    /// #537 item 4: the metadata lookup decides which audio the planner prefers. Declining (no provider, no match, unreachable)
+    /// #537 item 4: the metadata lookup decides which audio the planner prefers. Declining (lookup off, no match, unreachable)
     /// leaves the language preferences in charge, with a note saying so.
     /// </summary>
     private async Task<(ProcessingRulesConfig Config, WireObject Record)> ApplyOriginalLanguageAsync(
         ProcessingRulesConfig config,
         OriginalLanguageRules rules,
         string scope,
+        long? libraryId,
         string relativeMediaPath,
         HandoffOrigin? origin,
         IReadOnlyList<ProbeStreamInfo> audio,
@@ -23,7 +24,7 @@ public sealed partial class RemuxPassRunner
         LookupResult lookup;
         try
         {
-            lookup = await _originalLanguage.LookupAsync(scope, relativeMediaPath, origin, cancellationToken).ConfigureAwait(false);
+            lookup = await _originalLanguage.LookupAsync(scope, libraryId, relativeMediaPath, origin, cancellationToken).ConfigureAwait(false);
         }
 #pragma warning disable CA1031 // A failed lookup degrades to the language preferences; the pass still runs.
         catch (Exception exception) when (exception is not OperationCanceledException)

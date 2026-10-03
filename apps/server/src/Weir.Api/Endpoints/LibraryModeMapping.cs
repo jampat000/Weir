@@ -66,7 +66,13 @@ internal static class LibraryModeMapping
         .Set("total_removed_audio_tracks", totals.RemovedAudioTracks)
         .Set("total_removed_subtitle_tracks", totals.RemovedSubtitleTracks)
         .Set("cleaned", totals.Cleaned)
-        .Set("left_alone", totals.LeftAlone);
+        .Set("left_alone", totals.LeftAlone)
+        .Set("by_status", new WireObject()
+            .Set(LibraryFileStatus.NeedsCleaning, totals.ByStatus.NeedsCleaning)
+            .Set(LibraryFileStatus.Cleaning, totals.ByStatus.Cleaning)
+            .Set(LibraryFileStatus.Matches, totals.ByStatus.Matches)
+            .Set(LibraryFileStatus.CantCleanYet, totals.ByStatus.CantCleanYet)
+            .Set(LibraryFileStatus.LeftAlone, totals.ByStatus.LeftAlone));
 
     /// <summary>The final-removal confirmation numbers for a set of files (#505 point 5), shared by Clean and the schedule toggle.</summary>
     internal static (int Files, int Tracks, long BytesSaved) RemovalTotals(IEnumerable<LibraryScanFileEntry> files)

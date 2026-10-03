@@ -82,19 +82,19 @@ export function useProcessingManagerSetupQuery(
 }
 
 /**
- * The folder chain for one saved library: Weir's own watched/work/output folders plus every connected manager's
- * setup, in one read-only view. Keyed on the folders and media type too (not only the id) so an edit made in the
- * library editor, once it settles, is checked again — including right after Save, which changes the saved folders
- * under the same id.
+ * The query for one saved library's folder chain: Weir's own watched/work/output folders plus every connected
+ * manager's setup, in one read-only view. Keyed on the folders and media type too (not only the id) so an edit
+ * made in the library editor, once it settles, is checked again — including right after Save, which changes the
+ * saved folders under the same id. Anything that reads a chain with these options shares the editor's cache.
  */
-export function useLibraryFolderChainQuery(
-  libraryId: number | undefined,
+export function libraryFolderChainOptions(
+  libraryId: number,
   watchedFolder: string,
   workFolder: string,
   outputFolder: string,
   mediaType: ProcessingMediaType,
 ) {
-  return useQuery({
+  return {
     queryKey: [
       "processing",
       "library-folder-chain",
@@ -104,14 +104,33 @@ export function useLibraryFolderChainQuery(
       workFolder,
       outputFolder,
     ] as const,
-    queryFn: () => fetchLibraryFolderChain(libraryId as number),
-    enabled: libraryId !== undefined,
+    queryFn: () => fetchLibraryFolderChain(libraryId),
     staleTime: 30_000,
     retry: false,
+  };
+}
+
+/** The folder chain for one saved library, once it has an id: a new library has nothing to check yet. */
+export function useLibraryFolderChainQuery(
+  libraryId: number | undefined,
+  watchedFolder: string,
+  workFolder: string,
+  outputFolder: string,
+  mediaType: ProcessingMediaType,
+) {
+  return useQuery({
+    ...libraryFolderChainOptions(
+      libraryId as number,
+      watchedFolder,
+      workFolder,
+      outputFolder,
+      mediaType,
+    ),
+    enabled: libraryId !== undefined,
   });
 }
 
-/** The same folder chain for every library linked to one media manager connection (Settings › Media managers). */
+/** The same folder chain for every library linked to one media manager connection (Setup › Connections › Media managers). */
 export function useConnectionFolderChainQuery(connectionId: number) {
   return useQuery({
     queryKey: ["processing", "connection-folder-chain", connectionId] as const,
@@ -167,8 +186,9 @@ export function useReorderProcessingLibraries() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (ids: number[]) => reorderProcessingLibraries(ids),
+    // Settles once the list is read again, so a list held in its new order is not shown in the old one first.
     onSuccess: () =>
-      void qc.invalidateQueries({ queryKey: processingKeys.libraries }),
+      qc.invalidateQueries({ queryKey: processingKeys.libraries }),
   });
 }
 

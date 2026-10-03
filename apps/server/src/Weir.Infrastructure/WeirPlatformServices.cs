@@ -1,3 +1,4 @@
+using System.Runtime.Versioning;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
@@ -9,6 +10,8 @@ using Weir.Core.Time;
 using Weir.Core.Workers;
 using Weir.Infrastructure.Activity;
 using Weir.Infrastructure.Auth;
+using Weir.Infrastructure.ConnectionTraffic;
+using Weir.Infrastructure.Logging;
 using Weir.Infrastructure.Notifications;
 using Weir.Infrastructure.Processing;
 using Weir.Infrastructure.Runtime;
@@ -37,6 +40,12 @@ public static class WeirPlatformServices
         services.TryAddSingleton(sp => ActivityNotifications.For(sp.GetRequiredService<SqliteDatabase>()));
         // One process-wide live-progress store, shared by every running pass and every open stream (#750).
         services.TryAddSingleton<LiveProgressStore>();
+        // What is happening on each media manager and download client connection, for the live Connections views.
+        services.TryAddSingleton<ConnectionUsageLedger>();
+        services.TryAddSingleton<ConnectionActivityHub>();
+        services.TryAddSingleton<ActivityStreamClients>();
+        services.TryAddSingleton<LogAlerts>();
+        services.TryAddSingleton<PeriodicTaskRegistry>();
 
         // Auth, Activity, Notifications and Suite settings: instance stores over UnitOfWork, stateless
         // themselves, so one shared instance serves every request.
@@ -77,16 +86,23 @@ public static class WeirPlatformServices
         });
         services.TryAddSingleton<IOutputOwnership, OutputOwnership>();
 
-        // Where Weir listens and its own firewall rules, for System › About (docs/security-hardening.md#windows-firewall):
-        // the Windows package only, gated the same way as the ownership tools above. A host that never registered
-        // its listen address listens the way the server does by default.
-        services.TryAddSingleton<INetworkAccessReader>(sp =>
-            OperatingSystem.IsWindows()
-                ? new WindowsNetworkAccessReader(
-                    sp.GetService<ServerListenOptions>() ?? new ServerListenOptions(ServerListenOptions.DefaultHost, ServerListenOptions.DefaultPort))
-                : new UnsupportedNetworkAccessReader());
+        // Who can reach Weir, for System › About (docs/security-hardening.md#windows-firewall). Only the Windows
+        // package has a tray to carry a change out; Docker and a bare install are started with their own bind
+        // address. A host that never registered its listen address listens the way the server does by default.
+        services.TryAddSingleton(new LanAccessFile(options.WeirHome));
+        services.TryAddSingleton<INetworkAccess>(sp =>
+        {
+            var listen = sp.GetService<ServerListenOptions>() ?? new ServerListenOptions(ServerListenOptions.DefaultHost, ServerListenOptions.DefaultPort);
+            return OperatingSystem.IsWindows() && UpdateFiles.DetectInstallType(options.RuntimeKind) == "windows"
+                ? CreateWindowsNetworkAccess(sp, listen)
+                : new UnmanagedNetworkAccess(sp.GetService<ServerRunMode>() ?? ServerRunMode.App, listen);
+        });
         return services;
     }
+
+    [SupportedOSPlatform("windows")]
+    private static WindowsNetworkAccess CreateWindowsNetworkAccess(IServiceProvider services, ServerListenOptions listen) =>
+        new(listen, services.GetRequiredService<LanAccessFile>(), new ComServerFirewall(), new NetworkInterfaceLanAddresses());
 
     /// <summary>
     /// Hosts every registered <see cref="IPeriodicTask"/>. Added by the job host after startup recovery,

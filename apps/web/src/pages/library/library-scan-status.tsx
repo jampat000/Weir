@@ -1,69 +1,127 @@
-import type { ReactNode } from "react";
-
+import type { useTriggerLibraryScan } from "../../lib/processing/library-mode-queries";
+import { StatusDot } from "../../components/panels/status-dot";
 import { errorMessage } from "../../lib/api/error-message";
 import type {
   LibraryModeSchedule,
   LibraryScanInfo,
 } from "../../lib/processing/library-mode-api";
-import { useTriggerLibraryScan } from "../../lib/processing/library-mode-queries";
-import { useAppDateFormatter } from "../../lib/ui/mm-format-date";
-import { nextScheduled, scanned } from "./library-model";
+import {
+  useAppClockFormatter,
+  useAppDateFormatter,
+  useAppDayClockFormatter,
+} from "../../lib/ui/mm-format-date";
+import { nextScheduled, nextScheduledBrief, scanned } from "./library-model";
 
-/** Beside the title: when the numbers were counted, when the schedule runs next, and a way to count again. */
+type Rescan = ReturnType<typeof useTriggerLibraryScan>;
+
+const START_FAILED = "Weir couldn't start a check. Try again in a moment.";
+
+/**
+ * When this library's numbers were counted and when the schedule runs next, in a few words with the whole sentence in
+ * the tooltip. It sits in the Files card's header, because it is about the files, and says so if a check could not be
+ * started.
+ */
 export function LibraryScanStatus({
-  libraryId,
   scan,
   schedule,
   now,
-  after,
+  rescan,
 }: {
-  libraryId: number;
   scan: LibraryScanInfo | null;
   schedule: LibraryModeSchedule | undefined;
   now: number;
-  /** Sits at the end of the row, after the way to check again. */
-  after?: ReactNode;
+  rescan: Rescan;
 }) {
   const formatDate = useAppDateFormatter();
-  const rescan = useTriggerLibraryScan(libraryId);
+  const clock = useAppClockFormatter();
+  const dayClock = useAppDayClockFormatter();
+  const running = Boolean(scan?.running);
+  const when = running
+    ? "Checking this workflow now"
+    : scanned(scan?.generated_at ?? null, now);
   const scheduleLine = nextScheduled(schedule, now, formatDate);
+  const scheduleBrief = nextScheduledBrief(schedule, now, clock, dayClock);
+  const sentence = [when, scheduleLine].filter(Boolean).join(" · ");
   return (
-    <div className="mm-library-scan" data-testid="library-scan">
-      {scan?.running ? (
-        <>
-          <i className="mm-live-pulse" aria-hidden="true" />
-          <span>Checking this workflow now</span>
-        </>
-      ) : (
-        <>
-          <span className="mm-library-scan__dot" aria-hidden="true" />
-          <span>{scanned(scan?.generated_at ?? null, now)}</span>
-        </>
-      )}
-      {scheduleLine ? (
-        <span data-testid="library-schedule">· {scheduleLine}</span>
-      ) : null}
-      <button
-        type="button"
-        className="mm-head-control"
-        disabled={rescan.isPending || Boolean(scan?.running)}
-        onClick={() => rescan.mutate()}
+    <>
+      <span
+        className="mm-library-scan"
+        data-testid="library-scan"
+        title={sentence}
       >
-        {rescan.isPending ? "Starting a check…" : "Check again"}
-      </button>
-      {after}
+        {running ? (
+          <i className="mm-live-pulse" data-status="doing" aria-hidden="true" />
+        ) : (
+          <StatusDot meaning={scan ? "done" : "idle"} />
+        )}
+        <span>{when}</span>
+        {scheduleBrief ? (
+          <span data-testid="library-schedule">· {scheduleBrief}</span>
+        ) : null}
+        <span className="sr-only">
+          {scheduleLine ? `, ${scheduleLine}` : ""}
+        </span>
+      </span>
       {rescan.isError ? (
         <span
-          className="mm-library-scan__error"
+          className="mm-library-scan__error mm-status-text"
+          data-status="broken"
           role="alert"
+          title={errorMessage(rescan.error, START_FAILED)}
           data-testid="library-scan-error"
         >
-          {errorMessage(
-            rescan.error,
-            "Weir couldn't start a check. Try again in a moment.",
-          )}
+          {errorMessage(rescan.error, START_FAILED)}
         </span>
       ) : null}
-    </div>
+    </>
+  );
+}
+
+const REFRESH_ICON = (
+  <svg
+    className="mm-library-mark"
+    viewBox="0 0 24 24"
+    width="16"
+    height="16"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <path d="M21 12a9 9 0 1 1-2.64-6.36" />
+    <path d="M21 4v5h-5" />
+  </svg>
+);
+
+/**
+ * Counts this library again. A header with little room shows only the refresh mark; the words are still its name and its
+ * tooltip.
+ */
+export function LibraryCheckAgain({
+  scan,
+  rescan,
+  iconOnly = false,
+}: {
+  scan: LibraryScanInfo | null;
+  rescan: Rescan;
+  /** Where the header is short of room: the refresh mark alone, still named and tooltipped "Check again". */
+  iconOnly?: boolean;
+}) {
+  const label = rescan.isPending ? "Starting a check…" : "Check again";
+  return (
+    <button
+      type="button"
+      className="mm-head-control"
+      data-icon-only={iconOnly}
+      aria-label={label}
+      title={label}
+      disabled={rescan.isPending || Boolean(scan?.running)}
+      onClick={() => rescan.mutate()}
+    >
+      {REFRESH_ICON}
+      <span className="mm-library-words">{label}</span>
+    </button>
   );
 }

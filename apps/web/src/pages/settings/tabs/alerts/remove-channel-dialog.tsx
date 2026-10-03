@@ -57,6 +57,7 @@ export function RemoveChannelDialog({
         </>
       }
       confirmLabel="Remove alert"
+      tone="danger"
       busy={removal.deletingId === channel.id}
       error={removal.error}
       onCancel={removal.cancel}

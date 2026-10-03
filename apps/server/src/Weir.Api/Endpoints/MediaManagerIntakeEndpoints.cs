@@ -2,12 +2,14 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Weir.Api.Http;
+using Weir.Core;
 using Weir.Core.Activity;
 using Weir.Core.Configuration;
 using Weir.Core.Json;
 using Weir.Core.MediaManagers;
 using Weir.Core.Validation;
 using Weir.Infrastructure.Activity;
+using Weir.Infrastructure.Artwork;
 using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.MediaManagers;
 using Weir.Infrastructure.Processing;
@@ -41,9 +43,20 @@ internal sealed class MediaManagerIntakeEndpointHandlers
     private readonly HandbackOutcomes _handbackOutcomes;
     private readonly LibraryStore _libraries;
     private readonly MachineIdentity _machine;
+    private readonly ArtworkSubjects _artwork;
+    private readonly string _version;
 
-    public MediaManagerIntakeEndpointHandlers(MediaManagerIntake intake, HandbackOutcomes handbackOutcomes, LibraryStore libraries, MachineIdentity machine)
+    public MediaManagerIntakeEndpointHandlers(
+        MediaManagerIntake intake,
+        HandbackOutcomes handbackOutcomes,
+        LibraryStore libraries,
+        MachineIdentity machine,
+        ArtworkSubjects artwork,
+        WeirOptions options)
     {
+        ArgumentNullException.ThrowIfNull(options);
+        _version = WeirVersion.Resolve(options.VersionOverride);
+        _artwork = artwork ?? throw new ArgumentNullException(nameof(artwork));
         _machine = machine ?? throw new ArgumentNullException(nameof(machine));
         _intake = intake ?? throw new ArgumentNullException(nameof(intake));
         _handbackOutcomes = handbackOutcomes ?? throw new ArgumentNullException(nameof(handbackOutcomes));
@@ -102,6 +115,12 @@ internal sealed class MediaManagerIntakeEndpointHandlers
                 return ApiRoutes.Ok(new WireObject().Set("status", "ignored").Set("source", dialect.Key).Set("event", importEvent.EventKind));
             }
 
+            // The manager's own ids for the title are exact, so a file Weir handed back shows its poster by them rather than by a guess at its name. A message with no secret could have come from anybody, so it changes nothing.
+            if (identity.Authenticated && imported is { LibraryId: { } libraryId, RelativePath: { } relativePath } && importEvent.Artwork is { } hints)
+            {
+                await _artwork.LinkHandoffAsync(uow, libraryId, importEvent.MediaScope, [relativePath], importEvent.ReleaseName, hints).ConfigureAwait(false);
+            }
+
             await request.CommitAsync().ConfigureAwait(false);
             return ApiRoutes.Ok(new WireObject()
                 .Set("status", "ok")
@@ -134,7 +153,8 @@ internal sealed class MediaManagerIntakeEndpointHandlers
         await RefusalsAsApiErrors(() => _intake.RequireSecretAsync(uow, presented, null)).ConfigureAwait(false);
         return ApiRoutes.Ok(new WireObject()
             .Set("capabilities", new WireArray(IntakeRules.HandoffCapabilities.Select(c => (WireValue)new WireString(c))))
-            .Set("machine_name", _machine.Name));
+            .Set("machine_name", _machine.Name)
+            .Set("version", _version));
     }
 
     /// <summary>
@@ -215,7 +235,7 @@ internal sealed class MediaManagerIntakeEndpointHandlers
         });
     }
 
-    /// <summary>The manager's name as History and Activity say it: Sonarr, Radarr, Deluno.</summary>
+    /// <summary>The manager's name as the Activity page says it: Sonarr, Radarr, Deluno.</summary>
     private static string ManagerName(string sourceKey) =>
         ImportEvents.DialectForSource(sourceKey) is { Key: not "native" } dialect ? dialect.DisplayName : "Your media manager";
 

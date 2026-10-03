@@ -188,7 +188,7 @@ public sealed class ManagerSetupRulesTests
             cdh: false);
 
         Assert.Contains(result.Lines, line => line.State == SetupCheckLine.Problem &&
-            line.Text == "Completed Download Handling is off in Sonarr, so it will never import from Weir's output. Turn it on under Settings → Download Clients.");
+            line.Text == "Completed Download Handling is off in Sonarr, so it will never import from Weir's output. Turn it on under Setup › Connections › Download clients.");
     }
 
     [Fact]
@@ -218,7 +218,7 @@ public sealed class ManagerSetupRulesTests
 
         Assert.Equal(
             "qBittorrent files Sonarr's downloads under the category \"tv-sonarr\", but Sonarr does not say where that category saves. " +
-            "Weir cannot verify its folder is /media/downloads/complete or inside it. Connect qBittorrent to Weir under Settings → Media managers to check it.",
+            "Weir cannot verify its folder is /media/downloads/complete or inside it. Connect qBittorrent to Weir under Setup › Connections › Media managers to check it.",
             Single(elsewhere, SetupCheckLine.Unverified));
         Assert.Equal(SetupCheckLine.Unverified, Assert.Single(named.Lines, line => line.Text.StartsWith("qBittorrent files", StringComparison.Ordinal)).State);
     }
@@ -236,7 +236,7 @@ public sealed class ManagerSetupRulesTests
 
         Assert.Equal(
             "Sonarr does not say where Transmission saves its downloads. Weir cannot verify they land in /media/downloads/complete or inside it. " +
-            "Connect Transmission to Weir under Settings → Media managers to check it.",
+            "Connect Transmission to Weir under Setup › Connections › Media managers to check it.",
             Single(result, SetupCheckLine.Unverified));
     }
 

@@ -40,7 +40,7 @@ function PanelHead({
     >
       <div>
         <h3 id={headingId} className="mm-rules-preview__title">
-          Try on a file
+          Check the rules
         </h3>
         <p className="mm-rules-preview__lead">{lead}</p>
       </div>
@@ -128,7 +128,7 @@ export function RulesPreviewPanel({
       <section>
         <PanelHead
           open={false}
-          lead="See exactly what these rules would keep or drop on a real file — nothing is processed or queued."
+          lead="See what these rules would keep or drop on a real file. Nothing is processed or queued."
           action={
             <button
               type="button"
@@ -149,7 +149,7 @@ export function RulesPreviewPanel({
       <PanelHead
         open
         headingId={headingId}
-        lead="Read-only: this never processes, queues, or saves anything. It re-runs a moment after you stop editing the rules above."
+        lead="Read-only. It re-runs a moment after you stop editing the rules above."
         action={
           <button
             type="button"
@@ -240,7 +240,8 @@ export function RulesPreviewPanel({
         {preview.error ? (
           <p
             role="alert"
-            className="text-sm font-medium text-mm-status-failed-text"
+            className="mm-status-text text-sm font-medium"
+            data-status="broken"
           >
             {preview.error}
           </p>

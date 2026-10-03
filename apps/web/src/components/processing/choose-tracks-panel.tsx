@@ -32,7 +32,8 @@ export interface ChooseTracksPanelProps {
 function FailedNote({ text, testId }: { text: string; testId?: string }) {
   return (
     <p
-      className="mm-story-panel__note mm-status-text--failed"
+      className="mm-story-panel__note mm-status-text"
+      data-status="broken"
       role="alert"
       data-testid={testId}
     >

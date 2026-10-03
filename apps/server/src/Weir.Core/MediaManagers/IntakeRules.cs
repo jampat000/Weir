@@ -35,7 +35,7 @@ public static partial class IntakeRules
     /// so unlike an existing connection that has simply never rotated its secret, it is refused outright.
     /// </summary>
     public static string NoConnectionDetail(string sourceKey) =>
-        $"No {MediaManagerKinds.LabelForConnection(sourceKey, null)} is set up in Weir. Add it in Settings › Media managers, then send webhooks with its secret.";
+        $"No {MediaManagerKinds.LabelForConnection(sourceKey, null)} is set up in Weir. Add it in Setup › Connections › Media managers, then send webhooks with its secret.";
 
     /// <summary>
     /// What a media manager may rely on at <c>/api/v1/intake</c>: asking about and cancelling a hand-off, reporting what

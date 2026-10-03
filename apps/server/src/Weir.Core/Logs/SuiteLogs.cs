@@ -80,19 +80,9 @@ public sealed class SuiteLogFilter
             return;
         }
 
-        if (_search.Length > 0)
+        if (_search.Length > 0 && !ContainsText(entry, _search))
         {
-            var haystack = string.Join(
-                " ",
-                new[]
-                {
-                    entry.Message, entry.Detail ?? string.Empty, entry.Traceback ?? string.Empty, entry.Logger,
-                    entry.Source ?? string.Empty, entry.Component, entry.CorrelationId ?? string.Empty, entry.JobId ?? string.Empty,
-                }.Where(part => part.Length > 0)).ToLowerInvariant();
-            if (!haystack.Contains(_search, StringComparison.Ordinal))
-            {
-                return;
-            }
+            return;
         }
 
         _rows.Enqueue(entry);
@@ -207,6 +197,24 @@ public sealed class SuiteLogFilter
         return text.Length == 0 ? null : text;
     }
 
-    private static bool SkipLowValueNoise(ParsedLogEntry entry) =>
-        entry.Level is not ("ERROR" or "WARNING" or "CRITICAL") && !entry.Logger.StartsWith("weir", StringComparison.Ordinal);
+    /// <summary>Whether any text of the line contains <paramref name="loweredText"/>, which the caller has trimmed and lower-cased.</summary>
+    public static bool ContainsText(ParsedLogEntry entry, string loweredText)
+    {
+        ArgumentNullException.ThrowIfNull(entry);
+        var haystack = string.Join(
+            " ",
+            new[]
+            {
+                entry.Message, entry.Detail ?? string.Empty, entry.Traceback ?? string.Empty, entry.Logger,
+                entry.Source ?? string.Empty, entry.Component, entry.CorrelationId ?? string.Empty, entry.JobId ?? string.Empty,
+            }.Where(part => part.Length > 0)).ToLowerInvariant();
+        return haystack.Contains(loweredText, StringComparison.Ordinal);
+    }
+
+    /// <summary>Whether a line is left out of every view of the log: information from a logger that is not Weir's own.</summary>
+    public static bool SkipLowValueNoise(ParsedLogEntry entry)
+    {
+        ArgumentNullException.ThrowIfNull(entry);
+        return entry.Level is not ("ERROR" or "WARNING" or "CRITICAL") && !entry.Logger.StartsWith("weir", StringComparison.Ordinal);
+    }
 }

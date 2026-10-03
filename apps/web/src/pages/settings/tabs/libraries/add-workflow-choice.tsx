@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 
 import { Field } from "../../../../components/shared/field";
 import {
-  QuietFieldGroup,
+  QuietSection,
   quietActionRowClass,
 } from "../../../../components/shared/quiet-section";
 import { errorMessage } from "../../../../lib/api/error-message";
@@ -20,6 +20,7 @@ import {
 import { connectionTitle } from "../../../../lib/ui/connection-title";
 import { mmActionButtonClass } from "../../../../lib/ui/mm-control-roles";
 import type { LibraryForm } from "./library-form";
+import { setupTabPath } from "../../../../lib/settings/setup-areas";
 
 /** What the editor opens with: a blank workflow or the one filled in, and the workflow it fills in when it is one. */
 export type WorkflowStart = {
@@ -119,7 +120,11 @@ export function AddWorkflowChoice({
   };
 
   return (
-    <QuietFieldGroup title="Add a workflow">
+    <QuietSection
+      headingId="add-workflow-heading"
+      heading="Add a workflow"
+      level={3}
+    >
       <div className="mm-quiet-stack" data-testid="add-workflow-choice">
         <fieldset className="mm-wizard-choices">
           <legend className="mm-wizard-label">Which kind?</legend>
@@ -158,7 +163,7 @@ export function AddWorkflowChoice({
                     Nothing is connected yet.{" "}
                     <Link
                       className="mm-quiet-link"
-                      to="/settings?tab=media-managers"
+                      to={setupTabPath("managers")}
                     >
                       Connect Deluno, Sonarr or Radarr
                     </Link>{" "}
@@ -206,7 +211,11 @@ export function AddWorkflowChoice({
         ) : null}
 
         {suggestions.isError ? (
-          <p className="mm-status-text--failed text-sm" role="alert">
+          <p
+            className="mm-status-text text-sm"
+            data-status="broken"
+            role="alert"
+          >
             {errorMessage(
               suggestions.error,
               "Weir could not ask that media manager for its folders. Choose Local folders, or try again.",
@@ -233,6 +242,6 @@ export function AddWorkflowChoice({
           </button>
         </div>
       </div>
-    </QuietFieldGroup>
+    </QuietSection>
   );
 }

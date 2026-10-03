@@ -1,0 +1,60 @@
+/*
+ * Every Weir stylesheet, in cascade order. main.tsx imports this file instead of index.css importing the
+ * stylesheets: Tailwind rewrites each `color-mix()` over a `var()` in a file it processes into a fallback
+ * declaration plus an `@supports` copy, about 10 KB of stylesheet for the same colours. A file Tailwind does not
+ * process keeps the single declaration. Nothing here may use `@apply`, `theme()` or another Tailwind directive.
+ */
+@import "./weir-tokens.css";
+@import "./weir-shell.css";
+@import "./weir-activity.css";
+@import "./weir-toolbar.css";
+@import "./weir-header.css";
+@import "./weir-panels.css";
+@import "./weir-sidebar.css";
+@import "./weir-sidebar-nav.css";
+@import "./weir-main.css";
+@import "./weir-activity-detail.css";
+@import "./weir-auth.css";
+@import "./weir-forms.css";
+@import "./weir-loading.css";
+@import "./weir-shell-phone.css";
+@import "./weir-schedule-grid.css";
+@import "./weir-story-panel.css";
+@import "./weir-tracks.css";
+@import "./weir-direct-play.css";
+@import "./weir-wizard.css";
+@import "./weir-content.css";
+@import "./weir-quiet-table.css";
+@import "./weir-workflow-table.css";
+@import "./weir-interrupt.css";
+@import "./weir-fold.css";
+@import "./weir-setting-row.css";
+@import "./weir-tab-layouts.css";
+@import "./weir-dialogs.css";
+@import "./weir-system.css";
+@import "./weir-system-log.css";
+@import "./weir-settings.css";
+@import "./weir-rules.css";
+@import "./weir-processing-dashboard.css";
+@import "./weir-processing-tiles.css";
+@import "./weir-today-chart.css";
+@import "./weir-processing-side.css";
+@import "./weir-processing-stream.css";
+@import "./weir-system-cards.css";
+@import "./weir-system-health.css";
+@import "./weir-system-lists.css";
+@import "./weir-system-backups.css";
+@import "./weir-system-band.css";
+@import "./weir-live-trace.css";
+@import "./weir-connections.css";
+@import "./weir-poster.css";
+@import "./weir-pipeline.css";
+@import "./weir-shelf.css";
+@import "./weir-library.css";
+@import "./weir-library-table.css";
+@import "./weir-drawer.css";
+@import "./weir-history.css";
+@import "./weir-history-record.css";
+@import "./weir-workflow-editor.css";
+@import "./weir-status.css";
+@import "./weir-table-columns.css";

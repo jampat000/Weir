@@ -1,5 +1,6 @@
 import { useRef, useState, type KeyboardEvent } from "react";
 
+import { mmActionButtonClass } from "../../../../lib/ui/mm-control-roles";
 import {
   DAY_FULL_NAMES,
   DAY_NAMES,
@@ -173,7 +174,7 @@ export function ScheduleGridEditor({
         <button
           type="button"
           disabled={disabled}
-          className="mm-theme-toggle"
+          className={mmActionButtonClass({ variant: "secondary" })}
           data-testid="schedule-clear"
           onClick={() => onChange("")}
         >
@@ -182,7 +183,7 @@ export function ScheduleGridEditor({
         <button
           type="button"
           disabled={disabled}
-          className="mm-theme-toggle"
+          className={mmActionButtonClass({ variant: "secondary" })}
           data-testid="schedule-none"
           onClick={() => onChange("0".repeat(SLOTS_PER_WEEK))}
         >

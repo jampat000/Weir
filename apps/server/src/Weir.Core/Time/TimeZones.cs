@@ -59,6 +59,13 @@ public static class TimeZones
 
     public static DateTimeOffset ToLocal(DateTimeOffset now, string? name) => TimeZoneInfo.ConvertTime(now, Find(name));
 
+    /// <summary>The moment the local day containing <paramref name="now"/> began, in the zone named <paramref name="name"/>.</summary>
+    public static DateTimeOffset StartOfLocalDay(DateTimeOffset now, string? name)
+    {
+        var zone = Find(name);
+        return FromWallClock(TimeZoneInfo.ConvertTime(now, zone).Date, zone);
+    }
+
     /// <summary>
     /// A wall-clock time in <paramref name="zone"/> as an instant. For an ambiguous or skipped time
     /// this takes the first offset, the one in force before the transition.

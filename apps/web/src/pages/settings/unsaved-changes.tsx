@@ -1,7 +1,7 @@
 /**
- * Unsaved edits in Settings are never dropped without asking. A panel with edits not yet saved names
- * them through `useUnsavedChanges`; the Settings page asks before its tab changes or the page is
- * left, and a panel asks through `useLeaveConfirmation` before it switches profile or closes.
+ * Unsaved edits in a setup area are never dropped without asking. A panel with edits not yet saved names
+ * them through `useUnsavedChanges`; the area asks before its tab changes or the page is left, and a
+ * panel asks through `useLeaveConfirmation` before it switches profile or closes.
  */
 import {
   createContext,
@@ -95,7 +95,7 @@ export function UnsavedChangesScope({
 }
 
 /**
- * Tells the Settings page that `thing` has edits not yet saved, or that nothing does (null). Outside
+ * Tells the setup area that `thing` has edits not yet saved, or that nothing does (null). Outside
  * the page, as in a panel's own tests, it does nothing.
  */
 export function useUnsavedChanges(thing: string | null): void {

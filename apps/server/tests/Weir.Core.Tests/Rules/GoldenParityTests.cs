@@ -203,7 +203,6 @@ public sealed class GoldenParityTests
                         OriginalLanguage = metadataJson.GetProperty("original_language").GetString()!,
                         Title = metadataJson.GetProperty("title").GetString()!,
                         Year = metadataJson.GetProperty("year").ValueKind == JsonValueKind.Null ? null : metadataJson.GetProperty("year").GetInt32(),
-                        ProviderId = metadataJson.GetProperty("provider_id").GetString()!,
                     },
             };
             var tracks = input.GetProperty("tracks").EnumerateArray()

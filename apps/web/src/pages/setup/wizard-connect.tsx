@@ -114,7 +114,7 @@ function DownloadClientConnectionRow({
 
 /**
  * Connecting to the chosen source: what is already connected, and the form to connect more. Uses the same
- * forms, tests and removal dialogs as Settings › Media managers, so a connection made here is the same one.
+ * forms, tests and removal dialogs as Setup › Connections › Media managers, so a connection made here is the same one.
  */
 export function WizardConnect({
   source,
@@ -137,7 +137,7 @@ export function WizardConnect({
   }
   if (connections.failed) {
     return (
-      <p className="mm-status-text--failed text-sm" role="alert">
+      <p className="mm-status-text text-sm" data-status="broken" role="alert">
         Weir could not load what is connected. Reload the page, or choose
         &ldquo;Neither&rdquo; and pick the folders yourself.
       </p>

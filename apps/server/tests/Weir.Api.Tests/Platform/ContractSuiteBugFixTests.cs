@@ -130,7 +130,7 @@ public sealed class ContractSuiteBugFixTests
             Assert.Equal("{\"detail\":\"Not Found\"}", await unknown.Content.ReadAsStringAsync());
         }
 
-        using var clientRoute = await client.GetAsync("/settings/general", html);
+        using var clientRoute = await client.GetAsync("/setup/workflows", html);
         Assert.Equal(HttpStatusCode.OK, clientRoute.StatusCode);
         Assert.Equal("<!doctype html><title>Weir</title>", await clientRoute.Content.ReadAsStringAsync());
     }

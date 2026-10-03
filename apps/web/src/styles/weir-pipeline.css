@@ -1,0 +1,578 @@
+/*
+ * The Pipeline: the stations as one arrow-shaped ribbon of tinted segments (busy ones with a moving
+ * sheen), under it equal columns with dashed dividers the full height of the lanes, and cards that sit in
+ * their station's column and glide when their station changes.
+ *
+ * Colours are the --weir-* tokens with the values they hold in the dark theme as fallbacks; the block just
+ * below is the one place they are read. Motion stops under prefers-reduced-motion, and while the window is
+ * being resized.
+ */
+.mm-pipe,
+.mm-shelf {
+  --pipe-card: var(--mm-card-bg);
+  --pipe-surface-2: var(--mm-surface-2);
+  --pipe-surface-3: var(--mm-surface-3);
+  --pipe-hairline: var(--mm-hairline);
+  --pipe-foreground: var(--mm-text);
+  --pipe-muted: var(--mm-text2);
+  --pipe-primary: var(--mm-primary);
+  --pipe-ring: var(--mm-primary);
+}
+
+.mm-pipe [data-stage="incoming"] {
+  --pipe-st: var(--mm-lane-incoming);
+}
+
+.mm-pipe [data-stage="queued"] {
+  --pipe-st: var(--mm-lane-queued);
+}
+
+.mm-pipe [data-stage="analysing"] {
+  --pipe-st: var(--mm-lane-analysing);
+}
+
+.mm-pipe [data-stage="processing"] {
+  --pipe-st: var(--mm-lane-processing);
+}
+
+.mm-pipe [data-stage="delivering"] {
+  --pipe-st: var(--mm-lane-delivering);
+}
+
+/* The board sits in a panel and takes the height the panel gives it. */
+.mm-pipe {
+  display: flex;
+  min-height: 0;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  color: var(--pipe-foreground);
+}
+
+.mm-pipe__body {
+  position: relative;
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+/* The ribbon: one arrow-shaped bar, each station a tinted segment with its icon, name and count. */
+.mm-pipe__stations {
+  position: relative;
+  container: mm-ribbon / inline-size;
+  display: grid;
+  grid-template-columns: repeat(var(--pipe-n), 1fr);
+  padding: 0 12px 10px;
+}
+
+.mm-pipe__station {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+  margin-right: -10px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--pipe-st) 10%, transparent);
+  clip-path: polygon(
+    0 0,
+    calc(100% - 14px) 0,
+    100% 50%,
+    calc(100% - 14px) 100%,
+    0 100%,
+    14px 50%
+  );
+}
+
+.mm-pipe__station:first-child {
+  border-radius: 9px 0 0 9px;
+  clip-path: polygon(
+    0 0,
+    calc(100% - 14px) 0,
+    100% 50%,
+    calc(100% - 14px) 100%,
+    0 100%
+  );
+}
+
+.mm-pipe__station:last-child {
+  margin-right: 0;
+  border-radius: 0 9px 9px 0;
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%, 14px 50%);
+}
+
+.mm-pipe__station-body {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 9px 22px 9px 26px;
+}
+
+.mm-pipe__station:first-child .mm-pipe__station-body {
+  padding-left: 14px;
+}
+
+.mm-pipe__dot {
+  display: grid;
+  width: 22px;
+  height: 22px;
+  flex: none;
+  place-items: center;
+  border: 1.5px solid var(--pipe-st);
+  border-radius: 50%;
+  color: var(--pipe-st);
+}
+
+.mm-pipe__dot svg {
+  width: 12px;
+  height: 12px;
+}
+
+.mm-pipe__station-text {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  justify-content: center;
+  gap: 6px;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+
+/* On a narrow station the count gives way first and the stage's name stays whole, as on Deluno's. */
+.mm-pipe__station-name {
+  flex: 0 0 auto;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-overflow: ellipsis;
+}
+
+.mm-pipe__station-count {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--mm-type-caption);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-overflow: ellipsis;
+}
+
+/* A ribbon too narrow for every station's icon and name gives up the icons, all together, so the name stays whole;
+   what is left of a station's width is its count's, which its tooltip has in full. 800px is five stations of the
+   icon, the name "Processing" and the padding, with a digit's room to spare. */
+@container mm-ribbon (max-width: 800px) {
+  .mm-pipe__dot {
+    display: none;
+  }
+}
+
+.mm-pipe__station--empty {
+  opacity: 0.55;
+}
+
+.mm-pipe__station--active {
+  background: color-mix(in srgb, var(--pipe-st) 24%, transparent);
+}
+
+.mm-pipe__station--active::after {
+  position: absolute;
+  inset: 0;
+  content: "";
+  pointer-events: none;
+  background: linear-gradient(
+    100deg,
+    transparent 30%,
+    hsl(0 0% 100% / 0.1) 50%,
+    transparent 70%
+  );
+  animation: mm-pipe-sheen 2.6s linear infinite;
+}
+
+/* The lanes: equal columns with dashed dividers; cards are placed in them by left and top. */
+.mm-pipe__lanes {
+  position: relative;
+  min-height: 0;
+  margin: 0 12px;
+  overflow: hidden;
+}
+
+.mm-pipe__divider {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-left: 1px dashed color-mix(in srgb, var(--pipe-muted) 28%, transparent);
+  pointer-events: none;
+}
+
+.mm-pipe__calm {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  display: flex;
+  height: var(--pipe-card-h, 86px);
+  align-items: center;
+  margin: 0;
+  padding: 0 8px;
+  font-size: 0.875rem;
+  color: var(--pipe-muted);
+}
+
+/* A card: the tile is 2:3 and 17px shorter than the card at every size, so its width is a third shorter than its height. */
+.mm-pipe__card {
+  position: absolute;
+  display: grid;
+  width: calc(100% / var(--pipe-n) - 12px);
+  height: var(--pipe-card-h, 86px);
+  grid-template-columns: calc(var(--pipe-tile-h, 69px) / 1.5) minmax(0, 1fr);
+  gap: 10px;
+  padding: 8px;
+  border: 1px solid var(--pipe-hairline);
+  border-left: 3px solid var(--pipe-st);
+  border-radius: 11px;
+  background: linear-gradient(180deg, var(--pipe-surface-2), var(--pipe-card));
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  text-decoration: none;
+  animation: mm-pipe-pop 0.6s ease;
+  transition:
+    left 0.9s cubic-bezier(0.2, 0.8, 0.2, 1),
+    top 0.9s cubic-bezier(0.2, 0.8, 0.2, 1),
+    opacity 0.4s,
+    border-color 0.6s,
+    filter 0.2s;
+}
+
+button.mm-pipe__card {
+  cursor: pointer;
+}
+
+.mm-pipe__card:hover {
+  filter: brightness(1.1);
+}
+
+.mm-pipe__card:focus-visible {
+  outline: 2px solid var(--pipe-ring);
+  outline-offset: 1px;
+}
+
+.mm-pipe__card--arrived {
+  animation:
+    mm-pipe-pop 0.6s ease,
+    mm-pipe-glow 1.4s ease-out;
+}
+
+/* A card that has left the board is edged in the meaning it ended with; delivered is also full for a moment, before its
+   tile flies to Just finished. */
+.mm-pipe .mm-pipe__card[data-status] {
+  --pipe-st: var(--mm-st);
+  border-color: var(--mm-st);
+}
+
+.mm-pipe .mm-pipe__card--delivered {
+  box-shadow:
+    0 0 0 1px var(--mm-st),
+    0 0 22px color-mix(in srgb, var(--mm-st) 35%, transparent);
+}
+
+.mm-pipe__card--hidden {
+  visibility: hidden;
+}
+
+.mm-pipe__tile {
+  display: block;
+  width: calc(var(--pipe-tile-h, 69px) / 1.5);
+  height: var(--pipe-tile-h, 69px);
+}
+
+.mm-pipe__text > * {
+  flex: none;
+}
+
+.mm-pipe__text {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.mm-pipe__title {
+  display: -webkit-box;
+  overflow: hidden;
+  font-size: clamp(13px, calc(var(--pipe-card-h, 86px) * 0.15), 15px);
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--pipe-foreground);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: var(--pipe-title-lines, 2);
+}
+
+/* A card that must keep its first detail line gives its title's second line up for it (fit-details.ts). */
+.mm-pipe__card[data-pipeline-tight] .mm-pipe__title {
+  -webkit-line-clamp: 1;
+}
+
+.mm-pipe__status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 3px;
+  overflow: hidden;
+  font-size: var(--mm-type-caption);
+  line-height: 1.2;
+  color: var(--pipe-muted);
+  white-space: nowrap;
+}
+
+/* The bold lead and the words after it: those take what room is left, and which wording they say is measured to it. The
+   words ignore the pointer, so the card's own tooltip is the one that shows over them. */
+.mm-pipe__status-text {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 0;
+  gap: 0.3em;
+}
+
+.mm-pipe__status-rest {
+  min-width: 0;
+  flex: 1 1 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}
+
+.mm-pipe__status b {
+  flex: none;
+  font-weight: 600;
+  color: var(--mm-st);
+}
+
+/* The words say it in colour only when it is over: done, held back or broken. Waiting and under way keep to the dot. */
+.mm-pipe__status:is(
+  [data-status="done"],
+  [data-status="attention"],
+  [data-status="broken"]
+) {
+  color: var(--mm-st);
+}
+
+.mm-pipe__pulse {
+  animation: mm-pipe-blink 1.2s ease-in-out infinite;
+}
+
+.mm-pipe__bar {
+  display: block;
+  height: 4px;
+  flex: none;
+  margin-top: 6px;
+  overflow: hidden;
+  border-radius: 9px;
+  background: var(--pipe-surface-3);
+}
+
+.mm-pipe__bar i {
+  position: relative;
+  display: block;
+  height: 100%;
+  overflow: hidden;
+  border-radius: 9px;
+  background: var(--mm-st);
+  transition: width 1s linear;
+}
+
+.mm-pipe__bar--moving i::after {
+  position: absolute;
+  inset: 0;
+  content: "";
+  background: linear-gradient(
+    90deg,
+    transparent,
+    hsl(0 0% 100% / 0.35),
+    transparent
+  );
+  animation: mm-pipe-shimmer 1.4s linear infinite;
+}
+
+/* No figure says how far a pass has got: the bar only says it is under way. */
+.mm-pipe__bar--waiting i {
+  animation: mm-pipe-wait 1.6s ease-in-out infinite alternate;
+}
+
+/* The detail block: what matters at this stage, as many whole lines as the card's height holds. */
+.mm-pipe__text > .mm-pipe__details {
+  flex: 1 1 0;
+}
+
+.mm-pipe__details {
+  display: grid;
+  min-height: 0;
+  align-content: start;
+  gap: 2px;
+  margin-top: 6px;
+  overflow: hidden;
+  font-size: var(--mm-type-caption);
+  color: var(--pipe-muted);
+}
+
+.mm-pipe__detail {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  overflow: hidden;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+/* The facts take the room the remark at the right leaves, and say as much of themselves as fits it (card-words.ts). */
+.mm-pipe__detail > span:first-child {
+  min-width: 0;
+  flex: 1 1 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mm-pipe__detail b {
+  font-weight: 600;
+  color: var(--pipe-foreground);
+}
+
+.mm-pipe__file {
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: var(--mm-type-eyebrow);
+  color: color-mix(in srgb, var(--pipe-muted) 80%, transparent);
+}
+
+.mm-pipe__more {
+  position: absolute;
+  font-size: var(--mm-type-caption);
+  line-height: 14px;
+  color: var(--pipe-primary);
+  text-decoration: none;
+}
+
+.mm-pipe__more:hover {
+  text-decoration: underline;
+}
+
+.mm-pipe__more:focus-visible {
+  border-radius: 4px;
+  outline: 2px solid var(--pipe-ring);
+  outline-offset: 1px;
+}
+
+/* The poster in flight: lifted off the page, its corners set by the flight as it passes from the card's to the shelf's. */
+.mm-tile--flying {
+  box-shadow: 0 16px 36px hsl(0 0% 0% / 0.5);
+}
+
+/* A phone: the stations stack and the same cards flow one under another. */
+.mm-pipe__body--stacked {
+  gap: 4px;
+  padding: 4px 12px 12px;
+  overflow-y: auto;
+}
+
+.mm-pipe__body--stacked .mm-pipe__station {
+  margin-right: 0;
+  margin-bottom: 6px;
+  border-radius: 9px;
+  clip-path: none;
+}
+
+.mm-pipe__body--stacked .mm-pipe__station-body {
+  justify-content: flex-start;
+  padding: 8px 12px;
+}
+
+.mm-pipe__body--stacked .mm-pipe__card {
+  position: relative;
+  width: 100%;
+  margin-bottom: 8px;
+}
+
+.mm-pipe__body--stacked .mm-pipe__calm {
+  position: static;
+}
+
+@keyframes mm-pipe-sheen {
+  from {
+    transform: translateX(-100%);
+  }
+
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes mm-pipe-shimmer {
+  from {
+    transform: translateX(-100%);
+  }
+
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes mm-pipe-blink {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@keyframes mm-pipe-pop {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes mm-pipe-wait {
+  from {
+    width: 25%;
+    margin-left: 0;
+  }
+
+  to {
+    width: 35%;
+    margin-left: 65%;
+  }
+}
+
+@keyframes mm-pipe-glow {
+  from {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--pipe-st) 55%, transparent);
+  }
+
+  40% {
+    box-shadow: 0 0 0 6px color-mix(in srgb, var(--pipe-st) 18%, transparent);
+  }
+
+  to {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+
+/* While the window is being resized the poster in flight is out of sight; it keeps following the shelf's tile and lands when the resize is over (the rest of the page is stilled by weir-processing-dashboard.css). */
+body.mm-pipeline-resizing .mm-tile--flying {
+  display: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mm-pipe__card {
+    transition: none;
+  }
+
+  .mm-pipe__station--active::after,
+  .mm-pipe__pulse,
+  .mm-pipe__bar--moving i::after,
+  .mm-pipe__bar--waiting i,
+  .mm-pipe__card,
+  .mm-pipe__card--arrived {
+    animation: none;
+  }
+}

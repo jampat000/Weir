@@ -16,7 +16,7 @@ pytestmark = [
 ]
 
 
-def test_activity_feed_updates_without_manual_refresh(
+def test_the_log_updates_without_manual_refresh(
     weir_shell: str,
     seed_activity_event,
 ) -> None:
@@ -31,7 +31,7 @@ def test_activity_feed_updates_without_manual_refresh(
             ensure_signed_in(page, base)
             open_logs(page)
 
-            expect(page.get_by_text(marker_detail, exact=True)).to_have_count(0)
+            expect(page.get_by_text("Password changed", exact=True)).to_have_count(0)
 
             seed_activity_event(
                 event_type="auth.password_changed",
@@ -40,8 +40,11 @@ def test_activity_feed_updates_without_manual_refresh(
                 detail=marker_detail,
             )
 
-            expect(page.get_by_role("heading", name="Password changed")).to_be_visible(timeout=10_000)
-            expect(page.get_by_text(marker_detail, exact=True)).to_be_visible(timeout=10_000)
+            # The row arrives on its own; it opens to what the event recorded.
+            title = page.get_by_text("Password changed", exact=True)
+            expect(title).to_be_visible(timeout=10_000)
             expect(page.get_by_text("Account and sign-in activity", exact=True).first).to_be_visible()
+            title.click()
+            expect(page.get_by_text(marker_detail, exact=False)).to_be_visible(timeout=10_000)
         finally:
             browser.close()

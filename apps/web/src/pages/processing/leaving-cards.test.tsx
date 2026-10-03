@@ -55,15 +55,16 @@ describe("outcomeFor", () => {
     });
   });
 
-  it("marks a failed file at the step it was on, with the first sentence of its reason", () => {
+  it("marks a failed file at the step it was on, with a few words on the kind of failure", () => {
     const failed = file(1, "processing_failed", {
+      failure_class: "execution",
       status_reason: "ffmpeg stopped. It said the disk was full.",
     });
 
     expect(outcomeFor(failed, "write")).toEqual({
       kind: "failed",
       at: "write",
-      reason: "ffmpeg stopped.",
+      reason: "Writing stopped · original kept",
     });
   });
 
@@ -71,7 +72,7 @@ describe("outcomeFor", () => {
     expect(outcomeFor(file(1, "processing_failed"), "verify")).toEqual({
       kind: "failed",
       at: "verify",
-      reason: "Weir could not finish this file.",
+      reason: "Couldn't finish · original kept",
     });
   });
 
@@ -87,7 +88,7 @@ describe("outcomeFor", () => {
     expect(outcomeFor(rejected, "checking")).toMatchObject({
       kind: "rejected",
       at: "checking",
-      reason: "It has no video.",
+      reason: "Rejected",
     });
     expect(outcomeFor(rejected, "write")).toMatchObject({
       kind: "rejected",
@@ -228,7 +229,7 @@ describe("advance", () => {
           outcome: {
             kind: "failed",
             at: "checking",
-            reason: "It would not open.",
+            reason: "Couldn't finish · original kept",
           },
         },
       ]);
@@ -397,7 +398,7 @@ describe("useLeavingCards", () => {
         outcome: {
           kind: "failed",
           at: "write",
-          reason: "The new file would not play.",
+          reason: "Couldn't finish · original kept",
         },
       },
     ]);

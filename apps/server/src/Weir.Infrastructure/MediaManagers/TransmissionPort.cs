@@ -61,7 +61,7 @@ public sealed class TransmissionPort : IDownloadClientPort
     /// <summary>Try the call; on 409, retry once with the session id the refusal named. Never a copy-pasted second attempt — one retry helper, called once.</summary>
     private async Task<DownloadClientHttpResponse> CallSessionGetAsync(DownloadClientConnection connection, CancellationToken cancellationToken)
     {
-        var client = new DownloadClientHttpClient(connection.BaseUrl, _handlers);
+        var client = new DownloadClientHttpClient(connection.BaseUrl, _handlers, connection: connection.Reference);
         var authHeader = AuthHeader(connection);
         var first = await SendSessionGetAsync(client, authHeader, cancellationToken).ConfigureAwait(false);
         if (first.Status != 409)

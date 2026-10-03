@@ -1,3 +1,4 @@
+using Weir.Core.Artwork;
 using Weir.Core.Processing;
 namespace Weir.Core.Configuration;
 
@@ -166,6 +167,7 @@ public static class WeirOptionsLoader
             OutputOwnershipGid = outputOwnershipGid,
             OutputOwnershipFileMode = outputFileMode,
             OutputOwnershipDirectoryMode = outputDirMode,
+            ArtworkGatewayUrl = ParseArtworkGatewayUrl(runtime.Get("WEIR_ARTWORK_GATEWAY_URL")),
         };
     }
 
@@ -291,6 +293,31 @@ public static class WeirOptionsLoader
         }
 
         return (UnixFileMode)Convert.ToInt32(value, 8);
+    }
+
+    /// <summary>
+    /// The metadata gateway address: the real service when unset, empty for <c>off</c>, otherwise an http or https address with no
+    /// trailing slash. A set but unusable value refuses to start, since an address Weir cannot use is one it cannot ask.
+    /// </summary>
+    internal static string ParseArtworkGatewayUrl(string? raw)
+    {
+        var value = (raw ?? string.Empty).Trim();
+        if (value.Length == 0)
+        {
+            return ArtworkPosterSource.DefaultGatewayUrl;
+        }
+
+        if (value.Equals("off", StringComparison.OrdinalIgnoreCase))
+        {
+            return string.Empty;
+        }
+
+        if (!Uri.TryCreate(value, UriKind.Absolute, out var uri) || uri.Scheme is not ("http" or "https") || uri.Host.Length == 0)
+        {
+            throw new WeirConfigurationException("WEIR_ARTWORK_GATEWAY_URL must be an http or https address, or off.");
+        }
+
+        return value.TrimEnd('/');
     }
 
     private static string HttpUrlOrEmpty(string? raw)

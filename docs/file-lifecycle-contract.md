@@ -8,7 +8,7 @@ Weir must never report a partial media mutation as successful, and must never ex
 - Validate the staged file before final placement where validation is available.
 - Expose the final path only through a rename within the destination directory, so the final name only ever appears complete.
 - For cross-volume placement, copy into a hidden partial file in the destination directory first, then rename it onto the final path. A plain `File.Move` must not be used across volumes: .NET silently turns it into a copy to the final name, which exposes a half-written file.
-- Only record job or History success after the final file exists and passes the relevant safety checks.
+- Only record job or Activity success after the final file exists and passes the relevant safety checks.
 - Do not delete watched-folder or output-folder material unless the operation has traceable intent and an output safety check has passed.
 
 ## Seams

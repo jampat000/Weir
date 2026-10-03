@@ -23,6 +23,46 @@ public sealed class ProcessingJobStoreTests : IDisposable
     }
 
     [Fact]
+    public async Task A_job_that_runs_again_queues_a_new_run_once_the_last_one_has_finished()
+    {
+        var first = await _db.Store.EnqueueNextRunAsync("again", Kind);
+        Assert.Equal(first.Id, (await _db.Store.ClaimNextAsync("w", T0.AddHours(1), T0))!.Id);
+        Assert.True(await _db.Store.CompleteClaimedAsync(first.Id, "w", T0));
+
+        var second = await _db.Store.EnqueueNextRunAsync("again", Kind);
+
+        Assert.NotEqual(first.Id, second.Id);
+        Assert.Equal(ProcessingJobStatus.Pending, second.Status);
+        Assert.Equal("again", second.DedupeKey);
+        Assert.Equal($"again:ran:{first.Id}", _db.Scalar($"SELECT dedupe_key FROM jobs WHERE id = {first.Id}"));
+        Assert.Equal(ProcessingJobStatus.Completed, _db.Scalar($"SELECT status FROM jobs WHERE id = {first.Id}"));
+    }
+
+    [Fact]
+    public async Task A_job_that_runs_again_queues_a_new_run_after_a_failed_one_too()
+    {
+        var first = await _db.Store.EnqueueNextRunAsync("again", Kind);
+        _db.Execute("UPDATE jobs SET status = @status WHERE id = @id", ("@status", ProcessingJobStatus.Failed), ("@id", first.Id));
+
+        var second = await _db.Store.EnqueueNextRunAsync("again", Kind);
+
+        Assert.NotEqual(first.Id, second.Id);
+        Assert.Equal(2, _db.Count("SELECT count(*) FROM jobs"));
+    }
+
+    [Fact]
+    public async Task A_job_that_runs_again_never_has_two_runs_waiting_or_running()
+    {
+        var waiting = await _db.Store.EnqueueNextRunAsync("again", Kind);
+        Assert.Equal(waiting.Id, (await _db.Store.EnqueueNextRunAsync("again", Kind)).Id);
+
+        await _db.Store.ClaimNextAsync("w", T0.AddHours(1), T0);
+        Assert.Equal(waiting.Id, (await _db.Store.EnqueueNextRunAsync("again", Kind)).Id);
+
+        Assert.Equal(1, _db.Count("SELECT count(*) FROM jobs"));
+    }
+
+    [Fact]
     public async Task Enqueue_clamps_attempts_and_cost_and_writes_a_fresh_pending_row()
     {
         var job = await _db.Store.EnqueueOrGetAsync("shape", Kind, "{\"a\":1}", maxAttempts: 0, runnerCost: -4, priority: 7);

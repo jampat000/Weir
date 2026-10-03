@@ -3,7 +3,7 @@
 Run with WEIR_E2E=1. Screenshots are saved to artifacts/screenshots/ for
 visual inspection. The artifacts/ directory is .gitignored so no pixel-exact
 baselines are committed; these are informational smoke checks. What is asserted is
-the structure of each screen: Processing at "/", Settings and System as two rows of
+the structure of each screen: the Dashboard at "/", each setup area and System with a row of
 tabs, and System › Logs with its history statement.
 
 Usage:
@@ -32,6 +32,14 @@ pytestmark = [
         reason="Weir E2E requires WEIR_E2E=1 (see tests/e2e/weir/conftest.py).",
     ),
 ]
+
+# Every setup area, as named in the side menu.
+_SETUP_AREA_LABELS = (
+    "Workflows",
+    "Connections",
+    "Rules",
+    "Performance",
+)
 
 # Directory where screenshots are persisted (informational, .gitignored).
 _SCREENSHOT_DIR = Path(__file__).resolve().parents[3] / "artifacts" / "screenshots"
@@ -84,12 +92,18 @@ def _assert_document_owns_vertical_scroll(page) -> None:
     assert scroll["scrollingElement"] == "HTML", scroll
 
 
-def _assert_tab_workspace(page, *, page_test_id: str, tabs_test_id: str) -> None:
-    """A page uses the shared themed tab bar and accessible panel contract."""
+def _assert_workspace(page, *, page_test_id: str, tabs_test_id: str | None) -> None:
+    """A workspace page, and when it has tabs, the shared themed tab bar and accessible panel contract.
+
+    A page without tabs has no tab list.
+    """
     workspace = page.get_by_test_id(page_test_id)
     expect(workspace).to_have_class(re.compile(r"\bmm-workspace-page\b"))
+    if tabs_test_id is None:
+        expect(page.get_by_role("tablist")).to_have_count(0)
+        return
     tabs = page.get_by_test_id(tabs_test_id)
-    expect(tabs).to_have_class(re.compile(r"\bmm-workspace-tabs\b"))
+    expect(tabs).to_have_class(re.compile(r"\bmm-page-tabs\b"))
     active_tab = tabs.locator("[role='tab'][aria-selected='true']")
     expect(active_tab).to_have_count(1)
     panel_id = active_tab.get_attribute("aria-controls")
@@ -100,9 +114,9 @@ def _assert_tab_workspace(page, *, page_test_id: str, tabs_test_id: str) -> None
 
 
 def test_old_dashboard_address_is_not_found(weir_shell: str) -> None:
-    """A retired address such as /dashboard gets the not-found page, which offers the way to Processing.
+    """A retired address such as /dashboard gets the not-found page, which offers the way to the Dashboard.
 
-    Only addresses a user could still have saved are redirected; /dashboard is not one of them.
+    The Dashboard lives at "/", as Processing always did, so no address was ever saved as /dashboard.
     """
     base = weir_shell.rstrip("/")
     with sync_playwright() as p:
@@ -120,18 +134,20 @@ def test_old_dashboard_address_is_not_found(weir_shell: str) -> None:
                     "heading", name="This page doesn't exist.", exact=True
                 )
             ).to_be_visible()
-            expect(page.get_by_role("link", name="Dashboard", exact=True)).to_have_count(0)
+            expect(page.get_by_role("link", name="Dashboard", exact=True).first).not_to_have_attribute(
+                "aria-current", "page"
+            )
             _assert_no_error_state(page)
 
-            page.get_by_role("link", name="Go to Processing", exact=True).click()
+            page.get_by_role("link", name="Go to Dashboard", exact=True).click()
             expect(page).to_have_url(re.compile(r".*/(?:$|[?#])"))
-            expect(page.get_by_role("heading", name="Processing", exact=True)).to_be_visible()
+            expect(page.get_by_role("heading", name="Dashboard", exact=True)).to_be_visible()
         finally:
             browser.close()
 
 
-def test_processing_is_the_landing_page(weir_shell: str) -> None:
-    """Weir lands on Processing at "/": every file Weir is working on. There is no Home page."""
+def test_dashboard_is_the_landing_page(weir_shell: str) -> None:
+    """Weir lands on the Dashboard at "/": every file Weir is working on. There is no Home page."""
     base = weir_shell.rstrip("/")
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
@@ -143,7 +159,7 @@ def test_processing_is_the_landing_page(weir_shell: str) -> None:
             page.goto(f"{base}/", wait_until="domcontentloaded")
 
             expect(page.get_by_test_id("processing-page")).to_be_visible()
-            expect(page.get_by_role("heading", name="Processing", exact=True)).to_be_visible()
+            expect(page.get_by_role("heading", name="Dashboard", exact=True)).to_be_visible()
             expect(page.get_by_role("heading", name="Home", exact=True)).to_have_count(0)
             # Page content only: the shell brand line is replaced by the Weir rename (#458).
             expect(page.locator("main").get_by_text("your library", exact=False)).to_have_count(0)
@@ -167,16 +183,20 @@ def test_history_says_how_far_back_it_goes(weir_shell: str) -> None:
             open_logs(page)
 
             expect(page).to_have_url(re.compile(r".*/system\?tab=logs(?:$|[&#])"))
-            expect(page.get_by_test_id("activity-retention")).to_contain_text("History goes back 90 days")
-            expect(page.get_by_test_id("activity-feed")).to_be_visible()
+            expect(page.get_by_test_id("log-feed")).to_be_visible()
             _assert_no_error_state(page)
-            _save_screenshot(page, "history")
+            _save_screenshot(page, "logs")
+
+            page.get_by_role("button", name="Log settings", exact=True).click()
+            expect(page.get_by_test_id("suite-settings-retention")).to_contain_text("How long things are kept")
+            _assert_no_error_state(page)
+            _save_screenshot(page, "logs-settings")
         finally:
             browser.close()
 
 
-def test_settings_and_system_tabs_render(weir_shell: str) -> None:
-    """Every Settings and System tab opens, and the document keeps the scroll."""
+def test_setup_and_system_tabs_render(weir_shell: str) -> None:
+    """Every setup area and System tab opens, and the document keeps the scroll."""
     base = weir_shell.rstrip("/")
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
@@ -186,18 +206,27 @@ def test_settings_and_system_tabs_render(weir_shell: str) -> None:
 
             ensure_signed_in(page, base)
 
-            for label, page_test_id, tabs_test_id in (
-                ("Settings", "suite-settings-page", "settings-section-tabs"),
-                ("System", "suite-system-page", "system-section-tabs"),
-            ):
+            # Each setup area is an entry of its own in the side menu, with its tabs across the top, as System has.
+            for label in _SETUP_AREA_LABELS:
                 open_sidebar(page, label)
-                expect(page.get_by_test_id(page_test_id)).to_be_visible()
-                tabs = page.get_by_test_id(tabs_test_id).get_by_role("tab")
-                for index in range(tabs.count()):
-                    tab = tabs.nth(index)
-                    tab.click()
-                    expect(tab).to_have_attribute("aria-selected", "true")
+                expect(page.get_by_test_id("suite-settings-page")).to_be_visible()
+                # The previous area's tabs stay until this one has drawn, so count them only once its title shows.
+                expect(page.get_by_role("heading", level=1, name=label, exact=True)).to_be_visible()
+                area_tabs = page.get_by_test_id("setup-area-tabs").get_by_role("tab")
+                for index in range(area_tabs.count()):
+                    area_tab = area_tabs.nth(index)
+                    area_tab.click()
+                    expect(area_tab).to_have_attribute("aria-selected", "true")
                     _assert_no_error_state(page)
+
+            open_sidebar(page, "System")
+            expect(page.get_by_test_id("suite-system-page")).to_be_visible()
+            tabs = page.get_by_test_id("system-section-tabs").get_by_role("tab")
+            for index in range(tabs.count()):
+                tab = tabs.nth(index)
+                tab.click()
+                expect(tab).to_have_attribute("aria-selected", "true")
+                _assert_no_error_state(page)
 
             open_tab(page, "System", "Security")
             expect(page.get_by_test_id("suite-settings-security")).to_be_visible()
@@ -222,10 +251,10 @@ def test_settings_and_system_tabs_render(weir_shell: str) -> None:
             browser.close()
 
 
-def test_settings_and_system_share_themed_tabs_and_responsive_layout(
+def test_setup_and_system_share_themed_tabs_and_responsive_layout(
     weir_shell: str,
 ) -> None:
-    """Settings and System use the shared horizontal tab bar without page overflow."""
+    """The setup areas and System use the shared horizontal tab bar without page overflow."""
     base = weir_shell.rstrip("/")
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
@@ -236,15 +265,11 @@ def test_settings_and_system_share_themed_tabs_and_responsive_layout(
             ensure_signed_in(page, base)
 
             for label, page_test_id, tabs_test_id, screenshot_name in (
-                ("Settings", "suite-settings-page", "settings-section-tabs", "settings-workspace"),
+                ("Workflows", "suite-settings-page", "setup-area-tabs", "settings-workspace"),
                 ("System", "suite-system-page", "system-section-tabs", "system-workspace"),
             ):
                 open_sidebar(page, label)
-                _assert_tab_workspace(
-                    page,
-                    page_test_id=page_test_id,
-                    tabs_test_id=tabs_test_id,
-                )
+                _assert_workspace(page, page_test_id=page_test_id, tabs_test_id=tabs_test_id)
                 _assert_document_owns_vertical_scroll(page)
                 _assert_no_error_state(page)
                 _scroll_to_top(page)
@@ -255,11 +280,7 @@ def test_settings_and_system_share_themed_tabs_and_responsive_layout(
                     mobile_page.set_viewport_size({"width": 390, "height": 844})
                     mobile_page.set_default_timeout(30_000)
                     mobile_page.goto(page.url, wait_until="domcontentloaded")
-                    _assert_tab_workspace(
-                        mobile_page,
-                        page_test_id=page_test_id,
-                        tabs_test_id=tabs_test_id,
-                    )
+                    _assert_workspace(mobile_page, page_test_id=page_test_id, tabs_test_id=tabs_test_id)
                     assert mobile_page.evaluate(
                         "document.documentElement.scrollWidth <= document.documentElement.clientWidth"
                     ), f"{label} overflows the narrow viewport"
@@ -273,7 +294,7 @@ def test_settings_and_system_share_themed_tabs_and_responsive_layout(
 
 
 def test_rules_editor_renders(weir_shell: str) -> None:
-    """Settings › Rules: the full audio & subtitle profile editor stays readable at desktop width."""
+    """Setup › Rules › Profiles: the full audio & subtitle profile editor stays readable at desktop width."""
     base = weir_shell.rstrip("/")
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
@@ -282,9 +303,9 @@ def test_rules_editor_renders(weir_shell: str) -> None:
             page.set_default_timeout(30_000)
             ensure_signed_in(page, base)
 
-            open_tab(page, "Settings", "Rules")
+            open_tab(page, "Rules", "Profiles")
             expect(page.get_by_test_id("processing-rule-set-workspace")).to_be_visible()
-            page.get_by_role("button", name="New profile →", exact=True).click()
+            page.get_by_role("button", name="New profile", exact=True).click()
             # The profile bar: the picker, the name and who uses it on one line; the field is "Name".
             expect(page.get_by_test_id("rule-set-profile-bar").get_by_label("Name", exact=True)).to_be_visible()
             expect(page.get_by_text("Audio order", exact=True)).not_to_be_visible()

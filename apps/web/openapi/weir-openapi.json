@@ -44,6 +44,18 @@
             "title": "Module",
             "type": "string"
           },
+          "poster_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Where Weir serves this file's poster (/api/v1/artwork/posters/{id}). Null until one is found, when the title has none, or when an administrator has turned the metadata service off.",
+            "title": "Poster Url"
+          },
           "relative_path": {
             "anyOf": [
               {
@@ -469,6 +481,72 @@
           "bundle"
         ],
         "title": "ConfigurationBundleImportIn",
+        "type": "object"
+      },
+      "ConnectionActivityFrame": {
+        "description": "The data of a connection.activity frame on GET /activity/stream: one thing that happened on a media manager or download client connection.",
+        "properties": {
+          "at": {
+            "description": "When it happened.",
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "direction": {
+            "description": "outbound: Weir called the connection. inbound: the connection called Weir (a hand-off, webhook or outcome).",
+            "enum": [
+              "outbound",
+              "inbound"
+            ],
+            "title": "Direction",
+            "type": "string"
+          },
+          "id": {
+            "description": "The connection's id, in the list its kind names.",
+            "title": "Id",
+            "type": "integer"
+          },
+          "kind": {
+            "enum": [
+              "media_manager",
+              "download_client"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "ms": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "How long an outbound call took; null while it is still asked, and for an inbound call.",
+            "title": "Ms"
+          },
+          "phase": {
+            "description": "asked: Weir started a call. answered: the connection replied, or called Weir. failed: it did not reply, or refused Weir or was broken.",
+            "enum": [
+              "asked",
+              "answered",
+              "failed"
+            ],
+            "title": "Phase",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "id",
+          "phase",
+          "direction",
+          "at",
+          "ms"
+        ],
+        "title": "ConnectionActivityFrame",
         "type": "object"
       },
       "CsrfOut": {
@@ -1028,6 +1106,32 @@
               }
             ],
             "title": "Last Test Detail"
+          },
+          "last_answer_ms": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "How long the last call to this connection took, in milliseconds: a connection test or any real call. Null until Weir has made one.",
+            "title": "Last Answer Ms"
+          },
+          "last_used_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When Weir last talked to this connection, or it last called Weir. Null until that has happened.",
+            "title": "Last Used At"
           }
         },
         "required": [
@@ -1767,6 +1871,18 @@
             "title": "Path",
             "type": "string"
           },
+          "poster_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Where Weir serves this file's poster (/api/v1/artwork/posters/{id}). Null until one is found, when the title has none, or when an administrator has turned the metadata service off.",
+            "title": "Poster Url"
+          },
           "problem_kind": {
             "anyOf": [
               {
@@ -1812,6 +1928,35 @@
           "size_bytes": {
             "title": "Size Bytes",
             "type": "integer"
+          },
+          "status": {
+            "description": "Where the file stands now, against the current rules: exactly one of these. Left alone beats cleaning, which beats cant_clean_yet (still shared with a download, or unreadable), which beats needs_cleaning, which beats matches.",
+            "enum": [
+              "needs_cleaning",
+              "cleaning",
+              "matches",
+              "cant_clean_yet",
+              "left_alone"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "status_reason": {
+            "anyOf": [
+              {
+                "enum": [
+                  "new",
+                  "replaced",
+                  "rules_changed"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Why a file that needs cleaning does, when the scan can say: it is new since the last check, the file on disk is not the one Weir last saw or cleaned, or it matched before (or Weir cleaned it) and the rules changed. Null for any other status, and when nothing on record supports a reason.",
+            "title": "Status Reason"
           },
           "subtitle_summary": {
             "anyOf": [
@@ -1877,7 +2022,9 @@
           "video_codec",
           "video_height",
           "cleaned_at",
-          "leave_alone"
+          "leave_alone",
+          "status",
+          "status_reason"
         ],
         "title": "LibraryFileOut",
         "type": "object"
@@ -1938,7 +2085,8 @@
               "resolution",
               "audio",
               "subtitles",
-              "modified"
+              "modified",
+              "status"
             ],
             "title": "Sort",
             "type": "string"
@@ -2132,6 +2280,41 @@
           "libraries"
         ],
         "title": "LibraryFoldersOut",
+        "type": "object"
+      },
+      "LibraryStatusCountsOut": {
+        "additionalProperties": false,
+        "description": "How many files are in each status. One status per file, so these add up to the files.",
+        "properties": {
+          "cant_clean_yet": {
+            "title": "Cant Clean Yet",
+            "type": "integer"
+          },
+          "cleaning": {
+            "title": "Cleaning",
+            "type": "integer"
+          },
+          "left_alone": {
+            "title": "Left Alone",
+            "type": "integer"
+          },
+          "matches": {
+            "title": "Matches",
+            "type": "integer"
+          },
+          "needs_cleaning": {
+            "title": "Needs Cleaning",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "cant_clean_yet",
+          "cleaning",
+          "left_alone",
+          "matches",
+          "needs_cleaning"
+        ],
+        "title": "LibraryStatusCountsOut",
         "type": "object"
       },
       "ProposedLibraryCheckIn": {
@@ -2925,6 +3108,9 @@
         "additionalProperties": false,
         "description": "Issue #568: how many files a library holds and what its rules would do to them.",
         "properties": {
+          "by_status": {
+            "$ref": "#/components/schemas/LibraryStatusCountsOut"
+          },
           "cannot_process": {
             "title": "Cannot Process",
             "type": "integer"
@@ -2976,7 +3162,8 @@
           "total_removed_subtitle_tracks",
           "would_change",
           "cleaned",
-          "left_alone"
+          "left_alone",
+          "by_status"
         ],
         "title": "LibraryTotalsOut",
         "type": "object"
@@ -3072,7 +3259,7 @@
             "type": "integer"
           },
           "interval_seconds": {
-            "description": "How often this job runs: the interval saved in Settings › Cleanup, else the environment's.",
+            "description": "How often this job runs: the interval saved in Setup › Performance › Cleanup, else the environment's.",
             "title": "Interval Seconds",
             "type": "integer"
           },
@@ -3457,6 +3644,19 @@
             "title": "Lanes",
             "type": "array"
           },
+          "last_answer_ms": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "How long the last call to this connection took, in milliseconds: a connection test or any real call. Null until Weir has made one.",
+            "title": "Last Answer Ms"
+          },
           "last_test_at": {
             "anyOf": [
               {
@@ -3490,6 +3690,19 @@
               }
             ],
             "title": "Last Test Ok"
+          },
+          "last_used_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When Weir last talked to this connection, or it last called Weir. Null until that has happened.",
+            "title": "Last Used At"
           },
           "name": {
             "description": "The connection's name: its kind and the host in its address, set by Weir.",
@@ -3873,11 +4086,24 @@
                 "type": "null"
               }
             ],
-            "description": "Omit to leave the stored key untouched. An empty string clears it.",
+            "description": "Ignored. Weir no longer uses a key of its own.",
             "title": "Api Key"
+          },
+          "artwork_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Ignored. Artwork is always on unless an administrator turns the metadata service off with WEIR_ARTWORK_GATEWAY_URL=off.",
+            "title": "Artwork Enabled"
           },
           "base_url": {
             "default": "",
+            "description": "Ignored.",
             "maxLength": 500,
             "title": "Base Url",
             "type": "string"
@@ -3889,11 +4115,8 @@
           },
           "provider": {
             "default": "",
-            "description": "Empty clears the connection.",
-            "enum": [
-              "",
-              "tmdb"
-            ],
+            "description": "Ignored.",
+            "maxLength": 500,
             "title": "Provider",
             "type": "string"
           }
@@ -3906,13 +4129,25 @@
       },
       "MetadataProviderOut": {
         "properties": {
+          "artwork_enabled": {
+            "description": "Always true: Weir looks posters up through Deluno's metadata service and shows them.",
+            "title": "Artwork Enabled",
+            "type": "boolean"
+          },
           "base_url": {
-            "description": "Where Weir asks. Configurable so a cache or gateway in front of the provider works.",
-            "title": "Base Url",
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Always null: the address of Deluno's metadata service is not a setting.",
+            "title": "Base Url"
           },
           "key_configured": {
-            "description": "Whether a key is stored. The key itself is never returned.",
+            "description": "Always false: Weir needs no key.",
             "title": "Key Configured",
             "type": "boolean"
           },
@@ -3924,7 +4159,7 @@
             "type": "array"
           },
           "provider": {
-            "description": "The configured provider, or empty when there is none.",
+            "description": "Always deluno-gateway.",
             "title": "Provider",
             "type": "string"
           }
@@ -3932,7 +4167,8 @@
         "required": [
           "provider",
           "base_url",
-          "key_configured"
+          "key_configured",
+          "artwork_enabled"
         ],
         "title": "MetadataProviderOut",
         "type": "object"
@@ -4455,7 +4691,7 @@
       },
       "ProcessingFileForgetIn": {
         "additionalProperties": false,
-        "description": "History's remove dialog (#785). `resolution` is only meaningful for a failed or rejected file whose\noriginal is still in the watched folder (see ProcessingFileRemoveOptionsOut); anything else is always a plain\nremove, whatever `resolution` asks for. `confirm_size_bytes` and `confirm_modified_at` are the file's current\ndetails as `remove-options` reported them (#786 follow-up): required for `delete` or `keep` on a title whose\n`fingerprint_recorded` is false, ignored otherwise.",
+        "description": "Activity's remove dialog (#785). `resolution` is only meaningful for a failed or rejected file whose\noriginal is still in the watched folder (see ProcessingFileRemoveOptionsOut); anything else is always a plain\nremove, whatever `resolution` asks for. `confirm_size_bytes` and `confirm_modified_at` are the file's current\ndetails as `remove-options` reported them (#786 follow-up): required for `delete` or `keep` on a title whose\n`fingerprint_recorded` is false, ignored otherwise.",
         "properties": {
           "csrf_token": {
             "minLength": 1,
@@ -4505,7 +4741,7 @@
         "type": "object"
       },
       "ProcessingFileRemoveOptionsOut": {
-        "description": "What History's remove dialog should offer for one title, read before it is shown (#785).",
+        "description": "What Activity's remove dialog should offer for one title, read before it is shown (#785).",
         "properties": {
           "requires_choice": {
             "title": "Requires Choice",
@@ -4589,7 +4825,7 @@
         "type": "object"
       },
       "ProcessingKeptFileOut": {
-        "description": "One file kept without processing again from History's remove dialog (#785).",
+        "description": "One file kept without processing again from Activity's remove dialog (#785).",
         "properties": {
           "id": {
             "title": "Id",
@@ -4606,6 +4842,18 @@
           "relative_path": {
             "title": "Relative Path",
             "type": "string"
+          },
+          "poster_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Where Weir serves this file's poster (/api/v1/artwork/posters/{id}). Null until one is found, when the title has none, or when an administrator has turned the metadata service off.",
+            "title": "Poster Url"
           },
           "size_bytes": {
             "title": "Size Bytes",
@@ -4874,7 +5122,7 @@
           },
           "kind": {
             "const": "download",
-            "description": "Which kind of History entry this is: always a download here.",
+            "description": "Which kind of Activity entry this is: always a download here.",
             "title": "Kind",
             "type": "string"
           },
@@ -4958,6 +5206,18 @@
             ],
             "description": "Why, written for the person asking why there is no new output for this file.",
             "title": "Output Collision Reason"
+          },
+          "poster_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Where Weir serves this file's poster (/api/v1/artwork/posters/{id}). Null until one is found, when the title has none, or when an administrator has turned the metadata service off.",
+            "title": "Poster Url"
           },
           "progress_elapsed_seconds": {
             "anyOf": [
@@ -5675,6 +5935,18 @@
             "title": "Limit",
             "type": "integer"
           },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Pass as cursor for the next page; null on the last.",
+            "title": "Next Cursor"
+          },
           "returned": {
             "title": "Returned",
             "type": "integer"
@@ -5691,7 +5963,8 @@
           "files",
           "status_counts",
           "returned",
-          "limit"
+          "limit",
+          "next_cursor"
         ],
         "title": "ProcessingFilesPageOut",
         "type": "object"
@@ -5976,7 +6249,7 @@
         "type": "object"
       },
       "ProcessingLibraryCleanOut": {
-        "description": "What the newest library clean did to one file, as History lists it.",
+        "description": "What the newest library clean did to one file, as Activity lists it.",
         "properties": {
           "detail": {
             "description": "What happened, in the clean's own words.",
@@ -6016,6 +6289,18 @@
             "title": "Outcome",
             "type": "string"
           },
+          "poster_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Where Weir serves this file's poster (/api/v1/artwork/posters/{id}). Null until one is found, when the title has none, or when an administrator has turned the metadata service off.",
+            "title": "Poster Url"
+          },
           "recorded_at": {
             "format": "date-time",
             "title": "Recorded At",
@@ -6051,7 +6336,7 @@
         "type": "object"
       },
       "ProcessingLibraryCleansOut": {
-        "description": "Library cleans for History, newest first, one per file.",
+        "description": "Library cleans for Activity, newest first, one per file.",
         "properties": {
           "cleans": {
             "items": {
@@ -6196,7 +6481,7 @@
             "minimum": 0.0,
             "title": "Max Concurrent Files",
             "type": "integer",
-            "description": "The most files this workflow runs at once, as a share of \"Files at once\" in Settings › Performance. 0 means no limit of its own. It cannot be more than Performance's Files at once: a save that asks for more is refused."
+            "description": "The most files this workflow runs at once, as a share of \"Files at once\" in Setup › Performance › Speed. 0 means no limit of its own. It cannot be more than that Files at once: a save that asks for more is refused."
           },
           "max_file_size_mb": {
             "default": 0,
@@ -6821,7 +7106,7 @@
             "type": "integer"
           },
           "effective_max_concurrent_files": {
-            "description": "The most files this workflow is held to now: its own limit, and never more than Files at once in Settings › Performance, even if that was lowered after this was set.",
+            "description": "The most files this workflow is held to now: its own limit, and never more than Files at once in Setup › Performance › Speed, even if that was lowered after this was set.",
             "title": "Effective Max Concurrent Files",
             "type": "integer"
           },
@@ -7030,7 +7315,7 @@
             "minimum": 0.0,
             "title": "Max Concurrent Files",
             "type": "integer",
-            "description": "The most files this workflow runs at once, as a share of \"Files at once\" in Settings › Performance. 0 means no limit of its own. It cannot be more than Performance's Files at once: a save that asks for more is refused."
+            "description": "The most files this workflow runs at once, as a share of \"Files at once\" in Setup › Performance › Speed. 0 means no limit of its own. It cannot be more than that Files at once: a save that asks for more is refused."
           },
           "max_file_size_mb": {
             "default": 0,
@@ -7491,7 +7776,7 @@
                 "type": "null"
               }
             ],
-            "description": "How often the leftover-work-file sweep runs, set in Settings › Cleanup. Null keeps the environment's interval.",
+            "description": "How often the leftover-work-file sweep runs, set in Setup › Performance › Cleanup. Null keeps the environment's interval.",
             "title": "Work Temp Stale Sweep Interval Seconds"
           },
           "unclaimed_handback_cleanup_enabled": {
@@ -7515,7 +7800,7 @@
                 "type": "null"
               }
             ],
-            "description": "How often the unclaimed hand-back cleanup runs, set in Settings › Cleanup. Null keeps six hours.",
+            "description": "How often the unclaimed hand-back cleanup runs, set in Setup › Performance › Cleanup. Null keeps six hours.",
             "title": "Unclaimed Handback Cleanup Interval Seconds"
           }
         },
@@ -9651,8 +9936,67 @@
       },
       "SuiteNetworkAccessOut": {
         "additionalProperties": false,
-        "description": "Whether another device on the network can currently reach Weir.",
+        "description": "Who can reach Weir over the network, and what is happening about a change.",
         "properties": {
+          "addresses": {
+            "description": "Where another device would type to reach Weir (for example http://10.0.0.196:9347); empty unless the server listens, or is about to listen, for the network.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Addresses",
+            "type": "array"
+          },
+          "firewall": {
+            "description": "What Windows Firewall says about Weir's server program: allowed, blocked, or not_checked while nothing depends on it.",
+            "enum": [
+              "allowed",
+              "blocked",
+              "not_checked"
+            ],
+            "title": "Firewall",
+            "type": "string"
+          },
+          "machine_name": {
+            "description": "This PC's name, for \"approve on MEDIA-PC\".",
+            "title": "Machine Name",
+            "type": "string"
+          },
+          "pending_scope": {
+            "anyOf": [
+              {
+                "enum": [
+                  "this_pc_only",
+                  "network"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The saved choice when the running server has not caught up with it yet (the tray still has to restart it); null otherwise.",
+            "title": "Pending Scope"
+          },
+          "port": {
+            "title": "Port",
+            "type": "integer"
+          },
+          "scope": {
+            "anyOf": [
+              {
+                "enum": [
+                  "this_pc_only",
+                  "network"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Who the running server listens for; null when this copy of Weir does not manage that (Docker, a bare install).",
+            "title": "Scope"
+          },
           "state": {
             "description": "this_pc_only, allowed, blocked, or not_applicable",
             "minLength": 1,
@@ -9666,9 +10010,41 @@
         },
         "required": [
           "state",
-          "summary"
+          "summary",
+          "scope",
+          "pending_scope",
+          "firewall",
+          "port",
+          "machine_name",
+          "addresses"
         ],
         "title": "SuiteNetworkAccessOut",
+        "type": "object"
+      },
+      "SuiteNetworkAccessPutIn": {
+        "additionalProperties": false,
+        "description": "Body for PUT /suite/network-access.",
+        "properties": {
+          "csrf_token": {
+            "minLength": 1,
+            "title": "Csrf Token",
+            "type": "string"
+          },
+          "scope": {
+            "description": "this_pc_only or network (devices on the network, through Windows Firewall's Private and Domain networks).",
+            "enum": [
+              "this_pc_only",
+              "network"
+            ],
+            "title": "Scope",
+            "type": "string"
+          }
+        },
+        "required": [
+          "csrf_token",
+          "scope"
+        ],
+        "title": "SuiteNetworkAccessPutIn",
         "type": "object"
       },
       "SuiteOperationalHistoryResetIn": {
@@ -10172,6 +10548,1218 @@
           "summary"
         ],
         "title": "SuiteUpdateStatusOut",
+        "type": "object"
+      },
+      "SystemLogCategoryCountsOut": {
+        "additionalProperties": false,
+        "description": "How many rows each category would show with every other filter applied.",
+        "properties": {
+          "backups": {
+            "title": "backups",
+            "type": "integer"
+          },
+          "cleanup": {
+            "title": "cleanup",
+            "type": "integer"
+          },
+          "connections": {
+            "title": "connections",
+            "type": "integer"
+          },
+          "library": {
+            "title": "library",
+            "type": "integer"
+          },
+          "processing": {
+            "title": "processing",
+            "type": "integer"
+          },
+          "scans": {
+            "title": "scans",
+            "type": "integer"
+          },
+          "sign_in": {
+            "title": "sign_in",
+            "type": "integer"
+          },
+          "updates": {
+            "title": "updates",
+            "type": "integer"
+          },
+          "weir": {
+            "title": "weir",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "processing",
+          "scans",
+          "cleanup",
+          "library",
+          "connections",
+          "backups",
+          "sign_in",
+          "updates",
+          "weir"
+        ],
+        "type": "object"
+      },
+      "SystemLogCountsOut": {
+        "description": "What each filter choice would show: every count has all the other filters applied but not its own, so a chip says how many rows choosing it gives. Level, category and workflow counts cover the sources the filters name.",
+        "properties": {
+          "category": {
+            "$ref": "#/components/schemas/SystemLogCategoryCountsOut"
+          },
+          "level": {
+            "$ref": "#/components/schemas/SystemLogLevelCountsOut"
+          },
+          "source": {
+            "$ref": "#/components/schemas/SystemLogSourceCountsOut"
+          },
+          "workflow": {
+            "$ref": "#/components/schemas/SystemLogWorkflowCountsOut"
+          }
+        },
+        "required": [
+          "source",
+          "level",
+          "category",
+          "workflow"
+        ],
+        "title": "SystemLogCountsOut",
+        "type": "object"
+      },
+      "SystemLogFrame": {
+        "description": "The data of a system.log frame on GET /activity/stream: one warning or error Weir just wrote to its log. GET /suite/logs has what was logged before the stream opened.",
+        "properties": {
+          "at": {
+            "description": "When it was logged.",
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "level": {
+            "description": "The level, as the log file names it.",
+            "enum": [
+              "WARNING",
+              "ERROR",
+              "CRITICAL"
+            ],
+            "title": "Level",
+            "type": "string"
+          },
+          "message": {
+            "description": "What the log line says.",
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "at",
+          "level",
+          "message"
+        ],
+        "title": "SystemLogFrame",
+        "type": "object"
+      },
+      "SystemLogLevelCountsOut": {
+        "additionalProperties": false,
+        "description": "How many rows each level would show with every other filter applied.",
+        "properties": {
+          "error": {
+            "title": "error",
+            "type": "integer"
+          },
+          "info": {
+            "title": "info",
+            "type": "integer"
+          },
+          "success": {
+            "title": "success",
+            "type": "integer"
+          },
+          "warning": {
+            "title": "warning",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "error",
+          "warning",
+          "info",
+          "success"
+        ],
+        "type": "object"
+      },
+      "SystemLogOut": {
+        "description": "One page of System › Logs, newest first unless sorted another way.",
+        "properties": {
+          "counts": {
+            "$ref": "#/components/schemas/SystemLogCountsOut"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SystemLogRowOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Pass as cursor for the next page; null on the last.",
+            "title": "Next Cursor"
+          },
+          "total": {
+            "description": "Rows the filters match, across every page.",
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor",
+          "total",
+          "counts"
+        ],
+        "title": "SystemLogOut",
+        "type": "object"
+      },
+      "SystemLogRowOut": {
+        "description": "One thing that happened, whichever source recorded it. Exactly one of event, job and server holds the source's own record; the other two are null.",
+        "properties": {
+          "at": {
+            "description": "When it happened.",
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "category": {
+            "description": "What it is about.",
+            "enum": [
+              "processing",
+              "scans",
+              "cleanup",
+              "library",
+              "connections",
+              "backups",
+              "sign_in",
+              "updates",
+              "weir"
+            ],
+            "title": "Category",
+            "type": "string"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A quieter second line.",
+            "title": "Detail"
+          },
+          "event": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ActivityEventItemOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Event"
+          },
+          "id": {
+            "description": "The source and the row's number in it, such as event:41.",
+            "title": "Id",
+            "type": "string"
+          },
+          "job": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProcessingJobInspectionRow"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job"
+          },
+          "level": {
+            "description": "How it went.",
+            "enum": [
+              "error",
+              "warning",
+              "info",
+              "success"
+            ],
+            "title": "Level",
+            "type": "string"
+          },
+          "server": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SuiteLogEntryOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Server"
+          },
+          "source": {
+            "description": "Where the row came from.",
+            "enum": [
+              "event",
+              "job",
+              "server"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "title": {
+            "description": "One line in plain words.",
+            "title": "Title",
+            "type": "string"
+          },
+          "workflow": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SystemLogWorkflowOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workflow"
+          }
+        },
+        "required": [
+          "id",
+          "source",
+          "at",
+          "level",
+          "category",
+          "workflow",
+          "title",
+          "detail",
+          "event",
+          "job",
+          "server"
+        ],
+        "title": "SystemLogRowOut",
+        "type": "object"
+      },
+      "SystemLogSourceCountsOut": {
+        "additionalProperties": false,
+        "description": "How many rows each source would show with every other filter applied.",
+        "properties": {
+          "event": {
+            "title": "event",
+            "type": "integer"
+          },
+          "job": {
+            "title": "job",
+            "type": "integer"
+          },
+          "server": {
+            "title": "server",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "event",
+          "job",
+          "server"
+        ],
+        "type": "object"
+      },
+      "SystemLogWorkflowCountsOut": {
+        "additionalProperties": {
+          "type": "integer"
+        },
+        "description": "How many rows each workflow would show with every other filter applied, by workflow id. A workflow with no rows is left out, and so are the server log's lines, which belong to none.",
+        "type": "object"
+      },
+      "SystemLogWorkflowOut": {
+        "description": "The workflow a row belongs to.",
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null once the workflow has been deleted.",
+            "title": "Name"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "SystemLogWorkflowOut",
+        "type": "object"
+      },
+      "SystemOverviewChecksOut": {
+        "description": "How many of Weir's own checks pass. They are read from what Weir already knows, without testing anything: the database, the workers and the folder watcher, each switched-on media manager and download client (it passes unless its last test failed), and the media tools (ffmpeg and ffprobe are found).",
+        "properties": {
+          "passing": {
+            "description": "How many pass.",
+            "minimum": 0,
+            "title": "Passing",
+            "type": "integer"
+          },
+          "total": {
+            "description": "How many checks there are.",
+            "minimum": 0,
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "passing",
+          "total"
+        ],
+        "title": "SystemOverviewChecksOut",
+        "type": "object"
+      },
+      "SystemOverviewJobsOut": {
+        "description": "The jobs that finished since the day began in Weir's time zone. A watched-folder scan that found nothing wrong is left out, as it is from the Jobs list.",
+        "properties": {
+          "failed": {
+            "description": "How many of those failed.",
+            "minimum": 0,
+            "title": "Failed",
+            "type": "integer"
+          },
+          "run": {
+            "description": "How many jobs finished, worked or not.",
+            "minimum": 0,
+            "title": "Run",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "run",
+          "failed"
+        ],
+        "title": "SystemOverviewJobsOut",
+        "type": "object"
+      },
+      "SystemOverviewOut": {
+        "description": "The facts System shows about this copy of Weir. Nothing here asks a media manager, a download client or GitHub: the update status is the last answer Weir kept, and the size of the data folder is measured at most once a minute.",
+        "properties": {
+          "address": {
+            "description": "Where a browser reaches Weir: this computer's own name when it listens on every interface, localhost when only this computer can connect, otherwise the address it was told to bind.",
+            "title": "Address",
+            "type": "string"
+          },
+          "browsers_live": {
+            "description": "How many browsers hold the Activity stream open right now.",
+            "minimum": 0,
+            "title": "Browsers Live",
+            "type": "integer"
+          },
+          "checks": {
+            "$ref": "#/components/schemas/SystemOverviewChecksOut"
+          },
+          "data_bytes": {
+            "description": "How much room Weir's own data takes: every file under its home folder.",
+            "minimum": 0,
+            "title": "Data Bytes",
+            "type": "integer"
+          },
+          "jobs_today": {
+            "$ref": "#/components/schemas/SystemOverviewJobsOut"
+          },
+          "requests": {
+            "$ref": "#/components/schemas/SystemOverviewRequestsOut"
+          },
+          "restarts_this_week": {
+            "description": "How many times the server was restarted in the last seven days. The first start of an install is not a restart.",
+            "minimum": 0,
+            "title": "Restarts This Week",
+            "type": "integer"
+          },
+          "runs_as": {
+            "description": "How this copy was started: by the system as a service, by a person as an app, or inside a container.",
+            "enum": [
+              "service",
+              "app",
+              "docker"
+            ],
+            "title": "Runs As",
+            "type": "string"
+          },
+          "started_at": {
+            "description": "When the server started.",
+            "format": "date-time",
+            "title": "Started At",
+            "type": "string"
+          },
+          "update": {
+            "$ref": "#/components/schemas/SystemOverviewUpdateOut"
+          },
+          "uptime_seconds": {
+            "description": "Whole seconds since the server started.",
+            "minimum": 0,
+            "title": "Uptime Seconds",
+            "type": "integer"
+          },
+          "version": {
+            "description": "The version of Weir that is running.",
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "version",
+          "update",
+          "uptime_seconds",
+          "started_at",
+          "runs_as",
+          "address",
+          "data_bytes",
+          "browsers_live",
+          "requests",
+          "jobs_today",
+          "restarts_this_week",
+          "checks"
+        ],
+        "title": "SystemOverviewOut",
+        "type": "object"
+      },
+      "SystemOverviewRequestsOut": {
+        "description": "How Weir has been answering requests. Event streams, which stay open for as long as a browser watches, are not timed.",
+        "properties": {
+          "errors_today": {
+            "description": "How many requests failed on the server (a 5xx answer) since the day began in Weir's time zone.",
+            "minimum": 0,
+            "title": "Errors Today",
+            "type": "integer"
+          },
+          "median_ms": {
+            "description": "The median time to answer over the last fifteen minutes, in milliseconds; zero when nothing was asked.",
+            "minimum": 0,
+            "title": "Median Ms",
+            "type": "number"
+          },
+          "p95_ms": {
+            "description": "The time within which nineteen answers in twenty came, over the last fifteen minutes, in milliseconds; zero when nothing was asked.",
+            "minimum": 0,
+            "title": "P95 Ms",
+            "type": "number"
+          }
+        },
+        "required": [
+          "median_ms",
+          "p95_ms",
+          "errors_today"
+        ],
+        "title": "SystemOverviewRequestsOut",
+        "type": "object"
+      },
+      "SystemOverviewUpdateOut": {
+        "description": "Whether a newer Weir exists, as far as Weir last found out.",
+        "properties": {
+          "latest_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The newest published version, or the one the tray has downloaded and is waiting to install; null when none is known.",
+            "title": "Latest Version"
+          },
+          "status": {
+            "description": "checking: nothing learned yet. up_to_date. update_available. downloaded: the tray holds an update waiting to install. not_published: no release exists yet. unavailable: the release list could not be reached.",
+            "enum": [
+              "checking",
+              "up_to_date",
+              "update_available",
+              "downloaded",
+              "not_published",
+              "unavailable"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "latest_version"
+        ],
+        "title": "SystemOverviewUpdateOut",
+        "type": "object"
+      },
+      "SystemStatsDriveOut": {
+        "additionalProperties": false,
+        "description": "One drive that holds a workflow's folders. A network share has free space only: its activity is null.",
+        "properties": {
+          "busy_percent": {
+            "anyOf": [
+              {
+                "maximum": 100,
+                "minimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "How much of the time the drive was busy.",
+            "title": "Busy Percent"
+          },
+          "free_bytes": {
+            "description": "What is free for Weir to use.",
+            "minimum": 0,
+            "title": "Free Bytes",
+            "type": "integer"
+          },
+          "full_in_days": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When the drive will be full at the pace it has been filling, from the last day of readings kept since Weir started. Null when it is not filling, when there is less than an hour of history, or when it would take over a year.",
+            "title": "Full In Days"
+          },
+          "keep_free_bytes": {
+            "description": "The most any workflow on this drive wants kept free.",
+            "minimum": 0,
+            "title": "Keep Free Bytes",
+            "type": "integer"
+          },
+          "name": {
+            "description": "The drive as a person names it: a letter such as D:, a network share, or a mount point.",
+            "title": "Name",
+            "type": "string"
+          },
+          "path": {
+            "description": "The drive's root.",
+            "title": "Path",
+            "type": "string"
+          },
+          "read_bytes_per_sec": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What the drive reads each second, from the last two readings of it (every 30 seconds).",
+            "title": "Read Bytes Per Sec"
+          },
+          "total_bytes": {
+            "description": "The drive's size.",
+            "minimum": 0,
+            "title": "Total Bytes",
+            "type": "integer"
+          },
+          "weir_bytes": {
+            "description": "What Weir's own work files take on this drive.",
+            "minimum": 0,
+            "title": "Weir Bytes",
+            "type": "integer"
+          },
+          "workflows": {
+            "description": "The workflows with a folder on this drive, by name.",
+            "items": {
+              "$ref": "#/components/schemas/SystemStatsDriveWorkflowOut"
+            },
+            "title": "Workflows",
+            "type": "array"
+          },
+          "write_bytes_per_sec": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What the drive writes each second.",
+            "title": "Write Bytes Per Sec"
+          }
+        },
+        "required": [
+          "name",
+          "path",
+          "total_bytes",
+          "free_bytes",
+          "weir_bytes",
+          "keep_free_bytes",
+          "full_in_days",
+          "read_bytes_per_sec",
+          "write_bytes_per_sec",
+          "busy_percent",
+          "workflows"
+        ],
+        "title": "SystemStatsDriveOut",
+        "type": "object"
+      },
+      "SystemStatsDriveWorkflowOut": {
+        "additionalProperties": false,
+        "description": "A workflow that keeps a folder on a drive, and which of its folders those are.",
+        "properties": {
+          "id": {
+            "description": "The workflow's id.",
+            "title": "Id",
+            "type": "integer"
+          },
+          "name": {
+            "description": "The workflow's name.",
+            "title": "Name",
+            "type": "string"
+          },
+          "roles": {
+            "description": "Which of the workflow's folders are on this drive, in the order watched, work, output.",
+            "items": {
+              "enum": [
+                "watched",
+                "work",
+                "output"
+              ],
+              "type": "string"
+            },
+            "title": "Roles",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "roles"
+        ],
+        "title": "SystemStatsDriveWorkflowOut",
+        "type": "object"
+      },
+      "SystemStatsFrame": {
+        "additionalProperties": false,
+        "description": "The data of a system.stats frame on GET /activity/stream: the newest reading and the point to add to the traces.",
+        "properties": {
+          "now": {
+            "$ref": "#/components/schemas/SystemStatsNowOut",
+            "description": "The newest reading.",
+            "title": "Now"
+          },
+          "point": {
+            "$ref": "#/components/schemas/SystemStatsPointOut",
+            "description": "The point to add to the traces.",
+            "title": "Point"
+          }
+        },
+        "required": [
+          "now",
+          "point"
+        ],
+        "title": "SystemStatsFrame",
+        "type": "object"
+      },
+      "SystemStatsMachineOut": {
+        "additionalProperties": false,
+        "description": "What changes slowly about the machine. Each is null where the system cannot say.",
+        "properties": {
+          "os": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The operating system's name, such as Windows 11 Pro. In Docker, the container's distribution.",
+            "title": "Os"
+          },
+          "reboot_pending": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Whether the system is waiting for a restart. Null where it cannot tell: inside a container, or on a system without a way to record it.",
+            "title": "Reboot Pending"
+          },
+          "uptime_seconds": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "How long the machine has been running.",
+            "title": "Uptime Seconds"
+          }
+        },
+        "required": [
+          "os",
+          "uptime_seconds",
+          "reboot_pending"
+        ],
+        "title": "SystemStatsMachineOut",
+        "type": "object"
+      },
+      "SystemStatsNowOut": {
+        "additionalProperties": false,
+        "description": "The newest reading. A field is null where it cannot be read, such as disk activity on a network share or in a container without access to the host's counters.",
+        "properties": {
+          "at": {
+            "description": "When the reading was taken.",
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "cores": {
+            "description": "How many processor cores the machine, or the container's limit, has.",
+            "minimum": 1,
+            "title": "Cores",
+            "type": "integer"
+          },
+          "cpu_percent": {
+            "anyOf": [
+              {
+                "maximum": 100,
+                "minimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "How much of the whole machine's processor time is in use. Inside a container held to a processor limit, how much of that limit.",
+            "title": "Cpu Percent"
+          },
+          "disk_busy_percent": {
+            "anyOf": [
+              {
+                "maximum": 100,
+                "minimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "How much of the time the machine's local disks were busy.",
+            "title": "Disk Busy Percent"
+          },
+          "disk_read_bytes_per_sec": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What all the machine's local disks read each second.",
+            "title": "Disk Read Bytes Per Sec"
+          },
+          "disk_write_bytes_per_sec": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What all the machine's local disks write each second.",
+            "title": "Disk Write Bytes Per Sec"
+          },
+          "memory_total_bytes": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Physical memory in total, or the container's memory limit.",
+            "title": "Memory Total Bytes"
+          },
+          "memory_used_bytes": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Physical memory in use. Inside a container held to a memory limit, what the container holds against that limit.",
+            "title": "Memory Used Bytes"
+          },
+          "processing_read_bytes_per_sec": {
+            "description": "How fast the files being processed are read: the share of each source read so far, between two readings.",
+            "minimum": 0,
+            "title": "Processing Read Bytes Per Sec",
+            "type": "integer"
+          },
+          "processing_speed": {
+            "description": "The running passes' speeds added together: seconds of media written each second (148 for 148x). A copy has no such speed and adds nothing.",
+            "minimum": 0,
+            "title": "Processing Speed",
+            "type": "number"
+          },
+          "processing_write_bytes_per_sec": {
+            "description": "How fast the files being processed are written. ffmpeg reports what it has written; for mkvmerge, which does not, it is the same as what was read.",
+            "minimum": 0,
+            "title": "Processing Write Bytes Per Sec",
+            "type": "integer"
+          },
+          "running": {
+            "description": "Files being processed now.",
+            "minimum": 0,
+            "title": "Running",
+            "type": "integer"
+          },
+          "slots": {
+            "description": "How many files Weir will process at once.",
+            "minimum": 0,
+            "title": "Slots",
+            "type": "integer"
+          },
+          "tools_cpu_percent": {
+            "anyOf": [
+              {
+                "maximum": 100,
+                "minimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The tools Weir runs (ffmpeg, mkvmerge), as a share of the whole machine's processor time.",
+            "title": "Tools Cpu Percent"
+          },
+          "weir_cpu_percent": {
+            "anyOf": [
+              {
+                "maximum": 100,
+                "minimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Weir's own process, as a share of the whole machine's processor time.",
+            "title": "Weir Cpu Percent"
+          },
+          "weir_memory_bytes": {
+            "description": "The memory Weir's own process holds.",
+            "minimum": 0,
+            "title": "Weir Memory Bytes",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "at",
+          "cpu_percent",
+          "cores",
+          "memory_used_bytes",
+          "memory_total_bytes",
+          "disk_read_bytes_per_sec",
+          "disk_write_bytes_per_sec",
+          "disk_busy_percent",
+          "weir_cpu_percent",
+          "weir_memory_bytes",
+          "tools_cpu_percent",
+          "processing_read_bytes_per_sec",
+          "processing_write_bytes_per_sec",
+          "processing_speed",
+          "running",
+          "slots"
+        ],
+        "title": "SystemStatsNowOut",
+        "type": "object"
+      },
+      "SystemStatsOut": {
+        "additionalProperties": false,
+        "description": "The machine's load, Weir's share of it and the drives its workflows use, with the last ten minutes of the load. The same readings reach the Activity stream as system.stats frames.",
+        "properties": {
+          "drives": {
+            "description": "Every drive that holds a workflow's watched, work or output folder, read every 30 seconds.",
+            "items": {
+              "$ref": "#/components/schemas/SystemStatsDriveOut"
+            },
+            "title": "Drives",
+            "type": "array"
+          },
+          "history": {
+            "description": "The points of the last window, oldest first, at most 600. Each has its own time.",
+            "items": {
+              "$ref": "#/components/schemas/SystemStatsPointOut"
+            },
+            "title": "History",
+            "type": "array"
+          },
+          "interval_ms": {
+            "description": "How often a stream gets a reading while a browser is watching. With none watching, Weir reads every ten seconds, so history points can be further apart than this.",
+            "title": "Interval Ms",
+            "type": "integer"
+          },
+          "machine": {
+            "$ref": "#/components/schemas/SystemStatsMachineOut",
+            "description": "What changes slowly about the machine.",
+            "title": "Machine"
+          },
+          "now": {
+            "$ref": "#/components/schemas/SystemStatsNowOut",
+            "description": "The newest reading.",
+            "title": "Now"
+          },
+          "window_s": {
+            "description": "How far back history reaches.",
+            "title": "Window S",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "interval_ms",
+          "window_s",
+          "now",
+          "history",
+          "machine",
+          "drives"
+        ],
+        "title": "SystemStatsOut",
+        "type": "object"
+      },
+      "SystemStatsPointOut": {
+        "additionalProperties": false,
+        "description": "One moment of the traces. A field is null where it could not be read.",
+        "properties": {
+          "at": {
+            "description": "When the reading was taken.",
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "cpu_percent": {
+            "anyOf": [
+              {
+                "maximum": 100,
+                "minimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The share of the whole machine's processor time in use.",
+            "title": "Cpu Percent"
+          },
+          "disk_read_bytes_per_sec": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What all the machine's local disks read each second.",
+            "title": "Disk Read Bytes Per Sec"
+          },
+          "disk_write_bytes_per_sec": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What all the machine's local disks write each second.",
+            "title": "Disk Write Bytes Per Sec"
+          },
+          "memory_percent": {
+            "anyOf": [
+              {
+                "maximum": 100,
+                "minimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The share of physical memory in use.",
+            "title": "Memory Percent"
+          },
+          "processing_read_bytes_per_sec": {
+            "description": "How fast the files being processed are read.",
+            "minimum": 0,
+            "title": "Processing Read Bytes Per Sec",
+            "type": "integer"
+          },
+          "processing_speed": {
+            "description": "The running passes' speeds added together.",
+            "minimum": 0,
+            "title": "Processing Speed",
+            "type": "number"
+          },
+          "processing_write_bytes_per_sec": {
+            "description": "How fast the files being processed are written.",
+            "minimum": 0,
+            "title": "Processing Write Bytes Per Sec",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "at",
+          "cpu_percent",
+          "memory_percent",
+          "disk_read_bytes_per_sec",
+          "disk_write_bytes_per_sec",
+          "processing_read_bytes_per_sec",
+          "processing_write_bytes_per_sec",
+          "processing_speed"
+        ],
+        "title": "SystemStatsPointOut",
+        "type": "object"
+      },
+      "SystemTaskOut": {
+        "description": "One task Weir runs on its own: its last run, its next run, and whether it is running now. The same list arrives on the Activity stream as a system.tasks frame, whose data is an array of these, each time a run starts or ends or a task comes or goes.",
+        "properties": {
+          "interval_seconds": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "How often it runs, when that is a fixed time.",
+            "title": "Interval Seconds"
+          },
+          "key": {
+            "description": "A stable id: a task's own name, scan-{workflow id} for a workflow's periodic scan, library-clean-{workflow id} for its scheduled scan and clean, or the name of a cleanup.",
+            "title": "Key",
+            "type": "string"
+          },
+          "label": {
+            "description": "What the task does, in words, with its workflow's name when it belongs to one: Scan Movies, Clean Movies library.",
+            "title": "Label",
+            "type": "string"
+          },
+          "last_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Why the last run failed, in a sentence; null when it worked or has not run.",
+            "title": "Last Error"
+          },
+          "last_ok": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Whether the last run worked; null until one has finished.",
+            "title": "Last Ok"
+          },
+          "last_run_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When the last run finished; null until one has.",
+            "title": "Last Run At"
+          },
+          "next_run_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When the next run is due, as far as Weir knows; null when none is planned.",
+            "title": "Next Run At"
+          },
+          "running": {
+            "description": "A run is under way.",
+            "title": "Running",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "key",
+          "label",
+          "running",
+          "last_run_at",
+          "last_ok",
+          "last_error",
+          "next_run_at",
+          "interval_seconds"
+        ],
+        "title": "SystemTaskOut",
         "type": "object"
       },
       "ThemeIn": {
@@ -11282,7 +12870,7 @@
     },
     "/api/v1/activity/stream": {
       "get": {
-        "description": "Authenticated SSE freshness signal for activity-backed pages.",
+        "description": "Authenticated SSE stream for activity-backed pages. Frames: activity.latest (the newest Activity event id and revision), processing.progress (every file's live progress, at most once a second), connection.activity (one thing that happened on a media manager or download client connection: see ConnectionActivityFrame; each connection sends at most one frame per phase every 250 ms, and always the phase it ends on), system.stats (the machine's newest reading, once a second: see SystemStatsFrame), system.tasks (every scheduled task, each time a run starts or ends or a task comes or goes: see SystemTaskOut), and system.log (one for each new warning or error Weir logs: see SystemLogFrame).",
         "operationId": "get_activity_stream_api_v1_activity_stream_get",
         "responses": {
           "200": {
@@ -11297,6 +12885,44 @@
         "summary": "Get Activity Stream",
         "tags": [
           "activity"
+        ]
+      }
+    },
+    "/api/v1/artwork/posters/{poster_id}": {
+      "get": {
+        "description": "A poster image Weir already holds, as a files list names it in poster_url. The image is the cached copy, so the browser never asks the metadata service itself. Answers 404 for an id Weir does not hold.",
+        "operationId": "get_artwork_poster_api_v1_artwork_posters__poster_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "poster_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{32}$",
+              "title": "Poster Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "image/*": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              }
+            },
+            "description": "The poster image. Cached by the browser for 30 days."
+          },
+          "404": {
+            "description": "Weir holds no poster with that id."
+          }
+        },
+        "summary": "Get Artwork Poster",
+        "tags": [
+          "processing"
         ]
       }
     },
@@ -12130,11 +13756,17 @@
                       "description": "The name of the machine Weir runs on, for a media manager to name its connection to Weir.",
                       "title": "Machine Name",
                       "type": "string"
+                    },
+                    "version": {
+                      "description": "Weir’s release version, X.Y.Z as stamped from its release tag (0.0.1-dev on a development build). Weir before 4.0.0 sends no version.",
+                      "title": "Version",
+                      "type": "string"
                     }
                   },
                   "required": [
                     "capabilities",
-                    "machine_name"
+                    "machine_name",
+                    "version"
                   ],
                   "title": "Response Get Intake Capabilities Api V1 Intake Capabilities Get",
                   "type": "object"
@@ -13176,6 +14808,53 @@
             }
           },
           {
+            "description": "How the list is ordered: file (by path, ignoring the case of letters), status (by what the status means, then the status word; a cleaned copy still waiting for its media manager counts as to do) or when (by when the file last changed). Without it the list is newest-seen first, as it has always been. Files that tie fall by id, so paging never repeats or skips one.",
+            "in": "query",
+            "name": "sort",
+            "required": false,
+            "schema": {
+              "enum": [
+                "file",
+                "status",
+                "when"
+              ],
+              "title": "Sort",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Which way the order runs. Ascending runs the sort's own way (A to Z, oldest first, done first); descending reverses it, and is the default.",
+            "in": "query",
+            "name": "direction",
+            "required": false,
+            "schema": {
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "title": "Direction",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Where the page starts: the next_cursor of the page before, asked for with the same sort and direction. A cursor made for another sort or direction is refused.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
             "in": "query",
             "name": "limit",
             "required": false,
@@ -13380,7 +15059,7 @@
     },
     "/api/v1/processing/files/{file_id}/remove-options": {
       "get": {
-        "description": "What History's remove dialog should offer for this title (#785), read before it is shown.",
+        "description": "What Activity's remove dialog should offer for this title (#785), read before it is shown.",
         "operationId": "get_processing_file_remove_options_api_v1_files__file_id__remove_options_get",
         "parameters": [
           {
@@ -13425,7 +15104,7 @@
     },
     "/api/v1/processing/files/{file_id}": {
       "delete": {
-        "description": "History's \"Remove from list\" (#785). `resolution` chooses what happens to a failed or rejected file whose original is still in the watched folder: `delete` asks a manager to remove the download and search again, or Weir deletes it itself; `keep` leaves the file but skips it until it changes; `retry` queues it again. Anything else is always a plain remove.",
+        "description": "Activity's \"Remove from list\" (#785). `resolution` chooses what happens to a failed or rejected file whose original is still in the watched folder: `delete` asks a manager to remove the download and search again, or Weir deletes it itself; `keep` leaves the file but skips it until it changes; `retry` queues it again. Anything else is always a plain remove.",
         "operationId": "delete_processing_file_api_v1_files__file_id__delete",
         "parameters": [
           {
@@ -13486,7 +15165,7 @@
     },
     "/api/v1/processing/kept-files": {
       "get": {
-        "description": "Every file kept without processing again from History's remove dialog (#785).",
+        "description": "Every file kept without processing again from Activity's remove dialog (#785).",
         "operationId": "get_processing_kept_files_api_v1_processing_kept_files_get",
         "responses": {
           "200": {
@@ -14797,6 +16476,24 @@
             }
           },
           {
+            "description": "Narrow to the files in one status: where each file stands now against the current rules.",
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "enum": [
+                "needs_cleaning",
+                "cleaning",
+                "matches",
+                "cant_clean_yet",
+                "left_alone"
+              ],
+              "title": "Status",
+              "type": "string"
+            }
+          },
+          {
+            "description": "The column to sort by. status orders files by where each stands now, in the order the statuses read: matches, needs cleaning, cleaning, can't clean yet (those Weir cannot read or open last), left alone. Files that tie fall by path, whichever way the sort runs. A value that is not listed sorts by path.",
             "in": "query",
             "name": "sort",
             "required": false,
@@ -14811,7 +16508,8 @@
                 "resolution",
                 "audio",
                 "subtitles",
-                "modified"
+                "modified",
+                "status"
               ],
               "title": "Sort",
               "type": "string"
@@ -15846,6 +17544,8 @@
     },
     "/api/v1/processing/metadata-provider": {
       "get": {
+        "deprecated": true,
+        "description": "Deprecated. Weir gets titles' posters and original languages from Deluno's metadata service by itself, so there is nothing to set. The route still answers so older clients keep working: provider is always deluno-gateway, base_url null, key_configured false and artwork_enabled true.",
         "operationId": "get_metadata_provider_api_v1_processing_metadata_provider_get",
         "responses": {
           "200": {
@@ -15866,6 +17566,8 @@
         ]
       },
       "put": {
+        "deprecated": true,
+        "description": "Deprecated. Weir gets titles' posters and original languages from Deluno's metadata service by itself, so there is nothing to set. The route still answers so older clients keep working: what is sent is checked for shape and then ignored, and the answer is the same as the GET.",
         "operationId": "put_metadata_provider_api_v1_processing_metadata_provider_put",
         "requestBody": {
           "content": {
@@ -15908,7 +17610,8 @@
     },
     "/api/v1/processing/metadata-provider/test": {
       "post": {
-        "description": "Ask the provider a real question, so a saved connection is proven rather than assumed.",
+        "deprecated": true,
+        "description": "Deprecated. Weir gets titles' posters and original languages from Deluno's metadata service by itself, so there is nothing to set. The route still answers so older clients keep working: it checks that Deluno's metadata service answers its health check, and what is sent is ignored.",
         "operationId": "post_metadata_provider_test_api_v1_processing_metadata_provider_test_post",
         "requestBody": {
           "content": {
@@ -16640,7 +18343,7 @@
     },
     "/api/v1/suite/network-access": {
       "get": {
-        "description": "Whether other devices on the network can reach Weir (System › About). Windows package only; other platforms report not_applicable.",
+        "description": "Who can reach Weir over the network, and whether a change is waiting on the tray or the firewall (System › About). Windows package only; other installs report not_applicable.",
         "operationId": "get_suite_network_access_api_v1_suite_network_access_get",
         "responses": {
           "200": {
@@ -16655,6 +18358,46 @@
           }
         },
         "summary": "Get Suite Network Access",
+        "tags": [
+          "suite"
+        ]
+      },
+      "put": {
+        "description": "Admin only. Saves who can reach Weir for the Windows tray to apply: it restarts the server and, when Windows Firewall has no rule for Weir, asks for one on this PC (Private and Domain networks only). The answer is the state with the new choice pending. Answers 409 on Docker and on a bare install, where the way Weir is started decides.",
+        "operationId": "put_suite_network_access_api_v1_suite_network_access_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SuiteNetworkAccessPutIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuiteNetworkAccessOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Suite Network Access",
         "tags": [
           "suite"
         ]
@@ -17107,7 +18850,7 @@
     },
     "/api/v1/suite/update-status": {
       "get": {
-        "description": "Read-only update check for the signed-in Settings page.",
+        "description": "Read-only update check for the System › About tab.",
         "operationId": "get_suite_update_status_api_v1_suite_update_status_get",
         "responses": {
           "200": {
@@ -17177,6 +18920,632 @@
         ]
       }
     },
+    "/api/v1/system/log": {
+      "get": {
+        "description": "Weir's events, its jobs and its server log as one list, newest first unless sorted another way, with a cursor for the next page and the counts the filter chips show. Events are Weir's own (a file's story is on Activity); a finished watched-folder scan is left out unless a job status is asked for.",
+        "operationId": "get_system_log_api_v1_system_log_get",
+        "parameters": [
+          {
+            "description": "Where rows come from: event, job, server. Repeat it or separate with commas. None means all.",
+            "in": "query",
+            "name": "source",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Source"
+            }
+          },
+          {
+            "description": "How rows went: error, warning, info, success. Repeat it or separate with commas.",
+            "in": "query",
+            "name": "level",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Level"
+            }
+          },
+          {
+            "description": "What rows are about: processing, scans, cleanup, library, connections, backups, sign_in, updates, weir. Repeat it or separate with commas.",
+            "in": "query",
+            "name": "category",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Category"
+            }
+          },
+          {
+            "description": "A workflow's id. Leaves out the server log, whose lines belong to no workflow.",
+            "in": "query",
+            "name": "workflow",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Workflow"
+            }
+          },
+          {
+            "description": "Words to find in a row's text.",
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 200,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          },
+          {
+            "description": "Only rows at or after this time (ISO 8601; without an offset it is UTC).",
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "From"
+            }
+          },
+          {
+            "description": "Only rows at or before this time (ISO 8601; without an offset it is UTC).",
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "To"
+            }
+          },
+          {
+            "description": "One job's id: its row, the events that name it and the server lines written while it ran.",
+            "in": "query",
+            "name": "job",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Job"
+            }
+          },
+          {
+            "description": "An Activity event type. Only events have one, so this leaves out jobs and server lines.",
+            "in": "query",
+            "name": "event_type",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 64,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Event Type"
+            }
+          },
+          {
+            "description": "An Activity event's result: success, skipped, warning, retrying, running, failed. Only events have one.",
+            "in": "query",
+            "name": "result",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Result"
+            }
+          },
+          {
+            "description": "Why an Activity event happened: manual, scheduled, startup, worker, retry, system, webhook, folder_change. Only events have one.",
+            "in": "query",
+            "name": "trigger",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Trigger"
+            }
+          },
+          {
+            "description": "Job statuses: pending, leased, completed, failed, cancelled, handler_ok_finalize_failed. Repeat it or separate with commas. Only jobs have one; asking for any also shows finished watched-folder scans, which are otherwise left out.",
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "description": "Only server lines that carry an exception (true) or none (false). Only the server log has them.",
+            "in": "query",
+            "name": "has_exception",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Has Exception"
+            }
+          },
+          {
+            "description": "How the list is ordered: time (the default), level (by severity, errors first when ascending), source (event, job, server), category (by its word) or workflow (by the workflow's name, ignoring case; rows with no workflow come last either way). Rows that tie fall by time, newest first when descending and oldest first when ascending, so paging never repeats or skips one.",
+            "in": "query",
+            "name": "sort",
+            "required": false,
+            "schema": {
+              "default": "time",
+              "enum": [
+                "time",
+                "level",
+                "source",
+                "category",
+                "workflow"
+              ],
+              "title": "Sort",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Which way the order runs. Ascending runs the sort's own way (oldest first, errors first, A to Z); descending reverses it, and is the default: newest first.",
+            "in": "query",
+            "name": "direction",
+            "required": false,
+            "schema": {
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "title": "Direction",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Where the page starts: the next_cursor of the page before, asked for with the same sort and direction. A cursor made for another sort or direction is refused.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SystemLogOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get System Log",
+        "tags": [
+          "system-log"
+        ]
+      }
+    },
+    "/api/v1/system/log/export": {
+      "get": {
+        "description": "The log for the same filters and order as a file, newest first unless sorted another way: a spreadsheet (csv) or the rows as the API returns them (json). It holds every row the filters leave, up to the limit the X-Weir-Export-Limit header names (50000), and X-Weir-Export-Rows says how many it holds.",
+        "operationId": "get_system_log_export_api_v1_system_log_export_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "format",
+            "required": false,
+            "schema": {
+              "default": "csv",
+              "pattern": "^(csv|json)$",
+              "title": "Format",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Where rows come from: event, job, server. Repeat it or separate with commas. None means all.",
+            "in": "query",
+            "name": "source",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Source"
+            }
+          },
+          {
+            "description": "How rows went: error, warning, info, success. Repeat it or separate with commas.",
+            "in": "query",
+            "name": "level",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Level"
+            }
+          },
+          {
+            "description": "What rows are about: processing, scans, cleanup, library, connections, backups, sign_in, updates, weir. Repeat it or separate with commas.",
+            "in": "query",
+            "name": "category",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Category"
+            }
+          },
+          {
+            "description": "A workflow's id. Leaves out the server log, whose lines belong to no workflow.",
+            "in": "query",
+            "name": "workflow",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Workflow"
+            }
+          },
+          {
+            "description": "Words to find in a row's text.",
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 200,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          },
+          {
+            "description": "Only rows at or after this time (ISO 8601; without an offset it is UTC).",
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "From"
+            }
+          },
+          {
+            "description": "Only rows at or before this time (ISO 8601; without an offset it is UTC).",
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "To"
+            }
+          },
+          {
+            "description": "One job's id: its row, the events that name it and the server lines written while it ran.",
+            "in": "query",
+            "name": "job",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Job"
+            }
+          },
+          {
+            "description": "An Activity event type. Only events have one, so this leaves out jobs and server lines.",
+            "in": "query",
+            "name": "event_type",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 64,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Event Type"
+            }
+          },
+          {
+            "description": "An Activity event's result: success, skipped, warning, retrying, running, failed. Only events have one.",
+            "in": "query",
+            "name": "result",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Result"
+            }
+          },
+          {
+            "description": "Why an Activity event happened: manual, scheduled, startup, worker, retry, system, webhook, folder_change. Only events have one.",
+            "in": "query",
+            "name": "trigger",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Trigger"
+            }
+          },
+          {
+            "description": "Job statuses: pending, leased, completed, failed, cancelled, handler_ok_finalize_failed. Repeat it or separate with commas. Only jobs have one; asking for any also shows finished watched-folder scans, which are otherwise left out.",
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "description": "Only server lines that carry an exception (true) or none (false). Only the server log has them.",
+            "in": "query",
+            "name": "has_exception",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Has Exception"
+            }
+          },
+          {
+            "description": "How the list is ordered: time (the default), level (by severity, errors first when ascending), source (event, job, server), category (by its word) or workflow (by the workflow's name, ignoring case; rows with no workflow come last either way). Rows that tie fall by time, newest first when descending and oldest first when ascending, so paging never repeats or skips one.",
+            "in": "query",
+            "name": "sort",
+            "required": false,
+            "schema": {
+              "default": "time",
+              "enum": [
+                "time",
+                "level",
+                "source",
+                "category",
+                "workflow"
+              ],
+              "title": "Sort",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Which way the order runs. Ascending runs the sort's own way (oldest first, errors first, A to Z); descending reverses it, and is the default: newest first.",
+            "in": "query",
+            "name": "direction",
+            "required": false,
+            "schema": {
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "title": "Direction",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get System Log Export",
+        "tags": [
+          "system-log"
+        ]
+      }
+    },
     "/api/v1/system/media-tools": {
       "get": {
         "description": "Which external media tools this install has, and what they report as their version.",
@@ -17196,6 +19565,28 @@
         "summary": "Get System Media Tools",
         "tags": [
           "system"
+        ]
+      }
+    },
+    "/api/v1/system/overview": {
+      "get": {
+        "description": "The facts System shows about this copy of Weir: version and update, uptime, how it runs, where it listens, the size of its data, how fast it answers, the jobs it ran today, restarts this week and how many checks pass. Each comes from a store Weir already keeps.",
+        "operationId": "get_system_overview_api_v1_system_overview_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SystemOverviewOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get System Overview",
+        "tags": [
+          "system-overview"
         ]
       }
     },
@@ -17278,6 +19669,54 @@
         "summary": "Post Reconciliation Repair",
         "tags": [
           "system-reconciliation"
+        ]
+      }
+    },
+    "/api/v1/system/stats": {
+      "get": {
+        "description": "The machine's load now and over the last ten minutes, Weir's own share of it and the tools', and the drives the workflows use. A field is null where it cannot be read. The same readings arrive on the Activity stream as system.stats frames: see SystemStatsFrame.",
+        "operationId": "get_system_stats_api_v1_system_stats_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SystemStatsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get System Stats",
+        "tags": [
+          "system-stats"
+        ]
+      }
+    },
+    "/api/v1/system/tasks": {
+      "get": {
+        "description": "Every task Weir runs on its own: each workflow's periodic scan and scheduled library clean, the cleanups, configuration backup checks, history pruning and the rest, each with its last result and next run. The same list arrives on the Activity stream as a system.tasks frame.",
+        "operationId": "get_system_tasks_api_v1_system_tasks_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SystemTaskOut"
+                  },
+                  "title": "Response Get System Tasks",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get System Tasks",
+        "tags": [
+          "system-overview"
         ]
       }
     },

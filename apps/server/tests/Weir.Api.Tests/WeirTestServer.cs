@@ -46,7 +46,8 @@ internal sealed class WeirTestServer : IAsyncDisposable
         home ??= Path.Join(Path.GetTempPath(), "weir-api-tests-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(home);
         prepareHome?.Invoke(home);
-        var dictionary = new Dictionary<string, string>(StringComparer.Ordinal) { ["WEIR_HOME"] = home };
+        // No test reaches the real metadata service: posters are off here unless a test names a stand-in gateway.
+        var dictionary = new Dictionary<string, string>(StringComparer.Ordinal) { ["WEIR_HOME"] = home, ["WEIR_ARTWORK_GATEWAY_URL"] = "off" };
         foreach (var (name, value) in variables ?? [])
         {
             dictionary[name] = value.Replace("{home}", home, StringComparison.Ordinal);

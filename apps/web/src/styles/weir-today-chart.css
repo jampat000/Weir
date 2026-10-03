@@ -1,0 +1,177 @@
+/* The Today tile's chart: the last two hours on a round-number scale, its time span and the pointer readout. */
+
+.mm-today-chart {
+  position: relative;
+  display: block;
+  min-height: 0;
+  grid-row: 1 / -1;
+  border-radius: 6px;
+}
+
+.mm-today-chart:focus-visible {
+  outline: 2px solid var(--mm-primary);
+  outline-offset: 2px;
+}
+
+.mm-today-chart__svg {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.mm-today-chart__stop {
+  stop-color: var(--mm-primary);
+  stop-opacity: 0.45;
+}
+
+.mm-today-chart__stop--end {
+  stop-opacity: 0;
+}
+
+.mm-today-chart__line {
+  stroke: var(--mm-primary);
+  stroke-linejoin: round;
+  stroke-width: 2;
+}
+
+.mm-today-chart__dot {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--mm-primary);
+  box-shadow: 0 0 10px var(--mm-primary);
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+}
+
+.mm-today-chart__empty {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  padding: 0 6px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--mm-card-bg) 80%, transparent);
+  font-size: var(--mm-type-caption);
+  pointer-events: none;
+  white-space: nowrap;
+  color: var(--mm-text3);
+  transform: translate(-50%, -50%);
+}
+
+/* The chart's overlay (the markup and class names are shared with Deluno): four gridlines with the scale at the left,
+   the time span at the bottom right, and the pointer's line and readout. */
+.cs-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  touch-action: pan-y;
+  font-size: var(--mm-type-eyebrow);
+  line-height: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--mm-text3);
+}
+
+.cs-grid {
+  position: absolute;
+  right: 0;
+  left: 0;
+  height: 0;
+  border-top: 1px solid color-mix(in srgb, var(--mm-border) 35%, transparent);
+  pointer-events: none;
+}
+
+.cs-tick,
+.cs-end {
+  position: absolute;
+  padding: 0 3px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--mm-card-bg) 78%, transparent);
+  font-weight: 500;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.cs-tick {
+  left: 0;
+}
+
+.cs-below {
+  transform: translateY(1px);
+}
+
+.cs-end {
+  bottom: 0;
+}
+
+.cs-now {
+  right: 8px;
+}
+
+/* The split of the two hours, along the bottom edge beside the time span: a count for each tone, with the dot of what it means. */
+.cs-legend {
+  position: absolute;
+  bottom: 0;
+  left: 3px;
+  right: var(--today-span-room, 84px);
+  display: grid;
+  gap: 3px;
+  pointer-events: none;
+}
+
+.cs-legend__part {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 2px;
+  padding: 0 2px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--mm-card-bg) 78%, transparent);
+}
+
+.cs-legend .mm-status-dot {
+  width: 6px;
+  height: 6px;
+}
+
+.cs-legend__words {
+  min-width: 0;
+  flex: 1 1 0;
+  overflow: hidden;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cs-cursor {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 0;
+  border-left: 1px solid color-mix(in srgb, var(--mm-text1) 45%, transparent);
+  pointer-events: none;
+}
+
+.cs-read {
+  position: absolute;
+  top: 2px;
+  z-index: 2;
+  padding: 3px 7px;
+  border: 1px solid var(--mm-border);
+  border-radius: 7px;
+  background: var(--mm-surface-2);
+  box-shadow: 0 4px 14px hsl(0 0% 0% / 0.35);
+  font-size: var(--mm-type-eyebrow);
+  font-weight: 600;
+  line-height: 15px;
+  pointer-events: none;
+  white-space: nowrap;
+  color: var(--mm-text1);
+}
+
+.cs-layer.cs-on {
+  z-index: 5;
+}

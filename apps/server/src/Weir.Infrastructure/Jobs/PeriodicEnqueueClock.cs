@@ -3,7 +3,7 @@ using System.Collections.Concurrent;
 namespace Weir.Infrastructure.Jobs;
 
 /// <summary>
-/// When each periodic family next runs and how often, as its timer last worked it out, so Settings › Cleanup shows a
+/// When each periodic family next runs and how often, as its timer last worked it out, so Setup › Performance › Cleanup shows a
 /// real next run instead of a guess. A family that is switched off has no entry.
 /// </summary>
 public sealed class PeriodicEnqueueClock

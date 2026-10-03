@@ -111,7 +111,7 @@ public sealed class HandbackOutcomeApiTests : IDisposable
         Assert.Equal(1, await TestDatabase.ScalarAsync(
             server, "SELECT count(*) FROM activity_events WHERE event_type = 'processing.handback_outcome' AND title = 'Radarr imported The.Long.Tide.2024.mkv'"));
 
-        // History shows it.
+        // Activity shows it.
         var client = new ApiTestClient(server);
         await client.SignInAsync();
         using var files = await client.GetAsync("/api/v1/processing/files");

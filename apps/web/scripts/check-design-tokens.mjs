@@ -11,10 +11,12 @@ const requiredTokens = [
   "mm-text1",
   "mm-surface1",
   "mm-surface2",
-  "mm-status-healthy-text",
-  "mm-status-warning-text",
-  "mm-status-failed-text",
-  "mm-status-info-text",
+  "mm-status-done",
+  "mm-status-todo",
+  "mm-status-doing",
+  "mm-status-attention",
+  "mm-status-broken",
+  "mm-status-idle",
 ];
 
 async function collectSourceFiles(directory) {

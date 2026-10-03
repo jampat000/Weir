@@ -43,6 +43,23 @@ static class LanAccessSetting
         }
     }
 
+    /// <summary>
+    /// When the choice was last written, or null when nothing is saved. Saving the same choice again moves it, which is
+    /// how a person asking again is told apart from a choice that was already there.
+    /// </summary>
+    internal static DateTime? SavedAt(string runtimeHome)
+    {
+        var path = Path.Combine(runtimeHome, FileName);
+        try
+        {
+            return File.Exists(path) ? File.GetLastWriteTimeUtc(path) : null;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return null;
+        }
+    }
+
     internal static void Write(string runtimeHome, ListenScope scope) =>
         AtomicFile.WriteAllText(runtimeHome, FileName, scope == ListenScope.OtherDevices ? OtherDevicesText : ThisPcOnlyText);
 }

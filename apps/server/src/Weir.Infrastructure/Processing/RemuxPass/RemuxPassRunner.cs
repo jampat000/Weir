@@ -248,7 +248,7 @@ public sealed partial class RemuxPassRunner
         WireObject? originalLanguage = null;
         if (!passThrough && request.ManualPlan is null && config.OriginalLanguage is { Enabled: true } originalRules)
         {
-            (config, originalLanguage) = await ApplyOriginalLanguageAsync(config, originalRules, scope, relativeMediaPath, request.Origin, audio, cancellationToken)
+            (config, originalLanguage) = await ApplyOriginalLanguageAsync(config, originalRules, scope, request.LibraryId, relativeMediaPath, request.Origin, audio, cancellationToken)
                 .ConfigureAwait(false);
         }
 

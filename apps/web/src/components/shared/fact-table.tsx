@@ -2,8 +2,6 @@ export type Fact = {
   label: string;
   value: string;
   detail?: string;
-  /** An mm-status-text--* class when the value itself is good or bad news. */
-  toneClass?: string;
 };
 
 /**
@@ -38,11 +36,7 @@ export function FactTable({
             {facts.map((fact) => (
               <td key={fact.label} data-label={fact.label}>
                 <span>
-                  <span
-                    className={`mm-quiet-table__strong${fact.toneClass ? ` ${fact.toneClass}` : ""}`}
-                  >
-                    {fact.value}
-                  </span>
+                  <span className="mm-quiet-table__strong">{fact.value}</span>
                   {fact.detail ? (
                     <span className="mm-quiet-table__sub">{fact.detail}</span>
                   ) : null}

@@ -48,7 +48,8 @@ export function workflowKindOf(
 
 export const WEIR_ONLY_LABEL = "Weir only";
 
-function joinNames(names: string[]): string {
+/** "A", "A and B", "A, B and C". */
+export function joinNames(names: string[]): string {
   if (names.length <= 1) return names.join("");
   return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
 }

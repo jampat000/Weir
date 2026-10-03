@@ -25,7 +25,8 @@ export type ConfigurationBackupList = Schema<"SuiteConfigurationBackupListOut">;
 export type ConfigurationBackupItem = Schema<"SuiteConfigurationBackupItemOut">;
 export type UpdateStatus = Schema<"SuiteUpdateStatusOut">;
 export type NetworkAccessStatus = Schema<"SuiteNetworkAccessOut">;
-export type NetworkAccessState = NetworkAccessStatus["state"];
+export type NetworkAccessPutBody = RequestBody<"SuiteNetworkAccessPutIn">;
+export type NetworkScope = NetworkAccessPutBody["scope"];
 export type UpdateSettingsOut = Schema<"UpdateSettingsOut">;
 export type UpdateMode = UpdateSettingsOut["mode"];
 export type UpdateSettingsPutBody = RequestBody<"UpdateSettingsPutIn">;
@@ -36,18 +37,11 @@ export type UpdateStateOut = {
 };
 
 export type HistoryResetResult = Schema<"SuiteOperationalHistoryResetOut">;
-export type ServerLogEntry = Schema<"SuiteLogEntryOut">;
 export type ServerLogs = Schema<"SuiteLogsOut">;
 export type ServerMetrics = Schema<"SuiteMetricsOut">;
 export type NotificationChannelOut = Schema<"NotificationChannelOut">;
 export type NotificationChannelListOut = Schema<"NotificationChannelListOut">;
 export type NotificationChannelIn = RequestBody<"NotificationChannelIn">;
-export type ServerLogFilters = {
-  level?: string;
-  search?: string;
-  has_exception?: boolean;
-  limit?: number;
-};
 
 export type NotificationChannelTestOut = {
   ok: boolean;

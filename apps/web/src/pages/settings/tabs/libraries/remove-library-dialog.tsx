@@ -28,6 +28,7 @@ export function RemoveLibraryDialog({
         </p>
       }
       confirmLabel="Remove workflow"
+      tone="danger"
       busy={remove.isPending}
       error={
         remove.isError

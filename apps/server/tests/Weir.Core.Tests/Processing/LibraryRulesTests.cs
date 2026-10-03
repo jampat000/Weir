@@ -227,7 +227,7 @@ public sealed class LibraryRulesTests
 
         Assert.Equal(
             "The most files this workflow runs at once cannot be more than the 4 Weir runs in total. " +
-            "Choose a lower number, or raise Files at once in Settings › Performance first.",
+            "Choose a lower number, or raise Files at once in Setup › Performance › Speed first.",
             exception.Message);
     }
 

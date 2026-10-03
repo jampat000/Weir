@@ -1,0 +1,142 @@
+/* The Activity stream, and the pulsing dot that says something is live. Motion stops under prefers-reduced-motion. */
+
+/* ---- Activity stream -------------------------------------------------------- */
+
+/* The panel's height decides how many whole lines show (fit-rows.ts hides the ones that do not fit), so the list
+   does not scroll and the 10px under it is the host's margin, outside what is measured. */
+.mm-stream__fit {
+  min-height: 0;
+  flex: 1 1 0;
+  margin-bottom: 10px;
+  overflow: hidden;
+}
+
+.mm-stream__list {
+  display: flex;
+  flex-direction: column;
+  padding: 0 10px;
+  list-style: none;
+}
+
+.mm-stream__empty {
+  margin: 0;
+  padding: 0 18px;
+  font-size: var(--mm-type-body);
+  color: var(--mm-text2);
+}
+
+.mm-stream__item {
+  flex: none;
+  border-radius: 10px;
+}
+
+.mm-stream__item--new {
+  animation: mm-stream-in 0.6s ease;
+}
+
+.mm-stream__link {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  gap: 10px;
+  padding: 9px 8px;
+  border-radius: 10px;
+  text-decoration: none;
+  color: inherit;
+}
+
+.mm-stream__link:hover {
+  background: var(--mm-surface-2);
+}
+
+.mm-stream__link:focus-visible {
+  outline: 2px solid var(--mm-primary);
+  outline-offset: -2px;
+}
+
+.mm-stream__icon {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border-radius: 9px;
+}
+
+.mm-stream__text {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.mm-stream__what {
+  display: -webkit-box;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  font-size: 0.875rem;
+  line-height: 1.35;
+  color: var(--mm-text1);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.mm-stream__what b {
+  font-weight: 600;
+}
+
+.mm-stream__note {
+  overflow: hidden;
+  font-size: var(--mm-type-caption);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--mm-text2);
+}
+
+/* ---- A steady dot with a ring that fades away from it ----------------------- */
+
+/* The ring is a separate layer scaled and faded rather than a growing box-shadow, which repaints the whole
+   element every frame (#719). */
+.mm-live-pulse {
+  position: relative;
+  display: inline-block;
+  flex-shrink: 0;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--mm-st);
+}
+
+.mm-live-pulse::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: var(--mm-st);
+  animation: mm-live-pulse 1.8s ease-out infinite;
+}
+
+@keyframes mm-live-pulse {
+  0% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+
+  70%,
+  100% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+}
+
+@keyframes mm-stream-in {
+  from {
+    opacity: 0;
+    background: color-mix(in srgb, var(--mm-primary) 30%, transparent);
+    transform: translateY(-10px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mm-live-pulse::after,
+  .mm-stream__item--new {
+    animation: none;
+  }
+}

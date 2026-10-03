@@ -2,10 +2,7 @@ import { useState } from "react";
 
 import { ConfirmDialog } from "../../../../components/ui/confirm-dialog";
 import { errorMessage } from "../../../../lib/api/error-message";
-import {
-  DOWNLOAD_CLIENT_KIND_LABELS,
-  type DownloadClientConnection,
-} from "../../../../lib/download-clients/download-clients-api";
+import type { DownloadClientConnection } from "../../../../lib/download-clients/download-clients-api";
 import {
   useDeleteDownloadClientConnection,
   useTestDownloadClientConnection,
@@ -13,59 +10,12 @@ import {
 } from "../../../../lib/download-clients/queries";
 import { connectionTitle } from "../../../../lib/ui/connection-title";
 import { mmActionButtonClass } from "../../../../lib/ui/mm-control-roles";
+import { ConnectionStatusLine } from "./connection-health";
+import { ConnectionRow } from "./connection-row";
 import { DownloadClientEditForm } from "./download-client-edit-form";
 
 const TEST_FAILURE = "The download client could not be tested.";
 const TOGGLE_FAILURE = "This download client could not be turned on or off.";
-
-type Formatter = (iso: string | null) => string;
-
-/** A result only counts with a time behind it, the same rule the media-manager card uses. */
-function lastResult(connection: DownloadClientConnection): boolean | null {
-  return connection.last_test_at ? (connection.last_test_ok ?? null) : null;
-}
-
-function headline(connection: DownloadClientConnection): string {
-  const result = lastResult(connection);
-  if (result === null) return connection.enabled ? "Not tested yet" : "Off";
-  return result ? "Answering" : "Not answering";
-}
-
-function tone(result: boolean | null): string {
-  if (result === null) return "text-mm-text";
-  return result ? "mm-status-text--healthy" : "mm-status-text--failed";
-}
-
-function DownloadClientStatus({
-  connection,
-  fmt,
-}: {
-  connection: DownloadClientConnection;
-  fmt: Formatter;
-}) {
-  const result = lastResult(connection);
-  return (
-    <div
-      className="mt-3 text-sm text-mm-text2"
-      data-testid="download-client-status"
-    >
-      <p className={`text-sm font-medium ${tone(result)}`}>
-        {headline(connection)}
-      </p>
-      <p className="mt-1 text-xs text-mm-text2">
-        Last checked:{" "}
-        <span className="font-medium text-mm-text">
-          {connection.last_test_at ? fmt(connection.last_test_at) : "never"}
-        </span>
-      </p>
-      {result === false && connection.last_test_detail ? (
-        <p className="mm-status-text--failed mt-1 text-xs">
-          {connection.last_test_detail}
-        </p>
-      ) : null}
-    </div>
-  );
-}
 
 export function RemoveDownloadClientDialog({
   connection,
@@ -94,6 +44,7 @@ export function RemoveDownloadClientDialog({
         </>
       }
       confirmLabel="Remove download client"
+      tone="danger"
       busy={remove.isPending}
       error={
         remove.isError
@@ -120,7 +71,7 @@ export function DownloadClientCard({
   fmt,
 }: {
   connection: DownloadClientConnection;
-  fmt: Formatter;
+  fmt: (iso: string | null) => string;
 }) {
   const update = useUpdateDownloadClientConnection();
   const remove = useDeleteDownloadClientConnection();
@@ -131,30 +82,23 @@ export function DownloadClientCard({
   const locked = busy || editing;
 
   return (
-    <section className="mm-quiet-section" data-testid="download-client-card">
-      <div className="mm-quiet-section__head">
-        <h3 className="mm-quiet-section__title">
-          {connectionTitle(connection)}
-        </h3>
-        <div className="mm-quiet-section__aside">
-          <span className="mm-quiet-badge">
-            {DOWNLOAD_CLIENT_KIND_LABELS[connection.kind]}
-          </span>
-          <span
-            className={`mm-quiet-badge${connection.enabled ? "" : " mm-quiet-badge--off"}`}
-          >
-            {connection.enabled ? "Enabled" : "Disabled"}
-          </span>
-        </div>
-      </div>
-      <div className="mm-quiet-section__body">
-        <DownloadClientStatus connection={connection} fmt={fmt} />
-
-        <div className="mt-3 flex flex-wrap gap-2">
+    <ConnectionRow
+      title={connectionTitle(connection)}
+      status={
+        <ConnectionStatusLine
+          connection={connection}
+          fmt={fmt}
+          unchecked="Not tested yet"
+          testId="download-client-status"
+        />
+      }
+      testId="download-client-card"
+      actions={
+        <>
           <button
             type="button"
             data-testid="download-client-test"
-            className={mmActionButtonClass({ variant: "primary" })}
+            className={mmActionButtonClass({ variant: "secondary" })}
             disabled={locked}
             onClick={() => test.mutate(connection.id)}
           >
@@ -185,7 +129,7 @@ export function DownloadClientCard({
           <button
             type="button"
             data-testid="download-client-remove"
-            className={mmActionButtonClass({ variant: "tertiary" })}
+            className={mmActionButtonClass({ variant: "danger-outline" })}
             disabled={locked}
             aria-haspopup="dialog"
             onClick={() => {
@@ -195,35 +139,43 @@ export function DownloadClientCard({
           >
             Remove
           </button>
-        </div>
+        </>
+      }
+    >
+      {test.isError ? (
+        <p
+          className="mm-status-text mt-2 text-sm"
+          data-status="broken"
+          role="alert"
+        >
+          {errorMessage(test.error, TEST_FAILURE)}
+        </p>
+      ) : null}
 
-        {test.isError ? (
-          <p className="mm-status-text--failed mt-2 text-sm" role="alert">
-            {errorMessage(test.error, TEST_FAILURE)}
-          </p>
-        ) : null}
+      {update.isError ? (
+        <p
+          className="mm-status-text mt-2 text-sm"
+          data-status="broken"
+          role="alert"
+        >
+          {errorMessage(update.error, TOGGLE_FAILURE)}
+        </p>
+      ) : null}
 
-        {update.isError ? (
-          <p className="mm-status-text--failed mt-2 text-sm" role="alert">
-            {errorMessage(update.error, TOGGLE_FAILURE)}
-          </p>
-        ) : null}
+      {editing ? (
+        <DownloadClientEditForm
+          connection={connection}
+          onClose={() => setEditing(false)}
+        />
+      ) : null}
 
-        {editing ? (
-          <DownloadClientEditForm
-            connection={connection}
-            onClose={() => setEditing(false)}
-          />
-        ) : null}
-
-        {confirmingRemoval ? (
-          <RemoveDownloadClientDialog
-            connection={connection}
-            remove={remove}
-            onClose={() => setConfirmingRemoval(false)}
-          />
-        ) : null}
-      </div>
-    </section>
+      {confirmingRemoval ? (
+        <RemoveDownloadClientDialog
+          connection={connection}
+          remove={remove}
+          onClose={() => setConfirmingRemoval(false)}
+        />
+      ) : null}
+    </ConnectionRow>
   );
 }

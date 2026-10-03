@@ -1,45 +1,18 @@
-import {
-  SHOW_SUPPORT_URL_PLACEHOLDER,
-  SUPPORT_URL,
-} from "../../../../lib/support";
-import { QuietDisclosure } from "../../../../components/shared/quiet-section";
+import { SUPPORT_URL } from "../../../../lib/support";
 
-/** Supporting Weir: optional, and nothing here changes how it works, so it stays closed. */
+/** Supporting Weir: optional, so it is one small link, and nothing at all in a build that has no link to give. */
 export function SupportSection() {
+  if (!SUPPORT_URL) return null;
   return (
-    <div data-testid="suite-settings-support-tab" className="mm-quiet-stack">
-      <QuietDisclosure
-        title="Support Weir"
-        summaryWhenClosed="Optional"
-        data-testid="suite-settings-support"
-      >
-        <p className="mm-quiet-note">
-          Weir is free to use. Support is optional.
-        </p>
-        <p className="mm-quiet-note mt-2">
-          If Weir saves you time or keeps your downloads clean, you can support
-          ongoing development.
-        </p>
-        {SUPPORT_URL ? (
-          <p className="mt-4">
-            <a
-              href={SUPPORT_URL}
-              target="_blank"
-              rel="noreferrer"
-              className="mm-quiet-link"
-              data-testid="suite-settings-support-button"
-            >
-              Support Weir →
-            </a>
-          </p>
-        ) : null}
-        {SHOW_SUPPORT_URL_PLACEHOLDER ? (
-          <p className="mm-caption-note mt-3">
-            Development note: set <code>VITE_SUPPORT_URL</code> to show the
-            support button.
-          </p>
-        ) : null}
-      </QuietDisclosure>
-    </div>
+    <a
+      href={SUPPORT_URL}
+      target="_blank"
+      rel="noreferrer"
+      className="mm-sys-link"
+      title="Weir is free to use. Support is optional."
+      data-testid="suite-settings-support"
+    >
+      Support Weir →
+    </a>
   );
 }

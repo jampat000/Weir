@@ -13,12 +13,12 @@ public interface IPeriodicEnqueuer
     TimeSpan Interval { get; }
 
     /// <summary>
-    /// Whether the family is switched on. Read on every check, so switching a family on or off in Settings › Cleanup
+    /// Whether the family is switched on. Read on every check, so switching a family on or off in Setup › Performance › Cleanup
     /// applies within <see cref="PeriodicEnqueueService.DefaultRecheck"/>, without a restart.
     /// </summary>
     Task<bool> IsEnabledAsync(CancellationToken cancellationToken);
 
-    /// <summary>How often the family runs now: the interval saved in Settings › Cleanup, else <see cref="Interval"/>.</summary>
+    /// <summary>How often the family runs now: the interval saved in Setup › Performance › Cleanup, else <see cref="Interval"/>.</summary>
     Task<TimeSpan> IntervalAsync(CancellationToken cancellationToken) => Task.FromResult(Interval);
 
     Task EnqueueOnceAsync(CancellationToken cancellationToken);

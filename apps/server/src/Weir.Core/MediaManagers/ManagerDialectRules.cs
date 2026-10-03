@@ -86,7 +86,7 @@ public static class ManagerDialectRules
                 if (detail.Contains("HTTP 401", StringComparison.Ordinal) || detail.Contains("HTTP 403", StringComparison.Ordinal))
                 {
                     return $"{connection.Label} refused Weir's API key, so it could not say {what}. " +
-                           "Check the key on the Media managers settings page and save it again.";
+                           "Check the key in Setup › Connections › Media managers and save it again.";
                 }
 
                 return $"{connection.Label} did not give Weir the answer it expected when asked {what}. " +

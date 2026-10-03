@@ -86,7 +86,7 @@ public sealed class DownloadedScanNotifier
         var body = DownloadedScanRules.CommandBody(arrScope, managerPath, downloadClientId);
         try
         {
-            var client = new MediaManagerHttpClient(connection.BaseUrl, connection.ApiKey, _handlers, ManagerDialectRules.DescribeTimeout);
+            var client = new MediaManagerHttpClient(connection.BaseUrl, connection.ApiKey, _handlers, ManagerDialectRules.DescribeTimeout, connection.Reference);
             await client.PostJsonAsync(DownloadedScanRules.CommandPath, body, cancellationToken: cancellationToken).ConfigureAwait(false);
             await RecordAsync(uow, connection, relativeMediaPath, body, accepted: true, failureReason: null).ConfigureAwait(false);
         }
@@ -102,7 +102,7 @@ public sealed class DownloadedScanNotifier
     {
         try
         {
-            var client = new MediaManagerHttpClient(connection.BaseUrl, connection.ApiKey, _handlers, ManagerDialectRules.DescribeTimeout);
+            var client = new MediaManagerHttpClient(connection.BaseUrl, connection.ApiKey, _handlers, ManagerDialectRules.DescribeTimeout, connection.Reference);
             var raw = await client.GetJsonAsync(ManagerSetupRules.RemotePathMappingPath, cancellationToken: cancellationToken).ConfigureAwait(false);
             return ManagerSetupRules.ParseMappings(raw);
         }

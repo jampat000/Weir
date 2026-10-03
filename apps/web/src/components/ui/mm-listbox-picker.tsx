@@ -2,9 +2,10 @@ import { useCallback, useId, useRef, useState } from "react";
 import {
   mmListboxOptionButtonClass,
   mmListboxPanelClass,
-  mmPickerTriggerClass,
+  mmPickerTriggerSurface,
 } from "../../lib/ui/mm-control-roles";
 import { useCloseOnOutsideAndEscape } from "../../lib/ui/use-close-on-outside";
+import { MmPickerChevron } from "./mm-picker-chevron";
 import { useListboxKeyboardNav } from "./use-listbox-keyboard-nav";
 
 export type MmListboxOption = { value: string; label: string };
@@ -59,15 +60,6 @@ export function MmListboxPicker({
 
   const selected = options.find((o) => o.value === value);
   const triggerLabel = selected?.label ?? placeholder;
-  const triggerSurface = [
-    mmPickerTriggerClass,
-    "flex min-h-[2.5rem] items-center justify-between gap-2",
-    open && !disabled
-      ? "border-mm-input-border-focus !shadow-[inset_0_1px_3px_rgba(0,0,0,0.22),inset_0_1px_0_rgba(255,255,255,0.04),0_0_0_2px_var(--mm-input-focus-ring)]"
-      : "",
-  ]
-    .filter(Boolean)
-    .join(" ");
 
   return (
     <div
@@ -77,7 +69,7 @@ export function MmListboxPicker({
       <button
         ref={triggerRef}
         type="button"
-        className={triggerSurface}
+        className={mmPickerTriggerSurface}
         disabled={disabled}
         aria-haspopup="listbox"
         aria-controls={open ? listboxId : undefined}
@@ -95,18 +87,7 @@ export function MmListboxPicker({
         <span className="min-w-0 max-h-16 flex-1 overflow-y-auto whitespace-normal break-words text-left">
           {triggerLabel}
         </span>
-        <svg
-          aria-hidden
-          className={[
-            // The same accent mark a native select draws, so an anchored listbox and a select read alike.
-            "h-4 w-4 shrink-0 text-mm-accent transition-transform",
-            open ? "rotate-180" : "",
-          ].join(" ")}
-          viewBox="0 0 20 20"
-          fill="currentColor"
-        >
-          <path d="M5.5 7.5 10 12l4.5-4.5H5.5z" />
-        </svg>
+        <MmPickerChevron open={open} />
       </button>
       {open ? (
         <div

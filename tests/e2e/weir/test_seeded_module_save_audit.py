@@ -38,11 +38,10 @@ def test_saved_state_persists_across_settings_and_processing(
 
             ensure_signed_in(page, base)
 
-            # The setup wizard reopens from System › About, where it folds away because it
-            # is run once. There is no display density setting, in the wizard or on the page.
+            # The setup wizard reopens from System › About's "This Weir" card. There is no display
+            # density setting, in the wizard or on the page.
             open_sidebar(page, "System")
             expect(page.get_by_test_id("suite-settings-global")).to_be_visible()
-            page.get_by_role("heading", name="Setup wizard", exact=True).click()
             page.get_by_test_id("suite-settings-open-setup-wizard").click()
             expect(page).to_have_url(re.compile(r".*/setup-wizard"))
             expect(page.get_by_role("heading", name="Set up Weir")).to_be_visible()
@@ -52,8 +51,8 @@ def test_saved_state_persists_across_settings_and_processing(
             expect(page.get_by_test_id("processing-page")).to_be_visible()
             expect(page.locator("html")).not_to_have_attribute("data-mm-density", re.compile(".*"))
 
-            # Workflows is where Settings opens.
-            open_tab(page, "Settings", "Workflows")
+            # Workflows is where setup opens.
+            open_tab(page, "Workflows", "File paths")
             libraries = page.get_by_test_id("processing-libraries-section")
             expect(libraries).to_be_visible()
             # Every workflow says whether it is Weir only or linked to a media manager.
@@ -64,9 +63,9 @@ def test_saved_state_persists_across_settings_and_processing(
             form.get_by_role("textbox", name="Output folder").fill(str(tv_output))
             page.get_by_test_id("processing-library-save").click()
             expect(form).to_have_count(0)
-            open_sidebar(page, "Processing")
+            open_sidebar(page, "Dashboard")
             expect(page.get_by_test_id("processing-page")).to_be_visible()
-            open_tab(page, "Settings", "Workflows")
+            open_tab(page, "Workflows", "File paths")
             expect(page.get_by_test_id("processing-libraries-section")).to_contain_text(str(tv_watch))
         finally:
             browser.close()

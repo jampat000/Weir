@@ -12,10 +12,26 @@ import { stepForStage, type FlowStepId } from "./stage-flow-model";
 
 export const LIBRARY_CLEAN_JOB_KIND = "processing.library.clean.v1";
 
+/** The job kinds that are a library's own work: its scan and its clean. */
+const LIBRARY_JOB_KIND_PREFIX = "processing.library.";
+/** The job kinds that are new-download work: a file's pass, and the scan of a watched folder that finds it. */
+const DOWNLOAD_JOB_KIND_PREFIXES = [
+  "processing.file.",
+  "processing.watched_folder.",
+] as const;
+
 /** The file status the Working lane shows (see the `case "processing"` below). */
 export const WORKING_FILE_STATUS: ProcessingFile["status"] = "processing";
 
 export type WorkSource = "download" | "library";
+
+/** Which kind of work a job of this kind is. A job that is neither (a cleanup sweep, say) is Weir's own housekeeping: null. */
+export function workSourceOfJobKind(jobKind: string): WorkSource | null {
+  if (jobKind.startsWith(LIBRARY_JOB_KIND_PREFIX)) return "library";
+  return DOWNLOAD_JOB_KIND_PREFIXES.some((prefix) => jobKind.startsWith(prefix))
+    ? "download"
+    : null;
+}
 
 export type ArrivingItem = {
   key: string;
@@ -90,8 +106,6 @@ export type Lanes = {
   waiting: WaitingItem[];
   working: WorkingItem[];
   handing: HandingItem[];
-  /** Files that need a person: failed, or on hold after repeated failures. */
-  stuck: ProcessingFile[];
 };
 
 const EPISODE = /^(.+?)[ ._-]+(S\d{1,2}E\d{1,3}(?:-?E\d{1,3})?)(?:[ ._-]|$)/i;
@@ -157,6 +171,13 @@ function libraryJobParts(row: ProcessingJobInspectionRow): {
   }
 }
 
+/** The workflow a library clean job belongs to, or null when its payload does not say. */
+export function libraryCleanWorkflowId(
+  row: ProcessingJobInspectionRow,
+): number | null {
+  return libraryJobParts(row).libraryId;
+}
+
 /**
  * The general, paginated file list with the Working lane's own uncapped, status-filtered fetch folded in
  * (#781): a currently-processing file the general page's own limit left out is patched back onto the end,
@@ -191,7 +212,6 @@ export function buildLanes(
     waiting: [],
     working: [],
     handing: [],
-    stuck: [],
   };
 
   for (const file of files) {
@@ -292,9 +312,6 @@ export function buildLanes(
         });
         break;
       }
-      case "processing_failed":
-        lanes.stuck.push(file);
-        break;
       default:
         break;
     }
@@ -334,7 +351,16 @@ export function buildLanes(
     (a, b) =>
       (arrivingDeadline(a) ?? Infinity) - (arrivingDeadline(b) ?? Infinity),
   );
+  // A running pass keeps its place. The server lists files by when they were last seen, which moves while they run,
+  // and two cards that trade rows glide through one another.
+  lanes.working.sort(byKey);
+  lanes.handing.sort(byKey);
   return lanes;
+}
+
+/** Orders items by their key, the numbers in it as numbers: "file-9" before "file-10". */
+function byKey(a: { key: string }, b: { key: string }): number {
+  return a.key.localeCompare(b.key, undefined, { numeric: true });
 }
 
 /** How many cards the Working lane holds for these files and jobs, before the page's own filter. */

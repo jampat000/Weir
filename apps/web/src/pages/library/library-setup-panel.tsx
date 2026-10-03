@@ -54,7 +54,8 @@ export function LibrarySetupPanel({
           />
           {save.isError ? (
             <p
-              className="mm-status-text--failed text-sm"
+              className="mm-status-text text-sm"
+              data-status="broken"
               role="alert"
               data-testid="library-setup-save-error"
             >

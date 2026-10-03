@@ -16,15 +16,23 @@ import {
   windowNow,
 } from "./schedule-model";
 
-/** A library's week at a glance: seven rows of 24 hours, lit where it may start work. */
+/**
+ * A library's week at a glance: seven rows of 24 hours, lit where it may start work. A week with no
+ * gaps is one lit bar, since seven identical rows say nothing more.
+ */
 function WeekStrip({ grid, name }: { grid: string; name: string }) {
+  const week = weekHours(grid);
+  const label = `${name}: when it may start work, Monday to Sunday`;
+  if (week.every((day) => day.every(Boolean))) {
+    return (
+      <div className="mm-week mm-week--always" role="img" aria-label={label}>
+        <span className="mm-week__hour is-on" />
+      </div>
+    );
+  }
   return (
-    <div
-      className="mm-week"
-      role="img"
-      aria-label={`${name}: when it may start work, Monday to Sunday`}
-    >
-      {weekHours(grid).map((day, d) => (
+    <div className="mm-week" role="img" aria-label={label}>
+      {week.map((day, d) => (
         <div className="mm-week__day" key={DAY_NAMES[d]}>
           <span className="mm-week__label">{DAY_NAMES[d].slice(0, 1)}</span>
           {day.map((on, h) => (
@@ -54,14 +62,16 @@ function RightNow({
       return <span>Any time</span>;
     case "never":
       return (
-        <span className="mm-status-text--warning">
+        <span className="mm-status-text" data-status="attention">
           Never: no hours are chosen
         </span>
       );
     case "open":
       return (
         <span>
-          <span className="mm-status-text--healthy">Open</span>
+          <span className="mm-status-text" data-status="done">
+            Open
+          </span>
           {state.until ? (
             <span className="mm-quiet-table__sub">until {state.until}</span>
           ) : null}
@@ -70,7 +80,9 @@ function RightNow({
     case "closed":
       return (
         <span>
-          <span className="mm-status-text--warning">Closed</span>
+          <span className="mm-status-text" data-status="idle">
+            Closed
+          </span>
           <span className="mm-quiet-table__sub">opens {state.opens}</span>
         </span>
       );
@@ -92,7 +104,7 @@ function ScanNowButton({
       <button
         type="button"
         aria-label={`Scan ${library.name} now`}
-        className={mmActionButtonClass({ variant: "secondary" })}
+        className={mmActionButtonClass({ variant: "secondary", size: "row" })}
         disabled={!editable || !watchedSet || queueScan.isPending}
         title={
           watchedSet ? undefined : "This workflow has no watched folder yet."
@@ -112,7 +124,11 @@ function ScanNowButton({
             : "Scan now"}
       </button>
       {queueScan.isError ? (
-        <span className="mm-status-text--failed block text-xs" role="alert">
+        <span
+          className="mm-status-text block text-xs"
+          data-status="broken"
+          role="alert"
+        >
           {errorMessage(queueScan.error, "The scan could not be queued.")}
         </span>
       ) : null}
@@ -161,7 +177,10 @@ export function LibraryHoursRow({
         <div className="mm-schedule-actions">
           <button
             type="button"
-            className={mmActionButtonClass({ variant: "secondary" })}
+            className={mmActionButtonClass({
+              variant: "secondary",
+              size: "row",
+            })}
             aria-expanded={editing}
             onClick={onToggleEdit}
           >
@@ -228,7 +247,11 @@ export function LibraryHoursEditor({
         disabled={!editable || update.isPending}
       />
       {update.isError ? (
-        <p className="mm-status-text--failed mt-2 text-sm" role="alert">
+        <p
+          className="mm-status-text mt-2 text-sm"
+          data-status="broken"
+          role="alert"
+        >
           {errorMessage(update.error, "These hours could not be saved.")}
         </p>
       ) : null}

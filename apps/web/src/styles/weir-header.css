@@ -1,0 +1,537 @@
+/* The shell's header (components/shell/shell-header.tsx): sticky above every page. */
+
+.mm-header {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 14px var(--mm-header-pad-x);
+  border-bottom: 1px solid var(--mm-header-rule);
+  background: color-mix(in srgb, var(--mm-bg) 85%, transparent);
+  backdrop-filter: blur(24px);
+  /* Its own width is what the page's controls in it are sized by (a container query), not the window's, since the
+     menu takes a different share of the window open and collapsed. */
+  container: mm-header / inline-size;
+  /* The title sits lower than the header's middle by half of the eyebrow's line (1.35 times its size) and of the 4px
+     under it, less 0.45px that the title's line has above its letters. A control on the title line moves down by that
+     much, so it is centred on the title's text; a transform keeps the header's height. */
+  --title-line-shift: calc(var(--mm-type-eyebrow) * 0.675 + 1.55px);
+}
+
+/* Phones only: the button that opens the side menu. */
+.mm-header__menu {
+  display: none;
+}
+
+/* As wide as its eyebrow or its title line, whichever is wider, and no wider, as Deluno's is. */
+.mm-header__titles {
+  min-width: 0;
+}
+
+.mm-header__eyebrow {
+  font-size: var(--mm-type-eyebrow);
+  font-weight: 700;
+  letter-spacing: var(--mm-tracking-eyebrow);
+  line-height: 1.35;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--mm-text2);
+}
+
+.mm-header__title {
+  margin: 4px 0 0;
+  font-size: var(--mm-header-title-size);
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+  color: var(--mm-text1);
+}
+
+/* The title and, when the page has tabs, the tabs after it on the same line, 22px apart and on one baseline. The
+   title keeps its width; when the header is short of room it is the tabs that give way, folding into More. */
+.mm-header__line {
+  display: flex;
+  align-items: baseline;
+  column-gap: 22px;
+  min-width: 0;
+}
+
+.mm-header__line .mm-header__title {
+  flex-shrink: 0;
+}
+
+/* Only as tall as its tabs, so the header keeps its height; nothing shows when the page has none. */
+.mm-header__tabs {
+  display: flex;
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.mm-header__tabs:empty {
+  display: none;
+}
+
+/* A page's own buttons, on the title line at the right, just before the status and Pause. They keep their own size and
+   style, 8px apart. They never shrink, so it is the tabs that fold into More first. */
+.mm-header__buttons {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.mm-header__buttons:not(:has(button, a)) {
+  display: none;
+}
+
+.mm-header__buttons:has(button, a) + .mm-header__actions {
+  margin-left: 0;
+}
+
+/* Where a page puts its own control (a segmented choice, a picker); nothing shows when it has none. */
+.mm-header__slot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  margin-left: 12px;
+}
+
+.mm-header__slot:empty {
+  display: none;
+}
+
+/* The search in the slot (components/shell/header-search.tsx). Short of room it is a magnifier, a control's height square,
+   until it is focused or holds a search; it is the same input throughout, so nothing typed or focused moves. */
+.mm-header-search {
+  position: relative;
+  display: block;
+  min-width: 0;
+}
+
+.mm-header-search > .mm-input {
+  width: 100%;
+  padding-inline: 10px;
+  font-size: 13px;
+}
+
+.mm-header-search__mark {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: none;
+  width: 16px;
+  height: 16px;
+  margin: -8px 0 0 -8px;
+  color: var(--mm-text2);
+  pointer-events: none;
+}
+
+.mm-header-search[data-collapsed="true"]:not(:focus-within):has(
+    > input:placeholder-shown
+  ) {
+  flex: none;
+  width: var(--mm-control-height-page);
+  min-width: 0;
+}
+
+.mm-header-search[data-collapsed="true"]:not(:focus-within):has(
+    > input:placeholder-shown
+  )
+  > input {
+  padding: 0;
+  color: transparent;
+  cursor: pointer;
+}
+
+.mm-header-search[data-collapsed="true"]:not(:focus-within):has(
+    > input:placeholder-shown
+  )
+  > input::placeholder {
+  color: transparent;
+}
+
+.mm-header-search[data-collapsed="true"]:not(:focus-within):has(
+    > input:placeholder-shown
+  )
+  > input::-webkit-search-cancel-button {
+  display: none;
+}
+
+.mm-header-search[data-collapsed="true"]:not(:focus-within):has(
+    > input:placeholder-shown
+  )
+  > .mm-header-search__mark {
+  display: block;
+}
+
+/* Opened, it takes the room a search needs, and the chips beside it give way. */
+.mm-header-search[data-collapsed="true"]:is(
+    :focus-within,
+    :has(> input:not(:placeholder-shown))
+  ) {
+  flex: 0 0 11rem;
+}
+
+.mm-header__slot .mm-segmented {
+  height: var(--mm-control-height-page);
+}
+
+.mm-header__slot .mm-segmented__option {
+  height: auto;
+}
+
+/* The Dashboard's controls, on Live only: the workflow picker, then the kind of work. System puts nothing in the
+   header's slot. Where there is room the kind of work is a three-button switch; where there is not, the same choice
+   as a picker. The room is whatever the header has left after the picker, which the control's own box measures, so
+   the choice follows the window and the menu whatever else the header holds, and the header stays on one line. */
+.mm-dash-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.mm-dash-controls__compact {
+  display: none;
+}
+
+@media (min-width: 921px) {
+  .mm-header__slot:has(.mm-dash-controls) {
+    flex: 1 1 0;
+  }
+
+  .mm-dash-controls {
+    flex: 1 1 0;
+    flex-wrap: nowrap;
+  }
+
+  .mm-dash-controls__work {
+    flex: 1 1 0;
+    min-width: 0;
+    container-type: inline-size;
+  }
+
+  .mm-dash-controls__switch {
+    display: none;
+  }
+
+  .mm-dash-controls__compact {
+    display: block;
+  }
+
+  /* The three buttons are 369px wide at the default text size. The switch is as wide as they are, not as wide as
+     the room it was measured in. */
+  @container (min-width: 24.7rem) {
+    .mm-dash-controls__switch {
+      display: block;
+    }
+
+    .mm-dash-controls__switch .mm-segmented {
+      width: fit-content;
+      max-width: 100%;
+    }
+
+    .mm-dash-controls__compact {
+      display: none;
+    }
+  }
+}
+
+/* "All workflows ▾": one control among the page's others, as tall as the segmented choice beside it. Its width is
+   its own, whatever is chosen in it and whichever controls sit beside it, so it never moves when the view or the
+   workflow changes; it gives way only where the header is narrower than that. */
+.mm-workflow-picker {
+  flex: 0 1 var(--picker-w, 9.5rem);
+  width: var(--picker-w, 9.5rem);
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* "Library cleaning ▾" is the longest of the three. */
+.mm-work-picker {
+  --picker-w: 10.5rem;
+}
+
+.mm-workflow-picker .mm-input--opens {
+  margin-top: 0;
+}
+
+.mm-header__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  min-width: 0;
+  margin-left: auto;
+}
+
+/* Beside the menu the header stays on one row: the eyebrow and the page's own control give way
+   (wrapping inside themselves) before the status and actions are pushed down a row. */
+@media (min-width: 921px) {
+  .mm-header {
+    flex-wrap: nowrap;
+  }
+
+  .mm-header__actions {
+    flex-shrink: 0;
+    flex-wrap: nowrap;
+  }
+
+  .mm-header__slot,
+  .mm-header__buttons,
+  .mm-header__actions {
+    transform: translateY(var(--title-line-shift));
+  }
+}
+
+/* Empty while all is well, so a pill here is always news. */
+.mm-header-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.mm-header-status:empty {
+  display: none;
+}
+
+/* Tabs (components/shell/page-tabs.tsx): plain text, 18px apart. The chosen tab is in the accent colour with a
+   2px underline, and the weight is the same in every state, so the row does not shift as you move along it.
+   Tabs go on the header's title line, or in the toolbar row under the title. */
+.mm-page-tabs {
+  display: flex;
+  min-width: 0;
+  column-gap: 18px;
+}
+
+.mm-page-tabs__tab,
+.mm-page-tabs__more-button {
+  position: relative;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  color: var(--mm-text2);
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.mm-page-tabs__tab:hover,
+.mm-page-tabs__more-button:hover {
+  color: var(--mm-text1);
+}
+
+.mm-page-tabs__tab[aria-selected="true"] {
+  color: var(--mm-primary);
+}
+
+.mm-page-tabs__tab::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  border-radius: 999px;
+  background: transparent;
+}
+
+.mm-page-tabs__tab[aria-selected="true"]::after {
+  background: var(--mm-primary);
+}
+
+/* On the title's line: the underline sits 7px below the text, so the line, and with it the header, keeps its
+   height. */
+.mm-page-tabs--title {
+  align-items: baseline;
+}
+
+.mm-page-tabs--title .mm-page-tabs__tab::after {
+  bottom: -7px;
+}
+
+/* In the toolbar row: as tall as the row's inside (its 40px less the border), the underline on the row's bottom line. */
+.mm-page-tabs--row {
+  flex-wrap: wrap;
+  align-items: stretch;
+}
+
+.mm-page-tabs--row .mm-page-tabs__tab {
+  display: flex;
+  align-items: center;
+  height: 39px;
+}
+
+.mm-page-tabs--row .mm-page-tabs__tab::after {
+  bottom: -1px;
+}
+
+/* Tabs on the title line (components/shell/page-tabs.tsx): the box takes the room the header leaves them, and the
+   tabs that do not fit fold into More. The width of a tab is measured on a hidden copy, drawn with the same 18px
+   gap and type. That copy is in the flow so the box asks for the room all the tabs need, but it is no taller than
+   a line of nothing and no wider than the box, so it never adds to the page's size. */
+.mm-page-tabs-fit {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.mm-page-tabs-fit__row {
+  display: flex;
+  align-items: baseline;
+  column-gap: 18px;
+  min-width: 0;
+}
+
+/* A tab is never squeezed into More: the row is as wide as the tabs it shows, and More follows it. */
+.mm-page-tabs-fit__row > .mm-page-tabs {
+  flex: none;
+}
+
+.mm-page-tabs__measure {
+  display: flex;
+  column-gap: 18px;
+  width: max-content;
+  max-width: 100%;
+  height: 0;
+  overflow: hidden;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.mm-page-tabs__measure .mm-page-tabs__tab {
+  flex: none;
+}
+
+.mm-page-tabs__measure .mm-page-tabs__tab::before,
+.mm-page-tabs__probe::before {
+  content: attr(data-label);
+}
+
+.mm-page-tabs__probe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* "More" (components/shell/more-menu.tsx) ends a row of tabs or chips. As a tab it is set as a tab is, in 14px at weight 500,
+   and it is never drawn as the chosen one: the chosen tab or chip always has its place in the row. */
+.mm-more {
+  position: relative;
+  display: flex;
+}
+
+.mm-more__button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.mm-more__chevron {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  transition: transform 0.15s ease;
+}
+
+.mm-more__button[aria-expanded="true"] .mm-more__chevron {
+  transform: rotate(180deg);
+}
+
+/* The menu is the user menu's: the same surface, border, radius and shadow, and rows of the same type. */
+.mm-more__menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 90;
+  min-width: 176px;
+  overflow: hidden;
+  border: 1px solid var(--mm-panel-border);
+  border-radius: var(--mm-radius-field);
+  background: var(--mm-surface-elevated);
+  box-shadow: var(--mm-shadow-popover);
+}
+
+.mm-more__item {
+  display: block;
+  width: 100%;
+  padding: 10px 12px;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--mm-text2);
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.mm-more__item:hover,
+.mm-more__item:focus-visible {
+  background: var(--mm-surface-2);
+  color: var(--mm-text1);
+  outline: none;
+}
+
+/* The first row of a page with tabs, under the header: 40px, the tabs at the left and the page's own buttons at
+   the right. */
+.mm-page-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0 var(--mm-panel-gap);
+  min-height: 40px;
+  margin: 0 0 var(--mm-panel-gap);
+  border-bottom: 1px solid var(--mm-hairline);
+}
+
+.mm-page-toolbar__tabs {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.mm-page-toolbar__actions {
+  display: flex;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* A row with buttons and no tabs keeps them at the right. */
+.mm-page-toolbar__actions:only-child {
+  margin-left: auto;
+}
+
+/* The tab-owned buttons arrive through a portal into this element; it adds no box of its own, so they lay out as the
+   row's own buttons. */
+.mm-page-toolbar__slot {
+  display: contents;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mm-page-tabs__tab,
+  .mm-page-tabs__more-button,
+  .mm-more__chevron {
+    transition: none;
+  }
+}

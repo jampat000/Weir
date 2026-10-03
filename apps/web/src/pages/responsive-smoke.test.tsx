@@ -3,35 +3,43 @@ import { render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { JobsSection } from "./system/tabs/logs/jobs-section";
+import { UnifiedLog } from "./system/tabs/logs/unified-log";
 
-vi.mock("../lib/processing/jobs-inspection/queries", () => ({
-  useProcessingJobsInspectionQuery: vi.fn(() => ({
-    isPending: false,
-    isError: false,
-    data: {
-      jobs: [
-        {
-          id: 1,
-          status: "completed",
-          job_kind: "processing.process.test.v1",
-          updated_at: "2026-04-20T00:00:00Z",
-          lease_owner: null,
-          lease_expires_at: null,
-          dedupe_key: "dedupe-key-1",
-        },
-      ],
+vi.mock("../lib/system/system-log-api", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../lib/system/system-log-api")>()),
+  fetchSystemLog: vi.fn(async () => ({
+    items: [
+      {
+        id: "job:1",
+        source: "job",
+        at: "2026-04-20T00:00:00Z",
+        level: "success",
+        category: "processing",
+        workflow: null,
+        title: "Finished",
+        detail: "Process a media file",
+        event: null,
+        job: null,
+        server: null,
+      },
+    ],
+    next_cursor: null,
+    total: 1,
+    counts: {
+      source: { event: 0, job: 1, server: 0 },
+      level: { error: 0, warning: 0, info: 0, success: 1 },
+      category: {
+        processing: 1,
+        scans: 0,
+        cleanup: 0,
+        library: 0,
+        connections: 0,
+        backups: 0,
+        sign_in: 0,
+        updates: 0,
+        weir: 0,
+      },
     },
-  })),
-  useProcessingJobCancelPendingMutation: vi.fn(() => ({
-    isPending: false,
-    isError: false,
-    mutate: vi.fn(),
-  })),
-  useProcessingJobRecoverFinalizeFailedMutation: vi.fn(() => ({
-    isPending: false,
-    isError: false,
-    mutate: vi.fn(),
   })),
 }));
 
@@ -46,11 +54,12 @@ vi.mock("../lib/auth/queries", async (importOriginal) => {
   };
 });
 
-vi.mock("../lib/pause/pause-queries", () => ({
-  usePauseQuery: vi.fn(() => ({ data: { paused: false } })),
+vi.mock("../lib/processing/libraries-queries", () => ({
+  useProcessingLibrariesQuery: vi.fn(() => ({ data: [] })),
 }));
 
-vi.mock("../lib/settings/queries", () => ({
+vi.mock("../lib/settings/queries", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../lib/settings/queries")>()),
   useAppSettingsQuery: vi.fn(() => ({ data: undefined })),
 }));
 
@@ -79,12 +88,11 @@ describe("responsive smoke", () => {
     vi.clearAllMocks();
   });
 
-  it.each(VIEWPORTS)("renders Processing jobs at %ipx", (width) => {
+  it.each(VIEWPORTS)("renders the log at %ipx", async (width) => {
     setViewport(width);
-    render(withProviders(<JobsSection />));
-    expect(
-      screen.getByTestId("processing-jobs-inspection-section"),
-    ).toBeInTheDocument();
-    expect(screen.getByText("Jobs")).toBeInTheDocument();
+    render(withProviders(<UnifiedLog onOpenSettings={() => undefined} />));
+    expect(await screen.findByTestId("log-feed")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Log" })).toBeInTheDocument();
+    expect(screen.getByText("Finished")).toBeInTheDocument();
   });
 });

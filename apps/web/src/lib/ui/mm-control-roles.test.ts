@@ -5,7 +5,13 @@
 import { describe, expect, it } from "vitest";
 import { mmActionButtonClass } from "./mm-control-roles";
 
-const VARIANTS = ["primary", "secondary", "tertiary"] as const;
+const VARIANTS = [
+  "primary",
+  "secondary",
+  "tertiary",
+  "danger",
+  "danger-outline",
+] as const;
 
 /** The utilities whose roots are two words, longest first so `translate-y` is not read as `translate`. */
 const ROOTS = [
@@ -80,8 +86,36 @@ describe("mmActionButtonClass", () => {
     // The disabled rules are additions; nothing about a working button changed when they arrived.
     const primary = classesFor("primary");
     expect(primary).toContain("cursor-pointer");
-    expect(primary).toContain("border-mm-gold");
+    expect(primary).toContain("border-mm-primary");
     expect(classesFor("secondary")).toContain("border-mm-border");
     expect(classesFor("tertiary")).toContain("bg-transparent");
+  });
+
+  it.each([
+    ["header", "min-h-(--mm-control-height-page)"],
+    ["card", "min-h-(--mm-control-height-sm)"],
+    ["row", "min-h-(--mm-control-height-row)"],
+  ] as const)(
+    "gives a %s button its step of the control scale",
+    (size, height) => {
+      expect(mmActionButtonClass({ variant: "secondary", size })).toContain(
+        height,
+      );
+    },
+  );
+
+  it("is card height unless a size is asked for, whatever the variant", () => {
+    for (const variant of VARIANTS) {
+      expect(mmActionButtonClass({ variant })).toContain(
+        "min-h-(--mm-control-height-sm)",
+      );
+    }
+  });
+
+  it("draws a destructive action in the failure colour, filled or outlined", () => {
+    expect(classesFor("danger")).toContain("bg-mm-destructive");
+    expect(classesFor("danger")).not.toContain("bg-mm-primary");
+    expect(classesFor("danger-outline")).toContain("text-mm-broken");
+    expect(classesFor("danger-outline")).toContain("bg-transparent");
   });
 });

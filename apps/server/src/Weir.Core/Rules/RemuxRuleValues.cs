@@ -7,7 +7,7 @@ public static class RemuxRuleValues
     public const string SubtitleModeKeepSelected = "keep_selected";
 
     /// <summary>
-    /// Keep every subtitle track, whatever its language: the stored default and what Settings › Rules calls
+    /// Keep every subtitle track, whatever its language: the stored default and what Setup › Rules › Profiles calls
     /// "Keep all subtitles". It must not be read as keep-selected with an empty language list, which would
     /// remove every subtitle, forced and default included.
     /// </summary>
