@@ -1,4 +1,4 @@
-# The SQLite pool-race stress test (Issue640PoolRaceStressTests, Category=Stress), excluded from ci.yml's
+# The SQLite pool-race stress test (SqlitePoolRaceStressTests, Category=Stress), excluded from ci.yml's
 # normal run because it deliberately runs several seconds of wall clock across 8 threads and would starve
 # every other test running alongside it. Runs nightly and on demand instead.
 name: Stress
