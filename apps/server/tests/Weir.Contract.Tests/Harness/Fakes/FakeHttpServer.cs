@@ -141,13 +141,6 @@ public abstract class FakeHttpServer : IDisposable
         try
         {
             var request = await ReadAsync(context.Request);
-            lock (_gate)
-            {
-                _requests.Add(request);
-                _arrived.TrySetResult();
-                _arrived = NewSignal();
-            }
-
             HttpAnswer answer;
             try
             {
@@ -156,6 +149,15 @@ public abstract class FakeHttpServer : IDisposable
             catch (Exception problem)
             {
                 answer = new HttpAnswer(500, System.Text.Encoding.UTF8.GetBytes($"{{\"message\":\"the fake raised: {problem.GetType().Name}\"}}"), "application/json");
+            }
+
+            // Recorded once the route has run, so a test that waits for a request and then looks at what the route changed
+            // (a queue item removed, say) never sees the request first.
+            lock (_gate)
+            {
+                _requests.Add(request);
+                _arrived.TrySetResult();
+                _arrived = NewSignal();
             }
 
             var response = context.Response;
