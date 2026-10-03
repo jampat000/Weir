@@ -9,6 +9,7 @@ namespace Weir.Infrastructure.Processing;
 /// <summary>
 /// How a list of <c>files</c> is ordered and paged. A file's place in a list is its key: the values of the sort's own parts,
 /// then its id, which no other file shares, so a page can start right after any file. Every part runs the way the list does.
+/// A list sorted by status ranks a file by what it means, and a cleaned copy still waiting for its media manager means "to do".
 /// </summary>
 public static class ProcessingFileOrdering
 {
@@ -61,14 +62,23 @@ public static class ProcessingFileOrdering
         return values;
     }
 
+    /// <summary>
+    /// A file whose cleaned copy still waits for a media manager, which is the web's <c>awaitsImport</c> (<c>activity-model.ts</c>):
+    /// its workflow is linked to a manager, and the copy has no answer from one and was not settled by Weir.
+    /// </summary>
+    private const string AwaitsImportSql =
+        "EXISTS (SELECT 1 FROM library_manager_links link WHERE link.library_id = files.library_id) " +
+        "AND EXISTS (SELECT 1 FROM handbacks handback WHERE handback.library_id = files.library_id AND handback.relative_path = files.relative_path " +
+        "AND COALESCE(handback.outcome, '') = '' AND NOT (COALESCE(handback.settled_at, '') <> '' AND COALESCE(handback.release_note, '') <> ''))";
+
     private static string BuildMeaningRankSql()
     {
-        var builder = new StringBuilder("CASE status");
+        var builder = new StringBuilder("CASE WHEN ").Append(AwaitsImportSql).Append(" THEN ").Append((int)ProcessingFileMeaning.Todo).Append(" ELSE CASE status");
         foreach (var (status, meaning) in ProcessingFileMeanings.OfStatus)
         {
             builder.Append(" WHEN '").Append(status).Append("' THEN ").Append((int)meaning);
         }
 
-        return builder.Append(" ELSE ").Append(ProcessingFileMeanings.RankOf(string.Empty)).Append(" END").ToString();
+        return builder.Append(" ELSE ").Append(ProcessingFileMeanings.RankOf(string.Empty)).Append(" END END").ToString();
     }
 }

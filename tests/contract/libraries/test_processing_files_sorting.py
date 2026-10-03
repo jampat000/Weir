@@ -38,13 +38,15 @@ STATUSES = [
 ]
 
 # What each status means, in the order a list sorted by status shows them: done, to do, doing, needs a look, broken, idle.
+DONE = 0
+TODO = 1
 MEANING_RANK = {
-    "processed": 0,
-    "unprocessed": 1,
-    "out_of_schedule": 1,
+    "processed": DONE,
+    "unprocessed": TODO,
+    "out_of_schedule": TODO,
     "processing": 2,
     "on_hold": 3,
-    "blocked_upstream": 1,
+    "blocked_upstream": TODO,
     "passed_through": 3,
     "rejected": 3,
     "processing_failed": 4,
@@ -67,6 +69,16 @@ STATUSES_BY_MEANING = [
     "skipped",
 ]
 
+# The cleaned copies Weir handed back, by the file's position in the seeded order. All of the files are in a workflow linked
+# to a media manager, so a copy that no manager has answered about and Weir has not settled is still waiting for one.
+HANDBACKS_BY_INDEX = {
+    2: {},
+    14: {"outcome": "imported", "outcome_by": "Radarr"},
+    26: {"settled_at": "2026-10-01 12:00:00", "release_note": "Weir removed its copy."},
+    5: {"outcome": "not-imported", "outcome_by": "Radarr"},
+}
+WAITING_INDEXES = [2]
+
 # Before every time a scan could have recorded.
 NEVER = datetime.min.replace(tzinfo=UTC)
 
@@ -83,16 +95,20 @@ def _seeded(server) -> None:
 
     with seed.stopped(server) as conn:
         library_id = h.first_library_id(conn)
+        h.link_library_to_manager(conn, library_id)
         for index in range(FILE_COUNT):
             path = f"Title {index // 2:02d}/Episode.mkv"
+            relative_path = path.lower() if index % 2 else path
             h.insert_file(
                 conn,
                 library_id=library_id,
-                relative_path=path.lower() if index % 2 else path,
+                relative_path=relative_path,
                 status=STATUSES[index % len(STATUSES)],
                 updated_at=CHANGED_AT[index % len(CHANGED_AT)],
                 last_seen_at=None if index % 5 == 0 else SEEN_AT[index % len(SEEN_AT)],
             )
+            if index in HANDBACKS_BY_INDEX:
+                h.insert_handback(conn, library_id=library_id, relative_path=relative_path, **HANDBACKS_BY_INDEX[index])
 
 
 def _get(client, **params: Any) -> dict[str, Any]:
@@ -116,12 +132,27 @@ def _time(text: str | None) -> datetime | None:
     return moment if moment.tzinfo else moment.replace(tzinfo=UTC)
 
 
+def _awaits_import(row: dict[str, Any]) -> bool:
+    """Whether the file's cleaned copy still waits for a media manager: nobody has answered and Weir has not settled it."""
+
+    handback = row["handback"]
+    return (
+        handback is not None and not handback["outcome"] and not (handback["settled_at"] and handback["release_note"])
+    )
+
+
+def _rank(row: dict[str, Any]) -> int:
+    """Where the file stands when sorted by status: a copy waiting for a media manager is to do, whatever its status."""
+
+    return TODO if _awaits_import(row) else MEANING_RANK[row["status"]]
+
+
 def _expected(rows: list[dict[str, Any]], sort: str | None, direction: str) -> list[int]:
     """The files as the order should read, worked out from what each row shows rather than from the server's rules."""
 
     key = {
         "file": lambda row: (row["relative_path"].lower(), row["id"]),
-        "status": lambda row: (MEANING_RANK[row["status"]], row["status"], row["id"]),
+        "status": lambda row: (_rank(row), row["status"], row["id"]),
         "when": lambda row: (_time(row["updated_at"]), row["id"]),
         # A file no scan has seen sorts before every file one has seen.
         None: lambda row: (row["last_seen_at"] is not None, _time(row["last_seen_at"]) or NEVER, row["id"]),
@@ -137,6 +168,8 @@ def test_the_seeded_files_tie_on_every_sort(admin) -> None:
     assert len({row["relative_path"].lower() for row in rows}) == FILE_COUNT // 2
     assert len({row["updated_at"] for row in rows}) < FILE_COUNT / 2
     assert any(row["last_seen_at"] is None for row in rows)
+    assert sum(_awaits_import(row) for row in rows) == len(WAITING_INDEXES)
+    assert sum(row["handback"] is not None for row in rows) == len(HANDBACKS_BY_INDEX)
 
 
 @pytest.mark.parametrize(("sort", "direction"), ORDERS)
@@ -157,16 +190,46 @@ def test_a_list_asked_for_no_sort_is_newest_seen_first_and_files_never_seen_come
 
 
 def test_sorting_by_status_follows_what_the_status_means_and_then_the_status_word(admin) -> None:
-    rows = _get(admin, sort="status", direction="asc")["files"]
+    rows = [row for row in _get(admin, sort="status", direction="asc")["files"] if not _awaits_import(row)]
 
     distinct: list[str] = []
     for row in rows:
         if row["status"] not in distinct:
             distinct.append(row["status"])
     assert distinct == STATUSES_BY_MEANING
-    assert [row["status"] for row in _get(admin, sort="status", direction="desc")["files"]] == [
-        row["status"] for row in reversed(rows)
-    ]
+    descending = [row for row in _get(admin, sort="status", direction="desc")["files"] if not _awaits_import(row)]
+    assert [row["status"] for row in descending] == [row["status"] for row in reversed(rows)]
+
+
+def test_a_cleaned_copy_waiting_for_its_media_manager_sorts_with_the_to_do_files_and_still_reads_processed(
+    admin,
+) -> None:
+    rows = _get(admin, sort="status", direction="asc")["files"]
+
+    waiting = [row for row in rows if _awaits_import(row)]
+    positions = {row["id"]: position for position, row in enumerate(rows)}
+    finished = [positions[row["id"]] for row in rows if row["status"] == "processed" and not _awaits_import(row)]
+    in_progress = [positions[row["id"]] for row in rows if row["status"] == "processing"]
+    to_do_statuses: list[str] = []
+    for row in rows:
+        if _rank(row) == TODO and row["status"] not in to_do_statuses:
+            to_do_statuses.append(row["status"])
+    assert len(waiting) == len(WAITING_INDEXES)
+    assert {row["status"] for row in waiting} == {"processed"}
+    assert max(finished) < min(positions[row["id"]] for row in waiting) < min(in_progress)
+    assert to_do_statuses == ["blocked_upstream", "out_of_schedule", "processed", "unprocessed"]
+
+
+def test_a_cleaned_copy_a_media_manager_answered_or_weir_settled_stays_with_the_finished_files(admin) -> None:
+    rows = _get(admin, sort="status", direction="asc")["files"]
+
+    positions = {row["id"]: position for position, row in enumerate(rows)}
+    answered = [row for row in rows if row["handback"] is not None and not _awaits_import(row)]
+    finished = [positions[row["id"]] for row in answered if row["status"] == "processed"]
+    first_to_do = min(positions[row["id"]] for row in rows if row["status"] == "blocked_upstream")
+    assert len(answered) == len(HANDBACKS_BY_INDEX) - len(WAITING_INDEXES)
+    assert len(finished) == 2
+    assert max(finished) < first_to_do
 
 
 @pytest.mark.parametrize("sort", ["file", "status", "when"])
@@ -175,7 +238,11 @@ def test_files_that_tie_on_the_sort_value_fall_by_id_in_the_direction_of_the_sor
         rows = _get(admin, sort=sort, direction=direction)["files"]
         ties: dict[Any, list[int]] = {}
         for row in rows:
-            value = {"file": row["relative_path"].lower(), "status": row["status"], "when": row["updated_at"]}[sort]
+            value = {
+                "file": row["relative_path"].lower(),
+                "status": (_rank(row), row["status"]),
+                "when": row["updated_at"],
+            }[sort]
             ties.setdefault(value, []).append(row["id"])
 
         assert any(len(ids) > 1 for ids in ties.values())

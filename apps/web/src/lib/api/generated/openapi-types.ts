@@ -9931,7 +9931,7 @@ export interface operations {
           | null;
         path_contains?: string | null;
         within_days?: number | null;
-        /** @description How the list is ordered: file (by path, ignoring the case of letters), status (by what the status means, then the status word) or when (by when the file last changed). Without it the list is newest-seen first, as it has always been. Files that tie fall by id, so paging never repeats or skips one. */
+        /** @description How the list is ordered: file (by path, ignoring the case of letters), status (by what the status means, then the status word; a cleaned copy still waiting for its media manager counts as to do) or when (by when the file last changed). Without it the list is newest-seen first, as it has always been. Files that tie fall by id, so paging never repeats or skips one. */
         sort?: "file" | "status" | "when";
         /** @description Which way the order runs. Ascending runs the sort's own way (A to Z, oldest first, done first); descending reverses it, and is the default. */
         direction?: "asc" | "desc";

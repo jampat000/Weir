@@ -100,4 +100,29 @@ public sealed class ProcessingFilesSortApiTests
 
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
     }
+
+    [Fact]
+    public async Task A_cleaned_copy_waiting_for_its_media_manager_sorts_with_the_files_in_progress_and_still_reads_processed()
+    {
+        var (server, client) = await StartWithFilesAsync();
+        await using var _ = server;
+        var library = await TestDatabase.ScalarAsync(server, "SELECT id FROM libraries WHERE name = 'Files sorted'");
+        await TestDatabase.ExecuteAsync(server, "INSERT INTO media_manager_connections (kind, name, base_url) VALUES ('radarr', 'Radarr', 'http://192.0.2.20:7878')");
+        await TestDatabase.ExecuteAsync(server, "INSERT INTO library_manager_links (library_id, connection_id) SELECT $lib, id FROM media_manager_connections", ("$lib", library));
+        await TestDatabase.ExecuteAsync(
+            server,
+            "INSERT INTO files (library_id, relative_path, status, last_seen_at, updated_at) VALUES ($lib, 'd.mkv', 'processed', '2026-10-02 10:00:00', '2026-10-02 10:00:00')",
+            ("$lib", library));
+        await TestDatabase.ExecuteAsync(
+            server,
+            "INSERT INTO handbacks (library_id, relative_path, output_path, output_size, output_mtime_ns, written_at) VALUES ($lib, 'b.mkv', '/out/b.mkv', 1, 1, '2026-10-02 09:00:00')",
+            ("$lib", library));
+
+        var page = await ApiTestClient.Json(await client.GetAsync($"{Files}?sort=status&direction=asc"));
+
+        Assert.Equal(["d.mkv", "b.mkv", "c.mkv", "A.mkv"], Paths(page));
+        var waiting = page["files"]![1]!;
+        Assert.Equal("processed", waiting["status"]!.GetValue<string>());
+        Assert.Null(waiting["handback"]!["outcome"]);
+    }
 }

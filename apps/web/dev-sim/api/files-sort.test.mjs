@@ -3,18 +3,22 @@ import { describe, expect, it } from "vitest";
 
 import { operations, successResponse } from "../openapi/spec.mjs";
 import { violations } from "../openapi/validate.mjs";
+import { VERDICT } from "../engine/plan.mjs";
+import { release } from "../engine/seed-support.mjs";
 import { ask, createTestSim } from "../test-support.mjs";
 
 const WHOLE_LIST = 1000;
 const SMALL_PAGE = 7;
+const DONE = 0;
+const TODO = 1;
 const ATTENTION = 3;
 const MEANING_RANK = {
-  processed: 0,
-  unprocessed: 1,
-  out_of_schedule: 1,
+  processed: DONE,
+  unprocessed: TODO,
+  out_of_schedule: TODO,
   processing: 2,
   on_hold: ATTENTION,
-  blocked_upstream: 1,
+  blocked_upstream: TODO,
   passed_through: ATTENTION,
   rejected: ATTENTION,
   processing_failed: 4,
@@ -24,10 +28,40 @@ const MEANING_RANK = {
 };
 
 const sim = () => createTestSim({ withHistory: true }).sim;
+
+/** The history, plus a file cleaned just now in the first, linked workflow: its copy waits for the media manager. */
+function simWithACopyWaiting() {
+  const { sim: simulation } = createTestSim({ withHistory: true });
+  const file = release(
+    simulation.engine.admit(simulation.store.libraries[0], simulation.now(), {
+      verdict: VERDICT.CLEAN,
+    }),
+  );
+  simulation.engine.conclude(file, simulation.now());
+  return simulation;
+}
 const files = (simulation, query = "") =>
   ask(simulation, "GET", `/api/v1/processing/files?limit=${WHOLE_LIST}${query}`)
     .body;
 const ids = (body) => body.files.map((file) => file.id);
+
+const linkedLibraryIds = (simulation) =>
+  new Set(
+    ask(simulation, "GET", "/api/v1/processing/libraries")
+      .body.filter((library) => library.manager_connection_ids.length > 0)
+      .map((library) => library.id),
+  );
+
+/** A copy no media manager has answered about and Weir has not settled, in a workflow linked to one. */
+const waitsForManager = (file, linked) =>
+  linked.has(file.library_id) &&
+  file.handback !== null &&
+  !file.handback.outcome &&
+  !(file.handback.settled_at && file.handback.release_note);
+
+/** A copy waiting for its media manager is to do, whatever the file's status. */
+const rankOf = (file, linked) =>
+  waitsForManager(file, linked) ? TODO : MEANING_RANK[file.status];
 
 const EVERY_ORDER = ["file", "status", "when"].flatMap((sort) =>
   ["asc", "desc"].map((direction) => [sort, direction]),
@@ -52,13 +86,56 @@ describe("the simulated file list in each order", () => {
 
     const body = files(simulation, "&sort=status&direction=asc");
 
-    const ranks = body.files.map((file) => MEANING_RANK[file.status]);
+    const linked = linkedLibraryIds(simulation);
+    const ranks = body.files.map((file) => rankOf(file, linked));
     expect(ranks).toEqual([...ranks].sort((a, b) => a - b));
     expect(new Set(ranks).size).toBeGreaterThan(2);
     const needingAttention = body.files
-      .filter((file) => MEANING_RANK[file.status] === ATTENTION)
+      .filter((file) => rankOf(file, linked) === ATTENTION)
       .map((file) => file.status);
     expect(needingAttention).toEqual([...needingAttention].sort());
+  });
+
+  it("sorts a cleaned copy waiting for its media manager with the to-do files, though its status still reads processed", () => {
+    const simulation = simWithACopyWaiting();
+
+    const body = files(simulation, "&sort=status&direction=asc");
+
+    const linked = linkedLibraryIds(simulation);
+    const waiting = body.files.filter((file) => waitsForManager(file, linked));
+    const finished = body.files.filter(
+      (file) => file.status === "processed" && !waitsForManager(file, linked),
+    );
+    const position = (file) => body.files.indexOf(file);
+    expect(waiting.length).toBeGreaterThan(0);
+    expect(finished.length).toBeGreaterThan(0);
+    expect(waiting.every((file) => file.status === "processed")).toBe(true);
+    expect(Math.max(...finished.map(position))).toBeLessThan(
+      Math.min(...waiting.map(position)),
+    );
+    expect(waiting.every((file) => rankOf(file, linked) === TODO)).toBe(true);
+  });
+
+  it("keeps the place its status gives a copy a media manager answered about, or one in a Weir only workflow", () => {
+    const simulation = simWithACopyWaiting();
+
+    const body = files(simulation, "&sort=status&direction=asc");
+
+    const linked = linkedLibraryIds(simulation);
+    const kept = body.files.filter(
+      (file) =>
+        file.status === "processed" &&
+        file.handback !== null &&
+        !waitsForManager(file, linked),
+    );
+    const firstToDo = body.files.findIndex(
+      (file) => rankOf(file, linked) === TODO,
+    );
+    expect(kept.some((file) => file.handback.outcome)).toBe(true);
+    expect(kept.some((file) => !linked.has(file.library_id))).toBe(true);
+    expect(kept.every((file) => body.files.indexOf(file) < firstToDo)).toBe(
+      true,
+    );
   });
 
   it("lists files by when they last changed, newest first unless asked otherwise", () => {

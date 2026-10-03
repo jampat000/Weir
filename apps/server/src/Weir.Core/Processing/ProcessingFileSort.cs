@@ -9,7 +9,10 @@ public enum ProcessingFileSort
     /// <summary>The file's path, ignoring the case of its letters.</summary>
     File,
 
-    /// <summary>What the file's status means (<see cref="ProcessingFileMeanings"/>), then the status itself.</summary>
+    /// <summary>
+    /// What the file's status means (<see cref="ProcessingFileMeanings"/>), then the status itself. A cleaned copy still waiting
+    /// for its media manager to import it means "to do", whatever its status.
+    /// </summary>
     Status,
 
     /// <summary>When the file last changed.</summary>

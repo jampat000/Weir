@@ -30,7 +30,13 @@ function matching(sim, query) {
 
 function listFiles(sim, query) {
   const issues = [];
-  const order = readFileOrder(query, issues);
+  const order = readFileOrder(
+    query,
+    issues,
+    (file) =>
+      (sim.engine.library(file.libraryId)?.manager_connection_ids?.length ??
+        0) > 0,
+  );
   if (issues.length > 0) return refusal(issues);
   const statuses = listParam(query, "file_status");
   const limit = intParam(query, "limit") ?? DEFAULT_LIST_LIMIT;

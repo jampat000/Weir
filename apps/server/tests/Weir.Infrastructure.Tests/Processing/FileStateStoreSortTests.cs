@@ -207,6 +207,87 @@ public sealed class FileStateStoreSortTests
             page.Rows.Select(row => ProcessingFileMeanings.RankOf(row.Status)));
     }
 
+    [Theory]
+    [InlineData(true, null, null, null, true)]
+    [InlineData(true, "", null, null, true)]
+    [InlineData(true, null, "2026-10-02 10:00:00", null, true)]
+    [InlineData(true, null, null, "Weir left it alone.", true)]
+    [InlineData(true, null, "2026-10-02 10:00:00", "Weir left it alone.", false)]
+    [InlineData(true, "imported", null, null, false)]
+    [InlineData(true, "not-imported", null, null, false)]
+    [InlineData(false, null, null, null, false)]
+    public async Task A_cleaned_copy_waits_for_its_media_manager_only_while_the_workflow_is_linked_and_nobody_has_answered_or_settled_it(
+        bool linked, string? outcome, string? settledAt, string? releaseNote, bool waits)
+    {
+        using var db = new JobsTestDatabase();
+        var library = InsertLibrary(db);
+        if (linked)
+        {
+            LinkToManager(db, library);
+        }
+
+        InsertFile(db, library, "cleaned.mkv", ProcessingFileStatuses.Processed);
+        InsertHandback(db, library, "cleaned.mkv", outcome, settledAt, releaseNote);
+        InsertFile(db, library, "finished.mkv", ProcessingFileStatuses.Processed);
+        InsertFile(db, library, "waiting-turn.mkv", ProcessingFileStatuses.Unprocessed);
+        InsertFile(db, library, "working.mkv", ProcessingFileStatuses.Processing);
+
+        var ascending = await Paths(db, ProcessingFileSort.Status, SortDirection.Ascending);
+
+        Assert.Equal(
+            waits
+                ? new[] { "finished.mkv", "cleaned.mkv", "waiting-turn.mkv", "working.mkv" }
+                : ["cleaned.mkv", "finished.mkv", "waiting-turn.mkv", "working.mkv"],
+            ascending);
+    }
+
+    [Fact]
+    public async Task A_file_with_no_hand_back_row_keeps_the_place_its_status_gives_even_in_a_linked_workflow()
+    {
+        using var db = new JobsTestDatabase();
+        var library = InsertLibrary(db);
+        LinkToManager(db, library);
+        InsertFile(db, library, "a-finished.mkv", ProcessingFileStatuses.Processed);
+        InsertFile(db, library, "b-waiting-turn.mkv", ProcessingFileStatuses.Unprocessed);
+
+        var ascending = await Paths(db, ProcessingFileSort.Status, SortDirection.Ascending);
+
+        Assert.Equal(["a-finished.mkv", "b-waiting-turn.mkv"], ascending);
+    }
+
+    [Theory]
+    [InlineData(SortDirection.Ascending)]
+    [InlineData(SortDirection.Descending)]
+    public async Task Paging_by_status_through_copies_waiting_for_a_media_manager_visits_every_file_once_in_the_order_of_the_whole_list(SortDirection direction)
+    {
+        using var db = new JobsTestDatabase();
+        var library = InsertLibrary(db);
+        LinkToManager(db, library);
+        foreach (var index in Enumerable.Range(0, 12))
+        {
+            var path = $"file-{index:00}.mkv";
+            InsertFile(db, library, path, SeededStatuses[index % 3 * 5 % SeededStatuses.Length]);
+            if (index % 2 == 0)
+            {
+                InsertHandback(db, library, path, outcome: null, settledAt: null, releaseNote: null);
+            }
+        }
+
+        var whole = await ListPage(db, ProcessingFileSort.Status, direction, after: null, WholeList);
+        var walked = new List<long>();
+        IReadOnlyList<object?>? after = null;
+        do
+        {
+            var page = await ListPage(db, ProcessingFileSort.Status, direction, after, limit: 2);
+            walked.AddRange(page.Rows.Select(row => row.Id));
+            after = ProcessingFileOrdering.TryDecodeCursor(page.NextCursor, ProcessingFileSort.Status, direction, out var next) ? next : null;
+        }
+        while (after is not null);
+
+        Assert.Equal(whole.Rows.Select(row => row.Id), walked);
+        Assert.Equal(12, walked.Distinct().Count());
+    }
+
     /// <summary>Files that share a status, a change time and a seen time in several ways, so every order has ties to break.</summary>
     private static void SeedFilesWithManyTies(JobsTestDatabase db)
     {
@@ -238,6 +319,21 @@ public sealed class FileStateStoreSortTests
         db.Execute("INSERT INTO libraries (name, media_type) VALUES (@name, 'movie')", ("@name", name));
         return Convert.ToInt64(db.Scalar("SELECT id FROM libraries WHERE name = @name", ("@name", name)));
     }
+
+    private static void LinkToManager(JobsTestDatabase db, long libraryId)
+    {
+        db.Execute("INSERT INTO media_manager_connections (kind, name, base_url) VALUES ('radarr', 'Radarr', 'http://192.0.2.20:7878')");
+        db.Execute(
+            "INSERT INTO library_manager_links (library_id, connection_id) SELECT @lib, id FROM media_manager_connections",
+            ("@lib", libraryId));
+    }
+
+    private static void InsertHandback(JobsTestDatabase db, long libraryId, string relativePath, string? outcome, string? settledAt, string? releaseNote) =>
+        db.Execute(
+            "INSERT INTO handbacks (library_id, relative_path, output_path, output_size, output_mtime_ns, written_at, outcome, settled_at, release_note) " +
+            "VALUES (@lib, @path, @output, 1, 1, '2026-10-02 09:00:00', @outcome, @settled, @note)",
+            ("@lib", libraryId), ("@path", relativePath), ("@output", "/out/" + relativePath),
+            ("@outcome", outcome), ("@settled", settledAt), ("@note", releaseNote));
 
     private static void InsertFile(
         JobsTestDatabase db,
