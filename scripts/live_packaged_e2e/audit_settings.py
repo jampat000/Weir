@@ -154,7 +154,7 @@ class AuditSettingsMixin:
             self.page.get_by_test_id("suite-settings-global"), "System › About"
         )
         self.require(
-            self.page.get_by_text("What Weir works with", exact=True).count()
+            self.page.get_by_text("Media tools", exact=True).count()
             > 0,
             "runtime facts are missing from About",
         )

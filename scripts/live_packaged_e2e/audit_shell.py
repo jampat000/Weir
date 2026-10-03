@@ -68,14 +68,16 @@ class AuditShellMixin:
         self.page.goto(BASE_URL + "/", wait_until="domcontentloaded")
         menu = self.page.get_by_test_id("shell-nav-toggle")
         self.click(menu, "open mobile navigation")
-        self.visible(
+        backdrop = self.visible(
             self.page.get_by_role("button", name="Close navigation"),
             "mobile navigation backdrop",
         )
-        self.click(
-            self.page.get_by_role("button", name="Close navigation"),
-            "close mobile navigation",
-        )
+        # The drawer covers the left of the backdrop, its middle included, so tap the dimmed strip beside it, where a
+        # person would.
+        box = backdrop.bounding_box()
+        self.require(box is not None, "mobile navigation backdrop has no box")
+        backdrop.click(position={"x": box["width"] - 12, "y": box["height"] / 2})
+        self.page.wait_for_timeout(120)
         self.require(
             not self.page.get_by_role("button", name="Close navigation").count(),
             "mobile navigation did not close",
@@ -141,17 +143,14 @@ class AuditShellMixin:
                 "Activity",
                 "Library",
                 "Workflows",
+                "Connections",
                 "Rules",
-                "Media managers",
                 "Performance",
-                "Schedule",
-                "Cleanup",
-                "Alerts",
                 "System",
             ],
             f"primary navigation is {labels}",
         )
-        for retired in ("Home", "Processing", "Activity"):
+        for retired in ("Home", "Processing", "History"):
             self.require(
                 not self.page.get_by_role("link", name=retired, exact=True).count(),
                 f"{retired} must not appear in the sidebar",
@@ -191,7 +190,8 @@ class AuditShellMixin:
             f"the level picker does not say {chosen_level}",
         )
         filters.get_by_role("searchbox", name="Search the log").fill("audit")
-        self.click(filters.get_by_test_id("logs-when-picker"), "open the time picker")
+        # The pickers sit on the title line or in the Log card, wherever they fit, so they are found on the page.
+        self.click(self.page.get_by_test_id("logs-when-picker"), "open the time picker")
         self.click(
             self.page.get_by_role("option", name="Custom range", exact=True),
             "choose a custom range",
