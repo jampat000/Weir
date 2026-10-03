@@ -15,10 +15,7 @@ import {
 import { fileActivityRetentionNote } from "../../lib/processing/file-activity-retention";
 import { useProcessingFileLogQuery } from "../../lib/processing/files-queries";
 import { useProcessingLibrariesQuery } from "../../lib/processing/libraries-queries";
-import {
-  workflowKindName,
-  type WorkflowKind,
-} from "../../lib/processing/workflow-kind";
+import type { WorkflowKind } from "../../lib/processing/workflow-kind";
 import { activityGroupOf } from "./activity-entries";
 import { ActivityFileActions } from "./activity-file-actions";
 import { SizeFigures, WorkingFigures } from "./activity-figures";
@@ -28,6 +25,7 @@ import {
   handbackStory,
   latestPass,
   tookWords,
+  workflowKindLookup,
 } from "./activity-model";
 import { PassRecord } from "./activity-pass";
 import { useNarrowDetailFocus } from "./use-narrow-detail-focus";
@@ -35,9 +33,7 @@ import { useNarrowDetailFocus } from "./use-narrow-detail-focus";
 /** The kind of workflow the file belongs to; null until the workflows are known, so nothing is said wrongly meanwhile. */
 function useWorkflowKindOf(file: ProcessingFile): WorkflowKind["kind"] | null {
   const libraries = useProcessingLibrariesQuery();
-  if (!libraries.data) return null;
-  const library = libraries.data.find((item) => item.id === file.library_id);
-  return library ? workflowKindName(library) : "linked";
+  return workflowKindLookup(libraries.data)(file);
 }
 
 function Guidance({ file, now }: { file: ProcessingFile; now: number }) {

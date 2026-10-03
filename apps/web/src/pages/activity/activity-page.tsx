@@ -35,6 +35,7 @@ import {
   PERIODS,
   type SetParam,
 } from "./activity-filters";
+import { workflowKindLookup } from "./activity-model";
 import { ActivityKeptList } from "./activity-kept-list";
 import { ActivityList } from "./activity-list";
 import { ProcessRejectedAgain } from "./activity-rejected-again";
@@ -144,8 +145,13 @@ export function ActivityPage() {
   const editable = useCanEdit();
 
   const all = useMemo(
-    () => activityEntries(files.data?.files ?? [], cleans.data?.cleans ?? []),
-    [files.data, cleans.data],
+    () =>
+      activityEntries(
+        files.data?.files ?? [],
+        cleans.data?.cleans ?? [],
+        workflowKindLookup(libraries.data),
+      ),
+    [files.data, cleans.data, libraries.data],
   );
   const needsYou = group === "attention";
   const shown = sortActivityEntries(

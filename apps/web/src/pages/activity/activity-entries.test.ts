@@ -51,6 +51,19 @@ function file(partial: Partial<ProcessingFile>): ProcessingFile {
   };
 }
 
+const UNANSWERED_HANDBACK = {
+  output_path: "/hand-back/Show/Show.S01E01.mkv",
+  written_at: "2026-08-19T03:00:00",
+  outcome: null,
+  outcome_by: null,
+  outcome_at: null,
+  imported_path: null,
+  outcome_reason: null,
+  released_at: null,
+  settled_at: null,
+  release_note: null,
+} as const;
+
 function clean(partial: Partial<LibraryClean>): LibraryClean {
   return {
     kind: "library_clean",
@@ -67,8 +80,10 @@ function clean(partial: Partial<LibraryClean>): LibraryClean {
 }
 
 describe("activity groups", () => {
-  it("puts a file a manager still has under On hold", () => {
-    expect(activityGroupOf(file({ status: "blocked_upstream" }))).toBe("needs");
+  it("puts a file a manager still has under In progress, since it only waits its turn", () => {
+    expect(activityGroupOf(file({ status: "blocked_upstream" }))).toBe(
+      "working",
+    );
   });
 
   it("puts a file Weir gave up on under Failed, whatever it failed on and however often", () => {
@@ -106,6 +121,70 @@ describe("a library clean's group", () => {
       "skipped",
     );
     expect(entryGroup(cleanEntry(clean({ outcome: "failed" })))).toBe("failed");
+  });
+});
+
+describe("a cleaned copy waiting for its media manager", () => {
+  const waiting = file({
+    status: "processed",
+    handback: { ...UNANSWERED_HANDBACK },
+  });
+  const importedCopy = file({
+    status: "processed",
+    handback: {
+      ...UNANSWERED_HANDBACK,
+      outcome: "imported",
+      outcome_by: "Sonarr",
+    },
+  });
+
+  it("reads as waiting, not done, and is listed under All and In progress but not Finished", () => {
+    const entry = downloadEntry(waiting, "linked");
+
+    expect(entryMeaning(entry)).toBe("todo");
+    expect(entryGroup(entry)).toBe("working");
+    expect(inGroup(entry, "all")).toBe(true);
+    expect(inGroup(entry, "working")).toBe(true);
+    expect(inGroup(entry, "finished")).toBe(false);
+  });
+
+  it("does not wait on a person, so it is not under Needs you", () => {
+    expect(waitsOnAPerson(waiting)).toBe(false);
+    expect(inGroup(downloadEntry(waiting, "linked"), "attention")).toBe(false);
+  });
+
+  it("is done once the manager has imported it", () => {
+    const entry = downloadEntry(importedCopy, "linked");
+
+    expect(entryMeaning(entry)).toBe("done");
+    expect(entryGroup(entry)).toBe("finished");
+  });
+
+  it("is done in a Weir-only workflow, which has no manager to wait for, and while the workflows are unknown", () => {
+    expect(entryMeaning(downloadEntry(waiting, "weir_only"))).toBe("done");
+    expect(entryMeaning(downloadEntry(waiting))).toBe("done");
+  });
+
+  it("counts under In progress when entries are built with the workflows' kinds", () => {
+    const entries = activityEntries([waiting], [], () => "linked");
+
+    expect(entries.filter((entry) => inGroup(entry, "working"))).toHaveLength(
+      1,
+    );
+    expect(entries.filter((entry) => inGroup(entry, "finished"))).toHaveLength(
+      0,
+    );
+  });
+});
+
+describe("a file its media manager still has", () => {
+  it("reads as waiting and does not wait on a person", () => {
+    const held = file({ status: "blocked_upstream" });
+
+    expect(entryMeaning(downloadEntry(held))).toBe("todo");
+    expect(waitsOnAPerson(held)).toBe(false);
+    expect(inGroup(downloadEntry(held), "attention")).toBe(false);
+    expect(inGroup(downloadEntry(held), "needs")).toBe(false);
   });
 });
 

@@ -3,7 +3,11 @@ import type {
   ProcessingFileHandback,
   ProcessingFileLogEntry,
 } from "../../lib/processing/files-api";
-import type { WorkflowKind } from "../../lib/processing/workflow-kind";
+import type { ProcessingLibrary } from "../../lib/processing/libraries-api";
+import {
+  workflowKindName,
+  type WorkflowKind,
+} from "../../lib/processing/workflow-kind";
 import {
   audioCodecName,
   channelLayout,
@@ -249,7 +253,7 @@ export function handbackStory(
   const written = handback.written_at
     ? agoWords(handback.written_at, now)
     : null;
-  if (workflowKind === "weir_only") {
+  if (!awaitsImport(handback, workflowKind)) {
     const writtenNote = written ? ` It was written ${written}.` : "";
     return {
       heading: "Cleaned copy",
@@ -262,6 +266,41 @@ export function handbackStory(
     heading: "Handed back",
     sentence: `Weir put the cleaned copy at ${handback.output_path}${when} for your media manager to import. No media manager has said it imported it yet.`,
     meaning: "todo",
+  };
+}
+
+/**
+ * Whether the copy Weir handed back is still waiting for a media manager to take it: no manager has answered and
+ * Weir has not settled it. That is ordinary waiting, nothing for a person to do yet. A Weir-only workflow has no
+ * manager to wait for, so its copy is never waiting.
+ */
+export function awaitsImport(
+  handback: ProcessingFileHandback | null | undefined,
+  workflowKind: WorkflowKind["kind"],
+): boolean {
+  return (
+    handback != null &&
+    !handback.outcome &&
+    !(handback.settled_at && handback.release_note) &&
+    workflowKind === "linked"
+  );
+}
+
+/** The kind of workflow a file belongs to; null until the workflows are known, so nothing is said wrongly meanwhile. */
+export type WorkflowKindOf = (
+  file: Pick<ProcessingFile, "library_id">,
+) => WorkflowKind["kind"] | null;
+
+/** A workflow that has since been removed counts as linked: its files were handed to a manager. */
+export function workflowKindLookup(
+  workflows:
+    | readonly Pick<ProcessingLibrary, "id" | "manager_connection_ids">[]
+    | undefined,
+): WorkflowKindOf {
+  return (file) => {
+    if (!workflows) return null;
+    const workflow = workflows.find((item) => item.id === file.library_id);
+    return workflow ? workflowKindName(workflow) : "linked";
   };
 }
 

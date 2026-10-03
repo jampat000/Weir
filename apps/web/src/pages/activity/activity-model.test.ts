@@ -2,12 +2,14 @@ import { describe, expect, it } from "vitest";
 import type { ProcessingFile } from "../../lib/processing/files-api";
 import {
   agoWords,
+  awaitsImport,
   handbackStory,
   importedLabel,
   readableTrack,
   detailSizes,
   sizesFromRecord,
   tracksFromRecord,
+  workflowKindLookup,
 } from "./activity-model";
 
 function file(partial: Partial<ProcessingFile>): ProcessingFile {
@@ -219,5 +221,83 @@ describe("ago", () => {
   it("reads the server's zone-less times as UTC", () => {
     const now = Date.parse("2026-08-19T04:06:00Z");
     expect(agoWords("2026-08-19T04:00:00", now)).toBe("6 min ago");
+  });
+});
+
+describe("whether a handed-back copy awaits a media manager", () => {
+  const unanswered = {
+    output_path: "/hand-back/Show/Show.S01E01.mkv",
+    written_at: "2026-08-19T03:00:00",
+    outcome: null,
+    outcome_by: null,
+    outcome_at: null,
+    imported_path: null,
+    outcome_reason: null,
+    released_at: null,
+    settled_at: null,
+    release_note: null,
+  } as const;
+
+  it("does while no manager has answered and Weir has not settled it", () => {
+    expect(awaitsImport(unanswered, "linked")).toBe(true);
+  });
+
+  it("does not once a manager imported it or refused it", () => {
+    expect(awaitsImport({ ...unanswered, outcome: "imported" }, "linked")).toBe(
+      false,
+    );
+    expect(
+      awaitsImport({ ...unanswered, outcome: "not-imported" }, "linked"),
+    ).toBe(false);
+  });
+
+  it("does not once Weir settled it with a note, in a Weir-only workflow, or when there is no copy", () => {
+    expect(
+      awaitsImport(
+        {
+          ...unanswered,
+          settled_at: "2026-08-19T04:00:00",
+          release_note: "Weir removed its copy.",
+        },
+        "linked",
+      ),
+    ).toBe(false);
+    expect(awaitsImport(unanswered, "weir_only")).toBe(false);
+    expect(awaitsImport(null, "linked")).toBe(false);
+  });
+
+  it("agrees with the story told of the copy: it is waiting exactly when the story says to do", () => {
+    const now = Date.parse("2026-08-19T04:06:00Z");
+    const copies = [
+      unanswered,
+      { ...unanswered, outcome: "imported" as const },
+      { ...unanswered, outcome: "not-imported" as const },
+    ];
+    for (const copy of copies) {
+      for (const kind of ["linked", "weir_only"] as const) {
+        expect(awaitsImport(copy, kind)).toBe(
+          handbackStory(copy, now, kind)?.meaning === "todo",
+        );
+      }
+    }
+  });
+});
+
+describe("the kind of workflow a file belongs to", () => {
+  const workflows = [
+    { id: 1, manager_connection_ids: [4] },
+    { id: 2, manager_connection_ids: [] },
+  ];
+
+  it("is linked when a manager is, and Weir only when none is", () => {
+    const kindOf = workflowKindLookup(workflows);
+
+    expect(kindOf({ library_id: 1 })).toBe("linked");
+    expect(kindOf({ library_id: 2 })).toBe("weir_only");
+  });
+
+  it("is linked for a workflow that has been removed, and unknown until the workflows are", () => {
+    expect(workflowKindLookup(workflows)({ library_id: 9 })).toBe("linked");
+    expect(workflowKindLookup(undefined)({ library_id: 1 })).toBeNull();
   });
 });

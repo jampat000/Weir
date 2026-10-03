@@ -52,6 +52,43 @@ function renderList() {
   );
 }
 
+it("says a cleaned copy no media manager has taken yet is waiting for it, and once imported, who imported it", () => {
+  const copy = {
+    output_path: "/hand-back/a.mkv",
+    outcome: null,
+    outcome_by: null,
+  };
+  const waiting = { ...download, id: 2, handback: copy } as ProcessingFile;
+  const imported = {
+    ...download,
+    id: 3,
+    handback: { ...copy, outcome: "imported", outcome_by: "Sonarr" },
+  } as ProcessingFile;
+  render(
+    <WithWorkflows>
+      <ListWithColumns
+        entries={[
+          downloadEntry(waiting, "linked"),
+          downloadEntry(imported, "linked"),
+          downloadEntry(waiting, "weir_only"),
+        ]}
+        selectedKey={null}
+        now={NOW}
+        onPick={vi.fn()}
+      />
+    </WithWorkflows>,
+  );
+
+  const [linked, importedRow, weirOnly] = screen.getAllByRole("row").slice(1);
+  expect(
+    within(linked).getByText("Waiting for your media manager"),
+  ).toBeInTheDocument();
+  expect(
+    within(importedRow).getByText("Imported by Sonarr"),
+  ).toBeInTheDocument();
+  expect(within(weirOnly).getByText("Done")).toBeInTheDocument();
+});
+
 it("shows the title's small poster at the start of a download's row", () => {
   renderList();
 

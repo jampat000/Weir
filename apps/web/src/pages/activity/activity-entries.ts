@@ -3,6 +3,7 @@ import type {
   ProcessingFileStatus,
 } from "../../lib/processing/files-api";
 import type { LibraryClean } from "../../lib/processing/library-cleans-api";
+import type { WorkflowKind } from "../../lib/processing/workflow-kind";
 import type { StatusMeaning } from "../../lib/ui/status-meaning";
 import {
   meaningRank,
@@ -11,20 +12,31 @@ import {
   type TableSort,
 } from "../../lib/ui/table-columns";
 import type { ActivityColumnId } from "./activity-columns";
-import { serverMs } from "./activity-model";
+import { awaitsImport, serverMs, type WorkflowKindOf } from "./activity-model";
 
 /**
  * One row in Activity: a new download Weir processed, or a file it cleaned where it sits in a library (#695). Both are
- * listed together, so Activity is the one place to look for what happened to a file.
+ * listed together, so Activity is the one place to look for what happened to a file. A download whose cleaned copy is
+ * still waiting for a media manager to take it says so: it reads as waiting, though Weir's own work on it is done.
  */
 export type ActivityEntry =
-  | { kind: "download"; key: string; file: ProcessingFile }
+  | {
+      kind: "download";
+      key: string;
+      file: ProcessingFile;
+      awaitingManager: boolean;
+    }
   | { kind: "library_clean"; key: string; clean: LibraryClean };
 
-export const downloadEntry = (file: ProcessingFile): ActivityEntry => ({
+export const downloadEntry = (
+  file: ProcessingFile,
+  workflowKind: WorkflowKind["kind"] | null = null,
+): ActivityEntry => ({
   kind: "download",
   key: `download-${file.id}`,
   file,
+  awaitingManager:
+    workflowKind !== null && awaitsImport(file.handback, workflowKind),
 });
 
 export const cleanEntry = (clean: LibraryClean): ActivityEntry => ({
@@ -64,8 +76,8 @@ const WORKING: readonly ProcessingFileStatus[] = [
   "unprocessed",
   "processing",
   "out_of_schedule",
+  "blocked_upstream",
 ];
-const NEEDS: readonly ProcessingFileStatus[] = ["on_hold", "blocked_upstream"];
 const FINISHED: readonly ProcessingFileStatus[] = [
   "processed",
   "passed_through",
@@ -108,20 +120,24 @@ export const CLEAN_MEANING: Record<LibraryClean["outcome"], StatusMeaning> = {
   failed: "broken",
 };
 
+/** The state of a download whose media manager has not yet taken it: the original, or the copy Weir handed back. */
+const WAITING_FOR_MANAGER: ProcessingFileStatus = "blocked_upstream";
+
 export function entryMeaning(entry: ActivityEntry): StatusMeaning {
-  return entry.kind === "download"
-    ? FILE_MEANING[entry.file.status]
-    : CLEAN_MEANING[entry.clean.outcome];
+  if (entry.kind === "library_clean") return CLEAN_MEANING[entry.clean.outcome];
+  return FILE_MEANING[
+    entry.awaitingManager ? WAITING_FOR_MANAGER : entry.file.status
+  ];
 }
 
 /**
- * Where a download belongs. A file on hold, or one its media manager still has, waits on a person, so it is
- * "Needs you"; a file Weir has given up on is "Failed", with its reason; a skip is Weir deciding a file is not for it,
- * which is not a failure. A library that is off or a cancelled pass is neither working nor finished, so it only shows
+ * Where a download belongs. A file on hold waits on a person; one its media manager still has is only waiting its turn,
+ * so it is "In progress"; a file Weir has given up on is "Failed", with its reason; a skip is Weir deciding a file is
+ * not for it, which is not a failure. A library that is off or a cancelled pass is neither working nor finished, so it only shows
  * under All.
  */
 export function activityGroupOf(file: ProcessingFile): ActivityGroup | null {
-  if (NEEDS.includes(file.status)) return "needs";
+  if (file.status === "on_hold") return "needs";
   if (WORKING.includes(file.status)) return "working";
   if (FINISHED.includes(file.status)) return "finished";
   if (file.status === "skipped") return "skipped";
@@ -150,10 +166,10 @@ export function waitsOnAPerson(file: ProcessingFile): boolean {
   }
 }
 
+/** A download whose cleaned copy waits for a media manager is still in progress, though Weir has finished with it. */
 export function entryGroup(entry: ActivityEntry): ActivityGroup | null {
-  return entry.kind === "download"
-    ? activityGroupOf(entry.file)
-    : CLEAN_GROUPS[entry.clean.outcome];
+  if (entry.kind === "library_clean") return CLEAN_GROUPS[entry.clean.outcome];
+  return entry.awaitingManager ? "working" : activityGroupOf(entry.file);
 }
 
 export function inGroup(entry: ActivityEntry, group: ActivityGroup): boolean {
@@ -181,10 +197,12 @@ export function entryPath(entry: ActivityEntry): string {
 export function activityEntries(
   files: ProcessingFile[],
   cleans: LibraryClean[],
+  workflowKindOf: WorkflowKindOf = () => null,
 ): ActivityEntry[] {
-  return [...files.map(downloadEntry), ...cleans.map(cleanEntry)].sort(
-    (a, b) => serverMs(entryTime(b)) - serverMs(entryTime(a)),
-  );
+  return [
+    ...files.map((file) => downloadEntry(file, workflowKindOf(file))),
+    ...cleans.map(cleanEntry),
+  ].sort((a, b) => serverMs(entryTime(b)) - serverMs(entryTime(a)));
 }
 
 /** What each column of Activity's list sorts by: the file's path, what happened by its meaning, and when it last changed. */

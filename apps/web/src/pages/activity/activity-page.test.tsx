@@ -346,6 +346,45 @@ describe("ActivityPage", () => {
     ).toBeInTheDocument();
   });
 
+  it("counts a cleaned copy no media manager has taken yet under In progress, not Finished and not Needs you", () => {
+    files.files = [
+      file({
+        id: 3,
+        status: "processed",
+        handback: {
+          output_path: "/hand-back/a.mkv",
+          written_at: "2026-08-19T03:00:00",
+          outcome: null,
+          outcome_by: null,
+          outcome_at: null,
+          imported_path: null,
+          outcome_reason: null,
+          released_at: null,
+          settled_at: null,
+          release_note: null,
+        },
+      }),
+    ];
+    renderPage();
+
+    const chips = screen.getByRole("group", { name: "Show" });
+    expect(
+      within(chips).getByRole("button", { name: /All\s*1/ }),
+    ).toBeInTheDocument();
+    expect(
+      within(chips).getByRole("button", { name: /In progress\s*1/ }),
+    ).toBeInTheDocument();
+    expect(
+      within(chips).getByRole("button", { name: /Finished\s*0/ }),
+    ).toBeInTheDocument();
+    expect(
+      within(chips).getByRole("button", { name: /Needs you\s*0/ }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Waiting for your media manager"),
+    ).toBeInTheDocument();
+  });
+
   describe("the Needs you view, which is what the sidebar's badge counts", () => {
     const chips = () => screen.getByRole("group", { name: "Show" });
 

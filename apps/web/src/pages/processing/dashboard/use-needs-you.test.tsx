@@ -91,6 +91,22 @@ describe("what needs a person, for the panel, the Today tile and the sidebar", (
     expect(result.current.files).toHaveLength(0);
   });
 
+  it("leaves out a file its media manager still has and a cleaned copy no manager has taken yet, in the groups as in the count", () => {
+    needFiles.files = [
+      file({ id: 1, status: "blocked_upstream" }),
+      file({
+        id: 2,
+        status: "processed",
+        handback: { output_path: "/hand-back/a.mkv", outcome: null },
+      } as Partial<ProcessingFile>),
+    ];
+
+    const { result } = renderHook(() => useNeedsYou(null));
+
+    expect(result.current.files).toHaveLength(0);
+    expect(result.current.groups).toEqual([]);
+  });
+
   it("counts a kind of work's own files, whatever is wrong with Weir itself, so the Today tile and the panel agree", () => {
     failedJobs.jobs = [
       { id: 1, job_kind: "processing.file.remux_pass.v1" },

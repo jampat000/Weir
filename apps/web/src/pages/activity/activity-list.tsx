@@ -22,7 +22,10 @@ import { prettyName } from "../processing/processing-model";
 import { agoWords, importedLabel } from "./activity-model";
 
 /** What Weir did, in a few words, for the list. */
-function whatWeirDid(file: ProcessingFile): string {
+function whatWeirDid(file: ProcessingFile, awaitingManager: boolean): string {
+  if (awaitingManager) {
+    return processingFileStatusLabel({ ...file, status: "blocked_upstream" });
+  }
   if (file.status === "processing") {
     return file.progress_percent != null
       ? `Writing · ${Math.round(file.progress_percent)}%`
@@ -103,7 +106,7 @@ function EntryRow({
       <td data-col="status">
         <Chip meaning={entryMeaning(entry)} className="mm-history-what">
           {entry.kind === "download"
-            ? whatWeirDid(entry.file)
+            ? whatWeirDid(entry.file, entry.awaitingManager)
             : CLEAN_OUTCOME_WORDS[entry.clean.outcome]}
         </Chip>
       </td>

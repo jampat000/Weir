@@ -352,6 +352,21 @@ describe("the files that need a person", () => {
     expect(groups).toEqual([]);
   });
 
+  it("leaves out a file its media manager still has and a cleaned copy no manager has taken yet", () => {
+    const groups = buildNeeds({
+      ...healthy,
+      files: [
+        failedFile(1, { status: "blocked_upstream" }),
+        failedFile(2, {
+          status: "processed",
+          handback: { output_path: "/hand-back/a.mkv", outcome: null },
+        } as Partial<ProcessingFile>),
+      ],
+    });
+
+    expect(groups).toEqual([]);
+  });
+
   it("lists the groups in a fixed order whatever order the files arrive in", () => {
     const keys = buildNeeds({
       ...healthy,
