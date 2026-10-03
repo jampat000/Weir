@@ -1,5 +1,4 @@
 using System.Net;
-using System.Text.Json.Nodes;
 using Weir.Contract.Tests.Harness;
 using Weir.Contract.Tests.Harness.Fakes;
 
@@ -68,24 +67,5 @@ internal static class LibrariesPartBPosters
         {
             Assert.Equal(values, search.Query[name]);
         }
-    }
-
-    /// <summary>The image bytes at <paramref name="url"/> as the signed-in admin of <paramref name="server"/> receives them.</summary>
-    public static async Task<byte[]> ImageBytesAsync(WeirServer server, string url)
-    {
-        var cookies = new CookieContainer();
-        using var handler = new HttpClientHandler { CookieContainer = cookies, UseCookies = true, AllowAutoRedirect = false };
-        using var http = new HttpClient(handler) { BaseAddress = server.BaseUrl };
-        var token = JsonNode.Parse(await http.GetStringAsync($"{WeirClient.Api}/auth/csrf"))!["csrf_token"]!.ToString();
-        var credentials = new JsonObject
-        {
-            ["username"] = WeirClient.AdminUsername,
-            ["password"] = WeirClient.AdminPassword,
-            ["csrf_token"] = token,
-        };
-        using var login = await http.PostAsync(
-            $"{WeirClient.Api}/auth/login", new StringContent(credentials.ToJsonString(), System.Text.Encoding.UTF8, "application/json"));
-        Assert.Equal(HttpStatusCode.OK, login.StatusCode);
-        return await http.GetByteArrayAsync(url);
     }
 }

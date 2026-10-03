@@ -14,7 +14,7 @@ public sealed class AuthCookieSecureModeTests(ServerFixture fixture) : AliceTest
     [Fact]
     public async Task Plain_http_login_does_not_set_secure_cookie()
     {
-        var response = await Alice.LoginAsync();
+        var response = await Alice.AttemptLoginAsync();
         AssertStatus(HttpStatusCode.OK, response);
 
         var setCookie = SetCookieHeader(response);
@@ -22,7 +22,7 @@ public sealed class AuthCookieSecureModeTests(ServerFixture fixture) : AliceTest
         Assert.DoesNotContain("secure", setCookie.ToLowerInvariant(), StringComparison.Ordinal);
         Assert.Contains("httponly", setCookie.ToLowerInvariant(), StringComparison.Ordinal);
 
-        AssertStatus(HttpStatusCode.OK, await Alice.GetAsync($"{AuthSession.Api}/auth/me"));
+        AssertStatus(HttpStatusCode.OK, await Alice.GetAsync($"{WeirClient.Api}/auth/me"));
     }
 
     [Fact]
@@ -32,7 +32,7 @@ public sealed class AuthCookieSecureModeTests(ServerFixture fixture) : AliceTest
         var session = NewSession(server);
         await session.EnsureAdminAccountAsync();
 
-        var response = await session.LoginAsync();
+        var response = await session.AttemptLoginAsync();
 
         AssertStatus(HttpStatusCode.OK, response);
         Assert.Contains("secure", SetCookieHeader(response).ToLowerInvariant(), StringComparison.Ordinal);
@@ -49,7 +49,7 @@ public sealed class AuthCookieSecureModeTests(ServerFixture fixture) : AliceTest
         var session = NewSession(server);
         await session.EnsureAdminAccountAsync();
 
-        var response = await session.LoginAsync(headers: Headers(("X-Forwarded-Proto", "https")));
+        var response = await session.AttemptLoginAsync(headers: Headers(("X-Forwarded-Proto", "https")));
 
         AssertStatus(HttpStatusCode.OK, response);
         Assert.DoesNotContain("secure", SetCookieHeader(response).ToLowerInvariant(), StringComparison.Ordinal);
@@ -58,7 +58,7 @@ public sealed class AuthCookieSecureModeTests(ServerFixture fixture) : AliceTest
     [Fact]
     public async Task Logout_clears_the_cookie_it_set()
     {
-        AssertStatus(HttpStatusCode.OK, await Alice.LoginAsync());
+        AssertStatus(HttpStatusCode.OK, await Alice.AttemptLoginAsync());
 
         var logout = await Alice.LogoutWithBodyAsync();
         Assert.True(logout.Status is HttpStatusCode.OK or HttpStatusCode.NoContent, logout.ToString());
@@ -67,6 +67,6 @@ public sealed class AuthCookieSecureModeTests(ServerFixture fixture) : AliceTest
         Assert.False(string.IsNullOrEmpty(cleared), "logout must clear the session cookie");
         Assert.DoesNotContain("secure", cleared.ToLowerInvariant(), StringComparison.Ordinal);
 
-        Assert.Equal(HttpStatusCode.Unauthorized, (await Alice.GetAsync($"{AuthSession.Api}/auth/me")).Status);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await Alice.GetAsync($"{WeirClient.Api}/auth/me")).Status);
     }
 }

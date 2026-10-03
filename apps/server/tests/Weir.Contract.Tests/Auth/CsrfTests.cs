@@ -21,7 +21,7 @@ public sealed class CsrfTests(CsrfTests.CsrfServerFixture fixture) : AuthTestBas
     {
         await using var server = await WeirServer.StartNewAsync(new Dictionary<string, string> { [ServerEnvironment.SessionSecretVariable] = string.Empty });
 
-        var response = await NewSession(server).GetAsync($"{AuthSession.Api}/auth/csrf");
+        var response = await NewSession(server).GetAsync($"{WeirClient.Api}/auth/csrf");
 
         Assert.Equal(HttpStatusCode.ServiceUnavailable, response.Status);
     }
@@ -81,8 +81,8 @@ public sealed class CsrfTests(CsrfTests.CsrfServerFixture fixture) : AuthTestBas
     private async Task EnsureAdminAsync() =>
         await NewSession(Headers(("Origin", Trusted), RequestedWith)).EnsureAdminAccountAsync();
 
-    private static async Task<HttpStatusCode> LoginStatusAsync(AuthSession session, params (string Name, string Value)[] headers) =>
-        (await session.LoginAsync(headers: Headers(headers))).Status;
+    private static async Task<HttpStatusCode> LoginStatusAsync(WeirClient session, params (string Name, string Value)[] headers) =>
+        (await session.AttemptLoginAsync(headers: Headers(headers))).Status;
 
     /// <summary>
     /// WEIR_TRUSTED_BROWSER_ORIGINS overrides WEIR_CORS_ORIGINS for the Origin check. WEIR_ENV is unset (production) by

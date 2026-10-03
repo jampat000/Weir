@@ -9,7 +9,7 @@ namespace Weir.Contract.Tests.Auth;
 public sealed class CorsPolicyTests(CorsPolicyTests.CorsServerFixture fixture) : AuthTestBase(fixture), IClassFixture<CorsPolicyTests.CorsServerFixture>
 {
     private const string Origin = "http://localhost:5173";
-    private const string Csrf = $"{AuthSession.Api}/auth/csrf";
+    private const string Csrf = $"{WeirClient.Api}/auth/csrf";
 
     [Fact]
     public async Task Cors_preflight_allows_weir_browser_methods_and_headers()

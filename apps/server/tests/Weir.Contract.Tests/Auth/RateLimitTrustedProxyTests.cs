@@ -38,8 +38,8 @@ public sealed class RateLimitTrustedProxyTests(RateLimitTrustedProxyTests.ProxyR
         Assert.Equal(HttpStatusCode.Unauthorized, await AttemptAsync(session, "203.0.113.7, 198.51.100.20"));
     }
 
-    private static async Task<HttpStatusCode> AttemptAsync(AuthSession session, string forwardedFor) =>
-        (await session.LoginAsync(password: "wrong", headers: Headers(("X-Forwarded-For", forwardedFor)))).Status;
+    private static async Task<HttpStatusCode> AttemptAsync(WeirClient session, string forwardedFor) =>
+        (await session.AttemptLoginAsync(password: "wrong", headers: Headers(("X-Forwarded-For", forwardedFor)))).Status;
 
     public sealed class ProxyRateLimitServerFixture : ServerFixture
     {

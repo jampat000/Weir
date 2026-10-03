@@ -19,12 +19,12 @@ public sealed class HttpHardeningTests(HttpHardeningTests.ProxyServerFixture fix
         var session = NewSession();
         await session.EnsureAdminAccountAsync();
 
-        var https = await session.LoginAsync(headers: Headers(("X-Forwarded-Proto", "https")));
+        var https = await session.AttemptLoginAsync(headers: Headers(("X-Forwarded-Proto", "https")));
         AssertStatus(HttpStatusCode.OK, https);
         Assert.Contains("secure", SetCookieHeader(https).ToLowerInvariant(), StringComparison.Ordinal);
 
         // A chain is ambiguous (which hop is ours?), so the request stays plain HTTP.
-        var chain = await session.LoginAsync(headers: Headers(("X-Forwarded-Proto", "https, http")));
+        var chain = await session.AttemptLoginAsync(headers: Headers(("X-Forwarded-Proto", "https, http")));
         AssertStatus(HttpStatusCode.OK, chain);
         Assert.DoesNotContain("secure", SetCookieHeader(chain).ToLowerInvariant(), StringComparison.Ordinal);
     }
@@ -34,44 +34,32 @@ public sealed class HttpHardeningTests(HttpHardeningTests.ProxyServerFixture fix
     {
         var session = NewSession();
 
-        // The .br sibling holds fake bytes a brotli decoder would reject, so read the body undecoded.
-        var (br, brBody) = await session.GetRawAsync("/assets/app-abc.js", Headers(("Accept-Encoding", "br, gzip")));
-        using (br)
-        {
-            Assert.Equal(HttpStatusCode.OK, br.StatusCode);
-            Assert.Equal("brotli-bytes", Encoding.ASCII.GetString(brBody));
-            Assert.Equal("br", AuthSession.RawHeader(br, "Content-Encoding"));
-            Assert.Equal("public, max-age=31536000, immutable", AuthSession.RawHeader(br, "Cache-Control"));
-            Assert.Equal("Accept-Encoding", AuthSession.RawHeader(br, "Vary"));
-            var etag = AuthSession.RawHeader(br, "ETag");
-            Assert.False(string.IsNullOrEmpty(etag));
+        // The .br sibling holds fake bytes a brotli decoder would reject; the client does not decompress, so the body is read as sent.
+        var br = await session.GetAsync("/assets/app-abc.js", Headers(("Accept-Encoding", "br, gzip")));
+        Assert.Equal(HttpStatusCode.OK, br.Status);
+        Assert.Equal("brotli-bytes", Encoding.ASCII.GetString(br.Bytes));
+        Assert.Equal("br", br.RawHeader("Content-Encoding"));
+        Assert.Equal("public, max-age=31536000, immutable", br.RawHeader("Cache-Control"));
+        Assert.Equal("Accept-Encoding", br.RawHeader("Vary"));
+        var etag = br.RawHeader("ETag");
+        Assert.False(string.IsNullOrEmpty(etag));
 
-            var (gzipResponse, gzipBody) = await session.GetRawAsync("/assets/app-abc.js", Headers(("Accept-Encoding", "gzip")));
-            using (gzipResponse)
-            {
-                Assert.Equal(HttpStatusCode.OK, gzipResponse.StatusCode);
-                Assert.Equal("gzip-bytes", Encoding.ASCII.GetString(Gunzip(gzipBody)));
-                Assert.Equal("gzip", AuthSession.RawHeader(gzipResponse, "Content-Encoding"));
-            }
+        var gzip = await session.GetAsync("/assets/app-abc.js", Headers(("Accept-Encoding", "gzip")));
+        Assert.Equal(HttpStatusCode.OK, gzip.Status);
+        Assert.Equal("gzip-bytes", Encoding.ASCII.GetString(Gunzip(gzip.Bytes)));
+        Assert.Equal("gzip", gzip.RawHeader("Content-Encoding"));
 
-            var (unchanged, unchangedBody) = await session.GetRawAsync("/assets/app-abc.js", Headers(("Accept-Encoding", "br"), ("If-None-Match", etag!)));
-            using (unchanged)
-            {
-                Assert.Equal(HttpStatusCode.NotModified, unchanged.StatusCode);
-                Assert.Empty(unchangedBody);
-            }
-        }
+        var unchanged = await session.GetAsync("/assets/app-abc.js", Headers(("Accept-Encoding", "br"), ("If-None-Match", etag!)));
+        Assert.Equal(HttpStatusCode.NotModified, unchanged.Status);
+        Assert.Empty(unchanged.Bytes);
     }
 
     [Fact]
     public async Task Compressed_assets_do_not_intercept_range_requests()
     {
-        var (response, body) = await NewSession().GetRawAsync("/assets/range-abc.js", Headers(("Accept-Encoding", "gzip"), ("Range", "bytes=0-3")));
-        using (response)
-        {
-            Assert.Equal(HttpStatusCode.PartialContent, response.StatusCode);
-            Assert.Equal("0123", Encoding.ASCII.GetString(body));
-        }
+        var response = await NewSession().GetAsync("/assets/range-abc.js", Headers(("Accept-Encoding", "gzip"), ("Range", "bytes=0-3")));
+        Assert.Equal(HttpStatusCode.PartialContent, response.Status);
+        Assert.Equal("0123", Encoding.ASCII.GetString(response.Bytes));
     }
 
     private static byte[] Gunzip(byte[] compressed)

@@ -21,21 +21,30 @@ public sealed class WeirClient : IDisposable
     // rather than as a client that gave up at the same instant (#586). Keep it strictly greater.
     private static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(45);
 
+    // A browser or media manager always says what it accepts, as the Python client's HTTP library did.
+    private const string DefaultAccept = "*/*";
+
+    private readonly Uri _baseAddress;
+    private readonly CookieContainer _cookies = new();
     private readonly HttpClientHandler _handler;
     private readonly HttpClient _http;
 
-    // defaultHeaders go on every request, such as Origin and X-Requested-With for a browser-like client; none by default.
+    // defaultHeaders go on every request, such as Origin and X-Requested-With for a browser-like client; a header
+    // named here replaces the built-in default of the same name (Accept).
     public WeirClient(Uri baseAddress, IReadOnlyDictionary<string, string>? defaultHeaders = null)
     {
+        _baseAddress = baseAddress;
         _handler = new HttpClientHandler
         {
             AllowAutoRedirect = false,
             UseCookies = true,
-            CookieContainer = new CookieContainer(),
+            CookieContainer = _cookies,
         };
         _http = new HttpClient(_handler) { BaseAddress = baseAddress, Timeout = RequestTimeout };
+        _http.DefaultRequestHeaders.TryAddWithoutValidation("Accept", DefaultAccept);
         foreach (var (name, value) in defaultHeaders ?? new Dictionary<string, string>())
         {
+            _http.DefaultRequestHeaders.Remove(name);
             _http.DefaultRequestHeaders.TryAddWithoutValidation(name, value);
         }
     }
@@ -46,7 +55,28 @@ public sealed class WeirClient : IDisposable
         _handler.Dispose();
     }
 
+    // --- cookies --------------------------------------------------------------------------------
+
+    /// <summary>The value of the cookie the jar would send to the server, or null.</summary>
+    public string? Cookie(string name) => _cookies.GetCookies(_baseAddress)[name]?.Value;
+
+    public void SetCookie(string name, string value) => _cookies.Add(_baseAddress, new Cookie(name, value, "/"));
+
+    public void ClearCookies()
+    {
+        foreach (Cookie cookie in _cookies.GetAllCookies())
+        {
+            cookie.Expired = true;
+        }
+    }
+
     // --- requests -------------------------------------------------------------------------------
+
+    public Task<WeirResponse> HeadAsync(string path) => SendAsync(HttpMethod.Head, path, content: null);
+
+    public Task<WeirResponse> OptionsAsync(string path, IReadOnlyDictionary<string, string> headers) =>
+        SendAsync(HttpMethod.Options, path, content: null, headers);
+
 
     public Task<WeirResponse> GetAsync(string path, params (string Name, object Value)[] query) =>
         SendAsync(HttpMethod.Get, WithQuery(path, query), content: null);
@@ -107,13 +137,32 @@ public sealed class WeirClient : IDisposable
     public async Task<WeirResponse> BootstrapAsync(string username = AdminUsername, string password = AdminPassword) =>
         await PostAsync($"{Api}/auth/bootstrap", Credentials(username, password, await CsrfTokenAsync()));
 
+    /// <summary>
+    /// Tries to sign in and returns whatever the server answers. <paramref name="headers"/> go on this request only and
+    /// <paramref name="extra"/> adds fields to the body.
+    /// </summary>
+    public async Task<WeirResponse> AttemptLoginAsync(
+        string username = AdminUsername,
+        string password = AdminPassword,
+        IReadOnlyDictionary<string, string>? headers = null,
+        params (string Name, JsonNode Value)[] extra)
+    {
+        var body = Credentials(username, password, await CsrfTokenAsync());
+        foreach (var (name, value) in extra)
+        {
+            body[name] = value;
+        }
+
+        return await PostAsync($"{Api}/auth/login", body, headers);
+    }
+
     /// <summary>Signs in; fails the test unless the server answers <paramref name="expected"/>.</summary>
     public async Task<WeirResponse> LoginAsync(
         string username = AdminUsername,
         string password = AdminPassword,
         HttpStatusCode expected = HttpStatusCode.OK)
     {
-        var response = await PostAsync($"{Api}/auth/login", Credentials(username, password, await CsrfTokenAsync()));
+        var response = await AttemptLoginAsync(username, password);
         Assert.True(response.Status == expected, response.ToString());
         return response;
     }

@@ -19,8 +19,8 @@ public sealed class BootstrapStatusRouterTests
             SeedSql.Execute(database.Connection, "DROP TABLE users");
         }
 
-        using var session = new AuthSession(server.BaseUrl);
-        var response = await session.GetAsync($"{AuthSession.Api}/auth/bootstrap/status");
+        using var session = server.CreateClient();
+        var response = await session.GetAsync($"{WeirClient.Api}/auth/bootstrap/status");
 
         AssertStatus(HttpStatusCode.ServiceUnavailable, response);
         var detail = response.Fields["detail"]?.GetValue<string>();

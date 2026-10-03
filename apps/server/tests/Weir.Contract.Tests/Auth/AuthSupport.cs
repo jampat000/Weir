@@ -10,6 +10,7 @@ namespace Weir.Contract.Tests.Auth;
 /// <summary>Stateless helpers the auth tests share: seeded accounts, session rows and the clock.</summary>
 public static class AuthSupport
 {
+    public const string SessionCookie = "weir_session";
     public const string ViewerUsername = "bob";
     public const string ViewerPassword = "viewer-password-here";
 

@@ -10,7 +10,7 @@ namespace Weir.Contract.Tests.Auth;
 public sealed class AuthBootstrapTests(ServerFixture fixture, AuthBootstrapTests.NoAdminServerFixture noAdmin)
     : AliceTestBase(fixture), IClassFixture<ServerFixture>, IClassFixture<AuthBootstrapTests.NoAdminServerFixture>
 {
-    private const string Api = AuthSession.Api;
+    private const string Api = WeirClient.Api;
 
     [Fact]
     public async Task Bootstrap_returns_a_working_session()

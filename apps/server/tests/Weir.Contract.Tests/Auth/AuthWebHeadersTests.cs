@@ -8,7 +8,7 @@ namespace Weir.Contract.Tests.Auth;
 [ContractArea("auth")]
 public sealed class AuthWebHeadersTests(AuthWebHeadersTests.WebServerFixture fixture) : AuthTestBase(fixture), IClassFixture<AuthWebHeadersTests.WebServerFixture>
 {
-    private const string Api = AuthSession.Api;
+    private const string Api = WeirClient.Api;
 
     [Fact]
     public async Task Security_headers_on_health_and_api()
@@ -35,12 +35,9 @@ public sealed class AuthWebHeadersTests(AuthWebHeadersTests.WebServerFixture fix
     [Fact]
     public async Task Static_assets_do_not_get_api_no_store()
     {
-        var (response, _) = await NewSession().GetRawAsync("/assets/app.js");
-        using (response)
-        {
-            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-            Assert.NotEqual("no-store, private", AuthSession.RawHeader(response, "Cache-Control"));
-        }
+        var response = await NewSession().GetAsync("/assets/app.js");
+        Assert.Equal(HttpStatusCode.OK, response.Status);
+        Assert.NotEqual("no-store, private", response.RawHeader("Cache-Control"));
     }
 
     [Fact]
@@ -75,20 +72,8 @@ public sealed class AuthWebHeadersTests(AuthWebHeadersTests.WebServerFixture fix
     }
 
     /// <summary>A header lookup over one GET, with the headers exactly as the server wrote them.</summary>
-    private static async Task<Func<string, string?>> RawHeadersAsync(AuthSession session, string path)
-    {
-        var (response, _) = await session.GetRawAsync(path);
-        using (response)
-        {
-            var values = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
-            foreach (var header in response.Headers.NonValidated.Concat(response.Content.Headers.NonValidated))
-            {
-                values[header.Key] = string.Join(", ", header.Value);
-            }
-
-            return name => values.GetValueOrDefault(name);
-        }
-    }
+    private static async Task<Func<string, string?>> RawHeadersAsync(WeirClient session, string path) =>
+        (await session.GetAsync(path)).RawHeader;
 
     /// <summary>A server serving a small bundled web app from a folder of its own, with HSTS on.</summary>
     public sealed class WebServerFixture : ServerFixture, IDisposable

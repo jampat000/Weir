@@ -17,14 +17,14 @@ public sealed class RateLimitTests(RateLimitTests.RateLimitServerFixture fixture
     public async Task Login_rate_limit_window_slides()
     {
         var session = NewSession();
-        Assert.Equal(HttpStatusCode.Unauthorized, (await session.LoginAsync(password: "wrong")).Status);
-        Assert.Equal(HttpStatusCode.Unauthorized, (await session.LoginAsync(password: "wrong")).Status);
-        var limited = await session.LoginAsync(password: "wrong");
+        Assert.Equal(HttpStatusCode.Unauthorized, (await session.AttemptLoginAsync(password: "wrong")).Status);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await session.AttemptLoginAsync(password: "wrong")).Status);
+        var limited = await session.AttemptLoginAsync(password: "wrong");
         Assert.Equal(HttpStatusCode.TooManyRequests, limited.Status);
         Assert.Equal(WindowSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture), limited.Header("Retry-After"));
 
         await Poll.UntilAsync(
-            async () => (await session.LoginAsync(password: "wrong")).Status == HttpStatusCode.Unauthorized,
+            async () => (await session.AttemptLoginAsync(password: "wrong")).Status == HttpStatusCode.Unauthorized,
             "the login window to slide past the earlier attempts",
             TimeSpan.FromSeconds(WindowSeconds * 5));
     }

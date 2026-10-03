@@ -9,7 +9,7 @@ namespace Weir.Contract.Tests.Auth;
 [ContractArea("auth")]
 public sealed class AuthSessionsTests(ServerFixture fixture) : AliceTestBase(fixture), IClassFixture<ServerFixture>
 {
-    private const string Api = AuthSession.Api;
+    private const string Api = WeirClient.Api;
 
     // Sessions that are already past their absolute expiry are deleted at server start, so a test that needs one alive at
     // startup and expired at request time seeds it to expire shortly after the restart.
@@ -20,10 +20,10 @@ public sealed class AuthSessionsTests(ServerFixture fixture) : AliceTestBase(fix
     [Fact]
     public async Task Session_rotation_replaces_old_cookie()
     {
-        await Alice.LoginAsync();
-        var oldCookie = Alice.Cookie(AuthSession.SessionCookie);
-        await Alice.LoginAsync();
-        var newCookie = Alice.Cookie(AuthSession.SessionCookie);
+        await Alice.AttemptLoginAsync();
+        var oldCookie = Alice.Cookie(AuthSupport.SessionCookie);
+        await Alice.AttemptLoginAsync();
+        var newCookie = Alice.Cookie(AuthSupport.SessionCookie);
 
         Assert.NotEqual(oldCookie, newCookie);
         Assert.Equal(HttpStatusCode.OK, (await Alice.GetAsync($"{Api}/auth/me")).Status);
@@ -32,7 +32,7 @@ public sealed class AuthSessionsTests(ServerFixture fixture) : AliceTestBase(fix
     [Fact]
     public async Task Login_cookie_has_explicit_lifetime()
     {
-        var response = await Alice.LoginAsync();
+        var response = await Alice.AttemptLoginAsync();
 
         AssertStatus(HttpStatusCode.OK, response);
         var setCookie = SetCookieHeader(response);
@@ -44,7 +44,7 @@ public sealed class AuthSessionsTests(ServerFixture fixture) : AliceTestBase(fix
     [Fact]
     public async Task Trusted_device_login_uses_extended_session_policy()
     {
-        var response = await Alice.LoginAsync(extra: ("trusted_device", JsonValue.Create(true)));
+        var response = await Alice.AttemptLoginAsync(extra: ("trusted_device", JsonValue.Create(true)));
         AssertStatus(HttpStatusCode.OK, response);
 
         var sessionResponse = await Alice.GetAsync($"{Api}/auth/session");
@@ -69,15 +69,15 @@ public sealed class AuthSessionsTests(ServerFixture fixture) : AliceTestBase(fix
     [Fact]
     public async Task Session_cookie_survives_backend_app_restart()
     {
-        var login = await Alice.LoginAsync();
+        var login = await Alice.AttemptLoginAsync();
         AssertStatus(HttpStatusCode.OK, login);
-        var cookie = Alice.Cookie(AuthSession.SessionCookie);
+        var cookie = Alice.Cookie(AuthSupport.SessionCookie);
         Assert.False(string.IsNullOrEmpty(cookie));
 
         await Server.RestartAsync();
 
         var after = NewSession();
-        after.SetCookie(AuthSession.SessionCookie, cookie);
+        after.SetCookie(AuthSupport.SessionCookie, cookie);
         var me = await after.GetAsync($"{Api}/auth/me");
         AssertStatus(HttpStatusCode.OK, me);
         Assert.Equal("alice", (string)me.Fields["user"]!["username"]!);
@@ -88,10 +88,10 @@ public sealed class AuthSessionsTests(ServerFixture fixture) : AliceTestBase(fix
     {
         var remoteClient = NewSession();
         var localClient = NewSession();
-        Assert.Equal(HttpStatusCode.OK, (await remoteClient.LoginAsync()).Status);
+        Assert.Equal(HttpStatusCode.OK, (await remoteClient.AttemptLoginAsync()).Status);
         Assert.Equal(HttpStatusCode.OK, (await remoteClient.GetAsync($"{Api}/auth/me")).Status);
 
-        Assert.Equal(HttpStatusCode.OK, (await localClient.LoginAsync()).Status);
+        Assert.Equal(HttpStatusCode.OK, (await localClient.AttemptLoginAsync()).Status);
         Assert.Equal(HttpStatusCode.OK, (await localClient.GetAsync($"{Api}/auth/me")).Status);
         Assert.Equal(HttpStatusCode.OK, (await remoteClient.GetAsync($"{Api}/auth/me")).Status);
     }
@@ -106,7 +106,7 @@ public sealed class AuthSessionsTests(ServerFixture fixture) : AliceTestBase(fix
         var clients = Enumerable.Range(0, 6).Select(_ => NewSession(server)).ToList();
         foreach (var client in clients)
         {
-            AssertStatus(HttpStatusCode.OK, await client.LoginAsync());
+            AssertStatus(HttpStatusCode.OK, await client.AttemptLoginAsync());
         }
 
         Assert.Equal(HttpStatusCode.Unauthorized, (await clients[0].GetAsync($"{Api}/auth/me")).Status);
@@ -149,7 +149,7 @@ public sealed class AuthSessionsTests(ServerFixture fixture) : AliceTestBase(fix
         await WaitPastAsync(expires);
 
         var live = NewSession(server);
-        Assert.Equal(HttpStatusCode.OK, (await live.LoginAsync()).Status);
+        Assert.Equal(HttpStatusCode.OK, (await live.AttemptLoginAsync()).Status);
         Assert.Equal(HttpStatusCode.OK, (await live.GetAsync($"{Api}/auth/me")).Status);
 
         List<Dictionary<string, object?>> rows;
@@ -266,10 +266,10 @@ public sealed class AuthSessionsTests(ServerFixture fixture) : AliceTestBase(fix
         Assert.Equal(new HashSet<string> { activeId, bootstrapSessionId! }, ids.ToHashSet());
     }
 
-    private AuthSession SessionWithCookie(WeirServer server, string token)
+    private WeirClient SessionWithCookie(WeirServer server, string token)
     {
         var session = NewSession(server);
-        session.SetCookie(AuthSession.SessionCookie, token);
+        session.SetCookie(AuthSupport.SessionCookie, token);
         return session;
     }
 }

@@ -22,7 +22,7 @@ public sealed class AuthActivityTests(ServerFixture fixture) : AliceTestBase(fix
         var session = NewSession();
         for (var attempt = 0; attempt < 3; attempt++)
         {
-            AssertStatus(HttpStatusCode.Unauthorized, await session.LoginAsync(password: "wrong-password"));
+            AssertStatus(HttpStatusCode.Unauthorized, await session.AttemptLoginAsync(password: "wrong-password"));
         }
 
         long after;
@@ -60,15 +60,15 @@ public sealed class AuthActivityTests(ServerFixture fixture) : AliceTestBase(fix
     [Fact]
     public async Task Activity_recent_requires_authentication()
     {
-        Assert.Equal(HttpStatusCode.Unauthorized, (await Alice.GetAsync($"{AuthSession.Api}/activity/recent")).Status);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await Alice.GetAsync($"{WeirClient.Api}/activity/recent")).Status);
     }
 
     [Fact]
     public async Task Activity_recent_includes_login_event()
     {
-        AssertStatus(HttpStatusCode.OK, await Alice.LoginAsync());
+        AssertStatus(HttpStatusCode.OK, await Alice.AttemptLoginAsync());
 
-        var activity = await Alice.GetAsync($"{AuthSession.Api}/activity/recent");
+        var activity = await Alice.GetAsync($"{WeirClient.Api}/activity/recent");
 
         AssertStatus(HttpStatusCode.OK, activity);
         Assert.Contains(
@@ -79,11 +79,11 @@ public sealed class AuthActivityTests(ServerFixture fixture) : AliceTestBase(fix
     [Fact]
     public async Task Activity_recent_includes_logout_event()
     {
-        await Alice.LoginAsync();
+        await Alice.AttemptLoginAsync();
         AssertStatus(HttpStatusCode.NoContent, await Alice.LogoutWithHeaderAsync());
-        await Alice.LoginAsync();
+        await Alice.AttemptLoginAsync();
 
-        var activity = await Alice.GetAsync($"{AuthSession.Api}/activity/recent");
+        var activity = await Alice.GetAsync($"{WeirClient.Api}/activity/recent");
 
         AssertStatus(HttpStatusCode.OK, activity);
         var types = activity.Fields["items"]!.AsArray().Select(item => (string)item!["event_type"]!).ToList();

@@ -9,16 +9,16 @@ namespace Weir.Contract.Tests.Auth;
 [ContractArea("auth")]
 public sealed class AuthApiTests(ServerFixture fixture) : AliceTestBase(fixture), IClassFixture<ServerFixture>
 {
-    private const string Api = AuthSession.Api;
+    private const string Api = WeirClient.Api;
     private const string NewPassword = "new-password-stronger-123";
 
     [Fact]
     public async Task Login_me_logout_flow()
     {
-        var login = await Alice.LoginAsync();
+        var login = await Alice.AttemptLoginAsync();
         AssertStatus(HttpStatusCode.OK, login);
         Assert.Equal("alice", (string)login.Fields["user"]!["username"]!);
-        var cookie = Alice.Cookie(AuthSession.SessionCookie);
+        var cookie = Alice.Cookie(AuthSupport.SessionCookie);
         Assert.True(cookie is not null && cookie.Length > 20);
 
         var me = await Alice.GetAsync($"{Api}/auth/me");
@@ -36,13 +36,13 @@ public sealed class AuthApiTests(ServerFixture fixture) : AliceTestBase(fixture)
     [Fact]
     public async Task Login_invalid_password()
     {
-        Assert.Equal(HttpStatusCode.Unauthorized, (await Alice.LoginAsync(password: "wrong-password")).Status);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await Alice.AttemptLoginAsync(password: "wrong-password")).Status);
     }
 
     [Fact]
     public async Task Login_rejects_unexpected_fields()
     {
-        var response = await Alice.LoginAsync(extra: ("unexpected", JsonValue.Create("value")));
+        var response = await Alice.AttemptLoginAsync(extra: ("unexpected", JsonValue.Create("value")));
 
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.Status);
     }
@@ -53,7 +53,7 @@ public sealed class AuthApiTests(ServerFixture fixture) : AliceTestBase(fixture)
         await using var server = await WeirServer.StartNewAsync();
         var session = NewSession(server);
         await session.EnsureAdminAccountAsync();
-        AssertStatus(HttpStatusCode.OK, await session.LoginAsync());
+        AssertStatus(HttpStatusCode.OK, await session.AttemptLoginAsync());
 
         var change = await session.PostWithCsrfAsync(
             $"{Api}/auth/change-password",
@@ -62,14 +62,14 @@ public sealed class AuthApiTests(ServerFixture fixture) : AliceTestBase(fixture)
         AssertStatus(HttpStatusCode.OK, change);
         Assert.Contains("sign in again", ((string)change.Fields["message"]!).ToLowerInvariant(), StringComparison.Ordinal);
         Assert.Equal(HttpStatusCode.Unauthorized, (await session.GetAsync($"{Api}/auth/me")).Status);
-        Assert.Equal(HttpStatusCode.Unauthorized, (await session.LoginAsync()).Status);
-        AssertStatus(HttpStatusCode.OK, await session.LoginAsync(password: NewPassword));
+        Assert.Equal(HttpStatusCode.Unauthorized, (await session.AttemptLoginAsync()).Status);
+        AssertStatus(HttpStatusCode.OK, await session.AttemptLoginAsync(password: NewPassword));
     }
 
     [Fact]
     public async Task Change_password_rejects_wrong_current_password()
     {
-        AssertStatus(HttpStatusCode.OK, await Alice.LoginAsync());
+        AssertStatus(HttpStatusCode.OK, await Alice.AttemptLoginAsync());
 
         var change = await Alice.PostWithCsrfAsync(
             $"{Api}/auth/change-password",
@@ -97,7 +97,7 @@ public sealed class AuthApiTests(ServerFixture fixture) : AliceTestBase(fixture)
     [Fact]
     public async Task Logout_rejects_missing_csrf()
     {
-        await Alice.LoginAsync();
+        await Alice.AttemptLoginAsync();
 
         var response = await Alice.PostAsync($"{Api}/auth/logout");
 
@@ -109,8 +109,8 @@ public sealed class AuthApiTests(ServerFixture fixture) : AliceTestBase(fixture)
     {
         var clientA = NewSession();
         var clientB = NewSession();
-        Assert.Equal(HttpStatusCode.OK, (await clientA.LoginAsync()).Status);
-        Assert.Equal(HttpStatusCode.OK, (await clientB.LoginAsync()).Status);
+        Assert.Equal(HttpStatusCode.OK, (await clientA.AttemptLoginAsync()).Status);
+        Assert.Equal(HttpStatusCode.OK, (await clientB.AttemptLoginAsync()).Status);
 
         var sessionACsrf = await clientA.CsrfTokenAsync();
         var crossSession = await clientB.PostAsync(
@@ -128,7 +128,7 @@ public sealed class AuthApiTests(ServerFixture fixture) : AliceTestBase(fixture)
     [Fact]
     public async Task Admin_ping_requires_admin()
     {
-        await Alice.LoginAsync();
+        await Alice.AttemptLoginAsync();
 
         var response = await Alice.GetAsync($"{Api}/auth/admin/ping");
 
@@ -141,7 +141,7 @@ public sealed class AuthApiTests(ServerFixture fixture) : AliceTestBase(fixture)
     {
         await EnsureViewerAsync(Server);
         var session = NewSession();
-        await session.LoginAsync(ViewerUsername, ViewerPassword);
+        await session.AttemptLoginAsync(ViewerUsername, ViewerPassword);
 
         var response = await session.GetAsync($"{Api}/auth/admin/ping");
 
@@ -160,10 +160,10 @@ public sealed class AuthApiTests(ServerFixture fixture) : AliceTestBase(fixture)
         await session.EnsureAdminAccountAsync();
         for (var attempt = 0; attempt < 3; attempt++)
         {
-            AssertStatus(HttpStatusCode.Unauthorized, await session.LoginAsync(password: "wrong"));
+            AssertStatus(HttpStatusCode.Unauthorized, await session.AttemptLoginAsync(password: "wrong"));
         }
 
-        var limited = await session.LoginAsync(password: "wrong");
+        var limited = await session.AttemptLoginAsync(password: "wrong");
 
         Assert.Equal(HttpStatusCode.TooManyRequests, limited.Status);
         Assert.NotNull(limited.Header("Retry-After"));

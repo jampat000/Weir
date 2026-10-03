@@ -37,7 +37,7 @@ public sealed class ArtworkApiTests(ServerFixture fixture) : IClassFixture<Serve
         Assert.Equal("image/jpeg", image.Header("Content-Type"));
         var cache = image.Header("Cache-Control")!.Replace(" ", string.Empty, StringComparison.Ordinal).Split(',');
         Assert.Subset(cache.ToHashSet(), new HashSet<string> { "private", "max-age=2592000", "immutable" });
-        Assert.Equal(FakeGateway.ImageBytes, await LibrariesPartBPosters.ImageBytesAsync(server, url));
+        Assert.Equal(FakeGateway.ImageBytes, image.Bytes);
         Assert.Equal(["/artwork/w342/nosferatu.jpg"], gateway.ImageRequests().Select(request => request.Path));
         var entries = await admin.GetAsync($"{WeirClient.Api}/activity/recent", ("module", "processing"));
         Assert.Equal([url], entries.Fields["items"]!.AsArray().Select(entry => (string?)entry!["poster_url"]));

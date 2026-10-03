@@ -9,7 +9,7 @@ namespace Weir.Contract.Tests.Auth;
 [ContractArea("auth")]
 public sealed class AuthUsernameTests(ServerFixture fixture) : AliceTestBase(fixture), IClassFixture<ServerFixture>
 {
-    private const string Api = AuthSession.Api;
+    private const string Api = WeirClient.Api;
 
     /// <summary>`alice` is seeded; `Alice` and `ALICE` are the same account, not a wrong password.</summary>
     [Fact]
@@ -17,7 +17,7 @@ public sealed class AuthUsernameTests(ServerFixture fixture) : AliceTestBase(fix
     {
         foreach (var spelling in new[] { "alice", "Alice", "ALICE", "  AlIcE  " })
         {
-            var response = await Alice.LoginAsync(spelling);
+            var response = await Alice.AttemptLoginAsync(spelling);
 
             Assert.True(response.Status == HttpStatusCode.OK, $"'{spelling}': {response}");
             await Alice.LogoutWithBodyAsync();
@@ -27,7 +27,7 @@ public sealed class AuthUsernameTests(ServerFixture fixture) : AliceTestBase(fix
     [Fact]
     public async Task A_wrong_password_is_still_rejected()
     {
-        Assert.Equal(HttpStatusCode.Unauthorized, (await Alice.LoginAsync("ALICE", "not-the-password")).Status);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await Alice.AttemptLoginAsync("ALICE", "not-the-password")).Status);
     }
 
     [Fact]
@@ -36,7 +36,7 @@ public sealed class AuthUsernameTests(ServerFixture fixture) : AliceTestBase(fix
         await using var server = await WeirServer.StartNewAsync();
         var session = NewSession(server);
         await session.EnsureAdminAccountAsync();
-        Assert.Equal(HttpStatusCode.OK, (await session.LoginAsync("alice")).Status);
+        Assert.Equal(HttpStatusCode.OK, (await session.AttemptLoginAsync("alice")).Status);
 
         var response = await session.PostWithCsrfAsync(
             $"{Api}/auth/change-username",
@@ -48,15 +48,15 @@ public sealed class AuthUsernameTests(ServerFixture fixture) : AliceTestBase(fix
         Assert.Equal("operator2", (string)(await session.GetAsync($"{Api}/auth/me")).Fields["user"]!["username"]!);
 
         await session.LogoutWithBodyAsync();
-        Assert.Equal(HttpStatusCode.OK, (await session.LoginAsync("OPERATOR2")).Status);
-        Assert.Equal(HttpStatusCode.Unauthorized, (await session.LoginAsync("alice")).Status);
+        Assert.Equal(HttpStatusCode.OK, (await session.AttemptLoginAsync("OPERATOR2")).Status);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await session.AttemptLoginAsync("alice")).Status);
     }
 
     /// <summary>The username is half of the credentials, so an unattended browser is not enough.</summary>
     [Fact]
     public async Task Changing_the_username_needs_the_current_password()
     {
-        Assert.Equal(HttpStatusCode.OK, (await Alice.LoginAsync("alice")).Status);
+        Assert.Equal(HttpStatusCode.OK, (await Alice.AttemptLoginAsync("alice")).Status);
 
         var response = await Alice.PostWithCsrfAsync(
             $"{Api}/auth/change-username",
@@ -73,7 +73,7 @@ public sealed class AuthUsernameTests(ServerFixture fixture) : AliceTestBase(fix
         await using var server = await WeirServer.StartNewAsync();
         var session = NewSession(server);
         await session.EnsureAdminAccountAsync();
-        Assert.Equal(HttpStatusCode.OK, (await session.LoginAsync("alice")).Status);
+        Assert.Equal(HttpStatusCode.OK, (await session.AttemptLoginAsync("alice")).Status);
 
         var response = await session.PostWithCsrfAsync(
             $"{Api}/auth/change-username",
@@ -82,13 +82,13 @@ public sealed class AuthUsernameTests(ServerFixture fixture) : AliceTestBase(fix
         Assert.Equal("Alice", (string)(await session.GetAsync($"{Api}/auth/me")).Fields["user"]!["username"]!);
 
         await session.LogoutWithBodyAsync();
-        Assert.Equal(HttpStatusCode.OK, (await session.LoginAsync("alice")).Status);
+        Assert.Equal(HttpStatusCode.OK, (await session.AttemptLoginAsync("alice")).Status);
     }
 
     [Fact]
     public async Task An_unchanged_username_is_refused()
     {
-        Assert.Equal(HttpStatusCode.OK, (await Alice.LoginAsync("alice")).Status);
+        Assert.Equal(HttpStatusCode.OK, (await Alice.AttemptLoginAsync("alice")).Status);
 
         var response = await Alice.PostWithCsrfAsync(
             $"{Api}/auth/change-username",

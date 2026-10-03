@@ -8,25 +8,25 @@ namespace Weir.Contract.Tests.Auth;
 [ContractArea("auth")]
 public sealed class BootstrapInactiveAdminTests
 {
-    private const string Api = AuthSession.Api;
+    private const string Api = WeirClient.Api;
 
     [Fact]
     public async Task Active_admin_still_closes_bootstrap()
     {
         await using var server = await SeededServerAsync(active: true);
-        using var session = new AuthSession(server.BaseUrl);
+        using var session = server.CreateClient();
 
         Assert.False((bool)(await session.GetAsync($"{Api}/auth/bootstrap/status")).Fields["bootstrap_allowed"]!);
-        Assert.Equal(HttpStatusCode.OK, (await session.LoginAsync()).Status);
+        Assert.Equal(HttpStatusCode.OK, (await session.AttemptLoginAsync()).Status);
     }
 
     [Fact]
     public async Task Inactive_sole_admin_reopens_bootstrap()
     {
         await using var server = await SeededServerAsync(active: false);
-        using var session = new AuthSession(server.BaseUrl);
+        using var session = server.CreateClient();
 
-        Assert.Equal(HttpStatusCode.Unauthorized, (await session.LoginAsync()).Status);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await session.AttemptLoginAsync()).Status);
         Assert.True((bool)(await session.GetAsync($"{Api}/auth/bootstrap/status")).Fields["bootstrap_allowed"]!);
     }
 
@@ -35,13 +35,13 @@ public sealed class BootstrapInactiveAdminTests
     public async Task Recovering_from_an_inactive_admin_leaves_exactly_one()
     {
         await using var server = await SeededServerAsync(active: false);
-        using var session = new AuthSession(server.BaseUrl);
+        using var session = server.CreateClient();
 
         var created = await session.BootstrapAsync("alice-again", "recovered-password-strong");
 
         AssertStatus(HttpStatusCode.OK, created);
         Assert.False((bool)(await session.GetAsync($"{Api}/auth/bootstrap/status")).Fields["bootstrap_allowed"]!);
-        Assert.Equal(HttpStatusCode.OK, (await session.LoginAsync("alice-again", "recovered-password-strong")).Status);
+        Assert.Equal(HttpStatusCode.OK, (await session.AttemptLoginAsync("alice-again", "recovered-password-strong")).Status);
 
         List<Dictionary<string, object?>> admins;
         await using (var database = await StopForInspectionAsync(server))
