@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Globalization;
 using System.Net;
 using System.Net.Sockets;
 using System.Text.Json.Nodes;
@@ -43,9 +44,11 @@ public sealed class WeirServer : IAsyncDisposable
     /// <summary>Starts a server with a fresh data folder and waits until it reports ready.</summary>
     public static async Task<WeirServer> StartNewAsync(IReadOnlyDictionary<string, string>? environment = null)
     {
+        var binary = ServerBinary.Locate();
         ServerLedger.Shared.StopOrphans();
         var home = Directory.CreateTempSubdirectory("weir_contract_").FullName;
-        var server = new WeirServer(ServerBinary.Locate(), home, new Dictionary<string, string>(environment ?? new Dictionary<string, string>()));
+        var settings = new Dictionary<string, string>(environment ?? new Dictionary<string, string>());
+        var server = new WeirServer(binary, home, settings);
         try
         {
             await server.LaunchAsync();
@@ -156,7 +159,8 @@ public sealed class WeirServer : IAsyncDisposable
             UseShellExecute = false,
             CreateNoWindow = true,
         };
-        foreach (var argument in leadingArguments.Concat(["--host", "127.0.0.1", "--port", port.ToString(System.Globalization.CultureInfo.InvariantCulture)]))
+        var listenArguments = new[] { "--host", "127.0.0.1", "--port", port.ToString(CultureInfo.InvariantCulture) };
+        foreach (var argument in leadingArguments.Concat(listenArguments))
         {
             start.ArgumentList.Add(argument);
         }

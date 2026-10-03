@@ -15,6 +15,7 @@ public sealed class ServerLog : IDisposable
     {
         Path = path;
         Directory.CreateDirectory(System.IO.Path.GetDirectoryName(path)!);
+
         // Shared for reading, so a failing test can show the log while the server still writes to it.
         _writer = new StreamWriter(new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.ReadWrite)) { AutoFlush = true };
     }
