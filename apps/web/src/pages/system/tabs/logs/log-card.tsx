@@ -183,7 +183,11 @@ export function LogCard({
         {filters.when === "custom" ? (
           <LogRange from={filters.from} to={filters.to} onChange={onChange} />
         ) : null}
-        <section ref={watchFeed} aria-busy={entries.loading}>
+        <section
+          ref={watchFeed}
+          className="mm-log-feed"
+          aria-busy={entries.loading}
+        >
           {entries.arrived > 0 ? (
             <div className="sticky top-2 z-10 flex justify-center">
               <button

@@ -51,6 +51,11 @@
   container-type: inline-size;
 }
 
+/* While the answer to a new filter is on its way the list still holds the last one's rows: dimmed, so they do not pass for it. */
+.mm-log-feed[aria-busy="true"] .mm-log-list {
+  opacity: 0.45;
+}
+
 /* A day's name above its rows: a heading for the eye, not a row. */
 .mm-log-day {
   padding: 16px 8px 6px;

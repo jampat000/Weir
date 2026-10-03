@@ -10,6 +10,7 @@ import {
 } from "vitest";
 
 import {
+  JOB_ROW,
   NOW,
   chooseLevels,
   logPage,
@@ -146,6 +147,27 @@ describe("the filters", () => {
     );
     expect(pressed()).toHaveLength(1);
     expect(screen.getByTestId("location")).toHaveTextContent("?tab=logs");
+  });
+
+  it("holds the list busy until the answer to a new filter arrives, so the last answer's rows do not pass for it", async () => {
+    await rendered();
+    const feed = () => screen.getByTestId("log-feed").closest("section");
+    expect(feed()).toHaveAttribute("aria-busy", "false");
+
+    let answer: (page: ReturnType<typeof logPage>) => void = () => undefined;
+    mocks.fetchSystemLog.mockReturnValueOnce(
+      new Promise((resolve) => {
+        answer = resolve;
+      }),
+    );
+    fireEvent.click(chip("Source", /Jobs/));
+
+    await waitFor(() => expect(feed()).toHaveAttribute("aria-busy", "true"));
+    expect(screen.getAllByTestId("log-row")).toHaveLength(3);
+
+    answer(logPage([JOB_ROW]));
+    await waitFor(() => expect(feed()).toHaveAttribute("aria-busy", "false"));
+    expect(screen.getAllByTestId("log-row")).toHaveLength(1);
   });
 
   it("narrow to levels, the Info choice standing for information and successes together", async () => {
