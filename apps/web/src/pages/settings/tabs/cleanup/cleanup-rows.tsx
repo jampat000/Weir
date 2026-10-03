@@ -159,6 +159,35 @@ export function CleanupJobRow({
 }
 
 /**
+ * A setting in the same table as the jobs it belongs beside. It is one cell across the whole row, its name and what it
+ * does first and its control under them, so it reads the same whichever order the job columns are in.
+ */
+function SettingRow({
+  testId,
+  name,
+  description,
+  columnCount,
+  children,
+}: {
+  testId: string;
+  name: string;
+  description: string;
+  /** How many columns the table is showing, which the setting's cell spans. */
+  columnCount: number;
+  children: ReactNode;
+}) {
+  return (
+    <tr data-testid={testId}>
+      <td colSpan={columnCount} className="mm-cleanup-setting">
+        <span className="mm-quiet-table__name">{name}</span>
+        <span className="mm-cleanup-what">{description}</span>
+        <div className="mm-cleanup-setting__control">{children}</div>
+      </td>
+    </tr>
+  );
+}
+
+/**
  * A setting counted in days, in the same table as the jobs it governs. Save appears once the value
  * differs from the saved one and is within range.
  */
@@ -166,7 +195,7 @@ export function DaysSettingRow({
   testId,
   name,
   description,
-  span,
+  columnCount,
   inputId,
   inputLabel,
   saved,
@@ -181,8 +210,8 @@ export function DaysSettingRow({
   testId: string;
   name: string;
   description: string;
-  /** How many columns the setting's control takes: all those after the one holding its name. */
-  span: number;
+  /** How many columns the table is showing. */
+  columnCount: number;
   inputId: string;
   inputLabel: string;
   saved: number | undefined;
@@ -200,47 +229,46 @@ export function DaysSettingRow({
   const dirty = saved !== undefined && draft !== null && value !== saved;
   const inRange = value >= min && value <= max;
   return (
-    <tr data-testid={testId}>
-      <th scope="row" className="mm-quiet-table__name">
-        <span>{name}</span>
-        <span className="mm-cleanup-what">{description}</span>
-      </th>
-      <td data-label="On" colSpan={span}>
-        <span className="mm-setrow__unit">
-          <label className="sr-only" htmlFor={inputId}>
-            {inputLabel}
-          </label>
-          <input
-            id={inputId}
-            className="mm-input mm-setrow__number"
-            type="number"
-            min={min}
-            max={max}
-            value={shown}
-            disabled={!editable || saving}
-            onChange={(event) => setDraft(event.target.value)}
-          />
-          days
-          {dirty && inRange ? (
-            <button
-              type="button"
-              className={mmActionButtonClass({
-                variant: "secondary",
-                size: "row",
-              })}
-              disabled={saving}
-              onClick={() =>
-                void onSave(toBody(value), savedWords(value)).then(() =>
-                  setDraft(null),
-                )
-              }
-            >
-              {saving ? "Saving…" : "Save"}
-            </button>
-          ) : null}
-        </span>
-      </td>
-    </tr>
+    <SettingRow
+      testId={testId}
+      name={name}
+      description={description}
+      columnCount={columnCount}
+    >
+      <span className="mm-setrow__unit">
+        <label className="sr-only" htmlFor={inputId}>
+          {inputLabel}
+        </label>
+        <input
+          id={inputId}
+          className="mm-input mm-setrow__number"
+          type="number"
+          min={min}
+          max={max}
+          value={shown}
+          disabled={!editable || saving}
+          onChange={(event) => setDraft(event.target.value)}
+        />
+        days
+        {dirty && inRange ? (
+          <button
+            type="button"
+            className={mmActionButtonClass({
+              variant: "secondary",
+              size: "row",
+            })}
+            disabled={saving}
+            onClick={() =>
+              void onSave(toBody(value), savedWords(value)).then(() =>
+                setDraft(null),
+              )
+            }
+          >
+            {saving ? "Saving…" : "Save"}
+          </button>
+        ) : null}
+      </span>
+    </SettingRow>
   );
 }
 
@@ -249,7 +277,7 @@ export function SwitchSettingRow({
   testId,
   name,
   description,
-  span,
+  columnCount,
   switchId,
   enabled,
   editable,
@@ -259,8 +287,8 @@ export function SwitchSettingRow({
   testId: string;
   name: string;
   description: string;
-  /** How many columns the setting's control takes: all those after the one holding its name. */
-  span: number;
+  /** How many columns the table is showing. */
+  columnCount: number;
   switchId: string;
   enabled: boolean;
   editable: boolean;
@@ -268,22 +296,21 @@ export function SwitchSettingRow({
   onChange: (on: boolean) => void;
 }) {
   return (
-    <tr data-testid={testId}>
-      <th scope="row" className="mm-quiet-table__name">
-        <span>{name}</span>
-        <span className="mm-cleanup-what">{description}</span>
-      </th>
-      <td data-label="On" colSpan={span}>
-        <MmOnOffSwitch
-          id={switchId}
-          label={name}
-          enabled={enabled}
-          disabled={!editable || saving}
-          layout="control"
-          size="row"
-          onChange={onChange}
-        />
-      </td>
-    </tr>
+    <SettingRow
+      testId={testId}
+      name={name}
+      description={description}
+      columnCount={columnCount}
+    >
+      <MmOnOffSwitch
+        id={switchId}
+        label={name}
+        enabled={enabled}
+        disabled={!editable || saving}
+        layout="control"
+        size="row"
+        onChange={onChange}
+      />
+    </SettingRow>
   );
 }

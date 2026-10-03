@@ -173,6 +173,22 @@ it("holds only the leftover work files, the kept half-written copy and the copie
   ]);
 });
 
+it("gives each setting between the jobs one cell across every column, so it does not sit under any one heading", async () => {
+  setup(state());
+
+  render(<CleanupTab />, { wrapper });
+
+  const columnCount = (await screen.findAllByRole("columnheader")).length;
+  for (const testId of [
+    "processing-maintenance-keep-failed-copy",
+    "processing-maintenance-handback-window",
+  ]) {
+    const cells = within(screen.getByTestId(testId)).getAllByRole("cell");
+    expect(cells).toHaveLength(1);
+    expect(cells[0]).toHaveAttribute("colspan", String(columnCount));
+  }
+});
+
 it("keeps a failed file's half-written copy for a day when switched on, and saves at once", async () => {
   setup(state());
   saveSettings.mockResolvedValue({});

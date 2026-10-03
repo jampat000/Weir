@@ -12,6 +12,27 @@
   color: var(--mm-text3);
 }
 
+/* A setting among the jobs is one cell across the whole row: its name and what it does, its control under them. */
+.mm-cleanup-setting > .mm-quiet-table__name {
+  display: block;
+  color: var(--mm-text2);
+  font-weight: 400;
+}
+
+.mm-cleanup-setting__control {
+  margin-top: 0.5rem;
+}
+
+@container (max-width: 760px) {
+  .mm-quiet-table tbody td.mm-cleanup-setting {
+    display: block;
+  }
+
+  .mm-quiet-table tbody td.mm-cleanup-setting::before {
+    content: none;
+  }
+}
+
 .mm-cleanup-every {
   width: 10rem;
 }

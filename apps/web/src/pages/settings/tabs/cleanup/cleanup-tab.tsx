@@ -107,7 +107,7 @@ export function CleanupTab() {
   const shown = editable
     ? columns.order
     : columns.order.filter((id) => id !== "runNow");
-  const span = shown.length - 1;
+  const columnCount = shown.length;
   const confirmingState = confirming
     ? families.find((f) => f.family === confirming.job.family)
     : undefined;
@@ -172,7 +172,7 @@ export function CleanupTab() {
                   testId="processing-maintenance-keep-failed-copy"
                   name="Keep a failed file’s half-written copy for a day, so you can look at it."
                   description="Leftover work files removes it once it is a day old."
-                  span={span}
+                  columnCount={columnCount}
                   switchId={`${ids}-keep-failed`}
                   enabled={settings.data.keep_failed_work_files}
                   editable={editable}
@@ -193,7 +193,7 @@ export function CleanupTab() {
                 testId="processing-maintenance-handback-window"
                 name="Cleaned copies nobody picked up wait"
                 description="How long a copy Weir made for a media manager waits before Cleaned copies nobody picked up may remove it."
-                span={span}
+                columnCount={columnCount}
                 inputId={`${ids}-window`}
                 inputLabel="Cleaned copies nobody picked up wait for"
                 saved={
