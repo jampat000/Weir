@@ -8,7 +8,7 @@ namespace Weir.Contract.Tests.Harness.Fakes;
 public sealed record HttpAnswer(int Status, byte[] Payload, string? ContentType = null, IReadOnlyDictionary<string, string>? Headers = null);
 
 /// <summary>
-/// A real HTTP server on localhost and a free port, running inside the test process, that records every request it receives.
+/// A real HTTP server on 127.0.0.1 and a free port, running inside the test process, that records every request it receives.
 /// Derived fakes decide the answers. Disposing it stops it.
 /// </summary>
 public abstract class FakeHttpServer : IDisposable
@@ -26,11 +26,11 @@ public abstract class FakeHttpServer : IDisposable
         {
             var port = FreePort();
             _listener.Prefixes.Clear();
-            _listener.Prefixes.Add($"http://localhost:{port}/");
+            _listener.Prefixes.Add($"http://127.0.0.1:{port}/");
             try
             {
                 _listener.Start();
-                BaseUrl = $"http://localhost:{port}";
+                BaseUrl = $"http://127.0.0.1:{port}";
                 break;
             }
             catch (HttpListenerException) when (attempt < StartAttempts)
@@ -42,7 +42,7 @@ public abstract class FakeHttpServer : IDisposable
         _ = Task.Run(AcceptAsync);
     }
 
-    /// <summary>For example <c>http://localhost:51234</c>, without a trailing slash.</summary>
+    /// <summary>For example <c>http://127.0.0.1:51234</c>, without a trailing slash.</summary>
     public string BaseUrl { get; }
 
     /// <summary>Every request received so far, oldest first.</summary>

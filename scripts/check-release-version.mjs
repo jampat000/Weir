@@ -1,28 +1,34 @@
 #!/usr/bin/env node
-// Release gate: the tag must be a well-formed release version, X.Y.Z.
+// Release gate: the tag must be a well-formed SemVer release version, X.Y.Z or X.Y.Z-prerelease
+// (for example 1.0.0-rc.1).
 //
-// #804: no file in the tree carries the release version any more. apps/server/Directory.Build.props'
+// #804: no file in the tree carries the release version. apps/server/Directory.Build.props'
 // WeirVersion is a fixed placeholder (never bumped), and every build that ships stamps its own real
 // version on the command line instead, taken from the tag: packaging/windows/build-velopack.ps1 passes
-// it as WEIR_BUILD_VERSION -> -p:Version, the Dockerfile takes it as the WEIR_VERSION build-arg. That
-// removed the version-bump PR (and the checked-in-version-vs-tag check this script used to do), but it
-// also means nothing stops a malformed tag - "v3.2" or "v3.2.10.1" - from reaching those command lines
-// and being baked into every shipped binary, image and package. release.yml's own tag trigger
-// (`v*` / `!v*-*`) already excludes prerelease suffixes, but a glob is not a parser; this is what
-// actually validates the version before anything is built.
+// it as WEIR_BUILD_VERSION -> -p:Version, the Dockerfile takes it as the WEIR_VERSION build-arg. Nothing
+// else stops a malformed tag - "v3.2" or "v3.2.10.1" - from reaching those command lines and being baked
+// into every shipped binary, image and package; release.yml's `v*` tag trigger is a glob, not a parser,
+// so this is what actually validates the version before anything is built.
 //
-// Usage: node scripts/check-release-version.mjs <tag, e.g. v3.2.4>
+// A version with a prerelease part publishes as a GitHub pre-release (release.yml); build metadata
+// ("+build") is refused because neither a Docker tag nor a package file name can carry it.
+//
+// Usage: node scripts/check-release-version.mjs <tag, e.g. v1.0.0-rc.1>
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
+import { isPrerelease, parseSemver } from "./semver.mjs";
+
 export function parseReleaseVersion(tag) {
   const trimmed = (tag ?? "").trim();
-  const withoutV = trimmed.startsWith("v") ? trimmed.slice(1) : trimmed;
-  const match = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.exec(withoutV);
-  if (!match) {
-    return { ok: false, reason: `"${trimmed}" is not a release version in the form vX.Y.Z (three non-negative integers, no leading zeros, no prerelease or build suffix).` };
+  const parsed = parseSemver(trimmed);
+  if (!parsed) {
+    return {
+      ok: false,
+      reason: `"${trimmed}" is not a release version in the form vX.Y.Z or vX.Y.Z-rc.1 (three non-negative integers without leading zeros, an optional prerelease part, no build suffix).`,
+    };
   }
-  return { ok: true, version: withoutV };
+  return { ok: true, version: parsed.version, prerelease: isPrerelease(parsed) };
 }
 
 function main() {
@@ -36,7 +42,8 @@ function main() {
     console.error(`::error::${result.reason}`);
     process.exit(1);
   }
-  console.log(`Release tag ${tag} is a well-formed release version (${result.version}).`);
+  const kind = result.prerelease ? "pre-release" : "release";
+  console.log(`Release tag ${tag} is a well-formed ${kind} version (${result.version}).`);
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {

@@ -12,7 +12,7 @@ public sealed class ConnectionNamingTests
     [InlineData("Deluno", "http://RIG:5099", "Deluno on RIG")]
     [InlineData("Radarr", "http://nas:7878", "Radarr on nas")]
     [InlineData("Radarr", "https://media.example.lan/radarr", "Radarr on media.example.lan")]
-    [InlineData("qBittorrent", "http://10.1.1.51:8080", "qBittorrent on 10.1.1.51")]
+    [InlineData("qBittorrent", "http://10.0.0.51:8080", "qBittorrent on 10.0.0.51")]
     [InlineData("Sonarr", "http://192.168.0.9", "Sonarr on 192.168.0.9")]
     [InlineData("Radarr", "http://[::1]:7878", "Radarr on [::1]")]
     public void A_name_is_the_product_and_the_host_as_written(string product, string baseUrl, string expected)
@@ -122,7 +122,7 @@ public sealed class ConnectionNamingTests
     }
 
     [Theory]
-    [InlineData("qbittorrent", "qBittorrent on 10.1.1.51", "qBittorrent on 10.1.1.51")]
+    [InlineData("qbittorrent", "qBittorrent on 10.0.0.51", "qBittorrent on 10.0.0.51")]
     [InlineData("sabnzbd", "Living room", "SABnzbd (Living room)")]
     [InlineData("nzbget", "", "NZBGet")]
     public void A_download_client_label_leads_with_the_product_unless_the_name_already_does(string kind, string name, string expected)

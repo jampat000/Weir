@@ -25,13 +25,6 @@ internal static class FolderLinks
 
 internal static class RepositoryPaths
 {
-    /// <summary>
-    /// The checked-in schema reference, copied next to the test assembly: the schema and seed rows of the
-    /// last Alembic head, which the baseline migration reproduces exactly. It is frozen; the migrations are
-    /// the schema's only source.
-    /// </summary>
-    public static string AlembicHeadReference => Path.Join(AppContext.BaseDirectory, "schema", "alembic-head.sql");
-
     /// <summary>The repository root, found by walking up from the test assembly.</summary>
     public static string? RepositoryRoot
     {

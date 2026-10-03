@@ -16,7 +16,7 @@ public sealed class NetworkAccessEndpointTests
         NetworkScope? scope,
         NetworkScope? pending = null,
         FirewallVerdict firewall = FirewallVerdict.NotChecked) =>
-        new(state, scope, pending, firewall, 9347, ["http://10.1.1.196:9347"]);
+        new(state, scope, pending, firewall, 9347, ["http://10.0.0.196:9347"]);
 
     private static string Summary(NetworkAccessStatus status) =>
         Assert.IsType<WireString>(NetworkAccessStatusWire.From(status, "MEDIA-PC", notChangeableReason: null)["summary"]).Value;
@@ -139,7 +139,7 @@ public sealed class NetworkAccessEndpointTests
         Assert.Equal("network", json["pending_scope"]!.GetValue<string>());
         Assert.Equal("blocked", json["firewall"]!.GetValue<string>());
         Assert.Equal(9347, json["port"]!.GetValue<int>());
-        Assert.Equal(["http://10.1.1.196:9347"], json["addresses"]!.AsArray().Select(node => node!.GetValue<string>()).ToArray());
+        Assert.Equal(["http://10.0.0.196:9347"], json["addresses"]!.AsArray().Select(node => node!.GetValue<string>()).ToArray());
         Assert.False(string.IsNullOrWhiteSpace(json["machine_name"]!.GetValue<string>()));
     }
 

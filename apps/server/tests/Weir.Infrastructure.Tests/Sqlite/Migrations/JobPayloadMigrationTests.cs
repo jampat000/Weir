@@ -13,7 +13,7 @@ namespace Weir.Infrastructure.Tests.Sqlite.Migrations;
 /// <summary>
 /// Migrations 0002-0006 each copy data out of the old job-payload/detail_json storage they replace. Every
 /// test here builds a database at the frozen baseline (<see cref="SchemaMigrator.BaselineRevision"/>, the
-/// head every released Weir could create before these migrations existed), writes one row by hand in the
+/// schema before these migrations existed), writes one row by hand in the
 /// exact old format, upgrades the database to head (<see cref="SchemaMigrator.EnsureAtHead"/>'s new in-place
 /// upgrade path), and proves the same data reads back identically through the real, current store — not a
 /// reimplementation of the migration's own SQL.
@@ -32,7 +32,7 @@ public sealed class JobPayloadMigrationTests : IDisposable
     {
         _database = new SqliteDatabase(_temp.Join("weir.sqlite3"));
         Assert.Equal(SchemaStartupOutcome.Created, new SchemaMigrator(_database).EnsureAtBaseline());
-        // The baseline (like the Alembic head it reproduces) seeds two default libraries and a rule set;
+        // The baseline seeds two default libraries and a rule set;
         // this test writes its own with predictable ids instead.
         Execute("DELETE FROM refiner_libraries; DELETE FROM refiner_rule_sets;");
     }

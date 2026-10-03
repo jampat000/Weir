@@ -14,7 +14,7 @@ const mutate =
   vi.fn<(body: NetworkAccessPutBody, options?: MutateOptions) => void>();
 const reset = vi.fn();
 
-const ADDRESS = "http://10.1.1.196:9347";
+const ADDRESS = "http://10.0.0.196:9347";
 
 function status(over: Partial<NetworkAccessStatus> = {}): NetworkAccessStatus {
   return {

@@ -6,14 +6,14 @@ namespace Weir.Contract.Tests.SystemArea;
 
 /// <summary>The configuration bundle (<c>/suite/configuration-bundle</c>): access, its one address, and round trips.</summary>
 [ContractArea("system")]
-public sealed class ConfigurationBundleApiTests(SystemPartASeededServerFixture fixture) : IClassFixture<SystemPartASeededServerFixture>
+public sealed class ConfigurationBundleApiTests(UsersFixture fixture) : IClassFixture<UsersFixture>
 {
     private const string Bundle = $"{WeirClient.Api}/suite/configuration-bundle";
 
     [Fact]
     public async Task Configuration_bundle_get_requires_operator()
     {
-        using var viewer = await SystemPartAHelpers.SignedInViewerAsync(fixture.Server);
+        using var viewer = await SeededAccounts.SignInViewerAsync(fixture.Server);
         var response = await viewer.GetAsync(Bundle);
         Assert.Equal(HttpStatusCode.Forbidden, response.Status);
     }

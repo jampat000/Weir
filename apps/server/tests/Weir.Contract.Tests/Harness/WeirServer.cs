@@ -35,7 +35,7 @@ public sealed class WeirServer : IAsyncDisposable
 
     public string Home { get; }
 
-    public Uri BaseUrl { get; private set; } = new("http://localhost/");
+    public Uri BaseUrl { get; private set; } = new("http://127.0.0.1/");
 
     public string DatabasePath => Path.Combine(Home, "data", "weir.sqlite3");
 
@@ -119,12 +119,12 @@ public sealed class WeirServer : IAsyncDisposable
         }
     }
 
-    /// <summary>Stops the server, opens its SQLite file for seeding or inspection, and restarts it when disposed.</summary>
-    public async Task<StoppedDatabase> StopForDatabaseAsync()
+    /// <summary>Stops the server, opens its SQLite file for seeding or inspection, and restarts it when disposed (or leaves it stopped when <paramref name="restart"/> is false).</summary>
+    public async Task<StoppedDatabase> StopForDatabaseAsync(bool restart = true)
     {
         var wasRunning = IsRunning;
         await StopAsync();
-        return await StoppedDatabase.OpenAsync(DatabasePath, wasRunning ? LaunchAsync : () => Task.CompletedTask);
+        return await StoppedDatabase.OpenAsync(DatabasePath, restart && wasRunning ? LaunchAsync : () => Task.CompletedTask);
     }
 
     public string LogText() => string.Join(Environment.NewLine, _logs.Select(log => log.Text()));
@@ -139,14 +139,15 @@ public sealed class WeirServer : IAsyncDisposable
 
         if (Environment.GetEnvironmentVariable(KeepDataVariable) != "1")
         {
-            Directory.Delete(Home, recursive: true);
+            await DataFolderCleanup.DeleteAsync(Home, DatabasePath);
         }
     }
 
     private async Task LaunchAsync()
     {
+        using var startPlace = await ServerStartGate.EnterAsync();
         var port = FreePort();
-        BaseUrl = new Uri($"http://localhost:{port}/");
+        BaseUrl = new Uri($"http://127.0.0.1:{port}/");
         var log = new ServerLog(Path.Combine(Home, "contract-logs", $"server-{_logs.Count + 1}.log"));
         _logs.Add(log);
 

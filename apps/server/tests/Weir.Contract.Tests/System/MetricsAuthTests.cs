@@ -10,7 +10,7 @@ public sealed class MetricsAuthTests(MetricsAuthTests.BearerTokenServerFixture f
     private const string MetricsToken = "metrics-secret-token";
 
     /// <summary>One server for the class: a configured bearer token does not change how sessions are treated.</summary>
-    public sealed class BearerTokenServerFixture : SystemPartASeededServerFixture
+    public sealed class BearerTokenServerFixture : UsersFixture
     {
         protected override IReadOnlyDictionary<string, string> Environment =>
             new Dictionary<string, string> { ["WEIR_METRICS_BEARER_TOKEN"] = MetricsToken };
@@ -36,7 +36,7 @@ public sealed class MetricsAuthTests(MetricsAuthTests.BearerTokenServerFixture f
     [Fact]
     public async Task Metrics_forbids_viewer_session()
     {
-        using var viewer = await SystemPartAHelpers.SignedInViewerAsync(fixture.Server);
+        using var viewer = await SeededAccounts.SignInViewerAsync(fixture.Server);
         Assert.Equal(HttpStatusCode.Forbidden, (await viewer.GetAsync("/metrics")).Status);
     }
 

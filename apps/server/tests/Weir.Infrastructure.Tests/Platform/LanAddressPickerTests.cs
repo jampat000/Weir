@@ -14,7 +14,7 @@ public sealed class LanAddressPickerTests
     [Fact]
     public void An_adapter_with_a_gateway_gives_its_address()
     {
-        Assert.Equal(["10.1.1.196"], Pick(Adapter(usable: true, gateway: true, "10.1.1.196")));
+        Assert.Equal(["10.0.0.196"], Pick(Adapter(usable: true, gateway: true, "10.0.0.196")));
     }
 
     [Fact]
@@ -22,9 +22,9 @@ public sealed class LanAddressPickerTests
     {
         var picked = Pick(
             Adapter(usable: true, gateway: false, "172.28.80.1"),
-            Adapter(usable: true, gateway: true, "10.1.1.196"));
+            Adapter(usable: true, gateway: true, "10.0.0.196"));
 
-        Assert.Equal(["10.1.1.196"], picked);
+        Assert.Equal(["10.0.0.196"], picked);
     }
 
     [Fact]
@@ -40,22 +40,22 @@ public sealed class LanAddressPickerTests
     [Fact]
     public void An_adapter_that_is_down_is_never_offered()
     {
-        Assert.Empty(Pick(Adapter(usable: false, gateway: true, "10.1.1.196")));
+        Assert.Empty(Pick(Adapter(usable: false, gateway: true, "10.0.0.196")));
     }
 
     [Fact]
     public void A_self_assigned_address_is_never_offered()
     {
-        Assert.Equal(["10.1.1.196"], Pick(Adapter(usable: true, gateway: true, "169.254.10.20", "10.1.1.196")));
+        Assert.Equal(["10.0.0.196"], Pick(Adapter(usable: true, gateway: true, "169.254.10.20", "10.0.0.196")));
     }
 
     [Fact]
     public void An_address_two_adapters_share_is_offered_once()
     {
         var picked = Pick(
-            Adapter(usable: true, gateway: true, "10.1.1.196"),
-            Adapter(usable: true, gateway: true, "10.1.1.196"));
+            Adapter(usable: true, gateway: true, "10.0.0.196"),
+            Adapter(usable: true, gateway: true, "10.0.0.196"));
 
-        Assert.Equal(["10.1.1.196"], picked);
+        Assert.Equal(["10.0.0.196"], picked);
     }
 }

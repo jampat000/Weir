@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Text.Json.Nodes;
 using Microsoft.Data.Sqlite;
 using Weir.Contract.Tests.Harness;
@@ -11,13 +10,6 @@ internal sealed record EventFacts(string? Trigger = null, string? Result = null,
 /// <summary>Rows the activity tests seed straight into the schema, because no API creates them.</summary>
 internal static class ActivityRows
 {
-    public const string ViewerUsername = "bob";
-    public const string ViewerPassword = "viewer-password-here";
-
-    // Argon2id (PHC format, as users.password_hash holds it) of ViewerPassword: the suite has no hasher of its own.
-    private const string ViewerPasswordHash =
-        "$argon2id$v=19$m=65536,t=3,p=1$1FAZDPY1Q+jK6pqz4PUmDQ$xdxYW1ObpjuQPUugXzhpJTy8i3qLJQpca61EfWZ6gJI";
-
     private const string ProcessingEventType = "processing.file_remux_pass_completed";
     private const string ProcessingModule = "processing";
     private const int OldestResultSecondsAgo = 10;
@@ -54,15 +46,6 @@ internal static class ActivityRows
             ("$libraryId", facts?.LibraryId),
             ("$relativePath", facts?.RelativePath));
 
-    public static void EnsureViewer(SqliteConnection connection)
-    {
-        var existing = SeedSql.Scalar(connection, "SELECT COUNT(*) FROM users WHERE username = $username", ("$username", ViewerUsername));
-        if (Convert.ToInt64(existing, CultureInfo.InvariantCulture) == 0)
-        {
-            SeedSql.InsertUser(connection, ViewerUsername, ViewerPasswordHash);
-        }
-    }
-
     /// <summary>Replaces all activity and per-file processing records with the four Processing results.</summary>
     public static void SeedHistory(SqliteConnection connection)
     {
@@ -91,7 +74,7 @@ internal static class ActivityRows
                 ("$recordedAt", SeedSql.UtcText(now)));
         }
 
-        EnsureViewer(connection);
+        SeededAccounts.EnsureViewer(connection);
     }
 
     /// <summary>A finished job of the given age, whose removal shows the retention pass has run.</summary>

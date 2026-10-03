@@ -5,7 +5,7 @@ namespace Weir.Contract.Tests.Harness;
 /// <summary>
 /// The server's SQLite file, open while the server is stopped. The contract is the HTTP API and the schema, so a
 /// test may write rows the API cannot create, or read rows the API never shows, but only while nothing else holds
-/// the file. Disposing closes the file and starts the server again.
+/// the file. Disposing closes the file and starts the server again (unless it was stopped with restart: false).
 /// </summary>
 public sealed class StoppedDatabase : IAsyncDisposable
 {
@@ -33,9 +33,13 @@ public sealed class StoppedDatabase : IAsyncDisposable
     /// <summary>Opens the file once the operating system has released every handle the stopped server held on it.</summary>
     public static async Task<StoppedDatabase> OpenAsync(string path, Func<Task> restart)
     {
-        await Poll.UntilAsync(() => Task.FromResult(FilesAreFree(path)), "the stopped server to release its database files", ReleaseTimeout);
+        await WaitForReleaseAsync(path);
         return new StoppedDatabase(path, restart);
     }
+
+    /// <summary>Waits until no process holds the database files (the SQLite file and its write-ahead and shared-memory files).</summary>
+    public static Task WaitForReleaseAsync(string path) =>
+        Poll.UntilAsync(() => Task.FromResult(FilesAreFree(path)), "the stopped server to release its database files", ReleaseTimeout);
 
     public async ValueTask DisposeAsync()
     {

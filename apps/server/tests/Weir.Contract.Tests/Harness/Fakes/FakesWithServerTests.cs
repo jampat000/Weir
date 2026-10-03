@@ -3,12 +3,12 @@ using System.Text.Json.Nodes;
 
 namespace Weir.Contract.Tests.Harness.Fakes;
 
-/// <summary>Checks that a real server reaches the fakes the way the scenarios rely on: a manager on localhost, the fake tools by folder.</summary>
+/// <summary>Checks that a real server reaches the fakes the way the scenarios rely on: a manager on 127.0.0.1, the fake tools by folder.</summary>
 [ContractArea("harness")]
 public sealed class FakesWithServerTests
 {
     [Fact]
-    public async Task A_server_connects_to_a_fake_manager_on_localhost_and_sends_its_api_key()
+    public async Task A_server_connects_to_a_fake_manager_and_sends_its_api_key()
     {
         using var deluno = FakeManager.StartDeluno();
         await using var server = await WeirServer.StartNewAsync();

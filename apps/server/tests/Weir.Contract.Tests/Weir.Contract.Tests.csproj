@@ -3,6 +3,8 @@
     <PackageReference Include="coverlet.collector" />
     <PackageReference Include="Microsoft.Data.Sqlite" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <!-- IANA time zone names on Windows, where InvariantGlobalization leaves no ICU to map them (the server does the same). -->
+    <PackageReference Include="TimeZoneConverter" />
     <PackageReference Include="xunit" />
     <PackageReference Include="xunit.runner.visualstudio" />
   </ItemGroup>
