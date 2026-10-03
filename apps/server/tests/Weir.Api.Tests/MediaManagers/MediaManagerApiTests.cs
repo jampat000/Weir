@@ -446,6 +446,18 @@ public sealed class MediaManagerApiTests
     }
 
     [Fact]
+    public async Task Intake_capabilities_report_a_pre_release_version_exactly()
+    {
+        var (server, _, _) = await StartAsync(("WEIR_MEDIA_MANAGER_WEBHOOK_SECRET", "s3cret"), ("WEIR_VERSION", "1.0.0-rc.1"));
+        await using var _server = server;
+        var secret = new Dictionary<string, string> { ["X-Webhook-Secret"] = "s3cret" };
+
+        using var response = await new ApiTestClient(server).GetAsync("/api/v1/intake/capabilities", secret);
+
+        Assert.Equal("1.0.0-rc.1", (await Json(response))["version"]!.GetValue<string>());
+    }
+
+    [Fact]
     public async Task A_hand_off_is_queued_answered_for_and_cancelled_over_http()
     {
         var watched = Path.Join(Path.GetTempPath(), "weir-handoff-" + Guid.NewGuid().ToString("N"));

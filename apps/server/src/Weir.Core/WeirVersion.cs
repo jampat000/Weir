@@ -22,7 +22,17 @@ public static class WeirVersion
             return "0.0.0";
         }
 
-        var plus = informational.IndexOf('+', StringComparison.Ordinal);
-        return plus < 0 ? informational : informational[..plus];
+        return WithoutBuildMetadata(informational);
+    }
+
+    /// <summary>
+    /// Drops SemVer build metadata (<c>+abc123</c>) and keeps the rest, so <c>1.0.0-rc.1+abc123</c> reads as
+    /// <c>1.0.0-rc.1</c>.
+    /// </summary>
+    public static string WithoutBuildMetadata(string version)
+    {
+        ArgumentNullException.ThrowIfNull(version);
+        var plus = version.IndexOf('+', StringComparison.Ordinal);
+        return plus < 0 ? version : version[..plus];
     }
 }
