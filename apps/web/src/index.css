@@ -2,8 +2,8 @@
 
 /*
  * What Tailwind reads for class names: the application's own source, not its tests, the generated API types, the
- * dev sim, the OpenAPI document or this folder's docs. It reads every word as a candidate class, so a test title or a
- * comment that says "the filter" or "a table" used to generate a utility nothing uses.
+ * OpenAPI document or this folder's docs. It reads every word as a candidate class, so a test title or a comment
+ * that says "the filter" or "a table" used to generate a utility nothing uses.
  */
 @source not "./**/*.test.{ts,tsx}";
 @source not "./test";

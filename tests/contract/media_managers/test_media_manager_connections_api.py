@@ -65,10 +65,10 @@ def test_deluno_can_create_its_connection_with_the_body_it_sends(operator: WeirC
 
 def test_a_connection_is_named_after_its_kind_and_the_host_in_its_address(operator: WeirClient) -> None:
     _, on_a_name = _create(operator, kind="radarr", name="Anything", base_url="http://nas:7878")
-    _, on_an_address = _create(operator, kind="sonarr", name="Anything", base_url="http://10.1.1.51:8989")
+    _, on_an_address = _create(operator, kind="sonarr", name="Anything", base_url="http://10.0.0.51:8989")
 
     assert on_a_name["name"] == "Radarr on nas"
-    assert on_an_address["name"] == "Sonarr on 10.1.1.51"
+    assert on_an_address["name"] == "Sonarr on 10.0.0.51"
 
 
 def test_connections_of_one_kind_on_one_host_are_told_apart_by_port(operator: WeirClient) -> None:

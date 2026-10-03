@@ -1,4 +1,9 @@
-# Grouped updates match Dependabot PR titles like "bump the server group" / "bump the actions group".
+# Dependabot here is security-only. Every ecosystem sets open-pull-requests-limit: 0, which turns off
+# routine version-update pull requests (they spent CI minutes on churn and were not the way dependencies get
+# raised here: versions move on purpose, with the migration or test that goes with them). Security updates
+# are a separate Dependabot feature with their own limit, so a vulnerable dependency still gets a pull
+# request. The ignore entries below are kept as the record of why a major is held back; `schedule` stays
+# because the file format requires it.
 version: 2
 updates:
   # The .NET server. Versions are pinned centrally in apps/server/Directory.Packages.props.
@@ -6,22 +11,14 @@ updates:
     directory: /apps/server
     schedule:
       interval: weekly
-    open-pull-requests-limit: 5
-    groups:
-      server:
-        patterns:
-          - "*"
+    open-pull-requests-limit: 0
 
   # The Python test runners (contract suite, E2E, packaged live audit): tests/requirements.txt.
   - package-ecosystem: pip
     directory: /tests
     schedule:
       interval: weekly
-    open-pull-requests-limit: 5
-    groups:
-      test-runners:
-        patterns:
-          - "*"
+    open-pull-requests-limit: 0
     # The workflows moved to Python 3.13 (pyee 14.0.0's own floor), but pyee is still held: the
     # pinned playwright==1.63.0 (the latest release) itself requires "pyee<14,>=13", so 14.0.0
     # cannot be installed alongside it regardless of the Python version. Lift this once playwright
@@ -35,26 +32,15 @@ updates:
     directory: /
     schedule:
       interval: weekly
-    open-pull-requests-limit: 5
-    groups:
-      actions:
-        patterns:
-          - "*"
+    open-pull-requests-limit: 0
 
   # apps/web is the shipped frontend. CI's `npm audit --audit-level=high` only fails a build
-  # after the fact and ignores moderate severities; this is what opens the PRs that fix them.
+  # after the fact and ignores moderate severities; Dependabot security updates open the PRs that fix them.
   - package-ecosystem: npm
     directory: /apps/web
     schedule:
       interval: weekly
-    open-pull-requests-limit: 5
-    groups:
-      web:
-        patterns:
-          - "*"
-        update-types:
-          - "minor"
-          - "patch"
+    open-pull-requests-limit: 0
     # Keep unsupported toolchain majors quiet until their peer ecosystem catches up.
     # Checked 2026-09-27: eslint-plugin-jsx-a11y 6.10.2 (latest) still declares
     # peerDependencies eslint "^3 || ... || ^9" and rejects ESLint 10.11.0 (latest);
@@ -78,14 +64,7 @@ updates:
     directory: /docs-site
     schedule:
       interval: weekly
-    open-pull-requests-limit: 5
-    groups:
-      docs-site:
-        patterns:
-          - "*"
-        update-types:
-          - "minor"
-          - "patch"
+    open-pull-requests-limit: 0
     # Checked 2026-09-27: @docusaurus/tsconfig (from Docusaurus 3.10.2, latest;
     # no newer major is out) still sets "baseUrl": "." in its published tsconfig,
     # which TypeScript 7.0.2 rejects outright (error TS5102, "Option 'baseUrl'
@@ -101,22 +80,14 @@ updates:
     directory: /apps/tray
     schedule:
       interval: weekly
-    open-pull-requests-limit: 5
-    groups:
-      tray:
-        patterns:
-          - "*"
+    open-pull-requests-limit: 0
 
   # The Dockerfile's base images, pinned by digest with the tag kept as a comment for context.
   - package-ecosystem: docker
     directory: /
     schedule:
       interval: weekly
-    open-pull-requests-limit: 5
-    groups:
-      docker:
-        patterns:
-          - "*"
+    open-pull-requests-limit: 0
     # The web build stage's node major must match the root .node-version (scripts/check-node-docker-
     # version.mjs enforces it); #788 bumped the Dockerfile alone and briefly split it from CI's node
     # major. This keeps patch and digest updates within 24 flowing while holding a major bump until

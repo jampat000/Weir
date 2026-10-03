@@ -9,7 +9,7 @@ public readonly record struct ConnectionAddress(long Id, string Product, string 
 
 /// <summary>
 /// Names a media manager or download client connection after what it is and where it runs, so nobody types a name
-/// that does nothing (#826): "Deluno on RIG", "Radarr on NAS", "qBittorrent on 10.1.1.51".
+/// that does nothing (#826): "Deluno on RIG", "Radarr on NAS", "qBittorrent on 10.0.0.51".
 /// </summary>
 public static class ConnectionNaming
 {

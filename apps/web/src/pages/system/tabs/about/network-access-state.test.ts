@@ -46,13 +46,13 @@ describe("describeNetworkAccess", () => {
       status({
         state: "allowed",
         scope: "network",
-        addresses: ["http://10.1.1.196:9347"],
+        addresses: ["http://10.0.0.196:9347"],
       }),
     );
 
     expect(line).toMatchObject({
       meaning: "done",
-      addresses: ["http://10.1.1.196:9347"],
+      addresses: ["http://10.0.0.196:9347"],
     });
   });
 

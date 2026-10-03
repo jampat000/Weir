@@ -13,13 +13,13 @@ describe("CopyLink", () => {
     vi.useFakeTimers();
     const writeText = vi.fn().mockResolvedValue(undefined);
     vi.stubGlobal("navigator", { clipboard: { writeText } });
-    render(<CopyLink value="http://10.1.1.196:9347" label="the address" />);
+    render(<CopyLink value="http://10.0.0.196:9347" label="the address" />);
 
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Copy the address" }));
     });
 
-    expect(writeText).toHaveBeenCalledWith("http://10.1.1.196:9347");
+    expect(writeText).toHaveBeenCalledWith("http://10.0.0.196:9347");
     expect(screen.getByRole("button")).toHaveTextContent("Copied");
 
     await act(async () => {
