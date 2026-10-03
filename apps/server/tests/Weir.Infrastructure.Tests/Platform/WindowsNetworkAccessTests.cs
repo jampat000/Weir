@@ -9,7 +9,7 @@ public sealed class WindowsNetworkAccessTests : IDisposable
 
     private readonly TempDirectory _home = new();
     private readonly FakeFirewall _firewall = new();
-    private readonly FakeAddresses _addresses = new("10.1.1.196");
+    private readonly FakeAddresses _addresses = new("10.0.0.196");
 
     public void Dispose() => _home.Dispose();
 
@@ -62,7 +62,7 @@ public sealed class WindowsNetworkAccessTests : IDisposable
 
         Assert.Equal(NetworkAccessState.Allowed, status.State);
         Assert.Equal(NetworkScope.Network, status.Scope);
-        Assert.Equal(["http://10.1.1.196:9347"], status.Addresses);
+        Assert.Equal(["http://10.0.0.196:9347"], status.Addresses);
         Assert.Equal(Port, status.Port);
     }
 
@@ -86,7 +86,7 @@ public sealed class WindowsNetworkAccessTests : IDisposable
         Assert.Equal(NetworkScope.ThisPcOnly, status.Scope);
         Assert.Equal(NetworkScope.Network, status.PendingScope);
         Assert.Equal(NetworkAccessState.ThisPcOnly, status.State);
-        Assert.Equal(["http://10.1.1.196:9347"], status.Addresses);
+        Assert.Equal(["http://10.0.0.196:9347"], status.Addresses);
     }
 
     [Fact]

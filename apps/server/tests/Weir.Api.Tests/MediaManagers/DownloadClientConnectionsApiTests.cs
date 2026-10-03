@@ -91,7 +91,7 @@ public sealed class DownloadClientConnectionsApiTests
             ["csrf_token"] = await client.CsrfAsync(),
             ["kind"] = "qbittorrent",
             ["name"] = "Living room",
-            ["base_url"] = "http://10.1.1.51:8080",
+            ["base_url"] = "http://10.0.0.51:8080",
         });
         Assert.Equal(HttpStatusCode.Created, created.StatusCode);
         var id = (await Json(created))!["id"]!.GetValue<long>();
@@ -103,7 +103,7 @@ public sealed class DownloadClientConnectionsApiTests
         });
 
         Assert.Equal(HttpStatusCode.OK, edited.StatusCode);
-        Assert.Equal("qBittorrent on 10.1.1.51", (await Json(edited))!["name"]!.GetValue<string>());
+        Assert.Equal("qBittorrent on 10.0.0.51", (await Json(edited))!["name"]!.GetValue<string>());
     }
 
     [Fact]

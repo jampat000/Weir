@@ -48,7 +48,7 @@ The API still says "library" for what the app calls a workflow (for example the 
 capability below), so existing integrations keep working.
 
 You don't name a connection. Weir names it after the kind and the host in its address: "Deluno on
-RIG", "Radarr on nas", "qBittorrent on 10.1.1.51". Two of one kind on the same host also show their
+RIG", "Radarr on nas", "qBittorrent on 10.0.0.51". Two of one kind on the same host also show their
 port, like "Radarr on nas (7879)". Change the address and the name follows.
 
 To tell two connections apart at a glance, give one a **Nickname (optional)** when you add it or

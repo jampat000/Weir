@@ -9,7 +9,7 @@ describe("initialsOf", () => {
     ["admin", "A"],
     ["ann.lee", "AL"],
     ["ann lee smith", "AL"],
-    ["j_paton", "JP"],
+    ["j_smith", "JS"],
     ["émile", "É"],
     ["", "W"],
     ["---", "W"],

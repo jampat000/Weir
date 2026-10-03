@@ -16,7 +16,7 @@ const NETWORK = "network";
 const APPROVAL_DELAY_MS = 4 * SECOND_MS;
 
 const PORT = 9347;
-const LAN_ADDRESS = `http://10.1.1.196:${PORT}`;
+const LAN_ADDRESS = `http://10.0.0.196:${PORT}`;
 
 /** What the server says for each situation, in the same words. */
 const SUMMARY = {

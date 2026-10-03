@@ -20,7 +20,7 @@ public sealed class ConnectionNamesStartupTests
             command.CommandText =
                 "INSERT INTO media_manager_connections (kind, name, enabled, base_url) VALUES " +
                 "('radarr', 'Movies', 1, 'http://nas:7878'), ('radarr', '4K movies', 1, 'http://nas:7879'), ('deluno', 'Deluno', 1, 'http://RIG:5099');" +
-                "INSERT INTO download_client_connections (kind, name, enabled, base_url) VALUES ('qbittorrent', 'Living room', 1, 'http://10.1.1.51:8080');";
+                "INSERT INTO download_client_connections (kind, name, enabled, base_url) VALUES ('qbittorrent', 'Living room', 1, 'http://10.0.0.51:8080');";
             command.ExecuteNonQuery();
         }
 
@@ -44,6 +44,6 @@ public sealed class ConnectionNamesStartupTests
         Assert.Equal(
             ["Radarr on nas (7878)", "Radarr on nas (7879)", "Deluno on RIG"],
             (await Json(managers)).AsArray().Select(row => row!["name"]!.GetValue<string>()));
-        Assert.Equal(["qBittorrent on 10.1.1.51"], (await Json(downloadClients)).AsArray().Select(row => row!["name"]!.GetValue<string>()));
+        Assert.Equal(["qBittorrent on 10.0.0.51"], (await Json(downloadClients)).AsArray().Select(row => row!["name"]!.GetValue<string>()));
     }
 }

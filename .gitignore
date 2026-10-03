@@ -76,3 +76,22 @@ docs-site/.docusaurus/
 
 # The TypeScript incremental build cache.
 *.tsbuildinfo
+
+# Secrets and key material (never commit): certificates, private keys, data-protection key rings,
+# credential files, and SQLite files with their write-ahead companions.
+*.key
+*.pem
+*.pfx
+*.p12
+*.snk
+secrets.json
+*credentials*.json
+DataProtection-Keys/
+data-protection-keys/
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+*.sqlite3-wal
+*.sqlite3-shm
+*.db-wal
+*.db-shm
