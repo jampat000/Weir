@@ -3,7 +3,7 @@ using Microsoft.Data.Sqlite;
 
 namespace Weir.Infrastructure.Sqlite;
 
-/// <summary>One numbered SQL migration and the <c>alembic_version</c> value it leaves behind.</summary>
+/// <summary>One numbered SQL migration and the schema revision it leaves behind.</summary>
 /// <param name="Number">Order of application.</param>
 /// <param name="Revision">The revision recorded once the script has run.</param>
 /// <param name="ResourceName">The embedded <c>Migrations/*.sql</c> file.</param>
@@ -15,11 +15,8 @@ public enum SchemaMismatchKind
     /// <summary>The file exists but no revision is recorded (including an empty file).</summary>
     Unversioned,
 
-    /// <summary>A revision this build has never heard of (probably a newer release).</summary>
+    /// <summary>A revision this build has never heard of: a newer Weir release, or a database Weir did not create.</summary>
     UnknownRevision,
-
-    /// <summary>A revision from before the baseline: an earlier Weir release must migrate it first.</summary>
-    BehindHead,
 
     /// <summary>The version table is malformed.</summary>
     Incompatible,
@@ -73,18 +70,17 @@ public enum SchemaStartupOutcome
 /// <remarks>
 /// <para>
 /// <b>Version ledger:</b> the revision is recorded in the <c>alembic_version</c> table (one <c>version_num</c>
-/// row), because every existing Weir database already carries that table; a separate version table would
-/// make existing installs look unversioned. The schema is part of the contract (ADR-0017), and an install
-/// already at head is adopted with no write at all. Each migration names the revision it leaves behind,
-/// continuing the existing numbering (<c>0037_…</c>, #523).
+/// row). The table keeps the name it was created with because every existing Weir database carries it; a
+/// separate version table would make those installs look unversioned. An install already at head is adopted
+/// with no write at all. Each migration names the revision it leaves behind.
 /// </para>
 /// <para>
 /// <b>On startup:</b> a missing database file is created at head; a database whose recorded revision is
 /// head is adopted unchanged; a database recorded at any earlier revision in <see cref="Migrations"/> (the
 /// baseline or a later migration) is upgraded in place by applying every migration after it, in order, in
-/// one transaction (#557); anything else, including an existing file with no schema or a revision from
-/// before the baseline, is refused with a message and no change. A pre-baseline database has to be started
-/// once on an earlier Weir release, which migrates it to the baseline.
+/// one transaction (#557); anything else, including an existing file with no schema or a revision this
+/// build does not list, is refused with a message and no change. Weir only opens a database that Weir
+/// created.
 /// </para>
 /// </remarks>
 public sealed class SchemaMigrator
@@ -130,55 +126,8 @@ public sealed class SchemaMigrator
         new(38, "0073_library_change_reason", "Weir.Infrastructure.Migrations.0038_library_change_reason.sql"),
     ];
 
-    /// <summary>
-    /// The schema before issue #557's migrations. The checked-in <c>schema/alembic-head.sql</c> reference and
-    /// <c>SchemaParityTests</c> stay pinned to this revision (see apps/server/README.md, "Schema and migrations") rather than
-    /// to the moving <see cref="HeadRevision"/>, so the reference file never changes.
-    /// </summary>
+    /// <summary>The first migration's revision: the oldest schema this build can start from.</summary>
     public static string BaselineRevision => Migrations[0].Revision;
-
-    /// <summary>
-    /// Revisions before the baseline, oldest first. A database at one of these was made by an earlier
-    /// Weir release, which upgrades it to the baseline when started once.
-    /// </summary>
-    public static readonly IReadOnlyList<string> AlembicRevisionsBeforeBaseline =
-    [
-        "0001_weir_initial_schema",
-        "0002_weir_schema_tip",
-        "0003_pruner_auto_apply_snapshot_limits",
-        "0004_pruner_uniqueness_constraints",
-        "0005_refiner_guardrail_settings",
-        "0006_trusted_device_sessions",
-        "0007_indexes_and_retry_backoff",
-        "0008_notification_channels",
-        "0009_media_manager_connections",
-        "0010_drop_subber_tables",
-        "0011_refiner_libraries",
-        "0012_refiner_file_states",
-        "0013_refiner_file_settling",
-        "0014_refiner_watcher",
-        "0015_schedules_and_pause",
-        "0016_runner_units",
-        "0017_retry_and_sweeps",
-        "0018_file_processing_log",
-        "0019_track_sorters",
-        "0020_metadata_rules",
-        "0021_sidecar_migration",
-        "0022_output_collision_policy",
-        "0023_hardware_acceleration",
-        "0024_metadata_provider",
-        "0025_drop_refiner_singletons",
-        "0026_session_client_labels",
-        "0027_refiner_rejected_file_action",
-        "0028_refiner_detection_windows",
-        "0029_case_insensitive_usernames",
-        "0030_refiner_file_media_facts",
-        "0031_refiner_failure_policy",
-        "0032_media_manager_handoffs",
-        "0033_refiner_library_media_type",
-        "0034_activity_history_facts",
-        "0035_direct_play_facts",
-    ];
 
     public static string HeadRevision => Migrations[^1].Revision;
 
@@ -226,19 +175,11 @@ public sealed class SchemaMigrator
             return SchemaStartupOutcome.Upgraded;
         }
 
-        if (AlembicRevisionsBeforeBaseline.Contains(current, StringComparer.Ordinal))
-        {
-            throw new DatabaseSchemaMismatchException(
-                $"Database revision {Quote(current!)} was created by an older Weir release. " +
-                $"This build requires schema revision {Quote(HeadRevision)} and cannot upgrade older databases itself. " +
-                "Start the previous Weir release once so it migrates the database, then start this build again.",
-                SchemaMismatchKind.BehindHead);
-        }
-
         throw new DatabaseSchemaMismatchException(
             $"Database revision {Quote(current!)} is not recognized by this Weir build " +
-            $"(expected head {Quote(HeadRevision)}). The database may come from a newer release; " +
-            "upgrade the application or restore a backup that matches this version.",
+            $"(expected head {Quote(HeadRevision)}). The database may come from a newer release, " +
+            "or it was not created by Weir. Upgrade the application, restore a backup that matches this version, " +
+            "or move this file aside so Weir creates a new one.",
             SchemaMismatchKind.UnknownRevision);
     }
 
@@ -253,8 +194,7 @@ public sealed class SchemaMigrator
 
     /// <summary>
     /// Builds a fresh database at exactly <see cref="BaselineRevision"/>, ignoring every later migration.
-    /// Test-only: <c>SchemaParityTests</c> uses this to compare against <c>alembic-head.sql</c> without that
-    /// reference file ever changing.
+    /// Test-only: the migration tests start from this oldest schema, write rows in its shape, and upgrade.
     /// </summary>
     public SchemaStartupOutcome EnsureAtBaseline()
     {
@@ -365,7 +305,7 @@ public sealed class SchemaMigrator
 
     /// <summary>The refusal for a database with no recorded revision, with the operator's options.</summary>
     private static DatabaseSchemaMismatchException UnversionedError() => new(
-        "No Alembic revision is recorded for this database (migrations have not been applied). " +
+        "No schema revision is recorded for this database (Weir has not set it up). " +
         $"This build requires schema revision {Quote(HeadRevision)}. " +
         "Weir only opens a database that Weir created: point WEIR_DB_PATH at the right file, " +
         "restore a backup, or move this file aside so Weir creates a new one.",

@@ -37,11 +37,13 @@ public sealed class UpdateStatusReader
         try
         {
             var release = await _releases.FetchLatestAsync(currentVersion, cancellationToken).ConfigureAwait(false);
-            return UpdateStatus.FromRelease(currentVersion, installType, release);
+            return release is null
+                ? NotPublished(currentVersion, installType)
+                : UpdateStatus.FromRelease(currentVersion, installType, release);
         }
         catch (ReleaseFetchException exception) when (exception.StatusCode == 404)
         {
-            return UpdateStatus.Unavailable(currentVersion, installType, "not_published", "No public Weir release is published yet.");
+            return NotPublished(currentVersion, installType);
         }
 #pragma warning disable CA1031 // An update check that fails for any reason reads as unavailable, never an error page.
         catch (Exception exception) when (exception is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
@@ -50,4 +52,7 @@ public sealed class UpdateStatusReader
             return UpdateStatus.Unavailable(currentVersion, installType, "unavailable", "Could not check for updates right now.");
         }
     }
+
+    private static WireObject NotPublished(string currentVersion, string installType) =>
+        UpdateStatus.Unavailable(currentVersion, installType, "not_published", "No public Weir release is published yet.");
 }

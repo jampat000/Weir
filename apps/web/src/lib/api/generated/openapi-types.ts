@@ -9291,7 +9291,7 @@ export interface operations {
             machine_name: string;
             /**
              * Version
-             * @description Weir’s release version, X.Y.Z as stamped from its release tag (0.0.1-dev on a development build). Weir before 4.0.0 sends no version.
+             * @description Weir’s release version as stamped from its release tag: X.Y.Z, or X.Y.Z-rc.N for a pre-release such as 1.0.0-rc.1 (0.0.1-dev on a development build).
              */
             version: string;
           };

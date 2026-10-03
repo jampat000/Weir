@@ -77,28 +77,28 @@ npm run dev
 
 The Vite dev server and **`vite preview`** use **[`scripts/dev-ports.json`](../scripts/dev-ports.json)**. See **[`docs/ports.md`](ports.md)**. To override temporarily, set **`VITE_DEV_API_PROXY_TARGET`** and **`WEIR_DEV_API_PORT`** together.
 
-### Simulation mode (web app without a server)
+### A real server on a fresh data folder
+
+There is no mock of the Weir API: design and layout checks run against a real Weir, the same server the product ships. To look at the built web app on a clean, disposable install, serve it from the real server with its own data folder. From the repository root:
 
 ```powershell
 cd apps/web
-npm run dev:sim
+npm ci
+npm run build                      # writes apps/web/dist
+cd ../..
+dotnet build apps/server/src/Weir.Host
+
+$env:WEIR_SESSION_SECRET = "<long random>"
+$env:WEIR_HOME = Join-Path $env:TEMP "weir-home-review"     # a new folder: a first-run install
+$env:WEIR_WEB_DIST = "$PWD\apps\web\dist"
+dotnet run --project apps/server/src/Weir.Host --no-build -- --host 127.0.0.1 --port 18795
 ```
 
-Starts Vite against a small mock of the Weir API (**`apps/web/dev-sim/`**), so the real screens can be built, reviewed and screenshotted with files flowing through them: no .NET server, no account and no media. It prints the URL to open, on the first free port from 8790 (browse it as **`http://localhost:<port>`**; set **`SIM_PORT`** to choose one). It is a development tool only: nothing in the app imports it, it is not part of `npm run build`, and it refuses to start with `NODE_ENV=production`. It writes nothing to disk, never talks to a real Weir, and does not use the dev API port.
+Browse **`http://localhost:18795`** and create the admin account on the first screen. The server never opens a browser itself. Pick any free port that is not in **`scripts/dev-ports.json`**, so an installed Weir and your **`npm run dev`** stack are left alone, and give each instance its own **`WEIR_HOME`**: it holds the database and the settings, so an install you care about is never touched. Cookies are shared across ports on one host name, so browse a spare instance as `localhost` when your main one is at `127.0.0.1`, or the other way round.
 
-What it simulates, in memory for as long as it runs:
+An empty install shows the empty screens. To see files flow through it, add a workflow whose folders hold media you generated for the purpose (the end-to-end and live-audit runs make theirs with FFmpeg; see **`tests/e2e/weir/`** and **`scripts/live_packaged_e2e/`**), or connect a real media manager. Press Ctrl+C to stop it, then delete the data folder. If you started it in the background, stop it by the PIDs you recorded (`dotnet run` and the `Weir.exe` it starts), never by image name.
 
-- **A signed-in admin** on a machine called MEDIA-PC, with setup finished. Signing out and in again works, and the theme choice is remembered.
-- **Live work.** Files turn up in four workflows (Movies, TV, Kids with no media manager, and 4K Movies linked to a second Radarr), are held until they stop changing (sometimes with a media manager still importing them), wait for a free slot, then go through the steps a real pass reports: checking, planning, writing, verifying, handing back. Each finishes with a saved size, a hand-back that the media manager takes a few seconds later, and entries on the Activity page and in the Dashboard's Activity panel. Now and then the rules reject a file (no English audio) or a pass fails, and the file waits under "needs you"; a new session already has files waiting for each reason, including one held because Weir cannot open it and one skipped by a path rule. A library clean also runs now and then. A new session opens with a few hours of history already behind it.
-- **Folder chains and connections.** Movies, TV and Kids read as in sync; 4K Movies is ready but not verified, because its manager does not say where its downloads land. Every media manager is asked again about once a minute (the server's heartbeat), so how long ago each answered keeps changing, and a manager that stops answering turns its workflows' folder chains into a fix to make; a download client is asked only when someone tests it or Weir really calls it. Each connection also says how long its last call took and when Weir last talked to it (`last_answer_ms`, `last_used_at`), and the 4K manager sometimes answers slowly as well as not at all.
-- **The controls.** Pause and Resume (including a timed pause), "Files at once" and each workflow's own limit are honoured. Process again, Process all again, Remove from Activity, Move to top and cancelling a queued job act on the simulated files. The Everything / New downloads / Library cleaning filter is the page's own, except that the Activity feed is narrowed by `module` (`processing` for new downloads, `library` for library cleaning) as the server does.
-- **Live updates the way the app gets them.** The same Activity stream the app uses (`GET /api/v1/activity/stream`): an `activity.latest` frame whenever something is written, a `processing.progress` frame about once a second with every running file's step and percent, and a `connection.activity` frame whenever Weir calls a media manager or download client (a test, the managers' heartbeat, a folder-chain read, a hand-off, a new download's queue lookup, a library scan) or a manager calls Weir (it takes a hand-back), so the rows on Live and System light as they do against a real server.
-- **The computer and the scheduled tasks.** `GET /api/v1/system/stats`, `/system/overview` and `/system/tasks`, with `system.stats` (every second), `system.tasks` (when a task starts or ends) and `system.log` (each new warning or error) frames on the same stream. `GET /api/v1/system/log` is System › Logs: the simulation's Weir-level events, its jobs (failed ones too) and server lines, with the counts and cursor paging the server gives, and a failed pass writes a server line with its exception. The machine follows the engine: the processor, the tools' share of it and the processing read and write rates rise with the files being written and how fast they go, memory drifts slowly, and each drive's free space falls as cleaned copies are written and returns when a media manager takes one. The last ten minutes are already filled in when the session opens. The tasks are a scan and a library clean for each workflow, Weir's clean-ups, the configuration backup check, artwork lookups and the housekeeping, each with its last result and its next run from the engine's own timers; a running one shows as running.
-- **Settings and System.** Every read answers in the shape of **`apps/web/openapi/weir-openapi.json`**. Saves, creates and deletes (workflows, rule sets, media managers, download clients, notification channels, performance and the rest) are kept in memory and read back. An operation the contract describes that has no hand-written answer gets the contract's own empty answer, and the console says so once. A path the contract does not describe is refused and logged.
-
-Only fictional and public-domain titles are used. Environment variables: **`SIM_SPEED`** (how many times faster than normal the work runs; default 1), **`SIM_SEED`** (replays a session: the same files, in the same order, with the same fates) **`SIM_PORT`**, and **`SIM_SCENARIO`**: `busy` (the default) is the pace above, with the 4K manager answering slowly for a minute and twenty seconds and then dropping out for a minute and a half, every ten minutes; `quiet` has little happening, nothing waiting on a person and a flat computer, to see the empty screens; `trouble` has many files waiting on a person, Sonarr not answering (so the TV workflow needs a fix) and the 4K manager slow now and then, with bursts of other work on the processor, memory nearly full, drive D: below the free space its workflows ask Weir to keep, a configuration backup that keeps failing, and warnings and errors in the log. Stop it with Ctrl+C. If you started it in the background, stop that process by the PID you recorded, along with its Vite child.
-
-The mock has its own tests, which `npm run test` runs: the state machine in **`dev-sim/engine/`**, that every read answers in the contract's shape, and that every route it has exists in the contract.
+To rebuild the web app as you edit instead, use **`npm run dev`** (above): Vite on the dev web port, proxying to a real server on the dev API port. To put Vite in front of a server you started yourself, as above, set **`VITE_DEV_API_PROXY_TARGET`** to its address (`http://localhost:18795`) and run **`npm run dev:web`**.
 
 ### API contract and generated types (OpenAPI)
 
@@ -150,7 +150,7 @@ cares about changed (a manual run always runs everything). Its jobs:
 10. **`ci-passed`**: the verdict. It passes only when every job that was due for the change passed and
     every other job was skipped — this is the one check `main`'s ruleset requires.
 
-Pushing a semver tag **`v*`** runs the **`Release`** workflow. It does not repeat these tests: it
+Pushing a SemVer tag **`v*`** (`vX.Y.Z`, or `vX.Y.Z-rc.N` for a release candidate) runs the **`Release`** workflow. It does not repeat these tests: it
 refuses to publish unless `CI` already passed (`ci-passed`) on the tagged commit, then builds, tests
 and publishes the release artefacts — see **[`docs/release.md`](release.md)**.
 

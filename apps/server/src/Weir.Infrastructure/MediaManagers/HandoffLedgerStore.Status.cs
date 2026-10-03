@@ -13,7 +13,11 @@ namespace Weir.Infrastructure.MediaManagers;
 public sealed partial class HandoffLedgerStore
 {
     /// <summary>
-    /// The file, or every file under the folder, this hand-off covers.
+    /// The files this hand-off is about: the ones it covers (<c>media_manager_handoff_targets</c>, recorded at intake from
+    /// the file or from the folder's videos with samples left out). A sample or extra that merely sits in the same folder,
+    /// and that a scan recorded in its own right (even as waiting while processing was paused), is not one of them, so it
+    /// never holds the hand-off back. A hand-off that records no files of its own (one that arrived before they were
+    /// recorded) falls back to everything under its path.
     /// Matching is an exact prefix compare in .NET, not SQL <c>LIKE</c> (#544 item 5): <c>LIKE</c> treats <c>_</c> and
     /// <c>%</c> in the path as wildcards, so a sibling folder whose name merely resembles this one would be folded into
     /// this hand-off's status, and it ignores case on every platform. Case follows OS path semantics, as elsewhere
@@ -44,7 +48,19 @@ public sealed partial class HandoffLedgerStore
 
         var comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
         var prefix = path + "/";
-        return [.. rows.Where(file => string.Equals(file.RelativePath, path, comparison) || file.RelativePath.StartsWith(prefix, comparison))];
+        var underPath = rows.Where(file => string.Equals(file.RelativePath, path, comparison) || file.RelativePath.StartsWith(prefix, comparison)).ToList();
+
+        var covered = await uow.QueryAsync(
+            "SELECT relative_path FROM media_manager_handoff_targets WHERE handoff_row_id = $row",
+            reader => SqliteValues.GetString(reader, 0),
+            ("$row", row.Id)).ConfigureAwait(false);
+        if (covered.Count == 0)
+        {
+            return underPath;
+        }
+
+        var coveredPaths = new HashSet<string>(covered, OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
+        return [.. underPath.Where(file => coveredPaths.Contains(file.RelativePath))];
     }
 
     /// <summary>

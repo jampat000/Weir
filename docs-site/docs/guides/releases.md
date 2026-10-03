@@ -7,9 +7,12 @@ title: Versions and updates
 
 ## Version numbers
 
-Weir versions have three numbers, major.minor.patch, for example `3.2.0`. Each release is tagged
-`vX.Y.Z` on GitHub. The Windows installer and the Docker image of a release always carry the same
-version.
+Weir versions have three numbers, major.minor.patch, for example `1.0.0`. A fix raises the last
+number (`1.0.1`), a new feature the middle one (`1.1.0`) and a change that breaks something the
+first (`2.0.0`). Before a version is final it is released as a pre-release with `-rc.N` on the end,
+for example `1.0.0-rc.1`, then `1.0.0-rc.2`, and `1.0.0` comes after every rc. Each release is
+tagged `vX.Y.Z` or `vX.Y.Z-rc.N` on GitHub. The Windows installer and the Docker image of a release
+always carry the same version.
 
 To see which version you're running, open **System › About**. The **Updates** section shows the
 installed version, the latest release and a **Release notes** link.

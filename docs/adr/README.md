@@ -12,7 +12,7 @@ and timing-based pruning must follow [ADR-0009](ADR-0009-suite-wide-timing-isola
 | ADR | Title | Status |
 |-----|-------|--------|
 | [ADR-0001](ADR-0001-repo-structure.md) | Repository and application layout | Accepted; backend path updated by ADR-0017 |
-| [ADR-0002](ADR-0002-database-sqlite-alembic.md) | Database and Alembic (SQLite-first) | Accepted; Alembic replaced by numbered SQL migrations (ADR-0017) |
+| [ADR-0002](ADR-0002-database-sqlite-alembic.md) | Database and Alembic (SQLite-first) | Superseded by ADR-0017 (numbered SQL migrations in the .NET server) |
 | [ADR-0003](ADR-0003-auth-session-model.md) | Auth and session model | Accepted |
 | [ADR-0007](ADR-0007-module-owned-worker-lanes.md) | Module-owned worker lanes (SQLite) | Accepted; superseded in part by ADR-0016 (one lane, #459) |
 | [ADR-0008](ADR-0008-weir-settings-aggregate-runtime-config.md) | `WeirSettings` aggregate for runtime configuration | Superseded by ADR-0017 (`WeirOptions`/`WeirOptionsLoader`) |

@@ -1,10 +1,7 @@
--- Weir schema 0001: the baseline. Creates exactly what the Python backend's Alembic head
--- (revision 0036_drop_pruner_tables) creates, including the rows that revision seeds, so a
--- database created here can be opened by either backend.
+-- Weir schema 0001: the baseline. Every later migration builds on the tables, indexes and seed rows
+-- created here (revision 0036_drop_pruner_tables).
 --
--- The statements are sqlite_master's own text for an Alembic-created database, which keeps
--- column order, defaults, constraint names and CHECK clauses identical. Do not edit: the parity
--- test in Weir.Infrastructure.Tests compares this against schema/alembic-head.sql.
+-- Do not edit: databases already created from this script hold its statements as sqlite_master text.
 --
 -- The migration runner records the revision in alembic_version after this script succeeds.
 
