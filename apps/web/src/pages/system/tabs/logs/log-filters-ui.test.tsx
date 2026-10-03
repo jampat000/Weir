@@ -230,10 +230,11 @@ describe("the filters", () => {
     await rendered();
 
     fireEvent.click(screen.getByTestId("logs-workflow-picker"));
-    fireEvent.click(screen.getByRole("option", { name: "TV" }));
+    expect(screen.queryByRole("option", { name: "TV" })).toBeNull();
+    fireEvent.click(screen.getByRole("option", { name: "Movies" }));
 
-    await waitFor(() => expect(lastRequest()).toMatchObject({ workflow: 2 }));
-    expect(screen.getByTestId("location")).toHaveTextContent("workflow=2");
+    await waitFor(() => expect(lastRequest()).toMatchObject({ workflow: 1 }));
+    expect(screen.getByTestId("location")).toHaveTextContent("workflow=1");
   });
 
   it("narrow to a time counted back from when it was chosen", async () => {

@@ -51,8 +51,10 @@
   container-type: inline-size;
 }
 
-/* While the answer to a new filter is on its way the list still holds the last one's rows: dimmed, so they do not pass for it. */
-.mm-log-feed[aria-busy="true"] .mm-log-list {
+/* While the answer to a new filter is on its way the list, its count and the pickers still hold the last one's: dimmed, so they do not pass for it. */
+.mm-log-feed[aria-busy="true"] .mm-log-list,
+.mm-log-status[aria-busy="true"],
+.mm-workflow-picker[aria-busy="true"] {
   opacity: 0.45;
 }
 

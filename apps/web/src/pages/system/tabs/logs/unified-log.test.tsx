@@ -1,4 +1,10 @@
-import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import {
   afterEach,
   beforeAll,
@@ -139,7 +145,8 @@ describe("the list", () => {
       await screen.findByText("Nothing has been logged yet."),
     ).toBeInTheDocument();
 
-    chooseLevels(/Errors/);
+    cleanup();
+    renderLog("/system?tab=logs&level=error");
     expect(
       await screen.findByText("Nothing in the log matches these filters."),
     ).toBeInTheDocument();

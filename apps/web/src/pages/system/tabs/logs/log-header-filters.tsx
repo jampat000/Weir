@@ -57,6 +57,7 @@ function sourceOptions(counts: Counts): SegmentedOption<SourceChoice>[] {
 export function LogHeaderFilters({
   filters,
   counts,
+  busy,
   search,
   onSearch,
   onChange,
@@ -65,6 +66,8 @@ export function LogHeaderFilters({
   filters: LogFilters;
   /** What each choice would show, from the newest reading; undefined until there is one. */
   counts: Counts;
+  /** Whether the answer to the last choice is still on its way. */
+  busy: boolean;
   /** What is typed in the search box, before it is applied. */
   search: string;
   onSearch: (next: string) => void;
@@ -80,7 +83,12 @@ export function LogHeaderFilters({
     refit: `${chosen}|${search !== ""}|${JSON.stringify(counts)}`,
   });
   const pickers = (
-    <LogPickers filters={filters} counts={counts} onChange={onChange} />
+    <LogPickers
+      filters={filters}
+      counts={counts}
+      busy={busy}
+      onChange={onChange}
+    />
   );
 
   return (
@@ -105,8 +113,12 @@ export function LogHeaderFilters({
               value={chosen}
               options={sourceOptions(counts)}
               onChange={(next) => {
-                if (next !== chosen)
-                  onChange({ source: next === "all" ? null : next });
+                if (next === chosen) return;
+                // The server log's lines belong to no workflow, so a chosen one is let go with it.
+                onChange({
+                  source: next === "all" ? null : next,
+                  ...(next === "server" ? { workflow: null } : {}),
+                });
               }}
             />
           </div>

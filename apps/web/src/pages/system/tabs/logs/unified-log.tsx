@@ -5,6 +5,7 @@ import { LogHeaderFilters } from "./log-header-filters";
 import { EMPTY_LOG_FILTERS } from "./log-filters";
 import { useLogEntries } from "./use-log-entries";
 import { useLogFilters } from "./use-log-filters";
+import { useLeftoverChoicesDropped } from "./use-log-source-change";
 
 /**
  * System › Logs: everything Weir recorded, events, jobs and its server log, as one list. The filters are on the header's
@@ -14,12 +15,20 @@ import { useLogFilters } from "./use-log-filters";
 export function UnifiedLog({ onOpenSettings }: { onOpenSettings: () => void }) {
   const { filters, query, typed, setTyped, change, clear } = useLogFilters();
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const { watchFeed, ...entries } = useLogEntries(query, expandedId !== null);
+  const { watchFeed, ...read } = useLogEntries(query, expandedId !== null);
+  const dropping = useLeftoverChoicesDropped(
+    filters,
+    read.counts,
+    !read.loading,
+    change,
+  );
+  const entries = dropping ? { ...read, loading: true } : read;
 
   return (
     <LogHeaderFilters
       filters={filters}
       counts={entries.counts}
+      busy={entries.loading}
       search={typed}
       onSearch={setTyped}
       onChange={change}

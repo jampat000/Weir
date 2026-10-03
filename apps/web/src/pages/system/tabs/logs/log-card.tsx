@@ -129,6 +129,7 @@ export function LogCard({
           <span
             className="mm-log-status"
             data-testid="log-summary"
+            aria-busy={entries.loading}
             ref={setSummaryEl}
           >
             <StatusDot meaning="done" className="mm-log-live" />
