@@ -133,6 +133,7 @@ requireOrder(
     "- name: Publish release Docker image",
     "platforms: linux/amd64,linux/arm64",
     "push: true",
+    "- name: Attest provenance of the Docker image",
     "- name: Verify published Docker manifest",
     "- name: Smoke test published Docker image",
     "- name: Prepare user-facing release notes",
@@ -145,6 +146,19 @@ const latestAt = publish.indexOf(":latest");
 if (latestAt < 0 || latestAt < publish.indexOf("- name: Tag the published image latest")) {
   throw new Error(`${RELEASE} publish may name :latest only in its last step, after the GitHub Release exists.`);
 }
+
+// The pushed image is attested by digest (the build step must expose one), and a release already under way is
+// never cancelled by a second run for the same tag.
+for (const marker of [
+  "id: push",
+  "subject-digest: ${{ steps.push.outputs.digest }}",
+  "push-to-registry: true",
+  "id-token: write",
+  "attestations: write",
+]) {
+  requireText(publish, marker, `${RELEASE} publish job`);
+}
+requireText(releaseTop, "  cancel-in-progress: false", `${RELEASE} concurrency`);
 
 // The tagged commit must be one ci.yml already passed on.
 const ciPassed = requireJob(release, "ci-passed", RELEASE);
