@@ -21,7 +21,9 @@ work, not rewritten for its own sake. Scripts are named in kebab-case.
 | `check-test-console-programs.mjs` | Fails when a test source under `apps/` starts a system console program (`ping`, `timeout`, ...) as a stand-in, because that can pop a console window on a desktop (#806, #821) (`check-test-console-programs.test.mjs`). |
 | `check-node-docker-version.mjs` | Fails when the Dockerfile's node image major does not match the root `.node-version`. |
 | `check-release-workflow-gates.mjs` | Checks the shape of `release.yml` and `ci.yml`: only `publish` publishes, `latest` moves last, `ci-passed` judges every job. |
-| `check-release-version.mjs` | Fails a release whose tag is not a well-formed `X.Y.Z` version (`check-release-version.test.mjs`). No file carries the release version; every build that ships takes it from the tag instead (#804). |
+| `check-release-version.mjs` | Fails a release whose tag is not a well-formed `X.Y.Z` or `X.Y.Z-rc.N` SemVer version (`check-release-version.test.mjs`). No file carries the release version; every build that ships takes it from the tag instead (#804). |
+| `semver.mjs` | SemVer parsing and precedence for the release scripts (`semver.test.mjs`). |
+| `find-previous-release.mjs` | The delta base for the Windows package: the newest published release older than the one being released, by SemVer precedence (`find-previous-release.test.mjs`). |
 | `verify-ci-for-release.mjs` | Makes a release prove `ci.yml`'s `ci-passed` passed on the tagged commit (`verify-ci-for-release.test.mjs`). |
 | `prune-release-feed.mjs` | Removes the previous release's full nupkg (fetched only as the Windows package's delta base) and its feed entries from a `vpk pack` output directory, keeping just the version being released (`prune-release-feed.test.mjs`). |
 | `check-release-assets-single-version.mjs` | Release gate: fails if the Windows package output still names any version other than the one being released, as a backstop for `prune-release-feed.mjs` (`check-release-assets-single-version.test.mjs`). |

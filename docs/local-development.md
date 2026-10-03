@@ -150,7 +150,7 @@ cares about changed (a manual run always runs everything). Its jobs:
 10. **`ci-passed`**: the verdict. It passes only when every job that was due for the change passed and
     every other job was skipped — this is the one check `main`'s ruleset requires.
 
-Pushing a semver tag **`v*`** runs the **`Release`** workflow. It does not repeat these tests: it
+Pushing a SemVer tag **`v*`** (`vX.Y.Z`, or `vX.Y.Z-rc.N` for a release candidate) runs the **`Release`** workflow. It does not repeat these tests: it
 refuses to publish unless `CI` already passed (`ci-passed`) on the tagged commit, then builds, tests
 and publishes the release artefacts — see **[`docs/release.md`](release.md)**.
 
