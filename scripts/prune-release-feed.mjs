@@ -22,10 +22,19 @@ export const ASSET_FEED_FILE = "releases.win.json";
 export const LEGACY_RELEASES_FILE = "RELEASES";
 const BOM = "﻿";
 
+/**
+ * Whether a package file name is `version`'s own full or delta package: "<id>-<version>-full.nupkg". The
+ * version must be followed directly by the package kind, so "1.0.0" does not claim the pre-release
+ * package "<id>-1.0.0-rc.1-full.nupkg".
+ */
+export function isPackageOfVersion(fileName, version) {
+  const escapedVersion = version.replaceAll(".", String.raw`\.`);
+  return new RegExp(`-${escapedVersion}-(?:full|delta)\\.nupkg$`, "i").test(fileName);
+}
+
 /** The packages in an output directory listing that do not belong to `version`. */
 export function nupkgsToRemove(fileNames, version) {
-  const marker = `-${version}-`;
-  return fileNames.filter((name) => name.toLowerCase().endsWith(".nupkg") && !name.includes(marker));
+  return fileNames.filter((name) => name.toLowerCase().endsWith(".nupkg") && !isPackageOfVersion(name, version));
 }
 
 /** releases.win.json: `{ Assets: [{ PackageId, Version, Type, FileName, SHA1, SHA256, Size, ... }] }`. */
@@ -44,11 +53,14 @@ export function filterAssetFeed(feedJson, version) {
  */
 export function filterLegacyReleases(text, version) {
   const withoutBom = text.startsWith(BOM) ? text.slice(BOM.length) : text;
-  const marker = `-${version}-`;
   const lines = withoutBom.split("\n").filter((line) => line.trim().length > 0);
-  const kept = lines.filter((line) => line.includes(marker));
-  const dropped = lines.filter((line) => !line.includes(marker));
+  const kept = lines.filter((line) => isPackageOfVersion(fileNameOf(line), version));
+  const dropped = lines.filter((line) => !isPackageOfVersion(fileNameOf(line), version));
   return { text: BOM + kept.join("\n"), kept, dropped };
+}
+
+function fileNameOf(legacyLine) {
+  return legacyLine.trim().split(/\s+/)[1] ?? "";
 }
 
 export function prune(outputDir, version) {
