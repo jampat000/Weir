@@ -13,70 +13,10 @@ import pytest
 from tests.contract.support import seed
 from tests.contract.support.client import API, WeirClient
 from tests.contract.system import _helpers as h
+from tests.contract.system import _log_seed as seeded
 
 LOG = f"{API}/system/log"
 EXPORT = f"{API}/system/log/export"
-
-# Signing in and starting the server write rows of their own at the real time; everything seeded here is two days
-# back, and each request is held to that day so it sees only what the test put there.
-SEEDED_AT = (datetime.now(UTC) - timedelta(days=2)).replace(microsecond=0)
-WINDOW = {"from": (SEEDED_AT - timedelta(hours=1)).isoformat(), "to": (SEEDED_AT + timedelta(hours=1)).isoformat()}
-
-
-def _at(minutes: int) -> datetime:
-    return SEEDED_AT + timedelta(minutes=minutes)
-
-
-def _log_line(at: datetime, level: str, logger: str, message: str, **extra: Any) -> str:
-    entry = {
-        "timestamp": at.strftime("%Y-%m-%dT%H:%M:%S.%f") + "Z",
-        "level": level,
-        "logger": logger,
-        "message": message,
-        "source": None,
-        "detail": None,
-        "correlation_id": None,
-        "job_id": None,
-        **extra,
-    }
-    return json.dumps(entry)
-
-
-def _event(
-    conn,
-    at: datetime,
-    event_type: str,
-    title: str,
-    *,
-    result: str,
-    trigger: str | None = None,
-    library_id: int | None = None,
-    relative_path: str | None = None,
-) -> None:
-    conn.execute(
-        'INSERT INTO activity_events (created_at, event_type, module, title, result, "trigger", library_id, relative_path) '
-        "VALUES (?, ?, 'processing', ?, ?, ?, ?, ?)",
-        (seed.utc_text(at), event_type, title, result, trigger, library_id, relative_path),
-    )
-
-
-def _job(
-    conn,
-    at: datetime,
-    key: str,
-    kind: str,
-    status: str,
-    *,
-    last_error: str | None = None,
-    library_id: int | None = None,
-):
-    payload = json.dumps({"library_id": library_id}) if library_id is not None else None
-    conn.execute(
-        "INSERT INTO jobs (dedupe_key, job_kind, payload_json, status, attempt_count, max_attempts, last_error, "
-        "created_at, updated_at) VALUES (?, ?, ?, ?, 1, 3, ?, ?, ?)",
-        (key, kind, payload, status, last_error, seed.utc_text(at), seed.utc_text(at)),
-    )
-    return int(conn.execute("SELECT last_insert_rowid()").fetchone()[0])
 
 
 @pytest.fixture(scope="module", autouse=True)
@@ -87,45 +27,53 @@ def _seeded(server) -> dict[str, int]:
     with seed.stopped(server) as conn:
         conn.execute("DELETE FROM jobs")
         library_id = int(conn.execute("SELECT id FROM libraries ORDER BY id LIMIT 1").fetchone()[0])
-        _event(conn, _at(10), "auth.login_succeeded", "Signed in", result="success", trigger="manual")
-        _event(
+        seeded.event(conn, seeded.at(10), "auth.login_succeeded", "Signed in", result="success", trigger="manual")
+        seeded.event(
             conn,
-            _at(11),
+            seeded.at(11),
             "library.scan_completed",
             "Movies scanned",
             result="success",
             trigger="scheduled",
             library_id=library_id,
         )
-        _event(conn, _at(12), "auth.login_failed", "Sign-in failed", result="failed", trigger="manual")
-        _event(
+        seeded.event(conn, seeded.at(12), "auth.login_failed", "Sign-in failed", result="failed", trigger="manual")
+        seeded.event(
             conn,
-            _at(13),
+            seeded.at(13),
             "processing.file_remux_pass_completed",
             "Heat processed",
             result="success",
             library_id=library_id,
             relative_path="Heat/heat.mkv",
         )
-        failed = _job(
+        failed = seeded.job(
             conn,
-            _at(20),
+            seeded.at(20),
             "contract:failed",
             "processing.file.remux_pass.v1",
             "failed",
             last_error="ffmpeg stopped",
             library_id=library_id,
         )
-        _job(conn, _at(21), "contract:queued", "processing.file.remux_pass.v1", "pending", library_id=library_id)
-        _job(conn, _at(22), "contract:cleanup", "processing.work_temp_stale_sweep.v1", "completed")
-        _job(conn, _at(23), "contract:routine-scan", "processing.watched_folder.remux_scan_dispatch.v1", "completed")
+        seeded.job(
+            conn, seeded.at(21), "contract:queued", "processing.file.remux_pass.v1", "pending", library_id=library_id
+        )
+        seeded.job(conn, seeded.at(22), "contract:cleanup", "processing.work_temp_stale_sweep.v1", "completed")
+        seeded.job(
+            conn,
+            seeded.at(23),
+            "contract:routine-scan",
+            "processing.watched_folder.remux_scan_dispatch.v1",
+            "completed",
+        )
         # Written while the server is stopped, since it holds its log open while it runs.
         with (logs / "weir.log").open("a", encoding="utf-8") as log:
-            warning = _log_line(
-                _at(30), "WARNING", "weir.platform.suite_settings.backups", "The backup folder is nearly full"
+            warning = seeded.log_line(
+                seeded.at(30), "WARNING", "weir.platform.suite_settings.backups", "The backup folder is nearly full"
             )
-            error = _log_line(
-                _at(31),
+            error = seeded.log_line(
+                seeded.at(31),
                 "ERROR",
                 "weir.processing",
                 "The pass stopped",
@@ -146,7 +94,7 @@ def _titles(body: dict[str, Any]) -> list[str]:
 
 
 def _get(client: WeirClient, **params: Any) -> dict[str, Any]:
-    r = client.get(LOG, params={**WINDOW, **params})
+    r = client.get(LOG, params={**seeded.WINDOW, **params})
     assert r.status_code == 200, r.text
     return r.json()
 
@@ -292,15 +240,15 @@ def test_a_filter_the_log_does_not_understand_is_refused(admin, params: dict[str
 
 
 def test_a_viewer_can_read_the_log(viewer) -> None:
-    r = viewer.get(LOG, params=WINDOW)
+    r = viewer.get(LOG, params=seeded.WINDOW)
 
     assert r.status_code == 200
     assert r.json()["total"] == 8
 
 
 def test_the_log_exports_as_a_spreadsheet_or_as_json_for_the_same_filters(admin) -> None:
-    as_csv = admin.get(EXPORT, params={**WINDOW, "level": "error", "format": "csv"})
-    as_json = admin.get(EXPORT, params={**WINDOW, "source": "job", "format": "json"})
+    as_csv = admin.get(EXPORT, params={**seeded.WINDOW, "level": "error", "format": "csv"})
+    as_json = admin.get(EXPORT, params={**seeded.WINDOW, "source": "job", "format": "json"})
 
     assert as_csv.status_code == 200, as_csv.text
     assert "attachment" in as_csv.headers["content-disposition"]
