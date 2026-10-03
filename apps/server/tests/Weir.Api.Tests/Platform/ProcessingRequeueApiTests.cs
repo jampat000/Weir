@@ -4,7 +4,7 @@ using System.Text.Json.Nodes;
 namespace Weir.Api.Tests.Platform;
 
 /// <summary>
-/// Queueing files again from History: the exact files a person chose, and a finished file only while its original is
+/// Queueing files again from Activity: the exact files a person chose, and a finished file only while its original is
 /// still in the watched folder.
 /// </summary>
 public sealed class ProcessingRequeueApiTests

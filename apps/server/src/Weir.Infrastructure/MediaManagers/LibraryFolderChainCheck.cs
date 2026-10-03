@@ -118,7 +118,7 @@ public sealed class LibraryFolderChainCheck
     }
 
     /// <summary>
-    /// The same chain check for every library linked to one connection (Settings › Media managers wants "for this
+    /// The same chain check for every library linked to one connection (Setup › Connections › Media managers wants "for this
     /// connection, which of its linked libraries are fully chained"), in library order.
     /// </summary>
     public async Task<List<WireObject>> CheckForConnectionAsync(UnitOfWork uow, long connectionId, CancellationToken cancellationToken)

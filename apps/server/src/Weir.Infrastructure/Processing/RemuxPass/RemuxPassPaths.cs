@@ -173,7 +173,7 @@ public static class RemuxPassPaths
             return (null,
                 $"The {label} workflow has no watched folder set. " +
                 "Manual remux and folder-scan jobs need a watched folder to resolve relative paths. " +
-                "Set it in Settings › Workflows before enqueueing or running those jobs.");
+                "Set it in Setup › Workflows before enqueueing or running those jobs.");
         }
 
         var watched = Resolve(watchedRaw);
@@ -189,7 +189,7 @@ public static class RemuxPassPaths
         {
             return (null,
                 $"The {label} workflow has no output folder set. " +
-                "Set it in Settings › Workflows before running a live remux pass.");
+                "Set it in Setup › Workflows before running a live remux pass.");
         }
 
         var output = Resolve(outputRaw);

@@ -1,5 +1,8 @@
 import { type ReactNode, useEffect, useState } from "react";
 
+import { StatusDot } from "../components/panels/status-dot";
+import type { StatusMeaning } from "../lib/ui/status-meaning";
+
 type ReadyStep = {
   name: string;
   status: "ready" | "starting" | "failed" | string;
@@ -32,9 +35,9 @@ const WAITING_STEP: ReadyStep = {
   detail: "Waiting for Weir to start.",
 };
 
-function dotClass(step: ReadyStep, failed: boolean): string {
-  if (step.status === "ready") return "mm-startup__dot mm-startup__dot--ready";
-  return failed ? "mm-startup__dot mm-startup__dot--failed" : "mm-startup__dot";
+function stepMeaning(step: ReadyStep, failed: boolean): StatusMeaning {
+  if (step.status === "ready") return "done";
+  return failed ? "broken" : "doing";
 }
 
 async function fetchReadiness(signal: AbortSignal): Promise<ReadyPayload> {
@@ -161,7 +164,10 @@ export function StartupGate({ children }: { children: ReactNode }) {
           <ul className="mm-startup__steps space-y-3">
             {(state.steps.length ? state.steps : [WAITING_STEP]).map((step) => (
               <li key={step.name} className="mm-startup__step">
-                <span className={dotClass(step, state.kind === "failed")} />
+                <StatusDot
+                  className="mm-startup__dot"
+                  meaning={stepMeaning(step, state.kind === "failed")}
+                />
                 <span>
                   <span className="mm-startup__step-name">{step.name}</span>
                   <span className="mm-startup__step-detail">{step.detail}</span>

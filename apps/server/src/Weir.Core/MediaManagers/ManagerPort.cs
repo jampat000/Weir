@@ -72,6 +72,9 @@ public static class SignalStatus
 public sealed record ManagerConnection(string Kind, string Name, string BaseUrl, string ApiKey, long? ConnectionId = null, string? Nickname = null)
 {
     public string Label => MediaManagerKinds.LabelForConnection(Kind, Name, Nickname);
+
+    /// <summary>The saved connection this is, or null for the environment credentials.</summary>
+    public ConnectionRef? Reference => ConnectionRef.ForManager(ConnectionId);
 }
 
 /// <summary>One in-progress item, tagged with the scope whose dialect can read it.</summary>

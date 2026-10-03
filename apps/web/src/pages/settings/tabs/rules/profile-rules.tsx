@@ -14,12 +14,10 @@ import { AudioRulesGroup, SubtitleRulesGroup } from "./track-rules-groups";
  */
 export function ProfileRules({
   binding,
-  providerName,
   editable,
   resetKey,
 }: {
   binding: RuleSetBinding;
-  providerName: string;
   editable: boolean;
   /** Changes with the profile, so the ordering editor closes again on a switch. */
   resetKey: string;
@@ -31,7 +29,7 @@ export function ProfileRules({
         <AudioRulesGroup binding={binding} />
         <SubtitleRulesGroup binding={binding} />
       </div>
-      <OriginalLanguageFold binding={binding} providerName={providerName} />
+      <OriginalLanguageFold binding={binding} />
       <ContainerFold binding={binding} />
       <TrackNamingFold binding={binding} />
       <TrackOrderSection key={resetKey} binding={binding} />

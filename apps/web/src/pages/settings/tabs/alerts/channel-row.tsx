@@ -1,5 +1,13 @@
+import { Fragment, type ReactNode } from "react";
+
 import type { NotificationChannelOut } from "../../../../lib/settings/types";
+import { Chip } from "../../../../components/panels/chip";
 import { mmActionButtonClass } from "../../../../lib/ui/mm-control-roles";
+import {
+  ALERT_ACTIONS_COLUMN,
+  ALERT_NAME_COLUMN,
+  eventColumnId,
+} from "./alert-columns";
 import { eventLabel } from "./alert-events";
 import { ALERT_CHECKBOX_CLASS } from "./channel-form";
 import { maskWebhookUrl } from "./webhook-url-mask";
@@ -9,9 +17,8 @@ export type TestResult = { ok: boolean; error: string | null };
 function TestOutcome({ result }: { result: TestResult }) {
   return (
     <p
-      className={`mm-quiet-table__sub ${
-        result.ok ? "mm-status-text--healthy" : "mm-status-text--failed"
-      }`}
+      className="mm-quiet-table__sub mm-status-text"
+      data-status={result.ok ? "done" : "broken"}
       role="alert"
     >
       {result.ok
@@ -26,6 +33,7 @@ function TestOutcome({ result }: { result: TestResult }) {
 export function ChannelRow({
   channel,
   events,
+  order,
   onToggleEvent,
   toggling,
   onEdit,
@@ -37,6 +45,8 @@ export function ChannelRow({
 }: {
   channel: NotificationChannelOut;
   events: string[];
+  /** The ids of the table's columns, in the order to show them. */
+  order: readonly string[];
   onToggleEvent: (event: string) => void;
   toggling: boolean;
   onEdit: () => void;
@@ -46,39 +56,30 @@ export function ChannelRow({
   testResult: TestResult | null;
   deleting: boolean;
 }) {
-  return (
-    <tr>
-      <th scope="row" className="mm-quiet-table__name">
+  const cells: Record<string, ReactNode> = {
+    [ALERT_NAME_COLUMN]: (
+      <th
+        scope="row"
+        data-col={ALERT_NAME_COLUMN}
+        className="mm-quiet-table__name"
+      >
         <span>{channel.label}</span>
-        <span className="mm-quiet-badge">{channel.provider}</span>
-        {!channel.enabled ? (
-          <span className="mm-quiet-badge mm-quiet-badge--off">Disabled</span>
-        ) : null}
+        <Chip dot={false}>{channel.provider}</Chip>
+        {!channel.enabled ? <Chip meaning="idle">Disabled</Chip> : null}
         <span className="mm-quiet-table__sub font-mono">
           {maskWebhookUrl(channel.url)}
         </span>
       </th>
-      {events.map((event) => (
-        <td
-          key={event}
-          data-label={eventLabel(event)}
-          className="mm-alerts-cell"
-        >
-          <input
-            type="checkbox"
-            className={ALERT_CHECKBOX_CLASS}
-            aria-label={`${channel.label}: ${eventLabel(event)}`}
-            checked={channel.events.includes(event)}
-            disabled={toggling}
-            onChange={() => onToggleEvent(event)}
-          />
-        </td>
-      ))}
-      <td data-label="">
+    ),
+    [ALERT_ACTIONS_COLUMN]: (
+      <td data-label="" data-col={ALERT_ACTIONS_COLUMN}>
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
-            className={mmActionButtonClass({ variant: "tertiary" })}
+            className={mmActionButtonClass({
+              variant: "tertiary",
+              size: "row",
+            })}
             disabled={testing || deleting}
             onClick={onTest}
           >
@@ -86,7 +87,10 @@ export function ChannelRow({
           </button>
           <button
             type="button"
-            className={mmActionButtonClass({ variant: "secondary" })}
+            className={mmActionButtonClass({
+              variant: "secondary",
+              size: "row",
+            })}
             disabled={deleting}
             onClick={onEdit}
           >
@@ -94,7 +98,10 @@ export function ChannelRow({
           </button>
           <button
             type="button"
-            className={mmActionButtonClass({ variant: "tertiary" })}
+            className={mmActionButtonClass({
+              variant: "danger-outline",
+              size: "row",
+            })}
             disabled={deleting}
             aria-haspopup="dialog"
             onClick={onDelete}
@@ -104,6 +111,31 @@ export function ChannelRow({
         </div>
         {testResult ? <TestOutcome result={testResult} /> : null}
       </td>
+    ),
+  };
+  for (const event of events) {
+    cells[eventColumnId(event)] = (
+      <td
+        data-label={eventLabel(event)}
+        data-col={eventColumnId(event)}
+        className="mm-alerts-cell"
+      >
+        <input
+          type="checkbox"
+          className={ALERT_CHECKBOX_CLASS}
+          aria-label={`${channel.label}: ${eventLabel(event)}`}
+          checked={channel.events.includes(event)}
+          disabled={toggling}
+          onChange={() => onToggleEvent(event)}
+        />
+      </td>
+    );
+  }
+  return (
+    <tr>
+      {order.map((id) => (
+        <Fragment key={id}>{cells[id]}</Fragment>
+      ))}
     </tr>
   );
 }

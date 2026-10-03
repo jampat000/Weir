@@ -1,383 +1,65 @@
 /**
- * Every file Weir is working on, from the moment it lands to the moment the media manager has it back,
- * in five lanes that fold to the width they are given (weir-processing-board.css). Every number comes
- * from the server; the page follows the Activity stream rather than polling, and ticks once a second so
- * countdowns and "min ago" move between updates. A working file's percent, ETA and message come from the
- * same stream's live-progress frame (#750), which moves about once a second even though the file list
- * itself only changes on a database write — the start of a pass, a stage change, or its end.
+ * The Dashboard, Weir's landing page, in two views kept in the address: Live, everything Weir is doing
+ * right now, and System, how it is set up and what it does in the background. The header carries the
+ * tabs between them after the title and, on Live, the workflow to narrow everything to and the kind of work to show.
+ *
+ * The page decides its layout from the width of its own main area, not the window's. On Live, wide, it is
+ * exactly as tall as the window, so everything is sized from the space it has and the page itself never
+ * scrolls; narrower, or on a phone, it flows and scrolls like any page.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
-
-import { FileStoryPanel } from "../../components/processing/file-story-panel";
-import { ApiEntryError } from "../../components/shared/api-entry-error";
-import { PageLoading } from "../../components/shared/page-loading";
 import { PageHeader } from "../../components/shell/page-header";
-import type { FinishedFile } from "../../lib/activity/processing-outcome";
-import { activityKeys } from "../../lib/activity/query-keys";
-import {
-  useActivityStreamInvalidations,
-  useLiveProgress,
-} from "../../lib/activity/use-activity-stream-invalidation";
-import { loadErrorMessage } from "../../lib/api/error-message";
-import { usePauseQuery } from "../../lib/pause/pause-queries";
-import type { ProcessingFile } from "../../lib/processing/files-api";
-import {
-  useProcessingFileLog,
-  useProcessingFilesQuery,
-} from "../../lib/processing/files-queries";
-import { useProcessingJobsInspectionQuery } from "../../lib/processing/jobs-inspection/queries";
+import { ShellHeaderSlot } from "../../components/shell/shell-header-context";
 import { useProcessingLibrariesQuery } from "../../lib/processing/libraries-queries";
-import { mergeLiveProgress } from "../../lib/processing/live-progress-merge";
-import { useProcessingFilesAtOnceQuery } from "../../lib/processing/queries";
-import { processingKeys } from "../../lib/processing/query-keys";
-import { parseAppTime } from "../../lib/ui/mm-format-date";
-import { useNow } from "../../lib/ui/use-now";
-import { FinishedLane } from "./finished-lane";
-import { EmptyLane, Lane, More } from "./lane";
-import { ArrivingCard, HandingCard, WaitingCard } from "./lane-cards";
-import { LeavingCard } from "./leaving-card";
-import { drawnIn, useLeavingCards } from "./leaving-cards";
+import { useElementSize } from "../../lib/ui/use-element-size";
+import { useFitToScreen } from "../../lib/ui/use-fit-to-screen";
+import { useRemPx } from "../../lib/ui/use-rem-px";
 import {
-  arrivingDeadline,
-  buildLanes,
-  mergeWorkingFiles,
-  prettyName,
-} from "./processing-model";
-import { FAILED_JOBS_LIMIT, NeedsList } from "./processing-needs";
-import {
-  ProcessingToolbar,
-  TODAY_DAYS,
-  type Filter,
-} from "./processing-toolbar";
-import {
-  enabledWorkflowKinds,
-  handingLaneHint,
-  processingLead,
-} from "./processing-words";
-import { WorkingCard } from "./working-card";
-import { ACTIVE_JOBS_LIMIT, WORKING_FILES_QUERY } from "./working-count";
+  DashboardControls,
+  DashboardTabs,
+} from "./dashboard/dashboard-controls";
+import { MIN_GRID_PX, pageLayout } from "./dashboard/dashboard-layout";
+import { LiveView } from "./dashboard/live-view";
+import { SystemView } from "./dashboard/system-view";
+import { useDashboardAddress } from "./dashboard-address";
+import { LIBRARIES_REFRESH_MS } from "./use-processing-lanes";
 
-const FILES_QUERY = { limit: 200 } as const;
-const NO_FILES: ProcessingFile[] = [];
-/** Once a second, so countdowns and "min ago" move between server updates. */
-const TICK_MS = 1000;
-/** Arriving counts down to each library's next look, which moves with every scan. */
-const LIBRARIES_REFRESH_MS = 10_000;
-/** How long past a countdown's end before Weir's answer is fetched, and how often at most. */
-const LOOK_OVERDUE_MS = 1500;
-const LOOK_REFETCH_GAP_MS = 3000;
-// How many cards a lane shows before it says how many more there are. Working is never cut short:
-// it holds at most as many files as the files-at-once setting allows, and that tops out at 10.
-const ARRIVING_SHOWN = 3;
-const WAITING_SHOWN = 5;
-const HANDING_SHOWN = 4;
-
-// A running pass rewrites its progress row several times a second and every write reaches the
-// stream, so the lanes follow it closely and the totals, which only change when a file finishes,
-// follow it at a gentler pace. Just finished is read from the Activity entry a pass writes as it ends, so it
-// refreshes with the lanes: a file leaves them and lands there in the same step (#852).
-const LANE_KEYS = [
-  processingKeys.fileList(FILES_QUERY),
-  processingKeys.fileList(WORKING_FILES_QUERY),
-  processingKeys.jobsInspectionList("active", ACTIVE_JOBS_LIMIT),
-  activityKeys.recent,
-] as const;
-const TOTAL_KEYS = [
-  processingKeys.overviewStats(TODAY_DAYS),
-  processingKeys.filesAtOnce,
-  processingKeys.jobsInspectionList("failed", FAILED_JOBS_LIMIT, true),
-] as const;
-const LANE_THROTTLE_MS = 750;
-const TOTAL_THROTTLE_MS = 3_000;
-
-/** The lanes' files, grouped by where each one is, with what each library knows about its next look. */
-function useLanes() {
-  const files = useProcessingFilesQuery(FILES_QUERY);
-  const workingFiles = useProcessingFilesQuery(WORKING_FILES_QUERY);
-  const libraries = useProcessingLibrariesQuery(true, LIBRARIES_REFRESH_MS);
-  const activeJobs = useProcessingJobsInspectionQuery(
-    "active",
-    ACTIVE_JOBS_LIMIT,
-  );
-  const liveProgress = useLiveProgress();
-  const lanes = useMemo(() => {
-    const all = libraries.data ?? [];
-    const nextLooks = new Map<number, { at: number; interval: number }>();
-    for (const library of all) {
-      const at = parseAppTime(library.next_look_at);
-      if (at != null) {
-        nextLooks.set(library.id, {
-          at,
-          interval: library.scan_interval_seconds,
-        });
-      }
-    }
-    const allFiles = mergeWorkingFiles(
-      files.data?.files ?? [],
-      workingFiles.data?.files ?? [],
-    );
-    return buildLanes(
-      mergeLiveProgress(allFiles, liveProgress),
-      activeJobs.data?.jobs ?? [],
-      new Map(all.map((l) => [l.id, l.name])),
-      new Map(all.map((l) => [l.id, l.ready_after_seconds])),
-      nextLooks,
-    );
-  }, [
-    files.data,
-    workingFiles.data,
-    activeJobs.data,
-    libraries.data,
-    liveProgress,
-  ]);
-  return { files, libraries, lanes };
-}
-
-/**
- * A countdown that has run out means Weir is looking at that file now. Its answer, picked up or held
- * again for a new reason with a new time, only reaches the screen as fresh data, and a scan that
- * changes nothing else sends no live event, so fetch it rather than keep saying "checking it now".
- */
-function useRefetchOverdueLooks(
-  { files, libraries, lanes }: ReturnType<typeof useLanes>,
-  now: number,
-) {
-  const lastRefetch = useRef(0);
-  useEffect(() => {
-    const due = lanes.arriving.some((item) => {
-      const deadline = arrivingDeadline(item);
-      return deadline != null && deadline <= now - LOOK_OVERDUE_MS;
-    });
-    if (!due || now - lastRefetch.current < LOOK_REFETCH_GAP_MS) return;
-    lastRefetch.current = now;
-    void files.refetch();
-    void libraries.refetch();
-  }, [now, lanes.arriving, files, libraries]);
-}
+const EYEBROW = "Cleans new downloads and your library";
 
 export function ProcessingPage(): React.ReactElement {
-  useActivityStreamInvalidations(LANE_KEYS, { throttleMs: LANE_THROTTLE_MS });
-  useActivityStreamInvalidations(TOTAL_KEYS, {
-    throttleMs: TOTAL_THROTTLE_MS,
-  });
-  const now = useNow(TICK_MS);
-  const board = useLanes();
-  useRefetchOverdueLooks(board, now);
-  const { files, libraries, lanes } = board;
-  const filesAtOnce = useProcessingFilesAtOnceQuery();
-  const pause = usePauseQuery();
-  const fileLog = useProcessingFileLog();
-  const navigate = useNavigate();
-  const [storyFile, setStoryFile] = useState<{
-    id: number;
-    name: string;
-  } | null>(null);
-  const [filter, setFilter] = useState<Filter>("all");
-  // From the unfiltered lanes, so narrowing the page to one kind of file is never taken for a file leaving.
-  const leaving = useLeavingCards(
-    lanes.waiting,
-    lanes.working,
-    lanes.handing,
-    files.data?.files ?? NO_FILES,
+  const libraries = useProcessingLibrariesQuery(true, LIBRARIES_REFRESH_MS);
+  const enabledWorkflows = libraries.data?.filter(
+    (workflow) => workflow.enabled,
   );
-
-  const openFile = useCallback(
-    (file: ProcessingFile) => {
-      setStoryFile({ id: file.id, name: file.relative_path });
-      fileLog.mutate(file.id);
-    },
-    [fileLog],
-  );
-  const openFinished = useCallback(
-    (item: FinishedFile) => {
-      const match = (files.data?.files ?? []).find(
-        (f) =>
-          f.relative_path === item.relativePath &&
-          (item.libraryId == null || f.library_id === item.libraryId),
-      );
-      if (match) {
-        openFile(match);
-        return;
-      }
-      // Older than the files list reaches, or a library file: open its history instead.
-      const path = encodeURIComponent(item.relativePath);
-      void navigate(
-        item.source === "library"
-          ? `/library?path=${path}`
-          : `/history?q=${path}`,
-      );
-    },
-    [files.data, navigate, openFile],
-  );
-
-  if (files.isPending) return <PageLoading label="Loading Processing" />;
-  if (files.isError) {
-    return (
-      <div className="mm-page">
-        <ApiEntryError error={files.error} />
-      </div>
-    );
-  }
-
-  const shows = (item: { source: Filter }) =>
-    filter === "all" || filter === item.source;
-  const arriving = filter === "library" ? [] : lanes.arriving;
-  const waiting = lanes.waiting.filter(shows);
-  const working = lanes.working.filter(shows);
-  const handing = lanes.handing.filter(shows);
-  const leavingIn = (lane: "working" | "handing") =>
-    leaving.filter((card) => drawnIn(card) === lane && shows(card));
-  const leavingWorking = leavingIn("working");
-  const leavingHanding = leavingIn("handing");
-  const lanesAtOnce = filesAtOnce.data?.effective_files_at_once ?? null;
-  const workflowKinds = enabledWorkflowKinds(libraries.data ?? []);
+  const address = useDashboardAddress(enabledWorkflows);
+  const [pageRef, page] = useElementSize<HTMLDivElement>();
+  const rem = useRemPx();
+  const layout = pageLayout(page.width, rem);
+  const live = address.view === "live";
+  useFitToScreen(pageRef, layout.sideBySide, MIN_GRID_PX);
 
   return (
-    <div className="mm-page mm-live" data-testid="processing-page">
-      <PageHeader title="Processing" lead={processingLead(workflowKinds)} />
-
-      <ProcessingToolbar filter={filter} onFilter={setFilter} now={now} />
-
-      {pause.data?.paused ? (
-        <p className="mm-live-paused" role="status" data-testid="live-paused">
-          <b>Paused.</b> {pause.data.reason} Files already being written finish;
-          nothing new starts.
-        </p>
-      ) : null}
-
-      <NeedsList stuck={lanes.stuck} />
-
-      {/* Arriving and Waiting share a column below five-lane width, as do Handing back and Just
-          finished; on a wide screen the two wrappers dissolve and all five sit side by side. */}
-      <div className="mm-live-board">
-        <div className="mm-live-lanes">
-          <div className="mm-live-col mm-live-col--next">
-            <Lane
-              id="arriving"
-              active={arriving.length > 0}
-              label="Arriving"
-              count={arriving.length}
-              hint="Not ready yet: still being written, or held back for a while"
-            >
-              {arriving.length ? (
-                <ul className="mm-live-lane__body">
-                  {arriving.slice(0, ARRIVING_SHOWN).map((item) => (
-                    <ArrivingCard key={item.key} item={item} now={now} />
-                  ))}
-                  <More
-                    count={arriving.length - ARRIVING_SHOWN}
-                    what="arriving"
-                  />
-                </ul>
-              ) : (
-                <EmptyLane>
-                  Nothing arriving. New downloads show up here within seconds.
-                </EmptyLane>
-              )}
-            </Lane>
-
-            <Lane
-              id="waiting"
-              active={waiting.length > 0}
-              label="Waiting"
-              count={waiting.length}
-              hint="Ready, and next in line to start"
-            >
-              {waiting.length ? (
-                <ul className="mm-live-lane__body">
-                  {waiting.slice(0, WAITING_SHOWN).map((item, index) => (
-                    <WaitingCard key={item.key} item={item} index={index} />
-                  ))}
-                  <More count={waiting.length - WAITING_SHOWN} what="waiting" />
-                </ul>
-              ) : (
-                <EmptyLane>Nothing waiting.</EmptyLane>
-              )}
-            </Lane>
-          </div>
-
-          <Lane
-            id="working"
-            active={working.length > 0}
-            label="Working"
-            live={working.length > 0}
-            count={null}
-            hint="Writing a copy that keeps only the tracks your rules want"
-            aside={
-              <span className="mm-live-lane__count">
-                {working.length}
-                {lanesAtOnce != null ? (
-                  <small> of {lanesAtOnce} at once</small>
-                ) : null}
-              </span>
-            }
-          >
-            {/* The cards measure this, not the lane: a lane that is a size container cannot also
-                share the board's rows (subgrid), and sharing them is what lines the lanes up. */}
-            <div className="mm-live-work-area">
-              {working.length || leavingWorking.length ? (
-                <ul className="mm-live-lane__body mm-live-lane__body--work">
-                  {working.map((item) => (
-                    <WorkingCard key={item.key} item={item} onOpen={openFile} />
-                  ))}
-                  {leavingWorking.map((card) => (
-                    <LeavingCard key={card.key} card={card} onOpen={openFile} />
-                  ))}
-                </ul>
-              ) : (
-                <EmptyLane>
-                  {pause.data?.paused
-                    ? "Paused. Nothing new starts until you resume."
-                    : "Room for one more. The next file starts as soon as it is ready."}
-                </EmptyLane>
-              )}
-            </div>
-          </Lane>
-
-          <div className="mm-live-col mm-live-col--done">
-            <Lane
-              id="handing"
-              active={handing.length > 0}
-              label="Handing back"
-              count={handing.length}
-              hint={handingLaneHint(workflowKinds)}
-            >
-              {handing.length || leavingHanding.length ? (
-                <ul className="mm-live-lane__body">
-                  {handing.slice(0, HANDING_SHOWN).map((item) => (
-                    <HandingCard key={item.key} item={item} />
-                  ))}
-                  {leavingHanding.map((card) => (
-                    <LeavingCard key={card.key} card={card} onOpen={openFile} />
-                  ))}
-                  <More
-                    count={handing.length - HANDING_SHOWN}
-                    what="on final checks"
-                  />
-                </ul>
-              ) : (
-                <EmptyLane>Nothing on its final checks.</EmptyLane>
-              )}
-            </Lane>
-
-            <FinishedLane filter={filter} now={now} onOpen={openFinished} />
-          </div>
-        </div>
-      </div>
-
-      <FileStoryPanel
-        open={storyFile !== null}
-        fileName={storyFile ? prettyName(storyFile.name) : ""}
-        log={fileLog.data}
-        loading={fileLog.isPending}
-        error={
-          fileLog.isError
-            ? loadErrorMessage(fileLog.error, "what happened to this file")
-            : null
-        }
-        onClose={() => setStoryFile(null)}
-      />
+    <div
+      ref={pageRef}
+      className="mm-page mm-dash"
+      data-testid="processing-page"
+    >
+      <PageHeader eyebrow={EYEBROW} />
+      <DashboardTabs address={address} />
+      <ShellHeaderSlot>
+        <DashboardControls
+          address={address}
+          workflows={enabledWorkflows ?? []}
+        />
+      </ShellHeaderSlot>
+      {live ? (
+        <LiveView
+          filter={address.filter}
+          workflowId={address.workflowId}
+          layout={layout}
+        />
+      ) : (
+        <SystemView layout={layout} />
+      )}
     </div>
   );
 }

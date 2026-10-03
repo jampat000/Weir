@@ -1,104 +1,50 @@
 /* Layouts particular to one Settings or System tab. */
 
-/* Settings › Cleanup: each job's own switch and timer on one row. */
-.mm-cleanup-table .mm-quiet-table__name {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  max-width: 34rem;
-}
-
+/* Settings › Cleanup: each job's own switch and timer on one row. What a job does sits under its name inside the
+   cell, which stays a table cell: any other display breaks the row's hairline. */
 .mm-cleanup-what {
-  font-size: 0.8125rem;
+  display: block;
+  max-width: 34rem;
+  margin-top: 4px;
+  font-size: var(--mm-type-body);
   font-weight: 400;
   line-height: 1.45;
   color: var(--mm-text3);
 }
 
-.mm-cleanup-what--warn {
-  color: var(--mm-status-warning-text);
+/* A setting among the jobs is one cell across the whole row: its name and what it does, its control under them. */
+.mm-cleanup-setting > .mm-quiet-table__name {
+  display: block;
+  color: var(--mm-text2);
+  font-weight: 400;
+}
+
+.mm-cleanup-setting__control {
+  margin-top: 0.5rem;
+}
+
+@container (max-width: 760px) {
+  .mm-quiet-table tbody td.mm-cleanup-setting {
+    display: block;
+  }
+
+  .mm-quiet-table tbody td.mm-cleanup-setting::before {
+    content: none;
+  }
 }
 
 .mm-cleanup-every {
   width: 10rem;
 }
 
-/* Settings › Alerts: how an alert travels, in three plain steps, then one column per event. */
-.mm-alert-steps {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px 32px;
-  margin: 4px 0 8px;
-  padding: 0;
-  list-style: none;
-  counter-reset: mm-alert-step;
-}
-
-@media (max-width: 900px) {
-  .mm-alert-steps {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-
-.mm-alert-steps li {
-  position: relative;
-  padding-left: 40px;
-  font-size: 0.8125rem;
-  line-height: 1.5;
-  color: var(--mm-text3);
-  counter-increment: mm-alert-step;
-}
-
-.mm-alert-steps li::before {
-  content: counter(mm-alert-step);
-  position: absolute;
-  left: 0;
-  top: 0;
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  border: 1px solid var(--mm-accent-ring);
-  color: var(--mm-accent-bright);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 600;
-}
-
-.mm-alert-steps b {
-  display: block;
-  font-weight: 600;
-  color: var(--mm-text);
-}
-
+/* Settings › Alerts: one column per event. */
 .mm-alerts-cell {
   text-align: center;
   width: 8.5rem;
 }
 
-/* System › About: what Weir works with, its updates, and its time zone and setup, side by side. */
-.mm-about-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 8px 48px;
-  align-items: start;
-}
-
-@media (min-width: 900px) {
-  .mm-about-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@media (min-width: 1400px) {
-  .mm-about-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-}
-
 /* Facts, one per line: the name dim on the left, the fact on the right. */
 .mm-kv {
-  margin: 0;
   display: flex;
   flex-direction: column;
 }
@@ -126,53 +72,6 @@
   overflow-wrap: anywhere;
 }
 
-/* System › Backups: what and when on the left, the backups on this machine on the right. */
-.mm-backups-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 8px 56px;
-  align-items: start;
-}
-
-@media (min-width: 1100px) {
-  .mm-backups-grid {
-    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
-  }
-
-  .mm-backups-grid__wide {
-    grid-column: 1 / -1;
-  }
-}
-
-/* System › Security: changing the username and the password, side by side. */
-.mm-security-pair {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 8px 56px;
-  align-items: start;
-}
-
-@media (min-width: 1100px) {
-  .mm-security-pair {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-/* Settings › Libraries: where a library comes from, and its folders in the code face they are typed in. */
-.mm-library-source {
-  display: block;
-}
-
-.mm-library-source--synced {
-  color: var(--mm-accent-bright);
-}
-
-.mm-library-path {
-  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
-  font-size: 0.8125rem;
-  overflow-wrap: anywhere;
-}
-
 /* Settings › Rules: which profile, its name, and who uses it, on one line. */
 .mm-profile-bar {
   display: flex;
@@ -184,11 +83,11 @@
 
 .mm-profile-bar__used {
   margin: 0 0 9px;
-  font-size: 0.8125rem;
+  font-size: var(--mm-type-body);
   color: var(--mm-text2);
 }
 
-/* Settings › Schedule: the time zone on one line, a week per library, its editor underneath. */
+/* The time zone row: its picker and Save on one line. */
 .mm-schedule-zone {
   display: flex;
   align-items: center;
@@ -201,13 +100,24 @@
   min-width: 0;
 }
 
-/* Seven rows of 24 hours, lit where the library may start work. Small on purpose: it is read at a glance,
+/* Settings › Schedule: a week per library, its editor underneath. */
+
+/* Seven rows of 24 hours, lit where the library may start work. Flat on purpose: it is read at a glance,
    and the editor below is where hours are drawn. */
 .mm-week {
   display: grid;
-  gap: 2px;
-  width: 100%;
-  max-width: 16rem;
+  gap: 1px;
+  width: 22rem;
+  max-width: 100%;
+}
+
+.mm-week--always {
+  margin-top: 0.4rem;
+}
+
+.mm-week--always .mm-week__hour {
+  height: 8px;
+  border-radius: 4px;
 }
 
 .mm-week__day {
@@ -224,7 +134,7 @@
 }
 
 .mm-week__hour {
-  height: 6px;
+  height: 5px;
   border-radius: 1px;
   background: color-mix(in srgb, var(--mm-text3) 22%, transparent);
 }
@@ -246,7 +156,7 @@
 
 /* The schedule's tables stack into rows below 900px, not the usual 760px: a week, a state and two
    buttons do not share a tablet-width row without the page scrolling sideways. */
-@media (max-width: 900px) {
+@container (max-width: 900px) {
   .mm-schedule-table thead {
     position: absolute;
     width: 1px;
@@ -285,6 +195,11 @@
     content: attr(data-label);
     color: var(--mm-text3);
     font-size: var(--mm-type-caption);
+  }
+
+  /* What a cell holds, however many parts, stays in the value column beside its label. */
+  .mm-schedule-table tbody td > * {
+    grid-column: 2;
   }
 }
 

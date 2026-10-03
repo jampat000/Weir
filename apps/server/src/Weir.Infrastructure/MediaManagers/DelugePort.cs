@@ -25,7 +25,7 @@ public sealed class DelugePort : IDownloadClientPort
         ArgumentNullException.ThrowIfNull(connection);
         try
         {
-            var client = new DownloadClientHttpClient(connection.BaseUrl, _handlers);
+            var client = new DownloadClientHttpClient(connection.BaseUrl, _handlers, connection: connection.Reference);
             var (ok, _) = await LoginAsync(client, connection, cancellationToken).ConfigureAwait(false);
             return ok
                 ? (true, $"Connected. Weir can reach {connection.Label}.")
@@ -42,7 +42,7 @@ public sealed class DelugePort : IDownloadClientPort
         ArgumentNullException.ThrowIfNull(connection);
         try
         {
-            var client = new DownloadClientHttpClient(connection.BaseUrl, _handlers);
+            var client = new DownloadClientHttpClient(connection.BaseUrl, _handlers, connection: connection.Reference);
             var (ok, cookie) = await LoginAsync(client, connection, cancellationToken).ConfigureAwait(false);
             if (!ok)
             {

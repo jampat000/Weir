@@ -198,7 +198,7 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandlerTests
         await uow.CommitAsync();
     }
 
-    /// <summary>Forgets a file's row exactly as History's "Remove from list" endpoint does
+    /// <summary>Forgets a file's row exactly as Activity's "Remove from list" endpoint does
     /// (<c>FileStateStore.ForgetAsync</c>): the row goes, nothing else does.</summary>
     private static async Task ForgetFileAsync(StoreFixture store, long fileId)
     {

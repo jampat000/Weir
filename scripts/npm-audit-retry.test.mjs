@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { auditWithRetry, classifyAuditOutput, meetsAuditLevel, RegistryUnavailableError } from "./npm-audit-retry.mjs";
+import { auditWithRetry, classifyAuditOutput, meetsAuditLevel, RegistryUnavailableError, unapprovedAdvisories } from "./npm-audit-retry.mjs";
 
 const CLEAN_REPORT = { metadata: { vulnerabilities: { info: 0, low: 0, moderate: 0, high: 0, critical: 0 } } };
 const HIGH_REPORT = { metadata: { vulnerabilities: { info: 0, low: 2, moderate: 0, high: 1, critical: 0 } } };
@@ -67,4 +67,41 @@ test("a registry that never recovers fails with a message that blames the regist
     auditWithRetry({ cwd: ".", retries: 2, baseDelayMs: 10, run, wait: async () => {} }),
     (error) => error instanceof RegistryUnavailableError && /3 attempt/.test(error.message),
   );
+});
+
+const ADVISORY_REPORT = {
+  vulnerabilities: {
+    braces: { via: [{ url: "https://github.com/advisories/GHSA-aaaa-bbbb-cccc", severity: "high" }] },
+    micromatch: { via: ["braces"] },
+    tiny: { via: [{ url: "https://github.com/advisories/GHSA-low0-0000-0000", severity: "low" }] },
+  },
+};
+const CURRENT = { advisory: "GHSA-aaaa-bbbb-cccc", expires: "2026-11-02", mitigation: "dev only" };
+
+test("an advisory with no exception is reported", () => {
+  assert.deepEqual(unapprovedAdvisories(ADVISORY_REPORT, { level: "high", today: "2026-10-03" }), ["braces: GHSA-aaaa-bbbb-cccc"]);
+});
+
+test("a current exception with a mitigation approves its advisory", () => {
+  assert.deepEqual(unapprovedAdvisories(ADVISORY_REPORT, { exceptions: [CURRENT], level: "high", today: "2026-10-03" }), []);
+});
+
+test("an expired exception approves nothing", () => {
+  const [finding] = unapprovedAdvisories(ADVISORY_REPORT, { exceptions: [CURRENT], level: "high", today: "2026-11-03" });
+  assert.match(finding, /expired 2026-11-02/);
+});
+
+test("an exception without a mitigation approves nothing", () => {
+  const [finding] = unapprovedAdvisories(ADVISORY_REPORT, { exceptions: [{ ...CURRENT, mitigation: "" }], level: "high", today: "2026-10-03" });
+  assert.match(finding, /no mitigation/);
+});
+
+test("advisories below the level are left out, and at level info every one counts", () => {
+  assert.equal(unapprovedAdvisories(ADVISORY_REPORT, { exceptions: [CURRENT], level: "high", today: "2026-10-03" }).length, 0);
+  assert.deepEqual(unapprovedAdvisories(ADVISORY_REPORT, { exceptions: [CURRENT], level: "info", today: "2026-10-03" }), ["tiny: GHSA-low0-0000-0000"]);
+});
+
+test("an advisory of unknown severity is never skipped", () => {
+  const report = { vulnerabilities: { odd: { via: [{ url: "https://github.com/advisories/GHSA-odd0-0000-0000" }] } } };
+  assert.deepEqual(unapprovedAdvisories(report, { level: "critical", today: "2026-10-03" }), ["odd: GHSA-odd0-0000-0000"]);
 });

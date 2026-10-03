@@ -8,6 +8,7 @@ using Weir.Infrastructure.Activity;
 using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.LibraryMode;
 using Weir.Infrastructure.Processing;
+using Weir.Infrastructure.Scheduling;
 using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Infrastructure.Tests.Jobs;
@@ -251,6 +252,34 @@ public sealed class JobServicesTests : IDisposable
         Assert.NotNull(next);
         Assert.Equal(TimeSpan.FromHours(1), next.Value.Interval);
         Assert.Equal(time.GetUtcNow().AddHours(1), next.Value.NextRunAt);
+    }
+
+    [Fact]
+    public async Task A_cleanup_family_is_listed_with_its_next_run_while_switched_on_and_leaves_the_list_when_switched_off()
+    {
+        var time = new FakeTimeProvider();
+        var recheck = TimeSpan.FromMilliseconds(50);
+        var registry = new JobHandlerRegistry([new DelegateHandler(PeriodicJobKinds.WorkTempStaleSweep, _ => { })]);
+        var tasks = new PeriodicTaskRegistry(time);
+        var sweep = new WorkTempStaleSweepEnqueuer(_db.Store, "movie", TimeSpan.FromHours(1), killSwitch: false);
+        var iterationComplete = new SemaphoreSlim(0);
+        var service = new PeriodicEnqueueService(
+            [sweep], registry, time, NullLogger<PeriodicEnqueueService>.Instance, new PeriodicEnqueueClock(), recheck, () => iterationComplete.Release(), tasks);
+
+        await service.StartAsync(CancellationToken.None);
+        await WaitForIterationAsync(iterationComplete);
+
+        var listed = Assert.Single(tasks.Snapshot());
+        Assert.Equal(
+            (ScheduledJobTasks.LeftoverFiles.Key, "Clear leftover files", time.GetUtcNow() + TimeSpan.FromHours(1), TimeSpan.FromHours(1)),
+            (listed.Key, listed.Label, listed.NextRunAt, listed.Interval));
+
+        _db.Execute("UPDATE operator_settings SET work_temp_stale_sweep_enabled = 0");
+        time.Advance(recheck);
+        await WaitForIterationAsync(iterationComplete);
+        await service.StopAsync(CancellationToken.None);
+
+        Assert.Empty(tasks.Snapshot());
     }
 
     /// <summary>

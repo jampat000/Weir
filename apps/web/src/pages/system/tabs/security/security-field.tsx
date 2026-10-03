@@ -1,6 +1,8 @@
 import { useId, useState } from "react";
 
-import { mmActionButtonClass } from "../../../../lib/ui/mm-control-roles";
+import { EyeIcon, EyeOffIcon } from "../../../../components/ui/eye-icons";
+
+const EYE_SIZE = 18;
 
 type FieldProps = {
   label: string;
@@ -11,37 +13,32 @@ type FieldProps = {
   autoComplete: string;
 };
 
-/** A labelled field in the sign-in forms. */
-export function SecurityField({
-  type = "text",
-  onChange,
-  label,
-  ...input
-}: FieldProps & { type?: "text" | "password" }) {
+/** A labelled text field in the sign-in forms. */
+export function SecurityField({ onChange, label, ...input }: FieldProps) {
   const id = useId();
   return (
-    <label className="block" htmlFor={id}>
-      <span className="text-sm text-mm-text2">{label}</span>
-      <div className="mt-1 flex flex-wrap gap-2">
-        <input
-          {...input}
-          id={id}
-          type={type}
-          className="mm-input mm-security-field"
-          onChange={(e) => onChange(e.target.value)}
-        />
-      </div>
-    </label>
+    <div className="mm-field">
+      <label className="mm-field__label" htmlFor={id}>
+        {label}
+      </label>
+      <input
+        {...input}
+        id={id}
+        type="text"
+        className="mm-input"
+        onChange={(e) => onChange(e.target.value)}
+      />
+    </div>
   );
 }
 
 /**
- * A password field with a Show/Hide button that names what it reveals, e.g. "Show new password".
- * The button is a sibling of the `<label>`, not nested inside it: a `<label>` that wraps another
- * interactive control is invalid HTML and some browsers double-fire the click.
+ * A password field with an eye inside it that shows or hides the text, named for what it reveals, e.g. "Show new
+ * password". The toggle is a sibling of the label, not nested inside it: a label that wraps another interactive
+ * control is invalid HTML and some browsers double-fire the click.
  *
- * Emptying the field hides the text again; the form remounts it (a new `key`) after each submit, so
- * a shown password never outlives the attempt it was typed for.
+ * Emptying the field hides the text again; the form remounts it (a new key) after each submit, so a shown password
+ * never outlives the attempt it was typed for.
  */
 export function RevealablePasswordField({
   onChange,
@@ -53,18 +50,19 @@ export function RevealablePasswordField({
 }: FieldProps & { revealLabel: string }) {
   const id = useId();
   const [shown, setShown] = useState(false);
+  const toggleLabel = shown ? `Hide ${revealLabel}` : `Show ${revealLabel}`;
   return (
-    <div className="block">
-      <label className="text-sm text-mm-text2" htmlFor={id}>
+    <div className="mm-field">
+      <label className="mm-field__label" htmlFor={id}>
         {label}
       </label>
-      <div className="mt-1 flex flex-wrap gap-2">
+      <div className="mm-sys-secret">
         <input
           {...input}
           id={id}
           type={shown ? "text" : "password"}
           autoComplete={autoComplete}
-          className="mm-input mm-security-field"
+          className="mm-input"
           disabled={disabled}
           onChange={(e) => {
             onChange(e.target.value);
@@ -73,11 +71,13 @@ export function RevealablePasswordField({
         />
         <button
           type="button"
-          className={mmActionButtonClass({ variant: "tertiary" })}
+          className="mm-sys-secret__toggle"
           disabled={disabled}
+          aria-label={toggleLabel}
+          title={toggleLabel}
           onClick={() => setShown((prev) => !prev)}
         >
-          {shown ? `Hide ${revealLabel}` : `Show ${revealLabel}`}
+          {shown ? <EyeOffIcon size={EYE_SIZE} /> : <EyeIcon size={EYE_SIZE} />}
         </button>
       </div>
     </div>

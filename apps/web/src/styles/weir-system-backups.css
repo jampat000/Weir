@@ -1,0 +1,132 @@
+/* The System view's Backups and tools card. */
+
+.mm-sy-part {
+  display: grid;
+  gap: 4px;
+  padding: 0 18px 8px;
+}
+
+.mm-sy-part:first-child {
+  padding-bottom: 4px;
+}
+
+.mm-sy-part__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.mm-sy-part__title {
+  font-size: var(--mm-type-eyebrow);
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--mm-text2);
+}
+
+.mm-sy-part__line {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: var(--mm-type-caption);
+  white-space: nowrap;
+  color: var(--mm-text2);
+}
+
+.mm-sy-part__line > span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* The button is a size smaller here, so the heading, the schedule and a backup all fit a short card. */
+.mm-sy-part__head .mm-sy-btn {
+  height: var(--mm-control-height-row);
+  line-height: 22px;
+}
+
+.mm-sy-backup {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 3px;
+  padding: 3px 8px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--mm-surface-2) 60%, transparent);
+  font-size: var(--mm-type-caption);
+}
+
+.mm-sy-list > .mm-sy-backup:last-child {
+  margin-bottom: 0;
+}
+
+.mm-sy-backup__size {
+  font-variant-numeric: tabular-nums;
+  color: var(--mm-text2);
+}
+
+/* Tools and updates read as one line each: the part's name, then what it says, on one baseline. The name's column is
+   as wide as the longest name, "Updates". */
+.mm-sy-part--inline {
+  grid-template-columns: 64px minmax(0, 1fr);
+  align-items: baseline;
+  gap: 4px 8px;
+  padding-bottom: 4px;
+}
+
+/* The older backups sit under their own heading, after the updates and tools. */
+.mm-sy-part--earlier {
+  padding-inline: 0;
+}
+
+.mm-sy-part--earlier > .mm-sy-part__title {
+  padding-inline: 18px;
+}
+
+.mm-sy-inline-list {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 2px 14px;
+  white-space: nowrap;
+  list-style: none;
+}
+
+.mm-sy-tool {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: var(--mm-type-body);
+}
+
+.mm-sy-tool > span:nth-child(2) {
+  font-variant-numeric: tabular-nums;
+  color: var(--mm-text2);
+}
+
+.mm-sy-tool__mark {
+  font-weight: 700;
+}
+
+.mm-sy-update {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 2px 12px;
+  white-space: nowrap;
+  font-size: var(--mm-type-body);
+  color: var(--mm-text2);
+}
+
+.mm-sy-update b {
+  color: var(--mm-text1);
+}
+
+.mm-sy-update__state {
+  text-decoration: none;
+}
+
+/* The state chip is a size smaller, so the update line is one slim line. */
+.mm-sy-update .mm-chip {
+  height: 20px;
+}

@@ -34,6 +34,7 @@ public sealed class ProcessingWatchedFolderScanDispatchScheduleTask : IPeriodicT
     private readonly Dictionary<long, DateTimeOffset> _nextRunByLibrary = [];
     private readonly ScanWakeups? _wakeups;
     private readonly ScanSettingsChanges? _scanSettingsChanges;
+    private readonly PeriodicTaskRegistry? _tasks;
     private ScheduleInputs? _inputs;
 
     public ProcessingWatchedFolderScanDispatchScheduleTask(
@@ -45,8 +46,10 @@ public sealed class ProcessingWatchedFolderScanDispatchScheduleTask : IPeriodicT
         TimeProvider time,
         ILogger<ProcessingWatchedFolderScanDispatchScheduleTask> logger,
         ScanWakeups? wakeups = null,
-        ScanSettingsChanges? scanSettingsChanges = null)
+        ScanSettingsChanges? scanSettingsChanges = null,
+        PeriodicTaskRegistry? tasks = null)
     {
+        _tasks = tasks;
         _wakeups = wakeups;
         _scanSettingsChanges = scanSettingsChanges;
         _database = database ?? throw new ArgumentNullException(nameof(database));
@@ -59,6 +62,8 @@ public sealed class ProcessingWatchedFolderScanDispatchScheduleTask : IPeriodicT
     }
 
     public string Name => "processing-watched-folder-remux-scan-dispatch-enqueue";
+
+    public string? Label => null;
 
     /// <summary>A short, fixed poll. Each library's due time is tracked separately, so a 1s poll is simpler
     /// and easier to test than sleeping until the nearest due library. The poll only compares due times; the
@@ -86,6 +91,7 @@ public sealed class ProcessingWatchedFolderScanDispatchScheduleTask : IPeriodicT
             foreach (var id in _nextRunByLibrary.Keys)
             {
                 _wakeups?.ForgetPeriodic(id);
+                _tasks?.Remove(ScheduledJobTasks.ScanKey(id));
             }
 
             _nextRunByLibrary.Clear();
@@ -101,6 +107,7 @@ public sealed class ProcessingWatchedFolderScanDispatchScheduleTask : IPeriodicT
         {
             _nextRunByLibrary.Remove(staleId);
             _wakeups?.ForgetPeriodic(staleId);
+            _tasks?.Remove(ScheduledJobTasks.ScanKey(staleId));
         }
 
         foreach (var library in libraries)
@@ -112,6 +119,7 @@ public sealed class ProcessingWatchedFolderScanDispatchScheduleTask : IPeriodicT
                 // a delayed catch-up — exactly as if the library did not exist for this timer.
                 _nextRunByLibrary.Remove(library.Id);
                 _wakeups?.ForgetPeriodic(library.Id);
+                _tasks?.Remove(ScheduledJobTasks.ScanKey(library.Id));
                 continue;
             }
 
@@ -125,6 +133,7 @@ public sealed class ProcessingWatchedFolderScanDispatchScheduleTask : IPeriodicT
 
             if (now < due)
             {
+                AnnounceNextScan(library, interval, due);
                 continue;
             }
 
@@ -161,8 +170,17 @@ public sealed class ProcessingWatchedFolderScanDispatchScheduleTask : IPeriodicT
 
             _nextRunByLibrary[library.Id] = now + nextDelay;
             _wakeups?.RecordNextPeriodic(library.Id, now + nextDelay);
+            AnnounceNextScan(library, interval, now + nextDelay);
         }
     }
+
+    /// <summary>Tells the task list when a workflow is next looked at: the earlier of a booked look and its next periodic scan.</summary>
+    private void AnnounceNextScan(ProcessingLibraryRecord library, TimeSpan interval, DateTimeOffset periodicDue) =>
+        _tasks?.Plan(
+            ScheduledJobTasks.ScanKey(library.Id),
+            ScheduledJobTasks.ScanLabel(library.Name),
+            _wakeups?.NextLookFor(library.Id) ?? periodicDue,
+            interval);
 
     /// <summary>The enabled libraries and the scan switches, read again only when they may have changed.</summary>
     private async Task<(IReadOnlyList<ProcessingLibraryRecord> Libraries, ProcessingOperatorSettingsRecord Settings)> ReadInputsAsync(UnitOfWork uow, DateTimeOffset now)

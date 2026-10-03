@@ -14,7 +14,7 @@ import {
   useUnlinkDiscoveredProcessingLibrary,
   useUpdateProcessingLibrary,
 } from "../../../../lib/processing/libraries-queries";
-import { SaveModelNote } from "../../save-model-note";
+import { inDisplayOrder } from "../../../../lib/processing/workflow-hues";
 import { SettingsLoadError } from "../../settings-load-error";
 import { AddWorkflowChoice, type WorkflowStart } from "./add-workflow-choice";
 import { LibraryEditor } from "./library-editor";
@@ -44,9 +44,9 @@ type Editing =
     };
 
 /**
- * Settings › Libraries: add, edit, reorder, switch on and off, and remove the libraries Weir
+ * Setup › Workflows › File paths: add, edit, reorder, switch on and off, and remove the libraries Weir
  * watches. A library is a row, so a fourth one is ordinary rather than a schema change (ADR-0014).
- * The list's own switches and arrows save at once; the editor saves only on its Save.
+ * The list's own switches and priority order save at once; the editor saves only on its Save.
  */
 export function LibrariesTab() {
   const editable = useCanEdit();
@@ -80,9 +80,7 @@ export function LibrariesTab() {
   if (libraries.isPending) return <PageLoading label="Loading workflows" />;
   if (libraries.isError) return <SettingsLoadError what="workflows" />;
 
-  const rows = [...libraries.data].sort(
-    (a, b) => a.display_order - b.display_order,
-  );
+  const rows = inDisplayOrder(libraries.data);
   const managers = connections.data ?? [];
 
   /** Runs a change, clearing the last notice first and saying why if it fails. */
@@ -99,21 +97,18 @@ export function LibrariesTab() {
         })
       : create.mutateAsync(writeFrom(form));
 
-  const move = (library: ProcessingLibrary, direction: -1 | 1) => {
-    const index = rows.findIndex((r) => r.id === library.id);
-    const target = index + direction;
-    if (index < 0 || target < 0 || target >= rows.length) return;
-    const swapped = [...rows];
-    [swapped[index], swapped[target]] = [swapped[target], swapped[index]];
-    attempt(
-      reorder.mutateAsync(swapped.map((r) => r.id)),
-      "Workflows could not be reordered.",
-    );
+  /** Saves a new order, saying why when it fails; the list returns to the saved order either way. */
+  const reorderWorkflows = (ids: number[]) => {
+    setNotice(null);
+    return reorder
+      .mutateAsync(ids)
+      .catch((error: unknown) =>
+        setNotice(errorMessage(error, "Workflows could not be reordered.")),
+      );
   };
 
   return (
     <div className="mm-quiet-stack" data-testid="processing-libraries-section">
-      <SaveModelNote model="instant" />
       {notice ? (
         <p
           className="text-sm font-medium text-mm-text1"
@@ -133,6 +128,7 @@ export function LibrariesTab() {
           setNotice(null);
           setEditing({ kind: "choosing" });
         }}
+        onReorder={reorderWorkflows}
         actions={{
           onToggle: (library) =>
             attempt(
@@ -145,7 +141,6 @@ export function LibrariesTab() {
               }),
               "That workflow could not be changed.",
             ),
-          onMove: move,
           onEdit: (library) => {
             setNotice(null);
             setEditing({ kind: "editing", library });

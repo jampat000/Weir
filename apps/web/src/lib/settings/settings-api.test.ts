@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   deleteNotificationChannel,
+  networkAccessPath,
+  putNetworkAccess,
   configurationBackupsPath,
   configurationBundlePath,
   securityOverviewPath,
@@ -44,5 +46,33 @@ describe("suite settings API paths", () => {
     const [, request] = fetchMock.mock.calls[1] as [string, RequestInit];
     expect(request.method).toBe("DELETE");
     expect(request.headers).toMatchObject({ "X-CSRF-Token": "csrf-test" });
+  });
+
+  it("saves who can reach Weir with a CSRF token in the body", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ csrf_token: "csrf-test" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ state: "this_pc_only" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await putNetworkAccess({ scope: "network" });
+
+    const [path, request] = fetchMock.mock.calls[1] as [string, RequestInit];
+    expect(path).toBe(networkAccessPath());
+    expect(request.method).toBe("PUT");
+    expect(JSON.parse(String(request.body))).toEqual({
+      scope: "network",
+      csrf_token: "csrf-test",
+    });
   });
 });

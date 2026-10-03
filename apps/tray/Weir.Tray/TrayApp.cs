@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Diagnostics;
+using Weir.Tray.Firewall;
 using Weir.Tray.LanAccess;
 
 namespace Weir.Tray;
@@ -39,7 +40,7 @@ sealed class TrayApp : IDisposable
         _runtimeHome = Program.RuntimeHome();
         _openBrowserOnReady = openBrowserOnReady;
         _server = new ServerHost(_runtimeHome, installRoot, port, listenScope);
-        _lanAccess = new LanAccessSync(_runtimeHome, _server, TimeProvider.System);
+        _lanAccess = new LanAccessSync(_runtimeHome, _server, new WindowsFirewallAccess(), TimeProvider.System);
         _updateSettings = updateSettings;
         _updateService = updateService;
         _shutdown = new TrayShutdown(StopServerAsync, updateService);
@@ -98,7 +99,11 @@ sealed class TrayApp : IDisposable
         _lanAccessMenu = new LanAccessMenu(_lanAccess, _server, ShowLanAccessNotice, _cts.Token);
         _ = BackgroundWork.RunLoop(
             "LAN access watcher",
-            ct => _lanAccess.WatchAsync((scope, change) => OnUi(() => _lanAccessMenu?.OnChangedElsewhere(scope, change)), ct),
+            ct => _lanAccess.WatchAsync(
+                new LanAccessWatch(
+                    () => OnUi(() => _lanAccessMenu?.OnWaitingForWindows()),
+                    applied => OnUi(() => _lanAccessMenu?.OnChangedElsewhere(applied))),
+                ct),
             _cts.Token);
 
         _updates = new TrayUpdates(

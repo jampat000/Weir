@@ -47,7 +47,7 @@ public sealed class ArrManagerRedownload : IManagerRedownload
             throw new MediaManagerHttpException($"{connection.Label} needs a matched title id to redownload {filePath}, and none was given.");
         }
 
-        var client = new MediaManagerHttpClient(connection.BaseUrl, connection.ApiKey, _handlers, ManagerDialectRules.LibraryTimeout);
+        var client = new MediaManagerHttpClient(connection.BaseUrl, connection.ApiKey, _handlers, ManagerDialectRules.LibraryTimeout, connection.Reference);
         return mediaScope == MediaManagerKinds.Movie
             ? await RequestMovieRedownloadAsync(connection, client, id, cancellationToken).ConfigureAwait(false)
             : await RequestSeriesRedownloadAsync(connection, client, id, filePath, cancellationToken).ConfigureAwait(false);

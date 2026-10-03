@@ -4,7 +4,7 @@ using System.Text.Json.Nodes;
 namespace Weir.Api.Tests.Platform;
 
 /// <summary>
-/// <c>GET /processing/library-cleans</c>: History's library cleans, one entry per file with its newest outcome, each
+/// <c>GET /processing/library-cleans</c>: Activity's library cleans, one entry per file with its newest outcome, each
 /// naming its kind, filtered the way the download list is (#695).
 /// </summary>
 public sealed class LibraryCleansApiTests

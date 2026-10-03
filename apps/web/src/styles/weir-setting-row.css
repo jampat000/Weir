@@ -17,8 +17,7 @@
 }
 
 /* The quiet line that explains something, under a field or on its own. */
-.mm-field__hint,
-.mm-caption-note {
+.mm-field__hint {
   font-size: var(--mm-type-caption);
   line-height: 1.45;
   color: var(--mm-text3);
@@ -52,49 +51,13 @@
 }
 
 /*
- * Settings groups: the group's name and why it matters on the left, one setting per row on the right,
- * hairlines between. components/shared/settings-group.tsx. Two groups sit side by side above 1180px
- * (.mm-setgroups--columns), because a page too long for the screen uses the width, not more boxes.
+ * Settings groups: a panel holding a line on why the group matters, then one setting per row with
+ * hairlines between (components/shared/settings-group.tsx). A group takes the page's full width, like every
+ * other card in Setup.
  */
-.mm-setgroups {
-  display: flex;
-  flex-direction: column;
-}
-
-@media (min-width: 1180px) {
-  .mm-setgroups--columns {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    column-gap: 56px;
-    align-items: start;
-  }
-}
-
-.mm-setgroup {
-  display: grid;
-  grid-template-columns: minmax(0, 200px) minmax(0, 1fr);
-  gap: 28px;
-  padding: 16px 0;
-  border-top: 1px solid var(--mm-border);
-}
-
-@media (max-width: 760px) {
-  .mm-setgroup {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 8px;
-  }
-}
-
-.mm-setgroup__title {
-  margin: 0;
-  font-size: 0.9375rem;
-  font-weight: 600;
-  color: var(--mm-text);
-}
-
 .mm-setgroup__detail {
-  margin: 6px 0 0;
-  font-size: 0.8125rem;
+  margin: 0 0 10px;
+  font-size: var(--mm-type-body);
   line-height: 1.5;
   color: var(--mm-text3);
 }
@@ -105,6 +68,11 @@
   min-width: 0;
 }
 
+/* The group's own actions, set off from its last row. */
+.mm-setgroup__rows + .mm-quiet-actions {
+  margin-top: 12px;
+}
+
 .mm-setrow {
   display: flex;
   align-items: center;
@@ -112,7 +80,7 @@
   gap: 20px;
   min-height: 48px;
   padding: 6px 0;
-  border-bottom: 1px solid color-mix(in srgb, var(--mm-border) 60%, transparent);
+  border-bottom: 1px solid var(--mm-hairline);
 }
 
 .mm-setrow:last-child {
@@ -154,7 +122,7 @@
 }
 
 .mm-setrow__hint {
-  font-size: 0.8125rem;
+  font-size: var(--mm-type-body);
   line-height: 1.45;
   color: var(--mm-text3);
 }
@@ -175,7 +143,7 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  font-size: 0.8125rem;
+  font-size: var(--mm-type-body);
   color: var(--mm-text2);
 }
 
@@ -203,14 +171,14 @@
 
 .mm-choice-row button {
   min-width: 34px;
-  height: 30px;
+  height: calc(var(--mm-control-height-page) - 6px);
   padding: 0 10px;
   border: 0;
   border-radius: 8px;
   background: transparent;
   color: var(--mm-text2);
   font: inherit;
-  font-size: 0.8125rem;
+  font-size: var(--mm-type-body);
   font-weight: 500;
   cursor: pointer;
 }

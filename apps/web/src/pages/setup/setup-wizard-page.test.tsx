@@ -182,10 +182,10 @@ describe("SetupWizardPage", () => {
     });
     expect(
       screen.getByRole("link", { name: "Choose which tracks to keep" }),
-    ).toHaveAttribute("href", "/settings?tab=rules");
+    ).toHaveAttribute("href", "/setup/rules");
     expect(
       screen.getByRole("link", { name: "Connect Sonarr, Radarr or Deluno" }),
-    ).toHaveAttribute("href", "/settings?tab=media-managers");
+    ).toHaveAttribute("href", "/setup/connections");
     expect(
       screen.getByRole("link", { name: "Clean files you already have" }),
     ).toHaveAttribute("href", "/library");

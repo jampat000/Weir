@@ -82,12 +82,12 @@ The setup wizard has three parts:
 - **Automatic backups**: whether Weir keeps a rolling copy of its configuration, and how often.
 
 If Weir cannot reach what you connect, it says so and you can go back or choose **Neither**. You can
-skip the wizard and set these later: workflows under **Settings › Workflows**, connections under
-**Settings › Media managers**, backups under **System › Backups**.
+skip the wizard and set these later: workflows under **Setup › Workflows**, connections under
+**Setup › Connections › Media managers**, backups under **System › Backups**.
 
 ## 4. Choose what to keep
 
-Under **Settings › Rules**, set the audio and subtitle rules your workflows use. For example, keep
+Under **Setup › Rules › Profiles**, set the audio and subtitle rules your workflows use. For example, keep
 English and Japanese audio, keep English subtitles, and drop commentary tracks.
 
 ## 5. Try it with a real file
@@ -98,11 +98,11 @@ of relying on filesystem notifications.
 
 Weir does not touch a new file straight away. It waits until the file has not changed for 60 seconds, by
 size or by last-changed time, so a download that is still arriving is left alone. Each workflow has its own
-wait under **Settings › Workflows › File readiness**, and its own **Minimum file size** (50 MB for a new
+wait under **Setup › Workflows › File readiness**, and its own **Minimum file size** (50 MB for a new
 workflow) under **Intake rules**: smaller files, such as samples, are skipped.
 
 - The file shows up on **Processing** while Weir works on it.
-- Once it's done, it shows up in **History**, and the cleaned copy is in the output folder.
+- Once it's done, it shows up in **Activity**, and the cleaned copy is in the output folder.
 
 Already have a library you want to clean up? Open **Library** and pick the workflow from the title.
 A library with no folders yet shows **Set up this library**: add the folders your files sit in and
@@ -116,12 +116,13 @@ clean and what happens to the original file after a clean.
 | Problem | Try this |
 | --- | --- |
 | Files sit in the watched folder and nothing happens | In Docker, check the path in Weir is the path **inside the container**, not the path on the host. Weir can take up to five minutes to notice a file. |
-| "Permission denied" in a file's History | Set `WEIR_PUID` / `WEIR_PGID` to the user that owns your media folders. See [Docker deployment](deployment/docker). |
+| "Permission denied" in a file's Activity | Set `WEIR_PUID` / `WEIR_PGID` to the user that owns your media folders. See [Docker deployment](deployment/docker). |
 | Can't open Weir | Check the container is running and you're using the right port. Weir's health check is at `http://your-server-ip:9347/health`. |
 
 ## Next steps
 
 - [Connecting Deluno, Sonarr and Radarr](guides/media-managers) — hand off files automatically
+- [Posters](guides/posters) — what Artwork does, what it sends, and how to turn it off
 - [Docker deployment](deployment/docker) — media folders, file ownership, running alongside other apps
 - [Windows installer](deployment/windows) — ports, updates, unattended installs
 - [Building from source](guides/local-development) — for developers who want to run Weir from a clone

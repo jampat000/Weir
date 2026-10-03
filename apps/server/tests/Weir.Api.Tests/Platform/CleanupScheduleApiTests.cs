@@ -3,7 +3,7 @@ using System.Net;
 namespace Weir.Api.Tests.Platform;
 
 /// <summary>
-/// Settings › Cleanup over real HTTP: each cleanup job's interval is a setting, and <c>GET /processing/maintenance</c>
+/// Setup › Performance › Cleanup over real HTTP: each cleanup job's interval is a setting, and <c>GET /processing/maintenance</c>
 /// says how often each runs and, while it is switched on, when it next does.
 /// </summary>
 public sealed class CleanupScheduleApiTests

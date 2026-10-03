@@ -51,12 +51,15 @@ function DiscoveredLibrary({
           </span>
         ) : null}
         {item.already_imported ? (
-          <span className="block text-xs text-mm-status-healthy-text">
+          <span className="mm-status-text block text-xs" data-status="done">
             Already imported
           </span>
         ) : null}
         {problem ? (
-          <span className="block text-xs text-mm-status-warning-text">
+          <span
+            className="mm-status-text block text-xs"
+            data-status="attention"
+          >
             {problem}
           </span>
         ) : null}
@@ -70,7 +73,7 @@ function DriftList({ items }: { items: ProcessingLibraryDrift[] }) {
     <div className="mt-6" aria-label="Workflow comparison">
       <h4 className="text-sm font-medium text-mm-text1">Comparison result</h4>
       {items.length === 0 ? (
-        <p className="text-sm text-mm-status-healthy-text">
+        <p className="mm-status-text text-sm" data-status="done">
           No manager/workflow path differences were found.
         </p>
       ) : (

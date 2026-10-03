@@ -14,6 +14,7 @@ import type { MaintenanceState } from "../../../../lib/processing/maintenance-ap
 import * as maintenanceQueries from "../../../../lib/processing/maintenance-queries";
 import * as processingQueries from "../../../../lib/processing/queries";
 import * as settingsQueries from "../../../../lib/settings/queries";
+import { mmActionButtonClass } from "../../../../lib/ui/mm-control-roles";
 import { CleanupTab } from "./cleanup-tab";
 
 const mutate = vi.fn();
@@ -172,6 +173,22 @@ it("holds only the leftover work files, the kept half-written copy and the copie
   ]);
 });
 
+it("gives each setting between the jobs one cell across every column, so it does not sit under any one heading", async () => {
+  setup(state());
+
+  render(<CleanupTab />, { wrapper });
+
+  const columnCount = (await screen.findAllByRole("columnheader")).length;
+  for (const testId of [
+    "processing-maintenance-keep-failed-copy",
+    "processing-maintenance-handback-window",
+  ]) {
+    const cells = within(screen.getByTestId(testId)).getAllByRole("cell");
+    expect(cells).toHaveLength(1);
+    expect(cells[0]).toHaveAttribute("colspan", String(columnCount));
+  }
+});
+
 it("keeps a failed file's half-written copy for a day when switched on, and saves at once", async () => {
   setup(state());
   saveSettings.mockResolvedValue({});
@@ -248,6 +265,9 @@ it("asks for confirmation before switching on a destructive job, then saves once
   );
   expect(dialog).toHaveTextContent(
     'Switch on "Cleaned copies nobody picked up"?',
+  );
+  expect(within(dialog).getByRole("button", { name: "Switch on" })).toHaveClass(
+    ...mmActionButtonClass({ variant: "primary" }).split(" "),
   );
   fireEvent.click(within(dialog).getByRole("button", { name: "Switch on" }));
 

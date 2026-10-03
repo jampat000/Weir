@@ -13,7 +13,7 @@ export function DeveloperEntryError({ error }: { error: unknown }) {
   if (isLikelyNetworkFailure(error) || isLikelyViteProxyUpstreamDown(error)) {
     return (
       <>
-        <h1 className="mm-auth-title mm-auth-title--alert">
+        <h1 className="mm-auth-title mm-status-text" data-status="broken">
           Cannot reach the API
         </h1>
         {isLikelyViteProxyUpstreamDown(error) ? (
@@ -75,7 +75,7 @@ export function DeveloperEntryError({ error }: { error: unknown }) {
     if (status === 503) {
       return (
         <>
-          <h1 className="mm-auth-title mm-auth-title--caution">
+          <h1 className="mm-auth-title mm-status-text" data-status="attention">
             API is running but not ready
           </h1>
           <p className="mm-auth-lead">
@@ -107,7 +107,7 @@ export function DeveloperEntryError({ error }: { error: unknown }) {
     }
     return (
       <>
-        <h1 className="mm-auth-title mm-auth-title--alert">
+        <h1 className="mm-auth-title mm-status-text" data-status="broken">
           Unexpected API error
         </h1>
         <p className="mm-auth-lead">
@@ -124,7 +124,7 @@ export function DeveloperEntryError({ error }: { error: unknown }) {
 
   return (
     <>
-      <h1 className="mm-auth-title mm-auth-title--alert">
+      <h1 className="mm-auth-title mm-status-text" data-status="broken">
         Cannot load the app
       </h1>
       <p className="mm-auth-lead">

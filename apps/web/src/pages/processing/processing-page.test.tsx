@@ -1,13 +1,16 @@
+import type { ComponentProps } from "react";
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { LiveProgressEntry } from "../../lib/activity/use-activity-stream-invalidation";
 import type { ProcessingFile } from "../../lib/processing/files-api";
-import { activityKeys } from "../../lib/activity/query-keys";
-import { processingKeys } from "../../lib/processing/query-keys";
+import type { NextItem } from "./dashboard/next-model";
+import type { NeedsPanel } from "./dashboard/needs-panel";
 import { LEAVING_CARD_MS } from "./leaving-cards";
 import { LIBRARY_CLEAN_JOB_KIND } from "./processing-model";
 import { ProcessingPage } from "./processing-page";
+
+type NeedsPanelProps = ComponentProps<typeof NeedsPanel>;
 
 const files: {
   files: ProcessingFile[];
@@ -25,6 +28,7 @@ const fileLogState: { isError: boolean; error: unknown } = {
   isError: false,
   error: null,
 };
+const fileLogMutate = vi.fn();
 const pause = {
   paused: false,
   reason: "",
@@ -54,10 +58,16 @@ const readiness = {
   worker_health: [] as { module: string; status: string; detail: string }[],
 };
 const stats = { files_processed: 38, net_space_saved_bytes: 44_236_078_284 };
+const needsYou = { count: 0 };
+const nextItems: NextItem[] = [];
 const refetchFiles = vi.fn();
 const refetchLibraries = vi.fn();
 
 const liveProgress: Record<string, LiveProgressEntry> = {};
+/** What the page gave the Needs you panel, each time it rendered. */
+const needsProps: NeedsPanelProps[] = [];
+/** What the Activity stream asked for, each time it asked. */
+const streamFilters: { library_id?: number; module?: string }[] = [];
 /** The query keys each call to useActivityStreamInvalidations asked to refresh on activity. */
 const invalidations: (readonly unknown[])[] = [];
 
@@ -76,12 +86,13 @@ vi.mock("../../lib/processing/files-queries", () => ({
     refetch: refetchFiles,
   }),
   useProcessingFileLog: () => ({
-    mutate: vi.fn(),
+    mutate: fileLogMutate,
     data: undefined,
     isPending: false,
     isError: fileLogState.isError,
     error: fileLogState.error,
   }),
+  useRequeueProcessingFile: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 vi.mock("../../lib/processing/queries", () => ({
   useProcessingOverviewStatsQuery: () => ({ data: stats }),
@@ -93,6 +104,12 @@ vi.mock("../../lib/processing/queries", () => ({
       waiting_for: "free_slot",
       message: "1 waiting for a free lane",
     },
+  }),
+}));
+vi.mock("./dashboard/use-needs-you", () => ({
+  useNeedsYou: () => ({
+    groups: [],
+    files: Array.from({ length: needsYou.count }),
   }),
 }));
 vi.mock("../../lib/processing/jobs-inspection/queries", () => ({
@@ -121,13 +138,45 @@ vi.mock("../../lib/auth/queries", () => ({
   useSetThemeMutation: () => ({ mutate: vi.fn(), isError: false }),
 }));
 vi.mock("../../lib/activity/queries", () => ({
-  useActivityRecentQuery: (filters: { event_type: string }) => ({
-    data: activity[filters.event_type] ?? { items: [] },
-  }),
+  // The stream asks for the newest events of every kind; Just finished and the chart ask for one kind.
+  useActivityRecentQuery: (filters: {
+    event_type?: string;
+    library_id?: number;
+    module?: string;
+  }) => {
+    if (!filters.event_type) streamFilters.push(filters);
+    return {
+      data: (filters.event_type
+        ? activity[filters.event_type]
+        : activity.stream) ?? {
+        items: [],
+      },
+    };
+  },
   useActivityWindowQuery: (filters: { event_type: string }) => {
     const items = activity[filters.event_type]?.items ?? [];
     return { data: { items, total: items.length, complete: true } };
   },
+}));
+// The next-up list and the Health panel read their own endpoints; their tests are beside them.
+vi.mock("./dashboard/use-next-items", () => ({
+  useNextItems: () => nextItems,
+}));
+vi.mock("./dashboard/needs-panel", () => ({
+  NeedsPanel: (props: NeedsPanelProps) => {
+    needsProps.push(props);
+    return (
+      <button type="button" onClick={() => props.onOpen?.(file({ id: 9 }))}>
+        Open the story
+      </button>
+    );
+  },
+}));
+vi.mock("./dashboard/health-panel", () => ({
+  HealthPanel: () => <div data-testid="health-panel" />,
+}));
+vi.mock("../activity/activity-rejected-again", () => ({
+  ProcessRejectedAgain: () => <button type="button">Process all again</button>,
 }));
 
 function file(overrides: Partial<ProcessingFile>): ProcessingFile {
@@ -166,9 +215,30 @@ function file(overrides: Partial<ProcessingFile>): ProcessingFile {
   };
 }
 
-function renderLive() {
+/** A library clean that is running for the Movies workflow. */
+function libraryCleanJob(id: number) {
+  return {
+    id,
+    dedupe_key: `clean-${id}`,
+    job_kind: LIBRARY_CLEAN_JOB_KIND,
+    status: "leased",
+    attempt_count: 0,
+    max_attempts: 3,
+    lease_owner: "w",
+    lease_expires_at: null,
+    last_error: null,
+    payload_json: JSON.stringify({
+      library_id: 2,
+      path: "Paper Lanterns (2023)/Paper.Lanterns.2023.mkv",
+    }),
+    created_at: "2026-08-18T09:40:00",
+    updated_at: "2026-08-18T09:40:00",
+  };
+}
+
+function renderLive(address = "/") {
   return render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={[address]}>
       <ProcessingPage />
     </MemoryRouter>,
   );
@@ -185,14 +255,21 @@ describe("ProcessingPage", () => {
     jobs.failed = { jobs: [] };
     activity["processing.file_remux_pass_completed"] = { items: [] };
     activity["library.file_cleaned"] = { items: [] };
+    activity.stream = { items: [] };
+    nextItems.length = 0;
     pause.paused = false;
+    needsYou.count = 0;
     readiness.worker_health = [];
     refetchFiles.mockClear();
     refetchLibraries.mockClear();
     invalidations.length = 0;
+    streamFilters.length = 0;
+    needsProps.length = 0;
     fileLogState.isError = false;
     fileLogState.error = null;
   });
+
+  afterEach(() => vi.useRealTimers());
 
   it("fetches fresh data once a countdown runs out, instead of saying it is checking for ever", () => {
     files.files = [
@@ -205,216 +282,331 @@ describe("ProcessingPage", () => {
     ];
     renderLive();
 
-    expect(screen.getByTestId("live-arriving")).toHaveTextContent(
-      "Its wait is over. Weir is checking it now.",
-    );
     expect(refetchFiles).toHaveBeenCalled();
     expect(refetchLibraries).toHaveBeenCalled();
   });
 
-  it("names the wait every workflow holds a new download for", () => {
-    const before = libraries.map((library) => library.ready_after_seconds);
-    libraries.forEach((library) => {
-      library.ready_after_seconds = 10;
+  it("filters what the Pipeline shows from the header, which starts on Everything", () => {
+    files.files = [file({ id: 1, status: "unprocessed" })];
+    jobs.active = { jobs: [libraryCleanJob(40)] };
+    renderLive();
+    expect(screen.getByRole("button", { name: "Everything" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    const board = screen.getByTestId("pipeline-board");
+    expect(board).toHaveTextContent("The Quiet Harbour S01E03");
+    expect(board).toHaveTextContent("Paper Lanterns (2023)");
+
+    fireEvent.click(screen.getByRole("button", { name: "Library cleaning" }));
+
+    expect(board).not.toHaveTextContent("The Quiet Harbour S01E03");
+    expect(board).toHaveTextContent("Paper Lanterns (2023)");
+    expect(
+      screen.getByRole("button", { name: "Library cleaning" }),
+    ).toHaveAttribute("aria-pressed", "true");
+  });
+
+  describe("narrowed to one workflow from the address", () => {
+    beforeEach(() => {
+      files.files = [file({ id: 1, status: "unprocessed" })];
+      jobs.active = { jobs: [libraryCleanJob(40)] };
     });
-    try {
+
+    it("shows the Pipeline of that workflow's files and library cleans only", () => {
+      const tv = renderLive("/?workflow=1");
+      const tvBoard = screen.getByTestId("pipeline-board");
+      expect(tvBoard).toHaveTextContent("The Quiet Harbour S01E03");
+      expect(tvBoard).not.toHaveTextContent("Paper Lanterns (2023)");
+      tv.unmount();
+
+      renderLive("/?workflow=2");
+      const moviesBoard = screen.getByTestId("pipeline-board");
+      expect(moviesBoard).not.toHaveTextContent("The Quiet Harbour S01E03");
+      expect(moviesBoard).toHaveTextContent("Paper Lanterns (2023)");
+    });
+
+    it("lists only that workflow's files under Working on now", () => {
+      files.files = [
+        file({ id: 3, status: "processing", library_id: 1 }),
+        file({
+          id: 4,
+          status: "processing",
+          library_id: 2,
+          relative_path: "Glass.Orchard.S01E04.2160p.WEB-DL.mkv",
+        }),
+      ];
+      renderLive("/?workflow=2");
+
+      const tile = screen.getByRole("region", { name: "Working on now" });
+      expect(within(tile).getByTestId("live-working")).toHaveTextContent(
+        "Glass Orchard S01E04",
+      );
+      expect(within(tile).getByTestId("live-working")).not.toHaveTextContent(
+        "The Quiet Harbour",
+      );
+    });
+
+    it("asks the Activity stream only for that workflow's entries", () => {
+      renderLive("/?workflow=2");
+
+      expect(streamFilters.at(-1)).toMatchObject({ library_id: 2 });
+    });
+
+    it("asks for every workflow's entries when none is chosen", () => {
+      renderLive("/");
+
+      expect(streamFilters.at(-1)?.library_id).toBeUndefined();
+    });
+
+    it("asks for every kind of work's entries on Everything", () => {
+      renderLive("/");
+
+      expect(streamFilters.at(-1)?.module).toBeUndefined();
+    });
+
+    it("asks only for the entries of the kind of work chosen", () => {
+      renderLive("/?work=library");
+      expect(streamFilters.at(-1)?.module).toBe("library");
+
+      renderLive("/?work=download");
+      expect(streamFilters.at(-1)?.module).toBe("processing");
+    });
+  });
+
+  describe("the band", () => {
+    it("says how many files are being worked on out of how many may be at once, and names each", () => {
+      files.files = [
+        file({
+          id: 3,
+          status: "processing",
+          relative_path: "Glass.Orchard.S01E04.2160p.WEB-DL.mkv",
+          progress_percent: 46,
+          progress_stage: "writing",
+        }),
+      ];
       renderLive();
 
-      expect(
-        screen.getByText(
-          /new downloads wait 10 seconds after they stop changing/,
-        ),
-      ).toBeInTheDocument();
-    } finally {
-      libraries.forEach((library, index) => {
-        library.ready_after_seconds = before[index];
+      const tile = screen.getByRole("region", { name: "Working on now" });
+      expect(within(tile).getByTestId("live-working-count")).toHaveTextContent(
+        "1",
+      );
+      expect(tile).toHaveTextContent("of 2 at once");
+      expect(within(tile).getByTestId("live-working")).toHaveTextContent(
+        "Glass Orchard S01E04 · Writing46%",
+      );
+    });
+
+    it("opens a working file's story from its row", () => {
+      files.files = [
+        file({
+          id: 3,
+          status: "processing",
+          relative_path: "Glass.Orchard.S01E04.2160p.WEB-DL.mkv",
+          progress_percent: 46,
+        }),
+      ];
+      renderLive();
+
+      fireEvent.click(
+        within(screen.getByTestId("live-working")).getByRole("button"),
+      );
+
+      expect(fileLogMutate).toHaveBeenCalledWith(3);
+    });
+
+    it("names the wait every workflow holds a new download for, and links to where it is changed", () => {
+      const before = libraries.map((library) => library.ready_after_seconds);
+      libraries.forEach((library) => {
+        library.ready_after_seconds = 10;
       });
-    }
+      try {
+        renderLive();
+
+        const tile = screen.getByRole("region", { name: "Working on now" });
+        expect(tile).toHaveTextContent("new downloads wait 10s");
+        expect(
+          within(tile).getByRole("link", { name: "Change" }),
+        ).toHaveAttribute("href", "/setup/performance");
+      } finally {
+        libraries.forEach((library, index) => {
+          library.ready_after_seconds = before[index];
+        });
+      }
+    });
+
+    it("counts and lists only the kind of work the page is narrowed to", () => {
+      files.files = [
+        file({
+          id: 3,
+          status: "processing",
+          relative_path: "Glass.Orchard.S01E04.2160p.WEB-DL.mkv",
+          progress_percent: 46,
+        }),
+      ];
+      jobs.active = { jobs: [libraryCleanJob(40)] };
+      renderLive();
+      const tile = screen.getByRole("region", { name: "Working on now" });
+      expect(screen.getByTestId("live-working-count")).toHaveTextContent("2");
+
+      fireEvent.click(screen.getByRole("button", { name: "Library cleaning" }));
+      expect(screen.getByTestId("live-working-count")).toHaveTextContent("1");
+      expect(tile).toHaveTextContent("Paper Lanterns (2023)");
+      expect(tile).not.toHaveTextContent("Glass Orchard");
+
+      fireEvent.click(screen.getByRole("button", { name: "New downloads" }));
+      expect(screen.getByTestId("live-working-count")).toHaveTextContent("1");
+      expect(tile).toHaveTextContent("Glass Orchard");
+      expect(tile).not.toHaveTextContent("Paper Lanterns");
+    });
+
+    it("says what is narrowed away when there is nothing left to show", () => {
+      files.files = [file({ id: 3, status: "processing" })];
+      renderLive("/?work=library");
+
+      expect(
+        screen.getByRole("region", { name: "Working on now" }),
+      ).toHaveTextContent("No library cleaning right now.");
+      expect(screen.getByTestId("pipeline-board")).toHaveTextContent(
+        "No library cleaning right now.",
+      );
+    });
+
+    it("does not name the wait for new downloads when only library cleaning is shown", () => {
+      renderLive("/?work=library");
+
+      expect(
+        screen.getByRole("region", { name: "Working on now" }),
+      ).not.toHaveTextContent("new downloads wait");
+    });
+
+    it("says what has been cleaned today, and offers the files that need a look", () => {
+      needsYou.count = 3;
+      renderLive();
+
+      const tile = screen.getByRole("region", { name: "Today" });
+      expect(within(tile).getByTestId("live-done-today")).toHaveTextContent(
+        "38",
+      );
+      expect(tile).toHaveTextContent("41.20 GB saved");
+      expect(
+        within(tile).getByRole("button", { name: "3 need a look →" }),
+      ).toBeInTheDocument();
+    });
+
+    it("says Paused in Next, and that work already running finishes", () => {
+      pause.paused = true;
+      renderLive();
+
+      const tile = screen.getByRole("region", { name: "Next" });
+      expect(tile).toHaveTextContent("Paused");
+      expect(tile).toHaveTextContent("Running files finish first.");
+      expect(screen.getByTestId("pipeline-board")).toHaveTextContent(
+        "Paused · nothing new starts.",
+      );
+    });
+
+    it("counts down to the next thing Weir does on its own", () => {
+      nextItems.push({
+        key: "scan-1",
+        label: "Look for new downloads in TV",
+        to: "/setup/workflows?edit=1",
+        at: Date.parse("2026-08-18T10:00:42Z"),
+        intervalSeconds: 300,
+      });
+      renderLive();
+
+      const tile = screen.getByRole("region", { name: "Next" });
+      expect(within(tile).getByTestId("live-next-figure")).toHaveTextContent(
+        "42 s",
+      );
+      expect(tile).toHaveTextContent("Look for new downloads in TV");
+    });
   });
 
-  it("counts a file waiting on its manager down to Weir's next look", () => {
-    libraries[0] = {
-      ...libraries[0],
-      next_look_at: "2026-08-18T10:03:12Z",
-      scan_interval_seconds: 300,
-    } as (typeof libraries)[number];
-    files.files = [
-      file({
-        id: 2,
-        status: "blocked_upstream",
-        blocked_by_connection: "Sonarr",
-      }),
-    ];
+  describe("Needs you", () => {
+    it("is given the workflow the page is narrowed to", () => {
+      renderLive("/?workflow=2");
+
+      expect(needsProps.at(-1)?.workflowId).toBe(2);
+    });
+
+    it("is not narrowed when no workflow is chosen", () => {
+      renderLive();
+
+      expect(needsProps.at(-1)?.workflowId).toBeNull();
+    });
+
+    it("is given the kind of work the page is narrowed to", () => {
+      renderLive("/?work=download");
+      expect(needsProps.at(-1)?.filter).toBe("download");
+    });
+
+    it("opens a file's story from a row", () => {
+      files.files = [file({ id: 9, status: "processing_failed" })];
+      renderLive();
+
+      fireEvent.click(screen.getByRole("button", { name: "Open the story" }));
+
+      expect(fileLogMutate).toHaveBeenCalledWith(9);
+    });
+  });
+
+  it("lists what Weir just did, in the words of what happened to each file", () => {
+    activity.stream = {
+      items: [
+        {
+          id: 501,
+          created_at: "2026-08-18T09:58:00",
+          event_type: "processing.file_remux_pass_completed",
+          title: "x",
+          module: "processing",
+          library_id: 1,
+          relative_path: "The.Quiet.Harbour.S01E06.mkv",
+          detail: JSON.stringify({
+            outcome: "live_output_written",
+            ok: true,
+            relative_media_path: "The.Quiet.Harbour.S01E06.mkv",
+            source_size_bytes: 2_437_000_000,
+            output_size_bytes: 2_103_000_000,
+            removed_audio: ["a", "b", "c", "d"],
+            removed_subtitles: ["e", "f"],
+          }),
+        },
+      ],
+    };
     renderLive();
 
-    expect(screen.getByTestId("live-arriving")).toHaveTextContent(
-      "Sonarr is still importing it. Weir looks again in 3:12.",
+    const stream = screen.getByTestId("live-stream");
+    expect(stream).toHaveTextContent("The Quiet Harbour S01E06 cleaned");
+    expect(stream).toHaveTextContent(
+      "Saved 319 MB · removed 4 audio, 2 subtitles",
     );
-    delete (libraries[0] as { next_look_at?: string }).next_look_at;
+    expect(stream).toHaveTextContent("2 min ago");
   });
 
-  it("puts each file in the lane its state names, with what it is doing", () => {
+  it("says a file's story could not load, through the shared load-error wording", () => {
     files.files = [
-      file({
-        id: 1,
-        status: "on_hold",
-        status_reason:
-          "This file changed too recently. Weir waits 60s after the last change.",
-        hold_until: "2026-08-18T10:00:21",
-        size_changed_at: "2026-08-18T09:59:21",
-      }),
-      file({
-        id: 2,
-        status: "unprocessed",
-        relative_path: "Northbound.S01E02.720p.WEB-DL.mkv",
-      }),
       file({
         id: 3,
         status: "processing",
         relative_path: "Glass.Orchard.S01E04.2160p.WEB-DL.mkv",
         progress_percent: 46,
-        progress_eta_seconds: 41,
-        progress_speed: "148x",
-        progress_removed_audio: ["German", "French", "Spanish"],
-        progress_removed_subtitles: ["German"],
-      }),
-      file({
-        id: 4,
-        status: "processing",
-        relative_path: "Seoul.Nights.S01E08.mkv",
-        progress_status: "finishing",
       }),
     ];
+    fileLogState.isError = true;
+    fileLogState.error = new Error("boom");
     renderLive();
+
+    fireEvent.click(
+      within(screen.getByTestId("live-working")).getByRole("button"),
+    );
 
     expect(
-      within(screen.getByTestId("live-lane-arriving")).getByTestId(
-        "live-arriving",
+      screen.getByText(
+        "Weir couldn't load what happened to this file. Reload the page to try again.",
       ),
-    ).toHaveTextContent("The Quiet Harbour S01E03");
-    expect(screen.getByTestId("live-arriving")).toHaveTextContent("21s");
-    expect(screen.getByTestId("live-waiting")).toHaveTextContent("1st in line");
-    expect(screen.getByTestId("live-waiting")).toHaveTextContent(
-      "Download · TV",
-    );
-
-    const working = screen.getByTestId("live-working");
-    expect(working).toHaveTextContent("Glass Orchard S01E04");
-    expect(working).toHaveTextContent("46%");
-    expect(working).toHaveTextContent("41 s left");
-    expect(working).toHaveTextContent("Removing 3 audio, 1 subtitle");
-    expect(working).toHaveTextContent("148× real time");
-    expect(screen.getByTestId("live-handing")).toHaveTextContent(
-      "Seoul Nights S01E08",
-    );
-    expect(screen.getByTestId("live-lane-working")).toHaveTextContent(
-      "of 2 at once",
-    );
-  });
-
-  it("lights up only the lanes that hold a file right now, and never Just finished", () => {
-    files.files = [
-      file({ id: 1, status: "unprocessed" }),
-      file({
-        id: 2,
-        status: "processing",
-        relative_path: "Glass.Orchard.S01E04.2160p.WEB-DL.mkv",
-        progress_percent: 10,
-      }),
-    ];
-    activity["processing.file_remux_pass_completed"] = {
-      items: [
-        {
-          id: 701,
-          created_at: "2026-08-18T09:58:00",
-          event_type: "processing.file_remux_pass_completed",
-          title: "x",
-          library_id: 1,
-          relative_path: "Northbound.S04E10.mkv",
-          detail: JSON.stringify({ outcome: "live_output_written", ok: true }),
-        },
-      ],
-    };
-    renderLive();
-
-    const lit = (id: string) =>
-      screen
-        .getByTestId(`live-lane-${id}`)
-        .classList.contains("mm-live-lane--active");
-    expect(lit("waiting")).toBe(true);
-    expect(lit("working")).toBe(true);
-    expect(lit("arriving")).toBe(false);
-    expect(lit("handing")).toBe(false);
-    expect(lit("finished")).toBe(false);
-  });
-
-  it("puts the numbers of a file being written on its card, in words a person reads", () => {
-    files.files = [
-      file({
-        id: 3,
-        status: "processing",
-        relative_path: "Glass.Orchard.S01E04.2160p.WEB-DL.mkv",
-        size_bytes: 2_000_000_000,
-        duration_seconds: 2700,
-        progress_percent: 45,
-        progress_elapsed_seconds: 60,
-        progress_speed: "1.26e+03x",
-      }),
-    ];
-    renderLive();
-
-    const stats = screen.getByTestId("live-working-stats");
-    expect(stats).toHaveTextContent("Speed1,260× real time");
-    expect(stats).toHaveTextContent("Reading14.3 MB/s");
-    expect(stats).toHaveTextContent("Through the file20:15 of 45:00");
-    expect(stats).toHaveTextContent("Running for1 min");
-    expect(stats).not.toHaveTextContent("e+03");
-  });
-
-  it("shows a library clean as work of its own, and the filter narrows to one kind", () => {
-    files.files = [file({ id: 1, status: "unprocessed" })];
-    jobs.active = {
-      jobs: [
-        {
-          id: 40,
-          dedupe_key: "clean-40",
-          job_kind: LIBRARY_CLEAN_JOB_KIND,
-          status: "leased",
-          attempt_count: 0,
-          max_attempts: 3,
-          lease_owner: "w",
-          lease_expires_at: null,
-          last_error: null,
-          payload_json: JSON.stringify({
-            library_id: 2,
-            path: "Paper Lanterns (2023)/Paper.Lanterns.2023.mkv",
-          }),
-          created_at: "2026-08-18T09:40:00",
-          updated_at: "2026-08-18T09:40:00",
-        },
-      ],
-    };
-    renderLive();
-
-    expect(screen.getByTestId("live-working")).toHaveTextContent(
-      "Paper Lanterns (2023)",
-    );
-    expect(screen.getByTestId("live-working")).toHaveTextContent(
-      "Library · Movies",
-    );
-    expect(screen.getByTestId("live-waiting")).toHaveTextContent(
-      "The Quiet Harbour S01E03",
-    );
-
-    fireEvent.click(screen.getByRole("button", { name: "Library cleaning" }));
-
-    expect(screen.getByTestId("live-working")).toHaveTextContent(
-      "Paper Lanterns (2023)",
-    );
-    expect(screen.queryByTestId("live-waiting")).toBeNull();
-    expect(screen.getByTestId("live-lane-waiting")).toHaveTextContent(
-      "Nothing waiting",
-    );
+    ).toBeInTheDocument();
   });
 
   describe("a file that leaves Working", () => {
@@ -440,25 +632,24 @@ describe("ProcessingPage", () => {
       return view;
     }
 
-    it("keeps its card with every step ticked for a moment when it finishes, then lets it drop", () => {
+    it("stays on the Pipeline as Delivered for a moment when it finishes, then lets it drop", () => {
       const view = startRunning();
 
       files.files = [file({ id: 1, status: "processed" })];
       rerenderLive(view);
 
-      const ended = screen.getByTestId("live-leaving");
-      expect(ended).toHaveAttribute("data-outcome", "done");
-      expect(ended).toHaveTextContent("Glass Orchard S01E04");
-      expect(within(ended).getAllByText(/\(done\)/)).toHaveLength(5);
+      const board = screen.getByTestId("pipeline-board");
+      expect(board).toHaveTextContent("Glass Orchard S01E04");
+      expect(board).toHaveTextContent("✓ Delivered");
       expect(screen.queryByTestId("live-working")).toBeNull();
 
       act(() => {
         vi.advanceTimersByTime(LEAVING_CARD_MS);
       });
-      expect(screen.queryByTestId("live-leaving")).toBeNull();
+      expect(board).not.toHaveTextContent("Glass Orchard S01E04");
     });
 
-    it("marks the step it failed at and says why", () => {
+    it("says why it stopped when it fails", () => {
       const view = startRunning();
 
       files.files = [
@@ -470,28 +661,9 @@ describe("ProcessingPage", () => {
       ];
       rerenderLive(view);
 
-      const ended = screen.getByTestId("live-leaving");
-      expect(ended).toHaveAttribute("data-outcome", "failed");
-      expect(ended).toHaveTextContent("Write (failed)");
-      expect(ended).toHaveTextContent("The new file would not play.");
-    });
-
-    it("shows a rejection on the Plan step", () => {
-      const view = startRunning();
-
-      files.files = [
-        file({
-          id: 1,
-          status: "rejected",
-          status_reason: "Nothing in this file needs changing.",
-        }),
-      ];
-      rerenderLive(view);
-
-      const ended = screen.getByTestId("live-leaving");
-      expect(ended).toHaveAttribute("data-outcome", "rejected");
-      expect(ended).toHaveTextContent("Plan (failed)");
-      expect(ended).toHaveTextContent("Nothing in this file needs changing.");
+      expect(screen.getByTestId("pipeline-board")).toHaveTextContent(
+        "Couldn't finish · original kept",
+      );
     });
 
     it("leaves no card behind for a file that only went back to waiting", () => {
@@ -500,338 +672,10 @@ describe("ProcessingPage", () => {
       files.files = [file({ id: 1, status: "unprocessed" })];
       rerenderLive(view);
 
-      expect(screen.queryByTestId("live-leaving")).toBeNull();
+      expect(screen.getByTestId("pipeline-board")).not.toHaveTextContent(
+        "✓ Delivered",
+      );
     });
-
-    it("does not treat narrowing the page to another kind of file as a file leaving", () => {
-      startRunning();
-
-      fireEvent.click(screen.getByRole("button", { name: "Library cleaning" }));
-
-      expect(screen.queryByTestId("live-working")).toBeNull();
-      expect(screen.queryByTestId("live-leaving")).toBeNull();
-    });
-  });
-
-  it("says what needs a person, and nothing when a healthy install has nothing to say", () => {
-    renderLive();
-    expect(screen.queryByTestId("live-needs")).toBeNull();
-
-    files.files = [
-      file({
-        id: 9,
-        status: "processing_failed",
-        relative_path: "Ember.and.Ash.S01E02.mkv",
-      }),
-    ];
-    jobs.failed = { jobs: [{ id: 3 }, { id: 4 }] };
-    readiness.worker_health = [
-      {
-        module: "processing",
-        status: "degraded",
-        detail: "No worker has taken a job for 20 minutes.",
-      },
-    ];
-    renderLive();
-
-    const needs = screen.getByTestId("live-needs");
-    expect(needs).toHaveTextContent("2 jobs failed");
-    expect(needs).toHaveTextContent(
-      "Background work has stopped. No worker has taken a job for 20 minutes.",
-    );
-    expect(needs).toHaveTextContent("Ember and Ash S01E02 is stuck");
-    expect(
-      within(needs).getByRole("link", { name: /Open in History/ }),
-    ).toHaveAttribute("href", "/history?show=failed");
-  });
-
-  it("says when processing is paused, and what that means for work already running", () => {
-    pause.paused = true;
-    pause.reason = "Paused by alice until 07:00.";
-    renderLive();
-
-    expect(screen.getByTestId("live-paused")).toHaveTextContent(
-      "Paused by alice until 07:00. Files already being written finish; nothing new starts.",
-    );
-    expect(screen.getByTestId("live-lane-working")).toHaveTextContent(
-      "Paused. Nothing new starts until you resume.",
-    );
-  });
-
-  it("lists what just finished, in the words of what Weir did", () => {
-    activity["processing.file_remux_pass_completed"] = {
-      items: [
-        {
-          id: 501,
-          created_at: "2026-08-18T09:58:00",
-          event_type: "processing.file_remux_pass_completed",
-          title: "x",
-          library_id: 1,
-          relative_path: "The.Quiet.Harbour.S01E06.mkv",
-          detail: JSON.stringify({
-            outcome: "live_output_written",
-            ok: true,
-            relative_media_path: "The.Quiet.Harbour.S01E06.mkv",
-            source_size_bytes: 2_437_000_000,
-            output_size_bytes: 2_103_000_000,
-            removed_audio: ["a", "b", "c", "d"],
-            removed_subtitles: ["e", "f"],
-          }),
-        },
-      ],
-    };
-    renderLive();
-
-    const finished = screen.getByTestId("live-finished");
-    expect(finished).toHaveTextContent("The Quiet Harbour S01E06");
-    expect(finished).toHaveTextContent(
-      "Saved 319 MB · removed 4 audio, 2 subtitles",
-    );
-    expect(finished).toHaveTextContent("2 min ago");
-    expect(screen.getByTestId("live-done-today")).toHaveTextContent("38");
-  });
-
-  it("says Rejected, with the reason, for a file the rules rejected, and keeps Could not be finished for a real failure", () => {
-    const passEvent = (id: number, path: string, detail: object) => ({
-      id,
-      created_at: "2026-08-18T09:58:00",
-      event_type: "processing.file_remux_pass_completed",
-      title: "x",
-      library_id: 1,
-      relative_path: path,
-      detail: JSON.stringify({
-        relative_media_path: path,
-        ok: false,
-        ...detail,
-      }),
-    });
-    activity["processing.file_remux_pass_completed"] = {
-      items: [
-        passEvent(801, "Heat.mkv", {
-          outcome: "failed_before_execution",
-          rejected_without_manager: true,
-          reason: "Rejected: it has no audio tracks, so nothing would be kept.",
-          rejected_cleanup_detail: "The file was left where it is.",
-        }),
-        passEvent(802, "Ronin.mkv", { outcome: "failed_during_execution" }),
-      ],
-    };
-    renderLive();
-
-    const [rejected, failed] = screen.getAllByTestId("live-finished");
-    expect(rejected).toHaveTextContent(
-      "Rejected: it has no audio tracks, so nothing would be kept. The file was left where it is.",
-    );
-    expect(rejected).not.toHaveTextContent("Could not be finished");
-    expect(failed).toHaveTextContent(
-      "Could not be finished · the original is untouched",
-    );
-  });
-
-  it("moves a finished file's time on while the page stays open", () => {
-    activity["processing.file_remux_pass_completed"] = {
-      items: [
-        {
-          id: 502,
-          created_at: "2026-08-18T09:58:00",
-          event_type: "processing.file_remux_pass_completed",
-          title: "x",
-          library_id: 1,
-          relative_path: "The.Quiet.Harbour.S01E06.mkv",
-          detail: JSON.stringify({
-            outcome: "live_output_written",
-            ok: true,
-            relative_media_path: "The.Quiet.Harbour.S01E06.mkv",
-          }),
-        },
-      ],
-    };
-    renderLive();
-    expect(screen.getByTestId("live-finished")).toHaveTextContent("2 min ago");
-
-    act(() => {
-      vi.advanceTimersByTime(5 * 60 * 1000);
-    });
-
-    expect(screen.getByTestId("live-finished")).toHaveTextContent("7 min ago");
-  });
-
-  it("announces a newly finished file to a screen reader, but not the ones already on screen at load", () => {
-    const { rerender } = renderLive();
-    expect(screen.getByTestId("live-finished-announcement")).toHaveTextContent(
-      "",
-    );
-
-    activity["processing.file_remux_pass_completed"] = {
-      items: [
-        {
-          id: 701,
-          created_at: "2026-08-18T09:59:00",
-          event_type: "processing.file_remux_pass_completed",
-          title: "x",
-          library_id: 1,
-          relative_path: "Northbound.S04E10.mkv",
-          detail: JSON.stringify({
-            outcome: "live_output_written",
-            ok: true,
-            relative_media_path: "Northbound.S04E10.mkv",
-          }),
-        },
-      ],
-    };
-    rerender(
-      <MemoryRouter>
-        <ProcessingPage />
-      </MemoryRouter>,
-    );
-
-    expect(screen.getByTestId("live-finished-announcement")).toHaveTextContent(
-      "Northbound S04E10 finished: Cleaned",
-    );
-  });
-
-  it("says in words what the last two hours handed back, split the way Just finished colours it", () => {
-    activity["processing.file_remux_pass_completed"] = {
-      items: [
-        {
-          id: 601,
-          created_at: "2026-08-18T09:40:00",
-          event_type: "processing.file_remux_pass_completed",
-          title: "x",
-          library_id: 1,
-          relative_path: "Starlit.Relay.S02E04.mkv",
-          detail: JSON.stringify({
-            outcome: "live_output_written",
-            ok: true,
-            relative_media_path: "Starlit.Relay.S02E04.mkv",
-            removed_subtitles: ["a"],
-          }),
-        },
-        {
-          id: 602,
-          created_at: "2026-08-18T09:35:00",
-          event_type: "processing.file_remux_pass_completed",
-          title: "x",
-          library_id: 1,
-          relative_path: "Ember.and.Ash.S02E01.mkv",
-          detail: JSON.stringify({
-            outcome: "live_skipped_not_required",
-            ok: true,
-            relative_media_path: "Ember.and.Ash.S02E01.mkv",
-          }),
-        },
-      ],
-    };
-    renderLive();
-
-    const sum = screen.getByTestId("live-handed-back-sum");
-    expect(sum).toHaveTextContent("2 files");
-    expect(sum).toHaveTextContent("1 cleaned");
-    expect(sum).toHaveTextContent("1 already right");
-    expect(sum).not.toHaveTextContent("need a look");
-  });
-
-  it('links the last two hours\' "need a look" count straight to the failed files in History', () => {
-    activity["processing.file_remux_pass_completed"] = {
-      items: [
-        {
-          id: 611,
-          created_at: "2026-08-18T09:40:00",
-          event_type: "processing.file_remux_pass_completed",
-          title: "x",
-          library_id: 1,
-          relative_path: "Starlit.Relay.S02E04.mkv",
-          detail: JSON.stringify({
-            outcome: "failed",
-            ok: false,
-            relative_media_path: "Starlit.Relay.S02E04.mkv",
-          }),
-        },
-      ],
-    };
-    renderLive();
-
-    const figure = screen.getByTestId("live-handed-back");
-    expect(
-      within(figure).getByRole("link", { name: /need a look/ }),
-    ).toHaveAttribute("href", "/history?show=failed");
-  });
-
-  it("says nothing finished rather than drawing a row of empty bars", () => {
-    renderLive();
-
-    const figure = screen.getByTestId("live-handed-back");
-    expect(screen.getByTestId("live-handed-back-sum")).toHaveTextContent(
-      "Nothing finished in the last 2 hours.",
-    );
-    expect(figure.querySelector(".mm-live-spark__bar")).toBeNull();
-    // The chart's place is kept, empty, so switching views never resizes the toolbar.
-    expect(figure.querySelector(".mm-live-spark__bars")).not.toBeNull();
-  });
-
-  it("lets the keyboard walk the bars and reads each one's five minutes in the legend", () => {
-    activity["processing.file_remux_pass_completed"] = {
-      items: [
-        {
-          id: 601,
-          created_at: "2026-08-18T09:40:00",
-          event_type: "processing.file_remux_pass_completed",
-          title: "x",
-          library_id: 1,
-          relative_path: "Starlit.Relay.S02E04.mkv",
-          detail: JSON.stringify({
-            outcome: "live_output_written",
-            ok: true,
-            relative_media_path: "Starlit.Relay.S02E04.mkv",
-          }),
-        },
-      ],
-    };
-    renderLive();
-    const figure = screen.getByTestId("live-handed-back");
-    const bars = within(figure).getByRole("slider");
-
-    bars.focus();
-    expect(bars).toHaveAttribute(
-      "aria-valuetext",
-      expect.stringMatching(/^In the last/),
-    );
-    for (let step = 0; step < 24; step += 1) {
-      if (bars.getAttribute("aria-valuetext")?.includes("cleaned")) break;
-      fireEvent.keyDown(bars, { key: "ArrowLeft" });
-    }
-
-    expect(bars).toHaveAttribute(
-      "aria-valuetext",
-      expect.stringContaining("1 cleaned"),
-    );
-    expect(figure.querySelector(".mm-live-trend__pointed")).toHaveTextContent(
-      "1 cleaned",
-    );
-  });
-
-  it("says a file's story could not load, through the shared load-error wording", () => {
-    files.files = [
-      file({
-        id: 3,
-        status: "processing",
-        relative_path: "Glass.Orchard.S01E04.2160p.WEB-DL.mkv",
-        progress_percent: 46,
-      }),
-    ];
-    fileLogState.isError = true;
-    fileLogState.error = new Error("boom");
-    renderLive();
-
-    fireEvent.click(
-      screen.getByRole("button", { name: "Glass Orchard S01E04" }),
-    );
-
-    expect(
-      screen.getByText(
-        "Weir couldn't load what happened to this file. Reload the page to try again.",
-      ),
-    ).toBeInTheDocument();
   });
 
   describe("a pass that has started before the file list says so", () => {
@@ -849,12 +693,10 @@ describe("ProcessingPage", () => {
       removedSubtitles: [],
     };
 
-    it("moves the file from Waiting to Working as soon as a progress frame arrives for it", () => {
+    it("counts the file as being worked on as soon as a progress frame arrives for it", () => {
       files.files = [file({ id: 1, status: "unprocessed" })];
       const { rerender } = renderLive();
-      expect(screen.getByTestId("live-lane-waiting")).toHaveTextContent(
-        "The Quiet Harbour S01E03",
-      );
+      expect(screen.getByTestId("live-working-count")).toHaveTextContent("0");
 
       liveProgress[path] = frame;
       rerender(
@@ -863,15 +705,13 @@ describe("ProcessingPage", () => {
         </MemoryRouter>,
       );
 
-      expect(screen.getByTestId("live-lane-working")).toHaveTextContent(
-        "The Quiet Harbour S01E03",
-      );
-      expect(screen.getByTestId("live-lane-waiting")).not.toHaveTextContent(
-        "The Quiet Harbour S01E03",
+      expect(screen.getByTestId("live-working-count")).toHaveTextContent("1");
+      expect(screen.getByTestId("live-working")).toHaveTextContent(
+        "The Quiet Harbour S01E03 · Writing12%",
       );
     });
 
-    it("shows a file the server has just claimed in Working on its Checking step, before it has reported any progress", () => {
+    it("shows a file the server has just claimed on its Checking step, before it has reported any progress", () => {
       files.files = [
         file({
           id: 1,
@@ -881,239 +721,8 @@ describe("ProcessingPage", () => {
       ];
       renderLive();
 
-      const card = within(screen.getByTestId("live-lane-working")).getByTestId(
-        "live-working",
-      );
-      expect(card).toHaveTextContent("The Quiet Harbour S01E03");
-      expect(card).toHaveTextContent("Checking (in progress)");
-      expect(screen.getByTestId("live-lane-waiting")).not.toHaveTextContent(
-        "The Quiet Harbour S01E03",
-      );
-    });
-
-    it("still shows its ended card when the pass finishes before the list stops calling the file Waiting", () => {
-      files.files = [file({ id: 1, status: "unprocessed" })];
-      liveProgress[path] = frame;
-      const { rerender } = renderLive();
-      expect(screen.getByTestId("live-lane-working")).toHaveTextContent(
-        "The Quiet Harbour S01E03",
-      );
-
-      delete liveProgress[path];
-      rerender(
-        <MemoryRouter>
-          <ProcessingPage />
-        </MemoryRouter>,
-      );
-      files.files = [file({ id: 1, status: "processed" })];
-      rerender(
-        <MemoryRouter>
-          <ProcessingPage />
-        </MemoryRouter>,
-      );
-
-      const ended = screen.getByTestId("live-leaving");
-      expect(ended).toHaveAttribute("data-outcome", "done");
-      expect(ended).toHaveTextContent("The Quiet Harbour S01E03");
-    });
-  });
-
-  describe("a pass that ends before the page sees it in Working", () => {
-    const WAITING = {
-      id: 1,
-      relative_path: "Glass.Orchard.S01E04.2160p.WEB-DL.mkv",
-    };
-
-    function rerenderLive(view: ReturnType<typeof renderLive>) {
-      view.rerender(
-        <MemoryRouter>
-          <ProcessingPage />
-        </MemoryRouter>,
-      );
-    }
-
-    function startWaiting() {
-      files.files = [file({ ...WAITING, status: "unprocessed" })];
-      const view = renderLive();
-      expect(screen.getByTestId("live-waiting")).toBeInTheDocument();
-      return view;
-    }
-
-    it("draws an ended card with every step ticked when the file goes from Waiting to processed, then leaves it to Just finished", () => {
-      const view = startWaiting();
-
-      files.files = [file({ ...WAITING, status: "processed" })];
-      activity["processing.file_remux_pass_completed"] = {
-        items: [
-          {
-            id: 501,
-            created_at: "2026-08-18T09:59:59",
-            event_type: "processing.file_remux_pass_completed",
-            title: "x",
-            library_id: 1,
-            relative_path: WAITING.relative_path,
-            detail: JSON.stringify({
-              outcome: "live_output_written",
-              ok: true,
-              relative_media_path: WAITING.relative_path,
-              source_size_bytes: 2_000_000_000,
-              output_size_bytes: 1_800_000_000,
-              removed_audio: [],
-              removed_subtitles: [],
-            }),
-          },
-        ],
-      };
-      rerenderLive(view);
-
-      const ended = within(screen.getByTestId("live-lane-working")).getByTestId(
-        "live-leaving",
-      );
-      expect(ended).toHaveAttribute("data-outcome", "done");
-      expect(ended).toHaveTextContent("Glass Orchard S01E04");
-      expect(within(ended).getAllByText(/(done)/)).toHaveLength(5);
-      expect(screen.queryByTestId("live-waiting")).toBeNull();
-
-      act(() => {
-        vi.advanceTimersByTime(LEAVING_CARD_MS);
-      });
-      expect(screen.queryByTestId("live-leaving")).toBeNull();
-      expect(screen.getByTestId("live-finished")).toHaveTextContent(
-        "Glass Orchard S01E04",
-      );
-    });
-
-    it("marks the step it stopped at and says why when the file goes from Waiting to failed", () => {
-      const view = startWaiting();
-
-      files.files = [
-        file({
-          ...WAITING,
-          status: "processing_failed",
-          status_reason: "The file could not be read. Nothing was changed.",
-        }),
-      ];
-      rerenderLive(view);
-
-      const ended = screen.getByTestId("live-leaving");
-      expect(ended).toHaveAttribute("data-outcome", "failed");
-      expect(ended).toHaveTextContent("Checking (failed)");
-      expect(ended).toHaveTextContent("The file could not be read.");
-    });
-
-    it("shows a rejection with its reason when the file goes from Waiting to rejected", () => {
-      const view = startWaiting();
-
-      files.files = [
-        file({
-          ...WAITING,
-          status: "rejected",
-          status_reason: "Nothing in this file needs changing.",
-        }),
-      ];
-      rerenderLive(view);
-
-      const ended = screen.getByTestId("live-leaving");
-      expect(ended).toHaveAttribute("data-outcome", "rejected");
-      expect(ended).toHaveTextContent("Nothing in this file needs changing.");
-    });
-
-    it("shows nothing when the file goes from Waiting to on hold", () => {
-      const view = startWaiting();
-
-      files.files = [file({ ...WAITING, status: "on_hold" })];
-      rerenderLive(view);
-
-      expect(screen.queryByTestId("live-leaving")).toBeNull();
-      expect(screen.getByTestId("live-arriving")).toBeInTheDocument();
-    });
-
-    it("shows nothing when the file stays waiting and only its position changes", () => {
-      const view = startWaiting();
-
-      files.files = [
-        file({ ...WAITING, status: "unprocessed" }),
-        file({
-          id: 2,
-          relative_path: "Other.S01E01.mkv",
-          status: "unprocessed",
-        }),
-      ];
-      rerenderLive(view);
-
-      expect(screen.queryByTestId("live-leaving")).toBeNull();
-    });
-
-    it("does not treat narrowing the page to another kind of file as a file leaving Waiting", () => {
-      startWaiting();
-
-      fireEvent.click(screen.getByRole("button", { name: "Library cleaning" }));
-      fireEvent.click(screen.getByRole("button", { name: "Everything" }));
-
-      expect(screen.queryByTestId("live-leaving")).toBeNull();
-      expect(screen.getByTestId("live-waiting")).toBeInTheDocument();
-    });
-
-    it("refreshes Just finished in the same step as the file list", () => {
-      renderLive();
-
-      const withFiles = invalidations.find((keys) =>
-        keys.some(
-          (key) =>
-            JSON.stringify(key) ===
-            JSON.stringify(processingKeys.fileList({ limit: 200 })),
-        ),
-      );
-      expect(withFiles).toContain(activityKeys.recent);
-    });
-  });
-
-  describe("where the page says a file ends up", () => {
-    const original = libraries.map((library) => library.manager_connection_ids);
-    afterEach(() => {
-      libraries.forEach((library, index) => {
-        library.manager_connection_ids = original[index];
-      });
-    });
-
-    it("sends files back to the media manager when every workflow is linked", () => {
-      renderLive();
-
-      expect(screen.getByTestId("live-lane-handing")).toHaveTextContent(
-        "Final checks, then back to your media manager",
-      );
-      expect(screen.getByTestId("processing-page")).toHaveTextContent(
-        "to the moment your media manager has it back.",
-      );
-    });
-
-    it("names the output folder when every workflow is Weir only", () => {
-      libraries.forEach((library) => {
-        library.manager_connection_ids = [];
-      });
-      renderLive();
-
-      const lane = screen.getByTestId("live-lane-handing");
-      expect(lane).toHaveTextContent(
-        "Final checks, then into the output folder",
-      );
-      expect(lane).not.toHaveTextContent("media manager");
-      const page = screen.getByTestId("processing-page");
-      expect(page).toHaveTextContent(
-        "to the moment its cleaned copy is in the output folder.",
-      );
-      expect(page).not.toHaveTextContent("moment your media manager");
-    });
-
-    it("covers both when Weir-only and linked workflows are mixed", () => {
-      libraries[0].manager_connection_ids = [];
-      renderLive();
-
-      expect(screen.getByTestId("live-lane-handing")).toHaveTextContent(
-        "Final checks, then into the output folder or back to your media manager",
-      );
-      expect(screen.getByTestId("processing-page")).toHaveTextContent(
-        "its cleaned copy is in the output folder or your media manager has it back.",
+      expect(screen.getByTestId("live-working")).toHaveTextContent(
+        "The Quiet Harbour S01E03 · Checking",
       );
     });
   });

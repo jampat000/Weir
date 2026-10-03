@@ -39,11 +39,11 @@ export function useProcessingFilesQuery(query: ProcessingFilesQuery = {}) {
   });
 }
 
-/** How often History follows a running pass. */
-const HISTORY_REFRESH_MS = 5000;
+/** How often Activity follows a running pass. */
+const ACTIVITY_REFRESH_MS = 5000;
 
 /**
- * History's downloads. The list on screen stays while a new filter loads, and it refreshes by itself only while a
+ * Activity's downloads. The list on screen stays while a new filter loads, and it refreshes by itself only while a
  * file is being processed: a queued file changes nothing worth a thousand-row read until it starts (#719).
  */
 export function useFileHistoryQuery(query: ProcessingFilesQuery) {
@@ -53,12 +53,12 @@ export function useFileHistoryQuery(query: ProcessingFilesQuery) {
     placeholderData: keepPreviousData,
     refetchInterval: (q) =>
       q.state.data?.files.some((file) => file.status === "processing")
-        ? HISTORY_REFRESH_MS
+        ? ACTIVITY_REFRESH_MS
         : false,
   });
 }
 
-/** History's library cleans (#695), kept on screen while a new filter loads. */
+/** Activity's library cleans (#695), kept on screen while a new filter loads. */
 export function useLibraryCleansQuery(query: LibraryCleansQuery) {
   return useQuery({
     queryKey: processingKeys.libraryCleans(query),
@@ -96,7 +96,7 @@ export function useForgetProcessingFile() {
 }
 
 /**
- * What History's remove dialog should offer for one title (#785), asked only when someone opens the dialog for
+ * What Activity's remove dialog should offer for one title (#785), asked only when someone opens the dialog for
  * it — not for every row on every render.
  */
 export function useProcessingFileRemoveOptions() {

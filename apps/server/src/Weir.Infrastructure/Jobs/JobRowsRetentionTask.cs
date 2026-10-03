@@ -25,6 +25,8 @@ public sealed class JobRowsRetentionTask : IPeriodicTask
 
     public string Name => "platform-job-rows-retention";
 
+    public string? Label => "Tidy finished jobs";
+
     public TimeSpan Interval => TimeSpan.FromSeconds(_options.JobRowsRetentionScheduleIntervalSeconds);
 
     public bool RunAtStart => true;

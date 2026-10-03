@@ -428,20 +428,6 @@ public sealed class MediaManagerRulesTests
         Assert.Throws<WireValueException>(() => ScheduleCsv.NormalizeHhmm("9", "00:00"));
     }
 
-    [Fact]
-    public void Tmdb_answers_are_read_into_lookup_results()
-    {
-        var matched = TmdbResponses.Parse("""{"results":[{"id":42,"title":"Film","original_language":"FR ","release_date":"2001-05-01"}]}"""u8.ToArray(), "Film (2001)");
-        Assert.True(matched.Matched);
-        Assert.Equal(("fr", 2001, "42", "Film"), (matched.Metadata!.OriginalLanguage, matched.Metadata.Year!.Value, matched.Metadata.ProviderId, matched.Metadata.Title));
-        Assert.Equal("no_match", TmdbResponses.Parse("""{"results":[]}"""u8.ToArray(), "x").Status);
-        var unreadable = TmdbResponses.Parse("not json"u8.ToArray(), "x");
-        Assert.Equal("unreachable", unreadable.Status);
-        Assert.Contains("unreadable", unreadable.Detail, StringComparison.Ordinal);
-        Assert.Equal("api_key=k&query=Blade+Runner%C3%A9&year=1982", TmdbResponses.UrlEncode([new("api_key", "k"), new("query", "Blade Runneré"), new("year", "1982")]));
-        Assert.StartsWith("https://", TmdbResponses.DefaultBaseUrl, StringComparison.Ordinal);
-    }
-
     // --- library files and file changes (#507) -------------------------------------------------
 
     [Fact]

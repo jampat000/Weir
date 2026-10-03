@@ -102,7 +102,7 @@ it("tells a workflow that Performance was lowered under that it is limited by th
   expect(
     await screen.findByTestId("workflow-limited-by-total"),
   ).toHaveTextContent(
-    "Weir runs 2 files at once in total, so this workflow is limited to 2. Choose 2 or fewer, or raise Files at once in Settings › Performance.",
+    "Weir runs 2 files at once in total, so this workflow is limited to 2. Choose 2 or fewer, or raise Files at once in Setup › Performance › Speed.",
   );
 });
 

@@ -1,4 +1,5 @@
 using System.Numerics;
+using Weir.Core.Artwork;
 using Weir.Core.Json;
 
 namespace Weir.Core.MediaManagers;
@@ -40,6 +41,9 @@ public sealed record MediaManagerImportEvent
 
     /// <summary>The download client's id for the download, when the manager sent one (Sonarr's and Radarr's <c>downloadId</c>).</summary>
     public string? DownloadId { get; init; }
+
+    /// <summary>What the manager said about the title, for the file's poster. Null when it said nothing usable.</summary>
+    public ArtworkHints? Artwork { get; init; }
 }
 
 /// <summary>How one manager phrases an inbound event.</summary>
@@ -101,8 +105,13 @@ public static class ImportEvents
             SourceEntityId = ManagerValues.WholeNumber(episode.Get("id")),
             SourcePath = ManagerValues.Text(episodeFile!.Get("sourcePath")),
             DownloadId = ManagerValues.Text(body.Get("downloadId")),
+            Artwork = series is null || ArtworkHints.FromTitleRecord(series) is not { } hints
+                ? null
+                : hints with { Season = ArtworkNumber(episode.Get("seasonNumber")), Episode = ArtworkNumber(episode.Get("episodeNumber")) },
         };
     }
+
+    private static int? ArtworkNumber(WireValue? value) => ManagerValues.WholeNumber(value) is { } number && number >= 0 && number <= int.MaxValue ? (int)number : null;
 
     private static MediaManagerImportEvent? NormalizeRadarr(WireObject body)
     {
@@ -135,6 +144,7 @@ public static class ImportEvents
             SourceEntityId = ManagerValues.WholeNumber(movie.Get("id")),
             SourcePath = ManagerValues.Text(movieFile!.Get("sourcePath")),
             DownloadId = ManagerValues.Text(body.Get("downloadId")),
+            Artwork = ArtworkHints.FromTitleRecord(movie),
         };
     }
 
@@ -177,6 +187,7 @@ public static class ImportEvents
             CallbackPath = ManagerValues.Text(body.Get("callbackPath")),
             LibraryId = ManagerValues.Text(body.Get("libraryId")),
             DownloadId = ManagerValues.Text(body.Get("downloadId")),
+            Artwork = ArtworkHints.FromHandoff(body),
         };
     }
 

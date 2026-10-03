@@ -115,6 +115,28 @@ it("says a manager that is gone by that name and still calls the workflow linked
   ).toBeInTheDocument();
 });
 
+it("keeps a workflow whose manager does not answer as short as the rest, with its full sentence on hover and for screen readers", async () => {
+  const sentence =
+    "Weir could not reach Deluno at http://deluno. Check the address.";
+  withConnections(
+    connection({ last_test_ok: false, last_test_detail: sentence }),
+  );
+  vi.spyOn(api, "fetchProcessingLibraries").mockResolvedValue([
+    library({
+      manager_connection_ids: [5],
+      manager_coverage: "unreachable",
+    }),
+  ]);
+
+  render(<LibrariesTab />, { wrapper });
+
+  const cell = within(await screen.findByTestId("processing-library-1"));
+  const status = cell.getByText("Not answering");
+  expect(status).toHaveAttribute("aria-hidden", "true");
+  expect(status.parentElement).toHaveAttribute("title", sentence);
+  expect(cell.getByText(sentence)).toHaveClass("sr-only");
+});
+
 it("asks which kind first when adding, and Local folders opens today's form", async () => {
   withConnections(connection({}));
   vi.spyOn(api, "fetchProcessingLibraries").mockResolvedValue([library()]);
@@ -135,7 +157,11 @@ it("asks which kind first when adding, and Local folders opens today's form", as
 
   const form = await screen.findByTestId("processing-library-form");
   expect(within(form).getByPlaceholderText("Movies 4K")).toHaveValue("");
-  expect(within(form).getByText("Weir only")).toBeInTheDocument();
+  expect(
+    within(within(form).getByTestId("library-link-section")).getByText(
+      "Weir only",
+    ),
+  ).toBeInTheDocument();
 });
 
 it("offers From a media manager only when one is connected", async () => {
@@ -151,7 +177,7 @@ it("offers From a media manager only when one is connected", async () => {
   ).toBeDisabled();
   expect(
     choice.getByRole("link", { name: /Connect Deluno, Sonarr or Radarr/ }),
-  ).toHaveAttribute("href", "/settings?tab=media-managers");
+  ).toHaveAttribute("href", "/setup/connections");
 });
 
 it("fills a new workflow's folders in from the media manager and links it, saving only on Save", async () => {
@@ -184,7 +210,11 @@ it("fills a new workflow's folders in from the media manager and links it, savin
 
   const form = await screen.findByTestId("processing-library-form");
   expect(within(form).getByPlaceholderText("Movies 4K")).toHaveValue("TV (2)");
-  expect(within(form).getByText("Linked to Deluno")).toBeInTheDocument();
+  expect(
+    within(within(form).getByTestId("library-link-section")).getByText(
+      "Linked to Deluno",
+    ),
+  ).toBeInTheDocument();
   expect(create).not.toHaveBeenCalled();
 
   fireEvent.click(screen.getByTestId("processing-library-save"));
@@ -268,7 +298,11 @@ it("opens the editor on the chosen media manager, blank, when it reports no fold
   fireEvent.click(screen.getByTestId("add-workflow-continue"));
 
   const form = await screen.findByTestId("processing-library-form");
-  expect(within(form).getByText("Linked to Deluno")).toBeInTheDocument();
+  expect(
+    within(within(form).getByTestId("library-link-section")).getByText(
+      "Linked to Deluno",
+    ),
+  ).toBeInTheDocument();
   expect(within(form).getByPlaceholderText("Movies 4K")).toHaveValue("");
 });
 
@@ -299,7 +333,11 @@ it("presents Weir only as an option in the editor, not a warning, with a way to 
     target: { value: "5" },
   });
   fireEvent.click(section.getByTestId("library-link"));
-  expect(await screen.findByText("Linked to Deluno")).toBeInTheDocument();
+  expect(
+    await within(screen.getByTestId("library-link-section")).findByText(
+      "Linked to Deluno",
+    ),
+  ).toBeInTheDocument();
   fireEvent.click(screen.getByTestId("processing-library-save"));
 
   await waitFor(() =>
@@ -347,9 +385,7 @@ it("says what unlinking does in plain words, and unlinks on Save", async () => {
     section.getByText(/Unlinking makes this workflow Weir only/),
   ).toBeInTheDocument();
   expect(
-    section.getByText(
-      /The folders, the rules and the files already cleaned stay as they are/,
-    ),
+    section.getByText(/everything already set up or cleaned stays as it is/),
   ).toBeInTheDocument();
 
   fireEvent.click(section.getByTestId("library-unlink"));
@@ -415,7 +451,7 @@ it("opens a workflow's editor from a link on another page", async () => {
   ]);
 
   render(<LibrariesTab />, {
-    wrapper: wrapperAt("/settings?tab=libraries&edit=4"),
+    wrapper: wrapperAt("/setup/workflows?edit=4"),
   });
 
   const form = await screen.findByTestId("processing-library-form");
@@ -430,7 +466,7 @@ it("opens the add choice already on the media manager it was linked from", async
   vi.spyOn(api, "fetchProcessingLibraries").mockResolvedValue([library()]);
 
   render(<LibrariesTab />, {
-    wrapper: wrapperAt("/settings?tab=libraries&addFrom=6"),
+    wrapper: wrapperAt("/setup/workflows?addFrom=6"),
   });
 
   const choice = within(await screen.findByTestId("add-workflow-choice"));

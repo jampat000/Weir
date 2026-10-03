@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type RefObject } from "react";
 
 import { Field } from "../../../../components/shared/field";
 import { mmActionButtonClass } from "../../../../lib/ui/mm-control-roles";
@@ -32,6 +32,7 @@ export function ChannelForm({
   onCancel,
   saving,
   saveError,
+  labelRef,
 }: {
   initial?: ChannelFormData;
   supportedEvents: string[];
@@ -39,6 +40,8 @@ export function ChannelForm({
   onCancel: () => void;
   saving: boolean;
   saveError: string | null;
+  /** Reaches the label field, for a drawer that focuses it as it opens. */
+  labelRef?: RefObject<HTMLInputElement | null>;
 }) {
   const [draft, setDraft] = useState(initial);
   const change = <K extends keyof ChannelFormData>(
@@ -66,6 +69,7 @@ export function ChannelForm({
       <div className="mm-field-row">
         <Field label="Label" width="medium">
           <input
+            ref={labelRef}
             type="text"
             className="mm-input"
             value={draft.label}
@@ -132,7 +136,7 @@ export function ChannelForm({
       </label>
 
       {saveError ? (
-        <p className="mm-status-text--failed text-sm" role="alert">
+        <p className="mm-status-text text-sm" data-status="broken" role="alert">
           {saveError}
         </p>
       ) : null}

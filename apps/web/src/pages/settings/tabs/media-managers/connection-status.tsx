@@ -2,95 +2,67 @@ import { Link } from "react-router-dom";
 
 import type { MediaManagerConnection } from "../../../../lib/media-managers/media-managers-api";
 import { useProcessingLibrariesQuery } from "../../../../lib/processing/libraries-queries";
+import { joinNames } from "../../../../lib/processing/workflow-kind";
 import { connectionTitle } from "../../../../lib/ui/connection-title";
+import { workflowFromManagerPath } from "../../../../lib/settings/setup-areas";
+import { ConnectionStatusLine, lastResult } from "./connection-health";
 
 type Formatter = (iso: string | null) => string;
 
 /**
- * A result only counts with a time behind it. "Connected" above "Last checked: never" is two
- * sentences that cannot both be true, so a result with no check time reads as unchecked.
+ * Whether it answers, when it was last checked, and why not when it does not. What an operator wants to know
+ * here is "is it connected", not what the endpoint said, so a good result is one word. Weir checks every
+ * enabled manager each minute, so this is how it is now, not when someone last pressed Test.
  */
-function lastResult(connection: MediaManagerConnection): boolean | null {
-  return connection.last_test_at ? connection.last_test_ok : null;
-}
-
-/**
- * Weir checks every enabled manager each minute, so this is how it is now, not when someone last
- * pressed Test.
- */
-function headline(connection: MediaManagerConnection): string {
-  const result = lastResult(connection);
-  if (result === null) return connection.enabled ? "Checking…" : "Off";
-  return result ? "Answering" : "Not answering";
-}
-
-/** The site's status colours, so the headline reads like every other good or bad word in Weir. */
-function tone(result: boolean | null): string {
-  if (result === null) return "text-mm-text";
-  return result ? "mm-status-text--healthy" : "mm-status-text--failed";
-}
-
-/**
- * A plain headline, when it was last checked, and the detail underneath. What an operator wants to
- * know here is "is it connected", not what the endpoint said.
- */
-export function ConnectionStatusPanel({
+export function ConnectionStatus({
   connection,
   fmt,
 }: {
   connection: MediaManagerConnection;
   fmt: Formatter;
 }) {
-  const result = lastResult(connection);
+  const unchecked = connection.enabled && lastResult(connection) === null;
   return (
-    <div
-      className="mt-3 text-sm text-mm-text2"
-      data-testid="media-manager-status"
+    <ConnectionStatusLine
+      connection={connection}
+      fmt={fmt}
+      unchecked="Checking…"
+      testId="media-manager-status"
     >
-      <p className={`text-sm font-medium ${tone(result)}`}>
-        {headline(connection)}
-      </p>
-      <p className="mt-1 text-xs text-mm-text2">
-        Last checked:{" "}
-        <span className="font-medium text-mm-text">
-          {connection.last_test_at ? fmt(connection.last_test_at) : "never"}
-        </span>
-        {connection.enabled ? " · Weir checks every minute" : ""}
-      </p>
-      {result === false && connection.last_test_detail ? (
-        <p className="mm-status-text--failed mt-1 text-xs">
-          {connection.last_test_detail}
-        </p>
-      ) : null}
-      {result === null && connection.enabled ? (
-        <p className="mt-2 text-xs text-mm-text2">
+      {unchecked ? (
+        <p className="mm-conn-row__problem">
           Weir checks it within a minute, or press Test.
         </p>
       ) : null}
-    </div>
+    </ConnectionStatusLine>
   );
 }
 
-const UNSIGNED_WEBHOOK_WARNING = (managerName: string) =>
-  `This media manager accepts webhooks without a secret. Create a secret and add it to ${managerName}.`;
-
 /**
- * The field's own string content is never shown; its presence is only the signal that this
- * connection has no secret protecting its webhook (#701).
+ * One warning for the whole list, naming each manager that has no secret protecting its webhook (#701). The
+ * field's own string content is never shown; its presence is only the signal. The fix is in each manager's own
+ * setup details, which say so.
  */
-export function UnsignedWebhookWarning({
-  connection,
+export function UnsignedWebhookBanner({
+  connections,
 }: {
-  connection: MediaManagerConnection;
+  connections: readonly MediaManagerConnection[];
 }) {
-  if (connection.unsigned_webhook_warning === null) return null;
+  const unsigned = connections.filter(
+    (connection) => connection.unsigned_webhook_warning !== null,
+  );
+  if (unsigned.length === 0) return null;
+  const names = joinNames(unsigned.map(connectionTitle));
   return (
     <p
-      className="mm-status-text--warning mt-2 text-xs"
+      className="mm-conn-banner mm-status-text"
+      data-status="attention"
       role="alert"
       data-testid="media-manager-unsigned-webhook-warning"
     >
-      {UNSIGNED_WEBHOOK_WARNING(connectionTitle(connection))}
+      {unsigned.length === 1
+        ? `${names} accepts webhooks without a secret. Create one under "How to point it at Weir", then add it to ${names}.`
+        : `${names} accept webhooks without a secret. Create one for each under "How to point it at Weir", then add it to that manager.`}
     </p>
   );
 }
@@ -117,31 +89,28 @@ export function FedWorkflows({
     library.manager_connection_ids.includes(connection.id),
   );
   return (
-    <p
-      className="mt-2 text-xs text-mm-text2"
-      data-testid="media-manager-libraries"
-    >
-      {fed.length > 0 ? (
-        <>
-          Workflows it feeds:{" "}
-          <span className="font-medium text-mm-text">
-            {fed.map((library) => library.name).join(", ")}
-          </span>
-        </>
-      ) : (
-        "No workflow is linked to it yet."
-      )}
+    <div className="mm-conn-row__feeds">
+      <p data-testid="media-manager-libraries">
+        {fed.length > 0 ? (
+          <>
+            Workflows it feeds:{" "}
+            <span className="mm-conn-row__when">
+              {fed.map((library) => library.name).join(", ")}
+            </span>
+          </>
+        ) : (
+          "No workflow is linked to it yet."
+        )}
+      </p>
       {OFFERS_WORKFLOWS.includes(connection.kind) ? (
-        <>
-          {" "}
-          <Link
-            className="mm-quiet-link"
-            to={`/settings?tab=libraries&addFrom=${connection.id}`}
-          >
-            Add a workflow from {connectionTitle(connection)}
-          </Link>
-        </>
+        <Link
+          className="mm-quiet-link"
+          to={workflowFromManagerPath(connection.id)}
+          aria-label={`Add a workflow from ${connectionTitle(connection)}`}
+        >
+          Add a workflow
+        </Link>
       ) : null}
-    </p>
+    </div>
   );
 }

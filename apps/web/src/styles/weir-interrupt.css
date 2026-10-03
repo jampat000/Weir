@@ -36,26 +36,9 @@
   margin-right: 0.55rem;
   place-items: center;
   border-radius: 50%;
-  background: var(--mm-status-warning-text);
+  background: var(--mm-st);
   color: var(--mm-on-accent);
-  font-size: 0.7rem;
+  font-size: var(--mm-type-eyebrow);
   font-weight: 800;
   vertical-align: -0.15em;
-}
-
-/* System › History and logs: the one "Show" choice that picks what the list holds. It sits on
-   the list's own line rather than as a second row of tabs. */
-.mm-history-show {
-  display: inline-flex;
-  align-items: center;
-  align-self: flex-start;
-  gap: calc(10px * var(--mm-density-ui-scale));
-  font-size: 0.8125rem;
-  font-weight: 600;
-  color: var(--mm-text2);
-}
-
-.mm-history-show .mm-input {
-  width: auto;
-  min-width: 12rem;
 }

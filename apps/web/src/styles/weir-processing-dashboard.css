@@ -1,0 +1,140 @@
+/*
+ * The Processing page's grid. The tiles, the side panels and the stream have sheets of their own
+ * (weir-processing-tiles.css, -side.css and -stream.css); the panel, the tile and the chip come from
+ * weir-panels.css.
+ *
+ * Beside the right column the page is the main column with Health and Needs you down the right: the band, the
+ * Pipeline and the lower row are its rows, Health spans the band and the Pipeline, and Needs you sits beside the
+ * lower row, so their tops and bottoms line up. The grid is as tall as the window and its rows are shares of the
+ * height it has (dashboard-layout.ts, which also names the grid's columns and areas, set inline by live-grid.tsx).
+ * Narrower than that the right column moves under the lower row and everything stacks. The page decides from the
+ * width of its own area, not the window's (see processing-page.tsx).
+ */
+
+.mm-dash__grid {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mm-panel-gap);
+}
+
+.mm-dash__band {
+  container: mm-band / inline-size;
+}
+
+.mm-dash__tiles {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--mm-panel-gap);
+}
+
+.mm-dash__tiles--across {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+/* Stacked, a tile is as tall as its rows need it. */
+.mm-dash__tiles--stacked > .mm-stat {
+  height: auto;
+  min-height: 190px;
+}
+
+.mm-dash__board,
+.mm-dash__health,
+.mm-dash__needs {
+  display: flex;
+  min-height: 0;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.mm-dash__board > .mm-panel,
+.mm-dash__health > .mm-panel,
+.mm-dash__needs > .mm-panel {
+  flex: 1;
+}
+
+.mm-dash__low {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--mm-panel-gap);
+}
+
+.mm-dash__low > *,
+.mm-dash__health,
+.mm-dash__needs {
+  height: 26rem;
+}
+
+/* Three tiles in a narrow band are about 220px each: a smaller figure keeps its unit and side figure in view. */
+@container mm-band (max-width: 56rem) {
+  .mm-dash .mm-stat__figure {
+    gap: 8px;
+    font-size: 28px;
+  }
+
+  .mm-dash .mm-stat__unit,
+  .mm-dash .mm-stat__side {
+    font-size: 0.875rem;
+  }
+}
+
+.mm-dash__grid--beside {
+  display: grid;
+  height: 100%;
+}
+
+.mm-dash__grid--beside > .mm-dash__band {
+  grid-area: now;
+  min-height: 0;
+}
+
+.mm-dash__grid--beside > .mm-dash__board {
+  grid-area: board;
+}
+
+.mm-dash__grid--beside > .mm-dash__low {
+  grid-area: low;
+  min-height: 0;
+}
+
+.mm-dash__grid--beside > .mm-dash__health {
+  grid-area: health;
+}
+
+.mm-dash__grid--beside > .mm-dash__needs {
+  grid-area: needs;
+}
+
+.mm-dash__grid--beside > .mm-dash__low > *,
+.mm-dash__grid--beside > .mm-dash__health,
+.mm-dash__grid--beside > .mm-dash__needs {
+  height: auto;
+}
+
+/* The band fills its row: the tiles are as tall as the band, and list the whole rows that fit. */
+.mm-dash__grid--beside .mm-dash__band,
+.mm-dash__grid--beside .mm-dash__tiles {
+  height: 100%;
+}
+
+.mm-dash__grid--beside .mm-dash__tiles {
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.mm-dash__grid--beside .mm-dash__tiles > .mm-stat {
+  height: auto;
+  min-height: 0;
+}
+
+/*
+ * Nothing moves while the window is being resized: the page snaps, then the motion comes back. The animations and
+ * transitions are given no time rather than taken away, so the ones that have finished stay finished: taking an
+ * animation off an element and putting it back plays it from the start, and every tile on the page would arrive again.
+ */
+body.mm-pipeline-resizing .mm-dash__grid *,
+body.mm-pipeline-resizing .mm-dash__grid *::before,
+body.mm-pipeline-resizing .mm-dash__grid *::after {
+  animation-delay: 0s !important;
+  animation-duration: 0s !important;
+  transition-delay: 0s !important;
+  transition-duration: 0s !important;
+}

@@ -1,0 +1,57 @@
+-- Weir schema 0035 (revision 0070_artwork): posters for the files Weir shows, and the original language of each title, looked up
+-- once per title.
+--
+-- artwork_lookups holds one row per title (keyed by TMDb id when a media manager supplied one, otherwise by name and year)
+-- and what became of asking about it; artwork_posters holds one row per stored image (the image itself lives under
+-- WEIR_HOME/artwork/posters); artwork_files says which title each file belongs to.
+
+CREATE TABLE artwork_posters (
+	poster_id TEXT NOT NULL,
+	source_ref TEXT NOT NULL,
+	content_type TEXT NOT NULL,
+	size_bytes INTEGER NOT NULL,
+	created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	CONSTRAINT pk_artwork_posters PRIMARY KEY (poster_id)
+);
+
+-- outcome is pending (not asked yet, or to be asked again at retry_at), found (poster_id names the image) or
+-- missing (the service does not know the title; asked again at retry_at). poster_ref is a reference to the image (a TMDb file name or an https address)
+-- that a media manager supplied or an earlier search found, which saves the next search. original_language is what the service
+-- reported as the title's original language, an empty string when it answered without one, and null until it has answered.
+CREATE TABLE artwork_lookups (
+	lookup_key TEXT NOT NULL,
+	media_scope TEXT NOT NULL,
+	title TEXT NOT NULL,
+	year INTEGER,
+	tmdb_id INTEGER,
+	tvdb_id INTEGER,
+	imdb_id TEXT,
+	poster_ref TEXT,
+	original_language TEXT,
+	priority INTEGER NOT NULL DEFAULT 0,
+	outcome TEXT NOT NULL DEFAULT 'pending',
+	poster_id TEXT,
+	attempts INTEGER NOT NULL DEFAULT 0,
+	retry_at DATETIME,
+	created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	CONSTRAINT pk_artwork_lookups PRIMARY KEY (lookup_key),
+	CONSTRAINT fk_artwork_lookups_artwork_posters_poster_id FOREIGN KEY (poster_id) REFERENCES artwork_posters (poster_id)
+);
+
+CREATE INDEX ix_artwork_lookups_outcome_retry_at ON artwork_lookups (outcome, retry_at);
+
+-- lookup_key is null for a file whose name gave no title, so it is not read again on every pass. orphaned_at is when the pruning
+-- pass first found no file behind the row (null while the file is known); a row goes once that is long enough ago.
+CREATE TABLE artwork_files (
+	library_id INTEGER NOT NULL,
+	relative_path TEXT NOT NULL,
+	lookup_key TEXT,
+	season INTEGER,
+	episode INTEGER,
+	orphaned_at DATETIME,
+	CONSTRAINT pk_artwork_files PRIMARY KEY (library_id, relative_path),
+	CONSTRAINT fk_artwork_files_artwork_lookups_lookup_key FOREIGN KEY (lookup_key) REFERENCES artwork_lookups (lookup_key) ON DELETE CASCADE
+);
+
+CREATE INDEX ix_artwork_files_lookup_key ON artwork_files (lookup_key);
+CREATE INDEX ix_artwork_files_orphaned_at ON artwork_files (orphaned_at);

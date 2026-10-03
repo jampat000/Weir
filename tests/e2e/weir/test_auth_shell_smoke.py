@@ -52,6 +52,8 @@ def test_auth_shell_bootstrap_login_logout_guard(weir_shell: str) -> None:
             expect(page).to_have_url(re.compile(r".*/(?:$|[/?#])"))
             expect(page.get_by_test_id("shell-ready")).to_be_visible()
 
+            # Sign out is in the user menu at the foot of the side menu.
+            page.get_by_test_id("user-menu").click()
             with page.expect_response(
                 lambda response: response.url.endswith("/api/v1/auth/logout"),
                 timeout=_URL_ASSERT_MS,

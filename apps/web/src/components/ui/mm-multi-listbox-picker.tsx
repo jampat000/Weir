@@ -1,15 +1,18 @@
-import { useCallback, useId, useRef, useState } from "react";
+import { useCallback, useId, useRef, useState, type ReactNode } from "react";
 import {
   mmCheckboxControlClass,
   mmListboxPanelClass,
-  mmPickerTriggerClass,
+  mmPickerTriggerSurface,
 } from "../../lib/ui/mm-control-roles";
 import { useCloseOnOutsideAndEscape } from "../../lib/ui/use-close-on-outside";
 import type { MmListboxOption } from "./mm-listbox-picker";
 import { useListboxKeyboardNav } from "./use-listbox-keyboard-nav";
 
+/** An option, optionally with a small mark (a coloured dot, say) drawn before its label. */
+export type MmMultiListboxOption = MmListboxOption & { marker?: ReactNode };
+
 type MmMultiListboxPickerProps = {
-  options: readonly MmListboxOption[];
+  options: readonly MmMultiListboxOption[];
   values: readonly string[];
   onChange: (next: string[]) => void;
   disabled?: boolean;
@@ -64,15 +67,6 @@ export function MmMultiListboxPicker({
       : selectedLabels.length > 0
         ? selectedLabels.join(", ")
         : placeholder;
-  const triggerSurface = [
-    mmPickerTriggerClass,
-    "flex min-h-[2.5rem] items-center justify-between gap-2",
-    open && !disabled
-      ? "border-mm-input-border-focus !shadow-[inset_0_1px_3px_rgba(0,0,0,0.22),inset_0_1px_0_rgba(255,255,255,0.04),0_0_0_2px_var(--mm-input-focus-ring)]"
-      : "",
-  ]
-    .filter(Boolean)
-    .join(" ");
 
   return (
     <div
@@ -82,7 +76,7 @@ export function MmMultiListboxPicker({
       <button
         ref={triggerRef}
         type="button"
-        className={triggerSurface}
+        className={mmPickerTriggerSurface}
         disabled={disabled}
         aria-haspopup="listbox"
         aria-controls={open ? listboxId : undefined}
@@ -163,7 +157,14 @@ export function MmMultiListboxPicker({
                   className={mmCheckboxControlClass}
                   tabIndex={-1}
                 />
-                <span>{opt.label}</span>
+                {opt.marker ? (
+                  <span className="inline-flex items-center gap-2">
+                    {opt.marker}
+                    {opt.label}
+                  </span>
+                ) : (
+                  <span>{opt.label}</span>
+                )}
               </button>
             );
           })}

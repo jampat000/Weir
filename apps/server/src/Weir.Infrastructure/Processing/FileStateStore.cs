@@ -29,7 +29,7 @@ public sealed record ScannedFileWrite(
 
 /// <summary>SQLite access for <c>files</c>: read, list and forget, plus the upsert and mark-status writes the
 /// watched-folder scan performs.</summary>
-public sealed class FileStateStore
+public sealed partial class FileStateStore
 {
     private const string Columns =
         "id, library_id, relative_path, status, status_reason, blocked_by_connection, size_bytes, video_width, video_height, " +
@@ -50,13 +50,6 @@ public sealed class FileStateStore
             $"SELECT {Columns} FROM files WHERE library_id = @lib AND relative_path = @path",
             Read, ("@lib", libraryId), ("@path", relativePath));
 
-    /// <summary>The files matching <paramref name="filter"/>.</summary>
-    public Task<List<ProcessingFileRecord>> ListAsync(UnitOfWork uow, ProcessingFileListFilter filter)
-    {
-        var (sql, parameters) = ListQuery(filter);
-        return uow.QueryAsync(sql, Read, parameters);
-    }
-
     /// <summary>Every rejected file, oldest first, in one workflow or in all of them. Never paged, because a bulk
     /// action on "all" must not silently stop short.</summary>
     public Task<List<ProcessingFileRecord>> ListRejectedAsync(UnitOfWork uow, long? libraryId)
@@ -66,47 +59,6 @@ public sealed class FileStateStore
         return libraryId is { } id
             ? uow.QueryAsync(sql, Read, ("@status", ProcessingFileStatuses.Rejected), ("@library_id", id))
             : uow.QueryAsync(sql, Read, ("@status", ProcessingFileStatuses.Rejected));
-    }
-
-    internal static (string Sql, (string Name, object? Value)[] Parameters) ListQuery(ProcessingFileListFilter filter)
-    {
-        ArgumentNullException.ThrowIfNull(filter);
-        var clauses = new List<string>();
-        var parameters = new List<(string, object?)>();
-        if (filter.LibraryId is { } libraryId)
-        {
-            clauses.Add("library_id = @library_id");
-            parameters.Add(("@library_id", libraryId));
-        }
-
-        if (filter.Statuses is { Count: > 0 } statuses)
-        {
-            var names = statuses.Select((_, index) => $"@status{index}").ToArray();
-            clauses.Add($"status IN ({string.Join(", ", names)})");
-            parameters.AddRange(statuses.Select((status, index) => ($"@status{index}", (object?)status)));
-        }
-
-        if (!string.IsNullOrEmpty(filter.PathContains))
-        {
-            clauses.Add("relative_path LIKE @path_contains ESCAPE '\\'");
-            parameters.Add(("@path_contains", "%" + SqliteLike.Escape(filter.PathContains) + "%"));
-        }
-
-        if (filter.Since is { } since)
-        {
-            clauses.Add("last_seen_at >= @since");
-            parameters.Add(("@since", SqliteValues.ToSqlite(since)));
-        }
-
-        if (filter.Ids is { } ids)
-        {
-            var names = ids.Select((_, index) => $"@id_{index}").ToArray();
-            clauses.Add(names.Length == 0 ? "0" : $"id IN ({string.Join(", ", names)})");
-            parameters.AddRange(ids.Select((id, index) => ($"@id_{index}", (object?)id)));
-        }
-
-        var where = clauses.Count > 0 ? "WHERE " + string.Join(" AND ", clauses) : string.Empty;
-        return ($"SELECT {Columns} FROM files {where} ORDER BY last_seen_at DESC, id DESC LIMIT {filter.ClampedLimit}", [.. parameters]);
     }
 
     /// <summary>A count per known status, zero-filled.</summary>

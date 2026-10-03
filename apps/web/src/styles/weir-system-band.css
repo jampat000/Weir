@@ -1,0 +1,636 @@
+/*
+ * The Dashboard's System view: its grid, and the cards of its top band (This Weir, This computer, Processing) with
+ * Storage beside them. The grid is Live's: wide, it is as tall as the window and its three rows are shares of that
+ * height (dashboard-layout.ts names the columns, rows and areas, set inline by system-grid.tsx); narrower, the
+ * cards stack and the page scrolls. Every card lists only the whole rows that fit. Bars and the ring move on a
+ * transition; nothing moves under reduced motion, or while the window is being resized.
+ */
+
+/* ---- The grid -------------------------------------------------------------- */
+
+.mm-sy-grid {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mm-panel-gap);
+  /* Lines are 1.2 times their type, as Deluno's System sets them, so a row is as tall as Deluno's with the same padding. */
+  line-height: 1.2;
+}
+
+.mm-sy-cell {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.mm-sy-cell > .mm-panel {
+  flex: 1;
+}
+
+/* Stacked, a card is a fixed, comfortable height, so the rows it lists are measured the same way as when it is beside. */
+.mm-sy-cell--store,
+.mm-sy-cell--mid,
+.mm-sy-cell--conn,
+.mm-sy-cell--upd,
+.mm-sy-cell--low > .mm-panel {
+  height: 26rem;
+}
+
+.mm-sy-cell--low {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--mm-panel-gap);
+}
+
+.mm-sy-cell--band {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--mm-panel-gap);
+}
+
+/* The band's three cards are equal thirds, as Deluno's are, so no card's edge moves between the two. */
+.mm-sy-cell--across {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+/* Every card of the grid has the corner radius of a band card. */
+.mm-sy-grid .mm-panel {
+  border-radius: var(--mm-radius-tile);
+}
+
+.mm-sy-grid--beside {
+  display: grid;
+  height: 100%;
+}
+
+.mm-sy-grid--beside > .mm-sy-cell--band {
+  grid-area: band;
+  height: 100%;
+}
+
+.mm-sy-grid--beside > .mm-sy-cell--store {
+  grid-area: store;
+}
+
+.mm-sy-grid--beside > .mm-sy-cell--mid {
+  grid-area: mid;
+}
+
+.mm-sy-grid--beside > .mm-sy-cell--conn {
+  grid-area: conn;
+}
+
+.mm-sy-grid--beside > .mm-sy-cell--low {
+  grid-area: low;
+}
+
+.mm-sy-grid--beside > .mm-sy-cell--upd {
+  grid-area: upd;
+}
+
+.mm-sy-grid--beside > .mm-sy-cell--store,
+.mm-sy-grid--beside > .mm-sy-cell--mid,
+.mm-sy-grid--beside > .mm-sy-cell--conn,
+.mm-sy-grid--beside > .mm-sy-cell--upd,
+.mm-sy-grid--beside > .mm-sy-cell--low > .mm-panel {
+  height: auto;
+}
+
+/* ---- A band card ----------------------------------------------------------- */
+
+.mm-sy-band {
+  display: grid;
+  grid-template-rows: 16px minmax(0, 1fr);
+  row-gap: 6px;
+  min-width: 0;
+  min-height: 0;
+  padding: 14px 18px;
+  overflow: hidden;
+  border: 1px solid var(--mm-hairline);
+  border-radius: var(--mm-radius-tile);
+  background: var(--mm-card-bg);
+  container: mm-sy-band / size;
+}
+
+/* A card of the stacked page has the height of its content, so it needs a height to be a size container. */
+.mm-sy-cell--stacked > .mm-sy-band {
+  height: 14.5rem;
+}
+
+.mm-sy-grid--beside .mm-sy-cell--band > .mm-sy-band {
+  height: auto;
+}
+
+.mm-sy-band__body {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.mm-sy-band--computer > .mm-sy-band__body,
+.mm-sy-band--processing > .mm-sy-band__body {
+  grid-template-rows: minmax(0, 1fr) auto;
+  row-gap: 6px;
+}
+
+.mm-sy-band__note {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--mm-text2);
+}
+
+/* ---- This Weir: the ring, and tiles of facts ------------------------------- */
+
+/* The ring's column is as wide as its two-line caption (105px) and the tiles start 16px after it, whatever the caption and pill say. */
+.mm-sy-weir {
+  display: grid;
+  grid-template-columns: 105px minmax(0, 1fr);
+  gap: 16px;
+  align-items: center;
+  min-height: 0;
+}
+
+.mm-sy-ringbox {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 4px;
+  text-align: center;
+}
+
+/* A short band (under 180px tall, 150px inside its padding) has a narrower column, a closer gap, and a caption that drops "checks": "of 15 pass" is one line. */
+@container mm-sy-band (max-height: 149px) {
+  .mm-sy-weir {
+    grid-template-columns: 86px minmax(0, 1fr);
+    gap: 10px;
+  }
+
+  .mm-sy-ringbox {
+    gap: 3px;
+  }
+
+  .mm-sy-ringbox__long {
+    display: none;
+  }
+}
+
+.mm-sy-ringbox__caption {
+  max-width: 100%;
+  font-size: var(--mm-type-eyebrow);
+  line-height: 1.3;
+  color: var(--mm-text2);
+}
+
+.mm-sy-ring {
+  position: relative;
+}
+
+/* The ring grows with the card: 50px in the shortest band, 96px where there is room for it and its caption. */
+.mm-sy-ring svg {
+  display: block;
+  width: clamp(50px, calc(100cqh - 112px), 96px);
+  height: clamp(50px, calc(100cqh - 112px), 96px);
+  transform: rotate(-90deg);
+}
+
+.mm-sy-ring circle {
+  fill: none;
+  stroke-width: 8;
+}
+
+.mm-sy-ring__track {
+  stroke: var(--mm-surface-3);
+}
+
+.mm-sy-ring__value {
+  stroke: var(--mm-st);
+  stroke-linecap: round;
+  transition: stroke-dashoffset 1.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.mm-sy-ring b {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: clamp(16px, calc(100cqh - 124px), 22px);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--mm-text1);
+}
+
+.mm-sy-needs {
+  padding: 2px 7px;
+  border: 1px solid color-mix(in srgb, var(--mm-st) 45%, transparent);
+  border-radius: var(--mm-radius-pill);
+  font: inherit;
+  font-size: var(--mm-type-eyebrow);
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.mm-sy-needs:hover {
+  filter: brightness(1.15);
+}
+
+/* The arrow goes where the pill has no room for it; "N need you" is still the whole of what it says. */
+@container mm-sy-band (max-width: 300px) {
+  .mm-sy-needs {
+    padding-inline: 5px;
+  }
+
+  .mm-sy-needs__arrow {
+    display: none;
+  }
+}
+
+.mm-sy-needs--good {
+  cursor: default;
+}
+
+.mm-sy-facts-room {
+  display: grid;
+  align-content: center;
+  align-self: stretch;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/*
+ * The tiles are few and wide: 6.6rem is the room the longest name ("Files at once") needs with its padding, so a card
+ * has two columns where it is wide enough for two and three where it is wide enough for three, and no word in a tile
+ * is ever cut. They scroll a whole row at a time; the height the component sets is whole rows, so no row is cut through.
+ */
+.mm-sy-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(6.6rem, 1fr));
+  grid-auto-rows: 42px;
+  gap: 5px;
+  align-content: start;
+  min-width: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scroll-snap-type: y mandatory;
+  scrollbar-width: none;
+}
+
+.mm-sy-facts::-webkit-scrollbar {
+  display: none;
+}
+
+.mm-sy-facts:focus-visible {
+  border-radius: 8px;
+  outline: 2px solid var(--mm-primary);
+  outline-offset: 2px;
+}
+
+.mm-sy-fact {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto auto auto;
+  align-content: center;
+  min-width: 0;
+  padding: 0 9px;
+  border: 1px solid var(--mm-hairline);
+  border-radius: 8px;
+  background: var(--mm-surface-2);
+  scroll-snap-align: start;
+}
+
+.mm-sy-fact__label,
+.mm-sy-fact__value,
+.mm-sy-fact__sub {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.mm-sy-fact__label {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--mm-text3);
+}
+
+.mm-sy-fact__value {
+  font-size: 0.875rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--mm-text1);
+}
+
+.mm-sy-fact__sub {
+  font-size: var(--mm-type-eyebrow);
+  color: var(--mm-text2);
+}
+
+.mm-sy-fact[data-status] .mm-sy-fact__sub {
+  color: var(--mm-st);
+}
+
+/* ---- This computer and Processing: traces side by side -------------------- */
+
+.mm-sy-cols {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+}
+
+.mm-sy-cols--three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.mm-sy-cols--two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.mm-sy-col {
+  display: grid;
+  grid-template-rows: 16px 28px 15px minmax(0, 1fr);
+  row-gap: 2px;
+  min-width: 0;
+  min-height: 0;
+  padding: 0 12px;
+  border-left: 1px solid var(--mm-hairline);
+  container: mm-sy-col / inline-size;
+}
+
+.mm-sy-col:first-child {
+  padding-left: 0;
+  border-left: 0;
+}
+
+.mm-sy-col:last-child {
+  padding-right: 0;
+}
+
+.mm-sy-col__label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--mm-type-eyebrow);
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--mm-text2);
+}
+
+.mm-sy-col__label i {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 3px;
+  background: var(--mm-sy-colour);
+  box-shadow: 0 0 8px var(--mm-sy-colour);
+}
+
+.mm-sy-col__figure {
+  overflow: hidden;
+  font-size: 22px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 28px;
+  white-space: nowrap;
+  color: var(--mm-text1);
+}
+
+.mm-sy-col__figure small {
+  font-size: var(--mm-type-caption);
+  font-weight: 500;
+  color: var(--mm-text2);
+}
+
+.mm-sy-col__sub {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--mm-type-eyebrow);
+  line-height: 15px;
+  white-space: nowrap;
+  color: var(--mm-text2);
+}
+
+/* A narrow column gives its figure and unit less room, so a reading like 14.5 GB is never cut off. */
+@container mm-sy-col (max-width: 100px) {
+  .mm-sy-col__label {
+    font-size: 8.5px;
+    letter-spacing: 0.02em;
+  }
+
+  .mm-sy-col__figure {
+    font-size: 17px;
+  }
+
+  .mm-sy-col__figure small {
+    font-size: 9.5px;
+  }
+
+  .mm-sy-col__sub {
+    font-size: var(--mm-type-eyebrow);
+  }
+}
+
+/* Three readings in a narrow card (a 1366px window) share their room with less padding between them, and a figure that may reach four digits is smaller. */
+@container mm-sy-band (max-width: 230px) {
+  .mm-sy-col {
+    padding: 0 3px;
+  }
+
+  .mm-sy-col__figure {
+    font-size: 14px;
+  }
+
+  .mm-sy-col__figure small {
+    font-size: 8.5px;
+  }
+}
+
+.mm-sy-span__short {
+  display: none;
+}
+
+@container mm-sy-band (max-width: 280px) {
+  .mm-sy-span__long {
+    display: none;
+  }
+
+  .mm-sy-span__short {
+    display: inline;
+  }
+}
+
+/* The pills under the columns: 10px above them, 6px of the card's padding below, and two of them in a short band. */
+.mm-sy-tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  justify-content: center;
+  gap: 5px;
+  height: 29px;
+  margin-bottom: -6px;
+  padding-top: 10px;
+  overflow: hidden;
+}
+
+.mm-sy-tag {
+  padding: 1px 8px;
+  border: 1px solid var(--mm-hairline);
+  border-radius: var(--mm-radius-pill);
+  background: var(--mm-surface-2);
+  font-size: var(--mm-type-eyebrow);
+  white-space: nowrap;
+  color: var(--mm-text2);
+}
+
+.mm-sy-tag[data-status] {
+  border-color: color-mix(in srgb, var(--mm-st) 45%, transparent);
+}
+
+@container mm-sy-band (max-height: 149px) {
+  .mm-sy-tag:nth-child(n + 3) {
+    display: none;
+  }
+}
+
+/* Deluno's Network card has no pills, so Processing gives that row to its traces. */
+.mm-sy-band--processing > .mm-sy-band__body {
+  grid-template-rows: minmax(0, 1fr);
+}
+
+/* ---- Storage --------------------------------------------------------------- */
+
+.mm-sy-drives-fit {
+  flex: 1 1 0;
+  min-height: 0;
+  margin-bottom: 10px;
+  padding: 0 18px;
+  overflow: hidden;
+}
+
+.mm-sy-drives {
+  display: grid;
+  list-style: none;
+}
+
+.mm-sy-drives-note {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--mm-text2);
+}
+
+.mm-sy-drive {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 2px 10px;
+  margin-bottom: 8px;
+  padding-bottom: 7px;
+  border-bottom: 1px solid var(--mm-hairline);
+  font-size: var(--mm-type-body);
+}
+
+.mm-sy-drive:last-child {
+  margin-bottom: 0;
+  border-bottom: 0;
+}
+
+.mm-sy-drive__name {
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--mm-text1);
+}
+
+.mm-sy-drive__name small {
+  font-size: inherit;
+  font-weight: 500;
+  color: var(--mm-text2);
+}
+
+.mm-sy-drive__free {
+  white-space: nowrap;
+  color: var(--mm-text2);
+}
+
+.mm-sy-drive__bar {
+  position: relative;
+  display: flex;
+  grid-column: 1 / -1;
+  height: 5px;
+  overflow: hidden;
+  border-radius: 9px;
+  background: var(--mm-surface-3);
+}
+
+.mm-sy-drive__bar i {
+  display: block;
+  height: 100%;
+  background: var(--mm-text3);
+  transition: width 1s;
+}
+
+.mm-sy-drive__bar i.mm-sy-drive__weir {
+  background: color-mix(in srgb, var(--mm-primary) 62%, var(--mm-surface-3));
+}
+
+.mm-sy-drive[data-status] .mm-sy-drive__bar i {
+  background: var(--mm-st);
+}
+
+.mm-sy-drive__keep {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--mm-text1);
+  opacity: 0.7;
+  transform: translateX(-1px);
+}
+
+.mm-sy-drive__io {
+  display: flex;
+  grid-column: 1 / -1;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: var(--mm-type-eyebrow);
+  color: var(--mm-text2);
+}
+
+.mm-sy-drive__io > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mm-sy-drive__io > span:last-child {
+  flex: none;
+}
+
+.mm-sy-drive[data-status] .mm-sy-drive__io > span:last-child {
+  color: var(--mm-st);
+}
+
+/* ---- Motion ---------------------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .mm-sy-band *,
+  .mm-sy-drive * {
+    transition: none !important;
+  }
+}
+
+/* Nothing moves while the window is being resized: the transitions are given no time rather than taken away. */
+body.mm-pipeline-resizing .mm-sy-band *,
+body.mm-pipeline-resizing .mm-sy-drive * {
+  transition-delay: 0s !important;
+  transition-duration: 0s !important;
+}

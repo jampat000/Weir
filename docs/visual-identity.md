@@ -1,37 +1,40 @@
 # Weir — visual identity (web shell)
 
-The palette is the **Tailrace** theme: a cool slate base with a teal-cyan accent. Some token names are
-older than the palette, so `--mm-gold` is teal and `--mm-indigo` is blue. Read the names as labels, not
-colours.
+The palette is shared with Deluno so the two apps read as siblings: a deep blue-black base, one blue
+brand colour, and colour held back for signals. Dark is the default; light keeps the same roles on a
+toned-down grey page. Type is Inter for the interface and JetBrains Mono for keyboard hints and code;
+release and file names use the system monospace so characters can be compared.
 
 `apps/web/src/styles/weir-tokens.css` is the source of truth. This table is a summary of it, not a second
 definition — if the two disagree, the stylesheet is right.
 
-| Token         | Dark      | Light     | Use                                                        |
-|---------------|-----------|-----------|------------------------------------------------------------|
-| `--mm-charcoal` | `#0b1418` | `#eaf0f2` | App background                                             |
-| `--mm-slate`    | `#13212a` | `#ffffff` | Shell surfaces, dialogs and figure tiles                   |
-| `--mm-slate-elevated` | `#1b2d38` | `#e3ecef` | The surface one step above `--mm-slate`               |
-| `--mm-stone`    | `#e8f1f4` | `#11242b` | Primary text                                               |
-| `--mm-gold`     | `#3ed7c8` | `#0d6f68` | Brand accent (teal, despite the name), wired to `--mm-accent` |
-| `--mm-indigo`   | `#3d8bfd` | `#1f5fb8` | Secondary accent (sparingly)                               |
+| Token                                   | Dark      | Light     | Use                                                          |
+|-----------------------------------------|-----------|-----------|--------------------------------------------------------------|
+| `--mm-bg`                               | `#0c0f18` | `#e1e4e9` | The page                                                     |
+| `--mm-card-bg` (`--mm-slate`)           | `#131a25` | `#eff0f4` | A panel                                                      |
+| `--mm-surface-elevated`                 | `#181f2a` | `#f7f8fa` | Menus and dialogs, one step above a panel                    |
+| `--mm-surface-2`                        | `#1a222d` | `#dbdee5` | A card inside a panel                                        |
+| `--mm-surface-3`                        | `#212936` | `#cfd3db` | A track or well inside a card                                |
+| `--mm-hairline`                         | `#252e3c` | `#c3c8d1` | Rules and quiet borders                                      |
+| `--mm-sidebar-bg`                       | `#070b12` | `#d1d6de` | The side menu                                                |
+| `--mm-text` (`--mm-stone`)              | `#f3f4f7` | `#171c26` | Primary text                                                 |
+| `--mm-text2`                            | `#a9b0bc` | `#525966` | Muted text                                                   |
+| `--mm-primary` (`--mm-accent`)          | `#52a5ff` | `#125eba` | The brand colour: links, the current page, primary actions   |
+| `--mm-success` / `--mm-warning` / `--mm-destructive` / `--mm-info` | `#25e475` / `#fb8d2d` / `#ef4d4d` / `#41a7fb` | `#168846` / `#ab4705` / `#ce1212` / `#0872c9` | Fills for bars, dots and edges |
+| `--mm-status-*-text`                    | tuned     | tuned     | Words in a signal colour, at 4.5:1 or better on every surface |
 
-**Slate** colours the shell (sidebar, top bar, page header, tab row), dialogs and figure tiles. Page
-bodies are borderless, so Slate is not every surface in the app. See
-[`design/content-language.md`](design/content-language.md) rule 3.
+The Pipeline's five stations each have a fill colour for bars, dots and edges and a `-text` twin for
+words set in it, nudged until it reads at 4.5:1 on a panel: `--mm-lane-incoming` (purple),
+`--mm-lane-queued` (teal), `--mm-lane-analysing` (blue), `--mm-lane-processing` (green) and
+`--mm-lane-delivering` (gold).
 
-Status colours (`--mm-status-*`), input wells, shadows and the type ramp are all defined in the same file
-and are deliberately not duplicated here.
+Shapes: controls 10px (`--mm-radius-control`), fields 12px, tiles 14px, panels and dialogs 16px.
 
-**Implementation:** `weir-tokens.css`, `weir-shell.css`, `weir-content.css`, and the screen stylesheets
+Status colours (`--mm-status-*`), input wells, shadows and the type ramp are defined in the same file
+and are deliberately not duplicated here. The shared panel parts (`Panel`, `StatTile`, `Chip`,
+`BarListRow`, `SegmentedControl`) live in `apps/web/src/components/panels/` and are styled in
+`weir-panels.css`.
+
+**Implementation:** `weir-tokens.css`, `weir-shell.css`, `weir-header.css`, `weir-sidebar.css`,
+`weir-sidebar-nav.css`, `weir-panels.css`, `weir-content.css`, and the screen stylesheets
 `weir-processing.css`, `weir-history.css` and `weir-library.css`.
-
-## Delivery rules
-
-- The Weir mark is drawn inline as SVG from `apps/web/src/components/brand/weir-logo.tsx`, so it follows
-  the theme tokens rather than shipping as an image. `packaging/brand/weir-mark.svg` is the source that
-  `scripts/generate-brand-icons.py` turns into the favicon, tray icon and docs logo. The geometry is
-  generated by `packaging/brand/build/`; do not hand-edit the path data. The sidebar carries
-  the three-stream mark; only the 16px icon frame falls back to two streams.
-- Production web builds do not emit source maps. Set `WEIR_BUILD_SOURCEMAPS=true` only for a short-lived diagnostics build and keep that output private.
-- `npm run build` runs the bundle-budget check after Vite finishes. The check also caps CSS and JavaScript chunk sizes so visual polish cannot quietly turn into a slower shell.

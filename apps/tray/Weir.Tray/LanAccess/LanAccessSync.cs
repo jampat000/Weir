@@ -1,3 +1,5 @@
+using Weir.Tray.Firewall;
+
 namespace Weir.Tray.LanAccess;
 
 /// <summary>The part of the running server that <see cref="LanAccessSync"/> steers.</summary>
@@ -11,17 +13,27 @@ interface IServerListenScope
 
 /// <summary>
 /// Keeps the running server listening the way the saved LAN access choice says. The tray's own menu goes through
-/// <see cref="SetAsync"/>; a change made by another process (<c>--allow-lan</c>) is picked up by
+/// <see cref="SetAsync"/>; a change made by another process (the web page, <c>--allow-lan</c>) is picked up by
 /// <see cref="WatchAsync"/>, which restarts the server to match. The saved choice and the running server never
 /// disagree for long: a server that will not start the new way puts the saved choice back.
 /// </summary>
-sealed class LanAccessSync(string runtimeHome, IServerListenScope server, TimeProvider time) : IDisposable
+/// <remarks>
+/// A choice for other devices that arrives while Windows Firewall has no rule for Weir raises the same administrator
+/// prompt the tray menu does. Declining it still restarts the server for the network, because that is what was
+/// chosen; Windows Firewall then blocks, which System › About shows with a way to try again. Saving the choice again
+/// (the file's modified time moves even when its text does not) asks again.
+/// </remarks>
+sealed class LanAccessSync(string runtimeHome, IServerListenScope server, IFirewallAccess firewall, TimeProvider time) : IDisposable
 {
     private static readonly TimeSpan PollInterval = TimeSpan.FromSeconds(3);
 
     // Held while a choice is saved and applied, or while the saved choice is checked against the server, so the
-    // menu and the watcher never both restart the server for the same change.
+    // menu and the watcher never both restart the server, or raise the admin prompt, for the same change.
     private readonly SemaphoreSlim _changing = new(1, 1);
+
+    // When the saved choice was last written by a process the tray has already dealt with. A start with a choice
+    // already saved never raises the prompt: only a save made while the tray is running does.
+    private DateTime? _handledSavedAt = LanAccessSetting.SavedAt(runtimeHome);
 
     public void Dispose() => _changing.Dispose();
 
@@ -32,6 +44,7 @@ sealed class LanAccessSync(string runtimeHome, IServerListenScope server, TimePr
         try
         {
             LanAccessSetting.Write(runtimeHome, scope);
+            _handledSavedAt = LanAccessSetting.SavedAt(runtimeHome);
             return await ApplyAsync(scope, cancellationToken).ConfigureAwait(false);
         }
         finally
@@ -41,37 +54,54 @@ sealed class LanAccessSync(string runtimeHome, IServerListenScope server, TimePr
     }
 
     /// <summary>
-    /// Restarts the server whenever the saved choice is something the server is not doing, and reports each
-    /// restart to <paramref name="onRestarted"/>.
+    /// Carries out every choice another process saves: restarts the server for it, and reports each one to
+    /// <paramref name="watch"/>.
     /// </summary>
-    internal async Task WatchAsync(Action<ListenScope, ScopeChange> onRestarted, CancellationToken cancellationToken)
+    internal async Task WatchAsync(LanAccessWatch watch, CancellationToken cancellationToken)
     {
         using var timer = new PeriodicTimer(PollInterval, time);
         while (await timer.WaitForNextTickAsync(cancellationToken).ConfigureAwait(false))
         {
-            await CheckAsync(onRestarted, cancellationToken).ConfigureAwait(false);
+            await CheckAsync(watch, cancellationToken).ConfigureAwait(false);
         }
     }
 
-    internal async Task CheckAsync(Action<ListenScope, ScopeChange> onRestarted, CancellationToken cancellationToken)
+    internal async Task CheckAsync(LanAccessWatch watch, CancellationToken cancellationToken)
     {
         await _changing.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            if (LanAccessSetting.Read(runtimeHome, log: _ => { }) is not { } scope || scope == server.Scope)
+            var savedAt = LanAccessSetting.SavedAt(runtimeHome);
+            var isNewSave = savedAt != _handledSavedAt;
+            _handledSavedAt = savedAt;
+            if (LanAccessSetting.Read(runtimeHome, log: _ => { }) is not { } scope)
             {
                 return;
             }
-            var change = await ApplyAsync(scope, cancellationToken).ConfigureAwait(false);
-            if (change != ScopeChange.Unchanged)
+
+            var asked = isNewSave && scope == ListenScope.OtherDevices && !firewall.AllowsWeirIn()
+                ? await AskWindowsAsync(watch, cancellationToken).ConfigureAwait(false)
+                : (FirewallElevation.Outcome?)null;
+            var change = scope == server.Scope
+                ? ScopeChange.Unchanged
+                : await ApplyAsync(scope, cancellationToken).ConfigureAwait(false);
+            if (change != ScopeChange.Unchanged || asked is not null)
             {
-                onRestarted(scope, change);
+                watch.Applied(new SavedChoiceApplied(scope, change, asked));
             }
         }
         finally
         {
             _changing.Release();
         }
+    }
+
+    // The prompt blocks until the person answers it, off the caller's thread.
+    private async Task<FirewallElevation.Outcome> AskWindowsAsync(LanAccessWatch watch, CancellationToken cancellationToken)
+    {
+        TrayLog.Write("LAN access: a choice for other devices was saved and Windows Firewall has no rule for Weir; asking Windows for it.");
+        watch.AskingWindows();
+        return await Task.Run(firewall.AskToAllow, cancellationToken).ConfigureAwait(false);
     }
 
     private async Task<ScopeChange> ApplyAsync(ListenScope scope, CancellationToken cancellationToken)
@@ -89,6 +119,7 @@ sealed class LanAccessSync(string runtimeHome, IServerListenScope server, TimePr
         try
         {
             LanAccessSetting.Write(runtimeHome, server.Scope);
+            _handledSavedAt = LanAccessSetting.SavedAt(runtimeHome);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {

@@ -28,7 +28,7 @@ public sealed partial class ManagerSetupCheck
 
             try
             {
-                var client = new MediaManagerHttpClient(connection.BaseUrl, connection.ApiKey, _handlers, ManagerDialectRules.DescribeTimeout);
+                var client = new MediaManagerHttpClient(connection.BaseUrl, connection.ApiKey, _handlers, ManagerDialectRules.DescribeTimeout, connection.Reference);
                 var payload = await client.GetJsonAsync(ManagerSetupRules.DownloadClientPath, cancellationToken: cancellationToken).ConfigureAwait(false);
                 clients.AddRange(ManagerSetupRules.ParseDownloadClients(payload, mediaScope));
             }

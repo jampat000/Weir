@@ -1,43 +1,34 @@
-import { useEffect, useRef, useState } from "react";
-
-import type { ActivityRecentResponse } from "../../../../lib/api/types";
+import { useEffect, useState } from "react";
 
 /**
- * Updates as they happen, but calmly: fresh entries only land in the list while the reader is at the top with nothing
- * opened and no older pages loaded. Otherwise the list they are reading stays put, and the caller
- * offers the new entries with a button.
+ * Updates as they happen, but calmly: fresh data only lands in the list while the reader is at the top with nothing
+ * held open (a row they are reading, older pages they have loaded). Otherwise the list they are reading stays put, and the
+ * caller offers the new data with a button.
  */
-export function useCalmFeed(
-  live: ActivityRecentResponse | undefined,
+export function useCalmFeed<T>(
+  live: T | undefined,
   dataKey: string,
-  olderLoaded: boolean,
+  holding: boolean,
 ) {
-  const [snapshot, setSnapshot] = useState<{
-    key: string;
-    data: ActivityRecentResponse;
-  } | null>(null);
-  const [calm, setCalm] = useState(true);
-  const feedRef = useRef<HTMLElement | null>(null);
-  const hasData = Boolean(live);
+  const [snapshot, setSnapshot] = useState<{ key: string; data: T } | null>(
+    null,
+  );
+  const [atTop, setAtTop] = useState(true);
+  const [feed, setFeed] = useState<HTMLElement | null>(null);
+  const hasData = live !== undefined;
 
   useEffect(() => {
-    const evaluate = () => {
-      const feed = feedRef.current;
-      const atTop = !feed || feed.getBoundingClientRect().top >= 0;
-      const expanded = Boolean(feed?.querySelector("details[open]"));
-      setCalm(atTop && !expanded && !olderLoaded);
-    };
+    const evaluate = () =>
+      setAtTop(!feed || feed.getBoundingClientRect().top >= 0);
     evaluate();
     window.addEventListener("scroll", evaluate, true);
-    document.addEventListener("toggle", evaluate, true);
-    return () => {
-      window.removeEventListener("scroll", evaluate, true);
-      document.removeEventListener("toggle", evaluate, true);
-    };
-  }, [olderLoaded, hasData]);
+    return () => window.removeEventListener("scroll", evaluate, true);
+  }, [hasData, feed]);
+
+  const calm = atTop && !holding;
 
   useEffect(() => {
-    if (!live) return;
+    if (live === undefined) return;
     setSnapshot((prev) =>
       prev && prev.key === dataKey && (prev.data === live || !calm)
         ? prev
@@ -46,10 +37,11 @@ export function useCalmFeed(
   }, [live, dataKey, calm]);
 
   return {
-    feedRef,
+    /** The element whose top says whether the reader is at the top of the list: the callback that hands it over. */
+    watchFeed: setFeed,
     /** What the list shows: the held snapshot, or the live data before one exists. */
     shown: snapshot && snapshot.key === dataKey ? snapshot.data : live,
     /** Show this data now, whatever the reader is doing. */
-    show: (data: ActivityRecentResponse) => setSnapshot({ key: dataKey, data }),
+    show: (data: T) => setSnapshot({ key: dataKey, data }),
   };
 }

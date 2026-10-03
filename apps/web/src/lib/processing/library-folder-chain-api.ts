@@ -1,5 +1,6 @@
 import { apiFetch, readJson, requireOk } from "../api/client";
 import type { Schema } from "../api/types";
+import type { StatusMeaning } from "../ui/status-meaning";
 
 /**
  * The folder-chain check: Weir's own watched/work/output folders, plus every connected media manager's own setup
@@ -34,10 +35,20 @@ export const READINESS_LABELS: Record<Readiness, string> = {
   needs_attention: "Needs attention",
 };
 
-export const READINESS_CLASSES: Record<Readiness, string> = {
-  ready: "mm-status-text--healthy",
-  not_verified: "text-mm-text3",
-  needs_attention: "mm-status-text--warning",
+export const READINESS_MEANING: Record<Readiness, StatusMeaning> = {
+  ready: "done",
+  not_verified: "attention",
+  needs_attention: "attention",
+};
+
+export const FOLDER_LINE_MEANING: Record<
+  FolderChainLine["state"],
+  StatusMeaning
+> = {
+  ok: "done",
+  problem: "attention",
+  note: "idle",
+  unverified: "attention",
 };
 
 export async function fetchLibraryFolderChain(
@@ -64,4 +75,13 @@ export async function fetchConnectionFolderChain(
     "Could not check the folder chain of the workflows linked to it",
   );
   return readJson<LibraryFolderChain[]>(response);
+}
+
+/** Every line of a chain: Weir's own folders, then each media manager's and each download client's. */
+export function folderChainLines(chain: LibraryFolderChain): FolderChainLine[] {
+  return [
+    ...chain.local.lines,
+    ...chain.managers.flatMap((manager) => manager.lines),
+    ...chain.download_clients.flatMap((client) => client.lines),
+  ];
 }

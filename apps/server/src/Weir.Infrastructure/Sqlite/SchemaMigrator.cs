@@ -124,6 +124,10 @@ public sealed class SchemaMigrator
         new(32, "0067_failed_files_are_never_held", "Weir.Infrastructure.Migrations.0032_failed_files_are_never_held.sql"),
         new(33, "0068_remove_failed_download_cleanup_jobs", "Weir.Infrastructure.Migrations.0033_remove_failed_download_cleanup_jobs.sql"),
         new(34, "0069_file_history_orphans", "Weir.Infrastructure.Migrations.0034_file_history_orphans.sql"),
+        new(35, "0070_artwork", "Weir.Infrastructure.Migrations.0035_artwork.sql"),
+        new(36, "0071_connection_usage", "Weir.Infrastructure.Migrations.0036_connection_usage.sql"),
+        new(37, "0072_server_starts", "Weir.Infrastructure.Migrations.0037_server_starts.sql"),
+        new(38, "0073_library_change_reason", "Weir.Infrastructure.Migrations.0038_library_change_reason.sql"),
     ];
 
     /// <summary>

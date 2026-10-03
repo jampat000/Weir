@@ -27,7 +27,7 @@ public sealed record RemuxPassRequest
     public long MinimumFreeDiskSpaceMb { get; init; }
     public bool PassThroughUnchanged { get; init; }
 
-    /// <summary>Settings › Cleanup "Keep a failed file's half-written copy for a day": a failed write stays in the work folder.</summary>
+    /// <summary>Setup › Performance › Cleanup "Keep a failed file's half-written copy for a day": a failed write stays in the work folder.</summary>
     public bool KeepFailedWorkFiles { get; init; }
 
     /// <summary>The hand-off this file came from, when it did: its release name feeds the original-language lookup.</summary>

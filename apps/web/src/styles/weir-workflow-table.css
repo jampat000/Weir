@@ -1,0 +1,180 @@
+/* Setup › Workflows › File paths: the workflows in priority order, one line of each folder. */
+
+.mm-workflow-table .mm-priority {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.mm-priority__number {
+  min-width: 1.25rem;
+  color: var(--mm-text1);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  text-align: center;
+}
+
+.mm-reorder-handle {
+  display: inline-grid;
+  place-items: center;
+  width: var(--mm-control-height-row);
+  height: var(--mm-control-height-row);
+  border: 0;
+  border-radius: var(--mm-radius-sm);
+  background: transparent;
+  color: var(--mm-text3);
+  cursor: grab;
+  /* The browser must leave a drag that starts on the grip to the page, or a touch would scroll instead. */
+  touch-action: none;
+}
+
+.mm-reorder-handle svg {
+  fill: currentColor;
+}
+
+.mm-reorder-handle:hover {
+  background: var(--mm-surface-3);
+  color: var(--mm-text1);
+}
+
+.mm-reorder-handle:focus-visible {
+  outline: 2px solid var(--mm-accent);
+  outline-offset: 1px;
+}
+
+.mm-reorder-handle[aria-pressed="true"] {
+  background: var(--mm-surface-3);
+  color: var(--mm-accent);
+}
+
+.mm-workflow-table tr[data-grabbed] > * {
+  background: var(--mm-surface-2);
+}
+
+/* A folder is cut from its start, so the end of the path, the part that tells folders apart, stays. The
+ * bidirectional override keeps the characters in reading order inside the right-to-left box. */
+.mm-folder-path {
+  display: block;
+  overflow: hidden;
+  color: var(--mm-text1);
+  direction: rtl;
+  font-family: var(--mm-font-mono);
+  font-size: var(--mm-type-body);
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mm-folder-remark {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mm-workflow-table td > .mm-folder-remark:only-child {
+  margin-top: 0;
+}
+
+/* The kind's badge keeps to one line, and the sentence under it to two, so every row is as tall as the next. */
+.mm-workflow-table td .mm-workflow-table__badge {
+  display: inline-block;
+  max-width: 100%;
+  height: 24px;
+  min-height: 0;
+  padding: 0 10px;
+  overflow: hidden;
+  line-height: 22px;
+  text-overflow: ellipsis;
+  vertical-align: top;
+  white-space: nowrap;
+}
+
+/* The name and its media-type chip stay on one line; a long name is cut, never the chip. */
+.mm-workflow-name {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
+}
+
+.mm-workflow-name__text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mm-workflow-table .mm-workflow-name .mm-chip {
+  margin: 0;
+}
+
+.mm-workflow-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+@container (max-width: 760px) {
+  .mm-folder-remark {
+    white-space: normal;
+  }
+
+  .mm-folder-path {
+    white-space: normal;
+    direction: ltr;
+    overflow-wrap: anywhere;
+  }
+}
+
+/* As a table the columns share the room by their headings' widths. A cell that holds a path, a note or
+ * the rules' name asks for no width of its own, so a long one is cut where it is rather than widening the column. */
+@container (min-width: 761px) {
+  .mm-workflow-table {
+    min-width: 56rem;
+  }
+
+  .mm-workflow-table tbody th,
+  .mm-workflow-table tbody td {
+    vertical-align: middle;
+  }
+
+  .mm-workflow-table__fit {
+    width: 1%;
+    white-space: nowrap;
+  }
+
+  .mm-workflow-table__workflow {
+    width: 13%;
+  }
+
+  .mm-workflow-table__kind {
+    width: 28%;
+  }
+
+  .mm-workflow-table__path {
+    width: 21%;
+  }
+
+  .mm-workflow-table__rules {
+    width: 11%;
+  }
+
+  .mm-workflow-table tbody th.mm-workflow-table__workflow,
+  .mm-workflow-table td.mm-workflow-table__kind,
+  .mm-workflow-table td.mm-workflow-table__path,
+  .mm-workflow-table td.mm-workflow-table__rules {
+    max-width: 0;
+  }
+
+  .mm-workflow-table td.mm-workflow-table__rules {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .mm-workflow-actions {
+    flex-wrap: nowrap;
+  }
+}

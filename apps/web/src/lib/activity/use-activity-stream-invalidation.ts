@@ -2,9 +2,34 @@ import { useEffect } from "react";
 import { useQueryClient, type QueryKey } from "@tanstack/react-query";
 import { useSyncExternalStore } from "react";
 
+import {
+  CONNECTION_ACTIVITY_EVENT,
+  parseConnectionActivity,
+  type ConnectionActivityFrame,
+} from "../connections/connection-activity";
+import {
+  SYSTEM_STATS_EVENT,
+  parseSystemStatsFrame,
+} from "../system/system-stats-frame";
+import type { SystemStatsFrame } from "../system/system-stats-types";
+import {
+  SYSTEM_LOG_EVENT,
+  parseSystemLogFrame,
+  type SystemLogFrame,
+} from "../system/system-log-frame";
+import {
+  SYSTEM_TASKS_EVENT,
+  parseSystemTasksFrame,
+  type SystemTask,
+} from "../system/system-tasks-frame";
+
 type LatestPayload = { latest_event_id: number; activity_revision?: number };
 type ActivityLatestSubscriber = () => void;
 type LiveProgressSubscriber = () => void;
+type ConnectionActivitySubscriber = (frame: ConnectionActivityFrame) => void;
+type SystemStatsSubscriber = (frame: SystemStatsFrame) => void;
+type SystemTasksSubscriber = (tasks: SystemTask[]) => void;
+type SystemLogSubscriber = (frame: SystemLogFrame) => void;
 
 /**
  * Never cancel a query that is already mid-flight just because a newer activity event arrived: the
@@ -12,6 +37,25 @@ type LiveProgressSubscriber = () => void;
  * request every time events arrive faster than a screen's own query can finish (#710).
  */
 const INVALIDATE_OPTIONS = { cancelRefetch: false } as const;
+
+/**
+ * Marks these queries stale and reads them again. A read already in flight is kept rather than cancelled (#710), but it began
+ * before whatever made the data stale, so its answer can be missing that very change; once every such read has landed, the
+ * queries are read once more.
+ */
+export function invalidateLive(
+  qc: ReturnType<typeof useQueryClient>,
+  filters: { queryKey: QueryKey; exact?: boolean },
+): void {
+  const readingAlready = qc.isFetching(filters) > 0;
+  void qc.invalidateQueries(filters, INVALIDATE_OPTIONS);
+  if (!readingAlready) return;
+  const stopWatching = qc.getQueryCache().subscribe(() => {
+    if (qc.isFetching(filters) > 0) return;
+    stopWatching();
+    void qc.invalidateQueries(filters, INVALIDATE_OPTIONS);
+  });
+}
 
 /** How far a running pass has got, straight from the `processing.progress` stream frame (#750). */
 export type LiveProgressEntry = {
@@ -36,6 +80,10 @@ const EMPTY_PROGRESS: Readonly<Record<string, LiveProgressEntry>> = {};
 let liveProgressByPath: Readonly<Record<string, LiveProgressEntry>> =
   EMPTY_PROGRESS;
 const progressSubscribers = new Set<LiveProgressSubscriber>();
+const connectionActivitySubscribers = new Set<ConnectionActivitySubscriber>();
+const systemStatsSubscribers = new Set<SystemStatsSubscriber>();
+const systemTasksSubscribers = new Set<SystemTasksSubscriber>();
+const systemLogSubscribers = new Set<SystemLogSubscriber>();
 /** A progress frame arrived while the tab was hidden and has not been shown yet. */
 let progressChangedWhileHidden = false;
 
@@ -45,6 +93,17 @@ function emitActivityLatest(): void {
 
 function emitLiveProgress(): void {
   progressSubscribers.forEach((subscriber) => subscriber());
+}
+
+function hasSubscribers(): boolean {
+  return (
+    subscribers.size > 0 ||
+    progressSubscribers.size > 0 ||
+    connectionActivitySubscribers.size > 0 ||
+    systemStatsSubscribers.size > 0 ||
+    systemTasksSubscribers.size > 0 ||
+    systemLogSubscribers.size > 0
+  );
 }
 
 function tabIsHidden(): boolean {
@@ -151,7 +210,7 @@ function closeActivityStream(): void {
  */
 function onVisibilityChange(): void {
   if (tabIsHidden()) return;
-  if (subscribers.size > 0 || progressSubscribers.size > 0) {
+  if (hasSubscribers()) {
     ensureActivityStream();
   }
   if (progressChangedWhileHidden) {
@@ -196,12 +255,28 @@ function ensureActivityStream(): EventSource | null {
     }
     emitLiveProgress();
   });
+  source.addEventListener(CONNECTION_ACTIVITY_EVENT, (ev) => {
+    const frame = parseConnectionActivity((ev as MessageEvent<string>).data);
+    if (frame) connectionActivitySubscribers.forEach((fn) => fn(frame));
+  });
+  source.addEventListener(SYSTEM_STATS_EVENT, (ev) => {
+    const frame = parseSystemStatsFrame((ev as MessageEvent<string>).data);
+    if (frame) systemStatsSubscribers.forEach((fn) => fn(frame));
+  });
+  source.addEventListener(SYSTEM_TASKS_EVENT, (ev) => {
+    const tasks = parseSystemTasksFrame((ev as MessageEvent<string>).data);
+    if (tasks) systemTasksSubscribers.forEach((fn) => fn(tasks));
+  });
+  source.addEventListener(SYSTEM_LOG_EVENT, (ev) => {
+    const frame = parseSystemLogFrame((ev as MessageEvent<string>).data);
+    if (frame) systemLogSubscribers.forEach((fn) => fn(frame));
+  });
   return source;
 }
 
-/** Closes the shared connection once nobody — invalidation or live progress — still wants it. */
+/** Closes the shared connection once nobody — invalidation, live progress or connection lights — still wants it. */
 function closeIfNobodyIsWatching(): void {
-  if (subscribers.size === 0 && progressSubscribers.size === 0) {
+  if (!hasSubscribers()) {
     closeActivityStream();
     lastSeen = null;
     liveProgressByPath = EMPTY_PROGRESS;
@@ -229,6 +304,74 @@ function subscribeLiveProgress(subscriber: LiveProgressSubscriber): () => void {
 
   return () => {
     progressSubscribers.delete(subscriber);
+    closeIfNobodyIsWatching();
+  };
+}
+
+/**
+ * Calls `subscriber` with every `connection.activity` frame, on the one shared stream. A frame is a moment, not state:
+ * nothing is kept for a subscriber that arrives late, and nothing is replayed to it.
+ */
+export function subscribeConnectionActivity(
+  subscriber: ConnectionActivitySubscriber,
+): () => void {
+  connectionActivitySubscribers.add(subscriber);
+  watchVisibility();
+  ensureActivityStream();
+
+  return () => {
+    connectionActivitySubscribers.delete(subscriber);
+    closeIfNobodyIsWatching();
+  };
+}
+
+/**
+ * Calls `subscriber` with every `system.stats` frame, on the one shared stream: the machine's newest reading, once a
+ * second while any screen is listening. A frame is a moment, so nothing is replayed to a late subscriber.
+ */
+export function subscribeSystemStats(
+  subscriber: SystemStatsSubscriber,
+): () => void {
+  systemStatsSubscribers.add(subscriber);
+  watchVisibility();
+  ensureActivityStream();
+
+  return () => {
+    systemStatsSubscribers.delete(subscriber);
+    closeIfNobodyIsWatching();
+  };
+}
+
+/**
+ * Calls `subscriber` with the whole task list each time `system.tasks` says a task started or ended, on the one shared
+ * stream. A frame is a moment, so nothing is replayed to a late subscriber.
+ */
+export function subscribeSystemTasks(
+  subscriber: SystemTasksSubscriber,
+): () => void {
+  systemTasksSubscribers.add(subscriber);
+  watchVisibility();
+  ensureActivityStream();
+
+  return () => {
+    systemTasksSubscribers.delete(subscriber);
+    closeIfNobodyIsWatching();
+  };
+}
+
+/**
+ * Calls `subscriber` with every `system.log` frame, a warning or error as Weir writes it, on the one shared stream.
+ * A frame is a moment, so nothing is replayed to a late subscriber.
+ */
+export function subscribeSystemLog(
+  subscriber: SystemLogSubscriber,
+): () => void {
+  systemLogSubscribers.add(subscriber);
+  watchVisibility();
+  ensureActivityStream();
+
+  return () => {
+    systemLogSubscribers.delete(subscriber);
     closeIfNobodyIsWatching();
   };
 }
@@ -268,9 +411,7 @@ export function useActivityStreamInvalidations(
     const invalidate = () => {
       lastRunAt = Date.now();
       trailingPending = false;
-      queryKeys.forEach((queryKey) => {
-        void qc.invalidateQueries({ queryKey, exact }, INVALIDATE_OPTIONS);
-      });
+      queryKeys.forEach((queryKey) => invalidateLive(qc, { queryKey, exact }));
     };
 
     const unsubscribe = subscribeActivityLatest(() => {

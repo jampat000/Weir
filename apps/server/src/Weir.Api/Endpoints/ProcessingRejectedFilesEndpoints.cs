@@ -11,7 +11,7 @@ namespace Weir.Api.Endpoints;
 
 /// <summary>
 /// "Process all again" for rejected files: after the rules change, every rejected file whose original is still in its
-/// watched folder is put back to work in one step. It covers the whole rejected set, not only what History currently
+/// watched folder is put back to work in one step. It covers the whole rejected set, not only what Activity currently
 /// lists, narrowed to one workflow when <c>library_id</c> is given.
 /// </summary>
 public static class ProcessingRejectedFilesEndpoints

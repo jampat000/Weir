@@ -307,7 +307,7 @@ public sealed class DelunoDownloadDestinationsApiTests
         Assert.Equal("unverified", state);
         Assert.Equal(
             $"The API key Weir uses for {LabelOf(deluno)} can't read where downloads go. Give it the Imports permission: in Deluno, open System › API Access " +
-            "and create a key with Media automation access (it includes Imports), then save that key under Settings › Media managers in Weir.",
+            "and create a key with Media automation access (it includes Imports), then save that key under Setup › Connections › Media managers in Weir.",
             text);
         Assert.DoesNotContain(Lines(deluno), line => line.State == "problem");
         Assert.True(deluno["ready"]!.GetValue<bool>());

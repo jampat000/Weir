@@ -56,7 +56,7 @@ public sealed class NzbgetPort : IDownloadClientPort
 
     private Task<DownloadClientHttpResponse> CallConfigAsync(DownloadClientConnection connection, CancellationToken cancellationToken)
     {
-        var client = new DownloadClientHttpClient(connection.BaseUrl, _handlers);
+        var client = new DownloadClientHttpClient(connection.BaseUrl, _handlers, connection: connection.Reference);
         var body = new WireObject().Set("method", "config").Set("params", new WireArray());
         return client.SendAsync(
             HttpMethod.Post, "/jsonrpc", content: DownloadClientHttpClient.JsonContent(body), headers: BasicAuthHeader(connection), cancellationToken: cancellationToken);

@@ -10,11 +10,11 @@ using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Infrastructure.Processing.RemuxPass;
 
-/// <summary>What History's remove dialog did (#785): whether it went through, and the sentence to show for it.</summary>
+/// <summary>What Activity's remove dialog did (#785): whether it went through, and the sentence to show for it.</summary>
 public sealed record FileRemovalOutcome(bool Done, string Message);
 
 /// <summary>
-/// The "delete" and "keep" choices on History's remove dialog for a failed or rejected title whose file is still in
+/// The "delete" and "keep" choices on Activity's remove dialog for a failed or rejected title whose file is still in
 /// the watched folder (#785). "Delete" reuses <see cref="RejectRoutes"/> — the same manager conversation the
 /// automatic reject policy has — falling back to deleting the file itself, strictly through
 /// <see cref="RemuxPassPaths.CleanupRejectedFile"/>, only when no linked manager can take it. "Keep" records a skip
@@ -360,7 +360,7 @@ public sealed class HistoryFileRemovalService
     private Task<FileRemovalOutcome> FinishDeleteAsync(UnitOfWork uow, ProcessingFileRecord file, RejectRouteOutcome outcome) =>
         FinishAsync(
             uow, file, outcome, ActivityEventTypes.ProcessingFileRemovalDeleted,
-            successTitle: fileName => $"{fileName} was removed from History and its download deleted",
+            successTitle: fileName => $"{fileName} was removed from Activity and its download deleted",
             failureTitle: fileName => $"{fileName} could not be deleted");
 
     private Task<FileRemovalOutcome> FinishKeepAsync(UnitOfWork uow, ProcessingFileRecord file, RejectRouteOutcome outcome) =>

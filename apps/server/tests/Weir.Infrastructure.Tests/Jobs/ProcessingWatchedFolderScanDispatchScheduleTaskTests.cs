@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Weir.Core.Processing;
 using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.Processing;
+using Weir.Infrastructure.Scheduling;
 using Weir.Infrastructure.Sqlite;
 using Weir.Infrastructure.Tests.Platform;
 
@@ -191,6 +192,55 @@ public sealed class ProcessingWatchedFolderScanDispatchScheduleTaskTests
 
         var count = await store.Scalar("SELECT COUNT(*) FROM jobs WHERE job_kind = 'processing.watched_folder.remux_scan_dispatch.v1'");
         Assert.Equal(1, count);
+    }
+
+    [Fact]
+    public async Task A_scheduled_workflow_is_listed_as_a_scan_with_its_name_and_when_it_is_next_looked_at()
+    {
+        using var store = new StoreFixture(("WEIR_CREDENTIALS_SECRET", "schedule-task-tests-secret-7"));
+        var watched = store.Home.Join("watch");
+        var output = store.Home.Join("out");
+        Directory.CreateDirectory(watched);
+        Directory.CreateDirectory(output);
+        var libraryId = await CreateLibraryAsync(store, watched, output, scanIntervalSeconds: 600);
+        await SetMovieScheduleEnabledAsync(store, enabled: true);
+        var tasks = new PeriodicTaskRegistry(store.Clock);
+        var task = new ProcessingWatchedFolderScanDispatchScheduleTask(
+            store.Database, store.Options, new ProcessingJobStore(store.Database, store.Clock), OperatorSettings, Libraries, store.Clock,
+            NullLogger<ProcessingWatchedFolderScanDispatchScheduleTask>.Instance, tasks: tasks);
+
+        await task.RunOnceAsync(CancellationToken.None);
+
+        var listed = Assert.Single(tasks.Snapshot(), task => task.Key == ScheduledJobTasks.ScanKey(libraryId));
+        Assert.Equal(
+            (ScheduledJobTasks.ScanKey(libraryId), "Scan Movies", store.Clock.GetUtcNow() + TimeSpan.FromSeconds(600), TimeSpan.FromSeconds(600)),
+            (listed.Key, listed.Label, listed.NextRunAt, listed.Interval));
+    }
+
+    [Fact]
+    public async Task A_workflow_whose_periodic_scans_are_switched_off_leaves_the_task_list()
+    {
+        using var store = new StoreFixture(("WEIR_CREDENTIALS_SECRET", "schedule-task-tests-secret-8"));
+        var watched = store.Home.Join("watch");
+        var output = store.Home.Join("out");
+        Directory.CreateDirectory(watched);
+        Directory.CreateDirectory(output);
+        var libraryId = await CreateLibraryAsync(store, watched, output);
+        await SetMovieScheduleEnabledAsync(store, enabled: true);
+        var changes = new ScanSettingsChanges();
+        var tasks = new PeriodicTaskRegistry(store.Clock);
+        var task = new ProcessingWatchedFolderScanDispatchScheduleTask(
+            store.Database, store.Options, new ProcessingJobStore(store.Database, store.Clock), OperatorSettings, Libraries, store.Clock,
+            NullLogger<ProcessingWatchedFolderScanDispatchScheduleTask>.Instance, scanSettingsChanges: changes, tasks: tasks);
+        await task.RunOnceAsync(CancellationToken.None);
+        Assert.Contains(tasks.Snapshot(), task => task.Key == ScheduledJobTasks.ScanKey(libraryId));
+
+        await SetMovieScheduleEnabledAsync(store, enabled: false);
+        changes.Record();
+        store.Clock.Set(store.Clock.GetUtcNow() + TimeSpan.FromSeconds(1));
+        await task.RunOnceAsync(CancellationToken.None);
+
+        Assert.DoesNotContain(tasks.Snapshot(), task => task.Key == ScheduledJobTasks.ScanKey(libraryId));
     }
 
     private static async Task SetLibraryEnabledAsync(StoreFixture store, long libraryId, string watched, string output, bool enabled)

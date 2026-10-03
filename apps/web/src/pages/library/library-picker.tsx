@@ -1,10 +1,13 @@
 /**
- * The Library title is the picker: "Library › TV ▾". One library shows its name and no control at all;
- * several open a list from the title itself, with a search box once there are enough to need one. The list
- * works from the keyboard like any list box: arrows, Home and End move, Enter picks, Escape closes.
+ * The workflow picker, on the header's title line after "Library", drawn as the Dashboard's "All workflows" picker
+ * is: the same bordered field, height, type and width. One library shows its name in that box with no control;
+ * several open a list from it, with a search box once there are enough to need one. The list works from the keyboard
+ * like any list box: arrows, Home and End move, Enter picks, Escape closes.
  */
 import { useEffect, useRef, useState } from "react";
+import { MmPickerChevron } from "../../components/ui/mm-picker-chevron";
 import type { ProcessingLibrary } from "../../lib/processing/libraries-api";
+import { mmPickerTriggerSurface } from "../../lib/ui/mm-control-roles";
 
 const SEARCH_FROM = 7;
 
@@ -69,10 +72,11 @@ export function LibraryPicker({
 
   if (libraries.length <= 1) {
     return (
-      <span className="mm-library-title" data-testid="library-picker">
-        <span aria-hidden="true" className="mm-library-title__sep">
-          ›
-        </span>
+      <span
+        className="mm-workflow-picker mm-library-picker mm-library-picker--one"
+        data-testid="library-picker"
+        title={chosen?.name}
+      >
         {chosen?.name ?? "—"}
       </span>
     );
@@ -104,22 +108,24 @@ export function LibraryPicker({
   };
 
   return (
-    <div className="mm-library-title" ref={wrap} data-testid="library-picker">
-      <span aria-hidden="true" className="mm-library-title__sep">
-        ›
-      </span>
+    <div
+      className="mm-workflow-picker mm-library-picker"
+      ref={wrap}
+      data-testid="library-picker"
+    >
       <button
         type="button"
         ref={trigger}
-        className="mm-library-title__button"
+        className={mmPickerTriggerSurface}
         aria-haspopup="listbox"
         aria-expanded={open}
+        title={chosen?.name}
         onClick={() => setOpen((value) => !value)}
       >
-        {chosen?.name ?? "Choose"}
-        <span aria-hidden="true" className="mm-library-title__caret">
-          ▾
+        <span className="min-w-0 flex-1 truncate text-left">
+          {chosen?.name ?? "Choose"}
         </span>
+        <MmPickerChevron open={open} />
       </button>
       {open ? (
         <div

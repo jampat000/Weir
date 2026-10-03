@@ -57,10 +57,10 @@ it("lists each device with its note and source, and saves the chosen ids", async
 
   expect(
     await screen.findByText(
-      "Tick the devices you watch on. Each file then shows whether it can Direct Play on them, meaning your media server can play it as it is, without converting it. Information only: Weir never changes a file because of this.",
+      "Each file shows whether these can Direct Play it: your media server plays it as it is, without converting. Information only.",
     ),
   ).toBeInTheDocument();
-  expect(screen.getByText("Your playback devices")).toBeInTheDocument();
+  expect(screen.getByText("Devices you watch on")).toBeInTheDocument();
   expect(
     screen.getByText("Nothing changes until you press Save."),
   ).toBeInTheDocument();
@@ -81,6 +81,9 @@ it("lists each device with its note and source, and saves the chosen ids", async
   ).toBeInTheDocument();
   const iphone = screen.getByRole("checkbox", { name: "iPhone" });
   expect(iphone).not.toBeChecked();
+  expect(
+    screen.queryByRole("button", { name: "Save devices" }),
+  ).not.toBeInTheDocument();
   fireEvent.click(iphone);
   fireEvent.click(screen.getByRole("button", { name: "Save devices" }));
 
@@ -126,9 +129,9 @@ it("shows a viewer the list read-only", async () => {
   const iphone = await screen.findByRole("checkbox", { name: "iPhone" });
   expect(iphone).toBeDisabled();
   fireEvent.click(iphone);
-  const button = screen.getByRole("button", { name: "Save devices" });
-  expect(button).toBeDisabled();
-  fireEvent.click(button);
+  expect(
+    screen.queryByRole("button", { name: "Save devices" }),
+  ).not.toBeInTheDocument();
   expect(save).not.toHaveBeenCalled();
   expect(
     screen.getByText(/Only an operator or admin can change/),

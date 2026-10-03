@@ -2,6 +2,7 @@ using Microsoft.Data.Sqlite;
 using Weir.Core.Json;
 using Weir.Core.MediaManagers;
 using Weir.Core.Time;
+using Weir.Infrastructure.ConnectionTraffic;
 using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Infrastructure.MediaManagers;
@@ -19,7 +20,9 @@ public sealed record DownloadClientConnectionRecord(
     bool? LastTestOk,
     Timestamp? LastTestAt,
     string? LastTestDetail,
-    string? Nickname = null)
+    string? Nickname = null,
+    long? LastAnswerMs = null,
+    Timestamp? LastUsedAt = null)
 {
     /// <summary>How this connection is written in a sentence, led by its product and followed by its nickname.</summary>
     public string Label => DownloadClientKinds.LabelForConnection(Kind, Name, Nickname);
@@ -37,7 +40,9 @@ public sealed record DownloadClientConnectionRecord(
         .Set("api_key_is_saved", !string.IsNullOrEmpty(ApiKeyCiphertext))
         .Set("last_test_ok", LastTestOk is { } ok ? WireValue.Of(ok) : WireValue.Null)
         .Set("last_test_at", LastTestAt is { } at ? at.ToWireText() : null)
-        .Set("last_test_detail", LastTestDetail);
+        .Set("last_test_detail", LastTestDetail)
+        .Set("last_answer_ms", LastAnswerMs)
+        .Set("last_used_at", ConnectionUsage.WireText(LastUsedAt));
 }
 
 /// <summary>
@@ -48,12 +53,21 @@ public sealed class DownloadClientConnectionStore
 {
     private const string Columns =
         "id, kind, name, enabled, base_url, username, password_ciphertext, api_key_ciphertext, " +
-        "last_connection_test_ok, last_connection_test_at, last_connection_test_detail, nickname";
+        "last_connection_test_ok, last_connection_test_at, last_connection_test_detail, nickname, last_answer_ms, last_used_at";
 
-    public Task<List<DownloadClientConnectionRecord>> ListAsync(UnitOfWork uow)
+    private readonly ConnectionUsageLedger? _usage;
+
+    /// <param name="usage">Newer usage than the database holds, laid over every connection a list or lookup returns; none reads the database alone.</param>
+    public DownloadClientConnectionStore(ConnectionUsageLedger? usage = null)
+    {
+        _usage = usage;
+    }
+
+    public async Task<List<DownloadClientConnectionRecord>> ListAsync(UnitOfWork uow)
     {
         ArgumentNullException.ThrowIfNull(uow);
-        return uow.QueryAsync($"SELECT {Columns} FROM download_client_connections ORDER BY id", ReadRow);
+        var rows = await uow.QueryAsync($"SELECT {Columns} FROM download_client_connections ORDER BY id", ReadRow).ConfigureAwait(false);
+        return [.. rows.Select(WithLiveUsage)];
     }
 
     public Task<List<DownloadClientConnectionRecord>> ListEnabledAsync(UnitOfWork uow)
@@ -62,10 +76,11 @@ public sealed class DownloadClientConnectionStore
         return uow.QueryAsync($"SELECT {Columns} FROM download_client_connections WHERE enabled IS 1 ORDER BY id", ReadRow);
     }
 
-    public Task<DownloadClientConnectionRecord?> GetAsync(UnitOfWork uow, long connectionId)
+    public async Task<DownloadClientConnectionRecord?> GetAsync(UnitOfWork uow, long connectionId)
     {
         ArgumentNullException.ThrowIfNull(uow);
-        return uow.QuerySingleAsync($"SELECT {Columns} FROM download_client_connections WHERE id = $id", ReadRow, ("$id", connectionId));
+        var row = await uow.QuerySingleAsync($"SELECT {Columns} FROM download_client_connections WHERE id = $id", ReadRow, ("$id", connectionId)).ConfigureAwait(false);
+        return row is null ? null : WithLiveUsage(row);
     }
 
     /// <summary>
@@ -122,6 +137,29 @@ public sealed class DownloadClientConnectionStore
         ArgumentNullException.ThrowIfNull(uow);
         await uow.ExecuteAsync("DELETE FROM download_client_connections WHERE id = $id", ("$id", connectionId)).ConfigureAwait(false);
         await RefreshNamesAsync(uow).ConfigureAwait(false);
+        _usage?.Forget(new ConnectionRef(ConnectionKind.DownloadClient, connectionId));
+    }
+
+    /// <summary>Save how long the last call took and when the connection was last used; a value the usage does not carry stays as it was.</summary>
+    public Task<int> RecordUsageAsync(UnitOfWork uow, long connectionId, ConnectionUsage usage)
+    {
+        ArgumentNullException.ThrowIfNull(uow);
+        return uow.ExecuteAsync(
+            "UPDATE download_client_connections SET last_answer_ms = COALESCE($ms, last_answer_ms), last_used_at = COALESCE($at, last_used_at) WHERE id = $id",
+            ("$ms", usage.AnswerMilliseconds),
+            ("$at", usage.UsedAt?.ToSqlite()),
+            ("$id", connectionId));
+    }
+
+    private DownloadClientConnectionRecord WithLiveUsage(DownloadClientConnectionRecord row)
+    {
+        if (_usage is null)
+        {
+            return row;
+        }
+
+        var usage = _usage.Overlay(new ConnectionRef(ConnectionKind.DownloadClient, row.Id), row.LastAnswerMs, row.LastUsedAt);
+        return row with { LastAnswerMs = usage.AnswerMilliseconds, LastUsedAt = usage.UsedAt };
     }
 
     /// <summary>The conditional test-result write: 0 when the connection was removed meanwhile.</summary>
@@ -149,5 +187,7 @@ public sealed class DownloadClientConnectionStore
         SqliteValues.GetBoolOrNull(reader, 8),
         SqliteValues.GetDateTimeOrNull(reader, 9),
         SqliteValues.GetStringOrNull(reader, 10),
-        SqliteValues.GetStringOrNull(reader, 11));
+        SqliteValues.GetStringOrNull(reader, 11),
+        SqliteValues.GetInt64OrNull(reader, 12),
+        SqliteValues.GetDateTimeOrNull(reader, 13));
 }

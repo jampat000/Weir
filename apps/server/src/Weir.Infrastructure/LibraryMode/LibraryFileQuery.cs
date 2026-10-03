@@ -28,7 +28,10 @@ public sealed record LibraryFileRow(
     // When Weir last cleaned this file, or null when it never has, and whether a person told Weir to leave it
     // alone. Both come from library_file_marks (migration 0012), not from the scan.
     DateTimeOffset? CleanedAt = null,
-    bool LeaveAlone = false);
+    bool LeaveAlone = false,
+    // Where the file stands now (a LibraryFileStatus), and why the scan thinks it needs cleaning, when it can say.
+    string Status = LibraryFileStatus.Matches,
+    string? ChangeReason = null);
 
 /// <summary>The Files table's filters. Every field narrows; an empty filter is the whole library.</summary>
 public sealed record LibraryFileQuery
@@ -48,7 +51,16 @@ public sealed record LibraryFileQuery
     /// <summary><c>cleaned</c> or <c>left_alone</c>: what Weir has done with the file, rather than what is in it.</summary>
     public string? State { get; init; }
 
-    /// <summary>A sort key from <see cref="LibraryFileSort.Columns"/>; anything else falls back to the path.</summary>
+    /// <summary>One <see cref="LibraryFileStatus"/>: where each file stands now against the current rules.</summary>
+    public string? Status { get; init; }
+
+    /// <summary>
+    /// Whether the library cleans files that another name still shares (its own #508 setting). A shared file cannot be
+    /// cleaned yet unless it does, so it decides which status those files are in.
+    /// </summary>
+    public bool CleansHardlinkedFiles { get; init; }
+
+    /// <summary>A sort key from <see cref="LibraryFileSort.Columns"/>, or <see cref="LibraryFileSort.Status"/>; anything else falls back to the path.</summary>
     public string Sort { get; init; } = LibraryFileSort.Path;
 
     public bool Descending { get; init; }
@@ -62,6 +74,12 @@ public sealed record LibraryFileQuery
 public static class LibraryFileSort
 {
     public const string Path = "path";
+
+    /// <summary>
+    /// Where the file stands now (<see cref="LibraryFileStatus"/>), in the order people read the statuses. It has no column to
+    /// name: <see cref="LibraryViewStore"/> builds its SQL from the status query itself.
+    /// </summary>
+    public const string Status = "status";
 
     /// <summary>Column expression per accepted sort key. The key is the wire name; the value is checked-in SQL.</summary>
     public static readonly IReadOnlyDictionary<string, string> Columns = new Dictionary<string, string>(StringComparer.Ordinal)
@@ -81,7 +99,7 @@ public static class LibraryFileSort
     public static string ColumnFor(string? sort) =>
         sort is not null && Columns.TryGetValue(sort, out var column) ? column : Columns[Path];
 
-    public static string Normalize(string? sort) => sort is not null && Columns.ContainsKey(sort) ? sort : Path;
+    public static string Normalize(string? sort) => sort is not null && (sort == Status || Columns.ContainsKey(sort)) ? sort : Path;
 
     public const int MaxPageSize = 200;
 

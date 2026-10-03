@@ -1,34 +1,20 @@
-import { Navigate, useSearchParams } from "react-router-dom";
+import { Navigate, useLocation, useSearchParams } from "react-router-dom";
+
+import { legacySettingsAddress } from "../lib/settings/legacy-settings-addresses";
+import { setupTabPath } from "../lib/settings/setup-areas";
+import { ACTIVITY_PATH } from "../pages/activity/activity-links";
 
 /** Where each former Processing tab lives now, so a saved bookmark lands on the same thing. */
 const PROCESSING_TAB_HOMES: Record<string, string> = {
   overview: "/",
-  files: "/history",
-  libraries: "/settings?tab=libraries",
-  "audio-subtitles": "/settings?tab=rules",
-  schedules: "/settings?tab=schedule",
+  files: ACTIVITY_PATH,
+  libraries: setupTabPath("workflows"),
+  "audio-subtitles": setupTabPath("profiles"),
+  schedules: setupTabPath("schedule"),
   library: "/library",
-  jobs: "/system?tab=logs&show=jobs",
-  maintenance: "/settings?tab=cleanup",
+  jobs: "/system?tab=logs&source=job",
+  maintenance: setupTabPath("cleanup"),
 };
-
-/** Former Settings tabs that now live under System, so an old bookmark lands on the same thing. */
-const SETTINGS_TABS_MOVED_TO_SYSTEM: Record<string, string> = {
-  upgrade: "/system?tab=about",
-  support: "/system?tab=about",
-  backup: "/system?tab=backups",
-  security: "/system?tab=security",
-  logs: "/system?tab=logs",
-};
-
-/** Where a Settings tab name now lives on System, or null when it is still a Settings tab. */
-export function systemAddressForSettingsTab(
-  tab: string | null | undefined,
-): string | null {
-  return (
-    SETTINGS_TABS_MOVED_TO_SYSTEM[(tab ?? "").trim().toLowerCase()] ?? null
-  );
-}
 
 /** Filters the former Files and Jobs tabs understood, carried over so a saved filter still works. */
 const CARRIED_PARAMS = ["status", "path"];
@@ -44,7 +30,14 @@ export function LegacyProcessingRedirect() {
   return <Navigate to={`${url.pathname}${url.search}`} replace />;
 }
 
-/** Activity is System › Logs now; a file's own story is in History. */
-export function LegacyActivityRedirect() {
-  return <Navigate to="/system?tab=logs" replace />;
+/** Settings is the setup areas, and System for what moved there; the old address still lands on the same thing. */
+export function LegacySettingsRedirect() {
+  const { search, hash } = useLocation();
+  return <Navigate to={`${legacySettingsAddress(search)}${hash}`} replace />;
+}
+
+/** The Activity page was called History; every parameter an old link carried still means the same thing. */
+export function LegacyHistoryRedirect() {
+  const { search, hash } = useLocation();
+  return <Navigate to={`${ACTIVITY_PATH}${search}${hash}`} replace />;
 }

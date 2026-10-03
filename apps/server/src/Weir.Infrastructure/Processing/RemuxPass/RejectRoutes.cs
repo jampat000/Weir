@@ -17,7 +17,7 @@ public sealed record RejectRouteOutcome(bool Done, string Reason, string? Manage
 
 /// <summary>
 /// The single queue row, across every queue-capable connection, that safely identifies the download for a source
-/// file — or the plain reason none could be used safely. The same rule decides what "delete" would tell the History
+/// file — or the plain reason none could be used safely. The same rule decides what "delete" would tell the Activity
 /// remove dialog and what it actually does, so the two can never disagree (#786 review of #785): unreachable queues,
 /// no match, more than one match, a season pack sharing a download id, and a folder holding more than one video file
 /// all refuse rather than guess.
@@ -35,7 +35,7 @@ public sealed record QueueMatch(ManagerConnection? Connection, WireObject? Row, 
 /// The two ways Weir asks a media manager to take back a bad release (#465, #471, #785): through a manager whose
 /// port removes queue items directly (Sonarr, Radarr), or by reporting a hand-off's failure to the manager that
 /// handed the file over (Deluno and any other external integration). Both <see cref="ProcessingRejectHandler"/>'s
-/// automatic reject job and the manual "delete" choice on History's remove dialog call these, so the network calls
+/// automatic reject job and the manual "delete" choice on Activity's remove dialog call these, so the network calls
 /// and the safety checks around them (a download that holds more than this one file, a season pack, and so on) live
 /// in exactly one place.
 /// </summary>
@@ -91,7 +91,7 @@ public sealed class RejectRoutes
     /// an unreachable queue, no match, more than one match, a season pack (several items sharing a download id), or a
     /// folder holding more than one video file all refuse rather than guess which download to act on. Read-only — no
     /// queue item is removed here, so this also answers "would delete work, and through which manager" for the
-    /// History remove dialog (<see cref="Weir.Infrastructure.Processing.RemuxPass.HistoryFileRemovalService"/>).
+    /// Activity remove dialog (<see cref="Weir.Infrastructure.Processing.RemuxPass.HistoryFileRemovalService"/>).
     /// </summary>
     public async Task<QueueMatch> MatchQueueItemAsync(IReadOnlyList<ManagerConnection> connections, string source, CancellationToken cancellationToken)
     {

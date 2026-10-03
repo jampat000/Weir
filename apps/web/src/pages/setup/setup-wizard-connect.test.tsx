@@ -621,7 +621,7 @@ describe("first run: connect Sonarr and Radarr first", () => {
       await screen.findByRole("link", {
         name: "Finish setting up Sonarr and Radarr",
       }),
-    ).toHaveAttribute("href", "/settings?tab=libraries");
+    ).toHaveAttribute("href", "/setup/workflows");
     expect(
       screen.queryByRole("link", { name: "Connect Sonarr, Radarr or Deluno" }),
     ).not.toBeInTheDocument();

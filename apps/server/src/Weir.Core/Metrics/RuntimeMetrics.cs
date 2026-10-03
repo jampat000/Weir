@@ -13,6 +13,17 @@ public sealed class RuntimeMetricsStore
     private static readonly string[] JobEvents = ["started", "completed", "failed"];
     private static readonly string[] StatusBuckets = ["2xx", "3xx", "4xx", "5xx"];
 
+    private const int MaxTimingSamples = 20_000;
+    private const int MaxServerErrorsKept = 10_000;
+    private const double SlowRequestFraction = 0.95;
+    private const double MedianFraction = 0.5;
+
+    /// <summary>How far back the request timings reach: what "how fast Weir answers" means.</summary>
+    public static readonly TimeSpan TimingWindow = TimeSpan.FromMinutes(15);
+
+    /// <summary>How long a server error is remembered, enough for any "today" in any time zone.</summary>
+    private static readonly TimeSpan ServerErrorMemory = TimeSpan.FromDays(2);
+
     private readonly Lock _lock = new();
     private readonly TimeProvider _time;
     private readonly DateTimeOffset _startedAt;
@@ -22,6 +33,8 @@ public sealed class RuntimeMetricsStore
     private readonly Dictionary<(string Module, string Event), long> _moduleJobCounts = [];
     private readonly Dictionary<string, long> _queueDepths = new(StringComparer.Ordinal);
     private readonly Dictionary<string, long> _savings = new(StringComparer.Ordinal);
+    private readonly Queue<(DateTimeOffset At, double Ms)> _timings = new();
+    private readonly Queue<DateTimeOffset> _serverErrors = new();
     private long _httpTotal;
     private double _httpTotalMs;
 
@@ -32,20 +45,85 @@ public sealed class RuntimeMetricsStore
         _startedAt = time.GetUtcNow();
     }
 
+    /// <summary>One answered request: counted, and its time kept for <see cref="GetRequestFigures"/>.</summary>
     public void RecordRequest(string method, string route, int statusCode, double durationMs)
+    {
+        lock (_lock)
+        {
+            Count(method, route, statusCode, durationMs);
+            var now = _time.GetUtcNow();
+            _timings.Enqueue((now, Math.Max(durationMs, 0.0)));
+            DiscardOldTimings(now);
+            if (statusCode >= 500)
+            {
+                _serverErrors.Enqueue(now);
+                DiscardOldServerErrors(now);
+            }
+        }
+    }
+
+    /// <summary>
+    /// A request that held its connection open for as long as a browser watched (an event stream): counted, but its time says
+    /// nothing about how fast Weir answers, so <see cref="GetRequestFigures"/> leaves it out.
+    /// </summary>
+    public void RecordStreamRequest(string method, string route, int statusCode, double durationMs)
+    {
+        lock (_lock)
+        {
+            Count(method, route, statusCode, durationMs);
+        }
+    }
+
+    /// <summary>
+    /// How fast requests were answered over the last <see cref="TimingWindow"/> (zero when there were none), and how many
+    /// answered with a server error since <paramref name="errorsSince"/> (remembered for two days).
+    /// </summary>
+    public RequestFigures GetRequestFigures(DateTimeOffset errorsSince)
+    {
+        lock (_lock)
+        {
+            var now = _time.GetUtcNow();
+            DiscardOldTimings(now);
+            DiscardOldServerErrors(now);
+            var sorted = _timings.Select(sample => sample.Ms).Order().ToArray();
+            return new RequestFigures(
+                Percentile(sorted, MedianFraction),
+                Percentile(sorted, SlowRequestFraction),
+                _serverErrors.Count(at => at >= errorsSince));
+        }
+    }
+
+    private void Count(string method, string route, int statusCode, double durationMs)
     {
         ArgumentNullException.ThrowIfNull(method);
         var bucket = $"{statusCode / 100}xx";
         var label = $"{method.ToUpperInvariant()} {route}";
-        lock (_lock)
+        _httpTotal++;
+        _httpTotalMs += Math.Max(durationMs, 0.0);
+        _statusCounts[bucket] = _statusCounts.GetValueOrDefault(bucket) + 1;
+        var (count, total) = _routes.GetValueOrDefault(label);
+        _routes[label] = (count + 1, total + Math.Max(durationMs, 0.0));
+    }
+
+    private void DiscardOldTimings(DateTimeOffset now)
+    {
+        while (_timings.Count > 0 && (_timings.Count > MaxTimingSamples || now - _timings.Peek().At > TimingWindow))
         {
-            _httpTotal++;
-            _httpTotalMs += Math.Max(durationMs, 0.0);
-            _statusCounts[bucket] = _statusCounts.GetValueOrDefault(bucket) + 1;
-            var (count, total) = _routes.GetValueOrDefault(label);
-            _routes[label] = (count + 1, total + Math.Max(durationMs, 0.0));
+            _timings.Dequeue();
         }
     }
+
+    private void DiscardOldServerErrors(DateTimeOffset now)
+    {
+        while (_serverErrors.Count > 0 && (_serverErrors.Count > MaxServerErrorsKept || now - _serverErrors.Peek() > ServerErrorMemory))
+        {
+            _serverErrors.Dequeue();
+        }
+    }
+
+    /// <summary>The value at <paramref name="fraction"/> of the way through <paramref name="sorted"/> (nearest rank); zero when empty.</summary>
+    private static double Percentile(double[] sorted, double fraction) =>
+        sorted.Length == 0 ? 0.0 : sorted[Math.Clamp((int)Math.Ceiling(fraction * sorted.Length) - 1, 0, sorted.Length - 1)];
 
     public void RecordLog(string level)
     {
@@ -95,6 +173,9 @@ public sealed class RuntimeMetricsStore
             _savings[module] = _savings.GetValueOrDefault(module) + bytesSaved;
         }
     }
+
+    /// <summary>How fast requests were answered recently and how many failed on the server.</summary>
+    public sealed record RequestFigures(double MedianMs, double P95Ms, long ServerErrors);
 
     public sealed record RouteSummary(string Route, long RequestCount, double AverageResponseMs);
 

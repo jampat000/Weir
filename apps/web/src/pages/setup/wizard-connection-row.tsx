@@ -45,14 +45,16 @@ export function WizardConnectionRow({
         <code className="break-all">{address}</code>
       </p>
       {testing ? (
-        <p className="text-sm text-mm-text2">Testing…</p>
+        <p className="mm-status-text text-sm" data-status="doing">
+          Testing…
+        </p>
       ) : answering ? (
-        <p className="mm-status-text--healthy text-sm font-medium">
+        <p className="mm-status-text text-sm font-medium" data-status="done">
           ✓ Connected
         </p>
       ) : answering === false ? (
         <div className="space-y-1 text-sm" role="alert">
-          <p className="mm-status-text--failed font-medium">
+          <p className="mm-status-text font-medium" data-status="broken">
             Weir could not connect to {name}.
           </p>
           {detail ? <p className="text-mm-text2">{detail}</p> : null}
@@ -64,7 +66,7 @@ export function WizardConnectionRow({
         </div>
       ) : null}
       {testError ? (
-        <p className="mm-status-text--failed text-sm" role="alert">
+        <p className="mm-status-text text-sm" data-status="broken" role="alert">
           {testError}
         </p>
       ) : null}

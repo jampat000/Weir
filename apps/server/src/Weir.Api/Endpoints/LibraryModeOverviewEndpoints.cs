@@ -92,7 +92,7 @@ internal sealed class LibraryModeOverviewEndpointHandlers
         var uow = await request.DbAsync().ConfigureAwait(false);
         var library = await RequireLibraryAsync(uow, _libraries, libraryId, LibraryModeMapping.NoLibraryWithThatId).ConfigureAwait(false);
         var settings = await _librarySettings.GetAsync(uow, libraryId).ConfigureAwait(false);
-        var totals = await _libraryView.TotalsAsync(uow, libraryId).ConfigureAwait(false);
+        var totals = await _libraryView.TotalsAsync(uow, libraryId, new LibraryFileQuery { CleansHardlinkedFiles = settings.CleanHardlinkedFiles }).ConfigureAwait(false);
         var breakdowns = await _libraryView.AllBreakdownsAsync(uow, libraryId).ConfigureAwait(false);
         var problems = await _libraryView.ProblemsAsync(uow, libraryId, settings.CleanHardlinkedFiles).ConfigureAwait(false);
 

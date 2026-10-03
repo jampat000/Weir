@@ -22,6 +22,20 @@ sealed record LanAccessNotice(string Text, bool IsWarning)
         _ => new("Only this PC could already reach Weir.", IsWarning: false),
     };
 
+    /// <summary>A choice another process saved was carried out, and how the Windows admin prompt for it was answered.</summary>
+    internal static LanAccessNotice ForSavedChoice(SavedChoiceApplied applied) => applied switch
+    {
+        { Change: ScopeChange.Failed } => Restarted(applied.Scope, applied.Change),
+        { Firewall: FirewallElevation.Outcome.Declined, Change: ScopeChange.Applied } =>
+            new("Weir now listens for other devices, but Windows admin access was not granted, so Windows Firewall still blocks them. You can try again from System, then About.", IsWarning: true),
+        { Firewall: FirewallElevation.Outcome.Failed, Change: ScopeChange.Applied } =>
+            new($"Weir now listens for other devices, but Windows Firewall was not changed, so it still blocks them. {SeeLog}", IsWarning: true),
+        { Firewall: FirewallElevation.Outcome.Declined or FirewallElevation.Outcome.Failed } =>
+            FirewallStepFailed(applied.Firewall.Value, applied.Scope),
+        { Firewall: FirewallElevation.Outcome.Configured, Change: ScopeChange.Unchanged } => FirewallAllowsWeir(),
+        _ => Restarted(applied.Scope, applied.Change),
+    };
+
     /// <summary>The Windows admin step of "Allow other devices on your network..." did not create the rule.</summary>
     internal static LanAccessNotice FirewallStepFailed(FirewallElevation.Outcome outcome, ListenScope current) => outcome switch
     {

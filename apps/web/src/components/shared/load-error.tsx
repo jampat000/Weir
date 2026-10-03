@@ -12,7 +12,7 @@ export function LoadError({
   error?: unknown;
 }) {
   return (
-    <p className="mm-status-text--failed text-sm" role="alert">
+    <p className="mm-status-text text-sm" data-status="broken" role="alert">
       {loadErrorMessage(error, thing)}
     </p>
   );

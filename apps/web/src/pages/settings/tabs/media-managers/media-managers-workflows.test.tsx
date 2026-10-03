@@ -81,7 +81,7 @@ it("lists the workflows each connection feeds and offers to start one from what 
   );
   expect(
     screen.getByRole("link", { name: "Add a workflow from Deluno" }),
-  ).toHaveAttribute("href", "/settings?tab=libraries&addFrom=1");
+  ).toHaveAttribute("href", "/setup/workflows?addFrom=1");
   expect(lists[1]).toHaveTextContent("No workflow is linked to it yet.");
   expect(
     screen.queryByRole("link", { name: "Add a workflow from Home script" }),

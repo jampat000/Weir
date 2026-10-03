@@ -1,5 +1,7 @@
 using System.Collections;
 using Microsoft.Data.Sqlite;
+using Microsoft.Extensions.Hosting.Systemd;
+using Microsoft.Extensions.Hosting.WindowsServices;
 using Microsoft.Extensions.Logging.Console;
 using Weir.Api;
 using Weir.Api.Http;
@@ -93,12 +95,17 @@ public static class WeirServer
         builder.Logging.AddFilter("Microsoft.Hosting.Lifetime", minimumLevel);
         builder.Logging.AddConsole(console => console.FormatterName = WeirConsoleFormatter.FormatterName)
             .AddConsoleFormatter<WeirConsoleFormatter, ConsoleFormatterOptions>();
-        builder.Logging.AddProvider(new WeirLogFileLoggerProvider(logFile, TimeProvider.System, minimumLevel));
+        var logAlerts = new LogAlerts();
+        builder.Services.AddSingleton(logAlerts);
+        builder.Logging.AddProvider(new WeirLogFileLoggerProvider(logFile, TimeProvider.System, minimumLevel, logAlerts));
         var metrics = new RuntimeMetricsStore(TimeProvider.System);
         builder.Services.AddSingleton(metrics);
         builder.Logging.AddProvider(new MetricsLoggerProvider(metrics, minimumLevel));
 
         builder.Services.AddSingleton(listen);
+        builder.Services.AddSingleton(ServerRunMode.Detect(
+            UpdateFiles.DetectInstallType(options.RuntimeKind),
+            WindowsServiceHelpers.IsWindowsService() || SystemdHelpers.IsSystemdService()));
         builder.Services.AddWeirApi(options);
         builder.Services.AddWeirJobs(options, runtime);
         configureBuilder?.Invoke(builder);
@@ -168,6 +175,30 @@ public static class WeirServer
         }
     }
 
+    /// <summary>Notes this start, so System can say how often Weir restarted. A failure is logged and never stops the server.</summary>
+    private static void RecordServerStart(WebApplication app, SqliteDatabase database, ILogger logger)
+    {
+        try
+        {
+            var starts = app.Services.GetRequiredService<ServerStartStore>();
+            var now = app.Services.GetRequiredService<TimeProvider>().GetUtcNow();
+            var uow = UnitOfWork.OpenAsync(database).GetAwaiter().GetResult();
+            try
+            {
+                starts.RecordStartAsync(uow, now).GetAwaiter().GetResult();
+                uow.CommitAsync().GetAwaiter().GetResult();
+            }
+            finally
+            {
+                uow.DisposeAsync().AsTask().GetAwaiter().GetResult();
+            }
+        }
+        catch (SqliteException exception)
+        {
+            logger.LogError(exception, "Weir startup step failed but startup will continue step={Step}", "record_server_start");
+        }
+    }
+
     private static void OpenDatabase(WebApplication app, WeirOptions options, ILogger logger)
     {
         var database = app.Services.GetRequiredService<SqliteDatabase>();
@@ -196,6 +227,7 @@ public static class WeirServer
         }
 
         app.Services.GetRequiredService<ServerLifecycle>().MarkDatabaseOpened();
+        RecordServerStart(app, database, logger);
 
         // The suite log's own prune (LogRetentionTask, RunAtStart) runs in the background once the periodic-task
         // lane starts, so it never holds up Kestrel from listening; pruning it again here would only prune twice (#718).

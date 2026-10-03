@@ -48,7 +48,7 @@ public sealed class ArrRedownloadRiskGateway : IRedownloadRiskGateway
         return RedownloadRiskDialect.ParseQualityProfile(payload);
     }
 
-    private MediaManagerHttpClient Client(ManagerConnection connection) => new(connection.BaseUrl, connection.ApiKey, _handlers, Timeout);
+    private MediaManagerHttpClient Client(ManagerConnection connection) => new(connection.BaseUrl, connection.ApiKey, _handlers, Timeout, connection.Reference);
 }
 
 /// <summary>

@@ -7,6 +7,7 @@ from ``conftest.py`` and helpers from ``_handoff_status_helpers.py``.
 
 from __future__ import annotations
 
+import re
 import socket
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -61,7 +62,12 @@ def test_capabilities_name_every_ability(server: ServerUnderTest) -> None:
         "handoff-outcome-codes",
         "library-folders",
     ]
-    assert list(body) == ["machine_name"]
+    assert list(body) == ["machine_name", "version"]
+
+
+def test_capabilities_say_which_weir_version_answers(server: ServerUnderTest) -> None:
+    body = httpx.get(f"{server.base_url}{API}/intake/capabilities", headers=SECRET, timeout=30).json()
+    assert re.fullmatch(r"\d+\.\d+\.\d+(?:-[0-9A-Za-z.]+)?", body["version"])
 
 
 def test_capabilities_publish_the_machine_name_for_a_manager_to_name_its_connection(server: ServerUnderTest) -> None:

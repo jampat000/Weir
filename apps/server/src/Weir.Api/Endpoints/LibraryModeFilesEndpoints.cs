@@ -8,6 +8,7 @@ using Weir.Core.LibraryMode;
 using Weir.Core.Processing;
 using Weir.Core.Rules;
 using Weir.Core.Validation;
+using Weir.Infrastructure.Artwork;
 using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.LibraryMode;
 using Weir.Infrastructure.MediaManagers;
@@ -47,6 +48,7 @@ internal sealed class LibraryModeFilesEndpointHandlers
     private readonly RedownloadRiskChecker _riskChecker;
     private readonly ProcessingJobStore _jobs;
     private readonly LibraryStore _libraries;
+    private readonly ArtworkPosterUrls _posters;
 
     public LibraryModeFilesEndpointHandlers(
         LibraryScanStore scans,
@@ -57,7 +59,8 @@ internal sealed class LibraryModeFilesEndpointHandlers
         IHardlinkInspector hardlinkInspector,
         RedownloadRiskChecker riskChecker,
         ProcessingJobStore jobs,
-        LibraryStore libraries)
+        LibraryStore libraries,
+        ArtworkPosterUrls posters)
     {
         _scans = scans ?? throw new ArgumentNullException(nameof(scans));
         _fileMarks = fileMarks ?? throw new ArgumentNullException(nameof(fileMarks));
@@ -68,10 +71,12 @@ internal sealed class LibraryModeFilesEndpointHandlers
         _riskChecker = riskChecker ?? throw new ArgumentNullException(nameof(riskChecker));
         _libraries = libraries ?? throw new ArgumentNullException(nameof(libraries));
         _jobs = jobs ?? throw new ArgumentNullException(nameof(jobs));
+        _posters = posters ?? throw new ArgumentNullException(nameof(posters));
     }
 
-    private static WireObject FileOut(LibraryFileRow row) => new WireObject()
+    private static WireObject FileOut(LibraryFileRow row, string? posterUrl) => new WireObject()
         .Set("path", row.Path)
+        .Set("poster_url", posterUrl)
         .Set("size_bytes", row.SizeBytes)
         .Set("modified_at", row.ModifiedTimeUnixSeconds)
         .Set("classification", LibraryScanFileEntry.ClassificationName(row.Classification))
@@ -92,10 +97,12 @@ internal sealed class LibraryModeFilesEndpointHandlers
         .Set("link_count", row.LinkCount)
         .Set("problem_kind", row.ProblemKind is { } kind ? LibraryProblems.Name(kind) : null)
         .Set("cleaned_at", row.CleanedAt is { } cleaned ? cleaned.ToUnixTimeSeconds() : null)
-        .Set("leave_alone", row.LeaveAlone);
+        .Set("leave_alone", row.LeaveAlone)
+        .Set("status", row.Status)
+        .Set("status_reason", row.Status == LibraryFileStatus.NeedsCleaning ? row.ChangeReason : null);
 
     /// <summary>Reads the Files table's filters, sort and page off the query string.</summary>
-    private static LibraryFileQuery QueryFrom(ApiRequest request)
+    private static LibraryFileQuery QueryFrom(ApiRequest request, bool cleansHardlinkedFiles)
     {
         var facets = new List<LibraryFileFacet>();
         foreach (var facet in LibraryFacets.All)
@@ -114,6 +121,8 @@ internal sealed class LibraryModeFilesEndpointHandlers
             Facets = facets,
             ProblemKind = LibraryProblems.Parse(request.Query("problem")),
             State = StateFilter(request.Query("state")),
+            Status = StatusFilter(request.Query("status")),
+            CleansHardlinkedFiles = cleansHardlinkedFiles,
             Sort = LibraryFileSort.Normalize(request.Query("sort")),
             Descending = string.Equals(request.Query("direction"), "desc", StringComparison.OrdinalIgnoreCase),
             Page = PositiveInt(request.Query("page"), 1),
@@ -123,6 +132,9 @@ internal sealed class LibraryModeFilesEndpointHandlers
 
     /// <summary>What Weir has done with a file, as a filter: anything else narrows nothing.</summary>
     private static string? StateFilter(string? value) => value is "cleaned" or "left_alone" ? value : null;
+
+    /// <summary>Where each file stands now, as a filter: anything else narrows nothing.</summary>
+    private static string? StatusFilter(string? value) => LibraryFileStatus.IsKnown(value) ? value : null;
 
     private static string? NullIfBlank(string? value) => string.IsNullOrWhiteSpace(value) ? null : value;
 
@@ -148,17 +160,19 @@ internal sealed class LibraryModeFilesEndpointHandlers
         var uow = await request.DbAsync().ConfigureAwait(false);
         await RequireLibraryAsync(uow, _libraries, libraryId, LibraryModeMapping.NoLibraryWithThatId).ConfigureAwait(false);
 
-        var query = QueryFrom(request);
-        var overall = await _libraryView.TotalsAsync(uow, libraryId).ConfigureAwait(false);
+        var settings = await _librarySettings.GetAsync(uow, libraryId).ConfigureAwait(false);
+        var query = QueryFrom(request, settings.CleanHardlinkedFiles);
+        var overall = await _libraryView.TotalsAsync(uow, libraryId, new LibraryFileQuery { CleansHardlinkedFiles = settings.CleanHardlinkedFiles }).ConfigureAwait(false);
         var filtered = await _libraryView.TotalsAsync(uow, libraryId, query).ConfigureAwait(false);
         var rows = await _libraryView.ListFilesAsync(uow, libraryId, query).ConfigureAwait(false);
+        var posters = await _posters.ForFilesAsync(uow, rows.Select(row => (libraryId, row.Path))).ConfigureAwait(false);
 
         return ApiRoutes.Ok(new WireObject()
             .Set("library_id", libraryId)
             .Set("scan", await LibraryModeMapping.ScanOutAsync(uow, _scans, libraryId, LibraryModeMapping.Logger(request)).ConfigureAwait(false))
             .Set("summary", LibraryModeMapping.TotalsOut(overall))
             .Set("filtered", LibraryModeMapping.TotalsOut(filtered))
-            .Set("files", new WireArray(rows.Select(row => (WireValue)FileOut(row))))
+            .Set("files", new WireArray(rows.Select(row => (WireValue)FileOut(row, posters.GetValueOrDefault((libraryId, row.Path))))))
             .Set("total", filtered.Files)
             .Set("page", query.Page)
             .Set("page_size", query.PageSize)

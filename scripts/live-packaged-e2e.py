@@ -71,7 +71,7 @@ def run(playwright: Playwright) -> dict[str, Any]:
         audit.library()
         audit.history_activity()
         audit.settings_tabs()
-        audit.history_and_jobs()
+        audit.activity_and_jobs()
         audit.system_instance_and_setup()
         audit.system_backups_logs_security()
         audit.settings_notifications()

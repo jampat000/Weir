@@ -13,7 +13,7 @@ export function ApiEntryError({ error }: { error: unknown }) {
   const unreachable = isLikelyNetworkFailure(error);
   return (
     <>
-      <h1 className="mm-auth-title mm-auth-title--alert">
+      <h1 className="mm-auth-title mm-status-text" data-status="broken">
         {unreachable ? "Can't reach Weir" : "Weir hit a problem"}
       </h1>
       <p className="mm-auth-lead">

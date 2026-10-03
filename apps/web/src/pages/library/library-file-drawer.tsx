@@ -4,6 +4,7 @@
  * never disagree about a file. You can also pick the tracks for this one file (#501), mark it Left alone so
  * nothing cleans it, or ask its media manager to download it again when a past clean took too much (#509).
  */
+import { Chip } from "../../components/panels/chip";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { SidePanel } from "../../components/shared/side-panel";
@@ -26,10 +27,12 @@ import { errorMessage } from "../../lib/api/error-message";
 import { useAppDateFormatter } from "../../lib/ui/mm-format-date";
 import { plural } from "../../lib/ui/mm-plural";
 import { LibraryCleanOutcome } from "./library-clean-dialog";
+import { fileMeaning, statusNote, statusWords } from "./library-model";
 import { REMOVAL_IS_FINAL, removalIsRecoverable } from "./library-clean-model";
 import { TrackList, rulesKeep, toggled } from "./library-drawer-tracks";
 import { LibraryLeaveAlone, useLeaveAlone } from "./library-leave-alone";
 import { LibraryRedownload } from "./library-redownload";
+import { setupTabPath } from "../../lib/settings/setup-areas";
 
 const MANAGER_NAMES: Record<string, string> = {
   sonarr: "Sonarr",
@@ -51,28 +54,25 @@ function FileChips({
   file: LibraryFile;
   leftAlone: boolean;
 }) {
+  const note = statusNote(file);
   return (
     <div className="mm-drawer__chips">
-      {file.video_height ? (
-        <span className="mm-drawer__chip">{file.video_height}p</span>
-      ) : null}
+      {file.video_height ? <Chip dot={false}>{file.video_height}p</Chip> : null}
       {file.video_codec && file.video_codec !== "unknown" ? (
-        <span className="mm-drawer__chip">
-          {videoCodecName(file.video_codec)}
-        </span>
+        <Chip dot={false}>{videoCodecName(file.video_codec)}</Chip>
       ) : null}
-      <span className="mm-drawer__chip">{formatBytes(file.size_bytes)}</span>
+      <Chip dot={false}>{formatBytes(file.size_bytes)}</Chip>
       {file.manager_kind ? (
-        <span className="mm-drawer__chip mm-drawer__chip--ok">
+        <Chip meaning="done">
           {MANAGER_NAMES[file.manager_kind] ?? file.manager_kind}: matched
-        </span>
+        </Chip>
       ) : null}
-      {file.cleaned_at ? (
-        <span className="mm-drawer__chip mm-drawer__chip--ok">
-          Cleaned {new Date(file.cleaned_at * 1000).toLocaleDateString()}
-        </span>
-      ) : null}
-      {leftAlone ? <span className="mm-drawer__chip">Left alone</span> : null}
+      <Chip meaning={leftAlone ? "idle" : fileMeaning(file)}>
+        {leftAlone && file.status !== "left_alone"
+          ? "Left alone"
+          : statusWords(file)}
+      </Chip>
+      {note ? <span className="mm-drawer__note">{note}</span> : null}
     </div>
   );
 }
@@ -212,7 +212,7 @@ export function LibraryFileDrawer({
               ) : (
                 <>
                   {"Decided by this workflow’s rules. "}
-                  <Link to={`/settings?tab=rules&library=${libraryId}`}>
+                  <Link to={`${setupTabPath("profiles")}?library=${libraryId}`}>
                     Edit the rules →
                   </Link>
                 </>
@@ -255,7 +255,7 @@ export function LibraryFileDrawer({
         </div>
 
         {clean.failure ? (
-          <p className="mm-drawer__failure" role="alert">
+          <p className="mm-drawer__failure" data-status="broken" role="alert">
             {clean.failure}
           </p>
         ) : null}

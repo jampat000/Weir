@@ -1,18 +1,28 @@
+import { Chip } from "../panels/chip";
 import {
   workflowBadgeLabel,
   workflowKindNote,
   type WorkflowKind,
 } from "../../lib/processing/workflow-kind";
 
-/** The kind of a workflow as a badge; linked ones read as connected, Weir-only ones as plain. */
-export function WorkflowKindBadge({ kind }: { kind: WorkflowKind }) {
+/** The kind of a workflow as a plain badge: what it is, not how it is doing. */
+export function WorkflowKindBadge({
+  kind,
+  className,
+}: {
+  kind: WorkflowKind;
+  className?: string;
+}) {
+  const label = workflowBadgeLabel(kind);
   return (
-    <span
-      className={`mm-quiet-badge${kind.kind === "linked" ? " mm-workflow-badge--linked" : ""}`}
+    <Chip
+      dot={false}
+      className={className}
+      title={label}
       data-testid="workflow-kind-badge"
     >
-      {workflowBadgeLabel(kind)}
-    </span>
+      {label}
+    </Chip>
   );
 }
 
@@ -20,7 +30,7 @@ export function WorkflowKindBadge({ kind }: { kind: WorkflowKind }) {
 export function WorkflowKindSummary({ kind }: { kind: WorkflowKind }) {
   return (
     <>
-      <span className="mm-library-source">
+      <span className="block">
         <WorkflowKindBadge kind={kind} />
       </span>
       <span className="mm-quiet-table__sub">{workflowKindNote(kind)}</span>

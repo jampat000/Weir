@@ -36,6 +36,8 @@ public sealed partial class VanishedFileSweepTask : IPeriodicTask
 
     public string Name => "processing-vanished-file-sweep";
 
+    public string? Label => "Look for vanished files";
+
     public TimeSpan Interval => TimeSpan.FromMinutes(5);
 
     public bool RunAtStart => true;

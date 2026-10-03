@@ -21,14 +21,14 @@ Use the Velopack setup exe from the release being validated.
     - Choose Deluno, Sonarr / Radarr or a download client, connect it, and confirm it tests as connected and the Movies and TV workflows are offered with folders filled in, each with its kind badge.
     - Confirm an unreachable address says so and leaves Neither available.
     - Confirm `Finish setup` saves the time zone, the ticked workflows (linked to the media manager when there is one) and the automatic backup schedule, and that What's next no longer offers to connect a media manager.
-13. Confirm the navigation shows Processing, History, Library, Settings and System, and that Processing is the first screen.
-14. Confirm Settings shows the tabs Workflows, Rules, Media managers, Performance, Cleanup, Schedule and Alerts.
+13. Confirm the side menu shows Processing and Activity under Live, Library under Your library, Workflows, Rules, Media managers, Performance, Schedule, Cleanup and Alerts under Setup, and System under Weir, and that Processing is the first screen.
+14. Confirm each Setup item opens its own Settings section, with the section name as the page title and no row of tabs on the page.
 15. Confirm System shows the tabs About, Backups, Security and Logs.
 16. In System › Backups, use **Export or restore now** to download a configuration backup.
 17. Restore that backup and confirm the app remains usable.
 18. Confirm System › About › Updates shows a meaningful status, even when no update is available.
 19. Right-click the tray icon and confirm `Check for updates` is present and reaches the current release status.
-20. In Settings › Workflows, open a workflow's editor and use `Browse` on a folder field to pick a local folder. Confirm each row shows its kind (Weir only, or Linked to a media manager), and that `Add workflow` asks which kind first.
+20. In Setup › Workflows, open a workflow's editor and use `Browse` on a folder field to pick a local folder. Confirm each row shows its kind (Weir only, or Linked to a media manager), its watched folder and the folder it cleans into in separate columns, and that `Add workflow` asks which kind first. Drag a row by its grip (or press Alt with the up or down arrow on the grip) and confirm the Priority numbers change and stay changed after a reload.
 21. Enter a UNC path (`\\server\share\folder`) manually and confirm it saves; a missing folder is a warning, not a save blocker.
 22. Open Library, pick the library from the title and confirm `Check again` runs.
 23. Quit Weir from the tray icon, and confirm `tray-host.log` in `C:\ProgramData\Weir` says the server host `stopped cleanly` within a few seconds, not `killing it`. Do the same after switching LAN access on or off from the tray menu.
@@ -73,7 +73,7 @@ both `linux/amd64` and `linux/arm64` when hardware for both is available.
 8. Confirm the setup wizard opens.
 9. Complete or skip the setup wizard and confirm System › About can reopen it.
 10. Confirm `/health` returns healthy while the container is running.
-11. Drop a file into a watched folder and confirm Processing shows it without a manual page reload, and that it then appears in History.
+11. Drop a file into a watched folder and confirm Processing shows it without a manual page reload, and that it then appears in Activity.
 12. Confirm System › Logs shows application and runtime events, not developer build noise.
 13. Confirm System › Backups can export and restore a configuration backup against the mounted volume.
 14. Stop and restart the container with the same volume.

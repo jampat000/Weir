@@ -334,8 +334,8 @@ internal sealed class MediaManagerConnectionsEndpointHandlers
     }
 
     /// <summary>The connection test, shared with the heartbeat (<see cref="ManagerHealthProbe"/>).</summary>
-    private Task<(bool Ok, string Detail)> ProbeAsync(ApiRequest request, string name, string kind, string baseUrl, string? apiKey) =>
-        ManagerHealthProbe.ProbeAsync(_handlers, name, kind, baseUrl, apiKey, TestTimeout, request.Context.RequestAborted);
+    private Task<(bool Ok, string Detail)> ProbeAsync(ApiRequest request, MediaManagerConnectionRecord row, string? apiKey) =>
+        ManagerHealthProbe.ProbeAsync(_handlers, row.Label, row.Kind, row.BaseUrl, apiKey, TestTimeout, ConnectionRef.ForManager(row.Id), request.Context.RequestAborted);
 
     public async Task<ApiResult> PostConnectionTestAsync(ApiRequest request)
     {
@@ -362,7 +362,7 @@ internal sealed class MediaManagerConnectionsEndpointHandlers
         else
         {
             var apiKey = string.IsNullOrEmpty(row.ApiKeyCiphertext) ? null : _connections.Cipher.Decrypt(row.ApiKeyCiphertext);
-            (ok, detail) = await ProbeAsync(request, row.Label, row.Kind, row.BaseUrl, apiKey).ConfigureAwait(false);
+            (ok, detail) = await ProbeAsync(request, row, apiKey).ConfigureAwait(false);
         }
 
         // The probe can take seconds and the connection may be removed meanwhile, so the write is conditional.

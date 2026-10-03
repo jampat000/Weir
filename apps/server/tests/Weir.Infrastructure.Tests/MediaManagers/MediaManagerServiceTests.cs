@@ -3,7 +3,6 @@ using System.Net;
 using Weir.Core.Jobs;
 using Weir.Core.Json;
 using Weir.Core.MediaManagers;
-using Weir.Core.Rules;
 using Weir.Infrastructure.MediaManagers;
 using Weir.Infrastructure.Processing.RemuxPass;
 
@@ -382,63 +381,6 @@ public sealed class MediaManagerServiceTests
         using var home = new TempDirectory();
         Assert.Null(HandoffCompletionReporter.TranslateOutputPath(home.Join("elsewhere", "film.mkv"), home.Join("Refined"), "/data/refined"));
         Assert.Equal(@"E:\Deluno\Refined\Show\S01E01.mkv", HandoffCompletionReporter.TranslateOutputPath(home.Join("Refined", "Show", "S01E01.mkv"), home.Join("Refined"), @"E:\Deluno\Refined"));
-    }
-
-    // --- metadata provider ---------------------------------------------------------------------
-
-    private const string SearchPayload = """{"results":[{"id":42,"title":"Film","original_language":"fr","release_date":"2001-05-01"}]}""";
-
-    [Fact]
-    public async Task A_lookup_returns_the_original_language_and_repeats_come_from_the_cache()
-    {
-        var http = new FakeManagerHttp().Json(HttpMethod.Get, "/3/search/movie", SearchPayload);
-        var provider = new TmdbMetadataProvider("k", http, TimeProvider.System, cache: new MetadataLookupCache());
-        var result = await provider.LookupMovieAsync("Film", 2001);
-        Assert.True(result.Matched);
-        Assert.Equal(("fr", 2001), (result.Metadata!.OriginalLanguage, result.Metadata.Year!.Value));
-        await provider.LookupMovieAsync("film ", 2001);
-        Assert.Equal("https://api.themoviedb.org/3/search/movie?api_key=k&query=Film&year=2001", Assert.Single(http.Requests).Uri.ToString());
-    }
-
-    [Fact]
-    public async Task Provider_failures_are_statuses_never_exceptions()
-    {
-        var empty = new FakeManagerHttp().Json(HttpMethod.Get, "/3/search/movie", """{"results":[]}""");
-        var cached = new TmdbMetadataProvider("k", empty, TimeProvider.System, cache: new MetadataLookupCache());
-        Assert.Equal(LookupResult.StatusNoMatch, (await cached.LookupMovieAsync("Unknown", 1999)).Status);
-        await cached.LookupMovieAsync("Unknown", 1999);
-        Assert.Single(empty.Requests);
-
-        var none = new FakeManagerHttp();
-        Assert.Equal(LookupResult.StatusNotConfigured, (await new TmdbMetadataProvider(string.Empty, none, TimeProvider.System, cache: new MetadataLookupCache()).LookupMovieAsync("Film", 2001)).Status);
-        var down = await new TmdbMetadataProvider("k", none, TimeProvider.System, cache: new MetadataLookupCache()).LookupMovieAsync("Film", 2001);
-        Assert.Equal(LookupResult.StatusUnreachable, down.Status);
-        Assert.Contains("could not reach", down.Detail, StringComparison.Ordinal);
-
-        var rejected = new FakeManagerHttp().Json(HttpMethod.Get, "/3/search/movie", string.Empty, HttpStatusCode.Unauthorized);
-        var refusal = await new TmdbMetadataProvider("wrong", rejected, TimeProvider.System, cache: new MetadataLookupCache()).LookupMovieAsync("Film", 2001);
-        Assert.Equal(LookupResult.StatusNotConfigured, refusal.Status);
-        Assert.Contains("rejected the configured key", refusal.Detail, StringComparison.Ordinal);
-
-        var gateway = new FakeManagerHttp().Json(HttpMethod.Get, "/search/movie", SearchPayload);
-        Assert.True((await new TmdbMetadataProvider("k", gateway, TimeProvider.System, "https://metadata.example.workers.dev", new MetadataLookupCache()).LookupMovieAsync("Film", 2001)).Matched);
-        var internalAddress = await new TmdbMetadataProvider("k", gateway, TimeProvider.System, "http://169.254.169.254/latest", new MetadataLookupCache()).LookupMovieAsync("Film", 2001);
-        Assert.Equal(LookupResult.StatusNotConfigured, internalAddress.Status);
-        Assert.Contains("not usable", internalAddress.Detail, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public async Task The_saved_provider_is_built_from_suite_settings()
-    {
-        using var fixture = new MediaManagerFixture();
-        var service = new MetadataProviderService(fixture.Cipher, fixture.Http, fixture.Store.Clock);
-        Assert.Equal(LookupResult.StatusNotConfigured, (await fixture.Db(uow => service.TestProviderAsync(uow))).Status);
-        var ciphertext = service.StoreProviderKey("tmdb-key");
-        await fixture.Db(uow => uow.ExecuteAsync("UPDATE suite_settings SET metadata_provider = 'TMDB', metadata_provider_key_ciphertext = $c WHERE id = 1", ("$c", ciphertext)));
-        fixture.Http.Json(HttpMethod.Get, "/3/search/movie", SearchPayload);
-        var tested = await fixture.Db(uow => service.TestProviderAsync(uow));
-        Assert.Equal((LookupResult.StatusMatched, "The metadata provider answered."), (tested.Status, tested.Detail));
-        Assert.Contains("query=Blade+Runner&year=1982", fixture.Http.Requests[0].Uri.Query, StringComparison.Ordinal);
     }
 
     // --- intake and the ledger -----------------------------------------------------------------

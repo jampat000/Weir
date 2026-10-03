@@ -131,6 +131,8 @@ export interface ProcessingFile {
   last_attempt_at: string | null;
   /** The copy Weir handed back, when it wrote one. */
   handback?: ProcessingFileHandback | null;
+  /** Where Weir serves the title's poster. Null until one is found, when none exists, or when artwork is off. */
+  poster_url?: string | null;
 }
 
 export interface ProcessingFilesPage {
@@ -140,6 +142,9 @@ export interface ProcessingFilesPage {
   limit: number;
 }
 
+/** The ways the file list sorts: by the file's path, by what happened to it, or by when it last changed. */
+export type ProcessingFilesSort = "file" | "status" | "when";
+
 export interface ProcessingFilesQuery {
   library_id?: number;
   /** Several statuses join as one comma-separated value; the server splits them (#781). */
@@ -147,6 +152,9 @@ export interface ProcessingFilesQuery {
   path_contains?: string;
   within_days?: number;
   limit?: number;
+  /** Newest change first when not given. */
+  sort?: ProcessingFilesSort;
+  direction?: "asc" | "desc";
 }
 
 export const processingFilesPath = () => "/api/v1/processing/files";
@@ -173,7 +181,7 @@ export async function fetchProcessingFiles(
 }
 
 /**
- * History's remove dialog (#785): what to offer for one title before it is shown, and the choice a person made.
+ * Activity's remove dialog (#785): what to offer for one title before it is shown, and the choice a person made.
  * "remove" (the default) is today's plain forget; the other three only apply to a title `remove-options` says
  * `requires_choice` for.
  */

@@ -83,3 +83,33 @@ def insert_file(conn: Any, *, library_id: int, relative_path: str, **columns: An
     marks = ", ".join("?" for _ in values)
     cur = conn.execute(f"INSERT INTO files ({names}) VALUES ({marks})", tuple(values.values()))  # noqa: S608
     return int(cur.lastrowid or 0)
+
+
+def link_library_to_manager(conn: Any, library_id: int) -> None:
+    """Link the library to a media manager, which makes it a linked workflow rather than a Weir only one."""
+
+    cur = conn.execute(
+        "INSERT INTO media_manager_connections (kind, name, base_url) VALUES (?, ?, ?)",
+        ("radarr", "Radarr", "http://192.0.2.20:7878"),
+    )
+    conn.execute(
+        "INSERT INTO library_manager_links (library_id, connection_id) VALUES (?, ?)", (library_id, cur.lastrowid)
+    )
+
+
+def insert_handback(conn: Any, *, library_id: int, relative_path: str, **columns: Any) -> int:
+    """The cleaned copy Weir wrote for a file; with no ``columns`` no media manager has answered about it."""
+
+    values: dict[str, Any] = {
+        "library_id": library_id,
+        "relative_path": relative_path,
+        "output_path": f"/out/{relative_path}",
+        "output_size": 1,
+        "output_mtime_ns": 1,
+        "written_at": seed.utc_text(),
+        **columns,
+    }
+    names = ", ".join(values)
+    marks = ", ".join("?" for _ in values)
+    cur = conn.execute(f"INSERT INTO handbacks ({names}) VALUES ({marks})", tuple(values.values()))  # noqa: S608
+    return int(cur.lastrowid or 0)

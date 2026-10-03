@@ -8,6 +8,7 @@ import pytest
 
 from tests.contract.libraries import _helpers as h
 from tests.contract.support.client import API
+from tests.contract.support.polling import wait_until
 
 RULE_SETS = f"{API}/processing/rule-sets"
 MAINTENANCE = f"{API}/processing/maintenance"
@@ -84,6 +85,34 @@ def test_maintenance_unclaimed_handback_cleanup_can_be_run_by_hand(admin) -> Non
     assert r.status_code == 200, r.text
     assert r.json()["queued"] is True
     assert r.json()["detail"]
+
+
+def _completed_runs(admin, job_kind: str) -> int:
+    r = admin.get(f"{API}/processing/jobs/inspection", params={"status": "completed", "limit": 100})
+    assert r.status_code == 200, r.text
+    return sum(1 for job in r.json()["jobs"] if job["job_kind"] == job_kind)
+
+
+@pytest.mark.parametrize(
+    ("family", "job_kind"),
+    [
+        ("work_temp_stale_sweep", "processing.work_temp_stale_sweep.v1"),
+        ("unclaimed_handbacks", "processing.unclaimed_handback_cleanup.v1"),
+    ],
+)
+def test_maintenance_run_now_runs_every_time_it_is_pressed(
+    server_factory, client_factory, family: str, job_kind: str
+) -> None:
+    # Workers on, so each run is carried out, and the cleanup timers off, so only the presses below queue a run.
+    admin = h.signed_in_admin(server_factory(env={"WEIR_PROCESSING_WORKER_COUNT": "1"}), client_factory)
+    before = _completed_runs(admin, job_kind)
+    for run in (1, 2):
+        r = admin.post_csrf(f"{MAINTENANCE}/run", {"family": family, "media_scope": "movie"})
+        assert r.status_code == 200, r.text
+        wait_until(
+            lambda run=run: _completed_runs(admin, job_kind) >= before + run,
+            what=f"run {run} of {family} to finish",
+        )
 
 
 def test_maintenance_has_no_failed_download_cleanup_any_more(admin) -> None:
@@ -188,37 +217,48 @@ def test_reject_support_for_a_viewer_and_unknown_connections(viewer) -> None:
     assert unknown.json()["reason"]
 
 
-# --- metadata provider ------------------------------------------------------------------------------
+# --- metadata provider (deprecated: kept answering for older clients) -------------------------------
 
 
 def test_metadata_provider_needs_a_session(client) -> None:
     assert client.get(METADATA).status_code == 401
 
 
-def test_metadata_provider_shape_and_permissions(admin, viewer) -> None:
+def test_metadata_provider_always_describes_the_metadata_service(admin, viewer) -> None:
     r = viewer.get(METADATA)
     assert r.status_code == 200, r.text
-    body = r.json()
-    assert set(body) >= {"provider", "base_url", "key_configured", "known_providers"}
-    assert "tmdb" in body["known_providers"]
-    assert isinstance(body["key_configured"], bool)
-    assert body["base_url"]
+    assert r.json() == {
+        "provider": "deluno-gateway",
+        "base_url": None,
+        "key_configured": False,
+        "known_providers": ["deluno-gateway"],
+        "artwork_enabled": True,
+    }
 
+
+def test_a_metadata_provider_save_is_accepted_and_ignored(admin, viewer) -> None:
     assert viewer.put_csrf(METADATA, {"provider": "tmdb", "base_url": "https://x.example"}).status_code == 403
-    assert admin.put_csrf(METADATA, {"provider": "imdb"}).status_code == 422
     assert admin.put_csrf(METADATA, {"provider": "tmdb", "surprise": True}).status_code == 422
+    assert admin.put_csrf(METADATA, {"provider": "", "artwork_enabled": "maybe"}).status_code == 422
 
+    saved = admin.put_csrf(
+        METADATA,
+        {"provider": "tmdb", "base_url": "https://tmdb.example/3", "api_key": "secret-key", "artwork_enabled": False},
+    )
 
-def test_metadata_provider_cleared_reports_not_configured_without_asking_anyone(admin, viewer) -> None:
-    saved = admin.put_csrf(METADATA, {"provider": "", "base_url": "", "api_key": ""})
     assert saved.status_code == 200, saved.text
-    assert saved.json()["provider"] == ""
+    assert saved.json() == admin.get(METADATA).json()
+    assert saved.json()["provider"] == "deluno-gateway"
     assert saved.json()["key_configured"] is False
-    # An empty base URL falls back to the default provider address.
-    assert saved.json()["base_url"]
+    assert saved.json()["artwork_enabled"] is True
+    assert "secret-key" not in saved.text
 
+
+def test_the_metadata_provider_test_says_when_the_metadata_service_is_switched_off(admin, viewer) -> None:
     assert viewer.post_csrf(f"{METADATA}/test", {}).status_code == 403
-    tested = admin.post_csrf(f"{METADATA}/test", {})
+
+    tested = admin.post_csrf(f"{METADATA}/test", {"provider": "tmdb", "artwork_enabled": True})
+
     assert tested.status_code == 200, tested.text
     assert tested.json()["status"] == "not_configured"
     assert tested.json()["detail"]

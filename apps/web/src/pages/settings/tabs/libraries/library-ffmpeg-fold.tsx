@@ -1,3 +1,4 @@
+import { QuietDisclosure } from "../../../../components/shared/quiet-section";
 import { STRICTNESS_OPTIONS } from "./library-options";
 import { SelectSetting, type LibraryFormBinding } from "./library-settings";
 
@@ -11,11 +12,8 @@ export function LibraryFfmpegFold({
   binding: LibraryFormBinding;
 }) {
   return (
-    <details>
-      <summary className="mm-library-fold__summary">
-        FFmpeg compatibility (advanced)
-      </summary>
-      <div className="mm-field-row mt-4">
+    <QuietDisclosure title="Advanced">
+      <div className="mm-editor-grid">
         <SelectSetting
           binding={binding}
           name="ffmpeg_strictness"
@@ -25,6 +23,6 @@ export function LibraryFfmpegFold({
           testId="library-ffmpeg-compatibility"
         />
       </div>
-    </details>
+    </QuietDisclosure>
   );
 }

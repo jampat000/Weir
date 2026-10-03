@@ -201,6 +201,39 @@ describe("SettingsNotificationsTab removal confirmation", () => {
   });
 });
 
+describe("AlertsTab adding an alert", () => {
+  it("says what alerts do while there are none, and offers the first one", async () => {
+    vi.spyOn(api, "fetchNotificationChannels").mockResolvedValue(
+      channelList([]),
+    );
+
+    render(<AlertsTab />, { wrapper });
+
+    const empty = await screen.findByTestId("alerts-empty");
+    expect(empty).toHaveTextContent("posts to Discord");
+    fireEvent.click(
+      screen.getByRole("button", { name: "Add your first alert" }),
+    );
+    expect(
+      screen.getByRole("dialog", { name: "New alert" }),
+    ).toBeInTheDocument();
+  });
+
+  it("opens the form in a drawer with focus on its label, and closes it on Cancel", async () => {
+    vi.spyOn(api, "fetchNotificationChannels").mockResolvedValue(
+      channelList(threeChannels()),
+    );
+
+    render(<AlertsTab />, { wrapper });
+    fireEvent.click(await screen.findByRole("button", { name: "Add alert" }));
+
+    expect(screen.getByLabelText("Label")).toHaveFocus();
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add alert" })).toBeEnabled();
+  });
+});
+
 describe("AlertsTab loading and errors", () => {
   it("shows a loading state before alerts arrive", () => {
     vi.spyOn(api, "fetchNotificationChannels").mockReturnValue(
@@ -222,8 +255,6 @@ describe("AlertsTab loading and errors", () => {
     expect(await screen.findByTestId("settings-load-error")).toHaveTextContent(
       "Weir couldn’t load your alerts. Reload the page to try again.",
     );
-    expect(
-      screen.queryByText(/No alerts configured yet/),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId("alerts-empty")).not.toBeInTheDocument();
   });
 });

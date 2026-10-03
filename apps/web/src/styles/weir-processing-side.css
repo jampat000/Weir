@@ -1,0 +1,294 @@
+/* The Processing page's right column: Health and Needs you. */
+
+/* ---- Health ---------------------------------------------------------------- */
+
+/* The panel's height decides how many whole rows show (fit-rows.ts hides the ones that do not fit), so the body does
+   not scroll, and the 16px under it is the host's margin, outside what is measured. */
+.mm-health__fit {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 16px;
+  padding: 0 18px;
+  overflow: hidden;
+}
+
+.mm-health__heading {
+  margin: 0 0 8px;
+  font-size: var(--mm-type-eyebrow);
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--mm-text2);
+}
+
+.mm-health__list,
+.mm-health__pills {
+  list-style: none;
+}
+
+.mm-health__list {
+  display: grid;
+  gap: 8px;
+}
+
+.mm-health__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px 10px;
+}
+
+/* Why a workflow is not in sync, on a line of its own under its name. */
+.mm-health__why {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: var(--mm-type-body);
+  line-height: 1.4;
+  color: var(--mm-st);
+}
+
+.mm-health__notice {
+  margin: 0;
+  font-size: var(--mm-type-body);
+  color: var(--mm-text2);
+}
+
+.mm-health__action {
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--mm-primary);
+  cursor: pointer;
+}
+
+.mm-health__action:hover:not(:disabled) {
+  color: var(--mm-primary-bright);
+}
+
+.mm-health__action:disabled {
+  cursor: progress;
+  color: var(--mm-text3);
+}
+
+.mm-health__action:focus-visible {
+  outline: 2px solid var(--mm-primary);
+  outline-offset: 2px;
+  border-radius: var(--mm-radius-control);
+}
+
+.mm-health__name {
+  display: grid;
+  min-width: 0;
+  text-decoration: none;
+  color: var(--mm-text1);
+}
+
+.mm-health__name:hover b {
+  color: var(--mm-primary);
+}
+
+.mm-health__name small {
+  overflow: hidden;
+  font-size: var(--mm-type-caption);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--mm-text2);
+}
+
+.mm-health__pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.mm-health__pill {
+  display: inline-flex;
+  max-width: 100%;
+  text-decoration: none;
+}
+
+.mm-health__pill:focus-visible,
+.mm-health__name:focus-visible {
+  outline: 2px solid var(--mm-primary);
+  outline-offset: 2px;
+  border-radius: var(--mm-radius-pill);
+}
+
+.mm-health__state {
+  margin-left: 2px;
+  font-weight: 500;
+  opacity: 0.85;
+}
+
+.mm-health__empty {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--mm-text2);
+}
+
+/* ---- Needs you -------------------------------------------------------------- */
+
+/* The panel lists only the whole rows its height holds (useFittingRows); the rest are counted in its header's link. */
+.mm-needs {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  padding: 0 12px 12px;
+}
+
+.mm-needs__fit {
+  min-height: 0;
+  flex: 1;
+  overflow: hidden;
+}
+
+.mm-needs__list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* How many things need a person, in the header, where a glance finds it. */
+.mm-needs__count {
+  font-weight: 600;
+}
+
+.mm-needs__clear {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 0 6px;
+  font-size: var(--mm-type-body);
+  color: var(--mm-text2);
+}
+
+.mm-needs__clear svg,
+.mm-needs__clear b {
+  color: var(--mm-st);
+}
+
+.mm-needs__notice {
+  margin: 0 18px 10px;
+  font-size: var(--mm-type-body);
+  color: var(--mm-text2);
+}
+
+.mm-needs__group {
+  display: grid;
+  flex: none;
+  gap: 8px;
+}
+
+.mm-needs__group-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 12px;
+  padding: 0 6px;
+}
+
+.mm-needs__group-title {
+  font-size: var(--mm-type-eyebrow);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--mm-st);
+}
+
+.mm-needs__rows {
+  display: grid;
+  gap: 8px;
+  list-style: none;
+}
+
+.mm-needs__more {
+  padding: 0 6px;
+}
+
+.mm-need {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--mm-st) 45%, transparent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--mm-st) 10%, transparent);
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+
+.mm-need__title {
+  overflow-wrap: anywhere;
+  font-weight: 600;
+  color: var(--mm-text1);
+}
+
+.mm-need__workflow {
+  font-size: var(--mm-type-caption);
+  color: var(--mm-text2);
+}
+
+.mm-need__reason {
+  color: var(--mm-text2);
+}
+
+.mm-need__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  margin-top: 6px;
+}
+
+.mm-need__link {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  color: var(--mm-primary);
+  text-decoration: none;
+}
+
+.mm-need__link:hover {
+  color: var(--mm-primary-bright);
+}
+
+.mm-need__button {
+  height: var(--mm-control-height-row);
+  padding: 0 12px;
+  border: 1px solid var(--mm-hairline);
+  border-radius: var(--mm-radius-control);
+  background: var(--mm-surface-2);
+  font: inherit;
+  font-size: var(--mm-type-body);
+  font-weight: 600;
+  color: var(--mm-text1);
+  cursor: pointer;
+}
+
+.mm-need__button:hover:not(:disabled) {
+  background: var(--mm-surface-3);
+}
+
+.mm-need__button:disabled {
+  cursor: progress;
+  color: var(--mm-text3);
+}
+
+.mm-need__link:focus-visible,
+.mm-need__button:focus-visible {
+  outline: 2px solid var(--mm-primary);
+  outline-offset: 2px;
+}

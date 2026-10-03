@@ -132,7 +132,7 @@ public static partial class LibraryRules
     }
 
     /// <summary>
-    /// A workflow's own limit is a share of Settings › Performance's "Files at once", so it cannot ask for more than that total.
+    /// A workflow's own limit is a share of "Files at once" in Setup › Performance › Speed, so it cannot ask for more than that total.
     /// Zero, the workflow following the total, always passes.
     /// </summary>
     public static void ValidateMaxConcurrentFiles(long requested, long filesAtOnce)
@@ -142,7 +142,7 @@ public static partial class LibraryRules
         {
             throw new ProcessingLibraryException(
                 $"The most files this workflow runs at once cannot be more than the {total} Weir runs in total. " +
-                "Choose a lower number, or raise Files at once in Settings › Performance first.");
+                "Choose a lower number, or raise Files at once in Setup › Performance › Speed first.");
         }
     }
 

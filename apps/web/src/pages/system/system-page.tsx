@@ -1,12 +1,13 @@
+import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
 import { PageLoading } from "../../components/shared/page-loading";
 import {
   WorkspacePage,
   WorkspacePanel,
-  WorkspaceTabList,
-  type WorkspaceTabOption,
 } from "../../components/shared/workspace-shell";
+import type { PageTabOption } from "../../components/shell/page-tabs";
+import { PageToolbar } from "../../components/shell/page-toolbar";
 import { ConfirmDialog } from "../../components/ui/confirm-dialog";
 import {
   isHttpErrorFromApi,
@@ -17,6 +18,7 @@ import { useMeQuery } from "../../lib/auth/queries";
 import { useAppSettingsQuery } from "../../lib/settings/queries";
 import { AboutTab } from "./tabs/about/about-tab";
 import { BackupsTab } from "./tabs/backups/backups-tab";
+import { LOG_PARAMS } from "./tabs/logs/log-filters";
 import { LogsTab } from "./tabs/logs/logs-tab";
 import { SecurityTab } from "./tabs/security/security-tab";
 import { useSystemSettingsForm } from "./use-system-settings-form";
@@ -25,7 +27,7 @@ import { useUnsavedChangesGuard } from "./use-unsaved-changes-guard";
 type TabId = "about" | "backups" | "security" | "logs";
 
 /** What it is first, then what it keeps, who can sign in, and last the record of what it did. */
-const SYSTEM_TABS: readonly WorkspaceTabOption<TabId>[] = [
+const SYSTEM_TABS: readonly PageTabOption<TabId>[] = [
   { id: "about", label: "About" },
   { id: "backups", label: "Backups" },
   { id: "security", label: "Security" },
@@ -52,7 +54,7 @@ function SettingsLoadProblem({ error }: { error: Error }) {
   return (
     <div className="mm-page" data-testid="suite-settings-page">
       <header className="mm-page__intro">
-        <h1 className="mm-page__title">Settings</h1>
+        <h2 className="mm-page__title">System</h2>
         <p className="mm-page__lead">
           {isLikelyNetworkFailure(error)
             ? "Could not reach the Weir API. Check that the backend is running."
@@ -71,7 +73,9 @@ export function SystemPage() {
   const me = useMeQuery();
   const settingsQ = useAppSettingsQuery();
   const form = useSystemSettingsForm(settingsQ.data);
-  const blocker = useUnsavedChangesGuard(form.isDirty);
+  // The time zone is picked and saved on its own, so About tells the page when a pick is waiting for its Save.
+  const [zoneUnsaved, setZoneUnsaved] = useState(false);
+  const blocker = useUnsavedChangesGuard(form.isDirty || zoneUnsaved);
   // The address is the tab, so Back, Forward and the side menu move between tabs too.
   const tab = systemTabFrom(searchParams.get("tab"));
   const editable = canEdit(me.data?.role);
@@ -81,7 +85,8 @@ export function SystemPage() {
     // About is where System opens, so it needs no tab in the address.
     if (nextTab === "about") nextParams.delete("tab");
     else nextParams.set("tab", nextTab);
-    for (const name of ["show", "status", "path"]) nextParams.delete(name);
+    // What narrows the log belongs to the log: another tab has none of it.
+    for (const name of LOG_PARAMS) nextParams.delete(name);
     setSearchParams(nextParams);
   }
 
@@ -94,12 +99,8 @@ export function SystemPage() {
   const settings = settingsQ.data;
 
   return (
-    <WorkspacePage
-      title="System"
-      dataTestId="suite-system-page"
-      description="Weir itself: what it is running, what it keeps, and who can sign in."
-    >
-      <WorkspaceTabList
+    <WorkspacePage dataTestId="suite-system-page">
+      <PageToolbar
         tabs={SYSTEM_TABS}
         activeId={tab}
         onSelect={selectTab}
@@ -109,21 +110,25 @@ export function SystemPage() {
         dataTestId="system-section-tabs"
       />
       <WorkspacePanel id="system-panel" labelledBy={`system-tab-${tab}`}>
-        {tab === "about" ? (
-          <AboutTab settings={settings} />
-        ) : tab === "backups" ? (
-          <BackupsTab form={form} editable={editable} settings={settings} />
-        ) : tab === "security" ? (
-          <div className="mm-quiet-stack">
+        <div className="mm-system">
+          {tab === "about" ? (
+            <AboutTab
+              settings={settings}
+              editable={editable}
+              onTimeZoneUnsavedChange={setZoneUnsaved}
+            />
+          ) : tab === "backups" ? (
+            <BackupsTab form={form} editable={editable} settings={settings} />
+          ) : tab === "security" ? (
             <SecurityTab />
-          </div>
-        ) : (
-          <LogsTab
-            form={form}
-            editable={editable}
-            savedLogDays={settings.log_retention_days}
-          />
-        )}
+          ) : (
+            <LogsTab
+              form={form}
+              editable={editable}
+              savedLogDays={settings.log_retention_days}
+            />
+          )}
+        </div>
       </WorkspacePanel>
       {blocker.state === "blocked" ? (
         <ConfirmDialog

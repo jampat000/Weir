@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Weir.Core.Configuration;
 using Weir.Core.MediaManagers;
 using Weir.Core.Security;
+using Weir.Infrastructure.Artwork;
 using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.Processing;
 using Weir.Infrastructure.Scheduling;
@@ -34,16 +35,16 @@ public static class MediaManagerServices
         services.TryAddSingleton<ManagerSetupCheck>();
         services.TryAddSingleton<HandoffLedgerStore>();
         services.AddWeirJobStore();
+        services.AddWeirArtwork();
         services.TryAddSingleton<MediaManagerIntake>();
         services.TryAddSingleton<HandoffCompletionReporter>();
-        // Cancelling one queued job from the Jobs screen (#745 part 5): the ledger, the report and the file
+        // Cancelling one queued job from the jobs list in System › Logs (#745 part 5): the ledger, the report and the file
         // state it touches, constructor-injected instead of passed in on every call.
         services.TryAddSingleton<PendingJobCancellation>();
         // #652: what a manager said about a file Weir handed back, and the one rule that releases Weir's copy.
         services.TryAddSingleton<HandbackOutcomes>();
         // The optional downloaded-scan hand-back for a Sonarr/Radarr connection outside Weir's own hand-off flow.
         services.TryAddSingleton<DownloadedScanNotifier>();
-        services.TryAddSingleton<MetadataProviderService>();
         services.TryAddSingleton<ILibraryFileChangeNotifier, LibraryFileChangeNotifier>();
 
         // #509: asking a manager to redownload a title. What a clean removed, and which titles wait for a

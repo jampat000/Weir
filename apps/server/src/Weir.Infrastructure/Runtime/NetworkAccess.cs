@@ -1,5 +1,3 @@
-using System.Runtime.InteropServices;
-using System.Runtime.Versioning;
 using Weir.Core.Configuration;
 
 namespace Weir.Infrastructure.Runtime;
@@ -20,146 +18,87 @@ public enum NetworkAccessState
     Blocked,
 }
 
-/// <summary>
-/// Reads whether Weir can be reached from the network, for System › About. Registered by
-/// <c>WeirPlatformServices.AddWeirPlatform</c>: the Windows build reads its own bind address and the real firewall
-/// state, every other platform reports <see cref="NetworkAccessState.NotApplicable"/>.
-/// </summary>
-public interface INetworkAccessReader
+/// <summary>Who the Windows package's server accepts connections from.</summary>
+public enum NetworkScope
 {
-    NetworkAccessState ReadState();
+    /// <summary>Only this PC: the server listens on the loopback addresses.</summary>
+    ThisPcOnly,
+
+    /// <summary>Every device that can reach this PC, subject to Windows Firewall.</summary>
+    Network,
 }
 
-/// <inheritdoc cref="INetworkAccessReader"/>
-public sealed class UnsupportedNetworkAccessReader : INetworkAccessReader
+/// <summary>What Windows Firewall says about Weir's server program.</summary>
+public enum FirewallVerdict
 {
-    public NetworkAccessState ReadState() => NetworkAccessState.NotApplicable;
+    /// <summary>Not read: this is not the Windows package, or nothing is waiting on the firewall.</summary>
+    NotChecked,
+
+    /// <summary>An enabled allow rule covers the network this PC is on and no block rule does.</summary>
+    Allows,
+
+    /// <summary>No allow rule covers the network this PC is on, or a block rule does.</summary>
+    Blocks,
 }
 
-/// <summary>An inbound firewall rule for Weir's own server program, as much of it as the state decision needs.</summary>
-internal readonly record struct ServerFirewallRule(bool IsAllow, bool Enabled, int Profiles);
+/// <summary>
+/// Everything System › About needs to show and change network access.
+/// </summary>
+/// <param name="State">The effective reach: who can connect right now.</param>
+/// <param name="Scope">Who the running server listens for; null when this copy does not manage that.</param>
+/// <param name="PendingScope">The saved choice when the running server has not caught up with it yet.</param>
+/// <param name="Firewall">What the firewall says, read only while it matters.</param>
+/// <param name="Port">The port the server listens on.</param>
+/// <param name="Addresses">The addresses another device would type, when the server listens for the network.</param>
+public sealed record NetworkAccessStatus(
+    NetworkAccessState State,
+    NetworkScope? Scope,
+    NetworkScope? PendingScope,
+    FirewallVerdict Firewall,
+    int Port,
+    IReadOnlyList<string> Addresses);
 
 /// <summary>
-/// What System › About says, worked out from where the server listens and the firewall rules for its program.
-/// Pure, so the Windows-only COM read stays out of it.
+/// Reads and changes whether Weir can be reached from the network, for System › About. Registered by
+/// <c>WeirPlatformServices.AddWeirPlatform</c>: the Windows package works with its tray (<see cref="WindowsNetworkAccess"/>),
+/// every other install reports <see cref="NetworkAccessState.NotApplicable"/> and explains who does decide.
 /// </summary>
-internal static class NetworkAccessDecision
+public interface INetworkAccess
 {
+    NetworkAccessStatus Read();
+
+    /// <summary>Why the choice cannot be changed here, as a sentence for the operator; null when it can.</summary>
+    string? NotChangeableReason { get; }
+
     /// <summary>
-    /// Other devices get in when an enabled allow rule covers a network this PC is on and no enabled block rule
-    /// does: a block wins, as in Windows Firewall itself. Weir's own "Weir" rule and one Windows made when someone
-    /// clicked Allow on its prompt count the same.
+    /// Saves the choice where the tray picks it up. The running server does not change until the tray has restarted
+    /// it, so <see cref="Read"/> reports the new choice as pending until then.
     /// </summary>
-    internal static NetworkAccessState Decide(bool listensOnThisPcOnly, IReadOnlyList<ServerFirewallRule> rules, int currentProfiles)
-    {
-        ArgumentNullException.ThrowIfNull(rules);
-        if (listensOnThisPcOnly)
-        {
-            return NetworkAccessState.ThisPcOnly;
-        }
-
-        var enabled = rules.Where(rule => rule.Enabled && (rule.Profiles & currentProfiles) != 0).ToList();
-        var allowed = enabled.Any(rule => rule.IsAllow) && !enabled.Any(rule => !rule.IsAllow);
-        return allowed ? NetworkAccessState.Allowed : NetworkAccessState.Blocked;
-    }
+    /// <exception cref="InvalidOperationException">The choice is not changeable here (<see cref="NotChangeableReason"/>).</exception>
+    void Choose(NetworkScope scope);
 }
 
-/// <summary>
-/// The Windows package's read of Weir's own firewall rules, through the same COM policy object the tray writes to
-/// (<c>HNetCfg.FwPolicy2</c> / <c>INetFwPolicy2</c> — see <c>apps/tray/Weir.Tray/Firewall/ComFirewallPolicy.cs</c>).
-/// Reading a rule and the active network profile needs no administrator rights.
-///
-/// This does not share code with the tray's writer: <c>apps/server</c> and <c>apps/tray</c> are separate
-/// solutions with no shared project reference, and only the tray ever creates or removes the rule. Keep the
-/// program path in step with <c>WeirFirewallRule</c> there if it changes.
-/// </summary>
-[SupportedOSPlatform("windows")]
-public sealed class WindowsNetworkAccessReader : INetworkAccessReader
+/// <summary>Docker and a bare install: the way the server is started decides who can reach it, so there is nothing to change here.</summary>
+public sealed class UnmanagedNetworkAccess : INetworkAccess
 {
-    private const string ServerExeName = "WeirServer.exe";
+    private const string DockerReason = "Set by Docker's port mapping. Change the published port in your compose file or docker run command to change who can reach Weir.";
 
-    // NET_FW_RULE_DIRECTION_IN.
-    private const int DirectionIn = 1;
+    private const string BindReason = "Set by the bind address Weir was started with. Start it with --host 127.0.0.1 for this PC only, or --host 0.0.0.0 for devices on your network.";
 
-    // NET_FW_ACTION_.
-    private const int ActionAllow = 1;
-
+    private readonly ServerRunMode _runMode;
     private readonly ServerListenOptions _listen;
 
-    public WindowsNetworkAccessReader(ServerListenOptions listen)
+    public UnmanagedNetworkAccess(ServerRunMode runMode, ServerListenOptions listen)
     {
+        _runMode = runMode ?? throw new ArgumentNullException(nameof(runMode));
         _listen = listen ?? throw new ArgumentNullException(nameof(listen));
     }
 
-    public NetworkAccessState ReadState()
-    {
-        if (!OperatingSystem.IsWindows())
-        {
-            throw new PlatformNotSupportedException($"{nameof(WindowsNetworkAccessReader)} is Windows-only.");
-        }
+    public string? NotChangeableReason => _runMode == ServerRunMode.Docker ? DockerReason : BindReason;
 
-        if (_listen.IsThisPcOnly)
-        {
-            return NetworkAccessState.ThisPcOnly;
-        }
+    public NetworkAccessStatus Read() =>
+        new(NetworkAccessState.NotApplicable, Scope: null, PendingScope: null, FirewallVerdict.NotChecked, _listen.Port, Addresses: []);
 
-        try
-        {
-            return Read();
-        }
-        catch (Exception ex) when (ex is COMException or InvalidOperationException)
-        {
-            // The COM policy object could not be reached (a locked-down machine, a firewall service that is not
-            // running): the firewall's answer is unknown, so this reports what Weir can prove, that no allow rule
-            // was seen.
-            return NetworkAccessState.Blocked;
-        }
-    }
-
-    private static NetworkAccessState Read()
-    {
-        var programPath = Path.Combine(AppContext.BaseDirectory, ServerExeName);
-        dynamic policy = CreateComObject("HNetCfg.FwPolicy2");
-        var currentProfiles = (int)policy.CurrentProfileTypes;
-
-        var rules = new List<ServerFirewallRule>();
-        foreach (dynamic comRule in policy.Rules)
-        {
-            if (TryRead(comRule, programPath) is { } rule)
-            {
-                rules.Add(rule);
-            }
-        }
-        return NetworkAccessDecision.Decide(listensOnThisPcOnly: false, rules, currentProfiles);
-    }
-
-    // Only inbound rules for Weir's own server exe are meaningful here; everything else reads as null.
-    private static ServerFirewallRule? TryRead(dynamic comRule, string programPath)
-    {
-        try
-        {
-            if ((int)comRule.Direction != DirectionIn)
-            {
-                return null;
-            }
-            string? applicationName = comRule.ApplicationName;
-            if (!string.Equals(applicationName, programPath, StringComparison.OrdinalIgnoreCase))
-            {
-                return null;
-            }
-            return new ServerFirewallRule((int)comRule.Action == ActionAllow, (bool)comRule.Enabled, (int)comRule.Profiles);
-        }
-        catch (COMException)
-        {
-            return null;
-        }
-    }
-
-    private static dynamic CreateComObject(string progId)
-    {
-        var type = Type.GetTypeFromProgID(progId)
-            ?? throw new InvalidOperationException($"Windows Firewall's COM object '{progId}' is not registered on this machine.");
-        return Activator.CreateInstance(type)
-            ?? throw new InvalidOperationException($"Could not create Windows Firewall's COM object '{progId}'.");
-    }
+    public void Choose(NetworkScope scope) =>
+        throw new InvalidOperationException(NotChangeableReason);
 }

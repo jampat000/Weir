@@ -95,7 +95,7 @@ public static class WebApp
         if (IsUpgradeBrowserLanding(request))
         {
             context.Response.StatusCode = StatusCodes.Status303SeeOther;
-            context.Response.Headers.Location = "/settings";
+            context.Response.Headers.Location = "/system?tab=about";
             return;
         }
 
@@ -109,7 +109,7 @@ public static class WebApp
     }
 
     /// <summary>
-    /// Stale in-app-upgrade browser landings (<c>/api/…upgrade…</c>) go back to Settings instead of a
+    /// Stale in-app-upgrade browser landings (<c>/api/…upgrade…</c>) go back to System › About instead of a
     /// useless JSON 404 while the app restarts.
     /// </summary>
     internal static bool IsUpgradeBrowserLanding(HttpRequest request)

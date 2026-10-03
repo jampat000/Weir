@@ -139,7 +139,7 @@ public sealed partial class LibraryStore
         return count;
     }
 
-    /// <summary>Settings › Performance's "Files at once"; one when the settings row does not exist yet.</summary>
+    /// <summary>"Files at once" in Setup › Performance › Speed; one when the settings row does not exist yet.</summary>
     private async Task<long> FilesAtOnceAsync(UnitOfWork uow) =>
         await uow.ScalarAsync("SELECT max_concurrent_files FROM operator_settings WHERE id = 1").ConfigureAwait(false) is { } total and not DBNull
             ? Convert.ToInt64(total, System.Globalization.CultureInfo.InvariantCulture)

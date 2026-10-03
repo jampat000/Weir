@@ -24,7 +24,7 @@ public sealed class ActivityHistoryStore
     /// <summary>How far a stored time's written date can be from its UTC date (a UTC offset is at most 14 hours).</summary>
     private static readonly TimeSpan StoredDateSlack = TimeSpan.FromDays(1);
 
-    private const string Columns =
+    internal const string Columns =
         "activity_events.id, activity_events.created_at, activity_events.event_type, activity_events.module, activity_events.title, " +
         "activity_events.detail, activity_events.\"trigger\", activity_events.result, activity_events.library_id, " +
         "activity_events.relative_path, activity_events.run_key";
@@ -171,7 +171,7 @@ public sealed class ActivityHistoryStore
     }
 
     /// <summary>The WHERE clauses and parameters for an Activity filter.</summary>
-    private static (List<string> Where, List<(string Name, object? Value)> Parameters) Where(ActivityFilter filter)
+    internal static (List<string> Where, List<(string Name, object? Value)> Parameters) Where(ActivityFilter filter)
     {
         ArgumentNullException.ThrowIfNull(filter);
         var where = new List<string>();
@@ -194,7 +194,7 @@ public sealed class ActivityHistoryStore
             parameters.Add(("@library_id", libraryId));
         }
 
-        // System › Logs shows Weir's own events and History shows the files: "weir" keeps the events that are
+        // System › Logs shows Weir's own events and Activity shows the files: "weir" keeps the events that are
         // not about one file, "files" keeps the ones that are. Anything else filters nothing.
         switch (Core.Json.WireStrings.Strip(filter.About ?? string.Empty).ToLowerInvariant())
         {
@@ -288,7 +288,7 @@ public sealed class ActivityHistoryStore
     /// <summary>Text every event at or before <paramref name="utc"/> sorts below: the day after its date, plus the day of slack.</summary>
     private static string DateCeiling(DateTime utc) => utc.Date.AddDays(1).Add(StoredDateSlack).ToString(DateOnlyFormat, CultureInfo.InvariantCulture);
 
-    private static string WhereText(List<string> where) => where.Count == 0 ? string.Empty : " WHERE " + string.Join(" AND ", where);
+    internal static string WhereText(List<string> where) => where.Count == 0 ? string.Empty : " WHERE " + string.Join(" AND ", where);
 
     /// <summary>One file's events: with a library, events that never recorded one still belong to the file.</summary>
     private static (string Clause, (string Name, object? Value)[] Parameters) FileHistoryClause(long? libraryId, string relativePath)
@@ -310,7 +310,7 @@ public sealed class ActivityHistoryStore
                 [("@relative_path", relativePath), ("@library_id", id)])
             : ("file_logs.relative_path = @relative_path", [("@relative_path", relativePath)]);
 
-    private static ActivityEventRow ReadRow(SqliteDataReader reader) => new(
+    internal static ActivityEventRow ReadRow(SqliteDataReader reader) => new(
         SqliteValues.GetInt64(reader, 0),
         SqliteValues.GetDateTime(reader, 1),
         SqliteValues.GetString(reader, 2),

@@ -153,7 +153,7 @@ public sealed partial class ManagerSetupCheck
     private static bool IsDeluno(MediaManagerConnectionRecord row) => string.Equals(row.Kind, "deluno", StringComparison.OrdinalIgnoreCase);
 
     private static string MissingCredentialsText(string label) =>
-        $"{label} has no address or API key saved, so Weir cannot check it. Add them under Settings → Media managers.";
+        $"{label} has no address or API key saved, so Weir cannot check it. Add them under Setup › Connections › Media managers.";
 
     private async Task<ManagerFolderSuggestion> SuggestArrFoldersAsync(
         long connectionId, ManagerConnection connection, string mediaScope, CancellationToken cancellationToken)
@@ -161,7 +161,7 @@ public sealed partial class ManagerSetupCheck
         WireValue? clients;
         try
         {
-            var client = new MediaManagerHttpClient(connection.BaseUrl, connection.ApiKey, _handlers, ManagerDialectRules.DescribeTimeout);
+            var client = new MediaManagerHttpClient(connection.BaseUrl, connection.ApiKey, _handlers, ManagerDialectRules.DescribeTimeout, connection.Reference);
             clients = await client.GetJsonAsync(ManagerSetupRules.DownloadClientPath, cancellationToken: cancellationToken).ConfigureAwait(false);
         }
         catch (Exception exception) when (exception is MediaManagerHttpException or MediaManagerUnreachableException)
@@ -195,7 +195,7 @@ public sealed partial class ManagerSetupCheck
         WireValue? clients;
         try
         {
-            var client = new MediaManagerHttpClient(connection.BaseUrl, connection.ApiKey, _handlers, ManagerDialectRules.DescribeTimeout);
+            var client = new MediaManagerHttpClient(connection.BaseUrl, connection.ApiKey, _handlers, ManagerDialectRules.DescribeTimeout, connection.Reference);
             mappings = await client.GetJsonAsync(ManagerSetupRules.RemotePathMappingPath, cancellationToken: cancellationToken).ConfigureAwait(false);
             clients = await client.GetJsonAsync(ManagerSetupRules.DownloadClientPath, cancellationToken: cancellationToken).ConfigureAwait(false);
         }
@@ -250,7 +250,7 @@ public sealed partial class ManagerSetupCheck
     {
         try
         {
-            var client = new MediaManagerHttpClient(connection.BaseUrl, connection.ApiKey, _handlers, ManagerDialectRules.DescribeTimeout);
+            var client = new MediaManagerHttpClient(connection.BaseUrl, connection.ApiKey, _handlers, ManagerDialectRules.DescribeTimeout, connection.Reference);
             return await client.GetJsonAsync(ManagerSetupRules.DownloadClientConfigPath, cancellationToken: cancellationToken).ConfigureAwait(false) is WireObject config &&
                    config.Get("enableCompletedDownloadHandling") is WireBool flag
                 ? flag.Value

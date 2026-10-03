@@ -5,11 +5,12 @@ import {
   type FileProgressDetail as Detail,
 } from "../../lib/activity/pass-detail";
 import { baseName } from "../../lib/format/path";
+import type { StatusMeaning } from "../../lib/ui/status-meaning";
 
-const STATUS: Record<string, { text: string; modifier: string }> = {
-  finished: { text: "Finished", modifier: "finished" },
-  failed: { text: "Stopped", modifier: "failed" },
-  finishing: { text: "Final checks", modifier: "finishing" },
+const STATUS: Record<string, { text: string; meaning: StatusMeaning }> = {
+  finished: { text: "Finished", meaning: "done" },
+  failed: { text: "Stopped", meaning: "broken" },
+  finishing: { text: "Final checks", meaning: "doing" },
 };
 
 /** A pass that is still running, in plain words: how far, how long, how fast. */
@@ -36,9 +37,9 @@ export function FileProgressDetail({ detail }: { detail: string }) {
   const processed = formatDuration(parsed.processed_seconds);
   const duration = formatDuration(parsed.duration_seconds);
   const speed = formatProcessingSpeed(parsed.speed);
-  const { text: statusText, modifier } = STATUS[status] ?? {
+  const { text: statusText, meaning } = STATUS[status] ?? {
     text: "Processing",
-    modifier: "processing",
+    meaning: "doing",
   };
   const message =
     status === "finished"
@@ -57,7 +58,8 @@ export function FileProgressDetail({ detail }: { detail: string }) {
 
   return (
     <div
-      className={`mm-activity-processing mm-activity-processing--${modifier}`}
+      className="mm-activity-processing"
+      data-status={meaning}
       data-testid="processing-processing-progress-detail"
     >
       <div className="mm-activity-processing__header">
@@ -91,7 +93,12 @@ export function FileProgressDetail({ detail }: { detail: string }) {
         {speed ? <span>Processing speed {speed}</span> : null}
       </div>
       {parsed.reason ? (
-        <p className="mm-activity-processing__error">{parsed.reason}</p>
+        <p
+          className="mm-activity-processing__error mm-status-text"
+          data-status="broken"
+        >
+          {parsed.reason}
+        </p>
       ) : null}
     </div>
   );

@@ -105,7 +105,7 @@ public static partial class ManagerSetupRules
         {
             lines.Add(new SetupCheckLine(
                 SetupCheckLine.Problem,
-                $"Completed Download Handling is off in {managerLabel}, so it will never import from Weir's output. Turn it on under Settings → Download Clients."));
+                $"Completed Download Handling is off in {managerLabel}, so it will never import from Weir's output. Turn it on under Setup › Connections › Download clients."));
         }
         else if (completedDownloadHandling == true)
         {
@@ -243,9 +243,9 @@ public static partial class ManagerSetupRules
                 SetupCheckLine.Unverified,
                 category.Length > 0
                     ? $"{client.Name} files {managerLabel}'s downloads under the category \"{category}\", but {managerLabel} does not say where that category saves. " +
-                      $"Weir cannot verify its folder is {watched} or inside it. Connect {client.Name} to Weir under Settings → Media managers to check it."
+                      $"Weir cannot verify its folder is {watched} or inside it. Connect {client.Name} to Weir under Setup › Connections › Media managers to check it."
                     : $"{managerLabel} does not say where {client.Name} saves its downloads. " +
-                      $"Weir cannot verify they land in {watched} or inside it. Connect {client.Name} to Weir under Settings → Media managers to check it.");
+                      $"Weir cannot verify they land in {watched} or inside it. Connect {client.Name} to Weir under Setup › Connections › Media managers to check it.");
         }
     }
 

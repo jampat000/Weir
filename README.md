@@ -52,7 +52,7 @@ Weir removes them, so every file ends up with just the tracks you chose.
 
 Beyond the cleaning itself:
 
-- **History** keeps a record of every file Weir handled: which tracks it kept and removed, and why a file was held or skipped.
+- **Activity** keeps a record of every file Weir handled: which tracks it kept and removed, and why a file was held or skipped.
 - **Library** lists the files already on your storage, library by library. You can open any file and choose its tracks yourself when the rules don't fit it.
 - **Schedules** set the hours each workflow may start work, so cleaning a large library can wait for the night.
 - **Alerts** go to Discord or any webhook when a file finishes or fails.
@@ -67,15 +67,15 @@ Everything Weir needs comes with it, including ffmpeg and MKVToolNix. There's no
 
 ## Screenshots
 
-| Processing: every file as it is worked on | History: what Weir did to a file, track by track |
+| Processing: every file as it is worked on | Activity: what Weir did to a file, track by track |
 | --- | --- |
-| ![Processing](docs/assets/screenshots/processing.png) | ![History of one file](docs/assets/screenshots/history-detail.png) |
+| ![Processing](docs/assets/screenshots/processing.png) | ![Activity of one file](docs/assets/screenshots/history-detail.png) |
 
-| History | Library: the files already on your storage |
+| Activity | Library: the files already on your storage |
 | --- | --- |
-| ![History](docs/assets/screenshots/history.png) | ![Library](docs/assets/screenshots/library.png) |
+| ![Activity](docs/assets/screenshots/history.png) | ![Library](docs/assets/screenshots/library.png) |
 
-| Settings › Rules | Settings › Schedule |
+| Setup › Rules › Profiles | Setup › Workflows › Schedule |
 | --- | --- |
 | ![Rules](docs/assets/screenshots/settings.png) | ![Schedule](docs/assets/screenshots/schedule.png) |
 
@@ -253,11 +253,11 @@ More in the [Windows guide](https://jampat000.github.io/Weir/docs/deployment/win
      - **Output folder**: where Weir puts each cleaned file.
 
    Each pair is a **workflow**. Then pick your time zone. You can skip the wizard and add workflows later under
-   **Settings › Workflows**.
-3. **Choose what to keep.** Under **Settings › Rules**, set the audio and subtitle languages each workflow keeps.
+   **Setup › Workflows**.
+3. **Choose what to keep.** Under **Setup › Rules › Profiles**, set the audio and subtitle languages each workflow keeps.
 4. **Try it.** Put a file in a watched folder. Weir usually notices within seconds. On network shares
    and in Docker it can take up to five minutes, because Weir falls back to checking on a timer.
-   The file shows up on **Processing** while it's being worked on, and in **History** once it's done.
+   The file shows up on **Processing** while it's being worked on, and in **Activity** once it's done.
 
 To clean a library you already have, open **Library**, pick the library from the title and press
 **Check again**. Weir shows you what it would remove and how much space that frees before it changes
@@ -267,7 +267,7 @@ anything.
 
 A **workflow** is one route a file takes through Weir: a **watched folder** where files arrive, a
 private **work folder** where Weir cleans them, an **output folder** for the cleaned copy, and the
-rules and schedule that apply to it. You manage them under **Settings › Workflows**.
+rules and schedule that apply to it. You manage them under **Setup › Workflows**.
 
 There are two kinds, and both can run side by side:
 
@@ -278,11 +278,10 @@ There are two kinds, and both can run side by side:
   in the manager's own words: for Deluno, its download client category and the Deluno library the
   file is imported into; for Radarr and Sonarr, the download client category and the root folder.
 
-Each row in **Settings › Workflows** says which kind it is: **Weir only**, or **Linked to Deluno** (or
+Each row in **Setup › Workflows** says which kind it is: **Weir only**, or **Linked to Deluno** (or
 Sonarr, or Radarr). **Add workflow** asks which kind first: **Local folders**, or **From a media
 manager**, which asks the manager for its folders and opens the editor filled in and linked. A download
-client on its own only suggests a watched folder; it never makes a workflow linked. Under **Settings ›
-Media managers**, each connection lists the workflows it feeds.
+client on its own only suggests a watched folder; it never makes a workflow linked. Under **Setup › Connections › Media managers**, each connection lists the workflows it feeds.
 
 **Library** is a separate thing: it cleans files that are already in place in your media library.
 A workflow is the path new files take; **Library** works on what has already arrived.
@@ -291,7 +290,7 @@ The Weir API still says "library" for what the app calls a workflow, so existing
 
 ### Connecting other apps
 
-Under **Settings › Media managers** you can connect the apps below. You never name a connection: Weir
+Under **Setup › Connections › Media managers** you can connect the apps below. You never name a connection: Weir
 calls it after its kind and the host in its address, like "Deluno on RIG" or "Radarr on nas".
 
 - **Deluno** hands each file to Weir, waits for it to be cleaned, then imports it. This is the fully automatic setup.
@@ -307,12 +306,12 @@ folder, and Sonarr or Radarr import from there. You connect them with a **remote
 tells Sonarr "when the download client says a file is in the downloads folder, look in Weir's output
 folder instead." Sonarr then only ever sees cleaned files.
 
-1. **In Weir**, open **Settings › Workflows** and edit the workflow (or add one).
+1. **In Weir**, open **Setup › Workflows** and edit the workflow (or add one).
    - **Watched folder**: where your download client finishes files, e.g. `/media/downloads/complete/tv`
    - **Output folder**: where Weir puts cleaned files, e.g. `/media/weir/tv`
    - Using torrents? Turn **New downloads: after cleaning, delete the original download** off, so the torrent keeps
      seeding. Your download client or Sonarr removes it later, as they normally would.
-2. **Connect Sonarr** under **Settings › Media managers**, with its address and API key
+2. **Connect Sonarr** under **Setup › Connections › Media managers**, with its address and API key
    (Sonarr shows its API key on its **General** settings page).
 3. Back in the workflow, choose Sonarr in its **Media manager** section, press **Link to a media
    manager** and save. (**Add workflow › From a media manager** links it for you.) The **What your media
@@ -346,7 +345,7 @@ What changed in each version: [release notes](https://github.com/jampat000/Weir/
 | Problem | Try this |
 | --- | --- |
 | Files sit in the watched folder and nothing happens | Check the path in Weir is the path **inside the container** (`/media/...`, not `/srv/media/...`). In Docker, Weir may take up to five minutes to notice a file. |
-| "Permission denied" in a file's History | Set `WEIR_PUID` / `WEIR_PGID` to the user that owns your media folders |
+| "Permission denied" in a file's Activity | Set `WEIR_PUID` / `WEIR_PGID` to the user that owns your media folders |
 | Can't open Weir | Check the container is running (`docker ps`) and you're using the right port. Weir's health check is at `http://your-server-ip:9347/health` |
 | Logged out after every restart | You're setting `WEIR_SESSION_SECRET` to a different value each time. Remove it and let Weir manage it |
 

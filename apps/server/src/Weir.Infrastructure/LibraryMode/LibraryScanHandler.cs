@@ -89,6 +89,7 @@ public sealed class LibraryScanHandler : IJobHandler
         LibrarySettings settings;
         ProcessingRulesConfig rules;
         IReadOnlyList<LibraryScanFileEntry> previousFiles;
+        IReadOnlyDictionary<string, LibraryFileMark> marks;
         List<ManagerConnection> connections;
         await using (uow.ConfigureAwait(false))
         {
@@ -128,6 +129,7 @@ public sealed class LibraryScanHandler : IJobHandler
 
             rules = await LibraryModeRules.ForAsync(uow, _libraries, library, settings).ConfigureAwait(false);
             previousFiles = await _scans.CurrentFilesAsync(uow, libraryId).ConfigureAwait(false);
+            marks = await _fileMarks.ForLibraryAsync(uow, libraryId).ConfigureAwait(false);
             connections = await _connections.ConnectionsForScopeAsync(uow, library.MediaType).ConfigureAwait(false);
             await uow.CommitAsync().ConfigureAwait(false);
         }
@@ -139,7 +141,8 @@ public sealed class LibraryScanHandler : IJobHandler
         foreach (var walked in LibraryFileWalker.Walk(library, settings))
         {
             cancellationToken.ThrowIfCancellationRequested();
-            entries.Add(await ClassifyOneAsync(walked, rules, previousByPath, cancellationToken).ConfigureAwait(false));
+            var classified = await ClassifyOneAsync(walked, rules, previousByPath, cancellationToken).ConfigureAwait(false);
+            entries.Add(classified with { ChangeReason = ChangeReasonFor(classified, previousFiles.Count > 0, previousByPath, marks) });
         }
 
         // #551: match each walked file to the title a linked Sonarr/Radarr connection already knows it under.
@@ -157,12 +160,6 @@ public sealed class LibraryScanHandler : IJobHandler
         var preflight = new List<LibraryFilePreflightResult>();
         if (scheduled)
         {
-            IReadOnlyDictionary<string, LibraryFileMark> marks;
-            await using (var marksUow = await UnitOfWork.OpenAsync(_database, cancellationToken).ConfigureAwait(false))
-            {
-                marks = await _fileMarks.ForLibraryAsync(marksUow, libraryId).ConfigureAwait(false);
-            }
-
             toClean = entries
                 .Where(e => e.Classification == LibraryFileClassification.WouldChange && !(marks.TryGetValue(e.Path, out var mark) && mark.LeaveAlone))
                 .ToList();
@@ -227,6 +224,24 @@ public sealed class LibraryScanHandler : IJobHandler
         }
 
         return queued;
+    }
+
+    /// <summary>
+    /// Why a file the rules would change needs cleaning, judged against what the last scan knew of it and what Weir last did
+    /// to it (see <see cref="LibraryChangeReasons.Decide"/>). It is kept on the file's row and carried forward by each scan
+    /// until the file stops needing it.
+    /// </summary>
+    private static string? ChangeReasonFor(
+        LibraryScanFileEntry now,
+        bool hadEarlierScan,
+        Dictionary<string, LibraryScanFileEntry> previousByPath,
+        IReadOnlyDictionary<string, LibraryFileMark> marks)
+    {
+        var before = previousByPath.TryGetValue(now.Path, out var known)
+            ? new LibraryChangeReasons.Before(known.SizeBytes, known.ModifiedTimeUnixSeconds, known.Classification, known.ChangeReason)
+            : null;
+        long? cleanedAt = marks.TryGetValue(now.Path, out var mark) ? mark.CleanedAt?.ToUnixTimeSeconds() : null;
+        return LibraryChangeReasons.Decide(now.Classification, hadEarlierScan, before, now.SizeBytes, now.ModifiedTimeUnixSeconds, cleanedAt);
     }
 
     private async Task<LibraryScanFileEntry> ClassifyOneAsync(

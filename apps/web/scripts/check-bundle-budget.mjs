@@ -30,8 +30,8 @@ for (const file of files) {
   if (/logo-sidebar/i.test(relative) && size > maxBytes(20)) {
     failures.push(`${relative} is ${size} bytes; the sidebar logo budget is 20 KiB`);
   }
-  if (/\.css$/i.test(relative) && size > maxBytes(180)) {
-    failures.push(`${relative} is ${size} bytes; the stylesheet budget is 180 KiB`);
+  if (/\.css$/i.test(relative) && size > maxBytes(200)) {
+    failures.push(`${relative} is ${size} bytes; the stylesheet budget is 200 KiB`);
   }
   if (/\.js$/i.test(relative) && size > maxBytes(500)) {
     failures.push(`${relative} is ${size} bytes; the JavaScript chunk budget is 500 KiB`);

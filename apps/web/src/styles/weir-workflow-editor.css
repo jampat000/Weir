@@ -1,0 +1,140 @@
+/* The workflow editor in its drawer: sections that fold, fields on one grid, and the values to copy. */
+
+.mm-editor-sections {
+  display: flex;
+  flex-direction: column;
+}
+
+/* A section's fields: two to a row, each filling its cell. A path or sentence takes the whole row; a number keeps the
+   short width every number uses. One rule for every field, so no two of the same job differ in width. */
+.mm-editor-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 16px 20px;
+}
+
+.mm-editor-grid > .mm-field--wide,
+.mm-editor-grid > .mm-editor-grid__full {
+  grid-column: 1 / -1;
+}
+
+.mm-editor-grid .mm-field .mm-input {
+  width: 100%;
+}
+
+.mm-editor-grid .mm-field--short .mm-input {
+  width: var(--mm-field-short);
+}
+
+/* A folder and its Browse button on one line. */
+.mm-editor-grid .mm-folder-field {
+  flex-wrap: nowrap;
+}
+
+.mm-editor-grid .mm-folder-field > .mm-input {
+  flex: 1 1 0;
+  width: auto;
+  min-width: 0;
+}
+
+/* Switches in a section go one under another: a drawer is too narrow for two columns of sentences. */
+.mm-editor .mm-library-toggles {
+  grid-template-columns: minmax(0, 1fr);
+  margin-top: 8px;
+}
+
+/* A smaller heading inside a section, over a block of its own. */
+.mm-editor-sub {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mm-editor-sub + .mm-editor-sub {
+  margin-top: 20px;
+}
+
+.mm-editor-sub__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.mm-editor-sub__title {
+  margin: 0;
+  font-size: var(--mm-type-body);
+  font-weight: 600;
+  color: var(--mm-text1);
+}
+
+.mm-editor-sub__detail {
+  margin: 0;
+  font-size: var(--mm-type-caption);
+  line-height: 1.5;
+  color: var(--mm-text3);
+}
+
+/* The drawer's Save and Cancel stay at the foot of the screen however far the sections run. */
+.mm-editor-actions {
+  position: sticky;
+  bottom: -24px;
+  z-index: 1;
+  margin: 8px -24px -24px;
+  padding: 14px 24px;
+  border-top: 1px solid var(--mm-hairline);
+  background: var(--mm-card-bg);
+}
+
+/* The values a media manager needs typed in, each with its own Copy: what it is called, the value, the button. */
+.mm-copy-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--mm-type-body);
+}
+
+.mm-copy-table th,
+.mm-copy-table td {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--mm-hairline);
+  vertical-align: baseline;
+  text-align: left;
+}
+
+.mm-copy-table tr:last-child th,
+.mm-copy-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.mm-copy-table th {
+  width: 7.5rem;
+  padding-right: 12px;
+  font-weight: 500;
+  color: var(--mm-text2);
+}
+
+.mm-copy-table td:last-child {
+  width: 1%;
+  padding-left: 12px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.mm-copy-table code {
+  overflow-wrap: anywhere;
+  font-size: var(--mm-type-caption);
+  color: var(--mm-text1);
+}
+
+/* The first section needs no rule above it: the drawer's own header is the rule. */
+.mm-editor-sections > .mm-quiet-fold:first-child {
+  border-top: 0;
+}
+
+/* On a phone the fields go one to a row. */
+@media (max-width: 560px) {
+  .mm-editor-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

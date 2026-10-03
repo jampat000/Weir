@@ -60,7 +60,7 @@ public sealed partial class ConfigurationBundleStore
     }
 
     /// <summary>
-    /// A backup written when Settings › Performance held the space to keep free has no such value on its workflows. They take
+    /// A backup written when Setup › Performance › Speed held the space to keep free has no such value on its workflows. They take
     /// that value, as an upgrade gives it to them, rather than the default.
     /// </summary>
     private static void CarryPerformanceFreeSpaceToWorkflows(WireObject bundle, IEnumerable<WireObject> libraryRows)

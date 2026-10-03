@@ -38,7 +38,7 @@ public static class RuntimeVisibility
         "but the database still serializes writes, so raising the count may not speed things up proportionally and can add contention.";
 
     private const string ConfigurationNote =
-        "Concurrency is controlled by Settings › Workflows. Set Files at once to 1 for one active " +
+        "Concurrency is controlled by Files at once in Setup › Performance › Speed. Set Files at once to 1 for one active " +
         "file worker or up to 8 for parallel file work. No restart is needed after changing that setting.";
 
     private const string VisibilityNote =
@@ -48,7 +48,7 @@ public static class RuntimeVisibility
     private const string WatchedFolderScanPeriodicNote =
         "Periodic scanning for processing.watched_folder.remux_scan_dispatch.v1 is controlled per workflow (its own " +
         "enabled switch and scan interval, saved in the database and applied without a restart) and per scope on " +
-        "the Settings › Workflows screen (Movies/TV periodic-scan switch). It can also be turned off " +
+        "the Setup › Workflows screen (Movies/TV periodic-scan switch). It can also be turned off " +
         "altogether, for every scope, with WEIR_PROCESSING_WATCHED_FOLDER_REMUX_SCAN_DISPATCH_SCHEDULE_ENABLED in " +
         "the server's environment (default on; #533 — a manual scan still works with this off). Whether a periodic scan " +
         "that does run may also queue file work is the separate " +
@@ -79,8 +79,8 @@ public static class RuntimeVisibility
         var summary = disabled
             ? "In-process workers are off (0). jobs rows stay queued until you set WEIR_PROCESSING_WORKER_COUNT to at least 1 and restart this API."
             : n == 1
-                ? "Weir has one available jobs worker slot. Settings › Workflows controls the active Files at once value."
-                : $"{n} in-process worker slots are available. Settings › Workflows decides how many of those jobs slots may process files at once.";
+                ? "Weir has one available jobs worker slot. Setup › Performance › Speed controls the active Files at once value."
+                : $"{n} in-process worker slots are available. Setup › Performance › Speed decides how many of those jobs slots may process files at once.";
 
         return new ProcessingRuntimeSettings
         {

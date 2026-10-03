@@ -24,7 +24,7 @@ public static class LibraryFileIndexWriter
         "size_bytes, mtime, classification, summary, reason, removed_audio_tracks, removed_subtitle_tracks, estimated_bytes_saved, " +
         "manager_kind, manager_title, manager_connection_id, manager_title_id, manager_file_id, manager_quality_profile_id, " +
         "video_codec, video_height, resolution_class, audio_track_count, subtitle_track_count, audio_summary, subtitle_summary, " +
-        "link_count, problem_kind";
+        "link_count, problem_kind, change_reason";
 
     private static readonly string[] StoredColumnNames = StoredColumns.Split(", ");
 
@@ -209,5 +209,6 @@ public static class LibraryFileIndexWriter
         ("@subtitle_summary", facts.SubtitleSummary),
         ("@link_count", file.LinkCount),
         ("@problem_kind", file.ProblemKind is { } kind ? LibraryProblems.Name(kind) : null),
+        ("@change_reason", file.ChangeReason),
     ];
 }

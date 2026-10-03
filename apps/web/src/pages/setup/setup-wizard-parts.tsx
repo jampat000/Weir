@@ -2,9 +2,11 @@ import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 
 import { AuthBrandStack } from "../../components/brand/auth-brand-stack";
+import { Panel } from "../../components/panels/panel";
 import { ServerFolderPickerButton } from "../../components/ui/server-folder-picker-button";
 import { mmActionButtonClass } from "../../lib/ui/mm-control-roles";
 import type { ConnectedSource } from "./wizard-source";
+import { setupTabPath } from "../../lib/settings/setup-areas";
 
 const BACKUP_INTERVAL_OPTIONS = [
   { value: "24", label: "Every day" },
@@ -26,19 +28,12 @@ export function WizardSection({
   children: ReactNode;
 }) {
   return (
-    <section className="mm-quiet-section" aria-labelledby={headingId}>
-      <div className="mm-quiet-section__head">
-        <h2 id={headingId} className="mm-quiet-section__title">
-          {title}
-        </h2>
+    <Panel title={title} headingId={headingId} padded>
+      <div className="flex flex-col gap-3">
+        <p className="mm-quiet-note">{description}</p>
+        {children}
       </div>
-      <div className="mm-quiet-section__body">
-        <div className="flex flex-col gap-3">
-          <p className="mm-quiet-note">{description}</p>
-          {children}
-        </div>
-      </div>
-    </section>
+    </Panel>
   );
 }
 
@@ -150,15 +145,15 @@ export function BackupFields({
 
 const KEEP_TRACKS_STEP = {
   label: "Choose which tracks to keep",
-  to: "/settings?tab=rules",
+  to: setupTabPath("profiles"),
 };
 const CONNECT_STEP = {
   label: "Connect Sonarr, Radarr or Deluno",
-  to: "/settings?tab=media-managers",
+  to: setupTabPath("managers"),
 };
 const MAPPING_STEP = {
   label: "Finish setting up Sonarr and Radarr",
-  to: "/settings?tab=libraries",
+  to: setupTabPath("workflows"),
 };
 const CLEAN_STEP = {
   label: "Clean files you already have",
@@ -229,8 +224,8 @@ export function WizardLoadFailed() {
           <p className="mm-auth-eyebrow">Setup wizard</p>
           <h1 className="mm-auth-title">Could not load setup</h1>
           <p className="mm-auth-lead">
-            The wizard could not load the current settings. Open Settings later
-            and try again.
+            The wizard could not load the current settings. Open Setup later and
+            try again.
           </p>
           <p className="mm-auth-footer-link">
             <Link to="/">Continue to the app</Link>

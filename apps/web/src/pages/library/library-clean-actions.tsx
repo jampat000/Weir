@@ -63,7 +63,7 @@ export function LibraryCleanActions({
       ) : null}
 
       {failure ? (
-        <p className="mm-library-error" role="alert">
+        <p className="mm-library-error" data-status="broken" role="alert">
           {failure}
         </p>
       ) : null}

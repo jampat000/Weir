@@ -18,6 +18,7 @@ export function ConfirmDialog({
   busyLabel = "Removing…",
   confirmDisabled = false,
   initialFocus,
+  tone = "default",
   error = null,
   testId,
   onCancel,
@@ -35,6 +36,8 @@ export function ConfirmDialog({
   confirmDisabled?: boolean;
   /** A safe control to focus instead of the cancel button, such as the first choice being asked for. */
   initialFocus?: RefObject<HTMLElement | null>;
+  /** `danger` for an action that removes, overrides or steps outside normal running: the confirming button is red and the cancel button stays neutral. Routine work stays `default`. */
+  tone?: "default" | "danger";
   error?: string | null;
   testId: string;
   onCancel: () => void;
@@ -58,7 +61,11 @@ export function ConfirmDialog({
         </div>
       ) : null}
       {error ? (
-        <p className="mm-modal__error" role="alert">
+        <p
+          className="mm-modal__error mm-status-text"
+          data-status="broken"
+          role="alert"
+        >
           {error}
         </p>
       ) : null}
@@ -76,7 +83,9 @@ export function ConfirmDialog({
         <button
           type="button"
           data-testid={`${testId}-confirm`}
-          className={mmActionButtonClass({ variant: "primary" })}
+          className={mmActionButtonClass({
+            variant: tone === "danger" ? "danger" : "primary",
+          })}
           disabled={busy || confirmDisabled}
           onClick={onConfirm}
         >

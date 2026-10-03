@@ -135,6 +135,43 @@ it("shows an explicit load error instead of an empty schedule when libraries fai
   );
 });
 
+it("names the time zone the hours are read in, and sends changing it to System", async () => {
+  asOperator();
+  vi.spyOn(librariesApi, "fetchProcessingLibraries").mockResolvedValue([
+    library(),
+  ]);
+
+  render(<ScheduleTab />, { wrapper });
+
+  await screen.findAllByTestId("schedule-library-row");
+  expect(screen.getByText(/in UTC./)).toBeInTheDocument();
+  expect(
+    screen.getByRole("link", { name: "Change the time zone" }),
+  ).toHaveAttribute("href", "/system?tab=about");
+  expect(
+    screen.queryByTestId("schedule-save-timezone"),
+  ).not.toBeInTheDocument();
+});
+
+it("draws a week with no gaps as one bar, and a week with gaps as its seven days", async () => {
+  asOperator();
+  vi.spyOn(librariesApi, "fetchProcessingLibraries").mockResolvedValue([
+    library({ id: 1, name: "Movies" }),
+    library({
+      id: 2,
+      name: "TV",
+      schedule_enabled: true,
+      schedule_grid: "0".repeat(672),
+    }),
+  ]);
+
+  render(<ScheduleTab />, { wrapper });
+
+  const [movies, tv] = await screen.findAllByTestId("schedule-library-row");
+  expect(movies!.querySelectorAll(".mm-week__day")).toHaveLength(0);
+  expect(tv!.querySelectorAll(".mm-week__day")).toHaveLength(7);
+});
+
 it("asks before an unsaved library's hours are replaced by another library's", async () => {
   asOperator();
   vi.spyOn(librariesApi, "fetchProcessingLibraries").mockResolvedValue([

@@ -1,10 +1,18 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import {
+  QueryClient,
+  QueryClientProvider,
+  QueryObserver,
+} from "@tanstack/react-query";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ReactNode } from "react";
 
 import { activityKeys } from "./query-keys";
 import {
+  invalidateLive,
+  subscribeConnectionActivity,
+  subscribeSystemLog,
+  subscribeSystemTasks,
   useActivityStreamInvalidations,
   useLiveProgress,
 } from "./use-activity-stream-invalidation";
@@ -530,5 +538,212 @@ describe("useLiveProgress", () => {
 
     progress.unmount();
     expect(src.closed).toBe(true);
+  });
+});
+
+describe("subscribeConnectionActivity", () => {
+  afterEach(() => {
+    FakeEventSource.instances = [];
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+    document.dispatchEvent(new Event("visibilitychange"));
+  });
+
+  const frame = JSON.stringify({
+    kind: "media_manager",
+    id: 3,
+    phase: "asked",
+    direction: "outbound",
+    at: "2026-10-02T12:00:00Z",
+    ms: null,
+  });
+
+  it("hands every connection.activity frame to its subscriber, on the stream the others share", () => {
+    vi.stubGlobal(
+      "EventSource",
+      FakeEventSource as unknown as typeof EventSource,
+    );
+    const seen: unknown[] = [];
+    const progress = renderHook(() => useLiveProgress());
+    const stop = subscribeConnectionActivity((received) => seen.push(received));
+
+    expect(FakeEventSource.instances).toHaveLength(1);
+    FakeEventSource.instances[0].emit("connection.activity", frame);
+
+    expect(seen).toEqual([
+      expect.objectContaining({ kind: "media_manager", id: 3, phase: "asked" }),
+    ]);
+    stop();
+    progress.unmount();
+  });
+
+  it("ignores a frame it cannot read", () => {
+    vi.stubGlobal(
+      "EventSource",
+      FakeEventSource as unknown as typeof EventSource,
+    );
+    const seen: unknown[] = [];
+    const stop = subscribeConnectionActivity((received) => seen.push(received));
+
+    FakeEventSource.instances[0].emit("connection.activity", "not json");
+
+    expect(seen).toEqual([]);
+    stop();
+  });
+
+  it("keeps the stream open for a subscriber alone, and closes it when the last one leaves", () => {
+    vi.stubGlobal(
+      "EventSource",
+      FakeEventSource as unknown as typeof EventSource,
+    );
+    const stop = subscribeConnectionActivity(() => undefined);
+    const src = FakeEventSource.instances[0];
+
+    expect(src.closed).toBe(false);
+    stop();
+
+    expect(src.closed).toBe(true);
+  });
+});
+
+describe("subscribeSystemTasks and subscribeSystemLog", () => {
+  afterEach(() => {
+    FakeEventSource.instances = [];
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+    document.dispatchEvent(new Event("visibilitychange"));
+  });
+
+  const tasksFrame = JSON.stringify([
+    {
+      key: "scan-1",
+      label: "Scan Movies",
+      running: true,
+      last_run_at: null,
+      last_ok: null,
+      last_error: null,
+      next_run_at: null,
+      interval_seconds: null,
+    },
+  ]);
+  const logFrame = JSON.stringify({
+    at: "2026-10-02T12:00:00Z",
+    level: "WARNING",
+    message: "Radarr was slow.",
+  });
+
+  it("hands the task list of every system.tasks frame to its subscriber, on the one shared stream", () => {
+    vi.stubGlobal(
+      "EventSource",
+      FakeEventSource as unknown as typeof EventSource,
+    );
+    const seen: unknown[] = [];
+    const connections = subscribeConnectionActivity(() => undefined);
+    const stop = subscribeSystemTasks((tasks) => seen.push(tasks));
+
+    expect(FakeEventSource.instances).toHaveLength(1);
+    FakeEventSource.instances[0].emit("system.tasks", tasksFrame);
+
+    expect(seen).toEqual([
+      [expect.objectContaining({ key: "scan-1", running: true })],
+    ]);
+    stop();
+    connections();
+  });
+
+  it("hands every system.log frame to its subscriber", () => {
+    vi.stubGlobal(
+      "EventSource",
+      FakeEventSource as unknown as typeof EventSource,
+    );
+    const seen: unknown[] = [];
+    const stop = subscribeSystemLog((frame) => seen.push(frame));
+
+    FakeEventSource.instances[0].emit("system.log", logFrame);
+
+    expect(seen).toEqual([
+      {
+        at: "2026-10-02T12:00:00Z",
+        level: "WARNING",
+        message: "Radarr was slow.",
+      },
+    ]);
+    stop();
+  });
+
+  it("ignores a frame it cannot read", () => {
+    vi.stubGlobal(
+      "EventSource",
+      FakeEventSource as unknown as typeof EventSource,
+    );
+    const tasks: unknown[] = [];
+    const lines: unknown[] = [];
+    const stopTasks = subscribeSystemTasks((value) => tasks.push(value));
+    const stopLog = subscribeSystemLog((value) => lines.push(value));
+
+    FakeEventSource.instances[0].emit("system.tasks", "not json");
+    FakeEventSource.instances[0].emit("system.log", "{}");
+
+    expect(tasks).toEqual([]);
+    expect(lines).toEqual([]);
+    stopTasks();
+    stopLog();
+  });
+
+  it("keeps the stream open until the last of them leaves", () => {
+    vi.stubGlobal(
+      "EventSource",
+      FakeEventSource as unknown as typeof EventSource,
+    );
+    const stopTasks = subscribeSystemTasks(() => undefined);
+    const stopLog = subscribeSystemLog(() => undefined);
+    const src = FakeEventSource.instances[0];
+
+    stopTasks();
+    expect(src.closed).toBe(false);
+    stopLog();
+    expect(src.closed).toBe(true);
+  });
+});
+
+describe("invalidateLive", () => {
+  function watchedQuery(queryFn: () => Promise<number>) {
+    const qc = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    const observer = new QueryObserver(qc, { queryKey: ["live"], queryFn });
+    const stop = observer.subscribe(() => {});
+    return { qc, observer, stop };
+  }
+
+  it("reads again once a read already in flight lands, so a change that read began before is not lost", async () => {
+    let reads = 0;
+    let finishFirst: () => void = () => {};
+    const firstRead = new Promise<void>((resolve) => (finishFirst = resolve));
+    const { qc, observer, stop } = watchedQuery(async () => {
+      reads += 1;
+      if (reads === 1) await firstRead;
+      return reads;
+    });
+    await waitFor(() => expect(reads).toBe(1));
+
+    invalidateLive(qc, { queryKey: ["live"] });
+    finishFirst();
+
+    await waitFor(() => expect(observer.getCurrentResult().data).toBe(2));
+    stop();
+  });
+
+  it("reads once when nothing is in flight", async () => {
+    let reads = 0;
+    const { qc, observer, stop } = watchedQuery(async () => (reads += 1));
+    await waitFor(() => expect(observer.getCurrentResult().data).toBe(1));
+
+    invalidateLive(qc, { queryKey: ["live"] });
+
+    await waitFor(() => expect(observer.getCurrentResult().data).toBe(2));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(reads).toBe(2);
+    stop();
   });
 });

@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 
 import {
-  QuietFieldGroup,
+  QuietDisclosure,
   quietActionRowClass,
 } from "../../../../components/shared/quiet-section";
 import { SidePanel } from "../../../../components/shared/side-panel";
@@ -13,8 +13,12 @@ import type { ProcessingLibrary } from "../../../../lib/processing/libraries-api
 import type { ProcessingRuleSet } from "../../../../lib/processing/rule-sets-api";
 import type { WorkflowPath } from "../../../../lib/processing/workflow-story";
 import { useProcessingRejectSupportQuery } from "../../../../lib/processing/libraries-queries";
+import {
+  workflowBadgeLabel,
+  workflowKindOf,
+} from "../../../../lib/processing/workflow-kind";
 import { mmActionButtonClass } from "../../../../lib/ui/mm-control-roles";
-import { SaveModelNote } from "../../save-model-note";
+import { SAVE_MODEL_WORDS } from "../../save-model-note";
 import { useLeaveConfirmation, useUnsavedChanges } from "../../unsaved-changes";
 import { effectiveGrid, windowNow } from "../schedule/schedule-model";
 import { LibraryFolderChain } from "./library-folder-chain";
@@ -38,6 +42,7 @@ import {
   LibraryOutputGroup,
 } from "./library-output-groups";
 import type { LibraryFormBinding } from "./library-settings";
+import { setupTabPath } from "../../../../lib/settings/setup-areas";
 
 /** When the library may run, read from the schedule that owns its hours. */
 function runHoursText(library: ProcessingLibrary | undefined): string {
@@ -45,6 +50,13 @@ function runHoursText(library: ProcessingLibrary | undefined): string {
   return windowNow(effectiveGrid(library), undefined, new Date()).kind === "any"
     ? "Any time. "
     : "On the hours chosen for it. ";
+}
+
+/** The one line under the drawer's title: how it saves, and what a new workflow is. */
+function panelSubtitle(library: ProcessingLibrary | undefined): string {
+  return library
+    ? `${SAVE_MODEL_WORDS.explicit} A saved change applies on the next scan.`
+    : `${SAVE_MODEL_WORDS.explicit} A workflow is a watched folder, a work area and an output folder.`;
 }
 
 /**
@@ -82,6 +94,10 @@ export function LibraryEditor({
     onSuccess: onClose,
   });
   const linkedIds = linkedConnectionIds(form, library);
+  const kind = workflowKindOf(
+    { manager_connection_ids: linkedIds },
+    connections,
+  );
   const workflowPath: WorkflowPath = {
     watched: form.watched_folder.trim(),
     work: form.work_folder.trim(),
@@ -103,72 +119,93 @@ export function LibraryEditor({
       <SidePanel
         open
         title={library ? "Edit workflow" : "Add workflow"}
-        eyebrow="Settings · Workflows"
-        subtitle={
-          library
-            ? "Changes take effect on the next scan; nothing already running is disturbed."
-            : "A workflow is a watched folder, a work area and an output folder."
-        }
+        eyebrow="Setup · Workflows"
+        subtitle={panelSubtitle(library)}
         onClose={close}
         dataTestId="processing-library-form"
       >
-        <div className="mm-quiet-stack">
-          <SaveModelNote model="explicit" />
-          <LibraryFoldersGroup binding={binding} ruleSets={ruleSets} />
-          <LibraryLinkSection
-            linkedIds={linkedIds}
-            path={workflowPath}
-            connections={connections}
-            editable={editable}
-            onLink={(connectionId) =>
-              binding.update({ manager_connection_id: String(connectionId) })
-            }
-            onUnlink={() => binding.update({ manager_connection_id: "" })}
-          />
-          <LibraryDownloadClientSuggestions
-            mediaType={form.media_type}
-            watchedFolder={form.watched_folder}
-            editable={editable}
-            onUseFolder={(watched) =>
-              binding.update({ watched_folder: watched })
-            }
-          />
-          {linkedIds.length > 0 ? (
-            <LibraryManagerSetup
-              mediaType={form.media_type}
+        <div className="mm-editor">
+          <div className="mm-editor-sections">
+            <LibraryFoldersGroup binding={binding} ruleSets={ruleSets} />
+            <QuietDisclosure
+              title="Media manager"
+              summaryWhenClosed={workflowBadgeLabel(kind)}
+            >
+              <div className="mm-quiet-stack">
+                <LibraryLinkSection
+                  kind={kind}
+                  path={workflowPath}
+                  connections={connections}
+                  editable={editable}
+                  onLink={(connectionId) =>
+                    binding.update({
+                      manager_connection_id: String(connectionId),
+                    })
+                  }
+                  onUnlink={() => binding.update({ manager_connection_id: "" })}
+                />
+                <LibraryDownloadClientSuggestions
+                  mediaType={form.media_type}
+                  watchedFolder={form.watched_folder}
+                  editable={editable}
+                  onUseFolder={(watched) =>
+                    binding.update({ watched_folder: watched })
+                  }
+                />
+                {linkedIds.length > 0 ? (
+                  <LibraryManagerSetup
+                    mediaType={form.media_type}
+                    watchedFolder={form.watched_folder}
+                    outputFolder={form.output_folder}
+                    workFolder={form.work_folder}
+                    removeOriginal={form.remove_original_after_success}
+                    linkedConnectionIds={linkedIds}
+                    editable={editable}
+                    onUseFolders={(watched, output) =>
+                      binding.update({
+                        watched_folder: watched ?? form.watched_folder,
+                        output_folder: output ?? form.output_folder,
+                      })
+                    }
+                  />
+                ) : null}
+              </div>
+            </QuietDisclosure>
+            <LibraryFolderChain
+              libraryId={library?.id}
               watchedFolder={form.watched_folder}
-              outputFolder={form.output_folder}
               workFolder={form.work_folder}
-              removeOriginal={form.remove_original_after_success}
-              linkedConnectionIds={linkedIds}
-              editable={editable}
-              onUseFolders={(watched, output) =>
-                binding.update({
-                  watched_folder: watched ?? form.watched_folder,
-                  output_folder: output ?? form.output_folder,
-                })
-              }
+              outputFolder={form.output_folder}
+              mediaType={form.media_type}
             />
-          ) : null}
-          <LibraryFolderChain
-            libraryId={library?.id}
-            watchedFolder={form.watched_folder}
-            workFolder={form.work_folder}
-            outputFolder={form.output_folder}
-            mediaType={form.media_type}
-          />
-          <LibraryIntakeGroup binding={binding} />
-          <LibraryReadinessGroup binding={binding} />
-          <LibraryOutputGroup binding={binding} />
-          <LibraryCapacityGroup binding={binding} />
-          <LibraryFailureGroup
-            binding={binding}
-            rejectSupport={rejectSupport}
-          />
-          <LibraryFfmpegFold binding={binding} />
+            <LibraryIntakeGroup binding={binding} />
+            <LibraryReadinessGroup binding={binding} />
+            <LibraryOutputGroup binding={binding} />
+            <LibraryCapacityGroup binding={binding} />
+            <LibraryFailureGroup
+              binding={binding}
+              rejectSupport={rejectSupport}
+            />
+            <LibraryFfmpegFold binding={binding} />
+            {/* The hours are drawn in Setup › Workflows › Schedule beside every other library's week, so the two never disagree. */}
+            <QuietDisclosure title="When this workflow may run">
+              <p
+                className="mm-quiet-note"
+                data-testid="processing-library-hours"
+              >
+                {runHoursText(library)}
+                <Link
+                  className="mm-schedule-link"
+                  to={setupTabPath("schedule")}
+                >
+                  Change the hours in Schedule
+                </Link>
+              </p>
+            </QuietDisclosure>
+          </div>
           {library ? (
             <p
-              className="mm-quiet-note"
+              className="mm-quiet-note mt-4"
               data-testid="processing-library-cleaning-link"
             >
               Cleaning files already in your library is on the{" "}
@@ -181,25 +218,17 @@ export function LibraryEditor({
               .
             </p>
           ) : null}
-          {/* The hours are drawn in Settings › Schedule beside every other library's week, so the two never disagree. */}
-          <QuietFieldGroup title="When this workflow may run">
-            <p className="mm-quiet-note" data-testid="processing-library-hours">
-              {runHoursText(library)}
-              <Link className="mm-schedule-link" to="/settings?tab=schedule">
-                Change the hours in Schedule
-              </Link>
-            </p>
-          </QuietFieldGroup>
           {saveAll.isError ? (
             <p
-              className="mm-status-text--failed text-sm"
+              className="mm-status-text mt-4 text-sm"
+              data-status="broken"
               role="alert"
               data-testid="processing-library-save-error"
             >
               {errorMessage(saveAll.error, "That workflow could not be saved.")}
             </p>
           ) : null}
-          <div className={quietActionRowClass}>
+          <div className={`${quietActionRowClass} mm-editor-actions`}>
             <button
               type="button"
               className={mmActionButtonClass({ variant: "primary" })}

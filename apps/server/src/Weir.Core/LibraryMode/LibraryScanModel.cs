@@ -29,7 +29,8 @@ public sealed record LibraryScanFileEntry(
     long? ManagerFileId = null,
     long? ManagerQualityProfileId = null,
     LibraryProblemKind? ProblemKind = null,
-    int? LinkCount = null)
+    int? LinkCount = null,
+    string? ChangeReason = null)
 {
     /// <summary>Whether a freshly-walked file is the same one this entry already probed (path, size and mtime all agree).</summary>
     public bool MatchesFile(string path, long sizeBytes, long modifiedTimeUnixSeconds) =>
@@ -53,7 +54,8 @@ public sealed record LibraryScanFileEntry(
         .Set("manager_file_id", ManagerFileId)
         .Set("manager_quality_profile_id", ManagerQualityProfileId)
         .Set("problem_kind", ProblemKind is { } kind ? LibraryProblems.Name(kind) : null)
-        .Set("link_count", LinkCount);
+        .Set("link_count", LinkCount)
+        .Set("change_reason", ChangeReason);
 
     public static LibraryScanFileEntry? FromPyDict(WireValue value)
     {
@@ -80,7 +82,8 @@ public sealed record LibraryScanFileEntry(
             LongOrNull(dict.Get("manager_file_id")),
             LongOrNull(dict.Get("manager_quality_profile_id")),
             LibraryProblems.Parse(StrOrNull(dict.Get("problem_kind"))),
-            LongOrNull(dict.Get("link_count")) is { } links ? (int)links : null);
+            LongOrNull(dict.Get("link_count")) is { } links ? (int)links : null,
+            StrOrNull(dict.Get("change_reason")));
     }
 
     public static string ClassificationName(LibraryFileClassification classification) => classification switch

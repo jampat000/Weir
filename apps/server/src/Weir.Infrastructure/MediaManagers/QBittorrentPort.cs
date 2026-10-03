@@ -23,7 +23,7 @@ public sealed class QBittorrentPort : IDownloadClientPort
         ArgumentNullException.ThrowIfNull(connection);
         try
         {
-            var client = new DownloadClientHttpClient(connection.BaseUrl, _handlers);
+            var client = new DownloadClientHttpClient(connection.BaseUrl, _handlers, connection: connection.Reference);
             var (ok, cookie) = await LoginAsync(client, connection, cancellationToken).ConfigureAwait(false);
             if (!ok)
             {
@@ -47,7 +47,7 @@ public sealed class QBittorrentPort : IDownloadClientPort
         ArgumentNullException.ThrowIfNull(connection);
         try
         {
-            var client = new DownloadClientHttpClient(connection.BaseUrl, _handlers);
+            var client = new DownloadClientHttpClient(connection.BaseUrl, _handlers, connection: connection.Reference);
             var (ok, cookie) = await LoginAsync(client, connection, cancellationToken).ConfigureAwait(false);
             if (!ok)
             {

@@ -8,11 +8,13 @@ export function AppHydrateFallback() {
         <div className="mm-sidebar-fallback-mark" />
         <div className="mm-sidebar-fallback-lines" />
       </aside>
-      <main className="mm-main" id="mm-main-content" tabIndex={-1}>
-        <div className="mm-main-inner">
-          <PanelLoading label="Loading Weir" />
-        </div>
-      </main>
+      <div className="mm-main-column">
+        <main className="mm-main" id="mm-main-content" tabIndex={-1}>
+          <div className="mm-main-inner">
+            <PanelLoading label="Loading Weir" />
+          </div>
+        </main>
+      </div>
     </div>
   );
 }

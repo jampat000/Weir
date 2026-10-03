@@ -44,6 +44,10 @@ export interface MediaManagerConnection {
   last_test_ok: boolean | null;
   last_test_at: string | null;
   last_test_detail: string | null;
+  /** How long Weir's last call to it took, in ms. */
+  last_answer_ms?: number | null;
+  /** When Weir last talked to it or it last called Weir. */
+  last_used_at?: string | null;
   lanes: MediaManagerSearchLane[];
 }
 

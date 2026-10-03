@@ -5,7 +5,7 @@ using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Infrastructure.LibraryMode;
 
-/// <summary>Which library cleans History asks for: the same filters its download list takes.</summary>
+/// <summary>Which library cleans Activity asks for: the same filters its download list takes.</summary>
 public sealed record LibraryCleanHistoryFilter
 {
     /// <summary>The same page as the download list: 200 unless asked, never more than 1,000.</summary>
@@ -31,8 +31,8 @@ public sealed record LibraryCleanHistoryRow(
     string RelativePath);
 
 /// <summary>
-/// Library cleans for History (#695). What a clean did to a file lives only in the Activity event it wrote (a finished
-/// clean job row is deleted when the file is cleaned again), so History reads those events: the newest one per file,
+/// Library cleans for Activity (#695). What a clean did to a file lives only in the Activity event it wrote (a finished
+/// clean job row is deleted when the file is cleaned again), so Activity reads those events: the newest one per file,
 /// the way the download list keeps one row per file.
 /// </summary>
 public sealed class LibraryCleanHistoryStore

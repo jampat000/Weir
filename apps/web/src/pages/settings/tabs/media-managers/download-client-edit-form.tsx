@@ -66,7 +66,7 @@ function changesFrom(
 
 /**
  * Address and credentials, edited in place. Nothing is sent until Save; Cancel asks first
- * when anything changed, through the same guard every Settings panel with a Save/Cancel pair uses.
+ * when anything changed, through the same guard every setup panel with a Save/Cancel pair uses.
  */
 export function DownloadClientEditForm({
   connection,
@@ -181,7 +181,7 @@ export function DownloadClientEditForm({
       />
 
       {update.isError ? (
-        <p className="mm-status-text--failed text-sm" role="alert">
+        <p className="mm-status-text text-sm" data-status="broken" role="alert">
           {errorMessage(update.error, SAVE_FAILURE)}
         </p>
       ) : null}

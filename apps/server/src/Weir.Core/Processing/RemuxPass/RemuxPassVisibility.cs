@@ -145,8 +145,8 @@ public static class RemuxPassVisibility
         {
             // The reason stays in the detail; an action is something the operator can do.
             nextAction = Truthy(output.Get(RejectionResultKeys.WithoutManager))
-                ? "Open this file on the History screen to delete it, keep it, or process it again after changing the rule."
-                : "Open this file on the History screen for what went wrong, fix the cause, then use Try again there.";
+                ? "Open this file on the Activity page to delete it, keep it, or process it again after changing the rule."
+                : "Open this file on the Activity page for what went wrong, fix the cause, then use Try again there.";
         }
 
         var envelope = OperatorMessages.ActivityDetailEnvelope(

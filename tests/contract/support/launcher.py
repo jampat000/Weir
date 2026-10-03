@@ -133,6 +133,8 @@ class ServerUnderTest:
             "WEIR_PROCESSING_WATCHED_FOLDER_REMUX_SCAN_DISPATCH_PERIODIC_ENQUEUE_REMUX_JOBS": "0",
             "WEIR_PROCESSING_WORK_TEMP_STALE_SWEEP_MOVIE_SCHEDULE_ENABLED": "0",
             "WEIR_PROCESSING_WORK_TEMP_STALE_SWEEP_TV_SCHEDULE_ENABLED": "0",
+            # No server reaches the real metadata service: posters are off unless a test points Weir at a fake gateway.
+            "WEIR_ARTWORK_GATEWAY_URL": "off",
         }
         for key in ("WEIR_CORS_ORIGINS", "WEIR_TRUSTED_BROWSER_ORIGINS", "WEIR_ENV"):
             # A developer shell's own settings must not leak into a contract run.

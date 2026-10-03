@@ -42,6 +42,19 @@ public static class WireJsonWriter
         return builder.ToString();
     }
 
+    /// <summary>
+    /// <paramref name="value"/> laid out as it would be at nesting <paramref name="level"/> inside a larger document, so a document
+    /// that is too long to hold at once can be written one item at a time.
+    /// </summary>
+    public static string DumpsAtLevel(WireValue value, WireJsonFormat format, int level)
+    {
+        ArgumentNullException.ThrowIfNull(value);
+        ArgumentNullException.ThrowIfNull(format);
+        var builder = new StringBuilder();
+        Write(builder, value, format, level);
+        return builder.ToString();
+    }
+
     public static byte[] DumpsUtf8(WireValue value, WireJsonFormat format) => Encoding.UTF8.GetBytes(Dumps(value, format));
 
     /// <summary>

@@ -1,7 +1,7 @@
 import { apiFetch, readJson, requireOk } from "../api/client";
 import { sendJson } from "../api/send-json";
 
-/** One file kept without processing again from History's remove dialog (#785). */
+/** One file kept without processing again from Activity's remove dialog (#785). */
 export interface KeptFile {
   id: number;
   library_id: number;

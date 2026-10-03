@@ -10,7 +10,7 @@ using Weir.Infrastructure.Tests.Platform;
 namespace Weir.Infrastructure.Tests.Notifications;
 
 /// <summary>
-/// Settings › Alerts channels receive real job events, not only "Send test": the registered notifier turns job
+/// Setup › Connections › Alerts channels receive real job events, not only "Send test": the registered notifier turns job
 /// outcomes into alerts on every saved channel.
 /// </summary>
 public sealed class WebhookJobNotificationsTests : IDisposable
