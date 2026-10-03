@@ -129,7 +129,7 @@ export function TrackTable({ choice }: { choice: TrackChoice }) {
   const columns = useTableColumns(TRACK_COLUMNS);
   return (
     <div className="mm-tracks-table-wrap">
-      <div className="mm-tracks-table-tools">
+      <div className="mm-panel__aside px-3 py-2">
         <ColumnsMenu table={columns} />
       </div>
       <table className="mm-tracks-table" {...columns.tableProps}>

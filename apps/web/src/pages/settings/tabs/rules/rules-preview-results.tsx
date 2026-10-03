@@ -30,7 +30,7 @@ export function RulesPreviewResults({
             Estimated size change: about {sizeText} smaller (estimate only)
           </span>
         ) : null}
-        <div className="ml-auto">
+        <div className="mm-panel__aside flex-1">
           <ColumnsMenu table={columns} />
         </div>
       </div>

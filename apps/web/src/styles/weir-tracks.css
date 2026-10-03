@@ -12,13 +12,6 @@
   border-radius: var(--mm-radius-sm);
 }
 
-.mm-tracks-table-tools {
-  display: flex;
-  justify-content: flex-end;
-  padding: 0.4rem 0.6rem;
-  border-bottom: 1px solid var(--mm-border);
-}
-
 /* The way back from choosing a default subtitle, under the table it belongs to. */
 .mm-tracks-no-default {
   display: flex;
@@ -66,7 +59,9 @@
   border-bottom: none;
 }
 
-.mm-tracks-table th {
+/* A column's name: its heading, and the label beside a value once the row is stacked into a card. */
+.mm-tracks-table th,
+.mm-tracks-table td[data-label]::before {
   color: var(--mm-text3);
   font-weight: 600;
   text-transform: uppercase;
@@ -74,16 +69,18 @@
   font-size: var(--mm-type-eyebrow);
 }
 
-.mm-tracks-table__track {
-  color: var(--mm-text1);
+.mm-tracks-table__track,
+.mm-tracks-table__rule {
   white-space: normal;
   overflow-wrap: anywhere;
 }
 
+.mm-tracks-table__track {
+  color: var(--mm-text1);
+}
+
 .mm-tracks-table__rule {
   color: var(--mm-text2);
-  white-space: normal;
-  overflow-wrap: anywhere;
   min-width: 16rem;
 }
 
@@ -122,11 +119,6 @@
   .mm-tracks-table td[data-label]::before {
     content: attr(data-label);
     flex-shrink: 0;
-    color: var(--mm-text3);
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: var(--mm-tracking-eyebrow);
-    font-size: var(--mm-type-eyebrow);
   }
 
   .mm-tracks-table__rule {
