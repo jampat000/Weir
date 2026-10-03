@@ -4,6 +4,8 @@ A test suite that judges a **running** Weir server from the outside. It starts t
 process, talks to it only over HTTP, and reads or writes the SQLite file only while the server is
 stopped. It never imports Weir (epic #514, this suite is #516, decision record ADR-0017).
 
+> **Temporary Python.** Weir is a .NET product; this suite is Python only because it was written before the port. CI runs it as the `contract` job (`.github/workflows/ci-contract.yml`, one leg per area). Issue #892 ports it to .NET and then deletes this folder.
+
 ## Running it
 
 From the repo root. The suite is written in Python, so it needs a Python 3.13+ interpreter with the
