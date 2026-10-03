@@ -60,7 +60,7 @@ public sealed record LibraryFileQuery
     /// </summary>
     public bool CleansHardlinkedFiles { get; init; }
 
-    /// <summary>A sort key from <see cref="LibraryFileSort.Columns"/>; anything else falls back to the path.</summary>
+    /// <summary>A sort key from <see cref="LibraryFileSort.Columns"/>, or <see cref="LibraryFileSort.Status"/>; anything else falls back to the path.</summary>
     public string Sort { get; init; } = LibraryFileSort.Path;
 
     public bool Descending { get; init; }
@@ -74,6 +74,12 @@ public sealed record LibraryFileQuery
 public static class LibraryFileSort
 {
     public const string Path = "path";
+
+    /// <summary>
+    /// Where the file stands now (<see cref="LibraryFileStatus"/>), in the order people read the statuses. It has no column to
+    /// name: <see cref="LibraryViewStore"/> builds its SQL from the status query itself.
+    /// </summary>
+    public const string Status = "status";
 
     /// <summary>Column expression per accepted sort key. The key is the wire name; the value is checked-in SQL.</summary>
     public static readonly IReadOnlyDictionary<string, string> Columns = new Dictionary<string, string>(StringComparer.Ordinal)
@@ -93,7 +99,7 @@ public static class LibraryFileSort
     public static string ColumnFor(string? sort) =>
         sort is not null && Columns.TryGetValue(sort, out var column) ? column : Columns[Path];
 
-    public static string Normalize(string? sort) => sort is not null && Columns.ContainsKey(sort) ? sort : Path;
+    public static string Normalize(string? sort) => sort is not null && (sort == Status || Columns.ContainsKey(sort)) ? sort : Path;
 
     public const int MaxPageSize = 200;
 

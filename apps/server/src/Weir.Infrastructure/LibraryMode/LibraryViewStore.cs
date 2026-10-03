@@ -45,6 +45,28 @@ public sealed class LibraryViewStore
         "WHEN f.classification = 'would_change' THEN 'needs_cleaning' " +
         "ELSE 'matches' END)";
 
+    /// <summary>What a file counts for when a list is sorted by status: how far down the list it goes.</summary>
+    private const int MatchesRank = 0;
+    private const int NeedsCleaningRank = 1;
+    private const int CleaningRank = 2;
+    private const int CantCleanYetRank = 3;
+    private const int CantCleanYetUnreadableRank = 4;
+    private const int LeftAloneRank = 5;
+
+    /// <summary>
+    /// The order of a list sorted by status, which follows what each status means: done (matches), to do (needs cleaning),
+    /// doing (cleaning), needs a look (can't clean yet), broken (can't clean yet because Weir cannot read or open the file,
+    /// so it goes after the others) and left alone. Ascending reads in that order.
+    /// </summary>
+    private static readonly string StatusRankSql =
+        $"(CASE {StatusSql} " +
+        $"WHEN '{LibraryFileStatus.Matches}' THEN {MatchesRank} " +
+        $"WHEN '{LibraryFileStatus.NeedsCleaning}' THEN {NeedsCleaningRank} " +
+        $"WHEN '{LibraryFileStatus.Cleaning}' THEN {CleaningRank} " +
+        $"WHEN '{LibraryFileStatus.CantCleanYet}' THEN (CASE WHEN f.problem_kind IN ('{LibraryProblems.Name(LibraryProblemKind.Unreadable)}', '{LibraryProblems.Name(LibraryProblemKind.NoPermission)}') " +
+        $"THEN {CantCleanYetUnreadableRank} ELSE {CantCleanYetRank} END) " +
+        $"ELSE {LeftAloneRank} END)";
+
     /// <summary>How many paths a Problems group carries inline before the operator has to open Files to see the rest.</summary>
     public const int ProblemSampleSize = 5;
 
@@ -130,7 +152,8 @@ public sealed class LibraryViewStore
         var pageSize = Math.Clamp(filter.PageSize, 1, LibraryFileSort.MaxPageSize);
         var offset = (long)(Math.Max(filter.Page, 1) - 1) * pageSize;
         var direction = filter.Descending ? "DESC" : "ASC";
-        var order = $"ORDER BY {LibraryFileSort.ColumnFor(filter.Sort)} {direction}, f.path ASC";
+        var column = filter.Sort == LibraryFileSort.Status ? StatusRankSql : LibraryFileSort.ColumnFor(filter.Sort);
+        var order = $"ORDER BY {column} {direction}, f.path ASC";
 
         return await uow.QueryAsync(
             "SELECT f.id, f.path, f.size_bytes, f.mtime, f.classification, f.summary, f.reason, f.removed_audio_tracks, " +
