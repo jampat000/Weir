@@ -37,7 +37,7 @@ list first.
 - **3.0.3** (2026-09-20). A file handed over the moment its download finishes is cleaned instead of passed along untouched. [notes](docs/release-notes/v3.0.3.md) · [release](https://github.com/jampat000/Weir/releases/tag/v3.0.3)
 - **3.0.2** (2026-09-19). Works properly with Sonarr and Radarr, and sets each library up for the media manager it works with. [notes](docs/release-notes/v3.0.2.md) · [release](https://github.com/jampat000/Weir/releases/tag/v3.0.2)
 - **3.0.1** (2026-09-18). A file found by both a media manager hand-off and a library scan is processed once. [notes](docs/release-notes/v3.0.1.md) · [release](https://github.com/jampat000/Weir/releases/tag/v3.0.1)
-- **3.0.0** (2026-09-18). MediaMop becomes Weir: a .NET server, port 9347, renamed API routes and tables, and Pruner removed. Contains breaking changes. [notes](docs/release-notes/v3.0.0.md) · [release](https://github.com/jampat000/Weir/releases/tag/v3.0.0)
+- **3.0.0** (2026-09-18). Weir 3: a .NET server, port 9347, renamed API routes and tables, and Pruner removed. Contains breaking changes. [notes](docs/release-notes/v3.0.0.md) · [release](https://github.com/jampat000/Weir/releases/tag/v3.0.0)
 ## 2.x
 
 - **2.6.6** (2026-09-07). Clearer horizontal navigation and smoother busy screens. [notes](docs/release-notes/v2.6.6.md) · [release](https://github.com/jampat000/Weir/releases/tag/v2.6.6)
