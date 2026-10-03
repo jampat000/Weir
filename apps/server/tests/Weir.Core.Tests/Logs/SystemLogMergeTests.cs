@@ -104,6 +104,23 @@ public sealed class SystemLogMergeTests
     }
 
     [Fact]
+    public void Workflow_counts_add_up_over_the_sources_the_filter_names()
+    {
+        var slices = new Dictionary<SystemLogSource, SystemLogSlice>
+        {
+            [SystemLogSource.Event] = new([], 3, Tally(), Tally()) { Workflows = new Dictionary<long, long> { [2] = 1, [1] = 2 } },
+            [SystemLogSource.Job] = new([], 4, Tally(), Tally()) { Workflows = new Dictionary<long, long> { [1] = 4 } },
+            [SystemLogSource.Server] = new([], 9, Tally(), Tally()),
+        };
+
+        var both = SystemLogMerge.Page(slices, new SystemLogFilter(), SystemLogOrder.Newest, SystemLogOrder.NoWorkflowNames, limit: 10);
+        var jobs = SystemLogMerge.Page(slices, new SystemLogFilter { Sources = [SystemLogSource.Job] }, SystemLogOrder.Newest, SystemLogOrder.NoWorkflowNames, limit: 10);
+
+        Assert.Equal(new Dictionary<long, long> { [1] = 6, [2] = 1 }, both.Counts.ByWorkflow);
+        Assert.Equal(new Dictionary<long, long> { [1] = 4 }, jobs.Counts.ByWorkflow);
+    }
+
+    [Fact]
     public void A_filter_that_names_no_source_reads_every_one()
     {
         Assert.All(SystemLogSources.All, source => Assert.True(new SystemLogFilter().Selects(source)));

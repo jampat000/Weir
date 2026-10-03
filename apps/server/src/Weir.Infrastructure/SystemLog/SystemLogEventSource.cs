@@ -49,13 +49,28 @@ internal sealed class SystemLogEventSource
 
         var levels = await TallyAsync(uow, LevelSql, categoryOnly).ConfigureAwait(false);
         var categories = await TallyAsync(uow, CategorySql, levelOnly).ConfigureAwait(false);
+        var workflows = await WorkflowTallyAsync(uow, filter).ConfigureAwait(false);
         var page = both.Copy().AddAfter(SortColumns, request);
         var parameters = page.Parameters.Append(("@take", (object?)request.Take)).ToArray();
         var rows = await uow.QueryAsync(
             $"SELECT {ActivityHistoryStore.Columns} FROM {Table}{page.WhereText}{SortColumns.OrderBy(request.Order)} LIMIT @take",
             ActivityHistoryStore.ReadRow,
             parameters).ConfigureAwait(false);
-        return new SystemLogSlice([.. rows.Select(RowOf)], matching, levels, categories);
+        return new SystemLogSlice([.. rows.Select(RowOf)], matching, levels, categories) { Workflows = workflows };
+    }
+
+    /// <summary>The events of each workflow, with every filter but the workflow applied.</summary>
+    private static async Task<Dictionary<long, long>> WorkflowTallyAsync(UnitOfWork uow, SystemLogFilter filter)
+    {
+        var conditions = SharedConditions(filter with { WorkflowId = null })
+            .AddIn(LevelSql, "level", filter.Levels)
+            .AddIn(CategorySql, "category", filter.Categories)
+            .Add("activity_events.library_id IS NOT NULL");
+        var rows = await uow.QueryAsync(
+            $"SELECT activity_events.library_id, count(*) FROM {Table}{conditions.WhereText} GROUP BY activity_events.library_id",
+            reader => (Workflow: reader.GetInt64(0), Count: reader.GetInt64(1)),
+            conditions.Parameters).ConfigureAwait(false);
+        return rows.ToDictionary(row => row.Workflow, row => row.Count);
     }
 
     /// <summary>Everything but the level, the category and the page: what both of those, and their counts, are narrowed by.</summary>

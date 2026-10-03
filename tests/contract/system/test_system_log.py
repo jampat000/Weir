@@ -164,6 +164,15 @@ def test_counts_are_what_each_choice_would_show_with_the_other_filters_applied(a
     }
 
 
+def test_workflow_counts_are_what_choosing_a_workflow_would_show_with_the_other_filters_applied(admin, _seeded) -> None:
+    library = str(_seeded["library_id"])
+
+    assert _get(admin)["counts"]["workflow"] == {library: 3}
+    assert _get(admin, workflow=library)["counts"]["workflow"] == {library: 3}, "the workflow's own filter is left out"
+    assert _get(admin, level="error")["counts"]["workflow"] == {library: 1}
+    assert _get(admin, source="server")["counts"]["workflow"] == {}, "server lines belong to no workflow"
+
+
 def test_the_filters_narrow_every_source_together(admin, _seeded) -> None:
     errors = _get(admin, level="error")
     cleanup = _get(admin, category="cleanup")

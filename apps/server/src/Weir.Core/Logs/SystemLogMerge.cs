@@ -11,6 +11,9 @@ public sealed record SystemLogSlice(
     IReadOnlyDictionary<string, long> Levels,
     IReadOnlyDictionary<string, long> Categories)
 {
+    /// <summary>Its rows by workflow, with every filter but the workflow applied; a row with no workflow is in none.</summary>
+    public IReadOnlyDictionary<long, long> Workflows { get; init; } = new Dictionary<long, long>();
+
     /// <summary>What a source that cannot hold a matching row (or was not asked) reports.</summary>
     public static readonly SystemLogSlice None = new([], 0, new Dictionary<string, long>(), new Dictionary<string, long>());
 }
@@ -51,12 +54,24 @@ public static class SystemLogMerge
         var counts = new SystemLogCounts(
             SystemLogSources.All.ToDictionary(SystemLogSources.NameOf, source => slices[source].Matching),
             Sum(SystemLogLevels.All, selected.Select(source => slices[source].Levels)),
-            Sum(SystemLogCategories.All, selected.Select(source => slices[source].Categories)));
+            Sum(SystemLogCategories.All, selected.Select(source => slices[source].Categories)),
+            SumWorkflows(selected.Select(source => slices[source].Workflows)));
         return new SystemLogPage(
             rows,
             more ? order.EncodeCursor(keyed[^1].Key) : null,
             selected.Sum(source => slices[source].Matching),
             counts);
+    }
+
+    private static SortedDictionary<long, long> SumWorkflows(IEnumerable<IReadOnlyDictionary<long, long>> tallies)
+    {
+        var totals = new SortedDictionary<long, long>();
+        foreach (var (workflow, count) in tallies.SelectMany(tally => tally))
+        {
+            totals[workflow] = totals.GetValueOrDefault(workflow) + count;
+        }
+
+        return totals;
     }
 
     private static Dictionary<string, long> Sum(IReadOnlyList<string> keys, IEnumerable<IReadOnlyDictionary<string, long>> tallies)

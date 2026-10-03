@@ -134,6 +134,7 @@ const emptyLog: SystemLogPage = {
       updates: 0,
       weir: 0,
     },
+    workflow: {},
   },
 };
 

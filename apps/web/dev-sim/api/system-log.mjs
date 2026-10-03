@@ -77,6 +77,22 @@ const tally = (keys, rows, keyOf) =>
     keys.map((key) => [key, rows.filter((row) => keyOf(row) === key).length]),
   );
 
+/** How many rows each workflow has, by id: the rows that pass every filter but the workflow. */
+function workflowTally(sim, filter, passes) {
+  const unscoped = { ...filter, workflow: null };
+  const counts = {};
+  for (const row of allRows(sim)) {
+    if (
+      row.workflowId != null &&
+      canMatch(unscoped, row.source) &&
+      passesOther(row, unscoped) &&
+      passes(row)
+    )
+      counts[row.workflowId] = (counts[row.workflowId] ?? 0) + 1;
+  }
+  return counts;
+}
+
 /** @param {import("../sim.mjs").Sim} sim @param {URLSearchParams} query @param {ReturnType<typeof readLogOrder>} order @param {number} limit */
 function page(sim, query, order, limit) {
   const filter = filtersOf(query);
@@ -103,6 +119,11 @@ function page(sim, query, order, limit) {
         CATEGORIES,
         counted.filter(levelOk),
         (row) => row.category,
+      ),
+      workflow: workflowTally(
+        sim,
+        filter,
+        (row) => selected(row) && levelOk(row) && categoryOk(row),
       ),
     },
   };

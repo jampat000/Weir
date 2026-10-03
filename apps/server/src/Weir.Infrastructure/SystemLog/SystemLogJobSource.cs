@@ -57,12 +57,27 @@ internal sealed class SystemLogJobSource
 
         var levels = await TallyAsync(uow, "level", categoryOnly).ConfigureAwait(false);
         var categories = await TallyAsync(uow, "category", levelOnly).ConfigureAwait(false);
+        var workflows = await WorkflowTallyAsync(uow, filter).ConfigureAwait(false);
         var page = both.Copy().AddAfter(SortColumns, request);
         var rows = await uow.QueryAsync(
             $"{Selected}{page.WhereText}{SortColumns.OrderBy(request.Order)} LIMIT @take",
             reader => (Job: JobsInspectionStore.Read(reader), At: reader.GetString(AtTextOrdinal), Workflow: SqliteValues.GetInt64OrNull(reader, WorkflowOrdinal)),
             page.Parameters.Append(("@take", (object?)request.Take)).ToArray()).ConfigureAwait(false);
-        return new SystemLogSlice([.. rows.Select(row => RowOf(row.Job, row.At, row.Workflow))], matching, levels, categories);
+        return new SystemLogSlice([.. rows.Select(row => RowOf(row.Job, row.At, row.Workflow))], matching, levels, categories) { Workflows = workflows };
+    }
+
+    /// <summary>The jobs of each workflow, with every filter but the workflow applied.</summary>
+    private static async Task<Dictionary<long, long>> WorkflowTallyAsync(UnitOfWork uow, SystemLogFilter filter)
+    {
+        var conditions = SharedConditions(filter with { WorkflowId = null })
+            .AddIn("level", "level", filter.Levels)
+            .AddIn("category", "category", filter.Categories)
+            .Add("workflow_id IS NOT NULL");
+        var rows = await uow.QueryAsync(
+            $"SELECT workflow_id, count(*) FROM ({Selected}{conditions.WhereText}) GROUP BY workflow_id",
+            reader => (Workflow: reader.GetInt64(0), Count: reader.GetInt64(1)),
+            conditions.Parameters).ConfigureAwait(false);
+        return rows.ToDictionary(row => row.Workflow, row => row.Count);
     }
 
     /// <summary>Everything but the level, the category and the page.</summary>

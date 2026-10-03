@@ -177,7 +177,8 @@ public sealed record SystemLogFilter
 public sealed record SystemLogCounts(
     IReadOnlyDictionary<string, long> BySource,
     IReadOnlyDictionary<string, long> ByLevel,
-    IReadOnlyDictionary<string, long> ByCategory);
+    IReadOnlyDictionary<string, long> ByCategory,
+    IReadOnlyDictionary<long, long> ByWorkflow);
 
 /// <summary>One page of the log, newest first.</summary>
 public sealed record SystemLogPage(

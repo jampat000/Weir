@@ -25,7 +25,8 @@ internal static class SystemLogWire
             .Set("counts", new WireObject()
                 .Set("source", Tally(page.Counts.BySource))
                 .Set("level", Tally(page.Counts.ByLevel))
-                .Set("category", Tally(page.Counts.ByCategory)));
+                .Set("category", Tally(page.Counts.ByCategory))
+                .Set("workflow", Tally(page.Counts.ByWorkflow.ToDictionary(pair => pair.Key.ToString(CultureInfo.InvariantCulture), pair => pair.Value))));
     }
 
     /// <summary>One row: what every source shares, and its own record under the name of its source.</summary>

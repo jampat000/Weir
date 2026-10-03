@@ -7591,12 +7591,13 @@ export interface components {
     };
     /**
      * SystemLogCountsOut
-     * @description What each filter choice would show: every count has all the other filters applied but not its own, so a chip says how many rows choosing it gives. Level and category counts cover the sources the filters name.
+     * @description What each filter choice would show: every count has all the other filters applied but not its own, so a chip says how many rows choosing it gives. Level, category and workflow counts cover the sources the filters name.
      */
     SystemLogCountsOut: {
       category: components["schemas"]["SystemLogCategoryCountsOut"];
       level: components["schemas"]["SystemLogLevelCountsOut"];
       source: components["schemas"]["SystemLogSourceCountsOut"];
+      workflow: components["schemas"]["SystemLogWorkflowCountsOut"];
     };
     /**
      * SystemLogFrame
@@ -7721,6 +7722,10 @@ export interface components {
       job: number;
       /** server */
       server: number;
+    };
+    /** @description How many rows each workflow would show with every other filter applied, by workflow id. A workflow with no rows is left out, and so are the server log's lines, which belong to none. */
+    SystemLogWorkflowCountsOut: {
+      [key: string]: number;
     };
     /**
      * SystemLogWorkflowOut

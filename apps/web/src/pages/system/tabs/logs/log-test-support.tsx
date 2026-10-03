@@ -149,6 +149,13 @@ export function logPage(
         updates: 0,
         weir: 0,
       },
+      workflow: rows.reduce<Record<string, number>>((counts, row) => {
+        if (row.workflow) {
+          const id = String(row.workflow.id);
+          counts[id] = (counts[id] ?? 0) + 1;
+        }
+        return counts;
+      }, {}),
     },
     ...overrides,
   };

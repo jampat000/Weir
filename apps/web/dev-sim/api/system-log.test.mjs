@@ -133,6 +133,24 @@ describe("the simulated log's filters", () => {
     expect(Object.keys(body.counts.category)).toHaveLength(9);
   });
 
+  it("count each workflow's rows with every other filter applied but the workflow", () => {
+    const { sim } = simWithEachSource();
+
+    const all = log(sim, "");
+    const workflows = Object.keys(all.counts.workflow);
+
+    expect(workflows).toContain("1");
+    expect(log(sim, "?workflow=1").counts.workflow).toEqual(
+      all.counts.workflow,
+    );
+    expect(log(sim, "?source=server").counts.workflow).toEqual({});
+    expect(
+      Object.keys(log(sim, "?level=error").counts.workflow).every((id) =>
+        workflows.includes(id),
+      ),
+    ).toBe(true);
+  });
+
   it("search every source's text", () => {
     const { sim } = simWithEachSource();
 
