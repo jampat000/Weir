@@ -61,7 +61,6 @@ export function BackupListSection({
       }
       aside={
         <>
-          {items.length > 0 ? <ColumnsMenu table={columns} /> : null}
           <button
             type="button"
             className={`${mmActionButtonClass({ variant: "primary" })} mm-sys-btn`}
@@ -101,6 +100,7 @@ export function BackupListSection({
               if (file) onChooseFile(file);
             }}
           />
+          {items.length > 0 ? <ColumnsMenu table={columns} /> : null}
         </>
       }
     >

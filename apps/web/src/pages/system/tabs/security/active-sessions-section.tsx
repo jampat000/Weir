@@ -58,7 +58,6 @@ export function ActiveSessionsSection({ enabled }: { enabled: boolean }) {
       note={<span title={SESSIONS_DETAIL}>{SESSIONS_NOTE}</span>}
       aside={
         <>
-          {sessions.length > 0 ? <ColumnsMenu table={columns} /> : null}
           {others.length > 0 ? (
             <button
               type="button"
@@ -71,6 +70,7 @@ export function ActiveSessionsSection({ enabled }: { enabled: boolean }) {
                 : "Sign out other sessions"}
             </button>
           ) : null}
+          {sessions.length > 0 ? <ColumnsMenu table={columns} /> : null}
         </>
       }
     >
