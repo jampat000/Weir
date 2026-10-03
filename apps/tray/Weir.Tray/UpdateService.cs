@@ -22,7 +22,7 @@ sealed class UpdateService : IUpdateService
     internal UpdateService(Action<string> log)
     {
         _log = log;
-        var source = new GithubSource(GitHubRepo, accessToken: null, prerelease: false);
+        var source = new GithubSource(GitHubRepo, accessToken: null, prerelease: UpdateChannel.IncludesPreReleasesForThisBuild());
         _mgr = new UpdateManager(source);
     }
 
