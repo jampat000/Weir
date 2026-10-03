@@ -6,9 +6,11 @@
 // whatever it contains. Used directly as a CLI (apps/web's audit step) and imported by
 // docs-site/scripts/audit-dependencies.mjs, which applies its own exception list to the report.
 //
-// CLI usage (from the directory to audit): node <path-to>/npm-audit-retry.mjs [--level=high]
+// CLI usage (from the directory to audit): node <path-to>/npm-audit-retry.mjs [--level=high] [--exceptions=<file>]
+// With --exceptions, an advisory passes only while that file approves it (see unapprovedAdvisories).
 
 import { spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -79,9 +81,40 @@ export function meetsAuditLevel(report, level) {
   return SEVERITIES.slice(threshold).some((severity) => (counts[severity] ?? 0) > 0);
 }
 
+/**
+ * The advisories in a report, at or above `level`, that no current exception approves. An exception is
+ * `{ advisory: "GHSA-…", expires: "YYYY-MM-DD", mitigation: "why it is safe here" }`; one past its
+ * expiry, or one without a mitigation, approves nothing.
+ */
+export function unapprovedAdvisories(report, { exceptions = [], level = "info", today = new Date().toISOString().slice(0, 10) } = {}) {
+  const threshold = SEVERITIES.indexOf(level);
+  if (threshold < 0) throw new Error(`Unknown audit level: ${level}`);
+  const approved = new Map(exceptions.map((item) => [item.advisory, item]));
+  const findings = new Map();
+  for (const [name, entry] of Object.entries(report?.vulnerabilities ?? {})) {
+    for (const via of entry.via ?? []) {
+      if (typeof via === "string") continue;
+      const rank = SEVERITIES.indexOf(via.severity);
+      if (rank >= 0 && rank < threshold) continue;
+      const advisory = String(via.url || "").split("/").at(-1) || `${name} (no advisory id)`;
+      const exception = approved.get(advisory);
+      if (!exception) findings.set(advisory, `${name}: ${advisory}`);
+      else if (!exception.mitigation) findings.set(advisory, `${name}: ${advisory} (exception has no mitigation)`);
+      else if (exception.expires < today) findings.set(advisory, `${name}: ${advisory} (exception expired ${exception.expires})`);
+    }
+  }
+  return [...findings.values()];
+}
+
+function readExceptions(file) {
+  return JSON.parse(readFileSync(resolve(file), "utf8")).exceptions ?? [];
+}
+
 async function main() {
-  const levelArg = process.argv.slice(2).find((arg) => arg.startsWith("--level="));
+  const args = process.argv.slice(2);
+  const levelArg = args.find((arg) => arg.startsWith("--level="));
   const level = levelArg ? levelArg.slice("--level=".length) : "high";
+  const exceptionsArg = args.find((arg) => arg.startsWith("--exceptions="));
 
   let report;
   try {
@@ -93,6 +126,17 @@ async function main() {
       process.exit(1);
     }
     throw error;
+  }
+
+  if (exceptionsArg) {
+    const unapproved = unapprovedAdvisories(report, { exceptions: readExceptions(exceptionsArg.slice("--exceptions=".length)), level });
+    if (unapproved.length > 0) {
+      console.error(`[npm-audit] Advisories at or above "${level}" with no current exception:`);
+      for (const item of unapproved) console.error(`- ${item}`);
+      process.exit(1);
+    }
+    console.log(`[npm-audit] Every advisory at or above "${level}" is covered by a current exception.`);
+    return;
   }
 
   const counts = report?.metadata?.vulnerabilities ?? {};

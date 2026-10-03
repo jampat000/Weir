@@ -1,3 +1,16 @@
 {
-  "exceptions": []
+  "exceptions": [
+    {
+      "advisory": "GHSA-vfj7-8cjw-p6xm",
+      "package": "braces",
+      "expires": "2026-11-02",
+      "mitigation": "Build only: braces reaches the docs site through Docusaurus (micromatch, chokidar), which matches the site's own fixed file patterns while building. The published site is static HTML; no visitor input reaches those patterns. No fixed braces release exists yet (every version up to 3.0.3 is affected); approved by James on 2026-10-03 for 30 days."
+    },
+    {
+      "advisory": "GHSA-ch52-4w7c-c8xp",
+      "package": "http-cache-semantics",
+      "expires": "2026-11-02",
+      "mitigation": "Build only: http-cache-semantics reaches the docs site through Docusaurus's update-notifier (got, cacheable-request), which only checks the npm registry for a newer Docusaurus while the site builds in CI. The advisory concerns responses cached for several users by a shared cache; that check has one user and the published site is static HTML. No fixed release exists yet (every version up to 4.2.0 is affected); approved by James on 2026-10-03 for 30 days."
+    }
+  ]
 }

@@ -47,6 +47,7 @@ This checklist defines the current practical hardening baseline for Weir.
 - Security vulnerabilities are reported privately through `SECURITY.md`.
 - Public issues are not used for unpatched vulnerabilities.
 - CI runs a NuGet vulnerability scan (`node scripts/check-dotnet-vulnerabilities.mjs apps/server/Weir.slnx`, failing on High or Critical) and `npm audit` in addition to CodeQL and standard test gates.
+- An npm advisory with no fixed release can be let through only by an entry in `apps/web/dependency-audit-exceptions.json` or `docs-site/dependency-audit-exceptions.json`: the advisory id, why it cannot reach users (`mitigation`) and an `expires` date at most 30 days out, approved by the owner. An expired entry fails the scan again. Remove the entry as soon as a fixed release can be taken.
 
 ## Windows Firewall
 

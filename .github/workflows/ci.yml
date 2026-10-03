@@ -311,11 +311,12 @@ jobs:
         run: node scripts/check-dead-code.mjs
 
       # scripts/npm-audit-retry.mjs retries only a registry-side failure (an outage or dropped
-      # connection); a real High/Critical advisory fails immediately, same as a plain `npm audit`.
+      # connection); a real High/Critical advisory fails immediately unless apps/web/dependency-audit-exceptions.json
+      # approves it with a mitigation and an expiry.
       - name: Frontend dependency vulnerability scan
         if: needs.changes.outputs.run_web_audit == 'true'
         working-directory: apps/web
-        run: node ../../scripts/npm-audit-retry.mjs --level=high
+        run: node ../../scripts/npm-audit-retry.mjs --level=high --exceptions=dependency-audit-exceptions.json
 
   e2e-smoke:
     needs: [changes, web-dist]
