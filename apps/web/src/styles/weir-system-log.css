@@ -47,7 +47,6 @@
 /* ---- The list ---------------------------------------------------------------- */
 
 .mm-log-list {
-  list-style: none;
   container-type: inline-size;
 }
 
@@ -77,10 +76,12 @@
   box-shadow: inset 3px 0 0 var(--mm-st);
 }
 
-/* The row's line: time, level dot, source, category, workflow, then the title with its quieter second line. */
+/* The row's line: time, level dot, source, category, workflow, then the title with its quieter second line, in the
+   order of the columns. The headings over the rows are on the same grid, which the list sets. */
+.mm-log-head,
 .mm-log-row__head {
   display: grid;
-  grid-template-columns: 5.5rem 0.5rem 4rem 6.5rem 8rem minmax(0, 1fr) 0.875rem;
+  grid-template-columns: var(--log-cols);
   align-items: center;
   column-gap: 12px;
   width: 100%;
@@ -91,11 +92,11 @@
   color: inherit;
   font: inherit;
   text-align: left;
-  cursor: pointer;
 }
 
 .mm-log-row__head:hover {
   background: color-mix(in srgb, var(--mm-surface-2) 60%, transparent);
+  cursor: pointer;
 }
 
 .mm-log-row__head:focus-visible {
@@ -147,14 +148,15 @@
   transform: rotate(180deg);
 }
 
-/* Where the card is narrow the time, level, source and category share a line and the title has the line under it. */
+/* Where the card is narrow the time, level, source and category share a line and the title has the line under it, and the headings, which cannot say what a stacked row holds, are left out. */
 @container (max-width: 860px) {
   .mm-log-row__head {
-    grid-template-columns: 5.5rem 0.5rem auto minmax(0, 1fr) 0.875rem;
+    grid-template-columns: var(--log-cols-narrow);
     row-gap: 4px;
   }
 
-  .mm-log-row__workflow {
+  .mm-log-row__workflow,
+  .mm-log-head {
     display: none;
   }
 
@@ -173,6 +175,7 @@
   margin: 0;
 }
 
+.mm-log-head,
 .mm-log-facts dt,
 .mm-log-raw__label {
   color: var(--mm-text3);

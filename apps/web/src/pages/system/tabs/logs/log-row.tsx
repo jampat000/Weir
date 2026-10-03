@@ -1,3 +1,5 @@
+import { Fragment, type ReactNode } from "react";
+
 import { Chip } from "../../../../components/panels/chip";
 import { eventDisplay } from "../../../../lib/activity/activity-display";
 import { classNames } from "../../../../lib/ui/class-names";
@@ -7,6 +9,7 @@ import {
 } from "../../../../lib/system/system-log-api";
 import { parseAppTime } from "../../../../lib/ui/mm-format-date";
 import { needsYou } from "../../../../lib/ui/status-meaning";
+import type { LogColumnId } from "./log-columns";
 import { LOG_CATEGORY_LABELS, LOG_SOURCES } from "./log-filters";
 import { LogEventDetail } from "./log-event-detail";
 import { LogJobDetail } from "./log-job-detail";
@@ -87,6 +90,7 @@ export function LogRow({
   onToggle,
   clock,
   fullTime,
+  order,
   actions,
 }: {
   row: SystemLogRow;
@@ -96,14 +100,63 @@ export function LogRow({
   clock: (ms: number) => string;
   /** A date and time in full, in Weir's time zone. */
   fullTime: (iso: string) => string;
+  /** The columns in the order to show them. */
+  order: readonly LogColumnId[];
   actions: LogRowActions;
 }) {
   const { title, detail } = linesOf(row);
   const at = parseAppTime(row.at);
   const bodyId = `log-row-${row.id.replace(":", "-")}`;
   const meaning = LOG_LEVEL_MEANING[row.level];
+  const cells: Record<LogColumnId, ReactNode> = {
+    time: (
+      <time
+        data-col="time"
+        className="mm-log-row__time"
+        dateTime={row.at}
+        title={fullTime(row.at)}
+      >
+        {at === null ? "" : clock(at)}
+      </time>
+    ),
+    level: (
+      <span
+        data-col="level"
+        className="mm-status-dot"
+        role="img"
+        aria-label={LOG_LEVEL_WORDS[row.level]}
+        title={LOG_LEVEL_WORDS[row.level]}
+      />
+    ),
+    source: (
+      <span data-col="source">
+        <Chip dot={false}>{SOURCE_WORDS[row.source]}</Chip>
+      </span>
+    ),
+    category: (
+      <span data-col="category" className="mm-log-row__category">
+        {LOG_CATEGORY_LABELS[row.category]}
+      </span>
+    ),
+    workflow: (
+      <span
+        data-col="workflow"
+        className="mm-log-row__workflow"
+        title={row.workflow?.name ?? undefined}
+      >
+        {row.workflow?.name ?? ""}
+      </span>
+    ),
+    title: (
+      <span data-col="title" className="mm-log-row__text">
+        <strong title={title}>{title}</strong>
+        {detail ? <small title={detail}>{detail}</small> : null}
+      </span>
+    ),
+  };
   return (
     <li
+      role="row"
       className={classNames(
         "mm-log-row",
         needsYou(meaning) && "mm-log-row--problem",
@@ -113,60 +166,38 @@ export function LogRow({
       data-source={row.source}
       data-level={row.level}
     >
-      <button
-        type="button"
-        className="mm-log-row__head"
-        aria-expanded={expanded}
-        aria-controls={expanded ? bodyId : undefined}
-        onClick={onToggle}
-      >
-        <time
-          className="mm-log-row__time"
-          dateTime={row.at}
-          title={fullTime(row.at)}
+      <div role="cell">
+        <button
+          type="button"
+          className="mm-log-row__head"
+          aria-expanded={expanded}
+          aria-controls={expanded ? bodyId : undefined}
+          onClick={onToggle}
         >
-          {at === null ? "" : clock(at)}
-        </time>
-        <span
-          className="mm-status-dot"
-          role="img"
-          aria-label={LOG_LEVEL_WORDS[row.level]}
-          title={LOG_LEVEL_WORDS[row.level]}
-        />
-        <Chip dot={false}>{SOURCE_WORDS[row.source]}</Chip>
-        <span className="mm-log-row__category">
-          {LOG_CATEGORY_LABELS[row.category]}
-        </span>
-        <span
-          className="mm-log-row__workflow"
-          title={row.workflow?.name ?? undefined}
-        >
-          {row.workflow?.name ?? ""}
-        </span>
-        <span className="mm-log-row__text">
-          <strong title={title}>{title}</strong>
-          {detail ? <small title={detail}>{detail}</small> : null}
-        </span>
-        <svg
-          className="mm-log-row__chevron"
-          viewBox="0 0 24 24"
-          width="14"
-          height="14"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden="true"
-        >
-          <path d="m6 9 6 6 6-6" />
-        </svg>
-      </button>
-      {expanded ? (
-        <div className="flex flex-col gap-2.5 px-3 pb-4" id={bodyId}>
-          <RowBody row={row} time={fullTime(row.at)} actions={actions} />
-        </div>
-      ) : null}
+          {order.map((id) => (
+            <Fragment key={id}>{cells[id]}</Fragment>
+          ))}
+          <svg
+            className="mm-log-row__chevron"
+            viewBox="0 0 24 24"
+            width="14"
+            height="14"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="m6 9 6 6 6-6" />
+          </svg>
+        </button>
+        {expanded ? (
+          <div className="flex flex-col gap-2.5 px-3 pb-4" id={bodyId}>
+            <RowBody row={row} time={fullTime(row.at)} actions={actions} />
+          </div>
+        ) : null}
+      </div>
     </li>
   );
 }

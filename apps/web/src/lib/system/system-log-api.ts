@@ -17,6 +17,10 @@ export const LOG_LEVEL_MEANING: Record<SystemLogLevel, StatusMeaning> = {
   error: "broken",
 };
 
+/** What the log can be ordered by: when, how serious, where it came from, what kind, or which workflow. */
+export type SystemLogSort =
+  "time" | "level" | "source" | "category" | "workflow";
+
 /** What a request for the log can narrow it by. A list is sent as one comma-separated value; an empty one is no filter. */
 export type SystemLogQuery = {
   source?: readonly SystemLogSource[];
@@ -35,6 +39,10 @@ export type SystemLogQuery = {
   trigger?: string;
   status?: readonly string[];
   has_exception?: boolean;
+  /** How the list is ordered; without it, by time. Ties fall by time. */
+  sort?: SystemLogSort;
+  /** Which way: descending, newest first, unless said. */
+  direction?: "asc" | "desc";
 };
 
 /** A page of the log: the next page starts at the `cursor` the page before gave. */
@@ -65,6 +73,8 @@ function filterParams(query: SystemLogQuery): URLSearchParams {
     const value = query[name];
     if (value !== undefined) params.set(name, String(Math.trunc(value)));
   }
+  if (query.sort) params.set("sort", query.sort);
+  if (query.direction) params.set("direction", query.direction);
   if (query.has_exception !== undefined) {
     params.set("has_exception", String(query.has_exception));
   }

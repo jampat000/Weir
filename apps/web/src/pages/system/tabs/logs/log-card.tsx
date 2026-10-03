@@ -2,6 +2,7 @@ import { useState, type ReactNode } from "react";
 
 import { Panel } from "../../../../components/panels/panel";
 import { StatusDot } from "../../../../components/panels/status-dot";
+import { ColumnsMenu } from "../../../../components/shared/columns-menu";
 import { LoadError } from "../../../../components/shared/load-error";
 import {
   eventLabel,
@@ -12,7 +13,9 @@ import type { SystemLogQuery } from "../../../../lib/system/system-log-api";
 import { mmActionButtonClass } from "../../../../lib/ui/mm-control-roles";
 import { plural } from "../../../../lib/ui/mm-plural";
 import { useFitLevels } from "../../../../lib/ui/use-fit-levels";
+import type { TableColumns } from "../../../../lib/ui/use-table-columns";
 import { LogClearEvents } from "./log-clear-events";
+import type { LogColumnId } from "./log-columns";
 import { LogExportMenu } from "./log-export-menu";
 import { anyLogFilterSet, refineCount, type LogFilters } from "./log-filters";
 import { LogList } from "./log-list";
@@ -53,6 +56,7 @@ export function LogCard({
   movedPickers,
   filters,
   query,
+  columns,
   entries,
   watchFeed,
   expandedId,
@@ -66,6 +70,7 @@ export function LogCard({
   movedPickers: ReactNode;
   filters: LogFilters;
   query: SystemLogQuery;
+  columns: TableColumns<LogColumnId>;
   entries: LogEntries;
   /** Hands the list's element over, so new rows can wait while the reader is further down. */
   watchFeed: (element: HTMLElement | null) => void;
@@ -175,6 +180,7 @@ export function LogCard({
             >
               Log settings
             </button>
+            <ColumnsMenu table={columns} />
           </>
         }
       >
@@ -211,6 +217,7 @@ export function LogCard({
           ) : null}
           <LogBody
             entries={entries}
+            columns={columns}
             filtered={filtered}
             expandedId={expandedId}
             onToggle={onToggle}
@@ -238,6 +245,7 @@ export function LogCard({
 /** The list, or what stands in its place: that it is loading, that it could not be read, or that nothing matches. */
 function LogBody({
   entries,
+  columns,
   filtered,
   expandedId,
   onToggle,
@@ -245,6 +253,7 @@ function LogBody({
   actions,
 }: {
   entries: LogEntries;
+  columns: TableColumns<LogColumnId>;
   filtered: boolean;
   expandedId: string | null;
   onToggle: (id: string) => void;
@@ -278,6 +287,7 @@ function LogBody({
   return (
     <LogList
       rows={entries.rows}
+      columns={columns}
       expandedId={expandedId}
       onToggle={onToggle}
       actions={actions}
