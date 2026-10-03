@@ -59,11 +59,11 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      # One contract leg per area in areas.json, so a new area gets its leg without editing this file.
+      # One contract leg per area in the contract project's areas.json, so a new area gets its leg without editing this file.
       - name: Contract areas
         id: areas
         run: |
-          areas="$(jq -c '[.areas[].name]' tests/contract/areas.json)"
+          areas="$(jq -c '[.areas[].name]' apps/server/tests/Weir.Contract.Tests/areas.json)"
           echo "Contract areas: $areas"
           echo "areas=$areas" >> "$GITHUB_OUTPUT"
 
@@ -77,14 +77,7 @@ jobs:
             web:
               - 'apps/web/**'
             harness:
-              - 'tests/**'
               - 'scripts/**'
-              - 'pytest.ini'
-            contract:
-              - 'tests/contract/**'
-              - 'tests/e2e/weir/_runtime.py'
-              - 'tests/requirements.txt'
-              - 'apps/server/**'
             tray:
               - 'apps/tray/**'
               # The tray imports the server's build rules and product version.
@@ -102,8 +95,7 @@ jobs:
               - 'packaging/**'
               - 'apps/tray/**'
               - 'apps/server/src/Weir.Host/**'
-              - 'scripts/live_packaged_e2e/**'
-              - 'scripts/live-packaged-e2e.py'
+              - 'apps/server/tools/Weir.LiveAudit/**'
               - 'scripts/smoke-windows-package.ps1'
               - 'scripts/wait-for-health.mjs'
               - 'scripts/ffmpeg-cache-key.mjs'
@@ -116,7 +108,7 @@ jobs:
               - '.github/**'
 
       # Web checks also run for server and harness changes: the server embeds the OpenAPI document the web
-      # app's generated types come from, and the E2E smoke and contract suite serve the built web app. The
+      # app's generated types come from, and the E2E smoke serves the built web app. The
       # audits and the E2E smoke run on pull requests; a push to main was a squash merge its pull request
       # already ran them on. The arm64 image builds under QEMU, which is slow, so only when the image changes.
       - name: Which jobs are due
@@ -126,7 +118,6 @@ jobs:
           SERVER: ${{ steps.filter.outputs.server }}
           WEB: ${{ steps.filter.outputs.web }}
           HARNESS: ${{ steps.filter.outputs.harness }}
-          CONTRACT: ${{ steps.filter.outputs.contract }}
           TRAY: ${{ steps.filter.outputs.tray }}
           PACKAGING: ${{ steps.filter.outputs.packaging }}
           DOCKER: ${{ steps.filter.outputs.docker }}
@@ -151,7 +142,7 @@ jobs:
             echo "run_web=$web"
             echo "run_web_audit=$(on_pull_request "$(either "$all" "$WEB")")"
             echo "run_e2e=$(on_pull_request "$web")"
-            echo "run_contract=$(either "$all" "$CONTRACT")"
+            echo "run_contract=$(either "$all" "$SERVER")"
             echo "run_tray=$(either "$all" "$TRAY")"
             echo "run_packaging=$(either "$all" "$PACKAGING" "$packaging_reached_by_main")"
             echo "run_arm64=$(either "$manual" "$DOCKER")"
@@ -181,6 +172,16 @@ jobs:
         run: |
           node scripts/check-test-console-programs.mjs
           node --test scripts/check-test-console-programs.test.mjs
+
+      - name: No Python in the repository
+        run: |
+          node scripts/check-no-python.mjs
+          node --test scripts/check-no-python.test.mjs
+
+      - name: Contract areas match their test classes
+        run: |
+          node scripts/check-contract-areas.mjs
+          node --test scripts/check-contract-areas.test.mjs
 
       - name: Release and CI gate rules
         run: |
@@ -216,9 +217,10 @@ jobs:
 
       # Category=Stress (the SQLite pool-race test) runs several seconds of wall clock across 8 threads and
       # would starve every other test running alongside it here; ci-stress.yml runs it nightly instead.
+      # Category=Contract and Category=E2E start a real server (and a browser): the contract and e2e-smoke jobs run them.
       - name: Test Weir server
         working-directory: apps/server
-        run: dotnet test Weir.slnx --no-build --filter "Category!=Stress"
+        run: dotnet test Weir.slnx --no-build --filter "Category!=Stress&Category!=Contract&Category!=E2E"
 
       - name: Server dependency vulnerability scan
         if: needs.changes.outputs.run_server_audit == 'true'
@@ -252,9 +254,9 @@ jobs:
       # See server-linux's own "Test Weir server" step: ci-stress.yml runs Category=Stress nightly instead.
       - name: Test Weir server
         working-directory: apps/server
-        run: dotnet test Weir.slnx --no-build --filter "Category!=Stress"
+        run: dotnet test Weir.slnx --no-build --filter "Category!=Stress&Category!=Contract&Category!=E2E"
 
-  # The production web build, once, for the E2E smoke and every contract leg to serve.
+  # The production web build, once, for the E2E smoke to serve.
   web-dist:
     needs: changes
     if: needs.changes.outputs.run_web == 'true'
@@ -335,12 +337,13 @@ jobs:
           cache: true
           cache-dependency-path: apps/server/**/packages.lock.json
 
-      # The smoke runs `dotnet run --no-build` on the host (tests/e2e/weir/conftest.py).
-      - name: Build Weir server (the server under test)
+      # The E2E project builds the server (Weir.Host) before itself and starts it as a process, serving the web
+      # app downloaded below.
+      - name: Build the E2E tests and the server under test
         working-directory: apps/server
         run: |
-          dotnet restore src/Weir.Host --locked-mode
-          dotnet build src/Weir.Host --no-restore
+          dotnet restore tests/Weir.E2E.Tests --locked-mode
+          dotnet build tests/Weir.E2E.Tests --no-restore
 
       - name: Download web dist
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
@@ -348,32 +351,27 @@ jobs:
           name: weir-web-dist
           path: apps/web/dist
 
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
-        with:
-          python-version: "3.13"
-          cache: pip
-          cache-dependency-path: tests/requirements.txt
-
       - name: Cache Playwright browsers
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('tests/requirements.txt') }}
+          key: playwright-${{ runner.os }}-${{ hashFiles('apps/server/Directory.Packages.props') }}
 
-      - name: Install locked test runner + Playwright browser
-        run: |
-          python -m pip install --require-hashes -r tests/requirements.txt
-          python -m playwright install --with-deps chromium
+      # The install script is generated by the build, for the Playwright version in Directory.Packages.props. The
+      # browser itself comes from the cache when the version has not changed; the system libraries it needs do not
+      # (they live outside it), so those are installed every time.
+      - name: Install the Playwright browser
+        run: pwsh apps/server/tests/Weir.E2E.Tests/bin/Debug/net10.0/playwright.ps1 install --with-deps chromium
 
       - name: Weir E2E smoke (Playwright + real .NET server)
+        working-directory: apps/server
         env:
           WEIR_E2E: "1"
-          WEIR_HOME: ${{ runner.temp }}/weir-e2e
-        run: python -m pytest tests/e2e/weir -q --tb=short
+        run: dotnet test tests/Weir.E2E.Tests --no-build
 
   # The contract suite, one leg per area (ci-contract.yml).
   contract:
-    needs: [changes, web-dist]
+    needs: changes
     if: needs.changes.outputs.run_contract == 'true'
     uses: ./.github/workflows/ci-contract.yml
     with:
