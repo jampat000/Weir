@@ -106,9 +106,10 @@
   line-height: 16px;
 }
 
-/* A narrow card keeps its switch and its summary before the count of lines left out, and the link is its arrow alone (its words are still its name). */
+/* A narrow card keeps its switch and its summary before the count of lines left out, and the link is its arrow alone (its words are still its name). The tasks card likewise keeps its Columns menu before the count. */
 @container (max-width: 440px) {
-  .mm-sy-card--log .mm-sy-more {
+  .mm-sy-card--log .mm-sy-more,
+  .mm-sy-card--tasks .mm-sy-more {
     display: none;
   }
 }

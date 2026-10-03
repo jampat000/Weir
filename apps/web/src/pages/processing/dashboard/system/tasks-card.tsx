@@ -159,7 +159,7 @@ export function TasksCard() {
       to={JOBS_PATH}
       toLabel="Jobs"
       dataTestId="system-tasks"
-      className="mm-sy-card"
+      className="mm-sy-card mm-sy-card--tasks"
     >
       <div
         ref={listRef}
