@@ -44,7 +44,7 @@ MEANING_RANK = {
     "out_of_schedule": 1,
     "processing": 2,
     "on_hold": 3,
-    "blocked_upstream": 3,
+    "blocked_upstream": 1,
     "passed_through": 3,
     "rejected": 3,
     "processing_failed": 4,
@@ -54,10 +54,10 @@ MEANING_RANK = {
 }
 STATUSES_BY_MEANING = [
     "processed",
+    "blocked_upstream",
     "out_of_schedule",
     "unprocessed",
     "processing",
-    "blocked_upstream",
     "on_hold",
     "passed_through",
     "rejected",
