@@ -44,12 +44,15 @@ public sealed class ProcessingRulesPreviewApiTests
         var server = await WeirTestServer.StartAsync(
             // The watched-folder scan's own periodic scheduler (1s poll, RunAtStart) would otherwise
             // independently discover the same watched folder these tests write into and enqueue a real
-            // scan, racing the "the preview endpoint writes nothing" assertions below.
+            // scan, and the work-folder sweeps enqueue a job of their own just after start; either could
+            // land between the job counts below.
             variables:
             [
                 ("WEIR_SESSION_SECRET", ApiTestClient.Secret),
                 ("WEIR_PROCESSING_WORKER_COUNT", "0"),
                 ("WEIR_PROCESSING_WATCHED_FOLDER_REMUX_SCAN_DISPATCH_SCHEDULE_ENABLED", "false"),
+                ("WEIR_PROCESSING_WORK_TEMP_STALE_SWEEP_MOVIE_SCHEDULE_ENABLED", "0"),
+                ("WEIR_PROCESSING_WORK_TEMP_STALE_SWEEP_TV_SCHEDULE_ENABLED", "0"),
             ],
             configureServices: services =>
             {
