@@ -84,6 +84,8 @@ The `Release` workflow:
 - builds and pushes Docker tags for linux/amd64 and linux/arm64:
   - `ghcr.io/<owner>/<repo>:X.Y.Z` (the git tag is `vX.Y.Z`; the image tag drops the `v`)
   - `ghcr.io/<owner>/<repo>:latest`
+- records a signed provenance attestation for the pushed image's digest (the multi-architecture
+  manifest list), kept in ghcr beside the image, as is already done for the Windows files
 - verifies the published Docker manifest resolves
 - runs the published Docker image and waits for `/health`
 - creates the GitHub Release
@@ -103,7 +105,25 @@ lifecycle against the packaged executable and bundled FFmpeg.
 ## Registry authentication
 
 The release workflow publishes GHCR images with the repository `GITHUB_TOKEN` and
-`packages: write` permission. No personal access token is required for normal releases.
+`packages: write` permission. No personal access token is required for normal releases, and no
+workflow reads a `GHCR_TOKEN` secret.
+
+## Timeouts, permissions and concurrency
+
+- **Every job has a `timeout-minutes`**, about two to three times its slowest recent successful run
+  with a floor of 10, so a hung job fails in minutes instead of holding a runner for the six-hour
+  default. The release's `ci-passed` job keeps 50 minutes because it deliberately waits up to 45
+  for the tagged commit's CI. Raise a limit in the same change that makes a job genuinely slower.
+- **Every workflow starts at `permissions: contents: read`.** A job adds only what it needs: `changes`
+  adds `pull-requests: read`; `windows-smoke` adds `id-token: write` and `attestations: write`;
+  CodeQL's `analyze` adds `security-events: write`; and `publish` alone adds `contents: write`,
+  `packages: write`, `id-token: write` and `attestations: write`.
+- **A release is never cancelled once started.** `release.yml` serialises runs per tag with
+  `cancel-in-progress: false`: a second run for the same tag waits for the first, so `publish` cannot be
+  stopped between pushing the image and publishing the GitHub Release. Pull request runs of `ci.yml`,
+  CodeQL and the docs build do cancel when superseded; a push to `main` never does.
+- **Dependabot is security-only.** `.github/dependabot.yml` sets `open-pull-requests-limit: 0` for every
+  ecosystem, so there are no routine version pull requests; Dependabot security updates still open them.
 
 ## Release artifacts
 
@@ -112,7 +132,7 @@ The release workflow publishes GHCR images with the repository `GITHUB_TOKEN` an
 | `Tag + source tree` | Canonical source snapshot for the release. |
 | `weir-web-dist.zip` | Static production build of `apps/web/dist`. The Weir server is still required. |
 | `Weir-win-Setup.exe` | Windows desktop installer (Velopack) with .NET tray host, bundled .NET server (`server\WeirServer.exe`), bundled web UI, bundled FFmpeg, and delta update support. |
-| `ghcr.io/<owner>/<repo>:X.Y.Z` | Versioned all-in-one container image (linux/amd64 and linux/arm64). |
+| `ghcr.io/<owner>/<repo>:X.Y.Z` | Versioned all-in-one container image (linux/amd64 and linux/arm64), with a provenance attestation (`gh attestation verify oci://ghcr.io/<owner>/<repo>:X.Y.Z --repo <owner>/<repo>`). |
 | `ghcr.io/<owner>/<repo>:latest` | Latest stable container image. |
 
 ## Windows package
