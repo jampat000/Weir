@@ -39,6 +39,6 @@ Messages must explain what happened and what the user should do next. Do not exp
 
 ## Runtime truthfulness
 
-Readiness, metrics, the Processing and History screens, and the Settings and System pages must reflect real runtime behaviour. A disabled worker, unavailable dependency, queued but unprocessed job, or skipped deletion must be shown as degraded/skipped, not successful.
+Readiness, metrics, the Processing and Activity screens, and the Settings and System pages must reflect real runtime behaviour. A disabled worker, unavailable dependency, queued but unprocessed job, or skipped deletion must be shown as degraded/skipped, not successful.
 
-Success totals on Processing and History must be derived from explicit terminal outcome components. Do not calculate a success total from queued jobs, scanned files, attempted work, or broad completed queue rows unless that queue row itself proves finalized work. `MetricsTruth` in `Weir.Core/Observability` refuses negative counts when a total is built.
+Success totals on Processing and Activity must be derived from explicit terminal outcome components. Do not calculate a success total from queued jobs, scanned files, attempted work, or broad completed queue rows unless that queue row itself proves finalized work. `MetricsTruth` in `Weir.Core/Observability` refuses negative counts when a total is built.

@@ -41,7 +41,6 @@ export const processingKeys = {
   operatorSettings: ["processing", "operator-settings"] as const,
   runtimeSettings: ["processing", "runtime-settings"] as const,
   maintenance: ["processing", "maintenance"] as const,
-  metadataProvider: ["processing", "metadata-provider"] as const,
   directPlayDevices: ["processing", "direct-play-devices"] as const,
   libraries: ["processing", "libraries"] as const,
   ruleSets: ["processing", "rule-sets"] as const,
@@ -84,6 +83,6 @@ export const processingKeys = {
     ["processing", "library-file-preview", libraryId, path, ruleSetId] as const,
   libraryRedownloads: (libraryId: number) =>
     ["processing", "library-redownloads", libraryId] as const,
-  /** Files kept without processing again from History's remove dialog (#785). */
+  /** Files kept without processing again from Activity's remove dialog (#785). */
   keptFiles: ["processing", "kept-files"] as const,
 };

@@ -1,82 +1,118 @@
 /*
- * History: every file Weir has touched. The list on the left, the chosen file on the right, divided by a
- * hairline rather than boxed. Below 1100px the file follows the list.
+ * History: every file Weir has touched. The files in one panel on the left, the chosen file's story in a
+ * second on the right. Below 1100px the story follows the list.
  */
 
-.mm-history-filters {
+/*
+ * What narrows the list sits in the header's slot, on the title line after the title: the search, the kinds of file,
+ * then the two pickers at the right, just before Pause. The title block keeps the room for its tabs and eyebrow; the
+ * controls give way, a step at a time (components/shell/title-line-fit.ts): the search to a mark, the pickers into their
+ * card, the last chips into "More". The sizes follow the header's own width, which is not the window's: the menu takes
+ * a different share of it open and collapsed.
+ */
+.mm-history-controls {
   display: flex;
-  flex-wrap: wrap;
+  flex: 1 1 auto;
   align-items: center;
-  gap: 10px 14px;
-  margin-top: 4px;
+  gap: 8px;
+  min-width: 0;
 }
 
-.mm-history-search .mm-input {
-  width: 260px;
-  max-width: 100%;
+/* The form only carries the search's submit; the box in it is a flex item of the controls themselves. */
+.mm-history-search {
+  display: contents;
 }
 
+.mm-history-search-box {
+  flex: 0 100 260px;
+  min-width: 6.5rem;
+}
+
+/* The chips are as wide as they are; the room they are given is what decides how many fold into "More". */
 .mm-history-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
+  flex: 0 1 auto;
+  min-width: 0;
 }
 
-.mm-history-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 30px;
-  padding: 0 12px;
-  border-radius: var(--mm-radius-pill);
-  border: 1px solid var(--mm-line);
-  background: transparent;
-  color: var(--mm-text2);
-  font: inherit;
-  font-size: 0.8125rem;
-  cursor: pointer;
-}
-
-.mm-history-chip:hover {
-  border-color: var(--mm-input-border-hover);
-  color: var(--mm-text);
-}
-
-.mm-history-chip[aria-pressed="true"] {
-  border-color: var(--mm-accent-ring);
-  background: var(--mm-accent-soft);
-  color: var(--mm-text);
-}
-
-.mm-history-chip__count {
-  font-variant-numeric: tabular-nums;
-  color: var(--mm-text3);
-}
-
-.mm-history-chip[aria-pressed="true"] .mm-history-chip__count {
-  color: var(--mm-text2);
+.mm-history-chips .mm-segmented {
+  flex-wrap: nowrap;
+  width: max-content;
 }
 
 .mm-history-scope {
   display: flex;
+  flex: none;
   gap: 8px;
   margin-left: auto;
 }
 
-.mm-history-scope .mm-input {
-  width: 170px;
+/* "Everything kept ▾" is the longest of the two period choices. */
+.mm-period-picker {
+  --picker-w: 10.5rem;
+}
+
+@media (min-width: 921px) {
+  .mm-header__slot:has(.mm-history-controls) {
+    flex: 1 1 auto;
+  }
+
+  .mm-header:has(.mm-history-controls) .mm-header__titles {
+    flex-shrink: 0;
+  }
+}
+
+/* Where the header cannot hold the title and all of this, they take a row of their own under the title. */
+@media (min-width: 921px) and (max-width: 1279px) {
+  .mm-header:has(.mm-history-controls) {
+    flex-wrap: wrap;
+  }
+
+  .mm-header__slot:has(.mm-history-controls) {
+    order: 3;
+    flex-basis: 100%;
+    margin-left: 0;
+    transform: none;
+  }
+}
+
+/* On a phone the chips have a line of their own. */
+@media (max-width: 920px) {
+  .mm-history-controls {
+    flex-wrap: wrap;
+    row-gap: 8px;
+  }
+
+  .mm-history-search {
+    flex: 1 1 12rem;
+    max-width: 22rem;
+  }
+
+  .mm-history-chips {
+    flex: 1 1 100%;
+    order: 3;
+  }
 }
 
 .mm-history-empty {
-  margin: 24px 0 0;
+  margin: var(--mm-panel-gap) 0 0;
+  padding: 28px 18px;
+  border: 1px solid var(--mm-panel-border);
+  border-radius: var(--mm-radius-panel);
+  background: var(--mm-card-bg);
+  text-align: center;
   color: var(--mm-text2);
+}
+
+.mm-history-list .mm-history-empty {
+  margin: 0;
+  padding: 24px 18px;
+  border: 0;
 }
 
 .mm-history-body {
   display: grid;
   grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
-  gap: 28px;
-  margin-top: 16px;
+  gap: var(--mm-panel-gap);
   align-items: start;
 }
 
@@ -93,45 +129,55 @@
 }
 
 .mm-history-table th {
-  height: 32px;
-  padding: 0 10px;
+  height: 36px;
+  padding: 0 18px;
   text-align: left;
   font-size: var(--mm-type-eyebrow);
   font-weight: 600;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--mm-text2);
-  border-bottom: 1px solid var(--mm-line);
+  background: color-mix(in srgb, var(--mm-surface-2) 40%, transparent);
+  border-top: 1px solid var(--mm-hairline);
+  border-bottom: 1px solid var(--mm-hairline);
 }
 
-.mm-history-table th:nth-child(2) {
+.mm-history-table th[data-col="status"] {
   width: 38%;
 }
 
-.mm-history-table th:nth-child(3) {
-  width: 90px;
+.mm-history-table th[data-col="when"] {
+  width: 120px;
 }
 
 .mm-history-table td {
-  padding: 0 10px;
-  min-height: 50px;
-  border-bottom: 1px solid var(--mm-border);
+  padding: 4px 18px;
+  min-height: 56px;
+  border-bottom: 1px solid var(--mm-hairline);
   vertical-align: middle;
   font-size: 0.875rem;
 }
 
+.mm-history-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.mm-history-table tbody tr:hover td {
+  background: color-mix(in srgb, var(--mm-surface-2) 60%, transparent);
+}
+
 .mm-history-table tr.is-selected td {
-  background: var(--mm-accent-soft);
+  background: color-mix(in srgb, var(--mm-primary) 8%, transparent);
 }
 
 .mm-history-table tr.is-selected td:first-child {
-  box-shadow: inset 3px 0 0 var(--mm-accent);
+  box-shadow: inset 3px 0 0 var(--mm-primary);
 }
 
 .mm-history-file {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
+  align-items: center;
+  gap: 10px;
   width: 100%;
   min-width: 0;
   padding: 6px 0;
@@ -143,10 +189,28 @@
   cursor: pointer;
 }
 
-/* A file's name is shown whole, wrapping between its parts, never cut to "…". */
-.mm-history-file__name {
+/* The title's poster, small, at the start of the row. */
+.mm-history-file__poster {
   display: block;
+  width: 30px;
+  flex: none;
+  aspect-ratio: 2 / 3;
+}
+
+.mm-history-file__text {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+/* A file's name wraps between its parts to at most two lines, then an ellipsis; the whole name is the row's title. */
+.mm-history-file__name {
+  display: -webkit-box;
   max-width: 100%;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   overflow-wrap: anywhere;
   font-weight: 600;
   color: var(--mm-text);
@@ -166,21 +230,63 @@
   color: var(--mm-accent-bright);
 }
 
-.mm-history-what--working {
-  color: var(--mm-accent-bright);
+/* The outcome chip may wrap in a narrow column rather than push the table sideways. */
+.mm-history-what {
+  height: auto;
+  min-height: 24px;
+  padding-top: 3px;
+  padding-bottom: 3px;
+  line-height: 1.25;
+  white-space: normal;
 }
 
-.mm-history-what--needs {
-  color: var(--mm-status-warning-text);
-}
+/* On a phone a row is two lines, the file and then what happened and when, because the file name needs the width. */
+@media (max-width: 640px) {
+  .mm-history-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
 
-/* A skip is Weir deciding a file is not for it, not a failure, so it reads as neutral information (#699). */
-.mm-history-what--skipped {
-  color: var(--mm-text2);
-}
+  .mm-history-table,
+  .mm-history-table tbody {
+    display: block;
+  }
 
-.mm-history-what--failed {
-  color: var(--mm-status-failed-text);
+  .mm-history-table tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 2px 12px;
+    padding: 6px 18px;
+    border-bottom: 1px solid var(--mm-hairline);
+  }
+
+  .mm-history-table tbody tr:last-child {
+    border-bottom: 0;
+  }
+
+  .mm-history-table td,
+  .mm-history-table tbody tr:hover td,
+  .mm-history-table tr.is-selected td {
+    display: block;
+    padding: 0;
+    border-bottom: 0;
+    background: none;
+    box-shadow: none;
+  }
+
+  .mm-history-table td[data-col="file"] {
+    grid-column: 1 / -1;
+    order: -1;
+  }
+
+  .mm-history-table tr.is-selected {
+    background: color-mix(in srgb, var(--mm-primary) 8%, transparent);
+    box-shadow: inset 3px 0 0 var(--mm-primary);
+  }
 }
 
 .mm-history-when {
@@ -193,32 +299,25 @@
   display: flex;
   flex-direction: column;
   gap: 14px;
-  padding-left: 28px;
-  border-left: 1px solid var(--mm-line);
+  padding: 18px;
+  border: 1px solid var(--mm-panel-border);
+  border-radius: var(--mm-radius-panel);
+  background: var(--mm-card-bg);
+  box-shadow: var(--mm-shadow-card);
 }
 
 /* At desktop widths the detail stays on screen while the list scrolls past it, so a click's result never
-   scrolls out of view (#687). */
+   scrolls out of view (#687). It sits below the sticky header. */
 @media (min-width: 1100px) {
   .mm-history-detail {
     position: sticky;
-    top: 16px;
-    max-height: calc(100vh - 32px);
+    top: 88px;
+    max-height: calc(100vh - 100px);
     overflow: auto;
   }
 }
 
-@media (max-width: 1100px) {
-  .mm-history-detail {
-    padding-left: 0;
-    padding-top: 20px;
-    border-left: 0;
-    border-top: 1px solid var(--mm-line);
-  }
-}
-
 .mm-history-detail__eyebrow {
-  margin: 0;
   font-size: var(--mm-type-eyebrow);
   font-weight: 600;
   letter-spacing: 0.14em;
@@ -235,7 +334,7 @@
 
 .mm-history-detail__lead {
   margin: -6px 0 0;
-  font-size: 0.8125rem;
+  font-size: var(--mm-type-body);
   line-height: 1.5;
   color: var(--mm-text2);
 }
@@ -244,7 +343,6 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px 32px;
-  margin: 0;
 }
 
 .mm-history-figures dt {
@@ -260,10 +358,6 @@
   font-size: 1.125rem;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
-}
-
-.mm-history-saved {
-  color: var(--mm-accent-bright);
 }
 
 .mm-history-progress {
@@ -283,33 +377,11 @@
   display: block;
   height: 100%;
   border-radius: var(--mm-radius-pill);
-  background: var(--mm-accent);
+  background: var(--mm-st);
   transition: width 0.6s ease;
 }
 
 .mm-history-note {
-  margin: 0;
-  font-size: 0.8125rem;
+  font-size: var(--mm-type-body);
   color: var(--mm-text2);
-}
-
-.mm-history-retention {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-top: 28px;
-  padding-top: 16px;
-  border-top: 1px solid var(--mm-border);
-}
-
-.mm-history-retention__row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  font-size: 0.875rem;
-}
-
-.mm-history-retention__days {
-  width: 96px;
 }

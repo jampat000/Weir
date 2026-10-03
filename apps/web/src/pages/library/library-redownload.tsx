@@ -97,7 +97,7 @@ export function LibraryRedownload({
         </p>
       ) : null}
       {request.isError ? (
-        <p className="mm-drawer__failure" role="alert">
+        <p className="mm-drawer__failure" data-status="broken" role="alert">
           {errorMessage(
             request.error,
             "Weir couldn't ask your media manager. Nothing was deleted; try again.",
@@ -119,6 +119,7 @@ export function LibraryRedownload({
             </>
           }
           confirmLabel="Yes, download it again"
+          tone="danger"
           cancelLabel="Not now"
           busy={request.isPending}
           busyLabel="Asking your media manager…"

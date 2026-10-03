@@ -6,7 +6,7 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, useLocation } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   LibraryCleanResult,
@@ -15,6 +15,11 @@ import type {
   LibraryOverview,
   LibrarySettings,
 } from "../../lib/processing/library-mode-api";
+import {
+  ShellHeaderProvider,
+  useHeaderSlotRef,
+} from "../../components/shell/shell-header-context";
+import { mmActionButtonClass } from "../../lib/ui/mm-control-roles";
 import { LibraryPage } from "./library-page";
 
 const libraries = [
@@ -163,6 +168,8 @@ function file(overrides: Partial<LibraryFile>): LibraryFile {
     problem_kind: null,
     cleaned_at: null,
     leave_alone: false,
+    status: "needs_cleaning",
+    status_reason: "new",
     ...overrides,
   };
 }
@@ -178,16 +185,51 @@ const totals = {
   estimated_bytes_saved: 3_300_000_000,
   cleaned: 2,
   left_alone: 1,
+  by_status: {
+    needs_cleaning: 9,
+    cleaning: 1,
+    matches: 2,
+    cant_clean_yet: 1,
+    left_alone: 1,
+  },
 };
 
-function renderLibrary() {
+/** What the address says, so a test can read what the page wrote to it. */
+function Address() {
+  return <output data-testid="address">{useLocation().search}</output>;
+}
+
+function renderLibrary(address = "/library") {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
   return render(
     <QueryClientProvider client={client}>
-      <MemoryRouter>
+      <MemoryRouter initialEntries={[address]}>
         <LibraryPage />
+        <Address />
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
+}
+
+/** The shell's header, reduced to the slot a page's own controls go in. */
+function HeaderSlot() {
+  const slotRef = useHeaderSlotRef();
+  return <div data-testid="header-slot" ref={slotRef} />;
+}
+
+function renderInShell(address = "/library") {
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  return render(
+    <QueryClientProvider client={client}>
+      <MemoryRouter initialEntries={[address]}>
+        <ShellHeaderProvider>
+          <HeaderSlot />
+          <LibraryPage />
+        </ShellHeaderProvider>
       </MemoryRouter>
     </QueryClientProvider>,
   );
@@ -208,6 +250,7 @@ function settings(over: Partial<LibrarySettings>): LibrarySettings {
 
 describe("LibraryPage", () => {
   beforeEach(() => {
+    localStorage.clear();
     clean.mockReset();
     setAside.mockReset();
     rescan.mockReset();
@@ -255,6 +298,8 @@ describe("LibraryPage", () => {
         file({
           path: "D:/tv/The Quiet Harbour/Season 01/The.Quiet.Harbour.S01E02.mkv",
           classification: "matches",
+          status: "matches",
+          status_reason: null,
           summary: "Already matches your rules",
           estimated_bytes_saved: 0,
         }),
@@ -262,6 +307,8 @@ describe("LibraryPage", () => {
           path: "D:/tv/Northbound/Season 01/Northbound.S01E01.mkv",
           manager_title: "Northbound",
           classification: "cannot_process",
+          status: "cant_clean_yet",
+          status_reason: null,
           summary: "Still seeding, so Weir left it alone",
           problem_kind: "seeding",
           estimated_bytes_saved: 0,
@@ -275,20 +322,32 @@ describe("LibraryPage", () => {
     };
   });
 
-  it("names the library in the title, and groups files under the title they belong to", () => {
+  it("names the library beside the title, and groups files under the title they belong to", () => {
     renderLibrary();
 
     expect(screen.getByTestId("library-picker")).toHaveTextContent("TV");
-    expect(
-      screen.getByRole("heading", { name: "Library" }),
-    ).toBeInTheDocument();
     expect(screen.getAllByTestId("library-row")).toHaveLength(3);
     expect(screen.getByText("Northbound")).toBeInTheDocument();
-    expect(
-      screen.getByText(/Sonarr · 2 files · 1 would change/),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Sonarr · 2 files")).toBeInTheDocument();
+    expect(screen.getByText("1 need cleaning")).toHaveAttribute(
+      "data-status",
+      "todo",
+    );
     expect(
       screen.getByText(/back if everything that would change is cleaned/),
+    ).toBeInTheDocument();
+  });
+
+  it("puts the figures in the Files card's count, with what Weir does with the files on hover", () => {
+    renderLibrary();
+
+    const count = screen.getByText("14 files · 27.94 GB");
+    expect(count).toHaveAttribute(
+      "title",
+      expect.stringContaining("Weir reads them where they are"),
+    );
+    expect(
+      screen.getByText(/14 files, 27.94 GB on your storage/),
     ).toBeInTheDocument();
   });
 
@@ -302,8 +361,13 @@ describe("LibraryPage", () => {
       schedule: { enabled: true, next_run_at: "2999-01-02T02:00:00Z" },
     };
     const next = renderLibrary();
+    // The header has room for a few words; the whole sentence is the tooltip.
     expect(screen.getByTestId("library-schedule")).toHaveTextContent(
-      /next scheduled check and clean .*2999/,
+      /^· next /,
+    );
+    expect(screen.getByTestId("library-scan")).toHaveAttribute(
+      "title",
+      expect.stringMatching(/next scheduled check and clean .*2999/),
     );
     next.unmount();
 
@@ -313,7 +377,11 @@ describe("LibraryPage", () => {
     };
     const due = renderLibrary();
     expect(screen.getByTestId("library-schedule")).toHaveTextContent(
-      "scheduled check and clean starting now",
+      "next starting now",
+    );
+    expect(screen.getByTestId("library-scan")).toHaveAttribute(
+      "title",
+      expect.stringContaining("scheduled check and clean starting now"),
     );
     due.unmount();
 
@@ -327,20 +395,22 @@ describe("LibraryPage", () => {
     );
   });
 
-  it("makes each count a filter, and asks the server for that filter", () => {
+  it("makes each count a filter, asks the server for that status, and puts it in the address", () => {
     renderLibrary();
-    const chip = screen.getByRole("button", { name: /Would change/ });
-    expect(chip).toHaveTextContent("10");
+    const chip = screen.getByRole("button", { name: /Needs cleaning/ });
+    expect(chip).toHaveTextContent("9");
 
     fireEvent.click(chip);
 
     expect(chip).toHaveAttribute("aria-pressed", "true");
-    expect(lastFilters.at(-1)).toMatchObject({
-      classification: "would_change",
-    });
+    expect(lastFilters.at(-1)).toMatchObject({ status: "needs_cleaning" });
+    expect(screen.getByTestId("address")).toHaveTextContent(
+      "?show=needs_cleaning",
+    );
 
     fireEvent.click(chip);
-    expect(lastFilters.at(-1)?.classification).toBeUndefined();
+    expect(lastFilters.at(-1)?.status).toBeUndefined();
+    expect(screen.getByTestId("address")).toBeEmptyDOMElement();
   });
 
   it("only offers to clean what it would change, and asks before doing it", () => {
@@ -461,6 +531,9 @@ describe("LibraryPage", () => {
 
     expect(screen.getByTestId("library-confirm-warnings")).toHaveTextContent(
       "This file is still shared with a download.",
+    );
+    expect(screen.getByTestId("library-confirm-confirm")).toHaveClass(
+      ...mmActionButtonClass({ variant: "primary" }).split(" "),
     );
     expect(clean).not.toHaveBeenCalledWith(
       expect.objectContaining({ confirm: true }),
@@ -676,18 +749,14 @@ describe("LibraryPage", () => {
     expect(said).toHaveTextContent("still shared with a download");
   });
 
-  it("counts what Weir has done with these files, and filters by it", () => {
+  it("has no chip for what Weir has done: that is history, a note on the row", () => {
     renderLibrary();
 
-    const cleaned = screen.getByRole("button", { name: /Cleaned/ });
-    expect(cleaned).toHaveTextContent("2");
     expect(
-      screen.getByRole("button", { name: /Left alone/ }),
-    ).toHaveTextContent("1");
-
-    fireEvent.click(cleaned);
-
-    expect(lastFilters.at(-1)).toMatchObject({ state: "cleaned" });
+      screen.queryByRole("button", { name: /^Cleaned/ }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText("already clean")).toBeInTheDocument();
+    expect(screen.getByText("new")).toBeInTheDocument();
   });
 
   it("shows a library with no folders a step to set it up, not a link back to Settings", () => {
@@ -742,5 +811,331 @@ describe("LibraryPage", () => {
     fireEvent.click(screen.getByRole("option", { name: /Movies/ }));
 
     expect(screen.getByTestId("library-picker")).toHaveTextContent("Movies");
+  });
+
+  it("opens the library the address names", () => {
+    renderLibrary("/library?library=2");
+
+    expect(screen.getByTestId("library-picker")).toHaveTextContent("Movies");
+  });
+
+  it("opens the library last picked here when the address names none", () => {
+    const first = renderLibrary();
+    fireEvent.click(
+      within(screen.getByTestId("library-picker")).getByRole("button", {
+        name: /TV/,
+      }),
+    );
+    fireEvent.click(screen.getByRole("option", { name: /Movies/ }));
+    first.unmount();
+
+    renderLibrary();
+
+    expect(screen.getByTestId("library-picker")).toHaveTextContent("Movies");
+  });
+
+  it("prefers the library in the address to the one last picked", () => {
+    localStorage.setItem("weir-library-last", "2");
+
+    renderLibrary("/library?library=1");
+
+    expect(screen.getByTestId("library-picker")).toHaveTextContent("TV");
+  });
+
+  it("puts the picker, the search and the counts on the header's title line, and none of them in the Files card", () => {
+    renderInShell();
+
+    const slot = screen.getByTestId("header-slot");
+    const controls = within(slot).getByTestId("library-controls");
+    expect(
+      [...controls.children].map((c) => c.getAttribute("data-testid")),
+    ).toEqual(["library-picker", null, null]);
+    expect(
+      within(slot).getByRole("searchbox", { name: "Search this workflow" }),
+    ).toBeInTheDocument();
+    expect(
+      within(within(slot).getByRole("group", { name: "Show" }))
+        .getAllByRole("button")
+        .map((chip) => chip.textContent),
+    ).toEqual([
+      "All 14",
+      "Needs cleaning 9",
+      "Cleaning 1",
+      "Matches rules 2",
+      "Can't clean 1",
+      "Left alone 1",
+    ]);
+
+    const card = screen.getByRole("region", { name: "Files" });
+    expect(within(card).queryByRole("searchbox")).not.toBeInTheDocument();
+    expect(
+      within(card).queryByRole("group", { name: "Show" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("keeps the Columns menu and what cleaning would give back in the Files card's header", () => {
+    renderInShell();
+
+    const card = screen.getByRole("region", { name: "Files" });
+    const columns = within(card).getByRole("button", { name: "Columns" });
+    expect(columns.closest("header")).toBe(card.querySelector("header"));
+    expect(
+      within(card.querySelector("header")!).getByText(/back if everything/),
+    ).toBeInTheDocument();
+    expect(
+      within(card).queryByRole("button", { name: "Compact rows" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("asks the server for the files by title until a heading is clicked", () => {
+    renderInShell();
+
+    expect(lastFilters.at(-1)).toMatchObject({
+      sort: "title",
+      direction: "asc",
+    });
+  });
+
+  it("sorts the whole library by a heading on the server, from the first page, and reverses on a second click", async () => {
+    renderInShell();
+
+    fireEvent.click(screen.getByRole("button", { name: "Size" }));
+    await waitFor(() =>
+      expect(lastFilters.at(-1)).toMatchObject({
+        sort: "size",
+        direction: "desc",
+        page: 1,
+      }),
+    );
+    expect(screen.getByRole("columnheader", { name: "Size" })).toHaveAttribute(
+      "aria-sort",
+      "descending",
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Size" }));
+    await waitFor(() =>
+      expect(lastFilters.at(-1)).toMatchObject({
+        sort: "size",
+        direction: "asc",
+      }),
+    );
+  });
+
+  it("sorts by the status column in the server's own words", async () => {
+    renderInShell();
+
+    fireEvent.click(screen.getByRole("button", { name: "What Weir would do" }));
+
+    await waitFor(() =>
+      expect(lastFilters.at(-1)).toMatchObject({ sort: "status" }),
+    );
+  });
+
+  it("remembers the sort in this browser, and puts it back with Reset columns", async () => {
+    const view = renderInShell();
+    fireEvent.click(screen.getByRole("button", { name: "Back" }));
+    await waitFor(() =>
+      expect(lastFilters.at(-1)).toMatchObject({ sort: "saved" }),
+    );
+    view.unmount();
+
+    renderInShell();
+    expect(lastFilters.at(-1)).toMatchObject({ sort: "saved" });
+
+    fireEvent.click(screen.getByRole("button", { name: "Columns" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Reset columns" }));
+    await waitFor(() =>
+      expect(lastFilters.at(-1)).toMatchObject({
+        sort: "title",
+        direction: "asc",
+      }),
+    );
+    expect(localStorage.getItem("weir-table:library-files")).toBeNull();
+  });
+
+  it("asks the server for what is typed in the header's search", async () => {
+    renderInShell();
+
+    fireEvent.change(
+      screen.getByRole("searchbox", { name: "Search this workflow" }),
+      {
+        target: { value: "harbour" },
+      },
+    );
+
+    await waitFor(() =>
+      expect(lastFilters.at(-1)).toMatchObject({ q: "harbour" }),
+    );
+  });
+
+  it("puts when the library was last checked in the Files card's header, and Check again with the page's buttons", () => {
+    renderInShell();
+
+    const card = screen.getByRole("region", { name: "Files" });
+    const head = card.querySelector("header")!;
+    expect(within(head).getByTestId("library-scan")).toHaveTextContent(
+      /^checked/,
+    );
+    expect(
+      within(card).queryByRole("button", { name: "Check again" }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Check again" }));
+    expect(rescan).toHaveBeenCalled();
+  });
+
+  it("has an All chip, selected to begin with, that clears the filter and is no part of the request", () => {
+    renderLibrary();
+    const all = screen.getByRole("button", { name: /^All/ });
+    expect(all).toHaveAttribute("aria-pressed", "true");
+
+    fireEvent.click(screen.getByRole("button", { name: /Needs cleaning/ }));
+    expect(all).toHaveAttribute("aria-pressed", "false");
+    expect(lastFilters.at(-1)).toMatchObject({ status: "needs_cleaning" });
+
+    fireEvent.click(all);
+    expect(all).toHaveAttribute("aria-pressed", "true");
+    expect(lastFilters.at(-1)?.status).toBeUndefined();
+    expect(screen.getByTestId("address")).toBeEmptyDOMElement();
+  });
+
+  it.each([
+    ["needs_cleaning", "needs_cleaning"],
+    ["cleaning", "cleaning"],
+    ["matches", "matches"],
+    ["cant_clean_yet", "cant_clean_yet"],
+    ["left_alone", "left_alone"],
+    // The words the old chips used still land on the slice they were about.
+    ["would_change", "needs_cleaning"],
+    ["would-change", "needs_cleaning"],
+    ["cannot_process", "cant_clean_yet"],
+    ["untouched", "cant_clean_yet"],
+  ])("opens on the status an address names: ?show=%s", (show, status) => {
+    renderLibrary(`/library?show=${show}`);
+
+    expect(lastFilters.at(-1)).toMatchObject({ status });
+  });
+
+  it.each(["cleaned", "nonsense", ""])(
+    "shows every file for an address that names no status: ?show=%s",
+    (show) => {
+      renderLibrary(`/library?show=${show}`);
+
+      expect(lastFilters.at(-1)?.status).toBeUndefined();
+      expect(screen.getByRole("button", { name: /^All/ })).toHaveAttribute(
+        "aria-pressed",
+        "true",
+      );
+    },
+  );
+
+  it("shows each count and each file by what its status means: needs cleaning waits, cleaning is under way, matches is done, held back needs a look, set aside is idle", () => {
+    renderLibrary();
+
+    const tone = (name: RegExp) =>
+      screen.getByRole("button", { name }).getAttribute("data-status");
+    expect(tone(/Needs cleaning/)).toBe("todo");
+    expect(tone(/Cleaning \d/)).toBe("doing");
+    expect(tone(/Matches rules/)).toBe("done");
+    expect(tone(/Can't clean/)).toBe("attention");
+    expect(tone(/Left alone/)).toBe("idle");
+    expect(tone(/^All/)).toBeNull();
+
+    const rows = screen.getAllByTestId("library-row");
+    const verdict = (row: HTMLElement) =>
+      row.querySelector(".mm-library-verdict .mm-library-rag");
+    expect(
+      new Set(rows.map((row) => verdict(row)?.getAttribute("data-status"))),
+    ).toEqual(new Set(["todo", "done", "attention"]));
+  });
+
+  it("narrows can't clean yet to one reason, only while that status is chosen", () => {
+    renderLibrary();
+    expect(
+      screen.queryByRole("combobox", { name: /cannot clean a file yet/ }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /Can't clean/ }));
+    fireEvent.change(
+      screen.getByRole("combobox", { name: /cannot clean a file yet/ }),
+      { target: { value: "seeding" } },
+    );
+
+    expect(lastFilters.at(-1)).toMatchObject({
+      status: "cant_clean_yet",
+      problem: "seeding",
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /^All/ }));
+    expect(lastFilters.at(-1)?.problem).toBeUndefined();
+  });
+
+  describe("a status with no files", () => {
+    const withCounts = (by_status: Partial<typeof totals.by_status>) => {
+      overviewResult = {
+        ...overviewResult,
+        totals: {
+          ...totals,
+          by_status: { ...totals.by_status, ...by_status },
+        },
+      };
+    };
+    const chips = () =>
+      within(screen.getByRole("group", { name: "Show" }))
+        .getAllByRole("button")
+        .map((chip) => chip.textContent);
+
+    it("still has its chip, with a 0 shown muted, and every chip keeps its place", () => {
+      withCounts({ cleaning: 0, left_alone: 0 });
+      renderLibrary();
+
+      expect(chips()).toEqual([
+        "All 14",
+        "Needs cleaning 9",
+        "Cleaning 0",
+        "Matches rules 2",
+        "Can't clean 1",
+        "Left alone 0",
+      ]);
+      expect(screen.getByRole("button", { name: /Cleaning/ })).toHaveAttribute(
+        "data-empty",
+      );
+      expect(
+        screen.getByRole("button", { name: /Needs cleaning/ }),
+      ).not.toHaveAttribute("data-empty");
+    });
+
+    it("renders all six when nothing is in any status", () => {
+      withCounts({
+        needs_cleaning: 0,
+        cleaning: 0,
+        matches: 0,
+        cant_clean_yet: 0,
+        left_alone: 0,
+      });
+      renderLibrary();
+
+      expect(chips()).toEqual([
+        "All 14",
+        "Needs cleaning 0",
+        "Cleaning 0",
+        "Matches rules 0",
+        "Can't clean 0",
+        "Left alone 0",
+      ]);
+    });
+
+    it("can still be chosen, and the table says so in a line when there is nothing in it", () => {
+      withCounts({ cleaning: 0 });
+      filesResult = { ...filesResult, files: [], total: 0 };
+      renderLibrary();
+
+      fireEvent.click(screen.getByRole("button", { name: /Cleaning/ }));
+
+      expect(lastFilters.at(-1)).toMatchObject({ status: "cleaning" });
+      expect(screen.getByTestId("library-empty")).toHaveTextContent(
+        "No files are being cleaned right now.",
+      );
+    });
   });
 });

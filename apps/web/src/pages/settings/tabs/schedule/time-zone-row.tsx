@@ -1,6 +1,5 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
-import { SettingRow } from "../../../../components/shared/settings-group";
 import { MmListboxPicker } from "../../../../components/ui/mm-listbox-picker";
 import { errorMessage } from "../../../../lib/api/error-message";
 import { useAppSettingsSaveMutation } from "../../../../lib/settings/queries";
@@ -24,17 +23,23 @@ export function savedZone(settings: AppSettings): string {
 }
 
 /**
- * The time zone, on the Schedule tab because every time on it is read in this zone. The parent keys
- * this row on the saved zone, so a save elsewhere resets the choice.
+ * The time zone every time in Weir is read in: the picker with a Save that appears once a different zone is chosen,
+ * and the time it is there now. The parent keys this row on the saved zone, so a save elsewhere resets the choice.
  */
 export function TimeZoneRow({
+  labelId,
   settings,
   editable,
   now,
+  onUnsavedChange,
 }: {
+  /** The id of the visible text that names this setting. */
+  labelId: string;
   settings: AppSettings;
   editable: boolean;
   now: Date;
+  /** Told whether a zone is chosen and not yet saved, so the page can ask before it is left. */
+  onUnsavedChange?: (unsaved: boolean) => void;
 }) {
   const save = useAppSettingsSaveMutation();
   const saved = savedZone(settings);
@@ -43,48 +48,54 @@ export function TimeZoneRow({
   const clock = zoneClock(now, settings.app_timezone || FALLBACK_ZONE);
   const dirty = zone !== saved && zone !== "";
 
+  useEffect(() => {
+    onUnsavedChange?.(dirty);
+    return () => onUnsavedChange?.(false);
+  }, [dirty, onUnsavedChange]);
+
   return (
-    <SettingRow
-      label={<span id="schedule-timezone-label">Time zone</span>}
-      hint={
-        <>
-          It is {DAY_NAMES[clock.weekday]} {twoDigits(clock.hour)}:
-          {twoDigits(clock.minute)} there now. Every time on this page, and
-          across Weir, is in this zone.
-        </>
-      }
-    >
+    <>
       <div className="mm-schedule-zone">
         <MmListboxPicker
-          ariaLabelledBy="schedule-timezone-label"
+          ariaLabelledBy={labelId}
           placeholder="Select time zone"
           disabled={!editable || save.isPending}
           options={options.map((tz) => ({ value: tz.id, label: tz.label }))}
           value={zone}
           onChange={setZone}
         />
-        <button
-          type="button"
-          className={mmActionButtonClass({ variant: "primary" })}
-          disabled={!editable || !dirty || save.isPending}
-          data-testid="schedule-save-timezone"
-          onClick={() =>
-            save.mutate({
-              signed_in_home_notice: settings.signed_in_home_notice,
-              setup_wizard_state: settings.setup_wizard_state,
-              app_timezone: zone,
-              log_retention_days: settings.log_retention_days,
-            })
-          }
-        >
-          {save.isPending ? "Saving…" : "Save"}
-        </button>
+        {dirty ? (
+          <button
+            type="button"
+            className={`${mmActionButtonClass({ variant: "primary" })} mm-sys-btn`}
+            disabled={!editable || save.isPending}
+            data-testid="schedule-save-timezone"
+            onClick={() =>
+              save.mutate({
+                signed_in_home_notice: settings.signed_in_home_notice,
+                setup_wizard_state: settings.setup_wizard_state,
+                app_timezone: zone,
+                log_retention_days: settings.log_retention_days,
+              })
+            }
+          >
+            {save.isPending ? "Saving…" : "Save"}
+          </button>
+        ) : null}
       </div>
+      <p className="mm-sys-note">
+        Now {DAY_NAMES[clock.weekday]} {twoDigits(clock.hour)}:
+        {twoDigits(clock.minute)}. Every time across Weir is in this zone.
+      </p>
       {save.isError ? (
-        <p className="mm-status-text--failed mt-2 text-sm" role="alert">
+        <p
+          className="mm-status-text mt-2 text-sm"
+          data-status="broken"
+          role="alert"
+        >
           {errorMessage(save.error, "The time zone could not be saved.")}
         </p>
       ) : null}
-    </SettingRow>
+    </>
   );
 }

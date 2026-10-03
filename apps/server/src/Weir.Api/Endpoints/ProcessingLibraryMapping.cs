@@ -112,7 +112,7 @@ internal static class ProcessingLibraryMapping
             .Set("schedule_start", row.ScheduleStart)
             .Set("schedule_end", row.ScheduleEnd)
             .Set("max_concurrent_files", row.MaxConcurrentFiles)
-            // What the workflow is held to right now: never more than Settings › Performance's "Files at once", even if that was lowered after this was set.
+            // What the workflow is held to right now: never more than "Files at once" in Setup › Performance › Speed, even if that was lowered after this was set.
             .Set("effective_max_concurrent_files", OperatorSettingsRules.EffectiveLibraryLimit(row.MaxConcurrentFiles, performance.MaxConcurrentFiles))
             .Set("priority", row.Priority)
             .Set("rule_set_id", row.RuleSetId)

@@ -5,6 +5,7 @@ using Weir.Api.Http;
 using Weir.Core.Auth;
 using Weir.Core.Json;
 using Weir.Core.Validation;
+using Weir.Infrastructure.Artwork;
 using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.Processing;
 
@@ -32,12 +33,14 @@ internal sealed class ProcessingKeptFilesEndpointHandlers
     private readonly FileSkipMarkerStore _skipMarkers;
     private readonly ProcessingJobStore _jobs;
     private readonly LibraryStore _libraries;
+    private readonly ArtworkPosterUrls _posters;
 
-    public ProcessingKeptFilesEndpointHandlers(FileSkipMarkerStore skipMarkers, ProcessingJobStore jobs, LibraryStore libraries)
+    public ProcessingKeptFilesEndpointHandlers(FileSkipMarkerStore skipMarkers, ProcessingJobStore jobs, LibraryStore libraries, ArtworkPosterUrls posters)
     {
         _skipMarkers = skipMarkers ?? throw new ArgumentNullException(nameof(skipMarkers));
         _jobs = jobs ?? throw new ArgumentNullException(nameof(jobs));
         _libraries = libraries ?? throw new ArgumentNullException(nameof(libraries));
+        _posters = posters ?? throw new ArgumentNullException(nameof(posters));
     }
 
     public async Task<ApiResult> GetKeptFilesAsync(ApiRequest request)
@@ -45,11 +48,13 @@ internal sealed class ProcessingKeptFilesEndpointHandlers
         await request.RequireUserAsync().ConfigureAwait(false);
         var uow = await request.DbAsync().ConfigureAwait(false);
         var rows = await _skipMarkers.ListAsync(uow).ConfigureAwait(false);
+        var posters = await _posters.ForFilesAsync(uow, rows.Select(row => (row.LibraryId, row.RelativePath))).ConfigureAwait(false);
         return ApiRoutes.Ok(new WireObject().Set("files", new WireArray(rows.Select(row => (WireValue)new WireObject()
             .Set("id", row.Id)
             .Set("library_id", row.LibraryId)
             .Set("library_name", row.LibraryName)
             .Set("relative_path", row.RelativePath)
+            .Set("poster_url", posters.GetValueOrDefault((row.LibraryId, row.RelativePath)))
             .Set("size_bytes", row.SizeBytes)
             .Set("kept_at", row.CreatedAt.ToWireText())))));
     }

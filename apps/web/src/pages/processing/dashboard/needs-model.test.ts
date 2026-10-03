@@ -1,0 +1,525 @@
+import { describe, expect, it } from "vitest";
+
+import type { ProcessingFile } from "../../../lib/processing/files-api";
+import type { ProcessingLibrary } from "../../../lib/processing/libraries-api";
+import { ACTIVITY_GROUPS } from "../../activity/activity-entries";
+import {
+  FAILED_JOBS_LIMIT,
+  FILES_SHOWN_PER_GROUP,
+  buildNeeds,
+  failedJobsOf,
+  needUnits,
+  needsLeftOut,
+} from "./needs-model";
+
+const workflow = {
+  enabled: true,
+  watched_folder: "D:/downloads/tv",
+} as ProcessingLibrary;
+
+function failedFile(
+  id: number,
+  overrides: Partial<ProcessingFile> = {},
+): ProcessingFile {
+  return {
+    id,
+    library_id: 1,
+    library_name: "TV",
+    relative_path: `Ember.and.Ash.S01E0${id}.mkv`,
+    status: "processing_failed",
+    status_reason: "",
+    failure_class: "execution",
+    ...overrides,
+  } as ProcessingFile;
+}
+
+function rejectedFile(
+  id: number,
+  overrides: Partial<ProcessingFile> = {},
+): ProcessingFile {
+  return failedFile(id, {
+    status: "rejected",
+    failure_class: "rules",
+    status_reason: "Rejected: none of its audio tracks are in English.",
+    ...overrides,
+  });
+}
+
+function worker(module: string, status: string, detail: string) {
+  return {
+    module,
+    status,
+    detail,
+    active_workers: 0,
+    expected_workers: 1,
+    stale_workers: 0,
+    stopped_workers: 0,
+  };
+}
+
+const healthy = {
+  workflows: [workflow],
+  workflowId: null,
+  readiness: { worker_health: [] },
+  failedJobs: { count: 0, capped: false },
+  filter: "all" as const,
+  files: [],
+};
+
+describe("what needs a person", () => {
+  it("is nothing for a healthy install", () => {
+    expect(buildNeeds(healthy)).toEqual([]);
+  });
+
+  it("asks for a workflow to watch when none is on, but not while they are still loading", () => {
+    const [group] = buildNeeds({
+      ...healthy,
+      workflows: [{ ...workflow, enabled: false } as ProcessingLibrary],
+    });
+
+    expect(group.rows[0].title).toBe("Nothing to watch yet");
+    expect(group.rows[0].link?.to).toBe("/setup/workflows");
+    expect(buildNeeds({ ...healthy, workflows: undefined })).toEqual([]);
+  });
+
+  it("says background work has stopped, with the reason the server gave", () => {
+    const [group] = buildNeeds({
+      ...healthy,
+      readiness: {
+        worker_health: [
+          worker(
+            "processing",
+            "degraded",
+            "No worker has taken a job for 20 minutes.",
+          ),
+          worker("other", "ok", ""),
+        ],
+      },
+    });
+
+    expect(group.rows).toHaveLength(1);
+    expect(group.rows[0].title).toBe("Background work has stopped");
+    expect(group.rows[0]).toMatchObject({
+      reason: "Not responding · restart Weir",
+      detail: "No worker has taken a job for 20 minutes.",
+    });
+  });
+
+  it("counts failed jobs, and stops counting at the limit", () => {
+    const title = (count: number, capped = false) =>
+      buildNeeds({ ...healthy, failedJobs: { count, capped } })[0].rows[0]
+        .title;
+
+    expect(title(1)).toBe("1 job failed");
+    expect(title(2)).toBe("2 jobs failed");
+    expect(title(FAILED_JOBS_LIMIT, true)).toBe(
+      `${FAILED_JOBS_LIMIT}+ jobs failed`,
+    );
+  });
+
+  it("groups what is wrong with Weir itself under one title", () => {
+    const [group] = buildNeeds({
+      ...healthy,
+      failedJobs: { count: 2, capped: false },
+      readiness: { worker_health: [worker("p", "degraded", "x")] },
+    });
+
+    expect(group.title).toBe("2 things to fix in Weir");
+  });
+});
+
+describe("what each need means", () => {
+  it("is broken for a failed file and attention for one held back or turned away", () => {
+    const groups = buildNeeds({
+      ...healthy,
+      files: [failedFile(1), rejectedFile(2)],
+    });
+
+    expect(groups.map((group) => group.meaning)).toEqual([
+      "broken",
+      "attention",
+    ]);
+    expect(groups.map((group) => group.rows[0].meaning)).toEqual([
+      "broken",
+      "attention",
+    ]);
+  });
+
+  it("is broken for stopped work and failed jobs, and attention for having nothing to watch", () => {
+    const [stopped] = buildNeeds({
+      ...healthy,
+      readiness: { worker_health: [worker("p", "degraded", "x")] },
+    });
+    const [nothing] = buildNeeds({
+      ...healthy,
+      workflows: [{ ...workflow, enabled: false } as ProcessingLibrary],
+    });
+
+    expect(stopped.meaning).toBe("broken");
+    expect(nothing).toMatchObject({
+      meaning: "attention",
+      rows: [{ meaning: "attention" }],
+    });
+  });
+
+  it("gives the group the worst meaning of what Weir itself has wrong", () => {
+    const [group] = buildNeeds({
+      ...healthy,
+      workflows: [{ ...workflow, enabled: false } as ProcessingLibrary],
+      failedJobs: { count: 1, capped: false },
+    });
+
+    expect(group.rows.map((row) => row.meaning)).toEqual([
+      "attention",
+      "broken",
+    ]);
+    expect(group.meaning).toBe("broken");
+  });
+});
+
+describe("the failed jobs", () => {
+  const jobs = [
+    { job_kind: "processing.file.remux_pass.v1" },
+    { job_kind: "processing.watched_folder.remux_scan_dispatch.v1" },
+    { job_kind: "processing.library.clean.v1" },
+    { job_kind: "processing.work_temp_stale_sweep.v1" },
+  ];
+
+  it("counts every one, of any kind of work, housekeeping included", () => {
+    expect(failedJobsOf(jobs).count).toBe(4);
+  });
+
+  it("says the count may be short when the server's list was full", () => {
+    const full = Array.from({ length: FAILED_JOBS_LIMIT }, () => jobs[0]);
+
+    expect(failedJobsOf(full)).toEqual({
+      count: FAILED_JOBS_LIMIT,
+      capped: true,
+    });
+    expect(failedJobsOf(jobs).capped).toBe(false);
+  });
+});
+
+describe("what needs a person, for one kind of work", () => {
+  const trouble = {
+    ...healthy,
+    workflows: [{ ...workflow, enabled: false } as ProcessingLibrary],
+    readiness: { worker_health: [worker("p", "degraded", "x")] },
+    failedJobs: { count: 2, capped: false },
+    files: [failedFile(1), rejectedFile(2)],
+  };
+  const weirRows = ["setup", "worker-p", "failed-jobs"];
+
+  it("keeps new downloads' files, and still says what is wrong with Weir itself", () => {
+    const groups = buildNeeds({ ...trouble, filter: "download" });
+
+    expect(groups.map((group) => group.key)).toEqual([
+      "weir",
+      "failed-writing",
+      "rejected-language",
+    ]);
+    expect(groups[0].rows.map((row) => row.key)).toEqual(weirRows);
+  });
+
+  it("has no files for library cleaning, whose files are cleaned from the job queue, but still says what is wrong with Weir itself", () => {
+    const groups = buildNeeds({ ...trouble, filter: "library" });
+
+    expect(groups.map((group) => group.key)).toEqual(["weir"]);
+    expect(groups[0].rows.map((row) => row.key)).toEqual(weirRows);
+  });
+
+  it("is clear for library cleaning when nothing is wrong with Weir", () => {
+    expect(
+      buildNeeds({ ...healthy, files: trouble.files, filter: "library" }),
+    ).toEqual([]);
+  });
+});
+
+describe("the files that need a person", () => {
+  it("gives each file a row with its name, a few words on why, the server's sentence and the file itself", () => {
+    const [group] = buildNeeds({
+      ...healthy,
+      files: [
+        failedFile(2, {
+          status_reason: "The new file would not play. The original is safe.",
+        }),
+      ],
+    });
+
+    expect(group.rows[0]).toMatchObject({
+      title: "Ember and Ash S01E02",
+      reason: "Writing stopped · original kept",
+      detail: "The new file would not play.",
+      file: { id: 2 },
+    });
+  });
+
+  it("says what is true when a file has no reason of its own", () => {
+    const [group] = buildNeeds({
+      ...healthy,
+      files: [failedFile(1, { failure_class: null })],
+    });
+
+    expect(group.rows[0]).toMatchObject({
+      reason: "Couldn't finish · original kept",
+      detail: undefined,
+    });
+  });
+
+  it("says the kind of stop in a few words, whatever the server's sentence", () => {
+    const reasons = (failureClass: string | null) =>
+      buildNeeds({
+        ...healthy,
+        files: [failedFile(1, { failure_class: failureClass })],
+      })[0].rows[0].reason;
+
+    expect(reasons("preflight")).toBe("A check failed · original kept");
+    expect(reasons("guardrail")).toBe("Safety stop · original kept");
+  });
+
+  it("titles each group by how many files share a reason, in plain words", () => {
+    const groups = buildNeeds({
+      ...healthy,
+      files: [
+        failedFile(1),
+        failedFile(2, { failure_class: "preflight" }),
+        failedFile(3, { failure_class: "guardrail" }),
+        failedFile(4, { failure_class: null }),
+        rejectedFile(5),
+        rejectedFile(6),
+        rejectedFile(7, { status_reason: "Rejected: no keepable track." }),
+        rejectedFile(8, {
+          failure_class: "execution",
+          status_reason: "Rejected for a replacement.",
+        }),
+      ],
+    });
+
+    expect(groups.map((group) => group.title)).toEqual([
+      "1 couldn't finish writing",
+      "1 didn't pass the checks",
+      "1 stopped by a safety check",
+      "1 couldn't finish",
+      "2 not in a language you keep",
+      "1 rejected by your rules",
+      "1 rejected for a replacement",
+    ]);
+  });
+
+  it("lists a file held with no clock on it as stuck, but not one counting down to its turn", () => {
+    const stuck = failedFile(1, {
+      status: "on_hold",
+      hold_until: null,
+      status_reason: "Weir could not open this file for reading.",
+    });
+    const settling = failedFile(2, {
+      status: "on_hold",
+      hold_until: "2026-10-02T12:00:00Z",
+    });
+
+    const groups = buildNeeds({ ...healthy, files: [stuck, settling] });
+
+    expect(groups.map((group) => group.title)).toEqual(["1 stuck"]);
+    expect(groups[0].rows[0].file?.id).toBe(1);
+  });
+
+  it("lists a file skipped by one of the workflow's rules, but not a routine skip", () => {
+    const byRule = failedFile(1, {
+      status: "skipped",
+      status_reason:
+        "Skipped because its path matches this workflow's exclude patterns.",
+    });
+    const routine = failedFile(2, {
+      status: "skipped",
+      status_reason: "Already matched the workflow's rules.",
+    });
+
+    const groups = buildNeeds({ ...healthy, files: [routine, byRule] });
+
+    expect(groups.map((group) => group.title)).toEqual(["1 skipped by a rule"]);
+    expect(groups[0].rows[0].file?.id).toBe(1);
+  });
+
+  it("leaves a file that is waiting its turn or already finished out altogether", () => {
+    const groups = buildNeeds({
+      ...healthy,
+      files: [
+        failedFile(1, { status: "unprocessed" }),
+        failedFile(2, { status: "processed" }),
+      ],
+    });
+
+    expect(groups).toEqual([]);
+  });
+
+  it("leaves out a file its media manager still has and a cleaned copy no manager has taken yet", () => {
+    const groups = buildNeeds({
+      ...healthy,
+      files: [
+        failedFile(1, { status: "blocked_upstream" }),
+        failedFile(2, {
+          status: "processed",
+          handback: { output_path: "/hand-back/a.mkv", outcome: null },
+        } as Partial<ProcessingFile>),
+      ],
+    });
+
+    expect(groups).toEqual([]);
+  });
+
+  it("lists the groups in a fixed order whatever order the files arrive in", () => {
+    const keys = buildNeeds({
+      ...healthy,
+      files: [
+        failedFile(1, {
+          status: "skipped",
+          status_reason: "Skipped because its path matches an exclude pattern.",
+        }),
+        rejectedFile(2),
+        failedFile(3, { status: "on_hold", hold_until: null }),
+        failedFile(4),
+      ],
+    }).map((group) => group.key);
+
+    expect(keys).toEqual([
+      "failed-writing",
+      "stuck",
+      "rejected-language",
+      "skipped-by-rule",
+    ]);
+  });
+
+  it("offers Process all again only on the rejected groups", () => {
+    const groups = buildNeeds({
+      ...healthy,
+      files: [failedFile(1), rejectedFile(2)],
+    });
+
+    expect(groups.map((group) => group.rejected)).toEqual([false, true]);
+  });
+
+  it("lists a few files per group and counts the rest, which Activity has", () => {
+    const files = [1, 2, 3, 4, 5, 6].map((id) => failedFile(id));
+
+    const [group] = buildNeeds({ ...healthy, files });
+
+    expect(group.title).toBe("6 couldn't finish writing");
+    expect(group.rows).toHaveLength(FILES_SHOWN_PER_GROUP);
+    expect(group.more).toBe(2);
+  });
+
+  it("names the Activity view that has each group's files, and none for what is wrong with Weir itself", () => {
+    const groups = buildNeeds({
+      ...healthy,
+      workflows: [{ ...workflow, enabled: false } as ProcessingLibrary],
+      files: [
+        failedFile(1),
+        rejectedFile(2),
+        failedFile(3, { status: "on_hold", failure_class: null }),
+        failedFile(4, {
+          status: "skipped",
+          failure_class: null,
+          status_reason: "Skipped because its path matches an exclude pattern.",
+        }),
+      ],
+    });
+
+    expect(
+      Object.fromEntries(groups.map((group) => [group.key, group.activity])),
+    ).toEqual({
+      weir: null,
+      "failed-writing": "failed",
+      stuck: "needs",
+      "rejected-language": "failed",
+      "skipped-by-rule": "skipped",
+    });
+  });
+
+  it("names a Activity view that exists for every group", () => {
+    const ids = ACTIVITY_GROUPS.map((group) => group.id);
+    const groups = buildNeeds({
+      ...healthy,
+      files: [
+        failedFile(1),
+        rejectedFile(2),
+        failedFile(3, { status: "on_hold" }),
+      ],
+    });
+
+    for (const group of groups) expect(ids).toContain(group.activity);
+  });
+
+  it("narrows to one workflow's files, but still says what is wrong with Weir itself", () => {
+    const groups = buildNeeds({
+      ...healthy,
+      workflows: [{ ...workflow, enabled: false } as ProcessingLibrary],
+      readiness: { worker_health: [worker("p", "degraded", "x")] },
+      workflowId: 2,
+      failedJobs: { count: 3, capped: false },
+      files: [
+        failedFile(1, { library_id: 1 }),
+        failedFile(2, { library_id: 2 }),
+        rejectedFile(3, { library_id: 1 }),
+      ],
+    });
+
+    expect(groups.map((group) => group.key)).toEqual([
+      "weir",
+      "failed-writing",
+    ]);
+    expect(groups[0].rows.map((row) => row.key)).toEqual([
+      "setup",
+      "worker-p",
+      "failed-jobs",
+    ]);
+    expect(groups[1].rows.map((row) => row.file?.id)).toEqual([2]);
+  });
+
+  it("puts what blocks everything first and the rejected files last", () => {
+    const keys = buildNeeds({
+      ...healthy,
+      workflows: [{ ...workflow, enabled: false } as ProcessingLibrary],
+      readiness: { worker_health: [worker("p", "degraded", "x")] },
+      failedJobs: { count: 1, capped: false },
+      files: [failedFile(1), rejectedFile(2)],
+    }).map((group) => group.key);
+
+    expect(keys).toEqual(["weir", "failed-writing", "rejected-language"]);
+  });
+});
+
+describe("what the panel's fitting counts", () => {
+  const groups = () =>
+    buildNeeds({
+      workflows: [workflow],
+      workflowId: undefined,
+      readiness: undefined,
+      failedJobs: { count: 1, capped: false },
+      filter: "all",
+      files: [1, 2, 3, 4, 5, 6].map((id) => failedFile(id)),
+    });
+
+  it("lists a heading, then the rows, then the line that leads to the files a group does not list", () => {
+    expect(needUnits(groups()).map((unit) => unit.kind)).toEqual([
+      "heading",
+      "row",
+      "heading",
+      ...Array<string>(FILES_SHOWN_PER_GROUP).fill("row"),
+      "rest",
+    ]);
+  });
+
+  it("counts the hidden rows and the files a hidden group line leads to", () => {
+    const units = needUnits(groups());
+
+    expect(needsLeftOut(units, units.length)).toBe(0);
+    // Only the Weir group's heading and row show: the four files of the other group and the two it does not list are left.
+    expect(needsLeftOut(units, 2)).toBe(FILES_SHOWN_PER_GROUP + 2);
+  });
+
+  it("counts every row as left out when none of the units fits", () => {
+    expect(needsLeftOut(needUnits(groups()), 0)).toBe(
+      1 + FILES_SHOWN_PER_GROUP + 2,
+    );
+  });
+});

@@ -6,9 +6,12 @@
  * wants the technical detail, but it is never the first thing shown.
  */
 
-import { fileHistoryRetentionNote } from "../../lib/processing/file-history-retention";
+import { Poster } from "../shared/poster";
+import { STORY_STEP_MEANING } from "../../lib/processing/story-step-meaning";
+import { fileActivityRetentionNote } from "../../lib/processing/file-activity-retention";
 import { useAppDateFormatter } from "../../lib/ui/mm-format-date";
 import { DirectPlayLine } from "./direct-play-line";
+import { FileNowSection, type FileNow } from "./file-now-section";
 import { StoryPanelShell } from "./story-panel-shell";
 import type {
   ProcessingDirectPlay,
@@ -16,16 +19,12 @@ import type {
   ProcessingFileStoryStep,
 } from "../../lib/processing/files-api";
 
-const TONE_CLASS: Record<string, string> = {
-  good: "mm-story-step--good",
-  warn: "mm-story-step--warn",
-  bad: "mm-story-step--bad",
-  neutral: "",
-};
-
 function Step({ step }: { step: ProcessingFileStoryStep }): React.ReactElement {
   return (
-    <li className={`mm-story-step ${TONE_CLASS[step.tone] ?? ""}`}>
+    <li
+      className="mm-story-step"
+      data-status={STORY_STEP_MEANING[step.tone] ?? "idle"}
+    >
       <p className="mm-story-step__heading">{step.heading}</p>
       <p className="mm-story-step__sentence">{step.sentence}</p>
     </li>
@@ -35,8 +34,12 @@ function Step({ step }: { step: ProcessingFileStoryStep }): React.ReactElement {
 export interface FileStoryPanelProps {
   open: boolean;
   fileName: string;
+  /** What the header shows beside the name: the title's poster, tinted for its workflow when there is none. */
+  poster?: { url: string | null | undefined; workflow: string };
   /** Which of the operator's devices will play the file directly. Information only. */
   directPlay?: ProcessingDirectPlay[];
+  /** Where the file is on the Pipeline right now, when it is on it: shown above what has already happened to it. */
+  now?: FileNow;
   log: ProcessingFileLog | undefined;
   loading: boolean;
   error: string | null;
@@ -46,7 +49,9 @@ export interface FileStoryPanelProps {
 export function FileStoryPanel({
   open,
   fileName,
+  poster,
   directPlay = [],
+  now,
   log,
   loading,
   error,
@@ -56,13 +61,22 @@ export function FileStoryPanel({
 
   if (!open) return null;
 
-  const retention = log ? fileHistoryRetentionNote(log.retention_days) : null;
+  const retention = log ? fileActivityRetentionNote(log.retention_days) : null;
 
   return (
     <StoryPanelShell
       eyebrow="What happened to this file"
       title={fileName}
-      backdropLabel="Close file history"
+      art={
+        poster ? (
+          <Poster
+            url={poster.url}
+            title={fileName}
+            workflow={poster.workflow}
+          />
+        ) : undefined
+      }
+      backdropLabel="Close file activity"
       onClose={onClose}
     >
       <DirectPlayLine
@@ -70,16 +84,22 @@ export function FileStoryPanel({
         full
         testId="file-story-direct-play"
       />
+      {now ? <FileNowSection now={now} /> : null}
       {loading ? (
-        <p className="mm-story-panel__note">Reading the record…</p>
+        <p className="mm-story-panel__note">Loading…</p>
       ) : error ? (
-        <p className="mm-story-panel__note mm-status-text--failed" role="alert">
+        <p
+          className="mm-story-panel__note mm-status-text"
+          data-status="broken"
+          role="alert"
+        >
           {error}
         </p>
       ) : !log || log.entries.length === 0 ? (
         <p className="mm-story-panel__note">
-          Weir has not worked on this file yet, so there is nothing to tell. Its
-          story starts the first time it is processed.
+          {now
+            ? "What Weir kept and removed shows here once it has finished."
+            : "Nothing yet. Weir hasn't worked on this file."}
         </p>
       ) : (
         log.entries.map((entry) => (
@@ -97,7 +117,7 @@ export function FileStoryPanel({
               <p className="mm-story-panel__note">{entry.title}</p>
             )}
             <details className="mm-story-pass__detail">
-              <summary>Show the technical detail</summary>
+              <summary>Technical detail</summary>
               <pre>{JSON.stringify(entry.detail, null, 2)}</pre>
             </details>
           </section>

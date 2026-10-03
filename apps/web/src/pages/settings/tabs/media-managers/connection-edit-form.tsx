@@ -79,7 +79,7 @@ function changesFrom(
 
 /**
  * Address and API key, edited in place. Nothing is sent until Save; Cancel asks first when
- * anything changed, through the same guard every Settings panel with a Save/Cancel pair uses.
+ * anything changed, through the same guard every setup panel with a Save/Cancel pair uses.
  */
 export function ConnectionEditForm({
   connection,
@@ -174,7 +174,7 @@ export function ConnectionEditForm({
       ) : null}
 
       {update.isError ? (
-        <p className="mm-status-text--failed text-sm" role="alert">
+        <p className="mm-status-text text-sm" data-status="broken" role="alert">
           {errorMessage(update.error, SAVE_FAILURE)}
         </p>
       ) : null}

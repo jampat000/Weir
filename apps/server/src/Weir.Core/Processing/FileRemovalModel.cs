@@ -1,7 +1,7 @@
 namespace Weir.Core.Processing;
 
 /// <summary>
-/// The choices History's remove dialog offers for a failed or rejected title whose file is still in the watched
+/// The choices Activity's remove dialog offers for a failed or rejected title whose file is still in the watched
 /// folder (#785). A title that does not qualify for the choice (finished, or its file already gone) is always a
 /// plain <see cref="Remove"/>, which is today's "Remove from list" behaviour: forget Weir's row, touch nothing else.
 /// </summary>

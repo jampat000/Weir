@@ -36,7 +36,7 @@ public static class WeirJobs
             sp.GetRequiredService<ProcessingJobStore>(), "tv", TimeSpan.FromSeconds(options.ProcessingWorkTempStaleSweepTvScheduleIntervalSeconds),
             SwitchedOffByEnvironment(runtime, "WEIR_PROCESSING_WORK_TEMP_STALE_SWEEP_TV_SCHEDULE_ENABLED", options.ProcessingWorkTempStaleSweepTvScheduleEnabled)));
 
-        // #652: hand-back copies nobody claimed. Off until a person switches it on in Settings › Cleanup.
+        // #652: hand-back copies nobody claimed. Off until a person switches it on in Setup › Performance › Cleanup.
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IJobHandler, UnclaimedHandbackCleanupHandler>());
         services.AddSingleton<IPeriodicEnqueuer>(sp => new UnclaimedHandbackCleanupEnqueuer(sp.GetRequiredService<ProcessingJobStore>(), "movie"));
         services.AddSingleton<IPeriodicEnqueuer>(sp => new UnclaimedHandbackCleanupEnqueuer(sp.GetRequiredService<ProcessingJobStore>(), "tv"));
@@ -47,7 +47,7 @@ public static class WeirJobs
         services.TryAddSingleton<JobRowsRetention>();
         services.AddSingleton<IPeriodicTask, JobRowsRetentionTask>();
         services.AddWeirPeriodicTasks();
-        // When each Cleanup family next runs, for Settings › Cleanup.
+        // When each Cleanup family next runs, for Setup › Performance › Cleanup.
         services.AddSingleton<PeriodicEnqueueClock>();
         services.AddHostedService<PeriodicEnqueueService>();
         if (options.ProcessingWorkerCount > 0)

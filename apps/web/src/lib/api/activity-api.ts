@@ -75,31 +75,10 @@ export function activityExportPath(
   return `/api/v1/activity/export?${q.toString()}`;
 }
 
-function filenameFromDisposition(
+export function filenameFromDisposition(
   header: string | null,
   fallback: string,
 ): string {
   const match = header?.match(/filename="?([^";]+)"?/i);
   return match?.[1]?.trim() || fallback;
-}
-
-/** The filtered history as a file. The caller hands the blob to the browser. */
-export async function fetchActivityExport(
-  format: "csv" | "json",
-  options?: ActivityRecentFilters,
-): Promise<{ blob: Blob; filename: string }> {
-  const path = activityExportPath(format, options);
-  const r = await apiFetch(path, {
-    headers: {
-      Accept: format === "json" ? "application/json" : "text/csv",
-    },
-  });
-  await requireOk(path, r, "Could not export activity");
-  return {
-    blob: await r.blob(),
-    filename: filenameFromDisposition(
-      r.headers.get("Content-Disposition"),
-      `weir-activity.${format}`,
-    ),
-  };
 }

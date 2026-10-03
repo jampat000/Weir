@@ -93,9 +93,29 @@ export interface paths {
     };
     /**
      * Get Activity Stream
-     * @description Authenticated SSE freshness signal for activity-backed pages.
+     * @description Authenticated SSE stream for activity-backed pages. Frames: activity.latest (the newest Activity event id and revision), processing.progress (every file's live progress, at most once a second), connection.activity (one thing that happened on a media manager or download client connection: see ConnectionActivityFrame; each connection sends at most one frame per phase every 250 ms, and always the phase it ends on), system.stats (the machine's newest reading, once a second: see SystemStatsFrame), system.tasks (every scheduled task, each time a run starts or ends or a task comes or goes: see SystemTaskOut), and system.log (one for each new warning or error Weir logs: see SystemLogFrame).
      */
     get: operations["get_activity_stream_api_v1_activity_stream_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/artwork/posters/{poster_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Artwork Poster
+     * @description A poster image Weir already holds, as a files list names it in poster_url. The image is the cached copy, so the browser never asks the metadata service itself. Answers 404 for an id Weir does not hold.
+     */
+    get: operations["get_artwork_poster_api_v1_artwork_posters__poster_id__get"];
     put?: never;
     post?: never;
     delete?: never;
@@ -838,7 +858,7 @@ export interface paths {
     };
     /**
      * Get Processing File Remove Options
-     * @description What History's remove dialog should offer for this title (#785), read before it is shown.
+     * @description What Activity's remove dialog should offer for this title (#785), read before it is shown.
      */
     get: operations["get_processing_file_remove_options_api_v1_files__file_id__remove_options_get"];
     put?: never;
@@ -861,7 +881,7 @@ export interface paths {
     post?: never;
     /**
      * Delete Processing File
-     * @description History's "Remove from list" (#785). `resolution` chooses what happens to a failed or rejected file whose original is still in the watched folder: `delete` asks a manager to remove the download and search again, or Weir deletes it itself; `keep` leaves the file but skips it until it changes; `retry` queues it again. Anything else is always a plain remove.
+     * @description Activity's "Remove from list" (#785). `resolution` chooses what happens to a failed or rejected file whose original is still in the watched folder: `delete` asks a manager to remove the download and search again, or Weir deletes it itself; `keep` leaves the file but skips it until it changes; `retry` queues it again. Anything else is always a plain remove.
      */
     delete: operations["delete_processing_file_api_v1_files__file_id__delete"];
     options?: never;
@@ -878,7 +898,7 @@ export interface paths {
     };
     /**
      * Get Processing Kept Files
-     * @description Every file kept without processing again from History's remove dialog (#785).
+     * @description Every file kept without processing again from Activity's remove dialog (#785).
      */
     get: operations["get_processing_kept_files_api_v1_processing_kept_files_get"];
     put?: never;
@@ -1698,9 +1718,17 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Get Metadata Provider */
+    /**
+     * Get Metadata Provider
+     * @deprecated
+     * @description Deprecated. Weir gets titles' posters and original languages from Deluno's metadata service by itself, so there is nothing to set. The route still answers so older clients keep working: provider is always deluno-gateway, base_url null, key_configured false and artwork_enabled true.
+     */
     get: operations["get_metadata_provider_api_v1_processing_metadata_provider_get"];
-    /** Put Metadata Provider */
+    /**
+     * Put Metadata Provider
+     * @deprecated
+     * @description Deprecated. Weir gets titles' posters and original languages from Deluno's metadata service by itself, so there is nothing to set. The route still answers so older clients keep working: what is sent is checked for shape and then ignored, and the answer is the same as the GET.
+     */
     put: operations["put_metadata_provider_api_v1_processing_metadata_provider_put"];
     post?: never;
     delete?: never;
@@ -1720,7 +1748,8 @@ export interface paths {
     put?: never;
     /**
      * Post Metadata Provider Test
-     * @description Ask the provider a real question, so a saved connection is proven rather than assumed.
+     * @deprecated
+     * @description Deprecated. Weir gets titles' posters and original languages from Deluno's metadata service by itself, so there is nothing to set. The route still answers so older clients keep working: it checks that Deluno's metadata service answers its health check, and what is sent is ignored.
      */
     post: operations["post_metadata_provider_test_api_v1_processing_metadata_provider_test_post"];
     delete?: never;
@@ -1991,10 +2020,14 @@ export interface paths {
     };
     /**
      * Get Suite Network Access
-     * @description Whether other devices on the network can reach Weir (System › About). Windows package only; other platforms report not_applicable.
+     * @description Who can reach Weir over the network, and whether a change is waiting on the tray or the firewall (System › About). Windows package only; other installs report not_applicable.
      */
     get: operations["get_suite_network_access_api_v1_suite_network_access_get"];
-    put?: never;
+    /**
+     * Put Suite Network Access
+     * @description Admin only. Saves who can reach Weir for the Windows tray to apply: it restarts the server and, when Windows Firewall has no rule for Weir, asks for one on this PC (Private and Domain networks only). The answer is the state with the new choice pending. Answers 409 on Docker and on a bare install, where the way Weir is started decides.
+     */
+    put: operations["put_suite_network_access_api_v1_suite_network_access_put"];
     post?: never;
     delete?: never;
     options?: never;
@@ -2192,7 +2225,7 @@ export interface paths {
     };
     /**
      * Get Suite Update Status
-     * @description Read-only update check for the signed-in Settings page.
+     * @description Read-only update check for the System › About tab.
      */
     get: operations["get_suite_update_status_api_v1_suite_update_status_get"];
     put?: never;
@@ -2223,6 +2256,46 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/system/log": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get System Log
+     * @description Weir's events, its jobs and its server log as one list, newest first unless sorted another way, with a cursor for the next page and the counts the filter chips show. Events are Weir's own (a file's story is on Activity); a finished watched-folder scan is left out unless a job status is asked for.
+     */
+    get: operations["get_system_log_api_v1_system_log_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/system/log/export": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get System Log Export
+     * @description The log for the same filters and order as a file, newest first unless sorted another way: a spreadsheet (csv) or the rows as the API returns them (json). It holds every row the filters leave, up to the limit the X-Weir-Export-Limit header names (50000), and X-Weir-Export-Rows says how many it holds.
+     */
+    get: operations["get_system_log_export_api_v1_system_log_export_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/system/media-tools": {
     parameters: {
       query?: never;
@@ -2235,6 +2308,26 @@ export interface paths {
      * @description Which external media tools this install has, and what they report as their version.
      */
     get: operations["get_system_media_tools_api_v1_system_media_tools_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/system/overview": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get System Overview
+     * @description The facts System shows about this copy of Weir: version and update, uptime, how it runs, where it listens, the size of its data, how fast it answers, the jobs it ran today, restarts this week and how many checks pass. Each comes from a store Weir already keeps.
+     */
+    get: operations["get_system_overview_api_v1_system_overview_get"];
     put?: never;
     post?: never;
     delete?: never;
@@ -2303,6 +2396,46 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/system/stats": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get System Stats
+     * @description The machine's load now and over the last ten minutes, Weir's own share of it and the tools', and the drives the workflows use. A field is null where it cannot be read. The same readings arrive on the Activity stream as system.stats frames: see SystemStatsFrame.
+     */
+    get: operations["get_system_stats_api_v1_system_stats_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/system/tasks": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get System Tasks
+     * @description Every task Weir runs on its own: each workflow's periodic scan and scheduled library clean, the cleanups, configuration backup checks, history pruning and the rest, each with its last result and next run. The same list arrives on the Activity stream as a system.tasks frame.
+     */
+    get: operations["get_system_tasks_api_v1_system_tasks_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/health": {
     parameters: {
       query?: never;
@@ -2364,6 +2497,11 @@ export interface components {
        * @description Source area, e.g. auth.
        */
       module: string;
+      /**
+       * Poster Url
+       * @description Where Weir serves this file's poster (/api/v1/artwork/posters/{id}). Null until one is found, when the title has none, or when an administrator has turned the metadata service off.
+       */
+      poster_url?: string | null;
       /**
        * Relative Path
        * @description The file this concerns, relative to its library.
@@ -2538,6 +2676,45 @@ export interface components {
       };
       /** Csrf Token */
       csrf_token: string;
+    };
+    /**
+     * ConnectionActivityFrame
+     * @description The data of a connection.activity frame on GET /activity/stream: one thing that happened on a media manager or download client connection.
+     */
+    ConnectionActivityFrame: {
+      /**
+       * At
+       * Format: date-time
+       * @description When it happened.
+       */
+      at: string;
+      /**
+       * Direction
+       * @description outbound: Weir called the connection. inbound: the connection called Weir (a hand-off, webhook or outcome).
+       * @enum {string}
+       */
+      direction: "outbound" | "inbound";
+      /**
+       * Id
+       * @description The connection's id, in the list its kind names.
+       */
+      id: number;
+      /**
+       * Kind
+       * @enum {string}
+       */
+      kind: "media_manager" | "download_client";
+      /**
+       * Ms
+       * @description How long an outbound call took; null while it is still asked, and for an inbound call.
+       */
+      ms: number | null;
+      /**
+       * Phase
+       * @description asked: Weir started a call. answered: the connection replied, or called Weir. failed: it did not reply, or refused Weir or was broken.
+       * @enum {string}
+       */
+      phase: "asked" | "answered" | "failed";
     };
     /** CsrfOut */
     CsrfOut: {
@@ -2800,6 +2977,16 @@ export interface components {
       last_test_at?: string | null;
       /** Last Test Detail */
       last_test_detail?: string | null;
+      /**
+       * Last Answer Ms
+       * @description How long the last call to this connection took, in milliseconds: a connection test or any real call. Null until Weir has made one.
+       */
+      last_answer_ms?: number | null;
+      /**
+       * Last Used At
+       * @description When Weir last talked to this connection, or it last called Weir. Null until that has happened.
+       */
+      last_used_at?: string | null;
     };
     /** DownloadClientConnectionTestIn */
     DownloadClientConnectionTestIn: {
@@ -3111,6 +3298,11 @@ export interface components {
       modified_at: number;
       /** Path */
       path: string;
+      /**
+       * Poster Url
+       * @description Where Weir serves this file's poster (/api/v1/artwork/posters/{id}). Null until one is found, when the title has none, or when an administrator has turned the metadata service off.
+       */
+      poster_url?: string | null;
       /** Problem Kind */
       problem_kind:
         | (
@@ -3132,6 +3324,22 @@ export interface components {
       resolution_class: string;
       /** Size Bytes */
       size_bytes: number;
+      /**
+       * Status
+       * @description Where the file stands now, against the current rules: exactly one of these. Left alone beats cleaning, which beats cant_clean_yet (still shared with a download, or unreadable), which beats needs_cleaning, which beats matches.
+       * @enum {string}
+       */
+      status:
+        | "needs_cleaning"
+        | "cleaning"
+        | "matches"
+        | "cant_clean_yet"
+        | "left_alone";
+      /**
+       * Status Reason
+       * @description Why a file that needs cleaning does, when the scan can say: it is new since the last check, the file on disk is not the one Weir last saw or cleaned, or it matched before (or Weir cleaned it) and the rules changed. Null for any other status, and when nothing on record supports a reason.
+       */
+      status_reason: ("new" | "replaced" | "rules_changed") | null;
       /** Subtitle Summary */
       subtitle_summary: string | null;
       /** Subtitle Track Count */
@@ -3178,7 +3386,8 @@ export interface components {
         | "resolution"
         | "audio"
         | "subtitles"
-        | "modified";
+        | "modified"
+        | "status";
       summary: components["schemas"]["LibraryTotalsOut"];
       /** Total */
       total: number;
@@ -3257,6 +3466,22 @@ export interface components {
     LibraryFoldersOut: {
       /** Libraries */
       libraries: components["schemas"]["PublishedLibraryFoldersOut"][];
+    };
+    /**
+     * LibraryStatusCountsOut
+     * @description How many files are in each status. One status per file, so these add up to the files.
+     */
+    LibraryStatusCountsOut: {
+      /** Cant Clean Yet */
+      cant_clean_yet: number;
+      /** Cleaning */
+      cleaning: number;
+      /** Left Alone */
+      left_alone: number;
+      /** Matches */
+      matches: number;
+      /** Needs Cleaning */
+      needs_cleaning: number;
     };
     /**
      * ProposedLibraryCheckIn
@@ -3628,6 +3853,7 @@ export interface components {
      * @description Issue #568: how many files a library holds and what its rules would do to them.
      */
     LibraryTotalsOut: {
+      by_status: components["schemas"]["LibraryStatusCountsOut"];
       /** Cannot Process */
       cannot_process: number;
       /** Cleaned */
@@ -3702,7 +3928,7 @@ export interface components {
       window_days?: number;
       /**
        * Interval Seconds
-       * @description How often this job runs: the interval saved in Settings › Cleanup, else the environment's.
+       * @description How often this job runs: the interval saved in Setup › Performance › Cleanup, else the environment's.
        */
       interval_seconds?: number;
       /** Last Completed At */
@@ -3905,12 +4131,22 @@ export interface components {
       kind: "radarr" | "sonarr" | "deluno" | "native";
       /** Lanes */
       lanes?: components["schemas"]["MediaManagerSearchLaneOut"][];
+      /**
+       * Last Answer Ms
+       * @description How long the last call to this connection took, in milliseconds: a connection test or any real call. Null until Weir has made one.
+       */
+      last_answer_ms?: number | null;
       /** Last Test At */
       last_test_at?: string | null;
       /** Last Test Detail */
       last_test_detail?: string | null;
       /** Last Test Ok */
       last_test_ok?: boolean | null;
+      /**
+       * Last Used At
+       * @description When Weir last talked to this connection, or it last called Weir. Null until that has happened.
+       */
+      last_used_at?: string | null;
       /**
        * Name
        * @description The connection's name: its kind and the host in its address, set by Weir.
@@ -4076,11 +4312,17 @@ export interface components {
     MetadataProviderIn: {
       /**
        * Api Key
-       * @description Omit to leave the stored key untouched. An empty string clears it.
+       * @description Ignored. Weir no longer uses a key of its own.
        */
       api_key?: string | null;
       /**
+       * Artwork Enabled
+       * @description Ignored. Artwork is always on unless an administrator turns the metadata service off with WEIR_ARTWORK_GATEWAY_URL=off.
+       */
+      artwork_enabled?: boolean | null;
+      /**
        * Base Url
+       * @description Ignored.
        * @default
        */
       base_url: string;
@@ -4088,29 +4330,33 @@ export interface components {
       csrf_token: string;
       /**
        * Provider
-       * @description Empty clears the connection.
+       * @description Ignored.
        * @default
-       * @enum {string}
        */
-      provider: "" | "tmdb";
+      provider: string;
     };
     /** MetadataProviderOut */
     MetadataProviderOut: {
       /**
-       * Base Url
-       * @description Where Weir asks. Configurable so a cache or gateway in front of the provider works.
+       * Artwork Enabled
+       * @description Always true: Weir looks posters up through Deluno's metadata service and shows them.
        */
-      base_url: string;
+      artwork_enabled: boolean;
+      /**
+       * Base Url
+       * @description Always null: the address of Deluno's metadata service is not a setting.
+       */
+      base_url: string | null;
       /**
        * Key Configured
-       * @description Whether a key is stored. The key itself is never returned.
+       * @description Always false: Weir needs no key.
        */
       key_configured: boolean;
       /** Known Providers */
       known_providers?: string[];
       /**
        * Provider
-       * @description The configured provider, or empty when there is none.
+       * @description Always deluno-gateway.
        */
       provider: string;
     };
@@ -4357,7 +4603,7 @@ export interface components {
     };
     /**
      * ProcessingFileForgetIn
-     * @description History's remove dialog (#785). `resolution` is only meaningful for a failed or rejected file whose
+     * @description Activity's remove dialog (#785). `resolution` is only meaningful for a failed or rejected file whose
      *     original is still in the watched folder (see ProcessingFileRemoveOptionsOut); anything else is always a plain
      *     remove, whatever `resolution` asks for. `confirm_size_bytes` and `confirm_modified_at` are the file's current
      *     details as `remove-options` reported them (#786 follow-up): required for `delete` or `keep` on a title whose
@@ -4379,7 +4625,7 @@ export interface components {
     };
     /**
      * ProcessingFileRemoveOptionsOut
-     * @description What History's remove dialog should offer for one title, read before it is shown (#785).
+     * @description What Activity's remove dialog should offer for one title, read before it is shown (#785).
      */
     ProcessingFileRemoveOptionsOut: {
       /** Requires Choice */
@@ -4409,7 +4655,7 @@ export interface components {
     };
     /**
      * ProcessingKeptFileOut
-     * @description One file kept without processing again from History's remove dialog (#785).
+     * @description One file kept without processing again from Activity's remove dialog (#785).
      */
     ProcessingKeptFileOut: {
       /** Id */
@@ -4420,6 +4666,11 @@ export interface components {
       library_name: string;
       /** Relative Path */
       relative_path: string;
+      /**
+       * Poster Url
+       * @description Where Weir serves this file's poster (/api/v1/artwork/posters/{id}). Null until one is found, when the title has none, or when an administrator has turned the metadata service off.
+       */
+      poster_url?: string | null;
       /** Size Bytes */
       size_bytes: number;
       /** Kept At */
@@ -4547,7 +4798,7 @@ export interface components {
       id: number;
       /**
        * Kind
-       * @description Which kind of History entry this is: always a download here.
+       * @description Which kind of Activity entry this is: always a download here.
        * @constant
        */
       kind: "download";
@@ -4579,6 +4830,11 @@ export interface components {
        * @description Why, written for the person asking why there is no new output for this file.
        */
       output_collision_reason?: string | null;
+      /**
+       * Poster Url
+       * @description Where Weir serves this file's poster (/api/v1/artwork/posters/{id}). Null until one is found, when the title has none, or when an administrator has turned the metadata service off.
+       */
+      poster_url?: string | null;
       /**
        * Progress Elapsed Seconds
        * @description How long the running pass has been writing, in seconds.
@@ -4901,6 +5157,11 @@ export interface components {
       files: components["schemas"]["ProcessingFileOut"][];
       /** Limit */
       limit: number;
+      /**
+       * Next Cursor
+       * @description Pass as cursor for the next page; null on the last.
+       */
+      next_cursor: string | null;
       /** Returned */
       returned: number;
       /** Status Counts */
@@ -5049,7 +5310,7 @@ export interface components {
     };
     /**
      * ProcessingLibraryCleanOut
-     * @description What the newest library clean did to one file, as History lists it.
+     * @description What the newest library clean did to one file, as Activity lists it.
      */
     ProcessingLibraryCleanOut: {
       /**
@@ -5074,6 +5335,11 @@ export interface components {
        */
       outcome: "cleaned" | "skipped" | "failed";
       /**
+       * Poster Url
+       * @description Where Weir serves this file's poster (/api/v1/artwork/posters/{id}). Null until one is found, when the title has none, or when an administrator has turned the metadata service off.
+       */
+      poster_url?: string | null;
+      /**
        * Recorded At
        * Format: date-time
        */
@@ -5085,7 +5351,7 @@ export interface components {
     };
     /**
      * ProcessingLibraryCleansOut
-     * @description Library cleans for History, newest first, one per file.
+     * @description Library cleans for Activity, newest first, one per file.
      */
     ProcessingLibraryCleansOut: {
       /** Cleans */
@@ -5171,7 +5437,7 @@ export interface components {
       max_attempts: number;
       /**
        * Max Concurrent Files
-       * @description The most files this workflow runs at once, as a share of "Files at once" in Settings › Performance. 0 means no limit of its own. It cannot be more than Performance's Files at once: a save that asks for more is refused.
+       * @description The most files this workflow runs at once, as a share of "Files at once" in Setup › Performance › Speed. 0 means no limit of its own. It cannot be more than that Files at once: a save that asks for more is refused.
        * @default 0
        */
       max_concurrent_files: number;
@@ -5529,7 +5795,7 @@ export interface components {
       minimum_free_disk_space_mb: number;
       /**
        * Effective Max Concurrent Files
-       * @description The most files this workflow is held to now: its own limit, and never more than Files at once in Settings › Performance, even if that was lowered after this was set.
+       * @description The most files this workflow is held to now: its own limit, and never more than Files at once in Setup › Performance › Speed, even if that was lowered after this was set.
        */
       effective_max_concurrent_files: number;
       /**
@@ -5626,7 +5892,7 @@ export interface components {
       max_attempts: number;
       /**
        * Max Concurrent Files
-       * @description The most files this workflow runs at once, as a share of "Files at once" in Settings › Performance. 0 means no limit of its own. It cannot be more than Performance's Files at once: a save that asks for more is refused.
+       * @description The most files this workflow runs at once, as a share of "Files at once" in Setup › Performance › Speed. 0 means no limit of its own. It cannot be more than that Files at once: a save that asks for more is refused.
        * @default 0
        */
       max_concurrent_files: number;
@@ -5919,7 +6185,7 @@ export interface components {
       work_temp_stale_sweep_enabled: boolean;
       /**
        * Work Temp Stale Sweep Interval Seconds
-       * @description How often the leftover-work-file sweep runs, set in Settings › Cleanup. Null keeps the environment's interval.
+       * @description How often the leftover-work-file sweep runs, set in Setup › Performance › Cleanup. Null keeps the environment's interval.
        */
       work_temp_stale_sweep_interval_seconds?: number | null;
       /**
@@ -5934,7 +6200,7 @@ export interface components {
       unclaimed_handback_window_days: number;
       /**
        * Unclaimed Handback Cleanup Interval Seconds
-       * @description How often the unclaimed hand-back cleanup runs, set in Settings › Cleanup. Null keeps six hours.
+       * @description How often the unclaimed hand-back cleanup runs, set in Setup › Performance › Cleanup. Null keeps six hours.
        */
       unclaimed_handback_cleanup_interval_seconds?: number | null;
     };
@@ -7010,9 +7276,37 @@ export interface components {
     };
     /**
      * SuiteNetworkAccessOut
-     * @description Whether another device on the network can currently reach Weir.
+     * @description Who can reach Weir over the network, and what is happening about a change.
      */
     SuiteNetworkAccessOut: {
+      /**
+       * Addresses
+       * @description Where another device would type to reach Weir (for example http://10.0.0.196:9347); empty unless the server listens, or is about to listen, for the network.
+       */
+      addresses: string[];
+      /**
+       * Firewall
+       * @description What Windows Firewall says about Weir's server program: allowed, blocked, or not_checked while nothing depends on it.
+       * @enum {string}
+       */
+      firewall: "allowed" | "blocked" | "not_checked";
+      /**
+       * Machine Name
+       * @description This PC's name, for "approve on MEDIA-PC".
+       */
+      machine_name: string;
+      /**
+       * Pending Scope
+       * @description The saved choice when the running server has not caught up with it yet (the tray still has to restart it); null otherwise.
+       */
+      pending_scope: ("this_pc_only" | "network") | null;
+      /** Port */
+      port: number;
+      /**
+       * Scope
+       * @description Who the running server listens for; null when this copy of Weir does not manage that (Docker, a bare install).
+       */
+      scope: ("this_pc_only" | "network") | null;
       /**
        * State
        * @description this_pc_only, allowed, blocked, or not_applicable
@@ -7020,6 +7314,20 @@ export interface components {
       state: string;
       /** Summary */
       summary: string;
+    };
+    /**
+     * SuiteNetworkAccessPutIn
+     * @description Body for PUT /suite/network-access.
+     */
+    SuiteNetworkAccessPutIn: {
+      /** Csrf Token */
+      csrf_token: string;
+      /**
+       * Scope
+       * @description this_pc_only or network (devices on the network, through Windows Firewall's Private and Domain networks).
+       * @enum {string}
+       */
+      scope: "this_pc_only" | "network";
     };
     /**
      * SuiteOperationalHistoryResetIn
@@ -7259,6 +7567,641 @@ export interface components {
       summary: string;
       /** Windows Installer Url */
       windows_installer_url?: string | null;
+    };
+    /** @description How many rows each category would show with every other filter applied. */
+    SystemLogCategoryCountsOut: {
+      /** backups */
+      backups: number;
+      /** cleanup */
+      cleanup: number;
+      /** connections */
+      connections: number;
+      /** library */
+      library: number;
+      /** processing */
+      processing: number;
+      /** scans */
+      scans: number;
+      /** sign_in */
+      sign_in: number;
+      /** updates */
+      updates: number;
+      /** weir */
+      weir: number;
+    };
+    /**
+     * SystemLogCountsOut
+     * @description What each filter choice would show: every count has all the other filters applied but not its own, so a chip says how many rows choosing it gives. Level, category and workflow counts cover the sources the filters name.
+     */
+    SystemLogCountsOut: {
+      category: components["schemas"]["SystemLogCategoryCountsOut"];
+      level: components["schemas"]["SystemLogLevelCountsOut"];
+      source: components["schemas"]["SystemLogSourceCountsOut"];
+      workflow: components["schemas"]["SystemLogWorkflowCountsOut"];
+    };
+    /**
+     * SystemLogFrame
+     * @description The data of a system.log frame on GET /activity/stream: one warning or error Weir just wrote to its log. GET /suite/logs has what was logged before the stream opened.
+     */
+    SystemLogFrame: {
+      /**
+       * At
+       * Format: date-time
+       * @description When it was logged.
+       */
+      at: string;
+      /**
+       * Level
+       * @description The level, as the log file names it.
+       * @enum {string}
+       */
+      level: "WARNING" | "ERROR" | "CRITICAL";
+      /**
+       * Message
+       * @description What the log line says.
+       */
+      message: string;
+    };
+    /** @description How many rows each level would show with every other filter applied. */
+    SystemLogLevelCountsOut: {
+      /** error */
+      error: number;
+      /** info */
+      info: number;
+      /** success */
+      success: number;
+      /** warning */
+      warning: number;
+    };
+    /**
+     * SystemLogOut
+     * @description One page of System › Logs, newest first unless sorted another way.
+     */
+    SystemLogOut: {
+      counts: components["schemas"]["SystemLogCountsOut"];
+      /** Items */
+      items: components["schemas"]["SystemLogRowOut"][];
+      /**
+       * Next Cursor
+       * @description Pass as cursor for the next page; null on the last.
+       */
+      next_cursor: string | null;
+      /**
+       * Total
+       * @description Rows the filters match, across every page.
+       */
+      total: number;
+    };
+    /**
+     * SystemLogRowOut
+     * @description One thing that happened, whichever source recorded it. Exactly one of event, job and server holds the source's own record; the other two are null.
+     */
+    SystemLogRowOut: {
+      /**
+       * At
+       * Format: date-time
+       * @description When it happened.
+       */
+      at: string;
+      /**
+       * Category
+       * @description What it is about.
+       * @enum {string}
+       */
+      category:
+        | "processing"
+        | "scans"
+        | "cleanup"
+        | "library"
+        | "connections"
+        | "backups"
+        | "sign_in"
+        | "updates"
+        | "weir";
+      /**
+       * Detail
+       * @description A quieter second line.
+       */
+      detail: string | null;
+      /** Event */
+      event: components["schemas"]["ActivityEventItemOut"] | null;
+      /**
+       * Id
+       * @description The source and the row's number in it, such as event:41.
+       */
+      id: string;
+      /** Job */
+      job: components["schemas"]["ProcessingJobInspectionRow"] | null;
+      /**
+       * Level
+       * @description How it went.
+       * @enum {string}
+       */
+      level: "error" | "warning" | "info" | "success";
+      /** Server */
+      server: components["schemas"]["SuiteLogEntryOut"] | null;
+      /**
+       * Source
+       * @description Where the row came from.
+       * @enum {string}
+       */
+      source: "event" | "job" | "server";
+      /**
+       * Title
+       * @description One line in plain words.
+       */
+      title: string;
+      /** Workflow */
+      workflow: components["schemas"]["SystemLogWorkflowOut"] | null;
+    };
+    /** @description How many rows each source would show with every other filter applied. */
+    SystemLogSourceCountsOut: {
+      /** event */
+      event: number;
+      /** job */
+      job: number;
+      /** server */
+      server: number;
+    };
+    /** @description How many rows each workflow would show with every other filter applied, by workflow id. A workflow with no rows is left out, and so are the server log's lines, which belong to none. */
+    SystemLogWorkflowCountsOut: {
+      [key: string]: number;
+    };
+    /**
+     * SystemLogWorkflowOut
+     * @description The workflow a row belongs to.
+     */
+    SystemLogWorkflowOut: {
+      /** Id */
+      id: number;
+      /**
+       * Name
+       * @description Null once the workflow has been deleted.
+       */
+      name: string | null;
+    };
+    /**
+     * SystemOverviewChecksOut
+     * @description How many of Weir's own checks pass. They are read from what Weir already knows, without testing anything: the database, the workers and the folder watcher, each switched-on media manager and download client (it passes unless its last test failed), and the media tools (ffmpeg and ffprobe are found).
+     */
+    SystemOverviewChecksOut: {
+      /**
+       * Passing
+       * @description How many pass.
+       */
+      passing: number;
+      /**
+       * Total
+       * @description How many checks there are.
+       */
+      total: number;
+    };
+    /**
+     * SystemOverviewJobsOut
+     * @description The jobs that finished since the day began in Weir's time zone. A watched-folder scan that found nothing wrong is left out, as it is from the Jobs list.
+     */
+    SystemOverviewJobsOut: {
+      /**
+       * Failed
+       * @description How many of those failed.
+       */
+      failed: number;
+      /**
+       * Run
+       * @description How many jobs finished, worked or not.
+       */
+      run: number;
+    };
+    /**
+     * SystemOverviewOut
+     * @description The facts System shows about this copy of Weir. Nothing here asks a media manager, a download client or GitHub: the update status is the last answer Weir kept, and the size of the data folder is measured at most once a minute.
+     */
+    SystemOverviewOut: {
+      /**
+       * Address
+       * @description Where a browser reaches Weir: this computer's own name when it listens on every interface, localhost when only this computer can connect, otherwise the address it was told to bind.
+       */
+      address: string;
+      /**
+       * Browsers Live
+       * @description How many browsers hold the Activity stream open right now.
+       */
+      browsers_live: number;
+      checks: components["schemas"]["SystemOverviewChecksOut"];
+      /**
+       * Data Bytes
+       * @description How much room Weir's own data takes: every file under its home folder.
+       */
+      data_bytes: number;
+      jobs_today: components["schemas"]["SystemOverviewJobsOut"];
+      requests: components["schemas"]["SystemOverviewRequestsOut"];
+      /**
+       * Restarts This Week
+       * @description How many times the server was restarted in the last seven days. The first start of an install is not a restart.
+       */
+      restarts_this_week: number;
+      /**
+       * Runs As
+       * @description How this copy was started: by the system as a service, by a person as an app, or inside a container.
+       * @enum {string}
+       */
+      runs_as: "service" | "app" | "docker";
+      /**
+       * Started At
+       * Format: date-time
+       * @description When the server started.
+       */
+      started_at: string;
+      update: components["schemas"]["SystemOverviewUpdateOut"];
+      /**
+       * Uptime Seconds
+       * @description Whole seconds since the server started.
+       */
+      uptime_seconds: number;
+      /**
+       * Version
+       * @description The version of Weir that is running.
+       */
+      version: string;
+    };
+    /**
+     * SystemOverviewRequestsOut
+     * @description How Weir has been answering requests. Event streams, which stay open for as long as a browser watches, are not timed.
+     */
+    SystemOverviewRequestsOut: {
+      /**
+       * Errors Today
+       * @description How many requests failed on the server (a 5xx answer) since the day began in Weir's time zone.
+       */
+      errors_today: number;
+      /**
+       * Median Ms
+       * @description The median time to answer over the last fifteen minutes, in milliseconds; zero when nothing was asked.
+       */
+      median_ms: number;
+      /**
+       * P95 Ms
+       * @description The time within which nineteen answers in twenty came, over the last fifteen minutes, in milliseconds; zero when nothing was asked.
+       */
+      p95_ms: number;
+    };
+    /**
+     * SystemOverviewUpdateOut
+     * @description Whether a newer Weir exists, as far as Weir last found out.
+     */
+    SystemOverviewUpdateOut: {
+      /**
+       * Latest Version
+       * @description The newest published version, or the one the tray has downloaded and is waiting to install; null when none is known.
+       */
+      latest_version: string | null;
+      /**
+       * Status
+       * @description checking: nothing learned yet. up_to_date. update_available. downloaded: the tray holds an update waiting to install. not_published: no release exists yet. unavailable: the release list could not be reached.
+       * @enum {string}
+       */
+      status:
+        | "checking"
+        | "up_to_date"
+        | "update_available"
+        | "downloaded"
+        | "not_published"
+        | "unavailable";
+    };
+    /**
+     * SystemStatsDriveOut
+     * @description One drive that holds a workflow's folders. A network share has free space only: its activity is null.
+     */
+    SystemStatsDriveOut: {
+      /**
+       * Busy Percent
+       * @description How much of the time the drive was busy.
+       */
+      busy_percent: number | null;
+      /**
+       * Free Bytes
+       * @description What is free for Weir to use.
+       */
+      free_bytes: number;
+      /**
+       * Full In Days
+       * @description When the drive will be full at the pace it has been filling, from the last day of readings kept since Weir started. Null when it is not filling, when there is less than an hour of history, or when it would take over a year.
+       */
+      full_in_days: number | null;
+      /**
+       * Keep Free Bytes
+       * @description The most any workflow on this drive wants kept free.
+       */
+      keep_free_bytes: number;
+      /**
+       * Name
+       * @description The drive as a person names it: a letter such as D:, a network share, or a mount point.
+       */
+      name: string;
+      /**
+       * Path
+       * @description The drive's root.
+       */
+      path: string;
+      /**
+       * Read Bytes Per Sec
+       * @description What the drive reads each second, from the last two readings of it (every 30 seconds).
+       */
+      read_bytes_per_sec: number | null;
+      /**
+       * Total Bytes
+       * @description The drive's size.
+       */
+      total_bytes: number;
+      /**
+       * Weir Bytes
+       * @description What Weir's own work files take on this drive.
+       */
+      weir_bytes: number;
+      /**
+       * Workflows
+       * @description The workflows with a folder on this drive, by name.
+       */
+      workflows: components["schemas"]["SystemStatsDriveWorkflowOut"][];
+      /**
+       * Write Bytes Per Sec
+       * @description What the drive writes each second.
+       */
+      write_bytes_per_sec: number | null;
+    };
+    /**
+     * SystemStatsDriveWorkflowOut
+     * @description A workflow that keeps a folder on a drive, and which of its folders those are.
+     */
+    SystemStatsDriveWorkflowOut: {
+      /**
+       * Id
+       * @description The workflow's id.
+       */
+      id: number;
+      /**
+       * Name
+       * @description The workflow's name.
+       */
+      name: string;
+      /**
+       * Roles
+       * @description Which of the workflow's folders are on this drive, in the order watched, work, output.
+       */
+      roles: ("watched" | "work" | "output")[];
+    };
+    /**
+     * SystemStatsFrame
+     * @description The data of a system.stats frame on GET /activity/stream: the newest reading and the point to add to the traces.
+     */
+    SystemStatsFrame: {
+      /**
+       * Now
+       * @description The newest reading.
+       */
+      now: components["schemas"]["SystemStatsNowOut"];
+      /**
+       * Point
+       * @description The point to add to the traces.
+       */
+      point: components["schemas"]["SystemStatsPointOut"];
+    };
+    /**
+     * SystemStatsMachineOut
+     * @description What changes slowly about the machine. Each is null where the system cannot say.
+     */
+    SystemStatsMachineOut: {
+      /**
+       * Os
+       * @description The operating system's name, such as Windows 11 Pro. In Docker, the container's distribution.
+       */
+      os: string | null;
+      /**
+       * Reboot Pending
+       * @description Whether the system is waiting for a restart. Null where it cannot tell: inside a container, or on a system without a way to record it.
+       */
+      reboot_pending: boolean | null;
+      /**
+       * Uptime Seconds
+       * @description How long the machine has been running.
+       */
+      uptime_seconds: number | null;
+    };
+    /**
+     * SystemStatsNowOut
+     * @description The newest reading. A field is null where it cannot be read, such as disk activity on a network share or in a container without access to the host's counters.
+     */
+    SystemStatsNowOut: {
+      /**
+       * At
+       * Format: date-time
+       * @description When the reading was taken.
+       */
+      at: string;
+      /**
+       * Cores
+       * @description How many processor cores the machine, or the container's limit, has.
+       */
+      cores: number;
+      /**
+       * Cpu Percent
+       * @description How much of the whole machine's processor time is in use. Inside a container held to a processor limit, how much of that limit.
+       */
+      cpu_percent: number | null;
+      /**
+       * Disk Busy Percent
+       * @description How much of the time the machine's local disks were busy.
+       */
+      disk_busy_percent: number | null;
+      /**
+       * Disk Read Bytes Per Sec
+       * @description What all the machine's local disks read each second.
+       */
+      disk_read_bytes_per_sec: number | null;
+      /**
+       * Disk Write Bytes Per Sec
+       * @description What all the machine's local disks write each second.
+       */
+      disk_write_bytes_per_sec: number | null;
+      /**
+       * Memory Total Bytes
+       * @description Physical memory in total, or the container's memory limit.
+       */
+      memory_total_bytes: number | null;
+      /**
+       * Memory Used Bytes
+       * @description Physical memory in use. Inside a container held to a memory limit, what the container holds against that limit.
+       */
+      memory_used_bytes: number | null;
+      /**
+       * Processing Read Bytes Per Sec
+       * @description How fast the files being processed are read: the share of each source read so far, between two readings.
+       */
+      processing_read_bytes_per_sec: number;
+      /**
+       * Processing Speed
+       * @description The running passes' speeds added together: seconds of media written each second (148 for 148x). A copy has no such speed and adds nothing.
+       */
+      processing_speed: number;
+      /**
+       * Processing Write Bytes Per Sec
+       * @description How fast the files being processed are written. ffmpeg reports what it has written; for mkvmerge, which does not, it is the same as what was read.
+       */
+      processing_write_bytes_per_sec: number;
+      /**
+       * Running
+       * @description Files being processed now.
+       */
+      running: number;
+      /**
+       * Slots
+       * @description How many files Weir will process at once.
+       */
+      slots: number;
+      /**
+       * Tools Cpu Percent
+       * @description The tools Weir runs (ffmpeg, mkvmerge), as a share of the whole machine's processor time.
+       */
+      tools_cpu_percent: number | null;
+      /**
+       * Weir Cpu Percent
+       * @description Weir's own process, as a share of the whole machine's processor time.
+       */
+      weir_cpu_percent: number | null;
+      /**
+       * Weir Memory Bytes
+       * @description The memory Weir's own process holds.
+       */
+      weir_memory_bytes: number;
+    };
+    /**
+     * SystemStatsOut
+     * @description The machine's load, Weir's share of it and the drives its workflows use, with the last ten minutes of the load. The same readings reach the Activity stream as system.stats frames.
+     */
+    SystemStatsOut: {
+      /**
+       * Drives
+       * @description Every drive that holds a workflow's watched, work or output folder, read every 30 seconds.
+       */
+      drives: components["schemas"]["SystemStatsDriveOut"][];
+      /**
+       * History
+       * @description The points of the last window, oldest first, at most 600. Each has its own time.
+       */
+      history: components["schemas"]["SystemStatsPointOut"][];
+      /**
+       * Interval Ms
+       * @description How often a stream gets a reading while a browser is watching. With none watching, Weir reads every ten seconds, so history points can be further apart than this.
+       */
+      interval_ms: number;
+      /**
+       * Machine
+       * @description What changes slowly about the machine.
+       */
+      machine: components["schemas"]["SystemStatsMachineOut"];
+      /**
+       * Now
+       * @description The newest reading.
+       */
+      now: components["schemas"]["SystemStatsNowOut"];
+      /**
+       * Window S
+       * @description How far back history reaches.
+       */
+      window_s: number;
+    };
+    /**
+     * SystemStatsPointOut
+     * @description One moment of the traces. A field is null where it could not be read.
+     */
+    SystemStatsPointOut: {
+      /**
+       * At
+       * Format: date-time
+       * @description When the reading was taken.
+       */
+      at: string;
+      /**
+       * Cpu Percent
+       * @description The share of the whole machine's processor time in use.
+       */
+      cpu_percent: number | null;
+      /**
+       * Disk Read Bytes Per Sec
+       * @description What all the machine's local disks read each second.
+       */
+      disk_read_bytes_per_sec: number | null;
+      /**
+       * Disk Write Bytes Per Sec
+       * @description What all the machine's local disks write each second.
+       */
+      disk_write_bytes_per_sec: number | null;
+      /**
+       * Memory Percent
+       * @description The share of physical memory in use.
+       */
+      memory_percent: number | null;
+      /**
+       * Processing Read Bytes Per Sec
+       * @description How fast the files being processed are read.
+       */
+      processing_read_bytes_per_sec: number;
+      /**
+       * Processing Speed
+       * @description The running passes' speeds added together.
+       */
+      processing_speed: number;
+      /**
+       * Processing Write Bytes Per Sec
+       * @description How fast the files being processed are written.
+       */
+      processing_write_bytes_per_sec: number;
+    };
+    /**
+     * SystemTaskOut
+     * @description One task Weir runs on its own: its last run, its next run, and whether it is running now. The same list arrives on the Activity stream as a system.tasks frame, whose data is an array of these, each time a run starts or ends or a task comes or goes.
+     */
+    SystemTaskOut: {
+      /**
+       * Interval Seconds
+       * @description How often it runs, when that is a fixed time.
+       */
+      interval_seconds: number | null;
+      /**
+       * Key
+       * @description A stable id: a task's own name, scan-{workflow id} for a workflow's periodic scan, library-clean-{workflow id} for its scheduled scan and clean, or the name of a cleanup.
+       */
+      key: string;
+      /**
+       * Label
+       * @description What the task does, in words, with its workflow's name when it belongs to one: Scan Movies, Clean Movies library.
+       */
+      label: string;
+      /**
+       * Last Error
+       * @description Why the last run failed, in a sentence; null when it worked or has not run.
+       */
+      last_error: string | null;
+      /**
+       * Last Ok
+       * @description Whether the last run worked; null until one has finished.
+       */
+      last_ok: boolean | null;
+      /**
+       * Last Run At
+       * @description When the last run finished; null until one has.
+       */
+      last_run_at: string | null;
+      /**
+       * Next Run At
+       * @description When the next run is due, as far as Weir knows; null when none is planned.
+       */
+      next_run_at: string | null;
+      /**
+       * Running
+       * @description A run is under way.
+       */
+      running: boolean;
     };
     /** ThemeIn */
     ThemeIn: {
@@ -7709,6 +8652,35 @@ export interface operations {
         content: {
           "application/json": unknown;
         };
+      };
+    };
+  };
+  get_artwork_poster_api_v1_artwork_posters__poster_id__get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        poster_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description The poster image. Cached by the browser for 30 days. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "image/*": string;
+        };
+      };
+      /** @description Weir holds no poster with that id. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
       };
     };
   };
@@ -8317,6 +9289,11 @@ export interface operations {
              * @description The name of the machine Weir runs on, for a media manager to name its connection to Weir.
              */
             machine_name: string;
+            /**
+             * Version
+             * @description Weir’s release version, X.Y.Z as stamped from its release tag (0.0.1-dev on a development build). Weir before 4.0.0 sends no version.
+             */
+            version: string;
           };
         };
       };
@@ -8954,6 +9931,12 @@ export interface operations {
           | null;
         path_contains?: string | null;
         within_days?: number | null;
+        /** @description How the list is ordered: file (by path, ignoring the case of letters), status (by what the status means, then the status word; a cleaned copy still waiting for its media manager counts as to do) or when (by when the file last changed). Without it the list is newest-seen first, as it has always been. Files that tie fall by id, so paging never repeats or skips one. */
+        sort?: "file" | "status" | "when";
+        /** @description Which way the order runs. Ascending runs the sort's own way (A to Z, oldest first, done first); descending reverses it, and is the default. */
+        direction?: "asc" | "desc";
+        /** @description Where the page starts: the next_cursor of the page before, asked for with the same sort and direction. A cursor made for another sort or direction is refused. */
+        cursor?: string | null;
         limit?: number;
       };
       header?: never;
@@ -9995,6 +10978,14 @@ export interface operations {
         subtitle_language?: string;
         /** @description Narrow to files Weir has cleaned, or files you have set aside. */
         state?: ("cleaned" | "left_alone") | null;
+        /** @description Narrow to the files in one status: where each file stands now against the current rules. */
+        status?:
+          | "needs_cleaning"
+          | "cleaning"
+          | "matches"
+          | "cant_clean_yet"
+          | "left_alone";
+        /** @description The column to sort by. status orders files by where each stands now, in the order the statuses read: matches, needs cleaning, cleaning, can't clean yet (those Weir cannot read or open last), left alone. Files that tie fall by path, whichever way the sort runs. A value that is not listed sorts by path. */
         sort?:
           | "path"
           | "title"
@@ -10005,7 +10996,8 @@ export interface operations {
           | "resolution"
           | "audio"
           | "subtitles"
-          | "modified";
+          | "modified"
+          | "status";
         direction?: "asc" | "desc";
         page?: number;
         page_size?: number;
@@ -11270,6 +12262,39 @@ export interface operations {
       };
     };
   };
+  put_suite_network_access_api_v1_suite_network_access_put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["SuiteNetworkAccessPutIn"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["SuiteNetworkAccessOut"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
   get_notification_channels_api_v1_suite_notification_channels_get: {
     parameters: {
       query?: never;
@@ -11674,6 +12699,130 @@ export interface operations {
       };
     };
   };
+  get_system_log_api_v1_system_log_get: {
+    parameters: {
+      query?: {
+        /** @description Where rows come from: event, job, server. Repeat it or separate with commas. None means all. */
+        source?: string | null;
+        /** @description How rows went: error, warning, info, success. Repeat it or separate with commas. */
+        level?: string | null;
+        /** @description What rows are about: processing, scans, cleanup, library, connections, backups, sign_in, updates, weir. Repeat it or separate with commas. */
+        category?: string | null;
+        /** @description A workflow's id. Leaves out the server log, whose lines belong to no workflow. */
+        workflow?: number | null;
+        /** @description Words to find in a row's text. */
+        q?: string | null;
+        /** @description Only rows at or after this time (ISO 8601; without an offset it is UTC). */
+        from?: string | null;
+        /** @description Only rows at or before this time (ISO 8601; without an offset it is UTC). */
+        to?: string | null;
+        /** @description One job's id: its row, the events that name it and the server lines written while it ran. */
+        job?: number | null;
+        /** @description An Activity event type. Only events have one, so this leaves out jobs and server lines. */
+        event_type?: string | null;
+        /** @description An Activity event's result: success, skipped, warning, retrying, running, failed. Only events have one. */
+        result?: string | null;
+        /** @description Why an Activity event happened: manual, scheduled, startup, worker, retry, system, webhook, folder_change. Only events have one. */
+        trigger?: string | null;
+        /** @description Job statuses: pending, leased, completed, failed, cancelled, handler_ok_finalize_failed. Repeat it or separate with commas. Only jobs have one; asking for any also shows finished watched-folder scans, which are otherwise left out. */
+        status?: string | null;
+        /** @description Only server lines that carry an exception (true) or none (false). Only the server log has them. */
+        has_exception?: boolean | null;
+        /** @description How the list is ordered: time (the default), level (by severity, errors first when ascending), source (event, job, server), category (by its word) or workflow (by the workflow's name, ignoring case; rows with no workflow come last either way). Rows that tie fall by time, newest first when descending and oldest first when ascending, so paging never repeats or skips one. */
+        sort?: "time" | "level" | "source" | "category" | "workflow";
+        /** @description Which way the order runs. Ascending runs the sort's own way (oldest first, errors first, A to Z); descending reverses it, and is the default: newest first. */
+        direction?: "asc" | "desc";
+        /** @description Where the page starts: the next_cursor of the page before, asked for with the same sort and direction. A cursor made for another sort or direction is refused. */
+        cursor?: string | null;
+        limit?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["SystemLogOut"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_system_log_export_api_v1_system_log_export_get: {
+    parameters: {
+      query?: {
+        format?: string;
+        /** @description Where rows come from: event, job, server. Repeat it or separate with commas. None means all. */
+        source?: string | null;
+        /** @description How rows went: error, warning, info, success. Repeat it or separate with commas. */
+        level?: string | null;
+        /** @description What rows are about: processing, scans, cleanup, library, connections, backups, sign_in, updates, weir. Repeat it or separate with commas. */
+        category?: string | null;
+        /** @description A workflow's id. Leaves out the server log, whose lines belong to no workflow. */
+        workflow?: number | null;
+        /** @description Words to find in a row's text. */
+        q?: string | null;
+        /** @description Only rows at or after this time (ISO 8601; without an offset it is UTC). */
+        from?: string | null;
+        /** @description Only rows at or before this time (ISO 8601; without an offset it is UTC). */
+        to?: string | null;
+        /** @description One job's id: its row, the events that name it and the server lines written while it ran. */
+        job?: number | null;
+        /** @description An Activity event type. Only events have one, so this leaves out jobs and server lines. */
+        event_type?: string | null;
+        /** @description An Activity event's result: success, skipped, warning, retrying, running, failed. Only events have one. */
+        result?: string | null;
+        /** @description Why an Activity event happened: manual, scheduled, startup, worker, retry, system, webhook, folder_change. Only events have one. */
+        trigger?: string | null;
+        /** @description Job statuses: pending, leased, completed, failed, cancelled, handler_ok_finalize_failed. Repeat it or separate with commas. Only jobs have one; asking for any also shows finished watched-folder scans, which are otherwise left out. */
+        status?: string | null;
+        /** @description Only server lines that carry an exception (true) or none (false). Only the server log has them. */
+        has_exception?: boolean | null;
+        /** @description How the list is ordered: time (the default), level (by severity, errors first when ascending), source (event, job, server), category (by its word) or workflow (by the workflow's name, ignoring case; rows with no workflow come last either way). Rows that tie fall by time, newest first when descending and oldest first when ascending, so paging never repeats or skips one. */
+        sort?: "time" | "level" | "source" | "category" | "workflow";
+        /** @description Which way the order runs. Ascending runs the sort's own way (oldest first, errors first, A to Z); descending reverses it, and is the default: newest first. */
+        direction?: "asc" | "desc";
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
   get_system_media_tools_api_v1_system_media_tools_get: {
     parameters: {
       query?: never;
@@ -11690,6 +12839,26 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["MediaToolsOut"];
+        };
+      };
+    };
+  };
+  get_system_overview_api_v1_system_overview_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["SystemOverviewOut"];
         };
       };
     };
@@ -11763,6 +12932,46 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_system_stats_api_v1_system_stats_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["SystemStatsOut"];
+        };
+      };
+    };
+  };
+  get_system_tasks_api_v1_system_tasks_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["SystemTaskOut"][];
         };
       };
     };

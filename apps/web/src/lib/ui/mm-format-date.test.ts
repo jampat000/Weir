@@ -1,6 +1,17 @@
-import { describe, expect, it } from "vitest";
+import { renderHook } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
 
-import { parseAppDate, parseAppTime } from "./mm-format-date";
+import {
+  parseAppDate,
+  parseAppTime,
+  useAppClockFormatter,
+  useAppClockSecondsFormatter,
+} from "./mm-format-date";
+
+const settings = { timezone: "UTC" };
+vi.mock("../settings/queries", () => ({
+  useAppSettingsQuery: () => ({ data: { app_timezone: settings.timezone } }),
+}));
 
 const TEN_AM_UTC = Date.UTC(2026, 7, 22, 10, 0, 0);
 
@@ -35,5 +46,39 @@ describe("parseAppTime", () => {
 
   it("gives the epoch ms of a readable one", () => {
     expect(parseAppTime("2026-08-22T10:00:00")).toBe(TEN_AM_UTC);
+  });
+});
+
+describe("useAppClockFormatter", () => {
+  const clockIn = (timezone: string) => {
+    settings.timezone = timezone;
+    return renderHook(() => useAppClockFormatter()).result.current(TEN_AM_UTC);
+  };
+
+  it("writes the time in the timezone chosen in Settings", () => {
+    expect(clockIn("UTC")).toMatch(/^10:00\sam$/);
+    expect(clockIn("Australia/Brisbane")).toMatch(/^8:00\spm$/);
+  });
+
+  it("falls back to the browser's clock for a timezone it does not know", () => {
+    expect(clockIn("Not/AZone")).toMatch(/\d:\d\d/);
+  });
+});
+
+describe("useAppClockSecondsFormatter", () => {
+  const clockIn = (timezone: string) => {
+    settings.timezone = timezone;
+    return renderHook(() => useAppClockSecondsFormatter()).result.current(
+      TEN_AM_UTC + 5000,
+    );
+  };
+
+  it("writes the time with its seconds in the timezone chosen in Settings", () => {
+    expect(clockIn("UTC")).toMatch(/^10:00:05\sam$/);
+    expect(clockIn("Australia/Brisbane")).toMatch(/^8:00:05\spm$/);
+  });
+
+  it("falls back to the browser's clock for a timezone it does not know", () => {
+    expect(clockIn("Not/AZone")).toMatch(/\d:\d\d:\d\d/);
   });
 });

@@ -55,8 +55,8 @@ export function WizardDownloadsSection({
           <p className="mm-quiet-note">
             Where your downloader finishes files, and where Weir puts them once
             cleaned for your media manager to import. This fills in your first
-            Movies and TV workflow. Add more workflows in Settings › Workflows,
-            and choose which tracks to keep in Settings › Rules.
+            Movies and TV workflow. Add more workflows in Setup › Workflows, and
+            choose which tracks to keep in Setup › Rules.
           </p>
           <WizardManualLibraries
             draft={draft}

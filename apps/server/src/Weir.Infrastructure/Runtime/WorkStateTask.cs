@@ -17,6 +17,8 @@ public sealed class WorkStateTask(UpdateFiles files, ProcessingJobStore jobs, Jo
 
     public string Name => "update-work-state";
 
+    public string? Label => null;
+
     public TimeSpan Interval => Every;
 
     public bool RunAtStart => true;

@@ -1,6 +1,8 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Weir.Core.MediaManagers;
+using Weir.Infrastructure.ConnectionTraffic;
+using Weir.Infrastructure.Scheduling;
 
 namespace Weir.Infrastructure.MediaManagers;
 
@@ -23,6 +25,8 @@ public static class DownloadClientServices
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IDownloadClientPort, DelugePort>());
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IDownloadClientPort, TransmissionPort>());
         services.TryAddSingleton<DownloadClientSuggestions>();
+        // Every ten seconds, when each connection (manager or client) was last used and how long it took to answer.
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IPeriodicTask, ConnectionUsageFlushTask>());
         return services;
     }
 }

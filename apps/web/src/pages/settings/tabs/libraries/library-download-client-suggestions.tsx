@@ -1,4 +1,4 @@
-import { QuietFieldGroup } from "../../../../components/shared/quiet-section";
+import { EditorSubsection } from "./editor-subsection";
 import type { DownloadClientSuggestion } from "../../../../lib/download-clients/download-clients-api";
 import { useDownloadClientSuggestionsQuery } from "../../../../lib/download-clients/queries";
 import type { ProcessingMediaType } from "../../../../lib/processing/libraries-api";
@@ -57,7 +57,7 @@ export function LibraryDownloadClientSuggestions({
   );
   if (offers.length === 0) return null;
   return (
-    <QuietFieldGroup
+    <EditorSubsection
       title="Folder from your download client"
       detail="Your download client says where it saves finished downloads."
     >
@@ -75,6 +75,6 @@ export function LibraryDownloadClientSuggestions({
           />
         ))}
       </div>
-    </QuietFieldGroup>
+    </EditorSubsection>
   );
 }

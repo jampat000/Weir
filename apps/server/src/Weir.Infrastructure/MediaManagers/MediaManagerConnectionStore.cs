@@ -2,6 +2,7 @@ using Microsoft.Data.Sqlite;
 using Weir.Core.Json;
 using Weir.Core.MediaManagers;
 using Weir.Core.Time;
+using Weir.Infrastructure.ConnectionTraffic;
 using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Infrastructure.MediaManagers;
@@ -46,7 +47,9 @@ public sealed record MediaManagerConnectionRecord(
     Timestamp? LastTestAt,
     string? LastTestDetail,
     bool DownloadedScanEnabled = false,
-    string? Nickname = null)
+    string? Nickname = null,
+    long? LastAnswerMs = null,
+    Timestamp? LastUsedAt = null)
 {
     public IReadOnlyList<MediaManagerSearchLaneRecord> Lanes { get; init; } = [];
 
@@ -81,6 +84,8 @@ public sealed record MediaManagerConnectionRecord(
         .Set("last_test_ok", LastTestOk is { } ok ? WireValue.Of(ok) : WireValue.Null)
         .Set("last_test_at", LastTestAt is { } at ? at.ToWireText() : null)
         .Set("last_test_detail", LastTestDetail)
+        .Set("last_answer_ms", LastAnswerMs)
+        .Set("last_used_at", ConnectionUsage.WireText(LastUsedAt))
         .Set("downloaded_scan_enabled", DownloadedScanEnabled)
         .Set("lanes", new WireArray(Lanes.OrderBy(lane => lane.Lane, StringComparer.Ordinal).Select(lane => (WireValue)lane.ToOut())));
 }
@@ -106,18 +111,27 @@ public sealed class MediaManagerConnectionStore
 {
     private const string ConnectionColumns =
         "id, kind, name, enabled, base_url, api_key_ciphertext, webhook_secret_ciphertext, " +
-        "last_connection_test_ok, last_connection_test_at, last_connection_test_detail, downloaded_scan_enabled, nickname";
+        "last_connection_test_ok, last_connection_test_at, last_connection_test_detail, downloaded_scan_enabled, nickname, " +
+        "last_answer_ms, last_used_at";
 
     private const string LaneColumns =
         "id, connection_id, lane, enabled, max_items_per_run, retry_delay_minutes, schedule_enabled, schedule_days, " +
         "schedule_start, schedule_end, schedule_interval_seconds";
+
+    private readonly ConnectionUsageLedger? _usage;
+
+    /// <param name="usage">Newer usage than the database holds, laid over every connection a list or lookup returns; none reads the database alone.</param>
+    public MediaManagerConnectionStore(ConnectionUsageLedger? usage = null)
+    {
+        _usage = usage;
+    }
 
     /// <summary>Every connection with its lanes, by id.</summary>
     public async Task<List<MediaManagerConnectionRecord>> ListAsync(UnitOfWork uow)
     {
         ArgumentNullException.ThrowIfNull(uow);
         var rows = await uow.QueryAsync($"SELECT {ConnectionColumns} FROM media_manager_connections ORDER BY id", ReadConnection).ConfigureAwait(false);
-        return await WithLanesAsync(uow, rows).ConfigureAwait(false);
+        return [.. (await WithLanesAsync(uow, rows).ConfigureAwait(false)).Select(WithLiveUsage)];
     }
 
     /// <summary>Enabled connections by id, without their lanes.</summary>
@@ -132,7 +146,7 @@ public sealed class MediaManagerConnectionStore
     {
         ArgumentNullException.ThrowIfNull(uow);
         var row = await uow.QuerySingleAsync($"SELECT {ConnectionColumns} FROM media_manager_connections WHERE id = $id", ReadConnection, ("$id", connectionId)).ConfigureAwait(false);
-        return row is null ? null : (await WithLanesAsync(uow, [row]).ConfigureAwait(false))[0];
+        return row is null ? null : WithLiveUsage((await WithLanesAsync(uow, [row]).ConfigureAwait(false))[0]);
     }
 
     /// <summary>The first enabled connection of a kind.</summary>
@@ -233,6 +247,29 @@ public sealed class MediaManagerConnectionStore
         await uow.ExecuteAsync("DELETE FROM media_manager_search_lanes WHERE connection_id = $id", ("$id", connectionId)).ConfigureAwait(false);
         await uow.ExecuteAsync("DELETE FROM media_manager_connections WHERE id = $id", ("$id", connectionId)).ConfigureAwait(false);
         await RefreshNamesAsync(uow).ConfigureAwait(false);
+        _usage?.Forget(new ConnectionRef(ConnectionKind.MediaManager, connectionId));
+    }
+
+    /// <summary>Save how long the last call took and when the connection was last used; a value the usage does not carry stays as it was.</summary>
+    public Task<int> RecordUsageAsync(UnitOfWork uow, long connectionId, ConnectionUsage usage)
+    {
+        ArgumentNullException.ThrowIfNull(uow);
+        return uow.ExecuteAsync(
+            "UPDATE media_manager_connections SET last_answer_ms = COALESCE($ms, last_answer_ms), last_used_at = COALESCE($at, last_used_at) WHERE id = $id",
+            ("$ms", usage.AnswerMilliseconds),
+            ("$at", usage.UsedAt?.ToSqlite()),
+            ("$id", connectionId));
+    }
+
+    private MediaManagerConnectionRecord WithLiveUsage(MediaManagerConnectionRecord row)
+    {
+        if (_usage is null)
+        {
+            return row;
+        }
+
+        var usage = _usage.Overlay(new ConnectionRef(ConnectionKind.MediaManager, row.Id), row.LastAnswerMs, row.LastUsedAt);
+        return row with { LastAnswerMs = usage.AnswerMilliseconds, LastUsedAt = usage.UsedAt };
     }
 
     /// <summary>The conditional test-result write: 0 when the connection was removed meanwhile.</summary>
@@ -318,7 +355,9 @@ public sealed class MediaManagerConnectionStore
         SqliteValues.GetDateTimeOrNull(reader, 8),
         SqliteValues.GetStringOrNull(reader, 9),
         SqliteValues.GetBool(reader, 10),
-        SqliteValues.GetStringOrNull(reader, 11));
+        SqliteValues.GetStringOrNull(reader, 11),
+        SqliteValues.GetInt64OrNull(reader, 12),
+        SqliteValues.GetDateTimeOrNull(reader, 13));
 
     private static MediaManagerSearchLaneRecord ReadLane(SqliteDataReader reader) => new(
         SqliteValues.GetInt64(reader, 0),

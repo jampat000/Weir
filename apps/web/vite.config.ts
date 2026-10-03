@@ -92,6 +92,11 @@ export default defineConfig(({ mode }) => {
       // source paths or ship multi-megabyte maps by default.
       sourcemap:
         process.env.WEIR_BUILD_SOURCEMAPS === "true" ? "hidden" : false,
+      // Fonts stay files. A script's font is only fetched when text in that script appears (each
+      // subset's `unicode-range`), but a font small enough to be inlined was written into every
+      // visitor's stylesheet whether or not it was ever used: 2.7 KB of the 200 KiB budget.
+      assetsInlineLimit: (file) =>
+        file.endsWith(".woff2") ? false : undefined,
     },
     server: {
       // Local-only: binds to 127.0.0.1, not every interface, so the dev server isn't reachable

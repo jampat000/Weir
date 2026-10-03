@@ -44,6 +44,9 @@ public sealed record DownloadClientConnection(
     string Kind, string Name, string BaseUrl, string? Username, string? Password, string? ApiKey, long? ConnectionId = null, string? Nickname = null)
 {
     public string Label => DownloadClientKinds.LabelForConnection(Kind, Name, Nickname);
+
+    /// <summary>The saved connection this is, or null when it is not saved.</summary>
+    public ConnectionRef? Reference => ConnectionRef.ForDownloadClient(ConnectionId);
 }
 
 /// <summary>One category or label a download client organizes completed downloads by, and the folder it saves them to.</summary>

@@ -1,0 +1,217 @@
+/*
+ * System › Logs: one log of everything Weir recorded. The filters sit in the header's slot (the shared rules for it are in
+ * weir-history.css, which Activity uses too), or in the Log card when the header has no room; this is the chips, the
+ * card's list, its rows and what opens under them.
+ */
+
+/* The source chips, a little tighter than a page's own. */
+.mm-logs-controls .mm-history-chips {
+  display: flex;
+}
+
+.mm-logs-controls .mm-history-chips .mm-segmented {
+  flex: none;
+}
+
+.mm-logs-controls .mm-segmented__option {
+  padding-inline: 8px;
+}
+
+/* The filters the header had no room for, and the ones only some rows have: a row of their own above the list. */
+.mm-log-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 14px;
+}
+
+/* A picker's list opens as wide as its longest choice, so "Connections · 12" stays on one line. */
+.mm-log-toolbar [role="listbox"],
+.mm-history-scope [role="listbox"] {
+  width: max-content;
+  min-width: 100%;
+  max-width: 18rem;
+}
+
+.mm-log-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.mm-log-live {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--mm-st) 14%, transparent);
+}
+
+/* ---- The list ---------------------------------------------------------------- */
+
+.mm-log-list {
+  container-type: inline-size;
+}
+
+/* While the answer to a new filter is on its way the list, its count and the pickers still hold the last one's: dimmed, so they do not pass for it. */
+.mm-log-feed[aria-busy="true"] .mm-log-list,
+.mm-log-status[aria-busy="true"],
+.mm-workflow-picker[aria-busy="true"] {
+  opacity: 0.45;
+}
+
+/* A day's name above its rows: a heading for the eye, not a row. */
+.mm-log-day {
+  padding: 16px 8px 6px;
+  color: var(--mm-text3);
+  font-size: var(--mm-type-eyebrow);
+  font-weight: 700;
+  letter-spacing: var(--mm-tracking-eyebrow);
+  text-transform: uppercase;
+}
+
+.mm-log-row {
+  border-top: 1px solid var(--mm-hairline);
+}
+
+/* A problem has an accent at its edge, as Activity's entries do; everything else is quiet. */
+.mm-log-row--problem {
+  box-shadow: inset 3px 0 0 var(--mm-st);
+}
+
+/* The row's line: time, level dot, source, category, workflow, then the title with its quieter second line, in the
+   order of the columns. The headings over the rows are on the same grid, which the list sets. */
+.mm-log-head,
+.mm-log-row__head {
+  display: grid;
+  grid-template-columns: var(--log-cols);
+  align-items: center;
+  column-gap: 12px;
+  width: 100%;
+  padding: 9px 8px 9px 12px;
+  border: 0;
+  border-radius: var(--mm-radius-control);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+.mm-log-row__head:hover {
+  background: color-mix(in srgb, var(--mm-surface-2) 60%, transparent);
+  cursor: pointer;
+}
+
+.mm-log-row__head:focus-visible {
+  outline: 2px solid var(--mm-accent);
+  outline-offset: -2px;
+}
+
+.mm-log-row__time,
+.mm-log-row__workflow {
+  color: var(--mm-text3);
+  font-size: var(--mm-type-caption);
+  font-variant-numeric: tabular-nums;
+}
+
+.mm-log-row__category {
+  color: var(--mm-text2);
+  font-size: var(--mm-type-caption);
+}
+
+.mm-log-row__category,
+.mm-log-row__workflow,
+.mm-log-row__text strong,
+.mm-log-row__text small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mm-log-row__text {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.mm-log-row__text strong {
+  font-size: var(--mm-type-body);
+}
+
+.mm-log-row__text small {
+  color: var(--mm-text3);
+  font-size: var(--mm-type-caption);
+}
+
+.mm-log-row__chevron {
+  color: var(--mm-text3);
+}
+
+.mm-log-row__head[aria-expanded="true"] .mm-log-row__chevron {
+  transform: rotate(180deg);
+}
+
+/* Where the card is narrow the time, level, source and category share a line and the title has the line under it, and the headings, which cannot say what a stacked row holds, are left out. */
+@container (max-width: 860px) {
+  .mm-log-row__head {
+    grid-template-columns: var(--log-cols-narrow);
+    row-gap: 4px;
+  }
+
+  .mm-log-row__workflow,
+  .mm-log-head {
+    display: none;
+  }
+
+  .mm-log-row__text {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+}
+
+/* ---- What opens under a row --------------------------------------------------- */
+
+.mm-log-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 32px;
+  margin: 0;
+}
+
+.mm-log-head,
+.mm-log-facts dt,
+.mm-log-raw__label {
+  color: var(--mm-text3);
+  font-size: var(--mm-type-eyebrow);
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.mm-log-facts dd {
+  margin: 2px 0 0;
+  font-size: var(--mm-type-body);
+  overflow-wrap: anywhere;
+}
+
+.mm-log-facts__mono,
+.mm-log-raw__text {
+  font-family: var(--mm-font-mono);
+  font-size: var(--mm-type-caption);
+}
+
+/* Verbatim text from a job or the server: the box marks it as raw output, and its own edge says where it ends. */
+.mm-log-raw__label {
+  margin: 0 0 4px;
+}
+
+.mm-log-raw__text {
+  max-height: 18rem;
+  margin: 0;
+  overflow: auto;
+  padding: 10px 12px;
+  border: 1px solid var(--mm-hairline);
+  border-radius: var(--mm-radius-control);
+  background: var(--mm-well-bg);
+  color: var(--mm-text2);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}

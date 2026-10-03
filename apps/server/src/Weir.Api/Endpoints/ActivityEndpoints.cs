@@ -13,6 +13,7 @@ using Weir.Core.Json;
 using Weir.Core.Time;
 using Weir.Core.Validation;
 using Weir.Infrastructure.Activity;
+using Weir.Infrastructure.Artwork;
 using Weir.Infrastructure.Settings;
 
 namespace Weir.Api.Endpoints;
@@ -51,8 +52,9 @@ public static class ActivityEndpoints
 
     /// <summary>
     /// Authenticate once with a short-lived connection, then stream <c>activity.latest</c> frames and, once a second at
-    /// most, a <c>processing.progress</c> frame with every file's live progress (#750), plus keepalives, without
-    /// holding the database.
+    /// most, a <c>processing.progress</c> frame with every file's live progress (#750), plus a
+    /// <c>connection.activity</c> frame whenever a media manager or download client is asked, answers, fails or calls Weir,
+    /// plus keepalives, without holding the database.
     /// </summary>
     public static async IAsyncEnumerable<string> LatestFramesAsync(
         Func<CancellationToken, Task<long?>> readLatestId,
@@ -123,18 +125,36 @@ internal sealed class ActivityEndpointHandlers
     private readonly ActivityHistoryStore _history;
     private readonly SuiteSettingsStore _suiteSettings;
     private readonly ActivityProgressFrames _progressFrames;
+    private readonly ConnectionActivityFrames _connectionFrames;
+    private readonly SystemStatsFrames _statsFrames;
+    private readonly SystemTasksFrames _tasksFrames;
+    private readonly SystemLogFrames _logFrames;
+    private readonly ActivityStreamClients _streamClients;
     private readonly IHostApplicationLifetime _lifetime;
+    private readonly ArtworkPosterUrls _posters;
 
     public ActivityEndpointHandlers(
         ActivityHistoryStore history,
         SuiteSettingsStore suiteSettings,
         ActivityProgressFrames progressFrames,
-        IHostApplicationLifetime lifetime)
+        ConnectionActivityFrames connectionFrames,
+        SystemStatsFrames statsFrames,
+        SystemTasksFrames tasksFrames,
+        SystemLogFrames logFrames,
+        ActivityStreamClients streamClients,
+        IHostApplicationLifetime lifetime,
+        ArtworkPosterUrls posters)
     {
         _history = history ?? throw new ArgumentNullException(nameof(history));
         _suiteSettings = suiteSettings ?? throw new ArgumentNullException(nameof(suiteSettings));
         _progressFrames = progressFrames ?? throw new ArgumentNullException(nameof(progressFrames));
+        _connectionFrames = connectionFrames ?? throw new ArgumentNullException(nameof(connectionFrames));
+        _statsFrames = statsFrames ?? throw new ArgumentNullException(nameof(statsFrames));
+        _tasksFrames = tasksFrames ?? throw new ArgumentNullException(nameof(tasksFrames));
+        _logFrames = logFrames ?? throw new ArgumentNullException(nameof(logFrames));
+        _streamClients = streamClients ?? throw new ArgumentNullException(nameof(streamClients));
         _lifetime = lifetime ?? throw new ArgumentNullException(nameof(lifetime));
+        _posters = posters ?? throw new ArgumentNullException(nameof(posters));
     }
 
     public async Task<ApiResult> GetRecentAsync(ApiRequest request)
@@ -165,8 +185,13 @@ internal sealed class ActivityEndpointHandlers
         long? total = beforeId is null ? await _history.CountAsync(uow, filter).ConfigureAwait(false) : null;
         var settings = await _suiteSettings.EnsureAsync(uow).ConfigureAwait(false);
         var oldest = await _history.OldestCreatedAtAsync(uow).ConfigureAwait(false);
-        return ApiRoutes.Ok(ActivityHistory.RecentOut(page.Items, page.HasMore, total, settings.ActivityRetentionDays, oldest));
+        var posters = await _posters.ForFilesAsync(uow, FilesOf(page.Items)).ConfigureAwait(false);
+        return ApiRoutes.Ok(ActivityHistory.RecentOut(page.Items, page.HasMore, total, settings.ActivityRetentionDays, oldest, posters));
     }
+
+    /// <summary>The library and path of each event that is about a file.</summary>
+    private static IEnumerable<(long LibraryId, string Path)> FilesOf(IEnumerable<ActivityEventRow> events) =>
+        events.Where(row => row.LibraryId is not null && row.RelativePath is not null).Select(row => (row.LibraryId!.Value, row.RelativePath!));
 
     public async Task<ApiResult> GetExportAsync(ApiRequest request)
     {
@@ -268,6 +293,11 @@ internal sealed class ActivityEndpointHandlers
         var database = request.Database;
         var notifier = ActivityNotifications.For(database);
         var progressFrames = _progressFrames;
+        var connectionFrames = _connectionFrames;
+        var statsFrames = _statsFrames;
+        var tasksFrames = _tasksFrames;
+        var logFrames = _logFrames;
+        var streamClients = _streamClients;
         var time = request.Time;
         var lifetime = _lifetime;
         var logger = request.LoggerFactory.CreateLogger("weir.platform.activity.router");
@@ -276,12 +306,13 @@ internal sealed class ActivityEndpointHandlers
             // A stream that outlived the server stopping would hold the shutdown up for as long as a browser keeps it open.
             using var streamEnded = CancellationTokenSource.CreateLinkedTokenSource(context.RequestAborted, lifetime.ApplicationStopping);
             var streamEndedToken = streamEnded.Token;
+            using var streamOpen = streamClients.Open();
             context.Response.StatusCode = StatusCodes.Status200OK;
             context.Response.ContentType = "text/event-stream; charset=utf-8";
             context.Response.Headers.CacheControl = "no-store, no-cache";
             context.Response.Headers.Connection = "keep-alive";
             context.Response.Headers["X-Accel-Buffering"] = "no";
-            // One write at a time: the two frame sources run concurrently, and a chunk must reach the client whole.
+            // One write at a time: the frame sources run concurrently, and a chunk must reach the client whole.
             var writeGate = new SemaphoreSlim(1, 1);
             async Task WriteFrameAsync(string chunk)
             {
@@ -315,7 +346,11 @@ internal sealed class ActivityEndpointHandlers
                     logger,
                     streamEndedToken));
                 var progressLoop = PumpAsync(progressFrames.ForAsync(time, streamEndedToken));
-                await Task.WhenAll(activityLoop, progressLoop).ConfigureAwait(false);
+                var connectionLoop = PumpAsync(connectionFrames.ForAsync(streamEndedToken));
+                var statsLoop = PumpAsync(statsFrames.ForAsync(streamEndedToken));
+                var tasksLoop = PumpAsync(tasksFrames.ForAsync(streamEndedToken));
+                var logLoop = PumpAsync(logFrames.ForAsync(streamEndedToken));
+                await Task.WhenAll(activityLoop, progressLoop, connectionLoop, statsLoop, tasksLoop, logLoop).ConfigureAwait(false);
             }
             catch (OperationCanceledException) when (streamEndedToken.IsCancellationRequested)
             {

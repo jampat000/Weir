@@ -48,7 +48,7 @@ still only exposes it under its real name once that copy is complete.
 
 If Weir can't produce a usable result — the release turns out to have no tracks worth keeping, for
 example — it doesn't leave a broken file behind or silently drop your download. It hands the
-original file back unchanged and tells you why in History, so you (or your media manager) can
+original file back unchanged and tells you why in Activity, so you (or your media manager) can
 decide what to do next. That is the default. The workflow's **When retries run out** setting can
 keep the file on hold or reject the release instead.
 
@@ -62,29 +62,29 @@ next scan. A file that fails the pre-check is only tried again if you switch on 
 failed the pre-check**.
 
 When the tries run out, or the failure is not one the workflow retries, the file is **Failed** in
-History, with the reason, and **When retries run out** decides the rest: hand the original back, keep it
+Activity, with the reason, and **When retries run out** decides the rest: hand the original back, keep it
 until you deal with it, or reject the release. **Try again** on a failed file starts it again by hand,
 whatever the limit.
 
 A failed copy that was half written stays in the work folder only if you switch on **Keep a failed
-file's half-written copy for a day** in Settings › Cleanup. **Leftover work files** removes it once it
-is a day old. There is no job that deletes the downloads of failed files: remove one from History, where
+file's half-written copy for a day** in Setup › Performance › Cleanup. **Leftover work files** removes it once it
+is a day old. There is no job that deletes the downloads of failed files: remove one from Activity, where
 Weir asks first.
 
 ## How long a file's history is kept
 
-Everything Weir did to a file is in History. Weir keeps a file's history for as long as it still knows
-the file, then for **Keep a file's history for N days after it's gone** (set at the bottom of History,
-90 by default, 0 for ever). The days count from when Weir finds the file gone or forgotten, and a file
-that comes back before then keeps its history. System › Logs keeps Weir's own log and Activity
-separately, with their own settings.
+Everything Weir did to a file is in Activity. Weir keeps a file's history for as long as it still knows
+the file, then for **Keep a file's history for N days after it's gone** (set in System › Logs › Log settings, under
+**How long things are kept**, 90 by default, 0 for ever; Activity links to it). The days count from when Weir finds the file gone or forgotten, and a file
+that comes back before then keeps its history. The same place keeps Weir's own log and
+Activity, each with its own number of days.
 
 ## Changed your rules? Process rejected files again
 
 A file your rules turn down is stored as **Rejected** and left alone, so a scan doesn't keep
-checking it. After you change the rules, **History › Failed** offers **Process all again**. It asks
+checking it. After you change the rules, **Activity › Failed** offers **Process all again**. It asks
 first, saying how many rejected files it will check again with your current rules. It covers every
-rejected file in the workflow History is narrowed to, or in all workflows, not only the ones listed for
+rejected file in the workflow Activity is narrowed to, or in all workflows, not only the ones listed for
 the period you are looking at. A file whose original is no longer in its watched folder is skipped and
 counted. Nothing runs by itself when you change the rules.
 
@@ -102,7 +102,7 @@ rather than overwriting something you may have already edited.
 Weir only deletes the original file (or the source folder it came from) after the cleaned copy
 exists at its final path and any sidecars that needed to travel have been copied successfully. A
 file that's missing is treated as already gone, not as a completed deletion with something hidden
-behind it — and a file that's locked or in use produces a message you can read in History, not a
+behind it — and a file that's locked or in use produces a message you can read in Activity, not a
 silent skip.
 
 ## Library mode: cleaning files you already have
@@ -111,9 +111,9 @@ Cleaning a file that's already in your library, in place, follows the same rule:
 cleaned version alongside the original first and only swaps it in once the new copy is confirmed
 good. It never leaves your library with a file half-replaced.
 
-You set this up on the **Library** page, not in Settings: each library has its own folders, its own
+You set this up on the **Library** page, not in Setup: each library has its own folders, its own
 rules profile (the workflow's until you choose another), the daily clean, and two checks made before
 each clean. One skips a file when cleaning it would make the media manager download it again. The
 other skips a file that is still seeding. **Files already in your library: keep the original after
 cleaning** moves the original into an originals folder instead of deleting it, so removed tracks can
-be recovered. Settings › Workflows is only about new downloads.
+be recovered. Setup › Workflows is only about new downloads.

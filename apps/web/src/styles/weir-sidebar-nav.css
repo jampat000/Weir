@@ -1,4 +1,4 @@
-/* Inside the sidebar: the mark, the navigation links and the footer. */
+/* Inside the sidebar: the mark, the groups of links and the signed-in user. */
 
 /* Weir mark + wordmark (components/brand/weir-logo.tsx). */
 .mm-logo {
@@ -27,236 +27,300 @@
   fill: var(--mm-brand-water);
 }
 
-.mm-logo--sidebar {
-  font-size: calc(1.6rem * var(--mm-density-ui-scale));
-}
-
 .mm-logo--auth {
   font-size: 2.4rem;
 }
 
-.mm-sidebar--collapsed .mm-logo-wordmark {
+/* The links scroll when the window is short; the brand above and the user below stay put. */
+.mm-sidebar-nav {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.mm-sidebar-nav::-webkit-scrollbar {
   display: none;
 }
 
-.mm-sidebar-tagline {
-  margin: 0;
-  padding: 0;
-  font-size: 0.75rem;
-  line-height: 1.4;
-  font-weight: 500;
-  font-style: normal;
-  letter-spacing: 0.01em;
-  text-transform: none;
-  color: var(--mm-text3);
-  max-width: 16rem;
-  text-align: left;
-}
-
-.mm-sidebar-nav {
-  flex: 1;
+.mm-sidebar-group {
   display: flex;
   flex-direction: column;
-  padding: calc(6px * var(--mm-density-ui-scale))
-    calc(10px * var(--mm-density-ui-scale)) 0;
-  gap: calc(3px * var(--mm-density-ui-scale));
+  gap: 5.6px;
 }
 
-.mm-sidebar-link-icon {
-  display: flex;
-  flex-shrink: 0;
-  color: var(--mm-gold);
-  opacity: 0.78;
+.mm-sidebar-group__label {
+  margin: 20px 0 8px;
+  padding: 16px 13px 0;
+  border-top: 1px solid color-mix(in srgb, var(--mm-hairline) 70%, transparent);
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--mm-text2);
+}
+
+.mm-sidebar-group:first-child .mm-sidebar-group__label {
+  margin-top: 6px;
+  padding-top: 0;
+  border-top: 0;
 }
 
 .mm-sidebar-link {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: calc(11px * var(--mm-density-ui-scale));
-  padding: calc(10px * var(--mm-density-ui-scale))
-    calc(14px * var(--mm-density-ui-scale));
-  margin: 0 calc(4px * var(--mm-density-ui-scale)) 0
-    calc(2px * var(--mm-density-ui-scale));
-  border-radius: 14px;
+  gap: 10px;
+  min-height: 42px;
+  padding: 0 13px;
+  border-radius: var(--mm-radius-sm);
+  font-size: 14px;
+  font-weight: 600;
   color: var(--mm-text2);
   text-decoration: none;
-  font-size: 0.9375rem;
-  font-weight: 500;
-  letter-spacing: 0.015em;
-  border: 1px solid transparent;
-  transition:
-    background 0.16s ease,
-    color 0.16s ease,
-    border-color 0.16s ease;
+  transition: color 0.15s ease;
 }
 
 .mm-sidebar-link:hover {
-  color: var(--mm-text);
-  background: color-mix(in srgb, var(--mm-stone) 5%, transparent);
+  color: var(--mm-text1);
 }
 
-.mm-sidebar-link:hover .mm-sidebar-link-icon {
-  opacity: 0.95;
+/* The icon sits on a small tile; the current page's tile loses its fill and takes the brand outline. */
+.mm-sidebar-link-icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 28.6px;
+  height: 28.6px;
+  border: 1px solid color-mix(in srgb, var(--mm-hairline) 70%, transparent);
+  border-radius: var(--mm-radius-sm);
+  background: color-mix(in srgb, var(--mm-surface-2) 70%, transparent);
+  transition:
+    border-color 0.15s ease,
+    background-color 0.15s ease;
 }
 
-.mm-sidebar-link:focus-visible {
-  outline: 2px solid var(--mm-accent);
-  outline-offset: 2px;
+.mm-sidebar-link-icon svg {
+  width: 15px;
+  height: 15px;
 }
 
-.mm-sidebar-link.active {
-  color: var(--mm-text);
-  font-weight: 600;
-  letter-spacing: 0.018em;
-  position: relative;
-  background: linear-gradient(
-    100deg,
-    color-mix(in srgb, var(--mm-gold) 16%, transparent),
-    color-mix(in srgb, var(--mm-indigo) 8%, transparent)
-  );
-  border-color: color-mix(in srgb, var(--mm-gold) 18%, transparent);
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.04) inset,
-    0 8px 20px rgba(0, 0, 0, 0.1);
+.mm-sidebar-link-label {
+  min-width: 0;
+  flex: 1;
+  white-space: nowrap;
 }
 
-.mm-sidebar-link.active::before {
+.mm-sidebar-link[aria-current="page"] {
+  color: var(--mm-primary);
+}
+
+.mm-sidebar-link[aria-current="page"] .mm-sidebar-link-icon {
+  border-color: color-mix(in srgb, var(--mm-primary) 30%, transparent);
+  background: transparent;
+}
+
+/* The bar on the current page's left edge. */
+.mm-sidebar-link[aria-current="page"]::before {
   content: "";
   position: absolute;
-  left: -1px;
-  top: 10px;
-  bottom: 10px;
+  top: 50%;
+  left: 0;
   width: 3px;
-  border-radius: 3px;
-  background: linear-gradient(180deg, var(--mm-gold-bright), var(--mm-indigo));
-  box-shadow: 0 0 12px color-mix(in srgb, var(--mm-gold) 38%, transparent);
+  height: 23px;
+  margin-top: -11.5px;
+  border-radius: 0 var(--mm-radius-pill) var(--mm-radius-pill) 0;
+  background: var(--mm-primary);
 }
 
-.mm-sidebar-link.active .mm-sidebar-link-icon {
-  color: var(--mm-gold-bright);
-  opacity: 1;
-  filter: drop-shadow(
-    0 0 6px color-mix(in srgb, var(--mm-gold) 25%, transparent)
-  );
-}
-
-.mm-sidebar-footer {
-  padding: 0 calc(10px * var(--mm-density-ui-scale))
-    calc(6px * var(--mm-density-ui-scale));
-  margin-top: auto;
-}
-
-.mm-sidebar-footer-panel {
-  padding: calc(14px * var(--mm-density-ui-scale))
-    calc(14px * var(--mm-density-ui-scale))
-    calc(12px * var(--mm-density-ui-scale));
-  border-radius: 16px;
-  background: linear-gradient(
-    145deg,
-    rgba(0, 0, 0, 0.25),
-    color-mix(in srgb, var(--mm-indigo) 7%, transparent)
-  );
-  border: 1px solid color-mix(in srgb, var(--mm-stone) 9%, transparent);
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.04) inset,
-    0 12px 28px rgba(0, 0, 0, 0.14);
-}
-
-.mm-sidebar--collapsed .mm-sidebar-footer {
-  padding-inline: calc(12px * var(--mm-density-ui-scale));
-}
-
-.mm-sidebar--collapsed .mm-sidebar-footer-panel {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: calc(8px * var(--mm-density-ui-scale));
-}
-
-.mm-sidebar-meta {
-  font-size: var(--mm-type-eyebrow);
-  color: var(--mm-gold);
-  font-weight: 600;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  opacity: 0.85;
-}
-
-.mm-sidebar-version {
-  margin-top: 8px;
-  font-size: 0.75rem;
-  color: var(--mm-text2);
+/* A count beside a link: files in progress, and files that need someone. */
+.mm-sidebar-link-badge {
+  display: grid;
+  flex: none;
+  place-items: center;
+  min-width: 17.6px;
+  height: 17.6px;
+  padding: 0 6px;
+  border-radius: var(--mm-radius-pill);
+  background: var(--mm-surface-2);
+  font-size: 9.5px;
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
-  font-weight: 500;
-  opacity: 0.9;
-}
-
-.mm-sidebar-signout {
-  display: inline-flex;
-  align-self: stretch;
-  margin-top: 14px;
-  padding: 8px 2px 4px;
-  border: none;
-  border-top: 1px solid rgba(255, 255, 255, 0.055);
-  width: 100%;
-  justify-content: flex-start;
-  background: none;
-  font: inherit;
-  font-size: 0.8125rem;
-  font-weight: 600;
   color: var(--mm-text2);
-  cursor: pointer;
-  text-decoration: none;
-  letter-spacing: 0.04em;
-  transition: color 0.14s ease;
 }
 
-.mm-sidebar-signout__icon {
-  display: inline-flex;
-  flex-shrink: 0;
+/* Files that need someone are news wherever you are, so that count is coloured on every page; the other is only on its own page. */
+.mm-sidebar-link-badge[data-status="attention"],
+.mm-sidebar-link[aria-current="page"] .mm-sidebar-link-badge {
+  background: var(--mm-st);
+  color: var(--mm-bg);
 }
 
-.mm-sidebar-signout__label {
-  display: inline-flex;
-}
-
-.mm-sidebar--collapsed .mm-sidebar-signout {
-  width: calc(48px * var(--mm-density-ui-scale));
-  height: calc(48px * var(--mm-density-ui-scale));
-  align-items: center;
+/* Icons only: the words go, the tile stays where it was, and a count rides on the tile's corner. */
+.mm-sidebar--collapsed .mm-sidebar-link {
   justify-content: center;
-  margin: 0;
   padding: 0;
-  border: 1px solid color-mix(in srgb, var(--mm-stone) 9%, transparent);
-  border-radius: 14px;
-  background: rgba(0, 0, 0, 0.16);
 }
 
-.mm-sidebar--collapsed .mm-sidebar-signout__label {
+.mm-sidebar--collapsed .mm-sidebar-link-label {
   display: none;
 }
 
-.mm-sidebar-signout:hover:not(:disabled) {
-  color: var(--mm-accent-bright);
+.mm-sidebar--collapsed .mm-sidebar-link-badge {
+  position: absolute;
+  top: 2px;
+  right: 8px;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 4px;
+  font-size: 9px;
 }
 
-.mm-sidebar-signout:disabled {
+.mm-sidebar--collapsed .mm-sidebar-group__label {
+  margin-right: 6px;
+  margin-left: 6px;
+  padding: 0;
+  font-size: 0;
+  line-height: 0;
+}
+
+/* ---- The signed-in user -------------------------------------------------- */
+
+.mm-sidebar-user {
+  position: relative;
+  margin-top: auto;
+}
+
+.mm-sidebar-user__button {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 42px;
+  padding: 6px 12px;
+  border: 1px solid var(--mm-sidebar-border);
+  border-radius: var(--mm-radius-sm);
+  background: color-mix(in srgb, var(--mm-sidebar-accent) 45%, transparent);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background-color 0.15s ease;
+}
+
+.mm-sidebar-user__button:hover {
+  border-color: color-mix(in srgb, var(--mm-primary) 30%, transparent);
+  background: var(--mm-sidebar-accent);
+}
+
+.mm-sidebar-user__avatar {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--mm-primary), var(--mm-primary-2));
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--mm-on-accent);
+}
+
+.mm-sidebar-user__who {
+  display: block;
+  flex: 1;
+  min-width: 0;
+}
+
+.mm-sidebar-user__name {
+  display: block;
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--mm-text1);
+}
+
+.mm-sidebar-user__detail {
+  display: block;
+  overflow: hidden;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--mm-text2);
+}
+
+.mm-sidebar-user__chevron {
+  flex: none;
+  color: var(--mm-text2);
+}
+
+.mm-sidebar--collapsed .mm-sidebar-user__who,
+.mm-sidebar--collapsed .mm-sidebar-user__chevron {
+  display: none;
+}
+
+.mm-sidebar--collapsed .mm-sidebar-user__button {
+  justify-content: center;
+  padding: 6px 0;
+}
+
+.mm-sidebar-user__menu {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 0;
+  z-index: 90;
+  width: max(100%, 220px);
+  overflow: hidden;
+  border: 1px solid var(--mm-panel-border);
+  border-radius: var(--mm-radius-field);
+  background: var(--mm-surface-elevated);
+  box-shadow: var(--mm-shadow-popover);
+}
+
+.mm-sidebar-user__version {
+  margin: 0;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--mm-hairline);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--mm-text3);
+}
+
+.mm-sidebar-user__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--mm-text2);
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.mm-sidebar-user__item:hover:not(:disabled) {
+  background: var(--mm-surface-2);
+  color: var(--mm-text1);
+}
+
+.mm-sidebar-user__item--danger:hover:not(:disabled) {
+  background: var(--mm-broken-tint);
+  color: var(--mm-status-broken);
+}
+
+.mm-sidebar-user__item:disabled {
   opacity: 0.55;
   cursor: not-allowed;
-}
-
-.mm-sidebar-signout:focus-visible {
-  outline: 2px solid var(--mm-accent);
-  outline-offset: 2px;
-  border-radius: 2px;
-}
-
-html[data-mm-theme="light"] .mm-sidebar-footer-panel {
-  background: color-mix(in srgb, var(--mm-surface-2) 55%, transparent);
-  border-color: var(--mm-border);
-  box-shadow: none;
-}
-
-html[data-mm-theme="light"] .mm-sidebar-link:hover {
-  background: rgba(17, 36, 43, 0.05);
 }

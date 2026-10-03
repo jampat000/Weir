@@ -1,0 +1,367 @@
+/* Shared panel parts: the panel, the stat tile, the chip, the bar-list row and the segmented control. */
+
+/* ---- Panel (components/panels/panel.tsx) --------------------------------- */
+
+.mm-panel {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid var(--mm-panel-border);
+  border-radius: var(--mm-radius-panel);
+  background: var(--mm-card-bg);
+  box-shadow: var(--mm-shadow-card);
+}
+
+.mm-panel__head {
+  display: flex;
+  flex-shrink: 0;
+  align-items: baseline;
+  gap: 12px;
+  /* Deluno's card header is 44px whether or not it has a link or a count: 10px above and 11px below the title's own 23px
+     line, on which its letters, and so a card's controls, are centred. */
+  min-height: 44px;
+  padding: 10px 18px 11px;
+  --panel-line: 23px;
+}
+
+.mm-panel__title {
+  flex-shrink: 0;
+  font-size: var(--mm-type-panel);
+  font-weight: 600;
+  line-height: var(--panel-line);
+  white-space: nowrap;
+  color: var(--mm-text1);
+}
+
+/* A header with a note under its title: the title and the note are one block, centred on the line with the controls. */
+.mm-panel__head--note {
+  --panel-line: var(--mm-type-panel);
+  align-items: center;
+  row-gap: 20px;
+}
+
+/* The controls start at the title's line and are lifted by half of what they are taller than it, so they are centred on
+   the title and not on the block; a row of their own, where they wrap, keeps clear of the block. */
+.mm-panel__head--note > :is(.mm-panel__controls, .mm-panel__aside) {
+  align-self: flex-start;
+  transform: translateY(calc(var(--panel-line) / 2 - 50%));
+}
+
+.mm-panel__titles {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.mm-panel__note {
+  overflow: hidden;
+  font-size: var(--mm-type-caption);
+  font-variant-numeric: tabular-nums;
+  line-height: 13.8px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--mm-text2);
+}
+
+.mm-panel__count {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--mm-type-caption);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--mm-text2);
+}
+
+.mm-panel__link {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  /* A 13px link on its inherited line box is 19.76px tall and lowers the whole header line by 1px; 17px is the
+     height of the 12px count beside it, so every header sets its title and count at the same height. */
+  line-height: 17px;
+  white-space: nowrap;
+  color: var(--mm-primary);
+  text-decoration: none;
+}
+
+/* An arrow alone has no text baseline, and its bottom edge would be the baseline the header lines up on, lifting the
+   title 1px; it sits centred on the line instead. */
+.mm-panel__link--icon {
+  align-self: center;
+}
+
+.mm-panel__link:hover {
+  color: var(--mm-primary-bright);
+}
+
+/* Controls that take the count's place, such as Just finished's workflow chips: they use the room between the title
+   and the link, and the negative margin lets chips taller than the header's line sit in it without growing it. */
+.mm-panel__controls {
+  display: flex;
+  flex: 1;
+  align-self: center;
+  min-width: 0;
+  margin: -8px -8px;
+}
+
+/* The header's own controls: a text action or a switch, at the right edge. */
+.mm-panel__aside {
+  display: flex;
+  flex-shrink: 0;
+  align-self: center;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px 16px;
+  /* The header link's 17px line, which a control with `font: inherit` takes, so it cannot lower the header line. */
+  line-height: 17px;
+}
+
+/* A picker in a card's header is a card control's height, as the buttons beside it are, and sits in the header's own
+   padding so the header stays 44px tall like every card's. */
+.mm-panel__aside .mm-input {
+  height: var(--mm-control-height-sm);
+  min-height: 0;
+  padding-block: 0;
+}
+
+.mm-panel__aside .mm-workflow-picker {
+  margin-block: -6px;
+}
+
+/* A card with a picker or a More menu in its header stops clipping, so the list can reach past a short card's edge; its
+   body keeps the rounded corners. */
+:is(.mm-history-list, .mm-library-files, .mm-shelf-panel) {
+  overflow: visible;
+}
+
+:is(.mm-history-list, .mm-library-files, .mm-shelf-panel) > .mm-panel__body {
+  border-radius: 0 0 var(--mm-radius-panel) var(--mm-radius-panel);
+}
+
+/* A panel of fields or rows. The body is padded and set off from the header by a hairline; the panel
+   stops clipping so a picker that opens inside it can reach past its edge. */
+.mm-panel--padded {
+  overflow: visible;
+}
+
+/* A padded panel's header may take a second line, so a long action never runs out of a phone's width. */
+.mm-panel--padded > .mm-panel__head {
+  flex-wrap: wrap;
+  align-items: center;
+  min-height: 48px;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--mm-hairline);
+}
+
+/* Room above the title for controls that are as tall as the block and centred on its first line. */
+.mm-panel--padded > .mm-panel__head--note {
+  padding-top: 16px;
+}
+
+.mm-panel--padded > .mm-panel__head .mm-panel__count {
+  flex: 1 1 auto;
+  white-space: normal;
+}
+
+.mm-panel--padded > .mm-panel__body {
+  display: block;
+  min-width: 0;
+  overflow: visible;
+  padding: 14px 18px 18px;
+}
+
+/* Takes the height the panel is given and clips what does not fit; a panel with no height of its own
+   is as tall as its content. */
+.mm-panel__body {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* ---- Stat tile (components/panels/stat-tile.tsx) ------------------------- */
+
+.mm-stat {
+  display: grid;
+  grid-template-rows: 16px 44px minmax(0, 1fr);
+  row-gap: 6px;
+  min-width: 0;
+  height: 190px;
+  padding: 14px 18px;
+  overflow: hidden;
+  border: 1px solid var(--mm-hairline);
+  border-radius: var(--mm-radius-tile);
+  background: var(--mm-card-bg);
+}
+
+.mm-stat__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.mm-stat__label {
+  font-size: var(--mm-type-eyebrow);
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--mm-text2);
+  text-decoration: none;
+}
+
+a.mm-stat__label:hover {
+  color: var(--mm-text1);
+}
+
+.mm-stat__aside {
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--mm-type-caption);
+  font-variant-numeric: tabular-nums;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--mm-text3);
+}
+
+.mm-stat__aside a,
+.mm-stat__aside button {
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.mm-stat__aside a:hover,
+.mm-stat__aside button:hover {
+  text-decoration: underline;
+}
+
+.mm-stat__figure {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  overflow: hidden;
+  font-size: 34px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  line-height: 44px;
+  white-space: nowrap;
+  color: var(--mm-text1);
+}
+
+.mm-stat__unit {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-overflow: ellipsis;
+  color: var(--mm-text2);
+}
+
+.mm-stat__side {
+  flex: none;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+.mm-stat__body {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* ---- Chip (components/panels/chip.tsx) ----------------------------------- */
+
+.mm-chip {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 6px;
+  height: 24px;
+  padding: 0 10px;
+  border: 1px solid color-mix(in srgb, currentColor 30%, transparent);
+  border-radius: var(--mm-radius-pill);
+  font-size: var(--mm-type-caption);
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.mm-chip--neutral {
+  border-color: var(--mm-hairline);
+  color: var(--mm-text2);
+  background: var(--mm-surface-2);
+}
+
+/* ---- Segmented control (components/panels/segmented-control.tsx) --------- */
+
+.mm-segmented {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  min-width: 0;
+  padding: 3px;
+  border: 1px solid var(--mm-hairline);
+  border-radius: var(--mm-radius-field);
+  background: var(--mm-card-bg);
+}
+
+.mm-segmented__option {
+  height: 30px;
+  padding: 0 14px;
+  border: 1px solid transparent;
+  border-radius: var(--mm-radius-control);
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  color: var(--mm-text2);
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.mm-segmented__option:hover {
+  background: var(--mm-surface-2);
+  color: var(--mm-text1);
+}
+
+.mm-segmented__option[aria-pressed="true"] {
+  border-color: color-mix(in srgb, var(--mm-primary) 40%, transparent);
+  background: color-mix(in srgb, var(--mm-primary) 10%, transparent);
+  color: var(--mm-primary);
+}
+
+.mm-segmented__count {
+  margin-left: 2px;
+  font-variant-numeric: tabular-nums;
+  color: var(--mm-text3);
+}
+
+.mm-segmented__option[aria-pressed="true"] .mm-segmented__count {
+  color: inherit;
+  opacity: 0.8;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mm-segmented__option {
+    transition: none;
+  }
+}

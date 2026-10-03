@@ -100,22 +100,16 @@ it("says what happens to work already running rather than leaving it to be assum
   );
 });
 
-it("shows the reason, which carries when the pause lifts", () => {
-  setup(
-    state({
-      paused: true,
-      paused_until: "2026-08-26T16:00:00Z",
-      reason:
-        "Processing is paused. Weir will start work again automatically at 2026-08-26 16:00 UTC.",
-    }),
-  );
+it("offers Resume in place of Pause while paused, and leaves saying so to the header's status", () => {
+  setup(state({ paused: true, reason: "Processing is paused." }));
 
   render(<PauseControl />, { wrapper });
 
-  expect(screen.getByTestId("pause-badge")).toHaveTextContent("Paused");
-  expect(screen.getByTestId("pause-reason")).toHaveTextContent(
-    "2026-08-26 16:00 UTC",
+  expect(screen.getByTestId("pause-resume")).toHaveTextContent(
+    "Resume processing",
   );
+  expect(screen.queryByTestId("pause-open")).not.toBeInTheDocument();
+  expect(screen.queryByTestId("pause-badge")).not.toBeInTheDocument();
 });
 
 it("resumes without inventing a duration", () => {
@@ -130,13 +124,13 @@ it("resumes without inventing a duration", () => {
   );
 });
 
-it("lets a viewer see a pause but not change it", () => {
+it("gives a viewer no way to change a pause", () => {
   setup(state({ paused: true, reason: "Processing is paused." }), "viewer");
 
-  render(<PauseControl />, { wrapper });
+  const { container } = render(<PauseControl />, { wrapper });
 
-  expect(screen.getByTestId("pause-badge")).toBeInTheDocument();
   expect(screen.queryByTestId("pause-resume")).not.toBeInTheDocument();
+  expect(container).toBeEmptyDOMElement();
 });
 
 it("shows a viewer nothing at all when processing is running normally", () => {

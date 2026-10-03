@@ -7,10 +7,10 @@ import { settingsKeys } from "../../../../lib/settings/query-keys";
 import type { AppSettings } from "../../../../lib/settings/types";
 import type { SystemSettingsForm } from "../../use-system-settings-form";
 import { BackupListSection } from "./backup-list-section";
-import { BackupSettingsSection } from "./backup-settings-section";
+import { BackupScheduleSection } from "./backup-schedule-section";
 import { useBackupActions } from "./use-backup-actions";
 
-/** System › Backups: what to back up and when on the left, the backups on this machine on the right. */
+/** System › Backups: when Weir backs up on the left, the backups on this machine on the right, as tall as each other. */
 export function BackupsTab({
   form,
   editable,
@@ -41,48 +41,41 @@ export function BackupsTab({
     });
   };
 
-  const exportResult = actions.resultFor("export");
-  const snapshotResult = actions.resultFor("snapshot");
-
   return (
-    <div className="mm-quiet-stack">
-      <div data-testid="suite-settings-backup-tab" className="mm-quiet-stack">
-        {editable ? (
-          <div
-            className="mm-backups-grid"
-            data-testid="suite-settings-backup-restore"
-          >
-            <BackupSettingsSection
-              form={form}
-              lastRunAt={settings.configuration_backup_last_run_at}
-              busy={actions.busy}
-              onSaveSchedule={saveSchedule}
-              scheduleSaved={scheduleSaved}
-              onBackUpNow={() => void actions.backUpNow()}
-              onDownload={() => void actions.downloadConfiguration()}
-              onChooseFile={(file) => void actions.chooseRestoreFile(file)}
-              resultMessage={exportResult.message}
-              resultProblem={exportResult.problem}
-            />
-            <BackupListSection
-              backupsQ={backupsQ}
-              disabled={blocked}
-              onDownload={(id, fileName) =>
-                void actions.downloadSnapshot(id, fileName)
-              }
-              onRestore={(id) => void actions.chooseSavedBackup(id)}
-              resultMessage={snapshotResult.message}
-              resultProblem={snapshotResult.problem}
-            />
-          </div>
-        ) : null}
-      </div>
+    <div data-testid="suite-settings-backup-tab">
+      {editable ? (
+        <div
+          className="mm-sys-grid mm-sys-grid--backups"
+          data-testid="suite-settings-backup-restore"
+        >
+          <BackupScheduleSection
+            form={form}
+            settings={settings}
+            onSave={saveSchedule}
+            saved={scheduleSaved}
+          />
+          <BackupListSection
+            backupsQ={backupsQ}
+            disabled={blocked}
+            onBackUpNow={() => void actions.backUpNow()}
+            onDownloadSettings={() => void actions.downloadConfiguration()}
+            onChooseFile={(file) => void actions.chooseRestoreFile(file)}
+            onDownload={(id, fileName) =>
+              void actions.downloadSnapshot(id, fileName)
+            }
+            onRestore={(id) => void actions.chooseSavedBackup(id)}
+            resultMessage={actions.result.message}
+            resultProblem={actions.result.problem}
+          />
+        </div>
+      ) : null}
       {actions.pendingRestore ? (
         <ConfirmDialog
           title="Replace the settings on this server with this backup?"
           description="This cannot be undone."
           confirmLabel="Replace settings"
           cancelLabel="Keep current settings"
+          tone="danger"
           testId="restore-configuration-dialog"
           onCancel={actions.cancelRestore}
           onConfirm={actions.confirmRestore}

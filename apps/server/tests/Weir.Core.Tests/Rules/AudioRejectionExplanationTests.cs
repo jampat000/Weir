@@ -35,7 +35,7 @@ public sealed class AudioRejectionExplanationTests
 
         Assert.Equal(
             "Rejected: none of its audio tracks are in English, and the \"Movies\" rules keep only English audio, so there would be nothing to keep. " +
-            "It has Japanese audio. To accept files like this, change the first-choice language or \"How to choose audio\" in Settings › Rules.",
+            "It has Japanese audio. To accept files like this, change the first-choice language or \"How to choose audio\" in Setup › Rules › Profiles.",
             reason);
     }
 
@@ -65,7 +65,7 @@ public sealed class AudioRejectionExplanationTests
 
         Assert.Equal(
             "Rejected: the \"TV\" rules keep only your preferred audio languages, but no first-choice language is set, so no track can be kept. " +
-            "Choose a first-choice language, or change \"How to choose audio\", in Settings › Rules.",
+            "Choose a first-choice language, or change \"How to choose audio\", in Setup › Rules › Profiles.",
             reason);
     }
 
@@ -78,7 +78,7 @@ public sealed class AudioRejectionExplanationTests
 
         Assert.Equal(
             "Rejected: every audio track in this file is commentary, and your rules remove commentary, so no audio would be left. " +
-            "Turn off \"Remove commentary tracks\" in Settings › Rules to keep files like this.",
+            "Turn off \"Remove commentary tracks\" in Setup › Rules › Profiles to keep files like this.",
             reason);
     }
 

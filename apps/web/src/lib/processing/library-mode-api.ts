@@ -5,7 +5,7 @@ import type { Schema } from "../api/types";
 
 export type LibrarySettings = Schema<"LibrarySettingsOut">;
 export type LibraryFile = Schema<"LibraryFileOut">;
-export type LibraryFileClassification = LibraryFile["classification"];
+export type LibraryFileStatus = LibraryFile["status"];
 /** Why a file is not something Weir will clean. */
 export type LibraryProblemKind = NonNullable<LibraryFile["problem_kind"]>;
 export type LibraryTotals = Schema<"LibraryTotalsOut">;
@@ -38,12 +38,11 @@ export type LibraryFileSort = LibraryFilesResult["sort"];
 
 /** Every way the Files table can be narrowed, sorted and paged. */
 export interface LibraryFileFilters {
-  classification?: LibraryFileClassification;
+  /** Where each file stands now against the current rules; no value is every file. */
+  status?: LibraryFileStatus;
   manager?: string;
   q?: string;
   problem?: LibraryProblemKind;
-  /** What Weir has done with the file, rather than what is in it. */
-  state?: "cleaned" | "left_alone";
   facets?: Partial<Record<LibraryFacet, string>>;
   sort?: LibraryFileSort;
   direction?: "asc" | "desc";
@@ -128,12 +127,10 @@ export function libraryFileFiltersToParams(
   filters: LibraryFileFilters,
 ): URLSearchParams {
   const params = new URLSearchParams();
-  if (filters.classification)
-    params.set("classification", filters.classification);
+  if (filters.status) params.set("status", filters.status);
   if (filters.manager) params.set("manager", filters.manager);
   if (filters.q) params.set("q", filters.q);
   if (filters.problem) params.set("problem", filters.problem);
-  if (filters.state) params.set("state", filters.state);
   for (const facet of LIBRARY_FACETS) {
     const value = filters.facets?.[facet];
     if (value) params.set(facet, value);
@@ -157,6 +154,27 @@ export async function fetchLibraryFiles(
   return readJson<LibraryFilesResult>(r);
 }
 
+const NO_FILES_IN_ANY_STATUS: LibraryTotals["by_status"] = {
+  needs_cleaning: 0,
+  cleaning: 0,
+  matches: 0,
+  cant_clean_yet: 0,
+  left_alone: 0,
+};
+
+/**
+ * An overview with a count for every status. A server that does not report the per-status counts, such as an older one,
+ * counts no file in any status rather than leaving the page to read a count that is not there.
+ */
+export function withStatusCounts(overview: LibraryOverview): LibraryOverview {
+  const { totals } = overview;
+  if (!totals || totals.by_status) return overview;
+  return {
+    ...overview,
+    totals: { ...totals, by_status: NO_FILES_IN_ANY_STATUS },
+  };
+}
+
 /** #568's Overview: totals and every breakdown, aggregated on the server. */
 export async function fetchLibraryOverview(
   libraryId: number,
@@ -164,7 +182,7 @@ export async function fetchLibraryOverview(
   const path = `/api/v1/processing/libraries/${libraryId}/library-overview`;
   const r = await apiFetch(path);
   await requireOk(path, r, "Could not load this workflow's overview");
-  return readJson<LibraryOverview>(r);
+  return withStatusCounts(await readJson<LibraryOverview>(r));
 }
 
 /** Parses the structured 400 the API returns when removal needs confirming. Rethrows anything else. */

@@ -155,13 +155,13 @@ internal sealed class FakeCleanupData : IPostSuccessCleanupData
 
 internal sealed class FakeOriginalLanguage : IOriginalLanguageLookup
 {
-    public LookupResult Answer { get; set; } = new() { Status = LookupResult.StatusNotConfigured, Detail = "no metadata provider is configured" };
+    public LookupResult Answer { get; set; } = new() { Status = LookupResult.StatusNotConfigured, Detail = "the metadata lookup is switched off on this server" };
 
-    public List<(string Scope, string Path, HandoffOrigin? Origin)> Asked { get; } = [];
+    public List<(string Scope, long? LibraryId, string Path, HandoffOrigin? Origin)> Asked { get; } = [];
 
-    public Task<LookupResult> LookupAsync(string mediaScope, string relativeMediaPath, HandoffOrigin? origin, CancellationToken cancellationToken)
+    public Task<LookupResult> LookupAsync(string mediaScope, long? libraryId, string relativeMediaPath, HandoffOrigin? origin, CancellationToken cancellationToken)
     {
-        Asked.Add((mediaScope, relativeMediaPath, origin));
+        Asked.Add((mediaScope, libraryId, relativeMediaPath, origin));
         return Task.FromResult(Answer);
     }
 }

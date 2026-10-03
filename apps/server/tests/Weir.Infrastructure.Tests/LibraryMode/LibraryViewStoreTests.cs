@@ -11,7 +11,7 @@ namespace Weir.Infrastructure.Tests.LibraryMode;
 /// against a real database. Every scan row is written through the real store, so the facts and facet rows under
 /// test are the ones a scan actually produces from its cached ffprobe JSON.
 /// </summary>
-public sealed class LibraryViewStoreTests : IDisposable
+public sealed partial class LibraryViewStoreTests : IDisposable
 {
     private readonly StoreFixture _store = new();
     private readonly LibraryViewStore _libraryView = new();

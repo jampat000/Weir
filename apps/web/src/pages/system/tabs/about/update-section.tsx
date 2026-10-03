@@ -1,45 +1,20 @@
 import { useState } from "react";
 
-import { QuietSection } from "../../../../components/shared/quiet-section";
+import { Chip } from "../../../../components/panels/chip";
+import { Panel } from "../../../../components/panels/panel";
 import { errorMessage } from "../../../../lib/api/error-message";
 import {
   useUpdateSettingsQuery,
   useUpdateStatusQuery,
 } from "../../../../lib/settings/queries";
 import type { UpdateStatus } from "../../../../lib/settings/types";
+import { updateMeaning } from "../../../../lib/settings/update-status";
 import { mmActionButtonClass } from "../../../../lib/ui/mm-control-roles";
-import {
-  mmStatusPillClass,
-  type MmStatusTone,
-} from "../../../../lib/ui/mm-status-tone";
-import { UpdateModeSection } from "./update-mode-section";
+import { updateStatusLabel } from "./update-words";
+import { UpdatePreferences } from "./update-preferences";
 import { UpdateReadyNotice } from "./update-ready-notice";
 
-/** "up to date" -> "Up to date": status pills across Weir are sentence case. */
-function sentenceCase(text: string): string {
-  return text.charAt(0).toUpperCase() + text.slice(1);
-}
-
-/** How this install got here, in words a reader outside engineering recognises. */
-function installTypeLabel(installType: string): string {
-  switch (installType) {
-    case "windows":
-      return "Windows installer";
-    case "docker":
-      return "Docker";
-    case "source":
-      return "Built from source";
-    default:
-      return installType;
-  }
-}
-
-/** A failed check reads as a failure, not a quiet success; only "up to date" reads as healthy. */
-function statusTone(status: string): MmStatusTone {
-  if (status === "update_available") return "warning";
-  if (status === "up_to_date") return "healthy";
-  return "failed";
-}
+const COPIED_MS = 2000;
 
 function CopyCommandButton({ command }: { command: string }) {
   const [copied, setCopied] = useState(false);
@@ -47,7 +22,7 @@ function CopyCommandButton({ command }: { command: string }) {
     try {
       await navigator.clipboard.writeText(command);
       setCopied(true);
-      window.setTimeout(() => setCopied(false), 2000);
+      window.setTimeout(() => setCopied(false), COPIED_MS);
     } catch {
       setCopied(false);
     }
@@ -64,34 +39,44 @@ function CopyCommandButton({ command }: { command: string }) {
   );
 }
 
+/** The version the status is about: the new one when there is one, otherwise the one running. */
+function statusVersion(status: UpdateStatus): string | null {
+  if (status.status === "update_available")
+    return status.latest_version ?? null;
+  if (status.status === "up_to_date") return status.current_version;
+  return null;
+}
+
 function ReleaseStatus({
   status,
   checking,
+  isWindows,
+  dockerCommand,
   showUpdateButton,
   onCheck,
 }: {
   status: UpdateStatus;
   checking: boolean;
+  isWindows: boolean;
+  /** The command a Docker install runs to take the update, when there is an update and it is one. */
+  dockerCommand: string | null;
   /** Notify-only mode never downloads anything itself, so the installer link needs to read as the action, not a footnote. */
   showUpdateButton: boolean;
   onCheck: () => void;
 }) {
-  // Coequal facts about this install, none of them a magnitude, so none of them is a hero.
-  const facts = [
-    { label: "Installed", value: status.current_version },
-    { label: "Latest", value: status.latest_version || "Unknown" },
-    { label: "Installed from", value: installTypeLabel(status.install_type) },
-  ];
   const links = [
     { label: "Download installer →", href: status.windows_installer_url },
     { label: "Release notes →", href: status.release_url },
   ].filter((link) => link.href);
+  const version = statusVersion(status);
 
   return (
-    <QuietSection
-      level={3}
+    <Panel
+      title="Updates"
       headingId="suite-settings-upgrade-heading"
-      heading="Updates"
+      headingLevel={3}
+      padded
+      dataTestId="suite-settings-upgrade-tab"
       aside={
         <>
           <button
@@ -116,56 +101,55 @@ function ReleaseStatus({
         </>
       }
     >
+      {isWindows ? <UpdateReadyNotice /> : null}
       <p
-        className="mt-1 flex items-center gap-2 text-base font-semibold text-mm-text1"
+        className="mm-status-line"
+        title={status.summary}
         data-testid="suite-settings-release-status"
       >
-        <span className={mmStatusPillClass(statusTone(status.status))}>
-          {sentenceCase(status.status.replaceAll("_", " "))}
-        </span>
-        {status.summary}
+        <Chip meaning={updateMeaning(status.status)}>
+          {updateStatusLabel(status.status)}
+        </Chip>
+        <span>{version ?? status.summary}</span>
       </p>
-      <dl className="mm-kv mt-2" aria-label="This Weir install">
-        {facts.map((fact) => (
-          <div key={fact.label}>
-            <dt>{fact.label}</dt>
-            <dd>{fact.value}</dd>
-          </div>
-        ))}
-      </dl>
-      {status.install_type === "windows" ? (
-        <p className="mm-quiet-note mt-2">
-          On Windows, the Weir tray app installs updates itself.
-        </p>
-      ) : null}
       {showUpdateButton && status.windows_installer_url ? (
         <a
           href={status.windows_installer_url}
           target="_blank"
           rel="noreferrer"
-          className={`${mmActionButtonClass({ variant: "primary" })} mt-3 inline-flex`}
+          className={`${mmActionButtonClass({ variant: "primary" })} mm-sys-btn mt-3 inline-flex`}
         >
           Download the update
         </a>
       ) : null}
-    </QuietSection>
+      {isWindows ? <UpdatePreferences /> : null}
+      {dockerCommand ? <DockerUpgradeSteps command={dockerCommand} /> : null}
+    </Panel>
   );
 }
 
-function DockerUpgradeSection({ command }: { command: string }) {
+/** How a Docker install takes the update it has been told about: the command to run, and what to keep. */
+function DockerUpgradeSteps({ command }: { command: string }) {
   return (
-    <QuietSection
-      level={3}
-      headingId="suite-settings-upgrade-docker-heading"
-      heading="What happens next"
-      aside={<CopyCommandButton command={command} />}
+    <section
+      className="mm-update-next"
+      aria-labelledby="suite-settings-upgrade-docker-heading"
     >
+      <div className="mm-update-next__head">
+        <h4
+          id="suite-settings-upgrade-docker-heading"
+          className="mm-update-next__title"
+        >
+          What happens next
+        </h4>
+        <CopyCommandButton command={command} />
+      </div>
       <p className="mm-update-command">{command}</p>
-      <p className="mm-quiet-note mt-2">
+      <p className="mm-sys-note">
         Keep the same WEIR_HOME volume and WEIR_SESSION_SECRET value across
         upgrades so browser sessions and setup state continue cleanly.
       </p>
-    </QuietSection>
+    </section>
   );
 }
 
@@ -178,37 +162,37 @@ export function UpdateSection() {
   const notifyOnly = isWindows && updateSettingsQ.data?.mode === "NotifyOnly";
   const updateAvailable = status?.status === "update_available";
 
+  if (updateStatusQ.isPending) {
+    return (
+      <Panel title="Updates" headingLevel={3} padded>
+        <p className="mm-quiet-note">Checking for updates...</p>
+      </Panel>
+    );
+  }
+  if (!status) {
+    return (
+      <Panel title="Updates" headingLevel={3} padded>
+        <p className="mm-status-text text-sm" data-status="broken" role="alert">
+          {errorMessage(
+            updateStatusQ.error,
+            "Could not check for updates right now.",
+          )}
+        </p>
+      </Panel>
+    );
+  }
   return (
-    <div data-testid="suite-settings-upgrade-tab" className="mm-quiet-stack">
-      <div className="mm-quiet-stack" data-testid="suite-settings-upgrade">
-        {updateStatusQ.isPending ? (
-          <p className="mm-quiet-note">Checking for updates...</p>
-        ) : !status ? (
-          <p className="text-sm text-mm-status-failed-text" role="alert">
-            {errorMessage(
-              updateStatusQ.error,
-              "Could not check for updates right now.",
-            )}
-          </p>
-        ) : (
-          <>
-            {isWindows ? <UpdateReadyNotice /> : null}
-            <ReleaseStatus
-              status={status}
-              checking={updateStatusQ.isFetching}
-              showUpdateButton={Boolean(notifyOnly && updateAvailable)}
-              onCheck={() => void updateStatusQ.refetch()}
-            />
-            {isWindows ? (
-              <UpdateModeSection />
-            ) : status.install_type === "docker" &&
-              status.docker_update_command &&
-              updateAvailable ? (
-              <DockerUpgradeSection command={status.docker_update_command} />
-            ) : null}
-          </>
-        )}
-      </div>
-    </div>
+    <ReleaseStatus
+      status={status}
+      checking={updateStatusQ.isFetching}
+      isWindows={isWindows}
+      dockerCommand={
+        status.install_type === "docker" && updateAvailable
+          ? (status.docker_update_command ?? null)
+          : null
+      }
+      showUpdateButton={Boolean(notifyOnly && updateAvailable)}
+      onCheck={() => void updateStatusQ.refetch()}
+    />
   );
 }

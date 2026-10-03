@@ -43,3 +43,8 @@ if (typeof globalThis.localStorage === "undefined") {
     },
   });
 }
+
+// jsdom has no canvas: say so quietly rather than logging "not implemented" for every shelf that measures its captions.
+if (typeof HTMLCanvasElement !== "undefined") {
+  HTMLCanvasElement.prototype.getContext = () => null;
+}

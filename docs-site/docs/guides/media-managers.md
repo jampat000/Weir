@@ -5,7 +5,7 @@ title: Connecting Deluno, Sonarr and Radarr
 
 # Connecting Deluno, Sonarr and Radarr
 
-Under **Settings › Media managers**, Weir can connect to the tools that manage your downloads and
+Under **Setup › Connections › Media managers**, Weir can connect to the tools that manage your downloads and
 library, so cleaning happens automatically instead of you moving files around by hand.
 
 There are four kinds of connection: **Deluno**, **Sonarr**, **Radarr**, and **Something else** for
@@ -14,7 +14,7 @@ anything that can send Weir a message directly.
 ## Two kinds of workflow
 
 A **workflow** is one route a file takes through Weir: a watched folder, a work folder, an output
-folder, and the rules and schedule that apply. You manage them under **Settings › Workflows**.
+folder, and the rules and schedule that apply. You manage them under **Setup › Workflows**.
 There are two kinds, and both can run side by side in one Weir:
 
 - **Weir only (local folders).** Weir watches a folder you choose and writes the cleaned file to
@@ -32,12 +32,12 @@ For example, a linked workflow reads like this: comes from Deluno's download cli
 into its library **Movies**. A local one reads: watches `D:\Kids\Incoming` → works in its work
 folder → cleaned into `D:\Kids\Ready`.
 
-Each row in **Settings › Workflows** carries a badge, **Weir only** or **Linked to Deluno** (or Sonarr,
+Each row in **Setup › Workflows** carries a badge, **Weir only** or **Linked to Deluno** (or Sonarr,
 or Radarr). **Add workflow** asks which kind first: **Local folders**, or **From a media manager**,
 which asks the manager for its folders and opens the editor filled in and linked. In an existing
 workflow's **Media manager** section, **Link to a media manager** and **Unlink** change the kind; the
 change applies when you save. A bare download client on its own only suggests a watched folder, so it
-never makes a workflow linked. Under **Settings › Media managers**, each connection lists the
+never makes a workflow linked. Under **Setup › Connections › Media managers**, each connection lists the
 workflows it feeds and offers **Add a workflow from** it.
 
 Weir's **Library** menu is a separate thing. It cleans files that are already in place in your
@@ -77,8 +77,8 @@ A download client's completed folder for a category should be the same folder We
 that workflow. Weir's output folder is the one the manager reads cleaned files back from — either
 directly (Sonarr/Radarr's remote path mapping) or through Deluno's hand-off.
 
-This is what **Settings › Workflows**' compact **Folder chain** section checks for every workflow
-(only against the managers that workflow is linked to), and what **Settings › Media managers** checks per
+This is what **Setup › Workflows**' compact **Folder chain** section checks for every workflow
+(only against the managers that workflow is linked to), and what **Setup › Connections › Media managers** checks per
 connection: whether the watched folder exists and
 can be listed and read, whether the work folder is set, readable and on the same drive as the output folder,
 whether the output folder exists and can be listed, read and written, and — with a manager connected — whether its download-client
@@ -129,7 +129,7 @@ saves inside the watched folder, that is what both show.
 This needs two things from Deluno. It has to be **1.0.0-rc.23 or later**: an older Deluno has no such route,
 so Weir keeps the earlier, not verified lines and adds a short note naming that version. And the API key Weir uses
 for Deluno needs the **Imports** permission: in Deluno open **System › API Access** and create a key with
-**Media automation** access (it includes Imports), then save that key under **Settings › Media managers** in Weir.
+**Media automation** access (it includes Imports), then save that key under **Setup › Connections › Media managers** in Weir.
 With a key that lacks it, the line says so and the rest stays not verified. If the Deluno library a workflow was
 created from no longer exists, the line says that instead of checking another library.
 
@@ -151,7 +151,7 @@ mapping** in Sonarr/Radarr points them at the output folder. They only ever see 
 
 ### 1. Set up the workflow in Weir
 
-Open **Settings › Workflows** and edit the workflow:
+Open **Setup › Workflows** and edit the workflow:
 
 - **Watched folder**: where your download client finishes files, e.g. `/media/downloads/complete/tv`.
 - **Output folder**: where Weir puts cleaned files, e.g. `/media/weir/tv`.
@@ -165,7 +165,7 @@ Open **Settings › Workflows** and edit the workflow:
 
 ### 2. Connect Sonarr (or Radarr) to Weir
 
-Under **Settings › Media managers**, add Sonarr with its address and API key. You'll find the key in
+Under **Setup › Connections › Media managers**, add Sonarr with its address and API key. You'll find the key in
 Sonarr on its **General** settings page. Then link the workflow to it: in the workflow's editor, choose
 Sonarr in the **Media manager** section, press **Link to a media manager** and save. (**Add workflow ›
 From a media manager** does this for you.)
@@ -225,7 +225,7 @@ so Sonarr waits on them indefinitely. Keep the minimum size below your smallest 
 
 Sonarr and Radarr normally notice a cleaned file by scanning the remote path mapping on their own
 schedule. If you'd rather Weir tell them the moment a file is ready, edit the connection under
-**Settings › Media managers** and turn on **Scan for downloaded files after cleaning**. Off by
+**Setup › Connections › Media managers** and turn on **Scan for downloaded files after cleaning**. Off by
 default. When it's on, after Weir writes a cleaned file to the workflow's output folder it asks the
 connection to run its `DownloadedMoviesScan`/`DownloadedEpisodesScan` command over it — the same
 command tools like Unpackerr use — with the path translated through the remote path mapping so the
@@ -243,7 +243,7 @@ folders and never warns about a manager being absent.
 
 If you'd still like a watched-folder suggestion without connecting Sonarr, Radarr or Deluno, add
 your download client itself — SABnzbd, NZBGet, qBittorrent, Deluge or Transmission — under
-**Settings › Media managers**' **Download client** section, with its address and whatever
+**Setup › Connections › Download clients**, with its address and whatever
 credentials it needs. This connection is outbound only and read only: Weir reads the client's own
 completed-download folder (and, where the client organizes downloads by category, each category's
 own folder) to suggest a watched folder, and never changes anything on the client. It feeds the same

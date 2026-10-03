@@ -1,0 +1,23 @@
+import { afterEach, describe, expect, it } from "vitest";
+
+import { readLastLibrary, saveLastLibrary } from "./last-library";
+
+afterEach(() => localStorage.clear());
+
+describe("the last library picked", () => {
+  it("is nothing until a library has been picked", () => {
+    expect(readLastLibrary()).toBeNull();
+  });
+
+  it("comes back as the id that was saved", () => {
+    saveLastLibrary(4);
+    expect(readLastLibrary()).toBe(4);
+  });
+
+  it("ignores a stored value that is not a library id", () => {
+    localStorage.setItem("weir-library-last", "movies");
+    expect(readLastLibrary()).toBeNull();
+    localStorage.setItem("weir-library-last", "-3");
+    expect(readLastLibrary()).toBeNull();
+  });
+});

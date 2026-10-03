@@ -31,7 +31,7 @@ public sealed class WebAppTests
     {
         await using var server = await WeirTestServer.StartAsync(WithWebDist, prepareHome: WeirTestServer.WriteWebDist);
 
-        using var byAccept = await Get(server, "/settings/media-managers", accept: "text/html,application/xhtml+xml");
+        using var byAccept = await Get(server, "/setup/connections", accept: "text/html,application/xhtml+xml");
         Assert.Equal(HttpStatusCode.OK, byAccept.StatusCode);
         AssertNoCache(byAccept);
 
@@ -40,7 +40,7 @@ public sealed class WebAppTests
     }
 
     [Theory]
-    [InlineData("/settings", null)]
+    [InlineData("/setup/workflows", null)]
     [InlineData("/api/v1/unknown", "text/html")]
     [InlineData("/health-check", "text/html")]
     [InlineData("/missing.png", "text/html")]
@@ -81,14 +81,14 @@ public sealed class WebAppTests
     }
 
     [Fact]
-    public async Task Stale_upgrade_landings_redirect_to_settings()
+    public async Task Stale_upgrade_landings_redirect_to_system_about()
     {
         await using var server = await WeirTestServer.StartAsync();
 
         using var response = await server.Client.GetAsync("/api/v1/system/Upgrade-Now");
 
         Assert.Equal(HttpStatusCode.SeeOther, response.StatusCode);
-        Assert.Equal("/settings", response.Headers.Location?.ToString());
+        Assert.Equal("/system?tab=about", response.Headers.Location?.ToString());
     }
 
     [Fact]
@@ -171,7 +171,7 @@ public sealed class WebAppTests
         Assert.Null(CompressedStaticAssetsMiddleware.AssetPath(Path.GetTempPath(), urlPath));
 
     [Theory]
-    [InlineData("/settings", "")]
+    [InlineData("/setup/workflows", "")]
     [InlineData("/a/b.png", ".png")]
     [InlineData("/.well-known", "")]
     [InlineData("/file.", "")]

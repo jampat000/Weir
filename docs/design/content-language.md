@@ -9,12 +9,12 @@ lives beside them:
 | Screen             | Page component                                   | Screen stylesheet    |
 | ------------------ | ------------------------------------------------ | -------------------- |
 | Processing         | `apps/web/src/pages/processing/processing-page.tsx` | `weir-processing.css` |
-| History            | `apps/web/src/pages/history/history-page.tsx`    | `weir-history.css`   |
+| Activity           | `apps/web/src/pages/activity/activity-page.tsx`  | `weir-history.css`   |
 | Library            | `apps/web/src/pages/library/library-page.tsx`    | `weir-library.css`   |
-| Settings           | `apps/web/src/pages/settings/settings-page.tsx`  | `weir-content.css` only |
+| Setup areas        | `apps/web/src/pages/settings/setup-area-layout.tsx`  | `weir-content.css` only |
 | System             | `apps/web/src/pages/system/system-page.tsx`      | `weir-content.css` only |
 
-All of them sit under `apps/web/src/styles/` and are imported by `apps/web/src/index.css`. Colours,
+All of them sit under `apps/web/src/styles/` and are imported by `apps/web/src/styles/weir.css`, which `main.tsx` loads after `index.css`. Colours,
 type sizes and spacing come from `weir-tokens.css` only.
 
 ---
@@ -33,10 +33,10 @@ Where the screens stand:
 | Screen                 | Lead                                                                                  |
 | ---------------------- | ------------------------------------------------------------------------------------- |
 | Processing             | Its own lead: the live lanes in `weir-processing.css` (Arriving, Waiting, Working, Handing back, Just finished). |
-| History                | None. The file list and the chosen file, divided by a hairline.                        |
+| Activity               | None. The file list and the chosen file, divided by a hairline.                        |
 | Library                | None. The title is the library picker; a row of chips carries the counts and filters. |
 | Settings               | None. Settings has no "now".                                                           |
-| System › Logs › Events | `.mm-lead` with a `.mm-lead-caption`.                                                   |
+| System › Logs          | None. The filters are on the header's title line; the Log card is the one list.        |
 
 `.mm-lead` and `.mm-lead-caption` (in `weir-content.css`) are the only rule-1 primitives left: a
 wrapper and a one-line caption under it. An earlier, bordered "lead band" primitive
@@ -94,7 +94,7 @@ Dialogs are the exception: a dialog is a bordered surface over the page.
 ### Change the shell deliberately
 
 `apps/web/src/components/shell/**`, `apps/web/src/components/shared/workspace-shell.tsx`
-(`WorkspacePage`, `WorkspacePanel`, `WorkspaceTabList`) and the parts of `weir-shell.css` that style
+(`WorkspacePage`, `WorkspacePanel`), the tabs and toolbar row in `components/shell` and the parts of `weir-shell.css` and `weir-header.css` that style
 them are shared by every screen. Do not change them as a side effect of laying out one page's
 content. If a layout needs a shell change, make that change on its own and check every screen.
 
@@ -112,7 +112,7 @@ waiting." and so on). A loading or failed load uses the same slot.
 Read this before debugging a style that does nothing.
 
 `apps/web/src/index.css` starts with `@import "tailwindcss"`, and Tailwind v4 emits every utility
-inside `@layer utilities`. The `weir-*.css` files are imported after it and are unlayered. Cascade
+inside `@layer utilities`. The `weir-*.css` files are loaded after it (through `styles/weir.css`, deliberately outside Tailwind's own processing, see the comment there) and are unlayered. Cascade
 layers are resolved before specificity, and an unlayered declaration outranks a declaration in any
 layer. So a Tailwind utility on an element that also carries a `weir-*` class never applies to a
 property that class sets, and fails silently.

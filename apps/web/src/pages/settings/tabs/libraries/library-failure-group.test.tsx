@@ -71,7 +71,7 @@ it("says that the first try counts and that Weir looks again shortly after the d
     "Weir looks again shortly after this wait.",
   );
   expect(failure).toHaveTextContent(
-    "A file it gives up on shows as Failed in History, with the reason.",
+    "A file it gives up on shows as Failed in Activity, with the reason.",
   );
 });
 

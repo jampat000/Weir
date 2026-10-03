@@ -73,3 +73,6 @@ docs-site/.docusaurus/
 # PID of the dev API process this worktree's `npm run dev` spawned (scripts/stop-dev-api-port.mjs
 # reads it to stop only that process, never "whatever holds the port" — see run-api-dev.mjs).
 .dev-api.pid
+
+# The TypeScript incremental build cache.
+*.tsbuildinfo

@@ -1,30 +1,139 @@
-/* System › About: updates. */
+/* System: the layout and the controls its four tabs share. */
+
+/* One control height across a tab, the height of the Dashboard's controls, so a row of a field, a switch and a
+   button is one line. A card's header actions are the panel's own 32px. */
+.mm-system .mm-input,
+.mm-system .mm-sys-btn {
+  height: var(--mm-control-height-page);
+  min-height: 0;
+  padding-block: 0;
+}
+
+.mm-system .mm-sys-btn {
+  display: inline-flex;
+  align-items: center;
+}
+
+.mm-system .mm-panel__aside :is(.mm-sys-btn, .mm-input) {
+  height: var(--mm-control-height-sm);
+}
+
+.mm-system .mm-segmented {
+  min-height: var(--mm-control-height-page);
+}
+
+.mm-system .mm-segmented__option {
+  height: auto;
+}
+
+/* The On/Off switch is a pair of buttons in a frame: the frame takes the height and the buttons fill it. */
+.mm-sys-switch > div {
+  height: var(--mm-control-height-page);
+}
+
+.mm-sys-switch button {
+  padding-block: 0;
+}
+
+.mm-sys-field {
+  width: 11rem;
+}
+
+/* Cards in rows of two, each row as tall as its taller card, so a pair lines up top and bottom and nothing hangs
+   below its neighbour. A card's content stays at its top. */
+.mm-sys-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mm-panel-gap);
+}
+
+.mm-sys-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--mm-panel-gap);
+  align-items: stretch;
+}
+
+@media (min-width: 900px) {
+  .mm-sys-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* A line under a card's rows: a saved note, a warning. */
+.mm-sys-note {
+  margin: 10px 0 0;
+  color: var(--mm-text3);
+  font-size: var(--mm-type-caption);
+  line-height: 1.45;
+}
+
+/* A link inside a value or a sentence: the text's own size, in the accent. */
+.mm-sys-link {
+  color: var(--mm-accent);
+  text-decoration: none;
+}
+
+.mm-sys-link:hover {
+  text-decoration: underline;
+}
+
+/* A status and what it says, on one line that wraps under the pill rather than around it. */
+.mm-status-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--mm-text1);
+  font-size: var(--mm-type-body);
+  font-weight: 400;
+  line-height: 1.4;
+}
+
+.mm-status-line .mm-chip {
+  flex-shrink: 0;
+}
+
+/* ── About ───────────────────────────────────────────────────────────────── */
+
+/* Facts, one short line each, the name in a column every card shares. */
+.mm-sys-facts > div {
+  grid-template-columns: 7.5rem minmax(0, 1fr);
+  align-items: center;
+  padding-block: 6px;
+}
+
+.mm-sys-facts dd {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.mm-sys-facts .mm-chip {
+  margin-right: 10px;
+  vertical-align: middle;
+}
+
+/* A pill after the value it describes is set off from it; one that leads the line starts at the column. */
+.mm-sys-facts .mm-chip:not(:first-child) {
+  margin-left: 10px;
+}
 
 .mm-update-ready {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 1rem;
+  margin-bottom: 12px;
   padding: 0.75rem 1rem;
   border: 1px solid var(--mm-border);
   border-radius: 0.75rem;
-  background: var(--mm-status-healthy-bg);
+  background: color-mix(in srgb, var(--mm-st) 12%, transparent);
 }
 
-.mm-update-mode {
-  display: flex;
-  min-width: 0;
-  align-items: flex-start;
-  gap: 0.625rem;
-  padding: 0.625rem 0;
-  color: var(--mm-text2);
-  font-size: 0.875rem;
-  line-height: 1.25rem;
-  cursor: pointer;
-}
-
-.mm-update-mode--chosen {
-  color: var(--mm-text);
+/* Where a Windows update's mode, startup check and interval sit under the status line. */
+.mm-panel__body > .mm-setgroup__rows {
+  margin-top: 8px;
 }
 
 .mm-update-command {
@@ -37,59 +146,427 @@
   line-height: 1rem;
 }
 
-/* System › Security: a sign-in field shares its row with its Show button. */
-
-.mm-security-field {
-  flex: 1;
+/* How a Docker install takes the update it was told about, inside the Updates card. */
+.mm-update-next {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--mm-hairline);
 }
 
-/* System › Logs: history retention and reset, the server log's search row and its diagnostics. */
+.mm-update-next__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
 
-.mm-history-reset__label {
-  color: var(--mm-text2);
-  font-size: var(--mm-type-caption);
+.mm-update-next__title {
+  margin: 0;
+  color: var(--mm-text1);
+  font-size: var(--mm-type-body);
   font-weight: 600;
 }
 
-.mm-history-reset__outcome {
-  max-width: 28rem;
-  margin-top: 1rem;
-  padding: 0.5rem 0.75rem;
-  border: 1px solid var(--mm-border);
-  border-radius: 0.375rem;
-  font-size: 0.875rem;
-  line-height: 1.25rem;
+/* The last row of About: the credits Weir owes on the left, the licence and the source on the right, on one line. */
+.mm-about-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 24px;
+  padding: 12px 2px 0;
+  border-top: 1px solid var(--mm-hairline);
+  color: var(--mm-text3);
+  font-size: var(--mm-type-caption);
+  line-height: 1;
 }
 
-.mm-history-reset__outcome--done {
-  background: var(--mm-status-healthy-bg);
-  color: var(--mm-status-healthy-text);
+.mm-about-credits,
+.mm-about-footer__links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 18px;
 }
 
-.mm-history-reset__outcome--failed {
-  background: var(--mm-status-failed-bg);
-  color: var(--mm-status-failed-text);
+.mm-about-credits p {
+  margin: 0;
 }
 
-.mm-log-search {
+/* This PC: the network and the time zone as two halves that share a height, with a hairline between them. */
+.mm-this-pc {
   display: grid;
-  gap: 0.75rem;
-  margin-top: 1rem;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
 }
 
-@media (min-width: 1024px) {
-  .mm-log-search {
-    grid-template-columns: minmax(0, 2fr) 220px auto;
+@media (min-width: 640px) {
+  .mm-this-pc {
+    grid-template-columns: none;
+    grid-auto-columns: minmax(0, 1fr);
+    grid-auto-flow: column;
+    gap: 0;
+  }
+
+  .mm-this-pc__half {
+    padding-inline: 18px;
+  }
+
+  .mm-this-pc__half:first-child {
+    padding-left: 0;
+  }
+
+  .mm-this-pc__half:last-child {
+    padding-right: 0;
+  }
+
+  .mm-this-pc__half + .mm-this-pc__half {
+    border-left: 1px solid var(--mm-hairline);
   }
 }
 
-.mm-log-diagnostics__summary {
+.mm-this-pc__half {
+  min-width: 0;
+}
+
+/* A half is a little over half a card: the two choices of "who can reach Weir" are set closer to fit in it. */
+.mm-this-pc .mm-segmented__option {
+  padding-inline: 8px;
+  font-size: 12px;
+}
+
+.mm-this-pc__label {
+  margin: 0 0 10px;
+  color: var(--mm-text3);
+  font-size: var(--mm-type-eyebrow);
+  font-weight: 600;
+  letter-spacing: var(--mm-tracking-eyebrow);
+  text-transform: uppercase;
+}
+
+.mm-system .mm-schedule-zone {
+  align-items: center;
+  width: 100%;
+}
+
+/* The listbox trigger carries a top margin for the label it normally sits under; here there is none. */
+.mm-system .mm-schedule-zone .mm-input {
+  margin-top: 0;
+}
+
+/* ── Backups ─────────────────────────────────────────────────────────────── */
+
+/* The schedule and the backups side by side, the schedule narrower: the backups need the room for their actions. */
+@media (min-width: 1100px) {
+  .mm-sys-grid--backups {
+    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  }
+}
+
+.mm-sys-path {
+  font-family: var(--mm-font-mono);
+  font-size: 11.5px;
+}
+
+.mm-sys-value {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--mm-text1);
+  font-size: var(--mm-type-body);
+}
+
+/* A short table of records and what is done to each. It is not inside a table wrapper, so its heading row always shows,
+   whatever the card's width. */
+.mm-sys-table tbody th,
+.mm-sys-table tbody td {
+  padding-block: 8px;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.mm-sys-table tbody th {
+  color: var(--mm-text1);
+}
+
+.mm-sys-table th:last-child,
+.mm-sys-table td:last-child {
+  text-align: right;
+}
+
+/* A row's actions, icons with a tooltip and a name for a screen reader, at the row's right edge. */
+.mm-sys-table__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.mm-system .mm-sys-btn--icon {
+  justify-content: center;
+  width: var(--mm-control-height-page);
+  padding-inline: 0;
+}
+
+/* ── Security ────────────────────────────────────────────────────────────── */
+
+/* Cards stacked in one grid cell: the last takes what height is left, so the stack ends where its neighbour does. */
+.mm-sys-column {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--mm-panel-gap);
+}
+
+.mm-sys-column > .mm-panel:last-child {
+  flex: 1 1 auto;
+}
+
+.mm-sys-table__who {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+/* The account: a username form and a password form as equal columns. Each form's button sits at the foot of its
+   column, so the two buttons share a line however many fields each has. */
+.mm-account {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 24px;
+}
+
+@media (min-width: 760px) {
+  .mm-account {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0;
+  }
+
+  .mm-account-form:first-child {
+    padding-right: 28px;
+  }
+
+  .mm-account-form + .mm-account-form {
+    padding-left: 28px;
+    border-left: 1px solid var(--mm-hairline);
+  }
+}
+
+.mm-account-form {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.mm-account-form__fields {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.mm-account-form__title {
+  color: var(--mm-text1);
+  font-size: var(--mm-type-body);
+  font-weight: 600;
+}
+
+.mm-account-form__help {
+  margin: -6px 0 0;
+  color: var(--mm-text3);
+  font-size: var(--mm-type-caption);
+  line-height: 1.45;
+}
+
+.mm-account-form__action {
+  margin-top: auto;
+  padding-top: 4px;
+}
+
+/* A password field's eye sits inside the field at its right edge, so every field is the width of its column. */
+.mm-sys-secret {
+  position: relative;
+}
+
+.mm-sys-secret .mm-input {
+  padding-right: calc(var(--mm-control-height-page) + 4px);
+}
+
+.mm-sys-secret__toggle {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--mm-control-height-page);
+  border: 0;
+  border-radius: 0 var(--mm-radius-sm) var(--mm-radius-sm) 0;
+  background: transparent;
+  color: var(--mm-text3);
   cursor: pointer;
+}
+
+.mm-sys-secret__toggle:hover:not(:disabled) {
+  color: var(--mm-text1);
+}
+
+.mm-sys-secret__toggle:focus-visible {
+  outline: 2px solid var(--mm-accent);
+  outline-offset: -2px;
+}
+
+.mm-sys-secret__toggle:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+/* The protections as a checklist: a tick for each that is in force, a warning for each that needs a person, and those
+   first, in a box of their own with what to do. A value is a sentence, so it wraps onto a second line in whole words
+   rather than being cut, and the tick or warning stays level with the row's first line. */
+.mm-protection__list {
   list-style: none;
 }
 
-.mm-log-diagnostics__summary::-webkit-details-marker {
-  display: none;
+.mm-protection {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 15rem) minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--mm-hairline);
+  font-size: var(--mm-type-body);
+}
+
+.mm-protection:last-child {
+  border-bottom: 0;
+}
+
+.mm-protection__mark {
+  margin-block: calc((1lh - 16px) / 2);
+  color: var(--mm-st);
+}
+
+.mm-protection__name {
+  color: var(--mm-text1);
+}
+
+.mm-protection__value {
+  color: var(--mm-text3);
+}
+
+.mm-protection__attention {
+  margin-bottom: 8px;
+  padding: 2px 12px 10px;
+  border: 1px solid color-mix(in srgb, var(--mm-st) 45%, transparent);
+  border-radius: var(--mm-radius-control);
+  background: color-mix(in srgb, var(--mm-st) 14%, transparent);
+}
+
+.mm-protection[data-status="attention"] .mm-protection__value {
+  color: var(--mm-st);
+}
+
+.mm-protection[data-status="attention"] .mm-protection__name {
+  font-weight: 600;
+}
+
+.mm-protection__attention .mm-protection {
+  border-bottom: 0;
+}
+
+.mm-protection__advice {
+  margin: 2px 0 0 26px;
+  color: var(--mm-text2);
+  font-size: var(--mm-type-caption);
+  line-height: 1.45;
+}
+
+/* ── Logs ────────────────────────────────────────────────────────────────── */
+
+/* Logs' controls sit in the header's slot as Activity's do (weir-history.css). A picker keeps the width its words need, so
+   what gives way is the search (a magnifier) and then the title block's tabs (under "More"); a long choice is cut with an
+   ellipsis rather than growing the header. */
+.mm-logs-controls .mm-workflow-picker {
+  min-width: 7.4rem;
+}
+
+/* Where there is room for them, the tabs keep theirs and the controls narrow instead. */
+@media (min-width: 1440px) {
+  .mm-header:has(.mm-logs-controls.mm-history-controls) .mm-header__titles {
+    min-width: 22rem;
+  }
+}
+
+.mm-logs-controls .mm-input--opens > span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Dates a reader picks for themselves, above the list of events. */
+.mm-activity-range {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.mm-activity-range .mm-input {
+  width: 14rem;
+}
+
+/* How long things are kept: a label, the number of days, and a line on what the number does, three to a row. */
+.mm-retention {
+  display: flex;
+  flex-direction: column;
+}
+
+.mm-retention__row {
+  display: grid;
+  grid-template-columns: 11rem 9.5rem minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--mm-hairline);
+}
+
+.mm-retention__row:last-child {
+  border-bottom: 0;
+}
+
+@media (max-width: 760px) {
+  .mm-retention__row {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+}
+
+.mm-retention__label {
+  color: var(--mm-text1);
+  font-size: var(--mm-type-body);
+  font-weight: 500;
+}
+
+.mm-retention__days {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--mm-text2);
+  font-size: var(--mm-type-body);
+}
+
+.mm-retention__number {
+  width: 6.5rem;
+  text-align: right;
+}
+
+.mm-retention__help {
+  color: var(--mm-text3);
+  font-size: var(--mm-type-caption);
+  line-height: 1.4;
 }
 
 .mm-log-diagnostics[open] .mm-log-diagnostics__show,
@@ -97,13 +574,7 @@
   display: none;
 }
 
-.mm-log-traceback {
-  overflow: auto;
-  padding: 0.75rem;
-  border: 1px solid var(--mm-border);
-  border-radius: 0.375rem;
-  color: var(--mm-text2);
-  font-size: 0.75rem;
-  line-height: 1.25rem;
-  white-space: pre-wrap;
+/* A card's title and the line under it need a little air between them. */
+.mm-system .mm-panel__titles {
+  gap: 3px;
 }

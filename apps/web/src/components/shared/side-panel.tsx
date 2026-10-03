@@ -4,6 +4,8 @@
  * where clicking looks like nothing happened, belongs here. Escape closes it, focus moves into it, Tab stays
  * inside it and focus returns to whatever opened it, and the page behind it does not scroll.
  */
+import type { ReactNode, RefObject } from "react";
+
 import { useModalFocus } from "../../lib/ui/use-modal-focus";
 
 export function SidePanel({
@@ -12,6 +14,7 @@ export function SidePanel({
   eyebrow,
   subtitle,
   onClose,
+  initialFocus,
   children,
   dataTestId,
 }: {
@@ -21,10 +24,17 @@ export function SidePanel({
   /** One quiet line under the title: a path, a count, what this is. */
   subtitle?: string;
   onClose: () => void;
-  children: React.ReactNode;
+  /** The field to focus on open, for a panel that is a form. Without it the panel itself takes focus. */
+  initialFocus?: RefObject<HTMLElement | null>;
+  children: ReactNode;
   dataTestId?: string;
 }): React.ReactElement | null {
-  const panel = useModalFocus<HTMLElement>({ open, onClose, lockScroll: true });
+  const panel = useModalFocus<HTMLElement>({
+    open,
+    onClose,
+    lockScroll: true,
+    initialFocus,
+  });
 
   if (!open) return null;
 

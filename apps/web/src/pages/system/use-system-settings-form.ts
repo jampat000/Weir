@@ -22,7 +22,7 @@ function savedBackupTime(settings: AppSettings): string {
   );
 }
 
-/** How long the System log and Activity history are kept, as the Logs tab edits them. */
+/** How long the System log and Events are kept, as the Logs tab edits them. */
 function useRetentionDraft(settings: AppSettings | undefined) {
   const [logDraft, setLogDraft] = useState<string | null>(null);
   const [activityDraft, setActivityDraft] = useState<string | null>(null);
@@ -50,7 +50,7 @@ function useRetentionDraft(settings: AppSettings | undefined) {
       }
       return clamp(n, 1, MAX_RETENTION_DAYS);
     },
-    /** 0 keeps Activity history until it is cleared; blank or nonsense keeps the saved value. */
+    /** 0 keeps Events until they are cleared; blank or nonsense keeps the saved value. */
     finalizeActivityDays: (): number | undefined => {
       const raw = activityValue.trim();
       const n = Number(raw);
@@ -107,7 +107,7 @@ function useBackupScheduleDraft(settings: AppSettings | undefined) {
 export type SaveTarget = "logs" | "backup";
 
 /**
- * The two System forms that write Weir's settings: how long history is kept (Logs) and the backup
+ * The two System forms that write Weir's settings: how long things are kept (Logs) and the backup
  * schedule (Backups). They share one PUT, so a save sends both, and one unsaved-changes guard; the
  * drafts live above the tabs, so switching tabs keeps them.
  */

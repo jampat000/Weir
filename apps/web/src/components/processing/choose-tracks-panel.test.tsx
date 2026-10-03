@@ -194,3 +194,41 @@ it("shows the load error instead of a table when the probe failed", () => {
   ).toBeInTheDocument();
   expect(screen.queryByRole("table")).not.toBeInTheDocument();
 });
+
+function columnNames() {
+  return screen
+    .getAllByRole("columnheader")
+    .map((heading) => heading.textContent);
+}
+
+it("keeps the tracks in the order the file holds them, with no heading that sorts", () => {
+  localStorage.clear();
+  render(<ChooseTracksPanel {...baseProps()} />);
+
+  expect(
+    screen.queryByRole("button", { name: "Track" }),
+  ).not.toBeInTheDocument();
+  expect(
+    screen
+      .getAllByTestId(/^choose-tracks-row-/)
+      .map((row) => row.dataset.testid),
+  ).toEqual([
+    "choose-tracks-row-0",
+    "choose-tracks-row-1",
+    "choose-tracks-row-2",
+    "choose-tracks-row-3",
+  ]);
+});
+
+it("moves a column from the keyboard and puts the columns back with Reset columns", () => {
+  localStorage.clear();
+  render(<ChooseTracksPanel {...baseProps()} />);
+  const track = screen.getByRole("columnheader", { name: "Track" });
+
+  fireEvent.keyDown(track, { key: "ArrowLeft", altKey: true });
+  expect(columnNames().slice(0, 2)).toEqual(["Track", "Keep"]);
+
+  fireEvent.click(screen.getByRole("button", { name: "Columns" }));
+  fireEvent.click(screen.getByRole("menuitem", { name: "Reset columns" }));
+  expect(columnNames().slice(0, 2)).toEqual(["Keep", "Track"]);
+});

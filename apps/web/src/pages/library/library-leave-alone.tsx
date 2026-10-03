@@ -60,7 +60,7 @@ export function LibraryLeaveAlone({
             : ""}
       </p>
       {mutation.isError ? (
-        <p className="mm-drawer__failure" role="alert">
+        <p className="mm-drawer__failure" data-status="broken" role="alert">
           {errorMessage(
             mutation.error,
             "Weir couldn't save that. The file is as it was; try again.",

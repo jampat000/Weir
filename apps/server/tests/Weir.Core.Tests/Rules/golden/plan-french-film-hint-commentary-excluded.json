@@ -87,7 +87,7 @@
         3,
         2
       ],
-      "original_language_note": "Kept audio in the original language (fre) because the metadata provider identified it."
+      "original_language_note": "Kept audio in the original language (fre) because the metadata service identified it."
     }
   },
   "expected": {
@@ -132,7 +132,7 @@
       "audio_selection_notes": [
         "Excluded commentary track (stream 3) because remove commentary is enabled.",
         "Track ranking: commentary first, then channels lowest first, then codec order, then bitrate lowest first, then default first.",
-        "Kept audio in the original language (fre) because the metadata provider identified it.",
+        "Kept audio in the original language (fre) because the metadata service identified it.",
         "Selected fra ac3 6 ch (stream 2) by original language.",
         "Removed non-selected eng eac3 6 ch (stream 1) after selecting fra ac3 6 ch (stream 2)."
       ],

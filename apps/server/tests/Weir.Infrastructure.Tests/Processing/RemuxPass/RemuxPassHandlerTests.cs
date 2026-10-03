@@ -266,7 +266,7 @@ public sealed partial class RemuxPassHandlerTests : IDisposable
 
     private const string ForeignOnlyReason =
         "Rejected: none of its audio tracks are in English, and the \"English only\" rules keep only English audio, so there would be nothing to keep. " +
-        "It has Japanese audio. To accept files like this, change the first-choice language or \"How to choose audio\" in Settings › Rules.";
+        "It has Japanese audio. To accept files like this, change the first-choice language or \"How to choose audio\" in Setup › Rules › Profiles.";
 
     /// <summary>Gives the library a rules profile that keeps English audio only, so a Japanese-only file has nothing to keep.</summary>
     private async Task EnglishOnlyRulesAsync(long libraryId)
@@ -342,7 +342,7 @@ public sealed partial class RemuxPassHandlerTests : IDisposable
         Assert.Equal("Rejected", step.Heading);
         Assert.Equal(
             "None of its audio tracks are in English, and the \"English only\" rules keep only English audio, so there would be nothing to keep. " +
-            "It has Japanese audio. To accept files like this, change the first-choice language or \"How to choose audio\" in Settings › Rules. " +
+            "It has Japanese audio. To accept files like this, change the first-choice language or \"How to choose audio\" in Setup › Rules › Profiles. " +
             WeirOnlyRejection.LeftInPlace,
             step.Sentence);
     }

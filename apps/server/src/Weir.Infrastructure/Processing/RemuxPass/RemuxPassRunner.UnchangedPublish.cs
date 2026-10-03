@@ -83,6 +83,8 @@ public sealed partial class RemuxPassRunner
                 .Set("media_scope", context.Scope)
                 .Set("processed_bytes", copied)
                 .Set("total_bytes", total)
+                .Set("bytes_read", copied)
+                .Set("bytes_written", copied)
                 .Set("speed", $"{(bytesPerSecond / (1024 * 1024)).ToString("F1", CultureInfo.InvariantCulture)} MB/s")
                 .Set("message", passThrough
                     ? "Weir is passing this file through unchanged."

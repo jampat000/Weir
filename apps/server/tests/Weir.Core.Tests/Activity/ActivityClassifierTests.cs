@@ -28,6 +28,7 @@ public sealed partial class ActivityClassifierTests
         Assert.Equal(new ActivityFacts("manual", "success", null, null, null), ActivityClassifier.Classify(ActivityEventTypes.AuthLoginSucceeded, "alice"));
         Assert.Equal(new ActivityFacts("manual", "failed", null, null, null), ActivityClassifier.Classify(ActivityEventTypes.AuthBootstrapDenied, "An admin account already exists."));
         Assert.Equal(new ActivityFacts("manual", null, null, null, null), ActivityClassifier.Classify(ActivityEventTypes.SystemReconciliationRepair, null));
+        Assert.Equal(new ActivityFacts("manual", null, null, null, null), ActivityClassifier.Classify(ActivityEventTypes.SystemNetworkAccessChanged, "Only this PC can reach Weir. Changed by alice."));
         Assert.Equal(new ActivityFacts(null, "failed", null, null, null), ActivityClassifier.Classify(ActivityEventTypes.ProcessingWorkerFailure, null));
         // #540 item 8: the type's own terminal verb ("completed") is matched before "failure" in its name,
         // so a cleanup sweep that finished with no result given reads as "success", not "failed".

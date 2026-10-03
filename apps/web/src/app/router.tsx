@@ -9,14 +9,16 @@ import { RequireAuth } from "./require-auth";
 import { RequireSetupWizard } from "./require-setup-wizard";
 import { AppHydrateFallback } from "./hydrate-fallback";
 import {
-  LegacyActivityRedirect,
+  LegacyHistoryRedirect,
   LegacyProcessingRedirect,
+  LegacySettingsRedirect,
 } from "./legacy-redirects";
+import { setupRoutes } from "./setup-routes";
 
 const routeErrorElement = <RouteErrorScreen />;
 
-// Five places: Processing (/), History, Library, Settings and System. Addresses bookmarked from an
-// installed release that no longer exist redirect to where their page lives now
+// Five places: the Dashboard (/), Activity, Library, the four setup areas (/setup/...) and System. Addresses
+// bookmarked from an installed release that no longer exist redirect to where their page lives now
 // (legacy-redirects.tsx); anything older gets the Not found page.
 const router = createBrowserRouter([
   {
@@ -58,7 +60,7 @@ const router = createBrowserRouter([
             errorElement: routeErrorElement,
             children: [
               {
-                // Processing: every file Weir is working on, moving as it moves. The landing screen,
+                // The Dashboard: every file Weir is working on, moving as it moves. The landing screen,
                 // because what Weir is doing right now is what an operator opens the app to see.
                 index: true,
                 lazy: async () => ({
@@ -70,10 +72,10 @@ const router = createBrowserRouter([
               },
               {
                 // Every file Weir has touched: what it was, what Weir did and what came out.
-                path: "history",
+                path: "activity",
                 lazy: async () => ({
-                  Component: (await import("../pages/history/history-page"))
-                    .HistoryPage,
+                  Component: (await import("../pages/activity/activity-page"))
+                    .ActivityPage,
                 }),
                 errorElement: routeErrorElement,
               },
@@ -87,8 +89,8 @@ const router = createBrowserRouter([
                 errorElement: routeErrorElement,
               },
               {
-                path: "activity",
-                element: <LegacyActivityRedirect />,
+                path: "history",
+                element: <LegacyHistoryRedirect />,
                 errorElement: routeErrorElement,
               },
               {
@@ -96,12 +98,10 @@ const router = createBrowserRouter([
                 element: <LegacyProcessingRedirect />,
                 errorElement: routeErrorElement,
               },
+              ...setupRoutes(routeErrorElement),
               {
                 path: "settings",
-                lazy: async () => ({
-                  Component: (await import("../pages/settings/settings-page"))
-                    .SettingsPage,
-                }),
+                element: <LegacySettingsRedirect />,
                 errorElement: routeErrorElement,
               },
               {

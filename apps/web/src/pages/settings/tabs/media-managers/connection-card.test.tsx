@@ -119,7 +119,7 @@ describe("the unsigned webhook warning", () => {
     expect(
       await screen.findByTestId("media-manager-unsigned-webhook-warning"),
     ).toHaveTextContent(
-      "This media manager accepts webhooks without a secret. Create a secret and add it to Deluno.",
+      'Deluno accepts webhooks without a secret. Create one under "How to point it at Weir", then add it to Deluno.',
     );
   });
 

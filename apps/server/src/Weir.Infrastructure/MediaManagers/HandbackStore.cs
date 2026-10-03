@@ -131,7 +131,7 @@ public sealed class HandbackStore
             ("$path", relativePath));
     }
 
-    /// <summary>Every copy in these libraries, by file, for the Files and History lists.</summary>
+    /// <summary>Every copy in these libraries, by file, for the Files and Activity lists.</summary>
     public async Task<Dictionary<(long LibraryId, string RelativePath), HandbackRow>> ForLibrariesAsync(UnitOfWork uow, IEnumerable<long> libraryIds)
     {
         ArgumentNullException.ThrowIfNull(uow);
@@ -300,7 +300,7 @@ public sealed class HandbackStore
         return new HandbackRelease(HandbackReleaseKind.Removed, HandbackRules.RemovedNote(manager));
     }
 
-    /// <summary>The row as the Files and History lists show it (<c>handback</c>), or null when Weir wrote no copy.</summary>
+    /// <summary>The row as the Files and Activity lists show it (<c>handback</c>), or null when Weir wrote no copy.</summary>
     public static WireValue ToOut(HandbackRow? row)
     {
         if (row is null)

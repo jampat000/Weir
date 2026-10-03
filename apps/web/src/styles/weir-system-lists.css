@@ -1,0 +1,186 @@
+/* The System view's Scheduled tasks and Log cards. */
+
+.mm-sy-task {
+  display: grid;
+  grid-template-columns: var(--task-cols);
+  align-items: center;
+  gap: 10px;
+  /* 25px tall, as Deluno's rows are (5px, a line, 5px), with no padding of its own to run past the card's edge. */
+  min-height: 25px;
+  padding: 0 8px;
+  border-radius: 8px;
+  font-size: 0.875rem;
+}
+
+.mm-sy-list > .mm-sy-task:nth-child(odd) {
+  background: color-mix(in srgb, var(--mm-surface-2) 60%, transparent);
+}
+
+.mm-sy-task--head {
+  min-height: 0;
+  margin: 0 10px;
+  padding: 0 8px 4px;
+  font-size: var(--mm-type-eyebrow);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--mm-text3);
+}
+
+.mm-sy-task--head [data-col="result"],
+.mm-sy-task--head [data-col="next"] {
+  text-align: right;
+}
+
+.mm-sy-task[data-status="doing"] .mm-status-dot {
+  animation: mm-sy-blink 0.8s ease-in-out infinite;
+}
+
+.mm-sy-task__name {
+  min-width: 0;
+}
+
+.mm-sy-task__name > b {
+  display: block;
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--mm-text1);
+}
+
+.mm-sy-task__why {
+  display: block;
+  overflow: hidden;
+  font-size: var(--mm-type-eyebrow);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mm-sy-task__result,
+.mm-sy-task__next {
+  font-size: var(--mm-type-caption);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+  color: var(--mm-text2);
+}
+
+.mm-sy-task__next b {
+  font-weight: 600;
+  color: var(--mm-text1);
+}
+
+/* ---- Log ------------------------------------------------------------------- */
+
+/* The summary beside the title is a block, so it is as wide as the room the title leaves and its words fit it. */
+.mm-sy-count {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+/* The switch sits in the header between the count and the link, as Deluno's does, smaller than a page's (24px tall), and sticks out above and below the header's line without making the header taller. */
+.mm-sy-card--log .mm-panel__head {
+  container-type: inline-size;
+}
+
+.mm-sy-card--log .mm-panel__aside {
+  flex-wrap: nowrap;
+  align-self: center;
+  gap: 8px;
+  margin: -8px 0;
+}
+
+.mm-sy-card--log .mm-segmented {
+  flex-wrap: nowrap;
+  padding: 2px;
+}
+
+.mm-sy-card--log .mm-segmented__option {
+  height: 18px;
+  padding: 0 7px;
+  font-size: var(--mm-type-caption);
+  line-height: 16px;
+}
+
+/* A narrow card keeps its switch and its summary before the count of lines left out, and the link is its arrow alone (its words are still its name). The tasks card likewise keeps its Columns menu and its summary before the count and the link's words. */
+@container (max-width: 440px) {
+  .mm-sy-card--log .mm-sy-more,
+  .mm-sy-card--tasks .mm-sy-more {
+    display: none;
+  }
+
+  .mm-sy-card--tasks .mm-panel__link {
+    gap: 0;
+    font-size: 0;
+  }
+}
+
+@container (max-width: 320px) {
+  .mm-sy-card--log .mm-panel__link {
+    align-self: center;
+    gap: 0;
+    font-size: 0;
+  }
+
+  .mm-sy-card--log .mm-segmented__option {
+    padding: 0 5px;
+  }
+}
+
+/* A line says its level by its colour: information is quiet, a warning is amber and an error red, each with an accent. */
+.mm-sy-log {
+  display: grid;
+  grid-template-columns: 78px 62px minmax(0, 1fr);
+  align-items: baseline;
+  gap: 10px;
+  padding: 4px 8px 4px 6px;
+  border-bottom: 1px solid var(--mm-hairline);
+  border-left: 3px solid transparent;
+  font-size: var(--mm-type-caption);
+}
+
+.mm-sy-log--new {
+  animation: mm-sy-pulse-row 1.2s ease;
+}
+
+.mm-sy-log__time {
+  font-size: var(--mm-type-caption);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--mm-text3);
+}
+
+.mm-sy-log__level {
+  font-size: var(--mm-type-eyebrow);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--mm-text3);
+}
+
+.mm-sy-log__message {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mm-sy-log:not(.mm-sy-log--problem) .mm-sy-log__message {
+  color: var(--mm-text2);
+}
+
+.mm-sy-log--problem {
+  border-left-color: var(--mm-st);
+  background: color-mix(in srgb, var(--mm-st) 14%, transparent);
+}
+
+.mm-sy-log--problem .mm-sy-log__level {
+  color: var(--mm-st);
+}
+
+.mm-sy-log--problem .mm-sy-log__message {
+  font-weight: 500;
+  color: var(--mm-text1);
+}

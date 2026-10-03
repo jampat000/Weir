@@ -5,14 +5,15 @@ using Weir.Core.Json;
 using Weir.Core.Processing;
 using Weir.Core.Time;
 using Weir.Core.Validation;
+using Weir.Infrastructure.Artwork;
 using Weir.Infrastructure.LibraryMode;
 using Weir.Infrastructure.Processing;
 
 namespace Weir.Api.Endpoints;
 
 /// <summary>
-/// History's library cleans, <c>/api/v1/processing/library-cleans</c> (#695): what the newest clean did to each library
-/// file, filtered the way <c>/processing/files</c> filters downloads, so History lists both kinds side by side.
+/// Activity's library cleans, <c>/api/v1/processing/library-cleans</c> (#695): what the newest clean did to each library
+/// file, filtered the way <c>/processing/files</c> filters downloads, so Activity lists both kinds side by side.
 /// </summary>
 public static class ProcessingLibraryCleansEndpoints
 {
@@ -32,11 +33,13 @@ internal sealed class ProcessingLibraryCleansEndpointHandlers
 
     private readonly LibraryCleanHistoryStore _cleanHistory;
     private readonly FileStateStore _files;
+    private readonly ArtworkPosterUrls _posters;
 
-    public ProcessingLibraryCleansEndpointHandlers(LibraryCleanHistoryStore cleanHistory, FileStateStore files)
+    public ProcessingLibraryCleansEndpointHandlers(LibraryCleanHistoryStore cleanHistory, FileStateStore files, ArtworkPosterUrls posters)
     {
         _cleanHistory = cleanHistory ?? throw new ArgumentNullException(nameof(cleanHistory));
         _files = files ?? throw new ArgumentNullException(nameof(files));
+        _posters = posters ?? throw new ArgumentNullException(nameof(posters));
     }
 
     public async Task<ApiResult> GetLibraryCleansAsync(ApiRequest request)
@@ -66,6 +69,7 @@ internal sealed class ProcessingLibraryCleansEndpointHandlers
             Limit = limit,
         }).ConfigureAwait(false);
         var libraryNames = await _files.LibraryNamesAsync(uow).ConfigureAwait(false);
+        var posters = await _posters.ForFilesAsync(uow, rows.Where(row => row.LibraryId is not null).Select(row => (row.LibraryId!.Value, row.RelativePath))).ConfigureAwait(false);
 
         var cleans = rows.Select(row => (WireValue)new WireObject()
             .Set("kind", HistoryEntryKinds.LibraryClean)
@@ -73,6 +77,7 @@ internal sealed class ProcessingLibraryCleansEndpointHandlers
             .Set("library_id", row.LibraryId is { } id ? WireValue.Of(id) : WireValue.Null)
             .Set("library_name", row.LibraryId is { } known ? libraryNames.GetValueOrDefault(known, "Unknown workflow") : "Unknown workflow")
             .Set("relative_path", row.RelativePath)
+            .Set("poster_url", row.LibraryId is { } posterLibrary && posters.TryGetValue((posterLibrary, row.RelativePath), out var posterUrl) ? posterUrl : null)
             .Set("outcome", row.Outcome)
             .Set("detail", row.Detail)
             .Set("trigger", row.Trigger)

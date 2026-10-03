@@ -2,22 +2,21 @@ using Weir.Core.Json;
 
 namespace Weir.Core.Rules;
 
-/// <summary>What a metadata provider knows about one title.</summary>
+/// <summary>What the metadata service knows about one title.</summary>
 public sealed record TitleMetadata
 {
-    /// <summary>ISO 639-1 as providers report it (<c>fr</c>).</summary>
+    /// <summary>ISO 639-1 as the service reports it (<c>fr</c>).</summary>
     public string OriginalLanguage { get; init; } = string.Empty;
 
     public string Title { get; init; } = string.Empty;
     public int? Year { get; init; }
-    public string ProviderId { get; init; } = string.Empty;
 
     public bool HasOriginalLanguage => WireStrings.Strip(OriginalLanguage).Length > 0;
 }
 
 /// <summary>
-/// A lookup outcome, including the outcomes that are not answers. The provider that produces one
-/// does network IO and lives with the media managers; this is only the value the rules read.
+/// A lookup outcome, including the outcomes that are not answers. The lookup that produces one
+/// does network IO and lives with the artwork services; this is only the value the rules read.
 /// </summary>
 public sealed record LookupResult
 {
@@ -65,7 +64,7 @@ public sealed record OriginalLanguageTrack(int Index, string Language);
 
 /// <summary>
 /// Original-language audio selection: the pure mapping and selection. The lookup that feeds it calls a
-/// metadata provider over the network and lives outside the rules engine.
+/// metadata service over the network and lives outside the rules engine.
 /// </summary>
 public static class OriginalLanguage
 {
@@ -165,7 +164,7 @@ public static class OriginalLanguage
         {
             return new OriginalLanguageOutcome
             {
-                Note = "The metadata provider matched this title but reported no original language, so the configured language preferences chose the track.",
+                Note = "The metadata service matched this title but reported no original language, so the configured language preferences chose the track.",
             };
         }
 
@@ -206,7 +205,7 @@ public static class OriginalLanguage
             return new OriginalLanguageOutcome
             {
                 PreferredIndices = ordered,
-                Note = $"Kept audio in the original language ({original}{plus}) because the metadata provider identified it. Preferred languages: {kept}.",
+                Note = $"Kept audio in the original language ({original}{plus}) because the metadata service identified it. Preferred languages: {kept}.",
             };
         }
 

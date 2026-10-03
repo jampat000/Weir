@@ -35,8 +35,8 @@ function ArrInstructions({ name }: { name: string }) {
       >
         {name} picks up what Weir cleans through a remote path mapping from a
         workflow&apos;s watched folder to its output folder. Open that workflow
-        under Settings → Workflows: its editor shows the exact values to enter
-        and checks that {name} has them.
+        under Setup › Workflows: its editor shows the exact values to enter and
+        checks that {name} has them.
       </p>
       <p
         className="mb-3 text-mm-text2"
@@ -46,7 +46,7 @@ function ArrInstructions({ name }: { name: string }) {
         Connect, add a <strong>Webhook</strong>, tick <strong>On Import</strong>{" "}
         and <strong>On Upgrade</strong>, and use the address below with method
         POST. Add a header named <code>X-Webhook-Secret</code> holding the
-        secret. History then says &ldquo;Imported by {name}&rdquo;, and Weir
+        secret. Activity then says &ldquo;Imported by {name}&rdquo;, and Weir
         removes its own copy once {name} has taken it, only when that copy is
         still exactly as Weir wrote it.
       </p>
@@ -125,16 +125,21 @@ export function ConnectionSetup({
 
   return (
     <details
-      className="group mt-4 border-t border-mm-border pt-3 text-xs text-mm-text3"
+      className="mm-conn-setup group"
       data-testid="media-manager-setup-details"
     >
-      <summary className="flex cursor-pointer list-none items-baseline justify-between gap-3 font-medium text-mm-text2 [&::-webkit-details-marker]:hidden">
+      <summary className="mm-conn-setup__summary [&::-webkit-details-marker]:hidden">
         <span>How to point {connectionTitle(connection)} at Weir</span>
+        {connection.unsigned_webhook_warning !== null ? (
+          <span className="mm-status-text" data-status="attention">
+            Needs a secret
+          </span>
+        ) : null}
         <span className="mm-quiet-link group-open:hidden">Show →</span>
         <span className="mm-quiet-link hidden group-open:inline">Hide →</span>
       </summary>
 
-      <div className="mt-3">
+      <div className="mm-conn-setup__body">
         {isArrApp(connection) ? (
           <ArrInstructions name={connectionTitle(connection)} />
         ) : null}
@@ -162,7 +167,11 @@ export function ConnectionSetup({
         ) : null}
 
         {!confirmingReplace && secret.isError ? (
-          <p className="mm-status-text--failed mt-2 text-xs" role="alert">
+          <p
+            className="mm-status-text mt-2 text-xs"
+            data-status="broken"
+            role="alert"
+          >
             {errorMessage(secret.error, SECRET_FAILURE)}
           </p>
         ) : null}

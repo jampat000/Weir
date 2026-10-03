@@ -94,6 +94,38 @@ it("leaves the files a library already holds to the Library page", async () => {
   ).toHaveAttribute("href", "/library?library=7");
 });
 
+it("opens with the identity, folders and folder chain showing and every other setting folded away", async () => {
+  asOperator();
+  vi.spyOn(api, "fetchProcessingLibraries").mockResolvedValue([library()]);
+
+  render(<LibrariesTab />, { wrapper });
+  fireEvent.click(await screen.findByRole("button", { name: "Edit" }));
+
+  const form = await screen.findByTestId("processing-library-form");
+  const sections = Array.from(form.querySelectorAll("details")).map(
+    (section) => ({
+      title: section.querySelector("summary h3")?.textContent,
+      open: section.open,
+    }),
+  );
+  expect(sections.filter((section) => section.open)).toEqual([
+    { title: "Identity and folders", open: true },
+    { title: "Folder chain", open: true },
+  ]);
+  expect(sections.map((section) => section.title)).toEqual([
+    "Identity and folders",
+    "Media manager",
+    "Folder chain",
+    "Intake rules",
+    "File readiness",
+    "Output safety",
+    "Capacity",
+    "When a file fails",
+    "Advanced",
+    "When this workflow may run",
+  ]);
+});
+
 it("keeps FFmpeg compatibility folded away and offers no hardware decoding", async () => {
   asOperator();
   vi.spyOn(api, "fetchProcessingLibraries").mockResolvedValue([library()]);
@@ -101,9 +133,7 @@ it("keeps FFmpeg compatibility folded away and offers no hardware decoding", asy
   render(<LibrariesTab />, { wrapper });
   fireEvent.click(await screen.findByRole("button", { name: "Edit" }));
 
-  expect(
-    screen.getByText("FFmpeg compatibility (advanced)"),
-  ).toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "Advanced" })).toBeInTheDocument();
   expect(
     screen.getByRole("combobox", { name: "FFmpeg compatibility" }),
   ).toBeEnabled();

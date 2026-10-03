@@ -76,7 +76,8 @@ public sealed partial class RemuxPassRunner
                             .Set("removed_audio", output["removed_audio"])
                             .Set("removed_subtitles", output["removed_subtitles"])
                             .Set("message", "Weir is writing the cleaned-up file."),
-                        update)),
+                        update,
+                        context.Expected.SizeBytes)),
                 context.Duration,
                 ffmpegInputFlags,
                 writer,
@@ -216,13 +217,22 @@ public sealed partial class RemuxPassRunner
         return output;
     }
 
-    /// <summary><c>{**base, **update}</c> for an ffmpeg progress block.</summary>
-    private static WireObject ProgressWithUpdate(WireObject body, FfmpegProgressUpdate update) =>
-        body
+    /// <summary>
+    /// <c>{**base, **update}</c> for a progress block, with how much has been read and written so far for the System view's
+    /// throughput. The tools copy tracks, so the share of the source read is its percent; ffmpeg says how much it has
+    /// written, and for mkvmerge, which does not, the output is about as large as what was read.
+    /// </summary>
+    private static WireObject ProgressWithUpdate(WireObject body, FfmpegProgressUpdate update, long sourceSizeBytes)
+    {
+        var read = update.Percent is { } percent ? (long)(sourceSizeBytes * percent / 100d) : (long?)null;
+        return body
             .Set("percent", NullableFloat(update.Percent))
             .Set("eta_seconds", update.EtaSeconds)
             .Set("elapsed_seconds", update.ElapsedSeconds)
             .Set("processed_seconds", NullableFloat(update.ProcessedSeconds))
             .Set("speed", update.Speed)
-            .Set("progress", update.Progress);
+            .Set("progress", update.Progress)
+            .Set("bytes_read", read)
+            .Set("bytes_written", update.TotalSizeBytes ?? read);
+    }
 }

@@ -1,4 +1,4 @@
-import { QuietFieldGroup } from "../../../../components/shared/quiet-section";
+import { QuietDisclosure } from "../../../../components/shared/quiet-section";
 import type { ProcessingRuleSet } from "../../../../lib/processing/rule-sets-api";
 import {
   MEDIA_TYPE_OPTIONS,
@@ -46,11 +46,12 @@ export function LibraryFoldersGroup({
   ruleSets: ProcessingRuleSet[];
 }) {
   return (
-    <QuietFieldGroup
+    <QuietDisclosure
       title="Identity and folders"
       detail="One watched folder, one safe work area, and one finished output."
+      defaultOpen
     >
-      <div className="mm-field-row">
+      <div className="mm-editor-grid">
         <TextSetting
           binding={binding}
           name="name"
@@ -98,6 +99,6 @@ export function LibraryFoldersGroup({
           hint="Leave empty to use Weir's private temporary folder; put it on the same volume as the output folder so finished files move instead of copying."
         />
       </div>
-    </QuietFieldGroup>
+    </QuietDisclosure>
   );
 }

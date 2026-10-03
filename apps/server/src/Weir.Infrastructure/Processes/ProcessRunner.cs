@@ -105,7 +105,7 @@ public interface IProcessRunner
 }
 
 /// <summary><see cref="IProcessRunner"/> over <see cref="Process"/>, for Windows and Linux.</summary>
-public sealed partial class ProcessRunner(ILogger<ProcessRunner>? logger = null) : IProcessRunner
+public sealed partial class ProcessRunner(ILogger<ProcessRunner>? logger = null, ToolProcessLedger? tools = null) : IProcessRunner
 {
     /// <summary>
     /// How long to wait for pipes to drain after a kill before giving up on them. Internal (not private)
@@ -142,6 +142,7 @@ public sealed partial class ProcessRunner(ILogger<ProcessRunner>? logger = null)
 
         using var process = new Process { StartInfo = startInfo };
         process.Start();
+        using var toolUse = tools?.Track(process);
         SetPriority(process, request.Priority, request.Argv[0]);
         if (request.Stdin == ProcessInput.Null)
         {

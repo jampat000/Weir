@@ -1,13 +1,20 @@
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Weir.Api.Http;
-using Weir.Core.Json;
+using Weir.Core.Activity;
+using Weir.Core.Auth;
+using Weir.Core.Configuration;
+using Weir.Core.Validation;
+using Weir.Infrastructure.Activity;
 using Weir.Infrastructure.Runtime;
 
 namespace Weir.Api.Endpoints;
 
 /// <summary>
-/// Whether another device on the network can reach Weir, for System › About (docs/security-hardening.md#windows-firewall).
+/// Who can reach Weir over the network, shown and changed from System › About
+/// (docs/security-hardening.md#windows-firewall).
 /// </summary>
 public static class SuiteNetworkAccessEndpoints
 {
@@ -15,50 +22,60 @@ public static class SuiteNetworkAccessEndpoints
     {
         var handlers = endpoints.ServiceProvider.GetRequiredService<SuiteNetworkAccessEndpointHandlers>();
         endpoints.MapV1("GET", "/suite/network-access", handlers.GetNetworkAccessAsync);
+        endpoints.MapV1("PUT", "/suite/network-access", handlers.PutNetworkAccessAsync);
         return endpoints;
     }
 }
 
-/// <summary>Handler for <see cref="SuiteNetworkAccessEndpoints"/>.</summary>
+/// <summary>Handlers for <see cref="SuiteNetworkAccessEndpoints"/>.</summary>
 internal sealed class SuiteNetworkAccessEndpointHandlers
 {
-    private readonly INetworkAccessReader _reader;
+    private readonly INetworkAccess _access;
+    private readonly MachineIdentity _machine;
+    private readonly ActivityStore _activity;
 
-    public SuiteNetworkAccessEndpointHandlers(INetworkAccessReader reader)
+    public SuiteNetworkAccessEndpointHandlers(INetworkAccess access, MachineIdentity machine, ActivityStore activity)
     {
-        _reader = reader ?? throw new ArgumentNullException(nameof(reader));
+        _access = access ?? throw new ArgumentNullException(nameof(access));
+        _machine = machine ?? throw new ArgumentNullException(nameof(machine));
+        _activity = activity ?? throw new ArgumentNullException(nameof(activity));
     }
 
     public async Task<ApiResult> GetNetworkAccessAsync(ApiRequest request)
     {
         await request.RequireUserAsync().ConfigureAwait(false);
-        return ApiRoutes.Ok(NetworkAccessStatusWire.From(_reader.ReadState()));
+        return ApiRoutes.Ok(NetworkAccessStatusWire.From(_access.Read(), _machine.Name, _access.NotChangeableReason));
     }
-}
 
-/// <summary>The plain-language state and summary System › About shows, one line each, no jargon.</summary>
-internal static class NetworkAccessStatusWire
-{
-    internal static WireObject From(NetworkAccessState state) => new WireObject()
-        .Set("state", WireState(state))
-        .Set("summary", Summary(state));
-
-    private static string WireState(NetworkAccessState state) => state switch
+    public async Task<ApiResult> PutNetworkAccessAsync(ApiRequest request)
     {
-        NetworkAccessState.ThisPcOnly => "this_pc_only",
-        NetworkAccessState.Allowed => "allowed",
-        NetworkAccessState.Blocked => "blocked",
-        _ => "not_applicable",
-    };
+        var body = await request.ReadBodyAsync().ConfigureAwait(false);
+        var admin = await request.RequireUserAsync(UserRoles.AdminOnly).ConfigureAwait(false);
+        var issues = new ValidationIssues();
+        var model = new BodyModel(body, issues);
+        var csrfToken = model.Str("csrf_token", minLength: 1);
+        var scope = NetworkAccessStatusWire.ParseScope(model.Literal("scope", NetworkAccessStatusWire.Scopes));
+        model.Finish(ExtraFields.Forbid);
+        issues.ThrowIfAny();
 
-    private static string Summary(NetworkAccessState state) => state switch
-    {
-        NetworkAccessState.ThisPcOnly =>
-            "Only this PC can reach Weir. To let other devices on your network in, use the Weir tray icon → Allow other devices on your network.",
-        NetworkAccessState.Allowed =>
-            "Other devices on your network can reach Weir. To limit Weir to this PC, use the Weir tray icon → Only allow this PC.",
-        NetworkAccessState.Blocked =>
-            "Windows Firewall is blocking other devices. Use the Weir tray icon → Allow other devices on your network to fix it, or Only allow this PC.",
-        _ => "",
-    };
+        request.RequireConfirmationToken(csrfToken);
+        if (_access.NotChangeableReason is { } reason)
+        {
+            throw new ApiException(StatusCodes.Status409Conflict, reason);
+        }
+
+        _access.Choose(scope);
+        request.LoggerFactory.CreateLogger("weir.platform.network_access").LogInformation(
+            "network access: {Scope} chosen (user_id={UserId})",
+            NetworkAccessStatusWire.WireScope(scope),
+            admin.User.Id);
+        var uow = await request.DbAsync().ConfigureAwait(false);
+        await _activity.RecordAsync(
+            uow,
+            ActivityEventTypes.SystemNetworkAccessChanged,
+            "system",
+            "Network access changed",
+            $"{NetworkAccessStatusWire.Choice(scope)} Changed by {admin.User.Username}.").ConfigureAwait(false);
+        return ApiRoutes.Ok(NetworkAccessStatusWire.From(_access.Read(), _machine.Name, _access.NotChangeableReason));
+    }
 }

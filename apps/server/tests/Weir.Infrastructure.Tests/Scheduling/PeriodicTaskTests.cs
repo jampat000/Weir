@@ -70,6 +70,64 @@ public sealed class PeriodicTaskTests
     }
 
     [Fact]
+    public async Task A_task_with_a_label_is_listed_before_it_runs_and_its_run_is_recorded()
+    {
+        var time = new FakeTimeProvider();
+        var start = time.GetUtcNow();
+        var registry = new PeriodicTaskRegistry(time);
+        var task = new CountingTask(runAtStart: false, interval: TimeSpan.FromMinutes(10), label: "Counting");
+        using var stop = new CancellationTokenSource();
+        var loop = PeriodicTaskRunner.RunAsync(task, time, NullLogger.Instance, stop.Token, registry);
+
+        var planned = Assert.Single(registry.Snapshot());
+        Assert.Equal(("Counting", start + task.Interval, null), (planned.Label, planned.NextRunAt, planned.LastOk));
+
+        time.Advance(task.Interval);
+        await Eventually.ThatAsync(() => registry.Snapshot().Single().LastOk == true);
+        var ran = Assert.Single(registry.Snapshot());
+        Assert.Equal((false, start + task.Interval, start + task.Interval + task.Interval), (ran.Running, ran.LastRunAt, ran.NextRunAt));
+
+        await stop.CancelAsync();
+        await loop.WaitAsync(TimeSpan.FromSeconds(5));
+    }
+
+    [Fact]
+    public async Task A_failed_run_is_listed_with_the_tasks_own_failure_message_and_the_cooldown_as_its_next_run()
+    {
+        var time = new FakeTimeProvider();
+        var cooldown = TimeSpan.FromSeconds(20);
+        var registry = new PeriodicTaskRegistry(time);
+        var task = new CountingTask(runAtStart: true, interval: TimeSpan.FromHours(1), cooldown: cooldown, failFirst: true, label: "Counting");
+        using var stop = new CancellationTokenSource();
+        var loop = PeriodicTaskRunner.RunAsync(task, time, NullLogger.Instance, stop.Token, registry);
+
+        await Eventually.ThatAsync(() => registry.Snapshot().Single().LastOk == false);
+
+        var failed = Assert.Single(registry.Snapshot());
+        Assert.Equal(("counting tick failed", time.GetUtcNow() + cooldown), (failed.LastError, failed.NextRunAt));
+
+        await stop.CancelAsync();
+        await loop.WaitAsync(TimeSpan.FromSeconds(5));
+    }
+
+    [Fact]
+    public async Task A_task_with_no_label_is_never_listed()
+    {
+        var time = new FakeTimeProvider();
+        var registry = new PeriodicTaskRegistry(time);
+        var task = new CountingTask(runAtStart: true, interval: TimeSpan.FromHours(1));
+        using var stop = new CancellationTokenSource();
+        var loop = PeriodicTaskRunner.RunAsync(task, time, NullLogger.Instance, stop.Token, registry);
+
+        await Eventually.ThatAsync(() => task.Calls >= 1);
+
+        Assert.Empty(registry.Snapshot());
+
+        await stop.CancelAsync();
+        await loop.WaitAsync(TimeSpan.FromSeconds(5));
+    }
+
+    [Fact]
     public async Task The_host_runs_every_registered_task_once_however_often_it_is_added()
     {
         var first = new CountingTask(runAtStart: true, interval: TimeSpan.FromHours(1));
@@ -79,6 +137,7 @@ public sealed class PeriodicTaskTests
             .AddSingleton<TimeProvider>(new FakeTimeProvider())
             .AddSingleton<IPeriodicTask>(first)
             .AddSingleton<IPeriodicTask>(second);
+        services.AddSingleton<PeriodicTaskRegistry>();
         services.AddWeirPeriodicTasks();
         services.AddWeirPeriodicTasks();
         await using var provider = services.BuildServiceProvider();
@@ -89,13 +148,15 @@ public sealed class PeriodicTaskTests
         await hosted.StopAsync(CancellationToken.None);
     }
 
-    private sealed class CountingTask(bool runAtStart, TimeSpan interval, TimeSpan? cooldown = null, bool failFirst = false) : IPeriodicTask
+    private sealed class CountingTask(bool runAtStart, TimeSpan interval, TimeSpan? cooldown = null, bool failFirst = false, string? label = null) : IPeriodicTask
     {
         private int _calls;
 
         public int Calls => _calls;
 
         public string Name => "counting";
+
+        public string? Label => label;
 
         public TimeSpan Interval => interval;
 

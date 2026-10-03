@@ -34,10 +34,10 @@ Each workflow reports one of three coverage states (`manager_coverage` on
 - `unreachable`: a linked manager failed its latest connection test. Local
   remux remains possible, but manager-truth-dependent cleanup is held.
 
-Settings › Workflows shows which manager each workflow is linked to, and a
+Setup › Workflows shows which manager each workflow is linked to, and a
 warning when that manager did not answer its last check.
 
-Connect or repair a manager from Settings › Media managers. A manually created
+Connect or repair a manager from Setup › Connections › Media managers. A manually created
 workflow remains valid and is never deleted or disabled merely because it has no
 manager link.
 

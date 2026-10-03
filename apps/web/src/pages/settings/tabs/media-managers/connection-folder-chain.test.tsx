@@ -109,7 +109,7 @@ it("lists each workflow it feeds with its readiness, and opens its folder chain 
   expect(within(row).getByText("Needs attention")).toBeInTheDocument();
   expect(
     within(row).getByRole("link", { name: "See its folder chain" }),
-  ).toHaveAttribute("href", "/settings?tab=libraries&edit=12");
+  ).toHaveAttribute("href", "/setup/workflows?edit=12");
   // The lines live once, in the workflow editor's Folder chain.
   expect(
     screen.queryByText(/Sonarr has no enabled download client/),

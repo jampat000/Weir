@@ -257,7 +257,7 @@ internal sealed class ProcessingFileTracksEndpointHandlers
         {
             throw new ApiException(
                 StatusCodes.Status400BadRequest,
-                "This file is not on hold, so a manual track choice does not apply. Refresh the Files list and try again.");
+                "This file is not on hold, so a manual track choice does not apply. Refresh Activity and try again.");
         }
 
         var streams = RemuxRules.SplitStreams(context.Probe);

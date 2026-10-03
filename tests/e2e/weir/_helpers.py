@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+
 from playwright.sync_api import Page, expect
 
 BOOTSTRAP_USER = "e2e-shell-admin"
@@ -46,26 +48,58 @@ def ensure_signed_in(page: Page, base_url: str) -> None:
 
 
 def open_sidebar(page: Page, label: str) -> None:
-    page.get_by_role("link", name=label, exact=True).click()
+    # A link that carries a count is named for it ("Processing, 2 working", "Activity, 1 need you").
+    page.get_by_role("link", name=re.compile(rf"^{re.escape(label)}(?:,|$)")).click()
 
 
 def open_tab(page: Page, sidebar: str, tab: str) -> None:
-    """A tab on Settings or System: the side menu entry, then the tab across the top."""
+    """A tab of a setup area (Workflows, Connections, Rules, Performance) or of System.
+
+    Each area is an entry of its own in the side menu, which marks the one showing, and has its tabs across the top
+    of the page.
+    """
 
     open_sidebar(page, sidebar)
+    expect(page.get_by_role("link", name=re.compile(rf"^{re.escape(sidebar)}(?:,|$)"))).to_have_attribute(
+        "aria-current", "page"
+    )
     selected = page.get_by_role("tab", name=tab, exact=True)
     selected.click()
     expect(selected).to_have_attribute("aria-selected", "true")
 
 
-def open_logs(page: Page, show: str = "Events") -> None:
-    """System › Logs: Weir's own events, its jobs and the server log. Each file's story is in History.
+def open_logs(page: Page, source: str | None = None) -> None:
+    """System › Logs: one log of Weir's events, its jobs and the server log. Each file's story is in Activity.
 
-    ``show`` is the label of one option in its Show choice.
+    ``source`` is the name of one Source chip to press: "Events", "Jobs" or "Server".
     """
 
     open_tab(page, "System", "Logs")
-    choice = page.get_by_test_id("settings-history-show")
-    if show != "Events":
-        choice.select_option(label=show)
-    expect(choice.locator("option:checked")).to_have_text(show)
+    expect(page.get_by_test_id("log-summary")).to_be_visible()
+    if source:
+        chip = page.get_by_role("group", name="Source").get_by_role("button", name=re.compile(rf"^{re.escape(source)}"))
+        chip.click()
+        expect(chip).to_have_attribute("aria-pressed", "true")
+
+
+def activity_chip_labels(page: Page) -> list[str]:
+    """Every kind-of-file chip on Activity, in order, without their counts.
+
+    Short of room the last chips fold into a "More" menu (at Playwright's 1280x720 the title line is shared with the
+    pickers), so this reads the chips still on the title line, then opens More, reads what is folded into it, and
+    closes it again. The chosen chip stays on the line wherever it sits, so the order is the page's own only while
+    the first chip, All, is the chosen one.
+    """
+
+    group = page.get_by_role("group", name="Show")
+    on_line = group.locator("button.mm-segmented__option:not(.mm-more__button)").all_inner_texts()
+    more = group.get_by_role("button", name="More")
+    folded: list[str] = []
+    if more.count():
+        more.click()
+        menu = page.get_by_role("menu", name="More kinds of file")
+        expect(menu).to_be_visible()
+        folded = menu.get_by_role("menuitem").all_inner_texts()
+        page.keyboard.press("Escape")
+        expect(menu).to_be_hidden()
+    return [re.sub(r"\s+[\d,]+$", "", text.strip()) for text in [*on_line, *folded]]

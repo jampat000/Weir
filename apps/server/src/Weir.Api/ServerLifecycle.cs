@@ -8,6 +8,7 @@ public sealed class ServerLifecycle
 {
     private readonly TimeProvider _time;
     private readonly long _startedAt;
+    private readonly DateTimeOffset _startedAtUtc;
     private volatile bool _databaseOpened;
     private volatile bool _startupComplete;
 
@@ -15,9 +16,13 @@ public sealed class ServerLifecycle
     {
         _time = time;
         _startedAt = time.GetTimestamp();
+        _startedAtUtc = time.GetUtcNow();
     }
 
     public TimeSpan Elapsed => _time.GetElapsedTime(_startedAt);
+
+    /// <summary>When the server started, in UTC.</summary>
+    public DateTimeOffset StartedAt => _startedAtUtc;
 
     /// <summary>The database passed its schema check and can be queried.</summary>
     public bool DatabaseOpened => _databaseOpened;

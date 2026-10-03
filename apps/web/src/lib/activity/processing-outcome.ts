@@ -5,6 +5,7 @@
  */
 import type { ActivityEventItem } from "../api/types";
 import { processingFileLead, REJECTED_BY_RULES } from "../processing/files-api";
+import type { StatusMeaning } from "../ui/status-meaning";
 import {
   asNumber,
   asString,
@@ -20,6 +21,18 @@ import { isRejectedByRules } from "./pass-detail";
 export type FinishedKind =
   "cleaned" | "already" | "passed" | "rejected" | "failed";
 
+/**
+ * What a finished file means wherever it is shown: one cleaned, or already as clean as the rules want, is done; one passed
+ * through unchanged or rejected is a decision that needs a look, never a failure; only one Weir could not finish is broken.
+ */
+export const FINISHED_MEANING: Record<FinishedKind, StatusMeaning> = {
+  cleaned: "done",
+  already: "done",
+  passed: "attention",
+  rejected: "attention",
+  failed: "broken",
+};
+
 export type FinishedFile = {
   id: number;
   /** Where the file came from: a new download, or a file already in a library. */
@@ -34,11 +47,13 @@ export type FinishedFile = {
   /** The entry's own sentence, for kinds that have one worth showing as it is. */
   sentence: string | null;
   finishedAt: string;
+  /** Where Weir serves the title's poster, when it has one. */
+  posterUrl?: string | null;
 };
 
 /**
- * A rejection worded as History words it: "Rejected: <why> <what became of the file>". The reason and what became
- * of the file are the ones the pass recorded, so this reads the same as the file's entry in History.
+ * A rejection worded as Activity words it: "Rejected: <why> <what became of the file>". The reason and what became
+ * of the file are the ones the pass recorded, so this reads the same as the file's entry in Activity.
  */
 function rejectionSentence(detail: ActivityDetail): string {
   const reason = [
@@ -103,6 +118,7 @@ export function finishedFileFromEvent(
       removedSubtitles: count(detail?.removed_subtitles),
       sentence: rejected && detail ? rejectionSentence(detail) : null,
       finishedAt: ev.created_at,
+      posterUrl: ev.poster_url ?? null,
     };
   }
   if (ev.event_type === LIBRARY_FILE_CLEANED_EVENT) {
@@ -118,6 +134,7 @@ export function finishedFileFromEvent(
       removedSubtitles: 0,
       sentence: ev.title,
       finishedAt: ev.created_at,
+      posterUrl: ev.poster_url ?? null,
     };
   }
   return null;

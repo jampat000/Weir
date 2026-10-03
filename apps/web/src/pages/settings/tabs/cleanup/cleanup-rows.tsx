@@ -1,21 +1,21 @@
-import { useState } from "react";
+import { Fragment, useState, type ReactNode } from "react";
 
 import { MmOnOffSwitch } from "../../../../components/ui/mm-on-off-switch";
 import type { MaintenanceFamilyState } from "../../../../lib/processing/maintenance-api";
 import type { ProcessingOperatorSettingsPutBody } from "../../../../lib/processing/types";
+import { classNames } from "../../../../lib/ui/class-names";
 import { mmActionButtonClass } from "../../../../lib/ui/mm-control-roles";
 import { useAppDateFormatter } from "../../../../lib/ui/mm-format-date";
 import type { CleanupConfirmAction } from "./cleanup-confirm-dialog";
+import type { CleanupColumnId } from "./cleanup-columns";
 import {
   choiceLabel,
+  DEFAULT_INTERVAL_SECONDS,
   everyChoices,
   everyWords,
   lastRunLine,
   type CleanupJob,
 } from "./cleanup-jobs";
-
-/** An interval the server has not reported yet reads as hourly, the jobs' own default. */
-const DEFAULT_INTERVAL_SECONDS = 3600;
 
 /** Saves one operator setting and says in words what changed. */
 export type SaveSetting = (
@@ -33,10 +33,11 @@ function nextRunWords(
     : "Within half a minute";
 }
 
-/** One cleanup job: its switch, its timer, when it last and next runs, and Run now. */
+/** One cleanup job: its switch, its timer, when it last and next runs, and Run now, in the order of the columns. */
 export function CleanupJobRow({
   job,
   state,
+  order,
   switchId,
   editable,
   saving,
@@ -47,6 +48,7 @@ export function CleanupJobRow({
 }: {
   job: CleanupJob;
   state: MaintenanceFamilyState;
+  order: readonly CleanupColumnId[];
   switchId: string;
   editable: boolean;
   saving: boolean;
@@ -58,25 +60,30 @@ export function CleanupJobRow({
 }) {
   const formatDate = useAppDateFormatter();
   const interval = state.interval_seconds ?? DEFAULT_INTERVAL_SECONDS;
-  return (
-    <tr data-testid={`processing-maintenance-${job.family}`}>
-      <th scope="row" className="mm-quiet-table__name">
+  const cells: Record<CleanupColumnId, ReactNode> = {
+    job: (
+      <th data-col="job" scope="row" className="mm-quiet-table__name">
         <span>{job.name}</span>
         <span
-          className={`mm-cleanup-what${
-            job.destructive ? " mm-cleanup-what--warn" : ""
-          }`}
+          className={classNames(
+            "mm-cleanup-what",
+            job.destructive && "mm-status-text",
+          )}
+          data-status={job.destructive ? "attention" : undefined}
         >
           {state.description}
         </span>
       </th>
-      <td data-label="On">
+    ),
+    on: (
+      <td data-col="on" data-label="On">
         <MmOnOffSwitch
           id={switchId}
           label={`${job.name} on`}
           enabled={state.enabled}
           disabled={!editable || saving}
           layout="control"
+          size="row"
           onChange={(on) => {
             if (on && job.destructive) {
               onRequestConfirm("enable");
@@ -91,7 +98,9 @@ export function CleanupJobRow({
           }}
         />
       </td>
-      <td data-label="Every">
+    ),
+    every: (
+      <td data-col="every" data-label="Every">
         <select
           className="mm-input mm-cleanup-every"
           aria-label={`How often ${job.name} runs`}
@@ -112,23 +121,68 @@ export function CleanupJobRow({
           ))}
         </select>
       </td>
-      <td data-label="Last run">{lastRunLine(state, formatDate)}</td>
-      <td data-label="Next run">{nextRunWords(state, formatDate)}</td>
-      {editable ? (
-        <td data-label="Run now">
-          <button
-            type="button"
-            className={mmActionButtonClass({ variant: "tertiary" })}
-            disabled={running}
-            onClick={() =>
-              job.destructive ? onRequestConfirm("run") : onRun()
-            }
-            data-testid={`processing-maintenance-run-${job.family}`}
-          >
-            Run now
-          </button>
-        </td>
-      ) : null}
+    ),
+    lastRun: (
+      <td data-label="Last run" data-col="lastRun">
+        {lastRunLine(state, formatDate)}
+      </td>
+    ),
+    nextRun: (
+      <td data-label="Next run" data-col="nextRun">
+        {nextRunWords(state, formatDate)}
+      </td>
+    ),
+    runNow: (
+      <td data-col="runNow" data-label="Run now">
+        <button
+          type="button"
+          className={mmActionButtonClass({
+            variant: "tertiary",
+            size: "row",
+          })}
+          disabled={running}
+          onClick={() => (job.destructive ? onRequestConfirm("run") : onRun())}
+          data-testid={`processing-maintenance-run-${job.family}`}
+        >
+          Run now
+        </button>
+      </td>
+    ),
+  };
+  return (
+    <tr data-testid={`processing-maintenance-${job.family}`}>
+      {order.map((id) => (
+        <Fragment key={id}>{cells[id]}</Fragment>
+      ))}
+    </tr>
+  );
+}
+
+/**
+ * A setting in the same table as the jobs it belongs beside. It is one cell across the whole row, its name and what it
+ * does first and its control under them, so it reads the same whichever order the job columns are in.
+ */
+function SettingRow({
+  testId,
+  name,
+  description,
+  columnCount,
+  children,
+}: {
+  testId: string;
+  name: string;
+  description: string;
+  /** How many columns the table is showing, which the setting's cell spans. */
+  columnCount: number;
+  children: ReactNode;
+}) {
+  return (
+    <tr data-testid={testId}>
+      <td colSpan={columnCount} className="mm-cleanup-setting">
+        <span className="mm-quiet-table__name">{name}</span>
+        <span className="mm-cleanup-what">{description}</span>
+        <div className="mm-cleanup-setting__control">{children}</div>
+      </td>
     </tr>
   );
 }
@@ -141,6 +195,7 @@ export function DaysSettingRow({
   testId,
   name,
   description,
+  columnCount,
   inputId,
   inputLabel,
   saved,
@@ -155,6 +210,8 @@ export function DaysSettingRow({
   testId: string;
   name: string;
   description: string;
+  /** How many columns the table is showing. */
+  columnCount: number;
   inputId: string;
   inputLabel: string;
   saved: number | undefined;
@@ -172,47 +229,46 @@ export function DaysSettingRow({
   const dirty = saved !== undefined && draft !== null && value !== saved;
   const inRange = value >= min && value <= max;
   return (
-    <tr data-testid={testId}>
-      <th scope="row" className="mm-quiet-table__name">
-        <span>{name}</span>
-        <span className="mm-cleanup-what">{description}</span>
-      </th>
-      <td data-label="On" colSpan={2}>
-        <span className="mm-setrow__unit">
-          <label className="sr-only" htmlFor={inputId}>
-            {inputLabel}
-          </label>
-          <input
-            id={inputId}
-            className="mm-input mm-setrow__number"
-            type="number"
-            min={min}
-            max={max}
-            value={shown}
-            disabled={!editable || saving}
-            onChange={(event) => setDraft(event.target.value)}
-          />
-          days
-          {dirty && inRange ? (
-            <button
-              type="button"
-              className={mmActionButtonClass({ variant: "secondary" })}
-              disabled={saving}
-              onClick={() =>
-                void onSave(toBody(value), savedWords(value)).then(() =>
-                  setDraft(null),
-                )
-              }
-            >
-              {saving ? "Saving…" : "Save"}
-            </button>
-          ) : null}
-        </span>
-      </td>
-      <td data-label="Last run" />
-      <td data-label="Next run" />
-      {editable ? <td /> : null}
-    </tr>
+    <SettingRow
+      testId={testId}
+      name={name}
+      description={description}
+      columnCount={columnCount}
+    >
+      <span className="mm-setrow__unit">
+        <label className="sr-only" htmlFor={inputId}>
+          {inputLabel}
+        </label>
+        <input
+          id={inputId}
+          className="mm-input mm-setrow__number"
+          type="number"
+          min={min}
+          max={max}
+          value={shown}
+          disabled={!editable || saving}
+          onChange={(event) => setDraft(event.target.value)}
+        />
+        days
+        {dirty && inRange ? (
+          <button
+            type="button"
+            className={mmActionButtonClass({
+              variant: "secondary",
+              size: "row",
+            })}
+            disabled={saving}
+            onClick={() =>
+              void onSave(toBody(value), savedWords(value)).then(() =>
+                setDraft(null),
+              )
+            }
+          >
+            {saving ? "Saving…" : "Save"}
+          </button>
+        ) : null}
+      </span>
+    </SettingRow>
   );
 }
 
@@ -221,6 +277,7 @@ export function SwitchSettingRow({
   testId,
   name,
   description,
+  columnCount,
   switchId,
   enabled,
   editable,
@@ -230,6 +287,8 @@ export function SwitchSettingRow({
   testId: string;
   name: string;
   description: string;
+  /** How many columns the table is showing. */
+  columnCount: number;
   switchId: string;
   enabled: boolean;
   editable: boolean;
@@ -237,24 +296,21 @@ export function SwitchSettingRow({
   onChange: (on: boolean) => void;
 }) {
   return (
-    <tr data-testid={testId}>
-      <th scope="row" className="mm-quiet-table__name">
-        <span>{name}</span>
-        <span className="mm-cleanup-what">{description}</span>
-      </th>
-      <td data-label="On" colSpan={2}>
-        <MmOnOffSwitch
-          id={switchId}
-          label={name}
-          enabled={enabled}
-          disabled={!editable || saving}
-          layout="control"
-          onChange={onChange}
-        />
-      </td>
-      <td data-label="Last run" />
-      <td data-label="Next run" />
-      {editable ? <td /> : null}
-    </tr>
+    <SettingRow
+      testId={testId}
+      name={name}
+      description={description}
+      columnCount={columnCount}
+    >
+      <MmOnOffSwitch
+        id={switchId}
+        label={name}
+        enabled={enabled}
+        disabled={!editable || saving}
+        layout="control"
+        size="row"
+        onChange={onChange}
+      />
+    </SettingRow>
   );
 }

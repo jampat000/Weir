@@ -5,7 +5,7 @@ using Weir.Infrastructure.Tests.Jobs;
 namespace Weir.Infrastructure.Tests.Processing;
 
 /// <summary>
-/// A file's history is kept for as long as Weir still knows the file, then for the History page's number of days after the
+/// A file's history is kept for as long as Weir still knows the file, then for the Activity page's number of days after the
 /// file is gone or forgotten. The days count from when Weir first sees the history without its file, so a file forgotten long
 /// after it was processed still keeps its history for the whole period.
 /// </summary>

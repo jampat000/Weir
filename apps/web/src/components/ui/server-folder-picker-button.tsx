@@ -74,7 +74,7 @@ function FolderList({
   }
   if (browse.error) {
     return (
-      <div className="mm-status-text--failed text-sm" role="alert">
+      <div className="mm-status-text text-sm" data-status="broken" role="alert">
         {browse.error}
       </div>
     );
@@ -199,7 +199,9 @@ function PathBar({
         <span className="font-mono">/media/tv</span>.
       </p>
       {browse.notice ? (
-        <p className="mm-status-text--warning mt-3 text-sm">{browse.notice}</p>
+        <p className="mm-status-text mt-3 text-sm" data-status="attention">
+          {browse.notice}
+        </p>
       ) : null}
     </div>
   );

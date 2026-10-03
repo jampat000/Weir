@@ -13,7 +13,7 @@ export interface MaintenanceFamilyState {
   last_completed_at: string | null;
   last_failed_at: string | null;
   last_error: string | null;
-  /** How often it runs: the interval saved in Settings › Cleanup, else the environment's. */
+  /** How often it runs: the interval saved in Setup › Performance › Cleanup, else the environment's. */
   interval_seconds?: number;
   /** When it next runs by itself; null while it is switched off. */
   next_run_at?: string | null;

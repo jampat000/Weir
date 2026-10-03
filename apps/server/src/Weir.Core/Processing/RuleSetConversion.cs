@@ -9,7 +9,7 @@ public static class RuleSetConversion
 {
     /// <summary>
     /// A stored subtitle mode as the planner reads it. <c>remove_all</c> removes every subtitle;
-    /// <c>keep_listed</c> (what Settings › Rules saves) and <c>keep_selected</c> keep the listed languages;
+    /// <c>keep_listed</c> (what Setup › Rules › Profiles saves) and <c>keep_selected</c> keep the listed languages;
     /// anything else, including the stored default <c>keep_all</c>, keeps every subtitle. Treating keep-all as
     /// keep-selected would remove every track, because its language list is hidden and empty; so an unknown value
     /// errs towards keeping too.

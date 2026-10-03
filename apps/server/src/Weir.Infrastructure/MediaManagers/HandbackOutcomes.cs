@@ -12,15 +12,16 @@ namespace Weir.Infrastructure.MediaManagers;
 /// <param name="Matched">The message was about a file Weir handed back.</param>
 /// <param name="Released">Weir removed its copy.</param>
 /// <param name="Message">What happened, in plain words.</param>
+/// <param name="LibraryId">The library the file is in, when matched.</param>
 /// <param name="RelativePath">The file's path in the watched folder, when matched.</param>
-public sealed record ManagerImportResult(bool Matched, bool Released, string Message, string? RelativePath = null);
+public sealed record ManagerImportResult(bool Matched, bool Released, string Message, string? RelativePath = null, long? LibraryId = null);
 
 /// <summary>What Weir did with a manager's outcome for one of its hand-offs (#652).</summary>
 public sealed record HandoffOutcomeResult(bool Released, string Message);
 
 /// <summary>
 /// A manager's word on a file Weir handed back (#652): Sonarr's and Radarr's import webhook, and the hand-off outcome
-/// Deluno sends. Both record what the manager said, so the file's History shows it, and both release Weir's copy only
+/// Deluno sends. Both record what the manager said, so the file's Activity shows it, and both release Weir's copy only
 /// through <see cref="HandbackStore.Release"/>.
 /// </summary>
 public sealed class HandbackOutcomes
@@ -56,7 +57,7 @@ public sealed class HandbackOutcomes
         // The same message again (a manager retrying its webhook) changes nothing once Weir has settled the copy.
         if (row.Outcome == HandbackRules.Imported && row.SettledAt is not null)
         {
-            return new ManagerImportResult(true, row.ReleasedAt is not null, row.ReleaseNote ?? string.Empty, row.RelativePath);
+            return new ManagerImportResult(true, row.ReleasedAt is not null, row.ReleaseNote ?? string.Empty, row.RelativePath, row.LibraryId);
         }
 
         var now = _time.GetUtcNow();
@@ -67,7 +68,7 @@ public sealed class HandbackOutcomes
             // what happened to the copy then still stands.
             await RecordActivityAsync(uow, manager, HandbackRules.Imported, row.LibraryId, row.RelativePath, importEvent.FilePath, null, false, row.ReleaseNote ?? string.Empty, "webhook")
                 .ConfigureAwait(false);
-            return new ManagerImportResult(true, false, row.ReleaseNote ?? string.Empty, row.RelativePath);
+            return new ManagerImportResult(true, false, row.ReleaseNote ?? string.Empty, row.RelativePath, row.LibraryId);
         }
 
         var release = authenticated
@@ -76,7 +77,7 @@ public sealed class HandbackOutcomes
         await _handback.RecordReleaseAsync(uow, row.Id, release, now).ConfigureAwait(false);
         await RecordActivityAsync(uow, manager, HandbackRules.Imported, row.LibraryId, row.RelativePath, importEvent.FilePath, null, release.Removed, release.Note, "webhook")
             .ConfigureAwait(false);
-        return new ManagerImportResult(true, release.Removed, release.Note, row.RelativePath);
+        return new ManagerImportResult(true, release.Removed, release.Note, row.RelativePath, row.LibraryId);
     }
 
     /// <summary>

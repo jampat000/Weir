@@ -106,8 +106,8 @@ NORMAL_SCREENS: list[Screen] = [
     Screen(
         16,
         "processing-jobs",
-        "/processing?tab=jobs",
-        '[data-testid="processing-jobs-inspection-section"]',
+        "/system?tab=logs&source=job",
+        '[data-testid="log-feed"]',
         "Processing - Jobs",
     ),
     Screen(
@@ -142,8 +142,8 @@ NORMAL_SCREENS: list[Screen] = [
     Screen(
         22,
         "settings-logs",
-        "/settings?tab=logs",
-        '[data-testid="suite-settings-logs"]',
+        "/system?tab=logs&source=server",
+        '[data-testid="log-feed"]',
         "Settings - Logs",
     ),
     Screen(

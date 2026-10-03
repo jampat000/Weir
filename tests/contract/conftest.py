@@ -21,6 +21,7 @@ if str(REPO_ROOT) not in sys.path:
 from tests.contract.support import launcher  # noqa: E402
 from tests.contract.support.client import WeirClient  # noqa: E402
 from tests.contract.support.fake_ffmpeg import FakeFfmpeg, real_ffmpeg_dir  # noqa: E402
+from tests.contract.support.fake_gateway import FakeGateway  # noqa: E402
 from tests.contract.support.fake_manager import FakeManager  # noqa: E402
 
 CONTRACT_DIR = Path(__file__).resolve().parent
@@ -274,3 +275,11 @@ def fake_managers() -> Iterator[Callable[..., FakeManager]]:
     finally:
         for fake in made:
             fake.stop()
+
+
+@pytest.fixture
+def fake_gateway() -> Iterator[FakeGateway]:
+    """A fake metadata gateway, started for one test. Point a server at it with ``WEIR_ARTWORK_GATEWAY_URL``."""
+
+    with FakeGateway() as gateway:
+        yield gateway

@@ -12,7 +12,7 @@ public sealed partial class HandoffCompletionReporter
     /// Send every report Weir still owes a manager of this kind because it was not answering, or because nothing
     /// attempted delivery before this owed report was persisted (a claim recorded just before a crash, say, #667).
     /// The heartbeat calls this once the manager answers its connection test. A report the manager answers, accepted
-    /// or refused, stops being owed, and the History of each file it covers stops saying Weir is waiting; one it still does
+    /// or refused, stops being owed, and the Activity of each file it covers stops saying Weir is waiting; one it still does
     /// not answer stays owed. Each report is committed on its own. Returns how many the manager answered.
     /// </summary>
     public async Task<int> SendWaitingReportsAsync(UnitOfWork uow, string sourceKey, CancellationToken cancellationToken = default)
@@ -49,7 +49,7 @@ public sealed partial class HandoffCompletionReporter
     }
 
     /// <summary>
-    /// Attempt one delivery of an owed report, and settle it: still not answering, it stays owed and the History of
+    /// Attempt one delivery of an owed report, and settle it: still not answering, it stays owed and the Activity of
     /// each file it covers says so (added once, whether this is the first attempt or a retry); answered, accepted or
     /// refused, it stops being owed and Activity records it. Commits.
     /// </summary>
@@ -90,7 +90,7 @@ public sealed partial class HandoffCompletionReporter
         return delivery;
     }
 
-    /// <summary>A file's status reason with one sentence swapped for another (or dropped), so History reads as things are now.</summary>
+    /// <summary>A file's status reason with one sentence swapped for another (or dropped), so Activity reads as things are now.</summary>
     private static Task<int> ReplaceFileSentenceAsync(UnitOfWork uow, long libraryId, string relativePath, string sentence, string replacement) =>
         uow.ExecuteAsync(
             "UPDATE files SET status_reason = trim(replace(status_reason, $old, $new)), updated_at = CURRENT_TIMESTAMP " +
@@ -112,7 +112,7 @@ public sealed partial class HandoffCompletionReporter
     /// <summary>
     /// A report Weir owes a manager that was not answering, as saved on the hand-off row. <see cref="Subject"/> is the path
     /// Activity names the report by (the file, or the folder of a hand-off of several files); <see cref="Files"/> are the
-    /// files whose History says Weir is waiting.
+    /// files whose Activity says Weir is waiting.
     /// </summary>
     private sealed record PendingReport(
         string? CallbackPath, string? ReleaseName, string? ManagerLibraryId, WireObject Body, long? LibraryId, string? Subject, IReadOnlyList<string> Files)

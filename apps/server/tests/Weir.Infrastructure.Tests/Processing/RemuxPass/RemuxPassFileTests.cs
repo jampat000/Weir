@@ -506,7 +506,7 @@ public sealed class RemuxPassPathsTests : IDisposable
     /// <summary>
     /// A lexical prefix match is not enough: a junction (Windows) or symlink (elsewhere) placed under the watched
     /// folder can point straight out of it, and deleting through it would remove a file that actually lives
-    /// somewhere else (#786 review of #785). Shared by the automatic reject job and History's remove-dialog "delete".
+    /// somewhere else (#786 review of #785). Shared by the automatic reject job and Activity's remove-dialog "delete".
     /// </summary>
     [Fact]
     public void A_rejected_file_reached_through_a_linked_folder_is_left_alone()

@@ -6,7 +6,7 @@ namespace Weir.Infrastructure.Processing;
 
 /// <summary>
 /// Periodic pruning of a file's history (its per-file processing record): kept while Weir still knows the file, then for the
-/// History page's number of days after the file is gone or forgotten.
+/// Activity page's number of days after the file is gone or forgotten.
 /// Separate from the suite log's own retention: a suite log diagnoses the application, a file's history
 /// tells what happened to a file, and the two need different lifetimes.
 /// </summary>
@@ -15,6 +15,8 @@ public sealed class FileLogRetentionTask(
     : IPeriodicTask
 {
     public string Name => "processing-file-log-retention";
+
+    public string? Label => "Prune file history";
 
     public TimeSpan Interval => TimeSpan.FromSeconds(3600);
 

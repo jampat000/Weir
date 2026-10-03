@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Weir.Core.Jobs;
+using Weir.Infrastructure.Scheduling;
 
 namespace Weir.Infrastructure.Jobs;
 
@@ -12,7 +13,7 @@ namespace Weir.Infrastructure.Jobs;
 /// <para>A family is only timed when this server has a handler for its job kind, so the queue never fills with
 /// work no worker here can run.</para>
 /// <para>Each timer checks the family's switch and interval every <see cref="DefaultRecheck"/>, so a change in
-/// Settings › Cleanup applies without a restart: a family switched on runs at once, one switched off stops, and a
+/// Setup › Performance › Cleanup applies without a restart: a family switched on runs at once, one switched off stops, and a
 /// new interval counts from its last run.</para>
 /// </remarks>
 public sealed class PeriodicEnqueueService : BackgroundService
@@ -24,6 +25,7 @@ public sealed class PeriodicEnqueueService : BackgroundService
     private readonly PeriodicEnqueueClock _clock;
     private readonly TimeSpan _recheck;
     private readonly Action? _onIterationComplete;
+    private readonly PeriodicTaskRegistry? _tasks;
 
     /// <summary>How often a timer looks at its family's switch and interval again.</summary>
     public static readonly TimeSpan DefaultRecheck = TimeSpan.FromSeconds(30);
@@ -34,8 +36,9 @@ public sealed class PeriodicEnqueueService : BackgroundService
         TimeProvider time,
         ILogger<PeriodicEnqueueService> logger,
         PeriodicEnqueueClock? clock = null,
-        TimeSpan? recheck = null)
-        : this(enqueuers, handlers, time, logger, clock, recheck, onIterationComplete: null)
+        TimeSpan? recheck = null,
+        PeriodicTaskRegistry? tasks = null)
+        : this(enqueuers, handlers, time, logger, clock, recheck, onIterationComplete: null, tasks)
     {
     }
 
@@ -52,7 +55,8 @@ public sealed class PeriodicEnqueueService : BackgroundService
         ILogger<PeriodicEnqueueService> logger,
         PeriodicEnqueueClock? clock,
         TimeSpan? recheck,
-        Action? onIterationComplete)
+        Action? onIterationComplete,
+        PeriodicTaskRegistry? tasks = null)
     {
         _enqueuers = [.. enqueuers];
         _handlers = handlers;
@@ -61,6 +65,7 @@ public sealed class PeriodicEnqueueService : BackgroundService
         _clock = clock ?? new PeriodicEnqueueClock();
         _recheck = recheck ?? DefaultRecheck;
         _onIterationComplete = onIterationComplete;
+        _tasks = tasks;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -83,7 +88,7 @@ public sealed class PeriodicEnqueueService : BackgroundService
     /// <summary>
     /// One family's timer: while switched on, enqueue when due (at once the first time), then every interval; two seconds
     /// after a failure. The switch and the interval are read again before every wait, and no wait is longer than the
-    /// recheck, so a change in Settings › Cleanup applies without a restart.
+    /// recheck, so a change in Setup › Performance › Cleanup applies without a restart.
     /// </summary>
     internal async Task RunAsync(IPeriodicEnqueuer enqueuer, CancellationToken stoppingToken)
     {
@@ -101,6 +106,7 @@ public sealed class PeriodicEnqueueService : BackgroundService
             if (!enabled || interval <= TimeSpan.Zero)
             {
                 _clock.Forget(enqueuer.Name);
+                AnnounceCleanup(enqueuer.JobKind);
                 retryAt = null;
             }
             else
@@ -127,6 +133,7 @@ public sealed class PeriodicEnqueueService : BackgroundService
                 }
 
                 _clock.Record(enqueuer.Name, enqueuer.JobKind, due, interval);
+                AnnounceCleanup(enqueuer.JobKind);
                 var untilDue = due - _time.GetUtcNow();
                 wait = untilDue >= _recheck ? _recheck : untilDue > TimeSpan.Zero ? untilDue : TimeSpan.Zero;
             }
@@ -141,6 +148,24 @@ public sealed class PeriodicEnqueueService : BackgroundService
             {
                 return;
             }
+        }
+    }
+
+    /// <summary>Tells the task list when a cleanup family next runs: the soonest of its timers, or nothing while they are all off.</summary>
+    private void AnnounceCleanup(string jobKind)
+    {
+        if (_tasks is null || ScheduledJobTasks.CleanupForJobKind(jobKind) is not { } cleanup)
+        {
+            return;
+        }
+
+        if (_clock.NextRunFor([jobKind]) is { } next)
+        {
+            _tasks.Plan(cleanup.Key, cleanup.Label, next.NextRunAt, next.Interval);
+        }
+        else
+        {
+            _tasks.Remove(cleanup.Key);
         }
     }
 

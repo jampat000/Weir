@@ -59,7 +59,7 @@ The docs build runs an image-format preflight and rejects ICNS, JXL, HEIC, and H
 3. Confirm CodeQL has no open high-confidence findings
 4. Confirm auth smoke tests pass
 5. Confirm backup files don't expose secrets
-6. Confirm History and the logs don't expose tokens
+6. Confirm Activity and the logs don't expose tokens
 
 ## Locked out
 

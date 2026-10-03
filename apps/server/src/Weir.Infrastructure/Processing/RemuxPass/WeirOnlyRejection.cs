@@ -7,7 +7,7 @@ namespace Weir.Infrastructure.Processing.RemuxPass;
 /// <summary>
 /// A file the rules reject with no media manager involved: the reject policy is off, and the file did not come from a
 /// hand-off. Nobody else is told, so the file is recorded as rejected on its own and a person decides what happens to it
-/// from History (#817). A rejection a manager is asked to act on keeps its own wording and route.
+/// from Activity (#817). A rejection a manager is asked to act on keeps its own wording and route.
 /// </summary>
 public static class WeirOnlyRejection
 {

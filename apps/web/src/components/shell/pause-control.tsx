@@ -29,7 +29,7 @@ function pausedAnnouncement(duration: (typeof DURATIONS)[number]): string {
 }
 
 /**
- * Pause processing, from every page's title row: the reason to reach for it, a busy machine,
+ * Pause processing, from every page's header: the reason to reach for it, a busy machine,
  * has nothing to do with which screen you are on. It shares `.mm-head-control` with the theme
  * switch so the two are exactly the same height.
  */
@@ -67,16 +67,10 @@ export function PauseControl() {
       scan_while_paused: state.scan_while_paused,
     });
 
+  // The header's status pill says that processing is paused, and why; this is only the way back.
   if (state.paused) {
-    return (
+    return editable ? (
       <div className="mm-pause-control" data-testid="pause-control">
-        <span className="mm-pause-badge" data-testid="pause-badge">
-          Paused
-        </span>
-        {/* The reason carries the expiry, so an operator never has to guess how long. */}
-        <span className="mm-pause-reason" data-testid="pause-reason">
-          {state.reason}
-        </span>
         {announcement ? (
           <span
             className="sr-only"
@@ -86,20 +80,19 @@ export function PauseControl() {
             {announcement}
           </span>
         ) : null}
-        {editable ? (
-          <button
-            type="button"
-            className="mm-head-control"
-            data-testid="pause-resume"
-            disabled={save.isPending}
-            onClick={resume}
-          >
-            {save.isPending ? "Resuming…" : "Resume"}
-          </button>
-        ) : null}
+        <button
+          type="button"
+          className="mm-head-control mm-head-control--primary"
+          data-testid="pause-resume"
+          disabled={save.isPending}
+          onClick={resume}
+        >
+          {save.isPending ? "Resuming…" : "Resume processing"}
+        </button>
         {failed ? (
           <p
-            className="mm-pause-alert mm-status-text--failed"
+            className="mm-pause-alert mm-status-text"
+            data-status="broken"
             role="alert"
             data-testid="pause-alert"
           >
@@ -107,7 +100,7 @@ export function PauseControl() {
           </p>
         ) : null}
       </div>
-    );
+    ) : null;
   }
 
   if (!editable) return null;
@@ -201,7 +194,8 @@ export function PauseControl() {
           </p>
           {failed ? (
             <p
-              className="mm-pause-alert mm-status-text--failed"
+              className="mm-pause-alert mm-status-text"
+              data-status="broken"
               role="alert"
               data-testid="pause-alert"
             >

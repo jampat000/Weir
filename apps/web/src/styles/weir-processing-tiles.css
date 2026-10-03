@@ -1,0 +1,228 @@
+/* The three stat tiles of the Processing band: Today, Working on now and Next. Motion stops under prefers-reduced-motion. */
+
+/* ---- Tiles: the words and parts inside the three stat tiles --------------- */
+
+/* A label never wraps, and an aside with a link keeps the link when the note before it is cut short. */
+.mm-dash .mm-stat__label {
+  white-space: nowrap;
+}
+
+/* In a narrow tile the aside gives way: how many more goes first, and the link that changes the limit stays. */
+.mm-aside {
+  display: flex;
+  min-width: 0;
+  justify-content: flex-end;
+}
+
+.mm-aside a {
+  flex: none;
+}
+
+/* The aside takes what the label leaves, so what is measured inside it has a width of its own that does not follow the words. */
+.mm-dash .mm-stat__aside {
+  flex: 1 1 0;
+  text-align: right;
+}
+
+/* How many more files are running takes the room the link beside it leaves, and says as much of itself as fits
+   (working-tile.tsx measures). Where not even "+3" fits it says nothing, and the label is the link to them all. */
+.mm-aside__more {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 0;
+  justify-content: flex-end;
+  white-space: pre;
+}
+
+.mm-aside .mm-aside__more > a {
+  min-width: 0;
+  flex: 1 1 0;
+}
+
+.mm-aside__more:has(.mm-aside__more-words:empty) > * {
+  visibility: hidden;
+}
+
+.mm-aside__more-words {
+  display: block;
+  overflow: hidden;
+  text-align: right;
+  text-overflow: ellipsis;
+}
+
+/* The note beside a figure (how long a new download waits) takes the room the figure leaves and says as much of itself as
+   fits it: the tile measures it (working-tile.tsx). */
+.mm-stat__note {
+  min-width: 0;
+  flex: 1 1 0;
+  overflow: hidden;
+  font-size: var(--mm-type-caption);
+  font-weight: 400;
+  letter-spacing: 0;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--mm-text3);
+}
+
+.mm-stat__idle {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--mm-text2);
+}
+
+.mm-today {
+  display: grid;
+  height: 100%;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 4px;
+}
+
+/* The rows sit in the tile's body in the order they come, and the tile shows only the whole ones that fit (fit-rows.ts). */
+.mm-ops {
+  list-style: none;
+}
+
+.mm-op {
+  display: grid;
+  width: 100%;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 10px;
+  align-items: center;
+  padding: 6px 0;
+  border: 0;
+  border-bottom: 1px solid var(--mm-hairline);
+  background: none;
+  font: inherit;
+  font-size: var(--mm-type-body);
+  line-height: 1.4;
+  text-align: left;
+  color: var(--mm-text1);
+}
+
+button.mm-op {
+  cursor: pointer;
+}
+
+button.mm-op:hover {
+  color: var(--mm-primary);
+}
+
+button.mm-op:focus-visible {
+  outline: 2px solid var(--mm-primary);
+  outline-offset: -2px;
+}
+
+li:last-child > .mm-op {
+  border-bottom: 0;
+}
+
+.mm-op__text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mm-op__text span {
+  color: var(--mm-text2);
+}
+
+.mm-op__right {
+  font-size: var(--mm-type-caption);
+  font-variant-numeric: tabular-nums;
+  color: var(--mm-text2);
+}
+
+.mm-op__bar,
+.mm-next__bar {
+  display: block;
+  height: 4px;
+  overflow: hidden;
+  border-radius: 9px;
+  background: var(--mm-surface-3);
+}
+
+.mm-op__bar {
+  grid-column: 1 / -1;
+}
+
+.mm-op__bar i,
+.mm-next__bar i {
+  display: block;
+  height: 100%;
+  border-radius: 9px;
+  transition: width 1s linear;
+}
+
+.mm-op__bar i {
+  background: var(--mm-st);
+}
+
+.mm-next__bar i {
+  background: var(--mm-primary);
+}
+
+.mm-op__bar .mm-op__bar--moving {
+  width: 35%;
+  animation: mm-dash-sweep 1.6s ease-in-out infinite alternate;
+}
+
+.mm-next__bar {
+  margin: 2px 0 6px;
+}
+
+.mm-next__then {
+  display: grid;
+  gap: 4px;
+  margin: 8px 0 0;
+  list-style: none;
+  font-size: var(--mm-type-body);
+  font-variant-numeric: tabular-nums;
+  color: var(--mm-text2);
+}
+
+.mm-next__then li {
+  display: flex;
+  min-width: 0;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.mm-next__then a {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: inherit;
+  text-decoration: none;
+}
+
+.mm-next__then a:hover {
+  color: var(--mm-text1);
+}
+
+.mm-next__then span {
+  flex: none;
+}
+
+@keyframes mm-dash-sweep {
+  from {
+    margin-left: 0;
+  }
+
+  to {
+    margin-left: 65%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mm-op__bar .mm-op__bar--moving {
+    animation: none;
+  }
+
+  .mm-op__bar i,
+  .mm-next__bar i {
+    transition: none;
+  }
+}

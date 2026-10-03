@@ -31,7 +31,7 @@ public sealed class MaintenanceStore
         ["unclaimed_handbacks"] = "Deletes Weir's own cleaned copy from a hand-back folder when no media manager imported it in time. Only a copy that is still exactly as Weir wrote it; never a download. It stays off until you switch it on.",
     };
 
-    /// <summary>The families Settings › Cleanup lists, in its order.</summary>
+    /// <summary>The families Setup › Performance › Cleanup lists, in its order.</summary>
     public IReadOnlyList<string> Families { get; } = ["work_temp_stale_sweep", "unclaimed_handbacks"];
 
     /// <summary>The job kinds a family's timers queue, for asking the clock when it next runs.</summary>
@@ -65,7 +65,7 @@ public sealed class MaintenanceStore
         var scope = mediaScope == "tv" ? "tv" : "movie";
         var dedupe = scope == "tv" ? PeriodicJobKinds.WorkTempStaleSweepDedupeKeyTv : PeriodicJobKinds.WorkTempStaleSweepDedupeKeyMovie;
         var payload = WireJsonWriter.Dumps(new WireObject().Set("media_scope", scope).Set("trigger", trigger), WireJsonFormat.Compact);
-        return jobStore.EnqueueOrGetAsync(dedupe, PeriodicJobKinds.WorkTempStaleSweep, payload);
+        return jobStore.EnqueueNextRunAsync(dedupe, PeriodicJobKinds.WorkTempStaleSweep, payload);
     }
 
     /// <summary>The unclaimed hand-back cleanup now (#652): single-flight per scope, ignores the schedule toggle like the others.</summary>
@@ -75,6 +75,6 @@ public sealed class MaintenanceStore
         var scope = mediaScope == "tv" ? "tv" : "movie";
         var dedupe = scope == "tv" ? PeriodicJobKinds.UnclaimedHandbackCleanupDedupeKeyTv : PeriodicJobKinds.UnclaimedHandbackCleanupDedupeKeyMovie;
         var payload = WireJsonWriter.Dumps(new WireObject().Set("media_scope", scope).Set("trigger", trigger), WireJsonFormat.Compact);
-        return jobStore.EnqueueOrGetAsync(dedupe, PeriodicJobKinds.UnclaimedHandbackCleanup, payload);
+        return jobStore.EnqueueNextRunAsync(dedupe, PeriodicJobKinds.UnclaimedHandbackCleanup, payload);
     }
 }

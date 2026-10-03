@@ -74,7 +74,7 @@ public sealed partial class LibraryCleanHandler
         }
 
         var warnings = result.Warnings;
-        // #735: says where the original was kept, so Activity and History both carry it (History reads this same detail).
+        // #735: says where the original was kept, so the event feed and the Activity page both carry it (the page reads this same detail).
         var keptNote = result.KeptOriginalPath is { } keptPath ? $" The original was kept at {keptPath}." : string.Empty;
         var detail = $"Cleaned {Path.GetFileName(path)}: {RemovedTracks(plan.RemovedAudioCount, plan.RemovedSubtitleCount)}." +
                      (writerNote is null ? string.Empty : " " + writerNote) +

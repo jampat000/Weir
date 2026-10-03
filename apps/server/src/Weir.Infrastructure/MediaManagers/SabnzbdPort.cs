@@ -23,7 +23,7 @@ public sealed class SabnzbdPort : IDownloadClientPort
         ArgumentNullException.ThrowIfNull(connection);
         try
         {
-            var client = new DownloadClientHttpClient(connection.BaseUrl, _handlers);
+            var client = new DownloadClientHttpClient(connection.BaseUrl, _handlers, connection: connection.Reference);
             var response = await client.SendAsync(HttpMethod.Get, "/api", MiscParameters(connection), cancellationToken: cancellationToken).ConfigureAwait(false);
             return Classify(response, connection);
         }
@@ -38,7 +38,7 @@ public sealed class SabnzbdPort : IDownloadClientPort
         ArgumentNullException.ThrowIfNull(connection);
         try
         {
-            var client = new DownloadClientHttpClient(connection.BaseUrl, _handlers);
+            var client = new DownloadClientHttpClient(connection.BaseUrl, _handlers, connection: connection.Reference);
             var misc = await client.SendAsync(HttpMethod.Get, "/api", MiscParameters(connection), cancellationToken: cancellationToken).ConfigureAwait(false);
             var categories = await client.SendAsync(HttpMethod.Get, "/api", CategoriesParameters(connection), cancellationToken: cancellationToken).ConfigureAwait(false);
             if (misc.Status is < 200 or >= 300 || categories.Status is < 200 or >= 300)

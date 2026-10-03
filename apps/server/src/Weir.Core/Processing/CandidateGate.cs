@@ -195,7 +195,7 @@ public static class CandidateGate
     {
         var scopeWord = mediaScope == "tv" ? "TV episodes" : "Movies";
         return $"No media manager is connected for {scopeWord}, so Weir had no import check to make. " +
-               "Add one on the Media managers settings page if you want that safety check.";
+               "Add one in Setup › Connections › Media managers if you want that safety check.";
     }
 
     /// <summary>

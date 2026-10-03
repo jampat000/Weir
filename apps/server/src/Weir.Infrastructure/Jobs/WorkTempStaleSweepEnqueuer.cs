@@ -35,7 +35,7 @@ public sealed class WorkTempStaleSweepEnqueuer : IPeriodicEnqueuer
         OperatorSettingIntervalAsync(_store, "work_temp_stale_sweep_interval_seconds", Interval, cancellationToken);
 
     public Task EnqueueOnceAsync(CancellationToken cancellationToken) =>
-        _store.EnqueueOrGetAsync(
+        _store.EnqueueNextRunAsync(
             _scope == "tv" ? PeriodicJobKinds.WorkTempStaleSweepDedupeKeyTv : PeriodicJobKinds.WorkTempStaleSweepDedupeKeyMovie,
             PeriodicJobKinds.WorkTempStaleSweep,
             WireJsonWriter.Dumps(new WireObject().Set("media_scope", _scope).Set("trigger", "scheduled"), WireJsonFormat.Compact),

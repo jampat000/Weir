@@ -1,12 +1,16 @@
 using Microsoft.Data.Sqlite;
 using Weir.Core.Jobs;
 using Weir.Core.MediaManagers;
+using Weir.Core.Processing;
 using Weir.Core.Processing.RemuxPass;
 using Weir.Core.Time;
 using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Infrastructure.Processing;
+
+/// <summary>How many jobs ran in some stretch of time, and how many of them failed.</summary>
+public sealed record FinishedJobs(long Run, long Failed);
 
 /// <summary>Read-only <c>jobs</c> listing for operators.</summary>
 public sealed class JobsInspectionStore
@@ -96,11 +100,31 @@ public sealed class JobsInspectionStore
         return ($"SELECT {ProcessingJobStore.JobColumns} FROM jobs WHERE {where} ORDER BY updated_at DESC LIMIT {limit}", [.. parameters]);
     }
 
+    /// <summary>
+    /// The jobs that finished since <paramref name="since"/>: how many ran, and how many of those failed. A watched-folder scan that
+    /// found nothing wrong is left out, as it is from the Jobs list: periodic scans would otherwise outnumber real work.
+    /// </summary>
+    public async Task<FinishedJobs> CountFinishedSinceAsync(UnitOfWork uow, DateTimeOffset since)
+    {
+        ArgumentNullException.ThrowIfNull(uow);
+        var rows = await uow.QueryAsync(
+            "SELECT status, COUNT(*) FROM jobs WHERE status IN (@completed, @failed, @finalize_failed) AND updated_at >= @since " +
+            "AND NOT (status = @completed AND job_kind = @scan_kind) GROUP BY status",
+            reader => (Status: reader.GetString(0), Count: reader.GetInt64(1)),
+            ("@completed", ProcessingJobStatus.Completed),
+            ("@failed", ProcessingJobStatus.Failed),
+            ("@finalize_failed", ProcessingJobStatus.HandlerOkFinalizeFailed),
+            ("@since", Timestamp.FromUtc(since.UtcDateTime).ToSqlite()),
+            ("@scan_kind", ProcessingWatchedFolderScanDispatchJobKinds.ScanDispatch)).ConfigureAwait(false);
+        var failed = rows.Where(row => row.Status != ProcessingJobStatus.Completed).Sum(row => row.Count);
+        return new FinishedJobs(rows.Sum(row => row.Count), failed);
+    }
+
     private static DateTimeOffset? ToOffset(Timestamp? value) => value is { } v ? new DateTimeOffset(v.AsUtc, TimeSpan.Zero) : null;
 
     // Timestamps go through the strict ISO reader in SqliteValues rather than ProcessingJobStore.ReadJob's parser: the two
     // differ on unusual stored text, and the inspection API keeps its existing output and errors.
-    private static ProcessingJob Read(SqliteDataReader reader) => new(
+    internal static ProcessingJob Read(SqliteDataReader reader) => new(
         reader.GetInt64(0),
         reader.GetString(1),
         reader.GetString(2),

@@ -1,4 +1,5 @@
 import type { Schema } from "../../lib/api/types";
+import { FOLDER_LINE_MEANING } from "../../lib/processing/library-folder-chain-api";
 
 type SetupCheckLine = Schema<"ManagerSetupLineOut">;
 
@@ -7,13 +8,6 @@ const MARKS: Record<SetupCheckLine["state"], string> = {
   problem: "✗",
   note: "·",
   unverified: "?",
-};
-
-const MARK_CLASSES: Record<SetupCheckLine["state"], string> = {
-  ok: "mm-status-text--healthy",
-  problem: "mm-status-text--warning",
-  note: "text-mm-text3",
-  unverified: "text-mm-text3",
 };
 
 const SCREEN_READER_PREFIXES: Record<SetupCheckLine["state"], string> = {
@@ -35,15 +29,17 @@ export function SetupCheckLines({
   return (
     <ul className="space-y-1.5 text-sm leading-5" aria-label={`${label} check`}>
       {lines.map((line, index) => (
-        <li key={index} className="flex gap-2">
-          <span aria-hidden="true" className={MARK_CLASSES[line.state]}>
+        <li
+          key={index}
+          className="flex gap-2"
+          data-status={FOLDER_LINE_MEANING[line.state]}
+        >
+          <span aria-hidden="true" className="mm-status-text">
             {MARKS[line.state]}
           </span>
           <span
             className={
-              line.state === "problem"
-                ? "mm-status-text--warning"
-                : "text-mm-text2"
+              line.state === "problem" ? "mm-status-text" : "text-mm-text2"
             }
           >
             <span className="sr-only">

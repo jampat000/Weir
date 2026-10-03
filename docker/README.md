@@ -307,7 +307,7 @@ That step stays `ready`. Falling back is slower, not broken, and failing readine
 working instance out of a load balancer over a delay.
 
 If you would rather not be told about it for a given workflow, switch off **Watch this folder for
-changes** in that workflow's editor under **Settings › Workflows**. To turn the watcher off for every
+changes** in that workflow's editor under **Setup › Workflows**. To turn the watcher off for every
 workflow, set `WEIR_PROCESSING_WATCHER_ENABLED=0`.
 
 When events *do* work, `WEIR_PROCESSING_WATCHER_DEBOUNCE_SECONDS` (default 3) controls how long

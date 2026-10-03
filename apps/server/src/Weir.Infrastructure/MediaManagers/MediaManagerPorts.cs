@@ -274,5 +274,5 @@ public sealed partial class HttpMediaManagerPort : IMediaManagerPort
     }
 
     private MediaManagerHttpClient Client(ManagerConnection connection, TimeSpan timeout) =>
-        new(connection.BaseUrl, connection.ApiKey, _handlers, timeout);
+        new(connection.BaseUrl, connection.ApiKey, _handlers, timeout, connection.Reference);
 }

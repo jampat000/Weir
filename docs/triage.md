@@ -7,7 +7,7 @@ Weir issues should stay practical and reproducible. Every issue needs a clear us
 - `type: bug` - something is broken or behaves incorrectly.
 - `type: enhancement` - a new feature or workflow improvement.
 - `type: docs` - documentation, screenshots, release notes, or support text.
-- `area: processing` - workflows, rules, the remux pipeline, jobs, History and Library.
+- `area: processing` - workflows, rules, the remux pipeline, jobs, Activity and Library.
 - `area: settings` - settings, security, logs, backup, and support screens.
 - `area: logs` - runtime logs, diagnostics, retention, and observability.
 - `area: web` - shared web shell, responsive layout, accessibility, and frontend delivery.
@@ -29,7 +29,7 @@ Weir issues should stay practical and reproducible. Every issue needs a clear us
 These still exist on the repository and on older issues. Do not put them on new issues.
 
 - `area: home` - the Home screen, which Processing replaced as the first screen. Use `area: processing`. <!-- retired-ui: history -->
-- `area: activity` - the Activity page, whose events are now in System › Logs. Use `area: logs`. <!-- retired-ui: history -->
+- `area: activity` - the former event feed, whose events are now in System › Logs. Use `area: logs`. <!-- retired-ui: history -->
 - `area: pruner` - Pruner moved to Deluno and its tables were dropped by migration `0036_drop_pruner_tables`.
 
 ## Triage rules

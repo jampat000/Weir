@@ -3,8 +3,8 @@ using Weir.Core.Activity;
 namespace Weir.Core.Processing;
 
 /// <summary>
-/// The two kinds of entry History lists (#695): a new download Weir processed, and a file cleaned where it sits in a
-/// library. Every entry names its kind, so History tells them apart without guessing from the shape.
+/// The two kinds of entry Activity lists (#695): a new download Weir processed, and a file cleaned where it sits in a
+/// library. Every entry names its kind, so Activity tells them apart without guessing from the shape.
 /// </summary>
 public static class HistoryEntryKinds
 {

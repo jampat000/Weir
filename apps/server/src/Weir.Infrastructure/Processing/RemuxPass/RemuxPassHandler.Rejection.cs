@@ -40,7 +40,7 @@ public sealed partial class RemuxPassHandler
     }
 
     /// <summary>
-    /// Records a rules rejection no manager is involved in as <c>rejected</c>, with the file's current identity so History's
+    /// Records a rules rejection no manager is involved in as <c>rejected</c>, with the file's current identity so Activity's
     /// remove dialog can act on it safely later. Its failure fields are cleared: rejecting is a decision, not an attempt to retry.
     /// </summary>
     private static async Task RecordWeirOnlyRejectionAsync(UnitOfWork uow, ProcessingLibraryRecord library, string relativePath, string reason, WireObject result)

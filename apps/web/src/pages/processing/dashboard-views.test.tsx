@@ -1,0 +1,222 @@
+import { fireEvent, render, screen, within } from "@testing-library/react";
+import { MemoryRouter, useLocation } from "react-router-dom";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import { ProcessingPage } from "./processing-page";
+
+type Workflow = { id: number; name: string; enabled: boolean };
+
+let workflows: Workflow[];
+
+vi.mock("../../lib/processing/libraries-queries", () => ({
+  useProcessingLibrariesQuery: () => ({ data: workflows }),
+}));
+vi.mock("./dashboard/live-view", () => ({
+  LiveView: ({
+    filter,
+    workflowId,
+  }: {
+    filter: string;
+    workflowId: number | null;
+  }) => (
+    <p data-testid="live-view">
+      live {filter} {String(workflowId)}
+    </p>
+  ),
+}));
+vi.mock("./dashboard/system-view", () => ({
+  SystemView: () => <p data-testid="system-view">system</p>,
+}));
+
+function Address() {
+  const { pathname, search } = useLocation();
+  return <p data-testid="address">{`${pathname}${search}`}</p>;
+}
+
+function show(address: string) {
+  render(
+    <MemoryRouter initialEntries={[address]}>
+      <ProcessingPage />
+      <Address />
+    </MemoryRouter>,
+  );
+}
+
+const view = () => screen.getByRole("tablist", { name: "Dashboard view" });
+
+beforeEach(() => {
+  workflows = [
+    { id: 1, name: "TV", enabled: true },
+    { id: 2, name: "Movies", enabled: true },
+    { id: 3, name: "Archive", enabled: false },
+  ];
+});
+
+describe("the Dashboard's views", () => {
+  it("opens Live when the address names no view", () => {
+    show("/");
+
+    expect(screen.getByTestId("live-view")).toBeInTheDocument();
+    expect(screen.queryByTestId("system-view")).toBeNull();
+    expect(within(view()).getByRole("tab", { name: "Live" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+  });
+
+  it("opens System from the address", () => {
+    show("/?view=system");
+
+    expect(screen.getByTestId("system-view")).toBeInTheDocument();
+    expect(screen.queryByTestId("live-view")).toBeNull();
+    expect(within(view()).getByRole("tab", { name: "System" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+  });
+
+  it("puts System in the address and takes Live out of it again", () => {
+    show("/");
+
+    fireEvent.click(within(view()).getByRole("tab", { name: "System" }));
+    expect(screen.getByTestId("address")).toHaveTextContent("/?view=system");
+    expect(screen.getByTestId("system-view")).toBeInTheDocument();
+
+    fireEvent.click(within(view()).getByRole("tab", { name: "Live" }));
+    expect(screen.getByTestId("address")).toHaveTextContent(/^\/$/);
+    expect(screen.getByTestId("live-view")).toBeInTheDocument();
+  });
+
+  it("offers the choice of kind of work on Live only", () => {
+    show("/");
+    expect(screen.getByTestId("live-filter")).toBeInTheDocument();
+
+    fireEvent.click(within(view()).getByRole("tab", { name: "System" }));
+    expect(screen.queryByTestId("live-filter")).toBeNull();
+  });
+});
+
+describe("the kind of work", () => {
+  it("starts on what the address names, and keeps it in the address like the workflow", () => {
+    show("/?work=library");
+
+    expect(screen.getByTestId("live-view")).toHaveTextContent("live library");
+    expect(
+      screen.getByRole("button", { name: "Library cleaning" }),
+    ).toHaveAttribute("aria-pressed", "true");
+
+    fireEvent.click(screen.getByRole("button", { name: "New downloads" }));
+    expect(screen.getByTestId("address")).toHaveTextContent("/?work=download");
+
+    fireEvent.click(screen.getByRole("button", { name: "Everything" }));
+    expect(screen.getByTestId("address")).toHaveTextContent(/^\/$/);
+  });
+
+  it("stays in the address while System, which ignores it, is shown", () => {
+    show("/?work=download&workflow=1");
+
+    fireEvent.click(within(view()).getByRole("tab", { name: "System" }));
+
+    expect(screen.getByTestId("address")).toHaveTextContent("work=download");
+    expect(screen.getByTestId("address")).toHaveTextContent("view=system");
+    fireEvent.click(within(view()).getByRole("tab", { name: "Live" }));
+    expect(screen.getByTestId("live-view")).toHaveTextContent(
+      "live download 1",
+    );
+  });
+
+  it("puts the workflow picker first on Live, with the kind of work after it, and nothing in the header on System", () => {
+    show("/");
+    const controls = () =>
+      [...(document.querySelector(".mm-dash-controls")?.children ?? [])].map(
+        (child) => child.getAttribute("data-testid") ?? child.className,
+      );
+
+    expect(controls()).toEqual([
+      "mm-workflow-picker",
+      "mm-dash-controls__work",
+    ]);
+
+    fireEvent.click(within(view()).getByRole("tab", { name: "System" }));
+
+    expect(document.querySelector(".mm-dash-controls")).toBeNull();
+    expect(screen.queryByTestId("workflow-picker")).toBeNull();
+  });
+});
+
+describe("the workflow picker", () => {
+  it("lists the workflows that are switched on, after All workflows", () => {
+    show("/");
+
+    const picker = screen.getByTestId("workflow-picker");
+    expect(picker).toHaveTextContent("All workflows");
+    fireEvent.click(picker);
+    expect(
+      screen.getAllByRole("option").map((option) => option.textContent),
+    ).toEqual(["All workflows", "TV", "Movies"]);
+  });
+
+  it("is not drawn when there is only one workflow to choose", () => {
+    workflows = workflows.slice(0, 1);
+
+    show("/");
+
+    expect(screen.queryByTestId("workflow-picker")).toBeNull();
+  });
+
+  it("narrows the view to the workflow chosen and keeps it in the address", () => {
+    show("/");
+
+    fireEvent.click(screen.getByTestId("workflow-picker"));
+    fireEvent.click(screen.getByRole("option", { name: "Movies" }));
+
+    expect(screen.getByTestId("address")).toHaveTextContent("/?workflow=2");
+    expect(screen.getByTestId("live-view")).toHaveTextContent("live all 2");
+    expect(screen.getByTestId("workflow-picker")).toHaveTextContent("Movies");
+  });
+
+  it("starts narrowed to the workflow in the address, which System leaves alone and Live narrows by again", () => {
+    show("/?workflow=1");
+
+    expect(screen.getByTestId("live-view")).toHaveTextContent("live all 1");
+
+    fireEvent.click(within(view()).getByRole("tab", { name: "System" }));
+    expect(screen.getByTestId("address")).toHaveTextContent(
+      "/?workflow=1&view=system",
+    );
+    expect(screen.getByTestId("system-view")).toBeInTheDocument();
+
+    fireEvent.click(within(view()).getByRole("tab", { name: "Live" }));
+    expect(screen.getByTestId("address")).toHaveTextContent("/?workflow=1");
+    expect(screen.getByTestId("live-view")).toHaveTextContent("live all 1");
+    expect(screen.getByTestId("workflow-picker")).toHaveTextContent("TV");
+  });
+
+  it("shows every workflow again when All workflows is chosen", () => {
+    show("/?workflow=1");
+
+    fireEvent.click(screen.getByTestId("workflow-picker"));
+    fireEvent.click(screen.getByRole("option", { name: "All workflows" }));
+
+    expect(screen.getByTestId("address")).toHaveTextContent(/^\/$/);
+    expect(screen.getByTestId("live-view")).toHaveTextContent("live all null");
+  });
+
+  it("ignores a workflow that is switched off or does not exist", () => {
+    show("/?workflow=3");
+
+    expect(screen.getByTestId("live-view")).toHaveTextContent("live all null");
+    expect(screen.getByTestId("workflow-picker")).toHaveTextContent(
+      "All workflows",
+    );
+  });
+
+  it("holds Live and System to the window, so everything is sized from the space it has", () => {
+    show("/");
+    expect(screen.getByTestId("processing-page").style.height).not.toBe("");
+
+    fireEvent.click(within(view()).getByRole("tab", { name: "System" }));
+
+    expect(screen.getByTestId("processing-page").style.height).not.toBe("");
+  });
+});
