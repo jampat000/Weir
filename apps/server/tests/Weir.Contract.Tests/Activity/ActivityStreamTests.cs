@@ -37,7 +37,7 @@ public sealed class ActivityStreamTests(ServerFixture fixture) : IClassFixture<S
 
         Assert.Equal(["retry: 5000"], await stream.NextBlockAsync());
         // The system.stats frame is sent at once too, so the frame is looked for by name.
-        var data = await stream.NextEventNamedAsync(LatestEvent);
+        var data = (await stream.NextEventNamedAsync(LatestEvent)).AsObject();
         Assert.Equal(new HashSet<string> { "latest_event_id", "activity_revision" }, data.Select(field => field.Key).ToHashSet());
         Assert.Equal(await LatestActivityIdAsync(admin), (long)data["latest_event_id"]!);
         Assert.True(data["activity_revision"]!.AsValue().TryGetValue<long>(out _));
@@ -48,7 +48,7 @@ public sealed class ActivityStreamTests(ServerFixture fixture) : IClassFixture<S
     {
         using var admin = await Server.CreateAdminClientAsync();
         using var stream = await admin.OpenStreamAsync(Stream);
-        var first = await stream.NextEventNamedAsync(LatestEvent);
+        var first = (await stream.NextEventNamedAsync(LatestEvent)).AsObject();
 
         // Signing in again records an Activity event while the stream is open. The stream holds no database
         // session, so the write is not blocked by it.
@@ -57,10 +57,10 @@ public sealed class ActivityStreamTests(ServerFixture fixture) : IClassFixture<S
         var latest = await LatestActivityIdAsync(admin);
         Assert.True(latest > (long)first["latest_event_id"]!);
 
-        var data = await stream.NextEventNamedAsync(LatestEvent);
+        var data = (await stream.NextEventNamedAsync(LatestEvent)).AsObject();
         while ((long)data["latest_event_id"]! < latest)
         {
-            data = await stream.NextEventNamedAsync(LatestEvent);
+            data = (await stream.NextEventNamedAsync(LatestEvent)).AsObject();
         }
 
         Assert.Equal(latest, (long)data["latest_event_id"]!);

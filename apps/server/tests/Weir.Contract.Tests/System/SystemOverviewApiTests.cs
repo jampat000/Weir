@@ -251,7 +251,7 @@ public sealed class SystemOverviewApiTests(ServerFixture fixture) : IClassFixtur
         do
         {
             Assert.True(DateTime.UtcNow < deadline, $"Timed out waiting for the scan to finish in a system.tasks frame; the last task seen was {task?.ToJsonString()}");
-            frame = (await SystemPartBStreams.NextFrameNamedAsync(stream, "system.tasks")).AsArray();
+            frame = (await stream.NextEventNamedAsync("system.tasks", ScanFinishTimeout)).AsArray();
             task = TaskWithKey(frame, scan);
         }
         while (!(task is not null

@@ -31,15 +31,7 @@ public sealed class ConnectionActivityTests(NoWebhookSecretFixture fixture) : IC
         var frames = new List<JsonObject>();
         while (frames.Count < count)
         {
-            // Read raw blocks: other events on the stream carry data that is not a JSON object.
-            var block = await stream.NextBlockAsync();
-            if (!block.Contains($"event: {ConnectionFrame}"))
-            {
-                continue;
-            }
-
-            var data = block.Where(line => line.StartsWith("data:", StringComparison.Ordinal)).Select(line => line["data:".Length..].Trim());
-            var frame = JsonNode.Parse(string.Join('\n', data))!.AsObject();
+            var frame = (await stream.NextEventNamedAsync(ConnectionFrame)).AsObject();
             if ((string?)frame["kind"] == "media_manager" && (int?)frame["id"] == connectionId)
             {
                 frames.Add(frame);

@@ -10,8 +10,8 @@ public sealed class SseReader : IDisposable
     private const string EventField = "event:";
     private const string DataField = "data:";
 
-    // Short enough that a stream that never sends fails the test quickly instead of hanging it.
-    private static readonly TimeSpan ReadTimeout = TimeSpan.FromSeconds(10);
+    // Short enough that a stream that never sends fails the test quickly instead of hanging it; the Python reader's read timeout.
+    private static readonly TimeSpan DefaultIdleTimeout = TimeSpan.FromSeconds(10);
 
     private readonly HttpResponseMessage _response;
     private readonly StreamReader _lines;
@@ -32,12 +32,16 @@ public sealed class SseReader : IDisposable
         _response.Dispose();
     }
 
-    /// <summary>The lines of the next non-empty block.</summary>
-    public async Task<IReadOnlyList<string>> NextBlockAsync()
+    /// <summary>
+    /// The lines of the next non-empty block. Fails when the stream sends nothing at all for <paramref name="idleTimeout"/>
+    /// (10 seconds by default); a test that waits for something slow passes a longer one.
+    /// </summary>
+    public async Task<IReadOnlyList<string>> NextBlockAsync(TimeSpan? idleTimeout = null)
     {
-        using var timeout = new CancellationTokenSource(ReadTimeout);
+        var limit = idleTimeout ?? DefaultIdleTimeout;
+        using var timeout = new CancellationTokenSource(limit);
         var block = new List<string>();
-        while (await ReadLineAsync(timeout) is { } line)
+        while (await ReadLineAsync(timeout, limit) is { } line)
         {
             if (line.Length == 0)
             {
@@ -55,24 +59,12 @@ public sealed class SseReader : IDisposable
         throw new XunitException($"The stream ended; partial block [{string.Join(" | ", block)}]");
     }
 
-    private async Task<string?> ReadLineAsync(CancellationTokenSource timeout)
-    {
-        try
-        {
-            return await _lines.ReadLineAsync(timeout.Token);
-        }
-        catch (OperationCanceledException) when (timeout.IsCancellationRequested)
-        {
-            throw new XunitException($"The stream sent nothing for {ReadTimeout.TotalSeconds:0}s.");
-        }
-    }
-
-    /// <summary>The next named event, skipping <c>retry:</c> and keep-alive comment blocks.</summary>
-    public async Task<(string Name, JsonObject Data)> NextEventAsync()
+    /// <summary>The next named event, skipping <c>retry:</c> and keep-alive comment blocks. The data is whatever JSON the event holds: an object, or an array for <c>system.tasks</c>.</summary>
+    public async Task<(string Name, JsonNode Data)> NextEventAsync(TimeSpan? idleTimeout = null)
     {
         while (true)
         {
-            var block = await NextBlockAsync();
+            var block = await NextBlockAsync(idleTimeout);
             var name = block.FirstOrDefault(line => line.StartsWith(EventField, StringComparison.Ordinal));
             if (name is null)
             {
@@ -82,20 +74,32 @@ public sealed class SseReader : IDisposable
             var data = string.Join('\n', block
                 .Where(line => line.StartsWith(DataField, StringComparison.Ordinal))
                 .Select(line => line[DataField.Length..].Trim()));
-            return (name[EventField.Length..].Trim(), JsonNode.Parse(data)!.AsObject());
+            return (name[EventField.Length..].Trim(), JsonNode.Parse(data)!);
         }
     }
 
     /// <summary>The data of the next <paramref name="name"/> event, skipping every other one.</summary>
-    public async Task<JsonObject> NextEventNamedAsync(string name)
+    public async Task<JsonNode> NextEventNamedAsync(string name, TimeSpan? idleTimeout = null)
     {
         while (true)
         {
-            var (eventName, data) = await NextEventAsync();
+            var (eventName, data) = await NextEventAsync(idleTimeout);
             if (eventName == name)
             {
                 return data;
             }
+        }
+    }
+
+    private async Task<string?> ReadLineAsync(CancellationTokenSource timeout, TimeSpan limit)
+    {
+        try
+        {
+            return await _lines.ReadLineAsync(timeout.Token);
+        }
+        catch (OperationCanceledException) when (timeout.IsCancellationRequested)
+        {
+            throw new XunitException($"The stream sent nothing for {limit.TotalSeconds:0}s.");
         }
     }
 }

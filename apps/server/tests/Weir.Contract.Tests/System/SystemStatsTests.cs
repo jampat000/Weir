@@ -224,8 +224,8 @@ public sealed class SystemStatsTests(ServerFixture fixture) : IClassFixture<Serv
         JsonObject second;
         using (var stream = await SystemPartBStreams.OpenAsync(admin))
         {
-            first = await stream.NextEventNamedAsync("system.stats");
-            second = await stream.NextEventNamedAsync("system.stats");
+            first = (await stream.NextEventNamedAsync("system.stats")).AsObject();
+            second = (await stream.NextEventNamedAsync("system.stats")).AsObject();
         }
 
         foreach (var frame in new[] { first, second })
