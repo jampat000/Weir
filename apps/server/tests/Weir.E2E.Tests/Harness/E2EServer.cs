@@ -1,5 +1,6 @@
 using Microsoft.Playwright;
 using Weir.Contract.Tests.Harness;
+using Weir.Contract.Tests.Harness.Fakes;
 
 namespace Weir.E2E.Tests.Harness;
 
@@ -10,8 +11,6 @@ namespace Weir.E2E.Tests.Harness;
 /// </summary>
 public sealed class E2EServer : IAsyncLifetime
 {
-    private const string ProductionWorkerCount = "10";
-
     private WeirServer? _server;
     private IPlaywright? _playwright;
 
@@ -49,18 +48,10 @@ public sealed class E2EServer : IAsyncLifetime
         }
     }
 
-    // The Python suite ran the server as an operator does, so the workers, the file watcher, the periodic scan and the
-    // work file sweeps are on, as they are by default (the contract harness's quiet defaults switch them off). Without
-    // the sweeps the log has no job rows for the Jobs source to show.
-    private static Dictionary<string, string> Environment => new()
-    {
-        ["WEIR_WEB_DIST"] = RepoPaths.WebDist,
-        ["WEIR_PROCESSING_WORKER_COUNT"] = ProductionWorkerCount,
-        ["WEIR_PROCESSING_WATCHER_ENABLED"] = "1",
-        ["WEIR_PROCESSING_WATCHED_FOLDER_REMUX_SCAN_DISPATCH_PERIODIC_ENQUEUE_REMUX_JOBS"] = "1",
-        ["WEIR_PROCESSING_WORK_TEMP_STALE_SWEEP_MOVIE_SCHEDULE_ENABLED"] = "1",
-        ["WEIR_PROCESSING_WORK_TEMP_STALE_SWEEP_TV_SCHEDULE_ENABLED"] = "1",
-    };
+    // The Python suite ran the server as an operator does: the workers, the file watcher, the periodic scan and the work file
+    // sweeps are on (without the sweeps the log has no job rows for the Jobs source to show).
+    private static Dictionary<string, string> Environment =>
+        ServerEnvironment.OperatorDefaults.With(("WEIR_WEB_DIST", RepoPaths.WebDist));
 
     private static InvalidOperationException NotStarted() => new("The E2E server has not started: set WEIR_E2E=1.");
 }
