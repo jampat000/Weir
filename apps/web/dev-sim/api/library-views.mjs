@@ -15,6 +15,27 @@ const STATUSES = [
   "left_alone",
 ];
 
+/** What a list sorted by status goes by: how far down it a file goes, following what each status means. */
+const STATUS_RANK = {
+  matches: 0,
+  needs_cleaning: 1,
+  cleaning: 2,
+  cant_clean_yet: 3,
+  left_alone: 5,
+};
+
+/** A file Weir cannot read or open is cant_clean_yet too, but goes after the ones that are only waiting. */
+const CANT_CLEAN_UNREADABLE_RANK = 4;
+const UNREADABLE_PROBLEMS = ["unreadable", "no_permission"];
+
+function statusRank(file, now) {
+  const status = statusOf(file, now);
+  return status === "cant_clean_yet" &&
+    UNREADABLE_PROBLEMS.includes(file.problem_kind)
+    ? CANT_CLEAN_UNREADABLE_RANK
+    : STATUS_RANK[status];
+}
+
 const SORTERS = {
   path: (file) => file.path,
   title: (file) => file.manager_title ?? "",
@@ -26,6 +47,7 @@ const SORTERS = {
   resolution: (file) => file.video_height ?? 0,
   audio: (file) => file.audio_track_count,
   subtitles: (file) => file.subtitle_track_count,
+  status: statusRank,
 };
 
 export function scanState(sim) {
@@ -135,6 +157,8 @@ function fileWire(
   };
 }
 
+const compare = (a, b) => (a > b ? 1 : a < b ? -1 : 0);
+
 export function libraryFilesPage(sim, library, query) {
   const all = sim.libraryFiles.list(library.id);
   const sort = SORTERS[query.get("sort")] ? query.get("sort") : "path";
@@ -143,12 +167,14 @@ export function libraryFilesPage(sim, library, query) {
   const page = Number(query.get("page")) || 1;
   const sorter = SORTERS[sort];
   const now = statusContext(sim, library);
+  const sign = direction === "asc" ? 1 : -1;
   const filtered = all
     .filter((file) => matchesFilters(file, query, now))
     .sort(
       (a, b) =>
-        (sorter(a) > sorter(b) ? 1 : sorter(a) < sorter(b) ? -1 : 0) *
-        (direction === "asc" ? 1 : -1),
+        compare(sorter(a, now), sorter(b, now)) * sign ||
+        // Files that tie fall by path whichever way the sort runs, so paging never repeats or skips one.
+        compare(a.path, b.path),
     );
   return shaped("LibraryFilesOut", {
     library_id: library.id,
