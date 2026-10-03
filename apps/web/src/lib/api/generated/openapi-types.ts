@@ -3386,7 +3386,8 @@ export interface components {
         | "resolution"
         | "audio"
         | "subtitles"
-        | "modified";
+        | "modified"
+        | "status";
       summary: components["schemas"]["LibraryTotalsOut"];
       /** Total */
       total: number;
@@ -10979,6 +10980,7 @@ export interface operations {
           | "matches"
           | "cant_clean_yet"
           | "left_alone";
+        /** @description The column to sort by. status orders files by where each stands now, in the order the statuses read: matches, needs cleaning, cleaning, can't clean yet (those Weir cannot read or open last), left alone. Files that tie fall by path, whichever way the sort runs. A value that is not listed sorts by path. */
         sort?:
           | "path"
           | "title"
@@ -10989,7 +10991,8 @@ export interface operations {
           | "resolution"
           | "audio"
           | "subtitles"
-          | "modified";
+          | "modified"
+          | "status";
         direction?: "asc" | "desc";
         page?: number;
         page_size?: number;

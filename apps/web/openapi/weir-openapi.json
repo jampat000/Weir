@@ -2085,7 +2085,8 @@
               "resolution",
               "audio",
               "subtitles",
-              "modified"
+              "modified",
+              "status"
             ],
             "title": "Sort",
             "type": "string"
@@ -16481,6 +16482,7 @@
             }
           },
           {
+            "description": "The column to sort by. status orders files by where each stands now, in the order the statuses read: matches, needs cleaning, cleaning, can't clean yet (those Weir cannot read or open last), left alone. Files that tie fall by path, whichever way the sort runs. A value that is not listed sorts by path.",
             "in": "query",
             "name": "sort",
             "required": false,
@@ -16495,7 +16497,8 @@
                 "resolution",
                 "audio",
                 "subtitles",
-                "modified"
+                "modified",
+                "status"
               ],
               "title": "Sort",
               "type": "string"
