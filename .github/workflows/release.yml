@@ -1,4 +1,5 @@
-# Tag-driven release: push tag v* (not a prerelease v*-*) -> CI proof, Windows installer, Docker image, GitHub Release.
+# Tag-driven release: push tag vX.Y.Z or vX.Y.Z-rc.N -> CI proof, Windows installer, Docker image, GitHub Release.
+# A tag with a pre-release part (v1.0.0-rc.1) publishes a GitHub pre-release; a plain vX.Y.Z publishes a normal release.
 #
 # Every job but publish starts at once and none of them can publish anything:
 #
@@ -12,8 +13,8 @@
 #
 # publish needs all five. It alone holds registry credentials, `packages: write` and
 # `contents: write`, so nothing reaches ghcr or the Releases page unless every check above passed.
-# It pushes only the version tag, smokes that image, publishes the GitHub Release, and only then
-# moves `latest`, so `latest` never points at an image that failed its smoke.
+# It pushes only the version tag, attests its provenance, smokes that image, publishes the GitHub Release,
+# and only then moves `latest`, so `latest` never points at an image that failed its smoke.
 # scripts/check-release-workflow-gates.mjs enforces that shape.
 name: Release
 
@@ -21,11 +22,13 @@ on:
   push:
     tags:
       - "v*"
-      - "!v*-*"
 
+# One release per tag at a time, and a release that has started is never cancelled: stopping publish
+# halfway could leave the version tag on ghcr without its GitHub Release. A second run for the same
+# tag (a re-run, a re-pushed tag) waits for the first.
 concurrency:
   group: release-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 permissions:
   contents: read
@@ -60,7 +63,7 @@ jobs:
 
   windows-smoke:
     runs-on: windows-latest
-    timeout-minutes: 60
+    timeout-minutes: 25
     permissions:
       contents: read
       # For actions/attest-build-provenance below: it signs over OIDC (id-token) and records the
@@ -86,17 +89,20 @@ jobs:
         shell: bash
         run: node scripts/check-release-version.mjs "$TAG"
 
-      # The delta base for `vpk pack` below. A 404 (no release published yet) is not an error: it
-      # leaves this empty, packaging/windows/build-velopack.ps1 skips the cache lookup, and `vpk
-      # download` itself already tolerates having nothing to fetch (docs/release.md).
+      # The delta base for `vpk pack` below: the newest published release that is OLDER than this one by
+      # SemVer precedence, pre-releases included (scripts/find-previous-release.mjs). Never "the latest
+      # release": that can be a pre-release or a newer version, and neither is a valid base. Empty when
+      # nothing older is published, and build-velopack.ps1 then packs the full package alone (docs/release.md).
       - name: Previous release version
         id: previous
         shell: bash
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
-          tag="$(gh api "repos/${{ github.repository }}/releases/latest" --jq .tag_name 2>/dev/null || true)"
-          echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
+          version="$(gh api --paginate "repos/${{ github.repository }}/releases?per_page=100" \
+            --jq '.[] | select(.draft | not) | .tag_name' \
+            | node scripts/find-previous-release.mjs "${{ steps.version.outputs.plain }}")"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
 
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
         with:
@@ -231,7 +237,7 @@ jobs:
   # What CI cannot have proven: the artefacts built here, and advisories published since CI ran.
   validate:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 15
     permissions:
       contents: read
     env:
@@ -324,7 +330,7 @@ jobs:
   # Actions cache (not a registry), so publish rebuilds from them instead of from scratch.
   docker-candidate:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 15
     permissions:
       contents: read
     env:
@@ -420,7 +426,7 @@ jobs:
   # amd64 job so its ~4 minutes under QEMU overlap everything else instead of following it.
   docker-arm64:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 25
     permissions:
       contents: read
     steps:
@@ -450,13 +456,17 @@ jobs:
 
   publish:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 30
     # Every gate. Without ci-passed a commit CI never passed could ship; without windows-smoke a Docker
     # image could reach ghcr for a release that has no Windows build.
     needs: [ci-passed, validate, windows-smoke, docker-candidate, docker-arm64]
     permissions:
       contents: write
       packages: write
+      # For actions/attest-build-provenance on the Docker image below (OIDC signing, then recording the
+      # attestation on the repo and next to the image in ghcr).
+      id-token: write
+      attestations: write
     env:
       WEIR_SESSION_SECRET: ${{ github.run_id }}-${{ github.job }}-${{ github.run_attempt }}-release-session-secret-32chars-min
     steps:
@@ -472,9 +482,14 @@ jobs:
         id: image
         run: echo "name=${REGISTRY}/$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
 
+      # scripts/check-release-version.mjs already refused anything but X.Y.Z or X.Y.Z-prerelease, so a hyphen
+      # in the version means a pre-release.
       - name: Normalize tag version
         id: version
-        run: echo "plain=${TAG#v}" >> "$GITHUB_OUTPUT"
+        run: |
+          plain="${TAG#v}"
+          echo "plain=$plain" >> "$GITHUB_OUTPUT"
+          if [[ "$plain" == *-* ]]; then echo "prerelease=true" >> "$GITHUB_OUTPUT"; else echo "prerelease=false" >> "$GITHUB_OUTPUT"; fi
 
       - name: Download Velopack release artifacts
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
@@ -500,6 +515,7 @@ jobs:
       # Rebuilt from the layers docker-candidate and docker-arm64 cached. Only the version tag: `latest`
       # moves to it at the very end, once the image and the release are known good.
       - name: Publish release Docker image
+        id: push
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
         with:
           context: .
@@ -517,6 +533,16 @@ jobs:
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.version=${{ steps.version.outputs.plain }}
+
+      # The digest of the multi-architecture manifest list just pushed, so `gh attestation verify
+      # oci://ghcr.io/<owner>/weir:<version>` proves the image came from this repo's own release build, as
+      # it does for the Windows files.
+      - name: Attest provenance of the Docker image
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-name: ${{ steps.image.outputs.name }}
+          subject-digest: ${{ steps.push.outputs.digest }}
+          push-to-registry: true
 
       - name: Verify published Docker manifest
         env:
@@ -563,11 +589,25 @@ jobs:
             weir-web-dist.zip
             windows-artifact/*
           body_path: release-notes.md
+          prerelease: ${{ steps.version.outputs.prerelease }}
 
       # Last, so `latest` only ever names an image that passed its smoke and has a published release. A copy of
       # the version's manifest list: both architectures, provenance and SBOM included, nothing rebuilt.
+      # A pre-release moves `latest` too, on purpose: pulling the image without a tag and the compose
+      # file's default tag have to resolve to a working image, and while no stable X.Y.Z is published the newest
+      # pre-release is the only image there is. Once a stable release exists `latest` stays on stable releases, so
+      # a later release candidate never replaces the image people run by default.
       - name: Tag the published image latest
         env:
           IMAGE: ${{ steps.image.outputs.name }}
           VERSION: ${{ steps.version.outputs.plain }}
-        run: docker buildx imagetools create --tag "$IMAGE:latest" "$IMAGE:$VERSION"
+          PRERELEASE: ${{ steps.version.outputs.prerelease }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          stable_tags="$(gh api --paginate "repos/${{ github.repository }}/releases?per_page=100" \
+            --jq '.[] | select((.draft | not) and (.prerelease | not)) | .tag_name')"
+          if [ "$PRERELEASE" = "true" ] && [ -n "$stable_tags" ]; then
+            echo "A stable release exists, so latest stays on the stable image."
+            exit 0
+          fi
+          docker buildx imagetools create --tag "$IMAGE:latest" "$IMAGE:$VERSION"

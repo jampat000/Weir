@@ -10,6 +10,14 @@ The Windows artifact is a desktop app with a .NET tray host and Velopack for del
 
 Weir is released under AGPL-3.0-or-later. Release artifacts are built from the tagged source tree and remain subject to that license.
 
+## Version scheme
+
+Weir uses plain SemVer, the same as Deluno: `X.Y.Z`, with `-rc.N` (or another pre-release name such as
+`-beta.N`) on the end until the version is final. A fix raises the last number (`1.0.1`), a feature the
+middle one (`1.1.0`), a breaking change the first (`2.0.0`). `1.0.0-rc.1`, `1.0.0-rc.2` and
+`1.0.0` come in that order, and `1.0.0-rc.10` is newer than `1.0.0-rc.9`. Build metadata
+(`1.0.0+abc`) is not accepted in a tag.
+
 ## Contract
 
 There is no version-bump PR (#804): no file in the tree carries the release version. Every build
@@ -21,7 +29,7 @@ never changes. Cutting a release is:
    `main` HEAD, once its own push run is green.
 2. Create user-facing release notes for the target tag and merge them to `main` as a normal PR:
 
-   - Create `docs/release-notes/vX.Y.Z.md` using `docs/release-notes/TEMPLATE.md`.
+   - Create `docs/release-notes/vX.Y.Z.md` (or `vX.Y.Z-rc.N.md` for a release candidate) using `docs/release-notes/TEMPLATE.md`.
    - Keep wording operator-friendly and focused on what changed for users.
 
    Change only the notes file and `CHANGELOG.md`. The docs, README and `compose.yaml` show pinned
@@ -44,10 +52,45 @@ never changes. Cutting a release is:
 
 4. Pushing `v*` triggers `.github/workflows/release.yml`. Its `ci-passed` job confirms `CI` already
    passed on that exact commit (`scripts/verify-ci-for-release.mjs`) instead of re-running it, and
-   `windows-smoke` validates the tag itself is a well-formed `X.Y.Z` version
+   `windows-smoke` validates the tag itself is a well-formed `X.Y.Z` or `X.Y.Z-rc.N` version
    (`scripts/check-release-version.mjs`) before stamping it onto the server, the tray, the Windows
    package and the Docker image.
-5. The release workflow requires `docs/release-notes/vX.Y.Z.md` for the tag and publishes that file as the GitHub Release body.
+5. The release workflow requires `docs/release-notes/<tag>.md` for the tag and publishes that file as the GitHub Release body.
+
+### Cutting a release candidate
+
+A release candidate is cut exactly like a release, with a pre-release tag:
+
+```bash
+git tag -a v1.0.0-rc.1 -m "Weir v1.0.0-rc.1"
+git push origin v1.0.0-rc.1
+```
+
+The release workflow handles it end to end:
+
+- the GitHub Release is published as a **pre-release** (`prerelease: true`), so it never shows as "Latest" on
+  the Releases page; a plain `vX.Y.Z` tag publishes a normal release
+- the Windows package, the server, the tray and the Docker image all carry `1.0.0-rc.1`
+  (`WeirVersion.Resolve` keeps the pre-release part; .NET's numeric assembly version is `1.0.0.0`, and the
+  full text is the informational version)
+- the Docker image is tagged `1.0.0-rc.1` and `latest`. `latest` moves for a pre-release only while no stable
+  release is published: pulling the image without a tag has to resolve to something while the release
+  candidates are all there is, and once a stable release exists a later release candidate leaves `latest`
+  on it
+- the Windows delta is built against the newest published release that is older than this one
+  (`scripts/find-previous-release.mjs`), release candidates included, so `rc.2` is a delta from `rc.1` and
+  `1.0.0` from the last `rc`. With nothing older published, only the full package is produced
+
+After the release candidates comes `1.0.0`, then `1.0.1` for fixes, `1.1.0` for features and `2.0.0` for
+breaking changes.
+
+### Which version an install is offered
+
+Weir's own update check reads the GitHub release list (not `/releases/latest`, which never returns a
+pre-release) and offers the newest release by SemVer precedence, skipping drafts. An install running a
+pre-release is offered pre-releases and stable releases; an install running a stable version is offered stable
+releases only. The tray's Velopack update source follows the same rule. Docker installs are never updated in
+place: System › About names the newest tag and the pull command.
 
 Local Docker is not required for this release path. Docker build, publish,
 manifest verification, and container smoke testing all run on GitHub-hosted
@@ -82,8 +125,10 @@ The `Release` workflow:
   the processed tree before its watched source is removed, and uploads screenshots
   plus JSON evidence
 - builds and pushes Docker tags for linux/amd64 and linux/arm64:
-  - `ghcr.io/<owner>/<repo>:X.Y.Z` (the git tag is `vX.Y.Z`; the image tag drops the `v`)
-  - `ghcr.io/<owner>/<repo>:latest`
+  - `ghcr.io/<owner>/<repo>:X.Y.Z` (the git tag is `vX.Y.Z`; the image tag drops the `v`, and a pre-release keeps its suffix: `1.0.0-rc.1`)
+  - `ghcr.io/<owner>/<repo>:latest` (moves for a pre-release only while no stable release exists)
+- records a signed provenance attestation for the pushed image's digest (the multi-architecture
+  manifest list), kept in ghcr beside the image, as is already done for the Windows files
 - verifies the published Docker manifest resolves
 - runs the published Docker image and waits for `/health`
 - creates the GitHub Release
@@ -103,7 +148,25 @@ lifecycle against the packaged executable and bundled FFmpeg.
 ## Registry authentication
 
 The release workflow publishes GHCR images with the repository `GITHUB_TOKEN` and
-`packages: write` permission. No personal access token is required for normal releases.
+`packages: write` permission. No personal access token is required for normal releases, and no
+workflow reads a `GHCR_TOKEN` secret.
+
+## Timeouts, permissions and concurrency
+
+- **Every job has a `timeout-minutes`**, about two to three times its slowest recent successful run
+  with a floor of 10, so a hung job fails in minutes instead of holding a runner for the six-hour
+  default. The release's `ci-passed` job keeps 50 minutes because it deliberately waits up to 45
+  for the tagged commit's CI. Raise a limit in the same change that makes a job genuinely slower.
+- **Every workflow starts at `permissions: contents: read`.** A job adds only what it needs: `changes`
+  adds `pull-requests: read`; `windows-smoke` adds `id-token: write` and `attestations: write`;
+  CodeQL's `analyze` adds `security-events: write`; and `publish` alone adds `contents: write`,
+  `packages: write`, `id-token: write` and `attestations: write`.
+- **A release is never cancelled once started.** `release.yml` serialises runs per tag with
+  `cancel-in-progress: false`: a second run for the same tag waits for the first, so `publish` cannot be
+  stopped between pushing the image and publishing the GitHub Release. Pull request runs of `ci.yml`,
+  CodeQL and the docs build do cancel when superseded; a push to `main` never does.
+- **Dependabot is security-only.** `.github/dependabot.yml` sets `open-pull-requests-limit: 0` for every
+  ecosystem, so there are no routine version pull requests; Dependabot security updates still open them.
 
 ## Release artifacts
 
@@ -112,21 +175,23 @@ The release workflow publishes GHCR images with the repository `GITHUB_TOKEN` an
 | `Tag + source tree` | Canonical source snapshot for the release. |
 | `weir-web-dist.zip` | Static production build of `apps/web/dist`. The Weir server is still required. |
 | `Weir-win-Setup.exe` | Windows desktop installer (Velopack) with .NET tray host, bundled .NET server (`server\WeirServer.exe`), bundled web UI, bundled FFmpeg, and delta update support. |
-| `ghcr.io/<owner>/<repo>:X.Y.Z` | Versioned all-in-one container image (linux/amd64 and linux/arm64). |
-| `ghcr.io/<owner>/<repo>:latest` | Latest stable container image. |
+| `ghcr.io/<owner>/<repo>:X.Y.Z` | Versioned all-in-one container image (linux/amd64 and linux/arm64), with a provenance attestation (`gh attestation verify oci://ghcr.io/<owner>/<repo>:X.Y.Z --repo <owner>/<repo>`). |
+| `ghcr.io/<owner>/<repo>:latest` | Latest stable container image; the newest pre-release while no stable release exists. |
 
 ## Windows package
 
 The Velopack-based Windows package is the supported Windows release artifact. Release builds produce a setup exe, full nupkg, and delta nupkg under `dist/windows/releases/`.
 
 The delta nupkg is built by `packaging/windows/build-velopack.ps1 -PreviousReleaseRepoUrl <repo>
--PreviousReleaseVersion <X.Y.Z>`, which fetches the previous GitHub Release's full nupkg into the
-output directory before `vpk pack` runs; `vpk pack` then finds it there on its own and emits a delta
-package alongside the full one. `release.yml` resolves `-PreviousReleaseVersion` itself (the latest
-published release, via the GitHub API) and caches that one file across runs, keyed strictly on that
-version, so a release only ever downloads it once. If there is no previous release to diff against (a
-gap in the chain, or the very first release), only the full package is produced — every install can
-always fall back to it. Local and PR builds omit `-PreviousReleaseRepoUrl` and never fetch anything or
+-PreviousReleaseVersion <X.Y.Z or X.Y.Z-rc.N>`, which downloads that GitHub Release's full nupkg (by its
+tag, with `gh release download`) into the output directory before `vpk pack` runs; `vpk pack` then finds
+it there on its own and emits a delta package alongside the full one. `release.yml` picks the version
+itself (`scripts/find-previous-release.mjs`): the newest published release that is older than the one
+being released by SemVer precedence, release candidates included. A release that is not older (a newer
+version that is somehow still published, or the same tag re-run) is never the base. The downloaded file
+is kept in `packaging/windows/vendor/previous-release`, keyed on that version. If there is no older
+release to diff against (the very first release, or a gap in the chain), only the full package is
+produced — every install can always fall back to it. Local and PR builds omit `-PreviousReleaseRepoUrl` and never fetch anything or
 produce a delta, so they stay offline and fast.
 
 `vpk pack` also carries that downloaded previous-version nupkg forward into its own feed files
@@ -239,7 +304,7 @@ Weir from another program](https://github.com/jampat000/Weir/blob/main/docs-site
 
 ## Docker
 
-Stable Docker releases are published from the same tag workflow.
+Docker images, pre-releases included, are published from the same tag workflow.
 
 If Docker Desktop is broken or not installed locally, do not block the release
 on this workstation. Run the remote validation workflow instead:

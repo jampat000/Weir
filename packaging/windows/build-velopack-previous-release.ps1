@@ -3,28 +3,26 @@
 # stays under the project's line-count guideline (#747). Dot-sourcing runs this in the caller's own
 # scope, exactly as if it were inline there.
 
-# Fetches the previous release's full nupkg into $OutputDir, so `vpk pack` finds it there on its own
-# and emits a delta package alongside the full one (Velopack.Packaging.ReleaseEntryHelper.
-# GetPreviousFullRelease). Served from packaging/windows/vendor/previous-release (gitignored, the same
-# as the FFmpeg/MKVToolNix vendor folders; release.yml's own actions/cache sits in front of it, keyed
-# on $Version) when that already holds the right version, so a release only ever downloads it once.
-# When no previous release exists yet (a brand-new repo, or every existing release predates this
-# channel), `vpk download github` logs a warning and returns without error, and pack simply produces
-# the full package as before: the full package is always the fallback, never a hard dependency on
-# there being a prior release to diff against.
+# Fetches the full nupkg of the exact release $Version into $OutputDir, so `vpk pack` finds it there on
+# its own and emits a delta package alongside the full one (Velopack.Packaging.ReleaseEntryHelper.
+# GetPreviousFullRelease). The caller picks $Version: the newest published release older than the one
+# being packed, pre-releases included (scripts/find-previous-release.mjs). It is asked for by tag, never
+# as "the latest release", because the latest by publish date can be a pre-release or a newer version,
+# neither of which is a valid delta base.
+# Served from packaging/windows/vendor/previous-release (gitignored, the same as the FFmpeg/MKVToolNix
+# vendor folders) when that already holds the right version, so a release only ever downloads it once.
+# A release that has no full package attached, or a download that fails, leaves the pack to produce the
+# full package alone: the full package is always the fallback, never a hard dependency on a prior release.
 function Get-WeirPreviousReleaseFullNupkg {
   param(
     [Parameter(Mandatory)][string]$RepoUrl,
-    [string]$Version,
-    [Parameter(Mandatory)][string]$OutputDir,
-    [Parameter(Mandatory)][string]$VpkExePath
+    [Parameter(Mandatory)][string]$Version,
+    [Parameter(Mandatory)][string]$OutputDir
   )
-  $cacheDir = Join-Path $PSScriptRoot "vendor\\previous-release"
-  $cached = $null
-  if ($Version) {
-    $cached = Get-ChildItem -LiteralPath $cacheDir -Filter "*-$Version-full.nupkg" -File -ErrorAction SilentlyContinue |
-      Select-Object -First 1
-  }
+  $cacheDir = Join-Path $PSScriptRoot "vendor\previous-release"
+  $packagePattern = "*-$Version-full.nupkg"
+  $cached = Get-ChildItem -LiteralPath $cacheDir -Filter $packagePattern -File -ErrorAction SilentlyContinue |
+    Select-Object -First 1
   if ($cached) {
     Write-Host "Using cached previous full release $($cached.Name) for delta packaging."
     New-Item -ItemType Directory -Path $OutputDir -Force | Out-Null
@@ -32,20 +30,16 @@ function Get-WeirPreviousReleaseFullNupkg {
     return
   }
 
-  Write-Host "Downloading the previous full release from $RepoUrl for delta packaging..."
-  $downloadArgs = @("download", "github", "--repoUrl", $RepoUrl, "--outputDir", $OutputDir)
-  if ($env:GITHUB_TOKEN) {
-    $downloadArgs += @("--token", $env:GITHUB_TOKEN)
-  }
-  & $VpkExePath @downloadArgs
+  Write-Host "Downloading the full package of release v$Version from $RepoUrl for delta packaging..."
+  New-Item -ItemType Directory -Path $OutputDir -Force | Out-Null
+  & gh release download "v$Version" --repo $RepoUrl --pattern $packagePattern --dir $OutputDir --clobber
   if ($LASTEXITCODE -ne 0) {
-    throw ("Command failed with exit code {0}: {1} {2}" -f $LASTEXITCODE, $VpkExePath, ($downloadArgs -join " "))
+    Write-Warning "Could not download the full package of release v$Version; building the full package only."
+    return
   }
 
-  # Seeds the cache for next time from whatever was actually downloaded (the file on disk, not
-  # $Version, is the source of truth for its own name) so a release.yml run for the next version, with
-  # the same previous version, can skip this download entirely.
-  $downloaded = Get-ChildItem -LiteralPath $OutputDir -Filter "*-full.nupkg" -File -ErrorAction SilentlyContinue |
+  # Seeds the cache for next time from the file actually downloaded.
+  $downloaded = Get-ChildItem -LiteralPath $OutputDir -Filter $packagePattern -File -ErrorAction SilentlyContinue |
     Select-Object -First 1
   if ($downloaded) {
     New-Item -ItemType Directory -Path $cacheDir -Force | Out-Null

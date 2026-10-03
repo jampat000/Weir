@@ -99,3 +99,27 @@ test("prune tolerates missing feed files (a pack with no delta base yet)", () =>
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("a stable version does not keep its own release candidate's packages", () => {
+  const entries = ["Weir-1.0.0-rc.2-full.nupkg", "Weir-1.0.0-full.nupkg", "Weir-1.0.0-delta.nupkg"];
+  assert.deepEqual(nupkgsToRemove(entries, "1.0.0"), ["Weir-1.0.0-rc.2-full.nupkg"]);
+});
+
+test("a release candidate keeps only its own packages", () => {
+  const entries = ["Weir-1.0.0-rc.1-full.nupkg", "Weir-1.0.0-rc.2-full.nupkg", "Weir-1.0.0-rc.2-delta.nupkg", "Weir-1.0.0-rc.20-full.nupkg"];
+  assert.deepEqual(nupkgsToRemove(entries, "1.0.0-rc.2"), ["Weir-1.0.0-rc.1-full.nupkg", "Weir-1.0.0-rc.20-full.nupkg"]);
+});
+
+test("filterLegacyReleases drops a release candidate's line when the stable version is released", () => {
+  const legacy = "﻿AAA Weir-1.0.0-rc.2-full.nupkg 111\nBBB Weir-1.0.0-full.nupkg 222";
+  const { text, dropped } = filterLegacyReleases(legacy, "1.0.0");
+  assert.deepEqual(dropped, ["AAA Weir-1.0.0-rc.2-full.nupkg 111"]);
+  assert.equal(text, "﻿BBB Weir-1.0.0-full.nupkg 222");
+});
+
+test("filterAssetFeed keeps a release candidate's own entries and drops the stable version's", () => {
+  const feed = '{"Assets":[{"Version":"1.0.0-rc.1","FileName":"Weir-1.0.0-rc.1-full.nupkg"},{"Version":"1.0.0","FileName":"Weir-1.0.0-full.nupkg"}]}';
+  const { kept, dropped } = filterAssetFeed(feed, "1.0.0-rc.1");
+  assert.deepEqual(kept.map((asset) => asset.FileName), ["Weir-1.0.0-rc.1-full.nupkg"]);
+  assert.deepEqual(dropped.map((asset) => asset.FileName), ["Weir-1.0.0-full.nupkg"]);
+});

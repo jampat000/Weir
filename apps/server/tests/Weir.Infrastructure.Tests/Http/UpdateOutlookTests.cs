@@ -108,7 +108,7 @@ public sealed class UpdateOutlookTests : IDisposable
     private sealed class ScriptedCatalog : IReleaseCatalogClient
     {
         private readonly object _gate = new();
-        private TaskCompletionSource<GitHubReleaseRecord>? _held;
+        private TaskCompletionSource<GitHubReleaseRecord?>? _held;
         private GitHubReleaseRecord? _release;
         private int _calls;
 
@@ -118,7 +118,7 @@ public sealed class UpdateOutlookTests : IDisposable
         {
             lock (_gate)
             {
-                _held = new TaskCompletionSource<GitHubReleaseRecord>(TaskCreationOptions.RunContinuationsAsynchronously);
+                _held = new TaskCompletionSource<GitHubReleaseRecord?>(TaskCreationOptions.RunContinuationsAsynchronously);
             }
         }
 
@@ -133,7 +133,7 @@ public sealed class UpdateOutlookTests : IDisposable
 
         public void Fails() => _release = null;
 
-        public Task<GitHubReleaseRecord> FetchLatestAsync(string userAgentVersion, CancellationToken cancellationToken)
+        public Task<GitHubReleaseRecord?> FetchLatestAsync(string currentVersion, CancellationToken cancellationToken)
         {
             Interlocked.Increment(ref _calls);
             lock (_gate)
@@ -143,7 +143,7 @@ public sealed class UpdateOutlookTests : IDisposable
                     return held.Task;
                 }
 
-                return _release is { } release ? Task.FromResult(release) : throw new ReleaseFetchException("offline");
+                return _release is { } release ? Task.FromResult<GitHubReleaseRecord?>(release) : throw new ReleaseFetchException("offline");
             }
         }
     }

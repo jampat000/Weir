@@ -81,6 +81,17 @@ public sealed class SystemEndpointsTests
     }
 
     [Fact]
+    public async Task Readiness_reports_a_pre_release_version_exactly()
+    {
+        await using var server = await WeirTestServer.StartAsync([("WEIR_VERSION", "1.0.0-rc.1")], signedIn: true);
+
+        using var response = await server.Client.GetAsync("/api/v1/system/readiness");
+
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        Assert.Equal("1.0.0-rc.1", body.RootElement.GetProperty("version").GetString());
+    }
+
+    [Fact]
     public async Task Readiness_reports_running_workers()
     {
         await using var server = await WeirTestServer.StartAsync([("WEIR_VERSION", "7.8.9")], signedIn: true);

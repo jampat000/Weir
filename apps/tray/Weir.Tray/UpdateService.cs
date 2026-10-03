@@ -1,5 +1,4 @@
 using Velopack;
-using Velopack.Sources;
 
 namespace Weir.Tray;
 
@@ -22,8 +21,7 @@ sealed class UpdateService : IUpdateService
     internal UpdateService(Action<string> log)
     {
         _log = log;
-        var source = new GithubSource(GitHubRepo, accessToken: null, prerelease: false);
-        _mgr = new UpdateManager(source);
+        _mgr = new UpdateManager(UpdateChannel.SourceForThisBuild(GitHubRepo));
     }
 
     public bool IsInstalled => _mgr.IsInstalled;
