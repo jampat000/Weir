@@ -2285,7 +2285,7 @@ export interface paths {
     };
     /**
      * Get System Log Export
-     * @description The log for the same filters and order as a file, newest first unless sorted another way: a spreadsheet (csv) or the rows as the API returns them (json).
+     * @description The log for the same filters and order as a file, newest first unless sorted another way: a spreadsheet (csv) or the rows as the API returns them (json). It holds every row the filters leave, up to the limit the X-Weir-Export-Limit header names (50000), and X-Weir-Export-Rows says how many it holds.
      */
     get: operations["get_system_log_export_api_v1_system_log_export_get"];
     put?: never;

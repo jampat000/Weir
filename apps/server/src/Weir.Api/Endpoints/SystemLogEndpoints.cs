@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
@@ -58,18 +59,36 @@ internal sealed class SystemLogEndpointHandlers
         issues.ThrowIfAny();
 
         var uow = await request.DbAsync().ConfigureAwait(false);
-        var page = await _log.ReadAsync(uow, query.Filter, query.Order, null, ActivityHistory.ExportMaxRows).ConfigureAwait(false);
-        var names = await WorkflowNamesAsync(uow, page.Rows).ConfigureAwait(false);
-        var text = json ? SystemLogWire.Json(page.Rows, names) : SystemLogWire.Csv(page.Rows, names);
-        var fileName = SystemLogWire.ExportFileName(request.Time.GetLocalNow(), json ? "json" : "csv");
+        var writer = new SystemLogExportWriter(json);
+        var fileName = SystemLogWire.ExportFileName(request.Time.GetLocalNow(), writer.Extension);
         return new CustomApiResult(async context =>
         {
+            await using var pages = _log.ReadExportPagesAsync(uow, query.Filter, query.Order, ActivityHistory.ExportMaxRows, context.RequestAborted)
+                .GetAsyncEnumerator(context.RequestAborted);
+            if (!await pages.MoveNextAsync().ConfigureAwait(false))
+            {
+                throw new InvalidOperationException("An export always has a first page, even an empty one.");
+            }
+
+            var exportRows = Math.Min(pages.Current.Total, ActivityHistory.ExportMaxRows);
+            context.Response.StatusCode = StatusCodes.Status200OK;
+            context.Response.ContentType = writer.ContentType;
             context.Response.Headers["X-Weir-Export-Limit"] = ActivityHistory.ExportMaxRows.ToString(CultureInfo.InvariantCulture);
-            context.Response.Headers["X-Weir-Export-Rows"] = page.Rows.Count.ToString(CultureInfo.InvariantCulture);
+            context.Response.Headers["X-Weir-Export-Rows"] = exportRows.ToString(CultureInfo.InvariantCulture);
             context.Response.Headers.ContentDisposition = $"attachment; filename=\"{fileName}\"";
-            await ApiResponses.WritePlainTextAsync(context, StatusCodes.Status200OK, text, json ? "application/json" : "text/csv; charset=utf-8").ConfigureAwait(false);
+            await WriteAsync(context, writer.Start()).ConfigureAwait(false);
+            do
+            {
+                var names = await WorkflowNamesAsync(uow, pages.Current.Rows).ConfigureAwait(false);
+                await WriteAsync(context, writer.Rows(pages.Current.Rows, names)).ConfigureAwait(false);
+            }
+            while (await pages.MoveNextAsync().ConfigureAwait(false));
+            await WriteAsync(context, writer.End()).ConfigureAwait(false);
         });
     }
+
+    private static Task WriteAsync(HttpContext context, string text) =>
+        text.Length == 0 ? Task.CompletedTask : context.Response.Body.WriteAsync(Encoding.UTF8.GetBytes(text), context.RequestAborted).AsTask();
 
     private static Task<IReadOnlyDictionary<long, string>> WorkflowNamesAsync(UnitOfWork uow, IReadOnlyList<SystemLogRow> rows) =>
         SystemLogReader.WorkflowNamesAsync(uow, [.. rows.Select(row => row.WorkflowId).OfType<long>().Distinct()]);

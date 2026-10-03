@@ -229,4 +229,68 @@ public sealed class SystemLogApiTests
 
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
     }
+
+    private static Task SeedScanEventsAsync(WeirTestServer server, int count) =>
+        TestDatabase.ExecuteAsync(
+            server,
+            "WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < $count) " +
+            "INSERT INTO activity_events (created_at, event_type, module, title, detail, result, library_id) " +
+            "SELECT datetime('2026-05-09 00:00:00', '+' || i || ' seconds') || '.000000', 'library.scan_completed', 'library', 'Scan ' || i, '{}', 'success', 1 FROM n",
+            ("$count", count));
+
+    [Theory]
+    [InlineData("csv", "desc", "Scan 1250", "Scan 1")]
+    [InlineData("csv", "asc", "Scan 1", "Scan 1250")]
+    [InlineData("json", "desc", "Scan 1250", "Scan 1")]
+    [InlineData("json", "asc", "Scan 1", "Scan 1250")]
+    public async Task The_export_holds_every_row_the_filters_leave_not_just_the_hundred_a_page_of_the_list_holds(
+        string format, string direction, string firstTitle, string lastTitle)
+    {
+        const int Seeded = 1250;
+        var (server, client) = await StartAsync();
+        await using var _ = server;
+        await SeedScanEventsAsync(server, Seeded);
+
+        using var response = await client.GetAsync($"{Log}/export?{Window}&source=event&format={format}&direction={direction}");
+
+        Assert.Equal(Seeded.ToString(System.Globalization.CultureInfo.InvariantCulture), Header(response, "X-Weir-Export-Rows"));
+        var body = await response.Content.ReadAsStringAsync();
+        var titles = format == "json"
+            ? JsonNode.Parse(body)!.AsArray().Select(row => row!["title"]!.GetValue<string>()).ToList()
+            : [.. body.Split("\r\n", StringSplitOptions.RemoveEmptyEntries).Skip(1).Select(line => line.Split(',')[5])];
+        Assert.Equal(Seeded, titles.Count);
+        Assert.Equal(Seeded, titles.Distinct().Count());
+        Assert.Equal(firstTitle, titles[0]);
+        Assert.Equal(lastTitle, titles[^1]);
+    }
+
+    [Fact]
+    public async Task The_export_stops_at_the_limit_it_announces()
+    {
+        const int Limit = 50_000;
+        var (server, client) = await StartAsync();
+        await using var _ = server;
+        await SeedScanEventsAsync(server, Limit + 10);
+
+        using var response = await client.GetAsync($"{Log}/export?{Window}&source=event");
+
+        Assert.Equal("50000", Header(response, "X-Weir-Export-Limit"));
+        Assert.Equal("50000", Header(response, "X-Weir-Export-Rows"));
+        var lines = (await response.Content.ReadAsStringAsync()).Split("\r\n", StringSplitOptions.RemoveEmptyEntries);
+        Assert.Equal(Limit + 1, lines.Length);
+    }
+
+    [Fact]
+    public async Task An_export_of_nothing_is_a_header_alone_or_an_empty_list()
+    {
+        var (server, client) = await StartAsync();
+        await using var _ = server;
+
+        using var csv = await client.GetAsync($"{Log}/export?{Window}");
+        using var json = await client.GetAsync($"{Log}/export?{Window}&format=json");
+
+        Assert.Equal("time,source,level,category,workflow,title,detail\r\n", await csv.Content.ReadAsStringAsync());
+        Assert.Equal("0", Header(csv, "X-Weir-Export-Rows"));
+        Assert.Equal("[]", await json.Content.ReadAsStringAsync());
+    }
 }

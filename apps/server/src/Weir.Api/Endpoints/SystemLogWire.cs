@@ -50,14 +50,18 @@ internal static class SystemLogWire
         return wire;
     }
 
-    public static string Json(IReadOnlyList<SystemLogRow> rows, IReadOnlyDictionary<long, string> workflowNames) =>
-        WireJsonWriter.Dumps(new WireArray(rows.Select(row => (WireValue)Row(row, workflowNames))), ActivityHistory.ExportJsonFormat);
-
-    /// <summary>A header and a line for each row; a line of a row with no detail leaves it empty.</summary>
-    public static string Csv(IReadOnlyList<SystemLogRow> rows, IReadOnlyDictionary<long, string> workflowNames)
+    /// <summary>The line of column names a spreadsheet export starts with.</summary>
+    public static string CsvHeader()
     {
         var builder = new StringBuilder();
         ActivityHistory.AppendCsvLine(builder, ExportColumns);
+        return builder.ToString();
+    }
+
+    /// <summary>A line for each row; a row with no detail leaves it empty.</summary>
+    public static string CsvLines(IReadOnlyList<SystemLogRow> rows, IReadOnlyDictionary<long, string> workflowNames)
+    {
+        var builder = new StringBuilder();
         foreach (var row in rows)
         {
             ActivityHistory.AppendCsvLine(
