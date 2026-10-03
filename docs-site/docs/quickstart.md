@@ -45,7 +45,7 @@ mounts them, plus the recipe for running Weir alongside Sonarr, Radarr and a dow
 
 ### Windows
 
-1. Download `Weir-win-Setup.exe` from the [latest release](https://github.com/jampat000/Weir/releases/latest).
+1. Download `Weir-win-Setup.exe` from the newest release on the [releases page](https://github.com/jampat000/Weir/releases). Weir is in pre-release (1.0.0-rc.N), and GitHub's "latest release" link does not show pre-releases.
 2. Run it. You don't need admin rights.
 3. Weir asks which port to use the first time it starts. Keep **9347** unless something else uses it.
 4. Your browser opens Weir.
