@@ -36,7 +36,7 @@ describe("the log's grid", () => {
     ]);
 
     expect(grid["--log-cols"]).toBe(
-      "3.5rem 5.5rem 4rem 6.5rem 8rem minmax(0, 1fr) 0.875rem",
+      "3rem 5.5rem 4rem 6.5rem 8rem minmax(0, 1fr) 0.875rem",
     );
   });
 
@@ -51,7 +51,7 @@ describe("the log's grid", () => {
     ]);
 
     expect(grid["--log-cols-narrow"]).toBe(
-      "minmax(0, 1fr) 5.5rem 3.5rem auto 0.875rem",
+      "minmax(0, 1fr) 5.5rem 3rem auto 0.875rem",
     );
   });
 });

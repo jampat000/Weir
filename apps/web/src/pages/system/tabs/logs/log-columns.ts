@@ -32,7 +32,7 @@ export const LOG_COLUMNS: TableColumnsConfig<LogColumnId> = {
 /** Where each column sits in the row's grid, and how much room it takes. */
 const TRACKS: Record<LogColumnId, string> = {
   time: "5.5rem",
-  level: "3.5rem",
+  level: "3rem",
   source: "4rem",
   category: "6.5rem",
   workflow: "8rem",
@@ -42,7 +42,7 @@ const TRACKS: Record<LogColumnId, string> = {
 /** The same, once the card is narrow: the workflow and the title have left the first line. */
 const NARROW_TRACKS: Partial<Record<LogColumnId, string>> = {
   time: "5.5rem",
-  level: "3.5rem",
+  level: "3rem",
   source: "auto",
   category: "minmax(0, 1fr)",
 };
