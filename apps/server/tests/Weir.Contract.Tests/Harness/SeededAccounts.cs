@@ -6,7 +6,10 @@ namespace Weir.Contract.Tests.Harness;
 /// <summary>
 /// The two accounts tests seed because no API creates a user without an admin: the admin <c>alice</c> and the read-only
 /// viewer <c>bob</c>. The harness has no Argon2 of its own, so each password comes with a precomputed hash (Argon2id,
-/// PHC format as <c>users.password_hash</c> holds it: time 3, memory 65536 KiB, 1 lane, 32-byte hash, 16-byte salt).
+/// PHC format as <c>users.password_hash</c> holds it: 1 lane, 32-byte hash, 16-byte salt). They are made at the smallest
+/// cost the server's verifier accepts (time 1, memory 8 KiB), because the server reads the cost from the stored hash and a
+/// seeded account would otherwise spend about a second of every sign-in on a cost nothing here is testing. The cost the
+/// product itself uses is what bootstrap, password change and recovery produce, and the tests of those sign in with it.
 /// </summary>
 public static class SeededAccounts
 {
@@ -15,11 +18,11 @@ public static class SeededAccounts
 
     /// <summary>Hash of <see cref="ViewerPassword"/>.</summary>
     public const string ViewerPasswordHash =
-        "$argon2id$v=19$m=65536,t=3,p=1$EcJ710LJQO79Yp1EJYGJTw$voE4PjB0y5u5+mnoY4cQANEnKkWPG6VUFYBwLxTDy/g";
+        "$argon2id$v=19$m=8,t=1,p=1$CKLFy+69uhpu/wDhwA+ONQ$ODzXaenqMMKnLWrYR3BM1CObVzwGjmO22tK+WRTS5CM";
 
     /// <summary>Hash of <see cref="WeirClient.AdminPassword"/>.</summary>
     public const string AdminPasswordHash =
-        "$argon2id$v=19$m=65536,t=3,p=1$CJlvLLyHD9vjw57xenosZQ$TVsrhsG8/sn4eKb33TmwEI47n9hHHfm62NI4etjvJ7k";
+        "$argon2id$v=19$m=8,t=1,p=1$crmvJg0OQnYs9UpHYczjHg$z2lZc0sScTtRjmMABkRghwK/izA76Zub+n4ALQehTgQ";
 
     /// <summary>Adds the viewer to a stopped database when it has none.</summary>
     public static void EnsureViewer(SqliteConnection connection)

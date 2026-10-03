@@ -11,7 +11,7 @@ internal static class SystemPartBHelpers
     public const string ExistingAdminUsername = "existing-admin";
     public const string ExistingAdminPassword = "existing-admin-password";
     public const string ExistingAdminPasswordHash =
-        "$argon2id$v=19$m=65536,t=3,p=1$o1xjUc27A7Yoqn6qebapuQ$G8paeioeYD8vF+4TcnooWCWTBrbPk5VawNi2G8+0awI";
+        "$argon2id$v=19$m=8,t=1,p=1$IfK0xFn4K7Og0Zwh5XD08w$YIoo8K1mbtJ0iDeBvurhJvuuiH8aIsiUD8EFZscMpMs";
 
     // Every outbound HTTP(S) client the server builds from the environment goes through this proxy, which refuses
     // connections: an update check can never reach the internet from a contract run.
