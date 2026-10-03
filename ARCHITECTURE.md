@@ -71,7 +71,6 @@ flowchart LR
 | `docs` | Contracts, ADRs, release notes, runbooks and the agent documentation map; the index is [`docs/README.md`](docs/README.md). |
 | `docs-site` | The public documentation website (Docusaurus). |
 | `scripts` | Repository tooling, CI gates and release checks; see [`scripts/README.md`](scripts/README.md). |
-| `tests` | The contract suite and the E2E smoke, which judge a running server from outside. Python for now, moving to .NET in #892. |
 | `.github` | CI and release workflows, issue and pull request templates. |
 | `.githooks` | The pre-push hook that runs the local checks. |
 
@@ -83,7 +82,8 @@ Solution `apps/server/Weir.slnx`; details in [`apps/server/README.md`](apps/serv
 - `src/Weir.Api`: endpoints and HTTP behaviour — auth and CSRF, security headers, request ids, the OpenAPI document, serving the web app.
 - `src/Weir.Infrastructure`: SQLite (connections, stores, numbered migrations in `Migrations/`), the durable job queue and workers, the remux pass, the remux writers (ffmpeg/ffprobe and the mkvmerge writer added in #548), media manager clients, the filesystem and log files.
 - `src/Weir.Core`: records and rules with no IO — the Processing rules engine, job rules, media manager rules, settings and security primitives.
-- `tests/*`: xUnit tests per project. The language-neutral contract suite (`tests/contract`) and the E2E smoke (`tests/e2e/weir`) judge a running server from outside.
+- `tests/*`: xUnit tests per project. Two of the projects judge a running server from outside, as a process over HTTP and never in-process: `Weir.Contract.Tests` (the contract suite, one test class per area under `Activity/`, `Auth/`, ...; `Weir.Contract.FakeTools` is its fake ffprobe/ffmpeg) and `Weir.E2E.Tests` (Playwright for .NET, the browser smoke).
+- `tools/Weir.LiveAudit`: the packaged live audit, a Playwright for .NET walk through every screen of an installed Weir (the Docker image or the Windows package); CI and the release workflow run it.
 - `apps/tray/Weir.Tray`: the Windows tray app shipped in the installer.
 
 ## Frontend Map

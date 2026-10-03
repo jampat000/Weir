@@ -87,7 +87,7 @@ All calls use `credentials: 'include'`. Types are generated from `openapi/weir-o
 
 ## CI
 
-The GitHub Actions **Test** workflow runs `npm ci`, `api:types:check`, lint, format, build and unit tests in this directory after the .NET server build and tests, then Playwright E2E in `tests/e2e/weir/` against the real .NET server serving the built web app (not `vite preview`) (see **`../../docs/local-development.md`**).
+The GitHub Actions **Test** workflow runs `npm ci`, `api:types:check`, lint, format, build and unit tests in this directory after the .NET server build and tests, then Playwright E2E (`apps/server/tests/Weir.E2E.Tests`) against the real .NET server serving the built web app (not `vite preview`) (see **`../../docs/local-development.md`**).
 
 ## Intentionally not built
 

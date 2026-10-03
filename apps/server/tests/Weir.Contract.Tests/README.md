@@ -52,7 +52,7 @@ Everything is in `Harness/`. Areas live in folders beside it (`Activity/`), one 
   client does not decompress), `SetCookieValue(name)`, `Fields`/`Elements` as JSON). A client also has `HeadAsync`,
   `OptionsAsync`, `AttemptLoginAsync` (returns whatever the server answers) and a cookie jar to read and change
   (`Cookie`, `SetCookie`, `ClearCookies`). A client sends no
-  `Origin` or `X-Requested-With` unless asked, like the Python client: `server.CreateClient(headers)` or
+  `Origin` or `X-Requested-With` unless asked, as a media manager or a script would not: `server.CreateClient(headers)` or
   `CreateAdminClientAsync(headers)` set headers for every request (a browser-like client passes both), and
   `RequestAsync`, `GetAsync(path, headers, query...)` and the `...WithCsrfAsync` methods take headers for one request.
 - **`SseReader`** reads a stream block by block: `NextBlockAsync`, `NextEventAsync`, `NextEventNamedAsync`. Event data is
@@ -65,18 +65,21 @@ Everything is in `Harness/`. Areas live in folders beside it (`Activity/`), one 
   test run died before teardown; it never touches a server whose run is still alive, so runs side by side are safe.
 - **`ContractAreaAttribute`** puts a class in an area (`[ContractArea("activity")]`) and in `Category=Contract`.
 
-## Porting an area
+## Adding tests and areas
 
-1. Make `Weir.Contract.Tests/<Area>/`, namespace `Weir.Contract.Tests.<Area>`, one test class per Python module,
-   `[ContractArea("<area>")]`.
-2. Use `IClassFixture<ServerFixture>` where the Python module used the shared `server`; start a server of your own
-   (`await using var server = await WeirServer.StartNewAsync(env)`) where it used `server_factory`.
-3. Port **test for test**. Every Python test gets a C# test with the same meaning and every assertion. Nothing is
-   skipped, weakened or merged. Name it from the Python name without `test_`, in sentence form
-   (`test_a_filtered_range_exports_as_csv_and_json` becomes `A_filtered_range_exports_as_csv_and_json`).
-4. **Black-box only.** Drive the server through HTTP. Where no API sets up the state, seed SQLite while the server
+An area is a folder (`Weir.Contract.Tests/<Area>/`, namespace `Weir.Contract.Tests.<Area>`) whose test classes are marked
+`[ContractArea("<area>")]`. CI runs one leg per area in `areas.json` (`dotnet test --filter "Area=<area>"`), and
+`node scripts/check-contract-areas.mjs` fails when that list and the classes disagree, so a new area is added in both
+places and a leg can never run zero tests.
+
+1. One test class per subject. Use `IClassFixture<ServerFixture>` to share a server across a class; start a server of
+   your own (`await using var server = await WeirServer.StartNewAsync(env)`) where a test needs a clean database or its
+   own settings. Each server start takes seconds, so keep classes few and fixtures shared.
+2. **Black-box only.** Drive the server through HTTP and SSE. Where no API sets up the state, seed SQLite while the server
    is stopped (`await using var database = await server.StopForDatabaseAsync()`); create clients *after* the block,
    because the server comes back on a new port. Never reference a Weir assembly.
-5. Keep a side-by-side list (Python test, C# test) with matching counts in the pull request, and leave the Python
-   tests in place until the C# area is green in CI.
-6. Share only stateless helpers. Area-specific helpers (seed rows, settings bodies) stay in the area's folder.
+3. Name a test as a sentence (`A_filtered_range_exports_as_csv_and_json`). Wait with `Poll.UntilAsync`, never with a
+   fixed sleep.
+4. Share only stateless helpers. Area-specific helpers (seed rows, settings bodies) stay in the area's folder.
+5. Scenarios that need the real `ffmpeg` and `ffprobe` use `[RealFfmpegFact]`: they run when both are on `PATH` (or
+   in `WEIR_CONTRACT_REAL_FFMPEG_DIR`) and are skipped otherwise. CI installs ffmpeg so they run there.

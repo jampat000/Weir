@@ -18,14 +18,14 @@ There are **two drawings of this mark in the repo, and that is deliberate, not d
 - **Two streams — the small-size fallback, `weir-app-icon-small.svg` below.** Three bands do not
   survive being rasterised down to 16px: a 1.85-unit band on a 24-unit grid is 1.23 device pixels
   there, sub-pixel by construction, and the arcs fuse into a smear (see `gate-16px.png` in this
-  folder and `mark.py`'s `SHIPPED_STREAMS` comment). This drawing exists only to be the 16px frame
+  folder). This drawing exists only to be the 16px frame
   inside the `.ico` files: the favicon `.ico`, the docs `.ico`, and the Windows tray icon. It is
   not used anywhere a person looks at an SVG or a large raster directly.
 
 This is the standard type-design move of shipping separate "text" and "display" masters of one
 typeface: the identity is one mark, traced once, but which optical size represents it changes
 with how small it will actually be shown. Nothing about the underlying geometry differs between
-the two — `mark.py`'s `paths(3)` is `paths(2)` plus one more band on the same radius ladder — so
+the two (the three-stream drawing is the two-stream one plus one more band on the same radius ladder), so
 "fixing" the two to match by deleting one of them would be removing a deliberate accommodation,
 not tidying up an inconsistency.
 
@@ -35,7 +35,6 @@ pixels, the three arcs separate cleanly and the crest holds in every rendering i
 single-colour one the tray icon uses; at 16 a band is sub-pixel and they fuse. An earlier revision
 of this put the cutoff at 32 out of caution, which cost the real mark two of the three sizes a
 person actually sees in a tab strip or a system tray for no legibility gain. See
-`scripts/generate-brand-icons.py`'s `SMALL_ICON_MAX` for where the cutoff is enforced, and
 `wiring-comparison.png` in this folder for the actual rendered frames at each size.
 
 | File | Streams | Use |
@@ -53,41 +52,22 @@ the word "Weir" set in the app font (Inter), not outlines.
 
 ## Where the geometry comes from (#581)
 
-The SVGs here are generated, not drawn. The accepted render is kept at
-`source.png` in this folder, and the build traces it rather than redrawing it by eye:
+The SVGs here were generated, not drawn. The accepted render is kept at `source.png` in this folder; its band
+edges were traced (thresholded to two colours, contours walked, a circle fitted to every edge, residuals under
+1.3px on a 1024px render), put on a 24-unit grid with a 20-unit live area, and corrected for two defects in the
+render: a third-colour sliver inside the middle stream, and a middle stream nearly twice the width of the other two.
 
-- `build/trace.py` thresholds the render to two colours, walks the
-  contours and least-squares fits a circle to every band edge. Residuals are under 1.3px on a
-  1024px render, so the arcs in the SVGs are the arcs in the artwork.
-- `build/mark.py` puts those measurements on a 24-unit grid with a 20-unit live area and fixes
-  the two defects in the render: a third-colour sliver inside the middle stream, and the middle
-  stream being nearly twice the width of the other two. Its module comments carry the reasoning.
-- `build/build.py` writes the four SVGs in this folder, the contact sheets, and the 16px gate
-  sheet.
+**The mark is the three-stream render exactly as traced.** See the "Two optical sizes" section above for why a
+two-stream fallback also exists and where it is and is not used: that split is about small `.ico` frames only, not
+about which geometry is "the" mark.
 
-**The mark is the three-stream render exactly as traced.** See the "Two optical sizes" section
-above for why a two-stream fallback also exists and where it is and is not used — that split is
-about small `.ico` frames only, not about which geometry is "the" mark.
+**The SVGs are now the source.** The Python that traced and built them, and the script that rendered the raster
+icons from them, were removed with the rest of the repository's Python (#892). The files below are all committed, so
+nothing needs regenerating to build Weir. To change the mark, edit the paths in the four SVGs here and keep the copies
+(`apps/web/public/favicon.svg`, `apps/web/src/components/brand/weir-logo.tsx`, `docs-site/static/img/logo*.svg`)
+identical; the raster icons then need rendering again, which has no tool in the repository yet.
 
-To change the mark, edit `mark.py` and run:
-
-```
-python packaging/brand/build/build.py
-```
-
-That rewrites the four SVGs here and prints the path data to paste into `weir-logo.tsx`.
-
-## Regenerating the raster icons
-
-The SVGs are the source of truth. After changing one, run from the repository root:
-
-```
-python -m pip install --require-hashes -r tests/requirements.txt   # once: Playwright
-python -m playwright install chromium                               # once
-python scripts/generate-brand-icons.py
-```
-
-It renders with Chromium and rewrites, all committed:
+The raster icons derived from them, all committed:
 
 - `apps/web/public/favicon.svg`, `favicon.ico`, `apple-touch-icon.png`
 - `packaging/windows/assets/weir-tray-icon.ico` (tray, executable and installer icon)

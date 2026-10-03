@@ -32,8 +32,7 @@ WEIR_E2E=1 dotnet test tests/Weir.E2E.Tests            # PowerShell: $env:WEIR_E
 | Keep the server's data folder and log after the run | `WEIR_CONTRACT_KEEP_DATA=1` (log in `<folder>/contract-logs`) |
 | A fixed session secret | `WEIR_SESSION_SECRET` (the harness default is used otherwise) |
 
-Playwright 1.63.0 is the version the Python suite used, so the browser is the same Chromium build. A missing
-browser fails the first test with Playwright's own message naming the install command.
+A missing browser fails the first test with Playwright's own message naming the install command.
 
 Screenshots of the high-risk pages are written to `artifacts/screenshots/` at the repository root (ignored by git,
 overwritten each run). They are for looking at, not compared.
@@ -46,7 +45,7 @@ overwritten each run). They are for looking at, not compared.
   that make the server quiet (workers, file watcher, periodic scan, work file sweeps) are put back to their
   defaults, because the Logs tests expect the job rows a running server writes. Without `WEIR_E2E=1` it starts nothing.
 - **`Support/E2ETestBase`** resets per-test state before each test (users, sessions, suite settings and the library
-  folders are cleared, as the Python `conftest.py` did) and gives the test a headless Chromium of its own. All test
+  folders are cleared) and gives the test a headless Chromium of its own. All test
   classes share one collection, so tests run one at a time against the one server.
 - **`Harness/E2EDatabase`** writes plain SQL to the running server's SQLite file for what the browser cannot create, an
   activity event the open Logs tab must pick up live.

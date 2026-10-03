@@ -24,7 +24,7 @@ internal sealed class ToolScript(JsonObject script)
         return script[FakeToolProtocol.DefaultKey] as JsonObject ?? new JsonObject();
     }
 
-    // The shell-style globs of Python's fnmatch: * ? and [set] or [!set], compared case-insensitively where the file system is.
+    // Shell-style globs (fnmatch): * ? and [set] or [!set], compared case-insensitively where the file system is.
     private static bool Matches(string pattern, string name)
     {
         var regex = new StringBuilder("^");

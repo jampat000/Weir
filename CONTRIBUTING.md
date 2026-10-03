@@ -33,30 +33,27 @@ node scripts/check-dead-code.mjs
 
 Web tests never reach the network: `apps/web/src/test/setup.ts` refuses every `fetch` that a test has not stubbed and fails the test that made it. Stub the api function the component calls (`vi.spyOn(someApi, "fetchThing")`), or the query hook, in the test. Where a component waits on a debounce, move the clock with fake timers instead of waiting for it.
 
-The contract suite and the E2E smoke are Python test runners that judge a running .NET server from outside. Install their locked dependencies once (Python 3.13+):
+The contract suite and the E2E smoke are .NET projects that judge a running server from outside: each starts the built server as its own process, with its own data folder and port, and talks to it over HTTP or through a browser. Weir has no Python.
+
+Contract suite (every area in [`areas.json`](apps/server/tests/Weir.Contract.Tests/areas.json); see [`README.md`](apps/server/tests/Weir.Contract.Tests/README.md)):
 
 ```powershell
-python -m pip install --require-hashes -r tests/requirements.txt
-python -m playwright install chromium
+dotnet build apps/server/Weir.slnx
+dotnet test apps/server/tests/Weir.Contract.Tests --filter "Area=activity"   # one area
+dotnet test apps/server/tests/Weir.Contract.Tests                            # every area
 ```
 
-Contract suite (every area in `tests/contract/areas.json`; see [`tests/contract/README.md`](tests/contract/README.md)):
+E2E smoke (Playwright for .NET, a fresh data folder, the built web app served by the .NET server):
 
 ```powershell
 dotnet build apps/server/Weir.slnx
 cd apps/web; npm ci; npm run build; cd ../..
-python -m pytest tests/contract -q
-```
-
-E2E smoke (a temporary SQLite home, Playwright Chromium, the built web app served by the .NET server):
-
-```powershell
-dotnet build apps/server/Weir.slnx
-cd apps/web; npm ci; npm run build; cd ../..
+pwsh apps/server/tests/Weir.E2E.Tests/bin/Debug/net10.0/playwright.ps1 install chromium   # once
 $env:WEIR_E2E = "1"
-$env:WEIR_SESSION_SECRET = "local-dev-secret-at-least-32-characters-long"
-python -m pytest tests/e2e/weir -q --tb=short
+dotnet test apps/server/tests/Weir.E2E.Tests
 ```
+
+The server's own unit and API tests leave both out: `dotnet test apps/server/Weir.slnx --filter "Category!=Stress&Category!=Contract&Category!=E2E"`, which is what the CI server jobs run.
 
 Tray (Windows): `dotnet build apps/tray/Weir.Tray.slnx` and `dotnet test apps/tray/Weir.Tray.slnx`.
 

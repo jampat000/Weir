@@ -3,7 +3,7 @@ using System.Text.Json.Nodes;
 
 namespace Weir.Contract.Tests.SystemArea;
 
-/// <summary>Reading JSON the way the Python assertions did: key sets, nulls, truthiness and number kinds.</summary>
+/// <summary>Reading JSON for the assertions: key sets, nulls, truthiness and number kinds.</summary>
 internal static class SystemPartBJson
 {
     public static JsonNode Parse(string json) => JsonNode.Parse(json)!;
@@ -50,7 +50,7 @@ internal static class SystemPartBJson
     public static bool IsBool(JsonNode? node) =>
         node is JsonValue value && value.GetValueKind() is JsonValueKind.True or JsonValueKind.False;
 
-    /// <summary>Python truthiness: not null, not empty, not zero, not false.</summary>
+    /// <summary>Truthiness: not null, not empty, not zero, not false.</summary>
     public static bool IsTruthy(JsonNode? node) => node switch
     {
         null => false,

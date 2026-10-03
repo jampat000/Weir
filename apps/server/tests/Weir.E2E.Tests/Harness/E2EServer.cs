@@ -5,8 +5,8 @@ using Weir.Contract.Tests.Harness.Fakes;
 namespace Weir.E2E.Tests.Harness;
 
 /// <summary>
-/// The one server and the one Playwright driver every browser test shares (<c>ICollectionFixture</c>), as the
-/// Python suite shared one server for the whole session. The server is the real built host serving the built web
+/// The one server and the one Playwright driver every browser test shares (<c>ICollectionFixture</c>), for the
+/// whole run. The server is the real built host serving the built web
 /// app itself, exactly as the Docker and Windows packages do. Without <c>WEIR_E2E=1</c> nothing starts.
 /// </summary>
 public sealed class E2EServer : IAsyncLifetime
@@ -48,7 +48,7 @@ public sealed class E2EServer : IAsyncLifetime
         }
     }
 
-    // The Python suite ran the server as an operator does: the workers, the file watcher, the periodic scan and the work file
+    // The server runs as an operator's does: the workers, the file watcher, the periodic scan and the work file
     // sweeps are on (without the sweeps the log has no job rows for the Jobs source to show).
     private static Dictionary<string, string> Environment =>
         ServerEnvironment.OperatorDefaults.With(("WEIR_WEB_DIST", RepoPaths.WebDist));
