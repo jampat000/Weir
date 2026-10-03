@@ -241,10 +241,19 @@ class AuditSettingsMixin:
 
         self.open_logs("Server")
         logs = self.visible(self.page.get_by_test_id("logs-card"), "server log panel")
+        self.click(
+            self.page.get_by_role("button", name="Log settings", exact=True),
+            "open the Log settings",
+        )
         self.visible(
             self.page.get_by_text("Server diagnostics", exact=True),
             "server diagnostics disclosure",
         )
+        self.visible(
+            self.page.get_by_text("How long things are kept", exact=True),
+            "how long things are kept",
+        )
+        self.page.keyboard.press("Escape")
         self.page.get_by_role("searchbox", name="Search the log").fill("audit")
         level = self.page.get_by_test_id("logs-level-picker")
         self.click(level, "open the level picker")

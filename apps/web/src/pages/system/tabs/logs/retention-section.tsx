@@ -1,21 +1,10 @@
 import { useState, type ReactNode } from "react";
 
-import { Panel } from "../../../../components/panels/panel";
 import { quietActionRowClass } from "../../../../components/shared/quiet-section";
 import { errorMessage } from "../../../../lib/api/error-message";
 import { mmActionButtonClass } from "../../../../lib/ui/mm-control-roles";
-import { useScrollToHash } from "../../../../lib/ui/use-scroll-to-hash";
 import type { SystemSettingsForm } from "../../use-system-settings-form";
-import {
-  useFileActivityRetention,
-  type FileActivityRetention,
-} from "./use-file-activity-retention";
-
-/** Where the retention panel is in System › Logs, so a link elsewhere can bring it into view. */
-const RETENTION_ANCHOR = "retention";
-
-/** The address of the retention settings, for the pages whose records they govern. */
-export const RETENTION_PATH = `/system?tab=logs#${RETENTION_ANCHOR}`;
+import type { FileActivityRetention } from "./use-file-activity-retention";
 
 const MAX_LOG_DAYS = 3650;
 
@@ -97,21 +86,22 @@ function FileActivityRow({
  */
 export function RetentionSection({
   form,
+  fileActivity,
   editable,
   savedLogDays,
 }: {
   form: SystemSettingsForm;
+  /** The file activity number, held by whoever shows this, so a draft outlives the panel closing. */
+  fileActivity: FileActivityRetention;
   editable: boolean;
   savedLogDays: number;
 }) {
   const { retention, save } = form;
-  const fileActivity = useFileActivityRetention();
   const [saved, setSaved] = useState(false);
   const saving = save.isPending || fileActivity.saving;
   const disabled = !editable || saving;
   const dirty = retention.dirty || fileActivity.dirty;
   const failed = save.isError && form.lastSaveTarget === "logs";
-  useScrollToHash();
 
   const saveAll = () => {
     setSaved(false);
@@ -122,14 +112,16 @@ export function RetentionSection({
   };
 
   return (
-    <Panel
-      title="How long things are kept"
-      headingId="suite-settings-log-retention-heading"
-      headingLevel={3}
-      padded
-      id={RETENTION_ANCHOR}
-      dataTestId="suite-settings-retention"
+    <section
+      aria-labelledby="suite-settings-log-retention-heading"
+      data-testid="suite-settings-retention"
     >
+      <h3
+        id="suite-settings-log-retention-heading"
+        className="mm-drawer__eyebrow"
+      >
+        How long things are kept
+      </h3>
       <div className="mm-retention">
         <RetentionRow
           inputId="retention-system-log"
@@ -223,6 +215,6 @@ export function RetentionSection({
           ) : null}
         </div>
       ) : null}
-    </Panel>
+    </section>
   );
 }

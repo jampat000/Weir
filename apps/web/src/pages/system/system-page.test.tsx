@@ -295,7 +295,9 @@ describe("SystemPage", () => {
   });
 
   it("shows viewers the retention numbers with no way to save them", () => {
-    renderSettings(viewerMe, { initialEntries: ["/system?tab=logs"] });
+    renderSettings(viewerMe, {
+      initialEntries: ["/system?tab=logs#retention"],
+    });
     expect(
       screen.getByTestId("suite-settings-activity-retention"),
     ).toBeDisabled();
@@ -414,7 +416,9 @@ describe("SystemPage", () => {
         activity_retention_days: body.activity_retention_days ?? 0,
       }));
 
-    renderSettings(operatorMe, { initialEntries: ["/system?tab=history"] });
+    renderSettings(operatorMe, {
+      initialEntries: ["/system?tab=history#retention"],
+    });
     const input = await screen.findByTestId(
       "suite-settings-activity-retention",
     );
@@ -542,13 +546,16 @@ describe("SystemPage", () => {
     expect(screen.getByTestId("suite-settings-backup-tab")).toBeInTheDocument();
     expect(screen.queryByText("Time zone")).not.toBeInTheDocument();
 
-    // How long things are kept sits with the log they govern.
+    // The log is one list; how long things are kept is in the Log settings its card opens.
     fireEvent.click(screen.getByRole("tab", { name: "Logs" }));
-    expect(screen.getByText("System log")).toBeInTheDocument();
-    expect(screen.getByLabelText("Events")).toBeInTheDocument();
-    // The log is one list, with the retention that governs it under it.
     expect(screen.getByRole("heading", { name: "Log" })).toBeInTheDocument();
     expect(screen.getByTestId("settings-logs")).toBeInTheDocument();
+    expect(screen.queryByText("System log")).not.toBeInTheDocument();
+    expect(screen.queryByText("Server diagnostics")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Log settings" }));
+    expect(screen.getByText("System log")).toBeInTheDocument();
+    expect(screen.getByLabelText("Events")).toBeInTheDocument();
+    expect(screen.getByText("Server diagnostics")).toBeInTheDocument();
   });
 
   it("keeps every retention setting in one panel under Logs: log days, Activity days and file activity days", () => {
@@ -561,7 +568,9 @@ describe("SystemPage", () => {
     } as unknown as ReturnType<
       typeof processingQueries.useProcessingOperatorSettingsQuery
     >);
-    renderSettings(operatorMe, { initialEntries: ["/system?tab=logs"] });
+    renderSettings(operatorMe, {
+      initialEntries: ["/system?tab=logs#retention"],
+    });
 
     const panel = screen
       .getByRole("heading", { name: "How long things are kept" })
@@ -569,6 +578,34 @@ describe("SystemPage", () => {
     expect(within(panel).getByLabelText("System log")).toHaveValue(30);
     expect(within(panel).getByLabelText("Events")).toHaveValue(90);
     expect(within(panel).getByLabelText("File activity")).toHaveValue(45);
+  });
+
+  it("opens the Log settings from a link to the retention, and closes back to the log", () => {
+    renderSettings(operatorMe, {
+      initialEntries: ["/system?tab=logs#retention"],
+    });
+
+    const panel = screen.getByRole("dialog", { name: "Log settings" });
+    expect(within(panel).getByText("Server diagnostics")).toBeInTheDocument();
+    fireEvent.click(within(panel).getByRole("button", { name: "Close" }));
+
+    expect(
+      screen.queryByRole("dialog", { name: "Log settings" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Log" })).toBeInTheDocument();
+  });
+
+  it("keeps a changed retention number when the Log settings are closed and opened again", () => {
+    renderSettings(operatorMe, {
+      initialEntries: ["/system?tab=logs#retention"],
+    });
+    fireEvent.change(screen.getByLabelText("Events"), {
+      target: { value: "12" },
+    });
+    fireEvent.click(screen.getAllByRole("button", { name: "Close" })[0]);
+    fireEvent.click(screen.getByRole("button", { name: "Log settings" }));
+
+    expect(screen.getByLabelText("Events")).toHaveValue(12);
   });
 
   it("holds the time zone on About, and saves a different one chosen there", async () => {

@@ -74,7 +74,7 @@ Weir asks first.
 ## How long a file's history is kept
 
 Everything Weir did to a file is in Activity. Weir keeps a file's history for as long as it still knows
-the file, then for **Keep a file's history for N days after it's gone** (set in System › Logs under
+the file, then for **Keep a file's history for N days after it's gone** (set in System › Logs › Log settings, under
 **How long things are kept**, 90 by default, 0 for ever; Activity links to it). The days count from when Weir finds the file gone or forgotten, and a file
 that comes back before then keeps its history. The same place keeps Weir's own log and
 Activity, each with its own number of days.

@@ -47,7 +47,7 @@ function headerWraps(head: HTMLElement): boolean {
 
 /**
  * The Log card: one list of everything that happened, newest first, under the day each thing fell on. Its header holds a
- * line on what the list holds, a way to refine it past what the header's filters can, Export, and Clear events.
+ * line on what the list holds, a way to refine it past what the header's filters can, Export, Clear events and the Log settings.
  */
 export function LogCard({
   movedPickers,
@@ -59,6 +59,7 @@ export function LogCard({
   onToggle,
   onChange,
   onClearFilters,
+  onOpenSettings,
   onRelated,
 }: {
   /** The pickers, when the shell's header had no room for them; null while it holds them. They join this card's own header when it has the room, and a row above the list when not. */
@@ -72,6 +73,7 @@ export function LogCard({
   onToggle: (id: string) => void;
   onChange: (next: Partial<LogFilters>) => void;
   onClearFilters: () => void;
+  onOpenSettings: () => void;
   onRelated: (jobId: number) => void;
 }) {
   const canClear = useCanEdit();
@@ -165,6 +167,13 @@ export function LogCard({
                 }}
               />
             ) : null}
+            <button
+              type="button"
+              className={`${mmActionButtonClass({ variant: "secondary" })} mm-sys-btn`}
+              onClick={onOpenSettings}
+            >
+              Log settings
+            </button>
           </>
         }
       >

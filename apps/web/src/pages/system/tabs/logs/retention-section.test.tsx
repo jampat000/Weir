@@ -7,6 +7,7 @@ import { afterEach, expect, it, vi } from "vitest";
 import * as processingQueries from "../../../../lib/processing/queries";
 import type { SystemSettingsForm } from "../../use-system-settings-form";
 import { RetentionSection } from "./retention-section";
+import { useFileActivityRetention } from "./use-file-activity-retention";
 
 const mutate = vi.fn();
 const saveFrom = vi.fn();
@@ -69,15 +70,27 @@ function formWith(
   } as unknown as SystemSettingsForm;
 }
 
-function renderRetention(editable = true, logDirty = false) {
-  return render(
+function Retention({
+  editable,
+  logDirty,
+}: {
+  editable: boolean;
+  logDirty: boolean;
+}) {
+  return (
     <RetentionSection
       form={formWith(logDirty)}
+      fileActivity={useFileActivityRetention()}
       editable={editable}
       savedLogDays={30}
-    />,
-    { wrapper },
+    />
   );
+}
+
+function renderRetention(editable = true, logDirty = false) {
+  return render(<Retention editable={editable} logDirty={logDirty} />, {
+    wrapper,
+  });
 }
 
 afterEach(() => {

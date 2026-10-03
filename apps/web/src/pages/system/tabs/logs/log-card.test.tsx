@@ -285,6 +285,21 @@ describe("export", () => {
   });
 });
 
+describe("Log settings", () => {
+  it("are asked for by a button in the card's header, and the card holds nothing of them", async () => {
+    const onOpenSettings = vi.fn();
+    mocks.fetchSystemLog.mockResolvedValue(logPage());
+    renderLog("/system?tab=logs", onOpenSettings);
+    await screen.findAllByTestId("log-row");
+
+    fireEvent.click(screen.getByRole("button", { name: "Log settings" }));
+
+    expect(onOpenSettings).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText("How long things are kept")).toBeNull();
+    expect(screen.queryByText("Server diagnostics")).toBeNull();
+  });
+});
+
 describe("Clear events", () => {
   const counts = {
     status: "preview",

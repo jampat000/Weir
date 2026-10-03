@@ -90,7 +90,7 @@ describe("responsive smoke", () => {
 
   it.each(VIEWPORTS)("renders the log at %ipx", async (width) => {
     setViewport(width);
-    render(withProviders(<UnifiedLog />));
+    render(withProviders(<UnifiedLog onOpenSettings={() => undefined} />));
     expect(await screen.findByTestId("log-feed")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Log" })).toBeInTheDocument();
     expect(screen.getByText("Finished")).toBeInTheDocument();

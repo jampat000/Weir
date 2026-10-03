@@ -185,8 +185,16 @@ def test_signed_in_navigation_covers_main_screens_and_tabs(weir_shell: str) -> N
 
             open_logs(page, "Server")
             expect(page.get_by_test_id("log-feed")).to_be_visible()
-            expect(page.get_by_text("Server diagnostics", exact=True)).to_be_visible()
             expect(page.get_by_test_id("logs-export")).to_be_visible()
+
+            # How long things are kept, and the server's counters, are in the Log settings the Log card opens.
+            expect(page.get_by_text("Server diagnostics", exact=True)).to_have_count(0)
+            page.get_by_role("button", name="Log settings", exact=True).click()
+            settings = page.get_by_role("dialog", name="Log settings")
+            expect(settings.get_by_text("Server diagnostics", exact=True)).to_be_visible()
+            expect(settings.get_by_text("How long things are kept", exact=True)).to_be_visible()
+            page.keyboard.press("Escape")
+            expect(settings).to_have_count(0)
 
             # The address Logs had for its server list lands on the Server source.
             page.goto(f"{base}/system?tab=logs&show=server", wait_until="domcontentloaded")

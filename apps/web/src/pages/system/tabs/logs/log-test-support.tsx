@@ -171,14 +171,17 @@ function LocationProbe() {
 }
 
 /** The log in a router at `address`, with nothing cached, and the address shown so a test can read it. */
-export function renderLog(address = "/system?tab=logs") {
+export function renderLog(
+  address = "/system?tab=logs",
+  onOpenSettings: () => void = () => undefined,
+) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
   const tree = () => (
     <QueryClientProvider client={client}>
       <MemoryRouter initialEntries={[address]}>
-        <UnifiedLog />
+        <UnifiedLog onOpenSettings={onOpenSettings} />
         <LocationProbe />
       </MemoryRouter>
     </QueryClientProvider>

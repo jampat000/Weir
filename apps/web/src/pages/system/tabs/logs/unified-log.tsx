@@ -11,7 +11,7 @@ import { useLogFilters } from "./use-log-filters";
  * title line and in the address; the list is the Log card under it. A row opens in place, and while one is open the list
  * does not move, so what is being read stays put.
  */
-export function UnifiedLog() {
+export function UnifiedLog({ onOpenSettings }: { onOpenSettings: () => void }) {
   const { filters, query, typed, setTyped, change, clear } = useLogFilters();
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const { watchFeed, ...entries } = useLogEntries(query, expandedId !== null);
@@ -35,6 +35,7 @@ export function UnifiedLog() {
           onToggle={(id) => setExpandedId((open) => (open === id ? null : id))}
           onChange={change}
           onClearFilters={clear}
+          onOpenSettings={onOpenSettings}
           onRelated={(job) => {
             setExpandedId(null);
             setTyped("");

@@ -15,7 +15,7 @@ says where a setting lives and what actually happens when it is saved.
 - Security (System › Security): username, password and sessions are database-backed. The "How
   sign-in is protected" group (auth cookie, HTTPS and rate-limit configuration) is read-only and says
   it comes from startup configuration and changes only with a restart.
-- Retention (System › Logs, "How long things are kept"): saved to the database and enforced by runtime
+- Retention (System › Logs › Log settings, "How long things are kept"): saved to the database and enforced by runtime
   log pruning; no restart is required.
 
 ## Settings

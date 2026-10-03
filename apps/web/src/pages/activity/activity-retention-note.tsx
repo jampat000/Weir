@@ -2,7 +2,7 @@ import { Link } from "react-router-dom";
 
 import { useProcessingOperatorSettingsQuery } from "../../lib/processing/queries";
 import { plural } from "../../lib/ui/mm-plural";
-import { RETENTION_PATH } from "../system/tabs/logs/retention-section";
+import { RETENTION_PATH } from "../system/tabs/logs/log-settings-panel";
 
 /** How long a file's activity is kept, in the few words Activity has room for. */
 function keptWords(days: number): string {

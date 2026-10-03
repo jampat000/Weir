@@ -183,10 +183,14 @@ def test_history_says_how_far_back_it_goes(weir_shell: str) -> None:
             open_logs(page)
 
             expect(page).to_have_url(re.compile(r".*/system\?tab=logs(?:$|[&#])"))
-            expect(page.get_by_test_id("suite-settings-retention")).to_contain_text("How long things are kept")
             expect(page.get_by_test_id("log-feed")).to_be_visible()
             _assert_no_error_state(page)
             _save_screenshot(page, "logs")
+
+            page.get_by_role("button", name="Log settings", exact=True).click()
+            expect(page.get_by_test_id("suite-settings-retention")).to_contain_text("How long things are kept")
+            _assert_no_error_state(page)
+            _save_screenshot(page, "logs-settings")
         finally:
             browser.close()
 
