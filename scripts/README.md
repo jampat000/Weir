@@ -41,6 +41,7 @@ work, not rewritten for its own sake. Scripts are named in kebab-case.
 | Script | What it does |
 | --- | --- |
 | `pre-push.mjs` | The pre-push checks `.githooks/pre-push` runs: no Python, the contract areas, prettier, the dead-code guard and API types drift. |
+| `build-brand-icons.mjs` | Renders every raster icon (favicon, apple touch icon, Windows tray and installer icon) from the SVGs in `packaging/brand`; `--check` compares them with the committed files without changing anything (`build-brand-icons.test.mjs`). Needs `npm ci` in `apps/web`. |
 | `stop-dev-api-port.mjs` | Stops the dev API that this worktree's `npm run dev` started, and nothing else. |
 | `stop-dev-web-port.mjs` | Stops the dev Vite server that this worktree's `npm run dev` started, and nothing else. |
 | `dev-reset-auth.mjs` | Clears a development database's users and sessions so `/setup` works again. |
