@@ -107,11 +107,11 @@ public sealed class RecoverCommandTests
     public async Task A_locked_out_inactive_admin_is_recovered_sessions_revoked_and_event_recorded()
     {
         using var fixture = new RecoverFixture();
-        await fixture.SeedUserAsync("james", OldPassword, active: false, sessions: 2);
+        await fixture.SeedUserAsync("user1", OldPassword, active: false, sessions: 2);
         var (stdout, stderr) = Writers();
 
         var exit = await RecoverCommand.RunAsync(
-            ["--username", "james", "--password", NewPassword],
+            ["--username", "user1", "--password", NewPassword],
             fixture.Runtime,
             stdout,
             stderr,
@@ -119,11 +119,11 @@ public sealed class RecoverCommandTests
 
         Assert.Equal(RecoverCommand.ExitOk, exit);
         Assert.Contains("--password stays in your shell history", stderr.ToString());
-        Assert.Contains("Password reset for 'james'.", stdout.ToString());
+        Assert.Contains("Password reset for 'user1'.", stdout.ToString());
         Assert.Contains("The account is active and has the admin role.", stdout.ToString());
         Assert.Contains("2 signed-in sessions were ended — sign in again with the new password.", stdout.ToString());
 
-        var user = await fixture.WithUnitOfWork(uow => fixture.Users.FindUserByLowerUsernameAsync(uow, "james"));
+        var user = await fixture.WithUnitOfWork(uow => fixture.Users.FindUserByLowerUsernameAsync(uow, "user1"));
         Assert.NotNull(user);
         Assert.True(user!.IsActive);
         Assert.Equal(PasswordVerification.Match, PasswordHasher.Verify(NewPassword, user.PasswordHash));
@@ -141,18 +141,18 @@ public sealed class RecoverCommandTests
             reader => (Title: SqliteValues.GetString(reader, 0), Detail: SqliteValues.GetString(reader, 1))));
         var eventRow = Assert.Single(eventRows);
         Assert.Equal("Password recovered from the server", eventRow.Title);
-        Assert.Equal("james — reset from the server console. 2 signed-in sessions were ended.", eventRow.Detail);
+        Assert.Equal("user1 — reset from the server console. 2 signed-in sessions were ended.", eventRow.Detail);
     }
 
     [Fact]
     public async Task One_ended_session_reads_in_the_singular()
     {
         using var fixture = new RecoverFixture();
-        await fixture.SeedUserAsync("james", OldPassword, sessions: 1);
+        await fixture.SeedUserAsync("user1", OldPassword, sessions: 1);
         var (stdout, stderr) = Writers();
 
         var exit = await RecoverCommand.RunAsync(
-            ["--username", "james", "--password", NewPassword],
+            ["--username", "user1", "--password", NewPassword],
             fixture.Runtime,
             stdout,
             stderr,
@@ -163,14 +163,14 @@ public sealed class RecoverCommandTests
         var details = await fixture.WithUnitOfWork(uow => uow.QueryAsync(
             "SELECT detail FROM activity_events WHERE event_type = 'auth.password_changed'",
             reader => SqliteValues.GetString(reader, 0)));
-        Assert.Equal("james — reset from the server console. 1 signed-in session was ended.", Assert.Single(details));
+        Assert.Equal("user1 — reset from the server console. 1 signed-in session was ended.", Assert.Single(details));
     }
 
     [Fact]
     public async Task Recovery_of_the_only_account_needs_no_username()
     {
         using var fixture = new RecoverFixture();
-        await fixture.SeedUserAsync("james", OldPassword, role: "operator");
+        await fixture.SeedUserAsync("user1", OldPassword, role: "operator");
         var (stdout, stderr) = Writers();
 
         var exit = await RecoverCommand.RunAsync(
@@ -181,7 +181,7 @@ public sealed class RecoverCommandTests
             new FakePasswordPrompt(isInteractive: false));
 
         Assert.Equal(RecoverCommand.ExitOk, exit);
-        Assert.Contains("Password reset for 'james'.", stdout.ToString());
+        Assert.Contains("Password reset for 'user1'.", stdout.ToString());
         // Only an admin account gets the extra confirmation line.
         Assert.DoesNotContain("has the admin role", stdout.ToString());
     }
@@ -208,7 +208,7 @@ public sealed class RecoverCommandTests
     public async Task Refuses_an_unknown_username()
     {
         using var fixture = new RecoverFixture();
-        await fixture.SeedUserAsync("james", OldPassword);
+        await fixture.SeedUserAsync("user1", OldPassword);
         var (stdout, stderr) = Writers();
 
         var exit = await RecoverCommand.RunAsync(
@@ -226,7 +226,7 @@ public sealed class RecoverCommandTests
     public async Task Several_accounts_without_username_asks_for_one()
     {
         using var fixture = new RecoverFixture();
-        await fixture.SeedUserAsync("james", OldPassword);
+        await fixture.SeedUserAsync("user1", OldPassword);
         await fixture.SeedUserAsync("alice", OldPassword);
         var (stdout, stderr) = Writers();
 
@@ -238,18 +238,18 @@ public sealed class RecoverCommandTests
             new FakePasswordPrompt(isInteractive: false));
 
         Assert.Equal(RecoverCommand.ExitUsage, exit);
-        Assert.Contains("Several accounts exist. Pass --username. Found: alice, james", stderr.ToString());
+        Assert.Contains("Several accounts exist. Pass --username. Found: alice, user1", stderr.ToString());
     }
 
     [Fact]
     public async Task A_weak_password_is_refused_and_nothing_changes()
     {
         using var fixture = new RecoverFixture();
-        await fixture.SeedUserAsync("james", OldPassword);
+        await fixture.SeedUserAsync("user1", OldPassword);
         var (stdout, stderr) = Writers();
 
         var exit = await RecoverCommand.RunAsync(
-            ["--username", "james", "--password", "password"],
+            ["--username", "user1", "--password", "password"],
             fixture.Runtime,
             stdout,
             stderr,
@@ -259,7 +259,7 @@ public sealed class RecoverCommandTests
         Assert.Contains("--password stays in your shell history", stderr.ToString());
         Assert.Contains("Could not reset the password:", stderr.ToString());
 
-        var user = await fixture.WithUnitOfWork(uow => fixture.Users.FindUserByLowerUsernameAsync(uow, "james"));
+        var user = await fixture.WithUnitOfWork(uow => fixture.Users.FindUserByLowerUsernameAsync(uow, "user1"));
         Assert.Equal(PasswordVerification.Match, PasswordHasher.Verify(OldPassword, user!.PasswordHash));
     }
 
@@ -267,17 +267,17 @@ public sealed class RecoverCommandTests
     public async Task List_reports_accounts_and_changes_nothing()
     {
         using var fixture = new RecoverFixture();
-        await fixture.SeedUserAsync("james", OldPassword, active: false);
+        await fixture.SeedUserAsync("user1", OldPassword, active: false);
         var (stdout, stderr) = Writers();
 
         var exit = await RecoverCommand.RunAsync(["--list"], fixture.Runtime, stdout, stderr, new FakePasswordPrompt(isInteractive: false));
 
         Assert.Equal(RecoverCommand.ExitOk, exit);
-        Assert.Contains("james", stdout.ToString());
+        Assert.Contains("user1", stdout.ToString());
         Assert.Contains("role=admin", stdout.ToString());
         Assert.Contains("INACTIVE", stdout.ToString());
 
-        var user = await fixture.WithUnitOfWork(uow => fixture.Users.FindUserByLowerUsernameAsync(uow, "james"));
+        var user = await fixture.WithUnitOfWork(uow => fixture.Users.FindUserByLowerUsernameAsync(uow, "user1"));
         Assert.Equal(PasswordVerification.Match, PasswordHasher.Verify(OldPassword, user!.PasswordHash));
         Assert.False(user.IsActive);
     }
@@ -298,11 +298,11 @@ public sealed class RecoverCommandTests
     public async Task Without_password_or_a_terminal_the_operator_is_told_to_pass_one()
     {
         using var fixture = new RecoverFixture();
-        await fixture.SeedUserAsync("james", OldPassword);
+        await fixture.SeedUserAsync("user1", OldPassword);
         var (stdout, stderr) = Writers();
 
         var exit = await RecoverCommand.RunAsync(
-            ["--username", "james"],
+            ["--username", "user1"],
             fixture.Runtime,
             stdout,
             stderr,
@@ -318,11 +318,11 @@ public sealed class RecoverCommandTests
     public async Task A_prompted_mismatch_is_refused()
     {
         using var fixture = new RecoverFixture();
-        await fixture.SeedUserAsync("james", OldPassword);
+        await fixture.SeedUserAsync("user1", OldPassword);
         var (stdout, stderr) = Writers();
 
         var exit = await RecoverCommand.RunAsync(
-            ["--username", "james"],
+            ["--username", "user1"],
             fixture.Runtime,
             stdout,
             stderr,
@@ -336,18 +336,18 @@ public sealed class RecoverCommandTests
     public async Task A_matching_prompted_password_recovers_the_account()
     {
         using var fixture = new RecoverFixture();
-        await fixture.SeedUserAsync("james", OldPassword);
+        await fixture.SeedUserAsync("user1", OldPassword);
         var (stdout, stderr) = Writers();
 
         var exit = await RecoverCommand.RunAsync(
-            ["--username", "james"],
+            ["--username", "user1"],
             fixture.Runtime,
             stdout,
             stderr,
             new FakePasswordPrompt(isInteractive: true, NewPassword, NewPassword));
 
         Assert.Equal(RecoverCommand.ExitOk, exit);
-        var user = await fixture.WithUnitOfWork(uow => fixture.Users.FindUserByLowerUsernameAsync(uow, "james"));
+        var user = await fixture.WithUnitOfWork(uow => fixture.Users.FindUserByLowerUsernameAsync(uow, "user1"));
         Assert.Equal(PasswordVerification.Match, PasswordHasher.Verify(NewPassword, user!.PasswordHash));
     }
 

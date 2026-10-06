@@ -10,7 +10,7 @@ import { queryClient } from "./query-client";
 const SIGNED_IN: UserPublic = {
   id: 1,
   role: "operator",
-  username: "james",
+  username: "user1",
   app_theme: null,
 };
 const SETTINGS = { app_timezone: "UTC" };

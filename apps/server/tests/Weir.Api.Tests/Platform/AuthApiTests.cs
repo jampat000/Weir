@@ -447,17 +447,17 @@ public sealed class AuthApiTests
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         }
 
-        using var signedOut = await new ApiTestClient(server).PostAsync("/api/v1/auth/change-username", new { current_password = AdminPassword, new_username = "james", csrf_token = await client.CsrfAsync() });
+        using var signedOut = await new ApiTestClient(server).PostAsync("/api/v1/auth/change-username", new { current_password = AdminPassword, new_username = "user1", csrf_token = await client.CsrfAsync() });
         Assert.Equal(HttpStatusCode.Unauthorized, signedOut.StatusCode);
 
-        using var wrong = await client.PostAsync("/api/v1/auth/change-username", new { current_password = "wrong-password", new_username = "james", csrf_token = await client.CsrfAsync() });
+        using var wrong = await client.PostAsync("/api/v1/auth/change-username", new { current_password = "wrong-password", new_username = "user1", csrf_token = await client.CsrfAsync() });
         Assert.Equal(HttpStatusCode.BadRequest, wrong.StatusCode);
         using var unchanged = await client.PostAsync("/api/v1/auth/change-username", new { current_password = AdminPassword, new_username = "alice", csrf_token = await client.CsrfAsync() });
         Assert.Equal(HttpStatusCode.BadRequest, unchanged.StatusCode);
-        using var renamed = await client.PostAsync("/api/v1/auth/change-username", new { current_password = AdminPassword, new_username = "james", csrf_token = await client.CsrfAsync() });
-        Assert.Equal("{\"message\":\"Username changed. Use it the next time you sign in.\",\"username\":\"james\"}", await renamed.Content.ReadAsStringAsync());
-        Assert.Equal("james", (await Json(await client.GetAsync("/api/v1/auth/me")))["user"]!["username"]!.GetValue<string>());
-        Assert.Equal(HttpStatusCode.OK, (await client.LoginAsync("JAMES")).StatusCode);
+        using var renamed = await client.PostAsync("/api/v1/auth/change-username", new { current_password = AdminPassword, new_username = "user1", csrf_token = await client.CsrfAsync() });
+        Assert.Equal("{\"message\":\"Username changed. Use it the next time you sign in.\",\"username\":\"user1\"}", await renamed.Content.ReadAsStringAsync());
+        Assert.Equal("user1", (await Json(await client.GetAsync("/api/v1/auth/me")))["user"]!["username"]!.GetValue<string>());
+        Assert.Equal(HttpStatusCode.OK, (await client.LoginAsync("USER1")).StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, (await client.LoginAsync("alice")).StatusCode);
     }
 

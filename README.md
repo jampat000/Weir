@@ -37,7 +37,7 @@ I'm not a software engineer, so I'll be upfront about it: Weir is built with AI 
 
 It's opinionated. Everything in it is there because it fixed a real problem in my own setup first. If it suits the way you manage your library too, use it, improve it, and share what you change under the same license.
 
-— James
+— Weir's maintainer
 
 <!-- README_LOCKED_SECTION_END: project-note -->
 

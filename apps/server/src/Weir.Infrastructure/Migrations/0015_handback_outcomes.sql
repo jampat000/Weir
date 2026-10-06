@@ -53,7 +53,7 @@ ALTER TABLE media_manager_handoffs ADD COLUMN download_id TEXT;
 
 ALTER TABLE media_manager_handoffs ADD COLUMN pending_report_json TEXT;
 
--- 3. Settings › Cleanup › Unclaimed hand-backs: off until a person switches it on (James, 23 Sep 2026), and a copy
+-- 3. Settings › Cleanup › Unclaimed hand-backs: off until a person switches it on (the owner, 23 Sep 2026), and a copy
 --    nobody claimed is removed once it is this many days old. NULL interval: the built-in six hours.
 ALTER TABLE operator_settings ADD COLUMN unclaimed_handback_cleanup_enabled BOOLEAN DEFAULT '0' NOT NULL;
 
