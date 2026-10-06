@@ -10,4 +10,4 @@ Earlier version numbers were retired when Weir restarted at 1.0.0-rc.1. Their hi
 
 ## 1.x
 
-- **1.0.0-rc.1** (2026-10-03). The first release of Weir, a pre-release: an early build that is in active testing, so expect rough edges. [notes](docs/release-notes/v1.0.0-rc.1.md) · [release](https://github.com/jampat000/Weir/releases/tag/v1.0.0-rc.1)
+- **1.0.0-rc.1** (2026-10-06). The first release of Weir, a pre-release: an early build that is in active testing, so expect rough edges. [notes](docs/release-notes/v1.0.0-rc.1.md) · [release](https://github.com/jampat000/Weir/releases/tag/v1.0.0-rc.1)
