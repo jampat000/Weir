@@ -69,10 +69,11 @@ public enum SchemaStartupOutcome
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Version ledger:</b> the revision is recorded in the <c>alembic_version</c> table (one <c>version_num</c>
-/// row). The table keeps the name it was created with because every existing Weir database carries it; a
-/// separate version table would make those installs look unversioned. An install already at head is adopted
-/// with no write at all. Each migration names the revision it leaves behind.
+/// <b>Version ledger:</b> the revision is recorded in the <c>schema_version</c> table (one <c>revision</c>
+/// row). A database from before migration 39 holds that row in <c>alembic_version</c> (<c>version_num</c>);
+/// reading falls back to it, and migration 39 renames it. A database holding both tables is refused. An
+/// install already at head is adopted with no write at all. Each migration names the revision it leaves
+/// behind.
 /// </para>
 /// <para>
 /// <b>On startup:</b> a missing database file is created at head; a database whose recorded revision is
@@ -124,12 +125,19 @@ public sealed class SchemaMigrator
         new(36, "0071_connection_usage", "Weir.Infrastructure.Migrations.0036_connection_usage.sql"),
         new(37, "0072_server_starts", "Weir.Infrastructure.Migrations.0037_server_starts.sql"),
         new(38, "0073_library_change_reason", "Weir.Infrastructure.Migrations.0038_library_change_reason.sql"),
+        new(39, "0074_schema_version_table", "Weir.Infrastructure.Migrations.0039_schema_version_table.sql"),
     ];
 
     /// <summary>The first migration's revision: the oldest schema this build can start from.</summary>
     public static string BaselineRevision => Migrations[0].Revision;
 
     public static string HeadRevision => Migrations[^1].Revision;
+
+    private sealed record VersionLedger(string Table, string Column);
+
+    private static readonly VersionLedger CurrentLedger = new("schema_version", "revision");
+
+    private static readonly VersionLedger PreviousLedger = new("alembic_version", "version_num");
 
     private readonly SqliteDatabase _database;
 
@@ -255,7 +263,9 @@ public sealed class SchemaMigrator
         using (var record = connection.CreateCommand())
         {
             record.Transaction = transaction;
-            record.CommandText = "DELETE FROM alembic_version; INSERT INTO alembic_version (version_num) VALUES ($revision);";
+            var ledger = FindLedger(connection)
+                ?? throw new InvalidOperationException("No schema version table exists after the migrations ran.");
+            record.CommandText = $"DELETE FROM {ledger.Table}; INSERT INTO {ledger.Table} ({ledger.Column}) VALUES ($revision);";
             record.Parameters.AddWithValue("$revision", revision);
             record.ExecuteNonQuery();
         }
@@ -277,14 +287,12 @@ public sealed class SchemaMigrator
 
     private static string? ReadRecordedRevision(SqliteConnection connection)
     {
-        var hasTable = ScalarLong(
-            connection,
-            "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'alembic_version'") > 0;
+        var ledger = FindLedger(connection);
         var revisions = new List<string>();
-        if (hasTable)
+        if (ledger is not null)
         {
             using var command = connection.CreateCommand();
-            command.CommandText = "SELECT version_num FROM alembic_version";
+            command.CommandText = $"SELECT {ledger.Column} FROM {ledger.Table}";
             using var reader = command.ExecuteReader();
             while (reader.Read())
             {
@@ -302,6 +310,34 @@ public sealed class SchemaMigrator
                 SchemaMismatchKind.Incompatible),
         };
     }
+
+    /// <summary>
+    /// The table that records the revision: <c>schema_version</c>, or <c>alembic_version</c> in a database from
+    /// before migration 39. Null when neither exists. A database holding both is malformed and is refused.
+    /// </summary>
+    private static VersionLedger? FindLedger(SqliteConnection connection)
+    {
+        var hasCurrent = TableExists(connection, CurrentLedger.Table);
+        var hasPrevious = TableExists(connection, PreviousLedger.Table);
+        if (hasCurrent && hasPrevious)
+        {
+            throw new DatabaseSchemaMismatchException(
+                $"Database holds both a '{CurrentLedger.Table}' and an '{PreviousLedger.Table}' table, so its schema revision is ambiguous. " +
+                "Weir changed nothing. Restore a backup that matches this version, " +
+                "or move this file aside so Weir creates a new one.",
+                SchemaMismatchKind.Incompatible);
+        }
+
+        if (hasCurrent)
+        {
+            return CurrentLedger;
+        }
+
+        return hasPrevious ? PreviousLedger : null;
+    }
+
+    private static bool TableExists(SqliteConnection connection, string name) =>
+        ScalarLong(connection, $"SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = '{name}'") > 0;
 
     /// <summary>The refusal for a database with no recorded revision, with the operator's options.</summary>
     private static DatabaseSchemaMismatchException UnversionedError() => new(
