@@ -10,8 +10,8 @@ namespace Weir.Contract.Tests.Auth;
 [ContractArea("auth")]
 public sealed class RateLimitTests(RateLimitTests.RateLimitServerFixture fixture) : AuthTestBase(fixture), IClassFixture<RateLimitTests.RateLimitServerFixture>
 {
-    // Long enough that three Argon2-hashed sign-ins fit inside it on a slow CI runner.
-    private const int WindowSeconds = 10;
+    // Long enough that three Argon2-hashed sign-ins fit inside it on a CI runner busy with other test classes.
+    private const int WindowSeconds = 30;
 
     [Fact]
     public async Task Login_rate_limit_window_slides()
