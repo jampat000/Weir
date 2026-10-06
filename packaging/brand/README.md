@@ -61,11 +61,18 @@ render: a third-colour sliver inside the middle stream, and a middle stream near
 two-stream fallback also exists and where it is and is not used: that split is about small `.ico` frames only, not
 about which geometry is "the" mark.
 
-**The SVGs are now the source.** The Python that traced and built them, and the script that rendered the raster
-icons from them, were removed with the rest of the repository's Python (#892). The files below are all committed, so
-nothing needs regenerating to build Weir. To change the mark, edit the paths in the four SVGs here and keep the copies
-(`apps/web/public/favicon.svg`, `apps/web/src/components/brand/weir-logo.tsx`, `docs-site/static/img/logo*.svg`)
-identical; the raster icons then need rendering again, which has no tool in the repository yet.
+**The SVGs are the source.** The Python that traced and built them was removed with the rest of the repository's
+Python (#892). Everything below is committed, so nothing needs regenerating to build Weir. To change the mark, edit the
+paths in the four SVGs here and keep the copies (`apps/web/public/favicon.svg`,
+`apps/web/src/components/brand/weir-logo.tsx`, `docs-site/static/img/logo*.svg`) identical, then render the raster
+icons again:
+
+- `npm ci` in `apps/web` (the renderer, `@resvg/resvg-js`, is a dev dependency there).
+- `node scripts/build-brand-icons.mjs` renders every raster icon below from the SVGs and overwrites the committed files.
+- `node scripts/build-brand-icons.mjs --check` renders to a temporary folder and compares each frame with the committed
+  file, changing nothing. It reports the largest per-channel difference per frame and fails if one is over 96 of 255
+  (`--tolerance=N` changes that). Edge pixels differ slightly from the committed icons, which a browser drew; a changed
+  mark differs by much more.
 
 The raster icons derived from them, all committed:
 

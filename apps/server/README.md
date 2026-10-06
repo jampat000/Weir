@@ -59,9 +59,9 @@ The variables and their defaults are documented in the repository's [`.env.examp
 
 ## Schema and migrations
 
-The numbered SQL scripts in `src/Weir.Infrastructure/Migrations/` are the only source of schema changes. `Weir.Infrastructure.Sqlite.SchemaMigrator` lists them in order, each with the revision it leaves behind, and records the current revision in the `alembic_version` table. The table name matches what earlier Weir releases wrote, so their databases are recognised and upgraded.
+The numbered SQL scripts in `src/Weir.Infrastructure/Migrations/` are the only source of schema changes. `Weir.Infrastructure.Sqlite.SchemaMigrator` lists them in order, each with the revision it leaves behind, and records the current revision in the `schema_version` table (one `revision` row). A database from before migration `0039` records it in `alembic_version` instead; its first start on this build renames that table and carries the revision over. A database holding both tables is refused and left unchanged.
 
-The current head is migration `0020_library_file_probes`, revision `0055_library_file_probes`. The first script, `0001_baseline_0036_drop_pruner_tables.sql`, is the frozen baseline (revision `0036_drop_pruner_tables`).
+The current head is migration `0039_schema_version_table`, revision `0074_schema_version_table`. The first script, `0001_baseline_0036_drop_pruner_tables.sql`, is the frozen baseline (revision `0036_drop_pruner_tables`).
 
 On startup the server:
 

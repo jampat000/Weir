@@ -25,7 +25,7 @@ public sealed class SchemaMigratorTests
         database.ClearPool();
 
         Assert.Equal(SchemaStartupOutcome.Upgraded, outcome);
-        Assert.Equal(1, SchemaSnapshot.ScalarLong(path, $"SELECT COUNT(*) FROM alembic_version WHERE version_num = '{SchemaMigrator.HeadRevision}'"));
+        Assert.Equal(1, SchemaSnapshot.ScalarLong(path, $"SELECT COUNT(*) FROM schema_version WHERE revision = '{SchemaMigrator.HeadRevision}'"));
 
         // Matches a database created fresh at head, once the seeded suite_settings row's timestamps
         // (masked by SchemaSnapshot) and the fact a fresh install seeds no libraries/rule sets are allowed for.
@@ -44,7 +44,7 @@ public sealed class SchemaMigratorTests
         var database = new SqliteDatabase(temp.Join("weir.sqlite3"));
         Assert.Equal(SchemaStartupOutcome.Created, new SchemaMigrator(database).EnsureAtHead());
         Assert.Equal(SchemaStartupOutcome.AlreadyCurrent, new SchemaMigrator(database).EnsureAtHead());
-        Assert.Equal(1, SchemaSnapshot.ScalarLong(database.DatabasePath, $"SELECT COUNT(*) FROM alembic_version WHERE version_num = '{SchemaMigrator.HeadRevision}'"));
+        Assert.Equal(1, SchemaSnapshot.ScalarLong(database.DatabasePath, $"SELECT COUNT(*) FROM schema_version WHERE revision = '{SchemaMigrator.HeadRevision}'"));
         database.ClearPool();
     }
 
@@ -141,7 +141,7 @@ public sealed class SchemaMigratorTests
         Assert.Equal(SchemaStartupOutcome.Created, new SchemaMigrator(database).EnsureAtHead());
         database.ClearPool();
 
-        Assert.Equal(1, SchemaSnapshot.ScalarLong(path, "SELECT COUNT(*) FROM alembic_version"));
+        Assert.Equal(1, SchemaSnapshot.ScalarLong(path, "SELECT COUNT(*) FROM schema_version"));
     }
 
     /// <summary>
@@ -203,9 +203,10 @@ public sealed class SchemaMigratorTests
     private static void BuildDatabaseAtRevision(string path, int revisionNumber)
     {
         var migrations = SchemaMigrator.Migrations.Where(migration => migration.Number <= revisionNumber).OrderBy(migration => migration.Number).ToList();
-        var script = string.Concat(migrations.Select(SchemaMigrator.ReadMigrationSql)) +
-            $"DELETE FROM alembic_version; INSERT INTO alembic_version (version_num) VALUES ('{migrations[^1].Revision}');";
-        SchemaSnapshot.Execute(path, script);
+        SchemaSnapshot.Execute(path, string.Concat(migrations.Select(SchemaMigrator.ReadMigrationSql)));
+        var renamed = SchemaSnapshot.ScalarLong(path, "SELECT COUNT(*) FROM sqlite_master WHERE name = 'schema_version'") > 0;
+        var (table, column) = renamed ? ("schema_version", "revision") : ("alembic_version", "version_num");
+        SchemaSnapshot.Execute(path, $"DELETE FROM {table}; INSERT INTO {table} ({column}) VALUES ('{migrations[^1].Revision}');");
     }
 
     [Fact]

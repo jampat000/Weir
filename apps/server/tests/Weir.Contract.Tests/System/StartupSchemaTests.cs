@@ -8,6 +8,9 @@ namespace Weir.Contract.Tests.SystemArea;
 [ContractArea("system")]
 public sealed class StartupSchemaTests(StartupSchemaTests.HeadSchemaFixture fixture) : IClassFixture<StartupSchemaTests.HeadSchemaFixture>
 {
+    /// <summary>The last revision that recorded itself in the alembic_version table.</summary>
+    private const string PreviousRevision = "0073_library_change_reason";
+
     /// <summary>A server on its own data folder, with the tables and columns its database was brought to read once.</summary>
     public sealed class HeadSchemaFixture : ServerFixture, IAsyncLifetime
     {
@@ -90,6 +93,79 @@ public sealed class StartupSchemaTests(StartupSchemaTests.HeadSchemaFixture fixt
         Assert.Contains("radarr_upgrade_search_schedule_interval_seconds", names);
     }
 
+    /// <summary>A database whose revision is recorded in the old table is upgraded on start, and carries only schema_version afterwards.</summary>
+    [Fact]
+    public async Task A_database_recording_its_revision_in_the_old_table_is_upgraded_on_start()
+    {
+        await using var server = await WeirServer.StartNewAsync();
+        string? head;
+        await using (var stopped = await server.StopForDatabaseAsync(restart: false))
+        {
+            head = Revision(stopped.Connection);
+            RecordRevisionInOldTable(stopped.Connection, PreviousRevision);
+            Assert.DoesNotContain("schema_version", Tables(stopped.Connection));
+        }
+
+        await server.RestartAsync();
+        using (var client = server.CreateClient())
+        {
+            Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/health")).Status);
+        }
+
+        await using var upgraded = await server.StopForDatabaseAsync(restart: false);
+        Assert.Equal(head, Revision(upgraded.Connection));
+        Assert.DoesNotContain("alembic_version", Tables(upgraded.Connection));
+        Assert.Single(SeedSql.Rows(upgraded.Connection, "SELECT revision FROM schema_version"));
+    }
+
+    /// <summary>A revision this build has never heard of is refused whichever table holds it, and the file is left as it was.</summary>
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task A_database_at_an_unknown_revision_is_refused_and_left_unchanged(bool inOldTable)
+    {
+        await using var server = await WeirServer.StartNewAsync();
+        await using (var stopped = await server.StopForDatabaseAsync(restart: false))
+        {
+            if (inOldTable)
+            {
+                RecordRevisionInOldTable(stopped.Connection, "0999_from_the_future");
+            }
+            else
+            {
+                SeedSql.Execute(stopped.Connection, "UPDATE schema_version SET revision = '0999_from_the_future'");
+            }
+        }
+
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() => server.RestartAsync());
+        Assert.Contains("0999_from_the_future", error.Message, StringComparison.Ordinal);
+
+        await using var after = await server.StopForDatabaseAsync(restart: false);
+        var ledger = inOldTable ? "alembic_version" : "schema_version";
+        Assert.Contains(ledger, Tables(after.Connection));
+        Assert.Equal("0999_from_the_future", (string?)SeedSql.Scalar(after.Connection, $"SELECT * FROM {ledger}"));
+    }
+
+    /// <summary>Both version tables at once leave the revision ambiguous: the server refuses the database and changes nothing.</summary>
+    [Fact]
+    public async Task A_database_with_both_version_tables_is_refused_and_left_unchanged()
+    {
+        await using var server = await WeirServer.StartNewAsync();
+        await using (var stopped = await server.StopForDatabaseAsync(restart: false))
+        {
+            SeedSql.Execute(stopped.Connection, "CREATE TABLE alembic_version (version_num VARCHAR(32) NOT NULL)");
+            SeedSql.Execute(stopped.Connection, "INSERT INTO alembic_version VALUES ($revision)", ("$revision", PreviousRevision));
+        }
+
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() => server.RestartAsync());
+        Assert.Contains("both", error.Message, StringComparison.Ordinal);
+
+        await using var after = await server.StopForDatabaseAsync(restart: false);
+        Assert.Contains("alembic_version", Tables(after.Connection));
+        Assert.Contains("schema_version", Tables(after.Connection));
+        Assert.Equal(PreviousRevision, (string?)SeedSql.Scalar(after.Connection, "SELECT version_num FROM alembic_version"));
+    }
+
     /// <summary>A data folder whose database Weir never set up: the server refuses to start and changes nothing.</summary>
     [Fact]
     public async Task Api_startup_fails_without_migrations()
@@ -125,5 +201,21 @@ public sealed class StartupSchemaTests(StartupSchemaTests.HeadSchemaFixture fixt
     }
 
     private static string? Revision(SqliteConnection connection) =>
-        (string?)SeedSql.Scalar(connection, "SELECT version_num FROM alembic_version");
+        (string?)SeedSql.Scalar(connection, "SELECT revision FROM schema_version");
+
+    private static List<string> Tables(SqliteConnection connection) =>
+        SeedSql.Rows(connection, "SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name")
+            .Select(row => (string)row["name"]!)
+            .ToList();
+
+    /// <summary>
+    /// Puts the version record back the way a release before the schema_version table wrote it. Migration 39 only
+    /// renames that table, so the rest of the schema at head is exactly the schema of <see cref="PreviousRevision"/>.
+    /// </summary>
+    private static void RecordRevisionInOldTable(SqliteConnection connection, string revision)
+    {
+        SeedSql.Execute(connection, "ALTER TABLE schema_version RENAME COLUMN revision TO version_num");
+        SeedSql.Execute(connection, "ALTER TABLE schema_version RENAME TO alembic_version");
+        SeedSql.Execute(connection, "UPDATE alembic_version SET version_num = $revision", ("$revision", revision));
+    }
 }
