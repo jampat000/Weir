@@ -10,7 +10,7 @@ public sealed class SseReader : IDisposable
     private const string EventField = "event:";
     private const string DataField = "data:";
 
-    // Short enough that a stream that never sends fails the test quickly instead of hanging it; the Python reader's read timeout.
+    // Short enough that a stream that never sends fails the test quickly instead of hanging it.
     private static readonly TimeSpan DefaultIdleTimeout = TimeSpan.FromSeconds(10);
 
     private readonly HttpResponseMessage _response;

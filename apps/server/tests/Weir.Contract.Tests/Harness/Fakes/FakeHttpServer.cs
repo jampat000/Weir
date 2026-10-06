@@ -212,7 +212,7 @@ public abstract class FakeHttpServer : IDisposable
             request.HttpMethod.ToUpperInvariant(), path, ParseQuery(split < 0 ? string.Empty : raw[(split + 1)..]), headers, body.ToArray(), DateTimeOffset.UtcNow);
     }
 
-    // Like Python's parse_qs: percent-decoded, "+" as a space, and a parameter without a value is dropped.
+    // Query values are percent-decoded with "+" read as a space, and a parameter without a value is dropped.
     private static Dictionary<string, string[]> ParseQuery(string query)
     {
         var parsed = new Dictionary<string, List<string>>();

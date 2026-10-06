@@ -21,7 +21,7 @@ public sealed class WeirClient : IDisposable
     // rather than as a client that gave up at the same instant (#586). Keep it strictly greater.
     private static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(45);
 
-    // A browser or media manager always says what it accepts, as the Python client's HTTP library did.
+    // A browser or media manager always says what it accepts.
     private const string DefaultAccept = "*/*";
 
     private readonly Uri _baseAddress;
