@@ -66,6 +66,23 @@ public sealed class ArtworkResolverTests
     }
 
     [Fact]
+    public async Task A_title_answered_while_a_caller_waited_to_ask_is_not_asked_about_again()
+    {
+        using var fixture = new ArtworkFixture();
+        fixture.ServeSearch(ArtworkFixture.SearchAnswer(PosterFile, originalLanguage: "de")).ServeImage(PosterFile);
+        var library = await fixture.LibraryIdAsync("movie");
+        await fixture.QueueFileAsync(library, FilmPath);
+        var readBeforeTheAnswer = await fixture.LookupAsync(FilmKey());
+        await fixture.Resolver.ResolveDueAsync(10, CancellationToken.None);
+        fixture.Store.Clock.Advance(ArtworkRateLimiter.MinimumBetweenSearches);
+
+        await fixture.Resolver.SearchNowAsync(readBeforeTheAnswer!, CancellationToken.None);
+
+        Assert.Single(fixture.Searches());
+        Assert.Equal("de", await fixture.OriginalLanguageAsync(FilmKey()));
+    }
+
+    [Fact]
     public async Task A_title_with_a_poster_is_not_asked_about_again()
     {
         using var fixture = new ArtworkFixture();
