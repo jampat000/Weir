@@ -48,8 +48,9 @@ Weir should be easy for coding agents to inspect, modify, validate, and repair w
 | API types (from `apps/web`) | `npm run api:types:check` |
 | Dead code | `node scripts/check-dead-code.mjs` |
 | Docs map | `node scripts/check-agent-docs.mjs` |
-| Contract suite | [`../tests/contract/README.md`](../tests/contract/README.md) |
-| E2E | `python -m pytest tests/e2e/weir -q --tb=short` (see [`local-development.md`](local-development.md)) |
+| Contract suite | `dotnet test apps/server/tests/Weir.Contract.Tests --filter "Area=<area>"` ([README](../apps/server/tests/Weir.Contract.Tests/README.md)) |
+| E2E | `WEIR_E2E=1 dotnet test apps/server/tests/Weir.E2E.Tests` (see [`local-development.md`](local-development.md)) |
+| No Python | `node scripts/check-no-python.mjs` |
 | Windows and Docker smoke | [`smoke-checklists.md`](smoke-checklists.md) |
 
 ## Feedback loops to prefer

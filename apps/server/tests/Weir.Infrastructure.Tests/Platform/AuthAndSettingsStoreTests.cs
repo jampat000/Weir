@@ -2,7 +2,6 @@ using System.Text;
 using Microsoft.Data.Sqlite;
 using Weir.Core.Auth;
 using Weir.Core.Json;
-using Weir.Core.Security;
 using Weir.Core.Time;
 using Weir.Infrastructure.Logging;
 using Weir.Infrastructure.Notifications;
@@ -20,7 +19,7 @@ public sealed class AuthAndSettingsStoreTests
     public async Task Login_keeps_only_the_newest_five_active_sessions()
     {
         using var fixture = new StoreFixture();
-        await fixture.WithUnitOfWork(uow => fixture.Users.InsertUserAsync(uow, "alice", PasswordHasher.Hash(Password), "admin", true));
+        await fixture.WithUnitOfWork(uow => fixture.Users.InsertUserAsync(uow, "alice", CheapPasswordHash.For(Password), "admin", true));
         for (var i = 0; i < 6; i++)
         {
             fixture.Clock.Set(fixture.Clock.GetUtcNow().AddSeconds(1));
@@ -138,7 +137,7 @@ public sealed class AuthAndSettingsStoreTests
     public async Task Username_and_password_changes_follow_the_documented_rules()
     {
         using var fixture = new StoreFixture();
-        var id = await fixture.WithUnitOfWork(uow => fixture.Users.InsertUserAsync(uow, "alice", PasswordHasher.Hash(Password), "admin", true));
+        var id = await fixture.WithUnitOfWork(uow => fixture.Users.InsertUserAsync(uow, "alice", CheapPasswordHash.For(Password), "admin", true));
         await fixture.WithUnitOfWork(uow => fixture.Users.InsertUserAsync(uow, "bob", "x", "viewer", true));
 
         async Task<string> Error(Func<UnitOfWork, Task> work) =>
@@ -157,7 +156,7 @@ public sealed class AuthAndSettingsStoreTests
     public async Task A_new_user_has_no_theme_preference_until_one_is_set()
     {
         using var fixture = new StoreFixture();
-        var id = await fixture.WithUnitOfWork(uow => fixture.Users.InsertUserAsync(uow, "alice", PasswordHasher.Hash(Password), "admin", true));
+        var id = await fixture.WithUnitOfWork(uow => fixture.Users.InsertUserAsync(uow, "alice", CheapPasswordHash.For(Password), "admin", true));
 
         Assert.Null((await fixture.WithUnitOfWork(uow => fixture.Users.GetUserAsync(uow, id)))!.AppTheme);
 

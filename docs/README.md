@@ -38,7 +38,7 @@ whose source is in [`../docs-site/docs`](../docs-site/docs).
 - [`engineering/503-mkvmerge-vs-ffmpeg.md`](engineering/503-mkvmerge-vs-ffmpeg.md) - the trial that chose mkvmerge for Matroska output.
 - [`../apps/server/README.md`](../apps/server/README.md) - the .NET server: projects, build, schema and publishing.
 - [`../apps/web/README.md`](../apps/web/README.md) - the web app.
-- [`../tests/contract/README.md`](../tests/contract/README.md) - the API contract suite.
+- [`../apps/server/tests/Weir.Contract.Tests/README.md`](../apps/server/tests/Weir.Contract.Tests/README.md) - the API contract suite.
 
 ## Architecture
 

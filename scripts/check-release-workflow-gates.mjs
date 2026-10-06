@@ -268,13 +268,13 @@ for (const marker of [
   requireText(ciDockerSmoke, marker, `${CI_PACKAGING} docker-smoke job`);
 }
 
-// The contract suite runs one leg per area in areas.json, and every leg is part of CI's verdict.
+// The contract suite runs one leg per area in the contract project's areas.json, and every leg is part of CI's verdict.
 requireText(requireJob(ci, "contract", CI), "areas: ${{ needs.changes.outputs.contract_areas }}", `${CI} contract job`);
 const contractLeg = requireJob(ciContract, "area", CI_CONTRACT);
 for (const marker of [
   "area: ${{ fromJSON(inputs.areas) }}",
-  '--contract-area "$CONTRACT_AREA"',
-  "WEIR_CONTRACT_LEDGER: ${{ runner.temp }}/",
+  '--filter "Area=$CONTRACT_AREA"',
+  'WEIR_CONTRACT_KEEP_DATA: "1"',
 ]) {
   requireText(contractLeg, marker, `${CI_CONTRACT} area job`);
 }

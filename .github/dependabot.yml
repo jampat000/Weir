@@ -13,21 +13,6 @@ updates:
       interval: weekly
     open-pull-requests-limit: 0
 
-  # The Python test runners (contract suite, E2E, packaged live audit): tests/requirements.txt.
-  - package-ecosystem: pip
-    directory: /tests
-    schedule:
-      interval: weekly
-    open-pull-requests-limit: 0
-    # The workflows moved to Python 3.13 (pyee 14.0.0's own floor), but pyee is still held: the
-    # pinned playwright==1.63.0 (the latest release) itself requires "pyee<14,>=13", so 14.0.0
-    # cannot be installed alongside it regardless of the Python version. Lift this once playwright
-    # raises that bound, or once we intentionally drop below the version playwright pins.
-    ignore:
-      - dependency-name: "pyee"
-        versions:
-          - ">=14.0.0"
-
   - package-ecosystem: github-actions
     directory: /
     schedule:

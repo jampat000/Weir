@@ -240,7 +240,7 @@ Nothing under `apps/` was changed.
 
 The refresh ran after every conversion above had merged. `scripts/screenshot-site.py` captures
 every screen in both themes, at desktop and narrow widths, empty and seeded, for review. The images
-the README publishes are captured by [`scripts/capture-readme-screenshots.py`](../../scripts/capture-readme-screenshots.py),
+the README publishes are captured by `scripts/capture-readme-screenshots.py` (removed with the repository's Python in #892; the README screenshots now come from a real Weir),
 which reuses the harness's bring-up and seed but shoots viewport-only frames at the published sizes,
 and also opens and seeds the processing record the harness cannot reach.
 

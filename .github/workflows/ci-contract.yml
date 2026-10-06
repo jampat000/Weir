@@ -1,6 +1,6 @@
-# The contract suite (#516), called by ci.yml: starts the .NET server as a separate process and talks to it only
-# over HTTP (tests/contract/README.md). One leg per area in tests/contract/areas.json, all at once, rather than one
-# long runner. Serves the web build ci.yml's web-dist job uploaded to this run.
+# The contract suite (#516), called by ci.yml: apps/server/tests/Weir.Contract.Tests starts the built .NET server as
+# a separate process and talks to it only over HTTP (its README.md). One leg per area in that project's areas.json,
+# all at once, rather than one long runner.
 name: Contract suite
 
 on:
@@ -32,16 +32,13 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
-        with:
-          python-version: "3.13"
-          cache: pip
-          cache-dependency-path: tests/requirements.txt
-
-      - name: Install locked contract suite dependencies and ffmpeg
+      # The real-ffmpeg scenarios (Processing) run when ffmpeg and ffprobe are on PATH, and skip without them, so
+      # a runner that lacks them is fixed here rather than left to pass quietly.
+      - name: Install ffmpeg
         run: |
-          python -m pip install --require-hashes -r tests/requirements.txt
-          command -v ffmpeg >/dev/null || (sudo apt-get update && sudo apt-get install -y ffmpeg)
+          command -v ffmpeg >/dev/null && command -v ffprobe >/dev/null || (sudo apt-get update && sudo apt-get install -y ffmpeg)
+          ffmpeg -version | head -n 1
+          ffprobe -version | head -n 1
 
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
         with:
@@ -49,51 +46,34 @@ jobs:
           cache: true
           cache-dependency-path: apps/server/**/packages.lock.json
 
-      # Only the host: the suite runs `dotnet run --no-build` on it (tests/contract/support/launcher.py), and
-      # server-linux builds the whole solution with warnings as errors.
-      - name: Build Weir server (the server under test)
+      # The contract project builds the server (Weir.Host) and the fake ffprobe/ffmpeg before itself and starts them
+      # as processes; it references no server code.
+      - name: Build the contract suite and the server under test
         working-directory: apps/server
         run: |
-          dotnet restore src/Weir.Host --locked-mode
-          dotnet build src/Weir.Host --no-restore
+          dotnet restore tests/Weir.Contract.Tests --locked-mode
+          dotnet build tests/Weir.Contract.Tests --no-restore
 
-      - name: Download web dist (served by the server under test)
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
-        with:
-          name: weir-web-dist
-          path: apps/web/dist
-
-      - name: Contract suite lint
-        run: |
-          ruff check tests/contract
-          ruff format --check tests/contract
-
-      # --contract-area refuses an unknown area and one that collects no tests, so a leg can never pass empty.
+      # `dotnet test` passes when a filter matches nothing, so scripts/check-contract-areas.mjs (repo-checks)
+      # guarantees every area in areas.json has test classes.
       - name: Contract suite, area (${{ matrix.area }})
         id: contract
+        working-directory: apps/server
         env:
-          # The suite reaps servers an earlier run left behind through this ledger file; one per leg.
-          WEIR_CONTRACT_LEDGER: ${{ runner.temp }}/weir-contract-servers-${{ matrix.area }}.json
           CONTRACT_AREA: ${{ matrix.area }}
-        run: python -m pytest tests/contract -q --tb=short -p no:cacheprovider --contract-area "$CONTRACT_AREA"
-
-      # #586: the suite writes one log per server it starts (ServerUnderTest.logs_dir,
-      # tests/contract/support/launcher.py) into pytest's basetemp, outside the workspace. Copy them somewhere
-      # uploadable so an intermittent failure keeps its server-side evidence.
-      - name: Collect contract server logs
-        if: ${{ !cancelled() && steps.contract.outcome == 'failure' }}
+          # Keep each server's data folder and log (<folder>/contract-logs) until the leg is known to have passed.
+          WEIR_CONTRACT_KEEP_DATA: "1"
+          # Every server the suite starts gets its data folder under here, so a failed leg can upload them.
+          TMPDIR: ${{ runner.temp }}/weir-contract-data
         run: |
-          shopt -s nullglob globstar
-          mkdir -p artifacts/contract-logs
-          for log in /tmp/pytest-of-*/pytest-*/**/contract-logs/server-*.log; do
-            cp "$log" "artifacts/contract-logs/$(printf '%s' "${log#/tmp/}" | tr '/' '_')"
-          done
-          ls -la artifacts/contract-logs
+          mkdir -p "$TMPDIR"
+          dotnet test tests/Weir.Contract.Tests --no-build --filter "Area=$CONTRACT_AREA"
 
-      - name: Upload contract server logs
+      - name: Upload contract data folders and server logs
         if: ${{ !cancelled() && steps.contract.outcome == 'failure' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: weir-contract-logs-${{ matrix.area }}
+          name: weir-contract-data-${{ matrix.area }}
           if-no-files-found: warn
-          path: artifacts/contract-logs/*
+          retention-days: 7
+          path: ${{ runner.temp }}/weir-contract-data

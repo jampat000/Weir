@@ -210,7 +210,7 @@ An interrupt is a list of sentences with a link each, not a card, banner or colo
    and make it pass.
 9. Do not leave superseded CSS behind. When the last user of a rule goes, delete the rule in the
    same PR.
-10. Do not change what a `data-testid` points at. The E2E suite in `tests/e2e/weir` relies on them.
+10. Do not change what a `data-testid` points at. The E2E suite in `apps/server/tests/Weir.E2E.Tests` relies on them.
 11. Do not use a Tailwind utility to change something a `weir-*` class already sets.
 
 ---

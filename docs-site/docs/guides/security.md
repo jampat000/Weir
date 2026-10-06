@@ -42,7 +42,7 @@ Weir's security posture and hardening baseline.
 | CodeQL | Static analysis of the C# server and the JavaScript/TypeScript web app |
 | NuGet vulnerability scan | .NET package vulnerabilities (`node scripts/check-dotnet-vulnerabilities.mjs apps/server/Weir.slnx`; fails on High or Critical) |
 | npm audit | JavaScript dependency vulnerabilities |
-| Dependabot | Automated dependency update PRs for NuGet, npm, GitHub Actions, and the Python test-runner packages in `tests/requirements.txt` |
+| Dependabot | Automated dependency update PRs for NuGet, npm, GitHub Actions and Docker base images |
 
 The docs build runs an image-format preflight and rejects ICNS, JXL, HEIC, and HEIF before Docusaurus parses repository assets. The current `image-size` advisories are tracked in `dependency-audit-exceptions.json` because the registry does not yet publish a fixed version; the exception has an expiry date and a documented mitigation. When a fixed release is available, update the `image-size` override, remove the exception entries, and keep the preflight as defense in depth.
 

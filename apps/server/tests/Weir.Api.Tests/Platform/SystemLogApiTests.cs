@@ -20,6 +20,7 @@ public sealed class SystemLogApiTests
         await TestDatabase.SeedAdminAsync(server);
         var client = new ApiTestClient(server);
         await client.SignInAsync();
+        await TestDatabase.WaitForStartupPruneAsync(server);
         return (server, client);
     }
 
