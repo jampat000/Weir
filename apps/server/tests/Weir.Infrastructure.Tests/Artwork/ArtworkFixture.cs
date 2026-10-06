@@ -122,6 +122,10 @@ internal sealed class ArtworkFixture : IDisposable
             async uow => await uow.ScalarAsync("SELECT original_language FROM artwork_lookups WHERE lookup_key = $key", ("$key", lookupKey)) is string language ? language : null,
             commit: false);
 
+    /// <summary>A title's lookup as the resolver and the original-language lookup read it.</summary>
+    public Task<ArtworkLookup?> LookupAsync(string lookupKey) =>
+        Store.WithUnitOfWork(uow => Lookups.FindAsync(uow, lookupKey, Store.Clock.GetUtcNow()), commit: false);
+
     public Task<IReadOnlyDictionary<(long LibraryId, string Path), string>> PosterUrlsForAsync(long libraryId, params string[] paths) =>
         Store.WithUnitOfWork(uow => PosterUrls.ForFilesAsync(uow, paths.Select(path => (libraryId, path))), commit: false);
 
@@ -135,5 +139,9 @@ internal sealed class ArtworkFixture : IDisposable
     public Task InsertFileAsync(long libraryId, string path) =>
         Store.Execute($"INSERT INTO files (library_id, relative_path, status) VALUES ({libraryId}, '{path.Replace("'", "''", StringComparison.Ordinal)}', 'processed')");
 
-    public void Dispose() => Store.Dispose();
+    public void Dispose()
+    {
+        Resolver.Dispose();
+        Store.Dispose();
+    }
 }

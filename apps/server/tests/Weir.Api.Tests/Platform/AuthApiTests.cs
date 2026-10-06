@@ -175,6 +175,21 @@ public sealed class AuthApiTests
         Assert.Equal("Invalid account role.", await Detail(invalid));
     }
 
+    /// <summary>The other tests seed accounts at the smallest hash cost; this one keeps the cost the product really uses on the sign-in path.</summary>
+    [Fact]
+    public async Task A_password_hashed_at_the_production_cost_signs_in_and_a_wrong_one_does_not()
+    {
+        await using var server = await StartServerAsync();
+        var hash = Core.Security.PasswordHasher.Hash(AdminPassword);
+        Assert.StartsWith("$argon2id$v=19$m=65536,t=3,p=1$", hash, StringComparison.Ordinal);
+        await TestDatabase.ExecuteAsync(server, "INSERT INTO users (username, password_hash, role, is_active) VALUES ('alice', $h, 'admin', 1)", ("$h", hash));
+        var client = new ApiTestClient(server);
+
+        using var wrong = await client.LoginAsync(password: "wrong-password");
+        Assert.Equal(HttpStatusCode.Unauthorized, wrong.StatusCode);
+        await client.SignInAsync();
+    }
+
     [Fact]
     public async Task Bootstrap_creates_the_first_admin_once()
     {

@@ -24,6 +24,7 @@ internal sealed class JobsTestDatabase : IDisposable
     public JobsTestDatabase(bool keepSeedRows = false)
     {
         DbPath = _directory.Join("weir.sqlite3");
+        MigratedDatabaseTemplate.CopyTo(DbPath);
         Database = new SqliteDatabase(DbPath);
         new SchemaMigrator(Database).EnsureAtHead();
         if (!keepSeedRows)

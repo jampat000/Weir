@@ -1,0 +1,111 @@
+using System.Net;
+using Weir.Contract.Tests.Harness;
+
+namespace Weir.Contract.Tests.Activity;
+
+/// <summary>The activity freshness stream (server-sent events), and how recording an event treats retention.</summary>
+[ContractArea("activity")]
+public sealed class ActivityStreamTests(ServerFixture fixture) : IClassFixture<ServerFixture>
+{
+    private const string Stream = $"{WeirClient.Api}/activity/stream";
+    private const string Recent = $"{WeirClient.Api}/activity/recent";
+    private const string LatestEvent = "activity.latest";
+
+    private WeirServer Server => fixture.Server;
+
+    [Fact]
+    public async Task Activity_stream_requires_authentication()
+    {
+        using var client = Server.CreateClient();
+
+        using var stream = await client.OpenStreamAsync(Stream);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, stream.Status);
+    }
+
+    [Fact]
+    public async Task Activity_stream_authenticated_emits_latest_format()
+    {
+        using var admin = await Server.CreateAdminClientAsync();
+
+        using var stream = await admin.OpenStreamAsync(Stream);
+
+        Assert.Equal(HttpStatusCode.OK, stream.Status);
+        Assert.StartsWith("text/event-stream", stream.Header("Content-Type"));
+        Assert.Contains("no-store", stream.Header("Cache-Control"));
+        Assert.Equal("no", stream.Header("X-Accel-Buffering"));
+
+        Assert.Equal(["retry: 5000"], await stream.NextBlockAsync());
+        // The system.stats frame is sent at once too, so the frame is looked for by name.
+        var data = (await stream.NextEventNamedAsync(LatestEvent)).AsObject();
+        Assert.Equal(new HashSet<string> { "latest_event_id", "activity_revision" }, data.Select(field => field.Key).ToHashSet());
+        Assert.Equal(await LatestActivityIdAsync(admin), (long)data["latest_event_id"]!);
+        Assert.True(data["activity_revision"]!.AsValue().TryGetValue<long>(out _));
+    }
+
+    [Fact]
+    public async Task Activity_stream_emits_a_newer_id_and_revision_after_a_new_event()
+    {
+        using var admin = await Server.CreateAdminClientAsync();
+        using var stream = await admin.OpenStreamAsync(Stream);
+        var first = (await stream.NextEventNamedAsync(LatestEvent)).AsObject();
+
+        // Signing in again records an Activity event while the stream is open. The stream holds no database
+        // session, so the write is not blocked by it.
+        using var other = Server.CreateClient();
+        await other.LoginAsync();
+        var latest = await LatestActivityIdAsync(admin);
+        Assert.True(latest > (long)first["latest_event_id"]!);
+
+        var data = (await stream.NextEventNamedAsync(LatestEvent)).AsObject();
+        while ((long)data["latest_event_id"]! < latest)
+        {
+            data = (await stream.NextEventNamedAsync(LatestEvent)).AsObject();
+        }
+
+        Assert.Equal(latest, (long)data["latest_event_id"]!);
+        Assert.True((long)data["activity_revision"]! > (long)first["activity_revision"]!);
+    }
+
+    [Fact]
+    public async Task Record_activity_event_does_not_prune_history_using_log_retention()
+    {
+        const string title = "Old Processing result that still backs overview history";
+        const int logRetentionDays = 1;
+        await using var server = await WeirServer.StartNewAsync();
+        using (var admin = await server.CreateAdminClientAsync())
+        {
+            var current = await ActivitySettings.CurrentAsync(admin);
+            var saved = await ActivitySettings.SaveAsync(admin, ActivitySettings.UpdateBody(current, logRetentionDays: logRetentionDays));
+            Assert.True(saved.Status == HttpStatusCode.OK, saved.ToString());
+        }
+
+        await using (var database = await server.StopForDatabaseAsync())
+        {
+            ActivityRows.InsertEvent(
+                database.Connection,
+                "processing.file_remux_pass_completed",
+                "processing",
+                title,
+                detail: "{}",
+                createdAt: DateTime.UtcNow - TimeSpan.FromDays(10),
+                facts: new EventFacts(Result: "success"));
+        }
+
+        using var client = server.CreateClient();
+        await client.LoginAsync(); // records a new sign-in event
+
+        var response = await client.GetAsync(Recent, ("limit", 100));
+        Assert.True(response.Status == HttpStatusCode.OK, response.ToString());
+        var items = response.Fields["items"]!.AsArray();
+        Assert.Contains(title, items.Select(item => (string)item!["title"]!));
+        Assert.Contains(items, item => (string)item!["module"]! == "auth");
+    }
+
+    private static async Task<long> LatestActivityIdAsync(WeirClient client)
+    {
+        var response = await client.GetAsync(Recent, ("limit", 100));
+        Assert.True(response.Status == HttpStatusCode.OK, response.ToString());
+        return response.Fields["items"]!.AsArray().Max(item => (long)item!["id"]!);
+    }
+}

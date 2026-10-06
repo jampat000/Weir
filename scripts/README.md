@@ -4,8 +4,9 @@
 
 - **Node** (`.mjs`) for repository tooling and CI gates. Node is on every CI runner and every
   workstation that builds the web app, and needs no install step.
-- **Python** only for Playwright and test tooling, which share `tests/requirements.txt` with the
-  E2E smoke and the contract suite.
+- **.NET** for anything that drives a browser or judges a running server: the contract suite, the E2E tests and
+  the packaged live audit are projects under `apps/server`, not scripts.
+- **No Python.** `check-no-python.mjs` fails CI if a `.py` file is tracked.
 - **PowerShell** only for Windows packaging and checks that exercise the Windows package.
 
 A new script follows these rules. A script in the wrong language is replaced when it next needs real
@@ -18,6 +19,8 @@ work, not rewritten for its own sake. Scripts are named in kebab-case.
 | `ci-passed.mjs` | CI's single verdict: every job due for the change passed, every other job was skipped (`ci-passed.test.mjs`). |
 | `check-agent-docs.mjs` | Checks that the agent documentation map (`AGENTS.md` and its links) is valid. |
 | `check-github-action-pins.mjs` | Fails when a workflow uses an action that is not pinned to a full commit SHA. |
+| `check-no-python.mjs` | Fails when a Python file is tracked: Weir's tooling and tests are Node, PowerShell or .NET (`check-no-python.test.mjs`). |
+| `check-contract-areas.mjs` | Fails when the contract suite's `areas.json` and its `[ContractArea]` test classes disagree, so a CI leg can never run zero tests (`check-contract-areas.test.mjs`). |
 | `check-test-console-programs.mjs` | Fails when a test source under `apps/` starts a system console program (`ping`, `timeout`, ...) as a stand-in, because that can pop a console window on a desktop (#806, #821) (`check-test-console-programs.test.mjs`). |
 | `check-node-docker-version.mjs` | Fails when the Dockerfile's node image major does not match the root `.node-version`. |
 | `check-release-workflow-gates.mjs` | Checks the shape of `release.yml` and `ci.yml`: only `publish` publishes, `latest` moves last, `ci-passed` judges every job. |
@@ -37,7 +40,7 @@ work, not rewritten for its own sake. Scripts are named in kebab-case.
 
 | Script | What it does |
 | --- | --- |
-| `pre-push.mjs` | The pre-push checks `.githooks/pre-push` runs: ruff, prettier, the dead-code guard and API types drift. |
+| `pre-push.mjs` | The pre-push checks `.githooks/pre-push` runs: no Python, the contract areas, prettier, the dead-code guard and API types drift. |
 | `stop-dev-api-port.mjs` | Stops the dev API that this worktree's `npm run dev` started, and nothing else. |
 | `stop-dev-web-port.mjs` | Stops the dev Vite server that this worktree's `npm run dev` started, and nothing else. |
 | `dev-reset-auth.mjs` | Clears a development database's users and sessions so `/setup` works again. |
@@ -50,7 +53,7 @@ work, not rewritten for its own sake. Scripts are named in kebab-case.
 | --- | --- |
 | `smoke-windows-package.ps1` | Starts the assembled Windows package's server and checks it end to end. |
 | `verify-docker-remote.ps1` | Runs the Docker validation workflow on GitHub-hosted runners from a machine without Docker. |
-| `live-packaged-e2e.py` | Full browser and API audit of a packaged server (Docker or Windows) at `WEIR_LIVE_BASE_URL`. |
-| `screenshot-site.py` | Screenshots every screen in both themes and widths, with `build-contact-sheet.py` for the review page. |
-| `capture-readme-screenshots.py` | Captures exactly the screenshots `README.md` publishes. |
-| `generate-brand-icons.py` | Renders every raster icon from the SVG sources in `packaging/brand`. |
+
+The full browser and API audit of a packaged server (Docker or Windows) is not a script: it is
+`apps/server/tools/Weir.LiveAudit` (`dotnet run --project apps/server/tools/Weir.LiveAudit -c Release` with
+`WEIR_LIVE_BASE_URL` set; see its README). The README screenshots come from a real Weir (#890).

@@ -1,0 +1,13 @@
+{
+  "_comment": "One entry per contract area, named as in [ContractArea(\"<name>\")]. CI runs each as its own leg: dotnet test --filter \"Area=<name>\". scripts/check-contract-areas.mjs keeps this list and the test classes in step.",
+  "areas": [
+    { "name": "auth", "description": "Sign-in, sessions, CSRF, bootstrap, cookies, CORS and HTTP hardening." },
+    { "name": "system", "description": "Suite settings, logs, configuration bundle and backups, pause, health and readiness, metrics, notifications, directory browsing, startup schema." },
+    { "name": "activity", "description": "Activity feed, stream, export and file history." },
+    { "name": "media_managers", "description": "Media manager connections and capabilities, the intake webhook, and hand-off status." },
+    { "name": "jobs", "description": "Job inspection, manual enqueue, reconciliation and worker behaviour visible over HTTP." },
+    { "name": "libraries", "description": "Libraries, rule sets, files, operator and runtime settings, overview stats, direct play, hardware and maintenance APIs." },
+    { "name": "processing", "description": "Black-box processing scenarios with fake media managers and fake ffmpeg: hand-off, retry, pass-through, reject, crash recovery, pause and schedule." },
+    { "name": "harness", "description": "The harness itself: the client, the event reader, the fakes and the server lifecycle." }
+  ]
+}

@@ -31,8 +31,10 @@ This file is the short entry point for coding agents. Keep detailed rules in lin
 - Server: `dotnet build apps/server/Weir.slnx -warnaserror` and `dotnet test apps/server/Weir.slnx`.
 - Frontend: from `apps/web`, run `npm run lint`, `npm run build` and `npm run test`.
 - Tray (Windows): `dotnet build apps/tray/Weir.Tray.slnx` and `dotnet test apps/tray/Weir.Tray.slnx`.
-- Contract suite (judges a running server over HTTP): see [`tests/contract/README.md`](tests/contract/README.md).
-- E2E and packaging smoke checks are documented in [`CONTRIBUTING.md`](CONTRIBUTING.md).
+- Contract suite (judges a running server over HTTP): `dotnet test apps/server/tests/Weir.Contract.Tests --filter "Area=<area>"` per area, listed in `areas.json`; see [`Weir.Contract.Tests/README.md`](apps/server/tests/Weir.Contract.Tests/README.md). The server test run above leaves it and E2E out (`--filter "Category!=Stress&Category!=Contract&Category!=E2E"` is what CI uses).
+- E2E (Playwright for .NET): `WEIR_E2E=1 dotnet test apps/server/tests/Weir.E2E.Tests`, after `npm run build` in `apps/web` and the browser install in [`Weir.E2E.Tests/README.md`](apps/server/tests/Weir.E2E.Tests/README.md). The packaged live audit is `apps/server/tools/Weir.LiveAudit`.
+- Weir has no Python: `node scripts/check-no-python.mjs` fails if a `.py` file is tracked. Tooling is Node, PowerShell or .NET.
+- Packaging smoke checks are documented in [`CONTRIBUTING.md`](CONTRIBUTING.md).
 - Docs map validation: `node scripts/check-agent-docs.mjs`.
 
 ## Working Style

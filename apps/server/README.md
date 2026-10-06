@@ -17,7 +17,7 @@ Solution: `apps/server/Weir.slnx`.
 | `tests/Weir.Api.Tests` | Endpoint tests over HTTP, including `OpenApiDocumentParityTests`. |
 | `tests/Weir.TestChild` | A slow-program stand-in that the process runner tests start instead of a system tool. |
 
-The language-neutral contract suite (`tests/contract`) and the E2E smoke (`tests/e2e/weir`) judge a running server from outside. See [`tests/contract/README.md`](../../tests/contract/README.md).
+The contract suite (`tests/Weir.Contract.Tests`) and the E2E smoke (`tests/Weir.E2E.Tests`) judge a running server from outside, as a process over HTTP. See [`tests/Weir.Contract.Tests/README.md`](tests/Weir.Contract.Tests/README.md) and [`tests/Weir.E2E.Tests/README.md`](tests/Weir.E2E.Tests/README.md); the packaged live audit is [`tools/Weir.LiveAudit`](tools/Weir.LiveAudit/README.md).
 
 ## Build and test
 
@@ -29,6 +29,13 @@ dotnet test apps/server/Weir.slnx
 ```
 
 `RealFfmpegTests` run real ffprobe and ffmpeg and skip unless the tools are found through `WEIR_FFMPEG_DIR` or `PATH`.
+
+What makes the server tests fast, so a new test keeps them that way:
+
+- **Accounts are seeded with a cheap password hash.** The server verifies a password at the cost stored in its hash, and the product's own cost (Argon2id, 64 MiB, three passes) is about a second of managed code. A test that only needs an account signs in to one seeded with `CheapPasswordHash` (infrastructure and API tests) or the constants in `SeededAccounts` (contract tests). The product's cost stays covered where the product makes the hash (bootstrap, password change, recover) and by `AuthApiTests.A_password_hashed_at_the_production_cost_signs_in_and_a_wrong_one_does_not`. Never add a setting to the server that lowers the cost.
+- **Databases are copied, not migrated.** `MigratedDatabaseTemplate` migrates once per test process and each test gets its own copy of the file. `WeirTestServer.StartAsync(freshDatabase: true)` and the migration tests start from an empty folder.
+- **A server's start-up work finishes in the background after it is listening** (a retention pass, the first job a timer queues). A test that seeds rows older than the retention horizon, or counts all jobs, either waits for that work (`TestDatabase.WaitForStartupPruneAsync`) or switches the timer off for its server.
+- **Contract tests talk to `127.0.0.1`.** On Windows a client that resolves `localhost` tries `::1` first, and the refused connection takes about two seconds to fail before it falls back.
 
 A test that needs a slow or long-lived child uses a program of our own: `Weir.TestChild` for the server's tests and `Weir.Tray.StandInServer` (a Windows-subsystem program with no console, standing in for `WeirServer.exe`) for the tray's, never a system console program such as `ping` run through `cmd.exe`. `scripts/check-test-console-programs.mjs` fails CI if a test source under `apps/` starts one (#821). When a console program inherits its shell's console and the shell is killed while the program starts, Windows can hand the program a fresh console, and on a desktop where Windows Terminal is the default terminal that opens an error window (#806). No automated test can watch for that: the window belongs to the desktop session, CI has no Windows Terminal, and it needs a specific kill timing. After changing `ProcessRunnerTests` or anything that starts processes in tests, run them on a Windows desktop and check that no console, Windows Terminal or `PING.EXE` window appears.
 

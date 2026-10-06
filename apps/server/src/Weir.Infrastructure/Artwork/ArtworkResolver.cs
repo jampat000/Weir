@@ -10,7 +10,7 @@ namespace Weir.Infrastructure.Artwork;
 /// both; one the service does not know is asked about again after a week, and one that could not be asked is retried with growing
 /// waits.
 /// </summary>
-public sealed class ArtworkResolver
+public sealed class ArtworkResolver : IDisposable
 {
     private readonly SqliteDatabase _database;
     private readonly ArtworkLookupStore _lookups;
@@ -19,6 +19,7 @@ public sealed class ArtworkResolver
     private readonly ArtworkRateLimiter _limiter;
     private readonly TimeProvider _time;
     private readonly ILogger<ArtworkResolver> _logger;
+    private readonly SemaphoreSlim _searchGate = new(1, 1);
 
     public ArtworkResolver(
         SqliteDatabase database,
@@ -37,6 +38,8 @@ public sealed class ArtworkResolver
         _time = time ?? throw new ArgumentNullException(nameof(time));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
+
+    public void Dispose() => _searchGate.Dispose();
 
     /// <summary>Settle up to <paramref name="maxLookups"/> due titles, stopping early when the service is busy or cannot be reached. Returns how many were settled.</summary>
     public async Task<int> ResolveDueAsync(int maxLookups, CancellationToken cancellationToken)
@@ -64,6 +67,15 @@ public sealed class ArtworkResolver
         }
     }
 
+    private async Task<ArtworkLookup?> FindAsync(string key, CancellationToken cancellationToken)
+    {
+        var uow = await UnitOfWork.OpenAsync(_database, cancellationToken).ConfigureAwait(false);
+        await using (uow.ConfigureAwait(false))
+        {
+            return await _lookups.FindAsync(uow, key, _time.GetUtcNow()).ConfigureAwait(false);
+        }
+    }
+
     /// <summary>
     /// Ask the service about a title now rather than at its turn in the queue, for a caller that needs its original language. The answer
     /// is remembered like any other, so the poster that comes with it is not searched for again; the caller reads what it needs from the
@@ -78,8 +90,35 @@ public sealed class ArtworkResolver
     /// <summary>What a search left: whether the service can take more work, and the poster it named, if any.</summary>
     private readonly record struct Searched(bool ServiceAvailable, string? PosterRef);
 
-    /// <summary>One search and the settling of its answer: the language and the poster are remembered, and a title with no poster to fetch is settled as missing.</summary>
+    /// <summary>
+    /// One search at a time. A caller asking now and the background pass can reach the same title together; whichever goes second
+    /// reads the title again, finds that the other search settled it, and does not ask the service a second time.
+    /// </summary>
     private async Task<Searched> SearchAsync(ArtworkLookup lookup, CancellationToken cancellationToken)
+    {
+        await _searchGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            var current = await FindAsync(lookup.Key, cancellationToken).ConfigureAwait(false) ?? lookup;
+            if (SettledSince(lookup, current))
+            {
+                return new Searched(true, current.PosterRef);
+            }
+
+            return await SearchUnguardedAsync(current, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            _searchGate.Release();
+        }
+    }
+
+    /// <summary>Whether a search recorded something about the title after <paramref name="seen"/> was read: every search changes one of these.</summary>
+    private static bool SettledSince(ArtworkLookup seen, ArtworkLookup current) =>
+        (seen.OriginalLanguage, seen.Outcome, seen.Attempts, seen.IsDue) != (current.OriginalLanguage, current.Outcome, current.Attempts, current.IsDue);
+
+    /// <summary>One search and the settling of its answer: the language and the poster are remembered, and a title with no poster to fetch is settled as missing.</summary>
+    private async Task<Searched> SearchUnguardedAsync(ArtworkLookup lookup, CancellationToken cancellationToken)
     {
         await _limiter.WaitForSearchAsync(cancellationToken).ConfigureAwait(false);
         var answer = await _gateway.FindAsync(lookup, cancellationToken).ConfigureAwait(false);
