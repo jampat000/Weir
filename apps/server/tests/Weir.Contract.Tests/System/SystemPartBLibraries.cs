@@ -19,7 +19,8 @@ internal static class SystemPartBLibraries
     ];
 
     /// <summary>Points the library that scope-only work resolves to (the first movie library in display order) at these folders.</summary>
-    public static async Task<long> SetMovieFoldersAsync(WeirClient client, string? watched, string output, string? work = null)
+    public static async Task<long> SetMovieFoldersAsync(
+        WeirClient client, string? watched, string output, string? work = null, long? scanIntervalSeconds = null)
     {
         var listing = await client.GetAsync(LibrariesPath);
         Assert.True(listing.Status == HttpStatusCode.OK, listing.ToString());
@@ -42,6 +43,11 @@ internal static class SystemPartBLibraries
         body["watched_folder"] = watched ?? string.Empty;
         body["work_folder"] = work ?? string.Empty;
         body["output_folder"] = output;
+        if (scanIntervalSeconds is { } interval)
+        {
+            body["scan_interval_seconds"] = interval;
+        }
+
         var saved = await client.PutWithCsrfAsync($"{LibrariesPath}/{id}", body);
         Assert.True(saved.Status == HttpStatusCode.OK, saved.ToString());
         return id;

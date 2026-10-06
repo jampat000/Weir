@@ -25,6 +25,7 @@ internal sealed class StoreFixture : IDisposable
 
         Options = WeirOptionsLoader.Load(new RuntimeEnvironment(dictionary, OperatingSystem.IsWindows(), Home.Path, Home.Path));
         RuntimeDirectories.Ensure(Options);
+        MigratedDatabaseTemplate.CopyTo(Options.DbPath);
         Database = new SqliteDatabase(Options.DbPath);
         new SchemaMigrator(Database).EnsureAtHead();
         Clock = new FakeTimeProvider(new DateTimeOffset(2026, 1, 15, 10, 0, 0, TimeSpan.Zero));

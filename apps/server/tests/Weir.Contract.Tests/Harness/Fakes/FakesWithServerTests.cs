@@ -24,6 +24,9 @@ public sealed class FakesWithServerTests
 
         Assert.True(created.Status is HttpStatusCode.OK or HttpStatusCode.Created, created.ToString());
         Assert.Equal(deluno.BaseUrl, (string)created.Fields["base_url"]!);
+        // The server also checks every manager once a minute; asking for the check now keeps the test from waiting for the next one.
+        var tested = await admin.PostWithCsrfAsync($"{WeirClient.Api}/media-managers/connections/{(long)created.Fields["id"]!}/test");
+        Assert.True(tested.Status == HttpStatusCode.OK, tested.ToString());
         var probe = await deluno.WaitForRequestAsync("GET", "/api/integrations/external/health");
         Assert.Equal(FakeManager.DefaultApiKey, probe[0].Header("X-Api-Key"));
     }

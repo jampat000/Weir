@@ -27,6 +27,7 @@ internal sealed class RecoverFixture : IDisposable
         Runtime = new RuntimeEnvironment(variables, OperatingSystem.IsWindows(), Home.Path, Home.Path);
         Options = WeirOptionsLoader.Load(Runtime);
         RuntimeDirectories.Ensure(Options);
+        MigratedDatabaseTemplate.CopyTo(Options.DbPath);
         Database = new SqliteDatabase(Options.DbPath);
         new SchemaMigrator(Database).EnsureAtHead();
         Users = new AuthStore();
@@ -51,9 +52,10 @@ internal sealed class RecoverFixture : IDisposable
         var uow = await UnitOfWork.OpenAsync(Database);
         await using (uow.ConfigureAwait(false))
         {
-            var id = await Users.InsertUserAsync(uow, username, PasswordHasher.Hash(password), role, active).ConfigureAwait(false);
+            var hash = CheapPasswordHash.For(password);
+            var id = await Users.InsertUserAsync(uow, username, hash, role, active).ConfigureAwait(false);
             await uow.CommitAsync().ConfigureAwait(false);
-            var user = new UserRecord(id, username, PasswordHasher.Hash(password), role, active);
+            var user = new UserRecord(id, username, hash, role, active);
             for (var i = 0; i < sessions; i++)
             {
                 var loginUow = await UnitOfWork.OpenAsync(Database).ConfigureAwait(false);

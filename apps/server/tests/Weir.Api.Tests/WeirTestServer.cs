@@ -10,6 +10,7 @@ using Weir.Api.Http;
 using Weir.Core.Configuration;
 using Weir.Host;
 using Weir.Infrastructure.Sqlite;
+using Weir.Infrastructure.Tests;
 
 namespace Weir.Api.Tests;
 
@@ -36,16 +37,29 @@ internal sealed class WeirTestServer : IAsyncDisposable
     /// <summary>Keep the home directory on dispose (for a second server on the same home).</summary>
     public bool KeepHome { get; set; }
 
+    /// <summary>
+    /// Starts a server on its own home. A database that is already migrated is copied in first, which is faster and still
+    /// goes through the server's schema check; <paramref name="prepareHome"/> or an earlier server on the same home may
+    /// leave one of its own, and <paramref name="freshDatabase"/> starts on an empty folder so the server creates and
+    /// migrates the database itself.
+    /// </summary>
     public static async Task<WeirTestServer> StartAsync(
         IEnumerable<(string Name, string Value)>? variables = null,
         bool signedIn = false,
         Action<string>? prepareHome = null,
         string? home = null,
-        Action<IServiceCollection>? configureServices = null)
+        Action<IServiceCollection>? configureServices = null,
+        bool freshDatabase = false)
     {
         home ??= Path.Join(Path.GetTempPath(), "weir-api-tests-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(home);
         prepareHome?.Invoke(home);
+        var databasePath = Path.Join(home, "data", "weir.sqlite3");
+        if (!freshDatabase && !File.Exists(databasePath))
+        {
+            MigratedDatabaseTemplate.CopyTo(databasePath);
+        }
+
         // No test reaches the real metadata service: posters are off here unless a test names a stand-in gateway.
         var dictionary = new Dictionary<string, string>(StringComparer.Ordinal) { ["WEIR_HOME"] = home, ["WEIR_ARTWORK_GATEWAY_URL"] = "off" };
         foreach (var (name, value) in variables ?? [])

@@ -5,6 +5,9 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.Data.Sqlite;
+using Microsoft.Extensions.DependencyInjection;
+using Weir.Infrastructure.Scheduling;
+using Weir.Infrastructure.Tests;
 
 namespace Weir.Api.Tests.Platform;
 
@@ -168,13 +171,26 @@ internal static class TestDatabase
         await transaction.CommitAsync();
     }
 
-    /// <summary>Inserts an active user with a real password hash and the given role.</summary>
+    /// <summary>
+    /// Waits for the retention pass a server runs in the background just after it starts. It deletes finished jobs and
+    /// Activity older than the retention horizon, so a test that seeds rows dated beyond that horizon seeds them only
+    /// after this has finished; before, it could remove them between the test's own inserts.
+    /// </summary>
+    public static Task WaitForStartupPruneAsync(WeirTestServer server)
+    {
+        var registry = server.Services.GetRequiredService<PeriodicTaskRegistry>();
+        return Eventually.ThatAsync(
+            () => registry.Snapshot().Any(task => task.Key == "platform-job-rows-retention" && task.LastRunAt is not null),
+            message: "The start-up retention pass did not finish.");
+    }
+
+    /// <summary>Inserts an active user with a hashed password and the given role.</summary>
     public static Task SeedUserAsync(WeirTestServer server, string username, string password, string role) =>
         ExecuteAsync(
             server,
             "INSERT INTO users (username, password_hash, role, is_active) VALUES ($u, $h, $r, 1)",
             ("$u", username),
-            ("$h", Core.Security.PasswordHasher.Hash(password)),
+            ("$h", CheapPasswordHash.For(password)),
             ("$r", role));
 
     public static Task SeedAdminAsync(WeirTestServer server) => SeedUserAsync(server, "alice", ApiTestClient.AdminPassword, "admin");

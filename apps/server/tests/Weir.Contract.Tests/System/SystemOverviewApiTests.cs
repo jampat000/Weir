@@ -230,11 +230,20 @@ public sealed class SystemOverviewApiTests(ServerFixture fixture) : IClassFixtur
     public async Task A_scan_that_runs_reaches_an_open_stream_as_a_system_tasks_frame()
     {
         await using var server = await WeirServer.StartNewAsync(WorkersOn);
-        using var admin = await server.CreateAdminClientAsync();
         using var folders = new TemporaryFolder();
         var watched = Directory.CreateDirectory(Path.Combine(folders.Path, "watched")).FullName;
         var output = Directory.CreateDirectory(Path.Combine(folders.Path, "output")).FullName;
-        var libraryId = await SystemPartBLibraries.SetMovieFoldersAsync(admin, watched, output);
+        // A workflow's timer works out when it scans next at the server's start and again after each scan, so folders saved
+        // while the server runs leave the first timed scan a full interval away, five minutes by default. Saved with the
+        // smallest interval a workflow accepts (ten seconds) before a restart, the timed scan starts at once and repeats.
+        long libraryId;
+        using (var setup = await server.CreateAdminClientAsync())
+        {
+            libraryId = await SystemPartBLibraries.SetMovieFoldersAsync(setup, watched, output, scanIntervalSeconds: 10);
+        }
+
+        await server.RestartAsync();
+        using var admin = await server.CreateAdminClientAsync();
         var scan = $"scan-{libraryId}";
         await Poll.UntilAsync(
             async () => TaskWithKey(await TasksOfAsync(admin), scan), "the workflow's scan to be listed");
