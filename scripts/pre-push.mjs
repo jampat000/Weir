@@ -3,7 +3,7 @@
 // rather than after a CI run. .githooks/pre-push calls this (one-time setup: git config core.hooksPath .githooks);
 // it can also be run by hand: node scripts/pre-push.mjs
 //
-// A check whose tool is not installed yet (ruff, or apps/web/node_modules) is skipped with the command that
+// A check whose tool is not installed yet (apps/web/node_modules) is skipped with the command that
 // installs it, so a fresh clone can still push.
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
@@ -32,14 +32,11 @@ function fail(message, fix) {
 const skip = (label, install) => console.log(`[pre-push] ${label} skipped (install: ${install})`);
 const step = (label) => console.log(`[pre-push] ${label}...`);
 
-// ruff: the contract suite's lint and format.
-if (!quiet("ruff", ["--version"])) {
-  skip("ruff", "python -m pip install --require-hashes -r tests/requirements.txt");
-} else {
-  step("ruff");
-  if (!run("ruff", ["check", "tests/contract"])) fail("ruff check failed", "ruff check --fix tests/contract");
-  if (!run("ruff", ["format", "--check", "tests/contract"])) fail("ruff format --check failed", "ruff format tests/contract");
-}
+// Weir has no Python, and the contract suite's areas each have test classes (what CI's repo-checks job runs).
+step("no Python");
+if (!run(process.execPath, [path.join(repoRoot, "scripts", "check-no-python.mjs")])) fail("a Python file is tracked");
+step("contract areas");
+if (!run(process.execPath, [path.join(repoRoot, "scripts", "check-contract-areas.mjs")])) fail("the contract area list is out of step");
 
 if (!existsSync(prettier)) {
   skip("prettier, dead-code guard and API types drift", "npm ci in apps/web");

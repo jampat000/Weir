@@ -8,17 +8,18 @@ This **Weir** repository contains **`apps/server`** (the C# / .NET 10 server: HT
 
 - **.NET 10 SDK** (pinned in **`apps/server/global.json`**)
 - **Node.js** (pinned in **`.node-version`**; npm on `PATH`)
-- **Python 3.13+** only for the contract suite and E2E test runners (they judge the server from outside; nothing in Weir runs on Python)
+- **PowerShell 7 (`pwsh`)** only to install the browser for the E2E tests and the live audit (step 3 of [Contract suite, E2E and live audit](#contract-suite-e2e-and-live-audit-local)); Windows PowerShell also works on Windows
+- Weir has no Python: the server, the tray and every test suite are .NET, and the web app is TypeScript
 
 ## One-time setup (after cloning)
 
-Activate the pre-push hook so the contract suite lint, prettier, the dead-code guard and the OpenAPI types drift check run locally before every push:
+Activate the pre-push hook so the no-Python and contract-area checks, prettier, the dead-code guard and the OpenAPI types drift check run locally before every push:
 
 ```powershell
 git config core.hooksPath .githooks
 ```
 
-The hook delegates to `scripts/pre-push.mjs` (a plain Node script; run it by hand with `node scripts/pre-push.mjs`). It skips checks gracefully if `ruff` or `apps/web/node_modules` are not yet installed — set those up first for full coverage.
+The hook delegates to `scripts/pre-push.mjs` (a plain Node script; run it by hand with `node scripts/pre-push.mjs`). It skips the web checks gracefully if `apps/web/node_modules` is not installed yet — run `npm ci` in `apps/web` first for full coverage.
 
 The server persists state in **file-backed SQLite** under **`WEIR_HOME`** and creates or migrates its database itself when it starts; there is no separate migration command.
 Docker Desktop is not required for normal local development or for shipping a release.
@@ -96,7 +97,7 @@ dotnet run --project apps/server/src/Weir.Host --no-build -- --host 127.0.0.1 --
 
 Browse **`http://localhost:18795`** and create the admin account on the first screen. The server never opens a browser itself. Pick any free port that is not in **`scripts/dev-ports.json`**, so an installed Weir and your **`npm run dev`** stack are left alone, and give each instance its own **`WEIR_HOME`**: it holds the database and the settings, so an install you care about is never touched. Cookies are shared across ports on one host name, so browse a spare instance as `localhost` when your main one is at `127.0.0.1`, or the other way round.
 
-An empty install shows the empty screens. To see files flow through it, add a workflow whose folders hold media you generated for the purpose (the end-to-end and live-audit runs make theirs with FFmpeg; see **`tests/e2e/weir/`** and **`scripts/live_packaged_e2e/`**), or connect a real media manager. Press Ctrl+C to stop it, then delete the data folder. If you started it in the background, stop it by the PIDs you recorded (`dotnet run` and the `Weir.exe` it starts), never by image name.
+An empty install shows the empty screens. To see files flow through it, add a workflow whose folders hold media you generated for the purpose (the end-to-end and live-audit runs make theirs with FFmpeg; see **`apps/server/tests/Weir.E2E.Tests/`** and **`apps/server/tools/Weir.LiveAudit/`**), or connect a real media manager. Press Ctrl+C to stop it, then delete the data folder. If you started it in the background, stop it by the PIDs you recorded (`dotnet run` and the `Weir.exe` it starts), never by image name.
 
 To rebuild the web app as you edit instead, use **`npm run dev`** (above): Vite on the dev web port, proxying to a real server on the dev API port. To put Vite in front of a server you started yourself, as above, set **`VITE_DEV_API_PROXY_TARGET`** to its address (`http://localhost:18795`) and run **`npm run dev:web`**.
 
@@ -130,22 +131,23 @@ The default SQLite file is **`{WEIR_HOME}/data/weir.sqlite3`** unless **`WEIR_DB
 The **`CI`** workflow (`.github/workflows/ci.yml`) is path-aware: a job runs only when the paths it
 cares about changed (a manual run always runs everything). Its jobs:
 
-1. **`repo-checks`**: the agent documentation map, the GitHub Actions pin check, and the release/CI
-   gate rules.
-2. **`server-linux`**: **`dotnet build -warnaserror`**, **`dotnet test`** and a NuGet vulnerability
-   scan for **`apps/server`** on Linux.
+1. **`repo-checks`**: the agent documentation map, the GitHub Actions pin check, the check that no
+   Python file is tracked, the contract-area list check, and the release/CI gate rules.
+2. **`server-linux`**: **`dotnet build -warnaserror`**, **`dotnet test`** (the unit and API tests; the contract and
+   E2E projects are left to their own jobs) and a NuGet vulnerability scan for **`apps/server`** on Linux.
 3. **`server-windows`**: the same server build and tests on Windows (always runs on a push to `main`).
-4. **`web-dist`**: builds the production web app once, for `e2e-smoke` and `contract` to serve.
+4. **`web-dist`**: builds the production web app once, for `e2e-smoke` to serve.
 5. **`web`**: **`npm ci`**, **`api:types:check`**, lint, format and unit tests in **`apps/web`**; the
    dead-code guard; an `npm audit` on pull requests.
-6. **`e2e-smoke`**: Playwright against the real .NET server serving the built web app
-   (**`WEIR_E2E=1`**, **`WEIR_HOME`** on a temp dir, from repo-root **`tests/e2e/weir/`**, same as
-   local optional E2E below); pull requests only.
+6. **`e2e-smoke`**: Playwright for .NET against the real server serving the built web app
+   (**`WEIR_E2E=1`**, project [`apps/server/tests/Weir.E2E.Tests`](../apps/server/tests/Weir.E2E.Tests/README.md),
+   same as the local E2E below); pull requests only.
 7. **`contract`**: the contract suite against the .NET server, one job per area in
-   [`tests/contract/areas.json`](../tests/contract/areas.json), in parallel.
+   [`areas.json`](../apps/server/tests/Weir.Contract.Tests/areas.json), in parallel
+   (`dotnet test --filter "Area=<area>"`).
 8. **`tray`** (always runs on a push to `main`): the tray's unit tests.
 9. **`packaging`**: the Docker and Windows package smokes (`.github/workflows/ci-packaging.yml`) —
-   builds the image, runs it and the live packaged audit, and runs the Velopack build and
+   builds the image, runs it and the live packaged audit (`apps/server/tools/Weir.LiveAudit`), and runs the Velopack build and
    **`scripts/smoke-windows-package.ps1`**.
 10. **`ci-passed`**: the verdict. It passes only when every job that was due for the change passed and
     every other job was skipped — this is the one check `main`'s ruleset requires.
@@ -154,30 +156,43 @@ Pushing a SemVer tag **`v*`** (`vX.Y.Z`, or `vX.Y.Z-rc.N` for a release candidat
 refuses to publish unless `CI` already passed (`ci-passed`) on the tagged commit, then builds, tests
 and publishes the release artefacts — see **[`docs/release.md`](release.md)**.
 
-## Contract suite and E2E (local)
+## Contract suite, E2E and live audit (local)
 
-Both are Python test runners. Install their locked dependencies once:
-
-```powershell
-python -m pip install --require-hashes -r tests/requirements.txt
-python -m playwright install chromium
-```
-
-Build the server and the web shell, then run either:
+All three are .NET projects under `apps/server` that judge a **running** Weir from outside: each starts the built
+server as its own process (own data folder, own port) and talks to it over HTTP or through a browser. None loads
+server code.
 
 ```powershell
+# 1. The server and the test projects (building the solution builds the host first)
 dotnet build apps/server/Weir.slnx
-cd apps/web
-npm ci
-npm run build
-cd ../..
-python -m pytest tests/contract -q
+
+# 2. The contract suite: one area, or everything
+dotnet test apps/server/tests/Weir.Contract.Tests --filter "Area=activity"
+dotnet test apps/server/tests/Weir.Contract.Tests
+
+# 3. The browser tests: the web app, the browser, then the suite
+cd apps/web; npm ci; npm run build; cd ../..
+pwsh apps/server/tests/Weir.E2E.Tests/bin/Debug/net10.0/playwright.ps1 install chromium
 $env:WEIR_E2E = "1"
-$env:WEIR_SESSION_SECRET = "local-dev-secret-at-least-32-characters-long"
-python -m pytest tests/e2e/weir -q --tb=short
+dotnet test apps/server/tests/Weir.E2E.Tests
 ```
 
-The contract suite is described in **[`tests/contract/README.md`](../tests/contract/README.md)**. For E2E, **`WEIR_E2E_HOME`** gives a fixed data directory (otherwise a temp directory is used), **`WEIR_E2E_SERVER_EXE`** runs a published server instead of **`dotnet run --no-build`**, and **`WEIR_E2E_LEDGER`** overrides the leftover-server ledger (see **`tests/e2e/weir/conftest.py`**).
+The areas are listed in [`areas.json`](../apps/server/tests/Weir.Contract.Tests/areas.json); the harness, the keep-data
+and published-server switches are in **[`Weir.Contract.Tests/README.md`](../apps/server/tests/Weir.Contract.Tests/README.md)**,
+and the browser tests are in **[`Weir.E2E.Tests/README.md`](../apps/server/tests/Weir.E2E.Tests/README.md)**. The real-FFmpeg
+scenarios run when `ffmpeg` and `ffprobe` are on `PATH` (or in `WEIR_CONTRACT_REAL_FFMPEG_DIR`) and are skipped
+otherwise. A plain `dotnet test apps/server/Weir.slnx --filter "Category!=Stress&Category!=Contract&Category!=E2E"` runs
+only the unit and API tests, which is what the `server-linux` and `server-windows` jobs do.
+
+The packaged live audit (`apps/server/tools/Weir.LiveAudit`) walks every screen of an installed Weir, such as the Docker
+image or the Windows package. Point it at a running server:
+
+```powershell
+$env:WEIR_LIVE_BASE_URL = "http://localhost:9347"
+dotnet run --project apps/server/tools/Weir.LiveAudit -c Release
+```
+
+Its other settings (`WEIR_LIVE_E2E_*`) are described in **[`Weir.LiveAudit/README.md`](../apps/server/tools/Weir.LiveAudit/README.md)**.
 
 ## Split-origin production
 

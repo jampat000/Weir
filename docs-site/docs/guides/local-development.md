@@ -14,8 +14,8 @@ this to use the app.
 - **.NET 10 SDK** (`dotnet` on `PATH`; the exact version is pinned in `apps/server/global.json`)
 - **Node.js 24** (npm on `PATH`)
 
-The server uses file-backed SQLite under `WEIR_HOME`. No PostgreSQL required. Python is only
-needed if you want to run the contract suite or the E2E tests (see below).
+The server uses file-backed SQLite under `WEIR_HOME`. No PostgreSQL required. Weir has no
+Python; the contract suite and the E2E tests are .NET too (see below).
 
 ## Clone and run
 
@@ -153,13 +153,12 @@ the server first, or restart it afterwards.
 
 ## Contract and E2E tests (optional)
 
-The contract suite (`tests/contract`) and the browser E2E tests (`tests/e2e/weir`) are written in
-Python. They act as outside judges of the running .NET server, so they need a Python 3.13
-interpreter even though Weir itself does not.
+The contract suite (`apps/server/tests/Weir.Contract.Tests`) and the browser E2E tests
+(`apps/server/tests/Weir.E2E.Tests`) are .NET projects. They act as outside judges of the running
+server: each starts the built server as its own process and talks to it over HTTP or through a
+browser. Nothing else needs installing.
 
 ```powershell
-python -m pip install --require-hashes -r tests/requirements.txt
-python -m playwright install chromium
 dotnet build apps/server/Weir.slnx
 cd apps/web
 npm ci
@@ -167,21 +166,23 @@ npm run build
 cd ../..
 ```
 
-Contract suite:
+Contract suite (one area, or all of them):
 
 ```powershell
-python -m pytest tests/contract -q
+dotnet test apps/server/tests/Weir.Contract.Tests --filter "Area=activity"
+dotnet test apps/server/tests/Weir.Contract.Tests
 ```
 
-E2E:
+E2E (the browser comes from Playwright's own install script, built with the project):
 
 ```powershell
+pwsh apps/server/tests/Weir.E2E.Tests/bin/Debug/net10.0/playwright.ps1 install chromium
 $env:WEIR_E2E = "1"
-$env:WEIR_SESSION_SECRET = "local-dev-secret-at-least-32-characters-long"
-python -m pytest tests/e2e/weir -q --tb=short
+dotnet test apps/server/tests/Weir.E2E.Tests
 ```
 
-E2E starts the server with `dotnet run --project apps/server/src/Weir.Host --no-build`, so build it first. Set `WEIR_E2E_SERVER_EXE` to test a published server executable instead.
+Both start the server from the build output, so build it first. Set `WEIR_CONTRACT_SERVER` to test a
+published server instead (a `Weir.dll` or an executable).
 
 ## Troubleshooting
 

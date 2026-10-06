@@ -42,7 +42,7 @@ This checklist defines the current practical hardening baseline for Weir.
 
 - `main` is protected by GitHub rules.
 - The required check is `ci-passed` (the `CI` workflow's verdict job; see `docs/local-development.md`).
-- Dependabot is security-only: every ecosystem sets `open-pull-requests-limit: 0`, so no routine version pull requests open, while Dependabot security updates still do. It covers NuGet (`apps/server`, `apps/tray`), npm (`apps/web`, `docs-site`), GitHub Actions, and the Python test-runner packages in `tests/requirements.txt`.
+- Dependabot is security-only: every ecosystem sets `open-pull-requests-limit: 0`, so no routine version pull requests open, while Dependabot security updates still do. It covers NuGet (`apps/server`, `apps/tray`), npm (`apps/web`, `docs-site`), GitHub Actions.
 - CodeQL code scanning (C# and JavaScript/TypeScript) runs on `main`, pull requests to `main`, weekly schedule, and manual dispatch.
 - Security vulnerabilities are reported privately through `SECURITY.md`.
 - Public issues are not used for unpatched vulnerabilities.

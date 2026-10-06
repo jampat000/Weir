@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" />
+    <PackageReference Include="Microsoft.Data.Sqlite" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <!-- IANA time zone names on Windows, where InvariantGlobalization leaves no ICU to map them (the server does the same). -->
+    <PackageReference Include="TimeZoneConverter" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+  </ItemGroup>
+  <ItemGroup>
+    <!--
+      The server under test is only built before these tests, never referenced: no server type is visible here,
+      so every check goes through HTTP and the SQLite schema.
+    -->
+    <ProjectReference Include="..\..\src\Weir.Host\Weir.Host.csproj" ReferenceOutputAssembly="false" />
+    <!-- The fake ffprobe/ffmpeg program: built before these tests and copied into a folder per test (Harness/Fakes/FakeFfmpeg). -->
+    <ProjectReference Include="..\Weir.Contract.FakeTools\Weir.Contract.FakeTools.csproj" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- The names the fake tools and these tests agree on, compiled into both. -->
+    <Compile Include="..\Weir.Contract.FakeTools\FakeToolProtocol.cs" Link="Harness\Fakes\FakeToolProtocol.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Where the host's build output lands, for ServerBinary to find when WEIR_CONTRACT_SERVER is not set. -->
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+      <_Parameter1>BuiltServerFolder</_Parameter1>
+      <_Parameter2>$([MSBuild]::NormalizeDirectory('$(MSBuildProjectDirectory)', '..', '..', 'src', 'Weir.Host', 'bin', '$(Configuration)', '$(TargetFramework)'))</_Parameter2>
+    </AssemblyAttribute>
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+      <_Parameter1>BuiltFakeToolsFolder</_Parameter1>
+      <_Parameter2>$([MSBuild]::NormalizeDirectory('$(MSBuildProjectDirectory)', '..', 'Weir.Contract.FakeTools', 'bin', '$(Configuration)', '$(TargetFramework)'))</_Parameter2>
+    </AssemblyAttribute>
+  </ItemGroup>
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+</Project>

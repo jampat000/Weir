@@ -61,4 +61,4 @@ The server uses **file-backed SQLite** under **`WEIR_HOME`**. There is no databa
 
 ## CI / E2E
 
-Automated tests pick **ephemeral loopback ports** (see `tests/e2e/weir/conftest.py`) so they do not depend on 8782/18788 being free.
+Automated tests pick **ephemeral loopback ports** (see `WeirServer` in `apps/server/tests/Weir.Contract.Tests/Harness`) so they do not depend on 8782/18788 being free.
