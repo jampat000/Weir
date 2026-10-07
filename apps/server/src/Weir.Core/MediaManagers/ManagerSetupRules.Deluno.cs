@@ -109,7 +109,8 @@ public static partial class ManagerSetupRules
         {
             return new SetupCheckLine(
                 SetupCheckLine.Unverified,
-                $"{managerLabel} does not say where {libraryName}'s downloads arrive, so Weir cannot verify that its hand-offs sit inside this workflow's watched folder.");
+                $"{managerLabel} does not say where {libraryName}'s downloads arrive, so Weir cannot verify that its hand-offs sit inside this workflow's watched folder. " +
+                $"Set the downloads folder in {managerLabel} (or the clients' category folders) and Weir will pick it up.");
         }
 
         if (watched.Length == 0)

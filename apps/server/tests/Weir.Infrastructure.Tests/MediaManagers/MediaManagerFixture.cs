@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging.Abstractions;
 using Weir.Core.Security;
 using Weir.Infrastructure.Artwork;
 using Weir.Infrastructure.ConnectionTraffic;
@@ -36,6 +37,8 @@ internal sealed class MediaManagerFixture : IDisposable
         Intake = new MediaManagerIntake(Store.Options, Connections, ConnectionStore, Ledger, Targets, Jobs, SkipMarkers, Reporter, Artwork, Store.Clock, Activity);
         OperatorSettings = new OperatorSettingsStore();
         Cancellation = new PendingJobCancellation(Ledger, Reporter, Files);
+        WorkflowSync = new ManagerWorkflowSync(
+            Store.Database, ConnectionStore, Connections, Http, Libraries, new ScanSettingsChanges(), Store.Options, Store.Clock, NullLogger<ManagerWorkflowSync>.Instance);
     }
 
     public StoreFixture Store { get; }
@@ -78,6 +81,8 @@ internal sealed class MediaManagerFixture : IDisposable
 
     public PendingJobCancellation Cancellation { get; }
 
+    public ManagerWorkflowSync WorkflowSync { get; }
+
     public Task<T> Db<T>(Func<UnitOfWork, Task<T>> work, bool commit = true) => Store.WithUnitOfWork(work, commit);
 
     public async Task<long> AddConnectionAsync(string kind, string baseUrl = "http://manager.local", string? apiKey = "key", bool enabled = true) =>
@@ -103,5 +108,9 @@ internal sealed class MediaManagerFixture : IDisposable
             ("$w", watchedFolder))), System.Globalization.CultureInfo.InvariantCulture);
     }
 
-    public void Dispose() => Store.Dispose();
+    public void Dispose()
+    {
+        WorkflowSync.Dispose();
+        Store.Dispose();
+    }
 }

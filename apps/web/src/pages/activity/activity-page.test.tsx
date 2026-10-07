@@ -83,6 +83,9 @@ vi.mock("../../lib/processing/files-queries", async (importOriginal) => {
 const libraries = [
   { id: 1, name: "TV", media_type: "tv", manager_connection_ids: [1] },
 ];
+vi.mock("../../lib/processing/use-handed-off-note", () => ({
+  useHandedOffNote: () => null,
+}));
 vi.mock("../../lib/processing/libraries-queries", () => ({
   useProcessingLibrariesQuery: () => ({ data: libraries }),
 }));

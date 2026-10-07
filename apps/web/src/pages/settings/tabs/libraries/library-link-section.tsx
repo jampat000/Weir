@@ -4,7 +4,10 @@ import { Link } from "react-router-dom";
 import { Field } from "../../../../components/shared/field";
 import { WorkflowKindSummary } from "../../../../components/shared/workflow-kind";
 import type { MediaManagerConnection } from "../../../../lib/media-managers/media-managers-api";
-import type { WorkflowKind } from "../../../../lib/processing/workflow-kind";
+import {
+  handedOffNote,
+  type WorkflowKind,
+} from "../../../../lib/processing/workflow-kind";
 import {
   workflowStory,
   type WorkflowPath,
@@ -66,6 +69,12 @@ export function LibraryLinkSection({
             files back and telling it what happened, and everything already set
             up or cleaned stays as it is.
           </p>
+          {handedOffNote(kind) ? (
+            <p className="mm-quiet-note" data-testid="workflow-handed-off">
+              {handedOffNote(kind)} Weir does not scan its watched folder, so it
+              looks for nothing there on its own.
+            </p>
+          ) : null}
           <button
             type="button"
             data-testid="library-unlink"

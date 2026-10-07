@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Weir.Api.Http;
 using Weir.Core;
 using Weir.Core.Activity;
@@ -75,6 +76,23 @@ internal sealed class MediaManagerIntakeEndpointHandlers
         }
     }
 
+    // A refused hand-off is answered to the media manager, which may show nobody; the server log is where the
+    // operator can see that it was refused and why. Only authenticated callers get this far, so the detail may
+    // name Weir's own folders; the webhook secret is never part of it.
+    private static async Task<T> LoggingRefusals<T>(ApiRequest request, string source, Func<Task<T>> work)
+    {
+        try
+        {
+            return await RefusalsAsApiErrors(work).ConfigureAwait(false);
+        }
+        catch (ApiException exception)
+        {
+            request.LoggerFactory.CreateLogger("weir.media_managers.intake")
+                .LogWarning("Hand-off from {Source} refused with status {Status}: {Detail}", source, exception.StatusCode, exception.Detail);
+            throw;
+        }
+    }
+
     public async Task<ApiResult> PostWebhookAsync(ApiRequest request)
     {
         var body = await request.ReadBodyAsync().ConfigureAwait(false);
@@ -131,7 +149,7 @@ internal sealed class MediaManagerIntakeEndpointHandlers
                 .Set("message", imported.Message));
         }
 
-        var enqueued = await RefusalsAsApiErrors(() => _intake.EnqueueRefineAsync(uow, importEvent, identity.ConnectionId)).ConfigureAwait(false);
+        var enqueued = await LoggingRefusals(request, dialect.Key, () => _intake.EnqueueRefineAsync(uow, importEvent, identity.ConnectionId)).ConfigureAwait(false);
         await request.CommitAsync().ConfigureAwait(false);
         return ApiRoutes.Ok(new WireObject()
             .Set("status", "ok")

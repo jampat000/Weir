@@ -17,6 +17,7 @@ import {
   workflowBadgeLabel,
   workflowKindOf,
 } from "../../../../lib/processing/workflow-kind";
+import { connectionTitle } from "../../../../lib/ui/connection-title";
 import { mmActionButtonClass } from "../../../../lib/ui/mm-control-roles";
 import { SAVE_MODEL_WORDS } from "../../save-model-note";
 import { useLeaveConfirmation, useUnsavedChanges } from "../../unsaved-changes";
@@ -98,6 +99,13 @@ export function LibraryEditor({
     { manager_connection_ids: linkedIds },
     connections,
   );
+  // A manager that reports its folders owns the watched and output folders until the workflow is unlinked from it.
+  const syncedConnection = connections.find(
+    (connection) =>
+      connection.id === library?.folders_synced_from_connection_id &&
+      linkedIds.includes(connection.id),
+  );
+  const foldersEditable = editable && !syncedConnection;
   const workflowPath: WorkflowPath = {
     watched: form.watched_folder.trim(),
     work: form.work_folder.trim(),
@@ -126,7 +134,13 @@ export function LibraryEditor({
       >
         <div className="mm-editor">
           <div className="mm-editor-sections">
-            <LibraryFoldersGroup binding={binding} ruleSets={ruleSets} />
+            <LibraryFoldersGroup
+              binding={binding}
+              ruleSets={ruleSets}
+              syncedFrom={
+                syncedConnection ? connectionTitle(syncedConnection) : undefined
+              }
+            />
             <QuietDisclosure
               title="Media manager"
               summaryWhenClosed={workflowBadgeLabel(kind)}
@@ -147,7 +161,7 @@ export function LibraryEditor({
                 <LibraryDownloadClientSuggestions
                   mediaType={form.media_type}
                   watchedFolder={form.watched_folder}
-                  editable={editable}
+                  editable={foldersEditable}
                   onUseFolder={(watched) =>
                     binding.update({ watched_folder: watched })
                   }
@@ -158,9 +172,10 @@ export function LibraryEditor({
                     watchedFolder={form.watched_folder}
                     outputFolder={form.output_folder}
                     workFolder={form.work_folder}
-                    removeOriginal={form.remove_original_after_success}
+                    // A linked workflow never removes its originals, so a seeding client is no problem for it.
+                    removeOriginal={false}
                     linkedConnectionIds={linkedIds}
-                    editable={editable}
+                    editable={foldersEditable}
                     onUseFolders={(watched, output) =>
                       binding.update({
                         watched_folder: watched ?? form.watched_folder,
@@ -180,7 +195,7 @@ export function LibraryEditor({
             />
             <LibraryIntakeGroup binding={binding} />
             <LibraryReadinessGroup binding={binding} />
-            <LibraryOutputGroup binding={binding} />
+            <LibraryOutputGroup binding={binding} kind={kind} />
             <LibraryCapacityGroup binding={binding} />
             <LibraryFailureGroup
               binding={binding}

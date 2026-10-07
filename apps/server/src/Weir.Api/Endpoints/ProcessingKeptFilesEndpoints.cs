@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Weir.Api.Http;
 using Weir.Core.Auth;
 using Weir.Core.Json;
+using Weir.Core.MediaManagers;
 using Weir.Core.Validation;
 using Weir.Infrastructure.Artwork;
 using Weir.Infrastructure.Jobs;
@@ -77,6 +78,7 @@ internal sealed class ProcessingKeptFilesEndpointHandlers
             ?? throw new ApiException(StatusCodes.Status404NotFound, "Weir has no kept file with that id. It may already have been processed again.");
         await _skipMarkers.ClearByIdAsync(uow, id).ConfigureAwait(false);
         var library = await _libraries.GetAsync(uow, marker.LibraryId).ConfigureAwait(false);
+        var links = library is null ? WorkflowManagerLinks.None : await _libraries.ManagerLinksAsync(uow, library.Id).ConfigureAwait(false);
 
         // Committed before EnqueueScanDispatchJobAsync, or the request deadlocks: that call writes through the job
         // store's own connection, which BEGIN IMMEDIATEs while this uow's write above still holds the lock (the
@@ -84,7 +86,11 @@ internal sealed class ProcessingKeptFilesEndpointHandlers
         await request.CommitAsync().ConfigureAwait(false);
 
         var detail = "Weir will look at this file the next time it scans its workflow.";
-        if (library is not null)
+        if (links.HandedOffByManager)
+        {
+            detail = $"{links.ScanSkippedReason} Weir processes this file when Deluno hands it over.";
+        }
+        else if (library is not null)
         {
             await ProcessingWatchedFolderScanDispatchEnqueue.EnqueueScanDispatchJobAsync(
                 uow, _jobs, enqueueRemuxJobs: true, "manual", library.MediaType, library.Id).ConfigureAwait(false);

@@ -225,7 +225,10 @@ public sealed class MediaManagerIntake
             reader => new IntakeLibrary(SqliteValues.GetInt64(reader, 0), SqliteValues.GetString(reader, 1), SqliteValues.GetString(reader, 2)));
     }
 
-    /// <summary>The library a hand-off belongs to, chosen by folder; nothing containing it explains against the scope's seeded library.</summary>
+    /// <summary>
+    /// The library a hand-off belongs to, chosen by folder. A file that no workflow's folder contains is refused
+    /// with a list of the workflows; a hand-off that names no file is explained against the scope's seeded library.
+    /// </summary>
     public static async Task<(IntakeLibrary? Library, HandoffPathResult Resolved)> LibraryForHandoffAsync(UnitOfWork uow, MediaManagerImportEvent importEvent)
     {
         ArgumentNullException.ThrowIfNull(importEvent);
@@ -233,6 +236,14 @@ public sealed class MediaManagerIntake
         if (IntakeRules.ChooseLibrary(libraries, importEvent) is { } chosen)
         {
             return (chosen.Library, chosen.Resolved);
+        }
+
+        if (WireStrings.Strip(importEvent.FilePath).Length > 0)
+        {
+            var workflows = await uow.QueryAsync(
+                "SELECT name, media_type, watched_folder FROM libraries ORDER BY display_order, id",
+                reader => new WorkflowFolder(SqliteValues.GetString(reader, 0), SqliteValues.GetString(reader, 1), SqliteValues.GetString(reader, 2))).ConfigureAwait(false);
+            return (null, new HandoffPathResult(null, NoWorkflowWatches.Detail(workflows, importEvent.FilePath)));
         }
 
         var scope = ProcessingMediaScopes.Normalize(importEvent.MediaScope);

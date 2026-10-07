@@ -275,13 +275,14 @@ describe("AppShell", () => {
     expect(brand).not.toHaveTextContent("Media cleaner");
   });
 
-  it("shows who is signed in, and where, at the foot of the menu", () => {
+  it("shows who is signed in, and only that, at the foot of the menu", () => {
     renderShell("/");
 
     const user = screen.getByTestId("user-menu");
     expect(user).toHaveTextContent("AL");
     expect(user).toHaveTextContent("ann.lee");
-    expect(user).toHaveTextContent("@operator · Weir on RIG");
+    expect(user).not.toHaveTextContent("@operator");
+    expect(user).not.toHaveTextContent("Weir on RIG");
   });
 
   it("signs out from the user menu, and keeps the version beside it", () => {

@@ -74,6 +74,7 @@ internal sealed partial class Scenario
         fake.Libraries.Add(DelunoLibraryManifest());
         var connection = await CreateConnectionAsync(fake);
         var created = await CreateLibraryAsync([("manager_connection_ids", new JsonArray(connection["id"]!.DeepClone())), .. library]);
+        HandedOffLibraryId = (int)created["id"]!;
         return (fake, created);
     }
 

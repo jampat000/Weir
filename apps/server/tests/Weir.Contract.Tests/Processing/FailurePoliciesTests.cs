@@ -24,8 +24,6 @@ public sealed class FailurePoliciesTests
         var original = FakeMedia.Bytes(FakeMedia.Probe(audioLanguages: ["eng", "fre"]));
         var source = scenario.WriteRelease("Broken.Remux.2021", "film.mkv", original);
         const string rel = "Broken.Remux.2021/film.mkv";
-        // A scan records the file first, as in normal use (see DetectWithoutQueueingAsync).
-        await scenario.DetectWithoutQueueingAsync(library, rel);
 
         await scenario.PostHandoffAsync("handoff-pt-1", source);
 
@@ -65,7 +63,6 @@ public sealed class FailurePoliciesTests
         scenario.FakeTools.SetFileRule("film.mkv", new FileRule { RemuxError = RemuxCrash });
         var source = scenario.WriteRelease("Always.Broken.2022", "film.mkv", FakeMedia.Bytes(FakeMedia.Probe(audioLanguages: ["eng", "fre"])));
         const string rel = "Always.Broken.2022/film.mkv";
-        await scenario.DetectWithoutQueueingAsync(library, rel);
 
         await scenario.PostHandoffAsync("handoff-held-1", source);
         var row = await scenario.FailureAttemptsReachAsync(library, rel, 5);
@@ -79,11 +76,17 @@ public sealed class FailurePoliciesTests
         Assert.Empty(await scenario.JobsAsync(Scenario.PassThroughKind));
         Assert.True(File.Exists(source));
         Assert.Equal(5, scenario.FakeTools.Calls(tool: "ffmpeg", step: "remux").Count);
-        // Given up means given up: another scan does not start it again. A scan queues its remux jobs before it
-        // finishes, so once it has finished with no remux job waiting or running, none is coming.
-        var scan = await scenario.WaitForJobFinishedAsync(await scenario.EnqueueScanAsync(library));
-        Assert.Equal("completed", (string)scan["status"]!);
-        Assert.DoesNotContain(await scenario.JobsAsync(Scenario.RemuxKind), job => (string)job["status"]! is "pending" or "leased");
+        // The fifth attempt's own job is still finishing when its failure is recorded; let it end first, then watch for a sixth.
+        await Poll.UntilAsync(
+            async () => (await scenario.JobsAsync(Scenario.RemuxKind)).All(job => (string)job["status"]! is not ("pending" or "leased")) ? "idle" : null,
+            "the fifth attempt to finish",
+            TimeSpan.FromSeconds(30));
+        Assert.Equal(5, (await scenario.JobsAsync(Scenario.RemuxKind)).Count);
+        // Given up means given up: no further attempt is queued, however long Weir waits.
+        await Scenario.NeverWithinAsync(
+            async () => (await scenario.JobsAsync(Scenario.RemuxKind)).Any(job => (string)job["status"]! is "pending" or "leased"),
+            TimeSpan.FromSeconds(4),
+            "another attempt at a file Weir gave up on");
         Assert.Equal(5, scenario.FakeTools.Calls(tool: "ffmpeg", step: "remux").Count);
         var failed = await scenario.FileRowAsync(library, rel);
         Assert.NotNull(failed);
@@ -91,7 +94,7 @@ public sealed class FailurePoliciesTests
     }
 
     [Fact]
-    public async Task Content_rejection_under_reject_policy_reports_rejected_to_deluno_and_removes_the_download()
+    public async Task Content_rejection_under_reject_policy_reports_rejected_to_deluno_and_leaves_the_download_for_it_to_remove()
     {
         // This scenario never runs a scan before the hand-off. That such a rejection still gets a Files row
         // (#532) is asserted in RejectWithoutPriorScanTests.
@@ -110,15 +113,17 @@ public sealed class FailurePoliciesTests
         var report = Assert.Single(reports);
         Assert.Equal("failed", (string)report["status"]!);
         Assert.Equal("rejected", (string)report["disposition"]!);
-        Assert.True((bool)report["sourceRemoved"]!);
+        // The workflow is linked to Deluno, so the download is Deluno's and its client's to remove, not Weir's.
+        Assert.False((bool)report["sourceRemoved"]!);
         Assert.Equal("preflight", (string)report["failureClass"]!);
         Assert.Contains("no retainable audio", (string)report["message"]!, StringComparison.Ordinal);
-        await Poll.UntilAsync(() => Task.FromResult(!File.Exists(source)), "the rejected download to be removed", TimeSpan.FromSeconds(30));
-        Assert.Empty(scenario.FakeTools.Calls(tool: "ffmpeg", step: "remux"));
         Assert.Contains(await scenario.JobsAsync(Scenario.RejectKind), job => (string)job["status"]! == "completed");
+        Assert.True(File.Exists(source));
+        Assert.Empty(scenario.FakeTools.Calls(tool: "ffmpeg", step: "remux"));
         var rejected = Assert.Single(await scenario.ActivityAsync("processing.file_rejected"));
         Assert.Equal("film.mkv was rejected so a different release can be found", (string)rejected["title"]!);
         Assert.Contains("accepted that this release is bad", (string)rejected["detail"]!, StringComparison.Ordinal);
+        Assert.Contains("will remove the download; Weir left it in place.", (string)rejected["detail"]!, StringComparison.Ordinal);
     }
 
     [Fact]

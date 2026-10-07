@@ -1,3 +1,4 @@
+using Weir.Core.MediaManagers;
 using Weir.Core.Processing;
 using Weir.Infrastructure.Processing.RemuxPass;
 
@@ -466,17 +467,17 @@ public sealed class RemuxPassPathsTests : IDisposable
         var watched = Directory.CreateDirectory(_root.Join("watched")).FullName;
         var output = Directory.CreateDirectory(_root.Join("output")).FullName;
 
-        Assert.Contains("has no watched folder set", RemuxPassPaths.RuntimeForLibrary(Library(string.Empty, output), _root.Path).Problem, StringComparison.Ordinal);
-        Assert.Equal("The Movies workflow's watched folder must be an existing directory.", RemuxPassPaths.RuntimeForLibrary(Library(_root.Join("gone"), output), _root.Path).Problem);
-        Assert.Contains("has no output folder set", RemuxPassPaths.RuntimeForLibrary(Library(watched, string.Empty), _root.Path).Problem, StringComparison.Ordinal);
+        Assert.Contains("has no watched folder set", RemuxPassPaths.RuntimeForLibrary(Library(string.Empty, output), _root.Path, WorkflowManagerLinks.None).Problem, StringComparison.Ordinal);
+        Assert.Equal("The Movies workflow's watched folder must be an existing directory.", RemuxPassPaths.RuntimeForLibrary(Library(_root.Join("gone"), output), _root.Path, WorkflowManagerLinks.None).Problem);
+        Assert.Contains("has no output folder set", RemuxPassPaths.RuntimeForLibrary(Library(watched, string.Empty), _root.Path, WorkflowManagerLinks.None).Problem, StringComparison.Ordinal);
         Assert.Equal(
             "The watched folder and output folder must be separate (no overlap or containment).",
-            RemuxPassPaths.RuntimeForLibrary(Library(watched, watched), _root.Path).Problem);
+            RemuxPassPaths.RuntimeForLibrary(Library(watched, watched), _root.Path, WorkflowManagerLinks.None).Problem);
         Assert.Equal(
             "The Movies workflow's work/temp folder must be an existing directory when set to a custom path.",
-            RemuxPassPaths.RuntimeForLibrary(Library(watched, output, _root.Join("work-gone")), _root.Path).Problem);
+            RemuxPassPaths.RuntimeForLibrary(Library(watched, output, _root.Join("work-gone")), _root.Path, WorkflowManagerLinks.None).Problem);
 
-        var (runtime, problem) = RemuxPassPaths.RuntimeForLibrary(Library(watched, output), _root.Path);
+        var (runtime, problem) = RemuxPassPaths.RuntimeForLibrary(Library(watched, output), _root.Path, WorkflowManagerLinks.None);
         Assert.Null(problem);
         Assert.True(runtime!.WorkFolderIsDefault);
         Assert.Equal(Path.Join(_root.Path, "processing", "processing-movie-work"), runtime.WorkFolderEffective);

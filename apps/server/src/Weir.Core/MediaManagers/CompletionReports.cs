@@ -70,9 +70,10 @@ public static class CompletionReports
 
     /// <summary>
     /// The body reported to the manager when a hand-off of one file finishes. <c>outputFiles</c> lists the output file, or
-    /// nothing when there is none, the same field a hand-off of several files reports (<see cref="FolderHandoffReports"/>).
+    /// nothing when there is none, the same field a hand-off of several files reports (<see cref="FolderHandoffReports"/>). A rejection reports
+    /// <paramref name="sourceRemoved"/>: false when Weir leaves the download for the manager and its client to remove.
     /// </summary>
-    public static WireObject BuildCompletionBody(HandoffOrigin origin, WireObject result, string? outputPath = null, bool rejected = false)
+    public static WireObject BuildCompletionBody(HandoffOrigin origin, WireObject result, string? outputPath = null, bool rejected = false, bool sourceRemoved = true)
     {
         ArgumentNullException.ThrowIfNull(origin);
         ArgumentNullException.ThrowIfNull(result);
@@ -96,7 +97,7 @@ public static class CompletionReports
             if (rejected)
             {
                 body.Set("disposition", "rejected");
-                body.Set("sourceRemoved", true);
+                body.Set("sourceRemoved", sourceRemoved);
             }
             else if (result.Get("rejected_cleanup_status") is WireString { Value: "deleted" })
             {

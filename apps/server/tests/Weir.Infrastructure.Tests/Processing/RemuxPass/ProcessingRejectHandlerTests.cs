@@ -73,7 +73,7 @@ public sealed class ProcessingRejectHandlerTests : IDisposable
     // --- through a hand-off (Deluno) --------------------------------------------------------------
 
     [Fact]
-    public async Task An_accepted_handoff_rejection_removes_the_source_and_reports_disposition_rejected()
+    public async Task An_accepted_handoff_rejection_leaves_a_linked_workflows_download_for_the_manager_and_reports_it_not_removed()
     {
         var library = await LibraryAsync(rejectedFileAction: "delete_file");
         var source = _folders.Source("Film/film.mkv");
@@ -91,15 +91,38 @@ public sealed class ProcessingRejectHandlerTests : IDisposable
         var body = (WireObject)post.Json!;
         Assert.Equal("failed", WireConvert.Str(body["status"]));
         Assert.Equal("rejected", WireConvert.Str(body["disposition"]));
-        Assert.True(((WireBool)body["sourceRemoved"]).Value);
+        Assert.False(((WireBool)body["sourceRemoved"]).Value);
         Assert.Equal("lib-movies", WireConvert.Str(body["libraryId"]));
         Assert.Equal("execution", WireConvert.Str(body["failureClass"]));
-        Assert.False(File.Exists(source));
+        Assert.True(File.Exists(source), "the download is the manager's and its client's to remove");
         Assert.Equal("rejected", await ScalarText("SELECT status FROM files"));
+        Assert.Contains(
+            "Deluno on 192.0.2.30 will remove the download; Weir left it in place.",
+            await ScalarText("SELECT detail FROM activity_events WHERE event_type = 'processing.file_rejected'"),
+            StringComparison.Ordinal);
         Assert.Equal(1, await _fixture.Store.Scalar("SELECT count(*) FROM activity_events WHERE event_type = 'processing.file_rejected'"));
         Assert.Equal(1, await _fixture.Store.Scalar("SELECT count(*) FROM activity_events WHERE event_type = 'processing.handoff_reported'"));
         Assert.Equal(0, await _fixture.Store.Scalar($"SELECT count(*) FROM jobs WHERE job_kind = '{IntakeRules.PassThroughJobKind}'"));
         Assert.Equal("rejected", await ScalarText("SELECT state FROM media_manager_handoffs WHERE handoff_id = 'h1'"));
+    }
+
+    [Fact]
+    public async Task An_accepted_handoff_rejection_removes_the_source_of_a_workflow_no_manager_is_linked_to()
+    {
+        var library = await LibraryAsync(rejectedFileAction: "delete_file");
+        var source = _folders.Source("Film/film.mkv");
+        await FileRowAsync(library, "Film/film.mkv");
+        await _fixture.AddConnectionAsync("deluno", "http://192.0.2.30:5099", "k1");
+        await _fixture.Db(async uow => { await _fixture.Ledger.RecordReceivedAsync(uow, "deluno", "h1", library, "Film/film.mkv"); return 0; });
+        _fixture.Http.Json(HttpMethod.Get, ManifestPath, """{"capabilities":["processor-reject-regrab"],"libraries":[]}""");
+        _fixture.Http.Json(HttpMethod.Post, EventsPath, "{}", HttpStatusCode.Accepted);
+        var payload = $$$"""{"relative_media_path":"Film/film.mkv","library_id":{{{library}}},"reason":"ffmpeg could not read the audio track.","origin":{"source_key":"deluno","handoff_id":"h1","library_id":"lib-movies","callback_path":"{{{EventsPath}}}"}}""";
+
+        await Handler().HandleAsync(Context(42, payload), CancellationToken.None);
+
+        var body = (WireObject)Assert.Single(_fixture.Http.RequestsTo(HttpMethod.Post, EventsPath)).Json!;
+        Assert.True(((WireBool)body["sourceRemoved"]).Value);
+        Assert.False(File.Exists(source));
     }
 
     [Fact]

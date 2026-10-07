@@ -164,6 +164,7 @@ static class Program
                 return 1;
             }
             var listenScope = LanAccessStartup.Resolve(runtimeHome, InstallProcesses.Root(), () => new ComFirewallPolicy(), TrayLog.Write);
+            FirewallRuleWidening.AskInBackground(runtimeHome, listenScope, HasInteractiveDesktop(args, PortChoice.HasInteractiveDesktop));
 
             using var app = new TrayApp(port.Value, listenScope, openBrowserOnReady: OpensBrowser(args), updateService, updateSettings);
             return app.Run();

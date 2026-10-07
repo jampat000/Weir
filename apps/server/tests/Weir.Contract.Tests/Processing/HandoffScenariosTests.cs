@@ -42,9 +42,9 @@ public sealed class HandoffScenariosTests
         Assert.Single(remuxes);
         // The French track (input stream 2) was not mapped into the output.
         Assert.DoesNotContain("0:2", remuxes[0].Arguments);
-        // A successful Movies pass removes the release from the watched folder.
-        await Poll.UntilAsync(
-            () => Task.FromResult(!Directory.Exists(release)), "the source release folder to be cleaned up", TimeSpan.FromSeconds(30));
+        // The workflow is linked to Deluno, so the download stays where its download client put it.
+        Assert.True(File.Exists(source));
+        Assert.True(Directory.Exists(release));
         Assert.Single(Scenario.Callbacks(fake, "handoff-ok-1"));
     }
 

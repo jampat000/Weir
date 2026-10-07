@@ -7,6 +7,8 @@ import {
 } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 
+import * as managerApi from "../../../../lib/media-managers/media-managers-api";
+import type { MediaManagerConnection } from "../../../../lib/media-managers/media-managers-api";
 import * as api from "../../../../lib/processing/libraries-api";
 import * as managersApi from "../../../../lib/processing/library-managers-api";
 import { LibrariesTab } from "./libraries-tab";
@@ -321,17 +323,10 @@ it("lets an operator choose Reject when a linked manager supports it", async () 
   );
 });
 
-it("keeps the original download when told to, saves it, and asks the check about seeding with it", async () => {
+it("keeps the original download when told to, and saves it", async () => {
   asOperator();
-  const existing = library({
-    media_type: "tv",
-    name: "TV",
-    manager_connection_ids: [10],
-  });
+  const existing = library({ media_type: "tv", name: "TV" });
   vi.spyOn(api, "fetchProcessingLibraries").mockResolvedValue([existing]);
-  const check = vi
-    .spyOn(managersApi, "fetchProcessingManagerSetup")
-    .mockResolvedValue({ media_type: "tv", managers: [] });
   const update = vi
     .spyOn(api, "updateProcessingLibrary")
     .mockResolvedValue(existing);
@@ -349,6 +344,50 @@ it("keeps the original download when told to, saves it, and asks the check about
   ).toBeInTheDocument();
 
   fireEvent.click(toggle);
+  fireEvent.click(screen.getByTestId("processing-library-save"));
+
+  await waitFor(() =>
+    expect(update).toHaveBeenCalledWith(
+      1,
+      expect.objectContaining({ remove_original_after_success: false }),
+    ),
+  );
+});
+
+it("shows a linked workflow as keeping the original, says why, and leaves the saved setting alone", async () => {
+  asOperator();
+  const existing = library({
+    media_type: "tv",
+    name: "TV",
+    manager_connection_ids: [10],
+  });
+  vi.spyOn(api, "fetchProcessingLibraries").mockResolvedValue([existing]);
+  vi.spyOn(managerApi, "fetchMediaManagerConnections").mockResolvedValue([
+    { id: 10, kind: "deluno", name: "Deluno on RIG" } as MediaManagerConnection,
+  ]);
+  const check = vi
+    .spyOn(managersApi, "fetchProcessingManagerSetup")
+    .mockResolvedValue({ media_type: "tv", managers: [] });
+  const update = vi
+    .spyOn(api, "updateProcessingLibrary")
+    .mockResolvedValue(existing);
+
+  render(<LibrariesTab />, { wrapper });
+  fireEvent.click(await screen.findByRole("button", { name: "Edit" }));
+  const toggle = screen.getByRole("checkbox", {
+    name: /New downloads: after cleaning, delete the original download/,
+  });
+
+  expect(toggle).not.toBeChecked();
+  expect(toggle).toBeDisabled();
+  expect(await screen.findByTestId("workflow-handed-off")).toHaveTextContent(
+    "Deluno on RIG hands this workflow its downloads. Weir does not scan its watched folder",
+  );
+  expect(
+    await screen.findByText(
+      "Linked to Deluno on RIG: the original stays with your download client, which may still be seeding.",
+    ),
+  ).toBeInTheDocument();
   await waitFor(() =>
     expect(check).toHaveBeenLastCalledWith(
       "tv",
@@ -359,11 +398,10 @@ it("keeps the original download when told to, saves it, and asks the check about
     ),
   );
   fireEvent.click(screen.getByTestId("processing-library-save"));
-
   await waitFor(() =>
     expect(update).toHaveBeenCalledWith(
       1,
-      expect.objectContaining({ remove_original_after_success: false }),
+      expect.objectContaining({ remove_original_after_success: true }),
     ),
   );
 });

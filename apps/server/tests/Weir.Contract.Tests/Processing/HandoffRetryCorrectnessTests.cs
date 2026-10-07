@@ -1,19 +1,19 @@
+using System.Text.Json.Nodes;
 using Weir.Contract.Tests.Harness;
 using Weir.Contract.Tests.Harness.Fakes;
 
 namespace Weir.Contract.Tests.Processing;
 
 /// <summary>
-/// Hand-off retries must not reset the failure count, and must not lose the hand-off's origin when a scan requeues the file.
+/// Hand-off retries must not reset the failure count, and must not lose the hand-off's origin.
 /// <list type="bullet">
-/// <item>A hand-off's file has its size recorded when it arrives. Without that, the first scan after a failure sees a changed size
-/// and resets <c>failure_attempts</c> to 0, once. The first test skips <c>DetectWithoutQueueingAsync</c> and checks the fingerprint
-/// and the reset directly, because a test that only waited for the final failure count would still reach it after a one-time reset.</item>
-/// <item>A scan-driven retry carries the job's <c>origin</c> onto the requeued payload. Without it, the eventual pass-through is
+/// <item>A hand-off's file has its size recorded when it arrives, so nothing later sees a changed size and resets
+/// <c>failure_attempts</c> to 0. The first test checks the fingerprint, then that each retry adds to the count.</item>
+/// <item>A retry carries the job's <c>origin</c> onto the requeued payload. Without it, the eventual pass-through is
 /// reported to nobody: no callback, and <c>GET /intake/handoffs/{source}/{id}</c> keeps <c>outputPath: null</c>.</item>
 /// </list>
-/// The scan's automatic retry (a processing_failed file due another attempt) is queued like a fresh candidate, not as a person's
-/// "retry now", which resets <c>failure_attempts</c> and the backoff and would wipe the count the first test checks on every scan.
+/// A workflow a Deluno feeds is never scanned, so its failed hand-off queues each retry itself, to start when the backoff ends. The retry
+/// is queued like the scan's was, not as a person's "retry now", which resets <c>failure_attempts</c> and the backoff.
 /// </summary>
 [ContractArea("processing")]
 public sealed class HandoffRetryCorrectnessTests
@@ -21,7 +21,7 @@ public sealed class HandoffRetryCorrectnessTests
     private const string RemuxCrash = "Conversion failed: the fake ffmpeg was told to fail";
 
     [Fact]
-    public async Task A_hand_offs_fingerprint_is_recorded_up_front_so_a_scan_never_resets_its_failures()
+    public async Task A_hand_offs_fingerprint_is_recorded_up_front_and_each_retry_adds_to_its_failures()
     {
         await using var scenario = await Scenario.StartAsync();
         var (_, library) = await scenario.DelunoSetupAsync(
@@ -30,8 +30,7 @@ public sealed class HandoffRetryCorrectnessTests
         var source = scenario.WriteRelease("Always.Broken.531", "film.mkv", FakeMedia.Bytes(FakeMedia.Probe(audioLanguages: ["eng"])));
         const string rel = "Always.Broken.531/film.mkv";
 
-        // No DetectWithoutQueueingAsync: a hand-off's fingerprint must be recorded on arrival, not by a
-        // scan run first as a workaround.
+        // A hand-off's fingerprint must be recorded on arrival: no scan ever looks at this workflow first.
         await scenario.PostHandoffAsync("handoff-attempts-531", source);
 
         var first = await scenario.WaitForFileStatusAsync(library, rel, "processing_failed");
@@ -40,23 +39,16 @@ public sealed class HandoffRetryCorrectnessTests
             Scenario.Whole(first["size_bytes"]) > 0,
             "a hand-off must record the file's size at intake, not leave it for the first scan to discover");
 
-        // A scan that merely notices this (already-known) file must not treat it as a changed source.
-        // enqueueRemuxJobs: false only skips queueing new remux work: the size comparison (and any
-        // reset) run regardless, so this isolates the effect of the scan itself.
-        await scenario.EnqueueScanAsync(library, enqueueRemuxJobs: false);
-
-        var settled = await Poll.UntilAsync(
+        // The retries come from the hand-off itself; each adds to the count and none starts it over (#531 item 1).
+        var retried = await scenario.DriveRetriesUntilAsync<JsonObject>(
+            library,
             async () =>
             {
                 var row = await scenario.FileRowAsync(library, rel);
-                return row is not null && !string.IsNullOrEmpty((string?)row["last_seen_at"]) ? row : null;
+                return row is not null && Scenario.Whole(row["failure_attempts"]) >= 3 ? row : null;
             },
-            "the scan to finish noticing this file",
-            TimeSpan.FromSeconds(30));
-        Assert.True((string)settled["status"]! == "processing_failed", settled.ToJsonString());
-        Assert.True(
-            (int)settled["failure_attempts"]! == 1,
-            "an intervening scan must not reset the failure count (#531 item 1)");
+            "the hand-off to retry itself twice");
+        Assert.Equal("processing_failed", (string)retried["status"]!);
     }
 
     [Fact]
@@ -69,8 +61,7 @@ public sealed class HandoffRetryCorrectnessTests
         var original = FakeMedia.Bytes(FakeMedia.Probe(audioLanguages: ["eng", "fre"]));
         var source = scenario.WriteRelease("Broken.Origin.531", "film.mkv", original);
 
-        // No DetectWithoutQueueingAsync here either: the origin must survive the very first scan-driven
-        // retry, so the scenario goes through at least one.
+        // The origin must survive the very first retry, so the scenario goes through at least one.
         await scenario.PostHandoffAsync("handoff-origin-531", source);
 
         await scenario.DriveRetriesUntilAsync(

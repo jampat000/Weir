@@ -67,6 +67,12 @@ public static class ActivityEventTypes
 
     /// <summary>The Activity page's remove dialog, "keep": the file stays, and scans skip it until it changes (#785).</summary>
     public const string ProcessingFileRemovalKept = "processing.file_removal_kept";
+
+    /// <summary>A workflow was set up from, or had its folders updated from, a media manager that reports its folders (Deluno).</summary>
+    public const string ProcessingWorkflowSynced = "processing.workflow_synced";
+
+    /// <summary>Weir could not set up or update a workflow from a media manager yet, and what to do about it.</summary>
+    public const string ProcessingWorkflowSyncNotice = "processing.workflow_sync_notice";
 }
 
 /// <summary>

@@ -54,6 +54,13 @@ internal sealed class ProcessingWatchedFolderScanDispatchEndpointHandlers
             uow, _libraries, enqueueRemuxJobs, mediaScope, libraryId).ConfigureAwait(false);
         if (!ok)
         {
+            if (error == ScanDispatchPrerequisiteError.HandedOffByManager)
+            {
+                var linkedLibrary = libraryId is { } linkedId ? await _libraries.GetAsync(uow, linkedId).ConfigureAwait(false) : await _libraries.SeededForScopeAsync(uow, mediaScope).ConfigureAwait(false);
+                var links = await _libraries.ManagerLinksAsync(uow, linkedLibrary!.Id).ConfigureAwait(false);
+                throw new ApiException(StatusCodes.Status400BadRequest, links.ScanSkippedReason);
+            }
+
             if (error == ScanDispatchPrerequisiteError.MissingOutputForLiveRemux)
             {
                 throw new ApiException(StatusCodes.Status400BadRequest, "enqueue_remux_jobs requires a saved output folder for this media scope.");

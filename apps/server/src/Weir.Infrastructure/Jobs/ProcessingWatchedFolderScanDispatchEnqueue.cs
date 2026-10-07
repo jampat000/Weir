@@ -104,7 +104,7 @@ public static class ProcessingWatchedFolderScanDispatchEnqueue
     }
 
     /// <summary>
-    /// Shared checks for manual HTTP and periodic enqueue (library found; watched folder saved; output folder saved when live remux is on).
+    /// Shared checks for manual HTTP and periodic enqueue (library found; not a Deluno-fed workflow; watched folder saved; output folder saved when live remux is on).
     /// </summary>
     public static async Task<(bool Ok, ScanDispatchPrerequisiteError? Error)> ValidatePrerequisitesAsync(
         UnitOfWork uow, LibraryStore libraries, bool enqueueRemuxJobs, string mediaScope, long? libraryId)
@@ -117,6 +117,11 @@ public static class ProcessingWatchedFolderScanDispatchEnqueue
             // Libraries are the only store (#363): a database with no library covering this scope is one
             // an operator emptied, not an unmigrated one.
             return (false, ScanDispatchPrerequisiteError.NoSavedWatchedFolder);
+        }
+
+        if ((await libraries.ManagerLinksAsync(uow, library.Id).ConfigureAwait(false)).HandedOffByManager)
+        {
+            return (false, ScanDispatchPrerequisiteError.HandedOffByManager);
         }
 
         var error = ScanDispatchPrerequisites.Validate(library.WatchedFolder, library.OutputFolder, enqueueRemuxJobs);
@@ -165,6 +170,7 @@ public static class ProcessingWatchedFolderScanDispatchEnqueue
             return (false, error switch
             {
                 ScanDispatchPrerequisiteError.MissingOutputForLiveRemux => "missing_output_for_live_remux",
+                ScanDispatchPrerequisiteError.HandedOffByManager => "handed_off_by_manager",
                 _ => "no_saved_watched_folder",
             });
         }
@@ -180,10 +186,16 @@ public static class ProcessingWatchedFolderScanDispatchEnqueue
     /// <c>ProcessingWatchedFolderWatcherService</c>.
     /// </summary>
     public static async Task<(bool Inserted, string? Skip)> TryEnqueueForWatcherEventAsync(
-        UnitOfWork uow, ProcessingJobStore jobStore, ProcessingLibraryRecord library, bool enqueueRemuxJobs)
+        UnitOfWork uow, ProcessingJobStore jobStore, LibraryStore libraries, ProcessingLibraryRecord library, bool enqueueRemuxJobs)
     {
+        ArgumentNullException.ThrowIfNull(libraries);
         ArgumentNullException.ThrowIfNull(library);
         var scope = ProcessingMediaScopes.Normalize(library.MediaType);
+        if ((await libraries.ManagerLinksAsync(uow, library.Id).ConfigureAwait(false)).HandedOffByManager)
+        {
+            return (false, "handed_off_by_manager");
+        }
+
         if (await QueueHasActiveScanAsync(uow, scope, library.Id).ConfigureAwait(false))
         {
             // A queued scan will already look at this file. Adding another would mean two walks of the

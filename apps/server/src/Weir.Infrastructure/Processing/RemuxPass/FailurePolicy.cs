@@ -24,6 +24,12 @@ public interface IFailurePolicy
     /// <c>pass_through</c> or <c>reject</c>, or null.
     /// </summary>
     Task<string?> ApplyFailurePolicyAsync(UnitOfWork uow, ProcessingLibraryRecord library, string relativePath, bool willRetry, WireObject? origin, bool badRelease);
+
+    /// <summary>
+    /// Queues the next attempt at a failed hand-off's file to start at <paramref name="startsAt"/>, for a workflow whose own scan
+    /// never queues work (<see cref="HandoffRetries"/> decides when this is called).
+    /// </summary>
+    Task QueueHandoffRetryAsync(UnitOfWork uow, ProcessingLibraryRecord library, string relativePath, WireObject origin, DateTimeOffset startsAt);
 }
 
 /// <summary>
@@ -94,6 +100,16 @@ public sealed class QueueingFailurePolicy : IFailurePolicy
         return ProcessingFailurePolicies.PassThrough;
     }
 
+    public Task QueueHandoffRetryAsync(UnitOfWork uow, ProcessingLibraryRecord library, string relativePath, WireObject origin, DateTimeOffset startsAt)
+    {
+        ArgumentNullException.ThrowIfNull(uow);
+        ArgumentNullException.ThrowIfNull(library);
+        ArgumentNullException.ThrowIfNull(origin);
+        var body = Body(library, relativePath, origin).Set("media_scope", ProcessingMediaScopes.Normalize(library.MediaType)).Set("trigger", "retry").Set(HandoffRetries.PayloadMarker, true);
+        Enqueue(uow, $"{IntakeRules.RemuxPassJobKind}:handoff-retry:{library.Id}:{relativePath}:{startsAt.ToUnixTimeSeconds()}", IntakeRules.RemuxPassJobKind, body, library, startsAt);
+        return Task.CompletedTask;
+    }
+
     private static WireObject Body(ProcessingLibraryRecord library, string relativePath, WireObject? origin)
     {
         var body = new WireObject().Set("relative_media_path", relativePath).Set("library_id", library.Id).Set("trigger", "worker");
@@ -105,7 +121,7 @@ public sealed class QueueingFailurePolicy : IFailurePolicy
         return body;
     }
 
-    private void Enqueue(UnitOfWork uow, string dedupeKey, string jobKind, WireObject body, ProcessingLibraryRecord library) =>
+    private void Enqueue(UnitOfWork uow, string dedupeKey, string jobKind, WireObject body, ProcessingLibraryRecord library, DateTimeOffset? notBefore = null) =>
         _jobs.EnqueueOrGet(
             uow.Connection,
             uow.WriteTransaction(),
@@ -114,7 +130,8 @@ public sealed class QueueingFailurePolicy : IFailurePolicy
             WireJsonWriter.Dumps(body, WireJsonFormat.Compact),
             JobQueueRules.DefaultMaxAttempts,
             0,
-            (int)Math.Clamp(library.Priority, int.MinValue, int.MaxValue));
+            (int)Math.Clamp(library.Priority, int.MinValue, int.MaxValue),
+            notBefore);
 
     /// <summary>
     /// The source's own fingerprint (#545), folded into the dedupe key so a later failure of a since-replaced
@@ -138,6 +155,9 @@ public sealed class QueueingFailurePolicy : IFailurePolicy
 /// <summary>A policy that never queues a follow-up: every failure is left held where it is. For tests and diagnostics.</summary>
 public sealed class HoldingFailurePolicy : IFailurePolicy
 {
+    public Task QueueHandoffRetryAsync(UnitOfWork uow, ProcessingLibraryRecord library, string relativePath, WireObject origin, DateTimeOffset startsAt) =>
+        Task.CompletedTask;
+
     public Task<bool> RejectBadReleaseAsync(UnitOfWork uow, ProcessingLibraryRecord library, string relativePath, string reason, WireObject? origin) =>
         Task.FromResult(false);
 

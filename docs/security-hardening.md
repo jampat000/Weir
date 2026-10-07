@@ -71,7 +71,12 @@ This checklist defines the current practical hardening baseline for Weir.
   its own sign-in, and first-run setup from another device needs the one-time setup code. A rule written by an
   earlier version, for Private and Domain only, is replaced by the current one whenever the tray configures the
   rule; and when the PC is on a network that rule does not cover, choosing the network again (or **Try again** on
-  System › About) asks Windows for the administrator approval again, which widens it.
+  System › About) asks Windows for the administrator approval again, which widens it. An install that turned
+  network access on under 1.0.0-rc.1 still has such a rule, and on a Private network nothing would ask: so the
+  first interactive tray start after the update, with network access on and a rule that leaves a profile out,
+  asks Windows once to widen it. The question is recorded (`firewall-rule-widening-asked` in the data folder)
+  before the prompt shows, and never repeats whatever the answer; a `--silent` start or a PC with no desktop
+  never asks.
 - Creating or removing it needs a Windows admin (UAC) elevation; Weir asks for that once, at first run, with a
   plain explanation, and never asks again automatically if declined. Turning LAN access off leaves the rule in
   place: with nothing listening for the network it lets nothing in.
