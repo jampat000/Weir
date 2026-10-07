@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { ActivityEventItem } from "../api/types";
-import { eventDisplay } from "./activity-display";
+import { eventDisplay, eventLabel } from "./activity-display";
 import { REMUX_PASS_COMPLETED_EVENT } from "./event-types";
 
 function passEvent(detail: Record<string, unknown>): ActivityEventItem {
@@ -68,5 +68,22 @@ describe("eventDisplay for the pause", () => {
         entry("system.processing_resumed", "Processing was resumed by alice."),
       ).title,
     ).toBe("Processing resumed");
+  });
+});
+
+describe("eventLabel", () => {
+  it("titles the events added with workflow set-up, repeats and pausing", () => {
+    expect(eventLabel("processing.workflow_sync_notice")).toBe(
+      "Workflow could not be updated yet",
+    );
+    expect(eventLabel("processing.file_skipped_repeat")).toBe(
+      "Skipped: already cleaned",
+    );
+    expect(eventLabel("system.processing_paused")).toBe("Processing paused");
+    expect(eventLabel("system.processing_resumed")).toBe("Processing resumed");
+  });
+
+  it("falls back to the last part of an unknown type, in words", () => {
+    expect(eventLabel("processing.something_new")).toBe("something new");
   });
 });

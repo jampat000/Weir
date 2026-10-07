@@ -31,6 +31,27 @@ public sealed partial class RemuxPassRunner
         }
     }
 
+    /// <summary>
+    /// Records what the pass read and what it wrote, the moment the output is in place and before any source cleanup, so every
+    /// writer (mkvmerge, ffmpeg, the cover-art ffmpeg fallback, an unchanged copy) and every cleanup choice, kept original or
+    /// removed, leaves the same two figures for Activity and the overview totals.
+    /// </summary>
+    private static void RecordSizes(WireObject output, PassContext context, string outputFile)
+    {
+        long written;
+        try
+        {
+            written = new FileInfo(outputFile).Length;
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            return;
+        }
+
+        output.Set("source_size_bytes", context.Expected.SizeBytes);
+        output.Set("output_size_bytes", written);
+    }
+
     /// <summary>The result of a pass that failed before execution.</summary>
     public static WireObject FailBefore(string relativeMediaPath, string reason, string? inspectedSourcePath = null, WireObject? extra = null)
     {

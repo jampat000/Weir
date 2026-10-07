@@ -158,49 +158,78 @@ export function sizesFromRecord(detail: Record<string, unknown>): {
   return { before, after, saved: Math.max(0, before - after) };
 }
 
-/** A file's sizes as Activity shows them: always all three, with "not written" rather than a gap. */
+/** A file's sizes as Activity shows them: always all three, with a reason rather than a gap. */
 export type DetailSizes = {
   before: number | null;
-  /** Null when Weir wrote no new copy of the file. */
+  /** Null when Weir wrote no new copy of the file, or did not record how big it is. */
   after: number | null;
   saved: number | null;
+  /** Weir cleaned the file but its record holds no sizes (an older record). */
+  notRecorded: boolean;
   /** Why After is what it is, when that is not obvious. */
   note: string | null;
 };
 
+/** Whether the record says Weir handed the file back without rewriting it: passed through, or already clean. */
+function wentThroughUnchanged(detail: Record<string, unknown>): boolean {
+  return (
+    detail.pass_through_unchanged === true ||
+    detail.output_copied_without_remux === true ||
+    detail.outcome === "live_skipped_not_required"
+  );
+}
+
 /**
- * Before, After and Saved for the open file, whatever happened to it. A pass that measured both sizes gives them; a file
- * Weir finished without changing it ("already clean", passed through) is the same size after, and saved nothing; a file
- * Weir has not written a copy of shows its size and says so.
+ * Before, After and Saved for the open file, whatever happened to it. A pass that measured both sizes gives them. A file
+ * Weir handed back without changing it ("already clean", passed through) is the same size after and saved nothing, and
+ * only a record that says so is told that way. A file Weir cleaned whose record holds no sizes says "not recorded" rather
+ * than showing figures it does not have. A file Weir has not written a copy of shows its size and says so.
  */
 export function detailSizes(
   file: Pick<ProcessingFile, "status" | "size_bytes">,
   detail: Record<string, unknown> | null,
 ): DetailSizes {
   const measured = detail ? sizesFromRecord(detail) : null;
-  if (measured) return { ...measured, note: null };
-  const recorded = detail?.source_size_bytes;
+  const unchanged = detail ? wentThroughUnchanged(detail) : false;
+  if (measured) {
+    return {
+      ...measured,
+      notRecorded: false,
+      note: unchanged
+        ? "Weir handed the file back as it was, so its size did not change."
+        : null,
+    };
+  }
+  const recorded = detail?.source_size_bytes ?? detail?.source_fingerprint_size;
   const before =
     typeof recorded === "number" && recorded > 0
       ? recorded
       : file.size_bytes > 0
         ? file.size_bytes
         : null;
-  if (
-    file.status === "passed_through" ||
-    (detail && file.status === "processed")
-  ) {
+  if (file.status === "passed_through" || unchanged) {
     return {
       before,
       after: before,
       saved: before == null ? null : 0,
+      notRecorded: false,
       note: "Weir handed the file back as it was, so its size did not change.",
+    };
+  }
+  if (detail && file.status === "processed") {
+    return {
+      before,
+      after: null,
+      saved: null,
+      notRecorded: true,
+      note: "Size not recorded: Weir cleaned this file but did not keep its sizes, so how much it saved is not known.",
     };
   }
   return {
     before,
     after: null,
     saved: null,
+    notRecorded: false,
     note: "Weir has not written a new copy of this file.",
   };
 }

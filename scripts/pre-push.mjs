@@ -39,6 +39,8 @@ step("nothing private in public files");
 if (!run(process.execPath, [path.join(repoRoot, "scripts", "check-public-privacy.mjs")])) fail("a private-looking value is in a public file");
 step("contract areas");
 if (!run(process.execPath, [path.join(repoRoot, "scripts", "check-contract-areas.mjs")])) fail("the contract area list is out of step");
+step("event titles");
+if (!run(process.execPath, [path.join(repoRoot, "scripts", "check-event-titles.mjs")])) fail("a server event type has no title", "add it to apps/web/src/lib/activity/event-labels.ts");
 
 if (!existsSync(prettier)) {
   skip("prettier, dead-code guard and API types drift", "npm ci in apps/web");

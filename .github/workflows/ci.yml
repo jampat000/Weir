@@ -199,6 +199,11 @@ jobs:
           node scripts/check-contract-areas.mjs
           node --test scripts/check-contract-areas.test.mjs
 
+      - name: Every server event type has a title
+        run: |
+          node scripts/check-event-titles.mjs
+          node --test scripts/check-event-titles.test.mjs
+
       - name: Release and CI gate rules
         run: |
           node scripts/check-release-workflow-gates.mjs
