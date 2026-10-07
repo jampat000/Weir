@@ -55,7 +55,7 @@ public readonly record struct MediaManagerIntakeIdentity(bool Authenticated, lon
 /// The intake webhook's work: who may post, which library a hand-off belongs to, which files
 /// it means, and the remux jobs and ledger row it leaves behind.
 /// </summary>
-public sealed class MediaManagerIntake
+public sealed partial class MediaManagerIntake
 {
     /// <summary>Why a kept target's hand-off report says it was not delivered (#786 review of #785).</summary>
     private const string KeptReason = "A person chose to keep this file without processing it again.";
@@ -326,6 +326,7 @@ public sealed class MediaManagerIntake
             ? await _skipMarkers.ForLibraryAsync(uow, library.Id).ConfigureAwait(false)
             : new Dictionary<string, FileSkipMarker>(StringComparer.Ordinal);
         var kept = new List<string>();
+        var repeats = new List<(string Target, CleanedEarlier Earlier)>();
         foreach (var target in targets)
         {
             if (library is not null && IsKept(keptMarkers, library, target))
@@ -333,6 +334,15 @@ public sealed class MediaManagerIntake
                 // Tracked as one of this hand-off's own targets below (covered), exactly like any other file, so a
                 // folder hand-off with a mix of kept and new files still waits for all of them before it reports.
                 kept.Add(target);
+                covered.Add(target);
+                continue;
+            }
+
+            // The same source again (a resend, a replay) is never cleaned twice. It is covered like any other target, so
+            // it counts toward the hand-off's report, and is settled below once the hand-off is on the ledger.
+            if (library is not null && await CleanedSources.FindAsync(uow, library.Id, library.WatchedFolder, target).ConfigureAwait(false) is { } cleaned)
+            {
+                repeats.Add((target, cleaned));
                 covered.Add(target);
                 continue;
             }
@@ -390,6 +400,7 @@ public sealed class MediaManagerIntake
 
         if (library is not null)
         {
+            await SettleRepeatsAsync(uow, importEvent, library, relativePath, repeats).ConfigureAwait(false);
             await _artwork.LinkHandoffAsync(uow, library.Id, library.MediaType, targets, importEvent.ReleaseName, importEvent.Artwork).ConfigureAwait(false);
             foreach (var target in targets)
             {

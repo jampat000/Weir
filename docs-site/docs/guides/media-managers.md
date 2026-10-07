@@ -104,6 +104,12 @@ Deluno hands a file to Weir to work on, and waits to be told it's ready. This is
 automatic setup: Deluno tells Weir about a new file, Weir cleans it, and Deluno is told when the
 cleaned copy is ready to import. You don't move anything by hand.
 
+Weir cleans each downloaded file once. If the same file is handed over again, or you choose "Process
+again" on a file Weir has already cleaned, Weir does not process it a second time: Activity shows
+"Skipped: already done" (or "Skipped: already imported" once Deluno has collected the cleaned copy),
+and Deluno is told the file is ready, with the same cleaned copy as before, never that it failed. A
+download that has changed, or a different release, is processed as usual.
+
 ### Deluno: Weir sets up its workflows from it
 
 You don't type any folders. Once Deluno is connected, Weir sets up a workflow for each Deluno library that is set to

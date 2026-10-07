@@ -1,4 +1,5 @@
 using Weir.Core.Json;
+using Weir.Core.Processing;
 using Weir.Core.Text;
 
 namespace Weir.Core.MediaManagers;
@@ -148,6 +149,11 @@ public static class CompletionReports
 
     private static string SuccessMessage(string outcome, WireObject result)
     {
+        if (result.Get(CleanedEarlier.ResultKey) is WireBool { Value: true })
+        {
+            return CleanedEarlier.ReportMessage;
+        }
+
         if (result.Get("passed_through_after_failure") is WireBool { Value: true })
         {
             return PassThroughAfterFailureMessage;

@@ -44,6 +44,19 @@ The originals folder is always excluded from the library scan (`LibraryFileWalke
 
 A file held by another program is not a failure: the swap reports it as in use and the job is requeued.
 
+## Once per source
+
+A source file is cleaned once. A source is the file at a path with a size and a modification time; once a successful pass has cleaned it and written its copy (`files.processed_source_size` and `processed_source_mtime_ns`, with the `handbacks` row naming the copy), a repeat of the same source is never processed again. It settles as a skip with a reason, never a failure: `CleanedSources.FindAsync` is the one check, and every route that could queue or start a remux pass makes it:
+
+- hand-off intake (`MediaManagerIntake.EnqueueRefineAsync`), for the same hand-off sent again and for another hand-off naming the same download;
+- a manual requeue, "Process again" and "Try again" (`RequeueStore`);
+- the watched-folder scan's enqueue (`WatchedFolderScanRun`);
+- the start of the pass itself (`RemuxPassHandler.SettleRepeatAsync`), before it claims anything, which catches a job queued by any other route or before the check existed. An operator's own track choice or pass-through-unchanged is different work and is not a repeat.
+
+The copy decides what the skip says: while it still exists the file is "Already done: cleaned on <date> into <output path>"; when it is gone because a media manager collected it (the `handbacks` row's outcome is `imported`) it is "Already imported: <manager> collected the cleaned copy on <date>". A copy that is gone with nobody saying why is not a repeat: there is nothing to hand over, so the file is processed again. A changed size or modification time, or a different path, is a new source and goes through.
+
+A skipped repeat of a hand-off is answered like any finished file: a normal `completed` report naming the same output path the first completion named. It carries no `disposition` and never reads as a failure, so the manager does not refuse a good release or search again. Activity records one grey "Skipped: already done" or "Skipped: already imported" line (`processing.file_skipped_repeat`, result `skipped`).
+
 ## Keeping space free
 
 Each workflow keeps at least a set amount free (5 GB unless set; 0 turns the check off) on the drive it writes to. Every write checks it before starting:

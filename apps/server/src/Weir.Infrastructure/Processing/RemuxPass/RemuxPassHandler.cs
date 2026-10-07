@@ -148,6 +148,11 @@ public sealed partial class RemuxPassHandler : IJobHandler
             }
         }
 
+        if (await SettleRepeatAsync(data, provenance, rel, mediaScope, libraryId, payloadJson, cancellationToken).ConfigureAwait(false))
+        {
+            return;
+        }
+
         var claim = await ClaimAsync(context, rel, mediaScope, libraryId, data.Get(HandoffRetries.PayloadMarker) is WireBool { Value: true }, cancellationToken).ConfigureAwait(false);
         if (claim.Superseded)
         {
