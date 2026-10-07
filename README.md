@@ -19,17 +19,13 @@ It runs on Windows and in Docker. It is for one person, and your files and setti
 
 *The Dashboard: every file being worked on right now, and the health of the machine*
 
-<img src="docs/assets/screenshots/activity.png" width="49%"> <img src="docs/assets/screenshots/library.png" width="49%">
+<img src="docs/assets/screenshots/activity.png" width="49%"> <img src="docs/assets/screenshots/workflows.png" width="49%">
 
-*Activity: every file Weir handled and what it did, and Library: the files already on your storage*
+*Activity: every file Weir handled and what it did, and Workflows: the routes a file takes through Weir*
 
-<img src="docs/assets/screenshots/workflows.png" width="49%"> <img src="docs/assets/screenshots/logs.png" width="49%">
+<img src="docs/assets/screenshots/logs.png" width="67%"> <img src="docs/assets/screenshots/file-detail.png" width="31%">
 
-*Workflows: the routes a file takes through Weir, and the Logs*
-
-<img src="docs/assets/screenshots/file-detail.png">
-
-*One file's story: which tracks Weir kept, which it removed, and why*
+*The Logs, and one file's story: which tracks Weir kept, which it removed, and why*
 
 ## What it does, and why it is safe
 
