@@ -10,11 +10,14 @@ namespace Weir.Contract.Tests.Harness;
 /// One real Weir server process with its own data folder and its own port, so any number of them run side by
 /// side. Started from the built server, never in-process. Stopping it takes down only the process this class
 /// started (and what that process started). The data folder survives a restart; a restart picks a new port, so
-/// create clients after it.
+/// create clients after it. A port is chosen by asking the system for a free one and releasing it again, so another
+/// process can take it before the server binds; a server that exits for that reason alone is started again on a new
+/// port, up to <see cref="MaxStartAttempts"/> times in all.
 /// </summary>
 public sealed class WeirServer : IAsyncDisposable
 {
     public const string KeepDataVariable = "WEIR_CONTRACT_KEEP_DATA";
+    public const int MaxStartAttempts = 3;
 
     private static readonly TimeSpan StartTimeout = TimeSpan.FromSeconds(90);
     private static readonly TimeSpan ReadyPollInterval = TimeSpan.FromMilliseconds(100);
@@ -23,14 +26,16 @@ public sealed class WeirServer : IAsyncDisposable
 
     private readonly ServerBinary _binary;
     private readonly Dictionary<string, string> _environment;
+    private readonly Func<int> _pickPort;
     private readonly List<ServerLog> _logs = [];
     private Process? _process;
 
-    private WeirServer(ServerBinary binary, string home, Dictionary<string, string> environment)
+    private WeirServer(ServerBinary binary, string home, Dictionary<string, string> environment, Func<int> pickPort)
     {
         _binary = binary;
         Home = home;
         _environment = environment;
+        _pickPort = pickPort;
     }
 
     public string Home { get; }
@@ -42,13 +47,17 @@ public sealed class WeirServer : IAsyncDisposable
     public bool IsRunning => _process is { HasExited: false };
 
     /// <summary>Starts a server with a fresh data folder and waits until it reports ready.</summary>
-    public static async Task<WeirServer> StartNewAsync(IReadOnlyDictionary<string, string>? environment = null)
+    public static Task<WeirServer> StartNewAsync(IReadOnlyDictionary<string, string>? environment = null) =>
+        StartWithPortsAsync(environment, FreePort);
+
+    /// <summary>Starts a server whose ports come from <paramref name="pickPort"/>, so a test can make one clash.</summary>
+    internal static async Task<WeirServer> StartWithPortsAsync(IReadOnlyDictionary<string, string>? environment, Func<int> pickPort)
     {
         var binary = ServerBinary.Locate();
         ServerLedger.Shared.StopOrphans();
         var home = Directory.CreateTempSubdirectory("weir_contract_").FullName;
         var settings = new Dictionary<string, string>(environment ?? new Dictionary<string, string>());
-        var server = new WeirServer(binary, home, settings);
+        var server = new WeirServer(binary, home, settings, pickPort);
         try
         {
             await server.LaunchAsync();
@@ -146,10 +155,33 @@ public sealed class WeirServer : IAsyncDisposable
     private async Task LaunchAsync()
     {
         using var startPlace = await ServerStartGate.EnterAsync();
-        var port = FreePort();
+        string? lostPortNote = null;
+        for (var attempt = 1; ; attempt++)
+        {
+            try
+            {
+                await StartOnNewPortAsync(lostPortNote);
+                return;
+            }
+            catch (PortTakenException taken) when (attempt < MaxStartAttempts)
+            {
+                lostPortNote =
+                    $"contract harness: port {taken.Port} was taken before the server could listen on it; starting again on a new port (attempt {attempt + 1} of {MaxStartAttempts}).";
+                await StopAsync();
+            }
+        }
+    }
+
+    private async Task StartOnNewPortAsync(string? note)
+    {
+        var port = _pickPort();
         BaseUrl = new Uri($"http://127.0.0.1:{port}/");
         var log = new ServerLog(Path.Combine(Home, "contract-logs", $"server-{_logs.Count + 1}.log"));
         _logs.Add(log);
+        if (note is not null)
+        {
+            log.Note(note);
+        }
 
         var (program, leadingArguments) = _binary.Command();
         var start = new ProcessStartInfo(program)
@@ -171,10 +203,10 @@ public sealed class WeirServer : IAsyncDisposable
         _process = Process.Start(start) ?? throw new InvalidOperationException($"{program} did not start.");
         log.Follow(_process);
         ServerLedger.Shared.Record(_process);
-        await WaitUntilReadyAsync(_process, log);
+        await WaitUntilReadyAsync(_process, log, port);
     }
 
-    private async Task WaitUntilReadyAsync(Process process, ServerLog log)
+    private async Task WaitUntilReadyAsync(Process process, ServerLog log, int port)
     {
         var deadline = DateTime.UtcNow + StartTimeout;
         var lastProblem = "no answer yet";
@@ -182,8 +214,13 @@ public sealed class WeirServer : IAsyncDisposable
         {
             if (process.HasExited)
             {
-                throw new InvalidOperationException(
-                    $"The Weir server exited with code {process.ExitCode} before it was ready.{Environment.NewLine}Last lines of its log ({log.Path}):{Environment.NewLine}{log.Tail()}");
+                // Waits for the last of its output to reach the log, which is what says why it exited.
+                await process.WaitForExitAsync();
+                var message =
+                    $"The Weir server exited with code {process.ExitCode} before it was ready.{Environment.NewLine}Last lines of its log ({log.Path}):{Environment.NewLine}{log.Tail()}";
+                throw ServerBindFailure.IsPortInUse(log.Text())
+                    ? new PortTakenException(port, message)
+                    : new InvalidOperationException(message);
             }
 
             var problem = await ProbeReadyAsync();
@@ -221,7 +258,7 @@ public sealed class WeirServer : IAsyncDisposable
         }
     }
 
-    private static int FreePort()
+    internal static int FreePort()
     {
         var listener = new TcpListener(IPAddress.Loopback, 0);
         listener.Start();
@@ -233,5 +270,10 @@ public sealed class WeirServer : IAsyncDisposable
         {
             listener.Stop();
         }
+    }
+
+    private sealed class PortTakenException(int port, string message) : InvalidOperationException(message)
+    {
+        public int Port { get; } = port;
     }
 }
