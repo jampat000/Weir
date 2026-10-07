@@ -24,7 +24,7 @@ Login and bootstrap rate limiting is process-local memory. This is correct only 
 Weir ignores `X-Forwarded-For` unless `WEIR_TRUSTED_PROXY_IPS` is configured. Set it to the immediate reverse proxy IP or CIDR only, for example:
 
 ```text
-WEIR_TRUSTED_PROXY_IPS=172.18.0.1,10.0.0.0/24
+WEIR_TRUSTED_PROXY_IPS=192.0.2.1,192.0.2.0/24
 ```
 
 When the immediate peer is trusted, Weir uses the right-most untrusted address in `X-Forwarded-For` as the client key. Forwarded headers from untrusted peers are ignored.

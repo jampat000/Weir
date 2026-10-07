@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import type { ActivityEventItem } from "../api/types";
-import { eventDisplay } from "./activity-display";
-import { REMUX_PASS_COMPLETED_EVENT } from "./event-types";
+import { eventDisplay, eventLabel } from "./activity-display";
+import {
+  REMUX_PASS_COMPLETED_EVENT,
+  SKIPPED_REPEAT_EVENT,
+} from "./event-types";
 
 function passEvent(detail: Record<string, unknown>): ActivityEventItem {
   return {
@@ -41,5 +44,65 @@ describe("eventDisplay for a finished pass", () => {
     expect(display.title).toBe("film.mkv could not be processed");
     expect(display.chip).toBe("Processing failed");
     expect(display.meaning).toBe("broken");
+  });
+});
+
+describe("eventDisplay for the pause", () => {
+  it("names a pause and a resume, and keeps who and until when in the detail", () => {
+    const entry = (event_type: string, detail: string): ActivityEventItem => ({
+      id: 2,
+      created_at: "2026-10-07T03:24:00",
+      event_type,
+      module: "system",
+      title: "",
+      detail,
+    });
+
+    expect(
+      eventDisplay(
+        entry(
+          "system.processing_paused",
+          "Processing was paused until you resume by alice.",
+        ),
+      ).title,
+    ).toBe("Processing paused");
+    expect(
+      eventDisplay(
+        entry("system.processing_resumed", "Processing was resumed by alice."),
+      ).title,
+    ).toBe("Processing resumed");
+  });
+});
+
+describe("eventDisplay for a repeat that was skipped", () => {
+  it("shows the server's title and reads as left alone, not as needing attention", () => {
+    const display = eventDisplay({
+      id: 3,
+      created_at: "2026-10-07T03:24:00",
+      event_type: SKIPPED_REPEAT_EVENT,
+      module: "processing",
+      title: "Skipped: already imported (Film.mkv)",
+      detail: JSON.stringify({ status: "skipped" }),
+    });
+
+    expect(display.title).toBe("Skipped: already imported (Film.mkv)");
+    expect(display.meaning).toBe("idle");
+  });
+});
+
+describe("eventLabel", () => {
+  it("titles the events added with workflow set-up, repeats and pausing", () => {
+    expect(eventLabel("processing.workflow_sync_notice")).toBe(
+      "Workflow could not be updated yet",
+    );
+    expect(eventLabel("processing.file_skipped_repeat")).toBe(
+      "Skipped: already done or imported",
+    );
+    expect(eventLabel("system.processing_paused")).toBe("Processing paused");
+    expect(eventLabel("system.processing_resumed")).toBe("Processing resumed");
+  });
+
+  it("falls back to the last part of an unknown type, in words", () => {
+    expect(eventLabel("processing.something_new")).toBe("something new");
   });
 });

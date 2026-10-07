@@ -174,6 +174,11 @@ public sealed partial class RemuxPassRunner
             output.Set("output_replacement_note", collision.Reason);
         }
 
+        if (collision.Wrote)
+        {
+            RecordSizes(output, context, final);
+        }
+
         output.Set("after_track_lines_meaning",
             "Live remux finished; before = source probe; after = planned disposition (copy remux — " +
             "ffprobe of the written file was used for validation only).");

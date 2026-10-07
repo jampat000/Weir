@@ -23,7 +23,9 @@ work, not rewritten for its own sake. Scripts are named in kebab-case.
 | `summarize-test-results.mjs` | Writes TRX and Playwright results to a CI job's summary page. |
 | `retry-failed-tests.mjs` | Runs the browser tests that failed in the E2E smoke's first run once more and lists those that passed only then under "Flaky (passed on retry)"; backend tests are never retried (`retry-failed-tests.test.mjs`). |
 | `check-no-python.mjs` | Fails when a Python file is tracked: Weir's tooling and tests are Node, PowerShell or .NET (`check-no-python.test.mjs`). |
+| `check-public-privacy.mjs` | Fails when a private-looking value (a private IP address, a Windows machine name, a UNC or NAS path, an email address, an API key value, or a known private word held only as a SHA-256 hash in `public-privacy-hashes.json`) is in the README, the docs, the release notes, the changelog or the built web app. It never prints the match. `--audit` lists the same matches across every tracked file (`check-public-privacy.test.mjs`). |
 | `check-contract-areas.mjs` | Fails when the contract suite's `areas.json` and its `[ContractArea]` test classes disagree, so a CI leg can never run zero tests (`check-contract-areas.test.mjs`). |
+| `check-event-titles.mjs` | Fails when the server defines an Activity event type that `apps/web/src/lib/activity/event-labels.ts` has no title for, so System > Logs never shows a raw event name (`check-event-titles.test.mjs`). |
 | `check-test-console-programs.mjs` | Fails when a test source under `apps/` starts a system console program (`ping`, `timeout`, ...) as a stand-in, because that can pop a console window on a desktop (#806, #821) (`check-test-console-programs.test.mjs`). |
 | `check-node-docker-version.mjs` | Fails when the Dockerfile's node image major does not match the root `.node-version`. |
 | `check-release-workflow-gates.mjs` | Checks the shape of `release.yml` and `ci.yml`: only `publish` publishes, the moving image tags move last and never for a release candidate, `ci-passed` judges every job. |
@@ -31,6 +33,7 @@ work, not rewritten for its own sake. Scripts are named in kebab-case.
 | `semver.mjs` | SemVer parsing and precedence for the release scripts (`semver.test.mjs`). |
 | `find-previous-release.mjs` | The delta base for the Windows package: the newest published release older than the one being released, by SemVer precedence (`find-previous-release.test.mjs`). |
 | `verify-ci-for-release.mjs` | Makes a release prove `ci.yml`'s `ci-passed` passed on the tagged commit, without waiting for a run still going (`verify-ci-for-release.test.mjs`). |
+| `verify-golden-path-for-release.mjs` | Makes a release prove the golden path passed on the tagged commit: the newest `golden-path` commit status on it must be `success` (`verify-golden-path-for-release.test.mjs`). |
 | `prune-release-feed.mjs` | Removes the previous release's full nupkg (fetched only as the Windows package's delta base) and its feed entries from a `vpk pack` output directory, keeping just the version being released (`prune-release-feed.test.mjs`). |
 | `check-release-assets-single-version.mjs` | Release gate: fails if the Windows package output still names any version other than the one being released, as a backstop for `prune-release-feed.mjs` (`check-release-assets-single-version.test.mjs`). |
 | `check-dead-code.mjs` | Dead-code guard for the web app: unreferenced files, exports and types, found by Knip (allowlist in `dead-code-allowlist.json`) and unstyled class names. |

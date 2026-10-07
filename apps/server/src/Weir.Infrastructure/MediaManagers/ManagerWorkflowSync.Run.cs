@@ -33,7 +33,7 @@ public sealed partial class ManagerWorkflowSync
                 var synced = WorkflowSyncRules.FoldersSyncedFrom(workflow.DiscoveredFromConnectionId, workflow.DiscoveredLibraryKey, linked, connection.Kind) is not null;
                 snapshots.Add(new SyncWorkflow(
                     workflow.Id, workflow.Name, workflow.MediaType, workflow.WatchedFolder, workflow.OutputFolder,
-                    workflow.DiscoveredFromConnectionId, workflow.DiscoveredLibraryKey, synced));
+                    workflow.DiscoveredFromConnectionId, workflow.DiscoveredLibraryKey, synced, linked));
             }
 
             var changed = false;

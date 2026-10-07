@@ -5,6 +5,8 @@ namespace Weir.Core;
 /// <summary>
 /// The version the server reports: <c>WEIR_VERSION</c> when set,
 /// otherwise the build's version, which MSBuild takes from <c>WeirVersion</c> in <c>apps/server/Directory.Build.props</c>.
+/// A release reports its plain version. A CI build stamped for the golden path keeps its commit as build metadata
+/// (<c>1.0.0-rc.4+abc1234</c>), so the record names the exact build; version comparisons ignore that part.
 /// </summary>
 public static class WeirVersion
 {
@@ -17,22 +19,6 @@ public static class WeirVersion
     {
         var informational = typeof(WeirVersion).Assembly
             .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
-        if (string.IsNullOrWhiteSpace(informational))
-        {
-            return "0.0.0";
-        }
-
-        return WithoutBuildMetadata(informational);
-    }
-
-    /// <summary>
-    /// Drops SemVer build metadata (<c>+abc123</c>) and keeps the rest, so <c>1.0.0-rc.1+abc123</c> reads as
-    /// <c>1.0.0-rc.1</c>.
-    /// </summary>
-    public static string WithoutBuildMetadata(string version)
-    {
-        ArgumentNullException.ThrowIfNull(version);
-        var plus = version.IndexOf('+', StringComparison.Ordinal);
-        return plus < 0 ? version : version[..plus];
+        return string.IsNullOrWhiteSpace(informational) ? "0.0.0" : informational;
     }
 }

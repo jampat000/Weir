@@ -45,7 +45,9 @@ never changes. Cutting a release is:
    This PR touches nothing under `apps/`, `packaging/` or `Dockerfile`, so `CI / ci-passed` on it and
    on its merge to `main` both finish in well under a minute (path-aware CI skips everything but the
    repository checks).
-3. Create an annotated tag on that merge commit:
+3. Run the golden path on that exact commit and record that it passed
+   ([Golden path before tagging](#golden-path-before-tagging)). The release refuses to publish without it.
+4. Create an annotated tag on that merge commit:
 
    ```bash
    git fetch origin
@@ -55,12 +57,89 @@ never changes. Cutting a release is:
    git push origin vX.Y.Z
    ```
 
-4. Pushing `v*` triggers `.github/workflows/release.yml`. Its `ci-passed` job confirms `CI` already
-   passed on that exact commit (`scripts/verify-ci-for-release.mjs`) instead of re-running it, and
+5. Pushing `v*` triggers `.github/workflows/release.yml`. Its `ci-passed` job confirms `CI` already
+   passed on that exact commit (`scripts/verify-ci-for-release.mjs`) instead of re-running it, its
+   `golden-path` job confirms the golden path passed on it too (`scripts/verify-golden-path-for-release.mjs`), and
    `windows-smoke` validates the tag itself is a well-formed `X.Y.Z` or `X.Y.Z-rc.N` version
    (`scripts/check-release-version.mjs`) before stamping it onto the server, the tray, the Windows
    package and the Docker image.
-5. The release workflow requires `docs/release-notes/<tag>.md` for the tag and publishes that file as the GitHub Release body.
+6. The release workflow requires `docs/release-notes/<tag>.md` for the tag and publishes that file as the GitHub Release body.
+
+### Golden path before tagging
+
+Green tests have shipped bugs that only showed when the product was used (a pause that did not pause, seeding
+originals deleted, a file cleaned twice). So before a tag is made, the exact commit is installed on a clean machine
+and used the way a person uses it, and the release will not publish unless that run is on record. Decided by the owner,
+7 Oct 2026 (#903; Deluno's half is Deluno#1158, and the mechanism is the same in both).
+
+**1. Get the exact commit's build.** CI builds the Windows package for any commit without a tag and keeps it for
+7 days as the workflow artifact `weir-windows-<short sha>` (the first 7 characters of the commit), holding
+`Weir-win-Setup.exe` and `Weir-win-Portable.zip`.
+
+- A push to `main` builds it when the change touched code, packaging or a workflow. A commit that changed only
+  documents or release notes (which is what a release commit normally is) builds nothing, and neither does a pull
+  request run. To build any commit or branch, run CI by hand, which skips nothing. For the golden path, give it
+  the release the commit is meant to become:
+
+  ```bash
+  gh workflow run ci.yml --repo jampat000/Weir --ref main -f version=1.0.0-rc.4
+  ```
+
+  `--ref` takes a branch or a tag; for a commit that no branch points at, push a branch at it first.
+- Find the run, check it is for the commit you mean, and download it:
+
+  ```bash
+  gh run list --repo jampat000/Weir --workflow ci.yml --commit <full sha> --json databaseId,event,conclusion
+  gh run view <run id> --repo jampat000/Weir --json headSha
+  gh run download <run id> --repo jampat000/Weir -n weir-windows-<short sha> -D weir-build
+  ```
+
+- Given a version, the build reports that version with the commit as build metadata, such as
+  `1.0.0-rc.4+abc1234`: in `Weir.exe --version`, in System › About, and in the capabilities answer Deluno shows.
+  The golden-path record names it. Update checks ignore the `+abc1234` part, so the build counts as the release
+  itself. Without a version, or on a push, it reports `0.0.1-dev`, the placeholder in
+  `apps/server/Directory.Build.props`. Either way the artifact's name and its run's `headSha` tie it to the
+  commit, and it is never published.
+
+**2. Run it on the clean VM.** The Deluno session drives the run on a Hyper-V Windows VM that is reverted to its
+saved clean checkpoint before every run, with Deluno's installer and this build's `Weir-win-Setup.exe` both built from
+the commit being tagged. The Weir session checks Weir's side through Weir's UI and read-only, against one shared
+checklist. The rig stays the long-running real-data box and is not the golden path.
+
+**3. Weir's checklist.** Each line is checked by clicking or watching, and the evidence (what was seen, screenshots,
+log lines) goes in a comment on the release's tracking issue:
+
+- [ ] Deluno's picker installs Weir. Weir answers on this PC only, and its tray starts silently.
+- [ ] **Connect Weir** in Deluno creates the account, and Weir's Movies/TV workflows are set up from Deluno and
+  linked, with the Folder chain all ✓ and no typing in Weir.
+- [ ] One torrent film, one Usenet film and one TV episode each go through the lanes Incoming, Queued,
+  Analysing, Processing and Delivering, and are imported by Deluno. Each Activity entry is correct (tracks kept/removed, sizes before/after, saved).
+- [ ] The download client's seeding folder still holds every original file afterwards (.mkv, .nfo, sidecars).
+- [ ] Pause "until I resume" with "keep looking" on: a hand-off during the pause waits; nothing is processed or
+  removed; on resume it is processed once. Activity shows Paused and Resumed.
+- [ ] Re-sending a hand-off for a file already cleaned settles as "Skipped: already done" with no second output.
+- [ ] System › About → **Devices on my network** makes Weir reachable from another PC, on a Public network too.
+- [ ] Logs shows no unexpected warnings or errors, and every event has a readable title.
+
+**4. Record the result.** Whoever drove the run sets a commit status named `golden-path` on the full SHA, with a
+description and a link to the evidence comment:
+
+```bash
+gh api repos/jampat000/Weir/statuses/<full sha> \
+  -f state=success -f context=golden-path \
+  -f description="Golden path passed on the clean VM, 8 of 8 checks" \
+  -f target_url="https://github.com/jampat000/Weir/issues/<n>#issuecomment-<id>"
+```
+
+A run that fails is recorded the same way with `-f state=failure`. The newest status for the context is the one that
+counts, so a later failure withdraws an earlier success. A status belongs to one commit: a fix made after a failed run
+is a new commit, and so is a commit that changes only the release notes, and each needs its own run on record.
+
+**5. The release checks it.** The `golden-path` job in `release.yml` (`scripts/verify-golden-path-for-release.mjs`)
+passes only when the tagged commit's newest `golden-path` status is `success`. It does not wait. Without one the
+release stops there, before anything is published, with: "This commit has no passing golden-path run. Run the golden
+path on this exact build (see docs/release.md), then re-run the release." Record the result, then re-run the
+release's failed jobs.
 
 ### Cutting a release candidate
 
@@ -118,6 +197,10 @@ The `Release` workflow:
   gh workflow run ci.yml --ref vX.Y.Z
   ```
 
+- **`golden-path`**: confirms the golden path passed on the exact tagged commit: the newest commit status
+  with the context `golden-path` is `success` (`scripts/verify-golden-path-for-release.mjs`). It reads
+  statuses only and does not wait. See [Golden path before tagging](#golden-path-before-tagging).
+
 - **`validate`**: what CI cannot have checked. The release notes file exists, the release gate
   ordering holds, a NuGet vulnerability scan as of today, the E2E smoke, and the production web
   build published as `weir-web-dist.zip`
@@ -162,10 +245,10 @@ workflow reads a `GHCR_TOKEN` secret.
 
 - **Every job has a `timeout-minutes`**, about two to three times its slowest recent successful run
   with a floor of 10, so a hung job fails in minutes instead of holding a runner for the six-hour
-  default. The release's `ci-passed` job has 10: it only asks GitHub for the tagged commit's CI run and does not
-  wait for one. Raise a limit in the same change that makes a job genuinely slower.
+  default. The release's `ci-passed` and `golden-path` jobs have 10: they only ask GitHub about the tagged commit and do not
+  wait for anything. Raise a limit in the same change that makes a job genuinely slower.
 - **Every workflow starts at `permissions: contents: read`.** A job adds only what it needs: `changes`
-  adds `pull-requests: read`; CodeQL's `analyze` adds `security-events: write`; and `publish` alone adds `contents: write`,
+  adds `pull-requests: read`; the release's `ci-passed` adds `actions: read` and its `golden-path` adds `statuses: read`; CodeQL's `analyze` adds `security-events: write`; and `publish` alone adds `contents: write`,
   `packages: write`, `id-token: write` and `attestations: write`.
 - **A release is never cancelled once started.** `release.yml` serialises runs per tag with
   `cancel-in-progress: false`: a second run for the same tag waits for the first, so `publish` cannot be

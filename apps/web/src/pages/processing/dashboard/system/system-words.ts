@@ -84,7 +84,7 @@ export function fullInWords(days: number | null): string {
   return `~${rounded} ${rounded === 1 ? "day" : "days"}`;
 }
 
-/** The host and port of an address: "http://192.168.1.5:9347/" is host "192.168.1.5", port "9347". */
+/** The host and port of an address: "http://192.0.2.5:9347/" is host "192.0.2.5", port "9347". */
 export function splitAddress(address: string): {
   host: string;
   port: string | null;

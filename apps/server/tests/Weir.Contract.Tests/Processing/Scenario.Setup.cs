@@ -97,9 +97,9 @@ internal sealed partial class Scenario
         ["processorOutputPath"] = DelunoOutputRoot,
     };
 
-    public async Task<JsonObject> SetPauseAsync(bool paused)
+    public async Task<JsonObject> SetPauseAsync(bool paused, bool keepLooking = true)
     {
-        var response = await Admin.PutWithCsrfAsync($"{Api}/pause", new JsonObject { ["paused"] = paused, ["scan_while_paused"] = true });
+        var response = await Admin.PutWithCsrfAsync($"{Api}/pause", new JsonObject { ["paused"] = paused, ["scan_while_paused"] = keepLooking });
         Assert.True(response.Status == HttpStatusCode.OK, response.ToString());
         Assert.Equal(paused, (bool)response.Fields["paused"]!);
         return response.Fields;
