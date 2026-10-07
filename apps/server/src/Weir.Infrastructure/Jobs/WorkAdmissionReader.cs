@@ -108,13 +108,19 @@ public static class WorkAdmissionReader
             }
         }
 
+        // File work only: upkeep (scans, sweeps) has its own slots and takes nothing from files-at-once, as in Evaluate.
         var running = 0;
         var runningPerLibrary = new Dictionary<long, int>();
-        using (var command = Command(connection, transaction, "SELECT payload_json FROM jobs WHERE status = 'leased'"))
+        using (var command = Command(connection, transaction, "SELECT payload_json, job_kind FROM jobs WHERE status = 'leased'"))
         using (var reader = command.ExecuteReader())
         {
             while (reader.Read())
             {
+                if (WorkLanes.LaneOf(reader.GetString(1)) == WorkLane.Upkeep)
+                {
+                    continue;
+                }
+
                 running++;
                 if (JobPayload.LibraryIdForAdmission(reader.IsDBNull(0) ? null : reader.GetString(0)) is { } libraryId)
                 {

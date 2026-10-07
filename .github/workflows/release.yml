@@ -163,47 +163,6 @@ jobs:
       - name: Fetch bundled tool source archives
         run: powershell -ExecutionPolicy Bypass -File packaging/windows/fetch-bundled-tool-sources.ps1 -OutputDir dist/windows/releases
 
-      - name: Detect Windows code signing configuration
-        id: codesign
-        shell: bash
-        env:
-          WINDOWS_CODESIGN_PFX_BASE64: ${{ secrets.WINDOWS_CODESIGN_PFX_BASE64 }}
-          WINDOWS_CODESIGN_PASSWORD: ${{ secrets.WINDOWS_CODESIGN_PASSWORD }}
-        run: |
-          if [[ -n "${WINDOWS_CODESIGN_PFX_BASE64}" && -n "${WINDOWS_CODESIGN_PASSWORD}" ]]; then
-            echo "enabled=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "enabled=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Sign Velopack release artifacts
-        if: ${{ steps.codesign.outputs.enabled == 'true' }}
-        shell: powershell
-        env:
-          WINDOWS_CODESIGN_PFX_BASE64: ${{ secrets.WINDOWS_CODESIGN_PFX_BASE64 }}
-          WINDOWS_CODESIGN_PASSWORD: ${{ secrets.WINDOWS_CODESIGN_PASSWORD }}
-        run: |
-          $pfxPath = Join-Path $env:RUNNER_TEMP "weir-codesign.pfx"
-          [IO.File]::WriteAllBytes($pfxPath, [Convert]::FromBase64String($env:WINDOWS_CODESIGN_PFX_BASE64))
-          $signtool = (Get-Command signtool.exe -ErrorAction Stop).Source
-          $setupExe = Get-Item -LiteralPath "dist/windows/releases/Weir-win-Setup.exe" -ErrorAction Stop
-          & $signtool sign /f $pfxPath /p $env:WINDOWS_CODESIGN_PASSWORD /fd sha256 /tr http://timestamp.digicert.com /td sha256 $setupExe.FullName
-          if ($LASTEXITCODE -ne 0) {
-            throw "signtool failed with exit code $LASTEXITCODE"
-          }
-
-      - name: Verify Velopack setup signature
-        if: ${{ steps.codesign.outputs.enabled == 'true' }}
-        shell: powershell
-        run: |
-          $setupExe = Get-Item -LiteralPath "dist/windows/releases/Weir-win-Setup.exe" -ErrorAction Stop
-          $signature = Get-AuthenticodeSignature -FilePath $setupExe.FullName
-          if ($signature.Status -ne "Valid") {
-            throw "Setup signature verification failed: $($signature.Status) $($signature.StatusMessage)"
-          }
-
-      # After signing: signtool rewrites Setup.exe, so a hash taken earlier would not match the
-      # file people download (and installers that verify SHA256SUMS.txt would refuse it).
       - name: Generate release artifact checksums
         shell: powershell
         run: |

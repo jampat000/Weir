@@ -248,16 +248,14 @@ requireOrder(
   `${RELEASE} docker-arm64 job`,
 );
 
-// Checksums describe the files as published. Signing rewrites Setup.exe, so hashing must come
-// after it. (The provenance attestation of these files is publish's, over the bytes it downloads.)
+// Checksums describe the files as published, so they are taken once every file is final and before
+// the upload. (The provenance attestation of these files is publish's, over the bytes it downloads.)
 const windowsSmoke = requireJob(release, "windows-smoke", RELEASE);
 requireOrder(
   windowsSmoke,
   [
     "- name: Validate release version alignment",
     "- name: Verify no other-version release assets",
-    "- name: Sign Velopack release artifacts",
-    "- name: Verify Velopack setup signature",
     "- name: Generate release artifact checksums",
     "- name: Upload Velopack release artifacts",
   ],
