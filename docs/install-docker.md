@@ -14,7 +14,10 @@ The image is `ghcr.io/jampat000/weir`. The tag after the colon picks the version
 | Tag | What it is | Use it when |
 | --- | --- | --- |
 | `1.0.0-rc.1` | Exactly that release, forever | You want to choose when Weir changes. **Use this while Weir is a release candidate.** Newer ones are listed on the [Releases page](https://github.com/jampat000/Weir/releases). |
-| `latest` | The newest published image | You are happy for `docker compose pull` to move you to whatever is newest. Fine once Weir has a stable release you trust. |
+| `latest` | The newest stable release | You are happy for `docker compose pull` to move you to whatever is newest. It does not exist yet: it arrives with 1.0.0. |
+
+Release candidates are published under their version tag only. They never move `latest`, so until 1.0.0 you
+name the version, as every example below does.
 
 The image tag has no `v`: the release `v1.0.0-rc.1` is the image `1.0.0-rc.1`.
 
@@ -216,7 +219,7 @@ docker compose pull
 docker compose up -d
 ```
 
-If you use `latest`, only the two commands are needed. With `docker run`, pull the new image, then stop and
+Once 1.0.0 is out and you use `latest`, only the two commands are needed. With `docker run`, pull the new image, then stop and
 remove the old container and run the same `docker run` command again:
 
 ```bash

@@ -41,7 +41,7 @@ See [Windows installer](../deployment/windows#updates) for more.
 
 ## Updating on Docker
 
-With `image: ghcr.io/jampat000/weir:latest`, pull the new image and recreate the container:
+With `image: ghcr.io/jampat000/weir:latest` (stable releases only: release candidates are published under their version tag, so until 1.0.0 you pin one, as below), pull the new image and recreate the container:
 
 ```bash
 docker compose pull
