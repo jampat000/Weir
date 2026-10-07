@@ -59,7 +59,7 @@ internal sealed class SuitePauseEndpointHandlers
         }
 
         var uow = await request.DbAsync().ConfigureAwait(false);
-        var state = await _pause.ChangeAsync(uow, paused, minutes, scanWhilePaused, Timestamp.UtcNow(request.Time), signedIn.User.Username).ConfigureAwait(false);
+        var state = await _pause.ChangeAsync(uow, paused, minutes, keepEnd: !model.Has("pause_for_minutes"), scanWhilePaused, Timestamp.UtcNow(request.Time), signedIn.User.Username).ConfigureAwait(false);
         return ApiRoutes.Ok(state.ToOut());
     }
 

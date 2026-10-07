@@ -217,3 +217,18 @@ it("closes the menu on a click outside it", () => {
 
   expect(screen.queryByTestId("pause-menu")).not.toBeInTheDocument();
 });
+
+it("offers no Keep-looking choice while a pause is running, so the header cannot rewrite its length", () => {
+  setup(
+    state({
+      paused: true,
+      paused_until: "2026-10-07T10:00:00Z",
+      reason: "Processing is paused.",
+    }),
+  );
+
+  render(<PauseControl />, { wrapper });
+  expect(
+    screen.queryByTestId("pause-scan-while-paused"),
+  ).not.toBeInTheDocument();
+});

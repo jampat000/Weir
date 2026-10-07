@@ -23,7 +23,7 @@ public sealed class SuitePauseServiceTests : IDisposable
     private Timestamp Now => Timestamp.UtcNow(_store.Clock);
 
     private Task<PauseOutcome> ChangeAsync(bool paused, long? minutes = null, bool keepLooking = true, string by = "alice") =>
-        InUnitOfWorkAsync(uow => _pause.ChangeAsync(uow, paused, minutes, keepLooking, Now, by));
+        InUnitOfWorkAsync(uow => _pause.ChangeAsync(uow, paused, minutes, keepEnd: false, keepLooking, Now, by));
 
     private Task<PauseOutcome> CurrentAsync() => InUnitOfWorkAsync(uow => _pause.CurrentAsync(uow, Now));
 
@@ -109,6 +109,27 @@ public sealed class SuitePauseServiceTests : IDisposable
         var resumed = await ChangeAsync(paused: false);
 
         Assert.Empty(resumed.Entries);
+    }
+
+    [Fact]
+    public async Task A_change_that_says_nothing_about_the_length_keeps_the_end_of_a_running_pause()
+    {
+        await ChangeAsync(paused: true, minutes: 30);
+        _store.Clock.Advance(TimeSpan.FromMinutes(10));
+
+        var kept = await InUnitOfWorkAsync(uow => _pause.ChangeAsync(uow, true, null, keepEnd: true, false, Now, "alice"));
+
+        Assert.Equal(new DateTime(2026, 1, 15, 10, 30, 0, DateTimeKind.Utc), kept.State.PausedUntil!.Value.AsUtc);
+        Assert.False(kept.State.ScanWhilePaused);
+        Assert.EndsWith("Weir does not look for new files either.", kept.Entries[^1], StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_pause_that_is_not_running_yet_lasts_until_resumed_when_no_length_is_given()
+    {
+        var started = await InUnitOfWorkAsync(uow => _pause.ChangeAsync(uow, true, null, keepEnd: true, true, Now, "alice"));
+
+        Assert.Null(started.State.PausedUntil);
     }
 
     private sealed record PauseOutcome(PauseState State, string[] Entries);

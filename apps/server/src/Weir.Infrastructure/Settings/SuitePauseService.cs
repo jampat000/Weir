@@ -31,8 +31,12 @@ public sealed class SuitePauseService
         return await LapseAsync(uow, row, now).ConfigureAwait(false);
     }
 
-    /// <summary>Pauses (for <paramref name="minutes"/>, or until resumed when none) or resumes, on behalf of <paramref name="by"/>.</summary>
-    public async Task<PauseState> ChangeAsync(UnitOfWork uow, bool paused, long? minutes, bool scanWhilePaused, Timestamp now, string by)
+    /// <summary>
+    /// Pauses (for <paramref name="minutes"/>, or until resumed when none) or resumes, on behalf of <paramref name="by"/>. A
+    /// request that says nothing about the length (<paramref name="keepEnd"/>) leaves a pause that is already running as it is,
+    /// whatever else it changes; an explicit "no length" makes the pause last until it is resumed.
+    /// </summary>
+    public async Task<PauseState> ChangeAsync(UnitOfWork uow, bool paused, long? minutes, bool keepEnd, bool scanWhilePaused, Timestamp now, string by)
     {
         ArgumentNullException.ThrowIfNull(uow);
         ArgumentException.ThrowIfNullOrWhiteSpace(by);
@@ -40,7 +44,9 @@ public sealed class SuitePauseService
         var before = await LapseAsync(uow, row, now).ConfigureAwait(false);
         row = row with { ProcessingPaused = before.Paused, ProcessingPausedUntil = before.Paused ? before.PausedUntil : null };
 
-        Timestamp? until = paused && minutes is { } length ? Timestamp.FromUtc(now.AsUtc.AddMinutes((double)length)) : null;
+        Timestamp? until = !paused ? null
+            : keepEnd && before.Paused ? before.PausedUntil
+            : minutes is { } length ? Timestamp.FromUtc(now.AsUtc.AddMinutes((double)length)) : null;
         await _settings.UpdateAsync(uow, row, row with { ProcessingPaused = paused, ScanWhilePaused = scanWhilePaused, ProcessingPausedUntil = until }).ConfigureAwait(false);
         var after = PauseState.Resolve(paused, until, scanWhilePaused, now.AsUtc);
 

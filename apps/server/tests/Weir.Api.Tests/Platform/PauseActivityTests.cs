@@ -46,4 +46,21 @@ public sealed class PauseActivityTests
         Assert.All([running, first, again], response => Assert.Equal(HttpStatusCode.OK, response.StatusCode));
         Assert.Single((await TestDatabase.ScalarStringAsync(server, Entries))!.Split(" | "));
     }
+
+    [Fact]
+    public async Task Changing_only_whether_weir_keeps_looking_leaves_a_timed_pause_ending_when_it_did()
+    {
+        await using var server = await StartServerAsync();
+        await TestDatabase.SeedAdminAsync(server);
+        var client = new ApiTestClient(server);
+        await client.SignInAsync();
+        var timed = await Json(await client.PutAsync("/api/v1/pause", new { csrf_token = await client.CsrfAsync(), paused = true, pause_for_minutes = 120 }));
+
+        var unticked = await Json(await client.PutAsync("/api/v1/pause", new { csrf_token = await client.CsrfAsync(), paused = true, scan_while_paused = false }));
+
+        Assert.Equal(timed["paused_until"]!.GetValue<string>(), unticked["paused_until"]!.GetValue<string>());
+        Assert.False(unticked["scan_while_paused"]!.GetValue<bool>());
+        var indefinite = await Json(await client.PutAsync("/api/v1/pause", new { csrf_token = await client.CsrfAsync(), paused = true, pause_for_minutes = (int?)null }));
+        Assert.Null(indefinite["paused_until"]);
+    }
 }
