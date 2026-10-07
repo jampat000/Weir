@@ -43,6 +43,7 @@ internal sealed class MediaManagerIntakeEndpointHandlers
     private readonly MediaManagerIntake _intake;
     private readonly HandbackOutcomes _handbackOutcomes;
     private readonly LibraryStore _libraries;
+    private readonly MediaManagerConnectionStore _connections;
     private readonly MachineIdentity _machine;
     private readonly ArtworkSubjects _artwork;
     private readonly string _version;
@@ -51,6 +52,7 @@ internal sealed class MediaManagerIntakeEndpointHandlers
         MediaManagerIntake intake,
         HandbackOutcomes handbackOutcomes,
         LibraryStore libraries,
+        MediaManagerConnectionStore connections,
         MachineIdentity machine,
         ArtworkSubjects artwork,
         WeirOptions options)
@@ -62,6 +64,7 @@ internal sealed class MediaManagerIntakeEndpointHandlers
         _intake = intake ?? throw new ArgumentNullException(nameof(intake));
         _handbackOutcomes = handbackOutcomes ?? throw new ArgumentNullException(nameof(handbackOutcomes));
         _libraries = libraries ?? throw new ArgumentNullException(nameof(libraries));
+        _connections = connections ?? throw new ArgumentNullException(nameof(connections));
     }
 
     private static async Task<T> RefusalsAsApiErrors<T>(Func<Task<T>> work)
@@ -177,7 +180,8 @@ internal sealed class MediaManagerIntakeEndpointHandlers
 
     /// <summary>
     /// <c>GET /intake/library-folders</c>: every enabled library's watched, work and output folders, so a
-    /// media manager reads them instead of a person retyping them. Read only; authenticated like
+    /// media manager reads them instead of a person retyping them, with the manager's own library id for a workflow set up
+    /// from one and whether that manager still owns its watched and output folders. Read only; authenticated like
     /// <see cref="GetIntakeCapabilitiesAsync"/>, with no source key of its own (any connection's secret, or the
     /// shared instance-wide secret, proves a caller may read it).
     /// </summary>
@@ -188,16 +192,25 @@ internal sealed class MediaManagerIntakeEndpointHandlers
         await RefusalsAsApiErrors(() => _intake.RequireSecretAsync(uow, presented, null)).ConfigureAwait(false);
         var rows = await _libraries.ListAsync(uow, enabledOnly: true).ConfigureAwait(false);
         var weirHome = request.Options.WeirHome;
-        var libraries = rows
-            .Select(row => new PublishedLibraryFolders(
+        var libraries = new List<PublishedLibraryFolders>(rows.Count);
+        foreach (var row in rows)
+        {
+            var linkedConnectionIds = await _libraries.ManagerConnectionIdsAsync(uow, row.Id).ConfigureAwait(false);
+            var managerKind = row.DiscoveredFromConnectionId is { } managerId
+                ? (await _connections.GetAsync(uow, managerId).ConfigureAwait(false))?.Kind
+                : null;
+            libraries.Add(new PublishedLibraryFolders(
                 row.Id,
                 row.Name,
                 row.MediaType,
                 row.WatchedFolder,
                 ProcessingLibraryFolders.EffectiveWorkFolder(
                     new ProcessingLibraryFolderRow(row.Id, row.MediaType, (int)row.DisplayOrder, row.WorkFolder, row.OutputFolder), weirHome),
-                row.OutputFolder))
-            .ToList();
+                row.OutputFolder,
+                PublishedLibraryFolders.ManagerLibraryKeyOf(row.DiscoveredFromConnectionId, row.DiscoveredLibraryKey),
+                WorkflowSyncRules.FoldersSyncedFrom(row.DiscoveredFromConnectionId, row.DiscoveredLibraryKey, linkedConnectionIds, managerKind) is not null));
+        }
+
         return ApiRoutes.Ok(LibraryFolderPublishing.ToOut(libraries));
     }
 

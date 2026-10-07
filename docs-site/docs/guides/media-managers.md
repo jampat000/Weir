@@ -95,6 +95,12 @@ can read a connected manager's or download client's own configuration and offer 
 one-click suggestion in the workflow editor. Weir never changes a folder on its own — a suggestion is
 only ever applied when you press the button, and a folder you typed yourself always stays.
 
+Each workflow in that list has an `id`, `name`, `media_type`, `watched_folder`, `work_folder` and
+`output_folder`. A workflow Weir set up from a media manager also carries that manager's own id for the
+library in `manager_library_key`, so the manager can find its entry; it is `null` for a workflow that was
+never set up from a manager, or has been unlinked. `folders_from_manager` is `true` while the manager still
+owns the workflow's watched and output folders (only Deluno does today), and `false` otherwise.
+
 The same `/api/v1/intake/capabilities` answer carries `machine_name`, the name of the machine Weir
 runs on, so a manager can call its connection to Weir "Weir on my-pc".
 

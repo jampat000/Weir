@@ -28,7 +28,7 @@ work, not rewritten for its own sake. Scripts are named in kebab-case.
 | `check-event-titles.mjs` | Fails when the server defines an Activity event type that `apps/web/src/lib/activity/event-labels.ts` has no title for, so System > Logs never shows a raw event name (`check-event-titles.test.mjs`). |
 | `check-test-console-programs.mjs` | Fails when a test source under `apps/` starts a system console program (`ping`, `timeout`, ...) as a stand-in, because that can pop a console window on a desktop (#806, #821) (`check-test-console-programs.test.mjs`). |
 | `check-node-docker-version.mjs` | Fails when the Dockerfile's node image major does not match the root `.node-version`. |
-| `check-release-workflow-gates.mjs` | Checks the shape of `release.yml` and `ci.yml`: only `publish` publishes, the moving image tags move last and never for a release candidate, `ci-passed` judges every job. |
+| `check-release-workflow-gates.mjs` | Checks the shape of `release.yml` and `ci.yml`: only `publish-windows` and `publish-docker` publish and neither waits for the other, the moving image tags move last and never for a release candidate, `ci-passed` judges every job (`check-release-workflow-gates.test.mjs`). |
 | `check-release-version.mjs` | Fails a release whose tag is not a well-formed `X.Y.Z` or `X.Y.Z-rc.N` SemVer version (`check-release-version.test.mjs`). No file carries the release version; every build that ships takes it from the tag instead (#804). |
 | `semver.mjs` | SemVer parsing and precedence for the release scripts (`semver.test.mjs`). |
 | `find-previous-release.mjs` | The delta base for the Windows package: the newest published release older than the one being released, by SemVer precedence (`find-previous-release.test.mjs`). |

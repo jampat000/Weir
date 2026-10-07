@@ -205,22 +205,28 @@ The `Release` workflow:
   a mounted disposable Processing file that must pass through byte-identically into
   the processed tree before its watched source is removed, and uploads screenshots
   plus JSON evidence
-- builds and pushes Docker tags for linux/amd64 and linux/arm64:
-  - `ghcr.io/<owner>/<repo>:X.Y.Z` (the git tag is `vX.Y.Z`; the image tag drops the `v`, and a pre-release keeps its suffix: `1.0.0-rc.1`)
-  - the image carries its provenance and an SBOM from the build
-- when the repository variable `ATTEST_PROVENANCE` is `true`, records signed provenance attestations
-  for the pushed image's digest (the multi-architecture manifest list, kept in ghcr beside the image)
-  and for the release files (the Windows files and `weir-web-dist.zip`)
-- verifies the published Docker manifest resolves
-- runs the published Docker image and waits for `/health`
-- creates the GitHub Release
-- only then moves the moving tags `ghcr.io/<owner>/<repo>:X.Y` and `:latest` to the version's image, and
-  only for a stable release: a release candidate moves neither
+- **`publish-windows`**, once `ci-passed`, `golden-path`, `validate` and `windows-smoke` have passed:
+  - when the repository variable `ATTEST_PROVENANCE` is `true`, records a signed provenance attestation for the
+    release files (the Windows files and `weir-web-dist.zip`)
+  - creates the GitHub Release from `docs/release-notes/<tag>.md`, with those files attached
+- **`publish-docker`**, once `ci-passed`, `golden-path`, `validate`, `docker-candidate` and `docker-arm64` have passed:
+  - builds and pushes Docker tags for linux/amd64 and linux/arm64:
+    - `ghcr.io/<owner>/<repo>:X.Y.Z` (the git tag is `vX.Y.Z`; the image tag drops the `v`, and a pre-release keeps its suffix: `1.0.0-rc.1`)
+    - the image carries its provenance and an SBOM from the build
+  - when `ATTEST_PROVENANCE` is `true`, records a signed provenance attestation for the pushed image's digest
+    (the multi-architecture manifest list, kept in ghcr beside the image)
+  - verifies the published Docker manifest resolves
+  - runs the published Docker image and waits for `/health`
+  - only then moves the moving tags `ghcr.io/<owner>/<repo>:X.Y` and `:latest` to the version's image, and
+    only for a stable release: a release candidate moves neither
 
-All of those run at the same time. Only `publish` holds registry credentials and write
-permissions, and it needs every other job, so the registry login and Docker push occur only
-after the CI proof, the release checks, the Windows package and the unpushed candidate's
-complete live audit have all passed (`scripts/check-release-workflow-gates.mjs` enforces this).
+Everything before the two publish jobs runs at the same time. The publish jobs do not wait for each other: a slow
+or failed Docker build never holds back the GitHub Release that installed Weirs update from, and either job can be
+re-run alone (`gh run rerun <run id> --job <job id>`). Only `publish-windows` has `contents: write`, and only
+`publish-docker` holds registry credentials and `packages: write`. The registry login and Docker push occur only
+after the CI proof, the release checks, the unpushed candidate's complete live audit and the arm64 build have passed,
+and the GitHub Release is created only after the CI proof, the release checks and the Windows package have passed
+(`scripts/check-release-workflow-gates.mjs` enforces this).
 The published image is rebuilt from the candidate jobs' cached layers. A failed screen, API check, browser console error, page
 error, failed request, bad response, changed pass-through output, or incomplete
 source cleanup therefore stops the release before the versioned image or a
@@ -231,7 +237,7 @@ lifecycle against the packaged executable and bundled FFmpeg.
 
 ## Registry authentication
 
-The release workflow publishes GHCR images with the repository `GITHUB_TOKEN` and
+The release workflow publishes GHCR images, in `publish-docker`, with the repository `GITHUB_TOKEN` and
 `packages: write` permission. No personal access token is required for normal releases, and no
 workflow reads a `GHCR_TOKEN` secret.
 
@@ -242,11 +248,11 @@ workflow reads a `GHCR_TOKEN` secret.
   default. The release's `ci-passed` and `golden-path` jobs have 10: they only ask GitHub about the tagged commit and do not
   wait for anything. Raise a limit in the same change that makes a job genuinely slower.
 - **Every workflow starts at `permissions: contents: read`.** A job adds only what it needs: `changes`
-  adds `pull-requests: read`; the release's `ci-passed` adds `actions: read` and its `golden-path` adds `statuses: read`; CodeQL's `analyze` adds `security-events: write`; and `publish` alone adds `contents: write`,
-  `packages: write`, `id-token: write` and `attestations: write`.
+  adds `pull-requests: read`; the release's `ci-passed` adds `actions: read` and its `golden-path` adds `statuses: read`; CodeQL's `analyze` adds `security-events: write`; `publish-windows` alone adds `contents: write`,
+  `publish-docker` alone adds `packages: write`, and both add `id-token: write` and `attestations: write`.
 - **A release is never cancelled once started.** `release.yml` serialises runs per tag with
-  `cancel-in-progress: false`: a second run for the same tag waits for the first, so `publish` cannot be
-  stopped between pushing the image and publishing the GitHub Release. Pull request runs of `ci.yml`,
+  `cancel-in-progress: false`: a second run for the same tag waits for the first, so a publish job cannot be
+  stopped between pushing the image and moving the moving tags, or part-way through creating the GitHub Release. Pull request runs of `ci.yml`,
   CodeQL and the docs build do cancel when superseded; a push to `main` never does.
 - **Dependabot is security-only.** `.github/dependabot.yml` sets `open-pull-requests-limit: 0` for every
   ecosystem, so there are no routine version pull requests; Dependabot security updates still open them.
