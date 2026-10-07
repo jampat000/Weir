@@ -1,34 +1,23 @@
 #!/usr/bin/env node
-// Prints the cache key for the Windows package's vendored FFmpeg, read straight from the pin in
+// Prints the cache key for a vendored FFmpeg, read straight from the pin in
 // packaging/windows/build-velopack-vendored-media-tools.ps1 (dot-sourced from build-velopack.ps1):
 // the release tag, the archive name and the committed archive SHA256. No network call is needed,
 // unlike MKVToolNix's neighbouring pin further down that same file (whose cache key is a hash of
 // the whole file instead, for the same reason). The cache changes exactly when the pin does, and
 // never otherwise.
 //
-// Usage (a workflow step with an id): node scripts/ffmpeg-cache-key.mjs >> "$GITHUB_OUTPUT"   -> key=ffmpeg-vendor-<tag>-<archive>-<sha256>
-import { readFileSync } from "node:fs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
+// Usage (a workflow step with an id):
+//   node scripts/ffmpeg-cache-key.mjs >> "$GITHUB_OUTPUT"         -> key=ffmpeg-vendor-<tag>-<windows archive>-<sha256>
+//   node scripts/ffmpeg-cache-key.mjs linux >> "$GITHUB_OUTPUT"   -> key=ffmpeg-linux-<tag>-<linux archive>-<sha256>
+import { readFfmpegPin } from "./ffmpeg-pin.mjs";
 
-const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const buildScript = readFileSync(
-  path.join(repoRoot, "packaging", "windows", "build-velopack-vendored-media-tools.ps1"),
-  "utf8",
-);
-
-// Read from the build script so the two can never disagree about which archive is meant.
-function assignment(name) {
-  const match = buildScript.match(new RegExp(`^\\$${name} = "([^"$]+)"`, "m"));
-  if (!match) throw new Error(`$${name} was not found in build-velopack-vendored-media-tools.ps1.`);
-  return match[1];
+const platform = process.argv[2] ?? "windows";
+if (platform !== "windows" && platform !== "linux") {
+  console.error(`Usage: node scripts/ffmpeg-cache-key.mjs [windows|linux] (got "${platform}")`);
+  process.exit(2);
 }
 
-const releaseTag = assignment("ffmpegReleaseTag");
-const archiveName = assignment("ffmpegArchiveName");
-const archiveSha256 = assignment("ffmpegArchiveSha256");
-if (!/^[0-9a-f]{64}$/i.test(archiveSha256)) {
-  throw new Error(`$ffmpegArchiveSha256 in build-velopack.ps1 is not a 64-character hex SHA256: ${archiveSha256}`);
-}
-
-console.log(`key=ffmpeg-vendor-${releaseTag}-${archiveName}-${archiveSha256.toLowerCase()}`);
+const pin = readFfmpegPin();
+const archive = pin[platform];
+const prefix = platform === "windows" ? "ffmpeg-vendor" : "ffmpeg-linux";
+console.log(`key=${prefix}-${pin.releaseTag}-${archive.name}-${archive.sha256}`);

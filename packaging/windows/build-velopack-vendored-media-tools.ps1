@@ -61,6 +61,12 @@ $ffmpegSharedLibrarySha256 = [ordered]@{
   "swresample-7.dll"  = "7ead1f572f8c0db2106cc74e6c829fcd15753f58b6baab96df4c9efeef77f4a4"
   "swscale-10.dll"    = "420f146d39c7be6c45a1b51c39249800c0ccb0702b70bf9e5c45984f81afc756"
 }
+# The Linux CI jobs (contract suite, Docker smoke, release candidate) use the static LGPL linux64 build
+# of the same BtbN release (same FFmpeg commit as the Windows build above), so no job takes ffmpeg from a
+# package mirror. scripts/install-ffmpeg-linux.mjs reads these two lines; bump them with the Windows ones
+# and hash the tar.xz yourself in the same way.
+$ffmpegLinuxArchiveName = "ffmpeg-n9.0.2-3-ga5923073bf-linux64-lgpl-9.0.tar.xz"
+$ffmpegLinuxArchiveSha256 = "a7ee2de0d9d462f4bb7cd4e23255338089ac34bf8286b7e68ba8768363ac9de3"
 # #548: MKVToolNix, for the mkvmerge writer (Weir.Infrastructure.Media.MkvmergeRemuxWriter). Vendored,
 # cached and pinned exactly like ffmpeg above, against MKVToolNix's own immutable per-version release
 # directories rather than BtbN's. Bumping means editing both lines below together — the checksum is

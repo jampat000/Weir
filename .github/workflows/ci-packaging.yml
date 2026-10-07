@@ -47,14 +47,20 @@ jobs:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('apps/server/Directory.Packages.props') }}
 
+      # The live audit generates its media fixtures with the host's ffmpeg.
+      - uses: ./.github/actions/setup-ffmpeg-linux
+        timeout-minutes: 10
+
       # The live audit (apps/server/tools/Weir.LiveAudit) is built here so the browser install can use the
       # script the build generates for its Playwright version, and the audit step does not compile mid-run.
+      # The browser's system libraries come from apt, told to retry and give up on a dead mirror.
       - name: Build the live audit and install its browser
+        timeout-minutes: 15
         run: |
+          printf 'Acquire::Retries "3";\nAcquire::http::Timeout "30";\n' | sudo tee /etc/apt/apt.conf.d/80-weir-fail-fast >/dev/null
           dotnet restore apps/server/tools/Weir.LiveAudit --locked-mode
           dotnet build apps/server/tools/Weir.LiveAudit -c Release --no-restore
           pwsh apps/server/tools/Weir.LiveAudit/bin/Release/net10.0/playwright.ps1 install --with-deps chromium
-          command -v ffmpeg >/dev/null || (sudo apt-get update && sudo apt-get install -y ffmpeg)
 
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
 

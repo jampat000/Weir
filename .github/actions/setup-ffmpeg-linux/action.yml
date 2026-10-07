@@ -1,0 +1,30 @@
+# Puts the pinned static ffmpeg and ffprobe on PATH for a Linux job, without a package mirror. The pin is the
+# Windows package's (packaging/windows/build-velopack-vendored-media-tools.ps1); the download is checked against
+# its SHA-256 before it is unpacked (scripts/install-ffmpeg-linux.mjs). Run it after actions/checkout, with a
+# step-level timeout-minutes.
+name: Set up ffmpeg (Linux)
+description: Installs the pinned, checksum-verified ffmpeg and ffprobe and adds them to PATH.
+
+runs:
+  using: composite
+  steps:
+    - name: FFmpeg build checksum
+      id: ffmpeg
+      shell: bash
+      run: node scripts/ffmpeg-cache-key.mjs linux >> "$GITHUB_OUTPUT"
+
+    - name: Cache ffmpeg
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+      with:
+        path: ${{ runner.temp }}/weir-ffmpeg
+        key: ${{ runner.os }}-${{ steps.ffmpeg.outputs.key }}
+
+    - name: Install ffmpeg
+      shell: bash
+      env:
+        FFMPEG_DIR: ${{ runner.temp }}/weir-ffmpeg
+      run: |
+        node scripts/install-ffmpeg-linux.mjs "$FFMPEG_DIR"
+        echo "$FFMPEG_DIR" >> "$GITHUB_PATH"
+        "$FFMPEG_DIR/ffmpeg" -version | head -n 1
+        "$FFMPEG_DIR/ffprobe" -version | head -n 1
