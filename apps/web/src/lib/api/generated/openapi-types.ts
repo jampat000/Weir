@@ -9307,8 +9307,13 @@ export interface operations {
              */
             machine_name: string;
             /**
+             * Product
+             * @description The product answering, always "Weir", so a media manager can name the connection "<product> on <machine_name>" without knowing which processor it talks to.
+             */
+            product: string;
+            /**
              * Version
-             * @description Weir’s release version as stamped from its release tag: X.Y.Z, or X.Y.Z-rc.N for a pre-release such as 1.0.0-rc.1 (0.0.1-dev on a development build).
+             * @description Weir’s release version as stamped from its release tag: X.Y.Z, or X.Y.Z-rc.N for a pre-release such as 1.0.0-rc.1 (0.0.1-dev on a development build, and X.Y.Z-rc.N+<commit> on a build made for the golden path).
              */
             version: string;
           };
