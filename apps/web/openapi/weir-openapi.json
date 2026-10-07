@@ -4503,6 +4503,23 @@
           "output_folder": {
             "title": "Output Folder",
             "type": "string"
+          },
+          "manager_library_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The media manager's own id for the library this workflow was set up from. Null once the workflow is unlinked from that manager, or if it was never set up from one.",
+            "title": "Manager Library Key"
+          },
+          "folders_from_manager": {
+            "description": "True while the media manager the workflow was set up from owns its watched and output folders, so a person changes them there, not in Weir.",
+            "title": "Folders From Manager",
+            "type": "boolean"
           }
         },
         "required": [
@@ -4511,7 +4528,9 @@
           "media_type",
           "watched_folder",
           "work_folder",
-          "output_folder"
+          "output_folder",
+          "manager_library_key",
+          "folders_from_manager"
         ],
         "title": "PublishedLibraryFoldersOut",
         "type": "object"
