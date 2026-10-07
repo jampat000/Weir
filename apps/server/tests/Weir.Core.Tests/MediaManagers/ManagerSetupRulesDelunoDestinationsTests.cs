@@ -239,6 +239,16 @@ public sealed class ManagerSetupRulesDelunoDestinationsTests
     }
 
     [Fact]
+    public void A_library_whose_downloads_folder_is_empty_is_judged_by_where_its_clients_save()
+    {
+        var result = Evaluate(Library(downloads: null, destinations: [Destination(saveFolder: "C:\\Downloads\\Completed\\Movies")]));
+
+        Assert.DoesNotContain(result.Lines, line => line.Text.Contains("does not say where", StringComparison.Ordinal));
+        Assert.Equal(SetupCheckLine.Ok, LineAbout(result, "qBittorrent").State);
+        Assert.Equal("C:\\Downloads\\Completed\\Movies", result.WatchedFolder);
+    }
+
+    [Fact]
     public void An_output_folder_that_is_the_workflows_output_folder_after_mapping_is_ok()
     {
         var result = Evaluate(Library(destinations: [], mappings: [("C:\\NasMount", "C:\\Weir")]));

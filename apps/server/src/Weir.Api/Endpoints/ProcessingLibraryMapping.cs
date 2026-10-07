@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Http;
 using Weir.Api.Http;
 using Weir.Core.Json;
 using Weir.Core.Media;
+using Weir.Core.MediaManagers;
 using Weir.Core.Processing;
 using Weir.Core.Time;
 using Weir.Core.Validation;
@@ -40,6 +41,13 @@ internal static class ProcessingLibraryMapping
         {
             managerRows.Add(await connections.GetAsync(uow, connectionId).ConfigureAwait(false));
         }
+
+        // The manager that owns this workflow's watched and output folders, while the workflow is still linked to it.
+        var foldersSyncedFrom = WorkflowSyncRules.FoldersSyncedFrom(
+            row.DiscoveredFromConnectionId,
+            row.DiscoveredLibraryKey,
+            managerIds,
+            managerRows.FirstOrDefault(item => item?.Id == row.DiscoveredFromConnectionId)?.Kind);
 
         string coverage;
         string coverageDetail;
@@ -123,6 +131,7 @@ internal static class ProcessingLibraryMapping
             .Set("manager_coverage_detail", coverageDetail)
             .Set("discovered_from_connection_id", row.DiscoveredFromConnectionId)
             .Set("discovered_library_key", row.DiscoveredLibraryKey)
+            .Set("folders_synced_from_connection_id", foldersSyncedFrom)
             .Set("active_job_count", activeJobs)
             // When Weir next looks at the watched folder, so Processing can count an arriving file down to it.
             .Set("next_look_at", looks?.NextLookFor(row.Id) is { } next ? Timestamp.FromDateTimeOffset(next).ToWireText() : null)

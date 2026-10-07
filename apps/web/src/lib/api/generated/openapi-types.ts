@@ -5665,6 +5665,11 @@ export interface components {
       ffmpeg_strictness: string;
       /** File System Events Enabled */
       file_system_events_enabled: boolean;
+      /**
+       * Folders Synced From Connection Id
+       * @description The media manager (Deluno) that owns this workflow's watched and output folders and keeps them up to date, while the workflow is still linked to it; null for a workflow whose folders are its own.
+       */
+      folders_synced_from_connection_id?: number | null;
       /** Id */
       id: number;
       /** Ignore Size Changes */

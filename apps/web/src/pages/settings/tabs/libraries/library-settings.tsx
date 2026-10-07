@@ -60,15 +60,20 @@ export function FolderSetting({
   label,
   placeholder = "",
   hint,
+  lockedNote,
 }: {
   binding: LibraryFormBinding;
   name: LibraryTextField;
   label: string;
   placeholder?: string;
   hint?: string;
+  /** Says whose the folder is when a media manager owns it: the folder is then shown but cannot be changed here. */
+  lockedNote?: string;
 }) {
   const id = useId();
   const hintId = useId();
+  const locked = lockedNote !== undefined;
+  const note = lockedNote ?? hint;
   return (
     <div className="mm-field mm-field--wide">
       <label className="mm-field__label" htmlFor={id}>
@@ -80,20 +85,21 @@ export function FolderSetting({
           className="mm-input"
           value={binding.form[name]}
           placeholder={placeholder}
-          aria-describedby={hint ? hintId : undefined}
+          aria-describedby={note ? hintId : undefined}
           onChange={(e) => binding.update({ [name]: e.target.value })}
           disabled={!binding.editable}
+          readOnly={locked}
         />
         <ServerFolderPickerButton
           title={`Choose the ${label.toLowerCase()}`}
           value={binding.form[name]}
-          disabled={!binding.editable}
+          disabled={!binding.editable || locked}
           onSelect={(path) => binding.update({ [name]: path })}
         />
       </div>
-      {hint ? (
+      {note ? (
         <span id={hintId} className="mm-field__hint">
-          {hint}
+          {note}
         </span>
       ) : null}
     </div>

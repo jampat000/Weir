@@ -135,6 +135,7 @@ public static class WeirOptionsLoader
             ProcessingWorkerCount = processingWorkers,
             ProcessingJobLeaseSeconds = processingJobLeaseSeconds,
             ProcessingWatcherEnabled = watcherEnabled,
+            ManagerWorkflowSyncEnabled = EnvBool(runtime, "WEIR_MEDIA_MANAGER_WORKFLOW_SYNC_ENABLED", true),
             ProcessingWatcherDebounceSeconds = watcherDebounce,
             ProcessingWatchedFolderRemuxScanDispatchScheduleEnabled = EnvBool(
                 runtime, "WEIR_PROCESSING_WATCHED_FOLDER_REMUX_SCAN_DISPATCH_SCHEDULE_ENABLED", true),

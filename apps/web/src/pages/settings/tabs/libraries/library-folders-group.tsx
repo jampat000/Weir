@@ -37,14 +37,25 @@ function ruleSetOptions(
   ];
 }
 
+/** What to say under a watched or output folder that a media manager owns. */
+function syncedNote(manager: string, folder: string): string {
+  return folder.trim() === ""
+    ? `${manager} hasn't said yet; set it in ${manager} and Weir will fill it in.`
+    : `From ${manager}; change it in ${manager}.`;
+}
+
 /** What the library is called, what it holds and which folders it uses. */
 export function LibraryFoldersGroup({
   binding,
   ruleSets,
+  syncedFrom,
 }: {
   binding: LibraryFormBinding;
   ruleSets: ProcessingRuleSet[];
+  /** The media manager that owns the watched and output folders, when one does; they are then shown, not edited. */
+  syncedFrom?: string;
 }) {
+  const { form } = binding;
   return (
     <QuietDisclosure
       title="Identity and folders"
@@ -85,12 +96,18 @@ export function LibraryFoldersGroup({
           name="watched_folder"
           label="Watched folder"
           placeholder="/srv/media/movies-4k"
+          lockedNote={
+            syncedFrom ? syncedNote(syncedFrom, form.watched_folder) : undefined
+          }
         />
         <FolderSetting
           binding={binding}
           name="output_folder"
           label="Output folder"
           placeholder="/srv/media/movies-4k-out"
+          lockedNote={
+            syncedFrom ? syncedNote(syncedFrom, form.output_folder) : undefined
+          }
         />
         <FolderSetting
           binding={binding}

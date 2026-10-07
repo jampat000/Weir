@@ -83,6 +83,12 @@ public sealed record WeirOptions
     /// </summary>
     public required int ProcessingJobLeaseSeconds { get; init; }
     public required bool ProcessingWatcherEnabled { get; init; }
+
+    /// <summary>
+    /// Whether Weir sets up its workflows from a media manager that reports its folders (Deluno) and keeps them in step
+    /// (<c>WEIR_MEDIA_MANAGER_WORKFLOW_SYNC_ENABLED</c>, default on). Off leaves every workflow's folders to be typed.
+    /// </summary>
+    public bool ManagerWorkflowSyncEnabled { get; init; } = true;
     public required double ProcessingWatcherDebounceSeconds { get; init; }
     /// <summary>
     /// #533: the global kill switch for the periodic watched-folder scan timer itself

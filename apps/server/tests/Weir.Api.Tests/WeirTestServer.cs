@@ -17,6 +17,9 @@ namespace Weir.Api.Tests;
 /// <summary>The real server, built by <see cref="WeirServer"/>, on an in-memory test server with its own WEIR_HOME.</summary>
 internal sealed class WeirTestServer : IAsyncDisposable
 {
+    /// <summary>Off unless a test is about it, so connecting a manager never changes a workflow behind another test's back.</summary>
+    public const string ManagerWorkflowSyncVariable = "WEIR_MEDIA_MANAGER_WORKFLOW_SYNC_ENABLED";
+
     private readonly WebApplication _app;
 
     private WeirTestServer(string home, WebApplication app)
@@ -61,7 +64,7 @@ internal sealed class WeirTestServer : IAsyncDisposable
         }
 
         // No test reaches the real metadata service: posters are off here unless a test names a stand-in gateway.
-        var dictionary = new Dictionary<string, string>(StringComparer.Ordinal) { ["WEIR_HOME"] = home, ["WEIR_ARTWORK_GATEWAY_URL"] = "off" };
+        var dictionary = new Dictionary<string, string>(StringComparer.Ordinal) { ["WEIR_HOME"] = home, ["WEIR_ARTWORK_GATEWAY_URL"] = "off", [ManagerWorkflowSyncVariable] = "0" };
         foreach (var (name, value) in variables ?? [])
         {
             dictionary[name] = value.Replace("{home}", home, StringComparison.Ordinal);

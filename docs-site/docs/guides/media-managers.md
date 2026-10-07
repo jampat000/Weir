@@ -100,10 +100,54 @@ Deluno hands a file to Weir to work on, and waits to be told it's ready. This is
 automatic setup: Deluno tells Weir about a new file, Weir cleans it, and Deluno is told when the
 cleaned copy is ready to import. You don't move anything by hand.
 
-The Weir workflow still needs a watched folder: Weir only accepts a hand-off for a file inside one.
-Point it at the folder Deluno downloads into. A hand-off names its file by the path Deluno sees, and Weir accepts it
-only when that path is inside the watched folder. So either use that path, or add a path mapping in Deluno
-(Settings › Media Management › Processing Workflow › Weir › Path mappings) from its path to Weir's.
+### Deluno: Weir sets up its workflows from it
+
+You don't type any folders. Once Deluno is connected, Weir sets up a workflow for each Deluno library that is set to
+**Refine before import**, and keeps it in step with Deluno. It does this when the connection is saved or its address or key
+changes, after a connection test that passes, and every few minutes after that, so a folder you change in Deluno reaches
+Weir without anyone opening Weir.
+
+For each such library Weir makes sure one workflow is linked to it:
+
+- If a workflow is already linked to the library, Weir updates it.
+- Otherwise, if there is an unconfigured workflow of the same media type (no watched folder, no output folder, not linked:
+  the **Movies** and **TV** workflows a new install starts with), Weir uses that one and gives it the library's name.
+- Otherwise Weir makes a new workflow, named after the library.
+
+What Weir fills in is the **watched folder**, the **output folder**, the **media type**, the **name** and the link to
+Deluno. A new workflow gets Weir's default rules profile for its media type, as any new workflow does.
+
+- **Watched folder.** Deluno's own default is no downloads folder at all ("use the download client's folder"), so Weir asks
+  where each of the library's download clients really saves and uses that. One folder is used as it is. When the clients
+  save to several folders, Weir uses the folder that holds them all (never a drive or filesystem root) and otherwise the first
+  one; the **Folder chain** then reports the clients that save elsewhere. Only when no client names a folder does Weir use
+  the library's downloads folder. If Deluno gives neither, Weir leaves the watched folder empty rather than guess, and says
+  so in **Activity** and in the Folder chain: set the downloads folder in Deluno (or the clients' category folders) and Weir
+  picks it up on its next look.
+- **Output folder.** The processed folder Deluno imports from.
+- Both folders are turned into Weir's view through Deluno's path mappings for Weir (see below). With a Deluno older than
+  1.0.0-rc.23, which publishes no mappings, the folders are used as Deluno writes them.
+
+Deluno owns those two folders for a workflow linked to it. **Setup › Workflows** shows them but doesn't let you change them
+("From Deluno; change it in Deluno."), and Weir rewrites them when Deluno's change, saying so in Activity ("Movies' watched
+folder updated from Deluno"). Everything else stays yours: the **work folder**, the rules profile, the schedule and every other
+setting. **Unlink** a workflow and its folders are yours again and Weir stops updating it; Weir never deletes a workflow. If a
+library stops being set to Refine before import, or disappears from Deluno, its workflow is left as it is and the Folder chain
+says why. If the folders Deluno reports would overlap another workflow's folders, Weir leaves the workflow alone and says so in
+Activity.
+
+Two things stay manual:
+
+- **Weir's own work folder.** Deluno doesn't know it. Leave it empty and Weir uses a private folder under its own data
+  folder; set it in the workflow when you want it on a particular drive.
+- **Sonarr, Radarr and Something else.** They can't tell Weir where their folders are, so their workflows are set up by hand,
+  as described below.
+
+To stop Weir setting workflows up from Deluno, set `WEIR_MEDIA_MANAGER_WORKFLOW_SYNC_ENABLED=0`.
+
+A hand-off names its file by the path Deluno sees, and Weir accepts it only when that path is inside the watched folder.
+Deluno's path mappings for Weir (Settings › Media Management › Processing Workflow › Weir › Path mappings) turn its paths
+into Weir's, and the workflows Weir sets up use them.
 
 ### Deluno: checking where downloads land
 

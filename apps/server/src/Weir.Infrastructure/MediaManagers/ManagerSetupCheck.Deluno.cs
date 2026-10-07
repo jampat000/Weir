@@ -1,5 +1,3 @@
-using System.Net;
-using Microsoft.Extensions.Logging;
 using Weir.Core.MediaManagers;
 
 namespace Weir.Infrastructure.MediaManagers;
@@ -62,38 +60,9 @@ public sealed partial class ManagerSetupCheck
     }
 
     /// <summary>
-    /// <c>GET /api/integrations/processors/download-destinations?libraryId=</c>. A 404 is a Deluno that predates the route
-    /// (the library id comes from the manifest just read), and a 403 is a key without the Imports scope.
+    /// Where the chosen library's downloads land (<see cref="DelunoDestinationsReader"/>); the library id comes from the
+    /// manifest just read.
     /// </summary>
-    private async Task<DelunoDestinationsAnswer> ReadDestinationsAsync(ManagerConnection connection, string libraryKey, CancellationToken cancellationToken)
-    {
-        try
-        {
-            var client = new MediaManagerHttpClient(connection.BaseUrl, connection.ApiKey, _handlers, ManagerDialectRules.DownloadDestinationsTimeout, connection.Reference);
-            var payload = await client
-                .GetJsonAsync(DelunoDestinationRules.DownloadDestinationsPath, [new("libraryId", libraryKey)], cancellationToken)
-                .ConfigureAwait(false);
-            return DelunoDestinationsAnswer.Read(DelunoDestinationRules.ParseLibraries(payload));
-        }
-        catch (MediaManagerHttpException exception) when (exception.StatusCode == (int)HttpStatusCode.NotFound)
-        {
-            LogDestinationsNotOffered(_logger, connection.Label);
-            return DelunoDestinationsAnswer.Failed(DelunoDestinationsStatus.NotOffered);
-        }
-        catch (MediaManagerHttpException exception) when (exception.StatusCode == (int)HttpStatusCode.Forbidden)
-        {
-            LogDestinationsNeedScope(_logger, connection.Label);
-            return DelunoDestinationsAnswer.Failed(DelunoDestinationsStatus.NeedsImportsScope);
-        }
-        catch (Exception exception) when (exception is MediaManagerHttpException or MediaManagerUnreachableException)
-        {
-            return DelunoDestinationsAnswer.Failed(DelunoDestinationsStatus.Unreachable, UnreachableText(connection, exception, "where its downloads are saved"));
-        }
-    }
-
-    [LoggerMessage(Level = LogLevel.Debug, Message = "{Label} has no download-destinations route, so it is older than the release that added it.")]
-    private static partial void LogDestinationsNotOffered(ILogger logger, string label);
-
-    [LoggerMessage(Level = LogLevel.Information, Message = "{Label} refused the download-destinations read: its API key lacks the Imports scope.")]
-    private static partial void LogDestinationsNeedScope(ILogger logger, string label);
+    private Task<DelunoDestinationsAnswer> ReadDestinationsAsync(ManagerConnection connection, string libraryKey, CancellationToken cancellationToken) =>
+        DelunoDestinationsReader.ReadAsync(connection, libraryKey, _handlers, _logger, cancellationToken);
 }
