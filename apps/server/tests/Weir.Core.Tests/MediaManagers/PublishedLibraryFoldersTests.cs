@@ -1,0 +1,39 @@
+using Weir.Core.Json;
+using Weir.Core.MediaManagers;
+
+namespace Weir.Core.Tests.MediaManagers;
+
+/// <summary><see cref="PublishedLibraryFolders"/>: what a media manager reads about each workflow's folders and where it came from.</summary>
+public sealed class PublishedLibraryFoldersTests
+{
+    private static string Dump(PublishedLibraryFolders library) => WireJsonWriter.Dumps(library.ToOut(), WireJsonFormat.Response);
+
+    [Fact]
+    public void A_workflow_set_up_from_a_manager_publishes_the_managers_library_id_and_that_it_owns_the_folders()
+    {
+        var library = new PublishedLibraryFolders(1, "Movies", "movie", "/in", "/work", "/out", "lib-movies", true);
+
+        Assert.Equal(
+            """{"id":1,"name":"Movies","media_type":"movie","watched_folder":"/in","work_folder":"/work","output_folder":"/out","manager_library_key":"lib-movies","folders_from_manager":true}""",
+            Dump(library));
+    }
+
+    [Fact]
+    public void A_workflow_that_is_only_Weirs_publishes_no_key_and_no_manager_ownership()
+    {
+        var library = new PublishedLibraryFolders(2, "TV", "tv", "/in", "/work", "/out", null, false);
+
+        Assert.Equal(
+            """{"id":2,"name":"TV","media_type":"tv","watched_folder":"/in","work_folder":"/work","output_folder":"/out","manager_library_key":null,"folders_from_manager":false}""",
+            Dump(library));
+    }
+
+    [Fact]
+    public void The_key_is_published_only_while_the_workflow_is_set_up_from_a_manager()
+    {
+        Assert.Equal("lib-movies", PublishedLibraryFolders.ManagerLibraryKeyOf(5, "lib-movies"));
+        Assert.Null(PublishedLibraryFolders.ManagerLibraryKeyOf(null, "lib-movies"));
+        Assert.Null(PublishedLibraryFolders.ManagerLibraryKeyOf(5, null));
+        Assert.Null(PublishedLibraryFolders.ManagerLibraryKeyOf(5, string.Empty));
+    }
+}

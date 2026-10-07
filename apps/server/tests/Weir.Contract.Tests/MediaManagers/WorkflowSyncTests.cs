@@ -74,6 +74,39 @@ public sealed class WorkflowSyncTests
     }
 
     [Fact]
+    public async Task The_published_library_folders_name_the_Deluno_library_each_workflow_came_from_until_it_is_unlinked()
+    {
+        using var rig = new TemporaryFolder();
+        using var fake = DelunoWith(rig, "Completed/Movies");
+        await using var server = await WeirServer.StartNewAsync(new Dictionary<string, string>(SyncOn.Concat(Handoffs.SecretEnvironment)));
+        using var client = await server.CreateAdminClientAsync();
+        await ConnectAsync(client, fake);
+        var moviesId = (long)Movies(await SyncedAsync(client))["id"]!;
+
+        var movies = await PublishedMoviesAsync(client);
+        Assert.Equal(moviesId, (long)movies["id"]!);
+        Assert.Equal("lib-movies", (string)movies["manager_library_key"]!);
+        Assert.True((bool)movies["folders_from_manager"]!);
+        Assert.Equal(Native(rig, "Completed/Movies"), (string)movies["watched_folder"]!);
+        Assert.Equal(Native(rig, "Ready/Movies"), (string)movies["output_folder"]!);
+
+        var unlinked = await client.PostWithCsrfAsync($"{LibrariesRoute}/{moviesId}/unlink", new JsonObject());
+        Assert.True(unlinked.Status == HttpStatusCode.OK, unlinked.ToString());
+
+        movies = await PublishedMoviesAsync(client);
+        Assert.Null(movies["manager_library_key"]);
+        Assert.False((bool)movies["folders_from_manager"]!);
+        Assert.Equal(Native(rig, "Completed/Movies"), (string)movies["watched_folder"]!);
+    }
+
+    private static async Task<JsonObject> PublishedMoviesAsync(WeirClient client)
+    {
+        var published = await client.GetAsync($"{WeirClient.Api}/intake/library-folders", Handoffs.Secret);
+        Assert.True(published.Status == HttpStatusCode.OK, published.ToString());
+        return Assert.Single(published.Fields["libraries"]!.AsArray(), row => (string)row!["media_type"]! == "movie")!.AsObject();
+    }
+
+    [Fact]
     public async Task A_folder_Deluno_changes_is_recorded_in_Activity_in_plain_words()
     {
         using var rig = new TemporaryFolder();

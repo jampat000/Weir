@@ -544,6 +544,48 @@ public sealed class MediaManagerApiTests
     }
 
     /// <summary>
+    /// A workflow set up from a media manager publishes that manager's own library id, and says whether the manager still owns
+    /// its folders: Deluno does, a manager that cannot report folders does not, and a workflow no longer set up from a manager
+    /// publishes neither.
+    /// </summary>
+    [Fact]
+    public async Task Library_folders_carry_the_managers_library_key_and_whether_it_owns_the_folders()
+    {
+        var (server, admin, _) = await StartAsync(("WEIR_MEDIA_MANAGER_WEBHOOK_SECRET", "s3cret"));
+        await using var _server = server;
+        var secret = new Dictionary<string, string> { ["X-Webhook-Secret"] = "s3cret" };
+        var deluno = (await CreateAsync(admin))["id"]!.GetValue<long>();
+        var sonarr = (await CreateAsync(admin, "sonarr", "http://nas:8989"))["id"]!.GetValue<long>();
+        await TestDatabase.ExecuteAsync(
+            server,
+            "UPDATE libraries SET discovered_from_connection_id = CASE media_type WHEN 'movie' THEN $deluno ELSE $sonarr END, " +
+            "discovered_library_key = CASE media_type WHEN 'movie' THEN 'lib-movies' ELSE '7' END",
+            ("$deluno", deluno),
+            ("$sonarr", sonarr));
+        await TestDatabase.ExecuteAsync(
+            server,
+            "INSERT INTO library_manager_links (library_id, connection_id) SELECT id, discovered_from_connection_id FROM libraries");
+
+        async Task<Dictionary<string, (string? Key, bool FromManager)>> PublishedAsync()
+        {
+            using var response = await admin.GetAsync("/api/v1/intake/library-folders", secret);
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            return (await Json(response))!["libraries"]!.AsArray().ToDictionary(
+                library => library!["media_type"]!.GetValue<string>(),
+                library => (library!["manager_library_key"]?.GetValue<string>(), library["folders_from_manager"]!.GetValue<bool>()));
+        }
+
+        var published = await PublishedAsync();
+        Assert.Equal(("lib-movies", true), published["movie"]);
+        Assert.Equal(("7", false), published["tv"]);
+
+        await TestDatabase.ExecuteAsync(
+            server, "UPDATE libraries SET discovered_from_connection_id = NULL, discovered_library_key = NULL WHERE media_type = 'movie'");
+
+        Assert.Equal(((string?)null, false), (await PublishedAsync())["movie"]);
+    }
+
+    /// <summary>
     /// A library's <c>work_folder</c> column is blank whenever it uses Weir's own default (most libraries never set
     /// one), so the published folder must be the effective default, the same one <c>ProcessingLibraryFolders</c> and
     /// the folder-chain check resolve — not the blank column value.

@@ -4523,6 +4523,16 @@ export interface components {
       work_folder: string;
       /** Output Folder */
       output_folder: string;
+      /**
+       * Manager Library Key
+       * @description The media manager's own id for the library this workflow was set up from. Null once the workflow is unlinked from that manager, or if it was never set up from one.
+       */
+      manager_library_key: string | null;
+      /**
+       * Folders From Manager
+       * @description True while the media manager the workflow was set up from owns its watched and output folders, so a person changes them there, not in Weir.
+       */
+      folders_from_manager: boolean;
     };
     /** ReadinessResponse */
     ReadinessResponse: {
