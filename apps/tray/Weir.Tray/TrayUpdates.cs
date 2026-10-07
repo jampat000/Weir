@@ -88,6 +88,10 @@ sealed class TrayUpdates
             return;
         }
 
+        // This process has downloaded nothing yet. A file left by the run before it (one that downloaded the update now
+        // installed) would otherwise keep telling the server an update is waiting until a check next finishes.
+        WriteUpdateState(false);
+
         if (_settings.CheckOnStartup)
         {
             CheckInBackground();

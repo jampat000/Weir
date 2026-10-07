@@ -62,6 +62,26 @@ public sealed class TrayUpdatesTests : IDisposable
     }
 
     [Fact]
+    public void A_start_forgets_a_download_made_by_the_run_before_it()
+    {
+        var statePath = Path.Combine(_home.Path, "update-state.json");
+        File.WriteAllText(statePath, """{"downloaded": true, "version": "9.9.9"}""");
+        var updates = new TrayUpdates(
+            new FakeUpdateService(),
+            _home.Path,
+            new UpdateSettings { CheckOnStartup = false, CheckIntervalMinutes = 0 },
+            new UpdateCallbacks(OnUi: action => action(), Changed: () => { }, Announce: _ => { }, ApplyNow: () => { }),
+            _clock,
+            _shutdown.Token);
+
+        updates.Start();
+
+        var state = File.ReadAllText(statePath);
+        Assert.Contains("\"downloaded\": false", state, StringComparison.Ordinal);
+        Assert.Contains("\"version\": null", state, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task A_downloaded_update_waits_for_Weir_to_be_idle_in_Automatic_mode()
     {
         var updates = await CheckUntilAnnouncedAsync(new FakeUpdateService(), UpdateMode.Auto);
