@@ -101,8 +101,9 @@ library in `manager_library_key`, so the manager can find its entry; it is `null
 never set up from a manager, or has been unlinked. `folders_from_manager` is `true` while the manager still
 owns the workflow's watched and output folders (only Deluno does today), and `false` otherwise.
 
-The same `/api/v1/intake/capabilities` answer carries `machine_name`, the name of the machine Weir
-runs on, so a manager can call its connection to Weir "Weir on my-pc".
+The same `/api/v1/intake/capabilities` answer carries `product` (always `Weir`) and `machine_name`, the
+name of the machine Weir runs on, so a manager can call its connection "Weir on my-pc" without knowing
+which processor it talks to.
 
 ## Deluno: automatic hand-off
 

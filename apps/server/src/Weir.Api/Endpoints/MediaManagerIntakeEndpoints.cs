@@ -175,6 +175,7 @@ internal sealed class MediaManagerIntakeEndpointHandlers
         return ApiRoutes.Ok(new WireObject()
             .Set("capabilities", new WireArray(IntakeRules.HandoffCapabilities.Select(c => (WireValue)new WireString(c))))
             .Set("machine_name", _machine.Name)
+            .Set("product", IntakeRules.ProductName)
             .Set("version", _version));
     }
 

@@ -13800,8 +13800,13 @@
                       "title": "Machine Name",
                       "type": "string"
                     },
+                    "product": {
+                      "description": "The product answering, always \"Weir\", so a media manager can name the connection \"<product> on <machine_name>\" without knowing which processor it talks to.",
+                      "title": "Product",
+                      "type": "string"
+                    },
                     "version": {
-                      "description": "Weir’s release version as stamped from its release tag: X.Y.Z, or X.Y.Z-rc.N for a pre-release such as 1.0.0-rc.1 (0.0.1-dev on a development build).",
+                      "description": "Weir’s release version as stamped from its release tag: X.Y.Z, or X.Y.Z-rc.N for a pre-release such as 1.0.0-rc.1 (0.0.1-dev on a development build, and X.Y.Z-rc.N+<commit> on a build made for the golden path).",
                       "title": "Version",
                       "type": "string"
                     }
@@ -13809,6 +13814,7 @@
                   "required": [
                     "capabilities",
                     "machine_name",
+                    "product",
                     "version"
                   ],
                   "title": "Response Get Intake Capabilities Api V1 Intake Capabilities Get",

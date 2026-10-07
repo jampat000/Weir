@@ -61,7 +61,8 @@ public sealed class HandoffStatusTests(HandoffServerFixture fixture) : IClassFix
         Assert.Equal(
             ["handoff-status", "handoff-cancel", "handoff-outcome", "handoff-outcome-codes", "library-folders"], capabilities);
         body.Remove("capabilities");
-        Assert.Equal(["machine_name", "version"], body.Select(field => field.Key));
+        Assert.Equal(["machine_name", "product", "version"], body.Select(field => field.Key));
+        Assert.Equal("Weir", (string)body["product"]!);
     }
 
     [Fact]
