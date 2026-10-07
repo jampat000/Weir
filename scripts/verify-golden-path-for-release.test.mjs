@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { NO_PASSING_RUN, evaluateStatuses, latestStatus } from "./verify-golden-path-for-release.mjs";
+import { NO_PASSING_RUN, evaluateStatuses, latestStatus, requiresGoldenPath } from "./verify-golden-path-for-release.mjs";
 
 let nextId = 1;
 const status = (overrides = {}) => ({
@@ -69,4 +69,16 @@ test("the refusal tells the operator what to do", () => {
     NO_PASSING_RUN,
     "This commit has no passing golden-path run. Run the golden path on this exact build (see docs/release.md), then re-run the release.",
   );
+});
+
+test("a stable tag waits for the golden path; a release candidate does not", () => {
+  assert.equal(requiresGoldenPath("v1.0.0"), true);
+  assert.equal(requiresGoldenPath("refs/tags/v2.3.4"), true);
+  assert.equal(requiresGoldenPath("v1.0.0-rc.4"), false);
+  assert.equal(requiresGoldenPath("1.1.0-beta.1"), false);
+});
+
+test("something that is not a release tag is refused rather than waved through", () => {
+  assert.throws(() => requiresGoldenPath("main"), /Not a release tag/);
+  assert.throws(() => requiresGoldenPath(undefined), /Not a release tag/);
 });

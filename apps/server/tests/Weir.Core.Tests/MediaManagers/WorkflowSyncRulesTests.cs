@@ -283,6 +283,62 @@ public sealed class WorkflowSyncRulesTests
             library.Problem);
     }
 
+    private static ManagerLibraryDescriptor Listed(string key, bool refines) => new(key, key, "movies", ProcessesBeforeImport: refines);
+
+    [Fact]
+    public void A_synced_workflow_whose_library_is_gone_or_no_longer_refines_has_departed()
+    {
+        var gone = Workflow(1, from: Deluno, key: "lib-gone", synced: true, name: "Gone");
+        var stopped = Workflow(2, from: Deluno, key: "lib-stopped", synced: true, name: "Stopped");
+        var fine = Workflow(3, from: Deluno, key: "lib-fine", synced: true, name: "Fine");
+
+        var departed = WorkflowSyncRules.Departed(Deluno, [Listed("lib-stopped", false), Listed("lib-fine", true)], [gone, stopped, fine]);
+
+        Assert.Collection(
+            departed,
+            first =>
+            {
+                Assert.Equal(1, first.Workflow.Id);
+                Assert.Null(first.Library);
+            },
+            second =>
+            {
+                Assert.Equal(2, second.Workflow.Id);
+                Assert.Equal("lib-stopped", second.Library!.Key);
+            });
+    }
+
+    [Fact]
+    public void An_unlinked_workflow_or_one_from_another_manager_or_one_never_set_up_has_not_departed()
+    {
+        var unlinked = Workflow(1, from: Deluno, key: "lib-a", synced: false);
+        var other = Workflow(2, from: Deluno + 1, key: "lib-b", synced: true);
+        var mine = Workflow(3);
+
+        Assert.Empty(WorkflowSyncRules.Departed(Deluno, [], [unlinked, other, mine]));
+    }
+
+    [Fact]
+    public void A_departure_says_the_workflow_was_left_as_it_is_and_what_to_do()
+    {
+        var workflow = Workflow(1, from: Deluno, key: "lib-movies", synced: true);
+        var gone = new DepartedWorkflow(workflow, null);
+        var stopped = new DepartedWorkflow(workflow, new ManagerLibraryDescriptor("lib-movies", "Movies", "movies"));
+
+        Assert.Equal("Deluno no longer has the library for Movies", WorkflowSyncRules.DepartedTitle(gone, "Deluno"));
+        Assert.Equal("Deluno no longer has the library this workflow came from. Weir left Movies as it is.", WorkflowSyncRules.DepartedMessage(gone, "Deluno"));
+        Assert.Equal(
+            "Remove this workflow if the library is gone for good, or unlink it from Deluno to keep it as a Weir-only workflow.",
+            WorkflowSyncRules.DepartedNextAction(gone, "Deluno"));
+        Assert.Equal("Deluno no longer hands Movies to Weir", WorkflowSyncRules.DepartedTitle(stopped, "Deluno"));
+        Assert.Equal(
+            "Deluno's Movies library is no longer set to Refine before import, so Deluno will not hand movie downloads to Weir. Weir left Movies as it is.",
+            WorkflowSyncRules.DepartedMessage(stopped, "Deluno"));
+        Assert.Equal(
+            "Choose Refine before import for that library in Deluno. If you no longer want Movies, unlink it from Deluno or remove it in Weir.",
+            WorkflowSyncRules.DepartedNextAction(stopped, "Deluno"));
+    }
+
     [Fact]
     public void The_events_are_worded_for_the_person()
     {

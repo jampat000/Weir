@@ -12,7 +12,7 @@ namespace Weir.Infrastructure.MediaManagers;
 /// set to Refine before import gets one workflow: the one already linked to it, else an unconfigured one of the same media
 /// type (the install's Movies and TV), else a new one. Only the watched and output folders (and, when a workflow is made or
 /// adopted, its name and link) are written; the work folder, rules profile, schedule and the rest stay the person's. Nothing
-/// is ever deleted.
+/// is ever deleted, and a workflow whose library stops processing with Weir or is removed from the manager is reported and left as it is.
 /// </summary>
 /// <remarks>
 /// A manager that does not answer changes nothing and is tried again next time. The reads never hold the database, and
@@ -160,15 +160,10 @@ public sealed partial class ManagerWorkflowSync : IDisposable
 
         var answer = await DelunoDestinationsReader.ReadAsync(connection, null, _handlers, _logger, cancellationToken).ConfigureAwait(false);
         var wanted = WorkflowSyncRules.LibrariesOf(connection.Label, description.Libraries, answer);
-        if (wanted.Count == 0)
-        {
-            return;
-        }
-
         var uow = await UnitOfWork.OpenAsync(_database, cancellationToken).ConfigureAwait(false);
         await using (uow.ConfigureAwait(false))
         {
-            var applied = await new Run(this, uow, connection, connectionId, trigger).ApplyAsync(wanted).ConfigureAwait(false);
+            var applied = await new Run(this, uow, connection, connectionId, trigger).ApplyAsync(wanted, description.Libraries).ConfigureAwait(false);
             await uow.CommitAsync().ConfigureAwait(false);
             if (applied)
             {

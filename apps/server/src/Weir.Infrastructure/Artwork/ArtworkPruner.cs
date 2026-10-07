@@ -8,7 +8,8 @@ namespace Weir.Infrastructure.Artwork;
 /// <summary>
 /// Keeps poster data from growing for ever. A file Weir no longer knows is remembered for <see cref="ArtworkSchedule.GoneFileGrace"/>
 /// (so a download that comes back does not fetch its poster again); after that its row goes, then any title nothing uses, then any
-/// poster no title uses, image and all. What stays is one small row per title and per file Weir still knows.
+/// poster no title uses, image and all. A title is left the same grace from when it was queued, so one asked about for a file Weir
+/// has not titled yet is not asked about again. What stays is one small row per title and per file Weir still knows.
 /// </summary>
 public sealed class ArtworkPruner
 {
@@ -41,7 +42,10 @@ public sealed class ArtworkPruner
             await uow.ExecuteAsync(
                 "DELETE FROM artwork_files WHERE orphaned_at IS NOT NULL AND julianday(orphaned_at) <= julianday($cutoff)",
                 ("$cutoff", TimestampColumns.Orm(now - ArtworkSchedule.GoneFileGrace))).ConfigureAwait(false);
-            await uow.ExecuteAsync("DELETE FROM artwork_lookups WHERE NOT EXISTS (SELECT 1 FROM artwork_files WHERE artwork_files.lookup_key = artwork_lookups.lookup_key)").ConfigureAwait(false);
+            await uow.ExecuteAsync(
+                "DELETE FROM artwork_lookups WHERE julianday(created_at) <= julianday($cutoff) " +
+                "AND NOT EXISTS (SELECT 1 FROM artwork_files WHERE artwork_files.lookup_key = artwork_lookups.lookup_key)",
+                ("$cutoff", TimestampColumns.Orm(now - ArtworkSchedule.GoneFileGrace))).ConfigureAwait(false);
             removedPosters = await uow.QueryAsync(
                 "SELECT poster_id FROM artwork_posters WHERE NOT EXISTS (SELECT 1 FROM artwork_lookups WHERE artwork_lookups.poster_id = artwork_posters.poster_id)",
                 reader => SqliteValues.GetString(reader, 0)).ConfigureAwait(false);

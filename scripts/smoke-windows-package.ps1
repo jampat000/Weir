@@ -351,8 +351,17 @@ try {
   if ($currentPort -ne [string]$Port) {
     throw "Packaged tray wrote current-port.txt '$currentPort' but is running on $Port."
   }
-  $trayLog = Get-Content -LiteralPath (Join-Path $trayHome "tray-host.log") -Raw
-  if ($trayLog -notmatch [regex]::Escape("Using port $Port from --port")) {
+  # The tray may be writing its log at the moment it is read, so a read can come back short: look again for a while.
+  $portLine = [regex]::Escape("Using port $Port from --port")
+  $logDeadline = (Get-Date).AddSeconds(10)
+  do {
+    $trayLog = Get-Content -LiteralPath (Join-Path $trayHome "tray-host.log") -Raw -ErrorAction SilentlyContinue
+    if ($trayLog -match $portLine) {
+      break
+    }
+    Start-Sleep -Milliseconds 250
+  } while ((Get-Date) -lt $logDeadline)
+  if ($trayLog -notmatch $portLine) {
     throw "Packaged tray did not log that it used the supplied port."
   }
   Write-Host "Packaged tray started unattended on port $Port with --port: no dialog, port saved, server ready."

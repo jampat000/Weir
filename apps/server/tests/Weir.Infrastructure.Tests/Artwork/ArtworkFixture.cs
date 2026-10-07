@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Web;
 using Microsoft.Extensions.Logging.Abstractions;
 using Weir.Infrastructure.Artwork;
+using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.Sqlite;
 using Weir.Infrastructure.Tests.MediaManagers;
 using Weir.Infrastructure.Tests.Platform;
@@ -128,6 +129,10 @@ internal sealed class ArtworkFixture : IDisposable
 
     public Task<IReadOnlyDictionary<(long LibraryId, string Path), string>> PosterUrlsForAsync(long libraryId, params string[] paths) =>
         Store.WithUnitOfWork(uow => PosterUrls.ForFilesAsync(uow, paths.Select(path => (libraryId, path))), commit: false);
+
+    /// <summary>Stamp every lookup as queued at the fixture's clock, which the database's own wall-clock stamp does not follow.</summary>
+    public Task BackdateLookupsToClockAsync() =>
+        Store.Execute($"UPDATE artwork_lookups SET created_at = '{TimestampColumns.Orm(Store.Clock.GetUtcNow())}'");
 
     public Task InTransactionAsync(Func<UnitOfWork, Task> work) =>
         Store.WithUnitOfWork(async uow =>
