@@ -196,7 +196,7 @@ Your download client finishes into Weir's watched folder, Weir writes the cleane
 | Remote Path | `/media/downloads/complete/movies/` |
 | Local Path | `/media/weir/movies/` |
 
-Weir's workflow page shows the exact mapping to add, with copy buttons, and **Check again** reads Radarr's settings (it never changes them) to confirm. If you use torrents, turn off **New downloads: after cleaning, delete the original download**, so the torrent keeps seeding. Sonarr works the same way with a `tv` folder. The [media managers guide](https://jampat000.github.io/Weir/docs/guides/media-managers) has all of it.
+Weir's workflow page shows the exact mapping to add, with copy buttons, and **Check again** reads Radarr's settings (it never changes them) to confirm. Weir never deletes the original download for a workflow linked to Sonarr or Radarr, so a torrent keeps seeding. Sonarr works the same way with a `tv` folder. The [media managers guide](https://jampat000.github.io/Weir/docs/guides/media-managers) has all of it.
 
 ## Reaching Weir from another computer, safely
 
@@ -211,7 +211,7 @@ If you want to reach it away from home, the safest options are a VPN you already
 
 ## Working with Deluno
 
-[Deluno](https://github.com/jampat000/Deluno) is a separate, companion project that finds, downloads and files your movies and TV. Weir is the clean-up step before Deluno imports a download. This is how Deluno's *refine before import* works:
+Deluno is a separate, companion project that finds, downloads and files your movies and TV. Weir is the clean-up step before Deluno imports a download. This is how Deluno's *refine before import* works:
 
 1. Your download client finishes a download.
 2. Deluno hands the file to Weir and waits.
@@ -229,7 +229,7 @@ Deluno and Weir are independent. Each works without the other, and neither conta
 
 ## Updating, backing up and uninstalling
 
-**Windows.** Weir checks GitHub for new versions and tells you through the tray icon. **System › About** has the **Update mode**: **Auto**, **Download only** or **Notify only**. Updates need no administrator rights and keep your data. While Weir is a release candidate, the in-app check only looks at stable releases, so to move to the next release candidate, download the new `Weir-win-Setup.exe` and run it. It installs over the old one.
+**Windows.** Weir checks GitHub for new versions and tells you through the tray icon. **System › About** has the **Update mode**: **Auto**, **Download only** or **Notify only**. Updates need no administrator rights and keep your data. A release candidate is offered the next release candidate as well as stable releases, while a stable install is only ever offered stable ones. You can also download the new `Weir-win-Setup.exe` and run it: it installs over the old one.
 
 Before a big update, take a backup under **System › Backups**. It keeps a rolling copy of your configuration, and you can copy it somewhere else. To back up everything, quit Weir from the tray icon and copy `C:\ProgramData\Weir`.
 
