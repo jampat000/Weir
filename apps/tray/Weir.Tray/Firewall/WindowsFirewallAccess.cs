@@ -9,7 +9,7 @@ sealed class WindowsFirewallAccess : IFirewallAccess
     {
         try
         {
-            return WeirFirewallRule.AllowsServerInbound(new ComFirewallPolicy(), InstallProcesses.Root());
+            return WeirFirewallRule.AllowsServerOnCurrentNetwork(new ComFirewallPolicy(), InstallProcesses.Root());
         }
         catch (Exception ex) when (ex is COMException or InvalidOperationException)
         {

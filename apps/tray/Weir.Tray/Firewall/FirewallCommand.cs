@@ -102,7 +102,7 @@ static class FirewallCommand
     private static void LogConfigureResult(IFirewallPolicy policy, Action<string> log)
     {
         var summary = WeirFirewallRule.Configure(policy, InstallProcesses.Root());
-        log($"Firewall rule '{WeirFirewallRule.RuleName}' is in place (Private, Domain profiles). Removed {summary.BlockRulesRemoved} block rule(s) for Weir's server.");
+        log($"Firewall rule '{WeirFirewallRule.RuleName}' is in place ({WeirFirewallRule.AllowedProfiles} profiles). Removed {summary.BlockRulesRemoved} block rule(s) for Weir's server.");
     }
 
     internal static bool IsElevated()

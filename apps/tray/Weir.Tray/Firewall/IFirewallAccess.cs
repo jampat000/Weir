@@ -6,11 +6,14 @@ namespace Weir.Tray.Firewall;
 /// </summary>
 interface IFirewallAccess
 {
-    /// <summary>Whether an enabled allow rule already covers Weir's server. Read-only; needs no administrator rights.</summary>
+    /// <summary>
+    /// Whether an enabled allow rule already covers Weir's server on the network this PC is on right now. Read-only;
+    /// needs no administrator rights.
+    /// </summary>
     bool AllowsWeirIn();
 
     /// <summary>
-    /// Creates the rule through Windows' own administrator prompt on this PC (Private and Domain networks only), and
+    /// Creates the rule through Windows' own administrator prompt on this PC (every network profile, replacing an older rule that covered fewer), and
     /// returns once the person has answered it. Blocks until then.
     /// </summary>
     FirewallElevation.Outcome AskToAllow();
