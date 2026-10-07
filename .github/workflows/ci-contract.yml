@@ -67,7 +67,22 @@ jobs:
           TMPDIR: ${{ runner.temp }}/weir-contract-data
         run: |
           mkdir -p "$TMPDIR"
-          dotnet test tests/Weir.Contract.Tests --no-build --filter "Area=$CONTRACT_AREA"
+          dotnet test tests/Weir.Contract.Tests --no-build --filter "Area=$CONTRACT_AREA" --logger trx
+
+      - name: Summarize contract results
+        if: ${{ !cancelled() }}
+        env:
+          CONTRACT_AREA: ${{ matrix.area }}
+        run: node scripts/summarize-test-results.mjs trx apps/server/tests/Weir.Contract.Tests "Contract suite ($CONTRACT_AREA)"
+
+      - name: Upload contract results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: contract-test-results-${{ matrix.area }}
+          if-no-files-found: ignore
+          retention-days: 1
+          path: apps/server/tests/Weir.Contract.Tests/TestResults/*.trx
 
       - name: Upload contract data folders and server logs
         if: ${{ !cancelled() && steps.contract.outcome == 'failure' }}

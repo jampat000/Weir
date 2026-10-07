@@ -1,0 +1,76 @@
+# Weekly dependency audit. Advisories are published every day, so a tree that was clean when CI last ran can be
+# vulnerable today. This looks at what ships (not the dev tools) and fails when an advisory applies, which GitHub
+# reports to the repository owner by e-mail. Dependabot security updates open the fixing pull requests
+# (.github/dependabot.yml); this is the check that notices when none has been opened.
+name: Dependency audit
+
+on:
+  schedule:
+    # Mondays, 19:23 UTC.
+    - cron: "23 19 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: "1"
+  DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+
+jobs:
+  dotnet:
+    name: NuGet packages
+    # Windows because the tray targets net10.0-windows; the server restores the same way there.
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
+        with:
+          global-json-file: apps/server/global.json
+
+      # From apps/server, so its global.json picks the pinned SDK, as CI restores it.
+      - name: Restore the server and the tray
+        shell: bash
+        run: |
+          (cd apps/server && dotnet restore Weir.slnx)
+          dotnet restore apps/tray/Weir.Tray.slnx
+
+      # `dotnet list package --vulnerable` exits 0 even when it finds something, so the report is read.
+      - name: Vulnerable packages, direct and transitive
+        shell: bash
+        run: |
+          set -o pipefail
+          failed=0
+          for solution in apps/server/Weir.slnx apps/tray/Weir.Tray.slnx; do
+            dotnet list "$solution" package --vulnerable --include-transitive 2>&1 | tee audit.txt
+            if grep -q "has the following vulnerable packages" audit.txt; then
+              echo "::error::A NuGet package in $solution has a known vulnerability. See the report above."
+              failed=1
+            fi
+          done
+          exit "$failed"
+
+  npm:
+    name: npm packages
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version-file: .node-version
+
+      # Reads package-lock.json; nothing is installed. Production dependencies only, high severity and up: the
+      # web app's and the docs site's dev tools never ship.
+      - name: Production dependencies of the web app and the docs site
+        run: |
+          failed=0
+          for folder in apps/web docs-site; do
+            echo "::group::npm audit in $folder"
+            (cd "$folder" && npm audit --omit=dev --audit-level=high) || failed=1
+            echo "::endgroup::"
+          done
+          exit "$failed"
