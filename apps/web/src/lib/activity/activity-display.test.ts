@@ -2,7 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import type { ActivityEventItem } from "../api/types";
 import { eventDisplay, eventLabel } from "./activity-display";
-import { REMUX_PASS_COMPLETED_EVENT } from "./event-types";
+import {
+  REMUX_PASS_COMPLETED_EVENT,
+  SKIPPED_REPEAT_EVENT,
+} from "./event-types";
 
 function passEvent(detail: Record<string, unknown>): ActivityEventItem {
   return {
@@ -71,13 +74,29 @@ describe("eventDisplay for the pause", () => {
   });
 });
 
+describe("eventDisplay for a repeat that was skipped", () => {
+  it("shows the server's title and reads as left alone, not as needing attention", () => {
+    const display = eventDisplay({
+      id: 3,
+      created_at: "2026-10-07T03:24:00",
+      event_type: SKIPPED_REPEAT_EVENT,
+      module: "processing",
+      title: "Skipped: already imported (Film.mkv)",
+      detail: JSON.stringify({ status: "skipped" }),
+    });
+
+    expect(display.title).toBe("Skipped: already imported (Film.mkv)");
+    expect(display.meaning).toBe("idle");
+  });
+});
+
 describe("eventLabel", () => {
   it("titles the events added with workflow set-up, repeats and pausing", () => {
     expect(eventLabel("processing.workflow_sync_notice")).toBe(
       "Workflow could not be updated yet",
     );
     expect(eventLabel("processing.file_skipped_repeat")).toBe(
-      "Skipped: already cleaned",
+      "Skipped: already done or imported",
     );
     expect(eventLabel("system.processing_paused")).toBe("Processing paused");
     expect(eventLabel("system.processing_resumed")).toBe("Processing resumed");

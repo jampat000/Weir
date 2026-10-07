@@ -6,7 +6,11 @@ import type { ActivityEventItem } from "../api/types";
 import { baseName } from "../format/path";
 import { asBoolean, asNumber, asString, parseActivityDetail } from "./detail";
 import { EVENT_LABELS } from "./event-labels";
-import { FILE_PROGRESS_EVENT, REMUX_PASS_COMPLETED_EVENT } from "./event-types";
+import {
+  FILE_PROGRESS_EVENT,
+  REMUX_PASS_COMPLETED_EVENT,
+  SKIPPED_REPEAT_EVENT,
+} from "./event-types";
 import { isRejectedByRules } from "./pass-detail";
 import type { StatusMeaning } from "../ui/status-meaning";
 
@@ -150,10 +154,23 @@ function authDisplay(ev: ActivityEventItem): ActivityDisplay {
   };
 }
 
+/** Left alone, and nothing for anyone to do: the server's own title names the file and whether it was imported. */
+function skippedRepeatDisplay(ev: ActivityEventItem): ActivityDisplay {
+  return {
+    title: ev.title || eventLabel(ev.event_type),
+    summary: "Processing",
+    detail: ev.detail ?? null,
+    chip: null,
+    meaning: "idle",
+    compact: Boolean(ev.detail && ev.detail.length > 120),
+  };
+}
+
 /** How one entry reads in the log. */
 export function eventDisplay(ev: ActivityEventItem): ActivityDisplay {
   if (ev.event_type === FILE_PROGRESS_EVENT) return progressDisplay(ev);
   if (ev.event_type === REMUX_PASS_COMPLETED_EVENT) return passDisplay(ev);
+  if (ev.event_type === SKIPPED_REPEAT_EVENT) return skippedRepeatDisplay(ev);
   const routine = ROUTINE_PROCESSING[ev.event_type];
   if (routine) {
     return {

@@ -41,7 +41,7 @@ export const EVENT_LABELS: Record<string, string> = {
   "processing.downloaded_scan_requested": "Downloaded Scan requested",
   "processing.file_removal_deleted": "Download removed",
   "processing.file_removal_kept": "File kept",
-  "processing.file_skipped_repeat": "Skipped: already cleaned",
+  "processing.file_skipped_repeat": "Skipped: already done or imported",
   "processing.workflow_synced": "Workflow updated from your media manager",
   "processing.workflow_sync_notice": "Workflow could not be updated yet",
   "library.scan_completed": "Library scan finished",
