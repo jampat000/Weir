@@ -249,4 +249,31 @@ public sealed class ProcessingFilesAtOnceApiTests
         Assert.Equal((1, "library_closed"), (body["waiting"]!.GetValue<int>(), body["waiting_for"]!.GetValue<string>()));
         Assert.Equal("1 file is waiting for Movies's schedule to open.", body["message"]!.GetValue<string>());
     }
+
+    [Fact]
+    public async Task A_running_library_scan_takes_no_file_slot_in_the_read_out()
+    {
+        // Upkeep has its own slots (#717), so a scan running beside a file that waits on its schedule is not "1 of 1 in use".
+        var (server, client) = await SignedInAsync(("WEIR_PROCESSING_WORKER_COUNT", "2"));
+        await using var disposeServer = server;
+        var library = await TestDatabase.ScalarAsync(server, "SELECT id FROM libraries ORDER BY id LIMIT 1");
+        await TestDatabase.ExecuteAsync(
+            server,
+            "UPDATE libraries SET name = 'Movies', schedule_enabled = 1, schedule_grid = @grid WHERE id = " + library,
+            ("@grid", new string('0', Weir.Core.Jobs.ScheduleGrid.SlotsPerWeek)));
+        var payload = $"{{\"library_id\": {library}, \"relative_media_path\": \"a.mkv\"}}";
+        await TestDatabase.ExecuteAsync(
+            server,
+            "INSERT INTO jobs (dedupe_key, job_kind, payload_json, status, lease_owner, lease_expires_at) VALUES ('scan', @kind, @payload, 'leased', 'w', '2099-01-01 00:00:00.000000')",
+            ("@kind", Weir.Core.LibraryMode.LibraryModeJobKinds.ScanKind), ("@payload", $"{{\"library_id\": {library}}}"));
+        await TestDatabase.ExecuteAsync(
+            server,
+            "INSERT INTO jobs (dedupe_key, job_kind, payload_json, status) VALUES ('waiting', @kind, @payload, 'pending')",
+            ("@kind", Remux), ("@payload", payload));
+
+        using var response = await client.GetAsync("/api/v1/processing/files-at-once");
+
+        var body = await ApiTestClient.Json(response);
+        Assert.Equal((0, 1, "library_closed"), (body["running"]!.GetValue<int>(), body["waiting"]!.GetValue<int>(), body["waiting_for"]!.GetValue<string>()));
+    }
 }
