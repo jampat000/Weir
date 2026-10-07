@@ -12,6 +12,7 @@ public static class ServerEnvironment
     private const string PeriodicEnqueue = "WEIR_PROCESSING_WATCHED_FOLDER_REMUX_SCAN_DISPATCH_PERIODIC_ENQUEUE_REMUX_JOBS";
     private const string MovieSweep = "WEIR_PROCESSING_WORK_TEMP_STALE_SWEEP_MOVIE_SCHEDULE_ENABLED";
     private const string TvSweep = "WEIR_PROCESSING_WORK_TEMP_STALE_SWEEP_TV_SCHEDULE_ENABLED";
+    public const string WorkflowSync = "WEIR_MEDIA_MANAGER_WORKFLOW_SYNC_ENABLED";
 
     // Settings from a developer's own shell that must not change a contract run.
     private static readonly string[] InheritedVariablesToDrop =
@@ -38,6 +39,9 @@ public static class ServerEnvironment
         [MovieSweep] = "0",
         [TvSweep] = "0",
 
+        // Connecting a manager does not rewrite workflows behind a test's back; the sync's own tests turn it on.
+        [WorkflowSync] = "0",
+
         // No server reaches the real metadata service; posters stay off unless a test points at a fake.
         ["WEIR_ARTWORK_GATEWAY_URL"] = "off",
     };
@@ -54,6 +58,7 @@ public static class ServerEnvironment
         [PeriodicEnqueue] = "1",
         [MovieSweep] = "1",
         [TvSweep] = "1",
+        [WorkflowSync] = "1",
     };
 
     /// <summary>Sets <paramref name="environment"/> up for a server with this data folder and address.</summary>

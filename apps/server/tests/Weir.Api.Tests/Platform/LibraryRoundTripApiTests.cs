@@ -15,7 +15,7 @@ public sealed class LibraryRoundTripApiTests
     private static readonly string[] ReportedOnly =
     [
         "id", "display_order", "effective_max_concurrent_files", "manager_coverage", "manager_coverage_detail",
-        "discovered_from_connection_id", "discovered_library_key", "active_job_count", "next_look_at", "periodic_scan",
+        "discovered_from_connection_id", "discovered_library_key", "folders_synced_from_connection_id", "active_job_count", "next_look_at", "periodic_scan",
         "next_scan_at", "updated_at",
     ];
 

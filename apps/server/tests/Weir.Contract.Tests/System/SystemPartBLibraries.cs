@@ -14,7 +14,7 @@ internal static class SystemPartBLibraries
     private static readonly string[] ReadOnlyFields =
     [
         "id", "display_order", "manager_coverage", "manager_coverage_detail", "discovered_from_connection_id",
-        "discovered_library_key", "effective_max_concurrent_files", "active_job_count", "next_look_at", "periodic_scan",
+        "discovered_library_key", "folders_synced_from_connection_id", "effective_max_concurrent_files", "active_job_count", "next_look_at", "periodic_scan",
         "next_scan_at", "updated_at",
     ];
 

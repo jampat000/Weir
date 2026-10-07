@@ -72,14 +72,20 @@ internal sealed class MediaManagerConnectionsEndpointHandlers
     private readonly MediaManagerConnectionStore _connectionStore;
     private readonly LibraryFolderChainCheck _folderChainCheck;
     private readonly IManagerHttpHandlerFactory _handlers;
+    private readonly ManagerWorkflowSync _workflowSync;
 
     public MediaManagerConnectionsEndpointHandlers(
-        MediaManagerConnectionService connections, MediaManagerConnectionStore connectionStore, LibraryFolderChainCheck folderChainCheck, IManagerHttpHandlerFactory handlers)
+        MediaManagerConnectionService connections,
+        MediaManagerConnectionStore connectionStore,
+        LibraryFolderChainCheck folderChainCheck,
+        IManagerHttpHandlerFactory handlers,
+        ManagerWorkflowSync workflowSync)
     {
         _connections = connections ?? throw new ArgumentNullException(nameof(connections));
         _connectionStore = connectionStore ?? throw new ArgumentNullException(nameof(connectionStore));
         _folderChainCheck = folderChainCheck ?? throw new ArgumentNullException(nameof(folderChainCheck));
         _handlers = handlers ?? throw new ArgumentNullException(nameof(handlers));
+        _workflowSync = workflowSync ?? throw new ArgumentNullException(nameof(workflowSync));
     }
 
     public async Task<ApiResult> ListConnectionsAsync(ApiRequest request)
@@ -125,6 +131,7 @@ internal sealed class MediaManagerConnectionsEndpointHandlers
         }
 
         await request.CommitAsync().ConfigureAwait(false);
+        _workflowSync.RequestSync();
         var row = await RequireConnectionAsync(uow, _connectionStore, id).ConfigureAwait(false);
         return new JsonApiResult(StatusCodes.Status201Created, row.ToOut());
     }
@@ -214,6 +221,11 @@ internal sealed class MediaManagerConnectionsEndpointHandlers
         }
 
         await request.CommitAsync().ConfigureAwait(false);
+        if (baseUrl is not null || apiKey is not null || enabled is not null)
+        {
+            _workflowSync.RequestSync();
+        }
+
         return ApiRoutes.Ok((await RequireConnectionAsync(uow, _connectionStore, connectionId).ConfigureAwait(false)).ToOut());
     }
 
@@ -373,6 +385,11 @@ internal sealed class MediaManagerConnectionsEndpointHandlers
         }
 
         await request.CommitAsync().ConfigureAwait(false);
+        if (ok)
+        {
+            _workflowSync.RequestSync();
+        }
+
         return ApiRoutes.Ok(new WireObject()
             .Set("connection_id", row.Id)
             .Set("ok", ok)

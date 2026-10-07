@@ -64,7 +64,13 @@ public static partial class ManagerSetupRules
         var downloads = MapFolder(library, library.DownloadsPath);
         var processed = MapFolder(library, library.ProcessorOutputPath);
 
-        var lines = new List<SetupCheckLine>(choice.Lines) { DownloadsVerdict(managerLabel, library, downloads, watched, probe) };
+        var lines = new List<SetupCheckLine>(choice.Lines);
+        // Deluno's default is no downloads folder of its own: the clients' folders say it, and their lines speak for it.
+        if (downloads is not null || library.Destinations.All(destination => destination.SaveFolder is null))
+        {
+            lines.Add(DownloadsVerdict(managerLabel, library, downloads, watched, probe));
+        }
+
         lines.AddRange(library.Destinations
             .Select(destination => DestinationVerdict(managerLabel, library, destination, watched, probe))
             .OfType<SetupCheckLine>());
@@ -73,7 +79,8 @@ public static partial class ManagerSetupRules
             lines.Add(OutputVerdict(managerLabel, library, processed, output, probe));
         }
 
-        return new DelunoSetupResult(downloads?.Path, processed?.Path, lines);
+        var suggested = downloads?.Path ?? WorkflowSyncFolders.Watched(managerLabel, library.LibraryName, null, library).Folder;
+        return new DelunoSetupResult(suggested, processed?.Path, lines);
     }
 
     private static MappedPath? MapFolder(DelunoLibraryDestinations library, string? folder) =>
@@ -88,7 +95,8 @@ public static partial class ManagerSetupRules
         {
             return new SetupCheckLine(
                 SetupCheckLine.Unverified,
-                $"{managerLabel} does not say where {library.LibraryName}'s downloads finish, so Weir cannot verify that its hand-offs sit inside this workflow's watched folder.");
+                $"{managerLabel} does not say where {library.LibraryName}'s downloads finish, so Weir cannot verify that its hand-offs sit inside this workflow's watched folder. " +
+                $"Set the downloads folder in {managerLabel} (or the clients' category folders) and Weir will pick it up.");
         }
 
         if (watched.Length == 0)
