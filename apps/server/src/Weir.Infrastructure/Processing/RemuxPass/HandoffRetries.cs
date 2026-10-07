@@ -12,6 +12,9 @@ namespace Weir.Infrastructure.Processing.RemuxPass;
 /// </summary>
 internal static class HandoffRetries
 {
+    /// <summary>The payload field that marks a pass as a failed hand-off's own retry, which asks again when it starts whether it is still owed.</summary>
+    public const string PayloadMarker = "handoff_retry";
+
     /// <summary>Queues the next attempt when <paramref name="decision"/> asks for one, the file came from a hand-off, and the scan will not do it.</summary>
     public static async Task QueueIfOwedAsync(
         UnitOfWork uow, IFailurePolicy policy, LibraryStore libraries, ProcessingLibraryRecord library, string relativePath, WireObject? origin, RetryDecision decision)

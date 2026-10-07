@@ -275,4 +275,90 @@ public sealed class LinkedWorkflowOriginalsTests : IDisposable
         Assert.Equal(1, await RemuxJobsAsync());
         AssertNothingRemoved(download);
     }
+    private async Task<string> StatusAsync()
+    {
+        using var connection = _fixture.Store.Database.Open();
+        using var command = connection.CreateCommand();
+        command.CommandText = "SELECT status FROM files";
+        return Convert.ToString(await command.ExecuteScalarAsync(), CultureInfo.InvariantCulture) ?? string.Empty;
+    }
+
+    private async Task SeedFileAsync(string status, string? nextRetryAt)
+    {
+        Download(Release, "Film.2024.mkv");
+        await _fixture.Store.Execute(
+            "INSERT INTO files (library_id, relative_path, status, status_reason, failure_attempts, next_retry_at) " +
+            $"VALUES ({_libraryId}, '{Release}/Film.2024.mkv', '{status}', 'ffmpeg failed.', 3, {(nextRetryAt is null ? "NULL" : "'" + nextRetryAt + "'")})");
+    }
+
+    private async Task QueueRetryAsync()
+    {
+        var payload = new WireObject()
+            .Set("relative_media_path", $"{Release}/Film.2024.mkv")
+            .Set("media_scope", "movie")
+            .Set("library_id", _libraryId)
+            .Set("trigger", "retry")
+            .Set(HandoffRetries.PayloadMarker, true);
+        await _fixture.Jobs.EnqueueOrGetAsync($"retry-{Guid.NewGuid():N}", RemuxPassOutcomes.JobKind, WireJsonWriter.Dumps(payload, WireJsonFormat.Compact));
+    }
+
+    [Fact]
+    public async Task A_queued_retry_of_a_file_still_waiting_for_one_runs()
+    {
+        await SetUpAsync("movie", "deluno");
+        await SeedFileAsync(ProcessingFileStatuses.ProcessingFailed, "2000-01-01 00:00:00");
+
+        await QueueRetryAsync();
+        await DrainAsync();
+
+        Assert.True(File.Exists(_folders.Out(Path.Join(Release, "Film.2024.mkv"))));
+        Assert.Single(_media.Remuxes);
+    }
+
+    [Theory]
+    [InlineData(ProcessingFileStatuses.ProcessingFailed)]
+    [InlineData(ProcessingFileStatuses.Processed)]
+    [InlineData(ProcessingFileStatuses.Rejected)]
+    [InlineData(ProcessingFileStatuses.PassedThrough)]
+    public async Task A_queued_retry_drops_itself_when_its_file_was_given_up_on_or_finished_after_it_was_queued(string status)
+    {
+        await SetUpAsync("movie", "deluno");
+        // No next attempt is booked: the attempt that failed last was the one the workflow allows.
+        await SeedFileAsync(status, nextRetryAt: null);
+
+        await QueueRetryAsync();
+        await DrainAsync();
+
+        Assert.Empty(_media.Remuxes);
+        Assert.Empty(Directory.GetFileSystemEntries(_folders.Output));
+        Assert.Equal(status, await StatusAsync());
+        Assert.Equal(1, await _fixture.Store.Scalar("SELECT count(*) FROM jobs WHERE status = 'completed'"));
+        Assert.Equal(0, await _fixture.Store.Scalar("SELECT count(*) FROM activity_events WHERE event_type = 'processing.file_remux_pass_completed'"));
+    }
+
+    [Fact]
+    public async Task The_attempt_that_reaches_the_limit_queues_no_retry_because_the_same_count_decides_both()
+    {
+        await SetUpAsync("movie", "deluno");
+        await _fixture.Store.Execute($"UPDATE libraries SET max_attempts = 3 WHERE id = {_libraryId}");
+        var origin = new WireObject().Set("source_key", "deluno").Set("handoff_id", "h1");
+        var queued = new List<long>();
+
+        for (var attempt = 1; attempt <= 3; attempt++)
+        {
+            await _fixture.Db(async uow =>
+            {
+                var library = (await _fixture.Libraries.GetAsync(uow, _libraryId))!;
+                var decision = await RemuxPassFileState.RecordFailureAsync(
+                    uow, library, $"{Release}/Film.2024.mkv", ProcessingFailureClasses.Execution, "ffmpeg failed.", DateTimeOffset.UtcNow);
+                await HandoffRetries.QueueIfOwedAsync(
+                    uow, new QueueingFailurePolicy(_fixture.Jobs), _fixture.Libraries, library, $"{Release}/Film.2024.mkv", origin, decision);
+                return 0;
+            });
+            queued.Add(await _fixture.Store.Scalar("SELECT count(*) FROM jobs WHERE job_kind = 'processing.file.remux_pass.v1'"));
+        }
+
+        // One retry after each of the first two failures, and none after the third, which is the last the workflow allows.
+        Assert.Equal([1L, 2L, 2L], queued);
+    }
 }
