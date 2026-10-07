@@ -37,7 +37,8 @@ The first time Weir starts, it asks two things, one after the other.
 | **No** | Weir can only be reached from this PC. Nothing else on your network can even connect. This is the safe default and the right answer if Weir and your browser are on the same PC. |
 | **Yes** | Windows asks for administrator approval once, then Weir is reachable from other devices on your home network (a phone, another computer, Deluno or Radarr on another machine). Weir adds one firewall rule named **Weir**, for every network profile (**Domain**, **Private** and **Public**), because Windows often marks a home network as Public. Weir still needs its own sign-in. |
 
-You can change your mind later. Right-click the Weir icon in the system tray and choose
+You can change your mind later, in either of two places. In Weir, open **System › About** and choose
+**Devices on my network** or **This PC only**. Or right-click the Weir icon in the system tray and choose
 **Allow other devices on your network...** or **Only allow this PC**. Weir restarts when you do.
 
 **"Start Weir" and a port number.** Keep the default, **9347**, unless something else on the PC already uses

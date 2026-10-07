@@ -10,7 +10,10 @@ namespace Weir.Core.MediaManagers;
 public sealed record SyncedLibrary(
     string Key, string Name, string MediaType, string? WatchedFolder, string? OutputFolder, string? Problem);
 
-/// <summary>A workflow as the sync sees it. <see cref="SyncsFoldersFrom"/> is true when a manager owns its watched and output folders.</summary>
+/// <summary>
+/// A workflow as the sync sees it. <see cref="SyncsFoldersFrom"/> is true when a manager owns its watched and output folders;
+/// <see cref="LinkedConnectionIds"/> are the managers it is linked to, by the sync or by hand in the editor.
+/// </summary>
 public sealed record SyncWorkflow(
     long Id,
     string Name,
@@ -19,7 +22,8 @@ public sealed record SyncWorkflow(
     string OutputFolder,
     long? DiscoveredFromConnectionId,
     string? DiscoveredLibraryKey,
-    bool SyncsFoldersFrom);
+    bool SyncsFoldersFrom,
+    IReadOnlyCollection<long> LinkedConnectionIds);
 
 public enum WorkflowSyncKind
 {
@@ -103,8 +107,9 @@ public static class WorkflowSyncRules
 
     /// <summary>
     /// What to do for each library of manager <paramref name="connectionId"/>, in the order given. A library whose workflow was
-    /// unlinked from it is left alone. Each unconfigured workflow (no watched or output folder, not linked) is adopted at most
-    /// once, first in <paramref name="workflows"/>' order. An update that would change nothing is not an action.
+    /// unlinked from it is left alone. A library with no workflow of its own takes, in this order, a workflow of its media type
+    /// that someone linked to this manager by hand with exactly the library's folders, then an unconfigured one (no watched or output folder, not linked); each is
+    /// adopted at most once, first in <paramref name="workflows"/>' order. An update that would change nothing is not an action.
     /// </summary>
     public static IReadOnlyList<WorkflowSyncAction> Plan(
         long connectionId, IReadOnlyList<SyncedLibrary> libraries, IReadOnlyList<SyncWorkflow> workflows)
@@ -128,7 +133,9 @@ public static class WorkflowSyncRules
             }
 
             var free = workflows.FirstOrDefault(workflow =>
-                !adopted.Contains(workflow.Id) && IsUnconfigured(workflow) && workflow.MediaType == library.MediaType);
+                           !adopted.Contains(workflow.Id) && IsLinkedByHandTo(workflow, connectionId, library) && workflow.MediaType == library.MediaType)
+                       ?? workflows.FirstOrDefault(workflow =>
+                           !adopted.Contains(workflow.Id) && IsUnconfigured(workflow) && workflow.MediaType == library.MediaType);
             if (free is not null)
             {
                 adopted.Add(free.Id);
@@ -141,6 +148,17 @@ public static class WorkflowSyncRules
 
         return actions;
     }
+
+    /// <summary>
+    /// Linked to this manager in the editor, not set up from any of its libraries, and already holding exactly the folders this
+    /// library reports: the sync takes it over (which changes nothing on disk) rather than making a second one. A linked workflow
+    /// with other folders may have been taken out of the sync on purpose, so it is left alone.
+    /// </summary>
+    private static bool IsLinkedByHandTo(SyncWorkflow workflow, long connectionId, SyncedLibrary library) =>
+        workflow.DiscoveredFromConnectionId is null
+        && workflow.LinkedConnectionIds.Contains(connectionId)
+        && library.WatchedFolder is { } watched && SameFolder(watched, workflow.WatchedFolder)
+        && library.OutputFolder is { } output && SameFolder(output, workflow.OutputFolder);
 
     /// <summary>A workflow nobody has set up: no watched folder, no output folder, and not linked to a manager library.</summary>
     private static bool IsUnconfigured(SyncWorkflow workflow) =>

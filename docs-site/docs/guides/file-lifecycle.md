@@ -125,3 +125,17 @@ each clean. One skips a file when cleaning it would make the media manager downl
 other skips a file that is still seeding. **Files already in your library: keep the original after
 cleaning** moves the original into an originals folder instead of deleting it, so removed tracks can
 be recovered. Setup › Workflows is only about new downloads.
+
+## Pause means pause
+
+**Pause processing** in the header stops Weir changing anything: no file starts being cleaned, no
+original is deleted, and nothing is written to your output folder. A file already being cleaned when
+you pause is finished first.
+
+**Keep looking for new files while paused** lets Weir keep watching your folders, and nothing more. It
+notices new downloads and lists them as waiting, but it does not clean, delete or move
+a file. A hand-off from Deluno or another manager while paused is accepted and waits. When you resume,
+what was waiting is done once.
+
+Every pause and resume is written to Activity, with who did it and until when. A timed pause that ends on its
+own is recorded as resumed too.

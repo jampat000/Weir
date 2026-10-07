@@ -44,6 +44,19 @@ The originals folder is always excluded from the library scan (`LibraryFileWalke
 
 A file held by another program is not a failure: the swap reports it as in use and the job is requeued.
 
+## Once per source
+
+A source file is cleaned once. A source is the file at a path with a size and a modification time; once a successful pass has cleaned it and written its copy (`files.processed_source_size` and `processed_source_mtime_ns`, with the `handbacks` row naming the copy), a repeat of the same source is never processed again. It settles as a skip with a reason, never a failure: `CleanedSources.FindAsync` is the one check, and every route that could queue or start a remux pass makes it:
+
+- hand-off intake (`MediaManagerIntake.EnqueueRefineAsync`), for the same hand-off sent again and for another hand-off naming the same download;
+- a manual requeue, "Process again" and "Try again" (`RequeueStore`);
+- the watched-folder scan's enqueue (`WatchedFolderScanRun`);
+- the start of the pass itself (`RemuxPassHandler.SettleRepeatAsync`), before it claims anything, which catches a job queued by any other route or before the check existed. An operator's own track choice or pass-through-unchanged is different work and is not a repeat.
+
+The copy decides what the skip says: while it still exists the file is "Already done: cleaned on <date> into <output path>"; when it is gone because a media manager collected it (the `handbacks` row's outcome is `imported`) it is "Already imported: <manager> collected the cleaned copy on <date>". A copy that is gone with nobody saying why is not a repeat: there is nothing to hand over, so the file is processed again. A changed size or modification time, or a different path, is a new source and goes through.
+
+A skipped repeat of a hand-off is answered like any finished file: a normal `completed` report naming the same output path the first completion named. It carries no `disposition` and never reads as a failure, so the manager does not refuse a good release or search again. Activity records one grey "Skipped: already done" or "Skipped: already imported" line (`processing.file_skipped_repeat`, result `skipped`).
+
 ## Keeping space free
 
 Each workflow keeps at least a set amount free (5 GB unless set; 0 turns the check off) on the drive it writes to. Every write checks it before starting:
@@ -79,3 +92,16 @@ The reject route has no exception. When Weir tells the manager a release is bad 
 The sentence a person reads names the manager: "This workflow is linked to Deluno, so the original stays with your download client, which may still be seeding." It is the pass's `source_folder_skip_reason` (Movies) or `tv_season_folder_skip_reason` (TV), and the file's Processed reason says the original was kept for the download client. A workflow that is Weir only, and has the setting off, keeps its own sentence (`RemuxPassRunner.KeptOriginalReason`).
 
 **A workflow linked to Deluno is processed only from Deluno's hand-off.** Deluno sends each finished download to `POST /api/v1/intake/webhook/deluno`, which queues the pass. Weir's own watched-folder scan must never queue work for such a workflow, because the scan cannot know whether the file is still being downloaded, seeded or imported. So no scan is ever queued for it: not by the timer, not by the folder watcher or a save that changes the watched folder, not by "scan now" or "process again" (the server refuses them with "Deluno hands this workflow its downloads, so Weir does not scan its watched folder."), and a scan job that runs for it anyway stops before it looks at the folder. A hand-off that fails is retried by itself (`HandoffRetries`): the failed pass queues its next attempt to start when its backoff ends, carrying the hand-off's origin, instead of waiting for a scan to notice it. Sonarr, Radarr and other managers do not hand files over, so their workflows are still scanned as before, with the first rule applied. A Weir-only workflow is unchanged, remove-original option included.
+
+## Pause
+
+While processing is paused (the header's **Pause processing**, `PUT /api/v1/pause`) nothing changes a media file: no pass starts, no original is removed, no rejected file is deleted, nothing is written to an output folder and no library clean runs. Work that is already running may finish.
+
+- File jobs (remux pass, pass-through, reject, library clean) are gated where a worker claims a job (`ProcessingJobStore.AdmissionPredicate`), so a paused Weir leases none. The library scan and the maintenance sweeps are claimed under the same rule.
+- **Keep looking for new files while paused** lets only the watched-folder scan job be claimed. That scan may discover: it records files as waiting, and queues a pass that is due (a failed file's retry), which waits like any other. It never changes a file itself. A file is not judged while paused (the file shows as waiting), so a rejected file is not deleted, and `WatchedFolderScanRun` skips the one removal a scan can still reach, finishing a cleaned movie's original (`CompletedMovieRemoval`), while `ScanAdmissionWindow.Paused`. The first scan after the pause does both.
+- A hand-off received while paused is accepted and queued, and its pass waits.
+- When the pause ends, what waited runs once.
+- The claim is not the only check. Right after a worker claims a job, `ProcessingJobProcessor` asks the pause again, separately (`ProcessingJobStore.PauseForbidsAsync`); a job claimed while paused goes back to pending with its attempt given back, is logged as an error, and never reaches its handler.
+- Every change to the pause is an Activity entry (`system.processing_paused`, `system.processing_resumed`) with who made it and until when, written with the change by `SuitePauseService`. A timed pause that runs out is lifted and recorded by `SuitePauseExpiryTask`, or by the next read of the pause, whichever comes first.
+
+A new code path that can change a media file either runs as a claimed file job or checks the pause itself. `ScanWhilePausedTests` and the processing contract `PauseTests` pin this.

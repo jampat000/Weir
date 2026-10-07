@@ -167,7 +167,7 @@ public sealed class SuiteApiTests
         Assert.NotNull(timedBody["paused_until"]);
         Assert.Contains("automatically at", timedBody["reason"]!.GetValue<string>(), StringComparison.Ordinal);
 
-        var open = await Json(await client.PutAsync("/api/v1/pause", new { csrf_token = await client.CsrfAsync(), paused = true, scan_while_paused = false }));
+        var open = await Json(await client.PutAsync("/api/v1/pause", new { csrf_token = await client.CsrfAsync(), paused = true, pause_for_minutes = (int?)null, scan_while_paused = false }));
         Assert.Null(open["paused_until"]);
         Assert.Contains("when you resume it", open["reason"]!.GetValue<string>(), StringComparison.Ordinal);
         Assert.False(open["scan_while_paused"]!.GetValue<bool>());

@@ -195,6 +195,15 @@ for (const marker of ["actions: read", "node scripts/verify-ci-for-release.mjs"]
 }
 rejectText(ciPassed, "--wait", `${RELEASE} ci-passed job (tags are made after CI is green; the gate does not wait)`);
 
+// ...and one the golden path already passed on: a commit status the person who ran it recorded. The job only
+// reads statuses, so `statuses: read` is all it is granted (publish needs it, like every other job: checked above).
+const goldenPath = requireJob(release, "golden-path", RELEASE);
+for (const marker of ["statuses: read", "node scripts/verify-golden-path-for-release.mjs"]) {
+  requireText(goldenPath, marker, `${RELEASE} golden-path job`);
+}
+rejectText(goldenPath, "statuses: write", `${RELEASE} golden-path job (the gate reads the record; it never writes one)`);
+rejectText(goldenPath, "--wait", `${RELEASE} golden-path job (the golden path is run before the tag; the gate does not wait)`);
+
 const validate = requireJob(release, "validate", RELEASE);
 for (const marker of [
   "- name: Release notes file present",
@@ -335,6 +344,6 @@ for (const want of REQUIRED_EVIDENCE) {
 
 console.log(
   "Every release check gates publish, only publish can publish, the moving tags move last and never for a " +
-    "release candidate, the Docker candidate's live E2E runs unpushed, and ci-passed judges every CI job and " +
-    "still carries the release's evidence.",
+    "release candidate, the Docker candidate's live E2E runs unpushed, the release needs a golden-path " +
+    "status on the tagged commit, and ci-passed judges every CI job and still carries the release's evidence.",
 );

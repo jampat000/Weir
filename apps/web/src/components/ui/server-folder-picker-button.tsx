@@ -149,7 +149,7 @@ function PathBar({
           value={manualPath}
           onChange={(event) => setManualPath(event.target.value)}
           placeholder={examplePath(
-            String.raw`\\nas\media or X:\Media`,
+            String.raw`\\<host>\media or X:\Media`,
             "/media/tv",
           )}
           aria-label="Folder path"
@@ -194,8 +194,8 @@ function PathBar({
       </div>
       <p className="mm-folder-picker__help">
         Windows supports local drives, mapped drives, and UNC shares such as{" "}
-        <span className="font-mono">\\nas\media</span>. Docker installs must use
-        container-visible paths such as{" "}
+        <span className="font-mono">{String.raw`\\<host>\media`}</span>. Docker
+        installs must use container-visible paths such as{" "}
         <span className="font-mono">/media/tv</span>.
       </p>
       {browse.notice ? (

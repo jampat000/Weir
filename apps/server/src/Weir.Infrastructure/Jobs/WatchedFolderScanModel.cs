@@ -25,7 +25,11 @@ internal sealed record WatchedFolderScan(
 }
 
 /// <summary>Whether the library may start work now, and if not, why and until when.</summary>
-internal sealed record ScanAdmissionWindow(bool InWindow, string? PauseReason, DateTimeOffset? PauseUntil, DateTimeOffset? ReopensAt);
+internal sealed record ScanAdmissionWindow(bool InWindow, string? PauseReason, DateTimeOffset? PauseUntil, DateTimeOffset? ReopensAt)
+{
+    /// <summary>Processing is paused: the scan may look, record and queue, but never changes a media file.</summary>
+    public bool Paused => PauseReason is not null;
+}
 
 /// <summary>
 /// What a scan reads from the database once, before it looks at any file (#708): the library's file rows, the files with a

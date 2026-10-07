@@ -199,6 +199,42 @@ public sealed class KeepOriginalDownloadTests : IDisposable
             StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData("movie", "Film.2024", "Film.2024.mkv", false)]
+    [InlineData("tv", "Show.S01", "Show.S01E01.mkv", false)]
+    [InlineData("movie", "Film.2024", "Film.2024.mkv", true)]
+    public async Task A_cleaned_file_records_what_it_read_and_what_it_wrote_whether_or_not_the_original_is_kept(
+        string mediaType, string folder, string name, bool removeOriginal)
+    {
+        await SetUpAsync(mediaType, removeOriginal);
+        var source = _folders.Source(Path.Join(folder, name));
+        File.SetLastWriteTimeUtc(source, DateTime.UtcNow.AddDays(-3));
+        var sourceBytes = new FileInfo(source).Length;
+
+        await ScanAndDrainAsync(mediaType);
+
+        var written = new FileInfo(_folders.Out(Path.Join(folder, name))).Length;
+        Assert.NotEqual(sourceBytes, written);
+        var detail = (WireObject)WireJsonParser.Parse(await ActivityDetailAsync());
+        Assert.Equal(sourceBytes, (long)WireConvert.ToInt(detail["source_size_bytes"]));
+        Assert.Equal(written, (long)WireConvert.ToInt(detail["output_size_bytes"]));
+    }
+
+    [Fact]
+    public async Task A_file_that_needed_no_cleaning_records_the_same_size_before_and_after()
+    {
+        await SetUpAsync("movie", removeOriginal: false);
+        _media.Probes["Film.2024.mkv"] = FakeMediaRunner.EnglishOnly;
+        var source = _folders.Source(Path.Join("Film.2024", "Film.2024.mkv"));
+        var sourceBytes = new FileInfo(source).Length;
+
+        await ScanAndDrainAsync("movie");
+
+        var detail = (WireObject)WireJsonParser.Parse(await ActivityDetailAsync());
+        Assert.Equal(sourceBytes, (long)WireConvert.ToInt(detail["source_size_bytes"]));
+        Assert.Equal(sourceBytes, (long)WireConvert.ToInt(detail["output_size_bytes"]));
+    }
+
     [Fact]
     public async Task By_default_the_original_is_still_removed_after_a_successful_pass()
     {

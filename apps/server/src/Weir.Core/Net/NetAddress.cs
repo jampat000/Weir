@@ -153,7 +153,7 @@ public sealed record NetRange(bool IsV6, BigInteger NetworkAddress, int PrefixLe
             : throw new ArgumentException("Invalid IPv6 network.", nameof(address));
 
     /// <summary>
-    /// <paramref name="strict"/> = <see langword="false"/> masks host bits (<c>10.0.0.5/24</c> is <c>10.0.0.0/24</c>);
+    /// <paramref name="strict"/> = <see langword="false"/> masks host bits (<c>192.0.2.5/24</c> is <c>192.0.2.0/24</c>);
     /// <see langword="true"/> refuses them. A bare address is a single-host network.
     /// </summary>
     public static bool TryParse(string? text, bool strict, out NetRange network)

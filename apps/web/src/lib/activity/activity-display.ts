@@ -5,7 +5,12 @@
 import type { ActivityEventItem } from "../api/types";
 import { baseName } from "../format/path";
 import { asBoolean, asNumber, asString, parseActivityDetail } from "./detail";
-import { FILE_PROGRESS_EVENT, REMUX_PASS_COMPLETED_EVENT } from "./event-types";
+import { EVENT_LABELS } from "./event-labels";
+import {
+  FILE_PROGRESS_EVENT,
+  REMUX_PASS_COMPLETED_EVENT,
+  SKIPPED_REPEAT_EVENT,
+} from "./event-types";
 import { isRejectedByRules } from "./pass-detail";
 import type { StatusMeaning } from "../ui/status-meaning";
 
@@ -18,31 +23,6 @@ export type ActivityDisplay = {
   /** What it means: done, under way, needs a look, broken, or only information (idle). */
   meaning: StatusMeaning;
   compact: boolean;
-};
-
-const EVENT_LABELS: Record<string, string> = {
-  "auth.login_succeeded": "Sign-in finished",
-  "auth.login_failed": "Sign-in failed",
-  "auth.logout": "Sign-out finished",
-  "auth.bootstrap_succeeded": "First admin created",
-  "auth.bootstrap_denied": "First-time setup blocked",
-  "auth.password_changed": "Password changed",
-  "auth.username_changed": "Username changed",
-  "system.reconciliation.repair": "System repair finished",
-  "system.network_access.changed": "Network access changed",
-  "arr_library.connection_test_succeeded": "Connection check finished",
-  "arr_library.connection_test_failed": "Connection check failed",
-  "processing.supplied_payload_evaluation_completed":
-    "Manual queue check finished",
-  "processing.candidate_gate_completed": "Queue check finished",
-  "processing.file_processing_progress": "File processing",
-  "processing.file_remux_pass_completed": "File processing finished",
-  "processing.work_temp_stale_sweep_completed":
-    "Temporary files cleanup finished",
-  "processing.failure_cleanup_sweep_completed":
-    "Cleanup after failed processing finished",
-  "processing.handback_outcome": "What happened to a cleaned copy",
-  "processing.unclaimed_handback_cleanup_completed": "Unclaimed copies cleared",
 };
 
 /** Routine processing events: one fixed title, a compact row. */
@@ -174,10 +154,23 @@ function authDisplay(ev: ActivityEventItem): ActivityDisplay {
   };
 }
 
+/** Left alone, and nothing for anyone to do: the server's own title names the file and whether it was imported. */
+function skippedRepeatDisplay(ev: ActivityEventItem): ActivityDisplay {
+  return {
+    title: ev.title || eventLabel(ev.event_type),
+    summary: "Processing",
+    detail: ev.detail ?? null,
+    chip: null,
+    meaning: "idle",
+    compact: Boolean(ev.detail && ev.detail.length > 120),
+  };
+}
+
 /** How one entry reads in the log. */
 export function eventDisplay(ev: ActivityEventItem): ActivityDisplay {
   if (ev.event_type === FILE_PROGRESS_EVENT) return progressDisplay(ev);
   if (ev.event_type === REMUX_PASS_COMPLETED_EVENT) return passDisplay(ev);
+  if (ev.event_type === SKIPPED_REPEAT_EVENT) return skippedRepeatDisplay(ev);
   const routine = ROUTINE_PROCESSING[ev.event_type];
   if (routine) {
     return {

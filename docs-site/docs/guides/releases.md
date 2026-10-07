@@ -68,6 +68,7 @@ published for linux/amd64 and linux/arm64.
 ## For maintainers
 
 A release doesn't re-run the test suite. Its `ci-passed` job checks that CI already passed on the
-exact commit being tagged, and nothing is published until that job, the Windows package smoke test
+exact commit being tagged, and a second job checks that the golden path (a run of the real product on a
+clean machine) was recorded as passed on it. Nothing is published until those jobs, the Windows package smoke test
 and the Docker image checks have all passed. The full process is in
 [`docs/release.md`](https://github.com/jampat000/Weir/blob/main/docs/release.md).

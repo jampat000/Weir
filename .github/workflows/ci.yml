@@ -23,6 +23,14 @@ on:
     branches: ["main"]
   pull_request:
   workflow_dispatch:
+    inputs:
+      version:
+        description: >-
+          For the golden path: the release this commit is meant to become, e.g. 1.0.0-rc.4. The Windows build then
+          reports 1.0.0-rc.4+<short sha>. Leave empty for the placeholder version.
+        type: string
+        required: false
+        default: ""
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -181,10 +189,20 @@ jobs:
           node scripts/check-no-python.mjs
           node --test scripts/check-no-python.test.mjs
 
+      - name: Nothing private in the README, the docs and the release notes
+        run: |
+          node scripts/check-public-privacy.mjs
+          node --test scripts/check-public-privacy.test.mjs
+
       - name: Contract areas match their test classes
         run: |
           node scripts/check-contract-areas.mjs
           node --test scripts/check-contract-areas.test.mjs
+
+      - name: Every server event type has a title
+        run: |
+          node scripts/check-event-titles.mjs
+          node --test scripts/check-event-titles.test.mjs
 
       - name: Release and CI gate rules
         run: |
@@ -305,6 +323,9 @@ jobs:
         run: |
           npm ci
           npm run build
+
+      - name: Nothing private in the built web app
+        run: node scripts/check-public-privacy.mjs
 
       - name: Upload web dist
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
@@ -475,6 +496,7 @@ jobs:
     uses: ./.github/workflows/ci-packaging.yml
     with:
       arm64: ${{ needs.changes.outputs.run_arm64 == 'true' }}
+      version: ${{ inputs.version || '' }}
 
   # The verdict. `always()` so it reports even when a job it needs failed or was skipped.
   ci-passed:

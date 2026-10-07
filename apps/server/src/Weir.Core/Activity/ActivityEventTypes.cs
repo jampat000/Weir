@@ -20,6 +20,12 @@ public static class ActivityEventTypes
     /// <summary>An admin chose who can reach Weir over the network, from System › About.</summary>
     public const string SystemNetworkAccessChanged = "system.network_access.changed";
 
+    /// <summary>Processing was paused, or its pause changed; the entry says until when, by whom, and whether Weir keeps looking for files.</summary>
+    public const string SystemProcessingPaused = "system.processing_paused";
+
+    /// <summary>Processing was resumed, by someone or because a timed pause ran out.</summary>
+    public const string SystemProcessingResumed = "system.processing_resumed";
+
     // Shared *arr library (Sonarr/Radarr): operator-triggered connection checks
     public const string ArrLibraryConnectionTestSucceeded = "arr_library.connection_test_succeeded";
     public const string ArrLibraryConnectionTestFailed = "arr_library.connection_test_failed";
@@ -67,6 +73,9 @@ public static class ActivityEventTypes
 
     /// <summary>The Activity page's remove dialog, "keep": the file stays, and scans skip it until it changes (#785).</summary>
     public const string ProcessingFileRemovalKept = "processing.file_removal_kept";
+
+    /// <summary>A repeat of a source Weir had already cleaned was left alone: "Skipped: already done" or "already imported".</summary>
+    public const string ProcessingFileSkippedRepeat = "processing.file_skipped_repeat";
 
     /// <summary>A workflow was set up from, or had its folders updated from, a media manager that reports its folders (Deluno).</summary>
     public const string ProcessingWorkflowSynced = "processing.workflow_synced";

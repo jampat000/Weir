@@ -52,7 +52,7 @@ The API still says "library" for what the app calls a workflow (for example the 
 capability below), so existing integrations keep working.
 
 You don't name a connection. Weir names it after the kind and the host in its address: "Deluno on
-RIG", "Radarr on nas", "qBittorrent on 10.0.0.51". Two of one kind on the same host also show their
+my-pc", "Radarr on nas", "qBittorrent on 192.0.2.51". Two of one kind on the same host also show their
 port, like "Radarr on nas (7879)". Change the address and the name follows.
 
 To tell two connections apart at a glance, give one a **Nickname (optional)** when you add it or
@@ -96,13 +96,19 @@ one-click suggestion in the workflow editor. Weir never changes a folder on its 
 only ever applied when you press the button, and a folder you typed yourself always stays.
 
 The same `/api/v1/intake/capabilities` answer carries `machine_name`, the name of the machine Weir
-runs on, so a manager can call its connection to Weir "Weir on RIG".
+runs on, so a manager can call its connection to Weir "Weir on my-pc".
 
 ## Deluno: automatic hand-off
 
 Deluno hands a file to Weir to work on, and waits to be told it's ready. This is the fully
 automatic setup: Deluno tells Weir about a new file, Weir cleans it, and Deluno is told when the
 cleaned copy is ready to import. You don't move anything by hand.
+
+Weir cleans each downloaded file once. If the same file is handed over again, or you choose "Process
+again" on a file Weir has already cleaned, Weir does not process it a second time: Activity shows
+"Skipped: already done" (or "Skipped: already imported" once Deluno has collected the cleaned copy),
+and Deluno is told the file is ready, with the same cleaned copy as before, never that it failed. A
+download that has changed, or a different release, is processed as usual.
 
 ### Deluno: Weir sets up its workflows from it
 
