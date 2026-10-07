@@ -18,8 +18,11 @@ static class WeirFirewallRule
     /// </summary>
     internal const string Protocol = "TCP";
 
-    /// <summary>Private and Domain only, per the owner's decision. Public is never included: an untrusted network never gets a hole punched for Weir.</summary>
-    internal const FirewallProfiles AllowedProfiles = FirewallProfiles.Domain | FirewallProfiles.Private;
+    /// <summary>
+    /// Every network profile, Public included: Windows marks many home networks Public, and a rule that skipped them
+    /// would leave "Devices on my network" doing nothing there. Weir is still behind its own sign-in.
+    /// </summary>
+    internal const FirewallProfiles AllowedProfiles = FirewallProfiles.Domain | FirewallProfiles.Private | FirewallProfiles.Public;
 
     /// <summary>
     /// The server executable's path, scoped to Velopack's stable <c>current</c> folder
@@ -29,7 +32,7 @@ static class WeirFirewallRule
     internal static string ServerProgramPath(string installRoot) =>
         Path.GetFullPath(Path.Combine(installRoot, ServerRelativePath));
 
-    /// <summary>The rule Weir wants in place: one inbound TCP allow rule for its own server, on Private and Domain only.</summary>
+    /// <summary>The rule Weir wants in place: one inbound TCP allow rule for its own server, on every network profile.</summary>
     internal static FirewallRule DesiredRule(string installRoot) => new(
         RuleName,
         ServerProgramPath(installRoot),
@@ -39,7 +42,8 @@ static class WeirFirewallRule
         Enabled: true);
 
     /// <summary>
-    /// Adds or updates Weir's allow rule, and removes every inbound block rule that targets Weir's own server exe
+    /// Adds or updates Weir's allow rule (an older one that covers fewer profiles, or another program path, is
+    /// replaced by the current one), and removes every inbound block rule that targets Weir's own server exe
     /// (for example one Windows created when its own "blocked some features" prompt was cancelled). Never touches
     /// a rule for any other program. Idempotent: running it again when everything already matches changes nothing.
     /// </summary>
@@ -95,6 +99,26 @@ static class WeirFirewallRule
             && rule.Action == FirewallRuleAction.Allow
             && string.Equals(rule.ProgramPath, programPath, StringComparison.OrdinalIgnoreCase)));
         return (allowed & ~blocked) != FirewallProfiles.None;
+    }
+
+    /// <summary>
+    /// Whether Windows lets other devices reach Weir's server on the network this PC is on right now: an enabled
+    /// inbound allow rule for its program covers a current profile and no enabled block rule for it does. Unlike
+    /// <see cref="AllowsServerInbound"/>, a rule for other profiles only does not count, so a rule written before
+    /// Public was covered is asked for again when the PC is on a Public network. Read-only; needs no administrator rights.
+    /// </summary>
+    internal static bool AllowsServerOnCurrentNetwork(IFirewallPolicy policy, string installRoot)
+    {
+        ArgumentNullException.ThrowIfNull(policy);
+        var programPath = ServerProgramPath(installRoot);
+        var current = policy.CurrentProfiles;
+
+        var blocked = ProfilesOf(OwnBlockRules(policy, programPath));
+        var allowed = ProfilesOf(policy.Rules.Where(rule =>
+            rule.Direction == FirewallRuleDirection.Inbound
+            && rule.Action == FirewallRuleAction.Allow
+            && string.Equals(rule.ProgramPath, programPath, StringComparison.OrdinalIgnoreCase)));
+        return (allowed & current) != FirewallProfiles.None && (blocked & current) == FirewallProfiles.None;
     }
 
     private static FirewallProfiles ProfilesOf(IEnumerable<FirewallRule> rules) =>

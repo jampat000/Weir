@@ -50,6 +50,8 @@ sealed class ComFirewallPolicy : IFirewallPolicy
         }
     }
 
+    public FirewallProfiles CurrentProfiles => (FirewallProfiles)(int)_policy.CurrentProfileTypes;
+
     public void AddOrUpdateRule(FirewallRule rule)
     {
         ArgumentNullException.ThrowIfNull(rule);

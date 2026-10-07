@@ -29,6 +29,30 @@ public sealed class NetworkAccessDecisionTests
     }
 
     [Fact]
+    public void An_allow_rule_for_every_profile_allows_a_public_network()
+    {
+        var verdict = NetworkAccessDecision.Judge([Allow(Domain | Private | Public)], Public);
+
+        Assert.Equal(FirewallVerdict.Allows, verdict);
+    }
+
+    [Fact]
+    public void An_older_allow_rule_for_private_and_domain_only_blocks_a_public_network()
+    {
+        var verdict = NetworkAccessDecision.Judge([Allow(Domain | Private)], Public);
+
+        Assert.Equal(FirewallVerdict.Blocks, verdict);
+    }
+
+    [Fact]
+    public void A_block_rule_on_a_public_network_wins_over_an_allow_rule_for_every_profile()
+    {
+        var verdict = NetworkAccessDecision.Judge([Allow(Domain | Private | Public), Block(Public)], Public);
+
+        Assert.Equal(FirewallVerdict.Blocks, verdict);
+    }
+
+    [Fact]
     public void A_block_rule_wins_over_an_allow_rule()
     {
         var verdict = NetworkAccessDecision.Judge([Allow(Private), Block(Private)], Private);

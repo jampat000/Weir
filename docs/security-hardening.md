@@ -65,8 +65,13 @@ This checklist defines the current practical hardening baseline for Weir.
 - The Windows package can create exactly one inbound firewall rule, named `Weir`, scoped to the installed
   server's program path (`server\WeirServer.exe` under Velopack's stable `current` folder) — never a port-wide
   rule, and the program path is fixed by the installer, never taken from user input.
-- The rule's profiles are Private and Domain only. Public is never included, at install, from the tray's
-  "Allow other devices on your network..." menu item, or from `--allow-lan`.
+- The rule covers every network profile: Domain, Private and Public, at install, from the tray's
+  "Allow other devices on your network..." menu item, and from `--allow-lan`. Windows often marks a home network
+  Public, and a rule that skipped Public would make "Devices on my network" do nothing there. Weir is still behind
+  its own sign-in, and first-run setup from another device needs the one-time setup code. A rule written by an
+  earlier version, for Private and Domain only, is replaced by the current one whenever the tray configures the
+  rule; and when the PC is on a network that rule does not cover, choosing the network again (or **Try again** on
+  System › About) asks Windows for the administrator approval again, which widens it.
 - Creating or removing it needs a Windows admin (UAC) elevation; Weir asks for that once, at first run, with a
   plain explanation, and never asks again automatically if declined. Turning LAN access off leaves the rule in
   place: with nothing listening for the network it lets nothing in.

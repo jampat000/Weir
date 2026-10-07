@@ -149,6 +149,19 @@ public sealed class FirewallCommandTests
     }
 
     [Fact]
+    public void Configure_logs_that_the_rule_covers_every_profile_and_widens_an_older_one()
+    {
+        var older = new FirewallRule("Weir", @"C:oldserverWeirServer.exe", FirewallRuleAction.Allow, FirewallRuleDirection.Inbound, FirewallProfiles.Domain | FirewallProfiles.Private, Enabled: true);
+        var policy = new FakeFirewallPolicy(older);
+        var messages = new List<string>();
+
+        FirewallCommand.Run(["--configure-firewall"], messages.Add, isElevated: () => true, () => policy, NeverSave);
+
+        Assert.Contains(messages, m => m.StartsWith("Firewall rule 'Weir' is in place (Domain, Private, Public profiles).", StringComparison.Ordinal));
+        Assert.Equal(FirewallProfiles.Domain | FirewallProfiles.Private | FirewallProfiles.Public, Assert.Single(policy.Rules).Profiles);
+    }
+
+    [Fact]
     public void Allow_lan_when_elevated_turns_access_on_and_writes_the_rule_exactly_like_configure_firewall()
     {
         var policy = new FakeFirewallPolicy();

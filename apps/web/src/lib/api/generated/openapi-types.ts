@@ -2025,7 +2025,7 @@ export interface paths {
     get: operations["get_suite_network_access_api_v1_suite_network_access_get"];
     /**
      * Put Suite Network Access
-     * @description Admin only. Saves who can reach Weir for the Windows tray to apply: it restarts the server and, when Windows Firewall has no rule for Weir, asks for one on this PC (Private and Domain networks only). The answer is the state with the new choice pending. Answers 409 on Docker and on a bare install, where the way Weir is started decides.
+     * @description Admin only. Saves who can reach Weir for the Windows tray to apply: it restarts the server and, when Windows Firewall has no rule for Weir, asks for one on this PC (covering every network profile). The answer is the state with the new choice pending. Answers 409 on Docker and on a bare install, where the way Weir is started decides.
      */
     put: operations["put_suite_network_access_api_v1_suite_network_access_put"];
     post?: never;
@@ -7324,7 +7324,7 @@ export interface components {
       csrf_token: string;
       /**
        * Scope
-       * @description this_pc_only or network (devices on the network, through Windows Firewall's Private and Domain networks).
+       * @description this_pc_only or network (devices on the network, through Windows Firewall, on every network profile).
        * @enum {string}
        */
       scope: "this_pc_only" | "network";
