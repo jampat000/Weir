@@ -44,7 +44,7 @@ Copy this list into the run's record and tick each line with what was seen.
    - [ ] The download client's folder still holds every original file: the video, the `.nfo` and every other sidecar.
    - [ ] Activity tells the story in plain words, in both apps. Weir's entry is correct: the tracks kept and removed, the size before and after, and what was saved.
 7. **A title's own profile is honoured** in its search.
-   - [ ] 4K and 720p are each targeted correctly.
+   - [ ] 4K and 720p are each targeted correctly, and each title's page shows its own profile as the target.
 8. **Failure and recovery.**
    - [ ] A stalled torrent is replaced, and only it.
    - [ ] A failed hand-off sits under Needs action, is never deleted by the stall rules, and **Try again** from the download's drawer works.
@@ -55,7 +55,7 @@ Copy this list into the run's record and tick each line with what was seen.
 10. **Reaching Weir from another computer.**
     - [ ] In Weir's **System › About**, **Devices on my network** makes Weir reachable from another computer, with the VM's network set to Public.
 11. **Screens.**
-    - [ ] In Deluno, the poster Search and Refresh buttons work. Transfers, Activity, the Dashboard and System are clean, and every counted problem can be cleared on screen.
+    - [ ] In Deluno, at 1920 and 1366 wide and at phone width: the poster Search and Refresh buttons work; Transfers, Activity, the Dashboard and System are clean, and every counted problem can be cleared on screen.
     - [ ] In Weir, Logs shows no unexpected warnings or errors, and every Activity entry has a readable title.
     - [ ] No issue numbers or old page names appear in either app's copy.
 12. **Pass record.**
