@@ -93,8 +93,6 @@ export function AppSidebar({
         />
         <SidebarUser
           username={me.data?.username}
-          accountRole={me.data?.role}
-          machineName={readiness.data?.machine_name}
           version={readiness.data?.version}
           signingOut={logout.isPending}
           onSignOut={signOut}

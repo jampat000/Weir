@@ -6,8 +6,6 @@ import { NavIconChevronDown, NavIconSignOut } from "./nav-icons";
 
 type SidebarUserProps = {
   username: string | undefined;
-  accountRole: string | undefined;
-  machineName: string | undefined;
   version: string | undefined;
   signingOut: boolean;
   onSignOut: () => void;
@@ -26,13 +24,11 @@ export function initialsOf(username: string | undefined): string {
 }
 
 /**
- * Who is signed in, at the foot of the side menu: initials, name, and what they are on this Weir. A
- * click opens a menu with the version, where to change a password, and Sign out.
+ * Who is signed in, at the foot of the side menu: initials and name. A click opens a menu with the
+ * version, where to change a password, and Sign out.
  */
 export function SidebarUser({
   username,
-  accountRole,
-  machineName,
   version,
   signingOut,
   onSignOut,
@@ -42,10 +38,6 @@ export function SidebarUser({
   const containerRef = useRef<HTMLDivElement>(null);
   const close = useCallback(() => setOpen(false), []);
   useCloseOnOutsideAndEscape(open, close, containerRef);
-
-  const machine = machineName?.trim();
-  const where = machine ? `Weir on ${machine}` : "Weir";
-  const detail = accountRole ? `@${accountRole} · ${where}` : where;
 
   return (
     <div className="mm-sidebar-user" ref={containerRef}>
@@ -64,7 +56,6 @@ export function SidebarUser({
           <span className="mm-sidebar-user__name">
             {username ?? "Signed in"}
           </span>
-          <span className="mm-sidebar-user__detail">{detail}</span>
         </span>
         <NavIconChevronDown className="mm-sidebar-user__chevron" />
       </button>
