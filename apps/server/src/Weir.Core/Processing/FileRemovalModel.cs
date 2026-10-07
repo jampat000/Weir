@@ -38,7 +38,8 @@ public sealed record FileRemovalOptions(
     bool KeepNotifiesManager,
     bool FingerprintRecorded,
     long? UnconfirmedSizeBytes,
-    string? UnconfirmedModifiedAt)
+    string? UnconfirmedModifiedAt,
+    string? DeleteRefusedReason = null)
 {
     /// <summary>A title that keeps today's plain confirm: finished, or its file is already gone.</summary>
     public static readonly FileRemovalOptions PlainRemove = new(false, null, false, false, true, null, null);

@@ -27,6 +27,10 @@ There are two kinds, and both can run side by side in one Weir:
   - **Radarr and Sonarr:** the download client **category**, and the **root folder** the file is
     imported into.
 
+Whatever the manager, a linked workflow never deletes or moves the original download: it belongs to
+your download client and the manager, and the client may still be seeding it. See [How Weir keeps
+your files safe](file-lifecycle.md#deleting-the-original).
+
 For example, a linked workflow reads like this: comes from Deluno's download client, category
 **movies** → Weir works in its work folder → cleaned into the output folder → Deluno imports it
 into its library **Movies**. A local one reads: watches `D:\Kids\Incoming` → works in its work
@@ -149,6 +153,14 @@ A hand-off names its file by the path Deluno sees, and Weir accepts it only when
 Deluno's path mappings for Weir (Settings › Media Management › Processing Workflow › Weir › Path mappings) turn its paths
 into Weir's, and the workflows Weir sets up use them.
 
+A workflow linked to Deluno is fed **only** by Deluno's hand-off. Weir does not scan its watched folder:
+there is no scheduled scan, no scan when the folder changes, and no **Scan now** (Setup › Workflows ›
+Schedule says "Deluno hands this workflow its downloads"). That way Weir can never pick up a download
+that is still being fetched or seeded before Deluno asks for it. If a hand-off fails, Weir retries it
+on its own, as the workflow's retry settings say. Weir also never deletes the original download of
+this workflow, even with **After cleaning, delete the original download** on: the option shows as off
+and says why.
+
 ### Deluno: checking where downloads land
 
 Deluno 1.0.0-rc.23 and later publish, for each library, where every download client really saves its
@@ -199,11 +211,12 @@ Open **Setup › Workflows** and edit the workflow:
 
 - **Watched folder**: where your download client finishes files, e.g. `/media/downloads/complete/tv`.
 - **Output folder**: where Weir puts cleaned files, e.g. `/media/weir/tv`.
-- **New downloads: after cleaning, delete the original download**: turn this **off** if you use torrents. The torrent
-  needs its files to keep seeding, and if they disappear, Sonarr stops treating the download as
-  finished and never imports it. Your download client or Sonarr removes the original later, under
-  your normal seeding rules. Weir remembers what it has already cleaned, so it won't clean the same
-  file twice.
+- **New downloads: after cleaning, delete the original download**: shows as off, and cannot be changed, once the
+  workflow is linked to Sonarr or Radarr (step 2). Weir never deletes the original of a linked workflow:
+  the torrent needs its files to keep seeding, and if they disappear, Sonarr stops treating the
+  download as finished and never imports it. Your download client or Sonarr removes the original
+  later, under your normal seeding rules. Weir remembers what it has already cleaned, so it won't
+  clean the same file twice.
 - **Existing output**: leave it on anything except **Keep both**. Keep both renames the cleaned file,
   and Sonarr only looks for the original name.
 

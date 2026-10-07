@@ -335,7 +335,7 @@ public class ProcessingWatchedFolderWatcherService : BackgroundService
                 }
 
                 var (inserted, skip) = await ProcessingWatchedFolderScanDispatchEnqueue.TryEnqueueForWatcherEventAsync(
-                    uow, _jobStore, fresh, _options.ProcessingWatchedFolderRemuxScanDispatchPeriodicEnqueueRemuxJobs).ConfigureAwait(false);
+                    uow, _jobStore, _libraries, fresh, _options.ProcessingWatchedFolderRemuxScanDispatchPeriodicEnqueueRemuxJobs).ConfigureAwait(false);
                 if (inserted)
                 {
                     _logger.LogInformation("Queued a scan of {Library} because its watched folder changed.", fresh.Name);

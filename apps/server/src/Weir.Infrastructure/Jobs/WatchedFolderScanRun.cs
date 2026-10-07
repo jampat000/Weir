@@ -108,7 +108,7 @@ internal sealed class WatchedFolderScanRun
     {
         NoteHoldEnds(decision);
 
-        if (decision.FinishMovieRemoval && await NoPassOwnsAsync(decision.RelativePath).ConfigureAwait(false))
+        if (decision.FinishMovieRemoval && !_scan.KeepsOriginals && await NoPassOwnsAsync(decision.RelativePath).ConfigureAwait(false))
         {
             // Earlier files' writes land first, and the removal itself runs with no transaction open.
             await _batch.FlushAsync(cancellationToken).ConfigureAwait(false);

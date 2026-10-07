@@ -6,6 +6,7 @@ import {
 } from "../../../../lib/processing/libraries-api";
 import { useUpdateProcessingLibrary } from "../../../../lib/processing/libraries-queries";
 import { useProcessingWatchedFolderRemuxScanDispatchEnqueueMutation } from "../../../../lib/processing/queries";
+import { useHandedOffNote } from "../../../../lib/processing/use-handed-off-note";
 import { mmActionButtonClass } from "../../../../lib/ui/mm-control-roles";
 import { everyWords } from "../cleanup/cleanup-jobs";
 import { ScheduleGridEditor } from "./schedule-grid-editor";
@@ -153,6 +154,7 @@ export function LibraryHoursRow({
   onToggleEdit: () => void;
 }) {
   const grid = effectiveGrid(library);
+  const handedOff = useHandedOffNote(library.id);
   return (
     <tr
       className={editing ? "is-selected" : undefined}
@@ -171,7 +173,7 @@ export function LibraryHoursRow({
         <RightNow grid={grid} zone={zone} now={now} />
       </td>
       <td data-label="Looks for new files">
-        Every {everyWords(library.scan_interval_seconds)}
+        {handedOff ?? `Every ${everyWords(library.scan_interval_seconds)}`}
       </td>
       <td data-label="">
         <div className="mm-schedule-actions">
@@ -186,7 +188,9 @@ export function LibraryHoursRow({
           >
             Change hours
           </button>
-          <ScanNowButton library={library} editable={editable} />
+          {handedOff ? null : (
+            <ScanNowButton library={library} editable={editable} />
+          )}
         </div>
       </td>
     </tr>

@@ -1,5 +1,6 @@
 using Weir.Core.Json;
 using Weir.Core.Media;
+using Weir.Core.MediaManagers;
 using Weir.Core.Processing;
 using Weir.Core.Rules;
 using Weir.Infrastructure.IO;
@@ -21,8 +22,17 @@ public sealed record ProcessingPathRuntime
     /// <summary>Which tool writes this library's output (<see cref="Weir.Core.Media.RemuxWriterChoice"/>).</summary>
     public string RemuxWriter { get; init; } = RemuxWriterChoice.Best;
 
-    /// <summary>The library's <c>remove_original_after_success</c>: false leaves the source where it is after a successful pass.</summary>
+    /// <summary>The library's <c>remove_original_after_success</c> as saved. What a pass does is <see cref="RemovesOriginals"/>, which a link to a media manager overrides.</summary>
     public bool RemoveOriginalAfterSuccess { get; init; } = true;
+
+    /// <summary>The media managers the workflow is linked to when the pass starts, read from the links and not from a saved setting.</summary>
+    public WorkflowManagerLinks ManagerLinks { get; init; } = WorkflowManagerLinks.None;
+
+    /// <summary>Whether the pass may remove the source, its sidecars or its folder after cleaning: only a Weir-only workflow that asks for it.</summary>
+    public bool RemovesOriginals => RemoveOriginalAfterSuccess && !ManagerLinks.KeepsOriginals;
+
+    /// <summary>Why the source is still there when <see cref="RemovesOriginals"/> is false: the link, naming the manager, or the saved setting.</summary>
+    public string KeptOriginalReason => ManagerLinks.KeepsOriginals ? ManagerLinks.KeptOriginalReason : RemuxPassRunner.KeptOriginalReason;
 
     /// <summary>The library's own media extensions, so removing a source never takes another video with it.</summary>
     public string MediaExtensionsCsv { get; init; } = string.Empty;
@@ -161,11 +171,13 @@ public static class RemuxPassPaths
     }
 
     /// <summary>
-    /// One library's folders, or the sentence saying why they cannot be used.
+    /// One library's folders, or the sentence saying why they cannot be used. <paramref name="links"/> are the media managers it is linked
+    /// to right now (<see cref="LibraryStore.ManagerLinksAsync"/>), which decide whether the pass may remove an original.
     /// </summary>
-    public static (ProcessingPathRuntime? Runtime, string? Problem) RuntimeForLibrary(ProcessingLibraryRecord library, string weirHome)
+    public static (ProcessingPathRuntime? Runtime, string? Problem) RuntimeForLibrary(ProcessingLibraryRecord library, string weirHome, WorkflowManagerLinks links)
     {
         ArgumentNullException.ThrowIfNull(library);
+        ArgumentNullException.ThrowIfNull(links);
         var label = WireStrings.Strip(library.Name).Length > 0 ? WireStrings.Strip(library.Name) : library.MediaType == "tv" ? "TV" : "Movies";
         var watchedRaw = WireStrings.Strip(library.WatchedFolder ?? string.Empty);
         if (watchedRaw.Length == 0)
@@ -230,6 +242,7 @@ public static class RemuxPassPaths
             FfmpegStrictness = string.IsNullOrEmpty(library.FfmpegStrictness) ? "normal" : library.FfmpegStrictness,
             RemuxWriter = RemuxWriterChoice.Normalize(library.RemuxWriter),
             RemoveOriginalAfterSuccess = library.RemoveOriginalAfterSuccess,
+            ManagerLinks = links,
             MediaExtensionsCsv = library.MediaExtensionsCsv ?? string.Empty,
         }, null);
     }

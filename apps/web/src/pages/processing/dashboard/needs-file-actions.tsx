@@ -7,6 +7,7 @@ import {
   useRequeueProcessingFile,
 } from "../../../lib/processing/files-queries";
 import { activityFilePath } from "../../activity/activity-links";
+import { useHandedOffNote } from "../../../lib/processing/use-handed-off-note";
 import { useFileRemoval } from "../../activity/use-file-removal";
 
 export type NeedNotice = { text: string; failed: boolean };
@@ -96,7 +97,10 @@ export function NeedFileActions({
     onRemoved: (text) => onNotice({ text, failed: false }),
     onProblem: (text) => onNotice({ text, failed: true }),
   });
+  const handedOff = useHandedOffNote(file.library_id);
   const retry = retryWords(file);
+  // Weir never scans a workflow a media manager hands its downloads to, so there is nothing to check again.
+  const noScan = asksWorkflowAgain(file) ? handedOff : null;
   const retrying = requeue.isPending || checkAgain.isPending;
   const busy = retrying || removal.checking || removal.removing;
   const report = (text: string, failed: boolean) => onNotice({ text, failed });
@@ -123,8 +127,8 @@ export function NeedFileActions({
       <button
         type="button"
         className="mm-need__button"
-        title={retry.title}
-        disabled={busy}
+        title={noScan ?? retry.title}
+        disabled={busy || noScan !== null}
         onClick={retryNow}
       >
         {retryLabel(retry.label, {

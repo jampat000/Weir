@@ -40,7 +40,8 @@ public sealed partial class RemuxPassHandler
                 }
                 else
                 {
-                    (runtime, problem) = RemuxPassPaths.RuntimeForLibrary(library, _options.WeirHome);
+                    (runtime, problem) = RemuxPassPaths.RuntimeForLibrary(
+                        library, _options.WeirHome, await _libraries.ManagerLinksAsync(uow, library.Id).ConfigureAwait(false));
                 }
 
                 if (problem is not null)

@@ -1,4 +1,5 @@
 using Weir.Core.Json;
+using Weir.Core.MediaManagers;
 using Weir.Core.Processing;
 using Weir.Core.Processing.RemuxPass;
 using Weir.Infrastructure.Sqlite;
@@ -11,7 +12,7 @@ public sealed partial class RemuxPassHandler
     /// Decides what happens to the file a pass rejected. Under the reject policy the manager is asked, and the download is only
     /// removed once it accepts. Otherwise the library's own rejected-file choice applies, worded for a person when no manager is involved.
     /// </summary>
-    private static void ApplyRejectedFileAction(WireObject result, ProcessingLibraryRecord library, WireObject? origin)
+    private static void ApplyRejectedFileAction(WireObject result, ProcessingLibraryRecord library, WorkflowManagerLinks links, WireObject? origin)
     {
         var weirOnly = WeirOnlyRejection.Applies(library, origin);
         if (weirOnly)
@@ -21,7 +22,9 @@ public sealed partial class RemuxPassHandler
 
         var deletes = string.Equals(WireStrings.Strip(library.RejectedFileAction ?? string.Empty), RejectedFileActions.DeleteFile, StringComparison.OrdinalIgnoreCase)
                       // Under reject, the reject job removes the download, and only after the manager accepts.
-                      && ProcessingFailurePolicies.Normalize(library.FailurePolicy) != ProcessingFailurePolicies.Reject;
+                      && ProcessingFailurePolicies.Normalize(library.FailurePolicy) != ProcessingFailurePolicies.Reject
+                      // A linked workflow's original belongs to the download client and the manager, whatever the workflow's own choice says.
+                      && !links.KeepsOriginals;
         result.Set("rejected_file_action", deletes ? RejectedFileActions.DeleteFile : RejectedFileActions.Leave);
         if (deletes)
         {
@@ -35,9 +38,14 @@ public sealed partial class RemuxPassHandler
             result.Set("rejected_cleanup_status", "left_in_place");
             result.Set(
                 "rejected_cleanup_detail",
-                weirOnly ? WeirOnlyRejection.LeftInPlace : "Weir left the rejected file in place because this workflow's cleanup action is Leave in place.");
+                weirOnly ? WeirOnlyRejection.LeftInPlace : RejectedLeftInPlace(library, links));
         }
     }
+
+    private static string RejectedLeftInPlace(ProcessingLibraryRecord library, WorkflowManagerLinks links) =>
+        links.KeepsOriginals && string.Equals(WireStrings.Strip(library.RejectedFileAction ?? string.Empty), RejectedFileActions.DeleteFile, StringComparison.OrdinalIgnoreCase)
+            ? $"Weir left the rejected file in place. {links.KeptOriginalReason}"
+            : "Weir left the rejected file in place because this workflow's cleanup action is Leave in place.";
 
     /// <summary>
     /// Records a rules rejection no manager is involved in as <c>rejected</c>, with the file's current identity so Activity's

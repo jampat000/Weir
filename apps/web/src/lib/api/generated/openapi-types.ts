@@ -4642,6 +4642,8 @@ export interface components {
       unconfirmed_size_bytes: number | null;
       /** Unconfirmed Modified At */
       unconfirmed_modified_at: string | null;
+      /** Delete Refused Reason */
+      delete_refused_reason: string | null;
     };
     /**
      * ProcessingFileRemovalOut

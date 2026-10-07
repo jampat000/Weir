@@ -18,11 +18,12 @@ import {
   useSubmitProcessingManualPlan,
 } from "../../lib/processing/files-queries";
 import { useProcessingLibrariesQuery } from "../../lib/processing/libraries-queries";
+import { useHandedOffNote } from "../../lib/processing/use-handed-off-note";
 import { mmActionButtonClass } from "../../lib/ui/mm-control-roles";
 import { useFileRemoval } from "./use-file-removal";
 
 const PASS_THROUGH_EXPLAINED =
-  "Weir will skip the audio, subtitle and metadata rules, copy and check the original in this workflow's output folder, then remove the watched original the way it does after any finished file. Readiness checks still apply, so a download still being written is left alone.";
+  "Weir will skip the audio, subtitle and metadata rules, copy and check the original in this workflow's output folder, then keep or remove the watched original the way this workflow does after any finished file. Readiness checks still apply, so a download still being written is left alone.";
 
 /** States Weir is done with a file in, one way or another: it can only be processed again from here. */
 const CONCLUDED: readonly ProcessingFileStatus[] = [
@@ -48,6 +49,7 @@ export function ActivityFileActions({
   onRemoved: (message: string) => void;
 }) {
   const libraries = useProcessingLibrariesQuery();
+  const handedOff = useHandedOffNote(file.library_id);
   const moveToTop = useMoveProcessingFileToTop();
   const requeue = useRequeueProcessingFile();
   const whyHeld = useProcessingWhyHeld();
@@ -220,10 +222,12 @@ export function ActivityFileActions({
               () => void openTracks(),
             )
           : null}
-        {status === "on_hold" ||
-        status === "blocked_upstream" ||
-        status === "skipped" ||
-        status === "out_of_schedule"
+        {/* Weir never scans a workflow a media manager hands its downloads to, so there is nothing to check again. */}
+        {handedOff === null &&
+        (status === "on_hold" ||
+          status === "blocked_upstream" ||
+          status === "skipped" ||
+          status === "out_of_schedule")
           ? button(
               "Check again",
               "Checks this workflow now and queues files that are ready.",

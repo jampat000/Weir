@@ -109,6 +109,7 @@ public sealed class HistoryFileRemovalServiceTests : IDisposable
         Assert.True(options.RequiresChoice);
         Assert.False(options.DeleteHandledByManager);
         Assert.Null(options.ManagerLabel);
+        Assert.Null(options.DeleteRefusedReason);
 
         var outcome = await _fixture.Db(uow => Service().DeleteAsync(uow, file, null, CancellationToken.None));
 
@@ -176,10 +177,11 @@ public sealed class HistoryFileRemovalServiceTests : IDisposable
     /// <summary>
     /// A linked manager whose queue does not actually reference this file (the same "cannot tell which download"
     /// refusal the automatic reject job hits) is not one that "can do it": the wording and the action must agree
-    /// (#786 review of #785), so both say Weir alone, and Weir deletes the file itself.
+    /// (#786 review of #785), so neither names the manager. The workflow is linked, so the download belongs to its client:
+    /// Weir offers no delete of its own and does not delete the file.
     /// </summary>
     [Fact]
-    public async Task A_linked_manager_with_no_matching_queue_item_is_treated_as_weir_alone()
+    public async Task A_linked_manager_with_no_matching_queue_item_leaves_the_file_to_the_download_client()
     {
         var library = await LibraryAsync();
         var source = _folders.Source("Film/film.mkv");
@@ -191,11 +193,13 @@ public sealed class HistoryFileRemovalServiceTests : IDisposable
         var options = await _fixture.Db(uow => Service().EvaluateAsync(uow, file, CancellationToken.None));
         Assert.False(options.DeleteHandledByManager);
         Assert.Null(options.ManagerLabel);
+        Assert.Contains("This workflow is linked to Radarr", options.DeleteRefusedReason, StringComparison.Ordinal);
 
         var outcome = await _fixture.Db(uow => Service().DeleteAsync(uow, file, null, CancellationToken.None));
 
-        Assert.True(outcome.Done);
-        Assert.False(File.Exists(source));
+        Assert.False(outcome.Done);
+        Assert.True(File.Exists(source));
+        Assert.Contains("This workflow is linked to Radarr, so the original stays with your download client", outcome.Message, StringComparison.Ordinal);
         Assert.Empty(_fixture.Http.RequestsTo(HttpMethod.Delete, "/api/v3/queue/55"));
     }
 
@@ -228,7 +232,7 @@ public sealed class HistoryFileRemovalServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task A_handoff_manager_that_cannot_replace_the_release_falls_back_to_weir_deleting_it()
+    public async Task A_handoff_manager_that_cannot_replace_the_release_leaves_the_file_to_the_download_client()
     {
         var library = await LibraryAsync();
         var source = _folders.Source("Film/film.mkv");
@@ -242,11 +246,12 @@ public sealed class HistoryFileRemovalServiceTests : IDisposable
 
         var options = await _fixture.Db(uow => Service().EvaluateAsync(uow, file, CancellationToken.None));
         Assert.False(options.DeleteHandledByManager);
+        Assert.Contains("This workflow is linked to Deluno", options.DeleteRefusedReason, StringComparison.Ordinal);
 
         var outcome = await _fixture.Db(uow => Service().DeleteAsync(uow, file, null, CancellationToken.None));
 
-        Assert.True(outcome.Done);
-        Assert.False(File.Exists(source));
+        Assert.False(outcome.Done);
+        Assert.True(File.Exists(source));
         Assert.Empty(_fixture.Http.RequestsTo(HttpMethod.Post, EventsPath));
     }
 

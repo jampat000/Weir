@@ -89,6 +89,7 @@ public sealed partial class RemuxPassHandler
                         var failureClass = ProcessingFailureClasses.Classify(TextOr(result.Get("outcome"), string.Empty));
                         var reason = WireStrings.Slice(CollapseWhitespace(TextOr(result.Get("reason"), "Weir returned an unsuccessful result.")), 1200);
                         var decision = await RemuxPassFileState.RecordFailureAsync(uow, library, rel, failureClass, reason, now).ConfigureAwait(false);
+                        await HandoffRetries.QueueIfOwedAsync(uow, _failurePolicy, _libraries, library, rel, origin, decision).ConfigureAwait(false);
                         _scanWakeups?.RequestForRetry(library.Id, decision.NextRetryAt);
                         var followUp = await _failurePolicy.ApplyFailurePolicyAsync(
                             uow, library, rel, decision.WillRetry, origin, result.Get("content_unusable") is WireBool { Value: true }).ConfigureAwait(false);
@@ -110,6 +111,10 @@ public sealed partial class RemuxPassHandler
                     if (result.Get("source_kept_by_library_setting") is WireBool { Value: true })
                     {
                         processedReason += " The original download was kept in the watched folder, as this workflow asks.";
+                    }
+                    else if (result.Get("source_kept_by_manager_link") is WireBool { Value: true })
+                    {
+                        processedReason += " The original download was kept in the watched folder for your download client, because this workflow is linked to a media manager.";
                     }
 
                     if (await RemuxPassFileState.MarkFileStatusAsync(uow, library.Id, rel, ProcessingFileStatuses.Processed, processedReason, now).ConfigureAwait(false))

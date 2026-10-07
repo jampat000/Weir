@@ -62,6 +62,7 @@ public sealed class RemuxPassFailureRecorder : IUnhandledJobFailureRecorder
                     _logger.LogWarning(exception, "Unhandled-failure recorder could not read the payload of job_id={JobId}; applying the failure policy without its origin.", failure.Context.Id);
                 }
 
+                await HandoffRetries.QueueIfOwedAsync(uow, _policy, _libraries, library, failure.RelativeMediaPath, origin, decision).ConfigureAwait(false);
                 await _policy.ApplyFailurePolicyAsync(uow, library, failure.RelativeMediaPath, decision.WillRetry, origin, badRelease: false).ConfigureAwait(false);
                 return decision.WillRetry;
             },

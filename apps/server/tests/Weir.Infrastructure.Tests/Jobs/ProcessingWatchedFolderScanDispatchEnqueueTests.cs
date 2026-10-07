@@ -201,7 +201,7 @@ public sealed class ProcessingWatchedFolderScanDispatchEnqueueTests
         var library = await GetLibraryAsync(db, libraryId);
 
         await using var uow = await UnitOfWork.OpenAsync(db.Database);
-        var (inserted, skip) = await ProcessingWatchedFolderScanDispatchEnqueue.TryEnqueueForWatcherEventAsync(uow, db.Store, library, enqueueRemuxJobs: true);
+        var (inserted, skip) = await ProcessingWatchedFolderScanDispatchEnqueue.TryEnqueueForWatcherEventAsync(uow, db.Store, Libraries, library, enqueueRemuxJobs: true);
         await uow.CommitAsync();
 
         Assert.True(inserted);
@@ -222,7 +222,7 @@ public sealed class ProcessingWatchedFolderScanDispatchEnqueueTests
             ("@payload", $"{{\"media_scope\":\"movie\",\"library_id\":{libraryId}}}"));
 
         await using var uow = await UnitOfWork.OpenAsync(db.Database);
-        var (inserted, skip) = await ProcessingWatchedFolderScanDispatchEnqueue.TryEnqueueForWatcherEventAsync(uow, db.Store, library, enqueueRemuxJobs: true);
+        var (inserted, skip) = await ProcessingWatchedFolderScanDispatchEnqueue.TryEnqueueForWatcherEventAsync(uow, db.Store, Libraries, library, enqueueRemuxJobs: true);
 
         Assert.False(inserted);
         Assert.Equal("active_scan_already_queued", skip);
@@ -239,7 +239,7 @@ public sealed class ProcessingWatchedFolderScanDispatchEnqueueTests
         var library = await GetLibraryAsync(db, libraryId);
 
         await using var uow = await UnitOfWork.OpenAsync(db.Database);
-        var (inserted, skip) = await ProcessingWatchedFolderScanDispatchEnqueue.TryEnqueueForWatcherEventAsync(uow, db.Store, library, enqueueRemuxJobs: true);
+        var (inserted, skip) = await ProcessingWatchedFolderScanDispatchEnqueue.TryEnqueueForWatcherEventAsync(uow, db.Store, Libraries, library, enqueueRemuxJobs: true);
 
         Assert.False(inserted);
         Assert.Equal("missing_output_for_live_remux", skip);

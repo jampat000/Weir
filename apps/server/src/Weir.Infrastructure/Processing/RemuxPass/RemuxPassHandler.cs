@@ -202,7 +202,7 @@ public sealed partial class RemuxPassHandler : IJobHandler
         result.Set("library_id", claim.Library?.Id ?? libraryId);
         if (result.Get("rejection_kind") is { IsTruthy: true } && claim.Library is { } library)
         {
-            ApplyRejectedFileAction(result, library, origin);
+            ApplyRejectedFileAction(result, library, claim.Runtime?.ManagerLinks ?? WorkflowManagerLinks.None, origin);
         }
 
         await SettleUnreadableSourceAsync(context.Id, data, origin, result, cancellationToken).ConfigureAwait(false);

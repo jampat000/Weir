@@ -41,6 +41,9 @@ internal sealed partial class Scenario : IAsyncDisposable
 
     public Folders Folders { get; }
 
+    /// <summary>The workflow a fake Deluno feeds, whose retries come from the hand-off itself rather than from a scan; null until set up.</summary>
+    public int? HandedOffLibraryId { get; private set; }
+
     /// <summary>The fake tools, which every scenario but the real-ffmpeg ones has.</summary>
     public FakeFfmpeg FakeTools => Tools ?? throw new InvalidOperationException("This scenario runs the real ffmpeg.");
 

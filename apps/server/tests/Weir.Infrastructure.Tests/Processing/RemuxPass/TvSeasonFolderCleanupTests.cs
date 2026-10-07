@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using Weir.Core.Json;
+using Weir.Core.MediaManagers;
 using Weir.Core.Security;
 using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.MediaManagers;
@@ -69,6 +70,27 @@ public sealed class TvSeasonFolderCleanupTests : IDisposable
 
         var got = TvSeasonFolderCleanup.GetTvEpisodeSetMediaFiles(season);
         Assert.Equal(["a.mkv", "b.mkv"], got.Select(Path.GetFileName));
+    }
+
+    [Fact]
+    public async Task A_season_a_linked_workflow_owns_is_never_removed_even_when_every_other_check_would_pass()
+    {
+        var (store, cleanup, http, _, _) = await BuildAsync();
+        using var _1 = store;
+        var ep = _folders.Source("Serie/S01/e.mkv", 500);
+        Directory.CreateDirectory(Path.GetDirectoryName(_folders.Out("Serie/S01/e.mkv"))!);
+        File.WriteAllBytes(_folders.Out("Serie/S01/e.mkv"), new byte[500]);
+        RouteSonarrQueue(http, "[]");
+        var output = new WireObject();
+        var runtime = _folders.Runtime() with { ManagerLinks = new WorkflowManagerLinks(["sonarr"]) };
+
+        await cleanup.RunAsync(
+            new TvSeasonCleanupContext(output, runtime, ep, _folders.Watched, 0, null, LiveOkContext("Serie/S01/e.mkv"), _folders.Out("Serie/S01/e.mkv")),
+            CancellationToken.None);
+
+        Assert.True(File.Exists(ep));
+        Assert.False(Bool(output, "tv_season_folder_deleted"));
+        Assert.Contains("This workflow is linked to Sonarr, so the original stays", Str(output, "tv_season_folder_skip_reason"), StringComparison.Ordinal);
     }
 
     [Fact]

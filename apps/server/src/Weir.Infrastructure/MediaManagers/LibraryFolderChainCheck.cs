@@ -64,8 +64,10 @@ public sealed class LibraryFolderChainCheck
         var linked = library.Id == 0
             ? null
             : (IReadOnlySet<long>)(await _libraries.ManagerConnectionIdsAsync(uow, library.Id).ConfigureAwait(false)).ToHashSet();
+        // A workflow linked to a manager never removes its originals, so a seeding torrent client is no problem for it.
+        var removesOriginals = library.RemoveOriginalAfterSuccess && linked is not { Count: > 0 };
         var managers = await _managerSetupCheck
-            .CheckAsync(uow, library.MediaType, library.WatchedFolder, library.OutputFolder, linked, library.RemoveOriginalAfterSuccess, DelunoLinkOf(library), cancellationToken)
+            .CheckAsync(uow, library.MediaType, library.WatchedFolder, library.OutputFolder, linked, removesOriginals, DelunoLinkOf(library), cancellationToken)
             .ConfigureAwait(false);
         var managersReady = managers.All(entry => entry.Get("ready") is WireBool { Value: true });
 
