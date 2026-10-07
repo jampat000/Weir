@@ -338,7 +338,7 @@ jobs:
           npm run format
           npm run test
 
-      # After the web install above, so it reuses apps/web/node_modules for ts-prune.
+      # After the web install above, so it reuses apps/web/node_modules for Knip.
       - name: Weir dead-code guard
         run: node scripts/check-dead-code.mjs
 

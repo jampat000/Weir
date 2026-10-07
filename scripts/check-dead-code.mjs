@@ -2,7 +2,7 @@
 // Dead-code guard for Weir (#328): a refactor that changes behaviour must not leave the code it
 // replaced in the tree.
 //
-//   web    — `ts-prune` for exports nothing imports (this script).
+//   web    — Knip for files, exports and types nothing imports (this script).
 //   web    — phantom `mm-*` class names: markup styled by nothing (this script). The mirror
 //            image of an unused export, and the same failure — code that reads as if it does
 //            something and does not.
@@ -12,7 +12,7 @@
 //            classes nothing instantiates). `dotnet build apps/server/Weir.slnx -warnaserror` is
 //            that half of the guard, so it is not repeated here.
 //
-// The ts-prune half compares against `scripts/dead-code-allowlist.json` and fails only on entries
+// The Knip half compares against `scripts/dead-code-allowlist.json` and fails only on entries
 // that are *not* listed. The allowlist is the deliberate part: something kept on
 // purpose gets a line and a reason, and anything else is a build failure. Keeping a
 // silent baseline instead would just be the same accumulation with extra steps.
@@ -32,27 +32,33 @@ const allow = JSON.parse(readFileSync(ALLOWLIST, "utf8"));
 const allowedWeb = new Set(Object.keys(allow.webExports ?? {}));
 
 function webUnusedExports() {
-  // ts-prune's own JS entry, run with this node. Avoids `npx` (a shell on Windows,
-  // which node refuses to spawn without one) and the .bin/*.cmd shim entirely.
-  const entry = path.join(WEB, "node_modules", "ts-prune", "lib", "index.js");
+  // Knip's own JS entry, run with this node. Avoids `npx` (a shell on Windows, which node refuses
+  // to spawn without one) and the .bin/*.cmd shim entirely. What counts as an entry point, a
+  // reference or generated code is apps/web/knip.json.
+  const entry = path.join(WEB, "node_modules", "knip", "bin", "knip.js");
   if (!existsSync(entry)) {
     return { skipped: "apps/web/node_modules is missing (run npm ci)" };
   }
   let raw = "";
   try {
-    raw = execFileSync(process.execPath, [entry, "-p", "tsconfig.json"], { cwd: WEB, encoding: "utf8" });
+    raw = execFileSync(process.execPath, [entry, "--include", "files,exports,types", "--reporter", "json"], {
+      cwd: WEB,
+      encoding: "utf8",
+      maxBuffer: 64 * 1024 * 1024,
+    });
   } catch (err) {
-    // ts-prune exits non-zero when it reports findings; the findings are on stdout.
+    // Knip exits non-zero when it reports findings; the findings are on stdout.
     raw = err.stdout ?? "";
     if (!raw) throw err;
   }
+  // One finding per unreferenced file, export or type: a file is keyed by its path, an export or type by
+  // "path:name". That key is also the allowlist's.
   return {
-    findings: raw
-      .split(/\r?\n/)
-      .filter((line) => line.trim() && !line.includes("(used in module)"))
-      // Generated from the OpenAPI schema; unused members are the schema's business.
-      .filter((line) => !line.includes("openapi-types"))
-      .map((line) => line.trim().replace(/\\/g, "/").replace(/^\/?src/, "src")),
+    findings: JSON.parse(raw).issues.flatMap((issue) => {
+      const file = issue.file.replace(/\\/g, "/");
+      const members = [...issue.exports, ...issue.types].map((item) => `${file}:${item.name}`);
+      return [...issue.files.map(() => file), ...members];
+    }),
   };
 }
 
