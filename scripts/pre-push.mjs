@@ -37,6 +37,8 @@ step("no Python");
 if (!run(process.execPath, [path.join(repoRoot, "scripts", "check-no-python.mjs")])) fail("a Python file is tracked");
 step("contract areas");
 if (!run(process.execPath, [path.join(repoRoot, "scripts", "check-contract-areas.mjs")])) fail("the contract area list is out of step");
+step("event titles");
+if (!run(process.execPath, [path.join(repoRoot, "scripts", "check-event-titles.mjs")])) fail("a server event type has no title", "add it to apps/web/src/lib/activity/event-labels.ts");
 
 if (!existsSync(prettier)) {
   skip("prettier, dead-code guard and API types drift", "npm ci in apps/web");

@@ -24,6 +24,7 @@ work, not rewritten for its own sake. Scripts are named in kebab-case.
 | `retry-failed-tests.mjs` | Runs the browser tests that failed in the E2E smoke's first run once more and lists those that passed only then under "Flaky (passed on retry)"; backend tests are never retried (`retry-failed-tests.test.mjs`). |
 | `check-no-python.mjs` | Fails when a Python file is tracked: Weir's tooling and tests are Node, PowerShell or .NET (`check-no-python.test.mjs`). |
 | `check-contract-areas.mjs` | Fails when the contract suite's `areas.json` and its `[ContractArea]` test classes disagree, so a CI leg can never run zero tests (`check-contract-areas.test.mjs`). |
+| `check-event-titles.mjs` | Fails when the server defines an Activity event type that `apps/web/src/lib/activity/event-labels.ts` has no title for, so System > Logs never shows a raw event name (`check-event-titles.test.mjs`). |
 | `check-test-console-programs.mjs` | Fails when a test source under `apps/` starts a system console program (`ping`, `timeout`, ...) as a stand-in, because that can pop a console window on a desktop (#806, #821) (`check-test-console-programs.test.mjs`). |
 | `check-node-docker-version.mjs` | Fails when the Dockerfile's node image major does not match the root `.node-version`. |
 | `check-release-workflow-gates.mjs` | Checks the shape of `release.yml` and `ci.yml`: only `publish` publishes, the moving image tags move last and never for a release candidate, `ci-passed` judges every job. |

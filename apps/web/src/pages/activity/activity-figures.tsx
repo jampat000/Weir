@@ -3,6 +3,7 @@ import type { ProcessingFile } from "../../lib/processing/files-api";
 import { tookWords, type DetailSizes } from "./activity-model";
 
 const UNKNOWN = "—";
+const NOT_RECORDED = "Not recorded";
 
 /** How far a running pass is, and how fast it is going. */
 export function WorkingFigures({ file }: { file: ProcessingFile }) {
@@ -60,17 +61,21 @@ export function SizeFigures({ sizes }: { sizes: DetailSizes }) {
         <div>
           <dt>After</dt>
           <dd>
-            {sizes.after == null ? "No new copy" : formatBytes(sizes.after)}
+            {sizes.after != null
+              ? formatBytes(sizes.after)
+              : sizes.notRecorded
+                ? NOT_RECORDED
+                : "No new copy"}
           </dd>
         </div>
         <div>
           <dt>Saved</dt>
           <dd className={sizes.saved ? "mm-payoff" : undefined}>
-            {sizes.saved == null
-              ? UNKNOWN
-              : sizes.saved === 0
-                ? "0 B"
-                : formatBytes(sizes.saved)}
+            {sizes.saved != null
+              ? formatBytes(sizes.saved)
+              : sizes.notRecorded
+                ? NOT_RECORDED
+                : UNKNOWN}
           </dd>
         </div>
       </dl>

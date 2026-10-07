@@ -152,6 +152,11 @@ public sealed partial class RemuxPassRunner
         output.Set("output_copied_without_remux", true);
         output.Set("unchanged_output_method", method);
         output.Set("live_mutations_skipped", false);
+        if (collision.Wrote)
+        {
+            RecordSizes(output, context, finalSkip);
+        }
+
         await MigrateSidecarsBeforeCleanupAsync(context.Source, finalSkip, sidecarPatterns, request.Runtime.PreserveOriginalTimestamps, output).ConfigureAwait(false);
         await HandleCleanupAfterSuccessAsync(context, output, finalSkip, cancellationToken).ConfigureAwait(false);
         try

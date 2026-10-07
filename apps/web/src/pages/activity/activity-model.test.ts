@@ -116,7 +116,13 @@ describe("tracks from a pass record", () => {
         source_size_bytes: 100,
         output_size_bytes: 60,
       }),
-    ).toEqual({ before: 100, after: 60, saved: 40, note: null });
+    ).toEqual({
+      before: 100,
+      after: 60,
+      saved: 40,
+      notRecorded: false,
+      note: null,
+    });
     // Handed back as it was: the same size after, and nothing saved.
     expect(
       detailSizes(file({ status: "passed_through", size_bytes: 100 }), null),
@@ -129,6 +135,73 @@ describe("tracks from a pass record", () => {
       after: null,
       saved: null,
       note: "Weir has not written a new copy of this file.",
+    });
+  });
+
+  describe("a file that went through unchanged", () => {
+    const handedBack =
+      "Weir handed the file back as it was, so its size did not change.";
+
+    it("is told as handed back when the record says it was passed through", () => {
+      expect(
+        detailSizes(file({ status: "processed", size_bytes: 100 }), {
+          outcome: "live_output_written",
+          pass_through_unchanged: true,
+        }),
+      ).toEqual({
+        before: 100,
+        after: 100,
+        saved: 0,
+        notRecorded: false,
+        note: handedBack,
+      });
+    });
+
+    it("is told as handed back when it already matched the rules", () => {
+      expect(
+        detailSizes(file({ status: "processed", size_bytes: 100 }), {
+          outcome: "live_skipped_not_required",
+          source_size_bytes: 100,
+          output_size_bytes: 100,
+        }),
+      ).toMatchObject({ before: 100, after: 100, saved: 0, note: handedBack });
+    });
+  });
+
+  describe("a file Weir cleaned", () => {
+    it("shows the exact saving when it is far smaller than the file", () => {
+      const sizes = detailSizes(
+        file({ status: "processed", size_bytes: 3826958687 }),
+        {
+          outcome: "live_output_written",
+          pass_through_unchanged: false,
+          source_size_bytes: 3826958687,
+          output_size_bytes: 3826958687 - 412 * 1024,
+        },
+      );
+      expect(sizes).toMatchObject({ saved: 412 * 1024, note: null });
+      expect(sizes.note).toBeNull();
+    });
+
+    it("says the size was not recorded rather than calling it handed back as it was", () => {
+      const sizes = detailSizes(
+        file({ status: "processed", size_bytes: 100 }),
+        {
+          outcome: "live_output_written",
+          pass_through_unchanged: false,
+          source_size_bytes: null,
+          output_size_bytes: null,
+          source_fingerprint_size: 3826958687,
+        },
+      );
+      expect(sizes).toMatchObject({
+        before: 3826958687,
+        after: null,
+        saved: null,
+        notRecorded: true,
+      });
+      expect(sizes.note).toMatch(/^Size not recorded/);
+      expect(sizes.note).not.toMatch(/as it was/);
     });
   });
 });

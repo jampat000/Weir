@@ -5,6 +5,7 @@
 import type { ActivityEventItem } from "../api/types";
 import { baseName } from "../format/path";
 import { asBoolean, asNumber, asString, parseActivityDetail } from "./detail";
+import { EVENT_LABELS } from "./event-labels";
 import { FILE_PROGRESS_EVENT, REMUX_PASS_COMPLETED_EVENT } from "./event-types";
 import { isRejectedByRules } from "./pass-detail";
 import type { StatusMeaning } from "../ui/status-meaning";
@@ -18,33 +19,6 @@ export type ActivityDisplay = {
   /** What it means: done, under way, needs a look, broken, or only information (idle). */
   meaning: StatusMeaning;
   compact: boolean;
-};
-
-const EVENT_LABELS: Record<string, string> = {
-  "auth.login_succeeded": "Sign-in finished",
-  "auth.login_failed": "Sign-in failed",
-  "auth.logout": "Sign-out finished",
-  "auth.bootstrap_succeeded": "First admin created",
-  "auth.bootstrap_denied": "First-time setup blocked",
-  "auth.password_changed": "Password changed",
-  "auth.username_changed": "Username changed",
-  "system.reconciliation.repair": "System repair finished",
-  "system.network_access.changed": "Network access changed",
-  "system.processing_paused": "Processing paused",
-  "system.processing_resumed": "Processing resumed",
-  "arr_library.connection_test_succeeded": "Connection check finished",
-  "arr_library.connection_test_failed": "Connection check failed",
-  "processing.supplied_payload_evaluation_completed":
-    "Manual queue check finished",
-  "processing.candidate_gate_completed": "Queue check finished",
-  "processing.file_processing_progress": "File processing",
-  "processing.file_remux_pass_completed": "File processing finished",
-  "processing.work_temp_stale_sweep_completed":
-    "Temporary files cleanup finished",
-  "processing.failure_cleanup_sweep_completed":
-    "Cleanup after failed processing finished",
-  "processing.handback_outcome": "What happened to a cleaned copy",
-  "processing.unclaimed_handback_cleanup_completed": "Unclaimed copies cleared",
 };
 
 /** Routine processing events: one fixed title, a compact row. */
