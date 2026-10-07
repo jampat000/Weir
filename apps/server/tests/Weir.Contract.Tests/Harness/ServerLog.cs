@@ -31,6 +31,9 @@ public sealed class ServerLog : IDisposable
         process.BeginErrorReadLine();
     }
 
+    /// <summary>Adds a line of the harness's own, such as why the server was started again.</summary>
+    public void Note(string text) => Append(text);
+
     public string Text()
     {
         using var reader = new StreamReader(new FileStream(Path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite));

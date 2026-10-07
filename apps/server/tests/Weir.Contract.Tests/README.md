@@ -36,8 +36,10 @@ Everything is in `Harness/`. Areas live in folders beside it (`Activity/`), one 
   Every server has its own folder and port, so test classes and areas run side by side. The harness reaches a server
   on `127.0.0.1`, the address it binds, and so do the fakes. `ServerStartGate` lets only as many servers start at
   the same moment as the machine has processors (never fewer than two), so a small CI runner is not asked to start a
-  dozen at once; a server that is ready gives its place back. Disposing a server waits until nothing holds its
-  database files before it deletes the folder.
+  dozen at once; a server that is ready gives its place back. A port is picked by asking the system for a free one, so
+  another process can take it before the server binds; a server that exits with "address already in use" is started
+  again on a new port (three attempts in all), and any other early exit fails at once. Disposing a server waits until
+  nothing holds its database files before it deletes the folder.
 - **`ServerEnvironment`** is the quiet default environment: no workers, no watcher, no periodic enqueue, high
   sign-in limits, artwork off. Pass `environment` to add or override. `ServerEnvironment.OperatorDefaults` is what
   an installed Weir runs with instead (ten workers, the watcher, periodic scans, the work-file sweeps), for tests of
