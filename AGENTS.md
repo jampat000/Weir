@@ -18,6 +18,7 @@ This file is the short entry point for coding agents. Keep detailed rules in lin
 - Agent operating model: [`docs/agent-harness.md`](docs/agent-harness.md)
 - Issue triage: [`docs/triage.md`](docs/triage.md)
 - Release governance: [`docs/release-governance.md`](docs/release-governance.md)
+- CI and release standard (shared with Deluno as an identical separate copy): [`docs/ci-standard.md`](docs/ci-standard.md)
 
 ## High-Risk Invariants
 
