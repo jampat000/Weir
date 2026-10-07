@@ -1,44 +1,38 @@
 #!/usr/bin/env node
-// Release gate: refuse to publish a tag unless `.github/workflows/ci.yml` already passed on the exact
-// commit the tag points at, instead of re-running CI's tests in the release. A CI run counts only when
-// all of these hold:
+// Release gate: refuse to publish a tag unless `.github/workflows/ci.yml` already passed on the exact commit the
+// tag points at. A tag is made only after CI is green on that commit (docs/ci-standard.md), so
+// this does not wait for a run that is still going: it fails at once and says what to do.
 //
-// - it ran ci.yml for exactly this commit, as a `push` (to main) or a `workflow_dispatch` run. A
-//   `pull_request` run is never accepted: its head_sha is the branch head, but what it tested was that
-//   head merged into the base branch as it stood then, which is not this tree;
-// - its latest attempt finished `success` (a run that failed and passed on re-run counts; a run that
-//   passed and was then re-run into a failure does not);
-// - its `ci-passed` job and that job's verdict step concluded `success` in that latest attempt. ci-passed
-//   (scripts/ci-passed.mjs) passes only when every job due for the change passed and every other job was
-//   skipped by path filtering. A push or manual run always runs server-windows and tray, so the verdict
-//   also means the tagged tree itself was built and tested on Windows.
+// A CI run counts only when all of these hold:
 //
-// While a qualifying run could still appear (a CI run for this commit is queued or in progress, or the
-// tag was pushed seconds after the merge and the run does not exist yet) the gate waits. When nothing
-// can qualify it fails with the one command that fixes it: a manual ci.yml run on the tag, which runs
-// every job whatever changed, followed by re-running the release's failed jobs.
+// - it ran ci.yml for exactly this commit, as a `push` (to main) or a `workflow_dispatch` run. A `pull_request`
+//   run is never accepted: what it tested was the branch merged into the base as it stood then, not this tree;
+// - it is complete and its conclusion is `success`;
+// - its `ci-passed` job and that job's verdict step concluded `success`. ci-passed (scripts/ci-passed.mjs) passes
+//   only when every job due for the change passed and every other job was skipped by path filtering.
 //
-// Usage (in release.yml): node scripts/verify-ci-for-release.mjs
-//   env GITHUB_TOKEN (actions: read), GITHUB_REPOSITORY; commit defaults to `git rev-parse HEAD`.
+// Note what a green push run does and does not prove: a push that changed only documents skips every code job, so
+// its green says "nothing that needed testing changed since the last commit that did". Tag from a commit whose own
+// run ran the jobs, or run ci.yml by hand on the tag (a manual run skips nothing).
+//
+// Usage (in release.yml):  node scripts/verify-ci-for-release.mjs
+//   env GH_TOKEN (actions: read), GITHUB_REPOSITORY, GITHUB_SHA (else `git rev-parse HEAD`)
 // Diagnose one run by id, whatever its event:  node scripts/verify-ci-for-release.mjs --run-id <id>
-// Options: --sha <sha> --wait-minutes <n> --appear-minutes <n> --poll-seconds <n>
-
+// Options: --sha <sha>
 import { execFileSync } from "node:child_process";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
-
-const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+import { resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 
 export const CI_WORKFLOW = "ci.yml";
 export const ACCEPTED_EVENTS = ["push", "workflow_dispatch"];
 
-// The ci.yml job and step that carry CI's verdict. scripts/check-release-workflow-gates.mjs fails if
-// ci.yml stops declaring them, so a rename cannot silently disarm the gate.
+// The ci.yml job and step that carry CI's verdict. scripts/check-release-workflow-gates.mjs fails if ci.yml stops
+// declaring them, so a rename cannot silently disarm the gate.
 export const REQUIRED_EVIDENCE = [{ job: "ci-passed", steps: ["Every job that was due passed"] }];
 
-// Judges one completed run against the evidence. `jobs` must be the run's latest attempt
-// (GET .../runs/{id}/jobs?filter=latest). Returns the reasons it does not qualify; empty means it does.
-export function evaluateRun(run, jobs, evidence) {
+// Judges one run against the evidence. `run` has event, status, conclusion; `jobs` is the run's jobs, each with
+// name, conclusion and steps[{name, conclusion}]. Returns the reasons it does not qualify; empty means it does.
+export function evaluateRun(run, jobs, evidence = REQUIRED_EVIDENCE) {
   const problems = [];
   if (!ACCEPTED_EVENTS.includes(run.event)) {
     problems.push(`event is ${run.event}, and only ${ACCEPTED_EVENTS.join(" or ")} runs test this exact tree`);
@@ -47,15 +41,11 @@ export function evaluateRun(run, jobs, evidence) {
     problems.push(`still ${run.status}`);
     return problems;
   }
-  if (run.conclusion !== "success") {
-    problems.push(`attempt ${run.run_attempt} concluded ${run.conclusion}`);
-  }
+  if (run.conclusion !== "success") problems.push(`concluded ${run.conclusion}`);
   for (const want of evidence) {
     const matches = jobs.filter((job) => job.name === want.job);
     if (matches.length !== 1) {
-      problems.push(
-        matches.length === 0 ? `job "${want.job}" is missing` : `job "${want.job}" appears ${matches.length} times`,
-      );
+      problems.push(matches.length === 0 ? `job "${want.job}" is missing` : `job "${want.job}" appears ${matches.length} times`);
       continue;
     }
     const [job] = matches;
@@ -65,152 +55,88 @@ export function evaluateRun(run, jobs, evidence) {
     }
     for (const stepName of want.steps) {
       const step = (job.steps || []).find((candidate) => candidate.name === stepName);
-      if (!step) {
-        problems.push(`job "${want.job}" has no step "${stepName}"`);
-      } else if (step.conclusion !== "success") {
-        problems.push(`job "${want.job}" step "${stepName}" concluded ${step.conclusion}`);
-      }
+      if (!step) problems.push(`job "${want.job}" has no step "${stepName}"`);
+      else if (step.conclusion !== "success") problems.push(`job "${want.job}" step "${stepName}" concluded ${step.conclusion}`);
     }
   }
   return problems;
 }
 
-function parseArgs(argv) {
-  const options = { waitMinutes: 45, appearMinutes: 3, pollSeconds: 30 };
-  for (let i = 0; i < argv.length; i += 1) {
-    const flag = argv[i];
-    const value = argv[i + 1];
-    if (value === undefined) throw new Error(`${flag} needs a value`);
-    i += 1;
-    if (flag === "--sha") options.sha = value;
-    else if (flag === "--run-id") options.runId = value;
-    else if (flag === "--wait-minutes") options.waitMinutes = Number(value);
-    else if (flag === "--appear-minutes") options.appearMinutes = Number(value);
-    else if (flag === "--poll-seconds") options.pollSeconds = Number(value);
-    else throw new Error(`Unknown option ${flag}`);
-  }
-  return options;
+function gh(args) {
+  return JSON.parse(execFileSync("gh", args, { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 }));
 }
 
-function createApi(repository, token) {
-  return async function api(path) {
-    const url = `https://api.github.com/repos/${repository}${path}`;
-    // Transient failures (network, 5xx, 429) are retried; anything else (a bad token, a 404) is final.
-    let lastError;
-    for (let attempt = 1; attempt <= 4; attempt += 1) {
-      let response;
-      try {
-        response = await fetch(url, {
-          headers: {
-            Accept: "application/vnd.github+json",
-            Authorization: `Bearer ${token}`,
-            "X-GitHub-Api-Version": "2022-11-28",
-          },
-        });
-      } catch (error) {
-        lastError = error;
-      }
-      if (response?.ok) return await response.json();
-      if (response) {
-        lastError = new Error(`GET ${path} returned ${response.status}: ${(await response.text()).slice(0, 300)}`);
-        if (response.status < 500 && response.status !== 429) throw lastError;
-      }
-      await sleep(attempt * 5000);
-    }
-    throw lastError;
-  };
-}
-
-async function latestJobs(api, runId) {
-  const jobs = [];
-  for (let page = 1; ; page += 1) {
-    const body = await api(`/actions/runs/${runId}/jobs?filter=latest&per_page=100&page=${page}`);
-    jobs.push(...body.jobs);
-    if (body.jobs.length < 100) return jobs;
-  }
-}
-
-function sleep(ms) {
-  return new Promise((done) => setTimeout(done, ms));
+function runJobs(repository, runId) {
+  return gh(["run", "view", String(runId), "--repo", repository, "--json", "jobs"]).jobs;
 }
 
 function describe(run) {
-  return `run ${run.id} (${run.event}, attempt ${run.run_attempt}, ${run.html_url})`;
+  return `run ${run.databaseId} (${run.event}, ${run.status}${run.conclusion ? `/${run.conclusion}` : ""}, ${run.url})`;
 }
 
-async function main() {
-  const options = parseArgs(process.argv.slice(2));
+function main() {
+  const argv = process.argv.slice(2);
+  const option = (flag) => (argv.includes(flag) ? argv[argv.indexOf(flag) + 1] : undefined);
   const repository = process.env.GITHUB_REPOSITORY;
-  const token = process.env.GITHUB_TOKEN;
-  if (!repository || !token) throw new Error("GITHUB_REPOSITORY and GITHUB_TOKEN must be set.");
-  const api = createApi(repository, token);
-  const evidence = REQUIRED_EVIDENCE;
+  if (!repository) throw new Error("GITHUB_REPOSITORY must be set.");
 
-  if (options.runId) {
-    const run = await api(`/actions/runs/${options.runId}`);
-    const problems = evaluateRun(run, await latestJobs(api, run.id), evidence);
-    console.log(`${describe(run)} for ${run.head_sha}:`);
+  const runId = option("--run-id");
+  if (runId) {
+    const run = gh(["run", "view", runId, "--repo", repository, "--json", "databaseId,event,status,conclusion,headSha,url"]);
+    const problems = evaluateRun(run, runJobs(repository, runId));
+    console.log(`${describe(run)} for ${run.headSha}:`);
     for (const problem of problems) console.log(`  - ${problem}`);
     console.log(problems.length ? "Would NOT satisfy the release gate." : "Would satisfy the release gate.");
     process.exit(problems.length ? 1 : 0);
   }
 
-  const sha = options.sha || execFileSync("git", ["rev-parse", "HEAD^{commit}"], { cwd: repoRoot, encoding: "utf8" }).trim();
+  const sha = option("--sha") || process.env.GITHUB_SHA || execFileSync("git", ["rev-parse", "HEAD^{commit}"], { encoding: "utf8" }).trim();
   if (!/^[0-9a-f]{40}$/.test(sha)) throw new Error(`Not a full commit SHA: ${sha}`);
   const tag = process.env.GITHUB_REF_NAME || "<tag>";
-  console.log(`Release gate: ${CI_WORKFLOW} must have passed on ${sha}.`);
+  console.log(`Release gate: ${CI_WORKFLOW} must already have passed on ${sha}.`);
 
-  const started = Date.now();
-  const verdicts = new Map(); // `${id}:${attempt}` -> problems, for completed runs only
-  for (;;) {
-    const body = await api(`/actions/workflows/${CI_WORKFLOW}/runs?head_sha=${sha}&per_page=100`);
-    const runs = body.workflow_runs.filter(
-      (run) => run.head_sha === sha && ACCEPTED_EVENTS.includes(run.event) && run.head_repository?.full_name === repository,
-    );
-    const ignored = body.workflow_runs.length - runs.length;
+  const runs = gh([
+    "run", "list", "--repo", repository, "--workflow", CI_WORKFLOW, "--commit", sha, "--limit", "50",
+    "--json", "databaseId,event,status,conclusion,headSha,url",
+  ]).filter((run) => run.headSha === sha);
+  const considered = runs.filter((run) => ACCEPTED_EVENTS.includes(run.event));
+  const ignored = runs.length - considered.length;
 
-    for (const run of runs.filter((candidate) => candidate.status === "completed")) {
-      const key = `${run.id}:${run.run_attempt}`;
-      if (!verdicts.has(key)) verdicts.set(key, { run, problems: evaluateRun(run, await latestJobs(api, run.id), evidence) });
-      if (verdicts.get(key).problems.length === 0) {
-        console.log(`PASS: ${describe(run)} passed ci-passed on ${sha}.`);
-        return;
-      }
+  const verdicts = [];
+  for (const run of considered.filter((candidate) => candidate.status === "completed")) {
+    // A run that did not succeed is refused without asking for its jobs.
+    const problems = run.conclusion === "success" ? evaluateRun(run, runJobs(repository, run.databaseId)) : evaluateRun(run, [], []);
+    if (problems.length === 0) {
+      console.log(`PASS: ${describe(run)} passed ci-passed on ${sha}.`);
+      return;
     }
-
-    const elapsedMinutes = (Date.now() - started) / 60000;
-    const pending = runs.filter((run) => run.status !== "completed");
-    const waitingForFirstRun = runs.length === 0 && elapsedMinutes < options.appearMinutes;
-    if ((pending.length > 0 && elapsedMinutes < options.waitMinutes) || waitingForFirstRun) {
-      const what = pending.length
-        ? pending.map((run) => `${describe(run)} is ${run.status}`).join("; ")
-        : `no ${CI_WORKFLOW} run for this commit yet`;
-      console.log(`[${elapsedMinutes.toFixed(1)} min] waiting: ${what}`);
-      await sleep(options.pollSeconds * 1000);
-      continue;
-    }
-
-    console.error(`::error::No ${CI_WORKFLOW} run proves ${sha}. The release will not publish.`);
-    if (pending.length > 0) {
-      console.error(`Gave up after ${options.waitMinutes} minutes with CI still running: ${pending.map(describe).join("; ")}`);
-    }
-    if (runs.length === 0) {
-      console.error(`No push or workflow_dispatch run of ${CI_WORKFLOW} exists for this commit${ignored ? ` (${ignored} pull_request run(s) ignored)` : ""}.`);
-    }
-    for (const { run, problems } of verdicts.values()) {
-      console.error(`${describe(run)} does not qualify:`);
-      for (const problem of problems) console.error(`  - ${problem}`);
-    }
-    console.error("To prove this commit, run the full CI on the tag (a manual run skips nothing), wait for it to pass,");
-    console.error("then re-run this release's failed jobs:");
-    console.error(`  gh workflow run ${CI_WORKFLOW} --repo ${repository} --ref ${tag}`);
-    process.exit(1);
+    verdicts.push({ run, problems });
   }
+
+  console.error(`::error::No ${CI_WORKFLOW} run proves ${sha}. The release will not publish.`);
+  const pending = considered.filter((run) => run.status !== "completed");
+  if (pending.length) {
+    console.error(`CI is still running on this commit: ${pending.map(describe).join("; ")}`);
+    console.error("Tags are made after CI is green. Wait for it to finish, then re-run this release.");
+  }
+  if (considered.length === 0) {
+    console.error(`No push or workflow_dispatch run of ${CI_WORKFLOW} exists for this commit${ignored ? ` (${ignored} pull_request run(s) ignored)` : ""}.`);
+  }
+  for (const { run, problems } of verdicts) {
+    console.error(`${describe(run)} does not qualify:`);
+    for (const problem of problems) console.error(`  - ${problem}`);
+  }
+  console.error("To prove this commit, run the full CI on the tag (a manual run skips nothing), wait for it to pass,");
+  console.error("then re-run this release:");
+  console.error(`  gh workflow run ${CI_WORKFLOW} --repo ${repository} --ref ${tag}`);
+  process.exit(1);
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
-  main().catch((error) => {
+  try {
+    main();
+  } catch (error) {
     console.error(`::error::${error.message}`);
     process.exit(1);
-  });
+  }
 }
