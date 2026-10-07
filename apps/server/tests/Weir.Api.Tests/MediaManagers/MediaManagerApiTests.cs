@@ -473,7 +473,7 @@ public sealed class MediaManagerApiTests
         }
 
         Assert.Equal(
-            $$"""{"capabilities":["handoff-status","handoff-cancel","handoff-outcome","handoff-outcome-codes","library-folders"],"machine_name":"{{Environment.MachineName}}","version":"{{WeirVersion.BuildVersion}}"}""",
+            $$"""{"capabilities":["handoff-status","handoff-cancel","handoff-outcome","handoff-outcome-codes","library-folders"],"machine_name":"{{Environment.MachineName}}","product":"Weir","version":"{{WeirVersion.BuildVersion}}"}""",
             await (await manager.GetAsync("/api/v1/intake/capabilities", secret)).Content.ReadAsStringAsync());
         Assert.Equal(HttpStatusCode.NotFound, (await manager.GetAsync("/api/v1/intake/handoffs/deluno/h1", secret)).StatusCode);
         Assert.Equal("Unknown media manager source 'plex'.", await Detail(await manager.GetAsync("/api/v1/intake/handoffs/plex/h1", secret)));

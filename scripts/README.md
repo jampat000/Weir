@@ -40,7 +40,9 @@ work, not rewritten for its own sake. Scripts are named in kebab-case.
 | `check-dotnet-vulnerabilities.mjs` | Fails on High or Critical NuGet advisories in a .NET solution. |
 | `npm-audit-retry.mjs` | Runs `npm audit`, retrying only a registry-side failure; fails on a real High/Critical finding (`npm-audit-retry.test.mjs`). Used by apps/web's audit step and imported by `docs-site/scripts/audit-dependencies.mjs`. |
 | `wait-for-health.mjs` | Waits for a server's `/health`, printing a container's log if it never answers. |
-| `ffmpeg-cache-key.mjs` | Prints the cache key for the Windows package's vendored FFmpeg: upstream's current build checksum. |
+| `ffmpeg-pin.mjs` | Reads the FFmpeg pin (release tag, archive names, SHA-256) from `packaging/windows/build-velopack-vendored-media-tools.ps1`, for the two scripts below (`ffmpeg-pin.test.mjs`). |
+| `ffmpeg-cache-key.mjs` | Prints the cache key for the pinned FFmpeg, the Windows package's by default or the Linux CI jobs' with `linux`: it changes exactly when the pin does. |
+| `install-ffmpeg-linux.mjs` | Downloads the pinned static Linux FFmpeg with retries, checks its SHA-256 before unpacking and installs `ffmpeg` and `ffprobe` into a folder. Run through `.github/actions/setup-ffmpeg-linux`, so no Linux job installs FFmpeg from a package mirror. |
 
 ## Local development
 

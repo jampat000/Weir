@@ -33,12 +33,10 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       # The real-ffmpeg scenarios (Processing) run when ffmpeg and ffprobe are on PATH, and skip without them, so
-      # a runner that lacks them is fixed here rather than left to pass quietly.
-      - name: Install ffmpeg
-        run: |
-          command -v ffmpeg >/dev/null && command -v ffprobe >/dev/null || (sudo apt-get update && sudo apt-get install -y ffmpeg)
-          ffmpeg -version | head -n 1
-          ffprobe -version | head -n 1
+      # a runner that lacks them is fixed here rather than left to pass quietly. The pinned build is always used, so
+      # the Linux and Windows jobs run the same FFmpeg and none of them depends on a package mirror.
+      - uses: ./.github/actions/setup-ffmpeg-linux
+        timeout-minutes: 10
 
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
         with:

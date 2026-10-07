@@ -11,6 +11,9 @@ public sealed record IntakeLibrary(long Id, string MediaType, string WatchedFold
 /// <summary>The intake rules that do not touch the database or filesystem.</summary>
 public static partial class IntakeRules
 {
+    /// <summary>The product name in the capabilities answer, so a manager names the connection "Weir on &lt;machine&gt;" without knowing which processor it is.</summary>
+    public const string ProductName = "Weir";
+
     /// <summary>The job kind for a remux pass.</summary>
     public const string RemuxPassJobKind = "processing.file.remux_pass.v1";
 
