@@ -161,6 +161,14 @@ internal sealed class WatchedFolderScanRun
     private async Task EnqueueAsync(WatchedFileDecision decision)
     {
         var rel = decision.RelativePath;
+
+        // A source a pass already cleaned is never queued again. The scan's own rules recognise one for the libraries that keep
+        // originals; this is the same last check every other route makes, for the rest. Silent: a scan would repeat the line.
+        if (await CleanedSources.FindAsync(_reads, _scan.Library.Id, _scan.Paths.WatchedFolder, rel).ConfigureAwait(false) is not null)
+        {
+            return;
+        }
+
         var payload = new WireObject()
             .Set("relative_media_path", rel)
             .Set("media_scope", _scan.MediaScope)

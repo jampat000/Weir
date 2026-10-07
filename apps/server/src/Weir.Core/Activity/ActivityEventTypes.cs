@@ -68,6 +68,9 @@ public static class ActivityEventTypes
     /// <summary>The Activity page's remove dialog, "keep": the file stays, and scans skip it until it changes (#785).</summary>
     public const string ProcessingFileRemovalKept = "processing.file_removal_kept";
 
+    /// <summary>A repeat of a source Weir had already cleaned was left alone: "Skipped: already done" or "already imported".</summary>
+    public const string ProcessingFileSkippedRepeat = "processing.file_skipped_repeat";
+
     /// <summary>A workflow was set up from, or had its folders updated from, a media manager that reports its folders (Deluno).</summary>
     public const string ProcessingWorkflowSynced = "processing.workflow_synced";
 

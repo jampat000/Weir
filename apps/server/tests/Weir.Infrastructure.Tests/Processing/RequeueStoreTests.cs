@@ -15,4 +15,12 @@ public sealed class RequeueStoreTests
     [InlineData(0, 0, "Nothing matched, so nothing was queued.")]
     public void A_bulk_requeue_reports_its_counts_in_english(int requeued, int skipped, string expected) =>
         Assert.Equal(expected, RequeueStore.BulkDetail(requeued, skipped));
+
+    [Theory]
+    [InlineData(0, 0, 1, "Nothing was queued: 1 file was already cleaned, so Weir left it alone.")]
+    [InlineData(0, 0, 3, "Nothing was queued: 3 files were already cleaned, so Weir left them alone.")]
+    [InlineData(2, 0, 1, "Queued 2 files again. They start as capacity frees up. 1 file was already cleaned, so Weir left it alone.")]
+    [InlineData(1, 1, 2, "Queued 1 file again. 1 could not be queued because its workflow or original is gone. 2 files were already cleaned, so Weir left them alone.")]
+    public void A_bulk_requeue_says_how_many_sources_were_already_cleaned(int requeued, int lost, int alreadyCleaned, string expected) =>
+        Assert.Equal(expected, RequeueStore.BulkDetail(requeued, lost, alreadyCleaned));
 }
