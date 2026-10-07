@@ -165,24 +165,34 @@ export function ToggleSetting({
   name,
   label,
   hint,
+  lockedOff,
 }: {
   binding: LibraryFormBinding;
   name: LibraryToggleField;
   label: string;
   hint?: string;
+  /** The reason this setting is off and cannot be changed; the saved value is left as it is. */
+  lockedOff?: string;
 }) {
   return (
     <label className="mm-library-toggle">
       <input
         className="mt-0.5"
         type="checkbox"
-        checked={binding.form[name]}
+        checked={lockedOff === undefined && binding.form[name]}
         onChange={(e) => binding.update({ [name]: e.target.checked })}
-        disabled={!binding.editable}
+        disabled={!binding.editable || lockedOff !== undefined}
       />
       <span>
         <span className="mm-library-toggle__label">{label}</span>
-        {hint ? <span className="mm-library-toggle__hint">{hint}</span> : null}
+        {lockedOff !== undefined || hint ? (
+          <span
+            className="mm-library-toggle__hint"
+            data-testid={lockedOff === undefined ? undefined : `${name}-locked`}
+          >
+            {lockedOff ?? hint}
+          </span>
+        ) : null}
       </span>
     </label>
   );

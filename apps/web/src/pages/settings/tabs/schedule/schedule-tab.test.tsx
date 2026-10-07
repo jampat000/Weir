@@ -11,6 +11,8 @@ import { MemoryRouter } from "react-router-dom";
 import { afterEach, expect, it, vi } from "vitest";
 
 import * as authQueries from "../../../../lib/auth/queries";
+import * as managerApi from "../../../../lib/media-managers/media-managers-api";
+import type { MediaManagerConnection } from "../../../../lib/media-managers/media-managers-api";
 import * as maintenanceApi from "../../../../lib/processing/maintenance-api";
 import type { ProcessingLibrary } from "../../../../lib/processing/libraries-api";
 import * as librariesApi from "../../../../lib/processing/libraries-api";
@@ -116,6 +118,7 @@ function asOperator() {
   vi.spyOn(maintenanceApi, "fetchProcessingMaintenance").mockResolvedValue({
     families: [],
   });
+  vi.spyOn(managerApi, "fetchMediaManagerConnections").mockResolvedValue([]);
 }
 
 afterEach(() => {
@@ -220,4 +223,41 @@ it("keeps a workflow's other settings when its hours are saved", async () => {
   expect(update.mock.calls[0]![1]).toMatchObject({
     remux_writer: "ffmpeg",
   });
+});
+
+it("offers Scan now for a workflow Weir scans, and says Deluno hands over the downloads of one it does not", async () => {
+  asOperator();
+  vi.spyOn(managerApi, "fetchMediaManagerConnections").mockResolvedValue([
+    { id: 4, kind: "deluno", name: "Deluno on RIG" },
+    { id: 5, kind: "radarr", name: "Radarr on RIG" },
+  ] as MediaManagerConnection[]);
+  vi.spyOn(librariesApi, "fetchProcessingLibraries").mockResolvedValue([
+    library({ id: 1, name: "Movies", manager_connection_ids: [4] }),
+    library({ id: 2, name: "TV", manager_connection_ids: [5] }),
+    library({ id: 3, name: "Anime", manager_connection_ids: [] }),
+  ]);
+
+  render(<ScheduleTab />, { wrapper });
+
+  await waitFor(() =>
+    expect(
+      screen.getByText("Deluno on RIG hands this workflow its downloads."),
+    ).toBeInTheDocument(),
+  );
+  const [movies, tv, anime] = screen.getAllByTestId("schedule-library-row");
+  expect(
+    within(movies!).queryByRole("button", { name: "Scan Movies now" }),
+  ).toBeNull();
+  expect(
+    within(movies!).getByText(
+      "Deluno on RIG hands this workflow its downloads.",
+    ),
+  ).toBeInTheDocument();
+  expect(
+    within(tv!).getByRole("button", { name: "Scan TV now" }),
+  ).toBeInTheDocument();
+  expect(within(tv!).getByText("Every 5 minutes")).toBeInTheDocument();
+  expect(
+    within(anime!).getByRole("button", { name: "Scan Anime now" }),
+  ).toBeInTheDocument();
 });

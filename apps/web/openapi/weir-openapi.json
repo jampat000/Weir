@@ -4791,6 +4791,17 @@
               }
             ],
             "title": "Unconfirmed Modified At"
+          },
+          "delete_refused_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delete Refused Reason"
           }
         },
         "required": [
@@ -4800,7 +4811,8 @@
           "keep_notifies_manager",
           "fingerprint_recorded",
           "unconfirmed_size_bytes",
-          "unconfirmed_modified_at"
+          "unconfirmed_modified_at",
+          "delete_refused_reason"
         ],
         "title": "ProcessingFileRemoveOptionsOut",
         "type": "object"

@@ -33,6 +33,10 @@ vi.mock("../../lib/processing/files-queries", () => {
     useSubmitProcessingManualPlan: () => mutation(),
   };
 });
+const handedOffNote = vi.fn<() => string | null>(() => null);
+vi.mock("../../lib/processing/use-handed-off-note", () => ({
+  useHandedOffNote: () => handedOffNote(),
+}));
 vi.mock("../../lib/processing/libraries-queries", () => ({
   useProcessingLibrariesQuery: () => ({
     data: [{ id: 1, name: "Movies", media_type: "movie" }],
@@ -54,6 +58,7 @@ function removeOptionsResult(
     fingerprint_recorded: true,
     unconfirmed_size_bytes: null,
     unconfirmed_modified_at: null,
+    delete_refused_reason: null,
     ...partial,
   };
 }
@@ -105,6 +110,7 @@ describe("ActivityFileActions remove dialog", () => {
     forget.mockReset().mockResolvedValue(undefined);
     removeOptions.mockReset();
   });
+  handedOffNote.mockReset().mockReturnValue(null);
 
   it("removes a plain title immediately, with no dialog, when it does not qualify for a choice", async () => {
     removeOptions.mockResolvedValue(
@@ -159,6 +165,24 @@ describe("ActivityFileActions remove dialog", () => {
         "Radarr removes it, blocks this release and searches again.",
       ),
     ).toBeInTheDocument();
+  });
+
+  it("does not offer to delete the file of a workflow linked to a media manager, and says why", async () => {
+    removeOptions.mockResolvedValue(
+      removeOptionsResult({
+        delete_refused_reason:
+          "This workflow is linked to Radarr, so the original stays with your download client, which may still be seeding. Weir did not delete the file; remove the download from your download client.",
+      }),
+    );
+    renderActions();
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove from list" }));
+
+    const choice = await screen.findByTestId(
+      "activity-remove-dialog-choice-delete",
+    );
+    expect(within(choice).getByRole("radio")).toBeDisabled();
+    expect(choice).toHaveTextContent("This workflow is linked to Radarr");
   });
 
   it("says the manager will be told the file will not be imported when keep notifies it", async () => {
@@ -355,5 +379,27 @@ describe("ActivityFileActions remove dialog", () => {
         },
       }),
     );
+  });
+});
+
+describe("ActivityFileActions check again", () => {
+  beforeEach(() => {
+    handedOffNote.mockReset().mockReturnValue(null);
+  });
+
+  it("offers Check again for a held file in a workflow Weir scans", () => {
+    renderActions({ status: "on_hold" });
+
+    expect(
+      screen.getByRole("button", { name: "Check again" }),
+    ).toBeInTheDocument();
+  });
+
+  it("offers no Check again for a workflow a media manager hands its downloads to", () => {
+    handedOffNote.mockReturnValue("Deluno hands this workflow its downloads.");
+
+    renderActions({ status: "on_hold" });
+
+    expect(screen.queryByRole("button", { name: "Check again" })).toBeNull();
   });
 });

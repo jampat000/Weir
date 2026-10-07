@@ -158,7 +158,8 @@ export function LibraryEditor({
                     watchedFolder={form.watched_folder}
                     outputFolder={form.output_folder}
                     workFolder={form.work_folder}
-                    removeOriginal={form.remove_original_after_success}
+                    // A linked workflow never removes its originals, so a seeding client is no problem for it.
+                    removeOriginal={false}
                     linkedConnectionIds={linkedIds}
                     editable={editable}
                     onUseFolders={(watched, output) =>
@@ -180,7 +181,7 @@ export function LibraryEditor({
             />
             <LibraryIntakeGroup binding={binding} />
             <LibraryReadinessGroup binding={binding} />
-            <LibraryOutputGroup binding={binding} />
+            <LibraryOutputGroup binding={binding} kind={kind} />
             <LibraryCapacityGroup binding={binding} />
             <LibraryFailureGroup
               binding={binding}
