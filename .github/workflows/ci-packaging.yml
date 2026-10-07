@@ -1,5 +1,6 @@
 # The Docker and Windows package smokes, called by ci.yml when packaging, app or workflow files change. Each builds
-# the shippable artefact from this commit and exercises it; neither publishes anything.
+# the shippable artefact from this commit and exercises it; neither publishes anything. The Windows one also keeps
+# its Setup and portable package for a week as a workflow artifact, so any commit CI built can be installed.
 name: Package smokes
 
 on:
@@ -187,3 +188,24 @@ jobs:
 
       - name: Smoke test packaged Windows server
         run: powershell -ExecutionPolicy Bypass -File scripts/smoke-windows-package.ps1
+
+      # The installable build of this exact commit, for the golden path (docs/release.md, "Golden path before
+      # tagging"): the setup and portable packages the release would ship, but built without a tag, so they
+      # carry the placeholder version 0.0.1-dev and are never published. Named by the commit, kept a week. A pull
+      # request run is not offered: it built the branch merged into main, not a commit anyone can tag.
+      - name: Name the build by its commit
+        if: github.event_name != 'pull_request'
+        id: build
+        shell: bash
+        run: echo "short=${GITHUB_SHA:0:7}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload the Windows build of this commit
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: weir-windows-${{ steps.build.outputs.short }}
+          if-no-files-found: error
+          retention-days: 7
+          path: |
+            dist/windows/releases/Weir-win-Setup.exe
+            dist/windows/releases/Weir-win-Portable.zip

@@ -5,13 +5,15 @@
 #
 #   ci-passed         ci.yml's ci-passed job already passed on this exact commit
 #                     (scripts/verify-ci-for-release.mjs), so the release does not repeat CI's tests.
+#   golden-path       the golden path already passed on this exact commit: a `golden-path` commit status of
+#                     `success` on it (scripts/verify-golden-path-for-release.mjs, docs/release.md).
 #   validate          release-only checks: notes file, gate ordering, dependency advisories as of
 #                     today, the E2E smoke, and the production web build that ships as an asset.
 #   windows-smoke     builds, smokes and uploads the Windows package (artifact, not public).
 #   docker-candidate  builds the linux/amd64 image unpushed and runs the full live E2E against it.
 #   docker-arm64      builds the linux/arm64 image unpushed (QEMU).
 #
-# publish needs all five. It alone holds registry credentials, `packages: write` and
+# publish needs all six. It alone holds registry credentials, `packages: write` and
 # `contents: write`, so nothing reaches ghcr or the Releases page unless every check above passed.
 # It pushes only the version tag, smokes that image, publishes the GitHub Release, and only then moves the
 # moving tags (`major.minor` and `latest`), so a moving tag never names an image whose release failed. A release
@@ -59,6 +61,22 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: node scripts/verify-ci-for-release.mjs
+
+  # Does not wait either: the golden path is run on this commit's own build before the tag is made, and whoever ran
+  # it recorded the result as a commit status. A tag made without one fails at once, saying what to run.
+  golden-path:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      statuses: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: The golden path passed on the tagged commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/verify-golden-path-for-release.mjs
 
   windows-smoke:
     runs-on: windows-latest
@@ -423,7 +441,7 @@ jobs:
     timeout-minutes: 30
     # Every gate. Without ci-passed a commit CI never passed could ship; without windows-smoke a Docker
     # image could reach ghcr for a release that has no Windows build.
-    needs: [ci-passed, validate, windows-smoke, docker-candidate, docker-arm64]
+    needs: [ci-passed, golden-path, validate, windows-smoke, docker-candidate, docker-arm64]
     permissions:
       contents: write
       packages: write
