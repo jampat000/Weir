@@ -3,7 +3,6 @@ import { apiFetch, readJson, requireOk } from "../api/client";
 import type { RequestBody, Schema } from "../api/types";
 
 export type MediaManagerSearchLane = Schema<"MediaManagerSearchLaneOut">;
-export type SearchLane = MediaManagerSearchLane["lane"];
 
 /** A media manager Weir talks to. The kind selects the payload dialect, nothing more. */
 export type MediaManagerKind = Schema<"MediaManagerConnectionOut">["kind"];

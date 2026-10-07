@@ -165,6 +165,9 @@ jobs:
       - name: GitHub Actions pin check
         run: node scripts/check-github-action-pins.mjs
 
+      - name: Workflow permissions and timeouts
+        run: node scripts/check-workflow-hygiene.mjs
+
       - name: Dockerfile node major matches .node-version
         run: node scripts/check-node-docker-version.mjs
 
@@ -186,7 +189,7 @@ jobs:
       - name: Release and CI gate rules
         run: |
           node scripts/check-release-workflow-gates.mjs
-          node --test scripts/verify-ci-for-release.test.mjs scripts/ci-passed.test.mjs
+          node --test scripts/verify-ci-for-release.test.mjs scripts/ci-passed.test.mjs scripts/retry-failed-tests.test.mjs
           node --test scripts/semver.test.mjs scripts/check-release-version.test.mjs scripts/find-previous-release.test.mjs scripts/prune-release-feed.test.mjs scripts/check-release-assets-single-version.test.mjs
 
   server-linux:
@@ -220,7 +223,20 @@ jobs:
       # Category=Contract and Category=E2E start a real server (and a browser): the contract and e2e-smoke jobs run them.
       - name: Test Weir server
         working-directory: apps/server
-        run: dotnet test Weir.slnx --no-build --filter "Category!=Stress&Category!=Contract&Category!=E2E"
+        run: dotnet test Weir.slnx --no-build --filter "Category!=Stress&Category!=Contract&Category!=E2E" --logger trx
+
+      - name: Summarize server test results
+        if: ${{ !cancelled() }}
+        run: node scripts/summarize-test-results.mjs trx apps/server "Server tests (Linux)"
+
+      - name: Upload server test results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: server-test-results-linux
+          if-no-files-found: ignore
+          retention-days: 1
+          path: apps/server/**/TestResults/*.trx
 
       - name: Server dependency vulnerability scan
         if: needs.changes.outputs.run_server_audit == 'true'
@@ -254,7 +270,20 @@ jobs:
       # See server-linux's own "Test Weir server" step: ci-stress.yml runs Category=Stress nightly instead.
       - name: Test Weir server
         working-directory: apps/server
-        run: dotnet test Weir.slnx --no-build --filter "Category!=Stress&Category!=Contract&Category!=E2E"
+        run: dotnet test Weir.slnx --no-build --filter "Category!=Stress&Category!=Contract&Category!=E2E" --logger trx
+
+      - name: Summarize server test results
+        if: ${{ !cancelled() }}
+        run: node scripts/summarize-test-results.mjs trx apps/server "Server tests (Windows)"
+
+      - name: Upload server test results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: server-test-results-windows
+          if-no-files-found: ignore
+          retention-days: 1
+          path: apps/server/**/TestResults/*.trx
 
   # The production web build, once, for the E2E smoke to serve.
   web-dist:
@@ -309,7 +338,7 @@ jobs:
           npm run format
           npm run test
 
-      # After the web install above, so it reuses apps/web/node_modules for ts-prune.
+      # After the web install above, so it reuses apps/web/node_modules for Knip.
       - name: Weir dead-code guard
         run: node scripts/check-dead-code.mjs
 
@@ -363,11 +392,34 @@ jobs:
       - name: Install the Playwright browser
         run: pwsh apps/server/tests/Weir.E2E.Tests/bin/Debug/net10.0/playwright.ps1 install --with-deps chromium
 
+      # Browser tests retry once on CI (docs/ci-standard.md): this run is the first attempt, and the retry step runs
+      # only the tests that failed in it. The backend suites are never retried.
       - name: Weir E2E smoke (Playwright + real .NET server)
+        id: e2e
+        continue-on-error: true
         working-directory: apps/server
         env:
           WEIR_E2E: "1"
-        run: dotnet test tests/Weir.E2E.Tests --no-build
+        run: dotnet test tests/Weir.E2E.Tests --no-build --logger trx
+
+      - name: Summarize E2E smoke results
+        if: ${{ !cancelled() }}
+        run: node scripts/summarize-test-results.mjs trx apps/server/tests/Weir.E2E.Tests/TestResults "Browser smoke tests, first attempt"
+
+      - name: Retry the failed E2E tests once
+        if: ${{ steps.e2e.outcome == 'failure' }}
+        env:
+          WEIR_E2E: "1"
+        run: node scripts/retry-failed-tests.mjs apps/server/tests/Weir.E2E.Tests "Browser smoke tests, retry"
+
+      - name: Upload E2E smoke results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: e2e-test-results
+          if-no-files-found: ignore
+          retention-days: 1
+          path: apps/server/tests/Weir.E2E.Tests/TestResults*/*.trx
 
   # The contract suite, one leg per area (ci-contract.yml).
   contract:
@@ -401,7 +453,20 @@ jobs:
         run: dotnet build apps/tray/Weir.Tray.slnx --no-restore
 
       - name: Test Weir tray
-        run: dotnet test apps/tray/Weir.Tray.slnx --no-build
+        run: dotnet test apps/tray/Weir.Tray.slnx --no-build --logger trx
+
+      - name: Summarize tray test results
+        if: ${{ !cancelled() }}
+        run: node scripts/summarize-test-results.mjs trx apps/tray "Tray tests"
+
+      - name: Upload tray test results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: tray-test-results
+          if-no-files-found: ignore
+          retention-days: 1
+          path: apps/tray/**/TestResults/*.trx
 
   # The Docker and Windows package smokes (ci-packaging.yml).
   packaging:

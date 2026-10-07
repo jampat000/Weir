@@ -10,9 +10,7 @@ export type LibraryFileStatus = LibraryFile["status"];
 export type LibraryProblemKind = NonNullable<LibraryFile["problem_kind"]>;
 export type LibraryTotals = Schema<"LibraryTotalsOut">;
 export type LibraryScanInfo = Schema<"LibraryScanStateOut">;
-export type LibraryBreakdownRow = Schema<"LibraryBreakdownRowOut">;
 export type LibraryBreakdowns = Schema<"LibraryBreakdownsOut">;
-export type LibraryProblemGroup = Schema<"LibraryProblemGroupOut">;
 /** Once a day, inside the library's own schedule window. next_run_at is null when it is off or cannot run. */
 export type LibraryModeSchedule = Schema<"LibraryModeScheduleOut">;
 export type LibraryOverview = Schema<"LibraryOverviewOut">;

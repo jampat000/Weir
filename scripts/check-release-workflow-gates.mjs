@@ -103,6 +103,9 @@ const publishingText = [
   "packages: write",
   "contents: write",
   "uses: softprops/action-gh-release@",
+  "uses: actions/attest-build-provenance@",
+  "attestations: write",
+  "id-token: write",
   "gh release",
 ];
 for (const job of releaseJobs.filter((name) => name !== "publish")) {
@@ -126,7 +129,7 @@ for (const override of ["always()", "failure()", "cancelled()", "success() ||"])
   }
 }
 
-// The version tag is pushed, checked and smoked, and the release published, before `latest` moves.
+// The version tag is pushed, checked and smoked, and the release published, before any moving tag moves.
 requireOrder(
   publish,
   [
@@ -136,25 +139,40 @@ requireOrder(
     "platforms: linux/amd64,linux/arm64",
     "push: true",
     "- name: Attest provenance of the Docker image",
+    "- name: Attest provenance of the release files",
     "- name: Verify published Docker manifest",
     "- name: Smoke test published Docker image",
     "- name: Prepare user-facing release notes",
     "- name: Publish GitHub Release",
-    "- name: Tag the published image latest",
+    "- name: Move the moving image tags",
   ],
   `${RELEASE} publish job`,
 );
-const latestAt = publish.indexOf(":latest");
-if (latestAt < 0 || latestAt < publish.indexOf("- name: Tag the published image latest")) {
-  throw new Error(`${RELEASE} publish may name :latest only in its last step, after the GitHub Release exists.`);
+const movingStep = "- name: Move the moving image tags";
+const movingAt = publish.indexOf(movingStep);
+if (publish.indexOf("imagetools create") < movingAt || publish.includes(":latest")) {
+  throw new Error(`${RELEASE} publish may move a tag (imagetools create) only in its last step, after the GitHub Release exists.`);
 }
+// The build pushes the version tag alone. A release candidate (a version with a hyphen) leaves the moving step
+// before it creates anything: only a stable release moves `major.minor` and `latest`.
+requireText(publish, "tags: ${{ steps.image.outputs.name }}:${{ steps.version.outputs.plain }}\n", `${RELEASE} publish job`);
+const movingBody = publish.slice(movingAt);
+const guardAt = movingBody.indexOf('if [ "$PRERELEASE" = "true" ]');
+const exitAt = movingBody.indexOf("exit 0", guardAt);
+if (guardAt < 0 || exitAt < 0 || exitAt > movingBody.indexOf("imagetools create")) {
+  throw new Error(`${RELEASE} must leave the moving-tags step for a pre-release before it runs imagetools create.`);
+}
+requireText(movingBody, "PRERELEASE: ${{ steps.version.outputs.prerelease }}", `${RELEASE} moving-tags step`);
 
 // A tag with a pre-release part publishes a GitHub pre-release, never a normal release.
 requireText(publish, "prerelease: ${{ steps.version.outputs.prerelease }}", `${RELEASE} publish job`);
 
-// The pushed image is attested by digest (the build step must expose one), and a release already under way is
-// never cancelled by a second run for the same tag.
+// The image carries its provenance and an SBOM from the build. The pushed image is attested by digest (the build
+// step must expose one), and every signed attestation is switched by the repository variable ATTEST_PROVENANCE: a
+// private repository cannot have them. A release already under way is never cancelled by a second run for the same tag.
 for (const marker of [
+  "provenance: mode=max",
+  "sbom: true",
   "id: push",
   "subject-digest: ${{ steps.push.outputs.digest }}",
   "push-to-registry: true",
@@ -163,6 +181,11 @@ for (const marker of [
 ]) {
   requireText(publish, marker, `${RELEASE} publish job`);
 }
+const attestationSteps = publish.split(/\n {6}- /).filter((step) => step.includes("uses: actions/attest-build-provenance@"));
+if (attestationSteps.length !== 2) throw new Error(`${RELEASE} publish must attest the image and the release files; found ${attestationSteps.length} attestation step(s).`);
+for (const step of attestationSteps) {
+  requireText(step, "if: ${{ vars.ATTEST_PROVENANCE == 'true' }}", `${RELEASE} publish attestation step`);
+}
 requireText(releaseTop, "  cancel-in-progress: false", `${RELEASE} concurrency`);
 
 // The tagged commit must be one ci.yml already passed on.
@@ -170,6 +193,7 @@ const ciPassed = requireJob(release, "ci-passed", RELEASE);
 for (const marker of ["actions: read", "node scripts/verify-ci-for-release.mjs"]) {
   requireText(ciPassed, marker, `${RELEASE} ci-passed job`);
 }
+rejectText(ciPassed, "--wait", `${RELEASE} ci-passed job (tags are made after CI is green; the gate does not wait)`);
 
 const validate = requireJob(release, "validate", RELEASE);
 for (const marker of [
@@ -225,8 +249,7 @@ requireOrder(
 );
 
 // Checksums describe the files as published. Signing rewrites Setup.exe, so hashing must come
-// after it, and the provenance attestation must cover the same final bytes, so it comes after
-// checksums and before upload.
+// after it. (The provenance attestation of these files is publish's, over the bytes it downloads.)
 const windowsSmoke = requireJob(release, "windows-smoke", RELEASE);
 requireOrder(
   windowsSmoke,
@@ -236,14 +259,10 @@ requireOrder(
     "- name: Sign Velopack release artifacts",
     "- name: Verify Velopack setup signature",
     "- name: Generate release artifact checksums",
-    "- name: Attest provenance of Windows release artifacts",
     "- name: Upload Velopack release artifacts",
   ],
   `${RELEASE} windows-smoke job`,
 );
-for (const marker of ["id-token: write", "attestations: write", "uses: actions/attest-build-provenance@"]) {
-  requireText(windowsSmoke, marker, `${RELEASE} windows-smoke job`);
-}
 
 // --- ci.yml and the workflows it calls --------------------------------------------------------------
 
@@ -317,6 +336,7 @@ for (const want of REQUIRED_EVIDENCE) {
 }
 
 console.log(
-  "Every release check gates publish, only publish can publish, `latest` moves last, the Docker candidate's " +
-    "live E2E runs unpushed, and ci-passed judges every CI job and still carries the release's evidence.",
+  "Every release check gates publish, only publish can publish, the moving tags move last and never for a " +
+    "release candidate, the Docker candidate's live E2E runs unpushed, and ci-passed judges every CI job and " +
+    "still carries the release's evidence.",
 );
