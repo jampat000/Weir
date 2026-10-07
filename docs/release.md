@@ -32,8 +32,13 @@ never changes. Cutting a release is:
    - Create `docs/release-notes/vX.Y.Z.md` (or `vX.Y.Z-rc.N.md` for a release candidate) using `docs/release-notes/TEMPLATE.md`.
    - Keep wording operator-friendly and focused on what changed for users.
 
-   Change only the notes file and `CHANGELOG.md`. The docs, README and `compose.yaml` show pinned
-   versions as `X.Y.Z` on purpose, so they never need editing for a release. Touching `compose.yaml`,
+   For a stable release, change only the notes file and `CHANGELOG.md`: the docs, README and
+   `compose.yaml` show pinned versions as `X.Y.Z` and point at `latest`, so they never need editing.
+   Until 1.0.0, no image carries `latest` for a new release candidate, so the Docker examples name the
+   candidate itself: in the same PR, replace the previous candidate's version (for example
+   `1.0.0-rc.1`) with the new one in `compose.yaml`, `docker/.env.example`, `README.md`,
+   `docker/README.md`, `docs/docker.md`, `docs/install-docker.md` and `docs-site/docs`
+   (`git grep -l 1.0.0-rc.1` lists them). At 1.0.0 they go back to `latest`. Touching `compose.yaml`,
    `Dockerfile`, `docker/**` or `packaging/**` makes CI run both package smokes, on the PR and again on
    `main`, and the release is not tagged until that run on `main` is green (it does not wait for one).
 
