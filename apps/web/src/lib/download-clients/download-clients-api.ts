@@ -40,9 +40,6 @@ export type DownloadClientConnectionUpdate =
   RequestBody<"DownloadClientConnectionUpdateIn">;
 export type DownloadClientConnectionTest =
   Schema<"DownloadClientConnectionTestOut">;
-export type DownloadClientCategoryFolder =
-  Schema<"DownloadClientCategoryFolderOut">;
-export type DownloadClientSuggestionLine = Schema<"ManagerSetupLineOut">;
 export type DownloadClientSuggestion = Schema<"DownloadClientSuggestionOut">;
 
 export const downloadClientConnectionsPath = () =>
