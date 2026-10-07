@@ -211,7 +211,7 @@ If you want to reach it away from home, the safest options are a VPN you already
 
 ## Working with Deluno
 
-[Deluno](https://github.com/jampat000/Deluno) is a separate, companion project that finds, downloads and files your movies and TV. Weir is the clean-up step before Deluno imports a download. This is how Deluno's *refine before import* works:
+Deluno is a separate, companion project that finds, downloads and files your movies and TV. Weir is the clean-up step before Deluno imports a download. This is how Deluno's *refine before import* works:
 
 1. Your download client finishes a download.
 2. Deluno hands the file to Weir and waits.
