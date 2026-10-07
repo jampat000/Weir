@@ -35,7 +35,7 @@ This is the canonical governance checklist for keeping Weir releases controlled 
    (`scripts/check-release-assets-single-version.mjs` gates this in `windows-smoke`; #804).
 3. Confirm the published release body is plain-language and matches the approved `docs/release-notes/vX.Y.Z.md` content.
 4. Confirm the release notes/install guidance names the attached `Weir-win-Setup.exe` installer and explains any one-time upgrade requirement for older installs.
-5. Confirm the GHCR image exists for both `X.Y.Z` (or `X.Y.Z-rc.N`) and `latest` (`latest` moves only after the version's image passed its smoke and the release was published; a pre-release moves it only while no stable release exists).
+5. Confirm the GHCR image exists under its version tag (`X.Y.Z` or `X.Y.Z-rc.N`) and can be pulled by it. For a stable release, `X.Y` and `latest` name the same image; they move only after the version's image passed its smoke and the release was published, and a release candidate moves neither.
 6. Confirm the release workflow completed `ci-passed`, `validate`, `windows-smoke`, `docker-candidate`, `docker-arm64` and `publish`.
 7. Download `weir-docker-release-candidate-audit` and confirm its summary has
    no console warnings, console errors, page errors, failed requests, or bad responses;

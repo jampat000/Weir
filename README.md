@@ -92,12 +92,14 @@ Weir runs on any machine with Docker, including Synology, Unraid, TrueNAS and Ra
 
 ### The quickest way
 
+Weir is at release-candidate stage, and a release candidate is published under its version tag only, so the examples below name `1.0.0-rc.1`. The `latest` tag arrives with 1.0.0.
+
 Make a folder, save this as `compose.yaml` inside it:
 
 ```yaml
 services:
   weir:
-    image: ghcr.io/jampat000/weir:latest
+    image: ghcr.io/jampat000/weir:1.0.0-rc.1
     container_name: weir
     hostname: my-server   # what Weir calls itself: "Weir on my-server"
     ports:
@@ -127,7 +129,7 @@ Weir can only clean files it can see, so give it your media folders. This is the
 ```yaml
 services:
   weir:
-    image: ghcr.io/jampat000/weir:latest
+    image: ghcr.io/jampat000/weir:1.0.0-rc.1
     container_name: weir
     ports:
       - "9347:9347"
@@ -152,7 +154,7 @@ When one app tells another where a file is, that path has to mean the same thing
 ```yaml
 services:
   weir:
-    image: ghcr.io/jampat000/weir:latest
+    image: ghcr.io/jampat000/weir:1.0.0-rc.1
     container_name: weir
     ports:
       - "9347:9347"
@@ -206,7 +208,7 @@ A folder layout that works well:
 | I want to… | Do this |
 | --- | --- |
 | Use a different port | Change the left number: `"8080:9347"` puts Weir at `http://your-server-ip:8080` |
-| Pin a version instead of `latest` | `image: ghcr.io/jampat000/weir:1.0.0-rc.1`, or any other version tag from [the releases page](https://github.com/jampat000/Weir/releases) |
+| Use a different version | Change the tag, for example `image: ghcr.io/jampat000/weir:1.0.0-rc.2`: any version tag from [the releases page](https://github.com/jampat000/Weir/releases) |
 | Use HTTPS through a reverse proxy | Set `WEIR_TRUSTED_PROXY_IPS=<your proxy's IP>`. The sign-in cookie becomes HTTPS-only on its own once requests arrive over HTTPS; set `WEIR_SESSION_COOKIE_SECURE=true` only to force it. See [the reverse proxy guide](https://jampat000.github.io/Weir/docs/deployment/reverse-proxy) |
 | Protect saved API keys with their own secret | Set `WEIR_CREDENTIALS_SECRET` to a long random value (`openssl rand -hex 32`) **before** you add Sonarr or Radarr |
 | Use a GPU | See [hardware acceleration](docker/README.md#hardware-acceleration-and-device-passthrough). It's optional; Weir doesn't re-encode, so you usually don't need it |

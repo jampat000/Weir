@@ -13,9 +13,10 @@
 #
 # publish needs all five. It alone holds registry credentials, `packages: write` and
 # `contents: write`, so nothing reaches ghcr or the Releases page unless every check above passed.
-# It pushes only the version tag, attests its provenance, smokes that image, publishes the GitHub Release,
-# and only then moves `latest`, so `latest` never points at an image that failed its smoke.
-# scripts/check-release-workflow-gates.mjs enforces that shape.
+# It pushes only the version tag, smokes that image, publishes the GitHub Release, and only then moves the
+# moving tags (`major.minor` and `latest`), so a moving tag never names an image whose release failed. A release
+# candidate moves none. Signed provenance attestations for the image and the release files are switched by the
+# repository variable ATTEST_PROVENANCE. scripts/check-release-workflow-gates.mjs enforces that shape.
 name: Release
 
 on:
@@ -43,13 +44,11 @@ env:
   TAG: ${{ github.ref_name }}
 
 jobs:
-  # Waits (up to 45 minutes) while a CI run for this commit is queued or running, because the normal
-  # flow is to tag straight after merging and main's CI is then still going; refusing there would make
-  # every release a manual re-run. It never waits for a run that does not exist beyond a short grace
-  # period, and it fails with the fix (a manual ci.yml run on the tag) when no run can prove the commit.
+  # Does not wait: a tag is made after CI is green on that commit, and one made while CI is still running fails at
+  # once. It fails with the fix (wait for CI, or run ci.yml by hand on the tag, then re-run this release).
   ci-passed:
     runs-on: ubuntu-latest
-    timeout-minutes: 50
+    timeout-minutes: 10
     permissions:
       actions: read
       contents: read
@@ -58,19 +57,14 @@ jobs:
 
       - name: ci.yml passed on the tagged commit
         env:
-          GITHUB_TOKEN: ${{ github.token }}
-        run: node scripts/verify-ci-for-release.mjs --wait-minutes 45
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/verify-ci-for-release.mjs
 
   windows-smoke:
     runs-on: windows-latest
     timeout-minutes: 25
     permissions:
       contents: read
-      # For actions/attest-build-provenance below: it signs over OIDC (id-token) and records the
-      # attestation against this repo (attestations), neither of which is registry or Release
-      # access, so it does not need the publish job's packages/contents write.
-      id-token: write
-      attestations: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
@@ -219,14 +213,6 @@ jobs:
             "$hash  $($_.Name)" | Add-Content -LiteralPath (Join-Path $releasesDir "SHA256SUMS.txt") -Encoding ascii
           }
 
-      # After checksums, so the attestation covers the exact bytes SHA256SUMS.txt itself describes,
-      # and gives anyone who downloads a Windows release file a way to verify it actually came from
-      # this repo's own build (`gh attestation verify`), not just that some SHA256SUMS.txt says so.
-      - name: Attest provenance of Windows release artifacts
-        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
-        with:
-          subject-path: dist/windows/releases/*
-
       - name: Upload Velopack release artifacts
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
@@ -306,12 +292,34 @@ jobs:
           cd apps/web
           zip -r "$GITHUB_WORKSPACE/weir-web-dist.zip" dist
 
-      # On push to main ci.yml skips its E2E smoke, so a release proves it here, against this build.
+      # On push to main ci.yml skips its E2E smoke, so a release proves it here, against this build. Browser tests
+      # retry once (docs/ci-standard.md): the retry step runs only the tests that failed in this first attempt.
       - name: Weir E2E smoke (Playwright + real .NET server)
+        id: e2e
+        continue-on-error: true
         working-directory: apps/server
         env:
           WEIR_E2E: "1"
-        run: dotnet test tests/Weir.E2E.Tests --no-build
+        run: dotnet test tests/Weir.E2E.Tests --no-build --logger trx
+
+      - name: Summarize E2E smoke results
+        if: ${{ !cancelled() }}
+        run: node scripts/summarize-test-results.mjs trx apps/server/tests/Weir.E2E.Tests/TestResults "Browser smoke tests, first attempt"
+
+      - name: Retry the failed E2E tests once
+        if: ${{ steps.e2e.outcome == 'failure' }}
+        env:
+          WEIR_E2E: "1"
+        run: node scripts/retry-failed-tests.mjs apps/server/tests/Weir.E2E.Tests "Browser smoke tests, retry"
+
+      - name: Upload E2E smoke results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: e2e-test-results
+          if-no-files-found: ignore
+          retention-days: 1
+          path: apps/server/tests/Weir.E2E.Tests/TestResults*/*.trx
 
       - name: Upload web dist
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
@@ -460,8 +468,8 @@ jobs:
     permissions:
       contents: write
       packages: write
-      # For actions/attest-build-provenance on the Docker image below (OIDC signing, then recording the
-      # attestation on the repo and next to the image in ghcr).
+      # For actions/attest-build-provenance below (OIDC signing, then recording the attestation on the repo and,
+      # for the image, next to it in ghcr). Used only when the repository variable ATTEST_PROVENANCE is "true".
       id-token: write
       attestations: write
     env:
@@ -509,8 +517,9 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # Rebuilt from the layers docker-candidate and docker-arm64 cached. Only the version tag: `latest`
-      # moves to it at the very end, once the image and the release are known good.
+      # Rebuilt from the layers docker-candidate and docker-arm64 cached. Only the version tag: the moving tags
+      # move to it at the very end, once the image and the release are known good. Provenance and an SBOM travel
+      # with the image in the registry.
       - name: Publish release Docker image
         id: push
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
@@ -519,7 +528,7 @@ jobs:
           file: ./Dockerfile
           platforms: linux/amd64,linux/arm64
           push: true
-          provenance: true
+          provenance: mode=max
           sbom: true
           build-args: WEIR_VERSION=${{ steps.version.outputs.plain }}
           cache-from: |
@@ -531,15 +540,29 @@ jobs:
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.version=${{ steps.version.outputs.plain }}
 
+      # Signed attestations are free on a public repository and need GitHub Enterprise Cloud on a private one, so
+      # they are off until the repository variable ATTEST_PROVENANCE is "true".
+      #
       # The digest of the multi-architecture manifest list just pushed, so `gh attestation verify
       # oci://ghcr.io/<owner>/weir:<version>` proves the image came from this repo's own release build, as
-      # it does for the Windows files.
+      # it does for the release files.
       - name: Attest provenance of the Docker image
+        if: ${{ vars.ATTEST_PROVENANCE == 'true' }}
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-name: ${{ steps.image.outputs.name }}
           subject-digest: ${{ steps.push.outputs.digest }}
           push-to-registry: true
+
+      # The exact bytes people download: the Windows files (SHA256SUMS.txt included, so it is covered too) and
+      # the web build.
+      - name: Attest provenance of the release files
+        if: ${{ vars.ATTEST_PROVENANCE == 'true' }}
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: |
+            weir-web-dist.zip
+            windows-artifact/*
 
       - name: Verify published Docker manifest
         env:
@@ -588,23 +611,20 @@ jobs:
           body_path: release-notes.md
           prerelease: ${{ steps.version.outputs.prerelease }}
 
-      # Last, so `latest` only ever names an image that passed its smoke and has a published release. A copy of
-      # the version's manifest list: both architectures, provenance and SBOM included, nothing rebuilt.
-      # A pre-release moves `latest` too, on purpose: pulling the image without a tag and the compose
-      # file's default tag have to resolve to a working image, and while no stable X.Y.Z is published the newest
-      # pre-release is the only image there is. Once a stable release exists `latest` stays on stable releases, so
-      # a later release candidate never replaces the image people run by default.
-      - name: Tag the published image latest
+      # Last, so a moving tag only ever names an image that passed its smoke and has a published release. A copy of
+      # the version's manifest list: both architectures, provenance and SBOM included, nothing rebuilt. Only a
+      # stable release moves them: a release candidate is published under its version tag alone, so pulling
+      # without a tag finds nothing until 1.0.0 rather than a candidate.
+      - name: Move the moving image tags
         env:
           IMAGE: ${{ steps.image.outputs.name }}
           VERSION: ${{ steps.version.outputs.plain }}
           PRERELEASE: ${{ steps.version.outputs.prerelease }}
-          GITHUB_TOKEN: ${{ github.token }}
         run: |
-          stable_tags="$(gh api --paginate "repos/${{ github.repository }}/releases?per_page=100" \
-            --jq '.[] | select((.draft | not) and (.prerelease | not)) | .tag_name')"
-          if [ "$PRERELEASE" = "true" ] && [ -n "$stable_tags" ]; then
-            echo "A stable release exists, so latest stays on the stable image."
+          if [ "$PRERELEASE" = "true" ]; then
+            echo "A release candidate moves no moving tags."
             exit 0
           fi
-          docker buildx imagetools create --tag "$IMAGE:latest" "$IMAGE:$VERSION"
+          for moving in "${VERSION%.*}" latest; do
+            docker buildx imagetools create --tag "$IMAGE:$moving" "$IMAGE:$VERSION"
+          done

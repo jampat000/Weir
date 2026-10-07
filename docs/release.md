@@ -32,10 +32,15 @@ never changes. Cutting a release is:
    - Create `docs/release-notes/vX.Y.Z.md` (or `vX.Y.Z-rc.N.md` for a release candidate) using `docs/release-notes/TEMPLATE.md`.
    - Keep wording operator-friendly and focused on what changed for users.
 
-   Change only the notes file and `CHANGELOG.md`. The docs, README and `compose.yaml` show pinned
-   versions as `X.Y.Z` on purpose, so they never need editing for a release. Touching `compose.yaml`,
+   For a stable release, change only the notes file and `CHANGELOG.md`: the docs, README and
+   `compose.yaml` show pinned versions as `X.Y.Z` and point at `latest`, so they never need editing.
+   Until 1.0.0, no image carries `latest` for a new release candidate, so the Docker examples name the
+   candidate itself: in the same PR, replace the previous candidate's version (for example
+   `1.0.0-rc.1`) with the new one in `compose.yaml`, `docker/.env.example`, `README.md`,
+   `docker/README.md`, `docs/docker.md`, `docs/install-docker.md` and `docs-site/docs`
+   (`git grep -l 1.0.0-rc.1` lists them). At 1.0.0 they go back to `latest`. Touching `compose.yaml`,
    `Dockerfile`, `docker/**` or `packaging/**` makes CI run both package smokes, on the PR and again on
-   `main`, which the release then waits for.
+   `main`, and the release is not tagged until that run on `main` is green (it does not wait for one).
 
    This PR touches nothing under `apps/`, `packaging/` or `Dockerfile`, so `CI / ci-passed` on it and
    on its merge to `main` both finish in well under a minute (path-aware CI skips everything but the
@@ -73,10 +78,9 @@ The release workflow handles it end to end:
 - the Windows package, the server, the tray and the Docker image all carry `1.0.0-rc.1`
   (`WeirVersion.Resolve` keeps the pre-release part; .NET's numeric assembly version is `1.0.0.0`, and the
   full text is the informational version)
-- the Docker image is tagged `1.0.0-rc.1` and `latest`. `latest` moves for a pre-release only while no stable
-  release is published: pulling the image without a tag has to resolve to something while the release
-  candidates are all there is, and once a stable release exists a later release candidate leaves `latest`
-  on it
+- the Docker image is tagged `1.0.0-rc.1` and nothing else: a release candidate moves no moving tag, so `latest`
+  and `major.minor` (`1.0`) first appear with the stable `1.0.0`, and a later release candidate never
+  replaces the image people run by default. Pull a release candidate by its version tag
 - the Windows delta is built against the newest published release that is older than this one
   (`scripts/find-previous-release.mjs`), release candidates included, so `rc.2` is a delta from `rc.1` and
   `1.0.0` from the last `rc`. With nothing older published, only the full package is produced
@@ -104,11 +108,11 @@ The `Release` workflow:
   (`scripts/verify-ci-for-release.mjs`), instead of running those tests a second time. It accepts
   only a `push` run on `main` or a manual run, judged by its latest attempt, in which the server
   build and tests (Linux and Windows), the web checks and every required contract area actually
-  ran and passed; a job the path filter skipped does not count. If that run is still going, it
-  waits for it (up to 45 minutes). If no run proves the commit (the tag is on a commit that never
-  ran CI, CI failed or was cancelled, or a push to `main` skipped the tests because nothing they
-  cover changed), it fails with the fix: run the full CI on the tag, then re-run the release's
-  failed jobs:
+  ran and passed; a job the path filter skipped does not count. It does not wait: a tag made
+  while CI is still running fails at once, and the fix is to wait for CI and re-run the release.
+  If no run proves the commit (the tag is on a commit that never ran CI, CI failed or was
+  cancelled, or a push to `main` skipped the tests because nothing they cover changed), it fails
+  with the fix: run the full CI on the tag, wait for it, then re-run the release's failed jobs:
 
   ```bash
   gh workflow run ci.yml --ref vX.Y.Z
@@ -126,12 +130,15 @@ The `Release` workflow:
   plus JSON evidence
 - builds and pushes Docker tags for linux/amd64 and linux/arm64:
   - `ghcr.io/<owner>/<repo>:X.Y.Z` (the git tag is `vX.Y.Z`; the image tag drops the `v`, and a pre-release keeps its suffix: `1.0.0-rc.1`)
-  - `ghcr.io/<owner>/<repo>:latest` (moves for a pre-release only while no stable release exists)
-- records a signed provenance attestation for the pushed image's digest (the multi-architecture
-  manifest list), kept in ghcr beside the image, as is already done for the Windows files
+  - the image carries its provenance and an SBOM from the build
+- when the repository variable `ATTEST_PROVENANCE` is `true`, records signed provenance attestations
+  for the pushed image's digest (the multi-architecture manifest list, kept in ghcr beside the image)
+  and for the release files (the Windows files and `weir-web-dist.zip`)
 - verifies the published Docker manifest resolves
 - runs the published Docker image and waits for `/health`
 - creates the GitHub Release
+- only then moves the moving tags `ghcr.io/<owner>/<repo>:X.Y` and `:latest` to the version's image, and
+  only for a stable release: a release candidate moves neither
 
 All of those run at the same time. Only `publish` holds registry credentials and write
 permissions, and it needs every other job, so the registry login and Docker push occur only
@@ -139,8 +146,8 @@ after the CI proof, the release checks, the Windows package and the unpushed can
 complete live audit have all passed (`scripts/check-release-workflow-gates.mjs` enforces this).
 The published image is rebuilt from the candidate jobs' cached layers. A failed screen, API check, browser console error, page
 error, failed request, bad response, changed pass-through output, or incomplete
-source cleanup therefore stops the release before either the versioned image or
-`latest` is published. The Windows package smoke runs the same real pass-through
+source cleanup therefore stops the release before the versioned image or a
+moving tag is published. The Windows package smoke runs the same real pass-through
 lifecycle against the packaged executable and bundled FFmpeg.
 
 `VITE_SUPPORT_URL` is a Vite build-time variable. Official releases should set the GitHub Actions repository variable `VITE_SUPPORT_URL` to `https://github.com/sponsors/jampat000` so the production frontend and packaged Windows installer include the Support section of **System › About**. If that variable is missing, release builds still succeed, and production hides the Support section.
@@ -155,11 +162,10 @@ workflow reads a `GHCR_TOKEN` secret.
 
 - **Every job has a `timeout-minutes`**, about two to three times its slowest recent successful run
   with a floor of 10, so a hung job fails in minutes instead of holding a runner for the six-hour
-  default. The release's `ci-passed` job keeps 50 minutes because it deliberately waits up to 45
-  for the tagged commit's CI. Raise a limit in the same change that makes a job genuinely slower.
+  default. The release's `ci-passed` job has 10: it only asks GitHub for the tagged commit's CI run and does not
+  wait for one. Raise a limit in the same change that makes a job genuinely slower.
 - **Every workflow starts at `permissions: contents: read`.** A job adds only what it needs: `changes`
-  adds `pull-requests: read`; `windows-smoke` adds `id-token: write` and `attestations: write`;
-  CodeQL's `analyze` adds `security-events: write`; and `publish` alone adds `contents: write`,
+  adds `pull-requests: read`; CodeQL's `analyze` adds `security-events: write`; and `publish` alone adds `contents: write`,
   `packages: write`, `id-token: write` and `attestations: write`.
 - **A release is never cancelled once started.** `release.yml` serialises runs per tag with
   `cancel-in-progress: false`: a second run for the same tag waits for the first, so `publish` cannot be
@@ -175,8 +181,8 @@ workflow reads a `GHCR_TOKEN` secret.
 | `Tag + source tree` | Canonical source snapshot for the release. |
 | `weir-web-dist.zip` | Static production build of `apps/web/dist`. The Weir server is still required. |
 | `Weir-win-Setup.exe` | Windows desktop installer (Velopack) with .NET tray host, bundled .NET server (`server\WeirServer.exe`), bundled web UI, bundled FFmpeg, and delta update support. |
-| `ghcr.io/<owner>/<repo>:X.Y.Z` | Versioned all-in-one container image (linux/amd64 and linux/arm64), with a provenance attestation (`gh attestation verify oci://ghcr.io/<owner>/<repo>:X.Y.Z --repo <owner>/<repo>`). |
-| `ghcr.io/<owner>/<repo>:latest` | Latest stable container image; the newest pre-release while no stable release exists. |
+| `ghcr.io/<owner>/<repo>:X.Y.Z` | Versioned all-in-one container image (linux/amd64 and linux/arm64), with a signed provenance attestation when the repository variable `ATTEST_PROVENANCE` is `true` (`gh attestation verify oci://ghcr.io/<owner>/<repo>:X.Y.Z --repo <owner>/<repo>`). |
+| `ghcr.io/<owner>/<repo>:X.Y` and `:latest` | Moving tags for the newest stable container image. A release candidate publishes only its version tag. |
 
 ## Windows package
 
@@ -319,11 +325,11 @@ The Docker image build and Docker smoke test run on GitHub infrastructure.
 Pull and run:
 
 ```bash
-docker pull ghcr.io/jampat000/weir:latest
+docker pull ghcr.io/jampat000/weir:1.0.0-rc.1
 docker run --rm \
   -p 9347:9347 \
   -v weir-data:/data/weir \
-  ghcr.io/jampat000/weir:latest
+  ghcr.io/jampat000/weir:1.0.0-rc.1
 ```
 
 Or use the root `compose.yaml`:
