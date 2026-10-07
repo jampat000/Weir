@@ -1,7 +1,7 @@
 # Tag-driven release: push tag vX.Y.Z or vX.Y.Z-rc.N -> CI proof, Windows installer, Docker image, GitHub Release.
 # A tag with a pre-release part (v1.0.0-rc.1) publishes a GitHub pre-release; a plain vX.Y.Z publishes a normal release.
 #
-# Every job but publish starts at once and none of them can publish anything:
+# Every job but the two publish jobs starts at once and none of them can publish anything:
 #
 #   ci-passed         ci.yml's ci-passed job already passed on this exact commit
 #                     (scripts/verify-ci-for-release.mjs), so the release does not repeat CI's tests.
@@ -13,12 +13,20 @@
 #   docker-candidate  builds the linux/amd64 image unpushed and runs the full live E2E against it.
 #   docker-arm64      builds the linux/arm64 image unpushed (QEMU).
 #
-# publish needs all six. It alone holds registry credentials, `packages: write` and
-# `contents: write`, so nothing reaches ghcr or the Releases page unless every check above passed.
-# It pushes only the version tag, smokes that image, publishes the GitHub Release, and only then moves the
-# moving tags (`major.minor` and `latest`), so a moving tag never names an image whose release failed. A release
-# candidate moves none. Signed provenance attestations for the image and the release files are switched by the
-# repository variable ATTEST_PROVENANCE. scripts/check-release-workflow-gates.mjs enforces that shape.
+# Two jobs publish, one per thing published. Neither waits for the other, so a slow or failed Docker build never
+# holds back the Windows release that installed Weirs update from, and either can be re-run alone:
+#
+#   publish-windows   needs ci-passed, golden-path, validate and windows-smoke. It alone has `contents: write` and
+#                     publishes the GitHub Release: the Windows installer and update files, the web build and
+#                     the release notes, which name the Docker image.
+#   publish-docker    needs ci-passed, golden-path, validate, docker-candidate and docker-arm64. It alone holds
+#                     registry credentials and `packages: write`. It pushes only the version tag, smokes that
+#                     image, and only then moves the moving tags (`major.minor` and `latest`). A release
+#                     candidate moves none.
+#
+# Nothing reaches ghcr or the Releases page unless every check its job needs passed. Signed provenance attestations
+# for the image and the release files are switched by the repository variable ATTEST_PROVENANCE.
+# scripts/check-release-workflow-gates.mjs enforces that shape.
 name: Release
 
 on:
@@ -26,9 +34,9 @@ on:
     tags:
       - "v*"
 
-# One release per tag at a time, and a release that has started is never cancelled: stopping publish
-# halfway could leave the version tag on ghcr without its GitHub Release. A second run for the same
-# tag (a re-run, a re-pushed tag) waits for the first.
+# One release per tag at a time, and a release that has started is never cancelled: stopping a publish job
+# halfway could leave an image pushed but never smoked, or a Release with only some of its files. A second run
+# for the same tag (a re-run, a re-pushed tag) waits for the first.
 concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
@@ -209,7 +217,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      # Checked first so a missing file fails in seconds, not after the builds; publish reads it again.
+      # Checked first so a missing file fails in seconds, not after the builds; publish-windows reads it again.
       - name: Release notes file present
         run: |
           notes_file="docs/release-notes/${TAG}.md"
@@ -307,7 +315,7 @@ jobs:
           path: weir-web-dist.zip
 
   # The linux/amd64 image, built and audited without credentials. Its layers go to this run's GitHub
-  # Actions cache (not a registry), so publish rebuilds from them instead of from scratch.
+  # Actions cache (not a registry), so publish-docker rebuilds from them instead of from scratch.
   docker-candidate:
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -437,21 +445,19 @@ jobs:
           tags: weir-release-candidate:${{ steps.version.outputs.plain }}-arm64
           cache-to: type=gha,mode=max,scope=weir-release-arm64,ignore-error=true
 
-  publish:
+  # The GitHub Release, from what windows-smoke and validate built. It does not wait for the Docker jobs, and
+  # nothing in it touches the registry.
+  publish-windows:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-    # Every gate. Without ci-passed a commit CI never passed could ship; without windows-smoke a Docker
-    # image could reach ghcr for a release that has no Windows build.
-    needs: [ci-passed, golden-path, validate, windows-smoke, docker-candidate, docker-arm64]
+    timeout-minutes: 15
+    # Without ci-passed a commit CI never passed could ship; without windows-smoke there is no installer to release.
+    needs: [ci-passed, golden-path, validate, windows-smoke]
     permissions:
       contents: write
-      packages: write
-      # For actions/attest-build-provenance below (OIDC signing, then recording the attestation on the repo and,
-      # for the image, next to it in ghcr). Used only when the repository variable ATTEST_PROVENANCE is "true".
+      # For actions/attest-build-provenance below (OIDC signing, then recording the attestation on the repo).
+      # Used only when the repository variable ATTEST_PROVENANCE is "true".
       id-token: write
       attestations: write
-    env:
-      WEIR_SESSION_SECRET: ${{ github.run_id }}-${{ github.job }}-${{ github.run_attempt }}-release-session-secret-32chars-min
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
@@ -460,10 +466,6 @@ jobs:
         with:
           name: weir-web-dist
           path: ${{ github.workspace }}
-
-      - name: Docker image name
-        id: image
-        run: echo "name=${REGISTRY}/$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
 
       # scripts/check-release-version.mjs already refused anything but X.Y.Z or X.Y.Z-prerelease, so a hyphen
       # in the version means a pre-release.
@@ -480,6 +482,71 @@ jobs:
           name: weir-windows-velopack
           path: ${{ github.workspace }}/windows-artifact
 
+      # Signed attestations are free on a public repository and need GitHub Enterprise Cloud on a private one, so
+      # they are off until the repository variable ATTEST_PROVENANCE is "true".
+      #
+      # The exact bytes people download: the Windows files (SHA256SUMS.txt included, so it is covered too) and
+      # the web build.
+      - name: Attest provenance of the release files
+        if: ${{ vars.ATTEST_PROVENANCE == 'true' }}
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: |
+            weir-web-dist.zip
+            windows-artifact/*
+
+      - name: Prepare user-facing release notes
+        run: |
+          notes_file="docs/release-notes/${TAG}.md"
+          if [ ! -f "$notes_file" ]; then
+            echo "::error::Missing required release notes file: $notes_file"
+            echo "::error::Create it from docs/release-notes/TEMPLATE.md before tagging."
+            exit 1
+          fi
+          cp "$notes_file" "$GITHUB_WORKSPACE/release-notes.md"
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3
+        with:
+          files: |
+            weir-web-dist.zip
+            windows-artifact/*
+          body_path: release-notes.md
+          prerelease: ${{ steps.version.outputs.prerelease }}
+
+  # The container image, rebuilt from the layers docker-candidate and docker-arm64 cached. It does not wait for the
+  # Windows jobs, and nothing in it touches the Releases page.
+  publish-docker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    # Without ci-passed a commit CI never passed could ship; without docker-candidate and docker-arm64 an image
+    # that was never built and audited unpushed could reach ghcr.
+    needs: [ci-passed, golden-path, validate, docker-candidate, docker-arm64]
+    permissions:
+      contents: read
+      packages: write
+      # For actions/attest-build-provenance below (OIDC signing, then recording the attestation next to the image
+      # in ghcr). Used only when the repository variable ATTEST_PROVENANCE is "true".
+      id-token: write
+      attestations: write
+    env:
+      WEIR_SESSION_SECRET: ${{ github.run_id }}-${{ github.job }}-${{ github.run_attempt }}-release-session-secret-32chars-min
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Docker image name
+        id: image
+        run: echo "name=${REGISTRY}/$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+
+      # scripts/check-release-version.mjs already refused anything but X.Y.Z or X.Y.Z-prerelease, so a hyphen
+      # in the version means a pre-release.
+      - name: Normalize tag version
+        id: version
+        run: |
+          plain="${TAG#v}"
+          echo "plain=$plain" >> "$GITHUB_OUTPUT"
+          if [[ "$plain" == *-* ]]; then echo "prerelease=true" >> "$GITHUB_OUTPUT"; else echo "prerelease=false" >> "$GITHUB_OUTPUT"; fi
+
       # Only needed if the cache below misses: the published build then re-runs the arm64 final stage.
       - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4
         with:
@@ -487,7 +554,7 @@ jobs:
 
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
 
-      # Registry credentials and public tags are not created until every job above has passed,
+      # Registry credentials and public tags are not created until every job this one needs has passed,
       # including the complete packaged browser/API audit of the unpushed candidate.
       - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
         with:
@@ -496,7 +563,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       # Rebuilt from the layers docker-candidate and docker-arm64 cached. Only the version tag: the moving tags
-      # move to it at the very end, once the image and the release are known good. Provenance and an SBOM travel
+      # move to it at the very end, once the image is known good. Provenance and an SBOM travel
       # with the image in the registry.
       - name: Publish release Docker image
         id: push
@@ -532,16 +599,6 @@ jobs:
           subject-digest: ${{ steps.push.outputs.digest }}
           push-to-registry: true
 
-      # The exact bytes people download: the Windows files (SHA256SUMS.txt included, so it is covered too) and
-      # the web build.
-      - name: Attest provenance of the release files
-        if: ${{ vars.ATTEST_PROVENANCE == 'true' }}
-        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
-        with:
-          subject-path: |
-            weir-web-dist.zip
-            windows-artifact/*
-
       - name: Verify published Docker manifest
         env:
           IMAGE: ${{ steps.image.outputs.name }}:${{ steps.version.outputs.plain }}
@@ -570,26 +627,7 @@ jobs:
         if: always()
         run: docker rm -f weir-release-smoke >/dev/null 2>&1 || true
 
-      - name: Prepare user-facing release notes
-        run: |
-          notes_file="docs/release-notes/${TAG}.md"
-          if [ ! -f "$notes_file" ]; then
-            echo "::error::Missing required release notes file: $notes_file"
-            echo "::error::Create it from docs/release-notes/TEMPLATE.md before tagging."
-            exit 1
-          fi
-          cp "$notes_file" "$GITHUB_WORKSPACE/release-notes.md"
-
-      - name: Publish GitHub Release
-        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3
-        with:
-          files: |
-            weir-web-dist.zip
-            windows-artifact/*
-          body_path: release-notes.md
-          prerelease: ${{ steps.version.outputs.prerelease }}
-
-      # Last, so a moving tag only ever names an image that passed its smoke and has a published release. A copy of
+      # Last, so a moving tag only ever names an image that passed its smoke. A copy of
       # the version's manifest list: both architectures, provenance and SBOM included, nothing rebuilt. Only a
       # stable release moves them: a release candidate is published under its version tag alone, so pulling
       # without a tag finds nothing until 1.0.0 rather than a candidate.
