@@ -1,0 +1,19 @@
+# Makes the runner's apt fail fast instead of hanging on a dead package mirror. GitHub's Ubuntu runners list
+# azure.archive.ubuntu.com first in /etc/apt/apt-mirrors.txt and fall back to archive.ubuntu.com only after
+# each request to it times out; when the Azure mirror is down that turns a one-minute install into the job's
+# whole timeout (8 Oct 2026). This drops the Azure entry, so apt goes to the main archive, and makes every
+# request retry three times with a 30-second timeout. Use it before anything that runs apt on the runner,
+# such as Playwright's `install --with-deps`.
+name: Make apt fail fast
+description: Points apt at the main Ubuntu archive and gives every request retries and a short timeout.
+
+runs:
+  using: composite
+  steps:
+    - name: Make apt fail fast
+      shell: bash
+      run: |
+        printf 'Acquire::Retries "3";\nAcquire::http::Timeout "30";\n' | sudo tee /etc/apt/apt.conf.d/80-weir-fail-fast >/dev/null
+        if [ -f /etc/apt/apt-mirrors.txt ] && grep -q 'archive\.ubuntu\.com' /etc/apt/apt-mirrors.txt; then
+          sudo sed -i '/azure\.archive\.ubuntu\.com/d' /etc/apt/apt-mirrors.txt
+        fi
