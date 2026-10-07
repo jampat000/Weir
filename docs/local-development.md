@@ -153,7 +153,7 @@ cares about changed (a manual run always runs everything). Its jobs:
     every other job was skipped — this is the one check `main`'s ruleset requires.
 
 Pushing a SemVer tag **`v*`** (`vX.Y.Z`, or `vX.Y.Z-rc.N` for a release candidate) runs the **`Release`** workflow. It does not repeat these tests: it
-refuses to publish unless `CI` already passed (`ci-passed`) on the tagged commit, then builds, tests
+refuses to publish unless `CI` already passed (`ci-passed`) and the golden path was recorded as passed (`golden-path`) on the tagged commit, then builds, tests
 and publishes the release artefacts — see **[`docs/release.md`](release.md)**.
 
 ## Contract suite, E2E and live audit (local)
