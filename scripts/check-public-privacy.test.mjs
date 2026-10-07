@@ -69,8 +69,8 @@ test("a hit names its line and never the matched text", () => {
   assert.deepEqual(hits, [{ kind: "privateIp", line: 3 }]);
 });
 
-test("the shipped hash list holds exactly two SHA-256 hashes and no readable words", () => {
+test("the shipped hash list holds exactly three SHA-256 hashes and no readable words", () => {
   const { sha256: list } = JSON.parse(readFileSync(new URL("./public-privacy-hashes.json", import.meta.url), "utf8"));
-  assert.equal(list.length, 2);
+  assert.equal(list.length, 3);
   for (const entry of list) assert.match(entry, /^[0-9a-f]{64}$/);
 });
