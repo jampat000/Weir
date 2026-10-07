@@ -21,8 +21,9 @@ public sealed class WorkflowSyncRulesTests
         long? from = null,
         string? key = null,
         bool synced = false,
-        string? name = null) =>
-        new(id, name ?? (mediaType == "tv" ? "TV" : "Movies"), mediaType, watched, output, from, key, synced);
+        string? name = null,
+        long[]? linkedTo = null) =>
+        new(id, name ?? (mediaType == "tv" ? "TV" : "Movies"), mediaType, watched, output, from, key, synced, linkedTo ?? (from is { } connection ? [connection] : []));
 
     [Fact]
     public void With_no_workflow_at_all_a_library_gets_a_new_one()
@@ -53,6 +54,40 @@ public sealed class WorkflowSyncRulesTests
                 Assert.Equal(WorkflowSyncKind.Adopt, tv.Kind);
                 Assert.Equal(2, tv.Workflow!.Id);
             });
+    }
+
+    [Fact]
+    public void A_workflow_someone_linked_to_the_manager_by_hand_is_taken_over_instead_of_a_second_one_being_made()
+    {
+        var handLinked = Workflow(1, watched: @"C:\Downloads\Movies", output: @"C:\Weir\Ready\Movies", linkedTo: [Deluno]);
+
+        var action = Assert.Single(WorkflowSyncRules.Plan(Deluno, [Movies()], [handLinked]));
+
+        Assert.Equal(WorkflowSyncKind.Adopt, action.Kind);
+        Assert.Equal(1, action.Workflow!.Id);
+    }
+
+    [Fact]
+    public void A_workflow_linked_by_hand_is_preferred_to_an_unconfigured_one()
+    {
+        var unconfigured = Workflow(1);
+        var handLinked = Workflow(2, watched: @"C:\Downloads\Movies", output: @"C:\Weir\Ready\Movies", linkedTo: [Deluno]);
+
+        var action = Assert.Single(WorkflowSyncRules.Plan(Deluno, [Movies()], [unconfigured, handLinked]));
+
+        Assert.Equal((WorkflowSyncKind.Adopt, 2L), (action.Kind, action.Workflow!.Id));
+    }
+
+    [Fact]
+    public void A_workflow_linked_by_hand_to_another_manager_of_another_media_type_or_with_other_folders_is_not_taken_over()
+    {
+        var otherManager = Workflow(1, watched: @"C:\Downloads\Movies", output: @"C:\Weir\Ready\Movies", linkedTo: [Deluno + 1]);
+        var otherType = Workflow(2, "tv", watched: @"C:\Downloads\Movies", output: @"C:\Weir\Ready\Movies", linkedTo: [Deluno]);
+        var otherFolders = Workflow(3, watched: @"C:\Somewhere\Else", output: @"C:\Weir\Ready\Movies", linkedTo: [Deluno]);
+
+        var action = Assert.Single(WorkflowSyncRules.Plan(Deluno, [Movies()], [otherManager, otherType, otherFolders]));
+
+        Assert.Equal(WorkflowSyncKind.Create, action.Kind);
     }
 
     [Fact]
