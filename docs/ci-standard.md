@@ -10,7 +10,7 @@ Deluno and Weir each keep their own identical copy of this standard and of the s
 
 | File | What it is |
 |---|---|
-| `.github/workflows/ci.yml` | CI. Runs on a push to `main`, on a pull request, and by hand. |
+| `.github/workflows/ci.yml` | CI. Runs on a push to `main`, on a pull request, and by hand. A manual run is also how any commit gets an installable build for the golden path. |
 | `.github/workflows/release.yml` | The one release. Runs on a `v*` tag. The only workflow that publishes anything. |
 | `.github/workflows/audit.yml` | The weekly dependency audit. Runs on a schedule and by hand. |
 | `.github/dependabot.yml` | Dependabot, security updates only. |
@@ -53,7 +53,7 @@ The job ids and display names below are the same in both repositories.
 ## Rules for every workflow
 
 1. **Actions are pinned to a full commit SHA** with the release in a comment: `uses: actions/checkout@<40 hex characters> # v7.0.1`. Resolve a tag with `git ls-remote --tags https://github.com/<owner>/<repo>.git` and dereference annotated tags (the `^{}` line). `scripts/check-github-action-pins.mjs` fails otherwise. A local action or reusable workflow (`./...`) is exempt; the commit pins it.
-2. **Permissions.** A top-level `permissions: contents: read` and nothing wider. A job asks for more on the job itself (`packages: write` for the registry, `contents: write` for a release, `id-token` and `attestations` for provenance, `pull-requests: read` for the path filter on a pull request). `scripts/check-workflow-hygiene.mjs` fails on a missing block or a write at the top.
+2. **Permissions.** A top-level `permissions: contents: read` and nothing wider. A job asks for more on the job itself (`packages: write` for the registry, `contents: write` for a release, `id-token` and `attestations` for provenance, `pull-requests: read` for the path filter on a pull request, `statuses: read` for the release's golden-path check). `scripts/check-workflow-hygiene.mjs` fails on a missing block or a write at the top.
 3. **Every job has `timeout-minutes`**, about twice the time it has been seen to take. A job with no timeout runs six hours; a Windows job bills at twice the rate. The same script checks it.
 4. **Secrets reach scripts through `env:`**, never as `${{ secrets.X }}` inside script text, and the tag or any other value a person controls reaches a script the same way.
 5. **Downloads are checked.** A tool fetched during a build is pinned by SHA-256 and verified before it is unpacked or run. A cache for it is keyed by the file that holds the pin.
@@ -67,9 +67,11 @@ The job ids and display names below are the same in both repositories.
 ## The release
 
 1. **A tag is made only after CI is green on that exact commit.** The first job in `release.yml`, `ci-passed`, runs `scripts/verify-ci-for-release.mjs`: it asks GitHub (`gh run list --commit`) whether `ci.yml` has a completed `push` or manual run for the tagged commit whose `ci-passed` job passed. It does not wait. A tag made while CI is still running fails at once, and the fix is to wait for CI and re-run the release.
+
+   **A tag is made only after the golden path has passed on that exact commit.** The release's `golden-path` job runs `scripts/verify-golden-path-for-release.mjs`: it asks GitHub for the commit's statuses and passes only when the newest status with the context `golden-path` is `success`. It does not wait. The status is set by whoever drove the golden-path run: `gh api repos/<owner>/<repo>/statuses/<sha> -f state=success -f context=golden-path -f description=… -f target_url=…`.
 2. **Everything is built before anything is published.** The Windows build, the container build and the vulnerability scan run side by side, without credentials, and publish nothing.
 3. **One `publish` job publishes.** It `needs` every other job in the file. It alone has `packages: write` and `contents: write`, and it alone logs in to the registry. It pushes the image (with provenance and an SBOM), checks the pushed digest and starts it, creates the GitHub Release, and **only then moves the moving tags** (`major.minor` and `latest`), so a moving tag never names an image whose release failed. A release candidate has no moving tags.
-4. **`scripts/check-release-workflow-gates.mjs` checks this shape in `repo-checks`:** only `publish` can publish, it needs every job, the steps are in that order, and `ci-passed` still judges every CI job.
+4. **`scripts/check-release-workflow-gates.mjs` checks this shape in `repo-checks`:** only `publish` can publish, it needs every job, the steps are in that order, and `ci-passed` still judges every CI job, and `golden-path` is a job `publish` needs.
 5. **A second push of a tag never cancels a release in progress.**
 6. **After a tag, confirm the release is real:** the Release run is green, the GitHub Release has its assets, and the image can be pulled by its version tag.
 
@@ -93,6 +95,7 @@ Security updates only. Every ecosystem in `dependabot.yml` has `open-pull-reques
 | `scripts/check-github-action-pins.mjs` | Fails on an action that is not pinned to a full SHA with a release comment. |
 | `scripts/check-workflow-hygiene.mjs` | Fails on a missing top-level `permissions` or a job with no `timeout-minutes`. |
 | `scripts/verify-ci-for-release.mjs` | The release's check that CI passed on the tagged commit. |
+| `scripts/verify-golden-path-for-release.mjs` | The release's check that the golden path passed on the tagged commit (`golden-path` commit status). |
 | `scripts/check-release-workflow-gates.mjs` | Fails when the release workflow's publish shape is broken. |
 | `scripts/summarize-test-results.mjs` | Writes TRX and Playwright results to the job summary. |
 
