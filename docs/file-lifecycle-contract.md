@@ -72,7 +72,7 @@ A download in the watched folder is not Weir's. A download client may still be s
 
 - the post-success cleanup in `RemuxPassRunner.HandleCleanupAfterSuccessAsync`, which covers Movies' release-folder removal and hands TV to `TvSeasonFolderCleanup` (which checks again before it deletes a season);
 - the scan's retry of an interrupted movie removal, `WatchedFolderScanOps.RetryCompletedMovieSourceCleanup`, and the scan's decision to attempt it;
-- deleting a rejected file, both the workflow's "delete rejected files" choice (in the pass and in the scan) and Activity's "delete the file" choice, which tells the person to remove the download from their download client instead.
+- deleting a rejected file: the workflow's "delete rejected files" choice (in the pass and in the scan), Activity's "delete the file" choice (which tells the person to remove the download from their download client instead), and the reject route (`RejectRoutes.ThroughHandoffAsync`);
 
 The one removal left is the reject route, where Weir tells the manager a release is bad and removes the download only after the manager accepts. That removal is the manager's own decision, not Weir's.
 

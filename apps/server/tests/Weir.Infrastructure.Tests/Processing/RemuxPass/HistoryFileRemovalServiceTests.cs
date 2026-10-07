@@ -206,7 +206,7 @@ public sealed class HistoryFileRemovalServiceTests : IDisposable
     // --- through a hand-off (Deluno) -----------------------------------------------------------------------
 
     [Fact]
-    public async Task With_a_live_handoff_delete_reports_rejected_and_removes_the_file()
+    public async Task With_a_live_handoff_delete_reports_rejected_and_leaves_the_file_for_the_manager_to_remove()
     {
         var library = await LibraryAsync();
         var source = _folders.Source("Film/film.mkv");
@@ -224,10 +224,12 @@ public sealed class HistoryFileRemovalServiceTests : IDisposable
         var outcome = await _fixture.Db(uow => Service().DeleteAsync(uow, file, null, CancellationToken.None));
 
         Assert.True(outcome.Done);
-        Assert.False(File.Exists(source));
+        Assert.True(File.Exists(source), "the download is the manager's and its client's to remove");
+        Assert.Contains("Deluno on 192.0.2.30 will remove the download; Weir left it in place.", outcome.Message, StringComparison.Ordinal);
         var post = Assert.Single(_fixture.Http.RequestsTo(HttpMethod.Post, EventsPath));
         var body = (Weir.Core.Json.WireObject)post.Json!;
         Assert.Equal("rejected", Weir.Core.Json.WireConvert.Str(body["disposition"]));
+        Assert.False(((Weir.Core.Json.WireBool)body["sourceRemoved"]).Value);
         Assert.Equal(0, await _fixture.Store.Scalar("SELECT count(*) FROM files"));
     }
 

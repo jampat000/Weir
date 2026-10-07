@@ -88,7 +88,7 @@ public sealed class FailurePoliciesTests
     }
 
     [Fact]
-    public async Task Content_rejection_under_reject_policy_reports_rejected_to_deluno_and_removes_the_download()
+    public async Task Content_rejection_under_reject_policy_reports_rejected_to_deluno_and_leaves_the_download_for_it_to_remove()
     {
         // This scenario never runs a scan before the hand-off. That such a rejection still gets a Files row
         // (#532) is asserted in RejectWithoutPriorScanTests.
@@ -107,15 +107,17 @@ public sealed class FailurePoliciesTests
         var report = Assert.Single(reports);
         Assert.Equal("failed", (string)report["status"]!);
         Assert.Equal("rejected", (string)report["disposition"]!);
-        Assert.True((bool)report["sourceRemoved"]!);
+        // The workflow is linked to Deluno, so the download is Deluno's and its client's to remove, not Weir's.
+        Assert.False((bool)report["sourceRemoved"]!);
         Assert.Equal("preflight", (string)report["failureClass"]!);
         Assert.Contains("no retainable audio", (string)report["message"]!, StringComparison.Ordinal);
-        await Poll.UntilAsync(() => Task.FromResult(!File.Exists(source)), "the rejected download to be removed", TimeSpan.FromSeconds(30));
-        Assert.Empty(scenario.FakeTools.Calls(tool: "ffmpeg", step: "remux"));
         Assert.Contains(await scenario.JobsAsync(Scenario.RejectKind), job => (string)job["status"]! == "completed");
+        Assert.True(File.Exists(source));
+        Assert.Empty(scenario.FakeTools.Calls(tool: "ffmpeg", step: "remux"));
         var rejected = Assert.Single(await scenario.ActivityAsync("processing.file_rejected"));
         Assert.Equal("film.mkv was rejected so a different release can be found", (string)rejected["title"]!);
         Assert.Contains("accepted that this release is bad", (string)rejected["detail"]!, StringComparison.Ordinal);
+        Assert.Contains("will remove the download; Weir left it in place.", (string)rejected["detail"]!, StringComparison.Ordinal);
     }
 
     [Fact]
