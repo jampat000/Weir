@@ -105,4 +105,17 @@ public sealed class PauseTests
         Assert.True(File.Exists(Path.Combine(scenario.Folders.Output, "Paused.Handoff.2024", "film.mkv")));
         Assert.True(File.Exists(download.Video), "a workflow Deluno feeds never has its original removed");
     }
+
+    [Fact]
+    public async Task Pausing_and_resuming_are_in_activity()
+    {
+        await using var scenario = await Scenario.StartAsync();
+
+        await scenario.SetPauseAsync(paused: true);
+        await scenario.SetPauseAsync(paused: false);
+
+        var paused = Assert.Single(await scenario.ActivityAsync("system.processing_paused"));
+        Assert.Contains("paused until you resume", paused.ToJsonString(), StringComparison.Ordinal);
+        Assert.Single(await scenario.ActivityAsync("system.processing_resumed"));
+    }
 }

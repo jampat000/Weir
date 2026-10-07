@@ -43,3 +43,30 @@ describe("eventDisplay for a finished pass", () => {
     expect(display.meaning).toBe("broken");
   });
 });
+
+describe("eventDisplay for the pause", () => {
+  it("names a pause and a resume, and keeps who and until when in the detail", () => {
+    const entry = (event_type: string, detail: string): ActivityEventItem => ({
+      id: 2,
+      created_at: "2026-10-07T03:24:00",
+      event_type,
+      module: "system",
+      title: "",
+      detail,
+    });
+
+    expect(
+      eventDisplay(
+        entry(
+          "system.processing_paused",
+          "Processing was paused until you resume by alice.",
+        ),
+      ).title,
+    ).toBe("Processing paused");
+    expect(
+      eventDisplay(
+        entry("system.processing_resumed", "Processing was resumed by alice."),
+      ).title,
+    ).toBe("Processing resumed");
+  });
+});

@@ -1,0 +1,115 @@
+using Weir.Core.Settings;
+using Weir.Core.Time;
+using Weir.Infrastructure.Activity;
+using Weir.Infrastructure.Auth;
+using Weir.Infrastructure.Settings;
+using Weir.Infrastructure.Sqlite;
+using Weir.Infrastructure.Tests.Platform;
+
+namespace Weir.Infrastructure.Tests.Settings;
+
+/// <summary>The pause is in Activity whichever way it changes: someone pausing or resuming, or a timed pause running out.</summary>
+public sealed class SuitePauseServiceTests : IDisposable
+{
+    private const string Entries =
+        "SELECT group_concat(title || ': ' || detail, ' | ') FROM " +
+        "(SELECT title, detail FROM activity_events WHERE event_type LIKE 'system.processing_%' ORDER BY id)";
+
+    private readonly StoreFixture _store = new();
+    private readonly SuitePauseService _pause = new(new SuiteSettingsStore(new AuthStore()), new ActivityStore());
+
+    public void Dispose() => _store.Dispose();
+
+    private Timestamp Now => Timestamp.UtcNow(_store.Clock);
+
+    private Task<PauseOutcome> ChangeAsync(bool paused, long? minutes = null, bool keepLooking = true, string by = "alice") =>
+        InUnitOfWorkAsync(uow => _pause.ChangeAsync(uow, paused, minutes, keepLooking, Now, by));
+
+    private Task<PauseOutcome> CurrentAsync() => InUnitOfWorkAsync(uow => _pause.CurrentAsync(uow, Now));
+
+    private async Task<PauseOutcome> InUnitOfWorkAsync(Func<UnitOfWork, Task<PauseState>> work)
+    {
+        var uow = await UnitOfWork.OpenAsync(_store.Database);
+        await using (uow)
+        {
+            var state = await work(uow);
+            await uow.CommitAsync();
+            return new PauseOutcome(state, await EntriesAsync());
+        }
+    }
+
+    private async Task<string[]> EntriesAsync()
+    {
+        using var connection = _store.Database.Open();
+        using var command = connection.CreateCommand();
+        command.CommandText = Entries;
+        return (await command.ExecuteScalarAsync() as string)?.Split(" | ") ?? [];
+    }
+
+    [Fact]
+    public async Task A_timed_pause_that_runs_out_is_lifted_and_recorded_once()
+    {
+        await ChangeAsync(paused: true, minutes: 30);
+        _store.Clock.Advance(TimeSpan.FromMinutes(31));
+
+        var lifted = await CurrentAsync();
+        var again = await CurrentAsync();
+
+        Assert.False(lifted.State.Paused);
+        Assert.Equal(2, lifted.Entries.Length);
+        Assert.Equal("Processing resumed: The pause ran out at 2026-01-15 10:30 UTC, so processing was resumed.", lifted.Entries[1]);
+        Assert.Equal(lifted.Entries, again.Entries);
+        Assert.Equal(0, await _store.Scalar("SELECT processing_paused FROM suite_settings WHERE id = 1"));
+    }
+
+    [Fact]
+    public async Task The_expiry_task_records_a_pause_that_ran_out_with_nobody_looking()
+    {
+        await ChangeAsync(paused: true, minutes: 30);
+        _store.Clock.Advance(TimeSpan.FromHours(1));
+
+        await new SuitePauseExpiryTask(_store.Database, _pause, _store.Clock).RunOnceAsync(CancellationToken.None);
+
+        var entries = await EntriesAsync();
+        Assert.Equal(2, entries.Length);
+        Assert.StartsWith("Processing resumed: The pause ran out", entries[1], StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Pausing_again_after_a_pause_ran_out_records_both_in_order()
+    {
+        await ChangeAsync(paused: true, minutes: 30);
+        _store.Clock.Advance(TimeSpan.FromMinutes(45));
+
+        var repaused = await ChangeAsync(paused: true, minutes: 60, by: "bob");
+
+        Assert.True(repaused.State.Paused);
+        Assert.Equal(3, repaused.Entries.Length);
+        Assert.StartsWith("Processing paused: Processing was paused until 2026-01-15 10:30 UTC by alice.", repaused.Entries[0], StringComparison.Ordinal);
+        Assert.StartsWith("Processing resumed: The pause ran out", repaused.Entries[1], StringComparison.Ordinal);
+        Assert.StartsWith("Processing paused: Processing was paused until 2026-01-15 11:45 UTC by bob.", repaused.Entries[2], StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Changing_how_long_a_pause_lasts_is_recorded_and_saving_it_unchanged_is_not()
+    {
+        var first = await ChangeAsync(paused: true, minutes: 30);
+        var same = await ChangeAsync(paused: true, minutes: 30);
+        var longer = await ChangeAsync(paused: true, minutes: 120);
+
+        Assert.Single(first.Entries);
+        Assert.Single(same.Entries);
+        Assert.Equal(2, longer.Entries.Length);
+        Assert.StartsWith("Processing paused: Processing was paused until 2026-01-15 12:00 UTC by alice.", longer.Entries[1], StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Resuming_a_running_weir_records_nothing()
+    {
+        var resumed = await ChangeAsync(paused: false);
+
+        Assert.Empty(resumed.Entries);
+    }
+
+    private sealed record PauseOutcome(PauseState State, string[] Entries);
+}

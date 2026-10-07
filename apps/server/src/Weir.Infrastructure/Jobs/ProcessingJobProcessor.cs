@@ -84,6 +84,18 @@ public sealed class ProcessingJobProcessor
             return JobProcessOutcome.Idle;
         }
 
+        // The claim refuses work while paused. This asks the pause once more, separately, so that a job claimed by mistake
+        // goes back untouched, with its attempt given back, instead of reaching a handler that changes a file.
+        if (await _queue.PauseForbidsAsync(job.JobKind, _time.GetUtcNow(), cancellationToken).ConfigureAwait(false))
+        {
+            _logger.LogError(
+                "Weir claimed job_id={JobId} kind={JobKind} while processing is paused, so it was put back without running.",
+                job.Id,
+                job.JobKind);
+            await _queue.ReleaseClaimedAsync(job.Id, leaseOwner, when, CancellationToken.None).ConfigureAwait(false);
+            return JobProcessOutcome.Idle;
+        }
+
         var context = new JobWorkContext(
             job.Id,
             job.JobKind,

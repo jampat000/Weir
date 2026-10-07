@@ -136,3 +136,6 @@ you pause is finished first.
 notices new downloads and lists them as waiting, but it does not clean, delete or move
 a file. A hand-off from Deluno or another manager while paused is accepted and waits. When you resume,
 what was waiting is done once.
+
+Every pause and resume is written to Activity, with who did it and until when. A timed pause that ends on its
+own is recorded as resumed too.
