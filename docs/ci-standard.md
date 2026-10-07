@@ -1,10 +1,10 @@
 # CI standard
 
-The CI and release standard for Deluno and Weir. This page is the same, word for word, in both repositories; each repository adds only its own jobs between the shared ones. Decided by James, 3 Oct 2026 (Deluno [#1124](https://github.com/jampat000/Deluno/issues/1124)).
+The CI and release standard for Deluno and Weir. This page is the same, word for word, in both repositories; each repository adds only its own jobs between the shared ones. Decided by the owner, 3 Oct 2026 (Deluno [#1124](https://github.com/jampat000/Deluno/issues/1124)).
 
 ## Two copies, on purpose
 
-Deluno and Weir each keep their own identical copy of this standard and of the scripts below. They never share a workflow, a reusable workflow or an action across the two repositories. James decided this on 6 Oct 2026, "in case something happens to one repo or we decide to go a different direction on it": either repository must keep working, and be free to change, with the other gone or different. So a change to the standard is made in both repositories, in the same words, and neither points at the other.
+Deluno and Weir each keep their own identical copy of this standard and of the scripts below. They never share a workflow, a reusable workflow or an action across the two repositories. The owner decided this on 6 Oct 2026, "in case something happens to one repo or we decide to go a different direction on it": either repository must keep working, and be free to change, with the other gone or different. So a change to the standard is made in both repositories, in the same words, and neither points at the other.
 
 ## What each repository has
 

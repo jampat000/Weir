@@ -19,7 +19,7 @@ This is the canonical governance checklist for keeping Weir releases controlled 
 
 ## Proof before closing and before tagging
 
-Decided by James, 7 Oct 2026 (#903), after bugs kept turning up in things that seemed to work.
+Decided by the owner, 7 Oct 2026 (#903), after bugs kept turning up in things that seemed to work.
 
 1. **No user-facing issue closes without live proof.** The fix is clicked or watched working on the rig, and the
    closing note says what was seen (a screenshot, a log line, the Activity entry). Green tests and a code read are

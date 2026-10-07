@@ -2,6 +2,7 @@
   "about": "SHA-256 hashes of lowercase private words that must never appear in a public file. The words themselves are not kept anywhere in the repository. See scripts/check-public-privacy.mjs.",
   "sha256": [
     "8726cf1e10cc778977d12f5228bdbbf04769aa02faf4cc60c9a20294bc61e0b9",
-    "6fc98090e5c2536f531222b1c035ab3934005b90ef23983f5289fb0cd755f798"
+    "6fc98090e5c2536f531222b1c035ab3934005b90ef23983f5289fb0cd755f798",
+    "119c9ae6f9ca741bd0a76f87fba0b22cab5413187afb2906aa2875c38e213603"
   ]
 }
