@@ -16,13 +16,14 @@ public sealed partial class RemuxPassHandler
         ProcessingLibraryRecord? Library = null,
         ProcessingRulesConfig? Rules = null,
         ProcessingPathRuntime? Runtime = null,
-        string? RulesProfileName = null);
+        string? RulesProfileName = null,
+        bool Superseded = false);
 
     /// <summary>
     /// Read what the pass needs and mark the file as being processed, then commit: no ffprobe or ffmpeg work runs while the
     /// worker holds a transaction.
     /// </summary>
-    private Task<Claim> ClaimAsync(JobWorkContext context, string rel, string mediaScope, long? libraryId, CancellationToken cancellationToken) =>
+    private Task<Claim> ClaimAsync(JobWorkContext context, string rel, string mediaScope, long? libraryId, bool handoffRetry, CancellationToken cancellationToken) =>
         LockedWrites.RunAsync(
             _database,
             async uow =>
@@ -53,6 +54,12 @@ public sealed partial class RemuxPassHandler
                         .Set("reason", problem)
                         .Set("relative_media_path", rel)
                         .Set("library_id", library?.Id ?? libraryId));
+                }
+
+                if (handoffRetry && library is not null && !await RemuxPassFileState.RetryStillOwedAsync(uow, library.Id, rel).ConfigureAwait(false))
+                {
+                    // Queued when its failure was recorded; the file has been given up on, finished or started again since.
+                    return new Claim(null, Superseded: true);
                 }
 
                 if (library is not null)

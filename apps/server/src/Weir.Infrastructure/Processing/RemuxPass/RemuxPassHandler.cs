@@ -148,7 +148,13 @@ public sealed partial class RemuxPassHandler : IJobHandler
             }
         }
 
-        var claim = await ClaimAsync(context, rel, mediaScope, libraryId, cancellationToken).ConfigureAwait(false);
+        var claim = await ClaimAsync(context, rel, mediaScope, libraryId, data.Get(HandoffRetries.PayloadMarker) is WireBool { Value: true }, cancellationToken).ConfigureAwait(false);
+        if (claim.Superseded)
+        {
+            _logger.LogInformation("Dropped the queued retry of {Path}: the file was given up on, finished or started again after it was queued.", rel);
+            return;
+        }
+
         if (claim.Failure is { } failure)
         {
             Merge(failure, provenance);

@@ -105,7 +105,7 @@ public sealed class QueueingFailurePolicy : IFailurePolicy
         ArgumentNullException.ThrowIfNull(uow);
         ArgumentNullException.ThrowIfNull(library);
         ArgumentNullException.ThrowIfNull(origin);
-        var body = Body(library, relativePath, origin).Set("media_scope", ProcessingMediaScopes.Normalize(library.MediaType)).Set("trigger", "retry");
+        var body = Body(library, relativePath, origin).Set("media_scope", ProcessingMediaScopes.Normalize(library.MediaType)).Set("trigger", "retry").Set(HandoffRetries.PayloadMarker, true);
         Enqueue(uow, $"{IntakeRules.RemuxPassJobKind}:handoff-retry:{library.Id}:{relativePath}:{startsAt.ToUnixTimeSeconds()}", IntakeRules.RemuxPassJobKind, body, library, startsAt);
         return Task.CompletedTask;
     }

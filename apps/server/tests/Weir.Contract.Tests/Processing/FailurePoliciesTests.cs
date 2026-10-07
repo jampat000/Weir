@@ -76,6 +76,12 @@ public sealed class FailurePoliciesTests
         Assert.Empty(await scenario.JobsAsync(Scenario.PassThroughKind));
         Assert.True(File.Exists(source));
         Assert.Equal(5, scenario.FakeTools.Calls(tool: "ffmpeg", step: "remux").Count);
+        // The fifth attempt's own job is still finishing when its failure is recorded; let it end first, then watch for a sixth.
+        await Poll.UntilAsync(
+            async () => (await scenario.JobsAsync(Scenario.RemuxKind)).All(job => (string)job["status"]! is not ("pending" or "leased")) ? "idle" : null,
+            "the fifth attempt to finish",
+            TimeSpan.FromSeconds(30));
+        Assert.Equal(5, (await scenario.JobsAsync(Scenario.RemuxKind)).Count);
         // Given up means given up: no further attempt is queued, however long Weir waits.
         await Scenario.NeverWithinAsync(
             async () => (await scenario.JobsAsync(Scenario.RemuxKind)).Any(job => (string)job["status"]! is "pending" or "leased"),
