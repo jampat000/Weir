@@ -85,6 +85,16 @@ public sealed class ManagerWorkflowSyncTests
         fixture.Db(uow => uow.QueryAsync(
             "SELECT title FROM activity_events WHERE event_type = $type ORDER BY id", reader => reader.GetString(0), ("$type", eventType)));
 
+    private static async Task<(string Title, string Message, string NextAction)> OneNotice(MediaManagerFixture fixture)
+    {
+        var details = await fixture.Db(uow => uow.QueryAsync(
+            "SELECT title, detail FROM activity_events WHERE event_type = $t",
+            reader => (Title: reader.GetString(0), Detail: JsonDocument.Parse(reader.GetString(1)).RootElement.Clone()),
+            ("$t", ActivityEventTypes.ProcessingWorkflowSyncNotice)));
+        var notice = Assert.Single(details);
+        return (notice.Title, notice.Detail.GetProperty("user_message").GetString()!, notice.Detail.GetProperty("next_action").GetString()!);
+    }
+
     [Fact]
     public async Task The_install_defaults_become_Delunos_workflows_with_its_folders_and_a_link()
     {
@@ -212,6 +222,27 @@ public sealed class ManagerWorkflowSyncTests
     }
 
     [Fact]
+    public async Task A_library_that_stops_processing_with_Weir_is_reported_once_with_what_to_do()
+    {
+        using var fixture = Deluno([Movies, Tv]);
+        await ConnectAsync(fixture);
+        await Sync(fixture);
+        Script(fixture, [Movies with { Workflow = "standard" }, Tv], new Dictionary<string, string?> { ["lib-tv"] = "/data/completed/tv" }, []);
+
+        await Sync(fixture);
+        await Sync(fixture);
+
+        var (title, message, nextAction) = await OneNotice(fixture);
+        Assert.Equal("Deluno on 192.0.2.30 no longer hands Movies to Weir", title);
+        Assert.Equal(
+            "Deluno on 192.0.2.30's Movies library is no longer set to Refine before import, so Deluno on 192.0.2.30 will not hand movie downloads to Weir. Weir left Movies as it is.",
+            message);
+        Assert.Equal(
+            "Choose Refine before import for that library in Deluno on 192.0.2.30. If you no longer want Movies, unlink it from Deluno on 192.0.2.30 or remove it in Weir.",
+            nextAction);
+    }
+
+    [Fact]
     public async Task A_library_Deluno_no_longer_has_leaves_its_workflow_and_deletes_nothing()
     {
         using var fixture = Deluno([Movies, Tv]);
@@ -223,6 +254,39 @@ public sealed class ManagerWorkflowSyncTests
         await Sync(fixture);
 
         Assert.Equal(before, await Workflows(fixture));
+    }
+
+    [Fact]
+    public async Task A_library_Deluno_no_longer_has_is_reported_with_what_to_do()
+    {
+        using var fixture = Deluno([Movies, Tv]);
+        await ConnectAsync(fixture);
+        await Sync(fixture);
+        Script(fixture, [Tv], new Dictionary<string, string?> { ["lib-tv"] = "/data/completed/tv" }, []);
+
+        await Sync(fixture);
+
+        var (title, message, nextAction) = await OneNotice(fixture);
+        Assert.Equal("Deluno on 192.0.2.30 no longer has the library for Movies", title);
+        Assert.Equal("Deluno on 192.0.2.30 no longer has the library this workflow came from. Weir left Movies as it is.", message);
+        Assert.Equal(
+            "Remove this workflow if the library is gone for good, or unlink it from Deluno on 192.0.2.30 to keep it as a Weir-only workflow.",
+            nextAction);
+    }
+
+    [Fact]
+    public async Task A_library_that_stops_processing_with_Weir_is_not_reported_for_a_workflow_that_was_unlinked()
+    {
+        using var fixture = Deluno([Movies]);
+        var connection = await ConnectAsync(fixture);
+        await Sync(fixture);
+        var movies = (await Workflows(fixture)).Single(workflow => workflow.DiscoveredLibraryKey == "lib-movies");
+        await fixture.Store.Execute($"DELETE FROM library_manager_links WHERE library_id = {movies.Id} AND connection_id = {connection}");
+        Script(fixture, [Movies with { Workflow = "standard" }], new Dictionary<string, string?> { ["lib-movies"] = "/data/completed/movie" }, []);
+
+        await Sync(fixture);
+
+        Assert.Empty(await Titles(fixture, ActivityEventTypes.ProcessingWorkflowSyncNotice));
     }
 
     [Fact]
@@ -254,6 +318,7 @@ public sealed class ManagerWorkflowSyncTests
 
         Assert.Equal(before, await Workflows(fixture));
         Assert.Empty(await Titles(fixture, ActivityEventTypes.ProcessingWorkflowSynced));
+        Assert.Empty(await Titles(fixture, ActivityEventTypes.ProcessingWorkflowSyncNotice));
     }
 
     [Fact]

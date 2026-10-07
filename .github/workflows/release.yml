@@ -5,8 +5,8 @@
 #
 #   ci-passed         ci.yml's ci-passed job already passed on this exact commit
 #                     (scripts/verify-ci-for-release.mjs), so the release does not repeat CI's tests.
-#   golden-path       the golden path already passed on this exact commit: a `golden-path` commit status of
-#                     `success` on it (scripts/verify-golden-path-for-release.mjs, docs/release.md).
+#   golden-path       for a stable tag, the golden path already passed on this exact commit: a `golden-path` commit
+#                     status of `success` on it (scripts/verify-golden-path-for-release.mjs, docs/release.md).
 #   validate          release-only checks: notes file, gate ordering, dependency advisories as of
 #                     today, the E2E smoke, and the production web build that ships as an asset.
 #   windows-smoke     builds, smokes and uploads the Windows package (artifact, not public).
@@ -62,8 +62,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: node scripts/verify-ci-for-release.mjs
 
-  # Does not wait either: the golden path is run on this commit's own build before the tag is made, and whoever ran
-  # it recorded the result as a commit status. A tag made without one fails at once, saying what to run.
+  # Does not wait either: for a stable tag, the golden path is run on this commit's own build before the tag is made,
+  # and whoever ran it recorded the result as a commit status. A stable tag made without one fails at once, saying
+  # what to run. A release candidate passes at once (docs/release.md, "Golden path before tagging").
   golden-path:
     runs-on: ubuntu-latest
     timeout-minutes: 10

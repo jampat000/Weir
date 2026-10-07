@@ -40,9 +40,10 @@ public sealed class SystemOverviewApiTests
     }
 
     /// <summary>The data of the next frame named <paramref name="name"/>, repeating <paramref name="provoke"/> until one arrives so the test waits out the stream's own start.</summary>
-    private static async Task<JsonNode> NextFrameAsync(StreamReader reader, string name, Action provoke)
+    /// <summary>The first <paramref name="name"/> frame that <paramref name="settled"/> accepts, provoking until one arrives.</summary>
+    private static async Task<JsonNode> NextFrameAsync(StreamReader reader, string name, Action provoke, Func<JsonNode, bool>? settled = null)
     {
-        var pending = ReadFrameAsync(reader, name);
+        var pending = ReadFrameAsync(reader, name, settled ?? (_ => true));
         for (var attempt = 0; attempt < 50 && !pending.IsCompleted; attempt++)
         {
             provoke();
@@ -52,7 +53,7 @@ public sealed class SystemOverviewApiTests
         return await pending.WaitAsync(TimeSpan.FromSeconds(10));
     }
 
-    private static async Task<JsonNode> ReadFrameAsync(StreamReader reader, string name)
+    private static async Task<JsonNode> ReadFrameAsync(StreamReader reader, string name, Func<JsonNode, bool> settled)
     {
         string? eventName = null;
         while (await reader.ReadLineAsync() is { } line)
@@ -61,9 +62,10 @@ public sealed class SystemOverviewApiTests
             {
                 eventName = line["event: ".Length..];
             }
-            else if (line.StartsWith("data: ", StringComparison.Ordinal) && eventName == name)
+            else if (line.StartsWith("data: ", StringComparison.Ordinal) && eventName == name
+                     && JsonNode.Parse(line["data: ".Length..]) is { } frame && settled(frame))
             {
-                return JsonNode.Parse(line["data: ".Length..])!;
+                return frame;
             }
         }
 
@@ -196,11 +198,15 @@ public sealed class SystemOverviewApiTests
         tasks.Plan("test-task", "A test task", DateTimeOffset.UtcNow.AddMinutes(5), TimeSpan.FromMinutes(5));
         using var reader = await OpenStreamAsync(server, client);
 
-        var frame = await NextFrameAsync(reader, "system.tasks", () =>
-        {
-            tasks.Begin("test-task");
-            tasks.End("test-task", ok: false, error: "The test said so.");
-        });
+        var frame = await NextFrameAsync(
+            reader,
+            "system.tasks",
+            () =>
+            {
+                tasks.Begin("test-task");
+                tasks.End("test-task", ok: false, error: "The test said so.");
+            },
+            frame => frame.AsArray().Any(entry => entry!["key"]!.GetValue<string>() == "test-task" && entry["last_ok"] is not null));
 
         var task = frame.AsArray().Single(entry => entry!["key"]!.GetValue<string>() == "test-task")!;
         Assert.Equal(("A test task", false, false, "The test said so."), (

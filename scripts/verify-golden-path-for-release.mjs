@@ -1,5 +1,7 @@
 #!/usr/bin/env node
-// Release gate: refuse to publish a tag unless the golden path has passed on the exact commit the tag points at.
+// Release gate: refuse to publish a stable tag unless the golden path has passed on the exact commit the tag points at.
+// A release candidate (a tag with a pre-release part, such as v1.0.0-rc.4) is not held for it: Weir is independent of
+// Deluno, so a Weir fix ships at once and the real-data test keeps running on it (the owner, 7 Oct 2026).
 // The golden path (docs/release.md, "Golden path before tagging") is a run of the real product on a clean
 // machine, installed from that commit's own build. Whoever drives it records the result as a GitHub commit status
 // on the commit:
@@ -12,8 +14,8 @@
 // how the latest run went.
 //
 // Usage (in release.yml):  node scripts/verify-golden-path-for-release.mjs
-//   env GH_TOKEN (statuses: read), GITHUB_REPOSITORY, GITHUB_SHA (else `git rev-parse HEAD`)
-// Options: --sha <sha>
+//   env GH_TOKEN (statuses: read), GITHUB_REPOSITORY, GITHUB_REF_NAME (the tag), GITHUB_SHA (else `git rev-parse HEAD`)
+// Options: --sha <sha>, --tag <tag>
 import { execFileSync } from "node:child_process";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -22,6 +24,13 @@ export const GOLDEN_PATH_CONTEXT = "golden-path";
 
 export const NO_PASSING_RUN =
   "This commit has no passing golden-path run. Run the golden path on this exact build (see docs/release.md), then re-run the release.";
+
+// Whether a tag must wait for the golden path: a stable release does, a release candidate does not.
+export function requiresGoldenPath(tag) {
+  const version = String(tag ?? "").replace(/^refs\/tags\//, "").replace(/^v/, "").split("+")[0];
+  if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(version)) throw new Error(`Not a release tag: ${tag}`);
+  return !version.includes("-");
+}
 
 // The newest status for a context. `statuses` are commit statuses as the API returns them (id, context, state,
 // created_at, ...). Ids rise with time, so they settle two statuses created in the same second.
@@ -63,6 +72,11 @@ function listStatuses(repository, sha) {
 function main() {
   const argv = process.argv.slice(2);
   const option = (flag) => (argv.includes(flag) ? argv[argv.indexOf(flag) + 1] : undefined);
+  const tag = option("--tag") || process.env.GITHUB_REF_NAME;
+  if (!requiresGoldenPath(tag)) {
+    console.log(`Release gate: ${tag} is a release candidate, so it ships without waiting for the golden path.`);
+    return;
+  }
   const repository = process.env.GITHUB_REPOSITORY;
   if (!repository) throw new Error("GITHUB_REPOSITORY must be set.");
   const sha = option("--sha") || process.env.GITHUB_SHA || execFileSync("git", ["rev-parse", "HEAD^{commit}"], { encoding: "utf8" }).trim();
