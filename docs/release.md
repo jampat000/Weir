@@ -38,7 +38,7 @@ never changes. Cutting a release is:
    candidate itself: in the same PR, replace the previous candidate's version (for example
    `1.0.0-rc.1`) with the new one in `compose.yaml`, `docker/.env.example`, `README.md`,
    `docker/README.md`, `docs/docker.md`, `docs/install-docker.md` and `docs-site/docs`
-   (`git grep -l 1.0.0-rc.1` lists them). At 1.0.0 they go back to `latest`. Touching `compose.yaml`,
+   (`git grep -l <previous version>` lists them). At 1.0.0 they go back to `latest`. Touching `compose.yaml`,
    `Dockerfile`, `docker/**` or `packaging/**` makes CI run both package smokes, on the PR and again on
    `main`, and the release is not tagged until that run on `main` is green (it does not wait for one).
 

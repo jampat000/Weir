@@ -92,14 +92,14 @@ Weir runs on any machine with Docker, including Synology, Unraid, TrueNAS and Ra
 
 ### The quickest way
 
-Weir is at release-candidate stage, and a release candidate is published under its version tag only, so the examples below name `1.0.0-rc.1`. The `latest` tag arrives with 1.0.0.
+Weir is at release-candidate stage, and a release candidate is published under its version tag only, so the examples below name `1.0.0-rc.2`. The `latest` tag arrives with 1.0.0.
 
 Make a folder, save this as `compose.yaml` inside it:
 
 ```yaml
 services:
   weir:
-    image: ghcr.io/jampat000/weir:1.0.0-rc.1
+    image: ghcr.io/jampat000/weir:1.0.0-rc.2
     container_name: weir
     hostname: my-server   # what Weir calls itself: "Weir on my-server"
     ports:
@@ -129,7 +129,7 @@ Weir can only clean files it can see, so give it your media folders. This is the
 ```yaml
 services:
   weir:
-    image: ghcr.io/jampat000/weir:1.0.0-rc.1
+    image: ghcr.io/jampat000/weir:1.0.0-rc.2
     container_name: weir
     ports:
       - "9347:9347"
@@ -154,7 +154,7 @@ When one app tells another where a file is, that path has to mean the same thing
 ```yaml
 services:
   weir:
-    image: ghcr.io/jampat000/weir:1.0.0-rc.1
+    image: ghcr.io/jampat000/weir:1.0.0-rc.2
     container_name: weir
     ports:
       - "9347:9347"
