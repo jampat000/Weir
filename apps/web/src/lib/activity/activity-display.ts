@@ -30,6 +30,8 @@ const EVENT_LABELS: Record<string, string> = {
   "auth.username_changed": "Username changed",
   "system.reconciliation.repair": "System repair finished",
   "system.network_access.changed": "Network access changed",
+  "system.processing_paused": "Processing paused",
+  "system.processing_resumed": "Processing resumed",
   "arr_library.connection_test_succeeded": "Connection check finished",
   "arr_library.connection_test_failed": "Connection check failed",
   "processing.supplied_payload_evaluation_completed":

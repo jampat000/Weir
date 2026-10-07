@@ -55,6 +55,7 @@ public static class WeirPlatformServices
         services.TryAddSingleton<OperationalHistoryStore>();
         services.TryAddSingleton<NotificationChannelStore>();
         services.TryAddSingleton<SuiteSettingsStore>();
+        services.TryAddSingleton<SuitePauseService>();
         services.TryAddSingleton<ConfigurationBundleConnections>();
         services.TryAddSingleton<ConfigurationBundleStore>();
 
