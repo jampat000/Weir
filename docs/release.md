@@ -69,7 +69,7 @@ never changes. Cutting a release is:
 
 Green tests have shipped bugs that only showed when the product was used (a pause that did not pause, seeding
 originals deleted, a file cleaned twice). So before a tag is made, the exact commit is installed on a clean machine
-and used the way a person uses it, and the release will not publish unless that run is on record. Decided by James,
+and used the way a person uses it, and the release will not publish unless that run is on record. Decided by the owner,
 7 Oct 2026 (#903; Deluno's half is Deluno#1158, and the mechanism is the same in both).
 
 **1. Get the exact commit's build.** CI builds the Windows package for any commit without a tag and keeps it for
@@ -78,10 +78,11 @@ and used the way a person uses it, and the release will not publish unless that 
 
 - A push to `main` builds it when the change touched code, packaging or a workflow. A commit that changed only
   documents or release notes (which is what a release commit normally is) builds nothing, and neither does a pull
-  request run. To build any commit or branch, run CI by hand, which skips nothing:
+  request run. To build any commit or branch, run CI by hand, which skips nothing. For the golden path, give it
+  the release the commit is meant to become:
 
   ```bash
-  gh workflow run ci.yml --repo jampat000/Weir --ref main
+  gh workflow run ci.yml --repo jampat000/Weir --ref main -f version=1.0.0-rc.4
   ```
 
   `--ref` takes a branch or a tag; for a commit that no branch points at, push a branch at it first.
@@ -93,9 +94,12 @@ and used the way a person uses it, and the release will not publish unless that 
   gh run download <run id> --repo jampat000/Weir -n weir-windows-<short sha> -D weir-build
   ```
 
-- The build is not stamped with a version: it reports `0.0.1-dev`, the placeholder in
-  `apps/server/Directory.Build.props`, because only a tag stamps a real one. The artifact's name and its run's
-  `headSha` are what tie it to the commit. It is never published.
+- Given a version, the build reports that version with the commit as build metadata, such as
+  `1.0.0-rc.4+abc1234`: in `Weir.exe --version`, in System › About, and in the capabilities answer Deluno shows.
+  The golden-path record names it. Update checks ignore the `+abc1234` part, so the build counts as the release
+  itself. Without a version, or on a push, it reports `0.0.1-dev`, the placeholder in
+  `apps/server/Directory.Build.props`. Either way the artifact's name and its run's `headSha` tie it to the
+  commit, and it is never published.
 
 **2. Run it on the clean VM.** The Deluno session drives the run on a Hyper-V Windows VM that is reverted to its
 saved clean checkpoint before every run, with Deluno's installer and this build's `Weir-win-Setup.exe` both built from

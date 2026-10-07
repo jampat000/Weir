@@ -24,6 +24,10 @@ if (-not $PackageDir) {
   $PackageDir = Join-Path $repoRoot "dist\windows\pack\server"
 }
 $packagePath = (Resolve-Path -LiteralPath $PackageDir).Path
+if (-not $ExpectedVersion -and $env:WEIR_BUILD_VERSION) {
+  # The version build-velopack.ps1 stamped, as CI sets it for a golden-path build.
+  $ExpectedVersion = $env:WEIR_BUILD_VERSION.TrimStart("v")
+}
 if (-not $ExpectedVersion) {
   $propsPath = Join-Path $repoRoot "apps\server\Directory.Build.props"
   $propsMatch = [regex]::Match((Get-Content -LiteralPath $propsPath -Raw), '<WeirVersion>([^<]+)</WeirVersion>')

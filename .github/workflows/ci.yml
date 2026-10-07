@@ -23,6 +23,14 @@ on:
     branches: ["main"]
   pull_request:
   workflow_dispatch:
+    inputs:
+      version:
+        description: >-
+          For the golden path: the release this commit is meant to become, e.g. 1.0.0-rc.4. The Windows build then
+          reports 1.0.0-rc.4+<short sha>. Leave empty for the placeholder version.
+        type: string
+        required: false
+        default: ""
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -483,6 +491,7 @@ jobs:
     uses: ./.github/workflows/ci-packaging.yml
     with:
       arm64: ${{ needs.changes.outputs.run_arm64 == 'true' }}
+      version: ${{ inputs.version || '' }}
 
   # The verdict. `always()` so it reports even when a job it needs failed or was skipped.
   ci-passed:
