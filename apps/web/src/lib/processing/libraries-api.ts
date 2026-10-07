@@ -81,6 +81,8 @@ export interface ProcessingLibrary {
   manager_coverage_detail: string;
   discovered_from_connection_id: number | null;
   discovered_library_key: string | null;
+  /** The media manager (Deluno) that owns the watched and output folders and keeps them up to date; null when they are the workflow's own. */
+  folders_synced_from_connection_id: number | null;
   /** Queued or running jobs. Deletion is refused while this is non-zero. */
   active_job_count: number;
   /** When Weir next looks at the watched folder (the next periodic scan, or sooner when a held file's wait ends). */

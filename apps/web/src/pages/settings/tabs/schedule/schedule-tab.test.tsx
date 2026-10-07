@@ -98,6 +98,7 @@ function library(over: Partial<ProcessingLibrary> = {}): ProcessingLibrary {
       "No media manager has been tested for this workflow.",
     discovered_from_connection_id: null,
     discovered_library_key: null,
+    folders_synced_from_connection_id: null,
     active_job_count: 0,
     updated_at: null,
     ...over,
