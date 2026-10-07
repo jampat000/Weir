@@ -14,6 +14,20 @@ internal static class DelunoDestinationNotices
         $"in Deluno, open {KeysMenu} and create a key with Media automation access (it includes Imports), then save that key under Setup › Connections › Media managers in Weir.";
 
     public static string LibraryGone(string managerLabel) =>
-        $"{managerLabel} no longer has the library this workflow came from, so Weir can't check where its downloads go. " +
+        $"{LibraryGoneFact(managerLabel)}, so Weir can't check where its downloads go. {LibraryGoneAdvice(managerLabel)}";
+
+    /// <summary>What happened when Deluno no longer lists the library a workflow came from (no closing full stop, so a sentence can follow).</summary>
+    public static string LibraryGoneFact(string managerLabel) => $"{managerLabel} no longer has the library this workflow came from";
+
+    public static string LibraryGoneAdvice(string managerLabel) =>
         $"Remove this workflow if the library is gone for good, or unlink it from {managerLabel} to keep it as a Weir-only workflow.";
+
+    /// <summary>The word for a media scope in these sentences: "TV" or "movie".</summary>
+    public static string ScopeWord(string? mediaScope) => mediaScope == MediaManagerKinds.Tv ? "TV" : "movie";
+
+    public static string StoppedRefining(string managerLabel, string libraryName, string? mediaScope) =>
+        $"{managerLabel}'s {libraryName} library is no longer set to Refine before import, so {managerLabel} will not hand {ScopeWord(mediaScope)} downloads to Weir.";
+
+    public static string StoppedRefiningAdvice(string managerLabel) =>
+        $"Choose Refine before import for that library in {managerLabel}.";
 }

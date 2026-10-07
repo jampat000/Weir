@@ -22,8 +22,11 @@ public sealed partial class ManagerWorkflowSync
     {
         private List<ProcessingLibraryRecord> _workflows = [];
 
-        /// <summary>Makes every change <see cref="WorkflowSyncRules.Plan"/> asks for; true when a workflow changed.</summary>
-        public async Task<bool> ApplyAsync(IReadOnlyList<SyncedLibrary> wanted)
+        /// <summary>
+        /// Makes every change <see cref="WorkflowSyncRules.Plan"/> asks for and reports what it leaves alone; true when a workflow changed.
+        /// <paramref name="listed"/> is every library the manager lists, whether or not it processes with Weir.
+        /// </summary>
+        public async Task<bool> ApplyAsync(IReadOnlyList<SyncedLibrary> wanted, IReadOnlyList<ManagerLibraryDescriptor> listed)
         {
             _workflows = await sync._libraries.ListAsync(uow).ConfigureAwait(false);
             var snapshots = new List<SyncWorkflow>();
@@ -45,6 +48,11 @@ public sealed partial class ManagerWorkflowSync
             foreach (var library in wanted.Where(library => library.Problem is not null))
             {
                 await ReportProblemAsync(library).ConfigureAwait(false);
+            }
+
+            foreach (var departed in WorkflowSyncRules.Departed(connectionId, listed, snapshots))
+            {
+                await ReportDepartedAsync(departed).ConfigureAwait(false);
             }
 
             return changed;
@@ -176,6 +184,18 @@ public sealed partial class ManagerWorkflowSync
                 $"Set the folder in {connection.Label}.",
                 library.MediaType,
                 workflow).ConfigureAwait(false);
+        }
+
+        /// <summary>A workflow whose library stopped processing with Weir or is gone from the manager: left as it is, and the person is told.</summary>
+        private Task ReportDepartedAsync(DepartedWorkflow departed)
+        {
+            var label = connection.Label;
+            return NoticeAsync(
+                WorkflowSyncRules.DepartedTitle(departed, label),
+                WorkflowSyncRules.DepartedMessage(departed, label),
+                WorkflowSyncRules.DepartedNextAction(departed, label),
+                departed.Workflow.MediaType,
+                _workflows.First(workflow => workflow.Id == departed.Workflow.Id));
         }
 
         private async Task NoticeAsync(string title, string message, string nextAction, string mediaType, ProcessingLibraryRecord? workflow)

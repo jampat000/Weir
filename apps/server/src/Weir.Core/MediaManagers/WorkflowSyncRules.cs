@@ -25,6 +25,12 @@ public sealed record SyncWorkflow(
     bool SyncsFoldersFrom,
     IReadOnlyCollection<long> LinkedConnectionIds);
 
+/// <summary>
+/// A workflow still kept in step with a manager whose library no longer processes with Weir. <see cref="Library"/> is the library as
+/// the manager lists it now, or null when the manager no longer lists it.
+/// </summary>
+public sealed record DepartedWorkflow(SyncWorkflow Workflow, ManagerLibraryDescriptor? Library);
+
 public enum WorkflowSyncKind
 {
     /// <summary>No workflow is linked to the library and none is free to take over, so a new one is made.</summary>
@@ -87,6 +93,22 @@ public static class WorkflowSyncRules
                 answer.Status == DelunoDestinationsStatus.Read
                     ? answer.Libraries.FirstOrDefault(published => string.Equals(published.LibraryId, library.Key, StringComparison.OrdinalIgnoreCase))
                     : null))];
+    }
+
+    /// <summary>
+    /// The workflows kept in step with manager <paramref name="connectionId"/> whose library is no longer listed by it, or is no
+    /// longer set to Refine before import. They are reported and left as they are; a workflow that was unlinked is the person's own
+    /// and is not one of them.
+    /// </summary>
+    public static IReadOnlyList<DepartedWorkflow> Departed(
+        long connectionId, IReadOnlyList<ManagerLibraryDescriptor> libraries, IReadOnlyList<SyncWorkflow> workflows)
+    {
+        ArgumentNullException.ThrowIfNull(libraries);
+        ArgumentNullException.ThrowIfNull(workflows);
+        return [.. workflows
+            .Where(workflow => workflow.SyncsFoldersFrom && workflow.DiscoveredFromConnectionId == connectionId)
+            .Select(workflow => new DepartedWorkflow(workflow, libraries.FirstOrDefault(library => library.Key == workflow.DiscoveredLibraryKey)))
+            .Where(departed => departed.Library is not { ProcessesBeforeImport: true })];
     }
 
     /// <summary>
@@ -176,6 +198,23 @@ public static class WorkflowSyncRules
     /// <summary>The same folder, written either way round: case- and separator-insensitive, as a hand-off's path is compared.</summary>
     private static bool SameFolder(string first, string second) =>
         LibraryDiscoveryRules.Comparable(first) == LibraryDiscoveryRules.Comparable(second);
+
+    public static string DepartedTitle(DepartedWorkflow departed, string managerLabel) =>
+        departed.Library is { } library
+            ? $"{managerLabel} no longer hands {library.Name} to Weir"
+            : $"{managerLabel} no longer has the library for {departed.Workflow.Name}";
+
+    /// <summary>Why the workflow is not being worked on any more, and that Weir has left it as it is.</summary>
+    public static string DepartedMessage(DepartedWorkflow departed, string managerLabel) =>
+        (departed.Library is { } library
+            ? DelunoDestinationNotices.StoppedRefining(managerLabel, library.Name, library.MediaScope)
+            : $"{DelunoDestinationNotices.LibraryGoneFact(managerLabel)}.")
+        + $" Weir left {departed.Workflow.Name} as it is.";
+
+    public static string DepartedNextAction(DepartedWorkflow departed, string managerLabel) =>
+        departed.Library is null
+            ? DelunoDestinationNotices.LibraryGoneAdvice(managerLabel)
+            : $"{DelunoDestinationNotices.StoppedRefiningAdvice(managerLabel)} If you no longer want {departed.Workflow.Name}, unlink it from {managerLabel} or remove it in Weir.";
 
     public static string SetUpTitle(string workflowName, string managerLabel) => $"Workflow {workflowName} set up from {managerLabel}";
 
