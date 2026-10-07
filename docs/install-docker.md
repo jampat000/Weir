@@ -190,8 +190,8 @@ Why the work folder sits on the same volume as the output folder: when both are 
 a file by moving it, which is instant. If the work folder is on a different volume (by default it is inside
 `/data/weir`), Weir copies it instead, which takes about as long again as the cleaning.
 
-If you use torrents, turn **New downloads: after cleaning, delete the original download** off in the
-workflow, so the torrent keeps seeding.
+Weir never deletes the original download for a workflow linked to Sonarr or Radarr, so a torrent keeps
+seeding.
 
 **Sonarr** works the same way with a `tv` folder. **Deluno** needs no remote path mapping when it sees the same
 paths: Deluno hands Weir each file, Weir cleans it, and Deluno imports the result. If Deluno sees a different path,

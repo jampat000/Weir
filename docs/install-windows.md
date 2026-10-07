@@ -105,9 +105,9 @@ mode** decides what happens:
 Updates are small, need no administrator rights, and keep your data. After one, Weir starts again quietly,
 without opening a browser window.
 
-While Weir is a release candidate, the in-app check only looks at stable releases, not pre-releases. To move
-from one release candidate to the next, download the new `Weir-win-Setup.exe` from the Releases page and run
-it. It installs over the old one. Your data is not touched.
+A release candidate is offered the next release candidate as well as stable releases; a stable install is only
+ever offered stable ones. You can also download the new `Weir-win-Setup.exe` from the Releases page and run it.
+It installs over the old one. Your data is not touched.
 
 Before a big upgrade, take a backup under **System › Backups**.
 
