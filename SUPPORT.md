@@ -17,7 +17,7 @@ When opening an issue, include:
 ## Windows LAN access
 
 If Weir opens locally but another device on your LAN cannot reach it, allow
-`WeirServer.exe` (located under `%LocalAppData%\Weir\current\server\`) through Windows Firewall for your current network profile. Public network
-profiles are not opened automatically; switch the network to Private/Domain or add a manual rule only if that matches
-your security setup.
+`WeirServer.exe` (located under `%LocalAppData%\Weir\current\server\`) through Windows Firewall for your current network profile. If you chose **Devices on my network** before
+Weir's rule covered every network profile, choose it again (or use **Try again** on System › About) so Windows asks
+once more and replaces the older rule.
 

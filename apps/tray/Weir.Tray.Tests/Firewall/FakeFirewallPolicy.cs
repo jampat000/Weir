@@ -14,6 +14,9 @@ internal sealed class FakeFirewallPolicy : IFirewallPolicy
 
     public IReadOnlyList<FirewallRule> Rules => _rules;
 
+    /// <summary>The networks this PC is on; Private unless a test sets it.</summary>
+    public FirewallProfiles CurrentProfiles { get; set; } = FirewallProfiles.Private;
+
     public void AddOrUpdateRule(FirewallRule rule)
     {
         _rules.RemoveAll(r => r.Name == rule.Name);

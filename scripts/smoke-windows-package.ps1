@@ -507,8 +507,10 @@ function Assert-WeirFirewallRule {
     throw "The Weir firewall rule is not an enabled inbound allow rule (Direction=$($rule.Direction), Action=$($rule.Action), Enabled=$($rule.Enabled))."
   }
   $ruleProfile = [string]$rule.Profile
-  if ($ruleProfile -notmatch "Private" -or $ruleProfile -notmatch "Domain" -or $ruleProfile -match "Public") {
-    throw "The Weir firewall rule's profile is '$ruleProfile'; expected exactly Private and Domain, never Public."
+  # Windows reports a rule that covers every network as "Any"; otherwise the three profile names are listed.
+  $coversEveryProfile = $ruleProfile -match "Any" -or ($ruleProfile -match "Domain" -and $ruleProfile -match "Private" -and $ruleProfile -match "Public")
+  if (-not $coversEveryProfile) {
+    throw "The Weir firewall rule's profile is '$ruleProfile'; expected every profile (Domain, Private and Public)."
   }
   $ruleProgram = (Get-NetFirewallApplicationFilter -AssociatedNetFirewallRule $rule).Program
   if ($ruleProgram -ne $ServerExe) {
