@@ -21,6 +21,7 @@ public sealed class ArtworkPrunerTests
         await fixture.Discovery.DiscoverAsync(CancellationToken.None);
         await fixture.Resolver.ResolveDueAsync(5, CancellationToken.None);
         fixture.Store.Clock.Advance(ArtworkRateLimiter.MinimumBetweenSearches);
+        await fixture.BackdateLookupsToClockAsync();
         return library;
     }
 
@@ -98,8 +99,39 @@ public sealed class ArtworkPrunerTests
         await fixture.InsertFileAsync(await fixture.LibraryIdAsync("movie"), FilmPath);
         await fixture.Discovery.DiscoverAsync(CancellationToken.None);
         await fixture.Resolver.ResolveDueAsync(5, CancellationToken.None);
+        await fixture.BackdateLookupsToClockAsync();
         await ForgetFileAsync(fixture, FilmPath);
         await fixture.Pruner.PruneAsync(CancellationToken.None);
+
+        fixture.Store.Clock.Advance(TimeSpan.FromDays(31));
+        await fixture.Pruner.PruneAsync(CancellationToken.None);
+
+        Assert.Equal(0, await fixture.Store.Scalar("SELECT count(*) FROM artwork_lookups"));
+    }
+
+    [Fact]
+    public async Task A_title_asked_about_for_a_file_not_yet_titled_is_not_asked_about_again_when_a_pass_prunes()
+    {
+        using var fixture = new ArtworkFixture();
+        fixture.ServeSearch(ArtworkFixture.SearchAnswer(PosterFile, originalLanguage: "de"));
+        var library = await fixture.LibraryIdAsync("movie");
+        await fixture.OriginalLanguages.LookupAsync("movie", library, FilmPath, origin: null, CancellationToken.None);
+
+        await fixture.Pruner.PruneAsync(CancellationToken.None);
+        fixture.Store.Clock.Advance(ArtworkRateLimiter.MinimumBetweenSearches);
+        var again = await fixture.OriginalLanguages.LookupAsync("movie", library, FilmPath, origin: null, CancellationToken.None);
+
+        Assert.Equal("de", again.Metadata!.OriginalLanguage);
+        Assert.Single(fixture.Searches());
+    }
+
+    [Fact]
+    public async Task A_title_no_file_ever_used_goes_once_the_grace_has_passed()
+    {
+        using var fixture = new ArtworkFixture();
+        fixture.ServeSearch(ArtworkFixture.SearchAnswer(PosterFile));
+        await fixture.OriginalLanguages.LookupAsync("movie", await fixture.LibraryIdAsync("movie"), FilmPath, origin: null, CancellationToken.None);
+        await fixture.BackdateLookupsToClockAsync();
 
         fixture.Store.Clock.Advance(TimeSpan.FromDays(31));
         await fixture.Pruner.PruneAsync(CancellationToken.None);
