@@ -75,7 +75,9 @@ LAN access is one saved choice, kept in the data folder (`C:\ProgramData\Weir\la
 - a program runs `Weir.exe --allow-lan` (see [Unattended installs](#unattended-installs)).
 
 Saying yes creates one inbound firewall rule named **Weir**, scoped to the installed server
-(`server\WeirServer.exe`) and only the **Private** and **Domain** network profiles — never **Public**. It also
+(`server\WeirServer.exe`) and every network profile (**Domain**, **Private** and **Public**), because Windows often marks a home network
+Public. Weir is still behind its own sign-in. A rule from an earlier version that covers only Private and Domain is
+replaced by this one the next time you allow it. The same step also
 removes any block rule Windows itself created earlier for that program, for example one left behind if its own
 "blocked some features" prompt was cancelled or never seen. Declining leaves nothing changed, and Weir does not
 ask again automatically.
@@ -98,7 +100,7 @@ network** side by side and one line under them:
 | This PC only | LAN access is off. Choose **Devices on my network** to change it. |
 | Reachable from your network: `http://10.0.0.196:9347` | LAN access is on and Windows Firewall lets the network you are on through. The address is what another device types; **Copy** copies it. Choose **This PC only** to turn it off. |
 | Waiting for approval on your PC's name | You chose **Devices on my network** and Windows Firewall has no rule for Weir yet. Approve the Windows admin prompt on that PC. Weir restarts once you do. |
-| Blocked by Windows Firewall | LAN access is on, but a block rule exists, or the allow rule is missing, disabled, or does not cover the network you are on (Public is never covered), or the admin prompt was declined. **Try again** asks Windows once more. |
+| Blocked by Windows Firewall | LAN access is on, but a block rule exists, or the allow rule is missing, disabled, or does not cover the network you are on (for example a rule from an earlier version that skips Public), or the admin prompt was declined. **Try again** asks Windows once more, and the new rule covers every network. |
 
 Choosing **Devices on my network** asks you to confirm first, because other devices on your network will be able to
 reach Weir's sign-in page. Only an admin can change it, and each change is recorded in **Activity**.
