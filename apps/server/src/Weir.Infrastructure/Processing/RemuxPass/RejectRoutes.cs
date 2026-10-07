@@ -188,12 +188,14 @@ public sealed class RejectRoutes
         return QueueMatch.Ok(matchedConnection, matchedRow);
     }
 
-    /// <summary>A manager that hands files over gets a failed report with disposition: rejected.</summary>
+    /// <summary>A manager that hands files over gets a failed report with disposition: rejected. When the workflow is linked
+    /// to the manager, the download is the manager's and its client's to remove: the report says Weir did not remove it, and Weir leaves it in place.</summary>
     public async Task<RejectRouteOutcome> ThroughHandoffAsync(
-        HandoffReportTarget target, HandoffOrigin origin, string source, string watchedRoot, string reason, string? failureClass, CancellationToken cancellationToken)
+        HandoffReportTarget target, HandoffOrigin origin, string source, string watchedRoot, string reason, string? failureClass, WorkflowManagerLinks links, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(target);
         ArgumentNullException.ThrowIfNull(origin);
+        ArgumentNullException.ThrowIfNull(links);
         var connection = target.Connection;
         var label = connection.Label;
         var port = _ports.PortForKind(connection.Kind);
@@ -230,7 +232,7 @@ public sealed class RejectRoutes
             result.Set("failure_class", failureClass);
         }
 
-        var body = CompletionReports.BuildCompletionBody(origin, result, rejected: true);
+        var body = CompletionReports.BuildCompletionBody(origin, result, rejected: true, sourceRemoved: !links.KeepsOriginals);
         var delivery = await _reporter.PostHandoffReportAsync(target, body, cancellationToken).ConfigureAwait(false);
         var report = new RejectDeliveryReport(target, body, delivery);
         if (!delivery.Accepted)
@@ -242,6 +244,16 @@ public sealed class RejectRoutes
 
             var status = delivery.Status.StartsWith("failed: ", StringComparison.Ordinal) ? delivery.Status["failed: ".Length..] : delivery.Status;
             return new RejectRouteOutcome(false, $"{label} did not accept the rejection ({status}), so Weir kept the download.", label, null, report);
+        }
+
+        if (links.KeepsOriginals)
+        {
+            return new RejectRouteOutcome(
+                true,
+                $"{label} accepted that this release is bad and can find a different one. {label} will remove the download; Weir left it in place.",
+                label,
+                new WireObject().Set("route", "handoff").Set("source_removed", false),
+                report);
         }
 
         var cleanup = RemuxPassPaths.CleanupRejectedFile(watchedRoot, source, "delete_file");

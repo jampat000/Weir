@@ -161,7 +161,7 @@ public sealed class HistoryFileRemovalService
         var outcome = !route.DeleteHandled
             ? SelfDelete(watchedRoot, source, links)
             : route.HandoffTarget is not null
-                ? await _routes.ThroughHandoffAsync(route.HandoffTarget, route.Origin!, source, watchedRoot, DeleteReason, null, cancellationToken).ConfigureAwait(false)
+                ? await _routes.ThroughHandoffAsync(route.HandoffTarget, route.Origin!, source, watchedRoot, DeleteReason, null, links, cancellationToken).ConfigureAwait(false)
                 : await _routes.ThroughQueueAsync(route.QueueConnections, source, cancellationToken).ConfigureAwait(false);
 
         if (outcome.Done)
