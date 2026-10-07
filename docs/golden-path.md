@@ -1,6 +1,6 @@
 # Golden path
 
-The run that gates every release tag of Deluno and Weir. This page is the same, word for word, in both repositories. A change to it is made in both, in the same words.
+The run that gates every Deluno release and every Weir stable release. Weir's release candidates ship without waiting for it: Weir is independent of Deluno, so a Weir fix reaches the real-data machine at once (the owner, 7 Oct 2026). This page is the same, word for word, in both repositories. A change to it is made in both, in the same words.
 
 ## Why
 
@@ -8,7 +8,7 @@ Green tests have shipped bugs that only showed when the product was used: a paus
 
 ## When, where and who
 
-- **When:** before the tag, on the exact commit that will be tagged. A release whose tagged commit has no passing record does not publish.
+- **When:** before the tag, on the exact commit that will be tagged, for every release it gates. A release whose tagged commit has no passing record does not publish.
 - **Where:** a clean Hyper-V Windows VM with a saved clean checkpoint, reverted before every run. The real-data machine is not the golden path.
 - **What is installed:** Deluno's installer built from Deluno's commit, and Weir's Setup built from Weir's commit. Weir's comes from a manual CI run given the release it will become, `gh workflow run ci.yml --repo jampat000/Weir --ref main -f version=<version>`, as the artifact `weir-windows-<short sha>`. It reports `<version>+<short sha>`.
 - **Who:** the Deluno session drives the run. The Weir session checks Weir's side, read-only and through Weir's own screens.

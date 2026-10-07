@@ -45,8 +45,9 @@ never changes. Cutting a release is:
    This PR touches nothing under `apps/`, `packaging/` or `Dockerfile`, so `CI / ci-passed` on it and
    on its merge to `main` both finish in well under a minute (path-aware CI skips everything but the
    repository checks).
-3. Run the golden path on that exact commit and record that it passed
-   ([Golden path before tagging](#golden-path-before-tagging)). The release refuses to publish without it.
+3. For a stable release, run the golden path on that exact commit and record that it passed
+   ([Golden path before tagging](#golden-path-before-tagging)). The release refuses to publish without it. A release
+   candidate skips this step.
 4. Create an annotated tag on that merge commit:
 
    ```bash
@@ -71,6 +72,9 @@ Green tests have shipped bugs that only showed when the product was used (a paus
 originals deleted, a file cleaned twice). So before a tag is made, the exact commit is installed on a clean machine
 and used the way a person uses it, and the release will not publish unless that run is on record. Decided by the owner,
 7 Oct 2026 (#903; Deluno's half is Deluno#1158, and the mechanism is the same in both).
+
+This holds for stable releases. A release candidate (`v1.0.0-rc.4`) is tagged as soon as CI passes on its commit:
+Weir is independent of Deluno, so a Weir fix ships at once and the real-data test keeps running on it. The rig's live test is its proof, and the golden path runs on the next stable release.
 
 **1. Get the exact commit's build.** CI builds the Windows package for any commit without a tag and keeps it for
 7 days as the workflow artifact `weir-windows-<short sha>` (the first 7 characters of the commit), holding
@@ -186,7 +190,8 @@ The `Release` workflow:
   gh workflow run ci.yml --ref vX.Y.Z
   ```
 
-- **`golden-path`**: confirms the golden path passed on the exact tagged commit: the newest commit status
+- **`golden-path`**: for a stable tag, confirms the golden path passed on the exact tagged commit (a release
+  candidate passes it at once): the newest commit status
   with the context `golden-path` is `success` (`scripts/verify-golden-path-for-release.mjs`). It reads
   statuses only and does not wait. See [Golden path before tagging](#golden-path-before-tagging).
 

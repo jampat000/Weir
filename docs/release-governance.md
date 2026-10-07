@@ -26,9 +26,10 @@ Decided by the owner, 7 Oct 2026 (#903), after bugs kept turning up in things th
    never enough.
 2. **Every fix gets a test that does what the user does:** a real HTTP request against a running Weir, or a
    Playwright click. A check of an attribute or a label is not that test.
-3. **The golden path gates every release tag.** Before the tag, the exact commit's build is installed on a clean VM
+3. **The golden path gates every stable release.** Before the tag, the exact commit's build is installed on a clean VM
    and used end to end (`docs/release.md`, "Golden path before tagging"). The run is recorded as the commit status
-   `golden-path`, and `release.yml` refuses to publish a commit that has no passing one.
+   `golden-path`, and `release.yml` refuses to publish a stable tag whose commit has no passing one. A release
+   candidate is not held for it: Weir is independent of Deluno, so a Weir fix ships at once and the real-data test keeps running on it (the owner, 7 Oct 2026). Its proof is the live test on the rig.
 4. **Broad changes need a full click-through before they ship:** class rewrites, dependency bumps and refactors are
    checked by walking the whole product, not by the tests that cover the lines they touched.
 
