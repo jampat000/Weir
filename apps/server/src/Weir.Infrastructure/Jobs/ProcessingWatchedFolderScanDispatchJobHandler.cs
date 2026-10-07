@@ -22,6 +22,8 @@ namespace Weir.Infrastructure.Jobs;
 /// <see cref="WatchedFileDispatch"/> exactly as the "why held" diagnostic applies it.</para>
 /// <para>A scan is an independent lane: it reads what it needs, walks and decides with no transaction open, and writes in
 /// short batches (<see cref="WatchedFolderScanBatch"/>), so no other lane ever waits on it for the write lock (#708).</para>
+/// <para>A workflow a linked Deluno hands its downloads to is never scanned, whatever queued the scan: its files are processed only
+/// from Deluno's hand-off (<see cref="Weir.Core.MediaManagers.WorkflowManagerLinks.HandedOffByManager"/>).</para>
 /// </remarks>
 public sealed class ProcessingWatchedFolderScanDispatchJobHandler : IJobHandler
 {
