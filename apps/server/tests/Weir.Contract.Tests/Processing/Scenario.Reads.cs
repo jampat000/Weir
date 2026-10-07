@@ -136,7 +136,8 @@ internal sealed partial class Scenario
     /// <summary>
     /// Lets automatic retries happen, as the periodic watched-folder scan would, until <paramref name="probe"/> says yes. A failed
     /// file is picked up again by a scan once its backoff has passed. Rather than wait out the scan timer, the scenario asks for a
-    /// scan while a file waits for its retry and no scan is queued.
+    /// scan while a file waits for its retry and no scan is queued. A workflow a fake Deluno feeds is never scanned: its failed
+    /// hand-off queues its own retry, so there the scenario only waits.
     /// </summary>
     public async Task DriveRetriesUntilAsync(JsonObject library, Func<Task<bool>> probe, string what, TimeSpan? timeout = null) =>
         await DriveRetriesUntilAsync(library, async () => await probe() ? "done" : null, what, timeout);
@@ -154,7 +155,7 @@ internal sealed partial class Scenario
                 }
 
                 var waiting = (await FilesAsync(library)).Any(row => (string)row["status"]! == "processing_failed");
-                if (waiting && (!sinceLastScan.IsRunning || sinceLastScan.Elapsed >= RetryScanSpacing) && !await ScanPendingAsync())
+                if (waiting && (int)library["id"]! != HandedOffLibraryId && (!sinceLastScan.IsRunning || sinceLastScan.Elapsed >= RetryScanSpacing) && !await ScanPendingAsync())
                 {
                     await EnqueueScanAsync(library);
                     sinceLastScan.Restart();

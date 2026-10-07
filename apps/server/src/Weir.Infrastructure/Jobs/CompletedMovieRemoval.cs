@@ -18,7 +18,7 @@ internal static class CompletedMovieRemoval
         SqliteDatabase database, FileStateStore files, WatchedFolderScan scan, WatchedFileDecision decision, WatchedMediaFile file, CancellationToken cancellationToken)
     {
         var library = scan.Library;
-        var (removed, folderRemoved, reason) = WatchedFolderScanOps.RetryCompletedMovieSourceCleanup(scan.Paths.WatchedFolder, file.FullPath, library.MediaExtensionsCsv);
+        var (removed, folderRemoved, reason) = WatchedFolderScanOps.RetryCompletedMovieSourceCleanup(scan.Paths.WatchedFolder, file.FullPath, library.MediaExtensionsCsv, scan.Links);
         var uow = await UnitOfWork.OpenAsync(database, cancellationToken).ConfigureAwait(false);
         await using (uow.ConfigureAwait(false))
         {

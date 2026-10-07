@@ -58,16 +58,18 @@ public sealed partial class RemuxPassRunner
     /// </summary>
     private async Task HandleCleanupAfterSuccessAsync(PassContext context, WireObject output, string? finalOutputFile, CancellationToken cancellationToken)
     {
-        // The library keeps the original download (a torrent still seeding): nothing in the watched folder is touched —
-        // not the file, its release or season folder, nor its sidecars, which were copied, never moved. This is the one
-        // gate for every post-success source removal: Movies' release folder below and TV's season-folder cleanup.
-        if (!context.Request.Runtime.RemoveOriginalAfterSuccess)
+        // The original download stays where it is — a torrent still seeding, or a download a media manager owns: nothing in the
+        // watched folder is touched, not the file, its release or season folder, nor its sidecars, which were copied, never
+        // moved. A workflow linked to a media manager keeps it whatever its saved setting says. This is the one gate for
+        // every post-success source removal: Movies' release folder below and TV's season-folder cleanup.
+        var runtime = context.Request.Runtime;
+        if (!runtime.RemovesOriginals)
         {
             InitFolderCleanupFields(output);
             SkippedTvSeasonFolderCleanup.InitFields(output);
             output.Set("source_deleted_after_success", false);
-            output.Set("source_kept_by_library_setting", true);
-            output.Set(context.Scope == "tv" ? "tv_season_folder_skip_reason" : "source_folder_skip_reason", KeptOriginalReason);
+            output.Set(runtime.ManagerLinks.KeepsOriginals ? "source_kept_by_manager_link" : "source_kept_by_library_setting", true);
+            output.Set(context.Scope == "tv" ? "tv_season_folder_skip_reason" : "source_folder_skip_reason", runtime.KeptOriginalReason);
             return;
         }
 

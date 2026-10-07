@@ -14,6 +14,9 @@ public enum ScanDispatchPrerequisiteError
 {
     NoSavedWatchedFolder,
     MissingOutputForLiveRemux,
+
+    /// <summary>A linked Deluno hands this workflow its downloads, so Weir's own scan must not queue work for it.</summary>
+    HandedOffByManager,
 }
 
 /// <summary>Pure prerequisite checks shared by the manual HTTP route and the periodic enqueue tick.</summary>

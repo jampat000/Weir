@@ -66,6 +66,14 @@ public sealed class TvSeasonFolderCleanup : ITvSeasonFolderCleanup
 
         void AddSummary(string line) => summary.Items.Add(new WireString(line));
 
+        if (!context.Runtime.RemovesOriginals)
+        {
+            // The pass's own gate stops here first; this keeps a caller that skips it from removing a season a download client or manager owns.
+            output.Set("tv_season_folder_skip_reason", context.Runtime.KeptOriginalReason);
+            AddSummary(context.Runtime.KeptOriginalReason);
+            return;
+        }
+
         var watchedResolved = RemuxPassPaths.Resolve(context.WatchedRoot);
         var srcResolved = RemuxPassPaths.Resolve(context.Source);
         if (!RemuxPassPaths.IsUnder(srcResolved, watchedResolved))

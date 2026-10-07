@@ -24,8 +24,6 @@ public sealed class FailurePoliciesTests
         var original = FakeMedia.Bytes(FakeMedia.Probe(audioLanguages: ["eng", "fre"]));
         var source = scenario.WriteRelease("Broken.Remux.2021", "film.mkv", original);
         const string rel = "Broken.Remux.2021/film.mkv";
-        // A scan records the file first, as in normal use (see DetectWithoutQueueingAsync).
-        await scenario.DetectWithoutQueueingAsync(library, rel);
 
         await scenario.PostHandoffAsync("handoff-pt-1", source);
 
@@ -65,7 +63,6 @@ public sealed class FailurePoliciesTests
         scenario.FakeTools.SetFileRule("film.mkv", new FileRule { RemuxError = RemuxCrash });
         var source = scenario.WriteRelease("Always.Broken.2022", "film.mkv", FakeMedia.Bytes(FakeMedia.Probe(audioLanguages: ["eng", "fre"])));
         const string rel = "Always.Broken.2022/film.mkv";
-        await scenario.DetectWithoutQueueingAsync(library, rel);
 
         await scenario.PostHandoffAsync("handoff-held-1", source);
         var row = await scenario.FailureAttemptsReachAsync(library, rel, 5);
@@ -79,11 +76,11 @@ public sealed class FailurePoliciesTests
         Assert.Empty(await scenario.JobsAsync(Scenario.PassThroughKind));
         Assert.True(File.Exists(source));
         Assert.Equal(5, scenario.FakeTools.Calls(tool: "ffmpeg", step: "remux").Count);
-        // Given up means given up: another scan does not start it again. A scan queues its remux jobs before it
-        // finishes, so once it has finished with no remux job waiting or running, none is coming.
-        var scan = await scenario.WaitForJobFinishedAsync(await scenario.EnqueueScanAsync(library));
-        Assert.Equal("completed", (string)scan["status"]!);
-        Assert.DoesNotContain(await scenario.JobsAsync(Scenario.RemuxKind), job => (string)job["status"]! is "pending" or "leased");
+        // Given up means given up: no further attempt is queued, however long Weir waits.
+        await Scenario.NeverWithinAsync(
+            async () => (await scenario.JobsAsync(Scenario.RemuxKind)).Any(job => (string)job["status"]! is "pending" or "leased"),
+            TimeSpan.FromSeconds(4),
+            "another attempt at a file Weir gave up on");
         Assert.Equal(5, scenario.FakeTools.Calls(tool: "ffmpeg", step: "remux").Count);
         var failed = await scenario.FileRowAsync(library, rel);
         Assert.NotNull(failed);

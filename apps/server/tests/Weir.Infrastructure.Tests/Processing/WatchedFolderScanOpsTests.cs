@@ -1,3 +1,4 @@
+using Weir.Core.MediaManagers;
 using Weir.Core.Processing;
 using Weir.Infrastructure.Processing;
 using Weir.Infrastructure.Processing.RemuxPass;
@@ -191,11 +192,36 @@ public sealed class WatchedFolderScanOpsTests
         File.WriteAllBytes(media, "source"u8.ToArray());
         File.WriteAllText(Path.Combine(release, "extra.nfo"), "metadata");
 
-        var (ok, _, reason) = WatchedFolderScanOps.RetryCompletedMovieSourceCleanup(watched, media, null);
+        var (ok, _, reason) = WatchedFolderScanOps.RetryCompletedMovieSourceCleanup(watched, media, null, WorkflowManagerLinks.None);
 
         Assert.True(ok);
         Assert.Null(reason);
         Assert.False(Directory.Exists(release));
+    }
+
+    [Theory]
+    [InlineData("deluno")]
+    [InlineData("sonarr")]
+    [InlineData("radarr")]
+    [InlineData("native")]
+    public void Retry_completed_movie_source_cleanup_never_removes_a_linked_workflows_source(string kind)
+    {
+        using var dir = new TempDirectory();
+        var watched = dir.Join("watch");
+        var release = Path.Combine(watched, "Movie 2026");
+        Directory.CreateDirectory(release);
+        var media = Path.Combine(release, "Movie 2026.mkv");
+        var nfo = Path.Combine(release, "Movie 2026.nfo");
+        File.WriteAllBytes(media, "source"u8.ToArray());
+        File.WriteAllText(nfo, "metadata");
+
+        var (ok, folderRemoved, reason) = WatchedFolderScanOps.RetryCompletedMovieSourceCleanup(watched, media, null, new WorkflowManagerLinks([kind]));
+
+        Assert.False(ok);
+        Assert.False(folderRemoved);
+        Assert.Contains("the original stays with your download client", reason ?? string.Empty, StringComparison.Ordinal);
+        Assert.True(File.Exists(media));
+        Assert.True(File.Exists(nfo));
     }
 
     [Fact]
@@ -207,7 +233,7 @@ public sealed class WatchedFolderScanOpsTests
         var media = Path.Combine(watched, "Loose Movie 2026.mkv");
         File.WriteAllBytes(media, "source"u8.ToArray());
 
-        var (ok, _, reason) = WatchedFolderScanOps.RetryCompletedMovieSourceCleanup(watched, media, null);
+        var (ok, _, reason) = WatchedFolderScanOps.RetryCompletedMovieSourceCleanup(watched, media, null, WorkflowManagerLinks.None);
 
         Assert.False(ok);
         Assert.Contains("watched folder root", reason ?? string.Empty, StringComparison.Ordinal);
@@ -226,7 +252,7 @@ public sealed class WatchedFolderScanOpsTests
         File.WriteAllBytes(media, "source"u8.ToArray());
         File.WriteAllBytes(sibling, "another film"u8.ToArray());
 
-        var (ok, folderRemoved, reason) = WatchedFolderScanOps.RetryCompletedMovieSourceCleanup(watched, media, null);
+        var (ok, folderRemoved, reason) = WatchedFolderScanOps.RetryCompletedMovieSourceCleanup(watched, media, null, WorkflowManagerLinks.None);
 
         Assert.True(ok);
         Assert.False(folderRemoved);
@@ -246,7 +272,7 @@ public sealed class WatchedFolderScanOpsTests
         var media = Path.Combine(release, "Movie 2026.mkv");
         File.WriteAllBytes(media, "source"u8.ToArray());
 
-        var (ok, _, reason) = WatchedFolderScanOps.RetryCompletedMovieSourceCleanup(watched, media, null);
+        var (ok, _, reason) = WatchedFolderScanOps.RetryCompletedMovieSourceCleanup(watched, media, null, WorkflowManagerLinks.None);
 
         Assert.False(ok);
         Assert.Contains("not safely under the watched folder", reason ?? string.Empty, StringComparison.Ordinal);

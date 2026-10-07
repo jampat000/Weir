@@ -31,7 +31,11 @@ internal static class ProcessingLibraryMapping
         var managerIds = await libraries.ManagerConnectionIdsAsync(uow, row.Id).ConfigureAwait(false);
         var activeJobs = await libraries.ActiveJobCountAsync(uow, row).ConfigureAwait(false);
         var performance = await operatorSettings.EnsureAsync(uow).ConfigureAwait(false);
-        var periodicScan = await PeriodicScanStatusAsync(request, uow, row, performance, suiteSettings, looks).ConfigureAwait(false);
+        // Weir never scans a workflow a linked Deluno hands its downloads to, so there is no next scan or look to show.
+        var handedOff = (await libraries.ManagerLinksAsync(uow, row.Id).ConfigureAwait(false)).HandedOffByManager;
+        var periodicScan = handedOff
+            ? new PeriodicScanStatus(PeriodicScanStates.Off, null)
+            : await PeriodicScanStatusAsync(request, uow, row, performance, suiteSettings, looks).ConfigureAwait(false);
 
         // manager_coverage: the linked connections' last saved connection-test result (no live call — a
         // listing must not depend on every linked manager answering right now).
@@ -125,7 +129,7 @@ internal static class ProcessingLibraryMapping
             .Set("discovered_library_key", row.DiscoveredLibraryKey)
             .Set("active_job_count", activeJobs)
             // When Weir next looks at the watched folder, so Processing can count an arriving file down to it.
-            .Set("next_look_at", looks?.NextLookFor(row.Id) is { } next ? Timestamp.FromDateTimeOffset(next).ToWireText() : null)
+            .Set("next_look_at", !handedOff && looks?.NextLookFor(row.Id) is { } next ? Timestamp.FromDateTimeOffset(next).ToWireText() : null)
             // Whether the periodic scan-dispatch timer runs for this library right now, and when it next will (#747).
             .Set("periodic_scan", periodicScan.State)
             .Set("next_scan_at", periodicScan.NextScanAt is { } nextScan ? Timestamp.FromDateTimeOffset(nextScan).ToWireText() : null)

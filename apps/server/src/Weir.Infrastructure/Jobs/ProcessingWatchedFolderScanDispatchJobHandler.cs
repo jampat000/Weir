@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using Weir.Core.Configuration;
 using Weir.Core.Jobs;
 using Weir.Core.Json;
@@ -35,6 +36,7 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandler : IJobHandler
     private readonly FileSkipMarkerStore _skipMarkers;
 
     private readonly ScanWakeups? _wakeups;
+    private readonly ILogger<ProcessingWatchedFolderScanDispatchJobHandler>? _logger;
 
     public ProcessingWatchedFolderScanDispatchJobHandler(
         SqliteDatabase database,
@@ -46,7 +48,8 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandler : IJobHandler
         LibraryStore libraries,
         FileStateStore files,
         FileSkipMarkerStore skipMarkers,
-        ScanWakeups? wakeups = null)
+        ScanWakeups? wakeups = null,
+        ILogger<ProcessingWatchedFolderScanDispatchJobHandler>? logger = null)
     {
         _database = database ?? throw new ArgumentNullException(nameof(database));
         _time = time ?? throw new ArgumentNullException(nameof(time));
@@ -58,6 +61,7 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandler : IJobHandler
         _files = files ?? throw new ArgumentNullException(nameof(files));
         _skipMarkers = skipMarkers ?? throw new ArgumentNullException(nameof(skipMarkers));
         _wakeups = wakeups;
+        _logger = logger;
     }
 
     public string JobKind => ProcessingWatchedFolderScanDispatchJobKinds.ScanDispatch;
@@ -73,6 +77,11 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandler : IJobHandler
             body.Get("enqueue_remux_jobs") is WireValue v && v.IsTruthy);
 
         var scan = await PrepareAsync(request, cancellationToken).ConfigureAwait(false);
+        if (scan is null)
+        {
+            return;
+        }
+
         var candidates = WatchedFolderListing.Candidates(
             scan.Paths.WatchedFolder,
             scan.Rules.MediaExtensions.Count > 0 ? scan.Rules.MediaExtensions : null,
@@ -112,7 +121,7 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandler : IJobHandler
     /// The library, its folders and rules, what its managers are downloading and whether it may start work now. Reads only,
     /// apart from the settings rows a fresh database creates, and it leaves no transaction open.
     /// </summary>
-    private async Task<WatchedFolderScan> PrepareAsync(ScanRequest request, CancellationToken cancellationToken)
+    private async Task<WatchedFolderScan?> PrepareAsync(ScanRequest request, CancellationToken cancellationToken)
     {
         var now = _time.GetUtcNow();
         var uow = await UnitOfWork.OpenAsync(_database, cancellationToken).ConfigureAwait(false);
@@ -124,6 +133,14 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandler : IJobHandler
             {
                 var label = request.MediaScope == ProcessingMediaScopes.Tv ? "TV" : "Movies";
                 throw new InvalidOperationException($"No workflow covers {label}. Add one in Setup › Workflows, then queue this work again.");
+            }
+
+            var links = await _libraries.ManagerLinksAsync(uow, library.Id).ConfigureAwait(false);
+            if (links.HandedOffByManager)
+            {
+                // However this scan was queued, it queues nothing: a Deluno-linked workflow is processed only from Deluno's hand-off.
+                _logger?.LogInformation("Did not scan {Library}: {Reason}", library.Name, links.ScanSkippedReason);
+                return null;
             }
 
             var (paths, pathError) = WatchedFolderScanOps.ResolvePathRuntimeForLibrary(library, _options.WeirHome);
@@ -149,7 +166,8 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandler : IJobHandler
                 signals,
                 AdmissionWindow(library, suite, now),
                 request.EnqueueRemuxJobs,
-                now);
+                now,
+                links);
         }
     }
 
