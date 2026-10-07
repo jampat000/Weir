@@ -183,7 +183,7 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandlerTests
     /// <summary>Writes the Activity completion event the scan's own duplicate guard
     /// (<see cref="WatchedFolderScanOps.CompletedRemuxOutputExistsForRelativePathAsync"/>) reads, matching the exact
     /// source it names so the guard's fingerprint check passes.</summary>
-    private static async Task WriteCompletedPassEventAsync(StoreFixture store, long libraryId, string relativePath, string mediaScope, string source, string output)
+    internal static async Task WriteCompletedPassEventAsync(StoreFixture store, long libraryId, string relativePath, string mediaScope, string source, string output)
     {
         var detail = $$"""
             {"ok":true,"relative_media_path":"{{relativePath}}","media_scope":"{{mediaScope}}","library_id":{{libraryId}},
