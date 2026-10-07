@@ -106,20 +106,9 @@ saved clean checkpoint before every run, with Deluno's installer and this build'
 the commit being tagged. The Weir session checks Weir's side through Weir's UI and read-only, against one shared
 checklist. The rig stays the long-running real-data box and is not the golden path.
 
-**3. Weir's checklist.** Each line is checked by clicking or watching, and the evidence (what was seen, screenshots,
-log lines) goes in a comment on the release's tracking issue:
-
-- [ ] Deluno's picker installs Weir. Weir answers on this PC only, and its tray starts silently.
-- [ ] **Connect Weir** in Deluno creates the account, and Weir's Movies/TV workflows are set up from Deluno and
-  linked, with the Folder chain all ✓ and no typing in Weir.
-- [ ] One torrent film, one Usenet film and one TV episode each go through the lanes Incoming, Queued,
-  Analysing, Processing and Delivering, and are imported by Deluno. Each Activity entry is correct (tracks kept/removed, sizes before/after, saved).
-- [ ] The download client's seeding folder still holds every original file afterwards (.mkv, .nfo, sidecars).
-- [ ] Pause "until I resume" with "keep looking" on: a hand-off during the pause waits; nothing is processed or
-  removed; on resume it is processed once. Activity shows Paused and Resumed.
-- [ ] Re-sending a hand-off for a file already cleaned settles as "Skipped: already done" with no second output.
-- [ ] System › About → **Devices on my network** makes Weir reachable from another PC, on a Public network too.
-- [ ] Logs shows no unexpected warnings or errors, and every event has a readable title.
+**3. The checklist.** [golden-path.md](golden-path.md) is the one checklist for both products, in run order,
+the same word for word in Deluno. Each line is checked by clicking or watching, and the evidence (what was seen,
+screenshots, log lines) goes in the filled checklist that the pass record points at.
 
 **4. Record the result.** Whoever drove the run sets a commit status named `golden-path` on the full SHA, with a
 description and a link to the evidence comment:
