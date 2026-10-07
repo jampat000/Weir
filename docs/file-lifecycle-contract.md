@@ -63,3 +63,19 @@ When the optional ownership settings (`WEIR_CHOWN_OUTPUT`, `WEIR_FILE_MODE_OUTPU
 
 - Missing files are already absent, not success with hidden work.
 - Locked or in-use files must produce an operator-readable skipped or failed reason.
+
+## Originals that belong to a media manager
+
+A download in the watched folder is not Weir's. A download client may still be seeding it, and a media manager may still be waiting to import from it. Two rules follow, and both are decided from the workflow's links to media managers (`library_manager_links`, read through `LibraryStore.ManagerLinksAsync` into `WorkflowManagerLinks`) every time work starts, never from a stored setting, so an existing workflow is covered the moment Weir is updated.
+
+**A linked workflow never has its original removed or moved.** A workflow linked to Deluno, Sonarr, Radarr or another media manager keeps its source file, its sidecars and its release or season folder after a successful pass, whatever `remove_original_after_success` says. The saved setting is left as it is, so unlinking the workflow gives it back. Every place that removes a source goes through `ProcessingPathRuntime.RemovesOriginals` or `WorkflowManagerLinks.KeepsOriginals`:
+
+- the post-success cleanup in `RemuxPassRunner.HandleCleanupAfterSuccessAsync`, which covers Movies' release-folder removal and hands TV to `TvSeasonFolderCleanup` (which checks again before it deletes a season);
+- the scan's retry of an interrupted movie removal, `WatchedFolderScanOps.RetryCompletedMovieSourceCleanup`, and the scan's decision to attempt it;
+- deleting a rejected file, both the workflow's "delete rejected files" choice (in the pass and in the scan) and Activity's "delete the file" choice, which tells the person to remove the download from their download client instead.
+
+The one removal left is the reject route, where Weir tells the manager a release is bad and removes the download only after the manager accepts. That removal is the manager's own decision, not Weir's.
+
+The sentence a person reads names the manager: "This workflow is linked to Deluno, so the original stays with your download client, which may still be seeding." It is the pass's `source_folder_skip_reason` (Movies) or `tv_season_folder_skip_reason` (TV), and the file's Processed reason says the original was kept for the download client. A workflow that is Weir only, and has the setting off, keeps its own sentence (`RemuxPassRunner.KeptOriginalReason`).
+
+**A workflow linked to Deluno is processed only from Deluno's hand-off.** Deluno sends each finished download to `POST /api/v1/intake/webhook/deluno`, which queues the pass. Weir's own watched-folder scan must never queue work for such a workflow, because the scan cannot know whether the file is still being downloaded, seeded or imported. So no scan is ever queued for it: not by the timer, not by the folder watcher or a save that changes the watched folder, not by "scan now" or "process again" (the server refuses them with "Deluno hands this workflow its downloads, so Weir does not scan its watched folder."), and a scan job that runs for it anyway stops before it looks at the folder. A hand-off that fails is retried by itself (`HandoffRetries`): the failed pass queues its next attempt to start when its backoff ends, carrying the hand-off's origin, instead of waiting for a scan to notice it. Sonarr, Radarr and other managers do not hand files over, so their workflows are still scanned as before, with the first rule applied. A Weir-only workflow is unchanged, remove-original option included.
