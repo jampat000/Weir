@@ -318,7 +318,7 @@ jobs:
   # Actions cache (not a registry), so publish-docker rebuilds from them instead of from scratch.
   docker-candidate:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     permissions:
       contents: read
     env:
@@ -366,6 +366,7 @@ jobs:
           push: false
           build-args: WEIR_VERSION=${{ steps.version.outputs.plain }}
           tags: weir-release-candidate:${{ steps.version.outputs.plain }}
+          cache-from: type=gha,scope=weir-release-amd64
           cache-to: type=gha,mode=max,scope=weir-release-amd64,ignore-error=true
 
       # Before the candidate ever runs: a known HIGH/CRITICAL vulnerability with a fix already
@@ -417,7 +418,7 @@ jobs:
   # amd64 job so its ~4 minutes under QEMU overlap everything else instead of following it.
   docker-arm64:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
     permissions:
       contents: read
     steps:
@@ -443,6 +444,7 @@ jobs:
           push: false
           build-args: WEIR_VERSION=${{ steps.version.outputs.plain }}
           tags: weir-release-candidate:${{ steps.version.outputs.plain }}-arm64
+          cache-from: type=gha,scope=weir-release-arm64
           cache-to: type=gha,mode=max,scope=weir-release-arm64,ignore-error=true
 
   # The GitHub Release, from what windows-smoke and validate built. It does not wait for the Docker jobs, and
