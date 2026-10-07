@@ -7288,7 +7288,7 @@ export interface components {
     SuiteNetworkAccessOut: {
       /**
        * Addresses
-       * @description Where another device would type to reach Weir (for example http://10.0.0.196:9347); empty unless the server listens, or is about to listen, for the network.
+       * @description Where another device would type to reach Weir (for example http://192.0.2.10:9347); empty unless the server listens, or is about to listen, for the network.
        */
       addresses: string[];
       /**

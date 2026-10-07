@@ -35,6 +35,8 @@ const step = (label) => console.log(`[pre-push] ${label}...`);
 // Weir has no Python, and the contract suite's areas each have test classes (what CI's repo-checks job runs).
 step("no Python");
 if (!run(process.execPath, [path.join(repoRoot, "scripts", "check-no-python.mjs")])) fail("a Python file is tracked");
+step("nothing private in public files");
+if (!run(process.execPath, [path.join(repoRoot, "scripts", "check-public-privacy.mjs")])) fail("a private-looking value is in a public file");
 step("contract areas");
 if (!run(process.execPath, [path.join(repoRoot, "scripts", "check-contract-areas.mjs")])) fail("the contract area list is out of step");
 

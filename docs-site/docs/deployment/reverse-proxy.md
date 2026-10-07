@@ -16,7 +16,7 @@ for building Weir from source; a running install should never set it.
 Weir ignores `X-Forwarded-For` unless `WEIR_TRUSTED_PROXY_IPS` is configured:
 
 ```
-WEIR_TRUSTED_PROXY_IPS=172.18.0.1,10.0.0.0/24
+WEIR_TRUSTED_PROXY_IPS=192.0.2.1,192.0.2.0/24
 ```
 
 When the immediate peer is trusted, Weir uses the right-most untrusted address in `X-Forwarded-For` as the client key. Forwarded headers from untrusted peers are ignored.
