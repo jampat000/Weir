@@ -23,7 +23,7 @@ It runs on Windows and in Docker. It is for one person, and your files and setti
 
 *Activity: every file Weir handled and what it did, and Workflows: the routes a file takes through Weir*
 
-<img src="docs/assets/screenshots/logs.png" width="67%"> <img src="docs/assets/screenshots/file-detail.png" width="31%">
+<img src="docs/assets/screenshots/logs.png" width="67.4%"> <img src="docs/assets/screenshots/file-detail.png" width="30.6%">
 
 *The Logs, and one file's story: which tracks Weir kept, which it removed, and why*
 
