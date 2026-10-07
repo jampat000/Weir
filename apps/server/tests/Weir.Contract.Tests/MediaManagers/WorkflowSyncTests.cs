@@ -1,7 +1,7 @@
 using System.Net;
 using System.Text.Json.Nodes;
 using Weir.Contract.Tests.Harness;
-using Weir.Contract.Tests.Harness.Fakes;
+using static Weir.Contract.Tests.MediaManagers.DelunoSyncRig;
 
 namespace Weir.Contract.Tests.MediaManagers;
 
@@ -13,75 +13,6 @@ namespace Weir.Contract.Tests.MediaManagers;
 [ContractArea("media_managers")]
 public sealed class WorkflowSyncTests
 {
-    private const string Libraries = $"{WeirClient.Api}/processing/libraries";
-    private const string DestinationsPath = "/api/integrations/processors/download-destinations";
-
-    private static readonly IReadOnlyDictionary<string, string> SyncOn = new Dictionary<string, string> { [ServerEnvironment.WorkflowSync] = "1" };
-
-    private static JsonObject Library(string id, string name, string mediaType, string output) => new()
-    {
-        ["id"] = id,
-        ["name"] = name,
-        ["mediaType"] = mediaType,
-        ["rootPath"] = "/library/" + id,
-        ["importWorkflow"] = "refine-before-import",
-        ["processorOutputPath"] = output,
-        ["downloadsPath"] = string.Empty,
-    };
-
-    private static JsonObject Published(string id, string name, string saveFolder, string output) => new()
-    {
-        ["libraryId"] = id,
-        ["libraryName"] = name,
-        ["downloadsPath"] = string.Empty,
-        ["processorOutputPath"] = output,
-        ["destinations"] = new JsonArray(new JsonObject
-        {
-            ["downloadClientName"] = "qBittorrent",
-            ["category"] = "weir",
-            ["categoryKind"] = "category",
-            ["saveFolder"] = saveFolder,
-            ["savedBy"] = "client-category",
-            ["status"] = "ok",
-            ["message"] = string.Empty,
-        }),
-        ["processorConnection"] = new JsonObject { ["pathMappings"] = new JsonArray() },
-    };
-
-    private static FakeManager DelunoWith(TemporaryFolder rig, string moviesSaveFolder)
-    {
-        var moviesReady = Directory.CreateDirectory(Path.Join(rig.Path, "Ready", "Movies")).FullName;
-        var tvReady = Directory.CreateDirectory(Path.Join(rig.Path, "Ready", "TV")).FullName;
-        var fake = FakeManager.StartDeluno([Library("lib-movies", "Movies", "movie", moviesReady), Library("lib-tv", "TV", "tv", tvReady)]);
-        PublishDestinations(fake, rig, moviesSaveFolder);
-        return fake;
-    }
-
-    private static void PublishDestinations(FakeManager fake, TemporaryFolder rig, string moviesSaveFolder) =>
-        fake.Route("GET", DestinationsPath, new JsonObject
-        {
-            ["libraries"] = new JsonArray(
-                Published("lib-movies", "Movies", Directory.CreateDirectory(Path.Join(rig.Path, moviesSaveFolder)).FullName, Path.Join(rig.Path, "Ready", "Movies")),
-                Published("lib-tv", "TV", Directory.CreateDirectory(Path.Join(rig.Path, "Completed", "TV")).FullName, Path.Join(rig.Path, "Ready", "TV"))),
-        });
-
-    private static async Task<JsonArray> SyncedAsync(WeirClient client) =>
-        await Poll.UntilAsync(
-            async () =>
-            {
-                var listed = await client.GetAsync(Libraries);
-                Assert.True(listed.Status == HttpStatusCode.OK, listed.ToString());
-                var rows = listed.Elements;
-                return rows.Count(row => row!["discovered_library_key"] is not null) >= 2 ? rows : null;
-            },
-            "both workflows to be set up from Deluno");
-
-    /// <summary>A folder under the rig, written the way this machine writes paths.</summary>
-    private static string Native(TemporaryFolder rig, string relative) => Path.Join(rig.Path, relative.Replace('/', Path.DirectorySeparatorChar));
-
-    private static JsonObject Movies(JsonArray workflows) =>
-        Assert.Single(workflows, row => (string)row!["media_type"]! == "movie")!.AsObject();
-
     [Fact]
     public async Task Connecting_Deluno_fills_in_both_workflows_with_nothing_typed_and_leaves_the_folder_chain_ready()
     {
@@ -105,7 +36,7 @@ public sealed class WorkflowSyncTests
             Assert.Equal(string.Empty, (string)workflow["work_folder"]!);
             Assert.Equal([delunoId], workflow["manager_connection_ids"]!.AsArray().Select(id => (long)id!));
             Assert.Equal(delunoId, (long)workflow["folders_synced_from_connection_id"]!);
-            var chain = await client.GetAsync($"{Libraries}/{(long)workflow["id"]!}/folder-chain");
+            var chain = await client.GetAsync($"{LibrariesRoute}/{(long)workflow["id"]!}/folder-chain");
             Assert.True(chain.Status == HttpStatusCode.OK && (bool)chain.Fields["ready"]!, chain.ToString());
         }
     }
@@ -127,10 +58,10 @@ public sealed class WorkflowSyncTests
         Assert.True(test.Status == HttpStatusCode.OK, test.ToString());
         var moved = Path.Join(rig.Path, "Completed", "Movies 4K");
         await Poll.UntilAsync(
-            async () => (string)(await client.GetAsync($"{Libraries}/{moviesId}")).Fields["watched_folder"]! == moved,
+            async () => (string)(await client.GetAsync($"{LibrariesRoute}/{moviesId}")).Fields["watched_folder"]! == moved,
             "the workflow to follow Deluno's new folder");
 
-        var unlinked = await client.PostWithCsrfAsync($"{Libraries}/{moviesId}/unlink", new JsonObject());
+        var unlinked = await client.PostWithCsrfAsync($"{LibrariesRoute}/{moviesId}/unlink", new JsonObject());
         Assert.True(unlinked.Status == HttpStatusCode.OK, unlinked.ToString());
         Assert.Null(unlinked.Fields["folders_synced_from_connection_id"]);
         PublishDestinations(fake, rig, "Completed/Movies 8K");
@@ -139,6 +70,30 @@ public sealed class WorkflowSyncTests
         await fake.WaitForRequestAsync("GET", DestinationsPath, 3);
         await Task.Delay(500);
 
-        Assert.Equal(moved, (string)(await client.GetAsync($"{Libraries}/{moviesId}")).Fields["watched_folder"]!);
+        Assert.Equal(moved, (string)(await client.GetAsync($"{LibrariesRoute}/{moviesId}")).Fields["watched_folder"]!);
+    }
+
+    [Fact]
+    public async Task A_folder_Deluno_changes_is_recorded_in_Activity_in_plain_words()
+    {
+        using var rig = new TemporaryFolder();
+        using var fake = DelunoWith(rig, "Completed/Movies");
+        await using var server = await WeirServer.StartNewAsync(SyncOn);
+        using var client = await server.CreateAdminClientAsync();
+        var deluno = await ConnectAsync(client, fake);
+        await SyncedAsync(client);
+
+        PublishDestinations(fake, rig, "Completed/Movies 4K");
+        await TestConnectionAsync(client, deluno);
+
+        var updated = await Poll.UntilAsync(
+            async () =>
+            {
+                var events = await client.GetAsync($"{WeirClient.Api}/activity/recent", ("event_type", "processing.workflow_synced"), ("limit", 100));
+                Assert.True(events.Status == HttpStatusCode.OK, events.ToString());
+                return events.Fields["items"]!.AsArray().Select(item => (string)item!["title"]!).FirstOrDefault(title => title.Contains("updated from", StringComparison.Ordinal));
+            },
+            "the update to be recorded in Activity");
+        Assert.Equal($"Movies' watched folder updated from {(string)deluno["name"]!}", updated);
     }
 }

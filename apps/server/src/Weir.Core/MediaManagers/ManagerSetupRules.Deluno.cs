@@ -14,7 +14,7 @@ public static partial class ManagerSetupRules
         string managerLabel, string mediaScope, IReadOnlyList<ManagerLibraryDescriptor> libraries, string? preferredKey = null)
     {
         ArgumentNullException.ThrowIfNull(libraries);
-        var scopeWord = mediaScope == MediaManagerKinds.Tv ? "TV" : "movie";
+        var scopeWord = DelunoDestinationNotices.ScopeWord(mediaScope);
         if (preferredKey is not null && libraries.All(library => library.Key != preferredKey))
         {
             return new DelunoLibraryChoice(null, [new SetupCheckLine(SetupCheckLine.Unverified, DelunoDestinationNotices.LibraryGone(managerLabel))]);
@@ -25,8 +25,7 @@ public static partial class ManagerSetupRules
         {
             return new DelunoLibraryChoice(null, [new SetupCheckLine(
                 SetupCheckLine.Problem,
-                $"{managerLabel}'s {preferred.Name} library is no longer set to Refine before import, so {managerLabel} will not hand {scopeWord} downloads to Weir. " +
-                $"Choose Refine before import for that library in {managerLabel}.")]);
+                $"{DelunoDestinationNotices.StoppedRefining(managerLabel, preferred.Name, mediaScope)} {DelunoDestinationNotices.StoppedRefiningAdvice(managerLabel)}")]);
         }
 
         var refining = libraries.Where(library => library.MediaScope == mediaScope && library.ProcessesBeforeImport).ToList();
