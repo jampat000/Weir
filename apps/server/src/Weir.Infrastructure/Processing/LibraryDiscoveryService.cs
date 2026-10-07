@@ -18,7 +18,8 @@ namespace Weir.Infrastructure.Processing;
 ///
 /// <b>Re-sync reports, it never applies.</b> A watched folder that silently repoints is a destructive
 /// surprise. Drift is surfaced with the manager's value and Weir's own value side by side, and the
-/// operator decides.
+/// operator decides. The one exception is a manager that reports its folders (Deluno): the watched and output
+/// folders of a workflow linked to it belong to it and <see cref="ManagerWorkflowSync"/> keeps them in step.
 ///
 /// <b>A path on the manager's host is not automatically a path Weir can see.</b> The check is purely
 /// textual, the same approach <see cref="Weir.Core.MediaManagers.HandoffPaths"/> already uses, so it

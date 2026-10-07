@@ -20,13 +20,11 @@ describe("initialsOf", () => {
 });
 
 describe("SidebarUser", () => {
-  it("says what the person is on this Weir, and falls back to plain Weir with no machine name", () => {
+  it("shows only the name of whoever is signed in", () => {
     render(
       <MemoryRouter>
         <SidebarUser
           username="admin"
-          accountRole="admin"
-          machineName=" "
           version="3.2.16"
           signingOut={false}
           onSignOut={vi.fn()}
@@ -35,7 +33,6 @@ describe("SidebarUser", () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByTestId("user-menu")).toHaveTextContent("@admin · Weir");
-    expect(screen.getByTestId("user-menu")).not.toHaveTextContent("Weir on");
+    expect(screen.getByTestId("user-menu")).toHaveTextContent(/^Aadmin$/);
   });
 });

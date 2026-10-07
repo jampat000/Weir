@@ -533,7 +533,8 @@ public sealed class MediaManagerServiceTests
         using var fixture = new MediaManagerFixture();
         await fixture.Db(uow => uow.ExecuteAsync("UPDATE libraries SET watched_folder = ''"));
         var unset = await Assert.ThrowsAsync<IntakeRefusedException>(() => fixture.Db(uow => fixture.Intake.EnqueueRefineAsync(uow, Handoff("h", "/x/ep.mkv", "tv"))));
-        Assert.Contains("watched folder is not set", unset.Message, StringComparison.Ordinal);
+        Assert.Equal(400, unset.StatusCode);
+        Assert.StartsWith("No Weir workflow watches the folder that 'ep.mkv' is in. Weir's workflows: Movies has no watched folder yet; TV (TV episodes) has no watched folder yet. ", unset.Message, StringComparison.Ordinal);
 
         var watched = fixture.Store.Home.Join("movies");
         Directory.CreateDirectory(Path.Join(watched, "Empty.Release"));

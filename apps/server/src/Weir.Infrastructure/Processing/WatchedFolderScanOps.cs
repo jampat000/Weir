@@ -1,5 +1,6 @@
 using Weir.Core.Activity;
 using Weir.Core.Json;
+using Weir.Core.MediaManagers;
 using Weir.Core.Processing;
 using Weir.Infrastructure.IO;
 using Weir.Infrastructure.Jobs;
@@ -190,10 +191,18 @@ public static class WatchedFolderScanOps
     /// <summary>
     /// Retries removing a completed movie's source. Only the file's own folder under the watched root is removed, never
     /// the watched root itself, and only when it holds no other video (<see cref="ReleaseFolderRemoval"/>); otherwise
-    /// just the file goes. <c>FolderRemoved</c> says which happened.
+    /// just the file goes. <c>FolderRemoved</c> says which happened. A workflow linked to a media manager (<paramref name="links"/>)
+    /// never has its source removed.
     /// </summary>
-    public static (bool Ok, bool FolderRemoved, string? Reason) RetryCompletedMovieSourceCleanup(string watchedRoot, string filePath, string? mediaExtensionsCsv)
+    public static (bool Ok, bool FolderRemoved, string? Reason) RetryCompletedMovieSourceCleanup(string watchedRoot, string filePath, string? mediaExtensionsCsv, WorkflowManagerLinks links)
     {
+        ArgumentNullException.ThrowIfNull(links);
+        if (links.KeepsOriginals)
+        {
+            // The original belongs to the download client and the manager, so nothing here ever removes it.
+            return (false, false, links.KeptOriginalReason);
+        }
+
         string root, src;
         try
         {

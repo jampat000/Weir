@@ -60,15 +60,20 @@ export function FolderSetting({
   label,
   placeholder = "",
   hint,
+  lockedNote,
 }: {
   binding: LibraryFormBinding;
   name: LibraryTextField;
   label: string;
   placeholder?: string;
   hint?: string;
+  /** Says whose the folder is when a media manager owns it: the folder is then shown but cannot be changed here. */
+  lockedNote?: string;
 }) {
   const id = useId();
   const hintId = useId();
+  const locked = lockedNote !== undefined;
+  const note = lockedNote ?? hint;
   return (
     <div className="mm-field mm-field--wide">
       <label className="mm-field__label" htmlFor={id}>
@@ -80,20 +85,21 @@ export function FolderSetting({
           className="mm-input"
           value={binding.form[name]}
           placeholder={placeholder}
-          aria-describedby={hint ? hintId : undefined}
+          aria-describedby={note ? hintId : undefined}
           onChange={(e) => binding.update({ [name]: e.target.value })}
           disabled={!binding.editable}
+          readOnly={locked}
         />
         <ServerFolderPickerButton
           title={`Choose the ${label.toLowerCase()}`}
           value={binding.form[name]}
-          disabled={!binding.editable}
+          disabled={!binding.editable || locked}
           onSelect={(path) => binding.update({ [name]: path })}
         />
       </div>
-      {hint ? (
+      {note ? (
         <span id={hintId} className="mm-field__hint">
-          {hint}
+          {note}
         </span>
       ) : null}
     </div>
@@ -165,24 +171,34 @@ export function ToggleSetting({
   name,
   label,
   hint,
+  lockedOff,
 }: {
   binding: LibraryFormBinding;
   name: LibraryToggleField;
   label: string;
   hint?: string;
+  /** The reason this setting is off and cannot be changed; the saved value is left as it is. */
+  lockedOff?: string;
 }) {
   return (
     <label className="mm-library-toggle">
       <input
         className="mt-0.5"
         type="checkbox"
-        checked={binding.form[name]}
+        checked={lockedOff === undefined && binding.form[name]}
         onChange={(e) => binding.update({ [name]: e.target.checked })}
-        disabled={!binding.editable}
+        disabled={!binding.editable || lockedOff !== undefined}
       />
       <span>
         <span className="mm-library-toggle__label">{label}</span>
-        {hint ? <span className="mm-library-toggle__hint">{hint}</span> : null}
+        {lockedOff !== undefined || hint ? (
+          <span
+            className="mm-library-toggle__hint"
+            data-testid={lockedOff === undefined ? undefined : `${name}-locked`}
+          >
+            {lockedOff ?? hint}
+          </span>
+        ) : null}
       </span>
     </label>
   );

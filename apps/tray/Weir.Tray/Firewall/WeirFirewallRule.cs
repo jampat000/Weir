@@ -94,11 +94,18 @@ static class WeirFirewallRule
         var programPath = ServerProgramPath(installRoot);
 
         var blocked = ProfilesOf(OwnBlockRules(policy, programPath));
-        var allowed = ProfilesOf(policy.Rules.Where(rule =>
-            rule.Direction == FirewallRuleDirection.Inbound
-            && rule.Action == FirewallRuleAction.Allow
-            && string.Equals(rule.ProgramPath, programPath, StringComparison.OrdinalIgnoreCase)));
+        var allowed = ProfilesAllowedAt(policy, programPath);
         return (allowed & ~blocked) != FirewallProfiles.None;
+    }
+
+    /// <summary>
+    /// The network profiles on which an enabled inbound allow rule for Weir's server exists: <see cref="FirewallProfiles.None"/>
+    /// when there is no such rule. Block rules are not consulted. Read-only; needs no administrator rights.
+    /// </summary>
+    internal static FirewallProfiles ProfilesAllowed(IFirewallPolicy policy, string installRoot)
+    {
+        ArgumentNullException.ThrowIfNull(policy);
+        return ProfilesAllowedAt(policy, ServerProgramPath(installRoot));
     }
 
     /// <summary>
@@ -114,12 +121,15 @@ static class WeirFirewallRule
         var current = policy.CurrentProfiles;
 
         var blocked = ProfilesOf(OwnBlockRules(policy, programPath));
-        var allowed = ProfilesOf(policy.Rules.Where(rule =>
+        var allowed = ProfilesAllowedAt(policy, programPath);
+        return (allowed & current) != FirewallProfiles.None && (blocked & current) == FirewallProfiles.None;
+    }
+
+    private static FirewallProfiles ProfilesAllowedAt(IFirewallPolicy policy, string programPath) =>
+        ProfilesOf(policy.Rules.Where(rule =>
             rule.Direction == FirewallRuleDirection.Inbound
             && rule.Action == FirewallRuleAction.Allow
             && string.Equals(rule.ProgramPath, programPath, StringComparison.OrdinalIgnoreCase)));
-        return (allowed & current) != FirewallProfiles.None && (blocked & current) == FirewallProfiles.None;
-    }
 
     private static FirewallProfiles ProfilesOf(IEnumerable<FirewallRule> rules) =>
         rules.Where(rule => rule.Enabled).Aggregate(FirewallProfiles.None, (all, rule) => all | rule.Profiles);

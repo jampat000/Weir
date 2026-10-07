@@ -5,6 +5,13 @@ namespace Weir.Core.Tests.Configuration;
 /// <summary>How each WEIR_* variable is read, clamped and validated, matching <c>WeirSettings.load()</c>.</summary>
 public sealed class WeirOptionsParsingTests
 {
+    [Fact]
+    public void The_manager_workflow_sync_is_on_unless_switched_off()
+    {
+        Assert.True(TestRuntime.Load().ManagerWorkflowSyncEnabled);
+        Assert.False(TestRuntime.Load(("WEIR_MEDIA_MANAGER_WORKFLOW_SYNC_ENABLED", "0")).ManagerWorkflowSyncEnabled);
+    }
+
     [Theory]
     [InlineData(" Production ", "production")]
     [InlineData("", "production")]

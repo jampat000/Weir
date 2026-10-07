@@ -15,9 +15,11 @@ internal sealed record WatchedFolderScan(
     IReadOnlyList<ManagerQueueSignal> Signals,
     ScanAdmissionWindow Window,
     bool EnqueueRemuxJobs,
-    DateTimeOffset Now)
+    DateTimeOffset Now,
+    WorkflowManagerLinks Links)
 {
-    public bool KeepsOriginals => !Library.RemoveOriginalAfterSuccess;
+    /// <summary>The source stays after cleaning: the workflow says so, or a linked media manager and its download client own it.</summary>
+    public bool KeepsOriginals => !Library.RemoveOriginalAfterSuccess || Links.KeepsOriginals;
 
     public bool IsMovieScope => MediaScope == ProcessingMediaScopes.Movie;
 }

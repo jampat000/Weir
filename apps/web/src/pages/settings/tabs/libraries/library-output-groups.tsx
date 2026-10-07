@@ -1,6 +1,10 @@
 import type { ReactNode } from "react";
 import { Field } from "../../../../components/shared/field";
 import { QuietDisclosure } from "../../../../components/shared/quiet-section";
+import {
+  joinNames,
+  type WorkflowKind,
+} from "../../../../lib/processing/workflow-kind";
 import { useProcessingOperatorSettingsQuery } from "../../../../lib/processing/queries";
 import { COLLISION_OPTIONS } from "./library-options";
 import {
@@ -13,11 +17,21 @@ import {
 /** A blank "most files at once" is no limit of its own, which the server keeps as 0. */
 const NO_OWN_LIMIT = "0";
 
+/** A linked workflow never removes the original: the download client and the media manager own it. */
+function originalStaysReason(kind: WorkflowKind): string | undefined {
+  return kind.kind === "linked"
+    ? `Linked to ${joinNames(kind.managers.map((m) => m.name))}: the original stays with your download client, which may still be seeding.`
+    : undefined;
+}
+
 /** Sidecars, timestamps, and what happens when the destination already exists. */
 export function LibraryOutputGroup({
   binding,
+  kind,
 }: {
   binding: LibraryFormBinding;
+  /** Whether the workflow is Weir only or linked, as it is being edited. */
+  kind: WorkflowKind;
 }) {
   return (
     <QuietDisclosure
@@ -58,6 +72,7 @@ export function LibraryOutputGroup({
           name="remove_original_after_success"
           label="New downloads: after cleaning, delete the original download"
           hint="Turn off if your download client is still seeding it — Sonarr, Radarr or your client will clean it up."
+          lockedOff={originalStaysReason(kind)}
         />
       </div>
     </QuietDisclosure>

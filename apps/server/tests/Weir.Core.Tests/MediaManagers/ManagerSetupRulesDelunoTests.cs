@@ -183,7 +183,8 @@ public sealed class ManagerSetupRulesDelunoTests
             "Deluno", MediaManagerKinds.Tv, "/media/downloads/complete", "/media/downloads/weir/tv", [RefiningTv with { DownloadsPath = null }]);
 
         Assert.Equal(
-            "Deluno does not say where TV's downloads arrive, so Weir cannot verify that its hand-offs sit inside this workflow's watched folder.",
+            "Deluno does not say where TV's downloads arrive, so Weir cannot verify that its hand-offs sit inside this workflow's watched folder. " +
+            "Set the downloads folder in Deluno (or the clients' category folders) and Weir will pick it up.",
             Assert.Single(result.Lines, line => line.State == SetupCheckLine.Unverified).Text);
     }
 

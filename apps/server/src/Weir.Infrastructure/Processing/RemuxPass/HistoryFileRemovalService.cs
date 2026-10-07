@@ -113,7 +113,9 @@ public sealed class HistoryFileRemovalService
             }
         }
 
-        return new FileRemovalOptions(true, route.Label, route.DeleteHandled, route.KeepNotifies, fingerprintRecorded, unconfirmedSize, unconfirmedModifiedAt);
+        var links = await _libraries.ManagerLinksAsync(uow, library!.Id).ConfigureAwait(false);
+        return new FileRemovalOptions(true, route.Label, route.DeleteHandled, route.KeepNotifies, fingerprintRecorded, unconfirmedSize, unconfirmedModifiedAt,
+            route.DeleteHandled || !links.KeepsOriginals ? null : DeleteRefusal(links));
     }
 
     /// <summary>
@@ -147,18 +149,19 @@ public sealed class HistoryFileRemovalService
         }
 
         var watchedRoot = RemuxPassPaths.Resolve(library.WatchedFolder);
+        var links = await _libraries.ManagerLinksAsync(uow, library.Id).ConfigureAwait(false);
         var route = await ResolveManagerRouteAsync(uow, library, file.RelativePath, source, cancellationToken).ConfigureAwait(false);
 
         // Released before any network call or disk delete, the way the automatic reject job releases it (#708):
         // no other lane ever waits on this one for SQLite's write lock.
         await uow.CommitAsync().ConfigureAwait(false);
 
-        // A manager that cannot take the rejection (no capability, or none linked at all) never gets asked: Weir
-        // deletes the file itself rather than let ThroughHandoffAsync's own refusal stand in for that.
+        // A manager that cannot take the rejection (no capability, or none linked at all) never gets asked. Weir deletes the file
+        // itself only when no manager is linked, since a linked manager's download belongs to it and its download client.
         var outcome = !route.DeleteHandled
-            ? SelfDelete(watchedRoot, source)
+            ? SelfDelete(watchedRoot, source, links)
             : route.HandoffTarget is not null
-                ? await _routes.ThroughHandoffAsync(route.HandoffTarget, route.Origin!, source, watchedRoot, DeleteReason, null, cancellationToken).ConfigureAwait(false)
+                ? await _routes.ThroughHandoffAsync(route.HandoffTarget, route.Origin!, source, watchedRoot, DeleteReason, null, links, cancellationToken).ConfigureAwait(false)
                 : await _routes.ThroughQueueAsync(route.QueueConnections, source, cancellationToken).ConfigureAwait(false);
 
         if (outcome.Done)
@@ -243,8 +246,17 @@ public sealed class HistoryFileRemovalService
         return new RejectRouteOutcome(true, $"Weir will leave this file alone until it changes. {label} was told it will not be imported.", label, null, report);
     }
 
-    private static RejectRouteOutcome SelfDelete(string watchedRoot, string source)
+    /// <summary>Why Weir will not delete a linked workflow's file itself, in the words the dialog and the refusal share.</summary>
+    private static string DeleteRefusal(WorkflowManagerLinks links) =>
+        $"{links.KeptOriginalReason} Weir did not delete the file; remove the download from your download client.";
+
+    private static RejectRouteOutcome SelfDelete(string watchedRoot, string source, WorkflowManagerLinks links)
     {
+        if (links.KeepsOriginals)
+        {
+            return new RejectRouteOutcome(false, DeleteRefusal(links));
+        }
+
         var cleanup = RemuxPassPaths.CleanupRejectedFile(watchedRoot, source, "delete_file");
         return cleanup.Deleted
             ? new RejectRouteOutcome(true, "Weir deleted the file itself: no linked media manager could remove it.")

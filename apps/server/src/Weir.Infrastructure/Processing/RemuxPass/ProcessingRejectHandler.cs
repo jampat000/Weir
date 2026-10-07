@@ -95,6 +95,7 @@ public sealed partial class ProcessingRejectHandler : IJobHandler
         HandoffReportTarget? target = null;
         string? targetRefusalReason = null;
         var queueConnections = new List<ManagerConnection>();
+        var links = WorkflowManagerLinks.None;
         await LockedWrites.RunAsync(
             _database,
             async uow =>
@@ -106,6 +107,7 @@ public sealed partial class ProcessingRejectHandler : IJobHandler
                 }
 
                 watchedRoot = RemuxPassPaths.Resolve(library.WatchedFolder);
+                links = await _libraries.ManagerLinksAsync(uow, library.Id).ConfigureAwait(false);
                 if (origin is not null && _ports.PortForKind(origin.SourceKey) is { } originPort && !originPort.Capabilities().RemovesQueueItems)
                 {
                     (target, targetRefusalReason) = await _reporter.ResolveHandoffTargetAsync(uow, origin).ConfigureAwait(false);
@@ -127,7 +129,7 @@ public sealed partial class ProcessingRejectHandler : IJobHandler
         if (origin is not null)
         {
             attempt = target is not null
-                ? await _routes.ThroughHandoffAsync(target, origin, source, watchedRoot, reason, failureClass, cancellationToken).ConfigureAwait(false)
+                ? await _routes.ThroughHandoffAsync(target, origin, source, watchedRoot, reason, failureClass, links, cancellationToken).ConfigureAwait(false)
                 : targetRefusalReason is not null
                     ? new RejectRouteOutcome(false, $"Weir could not report to the manager: {targetRefusalReason}.")
                     : queueConnections.Count > 0

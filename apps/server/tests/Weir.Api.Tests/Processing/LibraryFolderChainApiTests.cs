@@ -17,6 +17,13 @@ namespace Weir.Api.Tests.Processing;
 /// </summary>
 public sealed class LibraryFolderChainApiTests
 {
+    private const string TorrentClient = """
+        [{"enable":true,"protocol":"torrent","priority":1,"removeCompletedDownloads":true,"removeFailedDownloads":true,"name":"qBittorrent",
+          "fields":[{"order":0,"name":"host","label":"Host","value":"qbittorrent","type":"textbox","advanced":false,"privacy":"normal","isFloat":false},
+                    {"order":1,"name":"port","label":"Port","value":8080,"type":"textbox","advanced":false,"privacy":"normal","isFloat":false}],
+          "implementationName":"qBittorrent","implementation":"QBittorrent","configContract":"QBittorrentSettings","tags":[],"id":1}]
+        """;
+
     private const string DelunoManifest = """
         {"product":"Deluno","version":"v1","instanceName":"Deluno","capabilities":["movies","tv","pre-import-processing"],
          "libraries":[{"id":"lib-tv","name":"TV","mediaType":"tv","rootPath":"/media/tv","downloadsPath":"WATCHED",
@@ -142,6 +149,25 @@ public sealed class LibraryFolderChainApiTests
         Assert.Contains(sonarr["lines"]!.AsArray(), line => line!["text"]!.GetValue<string>().Contains("no enabled download client", StringComparison.Ordinal));
         // The manager side is not ready, so the combined chain is not ready even though Weir's own side is.
         Assert.False(chain["ready"]!.GetValue<bool>());
+    }
+
+    [Fact]
+    public async Task A_linked_library_is_never_told_to_stop_removing_originals_because_it_never_removes_them()
+    {
+        var (server, client, manager) = await StartAsync();
+        await using var _server = server;
+        using var folders = TempFolders.Create();
+        var connectionId = await ConnectAsync(client, "sonarr", "Sonarr", "http://192.0.2.60:8989");
+        manager.Json(HttpMethod.Get, "/api/v3/remotepathmapping", "[]")
+            .Json(HttpMethod.Get, "/api/v3/downloadclient", TorrentClient)
+            .Json(HttpMethod.Get, "/api/v3/config/downloadclient", """{"enableCompletedDownloadHandling":true,"id":1}""");
+        // A new workflow asks to remove originals by default; linked to a manager, it keeps them.
+        var libraryId = await CreateLibraryAsync(client, "Sonarr and Weir", folders, [connectionId]);
+
+        var chain = await FolderChainAsync(client, libraryId);
+
+        var sonarr = Assert.Single(chain["managers"]!.AsArray())!;
+        Assert.DoesNotContain(sonarr["lines"]!.AsArray(), line => line!["text"]!.GetValue<string>().Contains("seeds torrents", StringComparison.Ordinal));
     }
 
     [Fact]

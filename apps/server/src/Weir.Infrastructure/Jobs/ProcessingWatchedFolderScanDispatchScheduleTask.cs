@@ -182,7 +182,7 @@ public sealed class ProcessingWatchedFolderScanDispatchScheduleTask : IPeriodicT
             _wakeups?.NextLookFor(library.Id) ?? periodicDue,
             interval);
 
-    /// <summary>The enabled libraries and the scan switches, read again only when they may have changed.</summary>
+    /// <summary>The enabled libraries a scan may feed and the scan switches, read again only when they may have changed.</summary>
     private async Task<(IReadOnlyList<ProcessingLibraryRecord> Libraries, ProcessingOperatorSettingsRecord Settings)> ReadInputsAsync(UnitOfWork uow, DateTimeOffset now)
     {
         var version = _scanSettingsChanges?.Version ?? 0;
@@ -191,8 +191,10 @@ public sealed class ProcessingWatchedFolderScanDispatchScheduleTask : IPeriodicT
             return (known.Libraries, known.Settings);
         }
 
+        // A workflow a linked Deluno hands its downloads to is never scheduled: its scan would only find what Deluno is about to send.
+        var handedOff = await _libraries.HandedOffLibraryIdsAsync(uow).ConfigureAwait(false);
         var libraries = (await _libraries.ListAsync(uow, enabledOnly: true).ConfigureAwait(false))
-            .Where(ScanDispatchScheduleGateEnabled)
+            .Where(library => ScanDispatchScheduleGateEnabled(library) && !handedOff.Contains(library.Id))
             .ToList();
         var operatorSettings = await _operatorSettings.EnsureAsync(uow).ConfigureAwait(false);
         // Release any write lock EnsureAsync took creating the singleton row on first run: the enqueue

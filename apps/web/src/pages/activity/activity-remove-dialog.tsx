@@ -20,9 +20,13 @@ type ActivityRemoveChoice = Extract<
  * offered, whatever the other three say, since it is the one choice that never needs the file's identity
  * confirmed — it never touches the file at all (#786 follow-up).
  */
-function choices(
-  options: ProcessingFileRemoveOptions,
-): { value: ActivityRemoveChoice; label: string; detail: string }[] {
+function choices(options: ProcessingFileRemoveOptions): {
+  value: ActivityRemoveChoice;
+  label: string;
+  detail: string;
+  /** Why this choice cannot be picked, when it cannot. */
+  unavailable?: string;
+}[] {
   const manager = options.manager_label;
   return [
     {
@@ -32,9 +36,11 @@ function choices(
           ? `Delete the download and ask ${manager} for another copy`
           : "Delete the file",
       detail:
-        options.delete_handled_by_manager && manager
+        options.delete_refused_reason ??
+        (options.delete_handled_by_manager && manager
           ? `${manager} removes it, blocks this release and searches again.`
-          : "Weir alone: the file is deleted.",
+          : "Weir alone: the file is deleted."),
+      unavailable: options.delete_refused_reason ?? undefined,
     },
     {
       value: "keep",
@@ -87,6 +93,10 @@ export function ActivityRemoveDialog({
   const [choice, setChoice] = useState<ActivityRemoveChoice | null>(null);
   const firstChoice = useRef<HTMLInputElement>(null);
   const formatDate = useAppDateFormatter();
+  const choiceList = choices(options);
+  const firstAvailable = choiceList.findIndex(
+    (opt) => opt.unavailable === undefined,
+  );
 
   return (
     <ConfirmDialog
@@ -128,18 +138,19 @@ export function ActivityRemoveDialog({
               </p>
             </div>
           ) : null}
-          {choices(options).map((opt, index) => (
+          {choiceList.map((opt, index) => (
             <label
               key={opt.value}
               data-testid={`activity-remove-dialog-choice-${opt.value}`}
               className={`mm-dialog-choice${choice === opt.value ? " mm-dialog-choice--chosen" : ""}`}
             >
               <input
-                ref={index === 0 ? firstChoice : undefined}
+                ref={index === firstAvailable ? firstChoice : undefined}
                 type="radio"
                 name="activity-remove-resolution"
                 value={opt.value}
                 checked={choice === opt.value}
+                disabled={opt.unavailable !== undefined}
                 onChange={() => setChoice(opt.value)}
                 className="mt-0.5 h-4 w-4 shrink-0 accent-mm-accent"
               />

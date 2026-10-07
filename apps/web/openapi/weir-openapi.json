@@ -4791,6 +4791,17 @@
               }
             ],
             "title": "Unconfirmed Modified At"
+          },
+          "delete_refused_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delete Refused Reason"
           }
         },
         "required": [
@@ -4800,7 +4811,8 @@
           "keep_notifies_manager",
           "fingerprint_recorded",
           "unconfirmed_size_bytes",
-          "unconfirmed_modified_at"
+          "unconfirmed_modified_at",
+          "delete_refused_reason"
         ],
         "title": "ProcessingFileRemoveOptionsOut",
         "type": "object"
@@ -6853,6 +6865,18 @@
           "file_system_events_enabled": {
             "title": "File System Events Enabled",
             "type": "boolean"
+          },
+          "folders_synced_from_connection_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The media manager (Deluno) that owns this workflow's watched and output folders and keeps them up to date, while the workflow is still linked to it; null for a workflow whose folders are its own.",
+            "title": "Folders Synced From Connection Id"
           },
           "id": {
             "title": "Id",

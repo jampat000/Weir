@@ -144,7 +144,10 @@ public sealed class IntakeTests(IntakeFixture fixture) : IClassFixture<IntakeFix
             $"{Webhook}/deluno", Handoff("handoff-2", "movies", Path.Combine(elsewhere.Path, "somewhere", "else", "film.mkv")));
 
         Assert.True(response.Status == HttpStatusCode.BadRequest, response.ToString());
-        Assert.Contains("not inside Weir's watched folder", (string)response.Fields["detail"]!);
+        var detail = (string)response.Fields["detail"]!;
+        Assert.StartsWith("No Weir workflow watches the folder that 'film.mkv' is in. Weir's workflows: ", detail, StringComparison.Ordinal);
+        Assert.Contains(" watches '", detail, StringComparison.Ordinal);
+        Assert.EndsWith("or add a path mapping in the media manager.", detail, StringComparison.Ordinal);
         Assert.Equal(before, (await RemuxJobs.ListAsync(client)).Count);
     }
 
@@ -162,7 +165,9 @@ public sealed class IntakeTests(IntakeFixture fixture) : IClassFixture<IntakeFix
             $"{Webhook}/deluno", Handoff("handoff-3", "tv", Path.Combine(elsewhere.Path, "handoff", "tv", "Show", "ep.mkv")));
 
         Assert.True(response.Status == HttpStatusCode.BadRequest, response.ToString());
-        Assert.Contains("watched folder is not set", (string)response.Fields["detail"]!);
+        var detail = (string)response.Fields["detail"]!;
+        Assert.StartsWith("No Weir workflow watches the folder that 'ep.mkv' is in. Weir's workflows: ", detail, StringComparison.Ordinal);
+        Assert.Contains("has no watched folder yet", detail, StringComparison.Ordinal);
     }
 
     [Fact]

@@ -31,6 +31,9 @@ public static class MediaManagerServices
         // Every minute, each manager's connection test, so Weir knows within a minute when one goes quiet.
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IPeriodicTask, ManagerHeartbeatTask>());
         services.TryAddSingleton<LibraryDiscoveryService>();
+        // Deluno reports its own folders, so the workflows linked to it are set up from it and kept in step every few minutes.
+        services.TryAddSingleton<ManagerWorkflowSync>();
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IPeriodicTask, ManagerWorkflowSyncTask>());
         services.TryAddSingleton<IFolderProbe, FilesystemFolderProbe>();
         services.TryAddSingleton<ManagerSetupCheck>();
         services.TryAddSingleton<HandoffLedgerStore>();

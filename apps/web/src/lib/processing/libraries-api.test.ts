@@ -15,6 +15,7 @@ const READ_ONLY_FIELDS: readonly (keyof ProcessingLibrary)[] = [
   "manager_coverage_detail",
   "discovered_from_connection_id",
   "discovered_library_key",
+  "folders_synced_from_connection_id",
   "active_job_count",
   "next_look_at",
   "updated_at",

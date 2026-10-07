@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import type { MediaManagerConnection } from "../media-managers/media-managers-api";
 import {
+  handedOffBy,
+  handedOffNote,
   workflowBadgeLabel,
   workflowKindCounts,
   workflowKindName,
@@ -110,5 +112,32 @@ describe("counting workflows by kind", () => {
     const kinds = [workflowKindOf({ manager_connection_ids: [] }, CONNECTIONS)];
 
     expect(workflowKindCounts(kinds)).toBe("1 Weir only");
+  });
+});
+
+describe("which workflows a media manager hands its downloads to", () => {
+  it("names Deluno, and only Deluno, as handing them over", () => {
+    const deluno = workflowKindOf({ manager_connection_ids: [1] }, CONNECTIONS);
+    const arr = workflowKindOf({ manager_connection_ids: [2, 3] }, CONNECTIONS);
+    const other = workflowKindOf({ manager_connection_ids: [4] }, CONNECTIONS);
+
+    expect(handedOffNote(deluno)).toBe(
+      "Deluno hands this workflow its downloads.",
+    );
+    expect(handedOffNote(arr)).toBeNull();
+    expect(handedOffNote(other)).toBeNull();
+    expect(handedOffNote({ kind: "weir_only" })).toBeNull();
+  });
+
+  it("names every Deluno when several are linked", () => {
+    const kind = workflowKindOf({ manager_connection_ids: [1, 2, 5] }, [
+      ...CONNECTIONS,
+      connection(5, "deluno", "Deluno on NAS"),
+    ]);
+
+    expect(handedOffBy(kind).map((manager) => manager.name)).toEqual([
+      "Deluno",
+      "Deluno on NAS",
+    ]);
   });
 });

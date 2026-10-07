@@ -27,6 +27,10 @@ There are two kinds, and both can run side by side in one Weir:
   - **Radarr and Sonarr:** the download client **category**, and the **root folder** the file is
     imported into.
 
+Whatever the manager, a linked workflow never deletes or moves the original download: it belongs to
+your download client and the manager, and the client may still be seeding it. See [How Weir keeps
+your files safe](file-lifecycle.md#deleting-the-original).
+
 For example, a linked workflow reads like this: comes from Deluno's download client, category
 **movies** → Weir works in its work folder → cleaned into the output folder → Deluno imports it
 into its library **Movies**. A local one reads: watches `D:\Kids\Incoming` → works in its work
@@ -100,10 +104,62 @@ Deluno hands a file to Weir to work on, and waits to be told it's ready. This is
 automatic setup: Deluno tells Weir about a new file, Weir cleans it, and Deluno is told when the
 cleaned copy is ready to import. You don't move anything by hand.
 
-The Weir workflow still needs a watched folder: Weir only accepts a hand-off for a file inside one.
-Point it at the folder Deluno downloads into. A hand-off names its file by the path Deluno sees, and Weir accepts it
-only when that path is inside the watched folder. So either use that path, or add a path mapping in Deluno
-(Settings › Media Management › Processing Workflow › Weir › Path mappings) from its path to Weir's.
+### Deluno: Weir sets up its workflows from it
+
+You don't type any folders. Once Deluno is connected, Weir sets up a workflow for each Deluno library that is set to
+**Refine before import**, and keeps it in step with Deluno. It does this when the connection is saved or its address or key
+changes, after a connection test that passes, and every few minutes after that, so a folder you change in Deluno reaches
+Weir without anyone opening Weir.
+
+For each such library Weir makes sure one workflow is linked to it:
+
+- If a workflow is already linked to the library, Weir updates it.
+- Otherwise, if there is an unconfigured workflow of the same media type (no watched folder, no output folder, not linked:
+  the **Movies** and **TV** workflows a new install starts with), Weir uses that one and gives it the library's name.
+- Otherwise Weir makes a new workflow, named after the library.
+
+What Weir fills in is the **watched folder**, the **output folder**, the **media type**, the **name** and the link to
+Deluno. A new workflow gets Weir's default rules profile for its media type, as any new workflow does.
+
+- **Watched folder.** Deluno's own default is no downloads folder at all ("use the download client's folder"), so Weir asks
+  where each of the library's download clients really saves and uses that. One folder is used as it is. When the clients
+  save to several folders, Weir uses the folder that holds them all (never a drive or filesystem root) and otherwise the first
+  one; the **Folder chain** then reports the clients that save elsewhere. Only when no client names a folder does Weir use
+  the library's downloads folder. If Deluno gives neither, Weir leaves the watched folder empty rather than guess, and says
+  so in **Activity** and in the Folder chain: set the downloads folder in Deluno (or the clients' category folders) and Weir
+  picks it up on its next look.
+- **Output folder.** The processed folder Deluno imports from.
+- Both folders are turned into Weir's view through Deluno's path mappings for Weir (see below). With a Deluno older than
+  1.0.0-rc.23, which publishes no mappings, the folders are used as Deluno writes them.
+
+Deluno owns those two folders for a workflow linked to it. **Setup › Workflows** shows them but doesn't let you change them
+("From Deluno; change it in Deluno."), and Weir rewrites them when Deluno's change, saying so in Activity ("Movies' watched
+folder updated from Deluno"). Everything else stays yours: the **work folder**, the rules profile, the schedule and every other
+setting. **Unlink** a workflow and its folders are yours again and Weir stops updating it; Weir never deletes a workflow. If a
+library stops being set to Refine before import, or disappears from Deluno, its workflow is left as it is and the Folder chain
+says why. If the folders Deluno reports would overlap another workflow's folders, Weir leaves the workflow alone and says so in
+Activity.
+
+Two things stay manual:
+
+- **Weir's own work folder.** Deluno doesn't know it. Leave it empty and Weir uses a private folder under its own data
+  folder; set it in the workflow when you want it on a particular drive.
+- **Sonarr, Radarr and Something else.** They can't tell Weir where their folders are, so their workflows are set up by hand,
+  as described below.
+
+To stop Weir setting workflows up from Deluno, set `WEIR_MEDIA_MANAGER_WORKFLOW_SYNC_ENABLED=0`.
+
+A hand-off names its file by the path Deluno sees, and Weir accepts it only when that path is inside the watched folder.
+Deluno's path mappings for Weir (Settings › Media Management › Processing Workflow › Weir › Path mappings) turn its paths
+into Weir's, and the workflows Weir sets up use them.
+
+A workflow linked to Deluno is fed **only** by Deluno's hand-off. Weir does not scan its watched folder:
+there is no scheduled scan, no scan when the folder changes, and no **Scan now** (Setup › Workflows ›
+Schedule says "Deluno hands this workflow its downloads"). That way Weir can never pick up a download
+that is still being fetched or seeded before Deluno asks for it. If a hand-off fails, Weir retries it
+on its own, as the workflow's retry settings say. Weir also never deletes the original download of
+this workflow, even with **After cleaning, delete the original download** on: the option shows as off
+and says why.
 
 ### Deluno: checking where downloads land
 
@@ -155,11 +211,12 @@ Open **Setup › Workflows** and edit the workflow:
 
 - **Watched folder**: where your download client finishes files, e.g. `/media/downloads/complete/tv`.
 - **Output folder**: where Weir puts cleaned files, e.g. `/media/weir/tv`.
-- **New downloads: after cleaning, delete the original download**: turn this **off** if you use torrents. The torrent
-  needs its files to keep seeding, and if they disappear, Sonarr stops treating the download as
-  finished and never imports it. Your download client or Sonarr removes the original later, under
-  your normal seeding rules. Weir remembers what it has already cleaned, so it won't clean the same
-  file twice.
+- **New downloads: after cleaning, delete the original download**: shows as off, and cannot be changed, once the
+  workflow is linked to Sonarr or Radarr (step 2). Weir never deletes the original of a linked workflow:
+  the torrent needs its files to keep seeding, and if they disappear, Sonarr stops treating the
+  download as finished and never imports it. Your download client or Sonarr removes the original
+  later, under your normal seeding rules. Weir remembers what it has already cleaned, so it won't
+  clean the same file twice.
 - **Existing output**: leave it on anything except **Keep both**. Keep both renames the cleaned file,
   and Sonarr only looks for the original name.
 

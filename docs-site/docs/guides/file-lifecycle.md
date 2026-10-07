@@ -105,6 +105,14 @@ file that's missing is treated as already gone, not as a completed deletion with
 behind it — and a file that's locked or in use produces a message you can read in Activity, not a
 silent skip.
 
+**A workflow linked to a media manager never deletes the original.** If a workflow is linked to Deluno,
+Sonarr, Radarr or another media manager, the original download belongs to your download client and
+the manager, and the client may still be seeding it. Weir leaves the file, its extra files and its
+folder where they are, whatever **After cleaning, delete the original download** says: the option
+shows as off, with the reason, and Activity says "This workflow is linked to Deluno, so the original
+stays with your download client, which may still be seeding." Unlink the workflow, and the option
+works again. Only a Weir-only workflow deletes originals.
+
 ## Library mode: cleaning files you already have
 
 Cleaning a file that's already in your library, in place, follows the same rule: Weir builds the

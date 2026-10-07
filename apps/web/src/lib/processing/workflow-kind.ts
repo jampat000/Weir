@@ -91,3 +91,18 @@ export function workflowKindCounts(kinds: WorkflowKind[]): string {
     .filter((part): part is string => part !== null)
     .join(" · ");
 }
+
+/** The linked managers that hand this workflow its downloads (Deluno). Weir's own scan never feeds such a workflow. */
+export function handedOffBy(kind: WorkflowKind): WorkflowManager[] {
+  return kind.kind === "linked"
+    ? kind.managers.filter((manager) => manager.kind === "deluno")
+    : [];
+}
+
+/** Why there is nothing to scan: "Deluno hands this workflow its downloads." Null when Weir's own scan feeds it. */
+export function handedOffNote(kind: WorkflowKind): string | null {
+  const managers = handedOffBy(kind);
+  return managers.length === 0
+    ? null
+    : `${joinNames(managers.map((manager) => manager.name))} hands this workflow its downloads.`;
+}

@@ -14,6 +14,7 @@ public static class LibraryBodies
         "manager_coverage_detail",
         "discovered_from_connection_id",
         "discovered_library_key",
+        "folders_synced_from_connection_id",
         "effective_max_concurrent_files",
         "active_job_count",
         "next_look_at",

@@ -59,6 +59,10 @@ vi.mock("../../../lib/system/readiness-queries", () => ({
 vi.mock("../../../lib/processing/jobs-inspection/queries", () => ({
   useProcessingJobsInspectionQuery: () => ({ data: failedJobs }),
 }));
+const handedOffNote = vi.fn<() => string | null>(() => null);
+vi.mock("../../../lib/processing/use-handed-off-note", () => ({
+  useHandedOffNote: () => handedOffNote(),
+}));
 vi.mock("../../../lib/processing/libraries-queries", () => ({
   useProcessingLibrariesQuery: () => ({ data: workflows }),
 }));
@@ -124,6 +128,7 @@ beforeEach(() => {
   forget.mockReset().mockResolvedValue({ detail: "Removed." });
   removeOptions.mockReset();
   rejectedAgain.mockReset();
+  handedOffNote.mockReset().mockReturnValue(null);
   fits = Number.MAX_SAFE_INTEGER;
   readiness.worker_health = [];
   failedJobs.jobs = [];
@@ -498,6 +503,22 @@ describe("asking a workflow to look again at a held or skipped file", () => {
       "Checking this workflow again",
     );
   });
+
+  it("does not offer to check a workflow a media manager hands its downloads to, and says why", () => {
+    needFiles.files = [held];
+    handedOffNote.mockReturnValue("Deluno hands this workflow its downloads.");
+    renderPanel();
+
+    const button = screen.getByRole("button", { name: "Check again" });
+
+    expect(button).toBeDisabled();
+    expect(button).toHaveAttribute(
+      "title",
+      "Deluno hands this workflow its downloads.",
+    );
+    fireEvent.click(button);
+    expect(checkAgain.mutate).not.toHaveBeenCalled();
+  });
 });
 
 describe("removing a file", () => {
@@ -510,6 +531,7 @@ describe("removing a file", () => {
       fingerprint_recorded: true,
       unconfirmed_size_bytes: null,
       unconfirmed_modified_at: null,
+      delete_refused_reason: null,
       ...partial,
     }) as ProcessingFileRemoveOptions;
 

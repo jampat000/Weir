@@ -62,6 +62,34 @@ public sealed class MediaManagerRulesTests
         Assert.DoesNotContain("/srv", HandoffPaths.RelativeMediaPathForHandoff("/srv", "/x/y.mkv").Problem, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void A_file_no_workflow_watches_is_refused_by_name_with_every_workflow_listed()
+    {
+        var detail = NoWorkflowWatches.Detail(
+            [
+                new WorkflowFolder("Movies", "movie", @"C:\Downloads\Completed\Movies"),
+                new WorkflowFolder("Kids", "movie", "/media/kids"),
+                new WorkflowFolder("TV", "tv", "  "),
+            ],
+            @"C:\Downloads\Completed\Other\Nosferatu 1922 [PublicHD]\Nosferatu.mkv");
+
+        Assert.Equal(
+            "No Weir workflow watches the folder that 'Nosferatu.mkv' is in. " +
+            @"Weir's workflows: Movies watches 'C:\Downloads\Completed\Movies'; Kids (Movies) watches '/media/kids'; TV (TV episodes) has no watched folder yet. " +
+            "Set a workflow's watched folder (Setup › Workflows) to the folder the download client finishes into, or add a path mapping in the media manager.",
+            detail);
+        Assert.DoesNotContain("Other", detail, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_refusal_with_no_workflows_says_so_and_still_names_only_the_file()
+    {
+        var detail = NoWorkflowWatches.Detail([], "/x/y/film.mkv");
+
+        Assert.StartsWith("No Weir workflow watches the folder that 'film.mkv' is in. Weir has no workflows yet. Add one in Setup › Workflows", detail, StringComparison.Ordinal);
+        Assert.DoesNotContain("/x/y", detail, StringComparison.Ordinal);
+    }
+
     // --- import events -------------------------------------------------------------------------
 
     [Fact]

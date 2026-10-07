@@ -1,4 +1,5 @@
 using Weir.Core.Json;
+using Weir.Core.MediaManagers;
 using Weir.Core.Processing;
 using Weir.Infrastructure.Sqlite;
 
@@ -48,6 +49,31 @@ public sealed partial class LibraryStore
             "SELECT connection_id FROM library_manager_links WHERE library_id = @id ORDER BY connection_id",
             reader => reader.GetInt64(0), ("@id", libraryId)).ConfigureAwait(false);
         return rows;
+    }
+
+    /// <summary>
+    /// The kinds of the media managers one workflow is linked to, read from the same <c>library_manager_links</c> rows the
+    /// editor writes. Every rule about originals and scanning asks this, so there is one answer to "is it linked, and to what".
+    /// </summary>
+    public async Task<WorkflowManagerLinks> ManagerLinksAsync(UnitOfWork uow, long libraryId)
+    {
+        var kinds = await uow.QueryAsync(
+            "SELECT media_manager_connections.kind FROM library_manager_links " +
+            "JOIN media_manager_connections ON media_manager_connections.id = library_manager_links.connection_id " +
+            "WHERE library_manager_links.library_id = @id ORDER BY library_manager_links.connection_id",
+            reader => reader.GetString(0), ("@id", libraryId)).ConfigureAwait(false);
+        return new WorkflowManagerLinks(kinds);
+    }
+
+    /// <summary>The ids of the workflows a linked Deluno hands downloads to, which Weir's own scan never feeds.</summary>
+    public async Task<HashSet<long>> HandedOffLibraryIdsAsync(UnitOfWork uow)
+    {
+        var ids = await uow.QueryAsync(
+            "SELECT DISTINCT library_manager_links.library_id FROM library_manager_links " +
+            "JOIN media_manager_connections ON media_manager_connections.id = library_manager_links.connection_id " +
+            "WHERE lower(trim(media_manager_connections.kind)) = 'deluno'",
+            reader => reader.GetInt64(0)).ConfigureAwait(false);
+        return [.. ids];
     }
 
     /// <summary>The libraries linked to one connection, in <c>display_order</c> then id (the reverse of <see cref="ManagerConnectionIdsAsync"/>).</summary>

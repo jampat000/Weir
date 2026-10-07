@@ -22,6 +22,22 @@ public static class RemuxPassFileState
             ("$library", libraryId),
             ("$path", relativePath));
 
+    /// <summary>
+    /// Whether a failed file is still waiting for an automatic retry: it is failed with a next attempt booked. A file that has been
+    /// given up on (no attempt booked), finished, rejected or started again some other way is not.
+    /// </summary>
+    public static async Task<bool> RetryStillOwedAsync(UnitOfWork uow, long libraryId, string relativePath)
+    {
+        ArgumentNullException.ThrowIfNull(uow);
+        var owed = await uow.QueryAsync(
+            "SELECT 1 FROM files WHERE library_id = $library AND relative_path = $path AND status = $status AND next_retry_at IS NOT NULL LIMIT 1",
+            reader => reader.GetInt64(0),
+            ("$library", libraryId),
+            ("$path", relativePath),
+            ("$status", ProcessingFileStatuses.ProcessingFailed)).ConfigureAwait(false);
+        return owed.Count > 0;
+    }
+
     /// <summary>Moves a file Weir has already seen into a new state. False when there is no row.</summary>
     public static async Task<bool> MarkFileStatusAsync(UnitOfWork uow, long libraryId, string relativePath, string status, string reason, DateTimeOffset now)
     {
