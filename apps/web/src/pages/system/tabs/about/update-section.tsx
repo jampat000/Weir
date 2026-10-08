@@ -10,6 +10,7 @@ import {
 import type { UpdateStatus } from "../../../../lib/settings/types";
 import { updateMeaning } from "../../../../lib/settings/update-status";
 import { mmActionButtonClass } from "../../../../lib/ui/mm-control-roles";
+import { useAppDateFormatter } from "../../../../lib/ui/mm-format-date";
 import { updateStatusLabel } from "./update-words";
 import { UpdatePreferences } from "./update-preferences";
 import { UpdateReadyNotice } from "./update-ready-notice";
@@ -45,6 +46,23 @@ function statusVersion(status: UpdateStatus): string | null {
     return status.latest_version ?? null;
   if (status.status === "up_to_date") return status.current_version;
   return null;
+}
+
+/** While GitHub is limiting the checks, the newest release Weir had learned of before that. */
+function LastKnownRelease({ status }: { status: UpdateStatus }) {
+  const formatDate = useAppDateFormatter();
+  if (status.status !== "rate_limited" || !status.latest_version) return null;
+  return (
+    <p
+      className="mm-quiet-note"
+      data-testid="suite-settings-last-known-release"
+    >
+      Latest known: {status.latest_version}
+      {status.published_at
+        ? `, published ${formatDate(status.published_at)}`
+        : ""}
+    </p>
+  );
 }
 
 function ReleaseStatus({
@@ -112,6 +130,7 @@ function ReleaseStatus({
         </Chip>
         <span>{version ?? status.summary}</span>
       </p>
+      <LastKnownRelease status={status} />
       {showUpdateButton && status.windows_installer_url ? (
         <a
           href={status.windows_installer_url}

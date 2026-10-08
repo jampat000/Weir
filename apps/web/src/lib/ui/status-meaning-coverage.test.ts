@@ -70,6 +70,7 @@ function updateStatuses(): Record<string, StatusMeaning> {
     "update_available",
     "downloaded",
     "not_published",
+    "rate_limited",
     "unavailable",
   ];
   return Object.fromEntries(
@@ -158,6 +159,7 @@ const PRODUCTION_MEANINGS = {
       update_available: "todo",
       downloaded: "todo",
       not_published: "idle",
+      rate_limited: "idle",
       unavailable: "attention",
     } satisfies Record<SystemOverview["update"]["status"], StatusMeaning>,
   },
