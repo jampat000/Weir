@@ -6,6 +6,7 @@ import path from "node:path";
 import { test } from "node:test";
 
 import { findOtherVersionAssets } from "./check-release-assets-single-version.mjs";
+import { readFfmpegPin } from "./ffmpeg-pin.mjs";
 
 function makeDir() {
   return mkdtempSync(path.join(tmpdir(), "weir-asset-check-"));
@@ -96,6 +97,27 @@ test("a directory holding only a release candidate's packages passes for that re
     writeFileSync(path.join(dir, "releases.win.json"), '{"Assets":[{"Version":"1.0.0-rc.1","FileName":"Weir-1.0.0-rc.1-full.nupkg"}]}');
     writeFileSync(path.join(dir, "RELEASES"), "﻿SHA1 Weir-1.0.0-rc.1-full.nupkg 123");
     assert.deepEqual(findOtherVersionAssets(dir, "1.0.0-rc.1"), []);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("the third-party archives a release carries beside its own packages are not other-version assets", () => {
+  const dir = makeDir();
+  try {
+    writeFileSync(path.join(dir, "Weir-1.0.1-full.nupkg"), "bytes");
+    writeFileSync(path.join(dir, "releases.win.json"), '{"Assets":[{"Version":"1.0.1","FileName":"Weir-1.0.1-full.nupkg"}]}');
+    const pin = readFfmpegPin();
+    const thirdParty = [
+      pin.windows.name,
+      pin.linux.name,
+      "mkvtoolnix-64-bit-102.0.zip",
+      "ffmpeg-source-27b46f0fbc.tar.gz",
+      `ffmpeg-build-scripts-${pin.releaseTag}.tar.gz`,
+      "SHA256SUMS.txt",
+    ];
+    for (const name of thirdParty) writeFileSync(path.join(dir, name), "bytes");
+    assert.deepEqual(findOtherVersionAssets(dir, "1.0.1"), []);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

@@ -218,6 +218,8 @@ jobs:
       # Builds the web app, publishes the .NET server and the tray, vendors FFmpeg and MKVToolNix, installs the
       # pinned vpk CLI and packs.
       - name: Build Weir Windows package (Velopack)
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: powershell -ExecutionPolicy Bypass -File packaging/windows/build-velopack.ps1
 
       - name: Smoke test packaged Windows server

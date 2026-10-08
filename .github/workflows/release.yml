@@ -186,8 +186,12 @@ jobs:
       # MKVToolNix binaries, hash-verified against the pins in
       # packaging/windows/build-velopack-vendored-media-tools.ps1, placed alongside the Windows
       # artifacts so they ride the same upload-artifact/attest/release steps below without a separate
-      # publish path.
-      - name: Fetch bundled tool source archives
+      # publish path. The archives the build itself uses (Windows and Linux FFmpeg, Windows MKVToolNix) come
+      # with them: upstream prunes old files, and a later build that finds one gone takes this copy from the
+      # release instead (packaging/windows/pinned-download.ps1).
+      - name: Fetch bundled tool archives and sources
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: powershell -ExecutionPolicy Bypass -File packaging/windows/fetch-bundled-tool-sources.ps1 -OutputDir dist/windows/releases
 
       - name: Generate release artifact checksums

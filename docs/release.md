@@ -264,6 +264,7 @@ workflow reads a `GHCR_TOKEN` secret.
 | `Tag + source tree` | Canonical source snapshot for the release. |
 | `weir-web-dist.zip` | Static production build of `apps/web/dist`. The Weir server is still required. |
 | `Weir-win-Setup.exe` | Windows desktop installer (Velopack) with .NET tray host, bundled .NET server (`server\WeirServer.exe`), bundled web UI, bundled FFmpeg, and delta update support. |
+| `ffmpeg-*.zip`, `ffmpeg-*.tar.xz`, `mkvtoolnix-64-bit-*.zip`, `ffmpeg-source-*.tar.gz`, `ffmpeg-build-scripts-*.tar.gz`, `mkvtoolnix-source-*.tar.xz` | The exact third-party archives the release was built with (listed in `SHA256SUMS.txt` with everything else). Upstream prunes old files (BtbN keeps a dated build for about two weeks), so a later build that finds a pinned archive gone takes the copy from the newest Weir release that has it, and checks it against the same pinned SHA-256 (`packaging/windows/pinned-download.ps1`, `scripts/pinned-download.mjs`). The Velopack feed and the update check ignore them. |
 | `ghcr.io/<owner>/<repo>:X.Y.Z` | Versioned all-in-one container image (linux/amd64 and linux/arm64), with a signed provenance attestation when the repository variable `ATTEST_PROVENANCE` is `true` (`gh attestation verify oci://ghcr.io/<owner>/<repo>:X.Y.Z --repo <owner>/<repo>`). |
 | `ghcr.io/<owner>/<repo>:X.Y` and `:latest` | Moving tags for the newest stable container image. A release candidate publishes only its version tag. |
 
