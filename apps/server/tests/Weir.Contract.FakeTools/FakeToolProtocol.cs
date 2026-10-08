@@ -20,6 +20,7 @@ internal static class FakeToolProtocol
     public const string DefaultKey = "default";
 
     public const string ProbeKey = "probe";
+    public const string ProbeDelaySecondsKey = "probe_delay_seconds";
     public const string ProbeErrorKey = "probe_error";
     public const string IntegrityErrorKey = "integrity_error";
     public const string RemuxErrorKey = "remux_error";

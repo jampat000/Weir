@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.RegularExpressions;
 using Weir.Contract.Tests.Harness;
+using Weir.Contract.Tests.Harness.Fakes;
 using Weir.E2E.Tests.Harness;
 using Weir.E2E.Tests.Support;
 using static Microsoft.Playwright.Assertions;
@@ -11,7 +12,8 @@ namespace Weir.E2E.Tests;
 public sealed partial class LibraryScanLiveTests(E2EServer server) : E2ETestBase(server)
 {
     private const int FilesInLibrary = 40;
-    private const int FilesInLongLibrary = 150;
+    private const int FilesInLongLibrary = 30;
+    private const double ProbeSeconds = 0.3;
     private const float ScanMs = 90_000;
 
     [GeneratedRegex(@"^([\d,]+) files · ")]
@@ -78,36 +80,35 @@ public sealed partial class LibraryScanLiveTests(E2EServer server) : E2ETestBase
             await File.WriteAllBytesAsync(Path.Join(libraryFolder, $"Film {index:D4}.mkv"), [1, 2, 3, 4]);
         }
 
+        // Each file takes the fake ffprobe a set time to answer, so the walk lasts several progress intervals on any machine.
+        using var tools = FakeFfmpeg.Install();
+        tools.SetFileRule("*.mkv", new FileRule { ProbeDelaySeconds = ProbeSeconds });
+        await using var own = await E2EServer.StartWithFakeToolsAsync(tools);
+        var baseUrl = own.BaseUrl.GetLeftPart(UriPartial.Authority);
+
         var page = await NewPageAsync();
-        await Navigation.EnsureSignedInAsync(page, BaseUrl);
+        await Navigation.EnsureSignedInAsync(page, baseUrl);
         var context = page.Context;
         var id = await WeirWorkflowApi.CreateAsync(
             context,
-            BaseUrl,
+            baseUrl,
             "E2E long scan",
             Directory.CreateDirectory(Path.Join(folders.Path, "watched")).FullName,
             Directory.CreateDirectory(Path.Join(folders.Path, "output")).FullName);
-        try
-        {
-            await WeirWorkflowApi.SetLibraryFoldersAsync(context, BaseUrl, id, libraryFolder);
-            await page.GotoAsync($"{BaseUrl}/library?library={id}");
-            await page.EvaluateAsync("() => { window.__weirNotReloaded = true; }");
-            var scan = page.GetByTestId("library-scan");
-            await Expect(scan).ToContainTextAsync("not scanned yet", new() { Timeout = Navigation.UrlAssertMs });
+        await WeirWorkflowApi.SetLibraryFoldersAsync(context, baseUrl, id, libraryFolder);
+        await page.GotoAsync($"{baseUrl}/library?library={id}");
+        await page.EvaluateAsync("() => { window.__weirNotReloaded = true; }");
+        var scan = page.GetByTestId("library-scan");
+        await Expect(scan).ToContainTextAsync("not scanned yet", new() { Timeout = Navigation.UrlAssertMs });
 
-            await WeirWorkflowApi.StartLibraryScanAsync(context, BaseUrl, id);
+        await WeirWorkflowApi.StartLibraryScanAsync(context, baseUrl, id);
 
-            var counted = await ObserveFilesSoFarUntilCheckedAsync(page);
-            Assert.True(counted.Count >= 3, $"The scan showed only {string.Join(", ", counted)} files so far.");
-            Assert.All(counted, seen => Assert.InRange(seen, 1, FilesInLongLibrary - 1));
-            Assert.Equal(counted.Order(), counted);
-            await Expect(page.GetByText(FilesCount())).ToContainTextAsync($"{FilesInLongLibrary:N0} files", new() { Timeout = ScanMs });
-            Assert.True(await page.EvaluateAsync<bool>("() => window.__weirNotReloaded === true"), "The page was reloaded.");
-        }
-        finally
-        {
-            await WeirWorkflowApi.DeleteAsync(context, BaseUrl, id);
-        }
+        var counted = await ObserveFilesSoFarUntilCheckedAsync(page);
+        Assert.True(counted.Count >= 3, $"The scan showed only {string.Join(", ", counted)} files so far.");
+        Assert.All(counted, seen => Assert.InRange(seen, 1, FilesInLongLibrary));
+        Assert.Equal(counted.Order(), counted);
+        await Expect(page.GetByText(FilesCount())).ToContainTextAsync($"{FilesInLongLibrary:N0} files", new() { Timeout = ScanMs });
+        Assert.True(await page.EvaluateAsync<bool>("() => window.__weirNotReloaded === true"), "The page was reloaded.");
     }
 
     /// <summary>Every distinct "files so far" count the scan line shows, in order, until the scan reports itself checked.</summary>

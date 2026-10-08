@@ -67,13 +67,19 @@ public sealed partial class SystemHealthLiveTests(E2EServer server) : E2ETestBas
         try
         {
             await page.GotoAsync($"{BaseUrl}/?view=system");
+
+            // The card lists only the rows that fit, problems first, and a hidden row has no text on screen. Among every check this
+            // row can fall below a missing tool and be left out, as it is on a machine without FFmpeg; under Workflows it is not.
+            await page.GetByRole(AriaRole.Group, new() { Name = "Health areas" }).GetByRole(AriaRole.Button, new() { NameRegex = new Regex("^Workflows") }).ClickAsync();
             var row = page.GetByTestId("system-check").Filter(new() { HasText = "E2E looked-at films" });
             await Expect(row).ToHaveAttributeAsync("data-status", "done", new() { Timeout = FolderCheckMs });
+            await Expect(row).ToBeVisibleAsync();
             await Expect(row).ToContainTextAsync("checked");
 
             // Nothing about the folders changes, so the page reads nothing new; the server looks every 15 s all the same.
             await Task.Delay(TimeSpan.FromSeconds(40));
 
+            await Expect(row).ToBeVisibleAsync();
             var shown = CheckedAgo().Match(await row.InnerTextAsync());
             Assert.True(shown.Success, "The row did not say when it was checked.");
             Assert.True(
