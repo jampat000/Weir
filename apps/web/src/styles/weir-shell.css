@@ -159,3 +159,13 @@ kbd {
   width: 100%;
   min-width: 0;
 }
+
+/* Live updates are lost: what is on screen may be out of date until Weir answers again. Full width under the header. */
+.mm-live-banner {
+  margin: 0;
+  padding: 8px var(--mm-header-pad-x);
+  border-bottom: 1px solid color-mix(in srgb, var(--mm-st) 40%, transparent);
+  background: color-mix(in srgb, var(--mm-st) 14%, var(--mm-bg-main));
+  font-size: var(--mm-type-body);
+  line-height: 1.5;
+}

@@ -14,9 +14,6 @@ export function usePauseQuery() {
   return useQuery<PauseState>({
     queryKey: pauseKeys.state,
     queryFn: fetchPause,
-    // A pause with an expiry lifts on its own, so the shell has to notice without a
-    // reload. One minute is well inside the smallest pause anyone can set.
-    refetchInterval: 60_000,
   });
 }
 

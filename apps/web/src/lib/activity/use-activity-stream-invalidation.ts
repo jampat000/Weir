@@ -3,6 +3,16 @@ import { useQueryClient, type QueryKey } from "@tanstack/react-query";
 import { useSyncExternalStore } from "react";
 
 import {
+  reportLiveConnection,
+  resetLiveConnection,
+} from "../live/live-connection";
+import {
+  DATA_CHANGED_EVENT,
+  parseDataChanged,
+  type LiveTopic,
+} from "../live/live-topics";
+import { SERVER_HELLO_EVENT, parseServerHello } from "../live/server-hello";
+import {
   CONNECTION_ACTIVITY_EVENT,
   parseConnectionActivity,
   type ConnectionActivityFrame,
@@ -30,6 +40,22 @@ type ConnectionActivitySubscriber = (frame: ConnectionActivityFrame) => void;
 type SystemStatsSubscriber = (frame: SystemStatsFrame) => void;
 type SystemTasksSubscriber = (tasks: SystemTask[]) => void;
 type SystemLogSubscriber = (frame: SystemLogFrame) => void;
+type LiveSignalSubscriber = (signal: LiveSignal) => void;
+
+/**
+ * What the shared stream tells the app to catch up on: one kind of data changed, the connection came back after it was
+ * lost, or the server restarted since this page last heard from it.
+ */
+export type LiveSignal =
+  | { type: "changed"; topic: LiveTopic }
+  | { type: "reconnected" }
+  | { type: "restarted" };
+
+/** An EventSource whose readyState is this has given up for good and will not try again by itself. */
+const EVENT_SOURCE_CLOSED = 2;
+
+/** How long to wait before opening the stream again after the browser gave up on it; the server asks for the same. */
+const REOPEN_DELAY_MS = 5_000;
 
 /**
  * Never cancel a query that is already mid-flight just because a newer activity event arrived: the
@@ -84,6 +110,10 @@ const connectionActivitySubscribers = new Set<ConnectionActivitySubscriber>();
 const systemStatsSubscribers = new Set<SystemStatsSubscriber>();
 const systemTasksSubscribers = new Set<SystemTasksSubscriber>();
 const systemLogSubscribers = new Set<SystemLogSubscriber>();
+const liveSignalSubscribers = new Set<LiveSignalSubscriber>();
+/** The run of the server the stream last said hello from; null until it has. */
+let bootId: string | null = null;
+let reopenTimer: number | null = null;
 /** A progress frame arrived while the tab was hidden and has not been shown yet. */
 let progressChangedWhileHidden = false;
 
@@ -102,7 +132,8 @@ function hasSubscribers(): boolean {
     connectionActivitySubscribers.size > 0 ||
     systemStatsSubscribers.size > 0 ||
     systemTasksSubscribers.size > 0 ||
-    systemLogSubscribers.size > 0
+    systemLogSubscribers.size > 0 ||
+    liveSignalSubscribers.size > 0
   );
 }
 
@@ -197,9 +228,37 @@ function parseProgressPayload(data: string): LiveProgressEntry[] | null {
   }
 }
 
+function emitLiveSignal(signal: LiveSignal): void {
+  liveSignalSubscribers.forEach((subscriber) => subscriber(signal));
+}
+
 function closeActivityStream(): void {
   source?.close();
   source = null;
+  if (reopenTimer !== null) {
+    window.clearTimeout(reopenTimer);
+    reopenTimer = null;
+  }
+}
+
+/** The stream dropped. The browser opens it again by itself, unless the server refused it outright. */
+function onStreamError(): void {
+  reportLiveConnection("dropped");
+  if (source?.readyState !== EVENT_SOURCE_CLOSED) return;
+  source.close();
+  source = null;
+  reopenTimer ??= window.setTimeout(() => {
+    reopenTimer = null;
+    if (hasSubscribers()) ensureActivityStream();
+  }, REOPEN_DELAY_MS);
+}
+
+function onServerHello(data: string): void {
+  const id = parseServerHello(data);
+  if (id === null) return;
+  const restarted = bootId !== null && bootId !== id;
+  bootId = id;
+  if (restarted) emitLiveSignal({ type: "restarted" });
 }
 
 /**
@@ -219,12 +278,28 @@ function onVisibilityChange(): void {
   }
 }
 
-let watchingVisibility = false;
+/**
+ * The browser says the network is gone. A connection cut by that can look open for a long time, so the stream is not
+ * trusted any more: it is dropped, and opened afresh (and every screen caught up) when the network is back.
+ */
+function onBrowserOffline(): void {
+  if (!hasSubscribers()) return;
+  closeActivityStream();
+  reportLiveConnection("dropped");
+}
 
-function watchVisibility(): void {
-  if (watchingVisibility || typeof document === "undefined") return;
+function onBrowserOnline(): void {
+  if (hasSubscribers()) ensureActivityStream();
+}
+
+let watchingBrowser = false;
+
+function watchBrowser(): void {
+  if (watchingBrowser || typeof document === "undefined") return;
   document.addEventListener("visibilitychange", onVisibilityChange);
-  watchingVisibility = true;
+  window.addEventListener("offline", onBrowserOffline);
+  window.addEventListener("online", onBrowserOnline);
+  watchingBrowser = true;
 }
 
 function ensureActivityStream(): EventSource | null {
@@ -235,6 +310,19 @@ function ensureActivityStream(): EventSource | null {
     return null;
   }
   source = new EventSource("/api/v1/activity/stream");
+  source.addEventListener("open", () => {
+    if (reportLiveConnection("opened").reconnected) {
+      emitLiveSignal({ type: "reconnected" });
+    }
+  });
+  source.addEventListener("error", onStreamError);
+  source.addEventListener(SERVER_HELLO_EVENT, (ev) =>
+    onServerHello((ev as MessageEvent<string>).data),
+  );
+  source.addEventListener(DATA_CHANGED_EVENT, (ev) => {
+    const topic = parseDataChanged((ev as MessageEvent<string>).data);
+    if (topic) emitLiveSignal({ type: "changed", topic });
+  });
   source.addEventListener("activity.latest", (ev) => {
     const payload = parseLatestPayload((ev as MessageEvent<string>).data);
     if (!payload || !isNewActivity(payload)) {
@@ -279,6 +367,8 @@ function closeIfNobodyIsWatching(): void {
   if (!hasSubscribers()) {
     closeActivityStream();
     lastSeen = null;
+    bootId = null;
+    resetLiveConnection();
     liveProgressByPath = EMPTY_PROGRESS;
     progressChangedWhileHidden = false;
   }
@@ -288,7 +378,7 @@ function subscribeActivityLatest(
   subscriber: ActivityLatestSubscriber,
 ): () => void {
   subscribers.add(subscriber);
-  watchVisibility();
+  watchBrowser();
   ensureActivityStream();
 
   return () => {
@@ -299,7 +389,7 @@ function subscribeActivityLatest(
 
 function subscribeLiveProgress(subscriber: LiveProgressSubscriber): () => void {
   progressSubscribers.add(subscriber);
-  watchVisibility();
+  watchBrowser();
   ensureActivityStream();
 
   return () => {
@@ -316,7 +406,7 @@ export function subscribeConnectionActivity(
   subscriber: ConnectionActivitySubscriber,
 ): () => void {
   connectionActivitySubscribers.add(subscriber);
-  watchVisibility();
+  watchBrowser();
   ensureActivityStream();
 
   return () => {
@@ -333,7 +423,7 @@ export function subscribeSystemStats(
   subscriber: SystemStatsSubscriber,
 ): () => void {
   systemStatsSubscribers.add(subscriber);
-  watchVisibility();
+  watchBrowser();
   ensureActivityStream();
 
   return () => {
@@ -350,7 +440,7 @@ export function subscribeSystemTasks(
   subscriber: SystemTasksSubscriber,
 ): () => void {
   systemTasksSubscribers.add(subscriber);
-  watchVisibility();
+  watchBrowser();
   ensureActivityStream();
 
   return () => {
@@ -367,11 +457,28 @@ export function subscribeSystemLog(
   subscriber: SystemLogSubscriber,
 ): () => void {
   systemLogSubscribers.add(subscriber);
-  watchVisibility();
+  watchBrowser();
   ensureActivityStream();
 
   return () => {
     systemLogSubscribers.delete(subscriber);
+    closeIfNobodyIsWatching();
+  };
+}
+
+/**
+ * Calls `subscriber` with each thing the shared stream says the app must catch up on (see {@link LiveSignal}). A signal is a
+ * moment, so nothing is replayed to a late subscriber.
+ */
+export function subscribeLiveSignals(
+  subscriber: LiveSignalSubscriber,
+): () => void {
+  liveSignalSubscribers.add(subscriber);
+  watchBrowser();
+  ensureActivityStream();
+
+  return () => {
+    liveSignalSubscribers.delete(subscriber);
     closeIfNobodyIsWatching();
   };
 }
