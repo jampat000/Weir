@@ -136,6 +136,25 @@ public sealed class ToolFailureTextTests
     }
 
     [Fact]
+    public void A_failure_outside_the_tools_is_never_worded_by_its_own_message()
+    {
+        Assert.Equal(ToolFailureText.UnreadableFile, ToolFailureText.ForFailure(new MediaUnreadableException("[matroska,webm @ 0x1] EBML header parsing failed")));
+        Assert.Equal(ToolFailureText.TookTooLong, ToolFailureText.ForFailure(new MediaToolTimeoutException("timed out")));
+        Assert.Equal("Weir wrote this.", ToolFailureText.ForFailure(new MkvmergeUnsupportedPlanException("Weir wrote this.")));
+        Assert.Equal(ToolFailureText.Generic, ToolFailureText.ForFailure(new IOException(@"The process cannot access the file C:\Media\Film.mkv")));
+    }
+
+    [Fact]
+    public void A_cause_the_tools_name_has_a_known_reason_and_any_other_exception_has_none()
+    {
+        Assert.Equal(ToolFailureText.UnreadableFile, ToolFailureText.KnownReason(new MediaUnreadableException("[matroska,webm @ 0x1] EBML header parsing failed")));
+        Assert.Equal(ToolFailureText.TookTooLong, ToolFailureText.KnownReason(new MediaToolTimeoutException("timed out")));
+        Assert.Equal(ToolFailureText.NoSpace, ToolFailureText.KnownReason(new MediaToolException("ffmpeg: No space left on device") { PlainMessage = ToolFailureText.NoSpace }));
+        Assert.Null(ToolFailureText.KnownReason(new MediaToolException("a sentence Weir wrote")));
+        Assert.Null(ToolFailureText.KnownReason(new InvalidOperationException("boom")));
+    }
+
+    [Fact]
     public void Technical_detail_hides_secrets_and_is_capped()
     {
         var error = new MediaToolException("failed with api_key=hunter2 " + new string('x', 3000));
