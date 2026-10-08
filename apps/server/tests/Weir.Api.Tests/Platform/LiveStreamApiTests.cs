@@ -52,6 +52,18 @@ public sealed class LiveStreamApiTests
         (await NextFrameAsync(reader, "data.changed"))["topic"]!.GetValue<string>();
 
     /// <summary>Reads topics until <paramref name="wanted"/> arrives, past the topics a request also moves, such as the queue its job joined.</summary>
+    /// <summary>The next topic among <paramref name="wanted"/>, past the ones Weir's own background work publishes meanwhile.</summary>
+    private static async Task<string> NextOfAsync(StreamReader reader, params string[] wanted)
+    {
+        string topic;
+        do
+        {
+            topic = await NextTopicAsync(reader);
+        }
+        while (!wanted.Contains(topic));
+        return topic;
+    }
+
     private static async Task AssertTopicArrivesAsync(StreamReader reader, string wanted)
     {
         string topic;
@@ -121,8 +133,9 @@ public sealed class LiveStreamApiTests
         publisher.Publish(DataTopics.Connections);
         publisher.Publish(DataTopics.Backups);
 
-        Assert.Equal([DataTopics.Connections, DataTopics.Backups], [await NextTopicAsync(first), await NextTopicAsync(first)]);
-        Assert.Equal([DataTopics.Connections, DataTopics.Backups], [await NextTopicAsync(second), await NextTopicAsync(second)]);
+        string[] published = [DataTopics.Connections, DataTopics.Backups];
+        Assert.Equal<IEnumerable<string>>(published, [await NextOfAsync(first, published), await NextOfAsync(first, published)]);
+        Assert.Equal<IEnumerable<string>>(published, [await NextOfAsync(second, published), await NextOfAsync(second, published)]);
     }
 
     private static async Task<string> NewLibraryWithFoldersAsync(WeirTestServer server, ApiTestClient client)
