@@ -281,6 +281,39 @@ public sealed class LanAccessSyncTests : IDisposable
     }
 
     [Fact]
+    public async Task Once_windows_has_answered_the_choice_is_saved_again_so_the_server_can_tell_the_page()
+    {
+        var server = new FakeServer(ListenScope.OtherDevices);
+        using var sync = SyncFor(server);
+        SaveFromAnotherProcess(ListenScope.OtherDevices);
+        var savedBefore = File.GetLastWriteTimeUtc(Path.Combine(Home, LanAccessSetting.FileName));
+
+        await sync.CheckAsync(Watch(), CancellationToken.None);
+
+        Assert.True(File.GetLastWriteTimeUtc(Path.Combine(Home, LanAccessSetting.FileName)) > savedBefore);
+        Assert.Equal(ListenScope.OtherDevices, Saved());
+        Assert.Empty(server.Moves);
+
+        await sync.CheckAsync(Watch(), CancellationToken.None);
+
+        Assert.Equal(1, _firewall.Asked);
+    }
+
+    [Fact]
+    public async Task A_choice_that_raises_no_prompt_is_left_as_it_was_saved()
+    {
+        _firewall.Allows = true;
+        var server = new FakeServer(ListenScope.ThisPcOnly);
+        using var sync = SyncFor(server);
+        SaveFromAnotherProcess(ListenScope.OtherDevices);
+        var savedBefore = File.GetLastWriteTimeUtc(Path.Combine(Home, LanAccessSetting.FileName));
+
+        await sync.CheckAsync(Watch(), CancellationToken.None);
+
+        Assert.Equal(savedBefore, File.GetLastWriteTimeUtc(Path.Combine(Home, LanAccessSetting.FileName)));
+    }
+
+    [Fact]
     public async Task A_choice_for_other_devices_with_a_firewall_rule_in_place_does_not_ask_windows()
     {
         _firewall.Allows = true;

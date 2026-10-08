@@ -21,7 +21,8 @@ interface IServerListenScope
 /// A choice for other devices that arrives while Windows Firewall has no rule for Weir raises the same administrator
 /// prompt the tray menu does. Declining it still restarts the server for the network, because that is what was
 /// chosen; Windows Firewall then blocks, which System › About shows with a way to try again. Saving the choice again
-/// (the file's modified time moves even when its text does not) asks again.
+/// (the file's modified time moves even when its text does not) asks again. Once Windows has answered, the tray saves
+/// the choice again, so the server that watches the file can tell System › About the firewall's new state.
 /// </remarks>
 sealed class LanAccessSync(string runtimeHome, IServerListenScope server, IFirewallAccess firewall, TimeProvider time) : IDisposable
 {
@@ -82,6 +83,11 @@ sealed class LanAccessSync(string runtimeHome, IServerListenScope server, IFirew
             var asked = isNewSave && scope == ListenScope.OtherDevices && !firewall.AllowsWeirIn()
                 ? await AskWindowsAsync(watch, cancellationToken).ConfigureAwait(false)
                 : (FirewallElevation.Outcome?)null;
+            if (asked is not null)
+            {
+                SaveAgain(scope);
+            }
+
             var change = scope == server.Scope
                 ? ScopeChange.Unchanged
                 : await ApplyAsync(scope, cancellationToken).ConfigureAwait(false);
@@ -114,16 +120,22 @@ sealed class LanAccessSync(string runtimeHome, IServerListenScope server, IFirew
         return change;
     }
 
-    private void PutSavedChoiceBack()
+    private void PutSavedChoiceBack() => Save(server.Scope, "the saved choice could not be put back");
+
+    // The server watches the saved choice and tells System › About when it is written, so saving the same choice once
+    // Windows has answered is how the page learns the firewall's new state when the server is not restarted for it.
+    private void SaveAgain(ListenScope scope) => Save(scope, "the saved choice could not be saved again after Windows answered");
+
+    private void Save(ListenScope scope, string failure)
     {
         try
         {
-            LanAccessSetting.Write(runtimeHome, server.Scope);
+            LanAccessSetting.Write(runtimeHome, scope);
             _handledSavedAt = LanAccessSetting.SavedAt(runtimeHome);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            TrayLog.Write($"LAN access: the saved choice could not be put back ({ex.Message}).");
+            TrayLog.Write($"LAN access: {failure} ({ex.Message}).");
         }
     }
 }
