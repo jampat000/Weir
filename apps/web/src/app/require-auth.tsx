@@ -2,6 +2,7 @@ import { Navigate, Outlet } from "react-router-dom";
 import { PageLoading } from "../components/shared/page-loading";
 import { useMeQuery, useSetThemeMutation } from "../lib/auth/queries";
 import { sessionWasNotKept } from "../lib/auth/session-kept";
+import { signedOutPath } from "../lib/auth/signed-in-before";
 import { useAccountThemeSync } from "../lib/ui/use-account-theme-sync";
 
 /** Everything past sign-in: a signed-out visitor goes to the login page, with the reason when a session did not stick. */
@@ -23,7 +24,7 @@ export function RequireAuth() {
     // wrong password, so carry the reason across (#453).
     const to = sessionWasNotKept()
       ? "/login?problem=session-not-kept"
-      : "/login";
+      : signedOutPath();
     return <Navigate to={to} replace />;
   }
   return <Outlet />;

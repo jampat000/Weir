@@ -15,13 +15,18 @@ import {
 } from "../api/auth-api";
 import type { UserPublic } from "../api/types";
 import { markLoginSucceeded } from "./session-kept";
+import { clearSignedIn, markSignedIn } from "./signed-in-before";
 import { activityKeys } from "../activity/query-keys";
 import { authKeys } from "./query-keys";
 
 export function useMeQuery() {
   return useQuery({
     queryKey: authKeys.me,
-    queryFn: fetchMe,
+    queryFn: async () => {
+      const user = await fetchMe();
+      if (user) markSignedIn();
+      return user;
+    },
     retry: false,
   });
 }
@@ -93,6 +98,7 @@ export function useLoginMutation() {
       // Remember that the server accepted us, so a 401 moments later can be reported as a
       // rejected cookie rather than a silent bounce back to the form (#453).
       markLoginSucceeded();
+      markSignedIn();
       // Anonymous /me is cached as `null` (401). Hydrate from the login response — do not invalidate
       // /me here: an immediate refetch can run before the session cookie is visible to fetch(), get
       // 401, and overwrite this cache back to null (E2E/CI flake).
@@ -109,6 +115,7 @@ export function useLogoutMutation() {
   return useMutation({
     mutationFn: postLogout,
     onMutate: async () => {
+      clearSignedIn();
       await qc.cancelQueries({ queryKey: authKeys.me });
       await qc.cancelQueries({ queryKey: authKeys.session });
       qc.setQueryData(authKeys.me, null);
@@ -140,6 +147,7 @@ export function useBootstrapMutation() {
       // sign-in does, rather than invalidating it and racing the new cookie's first request.
       if (data.user) {
         markLoginSucceeded();
+        markSignedIn();
         qc.setQueryData(authKeys.me, data.user);
       }
       void qc.invalidateQueries({ queryKey: authKeys.bootstrap });

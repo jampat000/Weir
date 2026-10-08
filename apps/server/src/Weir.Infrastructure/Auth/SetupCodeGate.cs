@@ -64,7 +64,7 @@ public sealed class SetupCodeGate
         }
 
         WriteOwnerOnlyFile(_path, code + Environment.NewLine);
-        logger.LogWarning(
+        logger.LogInformation(
             "Weir has no account yet. To create one from another device, enter this setup code: {SetupCode}. It is also in {Path}.",
             code,
             _path);
