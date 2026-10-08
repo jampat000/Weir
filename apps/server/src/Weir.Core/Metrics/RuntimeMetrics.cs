@@ -66,8 +66,9 @@ public sealed class RuntimeMetricsStore
     }
 
     /// <summary>
-    /// A request that held its connection open for as long as a browser watched (an event stream): counted, but its time says
-    /// nothing about how fast Weir answers, so <see cref="GetRequestFigures"/> leaves it out.
+    /// A request that held its connection open for as long as a browser watched (an event stream), or that the browser left
+    /// before it was answered: counted, but its time says nothing about how fast Weir answers, so
+    /// <see cref="GetRequestFigures"/> leaves it out.
     /// </summary>
     public void RecordStreamRequest(string method, string route, int statusCode, double durationMs)
     {

@@ -117,6 +117,35 @@ public sealed class MixedWorkflowsApiTests
     private static string Escaped(string path) => path.Replace("\\", "\\\\", StringComparison.Ordinal);
 
     [Fact]
+    public async Task A_linked_workflow_is_saved_with_the_rejected_file_choice_and_original_setting_it_was_given()
+    {
+        var (server, client, _) = await StartAsync();
+        await using var _server = server;
+        using var folders = Folders.Create();
+        var delunoId = await ConnectAsync(client, "deluno", "Deluno", "http://192.0.2.10:5099");
+
+        using var created = await client.PostAsync("/api/v1/processing/libraries", new Dictionary<string, object?>
+        {
+            ["csrf_token"] = await client.CsrfAsync(),
+            ["name"] = "TV from Deluno",
+            ["media_type"] = "tv",
+            ["watched_folder"] = folders.Watched,
+            ["output_folder"] = folders.Output,
+            ["manager_connection_ids"] = new[] { delunoId },
+            ["rejected_file_action"] = "delete_file",
+            ["remove_original_after_success"] = true,
+        });
+
+        // Whether the original goes is decided from the links when a file is processed, so what was chosen is kept as it was sent.
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        var workflow = await Json(created);
+        Assert.Equal("delete_file", workflow["rejected_file_action"]!.GetValue<string>());
+        Assert.True(workflow["remove_original_after_success"]!.GetValue<bool>());
+        using var read = await client.GetAsync($"/api/v1/processing/libraries/{workflow["id"]!.GetValue<long>()}");
+        Assert.Equal("delete_file", (await Json(read))["rejected_file_action"]!.GetValue<string>());
+    }
+
+    [Fact]
     public async Task A_weir_only_workflow_next_to_a_deluno_one_is_ready_without_involving_deluno()
     {
         var (server, client, manager) = await StartAsync();
