@@ -14,6 +14,9 @@ public sealed class RequestContextMiddleware
 
     private const string EventStreamContentType = "text/event-stream";
 
+    /// <summary>The status the metrics count a request under when the client went away before it was answered.</summary>
+    private const int ClientClosedRequest = 499;
+
     private readonly RequestDelegate _next;
     private readonly ILogger _logger;
     private readonly Core.Metrics.RuntimeMetricsStore _metrics;
@@ -53,6 +56,14 @@ public sealed class RequestContextMiddleware
         {
             await _next(context).ConfigureAwait(false);
         }
+        catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested)
+        {
+            // The browser left (a page change, a closed tab) while Weir was still working: nobody is waiting for an
+            // answer, and nothing failed, so it is neither an error in the log nor a 500 nobody will read.
+            LogClientLeft(requestId, context);
+            _metrics.RecordRequest(context.Request.Method, RouteLabelFor(context), ClientClosedRequest, _time.GetElapsedTime(started).TotalMilliseconds);
+            return;
+        }
         catch (Exception exception) when (LogUnhandled(exception, requestId, context, started))
         {
             throw;
@@ -78,6 +89,13 @@ public sealed class RequestContextMiddleware
         ?? _routes.FirstPathMatch(context.Request.Path)?.Label
         ?? context.Request.Path.Value
         ?? string.Empty;
+
+    private void LogClientLeft(string requestId, HttpContext context) =>
+        _logger.LogDebug(
+            "Request abandoned by the client request_id={RequestId} method={Method} route={Route}",
+            requestId,
+            HttpLogSanitizer.Sanitize(context.Request.Method),
+            HttpLogSanitizer.Sanitize(RouteLabelFor(context)));
 
     private bool LogUnhandled(Exception exception, string requestId, HttpContext context, long started)
     {
