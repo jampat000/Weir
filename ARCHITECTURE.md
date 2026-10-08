@@ -105,6 +105,14 @@ Solution `apps/server/Weir.slnx`; details in [`apps/server/README.md`](apps/serv
 - `Weir.Core` stays free of IO; filesystem, database, process and HTTP work lives in `Weir.Infrastructure` behind seams tests can replace.
 - File lifecycle changes must preserve the safety contract in [`docs/file-lifecycle-contract.md`](docs/file-lifecycle-contract.md).
 
+## Live Data
+
+Every screen follows Weir from one server-sent event stream, `GET /api/v1/activity/stream`, shared by the whole web app. A new number arrives by a push, never by a timer or a Refresh button.
+
+- **Publish:** a component that changes data calls `DataChangePublisher.Publish(DataTopics.<Topic>)` in `Weir.Infrastructure.Activity` once the change has committed (`uow.OnCommitted`). Each open stream sends a `data.changed` frame, `{ "topic": "<snake_case_name>" }`.
+- **Consume:** `LIVE_TOPIC_QUERIES` in `apps/web/src/lib/live/live-topics.ts` says which queries each topic reads again. A screen adds its query keys to its topic and drops its `refetchInterval`.
+- **Connection:** `server.hello` opens every stream with `{ "boot_id" }`, new on each server start. While the connection is lost the shell shows "Live updates paused", and when it is back every query is read again; a different `boot_id` after a reconnect also reloads the page if the server now serves a newer build.
+
 ## Job Lifecycle
 
 ```mermaid
