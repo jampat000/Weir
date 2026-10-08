@@ -406,6 +406,62 @@ it("shows a linked workflow as keeping the original, says why, and leaves the sa
   );
 });
 
+it("shows a linked workflow as leaving a rejected file, says why, and leaves the saved choice alone", async () => {
+  asOperator();
+  const existing = library({
+    media_type: "tv",
+    name: "TV",
+    manager_connection_ids: [10],
+    rejected_file_action: "delete_file",
+  });
+  vi.spyOn(api, "fetchProcessingLibraries").mockResolvedValue([existing]);
+  vi.spyOn(managerApi, "fetchMediaManagerConnections").mockResolvedValue([
+    { id: 10, kind: "deluno", name: "Deluno on RIG" } as MediaManagerConnection,
+  ]);
+  vi.spyOn(managersApi, "fetchProcessingManagerSetup").mockResolvedValue({
+    media_type: "tv",
+    managers: [],
+  });
+  const update = vi
+    .spyOn(api, "updateProcessingLibrary")
+    .mockResolvedValue(existing);
+
+  render(<LibrariesTab />, { wrapper });
+  fireEvent.click(await screen.findByRole("button", { name: "Edit" }));
+  const select = (await screen.findByRole("combobox", {
+    name: "When a file is rejected",
+  })) as HTMLSelectElement;
+
+  await waitFor(() => expect(select).toBeDisabled());
+  expect(select).toHaveValue("leave");
+  expect(
+    await screen.findByTestId("rejected_file_action-locked"),
+  ).toHaveTextContent(
+    "Linked to Deluno on RIG: the original stays with your download client, which may still be seeding.",
+  );
+  fireEvent.click(screen.getByTestId("processing-library-save"));
+  await waitFor(() =>
+    expect(update).toHaveBeenCalledWith(
+      1,
+      expect.objectContaining({ rejected_file_action: "delete_file" }),
+    ),
+  );
+});
+
+it("lets a Weir only workflow choose to delete a rejected file", async () => {
+  asOperator();
+  vi.spyOn(api, "fetchProcessingLibraries").mockResolvedValue([library()]);
+
+  render(<LibrariesTab />, { wrapper });
+  fireEvent.click(await screen.findByRole("button", { name: "Edit" }));
+  const select = await screen.findByRole("combobox", {
+    name: "When a file is rejected",
+  });
+
+  expect(select).toBeEnabled();
+  expect(screen.queryByTestId("rejected_file_action-locked")).toBeNull();
+});
+
 it("fills a library's folders from what Deluno reports, then saves them", async () => {
   asOperator();
   const existing = library({
