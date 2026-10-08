@@ -14,8 +14,6 @@ export function useProcessingMaintenanceQuery() {
   return useQuery<MaintenanceState>({
     queryKey: processingKeys.maintenance,
     queryFn: fetchProcessingMaintenance,
-    // A queued sweep starts within seconds, so the panel has to notice without a reload.
-    refetchInterval: 15_000,
   });
 }
 

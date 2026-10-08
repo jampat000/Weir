@@ -16,6 +16,8 @@ export const processingKeys = {
     ["processing", "files", query] as const,
   fileLog: (fileId: number, updatedAt: string) =>
     ["processing", "files", fileId, "log", updatedAt] as const,
+  /** Every library-clean list, whatever the filters. */
+  libraryCleanLists: ["processing", "library-cleans"] as const,
   libraryCleans: (query: LibraryCleansQuery) =>
     ["processing", "library-cleans", query] as const,
   filesAtOnce: ["processing", "files-at-once"] as const,

@@ -22,12 +22,12 @@ export type LiveTopic = Schema<"DataChangedFrame">["topic"];
 export const LIVE_TOPIC_QUERIES: Readonly<
   Record<LiveTopic, readonly QueryKey[]>
 > = {
-  pause: [pauseKeys.state],
+  pause: [pauseKeys.state, processingKeys.filesAtOnce],
   readiness: [systemKeys.readiness],
   files_at_once: [processingKeys.filesAtOnce],
   maintenance: [processingKeys.maintenance],
-  libraries: [processingKeys.libraries],
-  library_scan: [],
+  libraries: [processingKeys.libraries, processingKeys.filesAtOnce],
+  library_scan: [processingKeys.libraries, processingKeys.files],
   update: [
     settingsKeys.updateStatus,
     settingsKeys.updateSettings,
@@ -40,6 +40,8 @@ export const LIVE_TOPIC_QUERIES: Readonly<
     settingsKeys.notificationChannels,
     processingKeys.operatorSettings,
     processingKeys.runtimeSettings,
+    processingKeys.filesAtOnce,
+    processingKeys.maintenance,
   ],
   backups: [settingsKeys.configurationBackups],
   kept_files: [processingKeys.keptFiles],

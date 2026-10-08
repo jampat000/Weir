@@ -5,11 +5,28 @@ import { describe, expect, it, vi } from "vitest";
 
 import { WORKING_FILE_STATUS } from "../../pages/processing/processing-model";
 import { activityKeys } from "../activity/query-keys";
-import { useForgetProcessingFile } from "./files-queries";
+import {
+  useFileHistoryQuery,
+  useForgetProcessingFile,
+  useLibraryCleansQuery,
+} from "./files-queries";
 import { processingKeys } from "./query-keys";
 
+const followStream = vi.fn();
+vi.mock("../activity/use-activity-stream-invalidation", () => ({
+  useActivityStreamInvalidations: (keys: unknown, options: unknown) =>
+    followStream(keys, options),
+}));
 vi.mock("./files-api", () => ({
   forgetProcessingFile: vi.fn().mockResolvedValue(undefined),
+  fetchProcessingFiles: vi
+    .fn()
+    .mockResolvedValue({ files: [], returned: 0, limit: 1000 }),
+}));
+vi.mock("./library-cleans-api", () => ({
+  fetchLibraryCleans: vi
+    .fn()
+    .mockResolvedValue({ cleans: [], returned: 0, limit: 200 }),
 }));
 
 function withQueryClient(qc: QueryClient) {
@@ -62,5 +79,40 @@ describe("useForgetProcessingFile", () => {
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
     expect(query?.isStale()).toBe(true);
+  });
+});
+
+describe("Activity's lists follow the stream", () => {
+  it("reads the downloads again when the stream says a file changed, and never on a timer", () => {
+    const qc = new QueryClient();
+    const query = { within_days: 7, limit: 1000 };
+    followStream.mockClear();
+
+    renderHook(() => useFileHistoryQuery(query), {
+      wrapper: withQueryClient(qc),
+    });
+
+    expect(followStream).toHaveBeenCalledWith(
+      [processingKeys.files],
+      expect.objectContaining({ throttleMs: expect.any(Number) }),
+    );
+    const cached = qc
+      .getQueryCache()
+      .find({ queryKey: processingKeys.fileList(query) });
+    expect(cached?.observers[0].options.refetchInterval).toBeUndefined();
+  });
+
+  it("reads the library cleans again when the stream says one changed", () => {
+    const qc = new QueryClient();
+    followStream.mockClear();
+
+    renderHook(() => useLibraryCleansQuery({ within_days: 7 }), {
+      wrapper: withQueryClient(qc),
+    });
+
+    expect(followStream).toHaveBeenCalledWith(
+      [processingKeys.libraryCleanLists],
+      expect.objectContaining({ throttleMs: expect.any(Number) }),
+    );
   });
 });

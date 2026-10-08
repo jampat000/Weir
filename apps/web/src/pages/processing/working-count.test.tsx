@@ -1,31 +1,30 @@
-import { act, renderHook } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { renderHook } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ProcessingFile } from "../../lib/processing/files-api";
 import type { ProcessingJobInspectionRow } from "../../lib/processing/jobs-inspection/types";
+import { processingKeys } from "../../lib/processing/query-keys";
 import { LIBRARY_CLEAN_JOB_KIND, countWorking } from "./processing-model";
-import { useWorkingCount } from "./working-count";
+import {
+  ACTIVE_JOBS_LIMIT,
+  WORKING_FILES_QUERY,
+  useWorkingCount,
+} from "./working-count";
 
 const lists = {
   files: [] as ProcessingFile[],
   jobs: [] as ProcessingJobInspectionRow[],
 };
-const refetchFiles = vi.fn();
-const refetchJobs = vi.fn();
+const followStream = vi.fn();
 
+vi.mock("../../lib/activity/use-activity-stream-invalidation", () => ({
+  useActivityStreamInvalidations: (keys: unknown) => followStream(keys),
+}));
 vi.mock("../../lib/processing/files-queries", () => ({
-  useProcessingFilesQuery: () => ({
-    data: { files: lists.files },
-    refetch: refetchFiles,
-  }),
+  useProcessingFilesQuery: () => ({ data: { files: lists.files } }),
 }));
 vi.mock("../../lib/processing/jobs-inspection/queries", () => ({
-  useProcessingJobsInspectionQuery: () => ({
-    data: { jobs: lists.jobs },
-    refetch: refetchJobs,
-  }),
+  useProcessingJobsInspectionQuery: () => ({ data: { jobs: lists.jobs } }),
 }));
-
-const REFRESH_MS = 10_000;
 
 function file(
   id: number,
@@ -84,16 +83,9 @@ describe("the count of working files", () => {
 
 describe("useWorkingCount", () => {
   beforeEach(() => {
-    vi.useFakeTimers();
     lists.files = [file(1, "processing"), file(2, "on_hold")];
     lists.jobs = [libraryClean(10, "leased")];
-    refetchFiles.mockReset();
-    refetchJobs.mockReset();
-  });
-
-  afterEach(() => {
-    vi.useRealTimers();
-    vi.restoreAllMocks();
+    followStream.mockReset();
   });
 
   it("gives what the Working lane counts from the lane's own lists", () => {
@@ -102,26 +94,12 @@ describe("useWorkingCount", () => {
     expect(result.current).toBe(2);
   });
 
-  it("refreshes both lists on its own outside the Processing page", () => {
+  it("reads both lists again whenever the stream says a file or a job changed, with no timer", () => {
     renderHook(() => useWorkingCount());
 
-    act(() => {
-      vi.advanceTimersByTime(REFRESH_MS);
-    });
-
-    expect(refetchFiles).toHaveBeenCalledTimes(1);
-    expect(refetchJobs).toHaveBeenCalledTimes(1);
-  });
-
-  it("does not refresh while the tab is hidden", () => {
-    vi.spyOn(document, "visibilityState", "get").mockReturnValue("hidden");
-    renderHook(() => useWorkingCount());
-
-    act(() => {
-      vi.advanceTimersByTime(REFRESH_MS);
-    });
-
-    expect(refetchFiles).not.toHaveBeenCalled();
-    expect(refetchJobs).not.toHaveBeenCalled();
+    expect(followStream).toHaveBeenCalledWith([
+      processingKeys.fileList(WORKING_FILES_QUERY),
+      processingKeys.jobsInspectionList("active", ACTIVE_JOBS_LIMIT),
+    ]);
   });
 });

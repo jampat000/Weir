@@ -6,6 +6,7 @@ import type {
   ProcessingFile,
   ProcessingFileLog,
 } from "../../lib/processing/files-api";
+import type { LiveProgressEntry } from "../../lib/activity/use-activity-stream-invalidation";
 import type { KeptFile } from "../../lib/processing/kept-files-api";
 import type { LibraryClean } from "../../lib/processing/library-cleans-api";
 import { activityEntries, type ActivityEntry } from "./activity-entries";
@@ -33,12 +34,22 @@ const attention: { entries: ActivityEntry[]; count: number } = {
   count: 0,
 };
 const me = { role: "admin" };
+const liveProgress: Record<string, LiveProgressEntry> = {};
 const requeue = vi.fn();
 const requeueFiles = vi.fn();
 const processNow = vi.fn();
 const processKeptAgain = vi.fn();
 const fetchLog = vi.fn<(id: number) => Promise<ProcessingFileLog>>();
 
+vi.mock(
+  "../../lib/activity/use-activity-stream-invalidation",
+  async (importOriginal) => ({
+    ...(await importOriginal<
+      typeof import("../../lib/activity/use-activity-stream-invalidation")
+    >()),
+    useLiveProgress: () => liveProgress,
+  }),
+);
 vi.mock("../../lib/processing/files-queries", async (importOriginal) => {
   const mutation = (fn = vi.fn()) => ({
     mutateAsync: fn,
@@ -208,6 +219,7 @@ describe("ActivityPage", () => {
     fetchLog.mockReset();
     cleans.cleans = [];
     kept.files = [];
+    for (const path of Object.keys(liveProgress)) delete liveProgress[path];
     attention.entries = [];
     attention.count = 0;
     filesQueryState.isLoading = false;
@@ -294,6 +306,35 @@ describe("ActivityPage", () => {
     expect(screen.getByTestId("activity-detail")).toHaveTextContent(
       "The.Held.One.mkv",
     );
+  });
+
+  it("shows a running pass's percent from the live stream, with no new read of the list", () => {
+    const path = "Glass Orchard/Glass.Orchard.S03E04.mkv";
+    files.files = [
+      file({
+        id: 3,
+        relative_path: path,
+        status: "processing",
+        progress_percent: 5,
+      }),
+    ];
+    liveProgress[path] = {
+      relativePath: path,
+      status: "processing",
+      stage: null,
+      percent: 42.4,
+      etaSeconds: null,
+      message: null,
+      speed: null,
+      elapsedSeconds: null,
+      removedAudio: [],
+      removedSubtitles: [],
+    };
+
+    renderPage();
+
+    const [row] = screen.getAllByRole("row").slice(1);
+    expect(within(row).getByText("Writing · 42%")).toBeInTheDocument();
   });
 
   it("ends the page with how long file activity is kept", () => {

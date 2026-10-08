@@ -6,6 +6,7 @@ import {
 } from "@tanstack/react-query";
 
 import { activityKeys } from "../activity/query-keys";
+import { useActivityStreamInvalidations } from "../activity/use-activity-stream-invalidation";
 import { postProcessingFileRemuxPassEnqueue } from "./file-remux-pass-api";
 import {
   fetchProcessingFiles,
@@ -39,27 +40,34 @@ export function useProcessingFilesQuery(query: ProcessingFilesQuery = {}) {
   });
 }
 
-/** How often Activity follows a running pass. */
-const ACTIVITY_REFRESH_MS = 5000;
+/**
+ * A file's Activity row changes when its status does, and a thousand-row read is dear, so the list follows the stream
+ * gently. A running pass's percent does not wait for it: the page lays the stream's live progress over the rows.
+ */
+const ACTIVITY_THROTTLE_MS = 2_000;
+const HISTORY_KEYS = [processingKeys.files] as const;
+const CLEAN_KEYS = [processingKeys.libraryCleanLists] as const;
 
 /**
- * Activity's downloads. The list on screen stays while a new filter loads, and it refreshes by itself only while a
- * file is being processed: a queued file changes nothing worth a thousand-row read until it starts (#719).
+ * Activity's downloads. The list on screen stays while a new filter loads, and it is read again each time the stream says
+ * a file changed (#914).
  */
 export function useFileHistoryQuery(query: ProcessingFilesQuery) {
+  useActivityStreamInvalidations(HISTORY_KEYS, {
+    throttleMs: ACTIVITY_THROTTLE_MS,
+  });
   return useQuery<ProcessingFilesPage>({
     queryKey: processingKeys.fileList(query),
     queryFn: () => fetchProcessingFiles(query),
     placeholderData: keepPreviousData,
-    refetchInterval: (q) =>
-      q.state.data?.files.some((file) => file.status === "processing")
-        ? ACTIVITY_REFRESH_MS
-        : false,
   });
 }
 
-/** Activity's library cleans (#695), kept on screen while a new filter loads. */
+/** Activity's library cleans (#695), kept on screen while a new filter loads, and read again as the stream says one changed. */
 export function useLibraryCleansQuery(query: LibraryCleansQuery) {
+  useActivityStreamInvalidations(CLEAN_KEYS, {
+    throttleMs: ACTIVITY_THROTTLE_MS,
+  });
   return useQuery({
     queryKey: processingKeys.libraryCleans(query),
     queryFn: () => fetchLibraryCleans(query),
