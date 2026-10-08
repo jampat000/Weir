@@ -42,8 +42,9 @@ public sealed class PeriodicTaskRegistry
     public PeriodicTaskRegistry(TimeProvider time) => _time = time ?? throw new ArgumentNullException(nameof(time));
 
     /// <summary>
-    /// Says when a task is next due. A task seen for the first time is added; a task already listed keeps its history. Moving
-    /// the next time alone is not announced, because the timers say it again on every tick.
+    /// Says when a task is next due. A task seen for the first time is added; a task already listed keeps its history. A
+    /// change to its label, its next time or its interval is announced, so a countdown never counts to a time that has passed;
+    /// the timers say it again on every tick, and saying the same thing again announces nothing.
     /// </summary>
     public void Plan(string key, string label, DateTimeOffset nextRunAt, TimeSpan? interval)
     {
@@ -54,7 +55,7 @@ public sealed class PeriodicTaskRegistry
         {
             if (_entries.TryGetValue(key, out var entry))
             {
-                announce = entry.Label != label;
+                announce = entry.Label != label || entry.NextRunAt != nextRunAt || entry.Interval != interval;
                 entry.Label = label;
                 entry.NextRunAt = nextRunAt;
                 entry.Interval = interval;

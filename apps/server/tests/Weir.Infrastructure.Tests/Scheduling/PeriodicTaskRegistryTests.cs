@@ -127,14 +127,25 @@ public sealed class PeriodicTaskRegistryTests
     }
 
     [Fact]
-    public async Task Moving_only_the_next_time_is_not_announced()
+    public async Task Moving_the_next_time_is_announced_so_a_countdown_never_goes_stale()
     {
         _registry.Plan("scan-1", "Scan Movies", Noon, TimeSpan.FromMinutes(5));
         using var listener = _registry.SubscribeToChanges();
+
         _registry.Plan("scan-1", "Scan Movies", Noon.AddMinutes(1), TimeSpan.FromMinutes(5));
+
+        // Announcements are numbered from one: the task coming was the first, so the move is the second.
+        Assert.Equal(2, await NextAnnouncementAsync(listener));
+    }
+
+    [Fact]
+    public async Task Planning_a_task_for_the_time_it_already_has_announces_nothing()
+    {
+        _registry.Plan("scan-1", "Scan Movies", Noon, TimeSpan.FromMinutes(5));
+        using var listener = _registry.SubscribeToChanges();
+        _registry.Plan("scan-1", "Scan Movies", Noon, TimeSpan.FromMinutes(5));
         _registry.Begin("scan-1");
 
-        // Announcements are numbered from one: the task coming was the first, so the run starting is the second.
         Assert.Equal(2, await NextAnnouncementAsync(listener));
     }
 
