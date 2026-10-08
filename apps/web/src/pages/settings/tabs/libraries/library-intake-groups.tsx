@@ -3,7 +3,7 @@ import {
   originalStaysReason,
   type WorkflowKind,
 } from "../../../../lib/processing/workflow-kind";
-import { REJECTED_FILE_OPTIONS } from "./library-options";
+import { LEAVE_REJECTED_FILE, REJECTED_FILE_OPTIONS } from "./library-options";
 import {
   DateTimeSetting,
   SelectSetting,
@@ -17,7 +17,9 @@ function lockedRejectedFileAction(
   kind: WorkflowKind,
 ): { value: string; reason: string } | undefined {
   const reason = originalStaysReason(kind);
-  return reason === undefined ? undefined : { value: "leave", reason };
+  return reason === undefined
+    ? undefined
+    : { value: LEAVE_REJECTED_FILE, reason };
 }
 
 /** Which files belong to the library, decided before Weir spends time probing them. */
