@@ -70,6 +70,30 @@ public sealed class LiveStreamApiTests
     }
 
     [Fact]
+    public void The_checks_frame_names_when_the_server_last_looked_and_null_for_a_look_it_has_not_made()
+    {
+        var at = new DateTimeOffset(2026, 10, 8, 3, 4, 5, TimeSpan.Zero);
+
+        Assert.Equal(
+            "event: system.checks\ndata: {\"folders_checked_at\":null,\"readiness_checked_at\":\"2026-10-08T03:04:05Z\"}\n\n",
+            SystemChecksFrames.Frame(new ServerLookTimes(null, at)));
+    }
+
+    [Fact]
+    public async Task A_look_the_server_makes_reaches_an_open_stream_as_a_checks_frame()
+    {
+        var (server, client) = await StartSignedInAsync();
+        await using var _server = server;
+        using var reader = await OpenStreamAsync(server, client);
+        await NextFrameAsync(reader, "server.hello");
+
+        server.Services.GetRequiredService<ServerLooks>().ReadinessLooked();
+
+        var frame = await NextFrameAsync(reader, "system.checks");
+        Assert.NotNull(frame["readiness_checked_at"]);
+    }
+
+    [Fact]
     public async Task A_stream_that_opens_says_which_run_of_the_server_it_is_talking_to()
     {
         var (server, client) = await StartSignedInAsync();

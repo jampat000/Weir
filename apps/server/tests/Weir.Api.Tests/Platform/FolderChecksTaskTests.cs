@@ -20,7 +20,7 @@ public sealed class FolderChecksTaskTests : IDisposable
     public void Dispose() => Directory.Delete(_root, recursive: true);
 
     private sealed record Rig(
-        WeirTestServer Server, FolderChecksTask Task, DataChangePublisher Changes, ActivityStreamClients Clients, string WatchedFolder);
+        WeirTestServer Server, FolderChecksTask Task, DataChangePublisher Changes, ActivityStreamClients Clients, ServerLooks Looks, string WatchedFolder);
 
     private async Task<Rig> StartAsync()
     {
@@ -46,13 +46,15 @@ public sealed class FolderChecksTaskTests : IDisposable
         // the server's timer cannot add a look the test did not ask for.
         var changes = new DataChangePublisher();
         var clients = new ActivityStreamClients();
+        var looks = new ServerLooks(TimeProvider.System);
         var task = new FolderChecksTask(
             server.Services.GetRequiredService<SqliteDatabase>(),
             server.Services.GetRequiredService<LibraryStore>(),
             server.Services.GetRequiredService<LibraryFolderChainCheck>(),
             clients,
-            changes);
-        return new Rig(server, task, changes, clients, watched);
+            changes,
+            looks);
+        return new Rig(server, task, changes, clients, looks, watched);
     }
 
     private static async Task<string> NextAsync(BroadcastSubscription<string> subscription)
@@ -98,6 +100,39 @@ public sealed class FolderChecksTaskTests : IDisposable
     }
 
     [Fact]
+    public async Task Every_look_is_told_to_the_streams_even_when_the_answer_has_not_changed()
+    {
+        var rig = await StartAsync();
+        await using var _server = rig.Server;
+        using var watcher = rig.Clients.Open();
+        using var looks = rig.Looks.Subscribe();
+
+        await rig.Task.RunOnceAsync(CancellationToken.None);
+        var first = rig.Looks.Latest.Folders;
+        await rig.Task.RunOnceAsync(CancellationToken.None);
+
+        Assert.NotNull(first);
+        Assert.True(rig.Looks.Latest.Folders >= first);
+        Assert.Equal(2, await CountAsync(looks));
+    }
+
+    private static async Task<long> CountAsync(BroadcastSubscription<long> looks)
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        long last = 0;
+        await foreach (var version in looks.ReadAllAsync(timeout.Token))
+        {
+            last = version;
+            if (last == 2)
+            {
+                break;
+            }
+        }
+
+        return last;
+    }
+
+    [Fact]
     public async Task With_nobody_watching_nothing_is_checked_or_published()
     {
         var rig = await StartAsync();
@@ -107,6 +142,7 @@ public sealed class FolderChecksTaskTests : IDisposable
         await rig.Task.RunOnceAsync(CancellationToken.None);
 
         Assert.False(await PublishedAsync(rig, subscription));
+        Assert.Null(rig.Looks.Latest.Folders);
     }
 
     [Fact]

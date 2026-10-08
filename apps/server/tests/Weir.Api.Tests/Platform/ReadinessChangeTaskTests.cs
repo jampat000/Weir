@@ -60,13 +60,15 @@ public sealed class ReadinessChangeTaskTests
         await Eventually.ThatAsync(async () => (await SystemEndpoints.BuildReadinessAsync(server.Services)).Ready);
         var changes = new DataChangePublisher();
         var clients = new ActivityStreamClients();
-        var task = new ReadinessChangeTask(server.Services, clients, changes);
+        var looks = new ServerLooks(TimeProvider.System);
+        var task = new ReadinessChangeTask(server.Services, clients, changes, looks);
         var heartbeats = server.Services.GetRequiredService<WorkerHeartbeats>();
         using var watcher = clients.Open();
         using var subscription = changes.Subscribe();
 
         await task.RunOnceAsync(CancellationToken.None);
         Assert.Equal(DataTopics.Readiness, await NextAsync(subscription));
+        Assert.NotNull(looks.Latest.Readiness);
 
         await task.RunOnceAsync(CancellationToken.None);
         Assert.False(await PublishedAsync(changes, subscription), "An answer that has not changed is not published again.");
@@ -85,7 +87,7 @@ public sealed class ReadinessChangeTaskTests
     {
         await using var server = await WeirTestServer.StartAsync([("WEIR_SESSION_SECRET", ApiTestClient.Secret), ("WEIR_PROCESSING_WORKER_COUNT", "0")]);
         var changes = new DataChangePublisher();
-        var task = new ReadinessChangeTask(server.Services, new ActivityStreamClients(), changes);
+        var task = new ReadinessChangeTask(server.Services, new ActivityStreamClients(), changes, new ServerLooks(TimeProvider.System));
         using var subscription = changes.Subscribe();
 
         await task.RunOnceAsync(CancellationToken.None);

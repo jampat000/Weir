@@ -8,20 +8,23 @@ namespace Weir.Api.Endpoints;
 /// <c>readiness-changes</c>: while a browser is watching, looks at <c>GET /system/readiness</c>'s answer every few seconds and says so
 /// on <see cref="DataTopics.Readiness"/> when it is not the one it gave last time, so a worker that stops, or a start that
 /// finishes, shows on every open screen without anyone asking. The first look counts as a change, because a page that opened a
-/// moment earlier may have read an older answer. Idle, with no stream open, it does not touch the database.
+/// moment earlier may have read an older answer. Each look is told to the open streams as the time Health shows
+/// (<see cref="ServerLooks"/>). Idle, with no stream open, it does not touch the database.
 /// </summary>
 internal sealed class ReadinessChangeTask : IPeriodicTask
 {
     private readonly IServiceProvider _services;
     private readonly ActivityStreamClients _clients;
     private readonly DataChangePublisher _changes;
+    private readonly ServerLooks _looks;
     private string? _answer;
 
-    public ReadinessChangeTask(IServiceProvider services, ActivityStreamClients clients, DataChangePublisher changes)
+    public ReadinessChangeTask(IServiceProvider services, ActivityStreamClients clients, DataChangePublisher changes, ServerLooks looks)
     {
         _services = services ?? throw new ArgumentNullException(nameof(services));
         _clients = clients ?? throw new ArgumentNullException(nameof(clients));
         _changes = changes ?? throw new ArgumentNullException(nameof(changes));
+        _looks = looks ?? throw new ArgumentNullException(nameof(looks));
     }
 
     public string Name => "readiness-changes";
@@ -44,6 +47,7 @@ internal sealed class ReadinessChangeTask : IPeriodicTask
         }
 
         var answer = AnswerOf(await SystemEndpoints.BuildReadinessAsync(_services).ConfigureAwait(false));
+        _looks.ReadinessLooked();
         if (answer == _answer)
         {
             return;

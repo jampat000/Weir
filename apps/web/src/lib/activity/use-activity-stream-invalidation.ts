@@ -31,6 +31,12 @@ import {
   type SystemLogFrame,
 } from "../system/system-log-frame";
 import {
+  NO_LOOKS_YET,
+  SYSTEM_CHECKS_EVENT,
+  parseSystemChecksFrame,
+  type ServerLooks,
+} from "../system/system-checks-frame";
+import {
   SYSTEM_OVERVIEW_EVENT,
   parseSystemOverviewFrame,
 } from "../system/system-overview-frame";
@@ -47,6 +53,7 @@ type ConnectionActivitySubscriber = (frame: ConnectionActivityFrame) => void;
 type SystemStatsSubscriber = (frame: SystemStatsFrame) => void;
 type SystemTasksSubscriber = (tasks: SystemTask[]) => void;
 type SystemOverviewSubscriber = (overview: SystemOverview) => void;
+type SystemChecksSubscriber = () => void;
 type SystemLogSubscriber = (frame: SystemLogFrame) => void;
 type LiveSignalSubscriber = (signal: LiveSignal) => void;
 
@@ -133,7 +140,10 @@ const connectionActivitySubscribers = new Set<ConnectionActivitySubscriber>();
 const systemStatsSubscribers = new Set<SystemStatsSubscriber>();
 const systemTasksSubscribers = new Set<SystemTasksSubscriber>();
 const systemOverviewSubscribers = new Set<SystemOverviewSubscriber>();
+const systemChecksSubscribers = new Set<SystemChecksSubscriber>();
 const systemLogSubscribers = new Set<SystemLogSubscriber>();
+/** The newest times the server has said it looked, kept for a card that opens between two frames. */
+let serverLooks: ServerLooks = NO_LOOKS_YET;
 const liveSignalSubscribers = new Set<LiveSignalSubscriber>();
 /** The run of the server the stream last said hello from; null until it has. */
 let bootId: string | null = null;
@@ -160,6 +170,7 @@ function hasSubscribers(): boolean {
     systemStatsSubscribers.size > 0 ||
     systemTasksSubscribers.size > 0 ||
     systemOverviewSubscribers.size > 0 ||
+    systemChecksSubscribers.size > 0 ||
     systemLogSubscribers.size > 0 ||
     liveSignalSubscribers.size > 0
   );
@@ -445,6 +456,15 @@ function ensureActivityStream(): EventSource | null {
     }),
   );
   source.addEventListener(
+    SYSTEM_CHECKS_EVENT,
+    hear((data) => {
+      const looks = parseSystemChecksFrame(data);
+      if (!looks) return;
+      serverLooks = looks;
+      systemChecksSubscribers.forEach((fn) => fn());
+    }),
+  );
+  source.addEventListener(
     SYSTEM_LOG_EVENT,
     hear((data) => {
       const frame = parseSystemLogFrame(data);
@@ -556,6 +576,28 @@ export function subscribeSystemOverview(
     systemOverviewSubscribers.delete(subscriber);
     closeIfNobodyIsWatching();
   };
+}
+
+/**
+ * Calls `subscriber` each time a `system.checks` frame says the server looked again at what Health shows, on the one shared
+ * stream. What it said is read with {@link getServerLooks}, which keeps the newest times for a subscriber that arrives later.
+ */
+export function subscribeSystemChecks(
+  subscriber: SystemChecksSubscriber,
+): () => void {
+  systemChecksSubscribers.add(subscriber);
+  watchBrowser();
+  ensureActivityStream();
+
+  return () => {
+    systemChecksSubscribers.delete(subscriber);
+    closeIfNobodyIsWatching();
+  };
+}
+
+/** The newest times the server has said it looked, or none before its first frame. */
+export function getServerLooks(): ServerLooks {
+  return serverLooks;
 }
 
 /**

@@ -23,6 +23,16 @@ vi.mock("../../../lib/media-managers/queries", () => ({
 vi.mock("../../../lib/download-clients/queries", () => ({
   useDownloadClientConnectionsQuery: () => ({ data: [] }),
 }));
+let looks: {
+  foldersCheckedAt: number | null;
+  readinessCheckedAt: number | null;
+} = {
+  foldersCheckedAt: null,
+  readinessCheckedAt: null,
+};
+vi.mock("../../../lib/system/use-server-looks", () => ({
+  useServerLooks: () => looks,
+}));
 vi.mock("../../../lib/system/media-tools", () => ({
   useMediaToolsQuery: () => ({ data: undefined }),
 }));
@@ -37,7 +47,47 @@ const movies = {
   output_folder: "D:\\Out",
 } as ProcessingLibrary;
 
+const answer = {
+  library_id: 2,
+  ready: true,
+  local: { ready: true, lines: [] },
+  managers: [],
+  download_clients: [],
+};
+
+function renderHealth() {
+  const client = new QueryClient();
+  const wrapper = ({ children }: { children: ReactNode }) => (
+    <QueryClientProvider client={client}>{children}</QueryClientProvider>
+  );
+  return { client, ...renderHook(() => useHealth([movies]), { wrapper }) };
+}
+
 describe("useHealth", () => {
+  it("says a workflow was checked when the server last looked, not when this page last read", async () => {
+    vi.mocked(fetchLibraryFolderChain).mockResolvedValue(answer);
+    looks = { foldersCheckedAt: Date.now() + 60_000, readinessCheckedAt: null };
+    const { result } = renderHealth();
+    await waitFor(() =>
+      expect(result.current.workflows[0].chain).toBeDefined(),
+    );
+
+    expect(result.current.workflows[0].checkedAt).toBe(looks.foldersCheckedAt);
+    expect(result.current.foldersReadAt).toBeLessThan(
+      looks.foldersCheckedAt ?? 0,
+    );
+    looks = { foldersCheckedAt: null, readinessCheckedAt: null };
+  });
+
+  it("has no time for a workflow whose folders have not answered, whatever the server last looked", () => {
+    vi.mocked(fetchLibraryFolderChain).mockReturnValue(new Promise(() => {}));
+    looks = { foldersCheckedAt: Date.now(), readinessCheckedAt: null };
+    const { result } = renderHealth();
+
+    expect(result.current.workflows[0].checkedAt).toBeNull();
+    looks = { foldersCheckedAt: null, readinessCheckedAt: null };
+  });
+
   it("does not check a workflow's folders on a timer: the server says on `folder_checks` when an answer changes", async () => {
     vi.mocked(fetchLibraryFolderChain).mockResolvedValue({
       library_id: 2,

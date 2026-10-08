@@ -18,6 +18,7 @@ const health: Health = {
   managers: [],
   downloadClients: [],
   tools: null,
+  foldersReadAt: null,
   recheckFolders: vi.fn(),
 };
 const check: CheckNow = { run: vi.fn(), pending: false, notice: null };

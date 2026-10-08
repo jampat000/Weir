@@ -93,7 +93,7 @@ export interface paths {
     };
     /**
      * Get Activity Stream
-     * @description Authenticated SSE stream for activity-backed pages. Frames: activity.latest (the newest Activity event id and revision), processing.progress (every file's live progress, at most once a second), connection.activity (one thing that happened on a media manager or download client connection: see ConnectionActivityFrame; each connection sends at most one frame per phase every 250 ms, and always the phase it ends on), system.stats (the machine's newest reading, once a second: see SystemStatsFrame), system.tasks (every scheduled task, each time a run starts or ends or a task comes or goes: see SystemTaskOut), system.overview (the facts System shows about Weir, as GET /system/overview answers them, when the stream opens and whenever one changes: see SystemOverviewOut), system.log (one for each new warning, error or information line of Weir's own that Weir logs: see SystemLogFrame), server.hello (sent first when the stream opens, with the boot_id of this run of the server: see ServerHelloFrame) and data.changed (one for each time a kind of data changes, named by its topic: see DataChangedFrame).
+     * @description Authenticated SSE stream for activity-backed pages. Frames: activity.latest (the newest Activity event id and revision), processing.progress (every file's live progress, at most once a second), connection.activity (one thing that happened on a media manager or download client connection: see ConnectionActivityFrame; each connection sends at most one frame per phase every 250 ms, and always the phase it ends on), system.stats (the machine's newest reading, once a second: see SystemStatsFrame), system.tasks (every scheduled task, each time a run starts or ends or a task comes or goes: see SystemTaskOut), system.overview (the facts System shows about Weir, as GET /system/overview answers them, when the stream opens and whenever one changes: see SystemOverviewOut), system.checks (when the server last checked the workflows' folders and whether Weir is ready, when the stream opens and at every look: see SystemChecksFrame), system.log (one for each new warning, error or information line of Weir's own that Weir logs: see SystemLogFrame), server.hello (sent first when the stream opens, with the boot_id of this run of the server: see ServerHelloFrame) and data.changed (one for each time a kind of data changes, named by its topic: see DataChangedFrame).
      */
     get: operations["get_activity_stream_api_v1_activity_stream_get"];
     put?: never;
@@ -7627,6 +7627,22 @@ export interface components {
       summary: string;
       /** Windows Installer Url */
       windows_installer_url?: string | null;
+    };
+    /**
+     * SystemChecksFrame
+     * @description The data of a system.checks frame on GET /activity/stream: when the server last looked, on its own, at what Health shows. Sent when the stream opens and each time one of the looks happens, even when it found nothing new.
+     */
+    SystemChecksFrame: {
+      /**
+       * Folders Checked At
+       * @description When the server last checked every workflow's folders; null before its first check.
+       */
+      folders_checked_at: string | null;
+      /**
+       * Readiness Checked At
+       * @description When the server last checked whether Weir is ready and its workers are running; null before its first check.
+       */
+      readiness_checked_at: string | null;
     };
     /** @description How many rows each category would show with every other filter applied. */
     SystemLogCategoryCountsOut: {

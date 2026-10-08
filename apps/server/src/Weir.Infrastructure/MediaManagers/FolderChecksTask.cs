@@ -11,7 +11,8 @@ namespace Weir.Infrastructure.MediaManagers;
 /// (<see cref="LibraryFolderChainCheck"/>) on its own and says so on <see cref="DataTopics.FolderChecks"/> when any answer is not
 /// the one it gave last time, so a folder that goes missing, or comes back, turns Health red or green without anyone asking.
 /// The first answer for a workflow counts as a change, because a page that opened a moment earlier may have read an older one.
-/// Idle, with no stream open, it does not touch the disk, the database or a media manager.
+/// Each look is told to the open streams as the time Health shows (<see cref="ServerLooks"/>). Idle, with no stream open, it does not
+/// touch the disk, the database or a media manager.
 /// </summary>
 public sealed class FolderChecksTask : IPeriodicTask
 {
@@ -20,16 +21,19 @@ public sealed class FolderChecksTask : IPeriodicTask
     private readonly LibraryFolderChainCheck _check;
     private readonly ActivityStreamClients _clients;
     private readonly DataChangePublisher _changes;
+    private readonly ServerLooks _looks;
     private readonly Dictionary<long, string> _answers = [];
 
     public FolderChecksTask(
-        SqliteDatabase database, LibraryStore libraries, LibraryFolderChainCheck check, ActivityStreamClients clients, DataChangePublisher changes)
+        SqliteDatabase database, LibraryStore libraries, LibraryFolderChainCheck check, ActivityStreamClients clients, DataChangePublisher changes,
+        ServerLooks looks)
     {
         _database = database ?? throw new ArgumentNullException(nameof(database));
         _libraries = libraries ?? throw new ArgumentNullException(nameof(libraries));
         _check = check ?? throw new ArgumentNullException(nameof(check));
         _clients = clients ?? throw new ArgumentNullException(nameof(clients));
         _changes = changes ?? throw new ArgumentNullException(nameof(changes));
+        _looks = looks ?? throw new ArgumentNullException(nameof(looks));
     }
 
     public string Name => "folder-checks";
@@ -73,6 +77,7 @@ public sealed class FolderChecksTask : IPeriodicTask
             }
         }
 
+        _looks.FoldersLooked();
         if (changed)
         {
             _changes.Publish(DataTopics.FolderChecks);

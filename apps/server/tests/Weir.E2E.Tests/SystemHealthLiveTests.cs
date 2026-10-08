@@ -8,8 +8,11 @@ using static Microsoft.Playwright.Assertions;
 namespace Weir.E2E.Tests;
 
 /// <summary>Dashboard › System follows Weir's own look at a workflow's folders: it turns red when they go and green when they are back, with no reload.</summary>
-public sealed class SystemHealthLiveTests(E2EServer server) : E2ETestBase(server)
+public sealed partial class SystemHealthLiveTests(E2EServer server) : E2ETestBase(server)
 {
+    [GeneratedRegex(@"checked (just now|(\d+)s ago|[^·]*ago)")]
+    private static partial Regex CheckedAgo();
+
     // The server looks at the folders every 15 s while a browser watches, and the page reads the answer when it is told.
     private const float FolderCheckMs = 60_000;
 
@@ -45,6 +48,43 @@ public sealed class SystemHealthLiveTests(E2EServer server) : E2ETestBase(server
         {
             // A job of the workflow cannot finish while its folder is gone, and Weir will not remove a workflow with a job left.
             Directory.CreateDirectory(watched);
+            await WeirWorkflowApi.DeleteAsync(page.Context, BaseUrl, id);
+        }
+    }
+
+    [E2EFact]
+    public async Task A_workflows_checked_time_is_the_servers_last_look_not_the_pages_last_read_and_a_drive_says_live()
+    {
+        using var folders = new TemporaryFolder();
+        var page = await NewPageAsync();
+        await Navigation.EnsureSignedInAsync(page, BaseUrl);
+        var id = await WeirWorkflowApi.CreateAsync(
+            page.Context,
+            BaseUrl,
+            "E2E looked-at films",
+            Directory.CreateDirectory(Path.Join(folders.Path, "watched")).FullName,
+            Directory.CreateDirectory(Path.Join(folders.Path, "output")).FullName);
+        try
+        {
+            await page.GotoAsync($"{BaseUrl}/?view=system");
+            var row = page.GetByTestId("system-check").Filter(new() { HasText = "E2E looked-at films" });
+            await Expect(row).ToHaveAttributeAsync("data-status", "done", new() { Timeout = FolderCheckMs });
+            await Expect(row).ToContainTextAsync("checked");
+
+            // Nothing about the folders changes, so the page reads nothing new; the server looks every 15 s all the same.
+            await Task.Delay(TimeSpan.FromSeconds(40));
+
+            var shown = CheckedAgo().Match(await row.InnerTextAsync());
+            Assert.True(shown.Success, "The row did not say when it was checked.");
+            Assert.True(
+                shown.Groups[1].Value == "just now" || (shown.Groups[2].Success && int.Parse(shown.Groups[2].Value, System.Globalization.CultureInfo.InvariantCulture) <= 20),
+                $"After 40 s of nothing changing the row said \"checked {shown.Groups[1].Value}\", but the server looks every 15 s.");
+
+            await page.GetByRole(AriaRole.Group, new() { Name = "Health areas" }).GetByRole(AriaRole.Button, new() { NameRegex = new Regex("^Storage") }).ClickAsync();
+            await Expect(page.GetByTestId("system-check").First).ToContainTextAsync("live");
+        }
+        finally
+        {
             await WeirWorkflowApi.DeleteAsync(page.Context, BaseUrl, id);
         }
     }

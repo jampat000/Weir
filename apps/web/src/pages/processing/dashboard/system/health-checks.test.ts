@@ -146,6 +146,25 @@ describe("a check's few words", () => {
     );
     expect(drive({}).words).toBe("500 GB free");
   });
+
+  it("marks a drive live rather than giving it a time, because it follows the stream second by second", () => {
+    const [check] = storageChecks([
+      {
+        name: "D:",
+        path: "D:\\",
+        total_bytes: 1000,
+        free_bytes: 500,
+        weir_bytes: 0,
+        keep_free_bytes: 0,
+        full_in_days: null,
+        read_bytes_per_sec: null,
+        write_bytes_per_sec: null,
+        busy_percent: null,
+        workflows: [],
+      },
+    ]);
+    expect(check).toMatchObject({ live: true, checkedAt: null });
+  });
 });
 
 describe("connectionChecks", () => {

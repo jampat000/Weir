@@ -20,6 +20,7 @@ const health: Health = {
   managers: [],
   downloadClients: [],
   tools: null,
+  foldersReadAt: null,
   recheckFolders: vi.fn(),
 };
 const testConnection = vi.fn(async () => undefined);
@@ -72,6 +73,16 @@ vi.mock("../../../../lib/settings/queries", () => ({
 }));
 vi.mock("../../../../lib/system/readiness-queries", () => ({
   useSystemReadinessQuery: () => queries.readiness,
+}));
+let looks: {
+  foldersCheckedAt: number | null;
+  readinessCheckedAt: number | null;
+} = {
+  foldersCheckedAt: null,
+  readinessCheckedAt: null,
+};
+vi.mock("../../../../lib/system/use-server-looks", () => ({
+  useServerLooks: () => looks,
 }));
 vi.mock("../../../../lib/system/use-system-stats", () => ({
   useSystemOverviewQuery: () => queries.overview,
@@ -127,6 +138,7 @@ beforeEach(() => {
     },
   ];
   health.tools = null;
+  looks = { foldersCheckedAt: null, readinessCheckedAt: null };
   entries = [];
   drives = [];
   queries.settings.data = undefined;
@@ -207,6 +219,19 @@ describe("useHealthChecks", () => {
       ["weir:workers", "broken"],
       ["weir:update", "todo"],
     ]);
+  });
+
+  it("says Weir was checked when the server last looked, not when this page last read", () => {
+    queries.readiness.data = { worker_health: [] };
+    queries.readiness.dataUpdatedAt = NOW - 60_000;
+    looks = { foldersCheckedAt: null, readinessCheckedAt: NOW - 4_000 };
+    const { result } = renderChecks();
+
+    const workers = result.current.checks.find(
+      (check) => check.id === "weir:workers",
+    );
+    expect(workers?.checkedAt).toBe(NOW - 4_000);
+    expect(result.current.readAt).toBe(NOW);
   });
 
   it("checks every drive any workflow uses, and asks for every workflow's folders", async () => {

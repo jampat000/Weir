@@ -75,6 +75,14 @@ export function checkVerdict(check: {
   return check.isError ? UNCHECKED_VERDICT : CHECKING_VERDICT;
 }
 
+/** The latest of some times, ignoring the ones not known; null when none is. */
+export function newestTime(
+  ...times: readonly (number | null)[]
+): number | null {
+  const known = times.filter((time): time is number => time !== null);
+  return known.length > 0 ? Math.max(...known) : null;
+}
+
 const SECONDS_SHOWN_AS_SECONDS = 60;
 /** A check this fresh is just now: counting its seconds only flickers. */
 const JUST_NOW_SECONDS = 3;

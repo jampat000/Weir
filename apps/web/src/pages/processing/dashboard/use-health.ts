@@ -8,8 +8,10 @@ import type { ProcessingLibrary } from "../../../lib/processing/libraries-api";
 import { libraryFolderChainOptions } from "../../../lib/processing/libraries-queries";
 import type { LibraryFolderChain } from "../../../lib/processing/library-folder-chain-api";
 import { useMediaToolsQuery } from "../../../lib/system/media-tools";
+import { useServerLooks } from "../../../lib/system/use-server-looks";
 import {
   checkVerdict,
+  newestTime,
   toolRows,
   whyNotInSync,
   type ToolRow,
@@ -26,7 +28,10 @@ export type WorkflowHealth = {
   why: string | null;
   /** The whole chain, for the views that list every line. */
   chain: LibraryFolderChain | undefined;
-  /** When the chain was last read, in ms since the epoch. Null before the first answer. */
+  /**
+   * When the server last checked this chain, in ms since the epoch: the later of its own look (it checks on its own while a
+   * browser watches) and the last time this page asked. Null before the first answer.
+   */
   checkedAt: number | null;
   /** Reads this workflow's chain again. */
   recheck: () => Promise<unknown>;
@@ -34,6 +39,8 @@ export type WorkflowHealth = {
 
 export type Health = {
   workflows: WorkflowHealth[];
+  /** When this page last read any workflow's chain, in ms since the epoch. Null before the first answer. */
+  foldersReadAt: number | null;
   /** The media managers in scope, switched on or not. */
   managers: MediaManagerConnection[];
   /** The download clients in scope, switched on or not. */
@@ -92,6 +99,10 @@ export function useHealth(
   const managers = useMediaManagerConnectionsQuery();
   const downloadClients = useDownloadClientConnectionsQuery();
   const tools = useMediaToolsQuery();
+  const looks = useServerLooks();
+  const readAts = chains.map((chain) =>
+    chain.dataUpdatedAt > 0 ? chain.dataUpdatedAt : null,
+  );
   const rows = enabled.map((workflow, index) => {
     const chain = chains[index];
     return {
@@ -99,12 +110,15 @@ export function useHealth(
       verdict: checkVerdict(chain),
       why: chain.data ? whyNotInSync(chain.data) : null,
       chain: chain.data,
-      checkedAt: chain.dataUpdatedAt > 0 ? chain.dataUpdatedAt : null,
+      checkedAt: chain.data
+        ? newestTime(readAts[index], looks.foldersCheckedAt)
+        : null,
       recheck: () => chain.refetch(),
     };
   });
   return {
     workflows: rows,
+    foldersReadAt: newestTime(...readAts),
     ...inScope(
       workflowId,
       rows,

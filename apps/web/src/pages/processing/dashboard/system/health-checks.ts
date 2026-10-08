@@ -53,8 +53,10 @@ export type HealthCheck = {
   why: string;
   /** Why, in a few words, as the row says it on one line. */
   words: string;
-  /** When it was last looked at, in ms since the epoch. Null before the first look, and for a check that follows the stream. */
+  /** When it was last looked at, in ms since the epoch. Null before the first look, and for a check that is live. */
   checkedAt: number | null;
+  /** Its subject follows the stream second by second, so the row says it is live instead of when it was looked at. */
+  live?: true;
   fix: CheckFix | null;
   /** What "Check again" looks at again: the check's area, and which one in it for a workflow or a connection. */
   again: { area: HealthArea; key: string | null };
@@ -226,6 +228,7 @@ function driveCheck(drive: SystemDrive): HealthCheck {
     id: `drive:${drive.path}`,
     area: "storage" as const,
     checkedAt: null,
+    live: true as const,
     again: { area: "storage" as const, key: null },
     workflowId: null,
   };
@@ -259,10 +262,7 @@ function driveCheck(drive: SystemDrive): HealthCheck {
   };
 }
 
-/**
- * Each drive any workflow reads from or writes to. A drive follows the stream, so it has no time of its own to show: it is
- * as current as the connection is.
- */
+/** Each drive any workflow reads from or writes to. A drive follows the stream second by second, so its row says it is live. */
 export function storageChecks(
   drives: readonly SystemDrive[] | null,
 ): HealthCheck[] {
@@ -337,6 +337,7 @@ export type WeirFacts = {
   stoppedWorkers: readonly string[];
   /** The newer version waiting, when there is one. */
   updateVersion: string | null;
+  /** When the server last checked whether Weir is ready and its workers are running. */
   checkedAt: number | null;
 };
 
