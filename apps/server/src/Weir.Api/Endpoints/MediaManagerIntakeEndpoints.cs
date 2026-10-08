@@ -307,6 +307,9 @@ internal sealed class MediaManagerIntakeEndpointHandlers
 
         issues.ThrowIfAny();
 
+        // The write lock comes first: two outcomes for one hand-off racing each other must not both read "nothing recorded",
+        // or a late refusal could overwrite an import, and two imports could each release the same copy.
+        (await request.DbAsync().ConfigureAwait(false)).BeginImmediate();
         var (uow, key, row) = await RequireHandoffAsync(request).ConfigureAwait(false);
         var manager = ManagerName(key);
         if (row.Outcome is { } recorded && !HandbackRules.Supersedes(recorded, outcome))
