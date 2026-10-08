@@ -1,5 +1,6 @@
 using Microsoft.Data.Sqlite;
 using Weir.Core.Processing;
+using Weir.Infrastructure.Activity;
 using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Infrastructure.Processing;
@@ -23,6 +24,14 @@ public sealed class OperatorSettingsStore
         "tv_schedule_start, tv_schedule_end, updated_at, runner_budget_enabled, work_temp_stale_sweep_interval_seconds, " +
         "unclaimed_handback_cleanup_enabled, unclaimed_handback_window_days, " +
         "unclaimed_handback_cleanup_interval_seconds";
+
+    private readonly DataChangePublisher? _changes;
+
+    /// <param name="changes">Told, once an update commits, that these settings changed, so every open screen reads them again.</param>
+    public OperatorSettingsStore(DataChangePublisher? changes = null)
+    {
+        _changes = changes;
+    }
 
     public Task<ProcessingOperatorSettingsRecord?> GetAsync(UnitOfWork uow) =>
         uow.QuerySingleAsync($"SELECT {Columns} FROM operator_settings WHERE id = 1", Read);
@@ -90,6 +99,7 @@ public sealed class OperatorSettingsStore
 
         sets.Add("updated_at=CURRENT_TIMESTAMP");
         await uow.ExecuteAsync($"UPDATE operator_settings SET {string.Join(", ", sets)} WHERE id = 1", [.. parameters]).ConfigureAwait(false);
+        _changes?.PublishOnCommit(uow, DataTopics.Settings);
     }
 
     private static ProcessingOperatorSettingsRecord Read(SqliteDataReader reader) => new()

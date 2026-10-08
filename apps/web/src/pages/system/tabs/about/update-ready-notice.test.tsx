@@ -1,11 +1,14 @@
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { UpdateReadyNotice } from "./update-ready-notice";
 
+type Signal = { type: "changed"; topic: "update" } | { type: "restarted" };
+
 const mocks = vi.hoisted(() => ({
   useUpdateStateQuery: vi.fn(),
   useApplyUpdateMutation: vi.fn(),
+  subscribeLiveSignals: vi.fn(),
 }));
 
 vi.mock("../../../../lib/settings/queries", () => ({
@@ -14,30 +17,49 @@ vi.mock("../../../../lib/settings/queries", () => ({
   useApplyUpdateMutation: () => mocks.useApplyUpdateMutation(),
 }));
 
+vi.mock("../../../../lib/activity/use-activity-stream-invalidation", () => ({
+  subscribeLiveSignals: (subscriber: (signal: Signal) => void) =>
+    mocks.subscribeLiveSignals(subscriber),
+}));
+
 describe("UpdateReadyNotice", () => {
+  const reset = vi.fn();
+  let hear: (signal: Signal) => void;
+  const unsubscribe = vi.fn();
+
+  function restartSignalled() {
+    mocks.useApplyUpdateMutation.mockReturnValue({
+      isPending: false,
+      isError: false,
+      isSuccess: true,
+      mutate: vi.fn(),
+      reset,
+    });
+  }
+
   beforeEach(() => {
     mocks.useUpdateStateQuery.mockReturnValue({
       data: { downloaded: true, pending_version: "2.0.8" },
     });
+    mocks.subscribeLiveSignals.mockImplementation(
+      (subscriber: (signal: Signal) => void) => {
+        hear = subscriber;
+        return unsubscribe;
+      },
+    );
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
     vi.useRealTimers();
+    mocks.subscribeLiveSignals.mockReset();
+    unsubscribe.mockReset();
+    reset.mockReset();
   });
 
   it("says the page will reload itself once the restart is signalled", () => {
-    mocks.useApplyUpdateMutation.mockReturnValue({
-      isPending: false,
-      isError: false,
-      isSuccess: true,
-      mutate: vi.fn(),
-    });
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue({ json: () => Promise.resolve({}) }),
-    );
+    restartSignalled();
 
     render(<UpdateReadyNotice />);
 
@@ -48,71 +70,57 @@ describe("UpdateReadyNotice", () => {
     ).toBeInTheDocument();
   });
 
-  it("reloads the page once /ready answers after a restart is signalled", async () => {
+  it("asks the server nothing while it restarts: the stream tells the page when it is back", async () => {
     vi.useFakeTimers();
-    mocks.useApplyUpdateMutation.mockReturnValue({
-      isPending: false,
-      isError: false,
-      isSuccess: true,
-      mutate: vi.fn(),
-    });
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValue({ json: () => Promise.resolve({ ready: true }) });
+    restartSignalled();
+    const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
-    const reloadMock = vi.fn();
-    vi.stubGlobal("location", { ...window.location, reload: reloadMock });
 
     render(<UpdateReadyNotice />);
+    await vi.advanceTimersByTimeAsync(30_000);
 
-    await vi.advanceTimersByTimeAsync(3000);
-
-    expect(fetchMock).toHaveBeenCalledWith("/ready", { cache: "no-store" });
-    expect(reloadMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("keeps polling while the server is still restarting, then reloads once it answers", async () => {
-    vi.useFakeTimers();
-    mocks.useApplyUpdateMutation.mockReturnValue({
-      isPending: false,
-      isError: false,
-      isSuccess: true,
-      mutate: vi.fn(),
-    });
-    let attempt = 0;
-    const fetchMock = vi.fn().mockImplementation(() => {
-      attempt += 1;
-      if (attempt < 3) {
-        return Promise.reject(new Error("connection refused"));
-      }
-      return Promise.resolve({ json: () => Promise.resolve({ ready: true }) });
-    });
-    vi.stubGlobal("fetch", fetchMock);
-    const reloadMock = vi.fn();
-    vi.stubGlobal("location", { ...window.location, reload: reloadMock });
-
+  it("goes back to offering the restart when the server came back and the update is still waiting", () => {
+    restartSignalled();
     render(<UpdateReadyNotice />);
 
-    await vi.advanceTimersByTimeAsync(2000 + 1000 + 1000 + 1000);
+    act(() => hear({ type: "restarted" }));
 
-    expect(fetchMock.mock.calls.length).toBeGreaterThanOrEqual(3);
-    expect(reloadMock).toHaveBeenCalledTimes(1);
+    expect(reset).toHaveBeenCalledTimes(1);
   });
 
-  it("does not poll before a restart has been signalled", async () => {
-    vi.useFakeTimers();
+  it("is not reset by a change that is not a restart", () => {
+    restartSignalled();
+    render(<UpdateReadyNotice />);
+
+    act(() => hear({ type: "changed", topic: "update" }));
+
+    expect(reset).not.toHaveBeenCalled();
+  });
+
+  it("stops listening when it goes away", () => {
+    restartSignalled();
+    const { unmount } = render(<UpdateReadyNotice />);
+
+    unmount();
+
+    expect(unsubscribe).toHaveBeenCalledTimes(1);
+  });
+
+  it("offers nothing until an update has been downloaded", () => {
+    mocks.useUpdateStateQuery.mockReturnValue({ data: { downloaded: false } });
     mocks.useApplyUpdateMutation.mockReturnValue({
       isPending: false,
       isError: false,
       isSuccess: false,
       mutate: vi.fn(),
+      reset,
     });
-    const fetchMock = vi.fn();
-    vi.stubGlobal("fetch", fetchMock);
 
     render(<UpdateReadyNotice />);
-    await vi.advanceTimersByTimeAsync(5000);
 
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(screen.queryByText("Update ready to install")).toBeNull();
   });
 });

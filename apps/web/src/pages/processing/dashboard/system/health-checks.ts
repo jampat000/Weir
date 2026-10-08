@@ -53,8 +53,10 @@ export type HealthCheck = {
   why: string;
   /** Why, in a few words, as the row says it on one line. */
   words: string;
-  /** When it was last looked at, in ms since the epoch. */
+  /** When it was last looked at, in ms since the epoch. Null before the first look, and for a check that is live. */
   checkedAt: number | null;
+  /** Its subject follows the stream second by second, so the row says it is live instead of when it was looked at. */
+  live?: true;
   fix: CheckFix | null;
   /** What "Check again" looks at again: the check's area, and which one in it for a workflow or a connection. */
   again: { area: HealthArea; key: string | null };
@@ -213,7 +215,7 @@ export function toolChecks(
   });
 }
 
-function driveCheck(drive: SystemDrive, checkedAt: number | null): HealthCheck {
+function driveCheck(drive: SystemDrive): HealthCheck {
   const free = formatBytes(drive.free_bytes);
   const first = drive.workflows[0];
   const fix = first
@@ -225,7 +227,8 @@ function driveCheck(drive: SystemDrive, checkedAt: number | null): HealthCheck {
   const base = {
     id: `drive:${drive.path}`,
     area: "storage" as const,
-    checkedAt,
+    checkedAt: null,
+    live: true as const,
     again: { area: "storage" as const, key: null },
     workflowId: null,
   };
@@ -259,12 +262,11 @@ function driveCheck(drive: SystemDrive, checkedAt: number | null): HealthCheck {
   };
 }
 
-/** Each drive any workflow reads from or writes to. */
+/** Each drive any workflow reads from or writes to. A drive follows the stream second by second, so its row says it is live. */
 export function storageChecks(
   drives: readonly SystemDrive[] | null,
-  checkedAt: number | null,
 ): HealthCheck[] {
-  return (drives ?? []).map((drive) => driveCheck(drive, checkedAt));
+  return (drives ?? []).map(driveCheck);
 }
 
 export type BackupFacts = {
@@ -335,6 +337,7 @@ export type WeirFacts = {
   stoppedWorkers: readonly string[];
   /** The newer version waiting, when there is one. */
   updateVersion: string | null;
+  /** When the server last checked whether Weir is ready and its workers are running. */
   checkedAt: number | null;
 };
 

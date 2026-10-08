@@ -5,6 +5,7 @@ import { Panel } from "../../components/panels/panel";
 import { ColumnsMenu } from "../../components/shared/columns-menu";
 import { LoadError } from "../../components/shared/load-error";
 import { PanelLoading } from "../../components/shared/page-loading";
+import { useLiveProgress } from "../../lib/activity/use-activity-stream-invalidation";
 import { useCanEdit } from "../../lib/auth/can-edit";
 import {
   useFileHistoryQuery,
@@ -13,6 +14,7 @@ import {
 } from "../../lib/processing/files-queries";
 import { useKeptFilesQuery } from "../../lib/processing/kept-files-queries";
 import { useProcessingLibrariesQuery } from "../../lib/processing/libraries-queries";
+import { mergeLiveProgress } from "../../lib/processing/live-progress-merge";
 import { mmActionButtonClass } from "../../lib/ui/mm-control-roles";
 import { useTableColumns } from "../../lib/ui/use-table-columns";
 import { useNow } from "../../lib/ui/use-now";
@@ -42,7 +44,7 @@ import { ProcessRejectedAgain } from "./activity-rejected-again";
 import { ActivityRetentionNote } from "./activity-retention-note";
 import { useActivityAttention } from "./use-activity-attention";
 
-/** "min ago" moves on its own between refreshes. */
+/** "min ago" moves on its own between updates. */
 const TICK_MS = 15_000;
 const FILES_LIMIT = 1000;
 
@@ -143,15 +145,17 @@ export function ActivityPage() {
   const libraries = useProcessingLibrariesQuery();
   const kept = useKeptFilesQuery();
   const editable = useCanEdit();
+  // The list changes when a file's status does; a running pass's percent and speed come from the stream's live progress.
+  const liveProgress = useLiveProgress();
 
   const all = useMemo(
     () =>
       activityEntries(
-        files.data?.files ?? [],
+        mergeLiveProgress(files.data?.files ?? [], liveProgress),
         cleans.data?.cleans ?? [],
         workflowKindLookup(libraries.data),
       ),
-    [files.data, cleans.data, libraries.data],
+    [files.data, liveProgress, cleans.data, libraries.data],
   );
   const needsYou = group === "attention";
   const shown = sortActivityEntries(

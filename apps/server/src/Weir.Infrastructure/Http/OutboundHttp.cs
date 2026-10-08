@@ -28,7 +28,7 @@ public sealed class GitHubReleaseCatalogClient : IReleaseCatalogClient
 {
     public async Task<GitHubReleaseRecord?> FetchLatestAsync(string currentVersion, CancellationToken cancellationToken)
     {
-        using var client = new HttpClient(new SocketsHttpHandler { AllowAutoRedirect = true }) { Timeout = TimeSpan.FromSeconds(5) };
+        using var client = new HttpClient(new SocketsHttpHandler { AllowAutoRedirect = true, ConnectCallback = LoopbackFirstConnect.ConnectAsync }) { Timeout = TimeSpan.FromSeconds(5) };
         using var request = new HttpRequestMessage(HttpMethod.Get, ReleaseCatalog.ReleasesUrl);
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
         request.Headers.TryAddWithoutValidation("User-Agent", $"Weir/{currentVersion}");
@@ -89,15 +89,12 @@ public sealed class ExternalJsonPoster : IExternalJsonPoster
             SslOptions = new SslClientAuthenticationOptions { EnabledSslProtocols = SslProtocols.Tls12 | SslProtocols.Tls13 },
             ConnectCallback = async (context, token) =>
             {
-                var socket = new Socket(SocketType.Stream, ProtocolType.Tcp) { NoDelay = true };
                 try
                 {
-                    await socket.ConnectAsync(endpoint.Address, endpoint.Port, token).ConfigureAwait(false);
-                    return new NetworkStream(socket, ownsSocket: true);
+                    return await LoopbackFirstConnect.ConnectAsync([endpoint.Address], endpoint.Port, token).ConfigureAwait(false);
                 }
                 catch (Exception exception) when (exception is SocketException or OperationCanceledException)
                 {
-                    socket.Dispose();
                     throw new ExternalEndpointException(ExternalUrlPolicy.CouldNotConnect, exception);
                 }
             },

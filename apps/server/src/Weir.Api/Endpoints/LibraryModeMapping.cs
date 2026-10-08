@@ -33,7 +33,8 @@ internal static class LibraryModeMapping
 
     /// <summary>
     /// The scan's own state for the header: which job, what it is doing, when it last finished and anything it
-    /// could not do. <c>running</c> is what the "Scan now" button and its progress read.
+    /// could not do. <c>running</c> is what the "Scan now" button and its progress read; <c>files_seen</c> is how far the walk
+    /// of a running scan has got.
     /// </summary>
     internal static async Task<WireValue> ScanOutAsync(UnitOfWork uow, LibraryScanStore scans, long libraryId, ILogger logger)
     {
@@ -44,7 +45,7 @@ internal static class LibraryModeMapping
             return outcome is null
                 ? WireValue.Null
                 : new WireObject().Set("job_id", WireValue.Null).Set("status", "completed").Set("running", false)
-                    .Set("generated_at", outcome.GeneratedAt.ToUnixTimeSeconds()).Set("errors", new WireArray([]));
+                    .Set("generated_at", outcome.GeneratedAt.ToUnixTimeSeconds()).Set("files_seen", WireValue.Null).Set("errors", new WireArray([]));
         }
 
         var running = latest.Status is "pending" or "leased";
@@ -52,6 +53,7 @@ internal static class LibraryModeMapping
             .Set("job_id", latest.JobId)
             .Set("status", latest.Status)
             .Set("running", running)
+            .Set("files_seen", running ? scans.FilesSeen(latest.JobId) : null)
             .Set("generated_at", outcome?.GeneratedAt.ToUnixTimeSeconds())
             .Set("errors", new WireArray((outcome?.Errors ?? []).Select(e => (WireValue)new WireString(e))));
     }

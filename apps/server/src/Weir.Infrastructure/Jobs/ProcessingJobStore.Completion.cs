@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using Weir.Core.Jobs;
 using Weir.Core.Json;
 
@@ -60,6 +61,7 @@ public sealed partial class ProcessingJobStore
                     ("@id", jobId));
                 _metrics.RecordJobEvent(MetricsModule, "completed");
                 RecordQueueDepth(connection, transaction);
+                AnnounceQueueChange(transaction, job.JobKind);
                 return true;
             },
             cancellationToken);
@@ -108,6 +110,7 @@ public sealed partial class ProcessingJobStore
                 }
 
                 RecordQueueDepth(connection, transaction);
+                AnnounceQueueChange(transaction, job.JobKind);
                 return true;
             },
             cancellationToken);
@@ -140,12 +143,13 @@ public sealed partial class ProcessingJobStore
                     ("@id", jobId));
                 _metrics.RecordJobEvent(MetricsModule, "failed");
                 RecordQueueDepth(connection, transaction);
+                AnnounceQueueChange(transaction, job.JobKind);
                 return true;
             },
             cancellationToken);
     }
 
-    private static bool HoldsLease(ProcessingJob? job, string leaseOwner, DateTimeOffset when) =>
+    private static bool HoldsLease([NotNullWhen(true)] ProcessingJob? job, string leaseOwner, DateTimeOffset when) =>
         job is not null &&
         job.Status == ProcessingJobStatus.Leased &&
         job.LeaseOwner == leaseOwner &&

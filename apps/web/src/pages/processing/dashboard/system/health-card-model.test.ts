@@ -7,7 +7,6 @@ import {
   emptyHealthWords,
   healthHeadline,
   healthSummary,
-  lastCheckedAt,
   listedChecks,
 } from "./health-card-model";
 
@@ -157,22 +156,6 @@ describe("listedChecks", () => {
       "t1",
       "t2",
     ]);
-  });
-});
-
-describe("lastCheckedAt", () => {
-  it("is the newest time any check was looked at", () => {
-    expect(
-      lastCheckedAt([
-        check("a", "tools", "done", 5),
-        check("b", "tools", "done", 9),
-        check("c", "tools", "done", null),
-      ]),
-    ).toBe(9);
-  });
-
-  it("is null when none has been", () => {
-    expect(lastCheckedAt([check("a", "tools", "done")])).toBeNull();
   });
 });
 

@@ -11,4 +11,8 @@ public static class PeriodicJobKinds
     public const string UnclaimedHandbackCleanup = "processing.unclaimed_handback_cleanup.v1";
     public const string UnclaimedHandbackCleanupDedupeKeyMovie = "processing.unclaimed_handback_cleanup:v1:movie";
     public const string UnclaimedHandbackCleanupDedupeKeyTv = "processing.unclaimed_handback_cleanup:v1:tv";
+
+    /// <summary>Whether <paramref name="jobKind"/> is one of the maintenance families Setup › Performance › Cleanup lists.</summary>
+    public static bool IsMaintenance(string jobKind) =>
+        jobKind is WorkTempStaleSweep or UnclaimedHandbackCleanup;
 }

@@ -367,7 +367,7 @@ public sealed partial class MediaManagerIntake
                 continue;
             }
 
-            _jobs.EnqueueOrGet(connection, transaction, dedupeKey, IntakeRules.RemuxPassJobKind, IntakeRules.PayloadJson(payload), JobQueueRules.DefaultMaxAttempts, runnerCost: null, priority: 0);
+            _jobs.EnqueueOrGet(uow, dedupeKey, IntakeRules.RemuxPassJobKind, IntakeRules.PayloadJson(payload), JobQueueRules.DefaultMaxAttempts, runnerCost: null, priority: 0);
             covered.Add(target);
         }
 
@@ -420,7 +420,7 @@ public sealed partial class MediaManagerIntake
     /// another hand-off is left with it: this hand-off is still recorded and answers from the file's own state, and the
     /// file is not one this hand-off waits for before it reports. True when the hand-off took the pass over.
     /// </summary>
-    private static bool AdoptActivePass(
+    private bool AdoptActivePass(
         SqliteConnection connection, SqliteTransaction transaction, ProcessingJob active, MediaManagerImportEvent importEvent, string dedupeKey, WireObject handoffPayload)
     {
         WireObject existing;
@@ -453,6 +453,7 @@ public sealed partial class MediaManagerIntake
             ("@dedupe", newKey),
             ("@payload", IntakeRules.PayloadJson(existing)),
             ("@id", active.Id));
+        _jobs.AnnounceQueueChange(transaction, active.JobKind);
         return true;
     }
 

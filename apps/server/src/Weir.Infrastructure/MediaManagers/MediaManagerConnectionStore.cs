@@ -2,6 +2,7 @@ using Microsoft.Data.Sqlite;
 using Weir.Core.Json;
 using Weir.Core.MediaManagers;
 using Weir.Core.Time;
+using Weir.Infrastructure.Activity;
 using Weir.Infrastructure.ConnectionTraffic;
 using Weir.Infrastructure.Sqlite;
 
@@ -119,11 +120,14 @@ public sealed class MediaManagerConnectionStore
         "schedule_start, schedule_end, schedule_interval_seconds";
 
     private readonly ConnectionUsageLedger? _usage;
+    private readonly DataChangePublisher? _changes;
 
     /// <param name="usage">Newer usage than the database holds, laid over every connection a list or lookup returns; none reads the database alone.</param>
-    public MediaManagerConnectionStore(ConnectionUsageLedger? usage = null)
+    /// <param name="changes">Told, once a write commits, that the connections changed, so every open screen reads them again.</param>
+    public MediaManagerConnectionStore(ConnectionUsageLedger? usage = null, DataChangePublisher? changes = null)
     {
         _usage = usage;
+        _changes = changes;
     }
 
     /// <summary>Every connection with its lanes, by id.</summary>
@@ -216,6 +220,7 @@ public sealed class MediaManagerConnectionStore
         }
 
         await RefreshNamesAsync(uow).ConfigureAwait(false);
+        Changed(uow);
         return id;
     }
 
@@ -238,6 +243,8 @@ public sealed class MediaManagerConnectionStore
         {
             await RefreshNamesAsync(uow).ConfigureAwait(false);
         }
+
+        Changed(uow);
     }
 
     /// <summary>Delete the lanes first, then the connection, so no lane is left without its connection.</summary>
@@ -248,6 +255,7 @@ public sealed class MediaManagerConnectionStore
         await uow.ExecuteAsync("DELETE FROM media_manager_connections WHERE id = $id", ("$id", connectionId)).ConfigureAwait(false);
         await RefreshNamesAsync(uow).ConfigureAwait(false);
         _usage?.Forget(new ConnectionRef(ConnectionKind.MediaManager, connectionId));
+        Changed(uow);
     }
 
     /// <summary>Save how long the last call took and when the connection was last used; a value the usage does not carry stays as it was.</summary>
@@ -273,16 +281,22 @@ public sealed class MediaManagerConnectionStore
     }
 
     /// <summary>The conditional test-result write: 0 when the connection was removed meanwhile.</summary>
-    public Task<int> RecordTestResultAsync(UnitOfWork uow, long connectionId, bool ok, Timestamp checkedAt, string detail)
+    public async Task<int> RecordTestResultAsync(UnitOfWork uow, long connectionId, bool ok, Timestamp checkedAt, string detail)
     {
         ArgumentNullException.ThrowIfNull(uow);
-        return uow.ExecuteAsync(
+        var written = await uow.ExecuteAsync(
             "UPDATE media_manager_connections SET last_connection_test_ok = $ok, last_connection_test_at = $at, " +
             "last_connection_test_detail = $detail, updated_at = CURRENT_TIMESTAMP WHERE id = $id",
             ("$ok", ok ? 1 : 0),
             ("$at", checkedAt.ToSqlite()),
             ("$detail", detail),
-            ("$id", connectionId));
+            ("$id", connectionId)).ConfigureAwait(false);
+        if (written > 0)
+        {
+            Changed(uow);
+        }
+
+        return written;
     }
 
     public Task<MediaManagerSearchLaneRecord?> GetLaneAsync(UnitOfWork uow, long connectionId, string lane)
@@ -319,6 +333,7 @@ public sealed class MediaManagerConnectionStore
                 "schedule_days, schedule_start, schedule_end, schedule_interval_seconds) " +
                 "VALUES ($id, $lane, $enabled, $max, $retry, $sched, $days, $start, $end, $interval)",
                 [("$id", wanted.ConnectionId), ("$lane", wanted.Lane), .. values]).ConfigureAwait(false);
+            Changed(uow);
         }
         else if (existing with { Id = 0 } != wanted with { Id = 0 })
         {
@@ -327,10 +342,13 @@ public sealed class MediaManagerConnectionStore
                 "schedule_enabled = $sched, schedule_days = $days, schedule_start = $start, schedule_end = $end, " +
                 "schedule_interval_seconds = $interval, updated_at = CURRENT_TIMESTAMP WHERE id = $row",
                 [("$row", existing.Id), .. values]).ConfigureAwait(false);
+            Changed(uow);
         }
 
         return (await GetLaneAsync(uow, wanted.ConnectionId, wanted.Lane).ConfigureAwait(false))!;
     }
+
+    private void Changed(UnitOfWork uow) => _changes?.PublishOnCommit(uow, DataTopics.Connections);
 
     private async Task<List<MediaManagerConnectionRecord>> WithLanesAsync(UnitOfWork uow, List<MediaManagerConnectionRecord> rows)
     {

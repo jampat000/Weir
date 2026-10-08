@@ -19,6 +19,11 @@ internal static class FakeFfprobe
             return 1;
         }
 
+        if (Number(rule, FakeToolProtocol.ProbeDelaySecondsKey) is > 0 and var delay)
+        {
+            Thread.Sleep(TimeSpan.FromSeconds(delay));
+        }
+
         if (Text(rule, FakeToolProtocol.ProbeErrorKey) is { } error && !Path.GetFileName(path).Contains(StagedOutputMarker, StringComparison.Ordinal))
         {
             Output.Error(error);
@@ -28,6 +33,10 @@ internal static class FakeFfprobe
         Output.Out(MediaProbe.For(rule, path).ToJsonString());
         return 0;
     }
+
+    /// <summary>The rule's number for <paramref name="key"/>, or 0 when it is missing.</summary>
+    public static double Number(JsonObject rule, string key) =>
+        rule[key] is JsonValue value && value.TryGetValue<double>(out var number) ? number : 0;
 
     /// <summary>The rule's text for <paramref name="key"/>, or null when it is missing or empty.</summary>
     public static string? Text(JsonObject rule, string key) =>

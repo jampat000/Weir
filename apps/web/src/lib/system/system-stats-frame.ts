@@ -1,4 +1,6 @@
 import type {
+  SystemDrive,
+  SystemMachine,
   SystemNow,
   SystemPoint,
   SystemStatsFrame,
@@ -41,12 +43,47 @@ function isPoint(value: unknown): value is SystemPoint {
   );
 }
 
+function isMachine(value: unknown): value is SystemMachine {
+  return (
+    isRecord(value) &&
+    (value.os === null || typeof value.os === "string") &&
+    isNumberOrNull(value.uptime_seconds) &&
+    (value.reboot_pending === null || typeof value.reboot_pending === "boolean")
+  );
+}
+
+function isDrive(value: unknown): value is SystemDrive {
+  return (
+    isRecord(value) &&
+    typeof value.name === "string" &&
+    typeof value.path === "string" &&
+    isNumber(value.total_bytes) &&
+    isNumber(value.free_bytes) &&
+    isNumber(value.weir_bytes) &&
+    isNumber(value.keep_free_bytes) &&
+    Array.isArray(value.workflows)
+  );
+}
+
 /** The frame in a stream message, or null when it is not one this screen understands. */
 export function parseSystemStatsFrame(data: string): SystemStatsFrame | null {
   try {
     const raw: unknown = JSON.parse(data);
-    if (!isRecord(raw) || !isNow(raw.now) || !isPoint(raw.point)) return null;
-    return { now: raw.now, point: raw.point };
+    if (
+      !isRecord(raw) ||
+      !isNow(raw.now) ||
+      !isPoint(raw.point) ||
+      !isMachine(raw.machine) ||
+      !Array.isArray(raw.drives) ||
+      !raw.drives.every(isDrive)
+    )
+      return null;
+    return {
+      now: raw.now,
+      point: raw.point,
+      machine: raw.machine,
+      drives: raw.drives,
+    };
   } catch {
     return null;
   }

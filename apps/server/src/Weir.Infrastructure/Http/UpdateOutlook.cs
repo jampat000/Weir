@@ -1,4 +1,5 @@
 using Weir.Core.Json;
+using Weir.Infrastructure.Activity;
 using Weir.Infrastructure.Runtime;
 
 namespace Weir.Infrastructure.Http;
@@ -26,23 +27,25 @@ public sealed class UpdateOutlook
     private readonly UpdateStatusReader _status;
     private readonly UpdateFiles _files;
     private readonly TimeProvider _time;
+    private readonly DataChangePublisher _changes;
     private readonly Lock _gate = new();
     private UpdateOutlookSnapshot _known = new(Checking, null);
     private DateTimeOffset? _checkedAt;
     private bool _checkFailed;
     private bool _checking;
 
-    public UpdateOutlook(UpdateStatusReader status, UpdateFiles files, TimeProvider time)
+    public UpdateOutlook(UpdateStatusReader status, UpdateFiles files, TimeProvider time, DataChangePublisher changes)
     {
         _status = status ?? throw new ArgumentNullException(nameof(status));
         _files = files ?? throw new ArgumentNullException(nameof(files));
         _time = time ?? throw new ArgumentNullException(nameof(time));
+        _changes = changes ?? throw new ArgumentNullException(nameof(changes));
     }
 
     /// <summary>The outlook now: an update the tray already downloaded wins over what the last check found.</summary>
     public UpdateOutlookSnapshot Current()
     {
-        StartCheckWhenStale();
+        CheckWhenStale();
         var state = _files.ReadState();
         if (state.Get("downloaded")?.IsTruthy == true)
         {
@@ -55,20 +58,28 @@ public sealed class UpdateOutlook
         }
     }
 
-    /// <summary>Asks for the latest release and keeps the answer.</summary>
+    /// <summary>Asks for the latest release and keeps the answer; open screens hear of it when the answer is a different one.</summary>
     public async Task CheckAsync(CancellationToken cancellationToken)
     {
         var status = await _status.ReadAsync(cancellationToken).ConfigureAwait(false);
         var outlook = new UpdateOutlookSnapshot(TextOf(status.Get("status")) ?? Checking, TextOf(status.Get("latest_version")));
+        bool changed;
         lock (_gate)
         {
+            changed = outlook != _known;
             _known = outlook;
             _checkedAt = _time.GetUtcNow();
             _checkFailed = outlook.Status is "unavailable";
         }
+
+        if (changed)
+        {
+            _changes.Publish(DataTopics.Update);
+        }
     }
 
-    private void StartCheckWhenStale()
+    /// <summary>Starts a fresh check in the background when the last answer has gone stale, and returns at once.</summary>
+    public void CheckWhenStale()
     {
         lock (_gate)
         {

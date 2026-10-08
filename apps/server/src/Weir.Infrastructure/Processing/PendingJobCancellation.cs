@@ -3,6 +3,7 @@ using Weir.Core.Json;
 using Weir.Core.MediaManagers;
 using Weir.Core.Processing;
 using Weir.Core.Processing.RemuxPass;
+using Weir.Infrastructure.Activity;
 using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.MediaManagers;
 using Weir.Infrastructure.Sqlite;
@@ -27,12 +28,14 @@ public sealed class PendingJobCancellation
     private readonly HandoffLedgerStore _ledger;
     private readonly HandoffCompletionReporter _reporter;
     private readonly FileStateStore _files;
+    private readonly DataChangePublisher _changes;
 
-    public PendingJobCancellation(HandoffLedgerStore ledger, HandoffCompletionReporter reporter, FileStateStore files)
+    public PendingJobCancellation(HandoffLedgerStore ledger, HandoffCompletionReporter reporter, FileStateStore files, DataChangePublisher changes)
     {
         _ledger = ledger ?? throw new ArgumentNullException(nameof(ledger));
         _reporter = reporter ?? throw new ArgumentNullException(nameof(reporter));
         _files = files ?? throw new ArgumentNullException(nameof(files));
+        _changes = changes ?? throw new ArgumentNullException(nameof(changes));
     }
 
     public async Task<PendingJobCancelResult> CancelAsync(UnitOfWork uow, long jobId)
@@ -65,6 +68,7 @@ public sealed class PendingJobCancellation
             ("$status", ProcessingJobStatus.Cancelled),
             ("$error", JobQueueRules.CancelledByOperatorError),
             ("$id", found.Id)).ConfigureAwait(false);
+        _changes.PublishQueueChangeOnCommit(uow, found.Kind);
 
         var payload = Parse(found.Payload);
         if (found.Kind == RemuxPassOutcomes.JobKind &&

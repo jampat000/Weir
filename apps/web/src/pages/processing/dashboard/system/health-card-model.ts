@@ -114,14 +114,6 @@ export function listedChecks(
   );
 }
 
-/** The newest time any check was looked at, or null when none has been. */
-export function lastCheckedAt(checks: readonly HealthCheck[]): number | null {
-  const times = checks.flatMap((check) =>
-    check.checkedAt === null ? [] : [check.checkedAt],
-  );
-  return times.length > 0 ? Math.max(...times) : null;
-}
-
 /** What the list says when it has no row to show. */
 export function emptyHealthWords(area: HealthArea | null): string {
   if (area === null) return "Weir is still looking.";

@@ -62,6 +62,7 @@ public sealed partial class ProcessingJobStore
                     ("@status", ProcessingJobStatus.Pending),
                     ("@id", jobId));
                 RecordQueueDepth(connection, transaction);
+                AnnounceQueueChange(transaction, job.JobKind);
                 return true;
             },
             cancellationToken);

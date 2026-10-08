@@ -16,7 +16,11 @@ public sealed class SuitePauseServiceTests : IDisposable
         "(SELECT title, detail FROM activity_events WHERE event_type LIKE 'system.processing_%' ORDER BY id)";
 
     private readonly StoreFixture _store = new();
-    private readonly SuitePauseService _pause = new(new SuiteSettingsStore(new AuthStore()), new ActivityStore());
+    private readonly DataChangePublisher _changes = new();
+    private readonly SuitePauseService _pause;
+
+    public SuitePauseServiceTests() =>
+        _pause = new SuitePauseService(new SuiteSettingsStore(new AuthStore()), new ActivityStore(), _changes);
 
     public void Dispose() => _store.Dispose();
 
@@ -130,6 +134,73 @@ public sealed class SuitePauseServiceTests : IDisposable
         var started = await InUnitOfWorkAsync(uow => _pause.ChangeAsync(uow, true, null, keepEnd: true, true, Now, "alice"));
 
         Assert.Null(started.State.PausedUntil);
+    }
+
+    [Fact]
+    public async Task Pausing_and_resuming_each_announce_the_pause_once_it_commits()
+    {
+        using var heard = _changes.Subscribe();
+
+        await ChangeAsync(paused: true);
+        await ChangeAsync(paused: false);
+
+        Assert.Equal([DataTopics.Pause, DataTopics.Pause], await NextAsync(heard, 2));
+    }
+
+    [Fact]
+    public async Task A_pause_that_runs_out_is_announced_by_whatever_lifts_it()
+    {
+        await ChangeAsync(paused: true, minutes: 30);
+        _store.Clock.Advance(TimeSpan.FromHours(1));
+        using var heard = _changes.Subscribe();
+
+        await new SuitePauseExpiryTask(_store.Database, _pause, _store.Clock).RunOnceAsync(CancellationToken.None);
+
+        Assert.Equal([DataTopics.Pause], await NextAsync(heard, 1));
+    }
+
+    [Fact]
+    public async Task Lifting_a_lapsed_pause_and_pausing_again_in_one_change_announces_once()
+    {
+        await ChangeAsync(paused: true, minutes: 30);
+        _store.Clock.Advance(TimeSpan.FromMinutes(45));
+        using var heard = _changes.Subscribe();
+
+        await ChangeAsync(paused: true, minutes: 60);
+        _changes.Publish("sentinel");
+
+        Assert.Equal([DataTopics.Pause, "sentinel"], await NextAsync(heard, 2));
+    }
+
+    [Fact]
+    public async Task A_change_that_is_not_committed_announces_nothing()
+    {
+        using var heard = _changes.Subscribe();
+        var uow = await UnitOfWork.OpenAsync(_store.Database);
+        await using (uow)
+        {
+            await _pause.ChangeAsync(uow, true, null, keepEnd: false, true, Now, "alice");
+        }
+
+        _changes.Publish("sentinel");
+
+        Assert.Equal(["sentinel"], await NextAsync(heard, 1));
+    }
+
+    private static async Task<string[]> NextAsync(BroadcastSubscription<string> heard, int count)
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var topics = new List<string>();
+        await foreach (var topic in heard.ReadAllAsync(timeout.Token))
+        {
+            topics.Add(topic);
+            if (topics.Count == count)
+            {
+                break;
+            }
+        }
+
+        return [.. topics];
     }
 
     private sealed record PauseOutcome(PauseState State, string[] Entries);

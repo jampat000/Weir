@@ -2,15 +2,15 @@ using Weir.Infrastructure.Activity;
 
 namespace Weir.Infrastructure.Logging;
 
-/// <summary>A warning or error that was just written to the log.</summary>
+/// <summary>A line that was just written to the log.</summary>
 /// <param name="At">When it was logged.</param>
-/// <param name="Level">The level as the log file names it: <c>WARNING</c>, <c>ERROR</c> or <c>CRITICAL</c>.</param>
+/// <param name="Level">The level as the log file names it: <c>INFO</c>, <c>WARNING</c>, <c>ERROR</c> or <c>CRITICAL</c>.</param>
 /// <param name="Message">The message the log line carries.</param>
 public sealed record LogAlert(DateTimeOffset At, string Level, string Message);
 
 /// <summary>
-/// Every warning and error as it is logged, for the open streams. Informational lines are not published: the System screen's
-/// log shows only what needs a look, and the log file stays the place for the rest.
+/// Every line the System screen's log shows, as it is logged, for the open streams: warnings and errors, and the information
+/// from Weir's own loggers. The same lines <c>GET /suite/logs</c> leaves out as noise are left out here.
 /// </summary>
 public sealed class LogAlerts
 {

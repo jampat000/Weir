@@ -10,12 +10,13 @@ import {
 } from "../../../../lib/settings/queries";
 import { systemKeys } from "../../../../lib/system/query-keys";
 import { useMediaToolsQuery } from "../../../../lib/system/media-tools";
+import { useServerLooks } from "../../../../lib/system/use-server-looks";
 import { useSystemReadinessQuery } from "../../../../lib/system/readiness-queries";
 import { fetchSystemStats } from "../../../../lib/system/system-stats-api";
 import { useSystemOverviewQuery } from "../../../../lib/system/use-system-stats";
 import { parseAppTime } from "../../../../lib/ui/mm-format-date";
 import { useNow } from "../../../../lib/ui/use-now";
-import { CHECKING_WORDS } from "../health-model";
+import { CHECKING_WORDS, newestTime } from "../health-model";
 import { useConnectionTesting } from "../use-connection-testing";
 import { useHealth, type Health } from "../use-health";
 import {
@@ -30,8 +31,6 @@ import {
   type WeirFacts,
 } from "./health-checks";
 
-/** How often the drives are read again for the storage checks: the drives themselves are read this slowly. */
-const DRIVES_REFRESH_MS = 30_000;
 /** Backups are judged against hours, so a minute is as often as the time they are measured against needs to move. */
 const NOW_TICK_MS = 60_000;
 
@@ -42,6 +41,8 @@ export type HealthChecks = {
   /** Weir's own count of its checks, for the headline before every row has answered. */
   overviewChecks: { passing: number; total: number } | null;
   health: Health;
+  /** When any part of the card was last read again, for the card's sheen. Null before the first read. */
+  readAt: number | null;
   /** The ids of the checks being looked at again now. */
   busy: ReadonlySet<string>;
   /** Looks at one check's subject again. */
@@ -64,14 +65,13 @@ export function useHealthChecks(
     queryKey: systemKeys.stats,
     queryFn: fetchSystemStats,
     select: (value) => value.drives,
-    staleTime: DRIVES_REFRESH_MS,
-    refetchInterval: DRIVES_REFRESH_MS,
   });
   const settings = useAppSettingsQuery();
   const backupList = useConfigurationBackupsQuery(true);
   const readiness = useSystemReadinessQuery();
   const update = useUpdateStatusQuery();
   const overview = useSystemOverviewQuery();
+  const looks = useServerLooks();
   const now = useNow(NOW_TICK_MS);
   const [busy, setBusy] = useState<ReadonlySet<string>>(new Set());
 
@@ -101,9 +101,17 @@ export function useHealthChecks(
         update.data?.status === "update_available"
           ? (update.data.latest_version ?? null)
           : null,
-      checkedAt: readiness.dataUpdatedAt || null,
+      checkedAt: newestTime(
+        readiness.dataUpdatedAt || null,
+        looks.readinessCheckedAt,
+      ),
     };
-  }, [readiness.data, readiness.dataUpdatedAt, update.data]);
+  }, [
+    readiness.data,
+    readiness.dataUpdatedAt,
+    looks.readinessCheckedAt,
+    update.data,
+  ]);
 
   const checks = useMemo(
     () => [
@@ -113,10 +121,7 @@ export function useHealthChecks(
         health.tools,
         tools.dataUpdatedAt > 0 ? tools.dataUpdatedAt : null,
       ),
-      ...storageChecks(
-        stats.data ?? null,
-        stats.dataUpdatedAt > 0 ? stats.dataUpdatedAt : null,
-      ),
+      ...storageChecks(stats.data ?? null),
       ...backupChecks(backups, now),
       ...weirChecks(weir),
     ],
@@ -126,11 +131,18 @@ export function useHealthChecks(
       health.tools,
       tools.dataUpdatedAt,
       stats.data,
-      stats.dataUpdatedAt,
       backups,
       now,
       weir,
     ],
+  );
+
+  const readAt = newestTime(
+    health.foldersReadAt,
+    ...entries.map((entry) => entry.checkedAt),
+    tools.dataUpdatedAt || null,
+    settings.dataUpdatedAt || null,
+    readiness.dataUpdatedAt || null,
   );
 
   const lookAgain = async (check: HealthCheck): Promise<void> => {
@@ -181,6 +193,7 @@ export function useHealthChecks(
     ),
     overviewChecks: overview.data?.checks ?? null,
     health,
+    readAt,
     busy,
     again,
   };

@@ -123,8 +123,7 @@ public sealed class QueueingFailurePolicy : IFailurePolicy
 
     private void Enqueue(UnitOfWork uow, string dedupeKey, string jobKind, WireObject body, ProcessingLibraryRecord library, DateTimeOffset? notBefore = null) =>
         _jobs.EnqueueOrGet(
-            uow.Connection,
-            uow.WriteTransaction(),
+            uow,
             dedupeKey,
             jobKind,
             WireJsonWriter.Dumps(body, WireJsonFormat.Compact),

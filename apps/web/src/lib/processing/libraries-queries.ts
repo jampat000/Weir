@@ -96,8 +96,7 @@ export function libraryFolderChainOptions(
 ) {
   return {
     queryKey: [
-      "processing",
-      "library-folder-chain",
+      ...processingKeys.libraryFolderChains,
       libraryId,
       mediaType,
       watchedFolder,
@@ -140,16 +139,12 @@ export function useConnectionFolderChainQuery(connectionId: number) {
   });
 }
 
-/** `refetchIntervalMs` keeps each library's next look current on a screen that counts down to it. */
-export function useProcessingLibrariesQuery(
-  enabled = true,
-  refetchIntervalMs?: number,
-) {
+/** The workflows, each with its next look; the server says when either changes (`libraries`). */
+export function useProcessingLibrariesQuery(enabled = true) {
   return useQuery<ProcessingLibrary[]>({
     queryKey: processingKeys.libraries,
     queryFn: fetchProcessingLibraries,
     enabled,
-    refetchInterval: refetchIntervalMs,
   });
 }
 

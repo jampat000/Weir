@@ -21,12 +21,11 @@ import { MIN_GRID_PX, pageLayout } from "./dashboard/dashboard-layout";
 import { LiveView } from "./dashboard/live-view";
 import { SystemView } from "./dashboard/system-view";
 import { useDashboardAddress } from "./dashboard-address";
-import { LIBRARIES_REFRESH_MS } from "./use-processing-lanes";
 
 const EYEBROW = "Cleans new downloads and your library";
 
 export function ProcessingPage(): React.ReactElement {
-  const libraries = useProcessingLibrariesQuery(true, LIBRARIES_REFRESH_MS);
+  const libraries = useProcessingLibrariesQuery();
   const enabledWorkflows = libraries.data?.filter(
     (workflow) => workflow.enabled,
   );

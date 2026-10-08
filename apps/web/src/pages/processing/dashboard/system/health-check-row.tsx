@@ -34,8 +34,9 @@ export function HealthCheckRow({
   const { workflowId } = check;
   const problem = needsYou(check.meaning);
   const area = AREA_NAMES.get(check.area);
-  const checked =
-    check.checkedAt === null
+  const checked = check.live
+    ? "live"
+    : check.checkedAt === null
       ? ""
       : `checked ${checkedAgo(check.checkedAt, now)}`;
   return (

@@ -215,6 +215,14 @@ public sealed class SuiteLogFilter
     public static bool SkipLowValueNoise(ParsedLogEntry entry)
     {
         ArgumentNullException.ThrowIfNull(entry);
-        return entry.Level is not ("ERROR" or "WARNING" or "CRITICAL") && !entry.Logger.StartsWith("weir", StringComparison.Ordinal);
+        return IsLowValueNoise(entry.Level, entry.Logger);
+    }
+
+    /// <summary><see cref="SkipLowValueNoise"/> for a line that is being written: its level as the log file names it, and its logger.</summary>
+    public static bool IsLowValueNoise(string level, string logger)
+    {
+        ArgumentNullException.ThrowIfNull(level);
+        ArgumentNullException.ThrowIfNull(logger);
+        return level is not ("ERROR" or "WARNING" or "CRITICAL") && !logger.StartsWith("weir", StringComparison.Ordinal);
     }
 }

@@ -1,12 +1,27 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { renderHook } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { useLiveProgress } from "../activity/use-activity-stream-invalidation";
 import { systemKeys } from "./query-keys";
-import type { SystemNow, SystemPoint, SystemStats } from "./system-stats-types";
-import { useSystemStatsFrames } from "./use-system-stats";
+import { fetchSystemOverview, fetchSystemStats } from "./system-stats-api";
+import type {
+  SystemNow,
+  SystemOverview,
+  SystemPoint,
+  SystemStats,
+} from "./system-stats-types";
+import {
+  useSystemOverviewQuery,
+  useSystemStatsFrames,
+  useSystemStatsQuery,
+} from "./use-system-stats";
+
+vi.mock("./system-stats-api", () => ({
+  fetchSystemStats: vi.fn(),
+  fetchSystemOverview: vi.fn(),
+}));
 
 class FakeEventSource {
   static instances: FakeEventSource[] = [];
@@ -65,6 +80,31 @@ const point = (second: number): SystemPoint => ({
   processing_speed: 0,
 });
 
+const drive = (freeBytes: number) => ({
+  name: "D:",
+  path: "D:\\",
+  total_bytes: 1000,
+  free_bytes: freeBytes,
+  weir_bytes: 0,
+  keep_free_bytes: 0,
+  full_in_days: null,
+  read_bytes_per_sec: null,
+  write_bytes_per_sec: null,
+  busy_percent: null,
+  workflows: [],
+});
+
+const frame = (
+  reading: SystemNow,
+  added: SystemPoint,
+  drives: ReturnType<typeof drive>[] = [],
+) => ({
+  now: reading,
+  point: added,
+  machine: { os: "Windows 11", uptime_seconds: 60, reboot_pending: false },
+  drives,
+});
+
 const seeded = (): SystemStats => ({
   interval_ms: 1000,
   window_s: 600,
@@ -72,6 +112,21 @@ const seeded = (): SystemStats => ({
   history: [point(1)],
   machine: { os: "", uptime_seconds: 0, reboot_pending: null },
   drives: [],
+});
+
+const overview = (jobsRun: number): SystemOverview => ({
+  version: "1.0.0",
+  update: { status: "up_to_date", latest_version: null },
+  uptime_seconds: 60,
+  started_at: "2026-10-02T11:59:00Z",
+  runs_as: "app",
+  address: "http://pc:8484",
+  data_bytes: 1000,
+  browsers_live: 1,
+  requests: { median_ms: 10, p95_ms: 40, errors_today: 0 },
+  jobs_today: { run: jobsRun, failed: 0 },
+  restarts_this_week: 0,
+  checks: { passing: 5, total: 5 },
 });
 
 function setup(stats?: SystemStats) {
@@ -97,24 +152,31 @@ describe("following the system.stats frames", () => {
     const { client, wrapper } = setup(seeded());
     renderHook(() => useSystemStatsFrames(), { wrapper });
 
-    FakeEventSource.instances[0].emit("system.stats", {
-      now: now(77),
-      point: point(2),
-    });
+    FakeEventSource.instances[0].emit("system.stats", frame(now(77), point(2)));
 
     const stats = client.getQueryData<SystemStats>(systemKeys.stats);
     expect(stats?.history).toHaveLength(2);
     expect(stats?.now.cpu_percent).toBe(77);
   });
 
+  it("takes the drives the frame carries, so they follow the stream without a request", () => {
+    const { client, wrapper } = setup(seeded());
+    renderHook(() => useSystemStatsFrames(), { wrapper });
+
+    FakeEventSource.instances[0].emit(
+      "system.stats",
+      frame(now(77), point(2), [drive(400)]),
+    );
+
+    const stats = client.getQueryData<SystemStats>(systemKeys.stats);
+    expect(stats?.drives.map((d) => d.free_bytes)).toEqual([400]);
+  });
+
   it("leaves the cache empty until the history has been read, rather than starting one from a single point", () => {
     const { client, wrapper } = setup();
     renderHook(() => useSystemStatsFrames(), { wrapper });
 
-    FakeEventSource.instances[0].emit("system.stats", {
-      now: now(77),
-      point: point(2),
-    });
+    FakeEventSource.instances[0].emit("system.stats", frame(now(77), point(2)));
 
     expect(client.getQueryData(systemKeys.stats)).toBeUndefined();
   });
@@ -129,5 +191,56 @@ describe("following the system.stats frames", () => {
     expect(FakeEventSource.instances[0].closed).toBe(false);
     progress.unmount();
     expect(FakeEventSource.instances[0].closed).toBe(true);
+  });
+});
+
+describe("following the system.overview frames", () => {
+  it("reads the overview once, then takes each frame as the new overview", async () => {
+    vi.mocked(fetchSystemOverview).mockResolvedValue(overview(1));
+    const { client, wrapper } = setup();
+    const { result } = renderHook(() => useSystemOverviewQuery(), { wrapper });
+    await waitFor(() => expect(result.current.data?.jobs_today.run).toBe(1));
+
+    act(() => {
+      FakeEventSource.instances[0].emit("system.overview", overview(7));
+    });
+
+    expect(
+      client.getQueryData<SystemOverview>(systemKeys.overview)?.jobs_today.run,
+    ).toBe(7);
+    expect(fetchSystemOverview).toHaveBeenCalledTimes(1);
+  });
+
+  it("ignores a frame that is not an overview", async () => {
+    vi.mocked(fetchSystemOverview).mockResolvedValue(overview(1));
+    const { result } = renderHook(() => useSystemOverviewQuery(), setup());
+    await waitFor(() => expect(result.current.data).toBeDefined());
+
+    act(() => {
+      FakeEventSource.instances[0].emit("system.overview", { version: "x" });
+    });
+
+    expect(result.current.data?.jobs_today.run).toBe(1);
+  });
+});
+
+describe("the System readings", () => {
+  it("are not read again on a timer: the stream carries what changes", async () => {
+    vi.mocked(fetchSystemOverview).mockResolvedValue(overview(1));
+    vi.mocked(fetchSystemStats).mockResolvedValue(seeded());
+    const { client, wrapper } = setup();
+    const both = renderHook(
+      () => [useSystemOverviewQuery(), useSystemStatsQuery()] as const,
+      { wrapper },
+    );
+    await waitFor(() => expect(both.result.current[1].data).toBeDefined());
+
+    const intervals = client
+      .getQueryCache()
+      .findAll()
+      .map((query) => query.observers[0].options.refetchInterval);
+
+    expect(intervals).toHaveLength(2);
+    expect(intervals.every((interval) => !interval)).toBe(true);
   });
 });

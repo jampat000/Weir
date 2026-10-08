@@ -43,6 +43,7 @@ public sealed class LibraryScanChangeReasonTests : IDisposable
         new LibraryFileMarksStore(),
         new LibraryViewStore(),
         new LibraryStore(),
+        new LibraryScanProgress(),
         _fixture.Store.Clock,
         NullLogger<LibraryScanHandler>.Instance);
 

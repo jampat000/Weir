@@ -23,6 +23,23 @@ public sealed class E2EServer : IAsyncLifetime
     /// <summary>The server's address without a trailing slash.</summary>
     public string BaseUrl => (_server ?? throw NotStarted()).BaseUrl.GetLeftPart(UriPartial.Authority);
 
+    /// <summary>
+    /// A server of its own, set up as the Windows package is (the About screen offers an update to install only there), for a
+    /// test that has to stop and start it: the shared server serves every other test and is left running.
+    /// </summary>
+    public static Task<WeirServer> StartWindowsInstallAsync() =>
+        WeirServer.StartNewAsync(Environment.With(("WEIR_RUNTIME", "windows")));
+
+    /// <summary>
+    /// A server of its own that probes files with the fake tools, for a test whose files must take as long to look at as it
+    /// scripts: the shared server probes with whatever ffprobe the machine has, which answers as fast as the machine does.
+    /// </summary>
+    public static Task<WeirServer> StartWithFakeToolsAsync(FakeFfmpeg tools)
+    {
+        ArgumentNullException.ThrowIfNull(tools);
+        return WeirServer.StartNewAsync(Environment.With(tools.Env));
+    }
+
     public async Task InitializeAsync()
     {
         if (!E2EFactAttribute.IsEnabled)

@@ -2,6 +2,7 @@ using Microsoft.Data.Sqlite;
 using Weir.Core.Json;
 using Weir.Core.MediaManagers;
 using Weir.Core.Time;
+using Weir.Infrastructure.Activity;
 using Weir.Infrastructure.ConnectionTraffic;
 using Weir.Infrastructure.Sqlite;
 
@@ -56,11 +57,14 @@ public sealed class DownloadClientConnectionStore
         "last_connection_test_ok, last_connection_test_at, last_connection_test_detail, nickname, last_answer_ms, last_used_at";
 
     private readonly ConnectionUsageLedger? _usage;
+    private readonly DataChangePublisher? _changes;
 
     /// <param name="usage">Newer usage than the database holds, laid over every connection a list or lookup returns; none reads the database alone.</param>
-    public DownloadClientConnectionStore(ConnectionUsageLedger? usage = null)
+    /// <param name="changes">Told, once a write commits, that the connections changed, so every open screen reads them again.</param>
+    public DownloadClientConnectionStore(ConnectionUsageLedger? usage = null, DataChangePublisher? changes = null)
     {
         _usage = usage;
+        _changes = changes;
     }
 
     public async Task<List<DownloadClientConnectionRecord>> ListAsync(UnitOfWork uow)
@@ -108,6 +112,7 @@ public sealed class DownloadClientConnectionStore
             ("$key", apiKeyCiphertext),
             ("$nickname", nickname)).ConfigureAwait(false);
         await RefreshNamesAsync(uow).ConfigureAwait(false);
+        Changed(uow);
         return Convert.ToInt64(id, System.Globalization.CultureInfo.InvariantCulture);
     }
 
@@ -130,6 +135,8 @@ public sealed class DownloadClientConnectionStore
         {
             await RefreshNamesAsync(uow).ConfigureAwait(false);
         }
+
+        Changed(uow);
     }
 
     public async Task DeleteAsync(UnitOfWork uow, long connectionId)
@@ -138,6 +145,7 @@ public sealed class DownloadClientConnectionStore
         await uow.ExecuteAsync("DELETE FROM download_client_connections WHERE id = $id", ("$id", connectionId)).ConfigureAwait(false);
         await RefreshNamesAsync(uow).ConfigureAwait(false);
         _usage?.Forget(new ConnectionRef(ConnectionKind.DownloadClient, connectionId));
+        Changed(uow);
     }
 
     /// <summary>Save how long the last call took and when the connection was last used; a value the usage does not carry stays as it was.</summary>
@@ -163,17 +171,25 @@ public sealed class DownloadClientConnectionStore
     }
 
     /// <summary>The conditional test-result write: 0 when the connection was removed meanwhile.</summary>
-    public Task<int> RecordTestResultAsync(UnitOfWork uow, long connectionId, bool ok, Timestamp checkedAt, string detail)
+    public async Task<int> RecordTestResultAsync(UnitOfWork uow, long connectionId, bool ok, Timestamp checkedAt, string detail)
     {
         ArgumentNullException.ThrowIfNull(uow);
-        return uow.ExecuteAsync(
+        var written = await uow.ExecuteAsync(
             "UPDATE download_client_connections SET last_connection_test_ok = $ok, last_connection_test_at = $at, " +
             "last_connection_test_detail = $detail, updated_at = CURRENT_TIMESTAMP WHERE id = $id",
             ("$ok", ok ? 1 : 0),
             ("$at", checkedAt.ToSqlite()),
             ("$detail", detail),
-            ("$id", connectionId));
+            ("$id", connectionId)).ConfigureAwait(false);
+        if (written > 0)
+        {
+            Changed(uow);
+        }
+
+        return written;
     }
+
+    private void Changed(UnitOfWork uow) => _changes?.PublishOnCommit(uow, DataTopics.Connections);
 
     private static DownloadClientConnectionRecord ReadRow(SqliteDataReader reader) => new(
         SqliteValues.GetInt64(reader, 0),

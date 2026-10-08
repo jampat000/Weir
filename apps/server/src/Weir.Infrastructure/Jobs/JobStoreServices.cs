@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Weir.Infrastructure.Activity;
 using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Infrastructure.Jobs;
@@ -18,7 +19,8 @@ public static class JobStoreServices
             sp.GetRequiredService<SqliteDatabase>(),
             sp.GetRequiredService<TimeProvider>(),
             sp.GetService<IJobQueueMetrics>(),
-            sp.GetRequiredService<WorkerWakeSignals>()));
+            sp.GetRequiredService<WorkerWakeSignals>(),
+            sp.GetService<DataChangePublisher>()));
         return services;
     }
 }

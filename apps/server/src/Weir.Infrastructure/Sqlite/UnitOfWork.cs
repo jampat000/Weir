@@ -1,5 +1,6 @@
 using System.Data;
 using System.Globalization;
+using System.Runtime.CompilerServices;
 using Microsoft.Data.Sqlite;
 using SQLitePCL;
 using Weir.Core.Json;
@@ -22,6 +23,8 @@ namespace Weir.Infrastructure.Sqlite;
 /// </remarks>
 public sealed class UnitOfWork : IAsyncDisposable
 {
+    private static readonly ConditionalWeakTable<SqliteTransaction, UnitOfWork> Owners = [];
+
     private readonly CancellationToken _cancellationToken;
     private SqliteTransaction? _transaction;
     private List<Action>? _afterCommit;
@@ -42,6 +45,16 @@ public sealed class UnitOfWork : IAsyncDisposable
 
     /// <summary>Per-unit state for writers; cleared when the unit commits or rolls back.</summary>
     public IDictionary<string, object> Items => _items ??= new Dictionary<string, object>(StringComparer.Ordinal);
+
+    /// <summary>
+    /// The unit of work that began <paramref name="transaction"/>, for code handed only a connection and a transaction (the
+    /// job queue's enqueue) that must act once the unit commits. Null for a transaction no unit of work began.
+    /// </summary>
+    public static UnitOfWork? OwnerOf(SqliteTransaction transaction)
+    {
+        ArgumentNullException.ThrowIfNull(transaction);
+        return Owners.TryGetValue(transaction, out var owner) ? owner : null;
+    }
 
     public static async Task<UnitOfWork> OpenAsync(SqliteDatabase database, CancellationToken cancellationToken = default)
     {
@@ -91,6 +104,7 @@ public sealed class UnitOfWork : IAsyncDisposable
         }
 
         _transaction = Connection.BeginTransaction(IsolationLevel.Serializable, deferred: true);
+        Owners.Add(_transaction, this);
     }
 
     /// <summary>
@@ -273,7 +287,13 @@ public sealed class UnitOfWork : IAsyncDisposable
     /// </remarks>
     private void EnsureTransaction()
     {
-        _transaction ??= Connection.BeginTransaction(IsolationLevel.Serializable, deferred: false);
+        if (_transaction is not null)
+        {
+            return;
+        }
+
+        _transaction = Connection.BeginTransaction(IsolationLevel.Serializable, deferred: false);
+        Owners.Add(_transaction, this);
     }
 
     private SqliteCommand Create(string sql, (string Name, object? Value)[] parameters)

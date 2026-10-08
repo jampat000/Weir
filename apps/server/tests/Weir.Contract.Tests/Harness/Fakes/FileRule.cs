@@ -12,6 +12,9 @@ public sealed record FileRule
     /// <summary>The ffprobe answer, when the file does not carry its own (see <see cref="FakeMedia.Bytes"/>).</summary>
     public JsonObject? Probe { get; init; }
 
+    /// <summary>ffprobe takes this long to answer, so a walk over many files lasts however fast the machine is.</summary>
+    public double? ProbeDelaySeconds { get; init; }
+
     /// <summary>ffprobe exits 1 with this on stderr (never for Weir's own staged outputs).</summary>
     public string? ProbeError { get; init; }
 
@@ -37,6 +40,7 @@ public sealed record FileRule
     {
         var rule = new JsonObject();
         Set(rule, FakeToolProtocol.ProbeKey, Probe?.DeepClone());
+        Set(rule, FakeToolProtocol.ProbeDelaySecondsKey, ProbeDelaySeconds);
         Set(rule, FakeToolProtocol.ProbeErrorKey, ProbeError);
         Set(rule, FakeToolProtocol.IntegrityErrorKey, IntegrityError);
         Set(rule, FakeToolProtocol.RemuxErrorKey, RemuxError);

@@ -17,7 +17,7 @@ public abstract class FakeHttpServer : IDisposable
 
     private readonly object _gate = new();
     private readonly List<RecordedRequest> _requests = [];
-    private readonly HttpListener _listener = new();
+    private readonly HttpListener _listener;
     private TaskCompletionSource _arrived = NewSignal();
 
     protected FakeHttpServer()
@@ -25,17 +25,20 @@ public abstract class FakeHttpServer : IDisposable
         for (var attempt = 1; ; attempt++)
         {
             var port = FreePort();
-            _listener.Prefixes.Clear();
-            _listener.Prefixes.Add($"http://127.0.0.1:{port}/");
+            // A listener that failed to start cannot be reused (on Linux it is disposed), so each attempt gets its own.
+            var listener = new HttpListener();
+            listener.Prefixes.Add($"http://127.0.0.1:{port}/");
             try
             {
-                _listener.Start();
+                listener.Start();
+                _listener = listener;
                 BaseUrl = $"http://127.0.0.1:{port}";
                 break;
             }
             catch (HttpListenerException) when (attempt < StartAttempts)
             {
                 // Another process took the port between choosing it and listening; choose again.
+                listener.Close();
             }
         }
 
