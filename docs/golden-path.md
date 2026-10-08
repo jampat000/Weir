@@ -67,6 +67,12 @@ Copy this list into the run's record and tick each line with what was seen.
 
     - [ ] A failed run records `state=failure` on that commit instead, so an earlier success can never be used by mistake.
 
+## What the script covers
+
+Deluno's `scripts/golden-path/Invoke-GoldenPath.ps1 -RigHost <host> -InstallerPath <Setup.exe> -Version <version>` does the mechanical part of step 1 and leaves the VM running for the rest. It restores the clean checkpoint, starts the VM and waits for PowerShell Direct, copies the installer in (and checks its SHA256), installs it with `--silent`, starts Deluno in the VM's signed-in desktop session, and checks that the installed build is the version under test, that Deluno answers on its port, what the first-run state is, which components are installed (with versions), where their data folders are and which ports listen. It writes `golden-path-<version>-<date>.md` under `artifacts/`, one line per step: passed, failed or manual.
+
+It cannot tick the component picker: Setup.exe and the app take no component choice on the command line, and a silent Setup does not run the first-run hook that shows the picker or sets the firewall rule. So after the script, step 1's picker lines and everything from step 2 on are done by hand in the VM console; the script's results file lists each as manual. Steps 2 to 12 stay manual.
+
 ## After the run
 
 The tag is made on the commit that passed, and each release's `golden-path` job (`scripts/verify-golden-path-for-release.mjs`) confirms the record before anything is published. Issues fixed in that release close with the run's evidence in the closing note.
