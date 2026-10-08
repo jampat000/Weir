@@ -105,7 +105,27 @@ describe("the activity stream", () => {
     expect(routine).toBe(0);
   });
 
-  it("lists a repeat that was left alone, with its own title, however long its entry's detail is", () => {
+  it("counts a manager's resent hand-offs as routine instead of listing each one", () => {
+    const resent = () =>
+      event({
+        event_type: "processing.file_skipped_repeat",
+        module: "processing",
+        title: "Skipped: already imported (Heat.1995.mkv)",
+        relative_path: "Heat (1995)/Heat.1995.mkv",
+        detail: JSON.stringify({
+          result: "skipped",
+          trigger: "webhook",
+          note: "x".repeat(200),
+        }),
+      });
+
+    const { rows, routine } = buildStream([resent(), resent()]);
+
+    expect(rows).toHaveLength(0);
+    expect(routine).toBe(2);
+  });
+
+  it("lists a repeat the person asked for, with its own title, however long its entry's detail is", () => {
     const { rows, routine } = buildStream([
       event({
         event_type: "processing.file_skipped_repeat",
@@ -114,6 +134,7 @@ describe("the activity stream", () => {
         relative_path: "Heat (1995)/Heat.1995.mkv",
         detail: JSON.stringify({
           result: "skipped",
+          trigger: "manual",
           relative_media_path: "Heat (1995)/Heat.1995.mkv",
           user_message: "Already imported: Deluno collected the cleaned copy",
           note: "x".repeat(200),

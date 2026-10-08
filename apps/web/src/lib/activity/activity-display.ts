@@ -155,17 +155,19 @@ function authDisplay(ev: ActivityEventItem): ActivityDisplay {
 }
 
 /**
- * Left alone, and nothing for anyone to do: the server's own title names the file and whether it was imported. Never
- * compact, whatever the length of its detail: a person who asked for the file again is waiting to see this line.
+ * Left alone, and nothing for anyone to do: the server's own title names the file and whether it was imported. Listed
+ * in full, whatever the length of its detail, when the person asked for the file again and is waiting to see this
+ * line; a manager resending hand-offs is routine and is counted, so it cannot push real news off the stream.
  */
 function skippedRepeatDisplay(ev: ActivityEventItem): ActivityDisplay {
+  const trigger = asString(parseActivityDetail(ev.detail)?.trigger);
   return {
     title: ev.title || eventLabel(ev.event_type),
     summary: "Processing",
     detail: ev.detail ?? null,
     chip: null,
     meaning: "idle",
-    compact: false,
+    compact: trigger !== "manual",
   };
 }
 
