@@ -48,7 +48,7 @@ public sealed class MkvmergeRemuxWriter(MediaTools tools, IMediaToolResolver res
     {
         ArgumentNullException.ThrowIfNull(request);
         var mkvmerge = resolver.ResolveMkvmerge()
-            ?? throw new MediaToolException("mkvmerge was not found, so it cannot write this file.");
+            ?? throw new MediaToolException("mkvmerge was not found, so it cannot write this file.") { PlainMessage = ToolFailureText.WriterMissing };
         var identification = await tools.IdentifyMkvmergeAsync(mkvmerge, request.Source, cancellationToken).ConfigureAwait(false);
         var trackIds = MkvmergeCommands.MapStreamIndicesToTrackIds(SourceStreams(request.SourceProbe), identification);
         RefuseKeptCoverArt(request.Plan, trackIds);

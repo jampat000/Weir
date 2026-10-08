@@ -83,7 +83,9 @@ public static class OperatorJobStatus
             return ($"Weir could not find this file under the saved watched folder{subject}.", "Check the workflow’s folder or restore the file, then use Start again.", technical);
         }
 
-        if (lower.Contains("ffprobe failed", StringComparison.Ordinal) || lower.Contains("could not read this media", StringComparison.Ordinal))
+        if (lower.Contains("ffprobe failed", StringComparison.Ordinal) || lower.Contains("could not read this media", StringComparison.Ordinal)
+            || lower.Contains("couldn't read this file", StringComparison.Ordinal) || lower.Contains("can't read this file", StringComparison.Ordinal)
+            || lower.Contains("media tools couldn't finish", StringComparison.Ordinal))
         {
             return ($"Weir could not read this media file{subject}.", "Check that the file is complete and playable, then use Try again.", technical);
         }

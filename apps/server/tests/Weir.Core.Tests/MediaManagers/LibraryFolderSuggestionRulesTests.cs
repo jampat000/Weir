@@ -44,7 +44,7 @@ public sealed class LibraryFolderSuggestionRulesTests
     [Theory]
     [InlineData("movie", "/downloads/movies")]
     [InlineData("tv", "/downloads/tv-sonarr")]
-    public void A_category_named_for_the_media_type_wins_over_the_default_folder(string mediaScope, string expected)
+    public void A_category_named_for_the_media_type_gives_its_folder(string mediaScope, string expected)
     {
         var folders = Folders("/downloads", ("movies", "/downloads/movies"), ("tv-sonarr", "/downloads/tv-sonarr"));
 
@@ -57,15 +57,24 @@ public sealed class LibraryFolderSuggestionRulesTests
         var folders = Folders("/downloads", ("radarr", "/downloads/radarr"));
 
         Assert.Equal("/downloads/radarr", LibraryFolderSuggestionRules.DownloadClientFolderFor("movie", folders));
-        Assert.Equal("/downloads", LibraryFolderSuggestionRules.DownloadClientFolderFor("tv", folders));
+        Assert.Null(LibraryFolderSuggestionRules.DownloadClientFolderFor("tv", folders));
     }
 
     [Fact]
-    public void A_category_that_names_neither_media_type_leaves_the_default_folder()
+    public void The_default_folder_every_media_type_saves_to_is_never_offered()
+    {
+        var folders = Folders("/downloads");
+
+        Assert.Null(LibraryFolderSuggestionRules.DownloadClientFolderFor("movie", folders));
+        Assert.Null(LibraryFolderSuggestionRules.DownloadClientFolderFor("tv", folders));
+    }
+
+    [Fact]
+    public void A_category_that_names_neither_media_type_gives_no_folder()
     {
         var folders = Folders("/downloads", ("software", "/downloads/software"));
 
-        Assert.Equal("/downloads", LibraryFolderSuggestionRules.DownloadClientFolderFor("movie", folders));
+        Assert.Null(LibraryFolderSuggestionRules.DownloadClientFolderFor("movie", folders));
     }
 
     [Fact]
@@ -73,8 +82,8 @@ public sealed class LibraryFolderSuggestionRulesTests
     {
         var folders = Folders("/downloads", ("tv-and-movies", "/downloads/both"));
 
-        Assert.Equal("/downloads", LibraryFolderSuggestionRules.DownloadClientFolderFor("tv", folders));
-        Assert.Equal("/downloads", LibraryFolderSuggestionRules.DownloadClientFolderFor("movie", folders));
+        Assert.Null(LibraryFolderSuggestionRules.DownloadClientFolderFor("tv", folders));
+        Assert.Null(LibraryFolderSuggestionRules.DownloadClientFolderFor("movie", folders));
     }
 
     [Fact]

@@ -5,6 +5,7 @@ using Weir.Api.Http;
 using Weir.Core.Auth;
 using Weir.Core.Json;
 using Weir.Core.LibraryMode;
+using Weir.Core.Media;
 using Weir.Core.Processing;
 using Weir.Core.Rules;
 using Weir.Core.Validation;
@@ -218,9 +219,9 @@ internal sealed class LibraryModeFilesEndpointHandlers
             probe = ProbeResult.Parse(probeJson);
             streams = RemuxRules.SplitStreams(probe);
         }
-        catch (RulesInputException exception)
+        catch (RulesInputException)
         {
-            throw new ApiException(StatusCodes.Status400BadRequest, $"Weir could not read this file's tracks: {exception.Message}");
+            throw new ApiException(StatusCodes.Status400BadRequest, ToolFailureText.UnusableTrackData);
         }
 
         if (!ManualTrackPlan.TryValidate(choice, ManualTrackPlan.ClassifyIndices(streams), out var problem))

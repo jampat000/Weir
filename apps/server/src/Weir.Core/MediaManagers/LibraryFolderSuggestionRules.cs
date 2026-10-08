@@ -16,19 +16,24 @@ public static class LibraryFolderSuggestionRules
     /// <summary>What a library of this media type is called when it is suggested.</summary>
     public static string LibraryName(string mediaScope) => mediaScope == MediaManagerKinds.Tv ? "TV" : "Movies";
 
+    /// <summary>What to tell the person when a download client saves this media type to its one default folder, so no folder is offered.</summary>
+    public static string SharedClientFolderNote(string clientLabel, string mediaScope) =>
+        $"{clientLabel} has no category folder for {LibraryName(mediaScope)}, so it saves them with every other download and Weir can't tell them apart. " +
+        $"Give {LibraryName(mediaScope)} its own category folder in {clientLabel}, then add the workflow under Setup › Workflows.";
+
     /// <summary>
     /// The folder a download client saves this media type to: the folder of the category named for the type (a
-    /// "movies" or "radarr" category, a "tv" or "sonarr" one), otherwise its default completed-downloads folder.
-    /// A category that names both types, or neither, is not taken for either.
+    /// "movies" or "radarr" category, a "tv" or "sonarr" one), or null. A category that names both types, or neither, is
+    /// not taken for either, and the client's default completed-downloads folder is never offered: every media type saves
+    /// there, so a workflow watching it would overlap every other.
     /// </summary>
     public static string? DownloadClientFolderFor(string mediaScope, DownloadClientFolders folders)
     {
         ArgumentNullException.ThrowIfNull(folders);
         var own = mediaScope == MediaManagerKinds.Tv ? TvCategoryWords : MovieCategoryWords;
         var other = mediaScope == MediaManagerKinds.Tv ? MovieCategoryWords : TvCategoryWords;
-        var category = folders.CategoryFolders.FirstOrDefault(candidate =>
-            DownloadClientPaths.IsAbsolute(candidate.Folder) && NamesType(candidate.Category, own) && !NamesType(candidate.Category, other));
-        return category?.Folder ?? (string.IsNullOrEmpty(folders.CompletedFolder) ? null : folders.CompletedFolder);
+        return folders.CategoryFolders.FirstOrDefault(candidate =>
+            DownloadClientPaths.IsAbsolute(candidate.Folder) && NamesType(candidate.Category, own) && !NamesType(candidate.Category, other))?.Folder;
     }
 
     /// <summary>

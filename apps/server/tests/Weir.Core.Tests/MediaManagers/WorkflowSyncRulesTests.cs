@@ -165,6 +165,103 @@ public sealed class WorkflowSyncRulesTests
     }
 
     [Fact]
+    public void A_watched_folder_the_manager_gives_no_folder_for_is_cleared_when_it_is_the_same_as_another_workflows()
+    {
+        var movies = Workflow(1, watched: @"C:\Downloads", output: @"C:\Weir\Ready\Movies", from: Deluno, key: "lib-movies", synced: true);
+        var tv = Workflow(2, "tv", watched: @"c:\downloads\", output: @"C:\Weir\Ready\TV", from: Deluno, key: "lib-tv", synced: true);
+
+        var plan = WorkflowSyncRules.Plan(Deluno, [Movies(watched: null), Tv(watched: null)], [movies, tv]);
+
+        Assert.All(plan, action =>
+        {
+            Assert.Equal(WorkflowSyncKind.Update, action.Kind);
+            Assert.True(action.ClearsWatched);
+            Assert.False(action.ChangesWatched);
+            Assert.False(action.ChangesOutput);
+        });
+        Assert.Equal([1L, 2L], plan.Select(action => action.Workflow!.Id));
+    }
+
+    [Fact]
+    public void A_watched_folder_that_holds_another_workflows_is_cleared_and_the_folder_inside_it_is_kept()
+    {
+        var movies = Workflow(1, watched: @"C:\Downloads", output: @"C:\Weir\Ready\Movies", from: Deluno, key: "lib-movies", synced: true);
+        var tv = Workflow(2, "tv", watched: @"C:\Downloads\TV", output: @"C:\Weir\Ready\TV", from: Deluno, key: "lib-tv", synced: true);
+
+        var action = Assert.Single(WorkflowSyncRules.Plan(Deluno, [Movies(watched: null), Tv(watched: null)], [movies, tv]));
+
+        Assert.Equal(1, action.Workflow!.Id);
+        Assert.True(action.ClearsWatched);
+    }
+
+    [Fact]
+    public void A_watched_folder_nothing_else_overlaps_is_kept_when_the_manager_gives_no_folder()
+    {
+        var movies = Workflow(1, watched: @"C:\Downloads\Movies", output: @"C:\Weir\Ready\Movies", from: Deluno, key: "lib-movies", synced: true);
+        var mine = Workflow(2, "tv", watched: @"C:\Mine\TV", output: @"C:\Mine\Out");
+
+        Assert.Empty(WorkflowSyncRules.Plan(Deluno, [Movies(watched: null)], [movies, mine]));
+    }
+
+    [Fact]
+    public void A_stale_root_is_cleared_when_the_manager_gives_another_library_a_folder_inside_it_even_though_no_workflow_holds_that_folder_yet()
+    {
+        var movies = Workflow(1, watched: @"C:\Downloads", output: @"C:\Weir\Ready\Movies", from: Deluno, key: "lib-movies", synced: true);
+        var tv = Workflow(2, "tv", output: @"C:\Weir\Ready\TV", from: Deluno, key: "lib-tv", synced: true);
+
+        var plan = WorkflowSyncRules.Plan(Deluno, [Movies(watched: null), Tv()], [movies, tv]);
+
+        Assert.Collection(
+            plan,
+            clears =>
+            {
+                Assert.Equal(1, clears.Workflow!.Id);
+                Assert.True(clears.ClearsWatched);
+                Assert.Equal("TV", clears.SharedWith);
+            },
+            fills =>
+            {
+                Assert.Equal(2, fills.Workflow!.Id);
+                Assert.True(fills.ChangesWatched);
+            });
+    }
+
+    [Fact]
+    public void A_watched_folder_is_not_cleared_when_the_manager_s_destinations_could_not_be_read_so_a_missing_folder_may_only_be_unseen()
+    {
+        var movies = Workflow(1, watched: @"C:\Downloads", output: @"C:\Weir\Ready\Movies", from: Deluno, key: "lib-movies", synced: true);
+        var tv = Workflow(2, "tv", watched: @"C:\Downloads", output: @"C:\Weir\Ready\TV", from: Deluno, key: "lib-tv", synced: true);
+        var unseen = Movies(watched: null) with { DestinationsRead = false };
+
+        Assert.Empty(WorkflowSyncRules.Plan(Deluno, [unseen, Tv(watched: null) with { DestinationsRead = false }], [movies, tv]));
+    }
+
+    [Fact]
+    public void A_shared_folder_the_manager_named_is_cleared_even_when_its_destinations_could_not_be_read()
+    {
+        var movies = Workflow(1, watched: @"C:\Downloads", output: @"C:\Weir\Ready\Movies", from: Deluno, key: "lib-movies", synced: true);
+        var tv = Workflow(2, "tv", watched: @"C:\Downloads", output: @"C:\Weir\Ready\TV", from: Deluno, key: "lib-tv", synced: true);
+        SyncedLibrary Shared(SyncedLibrary library) =>
+            library with { DestinationsRead = false, Cause = SyncedLibraryProblem.SharedDownloadsFolder };
+
+        var plan = WorkflowSyncRules.Plan(Deluno, [Shared(Movies(watched: null)), Shared(Tv(watched: null))], [movies, tv]);
+
+        Assert.All(plan, action => Assert.True(action.ClearsWatched));
+    }
+
+    [Fact]
+    public void A_watched_folder_is_not_cleared_when_the_manager_gives_the_library_a_folder()
+    {
+        var movies = Workflow(1, watched: @"C:\Downloads", output: @"C:\Weir\Ready\Movies", from: Deluno, key: "lib-movies", synced: true);
+        var tv = Workflow(2, "tv", watched: @"C:\Downloads\TV", output: @"C:\Weir\Ready\TV", from: Deluno, key: "lib-tv", synced: true);
+
+        var action = Assert.Single(WorkflowSyncRules.Plan(Deluno, [Movies(), Tv()], [movies, tv]), planned => planned.Workflow!.Id == 1);
+
+        Assert.False(action.ClearsWatched);
+        Assert.True(action.ChangesWatched);
+    }
+
+    [Fact]
     public void A_workflow_that_was_unlinked_is_left_alone_and_no_second_one_is_made()
     {
         var unlinked = Workflow(1, watched: @"C:\Mine", output: @"C:\Mine\Out", from: Deluno, key: "lib-movies", synced: false);
@@ -266,6 +363,81 @@ public sealed class WorkflowSyncRulesTests
         Assert.Null(library.WatchedFolder);
         Assert.Equal(@"C:\Ready\Movies", library.OutputFolder);
         Assert.Equal(WorkflowSyncFolders.NoDownloadsFolder("Deluno", "Movies"), library.Problem);
+        Assert.Equal(SyncedLibraryProblem.NoDownloadsFolder, library.Cause);
+        Assert.False(library.DestinationsRead);
+    }
+
+    [Fact]
+    public void Libraries_given_the_same_downloads_folder_get_none_and_are_told_to_give_each_its_own()
+    {
+        var libraries = WorkflowSyncRules.LibrariesOf(
+            "Deluno",
+            [
+                Descriptor("lib-movies", "Movies", "movie", refining: true, downloads: @"C:\Downloads\Completed", output: @"C:\Ready\Movies"),
+                Descriptor("lib-tv", "TV", "tv", refining: true, downloads: @"c:/downloads/completed/", output: @"C:\Ready\TV"),
+            ],
+            DelunoDestinationsAnswer.Failed(DelunoDestinationsStatus.NotOffered));
+
+        Assert.All(libraries, library => Assert.Null(library.WatchedFolder));
+        Assert.Equal([@"C:\Ready\Movies", @"C:\Ready\TV"], libraries.Select(library => library.OutputFolder));
+        Assert.All(libraries, library => Assert.Equal(SyncedLibraryProblem.SharedDownloadsFolder, library.Cause));
+        Assert.Equal(
+            @"Deluno gives C:\Downloads\Completed for Movies' downloads, but another library's downloads arrive there too, so it is not Movies' own folder. " +
+            "Give each library its own downloads folder in Deluno (or its own category folder in the clients) and Weir will pick it up.",
+            libraries[0].Problem);
+        Assert.StartsWith("Deluno gives c:/downloads/completed/ for TV's downloads,", libraries[1].Problem, StringComparison.Ordinal);
+        Assert.Contains("so it is not TV's own folder.", libraries[1].Problem, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_shared_folder_has_its_own_title_and_next_step_and_a_missing_one_keeps_the_old_wording()
+    {
+        var shared = Movies(watched: null) with { Cause = SyncedLibraryProblem.SharedDownloadsFolder };
+        var missing = Movies(watched: null) with { Cause = SyncedLibraryProblem.NoDownloadsFolder };
+
+        Assert.Equal("Deluno gives Movies a downloads folder that another library uses too", WorkflowSyncRules.ProblemTitle(shared, "Deluno"));
+        Assert.Equal("Give Movies its own downloads folder in Deluno.", WorkflowSyncRules.ProblemNextAction(shared, "Deluno"));
+        Assert.Equal("Deluno has not told Weir all of the folders for Movies yet", WorkflowSyncRules.ProblemTitle(missing, "Deluno"));
+        Assert.Equal("Set the folder in Deluno.", WorkflowSyncRules.ProblemNextAction(missing, "Deluno"));
+    }
+
+    [Fact]
+    public void The_cleared_message_names_the_folder_the_other_workflow_and_the_reason_the_manager_gave()
+    {
+        Assert.Equal(
+            @"Weir cleared Movies' watched folder, C:\Downloads, because it is the same as, or holds, the folder of TV. Deluno doesn't say where downloads for Movies arrive.",
+            WorkflowSyncRules.ClearedMessage("Movies", @"C:\Downloads", "TV", "Deluno doesn't say where downloads for Movies arrive."));
+    }
+
+    [Fact]
+    public void A_downloads_folder_that_holds_another_librarys_is_not_given_but_the_folder_inside_it_is()
+    {
+        var libraries = WorkflowSyncRules.LibrariesOf(
+            "Deluno",
+            [
+                Descriptor("lib-movies", "Movies", "movie", refining: true, downloads: @"C:\Downloads\Completed", output: @"C:\Ready\Movies"),
+                Descriptor("lib-tv", "TV", "tv", refining: true, downloads: @"C:\Downloads\Completed\TV", output: @"C:\Ready\TV"),
+            ],
+            DelunoDestinationsAnswer.Failed(DelunoDestinationsStatus.NotOffered));
+
+        Assert.Null(libraries[0].WatchedFolder);
+        Assert.NotNull(libraries[0].Problem);
+        Assert.Equal(@"C:\Downloads\Completed\TV", libraries[1].WatchedFolder);
+        Assert.Null(libraries[1].Problem);
+    }
+
+    [Fact]
+    public void Folders_that_only_share_a_name_prefix_are_each_the_librarys_own()
+    {
+        var libraries = WorkflowSyncRules.LibrariesOf(
+            "Deluno",
+            [
+                Descriptor("lib-movies", "Movies", "movie", refining: true, downloads: @"C:\Downloads\Movies", output: @"C:\Ready\Movies"),
+                Descriptor("lib-4k", "Movies 4K", "movie", refining: true, downloads: @"C:\Downloads\Movies 4K", output: @"C:\Ready\Movies 4K"),
+            ],
+            DelunoDestinationsAnswer.Failed(DelunoDestinationsStatus.NotOffered));
+
+        Assert.Equal([@"C:\Downloads\Movies", @"C:\Downloads\Movies 4K"], libraries.Select(library => library.WatchedFolder));
     }
 
     [Fact]

@@ -158,7 +158,7 @@ public sealed partial class LibraryCleanHandler : IJobHandler
         }
         catch (Exception exception) when (exception is MediaToolException or MediaToolTimeoutException)
         {
-            await RecordAsync(libraryId, path, trigger, LibraryActivityEventTypes.FileFailed, $"Weir could not read this file: {exception.Message}").ConfigureAwait(false);
+            await RecordAsync(libraryId, path, trigger, LibraryActivityEventTypes.FileFailed, ToolFailureText.Plain(exception)).ConfigureAwait(false);
             return;
         }
 
@@ -181,9 +181,9 @@ public sealed partial class LibraryCleanHandler : IJobHandler
             {
                 plan = LibraryFilePlanner.Classify(probe, rules);
             }
-            catch (RulesInputException exception)
+            catch (RulesInputException)
             {
-                await RecordAsync(libraryId, path, trigger, LibraryActivityEventTypes.FileFailed, $"Weir could not plan this file: {exception.Message}").ConfigureAwait(false);
+                await RecordAsync(libraryId, path, trigger, LibraryActivityEventTypes.FileFailed, ToolFailureText.UnusableTrackData).ConfigureAwait(false);
                 return;
             }
         }

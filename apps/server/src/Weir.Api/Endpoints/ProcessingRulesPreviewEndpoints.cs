@@ -192,14 +192,14 @@ internal sealed class ProcessingRulesPreviewEndpointHandlers
         }
         catch (MediaUnreadableException exception)
         {
-            throw new ApiException(StatusCodes.Status400BadRequest, $"Weir could not read this file's contents: {exception.Message}");
+            throw new ApiException(StatusCodes.Status400BadRequest, ToolFailureText.Plain(exception));
         }
 #pragma warning disable CA1031 // Any ffprobe failure is the operator's 400, not a server error.
         catch (Exception exception) when (exception is not OperationCanceledException)
 #pragma warning restore CA1031
         {
-            PreviewLogger(request).LogWarning(exception, "Reading {Path} with ffprobe failed for a rules preview.", resolvedPath);
-            throw new ApiException(StatusCodes.Status400BadRequest, "Weir could not read this file with ffprobe. Check it is a complete media file that Weir can open.");
+            PreviewLogger(request).LogWarning(exception, "Reading {File} for a rules preview failed.", MediaPathNames.Name(resolvedPath, OperatingSystem.IsWindows()));
+            throw new ApiException(StatusCodes.Status400BadRequest, "Weir could not read this file. Check it is a complete media file that Weir can open.");
         }
 
         var probe = new ProbeResult(probeJson);

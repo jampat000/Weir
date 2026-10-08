@@ -39,10 +39,18 @@ public sealed partial class ManagerWorkflowSync
                     workflow.DiscoveredFromConnectionId, workflow.DiscoveredLibraryKey, synced, linked));
             }
 
+            // A folder the manager now gives may only be free once another workflow has let go of the one it held,
+            // so a change that conflicts is tried again after the rest and only then reported.
             var changed = false;
+            var waiting = new List<WorkflowSyncAction>();
             foreach (var action in WorkflowSyncRules.Plan(connectionId, wanted, snapshots))
             {
-                changed |= await ApplyAsync(action).ConfigureAwait(false);
+                changed |= await ApplyAsync(action, waiting).ConfigureAwait(false);
+            }
+
+            foreach (var action in waiting)
+            {
+                changed |= await ApplyAsync(action, waiting: null).ConfigureAwait(false);
             }
 
             foreach (var library in wanted.Where(library => library.Problem is not null))
@@ -58,15 +66,27 @@ public sealed partial class ManagerWorkflowSync
             return changed;
         }
 
-        private async Task<bool> ApplyAsync(WorkflowSyncAction action)
+        /// <summary>
+        /// Makes one change. A change the editor's folder rules refuse is added to <paramref name="waiting"/> to be tried again, or
+        /// reported when <paramref name="waiting"/> is null.
+        /// </summary>
+        private async Task<bool> ApplyAsync(WorkflowSyncAction action, List<WorkflowSyncAction>? waiting)
         {
             var library = action.Library;
             var existing = action.Workflow is { } snapshot ? _workflows.First(workflow => workflow.Id == snapshot.Id) : null;
-            var watched = action.ChangesWatched ? library.WatchedFolder : null;
+            var watched = action.ChangesWatched ? library.WatchedFolder : action.ClearsWatched ? string.Empty : null;
             var output = action.ChangesOutput ? library.OutputFolder : null;
             if (await FolderConflictAsync(existing, watched, output).ConfigureAwait(false) is { } conflict)
             {
-                await ReportConflictAsync(action, conflict).ConfigureAwait(false);
+                if (waiting is not null)
+                {
+                    waiting.Add(action);
+                }
+                else
+                {
+                    await ReportConflictAsync(action, conflict).ConfigureAwait(false);
+                }
+
                 return false;
             }
 
@@ -140,13 +160,27 @@ public sealed partial class ManagerWorkflowSync
         {
             var label = connection.Label;
             var setUp = action.Kind != WorkflowSyncKind.Update;
-            await RecordAsync(
-                ActivityEventTypes.ProcessingWorkflowSynced,
-                setUp ? WorkflowSyncRules.SetUpTitle(workflow.Name, label) : WorkflowSyncRules.UpdatedTitle(workflow.Name, label, watched is not null, output is not null),
-                setUp ? WorkflowSyncRules.SetUpMessage(workflow.Name, label, NullIfEmpty(workflow.WatchedFolder), NullIfEmpty(workflow.OutputFolder)) : WorkflowSyncRules.UpdatedMessage(workflow.Name, label, watched, output),
-                result: "success",
-                nextAction: null,
-                workflow).ConfigureAwait(false);
+            if (action.ClearsWatched)
+            {
+                await RecordAsync(
+                    ActivityEventTypes.ProcessingWorkflowSynced,
+                    WorkflowSyncRules.ClearedTitle(workflow.Name),
+                    WorkflowSyncRules.ClearedMessage(workflow.Name, action.Workflow!.WatchedFolder, action.SharedWith!, action.Library.Problem!),
+                    result: "warning",
+                    nextAction: WorkflowSyncRules.ProblemNextAction(action.Library, label),
+                    workflow).ConfigureAwait(false);
+            }
+
+            if (setUp || action.ChangesWatched || action.ChangesOutput)
+            {
+                await RecordAsync(
+                    ActivityEventTypes.ProcessingWorkflowSynced,
+                    setUp ? WorkflowSyncRules.SetUpTitle(workflow.Name, label) : WorkflowSyncRules.UpdatedTitle(workflow.Name, label, action.ChangesWatched, action.ChangesOutput),
+                    setUp ? WorkflowSyncRules.SetUpMessage(workflow.Name, label, NullIfEmpty(workflow.WatchedFolder), NullIfEmpty(workflow.OutputFolder)) : WorkflowSyncRules.UpdatedMessage(workflow.Name, label, action.ChangesWatched ? watched : null, output),
+                    result: "success",
+                    nextAction: null,
+                    workflow).ConfigureAwait(false);
+            }
         }
 
         private async Task ReportConflictAsync(WorkflowSyncAction action, string conflict)
@@ -157,7 +191,7 @@ public sealed partial class ManagerWorkflowSync
             await NoticeAsync(
                 $"Weir could not {verb} {name} from {label}",
                 $"Weir could not use the folders {label} reports for {name}: {conflict} Weir left {name} as it is.",
-                $"Change the folders in {label}, or give the other workflow different folders.",
+                $"Give {name} and the other workflow separate folders: change the downloads folder for {name} in {label}, or unlink or remove the other workflow in Weir.",
                 action.Library.MediaType,
                 _workflows.FirstOrDefault(workflow => workflow.Id == action.Workflow?.Id)).ConfigureAwait(false);
         }
@@ -179,9 +213,9 @@ public sealed partial class ManagerWorkflowSync
             }
 
             await NoticeAsync(
-                $"{connection.Label} has not told Weir all of the folders for {library.Name} yet",
+                WorkflowSyncRules.ProblemTitle(library, connection.Label),
                 library.Problem!,
-                $"Set the folder in {connection.Label}.",
+                WorkflowSyncRules.ProblemNextAction(library, connection.Label),
                 library.MediaType,
                 workflow).ConfigureAwait(false);
         }

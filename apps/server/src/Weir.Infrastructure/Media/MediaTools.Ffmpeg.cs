@@ -85,7 +85,7 @@ public sealed partial class MediaTools
         switch (result.Timeout)
         {
             case ProcessTimeoutKind.Overall:
-                throw new MediaToolException("ffmpeg timed out");
+                throw new MediaToolException("ffmpeg timed out") { PlainMessage = ToolFailureText.TookTooLong };
             case ProcessTimeoutKind.ExitAfterStdoutClosed:
                 throw new MediaToolTimeoutException(ProbeOutput.TimeoutMessage(progressArgv, FfmpegCommands.ProgressExitWaitSeconds));
             case ProcessTimeoutKind.None:

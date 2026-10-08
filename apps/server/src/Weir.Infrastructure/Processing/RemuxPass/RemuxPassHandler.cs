@@ -211,12 +211,13 @@ public sealed partial class RemuxPassHandler : IJobHandler
 
         result.Set("job_id", context.Id);
         result.Set("library_id", claim.Library?.Id ?? libraryId);
+        // Before the rejection is acted on: a file that stays unreadable through the looks is refused here, and only then.
+        await SettleUnreadableSourceAsync(context.Id, data, origin, result, cancellationToken).ConfigureAwait(false);
         if (result.Get("rejection_kind") is { IsTruthy: true } && claim.Library is { } library)
         {
             ApplyRejectedFileAction(result, library, claim.Runtime?.ManagerLinks ?? WorkflowManagerLinks.None, origin);
         }
 
-        await SettleUnreadableSourceAsync(context.Id, data, origin, result, cancellationToken).ConfigureAwait(false);
         await DeferUntilDiskSpaceAsync(context.Id, data, origin, result, cancellationToken).ConfigureAwait(false);
         Merge(result, provenance);
         await ApplyFileOutcomeStateAsync(result, libraryId, mediaScope, origin).ConfigureAwait(false);

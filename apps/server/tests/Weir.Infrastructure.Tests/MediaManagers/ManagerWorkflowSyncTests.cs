@@ -373,6 +373,160 @@ public sealed class ManagerWorkflowSyncTests
             StringComparison.Ordinal);
     }
 
+    /// <summary>Deluno names no downloads folder for either library: its destinations are empty, or the route is not there.</summary>
+    private static void ScriptNoFolders(MediaManagerFixture fixture, bool routeMissing = true) =>
+        fixture.Http
+            .Json(HttpMethod.Get, Manifest, ManifestJson(Movies, Tv))
+            .Json(HttpMethod.Get, Destinations, routeMissing ? "{}" : """{"libraries":[]}""", routeMissing ? HttpStatusCode.NotFound : HttpStatusCode.OK);
+
+    private static async Task<string> Watched(MediaManagerFixture fixture, string mediaType) =>
+        (await Workflows(fixture)).Single(workflow => workflow.MediaType == mediaType).WatchedFolder;
+
+    [Fact]
+    public async Task Two_libraries_with_no_downloads_folder_anywhere_are_both_linked_with_no_watched_folder_and_each_is_asked_for_one()
+    {
+        using var fixture = new MediaManagerFixture();
+        ScriptNoFolders(fixture);
+        await ConnectAsync(fixture);
+
+        await Sync(fixture);
+
+        var workflows = await Workflows(fixture);
+        Assert.Equal(2, workflows.Count);
+        Assert.All(workflows, workflow =>
+        {
+            Assert.NotNull(workflow.DiscoveredLibraryKey);
+            Assert.Equal(string.Empty, workflow.WatchedFolder);
+        });
+        Assert.Equal(["/data/ready/movies", "/data/ready/tv"], workflows.Select(workflow => workflow.OutputFolder).Order(StringComparer.Ordinal));
+        Assert.Equal(
+            [
+                "Deluno on 192.0.2.30 has not told Weir all of the folders for Movies yet",
+                "Deluno on 192.0.2.30 has not told Weir all of the folders for TV yet",
+            ],
+            await Titles(fixture, ActivityEventTypes.ProcessingWorkflowSyncNotice));
+    }
+
+    [Fact]
+    public async Task Libraries_Deluno_gives_the_same_folder_get_no_watched_folder_and_are_asked_for_their_own()
+    {
+        using var fixture = Deluno([Movies, Tv], new Dictionary<string, string?> { ["lib-movies"] = "/data/completed", ["lib-tv"] = "/data/completed" });
+        await ConnectAsync(fixture);
+
+        await Sync(fixture);
+
+        Assert.All(await Workflows(fixture), workflow => Assert.Equal(string.Empty, workflow.WatchedFolder));
+        var detail = await fixture.Db(uow => uow.QueryAsync("SELECT detail FROM activity_events WHERE event_type = $t ORDER BY id", reader => reader.GetString(0), ("$t", ActivityEventTypes.ProcessingWorkflowSyncNotice)));
+        Assert.Equal(2, detail.Count);
+        Assert.Contains("another library's downloads arrive there too", detail[0], StringComparison.Ordinal);
+        Assert.Contains("Give each library its own downloads folder in Deluno on 192.0.2.30", detail[0], StringComparison.Ordinal);
+        Assert.Equal(
+            [
+                "Deluno on 192.0.2.30 gives Movies a downloads folder that another library uses too",
+                "Deluno on 192.0.2.30 gives TV a downloads folder that another library uses too",
+            ],
+            await Titles(fixture, ActivityEventTypes.ProcessingWorkflowSyncNotice));
+    }
+
+    [Fact]
+    public async Task A_workflow_holding_a_shared_folder_from_an_older_version_is_given_Delunos_own_folder()
+    {
+        using var fixture = Deluno([Movies, Tv]);
+        await ConnectAsync(fixture);
+        await Sync(fixture);
+        await fixture.Store.Execute("UPDATE libraries SET watched_folder = '/data/completed' WHERE media_type = 'movie'");
+        await fixture.Store.Execute("UPDATE libraries SET watched_folder = '' WHERE media_type = 'tv'");
+
+        await Sync(fixture);
+
+        Assert.Equal("/data/completed/movie", await Watched(fixture, "movie"));
+        Assert.Equal("/data/completed/tv", await Watched(fixture, "tv"));
+        Assert.Empty(await Titles(fixture, ActivityEventTypes.ProcessingWorkflowSyncNotice));
+    }
+
+    [Fact]
+    public async Task A_folder_that_is_only_free_once_another_workflow_lets_go_of_it_is_given_in_the_same_sync_without_a_notice()
+    {
+        using var fixture = Deluno([Movies, Tv]);
+        await ConnectAsync(fixture);
+        await Sync(fixture);
+        await fixture.Store.Execute("UPDATE libraries SET watched_folder = '' WHERE media_type = 'movie'");
+        await fixture.Store.Execute("UPDATE libraries SET watched_folder = '/data/completed' WHERE media_type = 'tv'");
+
+        await Sync(fixture);
+
+        Assert.Equal("/data/completed/movie", await Watched(fixture, "movie"));
+        Assert.Equal("/data/completed/tv", await Watched(fixture, "tv"));
+        Assert.Empty(await Titles(fixture, ActivityEventTypes.ProcessingWorkflowSyncNotice));
+    }
+
+    [Fact]
+    public async Task Workflows_still_overlapping_when_Deluno_gives_no_folder_have_the_shared_one_cleared_and_are_told_what_to_set()
+    {
+        using var fixture = Deluno([Movies, Tv]);
+        await ConnectAsync(fixture);
+        await Sync(fixture);
+        await fixture.Store.Execute("UPDATE libraries SET watched_folder = '/data/completed' WHERE media_type = 'movie'");
+        await fixture.Store.Execute("UPDATE libraries SET watched_folder = '/data/completed/tv' WHERE media_type = 'tv'");
+        ScriptNoFolders(fixture, routeMissing: false);
+
+        await Sync(fixture);
+
+        Assert.Equal(string.Empty, await Watched(fixture, "movie"));
+        Assert.Equal("/data/completed/tv", await Watched(fixture, "tv"));
+        Assert.Equal("Movies' watched folder cleared", (await Titles(fixture, ActivityEventTypes.ProcessingWorkflowSynced))[^1]);
+        var cleared = await fixture.Db(uow => uow.QueryAsync(
+            "SELECT detail FROM activity_events WHERE event_type = $t AND title = $title",
+            reader => JsonDocument.Parse(reader.GetString(0)).RootElement.Clone(),
+            ("$t", ActivityEventTypes.ProcessingWorkflowSynced),
+            ("$title", "Movies' watched folder cleared")));
+        var detail = Assert.Single(cleared);
+        Assert.Equal(
+            "Weir cleared Movies' watched folder, /data/completed, because it is the same as, or holds, the folder of TV. " +
+            "Deluno on 192.0.2.30 doesn't say where downloads for Movies arrive. Set the downloads folder in Deluno on 192.0.2.30 (or the clients' category folders) and Weir will pick it up.",
+            detail.GetProperty("user_message").GetString());
+        Assert.Equal("Set the folder in Deluno on 192.0.2.30.", detail.GetProperty("next_action").GetString());
+        Assert.Equal("warning", detail.GetProperty("result").GetString());
+    }
+
+    [Fact]
+    public async Task A_stale_root_is_cleared_in_the_sync_that_gives_another_library_a_folder_inside_it_so_neither_waits_on_the_other()
+    {
+        using var fixture = Deluno([Movies, Tv]);
+        await ConnectAsync(fixture);
+        await Sync(fixture);
+        await fixture.Store.Execute("UPDATE libraries SET watched_folder = '/data/completed' WHERE media_type = 'movie'");
+        await fixture.Store.Execute("UPDATE libraries SET watched_folder = '' WHERE media_type = 'tv'");
+        Script(fixture, [Movies, Tv], new Dictionary<string, string?> { ["lib-tv"] = "/data/completed/tv" }, []);
+
+        await Sync(fixture);
+
+        Assert.Equal(string.Empty, await Watched(fixture, "movie"));
+        Assert.Equal("/data/completed/tv", await Watched(fixture, "tv"));
+        Assert.Equal(
+            ["Deluno on 192.0.2.30 has not told Weir all of the folders for Movies yet"],
+            await Titles(fixture, ActivityEventTypes.ProcessingWorkflowSyncNotice));
+    }
+
+    [Fact]
+    public async Task A_folder_is_never_cleared_on_a_read_of_Delunos_destinations_that_failed()
+    {
+        using var fixture = Deluno([Movies, Tv]);
+        await ConnectAsync(fixture);
+        await Sync(fixture);
+        await fixture.Store.Execute("UPDATE libraries SET watched_folder = '/data/completed' WHERE media_type = 'movie'");
+        await fixture.Store.Execute("UPDATE libraries SET watched_folder = '/data/completed/tv' WHERE media_type = 'tv'");
+        fixture.Http
+            .Json(HttpMethod.Get, Manifest, ManifestJson(Movies, Tv))
+            .Json(HttpMethod.Get, Destinations, """{"error":"busy"}""", HttpStatusCode.ServiceUnavailable);
+
+        await Sync(fixture);
+
+        Assert.Equal("/data/completed", await Watched(fixture, "movie"));
+        Assert.Equal("/data/completed/tv", await Watched(fixture, "tv"));
+        Assert.DoesNotContain(await Titles(fixture, ActivityEventTypes.ProcessingWorkflowSynced), title => title.Contains("cleared", StringComparison.Ordinal));
+    }
+
     [Fact]
     public async Task Folders_that_overlap_another_workflow_are_not_applied_and_the_person_is_told()
     {

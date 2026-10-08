@@ -78,17 +78,30 @@ public sealed class HandbackRulesTests
         Assert.Equal("film.mkv", HandbackRules.FileName("D:\\Data\\Film\\film.mkv"));
     }
 
+    [Theory]
+    [InlineData(HandbackRules.NotImported, HandbackRules.Imported, true)]
+    [InlineData(HandbackRules.Imported, HandbackRules.NotImported, false)]
+    [InlineData(HandbackRules.Imported, HandbackRules.Imported, false)]
+    [InlineData(HandbackRules.NotImported, HandbackRules.NotImported, false)]
+    [InlineData(null, HandbackRules.Imported, false)]
+    public void Only_an_import_replaces_a_refusal(string? recorded, string outcome, bool replaces) =>
+        Assert.Equal(replaces, HandbackRules.Supersedes(recorded, outcome));
+
     [Fact]
     public void The_words_say_what_happened_to_the_copy()
     {
         Assert.Equal("Sonarr imported film.mkv", HandbackRules.OutcomeTitle("Sonarr", HandbackRules.Imported, "film.mkv"));
         Assert.Equal("Deluno will not import film.mkv", HandbackRules.OutcomeTitle("Deluno", HandbackRules.NotImported, "film.mkv"));
+        Assert.Equal("Deluno imported film.mkv after all", HandbackRules.OutcomeTitle("Deluno", HandbackRules.Imported, "film.mkv", afterAll: true));
         Assert.Equal(
             "Deluno will not import this file: The release is a sample. Weir kept its copy in the hand-back folder.",
             HandbackRules.NotImportedNote("Deluno", "The release is a sample."));
         Assert.Equal(
             "Weir recorded that Deluno imported the file and released its copy.",
             HandbackRules.OutcomeMessage("Deluno", HandbackRules.Imported, removed: 1, gone: 0, kept: 0, firstKeptNote: null));
+        Assert.Equal(
+            "Deluno had said it would not import this file, and then imported it after all. Weir recorded that Deluno imported the file and released its copy.",
+            HandbackRules.AfterAllMessage("Deluno", "Weir recorded that Deluno imported the file and released its copy."));
         Assert.Equal(
             "Waiting for Radarr, which is not answering. Weir will tell it this file is ready when it answers.",
             ManagerWaitMessages.ReportWaiting("Radarr"));

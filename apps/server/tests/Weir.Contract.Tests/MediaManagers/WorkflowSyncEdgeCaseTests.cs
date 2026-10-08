@@ -94,6 +94,65 @@ public sealed class WorkflowSyncEdgeCaseTests
     }
 
     [Fact]
+    public async Task Two_libraries_with_no_downloads_folder_and_no_destinations_are_linked_with_no_watched_folders_and_each_asks_for_one_without_an_overlap()
+    {
+        using var rig = new TemporaryFolder();
+        var movies = Library("lib-movies", "Movies", "movie", MoviesReady(rig));
+        movies["downloadsPath"] = null;
+        var tv = TvLibrary(rig);
+        tv["downloadsPath"] = null;
+        using var fake = FakeManager.StartDeluno([movies, tv]);
+        fake.Route("GET", DestinationsPath, new JsonObject { ["libraries"] = new JsonArray() });
+        await using var server = await WeirServer.StartNewAsync(SyncOn);
+        using var client = await server.CreateAdminClientAsync();
+
+        var deluno = await ConnectAsync(client, fake);
+
+        var workflows = await SyncedAsync(client);
+        var name = (string)deluno["name"]!;
+        foreach (var (mediaType, ready) in new[] { ("movie", MoviesReady(rig)), ("tv", TvReady(rig)) })
+        {
+            var workflow = Assert.Single(workflows, row => (string)row!["media_type"]! == mediaType)!;
+            Assert.Equal(string.Empty, (string)workflow["watched_folder"]!);
+            Assert.Equal(ready, (string)workflow["output_folder"]!);
+            Assert.Equal((long)deluno["id"]!, (long)workflow["folders_synced_from_connection_id"]!);
+        }
+
+        foreach (var library in new[] { "Movies", "TV" })
+        {
+            var notice = await NoticeAsync(client, $"{name} has not told Weir all of the folders for {library} yet");
+            var detail = notice["detail"]!.ToString();
+            Assert.Contains($"say where downloads for {library} arrive", detail, StringComparison.Ordinal);
+            Assert.Contains("Set the downloads folder in", detail, StringComparison.Ordinal);
+        }
+
+        Assert.DoesNotContain(await SyncNoticesAsync(client), notice => ((string)notice["title"]!).StartsWith("Weir could not", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task A_workflow_holding_the_downloads_root_from_an_older_version_is_given_its_own_folder_when_Deluno_reports_one()
+    {
+        using var rig = new TemporaryFolder();
+        using var fake = DelunoWith(rig, "Completed/Movies");
+        await using var server = await WeirServer.StartNewAsync(SyncOn);
+        using var client = await server.CreateAdminClientAsync();
+        var deluno = await ConnectAsync(client, fake);
+        var workflows = await SyncedAsync(client);
+        var movies = Movies(workflows);
+        var tv = Assert.Single(workflows, row => (string)row!["media_type"]! == "tv")!.AsObject();
+        await ProcessingLibraries.UpdateAsync(client, tv, new JsonObject { ["watched_folder"] = string.Empty });
+        await ProcessingLibraries.UpdateAsync(client, movies, new JsonObject { ["watched_folder"] = Native(rig, "Completed") });
+
+        await TestConnectionAsync(client, deluno);
+
+        await Poll.UntilAsync(
+            async () => (string)(await WorkflowAsync(client, (long)movies["id"]!))["watched_folder"]! == Native(rig, "Completed/Movies")
+                        && (string)(await WorkflowAsync(client, (long)tv["id"]!))["watched_folder"]! == Native(rig, "Completed/TV"),
+            "both workflows to follow Deluno's own folders");
+        Assert.DoesNotContain(await SyncNoticesAsync(client), notice => ((string)notice["title"]!).StartsWith("Weir could not", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task A_workflow_linked_to_Deluno_by_hand_with_its_folders_is_taken_over_not_duplicated()
     {
         using var rig = new TemporaryFolder();

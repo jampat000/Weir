@@ -28,7 +28,7 @@ public sealed class RemuxOutputSwapValidator : ISwapOutputValidator
         }
         catch (Exception exception) when (exception is MediaToolException or MediaToolTimeoutException)
         {
-            return SwapValidation.Fail(exception.Message);
+            return SwapValidation.Fail(ToolFailureText.Plain(exception));
         }
     }
 }
