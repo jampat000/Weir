@@ -179,23 +179,27 @@ public sealed partial class RemuxPassRunner
         }
         catch (MediaUnreadableException exception)
         {
-            return FailBefore(
-                relativeMediaPath,
-                $"Weir could not read this file's contents, so the file itself looks damaged: {exception.Message}",
-                inspected,
-                // Evidence the release is bad, so a library set to reject can act on it (#471).
-                new WireObject().Set("content_unusable", true));
+            return RefuseUnreadable(relativeMediaPath, inspected, scope, RemuxPassPaths.Resolve(runtime.WatchedFolder), ToolFailureText.Technical(exception));
         }
 #pragma warning disable CA1031 // Any ffprobe failure fails this file before anything is written.
         catch (Exception exception) when (exception is not OperationCanceledException)
 #pragma warning restore CA1031
         {
-            return FailBefore(relativeMediaPath, $"ffprobe failed: {exception.Message}", inspected);
+            return FailBefore(
+                relativeMediaPath,
+                exception is MediaToolException or MediaToolTimeoutException ? ToolFailureText.Plain(exception) : ToolFailureText.Generic,
+                inspected,
+                new WireObject().Set("technical_detail", ToolFailureText.Technical(exception)));
         }
 
         var probe = new ProbeResult(probeJson);
-        var (video, audio, subtitles) = RemuxRules.SplitStreams(probe);
         var watchedRoot = RemuxPassPaths.Resolve(runtime.WatchedFolder);
+        if (probe.Streams.Count == 0)
+        {
+            return RefuseUnreadable(relativeMediaPath, inspected, scope, watchedRoot, "ffprobe found no streams in this file.");
+        }
+
+        var (video, audio, subtitles) = RemuxRules.SplitStreams(probe);
         if (video.Count == 0)
         {
             return FailBefore(
@@ -238,7 +242,7 @@ public sealed partial class RemuxPassRunner
         {
             // #646: named, so the handler can tell this wait (a file that will not read to the end) from the others and
             // stop waiting once the file has sat unchanged through several looks.
-            var waiting = SourceNotReady(relativeMediaPath, exception.Message, inspected);
+            var waiting = WithTechnicalDetail(SourceNotReady(relativeMediaPath, ToolFailureText.Plain(exception), inspected), exception);
             waiting.Set("not_ready_kind", UnreadableWait);
             return waiting;
         }

@@ -120,7 +120,8 @@ public sealed class RemuxPassRealFfmpegTests : IDisposable
         var result = await Run("The.Terror.1963/The.Terror.1963.mkv");
 
         Assert.Equal(RemuxPassOutcomes.FailedBeforeExecution, Str(result, "outcome"));
-        Assert.Equal(WireBool.True, result["content_unusable"]);
+        Assert.Equal("unreadable_file", Str(result, "rejection_kind"));
+        Assert.Equal(ToolFailureText.UnreadableFileRefusal, Str(result, "reason"));
         Assert.False(File.Exists(_folders.Out(Path.Join("The.Terror.1963", "The.Terror.1963.mkv"))));
         Assert.True(File.Exists(path));
     }

@@ -47,11 +47,14 @@ public static class ProbeOutput
             message = "ffprobe failed";
         }
 
-        var lowered = RulesJson.Lower(message);
-        return UnreadableMediaMarkers.Any(marker => MatchesUnreadableMarker(lowered, marker))
+        return IsUnreadableMedia(RulesJson.Lower(message))
             ? new MediaUnreadableException(message)
-            : new MediaToolException(message);
+            : new MediaToolException(message) { PlainMessage = ToolFailureText.ForToolText(message) };
     }
+
+    /// <summary>Whether lower-cased tool text carries one of <see cref="UnreadableMediaMarkers"/>.</summary>
+    public static bool IsUnreadableMedia(string lowered) =>
+        UnreadableMediaMarkers.Any(marker => MatchesUnreadableMarker(lowered, marker));
 
     /// <summary>Whether <paramref name="lowered"/> carries <paramref name="marker"/>, narrowed for "end of file" (#539 item 5).</summary>
     private static bool MatchesUnreadableMarker(string lowered, string marker)
@@ -94,7 +97,7 @@ public static class ProbeOutput
         const string Invalid = "ffprobe returned invalid or empty output";
         if (stdout is null || WireStrings.Strip(stdout).Length == 0)
         {
-            throw new MediaToolException(Invalid);
+            throw new MediaToolException(Invalid) { PlainMessage = ToolFailureText.Generic };
         }
 
         try
@@ -102,14 +105,14 @@ public static class ProbeOutput
             using var document = JsonDocument.Parse(stdout);
             if (document.RootElement.ValueKind != JsonValueKind.Object)
             {
-                throw new MediaToolException(Invalid);
+                throw new MediaToolException(Invalid) { PlainMessage = ToolFailureText.Generic };
             }
 
             return document.RootElement.Clone();
         }
         catch (JsonException error)
         {
-            throw new MediaToolException(Invalid, error);
+            throw new MediaToolException(Invalid, error) { PlainMessage = ToolFailureText.Generic };
         }
     }
 
@@ -233,8 +236,10 @@ public static class ProbeOutput
         var detail = WireStrings.Strip(stderr ?? string.Empty);
         detail = MediaText.Clip(detail, FfmpegCommands.ProbeLogMaxChars);
         return new MediaCompletenessException(
-            "Weir could not read this media file from start to finish. It may still be downloading or may be "
-            + $"incomplete, so Weir will wait. The media check reported: {(detail.Length > 0 ? detail : "incomplete media data")}.");
+            $"{ToolFailureText.IncompleteRead} The media check reported: {(detail.Length > 0 ? detail : "incomplete media data")}.")
+        {
+            PlainMessage = ToolFailureText.IncompleteRead,
+        };
     }
 
     /// <summary>
@@ -277,7 +282,7 @@ public static class ProbeOutput
 
     /// <summary>The error for a non-zero ffmpeg exit, from the tail of stderr.</summary>
     public static MediaToolException FfmpegFailure(string stderrTail) =>
-        new(stderrTail.Length > 0 ? stderrTail : "ffmpeg failed");
+        new(stderrTail.Length > 0 ? stderrTail : "ffmpeg failed") { PlainMessage = ToolFailureText.ForToolText(stderrTail) };
 
     /// <summary>The last bytes of stderr, decoded with replacement and stripped.</summary>
     public static string TailText(ReadOnlySpan<byte> bytes, int maxBytes = FfmpegCommands.FfmpegStderrTailBytes)

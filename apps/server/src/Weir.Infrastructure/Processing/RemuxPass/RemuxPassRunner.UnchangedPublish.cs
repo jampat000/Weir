@@ -107,7 +107,7 @@ public sealed partial class RemuxPassRunner
         }
         catch (MediaCompletenessException exception)
         {
-            return SourceNotReady(relativeMediaPath, exception.Message, context.Inspected);
+            return WithTechnicalDetail(SourceNotReady(relativeMediaPath, ToolFailureText.Plain(exception), context.Inspected), exception);
         }
 #pragma warning disable CA1031 // Any failure while copying becomes this file's recorded failure; the worker survives it.
         catch (Exception exception) when (exception is not OperationCanceledException)
@@ -121,13 +121,13 @@ public sealed partial class RemuxPassRunner
                 .Set("inspected_source_path", context.Inspected)
                 .Set("media_scope", context.Scope)
                 .Set("message", "Weir could not copy this unchanged file to the output folder.")
-                .Set("reason", exception.Message));
-            return new WireObject()
+                .Set("reason", ToolFailureText.Plain(exception)));
+            return WithTechnicalDetail(new WireObject()
                 .Set("ok", false)
                 .Set("outcome", RemuxPassOutcomes.FailedDuringExecution)
                 .Set("preflight_status", "ok")
                 .Set("preflight_reason", "ffprobe completed and remux plan was evaluated")
-                .Set("reason", exception.Message)
+                .Set("reason", ToolFailureText.Plain(exception))
                 .Set("relative_media_path", relativeMediaPath)
                 .Set("inspected_source_path", context.Inspected)
                 .Set("processing_watched_folder_resolved", context.WatchedRoot)
@@ -140,7 +140,7 @@ public sealed partial class RemuxPassRunner
                 .Set("subs_after", subsAfter)
                 .Set("remux_required", false)
                 .Set("ffmpeg_argv", StringList(argv))
-                .Set("audio_selection_notes", StringList(plan.AudioSelectionNotes));
+                .Set("audio_selection_notes", StringList(plan.AudioSelectionNotes)), exception);
         }
 
         output.Set("output_file", RemuxPassPaths.Resolve(finalSkip));

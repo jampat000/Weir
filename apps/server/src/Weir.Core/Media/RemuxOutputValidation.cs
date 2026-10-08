@@ -128,7 +128,10 @@ public static partial class RemuxOutputValidation
         if (newWarnings.Count > 0)
         {
             throw new MediaToolException(
-                "ffprobe reported warnings on the output that the source did not have: " + string.Join(" | ", newWarnings));
+                "ffprobe reported warnings on the output that the source did not have: " + string.Join(" | ", newWarnings))
+            {
+                PlainMessage = ToolFailureText.OutputNotPublishable,
+            };
         }
 
         // 6. Metadata: a cleared title must actually be cleared. Chapter removal (#498) is not checked here.

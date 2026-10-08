@@ -75,6 +75,28 @@ public sealed partial class RemuxPassRunner
         return result;
     }
 
+    /// <summary>
+    /// The result of a file Weir cannot read at all (ffprobe could not parse it, or found no streams in it): refused before any
+    /// output, the way a file with no video is. What the tool said stays in <c>technical_detail</c>.
+    /// </summary>
+    private static WireObject RefuseUnreadable(string relativeMediaPath, string inspectedSourcePath, string scope, string watchedRoot, string technicalDetail) =>
+        FailBefore(
+            relativeMediaPath,
+            ToolFailureText.UnreadableFileRefusal,
+            inspectedSourcePath,
+            new WireObject()
+                .Set("rejection_kind", "unreadable_file")
+                .Set("technical_detail", technicalDetail)
+                .Set("media_scope", scope)
+                .Set("processing_watched_folder_resolved", watchedRoot));
+
+    /// <summary>
+    /// Adds what a failed media tool said to <paramref name="result"/> as <c>technical_detail</c>, when the sentence a person reads
+    /// is not the tool's own words.
+    /// </summary>
+    private static WireObject WithTechnicalDetail(WireObject result, Exception exception) =>
+        ToolFailureText.Plain(exception) == exception.Message ? result : result.Set("technical_detail", ToolFailureText.Technical(exception));
+
     /// <summary><c>not_ready_kind</c> of a file that is only waiting out the minimum file age (#632).</summary>
     public const string MinimumAgeWait = "minimum_age";
 

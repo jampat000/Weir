@@ -18,6 +18,12 @@ public class MediaToolException : Exception
         : base(message, innerException)
     {
     }
+
+    /// <summary>
+    /// What a person reads in place of <see cref="Exception.Message"/> when that message is the tool's own text (stderr, file
+    /// paths, memory addresses), which belongs in technical detail only. Null when the message is a sentence Weir wrote.
+    /// </summary>
+    public string? PlainMessage { get; init; }
 }
 
 /// <summary>
