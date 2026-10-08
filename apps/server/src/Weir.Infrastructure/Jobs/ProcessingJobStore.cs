@@ -1,6 +1,7 @@
 using System.Globalization;
 using Microsoft.Data.Sqlite;
 using Weir.Core.Jobs;
+using Weir.Infrastructure.Activity;
 using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Infrastructure.Jobs;
@@ -22,7 +23,8 @@ namespace Weir.Infrastructure.Jobs;
 /// <remarks>
 /// Split across partial files by concern: this file holds construction, transactions and the shared SQL
 /// plumbing; <c>ProcessingJobStore.Enqueue.cs</c>, <c>.Claim.cs</c>, <c>.Completion.cs</c>,
-/// <c>.OperatorActions.cs</c>, <c>.Reads.cs</c> and <c>.FileWork.cs</c> hold the operations themselves.
+/// <c>.OperatorActions.cs</c>, <c>.Reads.cs</c> and <c>.FileWork.cs</c> hold the operations themselves, and <c>.Announce.cs</c> tells the live
+/// stream when one of them changed the queue.
 /// </remarks>
 public sealed partial class ProcessingJobStore
 {
@@ -32,13 +34,20 @@ public sealed partial class ProcessingJobStore
     private readonly TimeProvider _time;
     private readonly IJobQueueMetrics _metrics;
     private readonly WorkerWakeSignals? _wakeSignals;
+    private readonly DataChangePublisher? _changes;
 
-    public ProcessingJobStore(SqliteDatabase database, TimeProvider time, IJobQueueMetrics? metrics = null, WorkerWakeSignals? wakeSignals = null)
+    public ProcessingJobStore(
+        SqliteDatabase database,
+        TimeProvider time,
+        IJobQueueMetrics? metrics = null,
+        WorkerWakeSignals? wakeSignals = null,
+        DataChangePublisher? changes = null)
     {
         _database = database ?? throw new ArgumentNullException(nameof(database));
         _time = time ?? throw new ArgumentNullException(nameof(time));
         _metrics = metrics ?? NoJobQueueMetrics.Instance;
         _wakeSignals = wakeSignals;
+        _changes = changes;
     }
 
     public SqliteDatabase Database => _database;

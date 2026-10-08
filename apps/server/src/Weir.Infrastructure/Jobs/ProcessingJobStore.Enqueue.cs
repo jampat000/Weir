@@ -97,6 +97,7 @@ public sealed partial class ProcessingJobStore
         if (inserted is not null and not DBNull)
         {
             RecordQueueDepth(connection, transaction);
+            AnnounceQueueChange(transaction, jobKind);
             // Woken before this transaction commits, which is safe: a woken slot claims under BEGIN IMMEDIATE, so its claim
             // waits for this write lock and sees the job once it is committed, or nothing if it rolls back.
             _wakeSignals?.WakeAll();

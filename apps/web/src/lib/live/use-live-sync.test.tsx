@@ -106,7 +106,10 @@ describe("useLiveSync", () => {
 
     current().changed("pause");
 
-    expect(invalidatedKeys(invalidate)).toEqual([pauseKeys.state]);
+    expect(invalidatedKeys(invalidate)).toEqual([
+      pauseKeys.state,
+      processingKeys.filesAtOnce,
+    ]);
   });
 
   it("reads again each query a topic covers", () => {

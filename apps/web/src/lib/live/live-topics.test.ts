@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { pauseKeys } from "../pause/query-keys";
+import { processingKeys } from "../processing/query-keys";
 import {
   LIVE_TOPIC_QUERIES,
   parseDataChanged,
@@ -29,8 +30,25 @@ describe("LIVE_TOPIC_QUERIES", () => {
     expect(Object.keys(LIVE_TOPIC_QUERIES).sort()).toEqual(topics);
   });
 
-  it("refreshes the pause queries when the pause changes", () => {
-    expect(LIVE_TOPIC_QUERIES.pause).toEqual([pauseKeys.state]);
+  it("refreshes the pause queries, and what files wait for, when the pause changes", () => {
+    expect(LIVE_TOPIC_QUERIES.pause).toEqual([
+      pauseKeys.state,
+      processingKeys.filesAtOnce,
+    ]);
+  });
+
+  it("reads the Dashboard's workflows, files and read-outs again when the server says they changed", () => {
+    expect(LIVE_TOPIC_QUERIES.files_at_once).toEqual([
+      processingKeys.filesAtOnce,
+    ]);
+    expect(LIVE_TOPIC_QUERIES.maintenance).toEqual([
+      processingKeys.maintenance,
+    ]);
+    expect(LIVE_TOPIC_QUERIES.libraries).toContain(processingKeys.libraries);
+    expect(LIVE_TOPIC_QUERIES.library_scan).toEqual([
+      processingKeys.libraries,
+      processingKeys.files,
+    ]);
   });
 });
 
