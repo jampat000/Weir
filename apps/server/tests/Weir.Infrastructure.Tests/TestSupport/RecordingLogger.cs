@@ -2,18 +2,29 @@ using Microsoft.Extensions.Logging;
 
 namespace Weir.Infrastructure.Tests;
 
-/// <summary>Captures error-level log messages, so a test can wait for one instead of guessing a duration.</summary>
+/// <summary>Captures log messages by level, so a test can wait for one instead of guessing a duration.</summary>
 internal sealed class RecordingLogger<T> : ILogger<T>
 {
-    private readonly List<string> _errors = [];
+    private readonly List<(LogLevel Level, string Message)> _entries = [];
 
-    public IReadOnlyList<string> Errors
+    public IReadOnlyList<string> Errors => At(LogLevel.Error);
+
+    public IReadOnlyList<string> At(LogLevel level)
+    {
+        lock (_entries)
+        {
+            return [.. _entries.Where(entry => entry.Level == level).Select(entry => entry.Message)];
+        }
+    }
+
+    /// <summary>How many messages of any level were logged.</summary>
+    public int Count
     {
         get
         {
-            lock (_errors)
+            lock (_entries)
             {
-                return [.. _errors];
+                return _entries.Count;
             }
         }
     }
@@ -25,14 +36,9 @@ internal sealed class RecordingLogger<T> : ILogger<T>
 
     public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
     {
-        if (logLevel != LogLevel.Error)
+        lock (_entries)
         {
-            return;
-        }
-
-        lock (_errors)
-        {
-            _errors.Add(formatter(state, exception));
+            _entries.Add((logLevel, formatter(state, exception)));
         }
     }
 }

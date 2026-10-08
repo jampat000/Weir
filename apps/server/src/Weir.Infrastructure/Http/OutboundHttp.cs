@@ -18,31 +18,10 @@ public interface IReleaseCatalogClient
 {
     /// <summary>
     /// The newest published release by SemVer precedence, counting pre-releases only when <paramref name="currentVersion"/> is a
-    /// pre-release itself; null when none qualifies. Throws <see cref="ReleaseFetchException"/> for an HTTP error status, other
-    /// exceptions for anything else.
+    /// pre-release itself; null when none qualifies. Throws <see cref="ReleaseFetchException"/> for an HTTP error status (with its
+    /// <see cref="ReleaseFetchException.RateLimit"/> when GitHub is limiting the network), other exceptions for anything else.
     /// </summary>
     Task<GitHubReleaseRecord?> FetchLatestAsync(string currentVersion, CancellationToken cancellationToken);
-}
-
-public sealed class GitHubReleaseCatalogClient : IReleaseCatalogClient
-{
-    public async Task<GitHubReleaseRecord?> FetchLatestAsync(string currentVersion, CancellationToken cancellationToken)
-    {
-        using var client = new HttpClient(new SocketsHttpHandler { AllowAutoRedirect = true, ConnectCallback = LoopbackFirstConnect.ConnectAsync }) { Timeout = TimeSpan.FromSeconds(5) };
-        using var request = new HttpRequestMessage(HttpMethod.Get, ReleaseCatalog.ReleasesUrl);
-        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
-        request.Headers.TryAddWithoutValidation("User-Agent", $"Weir/{currentVersion}");
-        request.Headers.Add("X-GitHub-Api-Version", "2022-11-28");
-        using var response = await client.SendAsync(request, cancellationToken).ConfigureAwait(false);
-        if ((int)response.StatusCode >= 400)
-        {
-            throw new ReleaseFetchException((int)response.StatusCode);
-        }
-
-        var bytes = await response.Content.ReadAsByteArrayAsync(cancellationToken).ConfigureAwait(false);
-        var releases = ReleaseCatalog.CoerceReleaseListPayload(WireJsonParser.ParseBytes(bytes));
-        return ReleaseSelection.NewestFor(releases, currentVersion);
-    }
 }
 
 /// <summary>An operator-facing failure to reach or use an external endpoint; the message is shown as is.</summary>

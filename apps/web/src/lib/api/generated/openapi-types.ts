@@ -7619,8 +7619,13 @@ export interface components {
       /** Release Url */
       release_url?: string | null;
       /**
+       * Retry At
+       * @description When Weir checks again; set only while status is rate_limited.
+       */
+      retry_at?: string | null;
+      /**
        * Status
-       * @description up_to_date, update_available, or unavailable
+       * @description up_to_date, update_available, rate_limited (GitHub is limiting update checks; the latest_ fields are the last release Weir knew), or unavailable
        */
       status: string;
       /** Summary */
@@ -7933,7 +7938,7 @@ export interface components {
       latest_version: string | null;
       /**
        * Status
-       * @description checking: nothing learned yet. up_to_date. update_available. downloaded: the tray holds an update waiting to install. not_published: no release exists yet. unavailable: the release list could not be reached.
+       * @description checking: nothing learned yet. up_to_date. update_available. downloaded: the tray holds an update waiting to install. not_published: no release exists yet. rate_limited: GitHub is limiting update checks from this network, so the newest version is the last one known. unavailable: the release list could not be reached.
        * @enum {string}
        */
       status:
@@ -7942,6 +7947,7 @@ export interface components {
         | "update_available"
         | "downloaded"
         | "not_published"
+        | "rate_limited"
         | "unavailable";
     };
     /**

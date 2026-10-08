@@ -30,7 +30,13 @@ public sealed record GitHubReleaseRecord(
         AssetNamed(ReleaseCatalog.WindowsInstallerAssetName) ?? AssetNamed(ReleaseCatalog.LegacyWindowsInstallerAssetName);
 }
 
-/// <summary>A failed GitHub release request; <see cref="ReleaseFetchException.StatusCode"/> is set when GitHub answered with an HTTP error.</summary>
+/// <summary>GitHub is limiting requests from this network until <paramref name="ResetsAt"/>; <paramref name="LastKnown"/> is the newest release Weir had before that, if any.</summary>
+public sealed record ReleaseRateLimit(DateTimeOffset ResetsAt, GitHubReleaseRecord? LastKnown);
+
+/// <summary>
+/// A failed GitHub release request; <see cref="ReleaseFetchException.StatusCode"/> is set when GitHub answered with an HTTP
+/// error, and <see cref="ReleaseFetchException.RateLimit"/> when that error was GitHub limiting the network.
+/// </summary>
 public sealed class ReleaseFetchException : Exception
 {
     public ReleaseFetchException()
@@ -53,7 +59,15 @@ public sealed class ReleaseFetchException : Exception
         StatusCode = statusCode;
     }
 
+    public ReleaseFetchException(int statusCode, ReleaseRateLimit rateLimit)
+        : this(statusCode)
+    {
+        RateLimit = rateLimit;
+    }
+
     public int? StatusCode { get; }
+
+    public ReleaseRateLimit? RateLimit { get; }
 }
 
 /// <summary>Weir's GitHub releases: where they live, how versions compare, and reading the release API's payload.</summary>
@@ -67,6 +81,9 @@ public static class ReleaseCatalog
     /// while only pre-releases are published.
     /// </summary>
     public const string ReleasesUrl = "https://api.github.com/repos/jampat000/Weir/releases?per_page=30";
+
+    /// <summary>The public release feed and download URLs: neither counts against the API allowance.</summary>
+    public const string ReleasesFeedUrl = "https://github.com/jampat000/Weir/releases.atom";
     public const string WindowsInstallerAssetName = "Weir-win-Setup.exe";
     public const string LegacyWindowsInstallerAssetName = "WeirSetup.exe";
 
@@ -86,6 +103,8 @@ public static class ReleaseCatalog
         var stripped = text.StartsWith('v') ? text[1..] : text;
         return stripped.Length == 0 ? null : stripped;
     }
+
+    public static string DownloadUrl(string tag, string assetName) => $"https://github.com/{Owner}/{Repo}/releases/download/{Uri.EscapeDataString(tag)}/{assetName}";
 
     public static string TagForVersion(string version)
     {
@@ -160,6 +179,7 @@ public static class ReleaseCatalog
 public static class UpdateStatus
 {
     public const string DockerImage = "ghcr.io/jampat000/weir";
+    public const string RateLimitedStatus = "rate_limited";
     public static readonly IReadOnlyList<string> Modes = ["Auto", "DownloadOnly", "NotifyOnly"];
 
     public static WireObject Unavailable(string currentVersion, string installType, string status, string summary) =>
@@ -214,6 +234,26 @@ public static class UpdateStatus
             .Set("in_app_upgrade_supported", installType == "windows")
             .Set("in_app_upgrade_summary", installType == "windows" ? "Updates are managed by the Weir desktop app via Velopack." : null);
     }
+
+    /// <summary>
+    /// GitHub is limiting update checks from this network until <paramref name="retryAt"/>. The newest release Weir knew
+    /// before that stays in the answer, and <paramref name="summary"/> says when the next check is.
+    /// </summary>
+    public static WireObject RateLimited(string currentVersion, string installType, GitHubReleaseRecord? lastKnown, DateTimeOffset retryAt, string summary)
+    {
+        var status = lastKnown is null
+            ? Unavailable(currentVersion, installType, RateLimitedStatus, summary)
+            : FromRelease(currentVersion, installType, lastKnown).Set("status", RateLimitedStatus).Set("summary", summary);
+        return status.Set("retry_at", Timestamp.FromDateTimeOffset(retryAt.ToUniversalTime()).ToWireText());
+    }
+
+    /// <summary>The sentence for a limit that lifts at <paramref name="retryAt"/>, with the time on the clock of <paramref name="timezoneName"/>.</summary>
+    public static string RateLimitedSummary(DateTimeOffset retryAt, string? timezoneName) =>
+        $"GitHub is limiting update checks from your network right now. Weir will check again at {ClockText(retryAt, timezoneName)}.";
+
+    /// <summary>A clock time as the web writes it, "11:35 pm".</summary>
+    public static string ClockText(DateTimeOffset at, string? timezoneName) =>
+        TimeZones.ToLocal(at, timezoneName).ToString("h:mm tt", CultureInfo.InvariantCulture).ToLowerInvariant();
 
     public static WireObject UpdateSettingsOut(string mode, bool checkOnStartup, long checkIntervalMinutes) => new WireObject()
         .Set("mode", mode)
