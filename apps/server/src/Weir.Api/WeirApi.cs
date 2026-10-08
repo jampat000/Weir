@@ -46,6 +46,7 @@ public static class WeirApi
         // frames it takes a single dependency instead of holding the store only to forward it.
         services.TryAddSingleton<ActivityProgressFrames>();
         services.TryAddSingleton<ConnectionActivityFrames>();
+        services.TryAddSingleton<LiveStreamFrames>();
         services.TryAddSingleton<SystemStatsFrames>();
 
         // Endpoint handler groups: one instance per group, constructor-injected with the stores it needs.

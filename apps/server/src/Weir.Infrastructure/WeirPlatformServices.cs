@@ -44,6 +44,9 @@ public static class WeirPlatformServices
         services.TryAddSingleton<ConnectionUsageLedger>();
         services.TryAddSingleton<ConnectionActivityHub>();
         services.TryAddSingleton<ActivityStreamClients>();
+        // What the live stream announces: which data changed, and which run of the server this is.
+        services.TryAddSingleton<DataChangePublisher>();
+        services.TryAddSingleton<ServerBoot>();
         services.TryAddSingleton<LogAlerts>();
         services.TryAddSingleton<PeriodicTaskRegistry>();
 

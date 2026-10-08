@@ -10,17 +10,22 @@ namespace Weir.Infrastructure.Settings;
 /// <summary>
 /// The suite-wide pause: every way it changes (someone pausing or resuming, a timed pause running out) is written to the
 /// <c>suite_settings</c> row and to Activity in the same unit of work, so what Weir did can always be read back, with who
-/// and when.
+/// and when. Once a change commits, the live stream says the <see cref="DataTopics.Pause"/> data changed, so every open
+/// screen shows it without asking.
 /// </summary>
 public sealed class SuitePauseService
 {
+    private const string PublishedKey = "weir_pause_change_published";
+
     private readonly SuiteSettingsStore _settings;
     private readonly ActivityStore _activity;
+    private readonly DataChangePublisher _changes;
 
-    public SuitePauseService(SuiteSettingsStore settings, ActivityStore activity)
+    public SuitePauseService(SuiteSettingsStore settings, ActivityStore activity, DataChangePublisher changes)
     {
         _settings = settings ?? throw new ArgumentNullException(nameof(settings));
         _activity = activity ?? throw new ArgumentNullException(nameof(activity));
+        _changes = changes ?? throw new ArgumentNullException(nameof(changes));
     }
 
     /// <summary>The pause as it stands at <paramref name="now"/>; a timed pause that has run out is lifted, and said so, first.</summary>
@@ -48,6 +53,7 @@ public sealed class SuitePauseService
             : keepEnd && before.Paused ? before.PausedUntil
             : minutes is { } length ? Timestamp.FromUtc(now.AsUtc.AddMinutes((double)length)) : null;
         await _settings.UpdateAsync(uow, row, row with { ProcessingPaused = paused, ScanWhilePaused = scanWhilePaused, ProcessingPausedUntil = until }).ConfigureAwait(false);
+        PublishOnCommit(uow);
         var after = PauseState.Resolve(paused, until, scanWhilePaused, now.AsUtc);
 
         if (after.Paused && (!before.Paused || before.PausedUntil?.AsUtc != after.PausedUntil?.AsUtc || before.ScanWhilePaused != after.ScanWhilePaused))
@@ -71,6 +77,7 @@ public sealed class SuitePauseService
         }
 
         await _settings.UpdateAsync(uow, row, row with { ProcessingPaused = false, ProcessingPausedUntil = null }).ConfigureAwait(false);
+        PublishOnCommit(uow);
         await _activity.RecordAsync(
             uow,
             ActivityEventTypes.SystemProcessingResumed,
@@ -78,6 +85,15 @@ public sealed class SuitePauseService
             "Processing resumed",
             $"The pause ran out at {UtcText(state.PausedUntil)}, so processing was resumed.").ConfigureAwait(false);
         return state with { Expired = false };
+    }
+
+    /// <summary>Announces the change once <paramref name="uow"/> commits; a unit that lifts a lapsed pause and then changes it announces once.</summary>
+    private void PublishOnCommit(UnitOfWork uow)
+    {
+        if (uow.Items.TryAdd(PublishedKey, true))
+        {
+            uow.OnCommitted(() => _changes.Publish(DataTopics.Pause));
+        }
     }
 
     private static string PausedDetail(PauseState state, string by)

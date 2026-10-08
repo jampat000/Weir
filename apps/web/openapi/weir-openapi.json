@@ -621,6 +621,37 @@
         "title": "CurrentSessionOut",
         "type": "object"
       },
+      "DataChangedFrame": {
+        "description": "The data of a data.changed frame on GET /activity/stream: one kind of data changed, so every screen showing it should read it again.",
+        "properties": {
+          "topic": {
+            "description": "Which data changed: pause (Processing paused, resumed, or a timed pause ran out), readiness, files_at_once, maintenance, libraries, library_scan, update, network_access, connections, settings, backups, kept_files, metrics or jobs.",
+            "enum": [
+              "backups",
+              "connections",
+              "files_at_once",
+              "jobs",
+              "kept_files",
+              "libraries",
+              "library_scan",
+              "maintenance",
+              "metrics",
+              "network_access",
+              "pause",
+              "readiness",
+              "settings",
+              "update"
+            ],
+            "title": "Topic",
+            "type": "string"
+          }
+        },
+        "required": [
+          "topic"
+        ],
+        "title": "DataChangedFrame",
+        "type": "object"
+      },
       "DirectPlayDeviceOut": {
         "properties": {
           "id": {
@@ -9622,6 +9653,21 @@
         "title": "RemovedTrackOut",
         "type": "object"
       },
+      "ServerHelloFrame": {
+        "description": "The data of a server.hello frame on GET /activity/stream, sent first when the stream opens. A page that reconnects and hears a different boot_id knows the server restarted.",
+        "properties": {
+          "boot_id": {
+            "description": "A GUID made when the server started: the same for every stream of one run.",
+            "title": "Boot Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "boot_id"
+        ],
+        "title": "ServerHelloFrame",
+        "type": "object"
+      },
       "SessionActionOut": {
         "properties": {
           "message": {
@@ -12913,7 +12959,7 @@
     },
     "/api/v1/activity/stream": {
       "get": {
-        "description": "Authenticated SSE stream for activity-backed pages. Frames: activity.latest (the newest Activity event id and revision), processing.progress (every file's live progress, at most once a second), connection.activity (one thing that happened on a media manager or download client connection: see ConnectionActivityFrame; each connection sends at most one frame per phase every 250 ms, and always the phase it ends on), system.stats (the machine's newest reading, once a second: see SystemStatsFrame), system.tasks (every scheduled task, each time a run starts or ends or a task comes or goes: see SystemTaskOut), and system.log (one for each new warning or error Weir logs: see SystemLogFrame).",
+        "description": "Authenticated SSE stream for activity-backed pages. Frames: activity.latest (the newest Activity event id and revision), processing.progress (every file's live progress, at most once a second), connection.activity (one thing that happened on a media manager or download client connection: see ConnectionActivityFrame; each connection sends at most one frame per phase every 250 ms, and always the phase it ends on), system.stats (the machine's newest reading, once a second: see SystemStatsFrame), system.tasks (every scheduled task, each time a run starts or ends or a task comes or goes: see SystemTaskOut), system.log (one for each new warning or error Weir logs: see SystemLogFrame), server.hello (sent first when the stream opens, with the boot_id of this run of the server: see ServerHelloFrame) and data.changed (one for each time a kind of data changes, named by its topic: see DataChangedFrame).",
         "operationId": "get_activity_stream_api_v1_activity_stream_get",
         "responses": {
           "200": {
