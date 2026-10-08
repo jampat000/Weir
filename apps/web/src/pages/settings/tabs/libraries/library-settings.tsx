@@ -154,7 +154,10 @@ export function SelectSetting({
         lockedTo === undefined ? (
           hint
         ) : (
-          <span data-testid={`${name}-locked`}>{lockedTo.reason}</span>
+          <>
+            <span data-testid={`${name}-locked`}>{lockedTo.reason}</span>
+            {hint ? <> {hint}</> : null}
+          </>
         )
       }
     >

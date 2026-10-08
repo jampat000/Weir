@@ -439,6 +439,9 @@ it("shows a linked workflow as leaving a rejected file, says why, and leaves the
   ).toHaveTextContent(
     "Linked to Deluno on RIG: the original stays with your download client, which may still be seeding.",
   );
+  expect(
+    screen.getByText(/Weir never deletes a populated parent folder here/),
+  ).toBeInTheDocument();
   fireEvent.click(screen.getByTestId("processing-library-save"));
   await waitFor(() =>
     expect(update).toHaveBeenCalledWith(
