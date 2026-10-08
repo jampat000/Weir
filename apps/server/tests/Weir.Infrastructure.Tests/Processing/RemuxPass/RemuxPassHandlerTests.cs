@@ -541,14 +541,34 @@ public sealed partial class RemuxPassHandlerTests : IDisposable
     }
 
     [Fact]
-    public async Task Unreadable_content_under_reject_queues_a_reject_instead_of_a_hand_back()
+    public async Task Unreadable_content_is_not_rejected_on_the_first_look()
     {
         var library = await LibraryAsync(failurePolicy: "reject");
         _folders.Source("bad.mkv");
         _media.ProbeError = "[matroska,webm @ 0x1] EBML header parsing failed\nbad.mkv: Invalid data found when processing input";
         await FileRowAsync(library, "bad.mkv");
 
-        await Handler().HandleAsync(Context(9, $$$"""{"relative_media_path":"bad.mkv","library_id":{{{library}}}}"""), CancellationToken.None);
+        await Handler().HandleAsync(Context(8, $$$"""{"relative_media_path":"bad.mkv","library_id":{{{library}}}}"""), CancellationToken.None);
+
+        Assert.Equal(0, await _fixture.Store.Scalar("SELECT count(*) FROM jobs WHERE job_kind = 'processing.file.reject.v1'"));
+        Assert.Equal(0, await _fixture.Store.Scalar("SELECT count(*) FROM jobs WHERE job_kind = 'processing.file.pass_through.v1'"));
+        Assert.Equal(1, await _fixture.Store.Scalar("SELECT count(*) FROM jobs WHERE job_kind = 'processing.file.remux_pass.v1' AND status = 'pending'"));
+    }
+
+    [Fact]
+    public async Task Unreadable_content_that_stayed_unreadable_under_reject_queues_a_reject_instead_of_a_hand_back()
+    {
+        var library = await LibraryAsync(failurePolicy: "reject");
+        var source = _folders.Source("bad.mkv");
+        _media.ProbeError = "[matroska,webm @ 0x1] EBML header parsing failed\nbad.mkv: Invalid data found when processing input";
+        await FileRowAsync(library, "bad.mkv");
+        var info = new FileInfo(source);
+        var fingerprint = $"{info.Length.ToString(System.Globalization.CultureInfo.InvariantCulture)}:{info.LastWriteTimeUtc.Ticks.ToString(System.Globalization.CultureInfo.InvariantCulture)}";
+        var looks = RemuxPassHandler.UnreadableWaitMinutes.Count;
+
+        await Handler().HandleAsync(
+            Context(9, $$$"""{"relative_media_path":"bad.mkv","library_id":{{{library}}},"unreadable_looks":{{{looks}}},"unreadable_fingerprint":"{{{fingerprint}}}"}"""),
+            CancellationToken.None);
 
         Assert.Equal(1, await _fixture.Store.Scalar("SELECT count(*) FROM jobs WHERE job_kind = 'processing.file.reject.v1'"));
         Assert.Equal(0, await _fixture.Store.Scalar("SELECT count(*) FROM jobs WHERE job_kind = 'processing.file.pass_through.v1'"));

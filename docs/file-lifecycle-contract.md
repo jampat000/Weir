@@ -76,6 +76,7 @@ When the optional ownership settings (`WEIR_CHOWN_OUTPUT`, `WEIR_FILE_MODE_OUTPU
 
 - Missing files are already absent, not success with hidden work.
 - Locked or in-use files must produce an operator-readable skipped or failed reason.
+- A file Weir could not read is never deleted as a rejected file (`rejection_kind: unreadable_file`; `RemuxPassHandler.ApplyRejectedFileAction`). Weir cannot tell a damaged file from one that is still arriving or a share that hiccuped, so it waits, looks again, and only then refuses it, leaving the original where it is.
 
 ## Originals that belong to a media manager
 

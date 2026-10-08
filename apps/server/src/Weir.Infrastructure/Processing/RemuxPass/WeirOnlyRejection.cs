@@ -41,9 +41,17 @@ public static class WeirOnlyRejection
             result.Set("preflight_reason", explanation.Value);
         }
 
-        if (result.Get(RejectionResultKeys.Summary) is not { IsTruthy: true } && result.Get("rejection_kind") is WireString { Value: "no_video_stream" })
+        if (result.Get(RejectionResultKeys.Summary) is not { IsTruthy: true })
         {
-            result.Set(RejectionResultKeys.Summary, "it has no video");
+            switch (result.Get("rejection_kind"))
+            {
+                case WireString { Value: "no_video_stream" }:
+                    result.Set(RejectionResultKeys.Summary, "it has no video");
+                    break;
+                case WireString { Value: "unreadable_file" }:
+                    result.Set(RejectionResultKeys.Summary, "Weir couldn't read it");
+                    break;
+            }
         }
     }
 }

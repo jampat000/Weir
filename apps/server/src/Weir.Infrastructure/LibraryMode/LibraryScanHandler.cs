@@ -295,7 +295,7 @@ public sealed class LibraryScanHandler : IJobHandler
             {
                 return new LibraryScanFileEntry(
                     walked.Path, walked.SizeBytes, walked.ModifiedTimeUnixSeconds, LibraryFileClassification.CannotProcess,
-                    null, $"Weir could not read this file: {exception.Message}", 0, 0, null, null, null,
+                    null, ToolFailureText.Plain(exception), 0, 0, null, null, null,
                     ProblemKind: ProblemKindForReadFailure(walked.Path, exception), LinkCount: linkCount);
             }
         }
@@ -305,9 +305,9 @@ public sealed class LibraryScanHandler : IJobHandler
         {
             classification = LibraryFilePlanner.Classify(ProbeResult.Parse(probeJson), rules);
         }
-        catch (Exception exception) when (exception is RulesInputException)
+        catch (RulesInputException)
         {
-            classification = LibraryFilePlanResult.CannotProcess($"Weir could not plan this file: {exception.Message}");
+            classification = LibraryFilePlanResult.CannotProcess(ToolFailureText.UnusableTrackData);
         }
 
         return new LibraryScanFileEntry(

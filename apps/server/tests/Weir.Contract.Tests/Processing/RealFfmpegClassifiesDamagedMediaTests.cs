@@ -10,7 +10,7 @@ namespace Weir.Contract.Tests.Processing;
 /// <list type="bullet">
 /// <item>On a zero-filled <c>.mkv</c>, ffprobe exits 1, and the classification markers Weir looks for (<c>EBML header parsing
 /// failed</c>, etc.) reach stderr only with <c>-v error</c>, not with <c>-v quiet</c>. Weir runs ffprobe with <c>-v error</c>, so the
-/// file is classified unreadable and, under the reject policy, the hand-off is reported <c>failed</c> with <c>disposition: rejected</c>.</item>
+/// file is classified unreadable and, under the reject policy, it waits and is looked at again, and is neither rejected nor copied on the first look.</item>
 /// <item>On an MKV truncated after encoding, <c>ffmpeg ... -f null -</c> prints <c>File ended prematurely</c> but still exits 0, and
 /// the container header still names the original duration, so an exit-code check alone would accept the file as whole.</item>
 /// </list>
@@ -19,7 +19,7 @@ namespace Weir.Contract.Tests.Processing;
 public sealed class RealFfmpegClassifiesDamagedMediaTests
 {
     [RealFfmpegFact]
-    public async Task Unreadable_zero_filled_media_is_classified_unreadable_and_rejected()
+    public async Task Unreadable_zero_filled_media_is_classified_unreadable_and_waits_rather_than_being_rejected_at_once()
     {
         await using var scenario = await Scenario.StartWithRealToolsAsync();
         // All zero bytes, like the 10GB file from #494 (`fsutil file createnew`) but small enough for a contract test:
@@ -29,23 +29,25 @@ public sealed class RealFfmpegClassifiesDamagedMediaTests
             capabilities: ["processor-reject-regrab"], library: [("failure_policy", "reject")]);
 
         await scenario.PostHandoffAsync("handoff-zero-494", source);
-        await scenario.WaitForHandoffStateAsync("handoff-zero-494", "rejected", TimeSpan.FromSeconds(90));
+        var row = await scenario.WaitForFileStatusAsync(library, "Zero.Filled.494/film.mkv", "on_hold", TimeSpan.FromSeconds(90));
 
-        var reports = Scenario.Callbacks(fake, "handoff-zero-494");
-        Assert.True(reports.Count > 0, "the rejection must be reported to the manager");
-        var report = reports[^1];
-        Assert.Equal("failed", (string)report["status"]!);
-        Assert.Equal("rejected", (string)report["disposition"]!);
-        Assert.True(
-            string.IsNullOrEmpty((string?)report["outputPath"]),
-            "an unreadable file must never be reported completed with a copy of itself as output (#494)");
+        // Real ffprobe's text reads as unreadable, so the file waits: a download still arriving reads the same way. Only a file that
+        // stays unreadable and unchanged through the looks is rejected (see LeftInPlaceOriginalTests, which can move the clock on).
+        Assert.Equal("Weir can't read this file yet. It may still be arriving, so Weir will look again later.", (string)row["status_reason"]!);
+        foreach (var report in Scenario.Callbacks(fake, "handoff-zero-494"))
+        {
+            Assert.NotEqual("rejected", (string?)report["disposition"]);
+            Assert.True(
+                string.IsNullOrEmpty((string?)report["outputPath"]),
+                "an unreadable file must never be reported completed with a copy of itself as output (#494)");
+        }
 
-        // GET /processing/files must not 500 after this (#494 item 3 / #530), and must show the rejection.
+        Assert.Empty(Directory.GetFileSystemEntries(scenario.Folders.Output));
+        Assert.True(File.Exists(source));
+
+        // GET /processing/files must not 500 after this (#494 item 3 / #530).
         var files = await scenario.Admin.GetAsync($"{WeirClient.Api}/processing/files");
         Assert.True(files.Status == HttpStatusCode.OK, files.ToString());
-        var row = await scenario.FileRowAsync(library, "Zero.Filled.494/film.mkv");
-        Assert.True(row is not null, "the rejection must leave a Files row behind");
-        Assert.Equal("rejected", (string)row["status"]!);
     }
 
     [RealFfmpegFact]

@@ -1,4 +1,5 @@
 using Weir.Core.Json;
+using Weir.Core.Media;
 using Weir.Core.MediaManagers;
 using Weir.Core.Processing;
 using Weir.Core.Processing.RemuxPass;
@@ -20,7 +21,11 @@ public sealed partial class RemuxPassHandler
             WeirOnlyRejection.Present(result);
         }
 
-        var deletes = string.Equals(WireStrings.Strip(library.RejectedFileAction ?? string.Empty), RejectedFileActions.DeleteFile, StringComparison.OrdinalIgnoreCase)
+        var chosenDelete = string.Equals(WireStrings.Strip(library.RejectedFileAction ?? string.Empty), RejectedFileActions.DeleteFile, StringComparison.OrdinalIgnoreCase);
+        // A file Weir could not read may be a good file it cannot read yet, or a share that hiccuped: Weir cannot vouch for it, so it never destroys it.
+        var unreadable = result.Get("rejection_kind") is WireString { Value: "unreadable_file" };
+        var deletes = chosenDelete
+                      && !unreadable
                       // Under reject, the reject job removes the download, and only after the manager accepts.
                       && ProcessingFailurePolicies.Normalize(library.FailurePolicy) != ProcessingFailurePolicies.Reject
                       // A linked workflow's original belongs to the download client and the manager, whatever the workflow's own choice says.
@@ -38,7 +43,9 @@ public sealed partial class RemuxPassHandler
             result.Set("rejected_cleanup_status", "left_in_place");
             result.Set(
                 "rejected_cleanup_detail",
-                weirOnly ? WeirOnlyRejection.LeftInPlace : RejectedLeftInPlace(library, links));
+                unreadable && chosenDelete ? ToolFailureText.UnreadableKept
+                : weirOnly ? WeirOnlyRejection.LeftInPlace
+                : RejectedLeftInPlace(library, links));
         }
     }
 

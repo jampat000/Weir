@@ -2,6 +2,7 @@ using System.Text.Json;
 using Weir.Core.Configuration;
 using Weir.Core.Jobs;
 using Weir.Core.Json;
+using Weir.Core.Media;
 using Weir.Core.Processing;
 using Weir.Core.Processing.RemuxPass;
 using Weir.Core.Rules;
@@ -80,7 +81,7 @@ public static class ManualPlanSupport
         catch (Exception exception) when (exception is not OperationCanceledException)
 #pragma warning restore CA1031
         {
-            throw new ManualPlanEnqueueException(400, $"Weir could not read this file's tracks: {exception.Message}");
+            throw new ManualPlanEnqueueException(400, exception is MediaToolException or MediaToolTimeoutException ? ToolFailureText.Plain(exception) : ToolFailureText.Generic);
         }
 
         var rules = library.RuleSetId is { } ruleSetId && await libraries.GetRuleSetAsync(uow, ruleSetId).ConfigureAwait(false) is { } ruleSet
