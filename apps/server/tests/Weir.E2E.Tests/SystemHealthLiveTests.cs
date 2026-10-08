@@ -43,6 +43,8 @@ public sealed class SystemHealthLiveTests(E2EServer server) : E2ETestBase(server
         }
         finally
         {
+            // A job of the workflow cannot finish while its folder is gone, and Weir will not remove a workflow with a job left.
+            Directory.CreateDirectory(watched);
             await WeirWorkflowApi.DeleteAsync(page.Context, BaseUrl, id);
         }
     }
