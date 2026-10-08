@@ -45,6 +45,27 @@ public static class E2EDatabase
         transaction.Commit();
     }
 
+    /// <summary>
+    /// A file of the workflow that failed to process, as the remove dialog finds one: the row a failed pass leaves, with no
+    /// fingerprint recorded. Returns its id. The file itself must be in the workflow's watched folder.
+    /// </summary>
+    public static long InsertFailedFile(string databasePath, long libraryId, string relativePath, long sizeBytes)
+    {
+        using var connection = Open(databasePath);
+        using var transaction = connection.BeginTransaction();
+        var id = Convert.ToInt64(
+            SeedSql.Scalar(
+                connection,
+                "INSERT INTO files (library_id, relative_path, status, status_reason, size_bytes, last_seen_at) " +
+                "VALUES ($library, $path, 'processing_failed', 'Weir could not read the audio track.', $size, CURRENT_TIMESTAMP) RETURNING id",
+                ("$library", libraryId),
+                ("$path", relativePath),
+                ("$size", sizeBytes)),
+            CultureInfo.InvariantCulture);
+        transaction.Commit();
+        return id;
+    }
+
     private static SqliteConnection Open(string databasePath)
     {
         var connection = new SqliteConnection(new SqliteConnectionStringBuilder

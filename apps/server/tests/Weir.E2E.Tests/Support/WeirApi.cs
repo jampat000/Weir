@@ -31,6 +31,31 @@ public static class WeirApi
         await EnsureOkAsync(response, $"Setting the pause to {paused}");
     }
 
+    /// <summary>
+    /// Keeps a failed file without processing it again, as the remove dialog's "Keep" does: the dialog's own request, confirmed
+    /// with the file's details when Weir recorded none of its own.
+    /// </summary>
+    public static async Task KeepFileAsync(IBrowserContext context, string baseUrl, long fileId)
+    {
+        await using var options = await context.APIRequest.GetAsync($"{baseUrl}/api/v1/processing/files/{fileId}/remove-options");
+        await EnsureOkAsync(options, $"Reading what can be done with file {fileId}");
+        var offered = JsonDocument.Parse(await options.TextAsync()).RootElement;
+        var token = await CsrfTokenAsync(context, baseUrl);
+        await using var response = await context.APIRequest.DeleteAsync(
+            $"{baseUrl}/api/v1/processing/files/{fileId}",
+            new()
+            {
+                DataObject = new
+                {
+                    csrf_token = token,
+                    resolution = "keep",
+                    confirm_size_bytes = offered.GetProperty("unconfirmed_size_bytes").GetInt64(),
+                    confirm_modified_at = offered.GetProperty("unconfirmed_modified_at").GetString(),
+                },
+            });
+        await EnsureOkAsync(response, $"Keeping file {fileId}");
+    }
+
     /// <summary>Points the first movie workflow at two folders, as the person does in Workflows.</summary>
     public static async Task SetMovieFoldersAsync(IBrowserContext context, string baseUrl, string watchedFolder, string outputFolder)
     {
