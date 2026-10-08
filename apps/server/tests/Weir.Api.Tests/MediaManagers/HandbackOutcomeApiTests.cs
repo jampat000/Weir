@@ -337,7 +337,7 @@ public sealed class HandbackOutcomeApiTests : IDisposable
     private static async Task<string?> Code(HttpResponseMessage response) => (await Json(response))["code"]?.GetValue<string>();
 
     [Fact]
-    public async Task Not_imported_is_final_records_the_reason_and_keeps_the_copy()
+    public async Task Not_imported_records_the_reason_and_keeps_the_copy()
     {
         await using var server = await StartAsync();
         var copy = await FinishedHandoffAsync(server);
@@ -352,6 +352,107 @@ public sealed class HandbackOutcomeApiTests : IDisposable
             "Deluno will not import this file: The release is a sample. Weir kept its copy in the hand-back folder.",
             await TestDatabase.ScalarStringAsync(server, "SELECT release_note FROM handbacks WHERE outcome = 'not-imported' AND outcome_reason = 'The release is a sample.'"));
         Assert.Equal(1, await TestDatabase.ScalarAsync(server, "SELECT count(*) FROM activity_events WHERE title = 'Deluno will not import film.mkv'"));
+
+        using var again = await PostOutcomeAsync(server, "h1", DelunoOutcome("not-imported", null, "The release is a sample."));
+        Assert.Equal(HttpStatusCode.OK, again.StatusCode);
+        Assert.Equal(1, await TestDatabase.ScalarAsync(server, "SELECT count(*) FROM activity_events WHERE event_type = 'processing.handback_outcome'"));
+    }
+
+    [Fact]
+    public async Task An_imported_after_a_not_imported_replaces_it_and_releases_the_copy_the_refusal_kept()
+    {
+        await using var server = await StartAsync();
+        var copy = await FinishedHandoffAsync(server);
+        using (var refused = await PostOutcomeAsync(server, "h1", DelunoOutcome("not-imported", null, "The import dead-lettered.")))
+        {
+            Assert.Equal(HttpStatusCode.OK, refused.StatusCode);
+        }
+
+        Assert.True(File.Exists(copy));
+        const string expected =
+            """{"handoffId":"h1","outcome":"imported","released":true,"message":"Weir recorded that Deluno imported the file and released its copy."}""";
+
+        using (var imported = await PostOutcomeAsync(server, "h1", DelunoOutcome("imported", "/media/movies/Film (2020)/Film (2020).mkv", null)))
+        {
+            Assert.Equal((HttpStatusCode.OK, expected), (imported.StatusCode, await imported.Content.ReadAsStringAsync()));
+        }
+
+        Assert.False(File.Exists(copy));
+        Assert.True(File.Exists(Path.Join(Watched, "Film", "film.mkv")));
+        Assert.Equal(1, await TestDatabase.ScalarAsync(server, "SELECT count(*) FROM media_manager_handoffs WHERE outcome = 'imported' AND outcome_released = 1"));
+        Assert.Equal(
+            1,
+            await TestDatabase.ScalarAsync(
+                server,
+                "SELECT count(*) FROM handbacks WHERE outcome = 'imported' AND outcome_by = 'Deluno' AND outcome_reason IS NULL " +
+                "AND imported_path = '/media/movies/Film (2020)/Film (2020).mkv' AND released_at IS NOT NULL AND settled_at IS NOT NULL " +
+                "AND release_note = 'Weir removed its copy from the hand-back folder, because Deluno has the file now.'"));
+        Assert.Equal(1, await TestDatabase.ScalarAsync(server, "SELECT count(*) FROM activity_events WHERE title = 'Deluno will not import film.mkv'"));
+        Assert.Equal(1, await TestDatabase.ScalarAsync(server, "SELECT count(*) FROM activity_events WHERE title = 'Deluno imported film.mkv after all'"));
+
+        using (var repeat = await PostOutcomeAsync(server, "h1", DelunoOutcome("imported", "/media/movies/Film (2020)/Film (2020).mkv", null)))
+        {
+            Assert.Equal((HttpStatusCode.OK, expected), (repeat.StatusCode, await repeat.Content.ReadAsStringAsync()));
+        }
+
+        using var refusedAgain = await PostOutcomeAsync(server, "h1", DelunoOutcome("not-imported", null, "Changed its mind."));
+        Assert.Equal((HttpStatusCode.Conflict, "outcome_already_recorded"), (refusedAgain.StatusCode, await Code(refusedAgain)));
+        Assert.Equal(2, await TestDatabase.ScalarAsync(server, "SELECT count(*) FROM activity_events WHERE event_type = 'processing.handback_outcome'"));
+    }
+
+    [Fact]
+    public async Task An_imported_after_a_not_imported_still_keeps_a_copy_that_changed_since_Weir_wrote_it()
+    {
+        await using var server = await StartAsync();
+        var copy = await FinishedHandoffAsync(server);
+        using (var refused = await PostOutcomeAsync(server, "h1", DelunoOutcome("not-imported", null, "The import dead-lettered.")))
+        {
+            Assert.Equal(HttpStatusCode.OK, refused.StatusCode);
+        }
+
+        await File.AppendAllTextAsync(copy, ", and then someone else wrote to it");
+
+        using var imported = await PostOutcomeAsync(server, "h1", DelunoOutcome("imported", "/media/movies/Film/film.mkv", null));
+
+        Assert.Equal(
+            """{"handoffId":"h1","outcome":"imported","released":false,"message":"Weir recorded that Deluno imported the file. Weir's copy has changed since Weir wrote it, so Weir left it alone."}""",
+            await imported.Content.ReadAsStringAsync());
+        Assert.True(File.Exists(copy));
+        Assert.Equal(1, await TestDatabase.ScalarAsync(server, "SELECT count(*) FROM handbacks WHERE outcome = 'imported' AND released_at IS NULL AND settled_at IS NOT NULL"));
+    }
+
+    [Fact]
+    public async Task An_imported_after_a_not_imported_leaves_a_copy_another_manager_settled()
+    {
+        await using var server = await StartAsync();
+        var copy = await FinishedHandoffAsync(server);
+        using (var refused = await PostOutcomeAsync(server, "h1", DelunoOutcome("not-imported", null, "The import dead-lettered.")))
+        {
+            Assert.Equal(HttpStatusCode.OK, refused.StatusCode);
+        }
+
+        await TestDatabase.ExecuteAsync(server, "UPDATE handbacks SET outcome_by = 'Radarr'");
+
+        using var imported = await PostOutcomeAsync(server, "h1", DelunoOutcome("imported", "/media/movies/Film/film.mkv", null));
+
+        Assert.Equal(HttpStatusCode.OK, imported.StatusCode);
+        Assert.True(File.Exists(copy));
+    }
+
+    [Fact]
+    public async Task Another_managers_hand_off_with_the_same_id_is_never_found()
+    {
+        await using var server = await StartAsync();
+        await FinishedHandoffAsync(server);
+        using (var refused = await PostOutcomeAsync(server, "h1", DelunoOutcome("not-imported", null, "The import dead-lettered.")))
+        {
+            Assert.Equal(HttpStatusCode.OK, refused.StatusCode);
+        }
+
+        using var other = await new ApiTestClient(server).SendAsync(
+            HttpMethod.Post, "/api/v1/intake/handoffs/sonarr/h1/outcome", headers: SecretHeader, content: DelunoOutcome("imported", "/tv/film.mkv", null));
+
+        Assert.Equal(HttpStatusCode.NotFound, other.StatusCode);
     }
 
     /// <summary>

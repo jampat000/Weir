@@ -78,11 +78,21 @@ public sealed class HandbackRulesTests
         Assert.Equal("film.mkv", HandbackRules.FileName("D:\\Data\\Film\\film.mkv"));
     }
 
+    [Theory]
+    [InlineData(HandbackRules.NotImported, HandbackRules.Imported, true)]
+    [InlineData(HandbackRules.Imported, HandbackRules.NotImported, false)]
+    [InlineData(HandbackRules.Imported, HandbackRules.Imported, false)]
+    [InlineData(HandbackRules.NotImported, HandbackRules.NotImported, false)]
+    [InlineData(null, HandbackRules.Imported, false)]
+    public void Only_an_import_replaces_a_refusal(string? recorded, string outcome, bool replaces) =>
+        Assert.Equal(replaces, HandbackRules.Supersedes(recorded, outcome));
+
     [Fact]
     public void The_words_say_what_happened_to_the_copy()
     {
         Assert.Equal("Sonarr imported film.mkv", HandbackRules.OutcomeTitle("Sonarr", HandbackRules.Imported, "film.mkv"));
         Assert.Equal("Deluno will not import film.mkv", HandbackRules.OutcomeTitle("Deluno", HandbackRules.NotImported, "film.mkv"));
+        Assert.Equal("Deluno imported film.mkv after all", HandbackRules.OutcomeTitle("Deluno", HandbackRules.Imported, "film.mkv", afterAll: true));
         Assert.Equal(
             "Deluno will not import this file: The release is a sample. Weir kept its copy in the hand-back folder.",
             HandbackRules.NotImportedNote("Deluno", "The release is a sample."));
