@@ -42,6 +42,7 @@ public sealed partial class ProcessingJobStore
                     ("@id", jobId));
                 _metrics.RecordJobEvent(MetricsModule, "completed");
                 RecordQueueDepth(connection, transaction);
+                AnnounceQueueChange(transaction, job.JobKind);
                 return JobActionOutcome.Ok;
             },
             cancellationToken);
@@ -75,6 +76,7 @@ public sealed partial class ProcessingJobStore
                     ("@status", ProcessingJobStatus.Cancelled),
                     ("@error", JobQueueRules.CancelledByOperatorError),
                     ("@id", jobId));
+                AnnounceQueueChange(transaction, job.JobKind);
                 return JobActionOutcome.Ok;
             },
             cancellationToken);

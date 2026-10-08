@@ -104,6 +104,7 @@ public sealed partial class ProcessingJobStore
         var claimed = Get(connection, transaction, Convert.ToInt64(id, CultureInfo.InvariantCulture))!;
         _metrics.RecordJobEvent(MetricsModule, "started");
         RecordQueueDepth(connection, transaction);
+        AnnounceQueueChange(transaction, claimed.JobKind);
         return claimed;
     }
 

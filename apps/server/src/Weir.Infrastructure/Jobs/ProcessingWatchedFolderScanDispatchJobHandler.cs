@@ -4,6 +4,7 @@ using Weir.Core.Jobs;
 using Weir.Core.Json;
 using Weir.Core.Processing;
 using Weir.Core.Settings;
+using Weir.Infrastructure.Activity;
 using Weir.Infrastructure.MediaManagers;
 using Weir.Infrastructure.Processing;
 using Weir.Infrastructure.Settings;
@@ -39,6 +40,7 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandler : IJobHandler
 
     private readonly ScanWakeups? _wakeups;
     private readonly ILogger<ProcessingWatchedFolderScanDispatchJobHandler>? _logger;
+    private readonly DataChangePublisher? _changes;
 
     public ProcessingWatchedFolderScanDispatchJobHandler(
         SqliteDatabase database,
@@ -51,7 +53,8 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandler : IJobHandler
         FileStateStore files,
         FileSkipMarkerStore skipMarkers,
         ScanWakeups? wakeups = null,
-        ILogger<ProcessingWatchedFolderScanDispatchJobHandler>? logger = null)
+        ILogger<ProcessingWatchedFolderScanDispatchJobHandler>? logger = null,
+        DataChangePublisher? changes = null)
     {
         _database = database ?? throw new ArgumentNullException(nameof(database));
         _time = time ?? throw new ArgumentNullException(nameof(time));
@@ -64,6 +67,7 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandler : IJobHandler
         _skipMarkers = skipMarkers ?? throw new ArgumentNullException(nameof(skipMarkers));
         _wakeups = wakeups;
         _logger = logger;
+        _changes = changes;
     }
 
     public string JobKind => ProcessingWatchedFolderScanDispatchJobKinds.ScanDispatch;
@@ -115,6 +119,10 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandler : IJobHandler
 
             await run.RemoveRejectedFilesAsync(cancellationToken).ConfigureAwait(false);
         }
+
+        // A look that finds a file still held, or held for a new reason, changes no status and writes no Activity, so only this
+        // tells a screen counting down to it that the answer is in.
+        _changes?.Publish(DataTopics.LibraryScan);
     }
 
     private sealed record ScanRequest(long? LibraryId, string MediaScope, string Trigger, bool EnqueueRemuxJobs);
