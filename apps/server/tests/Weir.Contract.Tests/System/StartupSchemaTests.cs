@@ -103,6 +103,9 @@ public sealed class StartupSchemaTests(StartupSchemaTests.HeadSchemaFixture fixt
         {
             head = Revision(stopped.Connection);
             RecordRevisionInOldTable(stopped.Connection, PreviousRevision);
+            // A real database at that revision has none of what later migrations added; take those back out, or the upgrade
+            // would add them a second time.
+            SeedSql.Execute(stopped.Connection, "ALTER TABLE media_manager_handoff_targets DROP COLUMN output_written_at");
             Assert.DoesNotContain("schema_version", Tables(stopped.Connection));
         }
 

@@ -417,9 +417,9 @@ describe("first run: connect Deluno first", () => {
     choose("Deluno");
     const found = await foundLibraries();
 
-    expect(found.getAllByText(/Set the downloads folder in Deluno/)).toHaveLength(
-      2,
-    );
+    expect(
+      found.getAllByText(/Set the downloads folder in Deluno/),
+    ).toHaveLength(2);
     expect(found.queryByRole("textbox")).not.toBeInTheDocument();
     expect(
       found.getByRole("button", { name: "Pick the folders yourself" }),
