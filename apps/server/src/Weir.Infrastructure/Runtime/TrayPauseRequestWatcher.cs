@@ -14,7 +14,7 @@ namespace Weir.Infrastructure.Runtime;
 /// <summary>
 /// Hears the tray ask to pause or resume processing. The tray writes <see cref="FileName"/> in Weir's data folder, holding
 /// <c>{ "paused": true, "requested_at": "2026-10-09T08:30:00Z" }</c> (<c>false</c> to resume); the request is applied through
-/// <see cref="SuitePauseService"/> as "the tray", which records it in Activity, and the file is deleted. A pause asked for from
+/// <see cref="SuitePauseService"/> as "The tray", which records it in Activity, and the file is deleted. A pause asked for from
 /// the tray lasts until it is resumed and leaves the choice to keep looking for new files as it stands. A file that is not that
 /// shape is ignored and deleted. Only a process that can write to the data folder can make a request; no route takes one.
 /// </summary>
@@ -23,7 +23,7 @@ public sealed class TrayPauseRequestWatcher : BackgroundService
     public const string FileName = "pause-request.json";
 
     /// <summary>Who Activity says paused or resumed processing.</summary>
-    public const string RequestedBy = "the tray";
+    public const string RequestedBy = "The tray";
 
     private readonly WeirOptions _options;
     private readonly SqliteDatabase _database;

@@ -25,10 +25,10 @@ public sealed class PauseActivityTests
         Assert.All([indefinite, resumed, timed], response => Assert.Equal(HttpStatusCode.OK, response.StatusCode));
         var entries = (await TestDatabase.ScalarStringAsync(server, Entries))!.Split(" | ");
         Assert.Equal(3, entries.Length);
-        Assert.Equal("Processing paused: Processing was paused until you resume by alice. Weir keeps looking for new files and starts nothing.", entries[0]);
-        Assert.Equal("Processing resumed: Processing was resumed by alice.", entries[1]);
-        Assert.StartsWith("Processing paused: Processing was paused until 20", entries[2], StringComparison.Ordinal);
-        Assert.EndsWith(" UTC by alice. Weir does not look for new files either.", entries[2], StringComparison.Ordinal);
+        Assert.Equal("Processing paused: alice paused processing until you resume it. Weir keeps looking for new files and starts nothing.", entries[0]);
+        Assert.Equal("Processing resumed: alice resumed processing.", entries[1]);
+        Assert.StartsWith("Processing paused: alice paused processing until 20", entries[2], StringComparison.Ordinal);
+        Assert.EndsWith(" UTC. Weir does not look for new files either.", entries[2], StringComparison.Ordinal);
     }
 
     [Fact]

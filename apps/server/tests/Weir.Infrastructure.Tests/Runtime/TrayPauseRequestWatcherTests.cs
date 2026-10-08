@@ -69,7 +69,7 @@ public sealed class TrayPauseRequestWatcherTests : IDisposable
         var state = await CurrentAsync();
         Assert.True(state.Paused);
         Assert.Null(state.PausedUntil);
-        Assert.Equal(["Processing paused: Processing was paused until you resume by the tray. Weir keeps looking for new files and starts nothing."], await EntriesAsync());
+        Assert.Equal(["Processing paused: The tray paused processing until you resume it. Weir keeps looking for new files and starts nothing."], await EntriesAsync());
     }
 
     [Fact]
@@ -81,7 +81,7 @@ public sealed class TrayPauseRequestWatcherTests : IDisposable
         await RequestAsync(Request(paused: false));
 
         Assert.False((await CurrentAsync()).Paused);
-        Assert.Equal("Processing resumed: Processing was resumed by the tray.", (await EntriesAsync())[^1]);
+        Assert.Equal("Processing resumed: The tray resumed processing.", (await EntriesAsync())[^1]);
     }
 
     [Fact]

@@ -62,13 +62,13 @@ describe("eventDisplay for the pause", () => {
       eventDisplay(
         entry(
           "system.processing_paused",
-          "Processing was paused until you resume by alice.",
+          "alice paused processing until you resume it.",
         ),
       ).title,
     ).toBe("Processing paused");
     expect(
       eventDisplay(
-        entry("system.processing_resumed", "Processing was resumed by alice."),
+        entry("system.processing_resumed", "alice resumed processing."),
       ).title,
     ).toBe("Processing resumed");
   });

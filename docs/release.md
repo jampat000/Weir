@@ -343,7 +343,7 @@ How the tray learns what to show, and how it pauses Weir: two more files in the 
   ```
 
   `paused_until` is an ISO 8601 UTC time for a timed pause and null otherwise. `needs_you.files` counts the files that wait on a person, the same files as the sidebar badge (`FileStateStore.CountWaitingOnPersonAsync`). `managers_unreachable` names the enabled media managers whose last connection test, by the heartbeat or the Test button, got no answer.
-- `pause-request.json` is written by the tray: `{"paused": true, "requested_at": "<ISO 8601>"}`, or `false` to resume. The server applies it through `SuitePauseService` as "the tray": a pause lasts until it is resumed and leaves "keep looking for new files" as it stands. Activity records it like any other pause or resume, saying it was done by the tray, and the file is deleted. A request that is not that shape is ignored, noted in the log, and deleted. A request left while the server was down is answered when it starts.
+- `pause-request.json` is written by the tray: `{"paused": true, "requested_at": "<ISO 8601>"}`, or `false` to resume. The server applies it through `SuitePauseService` as "the tray": a pause lasts until it is resumed and leaves "keep looking for new files" as it stands. Activity records it like any other pause or resume, saying the tray did it, and the file is deleted. A request that is not that shape is ignored, noted in the log, and deleted. A request left while the server was down is answered when it starts.
 
 If an operator runs a manually staged copy without Velopack install metadata, the
 tray keeps `Check for updates` visible and sends it to the browser-based release check
