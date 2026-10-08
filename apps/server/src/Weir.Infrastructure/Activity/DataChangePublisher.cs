@@ -1,3 +1,5 @@
+using Weir.Infrastructure.Sqlite;
+
 namespace Weir.Infrastructure.Activity;
 
 /// <summary>
@@ -17,6 +19,20 @@ public sealed class DataChangePublisher
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(topic);
         _feed.Publish(topic);
+    }
+
+    /// <summary>
+    /// Says that the data named by <paramref name="topic"/> changed once <paramref name="uow"/> commits; a rollback says nothing.
+    /// Any number of calls for one topic in one unit of work say it once, so a sync writing many rows makes each open screen read once.
+    /// </summary>
+    public void PublishOnCommit(UnitOfWork uow, string topic)
+    {
+        ArgumentNullException.ThrowIfNull(uow);
+        ArgumentException.ThrowIfNullOrWhiteSpace(topic);
+        if (uow.Items.TryAdd($"data_changed:{topic}", true))
+        {
+            uow.OnCommitted(() => Publish(topic));
+        }
     }
 
     /// <summary>Starts a stream of every topic published from now on. Dispose it when the stream ends.</summary>

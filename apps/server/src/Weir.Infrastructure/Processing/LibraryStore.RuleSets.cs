@@ -71,6 +71,11 @@ public sealed partial class LibraryStore
             given += 1;
         }
 
+        if (given > 0)
+        {
+            Changed(uow);
+        }
+
         return given;
     }
 
@@ -115,6 +120,7 @@ public sealed partial class LibraryStore
         }
 
         await uow.ExecuteAsync("DELETE FROM rule_sets WHERE id = @id", ("@id", row.Id)).ConfigureAwait(false);
+        Changed(uow);
     }
 
     private async Task InsertRuleSetAsync(UnitOfWork uow, ProcessingRuleSetRecord row)
@@ -137,6 +143,7 @@ public sealed partial class LibraryStore
             "@standardize_track_names, @track_name_template, @track_name_override_forced, @track_name_override_hearing_impaired, " +
             "@track_name_override_commentary, @track_name_override_audio_description, @clear_video_track_names, @remove_chapters)",
             RuleSetParameters(row)).ConfigureAwait(false);
+        Changed(uow);
     }
 
     private async Task UpdateRuleSetRowAsync(UnitOfWork uow, ProcessingRuleSetRecord row)
@@ -161,6 +168,7 @@ public sealed partial class LibraryStore
             "clear_video_track_names=@clear_video_track_names, remove_chapters=@remove_chapters, " +
             "updated_at=CURRENT_TIMESTAMP WHERE id=@id",
             [.. RuleSetParameters(row), ("@id", row.Id)]).ConfigureAwait(false);
+        Changed(uow);
     }
 
     private static (string, object?)[] RuleSetParameters(ProcessingRuleSetRecord row) =>

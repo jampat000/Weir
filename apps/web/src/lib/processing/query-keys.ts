@@ -44,6 +44,8 @@ export const processingKeys = {
   directPlayDevices: ["processing", "direct-play-devices"] as const,
   libraries: ["processing", "libraries"] as const,
   ruleSets: ["processing", "rule-sets"] as const,
+  /** Every set of libraries setup offered, whichever connections were answering. */
+  allLibrarySuggestions: ["processing", "library-suggestions"] as const,
   librarySuggestions: (answeringConnections: string[]) =>
     ["processing", "library-suggestions", ...answeringConnections] as const,
   proposedLibraryCheck: (folders: ProposedFoldersByType) =>

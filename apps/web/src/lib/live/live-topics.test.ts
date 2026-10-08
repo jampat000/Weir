@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
+import { downloadClientKeys } from "../download-clients/query-keys";
+import { mediaManagerKeys } from "../media-managers/query-keys";
 import { pauseKeys } from "../pause/query-keys";
+import { processingKeys } from "../processing/query-keys";
 import {
   LIVE_TOPIC_QUERIES,
   parseDataChanged,
@@ -31,6 +34,21 @@ describe("LIVE_TOPIC_QUERIES", () => {
 
   it("refreshes the pause queries when the pause changes", () => {
     expect(LIVE_TOPIC_QUERIES.pause).toEqual([pauseKeys.state]);
+  });
+
+  it("refreshes the connection lists when a connection changes", () => {
+    expect(LIVE_TOPIC_QUERIES.connections).toEqual([
+      mediaManagerKeys.connections,
+      downloadClientKeys.connections,
+    ]);
+  });
+
+  it("refreshes the workflows, their profiles and the libraries setup offers when a workflow changes", () => {
+    expect(LIVE_TOPIC_QUERIES.libraries).toEqual([
+      processingKeys.libraries,
+      processingKeys.ruleSets,
+      processingKeys.allLibrarySuggestions,
+    ]);
   });
 });
 
