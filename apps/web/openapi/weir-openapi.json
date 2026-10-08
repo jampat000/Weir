@@ -10576,6 +10576,18 @@
             "title": "Install Type",
             "type": "string"
           },
+          "known_update_available": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Set only while status is rate_limited: whether the last release Weir knew of is newer than this install.",
+            "title": "Known Update Available"
+          },
           "latest_name": {
             "anyOf": [
               {
@@ -10621,8 +10633,21 @@
             ],
             "title": "Release Url"
           },
+          "retry_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When Weir checks again; set only while status is rate_limited.",
+            "title": "Retry At"
+          },
           "status": {
-            "description": "up_to_date, update_available, or unavailable",
+            "description": "up_to_date, update_available, rate_limited (GitHub is limiting update checks; the latest_ fields are the last release Weir knew), or unavailable",
             "minLength": 1,
             "title": "Status",
             "type": "string"
@@ -11232,13 +11257,14 @@
             "title": "Latest Version"
           },
           "status": {
-            "description": "checking: nothing learned yet. up_to_date. update_available. downloaded: the tray holds an update waiting to install. not_published: no release exists yet. unavailable: the release list could not be reached.",
+            "description": "checking: nothing learned yet. up_to_date. update_available. downloaded: the tray holds an update waiting to install. not_published: no release exists yet. rate_limited: GitHub is limiting update checks from this network, so the newest version is the last one known. unavailable: the release list could not be reached.",
             "enum": [
               "checking",
               "up_to_date",
               "update_available",
               "downloaded",
               "not_published",
+              "rate_limited",
               "unavailable"
             ],
             "title": "Status",

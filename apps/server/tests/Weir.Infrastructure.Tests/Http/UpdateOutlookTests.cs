@@ -1,7 +1,9 @@
+using Microsoft.Extensions.Logging.Abstractions;
 using Weir.Core.Updates;
 using Weir.Infrastructure.Activity;
 using Weir.Infrastructure.Http;
 using Weir.Infrastructure.Runtime;
+using Weir.Infrastructure.Settings;
 using Weir.Infrastructure.Tests.Platform;
 
 namespace Weir.Infrastructure.Tests.Http;
@@ -17,7 +19,7 @@ public sealed class UpdateOutlookTests : IDisposable
     public UpdateOutlookTests()
     {
         var files = new UpdateFiles(_fixture.Options);
-        _outlook = new UpdateOutlook(new UpdateStatusReader(_catalog, _fixture.Options), files, _fixture.Clock, _changes);
+        _outlook = new UpdateOutlook(new UpdateStatusReader(_catalog, _fixture.Options, _fixture.Database, new SuiteSettingsStore(_fixture.Users), NullLogger<UpdateStatusReader>.Instance), files, _fixture.Clock, _changes);
     }
 
     public void Dispose() => _fixture.Dispose();
@@ -55,6 +57,26 @@ public sealed class UpdateOutlookTests : IDisposable
         await _outlook.CheckAsync(CancellationToken.None);
 
         Assert.Equal(new UpdateOutlookSnapshot("unavailable", null), _outlook.Current());
+    }
+
+    [Fact]
+    public async Task A_limit_keeps_the_last_known_release_and_is_not_asked_about_again_until_it_lifts()
+    {
+        var lifts = _fixture.Clock.GetUtcNow().AddMinutes(20);
+        _catalog.LimitedUntil(lifts, Release("3.3.0"));
+        await _outlook.CheckAsync(CancellationToken.None);
+
+        Assert.Equal(new UpdateOutlookSnapshot("rate_limited", "3.3.0"), _outlook.Current());
+
+        _fixture.Clock.Advance(TimeSpan.FromMinutes(19));
+        _outlook.Current();
+        Assert.Equal(1, _catalog.Calls);
+
+        _catalog.Answers(Release("3.3.0"));
+        _fixture.Clock.Advance(TimeSpan.FromMinutes(2));
+        _outlook.Current();
+        await Eventually.ThatAsync(() => _catalog.Calls == 2);
+        await Eventually.ThatAsync(() => _outlook.Current().Status == "update_available");
     }
 
     [Fact]
@@ -154,6 +176,7 @@ public sealed class UpdateOutlookTests : IDisposable
         private readonly object _gate = new();
         private TaskCompletionSource<GitHubReleaseRecord?>? _held;
         private GitHubReleaseRecord? _release;
+        private ReleaseRateLimit? _limit;
         private int _calls;
 
         public int Calls => Volatile.Read(ref _calls);
@@ -166,10 +189,19 @@ public sealed class UpdateOutlookTests : IDisposable
             }
         }
 
+        public void LimitedUntil(DateTimeOffset resetsAt, GitHubReleaseRecord? lastKnown)
+        {
+            lock (_gate)
+            {
+                _limit = new ReleaseRateLimit(resetsAt, lastKnown);
+            }
+        }
+
         public void Answers(GitHubReleaseRecord release)
         {
             lock (_gate)
             {
+                _limit = null;
                 _release = release;
                 _held?.TrySetResult(release);
             }
@@ -185,6 +217,11 @@ public sealed class UpdateOutlookTests : IDisposable
                 if (_held is { } held)
                 {
                     return held.Task;
+                }
+
+                if (_limit is { } limit)
+                {
+                    throw new ReleaseFetchException(403, limit);
                 }
 
                 return _release is { } release ? Task.FromResult<GitHubReleaseRecord?>(release) : throw new ReleaseFetchException("offline");

@@ -70,6 +70,7 @@ const UPDATE_WORDS: Record<SystemOverview["update"]["status"], string> = {
   update_available: "update ready",
   downloaded: "update ready",
   not_published: "no release yet",
+  rate_limited: "limited by GitHub",
   unavailable: "can't check",
 };
 

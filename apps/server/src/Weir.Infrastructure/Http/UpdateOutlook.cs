@@ -1,4 +1,6 @@
+using System.Globalization;
 using Weir.Core.Json;
+using Weir.Core.Updates;
 using Weir.Infrastructure.Activity;
 using Weir.Infrastructure.Runtime;
 
@@ -7,7 +9,8 @@ namespace Weir.Infrastructure.Http;
 /// <summary>Whether a newer Weir exists, as far as Weir last found out.</summary>
 /// <param name="Status">
 /// <c>checking</c> (nothing learned yet), <c>up_to_date</c>, <c>update_available</c>, <c>downloaded</c> (waiting for the tray to
-/// install it), <c>not_published</c> or <c>unavailable</c>.
+/// install it), <c>not_published</c>, <c>rate_limited</c> (GitHub is limiting update checks; the latest version is the last one
+/// known) or <c>unavailable</c>.
 /// </param>
 /// <param name="LatestVersion">The newest version known, or the one waiting to install; null when none is known.</param>
 public sealed record UpdateOutlookSnapshot(string Status, string? LatestVersion);
@@ -30,8 +33,7 @@ public sealed class UpdateOutlook
     private readonly DataChangePublisher _changes;
     private readonly Lock _gate = new();
     private UpdateOutlookSnapshot _known = new(Checking, null);
-    private DateTimeOffset? _checkedAt;
-    private bool _checkFailed;
+    private DateTimeOffset? _nextCheckAt;
     private bool _checking;
 
     public UpdateOutlook(UpdateStatusReader status, UpdateFiles files, TimeProvider time, DataChangePublisher changes)
@@ -68,8 +70,7 @@ public sealed class UpdateOutlook
         {
             changed = outlook != _known;
             _known = outlook;
-            _checkedAt = _time.GetUtcNow();
-            _checkFailed = outlook.Status is "unavailable";
+            _nextCheckAt = NextCheckAt(outlook.Status, TextOf(status.Get("retry_at")));
         }
 
         if (changed)
@@ -83,8 +84,7 @@ public sealed class UpdateOutlook
     {
         lock (_gate)
         {
-            var wait = _checkFailed ? RetryAfterFailure : FreshFor;
-            if (_checking || (_checkedAt is { } at && _time.GetUtcNow() - at < wait))
+            if (_checking || (_nextCheckAt is { } at && _time.GetUtcNow() < at))
             {
                 return;
             }
@@ -93,6 +93,18 @@ public sealed class UpdateOutlook
         }
 
         _ = Task.Run(RunCheckAsync, CancellationToken.None);
+    }
+
+    /// <summary>When the answer goes stale: once GitHub says its limit lifts, five minutes after a failure, otherwise half an hour on.</summary>
+    private DateTimeOffset NextCheckAt(string status, string? retryAt)
+    {
+        var now = _time.GetUtcNow();
+        if (status == UpdateStatus.RateLimitedStatus && retryAt is not null && DateTimeOffset.TryParse(retryAt, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var lifts))
+        {
+            return lifts;
+        }
+
+        return now + (status is "unavailable" or UpdateStatus.RateLimitedStatus ? RetryAfterFailure : FreshFor);
     }
 
     private async Task RunCheckAsync()
