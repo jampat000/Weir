@@ -60,9 +60,10 @@ describe("LIVE_TOPIC_QUERIES", () => {
     ]);
   });
 
-  it("refreshes the workflows, their profiles and the libraries setup offers when a workflow changes", () => {
+  it("refreshes the workflows, files at once, their profiles and the libraries setup offers when a workflow changes", () => {
     expect(LIVE_TOPIC_QUERIES.libraries).toEqual([
       processingKeys.libraries,
+      processingKeys.filesAtOnce,
       processingKeys.ruleSets,
       processingKeys.allLibrarySuggestions,
     ]);
