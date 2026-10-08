@@ -384,10 +384,10 @@ it("shows a linked workflow as keeping the original, says why, and leaves the sa
     "Deluno on RIG hands this workflow its downloads. Weir does not scan its watched folder",
   );
   expect(
-    await screen.findByText(
-      "Linked to Deluno on RIG: the original stays with your download client, which may still be seeding.",
-    ),
-  ).toBeInTheDocument();
+    await screen.findByTestId("remove_original_after_success-locked"),
+  ).toHaveTextContent(
+    "Linked to Deluno on RIG: the original stays with your download client, which may still be seeding.",
+  );
   await waitFor(() =>
     expect(check).toHaveBeenLastCalledWith(
       "tv",

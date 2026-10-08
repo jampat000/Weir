@@ -1,4 +1,8 @@
 import { QuietDisclosure } from "../../../../components/shared/quiet-section";
+import {
+  originalStaysReason,
+  type WorkflowKind,
+} from "../../../../lib/processing/workflow-kind";
 import { REJECTED_FILE_OPTIONS } from "./library-options";
 import {
   DateTimeSetting,
@@ -8,11 +12,22 @@ import {
   type LibraryFormBinding,
 } from "./library-settings";
 
+/** A linked workflow never deletes the rejected file, so the choice is shown as leaving it, with the reason. */
+function lockedRejectedFileAction(
+  kind: WorkflowKind,
+): { value: string; reason: string } | undefined {
+  const reason = originalStaysReason(kind);
+  return reason === undefined ? undefined : { value: "leave", reason };
+}
+
 /** Which files belong to the library, decided before Weir spends time probing them. */
 export function LibraryIntakeGroup({
   binding,
+  kind,
 }: {
   binding: LibraryFormBinding;
+  /** Whether the workflow is Weir only or linked, as it is being edited. */
+  kind: WorkflowKind;
 }) {
   return (
     <QuietDisclosure
@@ -105,6 +120,7 @@ export function LibraryIntakeGroup({
           name="rejected_file_action"
           label="When a file is rejected"
           options={REJECTED_FILE_OPTIONS}
+          lockedTo={lockedRejectedFileAction(kind)}
           hint="Applies to a file this workflow's own size, date or path settings turn away, and to a file its rules find nothing in to keep. Weir never deletes a populated parent folder here."
         />
       </div>

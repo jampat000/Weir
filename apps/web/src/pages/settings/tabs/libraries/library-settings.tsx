@@ -135,6 +135,7 @@ export function SelectSetting({
   options,
   hint,
   testId,
+  lockedTo,
 }: {
   binding: LibraryFormBinding;
   name: LibraryTextField;
@@ -142,14 +143,26 @@ export function SelectSetting({
   options: readonly SettingOption[];
   hint?: ReactNode;
   testId?: string;
+  /** The choice this setting is held to and the reason it cannot be changed; the saved value is left as it is. */
+  lockedTo?: { value: string; reason: string };
 }) {
   return (
-    <Field label={label} width="medium" hint={hint}>
+    <Field
+      label={label}
+      width="medium"
+      hint={
+        lockedTo === undefined ? (
+          hint
+        ) : (
+          <span data-testid={`${name}-locked`}>{lockedTo.reason}</span>
+        )
+      }
+    >
       <select
         className="mm-input"
-        value={binding.form[name]}
+        value={lockedTo?.value ?? binding.form[name]}
         onChange={(e) => binding.update({ [name]: e.target.value })}
-        disabled={!binding.editable}
+        disabled={!binding.editable || lockedTo !== undefined}
         data-testid={testId}
       >
         {options.map((option) => (

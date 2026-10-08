@@ -193,7 +193,7 @@ export function LibraryEditor({
               outputFolder={form.output_folder}
               mediaType={form.media_type}
             />
-            <LibraryIntakeGroup binding={binding} />
+            <LibraryIntakeGroup binding={binding} kind={kind} />
             <LibraryReadinessGroup binding={binding} />
             <LibraryOutputGroup binding={binding} kind={kind} />
             <LibraryCapacityGroup binding={binding} />

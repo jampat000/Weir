@@ -92,6 +92,13 @@ export function workflowKindCounts(kinds: WorkflowKind[]): string {
     .join(" · ");
 }
 
+/** A linked workflow never removes or moves the original: the download client and the media manager own it. Undefined when Weir only. */
+export function originalStaysReason(kind: WorkflowKind): string | undefined {
+  return kind.kind === "linked"
+    ? `Linked to ${joinNames(kind.managers.map((m) => m.name))}: the original stays with your download client, which may still be seeding.`
+    : undefined;
+}
+
 /** The linked managers that hand this workflow its downloads (Deluno). Weir's own scan never feeds such a workflow. */
 export function handedOffBy(kind: WorkflowKind): WorkflowManager[] {
   return kind.kind === "linked"
