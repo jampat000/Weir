@@ -45,13 +45,17 @@ public static class WorkerFailures
     /// <summary>Whether another attempt follows this one.</summary>
     public static bool RetryComing(int attemptCount, int maxAttempts) => attemptCount < maxAttempts;
 
-    /// <summary>The operator failure for a job, ending with whether it will be retried or is marked failed.</summary>
-    public static OperatorFailure JobFailure(string module, FailureSubject cause, bool willRetry) =>
+    /// <summary>
+    /// The operator failure for a job, ending with whether it will be retried or is marked failed. <paramref name="knownReason"/> is the
+    /// sentence for a cause Weir recognises, which says why in place of the generic one for the failure kind.
+    /// </summary>
+    public static OperatorFailure JobFailure(string module, FailureSubject cause, bool willRetry, string? knownReason = null) =>
         FailureMessages.FromException(
             module,
             "job",
             cause,
-            continuation: willRetry ? WillRetryContinuation : MarkedFailedContinuation);
+            continuation: willRetry ? WillRetryContinuation : MarkedFailedContinuation,
+            reason: knownReason);
 
     /// <summary>The stored error text: the sentence a person reads first, then what to do, then the technical detail.</summary>
     public static string StoredError(OperatorFailure failure)

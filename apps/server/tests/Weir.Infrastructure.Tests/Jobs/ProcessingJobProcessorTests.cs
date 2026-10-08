@@ -199,7 +199,12 @@ public sealed class ProcessingJobProcessorTests : IDisposable
         await processor.ProcessOneAsync("w", now: T0);
 
         var line = Assert.Single(logger.Entries, entry => entry.Level == LogLevel.Error);
-        Assert.StartsWith("Job handler failed for job_id=1 kind=processing.test.unreadable.v1: Weir job failed:", line.Message, StringComparison.Ordinal);
+        Assert.StartsWith(
+            $"Job handler failed for job_id=1 kind=processing.test.unreadable.v1: Weir job failed: {ToolFailureText.UnreadableFile}",
+            line.Message,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain("unexpected error", line.Message, StringComparison.Ordinal);
+        Assert.Contains(ToolFailureText.UnreadableFile, (await _db.Store.GetAsync(1))!.LastError, StringComparison.Ordinal);
         Assert.DoesNotContain("matroska", line.Message, StringComparison.Ordinal);
         Assert.DoesNotContain("@ 0", line.Message, StringComparison.Ordinal);
         Assert.Equal(toolText, Assert.Single(logger.Exceptions).Message);

@@ -82,6 +82,18 @@ public static class ToolFailureText
         return exception is MediaToolException or MediaToolTimeoutException or MkvmergeUnsupportedPlanException ? Plain(exception) : Generic;
     }
 
+    /// <summary>
+    /// The sentence for a failure whose cause the media tools name: an unreadable file, a timeout, or a tool failure with words of its
+    /// own. Null for any other exception, which is not known to be a media failure.
+    /// </summary>
+    public static string? KnownReason(Exception exception)
+    {
+        ArgumentNullException.ThrowIfNull(exception);
+        return exception is MediaToolException { PlainMessage: { Length: > 0 } } or MediaUnreadableException or MediaToolTimeoutException
+            ? Plain(exception)
+            : null;
+    }
+
     /// <summary>The failure's own message for technical detail: what the tool said, with secrets redacted and capped at 1000 characters.</summary>
     public static string Technical(Exception exception)
     {
