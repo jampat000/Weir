@@ -1,5 +1,6 @@
 using Weir.Core.Json;
 using Weir.Core.MediaManagers;
+using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.Processing.RemuxPass;
 using Weir.Infrastructure.Sqlite;
 
@@ -61,12 +62,13 @@ public sealed class HandoffTargetStore
     {
         ArgumentNullException.ThrowIfNull(uow);
         return uow.QueryAsync(
-            "SELECT relative_path, result, output_file, message FROM media_manager_handoff_targets WHERE handoff_row_id = $row ORDER BY relative_path",
+            "SELECT relative_path, result, output_file, message, output_written_at FROM media_manager_handoff_targets WHERE handoff_row_id = $row ORDER BY relative_path",
             reader => new HandoffTarget(
                 SqliteValues.GetString(reader, 0),
                 SqliteValues.GetStringOrNull(reader, 1),
                 SqliteValues.GetStringOrNull(reader, 2),
-                SqliteValues.GetStringOrNull(reader, 3)),
+                SqliteValues.GetStringOrNull(reader, 3),
+                TimestampColumns.Parse(reader.GetValue(4))),
             ("$row", handoffRowId));
     }
 
@@ -89,11 +91,14 @@ public sealed class HandoffTargetStore
 
         var outputFile = CompletionReports.IsSucceeded(result) && result.Get("output_file") is WireString { Value.Length: > 0 } written ? written.Value : null;
         var updated = await uow.ExecuteAsync(
-            "UPDATE media_manager_handoff_targets SET result = $result, output_file = $output, message = $message " +
+            "UPDATE media_manager_handoff_targets SET result = $result, output_file = $output, message = $message, " +
+            "output_written_at = CASE WHEN $output IS NULL THEN NULL " +
+            "ELSE (SELECT written_at FROM handbacks WHERE library_id = $library AND relative_path = $path) END " +
             "WHERE handoff_row_id = $row AND relative_path = $path",
             ("$result", FolderHandoffReports.TargetResult(result)),
             ("$output", outputFile),
             ("$message", WireStrings.Slice(CompletionReports.MessageFor(result), 2000)),
+            ("$library", row.LibraryId),
             ("$row", row.Id),
             ("$path", relativePath)).ConfigureAwait(false);
         if (updated == 0)
@@ -149,8 +154,9 @@ public sealed class HandoffTargetStore
     }
 
     /// <summary>
-    /// Whether the manager was told about this copy: the hand-off reported the file, naming exactly this copy. A hand-off
-    /// that records no files of its own named only the one file it was for.
+    /// Whether the manager was told about this copy: the hand-off reported the file, naming exactly this copy as Weir wrote
+    /// it then. A copy Weir wrote for the same file after that report was never named to the manager, whatever its path.
+    /// A hand-off that records no files of its own named only the one file it was for.
     /// </summary>
     public async Task<Func<HandbackRow, bool>> ReportedCopiesAsync(UnitOfWork uow, HandoffLedgerRow row)
     {
@@ -168,7 +174,9 @@ public sealed class HandoffTargetStore
         }
 
         var reported = targets.Where(target => target.Delivered && target.OutputFile is not null).ToList();
-        return copy => reported.Any(target => target.RelativePath == copy.RelativePath && SameFile(target.OutputFile!, copy.OutputPath));
+        return copy => reported.Any(target =>
+            target.RelativePath == copy.RelativePath && SameFile(target.OutputFile!, copy.OutputPath) &&
+            (target.OutputWrittenAt is not { } writtenAt || writtenAt == copy.WrittenAt));
     }
 
     private static bool SameFile(string reported, string copy)

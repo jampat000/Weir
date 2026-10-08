@@ -274,10 +274,10 @@ internal sealed class MediaManagerIntakeEndpointHandlers
     /// <summary>
     /// <c>POST /intake/handoffs/{source_key}/{handoff_id}/outcome</c> (#652, agreed with Deluno): the manager
     /// says what became of the file Weir handed back. <c>imported</c> records it and releases Weir's copy when that is safe;
-    /// <c>not-imported</c> is final, and records it and keeps the copy. The same outcome sent again gets the same 200; a
-    /// hand-off never received is 404; one not finished, or with a different outcome already recorded, is 409 with a
-    /// <c>code</c> saying which (#664); a body that cannot be read is 422. Authenticated by <c>X-Webhook-Secret</c>, like
-    /// the other hand-off routes.
+    /// <c>not-imported</c> records it and keeps the copy, and a later <c>imported</c> replaces it (#928). The same outcome
+    /// sent again gets the same 200; a hand-off never received is 404; one not finished, or with a different outcome
+    /// already recorded that cannot be replaced, is 409 with a <c>code</c> saying which (#664); a body that cannot be read
+    /// is 422. Authenticated by <c>X-Webhook-Secret</c>, like the other hand-off routes.
     /// </summary>
     public async Task<ApiResult> PostHandoffOutcomeAsync(ApiRequest request)
     {
@@ -307,9 +307,12 @@ internal sealed class MediaManagerIntakeEndpointHandlers
 
         issues.ThrowIfAny();
 
+        // The write lock comes first: two outcomes for one hand-off racing each other must not both read "nothing recorded",
+        // or a late refusal could overwrite an import, and two imports could each release the same copy.
+        (await request.DbAsync().ConfigureAwait(false)).BeginImmediate();
         var (uow, key, row) = await RequireHandoffAsync(request).ConfigureAwait(false);
         var manager = ManagerName(key);
-        if (row.Outcome is { } recorded)
+        if (row.Outcome is { } recorded && !HandbackRules.Supersedes(recorded, outcome))
         {
             if (recorded != outcome)
             {

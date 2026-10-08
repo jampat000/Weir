@@ -8,9 +8,10 @@ namespace Weir.Core.MediaManagers;
 /// One file a hand-off covers and what its pass came to. <see cref="Result"/> is null until the file has a final result,
 /// then one of <see cref="HandoffLedgerRules.Completed"/>, <see cref="HandoffLedgerRules.PassedThrough"/>,
 /// <see cref="HandoffLedgerRules.Failed"/> or <see cref="HandoffLedgerRules.Cancelled"/>.
-/// <see cref="OutputFile"/> is the copy Weir wrote, as Weir sees it.
+/// <see cref="OutputFile"/> is the copy Weir wrote, as Weir sees it, and <see cref="OutputWrittenAt"/> when that copy was written
+/// (null when the report did not record it).
 /// </summary>
-public sealed record HandoffTarget(string RelativePath, string? Result, string? OutputFile, string? Message)
+public sealed record HandoffTarget(string RelativePath, string? Result, string? OutputFile, string? Message, DateTimeOffset? OutputWrittenAt = null)
 {
     public bool Delivered => Result is HandoffLedgerRules.Completed or HandoffLedgerRules.PassedThrough;
 }

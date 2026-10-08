@@ -54,11 +54,11 @@ public sealed class WorkflowSyncTests
         var moviesId = (long)movies["id"]!;
 
         PublishDestinations(fake, rig, "Completed/Movies 4K");
-        var test = await client.PostWithCsrfAsync($"{ManagerConnections.Route}/{delunoId}/test", new JsonObject());
-        Assert.True(test.Status == HttpStatusCode.OK, test.ToString());
         var moved = Path.Join(rig.Path, "Completed", "Movies 4K");
-        await Poll.UntilAsync(
-            async () => (string)(await client.GetAsync($"{LibrariesRoute}/{moviesId}")).Fields["watched_folder"]! == moved,
+        await SyncUntilAsync(
+            client,
+            created.Fields,
+            async () => (string)(await client.GetAsync($"{LibrariesRoute}/{moviesId}")).Fields["watched_folder"]! == moved ? "moved" : null,
             "the workflow to follow Deluno's new folder");
 
         var unlinked = await client.PostWithCsrfAsync($"{LibrariesRoute}/{moviesId}/unlink", new JsonObject());
@@ -117,9 +117,10 @@ public sealed class WorkflowSyncTests
         await SyncedAsync(client);
 
         PublishDestinations(fake, rig, "Completed/Movies 4K");
-        await TestConnectionAsync(client, deluno);
 
-        var updated = await Poll.UntilAsync(
+        var updated = await SyncUntilAsync(
+            client,
+            deluno,
             async () =>
             {
                 var events = await client.GetAsync($"{WeirClient.Api}/activity/recent", ("event_type", "processing.workflow_synced"), ("limit", 100));
