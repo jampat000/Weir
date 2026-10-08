@@ -179,7 +179,9 @@ export function UpdateSection() {
   const isWindows = status?.install_type === "windows";
   const updateSettingsQ = useUpdateSettingsQuery(isWindows);
   const notifyOnly = isWindows && updateSettingsQ.data?.mode === "NotifyOnly";
-  const updateAvailable = status?.status === "update_available";
+  const updateAvailable =
+    status?.status === "update_available" ||
+    status?.known_update_available === true;
 
   if (updateStatusQ.isPending) {
     return (

@@ -159,7 +159,7 @@ const PRODUCTION_MEANINGS = {
       update_available: "todo",
       downloaded: "todo",
       not_published: "idle",
-      rate_limited: "idle",
+      rate_limited: "attention",
       unavailable: "attention",
     } satisfies Record<SystemOverview["update"]["status"], StatusMeaning>,
   },
