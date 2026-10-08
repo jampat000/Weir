@@ -1,4 +1,5 @@
 using System.Globalization;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
 using Weir.Core.Activity;
@@ -54,7 +55,8 @@ internal sealed class JobsTestDatabase : IDisposable
         IJobNotifications? notifications = null,
         bool claimAllKinds = false,
         PeriodicTaskRegistry? tasks = null,
-        DataChangePublisher? changes = null) =>
+        DataChangePublisher? changes = null,
+        ILogger<ProcessingJobProcessor>? logger = null) =>
         new(
             Store,
             new JobHandlerRegistry(handlers ?? []),
@@ -62,7 +64,7 @@ internal sealed class JobsTestDatabase : IDisposable
             recorder ?? new NoUnhandledJobFailureRecorder(),
             notifications ?? new NoJobNotifications(),
             Clock,
-            NullLogger<ProcessingJobProcessor>.Instance,
+            logger ?? NullLogger<ProcessingJobProcessor>.Instance,
             tasks,
             changes)
         {

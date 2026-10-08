@@ -163,14 +163,19 @@ generate_secret() {
   head -c 48 /dev/urandom | base64 | tr '+/' '-_' | tr -d '=\n'
 }
 
+# The owner-only mode belongs to the secret file alone. The umask is set in a subshell because the server inherits
+# this script's umask, and 077 would make every folder and file it creates private to the weir user.
+write_secret_file() {
+  ( umask 077; printf '%s\n' "$2" > "$1" )
+}
+
 if [ -z "${WEIR_SESSION_SECRET:-}" ]; then
   secret_file="$WEIR_HOME/session.secret"
   if [ -f "$secret_file" ]; then
     WEIR_SESSION_SECRET="$(cat "$secret_file")"
   else
     WEIR_SESSION_SECRET="$(generate_secret)"
-    umask 077
-    printf '%s\n' "$WEIR_SESSION_SECRET" > "$secret_file"
+    write_secret_file "$secret_file" "$WEIR_SESSION_SECRET"
     log_info "generated WEIR_SESSION_SECRET at $secret_file"
   fi
   export WEIR_SESSION_SECRET
@@ -181,11 +186,29 @@ if [ "${#WEIR_SESSION_SECRET}" -lt 32 ]; then
   fail "WEIR_SESSION_SECRET must be at least 32 characters (try: openssl rand -hex 32)"
 fi
 
+# Saved provider keys are encrypted with a secret of their own. A WEIR_CREDENTIALS_SECRET from the environment wins;
+# otherwise one is made on first start and kept next to the session secret. Keys saved before this file existed were
+# encrypted with the session secret, which Weir still reads them with.
+if [ -z "${WEIR_CREDENTIALS_SECRET:-}" ]; then
+  credentials_file="$WEIR_HOME/credentials.secret"
+  if [ -f "$credentials_file" ]; then
+    WEIR_CREDENTIALS_SECRET="$(cat "$credentials_file")"
+  else
+    WEIR_CREDENTIALS_SECRET="$(generate_secret)"
+    write_secret_file "$credentials_file" "$WEIR_CREDENTIALS_SECRET"
+    log_info "generated WEIR_CREDENTIALS_SECRET at $credentials_file"
+  fi
+  export WEIR_CREDENTIALS_SECRET
+fi
+
 if [ "$(id -u)" -eq 0 ]; then
   update_runtime_identity
   ensure_runtime_home_ownership
   if [ -f "$WEIR_HOME/session.secret" ]; then
     chown weir:weir "$WEIR_HOME/session.secret"
+  fi
+  if [ -f "$WEIR_HOME/credentials.secret" ]; then
+    chown weir:weir "$WEIR_HOME/credentials.secret"
   fi
   cd /opt/weir
   exec gosu weir ./Weir --port "${PORT:-9347}"

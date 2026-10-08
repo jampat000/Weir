@@ -13,13 +13,13 @@ The image is `ghcr.io/jampat000/weir`. The tag after the colon picks the version
 
 | Tag | What it is | Use it when |
 | --- | --- | --- |
-| `1.0.0-rc.8` | Exactly that release, forever | You want to choose when Weir changes. **Use this while Weir is a release candidate.** Newer ones are listed on the [Releases page](https://github.com/jampat000/Weir/releases). |
+| `1.0.0-rc.9` | Exactly that release, forever | You want to choose when Weir changes. **Use this while Weir is a release candidate.** Newer ones are listed on the [Releases page](https://github.com/jampat000/Weir/releases). |
 | `latest` | The newest stable release | You are happy for `docker compose pull` to move you to whatever is newest. It does not exist yet: it arrives with 1.0.0. |
 
 Release candidates are published under their version tag only. They never move `latest`, so until 1.0.0 you
 name the version, as every example below does.
 
-The image tag has no `v`: the release `v1.0.0-rc.8` is the image `1.0.0-rc.8`.
+The image tag has no `v`: the release `v1.0.0-rc.9` is the image `1.0.0-rc.9`.
 
 ## 1. The quickest start
 
@@ -28,7 +28,7 @@ Make a folder for Weir, and save this as `compose.yaml` inside it:
 ```yaml
 services:
   weir:
-    image: ghcr.io/jampat000/weir:1.0.0-rc.8
+    image: ghcr.io/jampat000/weir:1.0.0-rc.9
     container_name: weir
     hostname: my-server        # what Weir calls itself: "Weir on my-server"
     ports:
@@ -59,7 +59,7 @@ This is the version most people want: your media folders, the right file owner, 
 ```yaml
 services:
   weir:
-    image: ghcr.io/jampat000/weir:1.0.0-rc.8
+    image: ghcr.io/jampat000/weir:1.0.0-rc.9
     container_name: weir
     hostname: my-server
     ports:
@@ -67,7 +67,7 @@ services:
     environment:
       - WEIR_PUID=1000             # the user that owns your media folders
       - WEIR_PGID=1000             # that user's group
-      # Recommended: encrypts the Radarr, Sonarr and Deluno keys Weir saves.
+      # Optional: encrypts the Radarr, Sonarr and Deluno keys Weir saves. Weir makes its own if you leave this out.
       # Make one with:  openssl rand -hex 32   and keep it with your backups.
       # - WEIR_CREDENTIALS_SECRET=<paste the value here>
     volumes:
@@ -88,7 +88,7 @@ docker run -d \
   -v "$(pwd)/weir-data:/data/weir" \
   -v /srv/media:/media \
   --restart unless-stopped \
-  ghcr.io/jampat000/weir:1.0.0-rc.8
+  ghcr.io/jampat000/weir:1.0.0-rc.9
 ```
 
 What each part means:
@@ -99,7 +99,7 @@ What each part means:
 | `/data/weir` | Where Weir keeps its data inside the container. Always mount something here, or your data disappears with the container. |
 | `/srv/media:/media` | Left is your media folder on the server, right is where Weir sees it. Change the left side. Use `/media/...` paths when you set up folders in Weir. |
 | `WEIR_PUID` / `WEIR_PGID` | The user and group Weir runs as, so it can read and write your files. Run `id <your-username>` on the server to find them. Synology is usually `1026` / `100`, Unraid `99` / `100`. `PUID` and `PGID` work too. Neither may be `0`: Weir refuses to run as root. |
-| `WEIR_CREDENTIALS_SECRET` | Optional, but set it before you add Radarr, Sonarr or Deluno. If you lose it later, you re-enter those keys. |
+| `WEIR_CREDENTIALS_SECRET` | Optional. Weir makes one on first start and keeps it in `weir-data`. Set your own before you add Radarr, Sonarr or Deluno if you want to manage it yourself. If you lose it later, you re-enter those keys. |
 
 **Time zone.** There is nothing to set on the container. Weir keeps its own time zone, which you choose in the
 setup wizard and can change under **System › About**. Schedules and dates follow that.
@@ -212,7 +212,7 @@ and reach it only through a proxy on the same machine, publish it on the loopbac
 
 Weir updates its own database when it starts, so updating is just replacing the container.
 
-With a pinned tag, edit the tag in `compose.yaml` first (for example `1.0.0-rc.8`), then:
+With a pinned tag, edit the tag in `compose.yaml` first (for example `1.0.0-rc.9`), then:
 
 ```bash
 docker compose pull
@@ -223,7 +223,7 @@ Once 1.0.0 is out and you use `latest`, only the two commands are needed. With `
 remove the old container and run the same `docker run` command again:
 
 ```bash
-docker pull ghcr.io/jampat000/weir:1.0.0-rc.8
+docker pull ghcr.io/jampat000/weir:1.0.0-rc.9
 docker stop weir && docker rm weir
 ```
 
@@ -245,8 +245,8 @@ Weir has two kinds of backup.
   docker compose start weir
   ```
 
-  Keep the file somewhere other than the same disk. If you set `WEIR_CREDENTIALS_SECRET`, store it with the
-  backup, because without it the saved connection keys cannot be read.
+  Keep the file somewhere other than the same disk. If you set `WEIR_CREDENTIALS_SECRET` yourself, store it with the
+  backup, because without it the saved connection keys cannot be read. The one Weir makes is inside `weir-data`.
 
 To restore: stop Weir, put the folder back, start it.
 

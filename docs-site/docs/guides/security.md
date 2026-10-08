@@ -14,6 +14,7 @@ Weir's security posture and hardening baseline.
 - Login and bootstrap routes are rate-limited
 - Session cookies are HTTP-only
 - CSRF protection on all authenticated state-changing requests
+- Optional extra hardening: set `WEIR_CORS_ORIGINS` to the address you reach Weir at, and browser posts from any other origin are refused
 - Secure cookies enabled when deployed behind HTTPS
 
 ## Secrets management

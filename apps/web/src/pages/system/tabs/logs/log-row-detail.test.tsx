@@ -171,6 +171,35 @@ describe("an open row", () => {
     ).toBeInTheDocument();
   });
 
+  it("reads a server line with an exception as its sentence, and keeps the tool's text for the open row", async () => {
+    const toolText =
+      "Weir.Core.Media.MediaUnreadableException: [matroska,webm @ 000001534eaabd00] EBML header parsing failed";
+    const sentence =
+      "Reading Film.mkv failed. Weir couldn't read this file: it isn't a video Weir recognises, or it is damaged or incomplete.";
+    mocks.fetchSystemLog.mockResolvedValue(
+      logPage([
+        {
+          ...SERVER_ROW,
+          title: sentence,
+          server: {
+            ...SERVER_ROW.server!,
+            message: sentence,
+            traceback: toolText,
+          },
+        },
+      ]),
+    );
+    await rendered();
+
+    const row = screen.getByText(sentence).closest("li") as HTMLElement;
+
+    expect(within(row).queryByText(/matroska/)).not.toBeInTheDocument();
+    fireEvent.click(within(row).getByRole("button", { expanded: false }));
+    expect(
+      within(row).getByText(/EBML header parsing failed/),
+    ).toBeInTheDocument();
+  });
+
   it("opens one row at a time", async () => {
     await rendered();
 

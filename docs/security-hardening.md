@@ -11,6 +11,9 @@ This checklist defines the current practical hardening baseline for Weir.
 - Login and bootstrap routes are rate-limited per IP; login also backs off per account after 5
   failures in 15 minutes, independent of which addresses the guesses came from.
 - Authenticated state-changing browser requests require CSRF protection.
+- Extra hardening, optional: set `WEIR_CORS_ORIGINS` (or `WEIR_TRUSTED_BROWSER_ORIGINS`) to the address you reach Weir
+  at, and a browser post is then also refused unless its `Origin` (or, failing that, `Referer`) is in that list. Without
+  it Weir does not check where a post came from; the CSRF token and the `X-Requested-With` header still apply.
 - Session cookies are HTTP-only.
 - Secure cookies should be enabled when deployed behind HTTPS.
 - Existing users must persist across restarts and upgrades.
@@ -29,7 +32,8 @@ This checklist defines the current practical hardening baseline for Weir.
 - Runtime SQLite databases must never be committed.
 - Logs, backups, media paths, API keys, provider tokens, and session secrets must never be committed.
 - Public issue logs must redact secrets, private hostnames, and private filesystem paths.
-- Docker can generate a persistent session secret when one is not provided.
+- Docker generates a persistent session secret and credentials secret (`session.secret`, `credentials.secret` in
+  `WEIR_HOME`) when none is provided; the Windows tray does the same.
 - `WEIR_SESSION_SECRET` signs sessions and CSRF tokens; `WEIR_CREDENTIALS_SECRET` encrypts saved provider
   credentials. Keep them separate.
 - `WEIR_METRICS_BEARER_TOKEN` can gate machine access to `/metrics` without requiring an operator browser session.

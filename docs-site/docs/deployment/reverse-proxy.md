@@ -55,6 +55,11 @@ cookie on an HTTP page, so sign-in sends you straight back to the login page.
 
 Credentialed browser requests require explicit origins. Setting `WEIR_CORS_ORIGINS=*` is rejected at startup.
 
+`WEIR_CORS_ORIGINS` is optional extra hardening for a same-origin setup too. Set it to the address you reach
+Weir at (for example `https://weir.example`) and browser posts are refused unless their `Origin`, or failing that
+their `Referer`, is in the list. It is off by default because a proxy that rewrites the `Host` header would otherwise
+be refused, and the CSRF token and `X-Requested-With` header already protect those requests.
+
 For split-origin deployments (static site and API on different origins):
 
 - Use HTTPS everywhere

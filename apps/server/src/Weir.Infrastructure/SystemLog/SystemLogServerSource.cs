@@ -112,7 +112,10 @@ internal sealed class SystemLogServerSource
     private static void Increment(Dictionary<string, long> tally, string key) =>
         tally[key] = tally.GetValueOrDefault(key) + 1;
 
-    /// <summary>The line as a row, or null when its time cannot be read, as the Logs list has always left such a line out.</summary>
+    /// <summary>
+    /// The line as a row, or null when its time cannot be read, as the Logs list has always left such a line out. An exception stays in
+    /// the record's <c>traceback</c>: it is what a person opens the row for, never the line the row reads as.
+    /// </summary>
     private static SystemLogRow? RowOf(ParsedLogEntry entry, long lineNumber)
     {
         if (SuiteLogFilter.ToOut(entry) is not { } record
@@ -129,12 +132,9 @@ internal sealed class SystemLogServerSource
             SystemLogRules.ServerCategory(entry.Logger),
             null,
             entry.Message,
-            entry.Detail ?? FirstLine(entry.Traceback),
+            entry.Detail,
             record);
     }
 
     private sealed record KeyedRow(SystemLogRow Row, IReadOnlyList<object?> Key);
-
-    private static string? FirstLine(string? text) =>
-        text?.Split('\n', 2)[0].Trim() is { Length: > 0 } line ? line : null;
 }
