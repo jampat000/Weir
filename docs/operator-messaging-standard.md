@@ -36,6 +36,8 @@ Failures must use the shared failure helper, `FailureMessages` in `Weir.Core/Obs
 - Say what happens next: skipped and continued, will retry, or marked failed.
 - Add `next_action` for credential, auth, network, filesystem, validation, and rate-limit cases.
 - Keep raw stack traces and exception internals in structured logs, not primary UI text.
+- A failure of ffprobe, ffmpeg or mkvmerge is worded through `ToolFailureText` in `Weir.Core/Media` wherever a person or a media manager reads it: Activity titles and reasons, the report to a manager, Logs headlines, notices and API errors. The tool's own text (stderr, memory addresses, file paths) goes in `technical_detail` on the Activity detail, or in the exception a log line carries.
+- A file Weir cannot read (ffprobe cannot parse it, or finds no streams in it) is refused before any output is written, as a file with no video is: the workflow's reject or leave choice applies, a linked workflow's original is left in place, and pass-through never hands it on.
 
 ## Wording
 

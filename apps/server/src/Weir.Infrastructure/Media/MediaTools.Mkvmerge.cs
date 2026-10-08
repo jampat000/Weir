@@ -32,7 +32,8 @@ public sealed partial class MediaTools
         // mkvmerge's exit code 1 means "identified, with warnings", which is still a usable answer.
         if (result.ExitCode is not 0 and not MkvmergeCommands.ExitCodeWarnings)
         {
-            throw new MediaToolException("mkvmerge could not identify the file: " + ProbeOutput.TailText(result.Stderr));
+            var detail = ProbeOutput.TailText(result.Stderr);
+            throw new MediaToolException("mkvmerge could not identify the file: " + detail) { PlainMessage = ToolFailureText.ForToolText(detail) };
         }
 
         try
@@ -101,7 +102,7 @@ public sealed partial class MediaTools
                 detail = ProbeOutput.TailText(result.Stdout);
             }
 
-            throw new MediaToolException("mkvmerge failed: " + detail);
+            throw new MediaToolException("mkvmerge failed: " + detail) { PlainMessage = ToolFailureText.ForToolText(detail) };
         }
     }
 }

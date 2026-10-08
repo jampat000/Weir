@@ -47,16 +47,25 @@ public sealed class MediaToolsTests : IDisposable
     }
 
     [Fact]
-    public async Task Ffprobe_failure_result_still_warns()
+    public async Task Ffprobe_failure_warns_in_plain_words_and_keeps_the_tools_text_as_the_exception()
     {
         var media = WriteFile("movie.mkv", "not-empty"u8.ToArray());
         var logger = new ListLogger<MediaTools>();
-        var runner = new ScriptedRunner(_ => new ScriptedRun { ExitCode = 1, Stderr = "broken"u8.ToArray() });
+        var runner = new ScriptedRunner(_ => new ScriptedRun
+        {
+            ExitCode = 1,
+            Stderr = "[matroska,webm @ 000001b280590a00] EBML header parsing failed\nmovie.mkv: Invalid data found when processing input"u8.ToArray(),
+        });
 
-        var error = await Assert.ThrowsAnyAsync<MediaToolException>(() => Tools(runner, logger).FfprobeJsonAsync(media));
+        await Assert.ThrowsAnyAsync<MediaToolException>(() => Tools(runner, logger).FfprobeJsonAsync(media));
 
-        Assert.Contains("broken", error.Message, StringComparison.Ordinal);
-        Assert.Contains(logger.Entries, e => e.Level == LogLevel.Warning && e.Message.Contains("PROCESSING_FFPROBE_RESULT", StringComparison.Ordinal));
+        var warning = Assert.Single(logger.Entries, e => e.Level == LogLevel.Warning);
+        Assert.Contains("movie.mkv", warning.Message, StringComparison.Ordinal);
+        Assert.Contains(ToolFailureText.UnreadableFile, warning.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("@ 0", warning.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("[matroska", warning.Message, StringComparison.Ordinal);
+        Assert.Contains("EBML header parsing failed", Assert.Single(logger.Exceptions).Message, StringComparison.Ordinal);
+        Assert.Contains(logger.Entries, e => e.Level == LogLevel.Debug && e.Message.Contains("PROCESSING_FFPROBE_RESULT", StringComparison.Ordinal));
     }
 
     [Theory]
