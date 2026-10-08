@@ -44,6 +44,19 @@ public sealed class TrayHandOffWatcherTests : IAsyncLifetime, IDisposable
         throw new InvalidOperationException("The subscription ended.");
     }
 
+    /// <summary>The first <paramref name="count"/> topics, however long the watcher takes to settle, then anything else that follows soon after.</summary>
+    private static async Task<string[]> HeardAsync(BroadcastSubscription<string> heard, int count)
+    {
+        var topics = new List<string>();
+        for (var i = 0; i < count; i++)
+        {
+            topics.Add(await NextAsync(heard));
+        }
+
+        topics.AddRange(await HeardAfterAsync(heard, LongEnoughToHearNothing));
+        return [.. topics];
+    }
+
     private static async Task<string[]> HeardAfterAsync(BroadcastSubscription<string> heard, TimeSpan wait)
     {
         await Task.Delay(wait);
@@ -89,7 +102,7 @@ public sealed class TrayHandOffWatcherTests : IAsyncLifetime, IDisposable
             await File.WriteAllTextAsync(Path.Join(Home, UpdateFiles.StateFileName), $"{{\"downloaded\": true, \"version\": \"9.9.{write}\"}}");
         }
 
-        Assert.Equal([DataTopics.Update], await HeardAfterAsync(heard, LongEnoughToHearNothing));
+        Assert.Equal([DataTopics.Update], await HeardAsync(heard, 1));
     }
 
     [Fact]
@@ -102,7 +115,7 @@ public sealed class TrayHandOffWatcherTests : IAsyncLifetime, IDisposable
 
         Assert.Equal(
             [DataTopics.NetworkAccess, DataTopics.Update],
-            [.. (await HeardAfterAsync(heard, LongEnoughToHearNothing)).Order(StringComparer.Ordinal)]);
+            [.. (await HeardAsync(heard, 2)).Order(StringComparer.Ordinal)]);
     }
 
     [Fact]
@@ -124,6 +137,6 @@ public sealed class TrayHandOffWatcherTests : IAsyncLifetime, IDisposable
         File.WriteAllText(Path.Join(Home, ".update-state.json.1a2b3c4d.tmp"), "{\"downloaded\": true, \"version\": \"9.9.9\"}");
         File.Move(Path.Join(Home, ".update-state.json.1a2b3c4d.tmp"), Path.Join(Home, UpdateFiles.StateFileName), overwrite: true);
 
-        Assert.Equal([DataTopics.Update], await HeardAfterAsync(heard, LongEnoughToHearNothing));
+        Assert.Equal([DataTopics.Update], await HeardAsync(heard, 1));
     }
 }
