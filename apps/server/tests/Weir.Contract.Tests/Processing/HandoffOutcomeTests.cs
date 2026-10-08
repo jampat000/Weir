@@ -73,6 +73,20 @@ public sealed class HandoffOutcomeTests
         Assert.True(File.Exists(copy));
     }
 
+    [Fact]
+    public async Task The_report_records_which_copy_it_named_so_a_later_copy_is_never_released_for_it()
+    {
+        await using var scenario = await Scenario.StartAsync();
+        await FinishedHandoffAsync(scenario);
+
+        await using var database = await scenario.Server.StopForDatabaseAsync();
+        var target = Assert.Single(SeedSql.Rows(
+            database.Connection,
+            "SELECT t.output_written_at AS named, h.written_at AS written FROM media_manager_handoff_targets t JOIN handbacks h ON h.relative_path = t.relative_path"));
+        Assert.NotNull(target["named"]);
+        Assert.Equal(target["written"], target["named"]);
+    }
+
     /// <summary>A hand-off the fake Deluno made, which Weir finished and reported: the copy it handed back, and the hand-off's id.</summary>
     private static async Task<(string Copy, string HandoffId)> FinishedHandoffAsync(Scenario scenario)
     {
