@@ -43,8 +43,9 @@ public static class OutboundAddressGuard
     public readonly record struct ResolvedAddresses(bool CouldNotResolve, IReadOnlyList<IPAddress> Allowed);
 
     /// <summary>
-    /// Resolves <paramref name="host"/> (an IP literal is returned as-is, with no DNS lookup) and returns every
-    /// resolved address <paramref name="isAllowed"/> accepts, in the order the resolver gave them.
+    /// Resolves <paramref name="host"/> (an IP literal is returned as-is and <c>localhost</c> is answered with the
+    /// loopback addresses in <see cref="LoopbackFirstConnect"/> order, neither with a DNS lookup) and returns every
+    /// resolved address <paramref name="isAllowed"/> accepts, in the order they were resolved.
     /// </summary>
     public static async Task<ResolvedAddresses> ResolveAllowedAsync(
         string host, Func<NetAddress, bool> isAllowed, HostResolver? resolveHost, CancellationToken cancellationToken)
@@ -55,6 +56,10 @@ public static class OutboundAddressGuard
         if (NetAddress.TryParse(host, out _) && IPAddress.TryParse(host, out var literal))
         {
             addresses = [literal];
+        }
+        else if (LoopbackFirstConnect.IsLocalhost(host))
+        {
+            addresses = [.. LoopbackFirstConnect.LoopbackAddresses()];
         }
         else
         {
@@ -95,16 +100,6 @@ public static class OutboundAddressGuard
             throw refused(host);
         }
 
-        var socket = new Socket(SocketType.Stream, ProtocolType.Tcp) { NoDelay = true };
-        try
-        {
-            await socket.ConnectAsync(resolved.Allowed[0], context.DnsEndPoint.Port, cancellationToken).ConfigureAwait(false);
-            return new NetworkStream(socket, ownsSocket: true);
-        }
-        catch (Exception exception) when (exception is SocketException or OperationCanceledException)
-        {
-            socket.Dispose();
-            throw;
-        }
+        return await LoopbackFirstConnect.ConnectAsync(resolved.Allowed, context.DnsEndPoint.Port, cancellationToken).ConfigureAwait(false);
     }
 }
