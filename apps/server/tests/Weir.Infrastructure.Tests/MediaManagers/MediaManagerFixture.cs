@@ -31,7 +31,7 @@ internal sealed class MediaManagerFixture : IDisposable
         Libraries = new LibraryStore();
         Handback = new HandbackStore();
         Ledger = new HandoffLedgerStore(Store.Clock, Targets, Files);
-        Jobs = new ProcessingJobStore(Store.Database, Store.Clock);
+        Jobs = new ProcessingJobStore(Store.Database, Store.Clock, changes: Changes);
         SkipMarkers = new FileSkipMarkerStore();
         Reporter = new HandoffCompletionReporter(Connections, ConnectionStore, Ledger, Targets, Libraries, Http);
         Artwork = new ArtworkSubjects(new ArtworkLookupStore(), new ArtworkFileStore());

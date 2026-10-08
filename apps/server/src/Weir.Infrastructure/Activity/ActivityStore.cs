@@ -54,6 +54,10 @@ public sealed class ActivityStore
 /// <summary>Previews and resets operational history: all Activity events plus finished job rows.</summary>
 public sealed class OperationalHistoryStore
 {
+    private readonly DataChangePublisher _changes;
+
+    public OperationalHistoryStore(DataChangePublisher changes) => _changes = changes ?? throw new ArgumentNullException(nameof(changes));
+
     private const string TerminalStatuses = "('completed', 'failed', 'handler_ok_finalize_failed', 'cancelled')";
 
     public sealed record ResetResult(long ActivityEventsDeleted, long ProcessingJobsDeleted)
@@ -75,6 +79,7 @@ public sealed class OperationalHistoryStore
         var counts = await PreviewAsync(uow).ConfigureAwait(false);
         await uow.ExecuteAsync("DELETE FROM activity_events").ConfigureAwait(false);
         await uow.ExecuteAsync($"DELETE FROM jobs WHERE jobs.status IN {TerminalStatuses}").ConfigureAwait(false);
+        _changes.PublishOnCommit(uow, DataTopics.Jobs);
         return counts;
     }
 }

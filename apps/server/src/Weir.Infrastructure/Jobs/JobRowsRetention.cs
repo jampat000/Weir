@@ -38,6 +38,11 @@ public sealed class JobRowsRetention
         var ledger = await PruneLedgerAsync(database, now, cancellationToken).ConfigureAwait(false);
         var activity = await PruneActivityAsync(database, await ActivityRetentionDaysAsync(database, cancellationToken).ConfigureAwait(false), now, cancellationToken)
             .ConfigureAwait(false);
+        if (processing > 0)
+        {
+            _queue.AnnouncePruned();
+        }
+
         return new JobRowsPruneCounts(processing, ledger, activity);
     }
 

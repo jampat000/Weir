@@ -1,4 +1,5 @@
 using Microsoft.Data.Sqlite;
+using Weir.Infrastructure.Activity;
 using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Infrastructure.Jobs;
@@ -16,7 +17,10 @@ public sealed partial class ProcessingJobStore
         _changes?.PublishQueueChangeOnCommit(uow, jobKind);
     }
 
-    private void AnnounceQueueChange(SqliteTransaction transaction, string jobKind)
+    /// <summary>Says that old job rows were removed, for a prune that commits in batches of its own.</summary>
+    internal void AnnouncePruned() => _changes?.Publish(DataTopics.Jobs);
+
+    internal void AnnounceQueueChange(SqliteTransaction transaction, string jobKind)
     {
         if (UnitOfWork.OwnerOf(transaction) is { } unit)
         {

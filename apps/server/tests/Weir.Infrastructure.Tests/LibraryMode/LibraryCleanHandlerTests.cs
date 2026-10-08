@@ -12,6 +12,7 @@ using Weir.Infrastructure.Media;
 using Weir.Infrastructure.MediaManagers;
 using Weir.Infrastructure.Processing;
 using Weir.Infrastructure.Processing.RemuxPass;
+using Weir.Infrastructure.Tests.Activity;
 using Weir.Infrastructure.Tests.Media;
 using Weir.Infrastructure.Tests.MediaManagers;
 using Weir.Infrastructure.Tests.Processing.RemuxPass;
@@ -55,7 +56,7 @@ public sealed class LibraryCleanHandlerTests : IDisposable
         var removedTrackStore = new Weir.Infrastructure.Library.FileLogRemovedTrackStore(_fixture.Store.Database, _fixture.Store.Clock);
         return new LibraryCleanHandler(
             _fixture.Store.Database, tools, swap, notifier, PhysicalHardlinkInspector.Instance, removedTrackStore,
-            _librarySettings, _fileMarks, _libraries, _fixture.Store.Clock, NullLogger<LibraryCleanHandler>.Instance);
+            _librarySettings, _fileMarks, _libraries, _fixture.Changes, _fixture.Store.Clock, NullLogger<LibraryCleanHandler>.Instance);
     }
 
     /// <summary>A library whose rule set keeps only English audio, strictly — the same policy proven in
@@ -431,9 +432,11 @@ public sealed class LibraryCleanHandlerTests : IDisposable
         _media.Probes["film.mkv"] = FakeMediaRunner.EnglishAndJapanese;
         await KeepMoreFreeThanTheDriveHasAsync(library);
         var jobId = await EnqueueCleanAsync(library, path, confirmFinalRemoval: true);
+        using var published = new PublishedTopics(_fixture.Changes);
 
         await RunCleanAsync(jobId);
 
+        Assert.Contains(DataTopics.Jobs, await published.TakeAsync());
         Assert.Equal(new byte[] { 1, 2, 3 }, await File.ReadAllBytesAsync(path));
         Assert.Empty(_media.Remuxes);
         Assert.Equal(1, await _fixture.Store.Scalar($"SELECT count(*) FROM jobs WHERE id = {jobId} AND status = '{ProcessingJobStatus.Pending}' AND not_before IS NOT NULL"));
