@@ -68,7 +68,7 @@ public sealed class PendingJobCancellation
             ("$status", ProcessingJobStatus.Cancelled),
             ("$error", JobQueueRules.CancelledByOperatorError),
             ("$id", found.Id)).ConfigureAwait(false);
-        uow.OnCommitted(() => _changes.Publish(DataTopics.Jobs));
+        _changes.PublishQueueChangeOnCommit(uow, found.Kind);
 
         var payload = Parse(found.Payload);
         if (found.Kind == RemuxPassOutcomes.JobKind &&

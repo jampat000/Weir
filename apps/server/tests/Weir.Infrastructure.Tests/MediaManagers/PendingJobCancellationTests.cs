@@ -31,7 +31,7 @@ public sealed class PendingJobCancellationTests : IDisposable
         var result = await _fixture.Db(uow => _fixture.Cancellation.CancelAsync(uow, job.Id));
 
         Assert.Equal(JobActionOutcome.Ok, result.Outcome);
-        Assert.Equal([DataTopics.Jobs], await HeardAsync(heard));
+        Assert.Equal([DataTopics.Jobs, DataTopics.FilesAtOnce], await HeardAsync(heard));
     }
 
     [Fact]

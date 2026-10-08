@@ -51,6 +51,17 @@ public sealed class LiveStreamApiTests
     internal static async Task<string> NextTopicAsync(StreamReader reader) =>
         (await NextFrameAsync(reader, "data.changed"))["topic"]!.GetValue<string>();
 
+    /// <summary>Reads topics until <paramref name="wanted"/> arrives, past the topics a request also moves, such as the queue its job joined.</summary>
+    private static async Task AssertTopicArrivesAsync(StreamReader reader, string wanted)
+    {
+        string topic;
+        do
+        {
+            topic = await NextTopicAsync(reader);
+        }
+        while (topic != wanted);
+    }
+
     [Fact]
     public void The_frames_are_the_documented_server_sent_events()
     {
@@ -115,7 +126,7 @@ public sealed class LiveStreamApiTests
         using var scan = await client.PostAsync($"{library}/library-scan", new { csrf_token = await client.CsrfAsync() });
 
         Assert.Equal(System.Net.HttpStatusCode.OK, scan.StatusCode);
-        Assert.Equal(DataTopics.LibraryScan, await NextTopicAsync(reader));
+        await AssertTopicArrivesAsync(reader, DataTopics.LibraryScan);
     }
 
     [Fact]
@@ -130,7 +141,7 @@ public sealed class LiveStreamApiTests
         using var scheduled = await client.PostAsync($"{library}/library-schedule", new { enabled = true, csrf_token = await client.CsrfAsync() });
 
         Assert.Equal(System.Net.HttpStatusCode.OK, scheduled.StatusCode);
-        Assert.Equal(DataTopics.LibraryScan, await NextTopicAsync(reader));
+        await AssertTopicArrivesAsync(reader, DataTopics.LibraryScan);
     }
 
     [Fact]

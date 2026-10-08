@@ -117,7 +117,7 @@ public sealed class LibraryScanStore
             parameters).ConfigureAwait(false);
 
         var transaction = uow.WriteTransaction();
-        jobs.AnnounceOnCommit(uow);
+        jobs.AnnounceOnCommit(uow, LibraryModeJobKinds.CleanKind);
         return jobs.EnqueueOrGet(
             uow.Connection,
             transaction,

@@ -2,7 +2,6 @@ using System.Net;
 using System.Text.Json.Nodes;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Time.Testing;
 using Weir.Api.Endpoints;
 using Weir.Core.Configuration;
 using Weir.Infrastructure.Activity;
@@ -273,13 +272,7 @@ public sealed class SystemOverviewApiTests
     {
         var (server, _) = await StartAsync();
         await using var _server = server;
-        var time = new FakeTimeProvider(Noon);
-        var frames = new SystemOverviewFrames(
-            server.Services.GetRequiredService<SystemOverviewReader>(),
-            server.Services.GetRequiredService<SqliteDatabase>(),
-            server.Services,
-            time,
-            server.Services.GetRequiredService<ILoggerFactory>());
+        var frames = server.Services.GetRequiredService<SystemOverviewFrames>();
         using var stop = new CancellationTokenSource();
         await using var stream = frames.ForAsync(stop.Token).GetAsyncEnumerator(stop.Token);
 
@@ -292,7 +285,7 @@ public sealed class SystemOverviewApiTests
         var quietLooks = 0;
         for (var look = 0; look < 20 && quietLooks < 3; look++)
         {
-            time.Advance(SystemOverviewFrames.CheckEvery);
+            await frames.RefreshAsync(stop.Token);
             await Task.Delay(TimeSpan.FromMilliseconds(250));
             if (next.IsCompleted)
             {
@@ -309,7 +302,7 @@ public sealed class SystemOverviewApiTests
         Assert.Equal(3, quietLooks);
 
         using var browser = server.Services.GetRequiredService<ActivityStreamClients>().Open();
-        time.Advance(SystemOverviewFrames.CheckEvery);
+        await frames.RefreshAsync(stop.Token);
 
         Assert.True(await next.WaitAsync(TimeSpan.FromSeconds(10)));
         Assert.Contains("\"browsers_live\":1", stream.Current, StringComparison.Ordinal);

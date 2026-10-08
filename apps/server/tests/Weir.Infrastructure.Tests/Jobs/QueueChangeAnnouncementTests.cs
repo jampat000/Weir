@@ -112,6 +112,21 @@ public sealed class QueueChangeAnnouncementTests : IDisposable
     }
 
     [Fact]
+    public async Task Raising_a_queued_pass_announces_and_renewing_a_lease_does_not()
+    {
+        var running = await _store.EnqueueOrGetAsync("running", FilePass);
+        var waiting = await _store.EnqueueOrGetAsync("waiting", FilePass);
+        await _store.ClaimNextAsync("worker", T0.AddHours(1), T0);
+        await _published.TakeAsync();
+
+        Assert.True(await _store.RenewLeaseAsync(running.Id, "worker", T0.AddHours(2), T0));
+        Assert.Empty(await _published.TakeAsync());
+
+        Assert.Equal(JobActionOutcome.Ok, await _store.MoveToTopAsync(waiting.Id));
+        Assert.Equal([DataTopics.Jobs, DataTopics.FilesAtOnce], await _published.TakeAsync());
+    }
+
+    [Fact]
     public async Task A_unit_of_work_that_queues_several_passes_announces_once_after_it_commits()
     {
         await using var unit = await UnitOfWork.OpenAsync(_db.Database);

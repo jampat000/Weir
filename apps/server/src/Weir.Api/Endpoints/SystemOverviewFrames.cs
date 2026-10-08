@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using Weir.Core.Json;
+using Weir.Infrastructure.Activity;
 using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Api.Endpoints;
@@ -7,50 +8,96 @@ namespace Weir.Api.Endpoints;
 /// <summary>
 /// The <c>system.overview</c> side of the Activity stream: the facts System shows about this copy of Weir (its jobs and requests
 /// today, its checks, the update, the browsers watching), sent when a stream opens and again each time one of them has changed.
-/// Weir looks every few seconds for the stream; what has not changed sends nothing. Uptime counts every second and so never makes
-/// a frame by itself: the page counts it from <c>started_at</c>.
+/// The overview is read once for every stream together: <see cref="RefreshAsync"/> reads it and, when a fact differs from the last
+/// reading, hands the new frame to every open stream. <see cref="SystemOverviewChangeTask"/> refreshes it every few seconds while
+/// a browser is watching, and a stream that opens refreshes it too, so it starts from the facts of the moment. Uptime counts every
+/// second and so never makes a frame by itself: the page counts it from <c>started_at</c>.
 /// </summary>
-internal sealed class SystemOverviewFrames
+internal sealed class SystemOverviewFrames : IDisposable
 {
-    /// <summary>How often a stream looks for a change in the overview.</summary>
-    public static readonly TimeSpan CheckEvery = TimeSpan.FromSeconds(5);
+    /// <summary>How many frames one slow stream may hold before its oldest are dropped.</summary>
+    private const int StreamBacklog = 8;
 
     private readonly SystemOverviewReader _overview;
     private readonly SqliteDatabase _database;
     private readonly IServiceProvider _services;
-    private readonly TimeProvider _time;
     private readonly ILogger _logger;
+    private readonly Broadcast<string> _feed = new(StreamBacklog);
+    private readonly SemaphoreSlim _refreshing = new(1, 1);
+    private long _refreshes;
+    private string? _facts;
+    private string? _frame;
 
-    public SystemOverviewFrames(
-        SystemOverviewReader overview, SqliteDatabase database, IServiceProvider services, TimeProvider time, ILoggerFactory loggers)
+    public SystemOverviewFrames(SystemOverviewReader overview, SqliteDatabase database, IServiceProvider services, ILoggerFactory loggers)
     {
         _overview = overview ?? throw new ArgumentNullException(nameof(overview));
         _database = database ?? throw new ArgumentNullException(nameof(database));
         _services = services ?? throw new ArgumentNullException(nameof(services));
-        _time = time ?? throw new ArgumentNullException(nameof(time));
         ArgumentNullException.ThrowIfNull(loggers);
         _logger = loggers.CreateLogger("weir.platform.system.overview");
     }
 
-    /// <summary>The frames for one open stream, from when it opens until it ends.</summary>
+    /// <summary>The frames for one open stream, from when it opens until it ends: the overview as it is now, then each change.</summary>
     public async IAsyncEnumerable<string> ForAsync([System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
     {
+        using var changes = _feed.Subscribe();
+        await RefreshAsync(cancellationToken).ConfigureAwait(false);
         string? sent = null;
-        while (!cancellationToken.IsCancellationRequested)
+        if (Volatile.Read(ref _frame) is { } current)
         {
-            if (await TryReadAsync(cancellationToken).ConfigureAwait(false) is { } overview)
-            {
-                var facts = WireJsonWriter.Dumps(WithoutUptime(overview), WireJsonFormat.Compact);
-                if (facts != sent)
-                {
-                    sent = facts;
-                    yield return Frame(overview);
-                }
-            }
+            sent = current;
+            yield return current;
+        }
 
-            await Task.Delay(CheckEvery, _time, cancellationToken).ConfigureAwait(false);
+        await foreach (var frame in changes.ReadAllAsync(cancellationToken).ConfigureAwait(false))
+        {
+            if (frame != sent)
+            {
+                sent = frame;
+                yield return frame;
+            }
         }
     }
+
+    /// <summary>
+    /// Reads the overview and sends it to every open stream if a fact about Weir differs from the last reading. Callers that arrive
+    /// before a reading starts share it instead of making another. A reading that fails changes nothing: the next one tries again.
+    /// </summary>
+    public async Task RefreshAsync(CancellationToken cancellationToken)
+    {
+        var seen = Volatile.Read(ref _refreshes);
+        await _refreshing.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            if (Volatile.Read(ref _refreshes) != seen)
+            {
+                return;
+            }
+
+            Interlocked.Increment(ref _refreshes);
+            if (await TryReadAsync(cancellationToken).ConfigureAwait(false) is not { } overview)
+            {
+                return;
+            }
+
+            var facts = WireJsonWriter.Dumps(WithoutUptime(overview), WireJsonFormat.Compact);
+            if (facts == _facts)
+            {
+                return;
+            }
+
+            _facts = facts;
+            var frame = Frame(overview);
+            Volatile.Write(ref _frame, frame);
+            _feed.Publish(frame);
+        }
+        finally
+        {
+            _refreshing.Release();
+        }
+    }
+
+    public void Dispose() => _refreshing.Dispose();
 
     /// <summary>The <c>system.overview</c> SSE frame: the overview as <c>GET /system/overview</c> answers it.</summary>
     public static string Frame(WireObject overview)
@@ -66,7 +113,7 @@ internal sealed class SystemOverviewFrames
         return facts;
     }
 
-    /// <summary>The overview now, or null when it could not be read: the next look tries again.</summary>
+    /// <summary>The overview now, or null when it could not be read.</summary>
     private async Task<WireObject?> TryReadAsync(CancellationToken cancellationToken)
     {
         try

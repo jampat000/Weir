@@ -28,6 +28,7 @@ public static class SystemOverviewServices
         services.TryAddSingleton<SystemTasksFrames>();
         services.TryAddSingleton<SystemOverviewFrames>();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IPeriodicTask, ReadinessChangeTask>());
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IPeriodicTask, SystemOverviewChangeTask>());
         services.TryAddSingleton<SystemLogFrames>();
         services.TryAddSingleton<SystemLogReader>();
         services.TryAddSingleton<SystemLogEndpointHandlers>();

@@ -107,6 +107,7 @@ public sealed partial class ProcessingJobStore
                         "UPDATE jobs SET priority = @priority, updated_at = CURRENT_TIMESTAMP WHERE id = @id",
                         ("@priority", priority),
                         ("@id", jobId));
+                    AnnounceQueueChange(transaction, job.JobKind);
                 }
 
                 return JobActionOutcome.Ok;
