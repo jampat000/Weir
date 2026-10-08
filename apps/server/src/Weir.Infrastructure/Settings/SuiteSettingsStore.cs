@@ -1,5 +1,6 @@
 using Microsoft.Data.Sqlite;
 using Weir.Core.Settings;
+using Weir.Infrastructure.Activity;
 using Weir.Infrastructure.Auth;
 using Weir.Infrastructure.Sqlite;
 
@@ -14,10 +15,13 @@ public sealed class SuiteSettingsStore
         "configuration_backup_last_run_at, processing_paused, processing_paused_until, scan_while_paused, updated_at";
 
     private readonly AuthStore _users;
+    private readonly DataChangePublisher? _changes;
 
-    public SuiteSettingsStore(AuthStore users)
+    /// <summary>Once an update commits, <paramref name="changes"/> tells every open screen that Weir's settings changed.</summary>
+    public SuiteSettingsStore(AuthStore users, DataChangePublisher? changes = null)
     {
         _users = users ?? throw new ArgumentNullException(nameof(users));
+        _changes = changes;
     }
 
     public Task<SuiteSettingsRecord?> GetAsync(UnitOfWork uow)
@@ -84,6 +88,18 @@ public sealed class SuiteSettingsStore
 
         sets.Add("updated_at=CURRENT_TIMESTAMP");
         await uow.ExecuteAsync($"UPDATE suite_settings SET {string.Join(", ", sets)} WHERE suite_settings.id = 1", [.. parameters]).ConfigureAwait(false);
+
+        // The pause has a topic of its own (SuitePauseService), and no screen reads it with the settings.
+        var apartFromPause = before with
+        {
+            ProcessingPaused = after.ProcessingPaused,
+            ProcessingPausedUntil = after.ProcessingPausedUntil,
+            ScanWhilePaused = after.ScanWhilePaused,
+        };
+        if (apartFromPause != after)
+        {
+            _changes?.PublishOnCommit(uow, DataTopics.Settings);
+        }
     }
 
     private static SuiteSettingsRecord Read(SqliteDataReader reader) => new()

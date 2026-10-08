@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Weir.Api.Http;
 using Weir.Core.Auth;
 using Weir.Core.Validation;
+using Weir.Infrastructure.Activity;
 using Weir.Infrastructure.LibraryMode;
 using Weir.Infrastructure.MediaManagers;
 using Weir.Infrastructure.Processing;
@@ -34,6 +35,7 @@ internal sealed class LibraryModeScheduleEndpointHandlers
     private readonly IHardlinkInspector _hardlinkInspector;
     private readonly RedownloadRiskChecker _riskChecker;
     private readonly LibraryStore _libraries;
+    private readonly DataChangePublisher _changes;
 
     public LibraryModeScheduleEndpointHandlers(
         LibrarySettingsStore librarySettings,
@@ -41,7 +43,8 @@ internal sealed class LibraryModeScheduleEndpointHandlers
         MediaManagerConnectionService connections,
         IHardlinkInspector hardlinkInspector,
         RedownloadRiskChecker riskChecker,
-        LibraryStore libraries)
+        LibraryStore libraries,
+        DataChangePublisher changes)
     {
         _librarySettings = librarySettings ?? throw new ArgumentNullException(nameof(librarySettings));
         _scans = scans ?? throw new ArgumentNullException(nameof(scans));
@@ -49,6 +52,7 @@ internal sealed class LibraryModeScheduleEndpointHandlers
         _hardlinkInspector = hardlinkInspector ?? throw new ArgumentNullException(nameof(hardlinkInspector));
         _riskChecker = riskChecker ?? throw new ArgumentNullException(nameof(riskChecker));
         _libraries = libraries ?? throw new ArgumentNullException(nameof(libraries));
+        _changes = changes ?? throw new ArgumentNullException(nameof(changes));
     }
 
     public async Task<ApiResult> PostScheduleAsync(ApiRequest request)
@@ -89,6 +93,7 @@ internal sealed class LibraryModeScheduleEndpointHandlers
 
         var updated = settings with { ScheduleEnabled = enabled };
         await _librarySettings.SetAsync(uow, libraryId, updated).ConfigureAwait(false);
+        uow.OnCommitted(() => _changes.Publish(DataTopics.LibraryScan));
         await request.CommitAsync().ConfigureAwait(false);
         return ApiRoutes.Ok(LibraryModeMapping.SettingsOut(updated));
     }

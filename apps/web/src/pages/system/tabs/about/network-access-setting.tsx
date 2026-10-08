@@ -21,7 +21,7 @@ const SCOPE_OPTIONS: readonly SegmentedOption<NetworkScope>[] = [
   { value: "network", label: "Devices on my network" },
 ];
 
-/** How long the page keeps reading the state after someone asks Windows again: the prompt waits for a person. */
+/** How long the page says Windows may be asking for approval after someone asks again: the prompt waits for a person. */
 const RETRY_WATCH_MS = 60_000;
 
 /**
@@ -33,7 +33,7 @@ const RETRY_WATCH_MS = 60_000;
 export function NetworkAccessSetting({ editable }: { editable: boolean }) {
   const [retrying, setRetrying] = useState(false);
   const [confirming, setConfirming] = useState(false);
-  const query = useNetworkAccessQuery(retrying);
+  const query = useNetworkAccessQuery();
   const change = useNetworkAccessMutation();
   const status = query.data;
 

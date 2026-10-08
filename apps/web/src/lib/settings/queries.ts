@@ -52,24 +52,17 @@ export function useConfigurationBackupsQuery(enabled: boolean) {
   });
 }
 
-/** How often the state is read again while a change waits for the tray, or while someone retries the firewall step. */
-const NETWORK_ACCESS_PENDING_POLL_MS = 2_000;
-
 /**
  * System › About's network-reach state. Independent of every other card on the page (ux-common: no panel waits on
- * another's data). It is read again every couple of seconds while a change is pending, and while `watching` says a
- * retry of the firewall step is under way.
+ * another's data). The server says when the tray has answered (the `network_access` topic), so a change that waits for
+ * the tray, or a retry of the firewall step, shows its outcome without asking.
  */
-export function useNetworkAccessQuery(watching = false) {
+export function useNetworkAccessQuery() {
   return useQuery({
     queryKey: settingsKeys.networkAccess,
     queryFn: () => fetchNetworkAccess(),
     staleTime: 30_000,
     retry: false,
-    refetchInterval: (query) =>
-      watching || query.state.data?.pending_scope
-        ? NETWORK_ACCESS_PENDING_POLL_MS
-        : false,
   });
 }
 
@@ -83,16 +76,12 @@ export function useNetworkAccessMutation() {
   });
 }
 
-export function useUpdateStatusQuery(
-  enabled = true,
-  refetchInterval: number | false = false,
-) {
+export function useUpdateStatusQuery(enabled = true) {
   return useQuery({
     queryKey: settingsKeys.updateStatus,
     queryFn: () => fetchUpdateStatus(),
     enabled,
-    staleTime: enabled && refetchInterval ? 0 : 60_000,
-    refetchInterval,
+    staleTime: 60_000,
     retry: false,
   });
 }
@@ -103,7 +92,6 @@ export function useUpdateStateQuery(enabled = true) {
     queryFn: () => fetchUpdateState(),
     enabled,
     staleTime: 0,
-    refetchInterval: enabled ? 10_000 : false,
     retry: false,
   });
 }
@@ -154,7 +142,6 @@ export function useServerMetricsQuery(enabled = true) {
     queryFn: () => fetchServerMetrics(),
     enabled,
     staleTime: 5000,
-    refetchInterval: enabled ? 10000 : false,
     retry: false,
   });
 }

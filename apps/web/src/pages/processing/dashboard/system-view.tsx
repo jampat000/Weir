@@ -17,7 +17,6 @@ import {
   useSystemStatsFrames,
 } from "../../../lib/system/use-system-stats";
 import { classNames } from "../../../lib/ui/class-names";
-import { LIBRARIES_REFRESH_MS } from "../use-processing-lanes";
 import { LOW_COLUMNS, type PageLayout } from "./dashboard-layout";
 import { BackupsCard } from "./system/backups-card";
 import { ConnectionsSlot } from "./system/connections-slot";
@@ -41,7 +40,7 @@ type SystemViewProps = {
 
 export function SystemView({ layout }: SystemViewProps) {
   useSystemStatsFrames();
-  const workflows = useProcessingLibrariesQuery(true, LIBRARIES_REFRESH_MS);
+  const workflows = useProcessingLibrariesQuery();
   const overview = useSystemOverviewQuery();
   const health = useHealthChecks(workflows.data ?? NO_WORKFLOWS);
   const [jump, setJump] = useState(0);

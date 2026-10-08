@@ -16,6 +16,8 @@ export const processingKeys = {
     ["processing", "files", query] as const,
   fileLog: (fileId: number, updatedAt: string) =>
     ["processing", "files", fileId, "log", updatedAt] as const,
+  /** Every library-clean list, whatever the filters. */
+  libraryCleanLists: ["processing", "library-cleans"] as const,
   libraryCleans: (query: LibraryCleansQuery) =>
     ["processing", "library-cleans", query] as const,
   filesAtOnce: ["processing", "files-at-once"] as const,
@@ -44,6 +46,8 @@ export const processingKeys = {
   directPlayDevices: ["processing", "direct-play-devices"] as const,
   libraries: ["processing", "libraries"] as const,
   ruleSets: ["processing", "rule-sets"] as const,
+  /** Every set of libraries setup offered, whichever connections were answering. */
+  allLibrarySuggestions: ["processing", "library-suggestions"] as const,
   librarySuggestions: (answeringConnections: string[]) =>
     ["processing", "library-suggestions", ...answeringConnections] as const,
   proposedLibraryCheck: (folders: ProposedFoldersByType) =>
@@ -73,8 +77,14 @@ export const processingKeys = {
     ["processing", "library-files", libraryId] as const,
   libraryFileList: (libraryId: number, filters: LibraryFileFilters) =>
     ["processing", "library-files", libraryId, filters] as const,
+  /** Every library's files, whichever library and filters. */
+  allLibraryFiles: ["processing", "library-files"] as const,
   libraryOverview: (libraryId: number) =>
     ["processing", "library-overview", libraryId] as const,
+  /** Every library's overview. */
+  allLibraryOverviews: ["processing", "library-overview"] as const,
+  /** Every workflow's folder check, whichever folders it was asked about. */
+  libraryFolderChains: ["processing", "library-folder-chain"] as const,
   libraryFilePreview: (
     libraryId: number,
     path: string,

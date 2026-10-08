@@ -232,8 +232,7 @@ public sealed partial class ProcessingRejectHandler : IJobHandler
         // (#586 made that lock start at BEGIN). QueueingFailurePolicy.Enqueue's callers do the same.
         var dedupeKey = $"{IntakeRules.PassThroughJobKind}:{library.Id}:{relativePath}:{QueueingFailurePolicy.FingerprintTag(library, relativePath)}";
         _jobs.EnqueueOrGet(
-            uow.Connection,
-            uow.WriteTransaction(),
+            uow,
             dedupeKey,
             IntakeRules.PassThroughJobKind,
             WireJsonWriter.Dumps(body, WireJsonFormat.Compact),

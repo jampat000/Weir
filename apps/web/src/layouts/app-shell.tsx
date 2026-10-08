@@ -2,19 +2,22 @@ import { Outlet, useLocation } from "react-router-dom";
 import { useCallback, useEffect, useState } from "react";
 import { MainLandmark } from "../components/shared/page-loading";
 import { AppSidebar } from "../components/shell/app-sidebar";
+import { LiveConnectionBanner } from "../components/shell/live-connection-banner";
 import { ShellHeader } from "../components/shell/shell-header";
 import { ShellHeaderProvider } from "../components/shell/shell-header-context";
+import { useLiveSync } from "../lib/live/use-live-sync";
 import { appTitle } from "../lib/system/app-title";
 import { useSystemReadinessQuery } from "../lib/system/readiness-queries";
 
 /**
  * Every signed-in screen: the side menu, the header above the page, and the page itself in the one
  * main landmark. The header owns the title, Pause and the theme switch, so a page only fills what is
- * its own.
+ * its own. It also keeps every screen current from the live stream and says when that stream is lost.
  */
 export function AppShell() {
   const location = useLocation();
   const readiness = useSystemReadinessQuery();
+  useLiveSync();
   const [menuOpen, setMenuOpen] = useState(false);
   const closeMenu = useCallback(() => setMenuOpen(false), []);
   const productTitle = appTitle(readiness.data?.machine_name);
@@ -49,6 +52,7 @@ export function AppShell() {
             menuOpen={menuOpen}
             onToggleMenu={() => setMenuOpen((open) => !open)}
           />
+          <LiveConnectionBanner />
           <main className="mm-main" id="mm-main-content" tabIndex={-1}>
             <div className="mm-main-inner">
               <MainLandmark>

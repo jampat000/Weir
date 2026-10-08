@@ -1,4 +1,6 @@
 using Weir.Core.LibraryMode;
+using Weir.Infrastructure.Activity;
+using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Infrastructure.LibraryMode;
@@ -12,6 +14,10 @@ namespace Weir.Infrastructure.LibraryMode;
 /// </summary>
 public sealed class LibrarySettingsStore
 {
+    private readonly DataChangePublisher? _changes;
+
+    public LibrarySettingsStore(DataChangePublisher? changes = null) => _changes = changes;
+
     /// <summary>Every library folder configured on any library, de-duplicated — for the #506 startup sweep's folder-walk fallback.</summary>
     public async Task<IReadOnlyList<string>> AllFoldersAsync(UnitOfWork uow)
     {
@@ -86,6 +92,8 @@ public sealed class LibrarySettingsStore
             "DELETE FROM jobs WHERE job_kind = @cleanKind AND dedupe_key LIKE @prefix ESCAPE '\\'",
             ("@cleanKind", LibraryModeJobKinds.CleanKind),
             ("@prefix", SqliteLike.Escape($"{LibraryModeJobKinds.CleanKind}:{libraryId}:") + "%")).ConfigureAwait(false);
+        _changes?.PublishQueueChangeOnCommit(uow, LibraryModeJobKinds.ScanKind);
+        _changes?.PublishQueueChangeOnCommit(uow, LibraryModeJobKinds.CleanKind);
     }
 
     private static async Task<List<string>> FoldersForAsync(UnitOfWork uow, long libraryId) =>

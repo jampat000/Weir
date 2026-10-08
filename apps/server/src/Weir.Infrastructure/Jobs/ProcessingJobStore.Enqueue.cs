@@ -1,5 +1,6 @@
 using Microsoft.Data.Sqlite;
 using Weir.Core.Jobs;
+using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Infrastructure.Jobs;
 
@@ -60,6 +61,24 @@ public sealed partial class ProcessingJobStore
             cancellationToken);
     }
 
+    /// <summary>
+    /// <see cref="EnqueueOrGet(SqliteConnection, SqliteTransaction, string, string, string?, int, int?, int, DateTimeOffset?)"/> on the
+    /// caller's unit of work: commits nothing, and announces the new job once the unit commits.
+    /// </summary>
+    public ProcessingJob EnqueueOrGet(
+        UnitOfWork uow,
+        string dedupeKey,
+        string jobKind,
+        string? payloadJson,
+        int maxAttempts,
+        int? runnerCost,
+        int priority,
+        DateTimeOffset? notBefore = null)
+    {
+        ArgumentNullException.ThrowIfNull(uow);
+        return EnqueueOrGet(uow.Connection, uow.WriteTransaction(), dedupeKey, jobKind, payloadJson, maxAttempts, runnerCost, priority, notBefore);
+    }
+
     internal ProcessingJob EnqueueOrGet(
         SqliteConnection connection,
         SqliteTransaction transaction,
@@ -97,6 +116,7 @@ public sealed partial class ProcessingJobStore
         if (inserted is not null and not DBNull)
         {
             RecordQueueDepth(connection, transaction);
+            AnnounceQueueChange(transaction, jobKind);
             // Woken before this transaction commits, which is safe: a woken slot claims under BEGIN IMMEDIATE, so its claim
             // waits for this write lock and sees the job once it is committed, or nothing if it rolls back.
             _wakeSignals?.WakeAll();

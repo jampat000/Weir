@@ -3,10 +3,11 @@ import type { Schema } from "../api/types";
 /** The name of the frame on the Activity stream. */
 export const SYSTEM_LOG_EVENT = "system.log";
 
-/** A warning or error that Weir just wrote to its log. */
+/** A line that Weir just wrote to its log: a warning or error, or information from Weir's own loggers. */
 export type SystemLogFrame = Schema<"SystemLogFrame">;
 
 const LEVELS: readonly string[] = [
+  "INFO",
   "WARNING",
   "ERROR",
   "CRITICAL",

@@ -46,6 +46,7 @@ public static class WeirApi
         // frames it takes a single dependency instead of holding the store only to forward it.
         services.TryAddSingleton<ActivityProgressFrames>();
         services.TryAddSingleton<ConnectionActivityFrames>();
+        services.TryAddSingleton<LiveStreamFrames>();
         services.TryAddSingleton<SystemStatsFrames>();
 
         // Endpoint handler groups: one instance per group, constructor-injected with the stores it needs.
@@ -88,6 +89,10 @@ public static class WeirApi
         services.AddSingleton<IPeriodicTask>(provider => provider.GetRequiredService<ActivityLatestPollTask>());
         services.AddSingleton<IPeriodicTask, WorkStateTask>();
         services.AddSingleton<IPeriodicTask, SuitePauseExpiryTask>();
+        services.AddSingleton<IPeriodicTask, MetricsChangeTask>();
+        services.AddSingleton<IPeriodicTask, UpdateCheckTask>();
+        // Hears the tray's answers (a downloaded update, the firewall prompt) so open screens show them at once.
+        services.AddHostedService<TrayHandOffWatcher>();
         services.AddWeirResponseCompression();
         services.AddRouting();
         return services;

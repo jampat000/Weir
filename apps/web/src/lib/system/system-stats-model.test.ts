@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 
 import { seriesOf, withFrame } from "./system-stats-model";
-import type { SystemNow, SystemPoint, SystemStats } from "./system-stats-types";
+import type {
+  SystemDrive,
+  SystemNow,
+  SystemPoint,
+  SystemStats,
+  SystemStatsFrame,
+} from "./system-stats-types";
 
 const now = (cpu: number): SystemNow => ({
   at: "2026-10-02T12:00:00Z",
@@ -42,21 +48,43 @@ const stats = (history: SystemPoint[], windowS = 600): SystemStats => ({
   drives: [],
 });
 
+const frame = (
+  reading: SystemNow,
+  added: SystemPoint,
+  drives: SystemDrive[] = [],
+): SystemStatsFrame => ({
+  now: reading,
+  point: added,
+  machine: { os: "Windows 11", uptime_seconds: 60, reboot_pending: false },
+  drives,
+});
+
+const drive = (freeBytes: number): SystemDrive => ({
+  name: "D:",
+  path: "D:\\",
+  total_bytes: 1000,
+  free_bytes: freeBytes,
+  weir_bytes: 0,
+  keep_free_bytes: 0,
+  full_in_days: null,
+  read_bytes_per_sec: null,
+  write_bytes_per_sec: null,
+  busy_percent: null,
+  workflows: [],
+});
+
 describe("adding a frame", () => {
   it("adds its point and takes its reading", () => {
-    const next = withFrame(stats([point(1)]), {
-      now: now(55),
-      point: point(2, 55),
-    });
+    const next = withFrame(stats([point(1)]), frame(now(55), point(2, 55)));
     expect(next.history.map((p) => p.cpu_percent)).toEqual([0, 55]);
     expect(next.now.cpu_percent).toBe(55);
   });
 
   it("drops the points older than the window, by their own times", () => {
-    const next = withFrame(stats([point(1), point(2), point(3)], 2), {
-      now: now(1),
-      point: point(4),
-    });
+    const next = withFrame(
+      stats([point(1), point(2), point(3)], 2),
+      frame(now(1), point(4)),
+    );
     expect(next.history.map((p) => p.at.slice(-3))).toEqual([
       "02Z",
       "03Z",
@@ -66,15 +94,25 @@ describe("adding a frame", () => {
 
   it("keeps the history when the point is one it already has, and still takes the reading", () => {
     const before = stats([point(1), point(2)]);
-    const next = withFrame(before, { now: now(77), point: point(2) });
+    const next = withFrame(before, frame(now(77), point(2)));
     expect(next.history).toBe(before.history);
     expect(next.now.cpu_percent).toBe(77);
   });
 
+  it("takes the machine's facts and the drives the frame carries, with the history kept or not", () => {
+    const before = stats([point(1), point(2)]);
+    const added = withFrame(before, frame(now(1), point(3), [drive(400)]));
+    const replayed = withFrame(before, frame(now(1), point(2), [drive(300)]));
+    expect(added.drives.map((d) => d.free_bytes)).toEqual([400]);
+    expect(added.machine.os).toBe("Windows 11");
+    expect(replayed.drives.map((d) => d.free_bytes)).toEqual([300]);
+    expect(replayed.history).toBe(before.history);
+  });
+
   it("starts the history from a first point", () => {
-    expect(
-      withFrame(stats([]), { now: now(1), point: point(1) }).history,
-    ).toHaveLength(1);
+    expect(withFrame(stats([]), frame(now(1), point(1))).history).toHaveLength(
+      1,
+    );
   });
 });
 

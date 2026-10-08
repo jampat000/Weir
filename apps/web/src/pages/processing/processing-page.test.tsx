@@ -271,7 +271,7 @@ describe("ProcessingPage", () => {
 
   afterEach(() => vi.useRealTimers());
 
-  it("fetches fresh data once a countdown runs out, instead of saying it is checking for ever", () => {
+  it("waits for the server to say a look finished when a countdown runs out, and reads nothing by itself", () => {
     files.files = [
       file({
         id: 1,
@@ -282,8 +282,8 @@ describe("ProcessingPage", () => {
     ];
     renderLive();
 
-    expect(refetchFiles).toHaveBeenCalled();
-    expect(refetchLibraries).toHaveBeenCalled();
+    expect(refetchFiles).not.toHaveBeenCalled();
+    expect(refetchLibraries).not.toHaveBeenCalled();
   });
 
   it("filters what the Pipeline shows from the header, which starts on Everything", () => {

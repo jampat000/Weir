@@ -12,13 +12,12 @@ import type {
 } from "./types";
 import { processingKeys } from "./query-keys";
 
-/** What is running and what the waiting files are waiting for. Polled: it is a live read-out. */
+/** What is running and what the waiting files are waiting for. The server says when it changes (`files_at_once`). */
 export function useProcessingFilesAtOnceQuery() {
   return useQuery({
     queryKey: processingKeys.filesAtOnce,
     queryFn: () => fetchProcessingFilesAtOnce(),
     staleTime: 5_000,
-    refetchInterval: 10_000,
   });
 }
 

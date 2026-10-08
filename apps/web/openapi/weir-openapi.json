@@ -621,6 +621,38 @@
         "title": "CurrentSessionOut",
         "type": "object"
       },
+      "DataChangedFrame": {
+        "description": "The data of a data.changed frame on GET /activity/stream: one kind of data changed, so every screen showing it should read it again. A topic is published as the screens that show its data are converted, so not every topic listed is sent yet.",
+        "properties": {
+          "topic": {
+            "description": "Which data changed (a topic is named here before it is published): pause (Processing paused, resumed, or a timed pause ran out), readiness, files_at_once, maintenance, libraries, library_scan, folder_checks, update, network_access, connections, settings, backups, kept_files, metrics or jobs.",
+            "enum": [
+              "backups",
+              "connections",
+              "files_at_once",
+              "folder_checks",
+              "jobs",
+              "kept_files",
+              "libraries",
+              "library_scan",
+              "maintenance",
+              "metrics",
+              "network_access",
+              "pause",
+              "readiness",
+              "settings",
+              "update"
+            ],
+            "title": "Topic",
+            "type": "string"
+          }
+        },
+        "required": [
+          "topic"
+        ],
+        "title": "DataChangedFrame",
+        "type": "object"
+      },
       "DirectPlayDeviceOut": {
         "properties": {
           "id": {
@@ -2895,6 +2927,18 @@
             "title": "Errors",
             "type": "array"
           },
+          "files_seen": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "How many files the running scan has looked at so far; null when it has not started walking or no scan is running.",
+            "title": "Files Seen"
+          },
           "generated_at": {
             "anyOf": [
               {
@@ -2928,6 +2972,7 @@
         },
         "required": [
           "errors",
+          "files_seen",
           "generated_at",
           "job_id",
           "running",
@@ -9622,6 +9667,21 @@
         "title": "RemovedTrackOut",
         "type": "object"
       },
+      "ServerHelloFrame": {
+        "description": "The data of a server.hello frame on GET /activity/stream, sent first when the stream opens. A page that reconnects and hears a different boot_id knows the server restarted.",
+        "properties": {
+          "boot_id": {
+            "description": "A GUID made when the server started: the same for every stream of one run.",
+            "title": "Boot Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "boot_id"
+        ],
+        "title": "ServerHelloFrame",
+        "type": "object"
+      },
       "SessionActionOut": {
         "properties": {
           "message": {
@@ -10593,6 +10653,41 @@
         "title": "SuiteUpdateStatusOut",
         "type": "object"
       },
+      "SystemChecksFrame": {
+        "description": "The data of a system.checks frame on GET /activity/stream: when the server last looked, on its own, at what Health shows. Sent when the stream opens and each time one of the looks happens, even when it found nothing new.",
+        "properties": {
+          "folders_checked_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When the server last checked every workflow's folders; null before its first check.",
+            "title": "Folders Checked At"
+          },
+          "readiness_checked_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When the server last checked whether Weir is ready and its workers are running; null before its first check.",
+            "title": "Readiness Checked At"
+          }
+        },
+        "required": [
+          "folders_checked_at",
+          "readiness_checked_at"
+        ],
+        "title": "SystemChecksFrame",
+        "type": "object"
+      },
       "SystemLogCategoryCountsOut": {
         "additionalProperties": false,
         "description": "How many rows each category would show with every other filter applied.",
@@ -10673,7 +10768,7 @@
         "type": "object"
       },
       "SystemLogFrame": {
-        "description": "The data of a system.log frame on GET /activity/stream: one warning or error Weir just wrote to its log. GET /suite/logs has what was logged before the stream opened.",
+        "description": "The data of a system.log frame on GET /activity/stream: one line Weir just wrote to its log that the System log shows (a warning, an error, or information from Weir's own loggers). GET /suite/logs has what was logged before the stream opened.",
         "properties": {
           "at": {
             "description": "When it was logged.",
@@ -10684,6 +10779,7 @@
           "level": {
             "description": "The level, as the log file names it.",
             "enum": [
+              "INFO",
               "WARNING",
               "ERROR",
               "CRITICAL"
@@ -11310,8 +11406,21 @@
       },
       "SystemStatsFrame": {
         "additionalProperties": false,
-        "description": "The data of a system.stats frame on GET /activity/stream: the newest reading and the point to add to the traces.",
+        "description": "The data of a system.stats frame on GET /activity/stream: the newest reading, the point to add to the traces, and the machine's facts and the drives as they stand.",
         "properties": {
+          "drives": {
+            "description": "Every drive that holds a workflow's watched, work or output folder, as last read (every 30 seconds).",
+            "items": {
+              "$ref": "#/components/schemas/SystemStatsDriveOut"
+            },
+            "title": "Drives",
+            "type": "array"
+          },
+          "machine": {
+            "$ref": "#/components/schemas/SystemStatsMachineOut",
+            "description": "What changes slowly about the machine.",
+            "title": "Machine"
+          },
           "now": {
             "$ref": "#/components/schemas/SystemStatsNowOut",
             "description": "The newest reading.",
@@ -11325,7 +11434,9 @@
         },
         "required": [
           "now",
-          "point"
+          "point",
+          "machine",
+          "drives"
         ],
         "title": "SystemStatsFrame",
         "type": "object"
@@ -12913,7 +13024,7 @@
     },
     "/api/v1/activity/stream": {
       "get": {
-        "description": "Authenticated SSE stream for activity-backed pages. Frames: activity.latest (the newest Activity event id and revision), processing.progress (every file's live progress, at most once a second), connection.activity (one thing that happened on a media manager or download client connection: see ConnectionActivityFrame; each connection sends at most one frame per phase every 250 ms, and always the phase it ends on), system.stats (the machine's newest reading, once a second: see SystemStatsFrame), system.tasks (every scheduled task, each time a run starts or ends or a task comes or goes: see SystemTaskOut), and system.log (one for each new warning or error Weir logs: see SystemLogFrame).",
+        "description": "Authenticated SSE stream for activity-backed pages. Frames: activity.latest (the newest Activity event id and revision), processing.progress (every file's live progress, at most once a second), connection.activity (one thing that happened on a media manager or download client connection: see ConnectionActivityFrame; each connection sends at most one frame per phase every 250 ms, and always the phase it ends on), system.stats (the machine's newest reading, once a second: see SystemStatsFrame), system.tasks (every scheduled task, each time a run starts or ends or a task comes or goes: see SystemTaskOut), system.overview (the facts System shows about Weir, as GET /system/overview answers them, when the stream opens and whenever one changes: see SystemOverviewOut), system.checks (when the server last checked the workflows' folders and whether Weir is ready, when the stream opens and at every look: see SystemChecksFrame), system.log (one for each new warning, error or information line of Weir's own that Weir logs: see SystemLogFrame), server.hello (sent first when the stream opens, with the boot_id of this run of the server: see ServerHelloFrame) and data.changed (one for each time a kind of data changes, named by its topic: see DataChangedFrame).",
         "operationId": "get_activity_stream_api_v1_activity_stream_get",
         "responses": {
           "200": {

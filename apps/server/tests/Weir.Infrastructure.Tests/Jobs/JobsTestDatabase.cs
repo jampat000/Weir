@@ -53,7 +53,8 @@ internal sealed class JobsTestDatabase : IDisposable
         IUnhandledJobFailureRecorder? recorder = null,
         IJobNotifications? notifications = null,
         bool claimAllKinds = false,
-        PeriodicTaskRegistry? tasks = null) =>
+        PeriodicTaskRegistry? tasks = null,
+        DataChangePublisher? changes = null) =>
         new(
             Store,
             new JobHandlerRegistry(handlers ?? []),
@@ -62,7 +63,8 @@ internal sealed class JobsTestDatabase : IDisposable
             notifications ?? new NoJobNotifications(),
             Clock,
             NullLogger<ProcessingJobProcessor>.Instance,
-            tasks)
+            tasks,
+            changes)
         {
             Kinds = claimAllKinds ? null : ClaimableKinds.For(new JobHandlerRegistry(handlers ?? [])),
         };

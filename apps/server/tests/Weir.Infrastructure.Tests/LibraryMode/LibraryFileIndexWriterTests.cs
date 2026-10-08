@@ -57,6 +57,32 @@ public sealed class LibraryFileIndexWriterTests : IDisposable
         _store.WithUnitOfWork(uow => _scans.CurrentFilesAsync(uow, _libraryId), commit: false);
 
     [Fact]
+    public async Task It_says_so_after_each_chunk_of_files_that_lands()
+    {
+        await LibraryAsync();
+        var files = Enumerable.Range(0, LibraryFileIndexWriter.ChunkSize + 1).Select(index => File($"/lib/{index:D4}.mkv", HevcProbe)).ToArray();
+        var landed = 0;
+
+        await LibraryFileIndexWriter.ReplaceAsync(_store.Database, _libraryId, files, CancellationToken.None, () => landed++);
+
+        Assert.Equal(2, landed);
+        Assert.Equal(files.Length, (await RowsAsync()).Count);
+    }
+
+    [Fact]
+    public async Task It_says_so_after_removing_the_rows_of_files_that_are_gone_too()
+    {
+        await LibraryAsync();
+        await ReplaceAsync(File("/lib/a.mkv", HevcProbe));
+        var landed = 0;
+
+        await LibraryFileIndexWriter.ReplaceAsync(_store.Database, _libraryId, [], CancellationToken.None, () => landed++);
+
+        Assert.Equal(1, landed);
+        Assert.Empty(await RowsAsync());
+    }
+
+    [Fact]
     public async Task An_unchanged_file_keeps_its_row_untouched()
     {
         await LibraryAsync();

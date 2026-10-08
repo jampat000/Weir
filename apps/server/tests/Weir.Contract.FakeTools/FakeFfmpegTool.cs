@@ -49,7 +49,7 @@ internal static class FakeFfmpegTool
         var attempt = folder.Bump($"remux:{name}");
         folder.LogCall("ffmpeg", argv, (FakeToolProtocol.StepKey, FakeToolProtocol.RemuxStep), (FakeToolProtocol.FileKey, name), (FakeToolProtocol.AttemptKey, attempt));
         var output = argv[^1];
-        var delay = Number(rule, FakeToolProtocol.RemuxDelaySecondsKey);
+        var delay = FakeFfprobe.Number(rule, FakeToolProtocol.RemuxDelaySecondsKey);
         var releaseFile = FakeFfprobe.Text(rule, FakeToolProtocol.RemuxReleaseFileKey);
         if (delay > 0 || releaseFile is not null)
         {
@@ -142,9 +142,6 @@ internal static class FakeFfmpegTool
 
         return true;
     }
-
-    private static double Number(JsonObject rule, string key) =>
-        rule[key] is JsonValue value && value.TryGetValue<double>(out var number) ? number : 0;
 
     private static string? ArgumentAfter(string[] argv, string flag)
     {

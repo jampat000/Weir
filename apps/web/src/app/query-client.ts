@@ -10,6 +10,7 @@ export const queryClient = new QueryClient({
     queries: {
       staleTime: 30_000,
       retry: 1,
+      // Freshness comes from the live stream (see lib/live); refocusing the tab is only an extra read.
       refetchOnWindowFocus: true,
     },
     mutations: {

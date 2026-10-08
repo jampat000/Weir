@@ -75,6 +75,21 @@ public sealed class FakeFfmpegTests : IDisposable
     }
 
     [Fact]
+    public async Task Ffprobe_takes_the_time_a_rule_gives_it_before_it_answers()
+    {
+        const double delaySeconds = 0.5;
+        _tools.SetFileRule("film.mkv", new FileRule { ProbeDelaySeconds = delaySeconds });
+        var file = Write("film.mkv", FakeMedia.Bytes(FakeMedia.Probe()));
+
+        var clock = Stopwatch.StartNew();
+        var result = await RunAsync("ffprobe", file);
+        clock.Stop();
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.True(clock.Elapsed >= TimeSpan.FromSeconds(delaySeconds), $"ffprobe answered after {clock.Elapsed.TotalSeconds:0.00}s.");
+    }
+
+    [Fact]
     public async Task Ffmpeg_answers_a_capability_query_and_logs_it()
     {
         var result = await RunAsync("ffmpeg", "-hide_banner", "-hwaccels");

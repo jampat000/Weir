@@ -39,6 +39,7 @@ const health: Health = {
   managers: [],
   downloadClients: [],
   tools: null,
+  foldersReadAt: null,
   recheckFolders: vi.fn(),
 };
 const checks: HealthChecks = {
@@ -46,6 +47,7 @@ const checks: HealthChecks = {
   checking: false,
   overviewChecks: null,
   health,
+  readAt: null,
   busy: new Set(),
   again: vi.fn(async () => undefined),
 };
@@ -241,6 +243,21 @@ describe("the Health card", () => {
     );
   });
 
+  it("says a drive is live instead of when it was looked at", () => {
+    checks.checks = [
+      item("drive", "storage", "done", {
+        title: "D:",
+        checkedAt: null,
+        live: true,
+      }),
+    ];
+    const { card } = renderCard();
+
+    const row = within(card).getByTestId("system-check");
+    expect(row).toHaveTextContent("Storage · live");
+    expect(row).not.toHaveTextContent("checked");
+  });
+
   it("says Weir is still looking while there is no check", () => {
     checks.checks = [];
     const { card } = renderCard();
@@ -267,9 +284,10 @@ describe("the Health card", () => {
     expect(card).toHaveTextContent(RADARR);
   });
 
-  it("sweeps a sheen over the areas when the checks are read again", () => {
+  it("sweeps a sheen over the areas when the checks are read again, and not each time the server says it looked", () => {
     vi.useFakeTimers({ toFake: ["Date", "setTimeout", "clearTimeout"] });
     vi.setSystemTime(NOW);
+    checks.readAt = NOW - 12_000;
     const { card, rerender } = renderCard();
     const ribbon = within(card).getByRole("group", { name: "Health areas" });
     const first = () => within(ribbon).getAllByRole("button")[0];
@@ -280,11 +298,16 @@ describe("the Health card", () => {
       checkedAt: NOW,
     }));
     rerender(<Card />);
+    expect(first()).not.toHaveClass("mm-sy-area--checking");
+
+    checks.readAt = NOW;
+    rerender(<Card />);
     expect(first()).toHaveClass("mm-sy-area--checking");
 
     act(() => {
       vi.advanceTimersByTime(SHEEN_MS);
     });
     expect(first()).not.toHaveClass("mm-sy-area--checking");
+    checks.readAt = null;
   });
 });

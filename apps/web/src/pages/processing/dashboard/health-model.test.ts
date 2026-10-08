@@ -8,6 +8,7 @@ import type {
 import {
   chainVerdict,
   checkedAgo,
+  newestTime,
   problemCount,
   rowsLeftOut,
   toolRows,
@@ -95,6 +96,17 @@ describe("a workflow's folder-chain verdict", () => {
       meaning: "attention",
       readiness: "needs_attention",
     });
+  });
+});
+
+describe("newestTime", () => {
+  it("is the latest time known, ignoring the ones that are not", () => {
+    expect(newestTime(5, null, 9, 7)).toBe(9);
+  });
+
+  it("is null when no time is known", () => {
+    expect(newestTime(null, null)).toBeNull();
+    expect(newestTime()).toBeNull();
   });
 });
 

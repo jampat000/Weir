@@ -37,6 +37,7 @@ public sealed partial class HandoffLedgerStore
                 ("$status", ProcessingJobStatus.Cancelled),
                 ("$error", JobQueueRules.CancelledByOperatorError),
                 ("$id", job.Id)).ConfigureAwait(false);
+            jobs.AnnounceOnCommit(uow, job.JobKind);
         }
 
         // Its files read cancelled too (#643), so the Files list agrees with the manager and a scan does not quietly queue

@@ -49,8 +49,9 @@ public static class LibraryFileIndexWriter
     /// <summary>One row as the walk read it, before deciding what the scan would write.</summary>
     internal sealed record ExistingLibraryFile(long Id, IReadOnlyList<object?> StoredValues);
 
-    /// <summary>Makes the library's index hold exactly <paramref name="files"/>.</summary>
-    public static async Task ReplaceAsync(SqliteDatabase database, long libraryId, IReadOnlyList<LibraryScanFileEntry> files, CancellationToken cancellationToken)
+    /// <summary>Makes the library's index hold exactly <paramref name="files"/>; <paramref name="chunkWritten"/> is called after each chunk lands.</summary>
+    public static async Task ReplaceAsync(
+        SqliteDatabase database, long libraryId, IReadOnlyList<LibraryScanFileEntry> files, CancellationToken cancellationToken, Action? chunkWritten = null)
     {
         ArgumentNullException.ThrowIfNull(database);
         ArgumentNullException.ThrowIfNull(files);
@@ -60,11 +61,13 @@ public static class LibraryFileIndexWriter
         foreach (var chunk in gone.Chunk(ChunkSize))
         {
             await WriteLockTurns.TakeAsync(() => DeleteAsync(database, chunk, cancellationToken), cancellationToken).ConfigureAwait(false);
+            chunkWritten?.Invoke();
         }
 
         foreach (var chunk in files.Chunk(ChunkSize))
         {
             await WriteLockTurns.TakeAsync(() => WriteChunkAsync(database, libraryId, chunk, existing, cancellationToken), cancellationToken).ConfigureAwait(false);
+            chunkWritten?.Invoke();
         }
     }
 

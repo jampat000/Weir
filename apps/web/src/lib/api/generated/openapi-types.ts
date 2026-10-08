@@ -93,7 +93,7 @@ export interface paths {
     };
     /**
      * Get Activity Stream
-     * @description Authenticated SSE stream for activity-backed pages. Frames: activity.latest (the newest Activity event id and revision), processing.progress (every file's live progress, at most once a second), connection.activity (one thing that happened on a media manager or download client connection: see ConnectionActivityFrame; each connection sends at most one frame per phase every 250 ms, and always the phase it ends on), system.stats (the machine's newest reading, once a second: see SystemStatsFrame), system.tasks (every scheduled task, each time a run starts or ends or a task comes or goes: see SystemTaskOut), and system.log (one for each new warning or error Weir logs: see SystemLogFrame).
+     * @description Authenticated SSE stream for activity-backed pages. Frames: activity.latest (the newest Activity event id and revision), processing.progress (every file's live progress, at most once a second), connection.activity (one thing that happened on a media manager or download client connection: see ConnectionActivityFrame; each connection sends at most one frame per phase every 250 ms, and always the phase it ends on), system.stats (the machine's newest reading, once a second: see SystemStatsFrame), system.tasks (every scheduled task, each time a run starts or ends or a task comes or goes: see SystemTaskOut), system.overview (the facts System shows about Weir, as GET /system/overview answers them, when the stream opens and whenever one changes: see SystemOverviewOut), system.checks (when the server last checked the workflows' folders and whether Weir is ready, when the stream opens and at every look: see SystemChecksFrame), system.log (one for each new warning, error or information line of Weir's own that Weir logs: see SystemLogFrame), server.hello (sent first when the stream opens, with the boot_id of this run of the server: see ServerHelloFrame) and data.changed (one for each time a kind of data changes, named by its topic: see DataChangedFrame).
      */
     get: operations["get_activity_stream_api_v1_activity_stream_get"];
     put?: never;
@@ -2763,6 +2763,33 @@ export interface components {
       /** Trusted Device */
       trusted_device: boolean;
     };
+    /**
+     * DataChangedFrame
+     * @description The data of a data.changed frame on GET /activity/stream: one kind of data changed, so every screen showing it should read it again. A topic is published as the screens that show its data are converted, so not every topic listed is sent yet.
+     */
+    DataChangedFrame: {
+      /**
+       * Topic
+       * @description Which data changed (a topic is named here before it is published): pause (Processing paused, resumed, or a timed pause ran out), readiness, files_at_once, maintenance, libraries, library_scan, folder_checks, update, network_access, connections, settings, backups, kept_files, metrics or jobs.
+       * @enum {string}
+       */
+      topic:
+        | "backups"
+        | "connections"
+        | "files_at_once"
+        | "folder_checks"
+        | "jobs"
+        | "kept_files"
+        | "libraries"
+        | "library_scan"
+        | "maintenance"
+        | "metrics"
+        | "network_access"
+        | "pause"
+        | "readiness"
+        | "settings"
+        | "update";
+    };
     /** DirectPlayDeviceOut */
     DirectPlayDeviceOut: {
       /** Id */
@@ -3742,6 +3769,11 @@ export interface components {
     LibraryScanStateOut: {
       /** Errors */
       errors: string[];
+      /**
+       * Files Seen
+       * @description How many files the running scan has looked at so far; null when it has not started walking or no scan is running.
+       */
+      files_seen: number | null;
       /** Generated At */
       generated_at: number | null;
       /** Job Id */
@@ -7144,6 +7176,17 @@ export interface components {
       /** Variant */
       variant?: string | null;
     };
+    /**
+     * ServerHelloFrame
+     * @description The data of a server.hello frame on GET /activity/stream, sent first when the stream opens. A page that reconnects and hears a different boot_id knows the server restarted.
+     */
+    ServerHelloFrame: {
+      /**
+       * Boot Id
+       * @description A GUID made when the server started: the same for every stream of one run.
+       */
+      boot_id: string;
+    };
     /** SessionActionOut */
     SessionActionOut: {
       /** Message */
@@ -7585,6 +7628,22 @@ export interface components {
       /** Windows Installer Url */
       windows_installer_url?: string | null;
     };
+    /**
+     * SystemChecksFrame
+     * @description The data of a system.checks frame on GET /activity/stream: when the server last looked, on its own, at what Health shows. Sent when the stream opens and each time one of the looks happens, even when it found nothing new.
+     */
+    SystemChecksFrame: {
+      /**
+       * Folders Checked At
+       * @description When the server last checked every workflow's folders; null before its first check.
+       */
+      folders_checked_at: string | null;
+      /**
+       * Readiness Checked At
+       * @description When the server last checked whether Weir is ready and its workers are running; null before its first check.
+       */
+      readiness_checked_at: string | null;
+    };
     /** @description How many rows each category would show with every other filter applied. */
     SystemLogCategoryCountsOut: {
       /** backups */
@@ -7618,7 +7677,7 @@ export interface components {
     };
     /**
      * SystemLogFrame
-     * @description The data of a system.log frame on GET /activity/stream: one warning or error Weir just wrote to its log. GET /suite/logs has what was logged before the stream opened.
+     * @description The data of a system.log frame on GET /activity/stream: one line Weir just wrote to its log that the System log shows (a warning, an error, or information from Weir's own loggers). GET /suite/logs has what was logged before the stream opened.
      */
     SystemLogFrame: {
       /**
@@ -7632,7 +7691,7 @@ export interface components {
        * @description The level, as the log file names it.
        * @enum {string}
        */
-      level: "WARNING" | "ERROR" | "CRITICAL";
+      level: "INFO" | "WARNING" | "ERROR" | "CRITICAL";
       /**
        * Message
        * @description What the log line says.
@@ -7969,9 +8028,19 @@ export interface components {
     };
     /**
      * SystemStatsFrame
-     * @description The data of a system.stats frame on GET /activity/stream: the newest reading and the point to add to the traces.
+     * @description The data of a system.stats frame on GET /activity/stream: the newest reading, the point to add to the traces, and the machine's facts and the drives as they stand.
      */
     SystemStatsFrame: {
+      /**
+       * Drives
+       * @description Every drive that holds a workflow's watched, work or output folder, as last read (every 30 seconds).
+       */
+      drives: components["schemas"]["SystemStatsDriveOut"][];
+      /**
+       * Machine
+       * @description What changes slowly about the machine.
+       */
+      machine: components["schemas"]["SystemStatsMachineOut"];
       /**
        * Now
        * @description The newest reading.

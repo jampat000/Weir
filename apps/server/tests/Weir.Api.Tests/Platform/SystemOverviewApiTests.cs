@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Weir.Api.Endpoints;
 using Weir.Core.Configuration;
+using Weir.Infrastructure.Activity;
 using Weir.Infrastructure.Logging;
 using Weir.Infrastructure.Scheduling;
 using Weir.Infrastructure.Sqlite;
@@ -215,21 +216,104 @@ public sealed class SystemOverviewApiTests
     }
 
     [Fact]
-    public async Task A_warning_the_server_logs_reaches_an_open_stream_but_information_does_not()
+    public async Task A_warning_and_information_from_weirs_own_loggers_reach_an_open_stream_with_their_levels()
     {
         var (server, client) = await StartAsync();
         await using var _server = server;
         var logger = server.Services.GetRequiredService<ILoggerFactory>().CreateLogger("weir.test");
         using var reader = await OpenStreamAsync(server, client);
 
+        var warning = await NextFrameAsync(reader, "system.log", () => logger.LogWarning("The disk on {Drive} is nearly full.", "D:"), frame => frame["message"]!.GetValue<string>() == "The disk on D: is nearly full.");
+        var information = await NextFrameAsync(reader, "system.log", () => logger.LogInformation("Scanned {Library}.", "Movies"), frame => frame["message"]!.GetValue<string>() == "Scanned Movies.");
+
+        Assert.Equal("WARNING", warning["level"]!.GetValue<string>());
+        Assert.Equal("INFO", information["level"]!.GetValue<string>());
+        Assert.EndsWith("Z", information["at"]!.GetValue<string>(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Information_from_a_logger_that_is_not_weirs_does_not_reach_an_open_stream()
+    {
+        var (server, client) = await StartAsync();
+        await using var _server = server;
+        var factory = server.Services.GetRequiredService<ILoggerFactory>();
+        var other = factory.CreateLogger("Some.Library.Chatter");
+        var weir = factory.CreateLogger("weir.test");
+        using var reader = await OpenStreamAsync(server, client);
+
         var frame = await NextFrameAsync(reader, "system.log", () =>
         {
-            logger.LogInformation("Nothing to see.");
-            logger.LogWarning("The disk on {Drive} is nearly full.", "D:");
+            other.LogInformation("Nothing to see.");
+            weir.LogError("The folder is gone.");
         });
 
-        Assert.Equal(("WARNING", "The disk on D: is nearly full."), (frame["level"]!.GetValue<string>(), frame["message"]!.GetValue<string>()));
-        Assert.EndsWith("Z", frame["at"]!.GetValue<string>(), StringComparison.Ordinal);
+        Assert.Equal(("ERROR", "The folder is gone."), (frame["level"]!.GetValue<string>(), frame["message"]!.GetValue<string>()));
+    }
+
+    [Fact]
+    public async Task The_overview_reaches_a_stream_that_opens_and_again_when_a_fact_about_weir_changes()
+    {
+        var (server, client) = await StartAsync();
+        await using var _server = server;
+        using var first = await OpenStreamAsync(server, client);
+
+        var opening = await NextFrameAsync(first, "system.overview", () => { });
+        using var second = await OpenStreamAsync(server, client);
+        var changed = await NextFrameAsync(first, "system.overview", () => { }, frame => frame["browsers_live"]!.GetValue<int>() == 2);
+
+        var documented = (JsonObject)await Json(await client.GetAsync(Overview));
+        Assert.Equal(documented.Select(pair => pair.Key), ((JsonObject)opening).Select(pair => pair.Key));
+        Assert.Equal(1, opening["browsers_live"]!.GetValue<int>());
+        Assert.Equal(2, changed["browsers_live"]!.GetValue<int>());
+    }
+
+    [Fact]
+    public async Task The_overview_frames_send_the_facts_when_a_stream_opens_and_only_again_when_one_changes()
+    {
+        var (server, _) = await StartAsync();
+        await using var _server = server;
+        var frames = server.Services.GetRequiredService<SystemOverviewFrames>();
+        using var stop = new CancellationTokenSource();
+        await using var stream = frames.ForAsync(stop.Token).GetAsyncEnumerator(stop.Token);
+
+        Assert.True(await stream.MoveNextAsync());
+        Assert.StartsWith("event: system.overview\ndata: {\"version\":", stream.Current, StringComparison.Ordinal);
+        var next = stream.MoveNextAsync().AsTask();
+
+        // A server that has only just started may still be settling (the update check answering), and says so: wait for looks
+        // that find nothing new, which is the case being tested.
+        var quietLooks = 0;
+        for (var look = 0; look < 20 && quietLooks < 3; look++)
+        {
+            await frames.RefreshAsync(stop.Token);
+            await Task.Delay(TimeSpan.FromMilliseconds(250));
+            if (next.IsCompleted)
+            {
+                quietLooks = 0;
+                Assert.True(await next);
+                next = stream.MoveNextAsync().AsTask();
+            }
+            else
+            {
+                quietLooks++;
+            }
+        }
+
+        Assert.Equal(3, quietLooks);
+
+        using var browser = server.Services.GetRequiredService<ActivityStreamClients>().Open();
+        await frames.RefreshAsync(stop.Token);
+
+        Assert.True(await next.WaitAsync(TimeSpan.FromSeconds(10)));
+        Assert.Contains("\"browsers_live\":1", stream.Current, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void The_overview_frame_is_the_overview_as_the_endpoint_answers_it()
+    {
+        var overview = new Weir.Core.Json.WireObject().Set("version", "1.0.0").Set("uptime_seconds", 5L);
+
+        Assert.Equal("event: system.overview\ndata: {\"version\":\"1.0.0\",\"uptime_seconds\":5}\n\n", SystemOverviewFrames.Frame(overview));
     }
 
     [Fact]

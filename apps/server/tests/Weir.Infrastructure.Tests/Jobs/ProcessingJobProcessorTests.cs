@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Weir.Core.Activity;
 using Weir.Core.Jobs;
+using Weir.Core.LibraryMode;
 using Weir.Infrastructure.Activity;
 using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.Scheduling;
@@ -53,6 +54,62 @@ public sealed class ProcessingJobProcessorTests : IDisposable
         Assert.Contains("Weir job failed", row.LastError, StringComparison.Ordinal);
         Assert.Contains("marked failed", row.LastError, StringComparison.Ordinal);
         Assert.Equal(["failed 1 processing.test.bad.v1 willRetry=False"], notifications.Sent);
+    }
+
+    private static async Task<string> NextTopicAsync(BroadcastSubscription<string> subscription)
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        await foreach (var topic in subscription.ReadAllAsync(timeout.Token))
+        {
+            return topic;
+        }
+
+        throw new InvalidOperationException("The subscription ended.");
+    }
+
+    [Fact]
+    public async Task A_library_scan_that_completes_says_so_on_library_scan_once_its_row_is_final()
+    {
+        var changes = new DataChangePublisher();
+        using var subscription = changes.Subscribe();
+        await _db.Store.EnqueueOrGetAsync("scan", LibraryModeJobKinds.ScanKind, "{\"library_id\":1}");
+        string? statusWhenHandled = null;
+        var processor = _db.Processor(
+            [new DelegateHandler(LibraryModeJobKinds.ScanKind, _ => statusWhenHandled = _db.Store.GetAsync(1).GetAwaiter().GetResult()!.Status)],
+            changes: changes);
+
+        await processor.ProcessOneAsync("w", 3600, T0);
+
+        Assert.Equal(DataTopics.LibraryScan, await NextTopicAsync(subscription));
+        Assert.Equal((ProcessingJobStatus.Leased, ProcessingJobStatus.Completed), (statusWhenHandled, (await _db.Store.GetAsync(1))!.Status));
+    }
+
+    [Fact]
+    public async Task A_library_scan_that_fails_says_so_on_library_scan_too()
+    {
+        var changes = new DataChangePublisher();
+        using var subscription = changes.Subscribe();
+        await _db.Store.EnqueueOrGetAsync("scan", LibraryModeJobKinds.ScanKind, "{\"library_id\":1}", maxAttempts: 1);
+        var processor = _db.Processor([new DelegateHandler(LibraryModeJobKinds.ScanKind, _ => throw new InvalidOperationException("boom"))], changes: changes);
+
+        await processor.ProcessOneAsync("w", 3600, T0);
+
+        Assert.Equal(DataTopics.LibraryScan, await NextTopicAsync(subscription));
+        Assert.Equal(ProcessingJobStatus.Failed, (await _db.Store.GetAsync(1))!.Status);
+    }
+
+    [Fact]
+    public async Task A_job_that_is_not_a_library_scan_says_nothing_on_library_scan()
+    {
+        var changes = new DataChangePublisher();
+        using var subscription = changes.Subscribe();
+        await _db.Store.EnqueueOrGetAsync("d1", "processing.test.ok.v1", maxAttempts: 3);
+        var processor = _db.Processor([new DelegateHandler("processing.test.ok.v1", _ => { })], changes: changes);
+
+        await processor.ProcessOneAsync("w", 3600, T0);
+        changes.Publish(DataTopics.Settings);
+
+        Assert.Equal(DataTopics.Settings, await NextTopicAsync(subscription));
     }
 
     [Fact]

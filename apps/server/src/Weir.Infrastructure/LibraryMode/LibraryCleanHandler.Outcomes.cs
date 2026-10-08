@@ -127,6 +127,7 @@ public sealed partial class LibraryCleanHandler
             ("@pending", ProcessingJobStatus.Pending),
             ("@notBefore", notBefore.UtcDateTime),
             ("@id", context.Id)).ConfigureAwait(false);
+        _changes.PublishQueueChangeOnCommit(uow, LibraryModeJobKinds.CleanKind);
         await uow.CommitAsync().ConfigureAwait(false);
     }
 

@@ -20,6 +20,18 @@ public sealed class Broadcast<T>
         _backlog = backlog;
     }
 
+    /// <summary>Whether anyone is listening right now.</summary>
+    public bool HasSubscribers
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _subscribers.Count > 0;
+            }
+        }
+    }
+
     public void Publish(T item)
     {
         lock (_gate)

@@ -1,10 +1,20 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PageLoading } from "../components/shared/page-loading";
 import { PageHeader } from "../components/shell/page-header";
 import { ShellHeaderSlot } from "../components/shell/shell-header-context";
+import {
+  reportLiveConnection,
+  resetLiveConnection,
+} from "../lib/live/live-connection";
+import { LOST_CONNECTION_GRACE_MS } from "../lib/live/use-live-updates-paused";
 import { AppShell } from "./app-shell";
+
+const useLiveSync = vi.fn();
+vi.mock("../lib/live/use-live-sync", () => ({
+  useLiveSync: () => useLiveSync(),
+}));
 
 const logoutMutate = vi.fn();
 const scrollToMock = vi.fn();
@@ -350,6 +360,11 @@ describe("AppShell", () => {
 });
 
 describe("the shell's header", () => {
+  afterEach(() => {
+    resetLiveConnection();
+    vi.useRealTimers();
+  });
+
   beforeEach(() => {
     counts.working = 0;
     counts.needsYou = 0;
@@ -464,6 +479,33 @@ describe("the shell's header", () => {
       "Resume processing",
     );
     expect(screen.queryByTestId("pause-open")).not.toBeInTheDocument();
+  });
+
+  it("keeps every screen current from the live stream", () => {
+    renderShell("/");
+
+    expect(useLiveSync).toHaveBeenCalled();
+  });
+
+  it("says live updates are paused while the connection is lost, under the header and above the page", () => {
+    vi.useFakeTimers();
+    renderShell("/");
+    act(() => void reportLiveConnection("opened"));
+    expect(
+      screen.queryByTestId("live-connection-banner"),
+    ).not.toBeInTheDocument();
+
+    act(() => void reportLiveConnection("dropped"));
+    act(() => void vi.advanceTimersByTime(LOST_CONNECTION_GRACE_MS));
+
+    const banner = screen.getByTestId("live-connection-banner");
+    expect(banner).toHaveTextContent("Live updates paused");
+    expect(
+      screen.getByTestId("shell-header").compareDocumentPosition(banner),
+    ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(banner.compareDocumentPosition(screen.getByRole("main"))).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
   });
 
   it("says Weir cannot be reached when it does not answer", () => {

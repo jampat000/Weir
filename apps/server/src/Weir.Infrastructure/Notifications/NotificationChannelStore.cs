@@ -1,5 +1,6 @@
 using Microsoft.Data.Sqlite;
 using Weir.Core.Notifications;
+using Weir.Infrastructure.Activity;
 using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Infrastructure.Notifications;
@@ -8,6 +9,14 @@ namespace Weir.Infrastructure.Notifications;
 public sealed class NotificationChannelStore
 {
     private const string Columns = "id, label, provider, url, events_json, enabled, created_at, updated_at";
+
+    private readonly DataChangePublisher? _changes;
+
+    /// <param name="changes">Told, once a write commits, that the alert channels changed, so every open screen reads them again.</param>
+    public NotificationChannelStore(DataChangePublisher? changes = null)
+    {
+        _changes = changes;
+    }
 
     public Task<List<NotificationChannelRecord>> ListAsync(UnitOfWork uow)
     {
@@ -40,6 +49,7 @@ public sealed class NotificationChannelStore
             ("$url", url),
             ("$events", NotificationRules.SerializeEvents(events)),
             ("$enabled", enabled ? 1 : 0)).ConfigureAwait(false);
+        Changed(uow);
         return await GetAsync(uow, Convert.ToInt64(id, System.Globalization.CultureInfo.InvariantCulture)).ConfigureAwait(false)
             ?? throw new InvalidOperationException("Notification channel was not created.");
     }
@@ -74,16 +84,25 @@ public sealed class NotificationChannelStore
             await uow.ExecuteAsync(
                 $"UPDATE notification_channels SET {string.Join(", ", sets)} WHERE notification_channels.id = $id",
                 [.. parameters]).ConfigureAwait(false);
+            Changed(uow);
         }
 
         return await GetAsync(uow, row.Id).ConfigureAwait(false) ?? row;
     }
 
-    public Task<int> DeleteAsync(UnitOfWork uow, long id)
+    public async Task<int> DeleteAsync(UnitOfWork uow, long id)
     {
         ArgumentNullException.ThrowIfNull(uow);
-        return uow.ExecuteAsync("DELETE FROM notification_channels WHERE notification_channels.id = $id", ("$id", id));
+        var removed = await uow.ExecuteAsync("DELETE FROM notification_channels WHERE notification_channels.id = $id", ("$id", id)).ConfigureAwait(false);
+        if (removed > 0)
+        {
+            Changed(uow);
+        }
+
+        return removed;
     }
+
+    private void Changed(UnitOfWork uow) => _changes?.PublishOnCommit(uow, DataTopics.Settings);
 
     private static NotificationChannelRecord Read(SqliteDataReader reader) => new(
         SqliteValues.GetInt64(reader, 0),

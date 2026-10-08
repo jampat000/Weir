@@ -13,7 +13,6 @@ import {
   emptyHealthWords,
   healthHeadline,
   healthSummary,
-  lastCheckedAt,
   listedChecks,
 } from "./health-card-model";
 import type { HealthArea } from "./health-checks";
@@ -57,7 +56,7 @@ export function HealthCard({ workflows, jump = 0 }: HealthCardProps) {
     () => listedChecks(health.checks, picked),
     [health.checks, picked],
   );
-  const sheen = useSheen(lastCheckedAt(health.checks));
+  const sheen = useSheen(health.readAt);
   const more = listed.length - Math.min(fits, listed.length);
   const detail = health.health.workflows.find(
     (item) => item.workflow.id === detailId,

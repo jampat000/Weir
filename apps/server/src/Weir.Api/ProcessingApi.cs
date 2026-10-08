@@ -31,6 +31,8 @@ public static class ProcessingApi
         // The folder-chain check composes ManagerSetupCheck (already registered by AddWeirMediaManagerServices)
         // with Weir's own watched/work/output folder rules.
         services.TryAddSingleton<LibraryFolderChainCheck>();
+        // Checked again on its own while a browser is watching, so a folder going missing or coming back is pushed, not asked for.
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IPeriodicTask, FolderChecksTask>());
         // First-run setup offers libraries from what is connected, and checks the ones a person confirms.
         services.TryAddSingleton<LibrarySuggestions>();
         services.TryAddSingleton<ProposedLibraryCheck>();

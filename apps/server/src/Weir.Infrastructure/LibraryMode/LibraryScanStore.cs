@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using Weir.Core.Jobs;
 using Weir.Core.Json;
 using Weir.Core.LibraryMode;
+using Weir.Infrastructure.Activity;
 using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.Sqlite;
 
@@ -24,8 +25,22 @@ public sealed record LibraryScanOutcome(DateTimeOffset GeneratedAt, IReadOnlyLis
 /// </summary>
 public sealed class LibraryScanStore
 {
+    private readonly DataChangePublisher? _changes;
+    private readonly LibraryScanProgress? _progress;
+
+    /// <param name="changes">Told when a scan is queued, so the screens showing scans follow it; null in a host with no live stream.</param>
+    /// <param name="progress">Where a running scan says how many files it has looked at; null reports none.</param>
+    public LibraryScanStore(DataChangePublisher? changes = null, LibraryScanProgress? progress = null)
+    {
+        _changes = changes;
+        _progress = progress;
+    }
+
+    /// <summary>How many files the running scan job has looked at so far, or null when it has not said.</summary>
+    public long? FilesSeen(long jobId) => _progress?.FilesSeen(jobId);
+
     /// <summary>
-    /// Enqueues the scan on <paramref name="uow"/>'s own connection and transaction (<see cref="ProcessingJobStore.EnqueueOrGet"/>),
+    /// Enqueues the scan on <paramref name="uow"/>'s own connection and transaction (<see cref="ProcessingJobStore.EnqueueOrGet(UnitOfWork, string, string, string?, int, int?, int, DateTimeOffset?)"/>),
     /// not <see cref="ProcessingJobStore.EnqueueOrGetAsync"/>: that opens its own connection, which — called while an API
     /// endpoint's write <see cref="UnitOfWork"/> is still open, as here — can deadlock against it, exactly the trap
     /// <see cref="Weir.Infrastructure.Processing.RequeueStore"/> already documents for the same reason.
@@ -45,14 +60,14 @@ public sealed class LibraryScanStore
         }
 
         var job = jobs.EnqueueOrGet(
-            uow.Connection,
-            uow.WriteTransaction(),
+            uow,
             LibraryModeJobKinds.ScanDedupeKey(libraryId),
             LibraryModeJobKinds.ScanKind,
             WireJsonWriter.Dumps(payload, WireJsonFormat.Compact),
             JobQueueRules.DefaultMaxAttempts,
             0,
             LibraryModePriority.Low);
+        uow.OnCommitted(() => _changes?.Publish(DataTopics.LibraryScan));
         return Task.FromResult(job);
     }
 
@@ -111,6 +126,7 @@ public sealed class LibraryScanStore
             parameters).ConfigureAwait(false);
 
         var transaction = uow.WriteTransaction();
+        jobs.AnnounceOnCommit(uow, LibraryModeJobKinds.CleanKind);
         return jobs.EnqueueOrGet(
             uow.Connection,
             transaction,

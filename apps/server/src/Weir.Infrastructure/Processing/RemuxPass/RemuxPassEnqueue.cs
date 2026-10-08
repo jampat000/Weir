@@ -95,12 +95,12 @@ public static class RemuxPassEnqueue
                 "UPDATE jobs SET payload_json = $payload, not_before = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = $id",
                 ("$payload", json),
                 ("$id", pending.Id)).ConfigureAwait(false);
+            jobs.AnnounceOnCommit(uow, RemuxPassOutcomes.JobKind);
             return pending with { PayloadJson = json };
         }
 
         return jobs.EnqueueOrGet(
-            uow.Connection,
-            uow.WriteTransaction(),
+            uow,
             $"{RemuxPassOutcomes.JobKind}:{Guid.NewGuid():N}",
             RemuxPassOutcomes.JobKind,
             WireJsonWriter.Dumps(payload, WireJsonFormat.Compact),

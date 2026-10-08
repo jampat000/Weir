@@ -21,6 +21,8 @@ public sealed class SystemStatsApiTests
         new MachineFacts("Windows 11 Pro", 3600, null),
         [new DriveReading("D:", "D:\\", 2000, 500, 30, 100, 12.5, null, null, null, [new WorkflowOnDrive(1, "Movies", ["watched", "output"])])]);
 
+    private static StatsUpdate Update(StatsSample sample) => new(1, sample, Snapshot.Machine, Snapshot.Drives);
+
     [Fact]
     public void The_snapshot_is_the_documented_json()
     {
@@ -62,9 +64,9 @@ public sealed class SystemStatsApiTests
     [Fact]
     public void A_reading_the_machine_could_not_give_is_null_in_the_json()
     {
-        var sample = StatsSample.Of(SomeNow(cpu: null, diskRead: null));
+        var update = Update(StatsSample.Of(SomeNow(cpu: null, diskRead: null)));
 
-        var frame = SystemStatsFrames.Frame(sample);
+        var frame = SystemStatsFrames.Frame(update);
 
         var data = JsonNode.Parse(frame.Split('\n')[1]["data: ".Length..])!;
         Assert.Null(data["now"]!["cpu_percent"]);
@@ -76,13 +78,41 @@ public sealed class SystemStatsApiTests
     [Fact]
     public void A_frame_carries_the_readings_of_the_moment_and_the_point_for_the_traces()
     {
-        var frame = SystemStatsFrames.Frame(StatsSample.Of(SomeNow()));
+        var frame = SystemStatsFrames.Frame(Update(StatsSample.Of(SomeNow())));
 
         Assert.StartsWith("event: system.stats\ndata: {\"now\":{\"at\":\"2026-10-02T12:00:00Z\"", frame, StringComparison.Ordinal);
         Assert.EndsWith("\n\n", frame, StringComparison.Ordinal);
         var data = JsonNode.Parse(frame.Split('\n')[1]["data: ".Length..])!;
         Assert.Equal("2026-10-02T12:00:00Z", data["point"]!["at"]!.GetValue<string>());
         Assert.Equal(148.0, data["point"]!["processing_speed"]!.GetValue<double>());
+    }
+
+    [Fact]
+    public void A_frame_carries_the_machine_and_the_drives_as_they_stand()
+    {
+        var frame = SystemStatsFrames.Frame(Update(StatsSample.Of(SomeNow())));
+
+        var data = JsonNode.Parse(frame.Split('\n')[1]["data: ".Length..])!;
+        Assert.Equal("Windows 11 Pro", data["machine"]!["os"]!.GetValue<string>());
+        Assert.Equal(3600, data["machine"]!["uptime_seconds"]!.GetValue<long>());
+        Assert.Equal(("D:", 500), (data["drives"]![0]!["name"]!.GetValue<string>(), data["drives"]![0]!["free_bytes"]!.GetValue<int>()));
+    }
+
+    [Fact]
+    public async Task A_stream_hears_of_drives_the_sampler_read_with_the_next_reading()
+    {
+        var store = new SystemStatsStore(TimeProvider.System, 4);
+        store.Add(StatsSample.Of(SomeNow()));
+        using var stop = new CancellationTokenSource();
+        await using var frames = new SystemStatsFrames(store).ForAsync(stop.Token).GetAsyncEnumerator(stop.Token);
+        Assert.True(await frames.MoveNextAsync());
+        Assert.Contains("\"drives\":[]", frames.Current, StringComparison.Ordinal);
+
+        store.SetDrives(Snapshot.Drives);
+        store.Add(StatsSample.Of(SomeNow(cpu: 20)));
+
+        Assert.True(await frames.MoveNextAsync());
+        Assert.Contains("\"name\":\"D:\"", frames.Current, StringComparison.Ordinal);
     }
 
     [Fact]

@@ -105,6 +105,17 @@ Solution `apps/server/Weir.slnx`; details in [`apps/server/README.md`](apps/serv
 - `Weir.Core` stays free of IO; filesystem, database, process and HTTP work lives in `Weir.Infrastructure` behind seams tests can replace.
 - File lifecycle changes must preserve the safety contract in [`docs/file-lifecycle-contract.md`](docs/file-lifecycle-contract.md).
 
+## Live Data
+
+Every screen follows Weir from one server-sent event stream, `GET /api/v1/activity/stream`, shared by the whole web app. A new number arrives by a push, never by a timer or a Refresh button.
+
+- **Publish:** a component that changes data calls `DataChangePublisher.Publish(DataTopics.<Topic>)` in `Weir.Infrastructure.Activity` once the change has committed (`uow.OnCommitted`); `PublishOnCommit(uow, topic)` does that and says each topic once however many rows the unit of work wrote. Each open stream sends a `data.changed` frame, `{ "topic": "<snake_case_name>" }`.
+- **Consume:** `LIVE_TOPIC_QUERIES` in `apps/web/src/lib/live/live-topics.ts` says which queries each topic reads again. A screen adds its query keys to its topic and drops its `refetchInterval`.
+- **Not from the database:** data that changes outside a commit has a publisher of its own. `TrayHandOffWatcher` watches the files the Windows tray writes in the data folder (`update-state.json`, `update-settings.json`, `lan-access`) and publishes `update` and `network_access` when one is written, by the tray or by the server. `UpdateOutlook` publishes `update` when a release check finds something new, and `MetricsChangeTask` publishes `metrics` at most every five seconds while a stream is open. After "Restart to apply" the page needs no check of its own: the stream reconnects and the new `boot_id` reads every query again.
+- **Frames:** what changes too often to read again each time, or arrives whole, travels in its own frame instead of a topic: `processing.progress`, `system.stats` (a reading a second, with the machine's facts and the drives), `system.overview` (the facts System shows about Weir, read once for every open stream and sent when one changes), `system.tasks`, `system.checks` (when the server last checked the workflows' folders and whether Weir is ready, at every look, so Health says when the server looked rather than when the page read) and `system.log` (warnings, errors and Weir's own information).
+- **Watching tasks:** what has no change to hook, such as a worker that stops or a folder that goes missing, is looked at by the server on a timer, only while a browser holds the stream, and published when the answer differs from last time (`readiness-changes`, `folder-checks`). A long-running job says so as it goes, at most once a second (`ThrottledDataChange`), and once more when its job row is final.
+- **Connection:** `server.hello` opens every stream with `{ "boot_id" }`, new on each server start. While the connection is lost the shell shows "Live updates paused", and when it is back every query is read again; a different `boot_id` after a reconnect also reloads the page if the server now serves a newer build. A stream that sends nothing for 40 seconds while the tab is showing is dropped and opened again, and one the server refuses sends the page to sign-in when the session has ended.
+
 ## Job Lifecycle
 
 ```mermaid

@@ -15,9 +15,6 @@ export async function fetchSystemTasks(): Promise<SystemTask[]> {
   return parseSystemTasks(await readJson<unknown>(response)) ?? [];
 }
 
-/** How often the list is read again in case a frame was missed: the countdowns come from the times in it. */
-const TASKS_REFRESH_MS = 60_000;
-
 /** Every periodic task, read once and then kept current by the `system.tasks` frames the server pushes. */
 export function useSystemTasksQuery() {
   const queryClient = useQueryClient();
@@ -31,8 +28,8 @@ export function useSystemTasksQuery() {
   return useQuery({
     queryKey: systemKeys.tasks,
     queryFn: fetchSystemTasks,
-    staleTime: TASKS_REFRESH_MS,
-    refetchInterval: TASKS_REFRESH_MS,
+    // Frames reach the cache only while a card is listening, so a card that opens reads the list again whatever it kept.
+    staleTime: 0,
     retry: false,
   });
 }

@@ -5,6 +5,7 @@ import type {
   LibraryModeSchedule,
   LibraryScanInfo,
 } from "../../lib/processing/library-mode-api";
+import { plural } from "../../lib/ui/mm-plural";
 import {
   useAppClockFormatter,
   useAppDateFormatter,
@@ -15,6 +16,13 @@ import { nextScheduled, nextScheduledBrief, scanned } from "./library-model";
 type Rescan = ReturnType<typeof useTriggerLibraryScan>;
 
 const START_FAILED = "Weir couldn't start a check. Try again in a moment.";
+
+/** What a running check says: it is under way, and how many files it has looked at so far once it has looked at some. */
+function checking(filesSeen: number | null): string {
+  return filesSeen
+    ? `Checking this workflow now · ${plural(filesSeen, "file", "files")} so far`
+    : "Checking this workflow now";
+}
 
 /**
  * When this library's numbers were counted and when the schedule runs next, in a few words with the whole sentence in
@@ -37,7 +45,7 @@ export function LibraryScanStatus({
   const dayClock = useAppDayClockFormatter();
   const running = Boolean(scan?.running);
   const when = running
-    ? "Checking this workflow now"
+    ? checking(scan?.files_seen ?? null)
     : scanned(scan?.generated_at ?? null, now);
   const scheduleLine = nextScheduled(schedule, now, formatDate);
   const scheduleBrief = nextScheduledBrief(schedule, now, clock, dayClock);

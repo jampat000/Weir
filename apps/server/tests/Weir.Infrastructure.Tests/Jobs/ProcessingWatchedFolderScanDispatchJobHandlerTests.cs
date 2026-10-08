@@ -2,6 +2,7 @@ using Weir.Core.Jobs;
 using Weir.Core.Json;
 using Weir.Core.Processing;
 using Weir.Core.Security;
+using Weir.Infrastructure.Activity;
 using Weir.Infrastructure.Auth;
 using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.MediaManagers;
@@ -9,6 +10,7 @@ using Weir.Infrastructure.Processing;
 using Weir.Infrastructure.Processing.RemuxPass;
 using Weir.Infrastructure.Settings;
 using Weir.Infrastructure.Sqlite;
+using Weir.Infrastructure.Tests.Activity;
 using Weir.Infrastructure.Tests.MediaManagers;
 using Weir.Infrastructure.Tests.Platform;
 
@@ -26,7 +28,8 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandlerTests
     private static readonly FileStateStore Files = new();
     private static readonly FileSkipMarkerStore SkipMarkers = new();
 
-    internal static async Task<(StoreFixture Store, ProcessingJobStore Jobs, ProcessingWatchedFolderScanDispatchJobHandler Handler)> BuildAsync()
+    internal static async Task<(StoreFixture Store, ProcessingJobStore Jobs, ProcessingWatchedFolderScanDispatchJobHandler Handler)> BuildAsync(
+        DataChangePublisher? changes = null)
     {
         var store = new StoreFixture(("WEIR_CREDENTIALS_SECRET", "handler-tests-credentials-secret"));
         var cipher = new CredentialCipher(store.Options.CredentialsSecret, store.Options.SessionSecret, store.Options.PreviousCredentialsSecrets, store.Clock);
@@ -34,7 +37,7 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandlerTests
         var connections = new MediaManagerConnectionService(store.Options, cipher, ports, new MediaManagerConnectionStore());
         var jobs = new ProcessingJobStore(store.Database, store.Clock);
         var handler = new ProcessingWatchedFolderScanDispatchJobHandler(
-            store.Database, store.Clock, store.Options, jobs, connections, new SuiteSettingsStore(new AuthStore()), Libraries, Files, SkipMarkers);
+            store.Database, store.Clock, store.Options, jobs, connections, new SuiteSettingsStore(new AuthStore()), Libraries, Files, SkipMarkers, changes: changes);
         // Libraries these tests create wait for nothing and take any size (see CreateLibraryAsync), so they assert scan dispatch
         // itself, not the settling and hold-timer gates a freshly written test file would otherwise trip.
         await store.Execute(
@@ -107,6 +110,25 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandlerTests
         Assert.Equal("manual", ((WireString)body.Get("trigger")!).Value);
         Assert.Equal(libraryId, (long)((WireInteger)body.Get("library_id")!).Value);
         Assert.Null(body.Get("dry_run"));
+    }
+
+    [Fact]
+    public async Task A_look_that_finishes_tells_the_live_stream_even_when_it_finds_nothing()
+    {
+        var changes = new DataChangePublisher();
+        using var published = new PublishedTopics(changes);
+        var (store, jobs, handler) = await BuildAsync(changes);
+        using var _ = store;
+        var watched = store.Home.Join("watch");
+        var output = store.Home.Join("out");
+        Directory.CreateDirectory(watched);
+        Directory.CreateDirectory(output);
+        var libraryId = await CreateLibraryAsync(store, watched, output);
+        await published.TakeAsync();
+
+        await RunScanAsync(handler, jobs, libraryId, enqueueRemuxJobs: true);
+
+        Assert.Contains(DataTopics.LibraryScan, await published.TakeAsync());
     }
 
     [Fact]

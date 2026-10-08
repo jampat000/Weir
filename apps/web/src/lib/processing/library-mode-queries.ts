@@ -88,16 +88,14 @@ export function useLibraryFilesQuery(
 }
 
 /**
- * #568's Overview. `refetchInterval` follows the scan: while one is queued or running the totals and
- * breakdowns are still changing, so the page polls; once it finishes, polling stops.
+ * #568's Overview. While a scan is queued or running the totals and breakdowns are still changing: the server says so
+ * on `library_scan` when the scan is queued, as its files are indexed and when it ends, and each of those reads this again.
  */
 export function useLibraryOverviewQuery(libraryId: number, enabled = true) {
   return useQuery({
     queryKey: processingKeys.libraryOverview(libraryId),
     queryFn: () => fetchLibraryOverview(libraryId),
     enabled: enabled && libraryId > 0,
-    refetchInterval: (query) =>
-      query.state.data?.scan?.running ? 3000 : false,
   });
 }
 

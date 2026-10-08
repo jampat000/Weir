@@ -49,5 +49,8 @@ overwritten each run). They are for looking at, not compared.
   classes share one collection, so tests run one at a time against the one server.
 - **`Harness/E2EDatabase`** writes plain SQL to the running server's SQLite file for what the browser cannot create, an
   activity event the open Logs tab must pick up live.
+- **`Support/ProcessingRig`** is a second Weir for a test that watches a file move through the screens: one worker over a fake
+  ffmpeg, so a pass stays under way until the test releases it, and a fake Deluno. Files arrive and finish through the hand-off
+  webhook and the outcome route, as a media manager makes them, never by writing to the database.
 - **`Support/Navigation`** is sign-in, the side menu, the tabs of an area, Logs and the Activity chips. **`Support/PageChecks`**
   holds the structural checks and screenshots of the visual smoke tests.

@@ -1,6 +1,7 @@
 using Weir.Core.Json;
 using Weir.Core.Settings;
 using Weir.Core.Time;
+using Weir.Infrastructure.Activity;
 using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Infrastructure.Settings;
@@ -30,6 +31,7 @@ public sealed partial class ConfigurationBundleStore
 
     private readonly SuiteSettingsStore _suiteSettings;
     private readonly ConfigurationBundleConnections _connections;
+    private readonly DataChangePublisher? _changes;
 
     private enum ColumnKind
     {
@@ -40,10 +42,12 @@ public sealed partial class ConfigurationBundleStore
 
     private sealed record Column(string Name, ColumnKind Kind);
 
-    public ConfigurationBundleStore(SuiteSettingsStore suiteSettings, ConfigurationBundleConnections connections)
+    /// <summary>Once a restore commits, <paramref name="changes"/> tells every open screen that the workflows and settings it rewrote changed.</summary>
+    public ConfigurationBundleStore(SuiteSettingsStore suiteSettings, ConfigurationBundleConnections connections, DataChangePublisher? changes = null)
     {
         _suiteSettings = suiteSettings ?? throw new ArgumentNullException(nameof(suiteSettings));
         _connections = connections ?? throw new ArgumentNullException(nameof(connections));
+        _changes = changes;
     }
 
     /// <summary>Build the export bundle from the settings rows. Throws <see cref="WireValueException"/> when a required row is missing.</summary>
@@ -118,6 +122,8 @@ public sealed partial class ConfigurationBundleStore
         var restoredConnectionIds = await _connections.RestoreMediaManagersAsync(uow, bundle).ConfigureAwait(false);
         await RestoreProcessingLibrariesAsync(uow, bundle, weirHome, restoredConnectionIds).ConfigureAwait(false);
         await _connections.RestoreAlertsAsync(uow, bundle).ConfigureAwait(false);
+        _changes?.PublishOnCommit(uow, DataTopics.Libraries);
+        _changes?.PublishOnCommit(uow, DataTopics.Settings);
     }
 
     private async Task ApplySuiteSettingsAsync(UnitOfWork uow, WireValue section, ITimeZoneResolver zones)

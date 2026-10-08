@@ -1,5 +1,7 @@
 using System.Net;
+using System.Text.Json.Nodes;
 using Weir.Contract.Tests.Harness;
+using Weir.Contract.Tests.Jobs;
 
 namespace Weir.Contract.Tests.Activity;
 
@@ -68,6 +70,72 @@ public sealed class ActivityStreamTests(ServerFixture fixture) : IClassFixture<S
     }
 
     [Fact]
+    public async Task Activity_stream_says_hello_with_the_id_of_this_run_of_the_server()
+    {
+        using var admin = await Server.CreateAdminClientAsync();
+        using var first = await admin.OpenStreamAsync(Stream);
+        using var second = await admin.OpenStreamAsync(Stream);
+
+        var hello = (await first.NextEventNamedAsync("server.hello")).AsObject();
+        var again = (await second.NextEventNamedAsync("server.hello")).AsObject();
+
+        Assert.Equal(["boot_id"], hello.Select(field => field.Key));
+        Assert.True(Guid.TryParse((string)hello["boot_id"]!, out _));
+        Assert.Equal((string)hello["boot_id"]!, (string)again["boot_id"]!);
+    }
+
+    [Fact]
+    public async Task Pausing_and_resuming_send_a_data_changed_frame_for_the_pause_topic_to_an_open_stream()
+    {
+        using var admin = await Server.CreateAdminClientAsync();
+        using var stream = await admin.OpenStreamAsync(Stream);
+        await stream.NextEventNamedAsync("server.hello");
+
+        var paused = await admin.PutWithCsrfAsync($"{WeirClient.Api}/pause", new JsonObject { ["paused"] = true });
+        Assert.True(paused.Status == HttpStatusCode.OK, paused.ToString());
+        var pausedFrame = (await stream.NextEventNamedAsync("data.changed")).AsObject();
+        var resumed = await admin.PutWithCsrfAsync($"{WeirClient.Api}/pause", new JsonObject { ["paused"] = false });
+        Assert.True(resumed.Status == HttpStatusCode.OK, resumed.ToString());
+        var resumedFrame = (await stream.NextEventNamedAsync("data.changed")).AsObject();
+
+        Assert.Equal(["topic"], pausedFrame.Select(field => field.Key));
+        Assert.Equal("pause", (string)pausedFrame["topic"]!);
+        Assert.Equal("pause", (string)resumedFrame["topic"]!);
+    }
+
+    [Fact]
+    public async Task Queuing_a_file_pass_sends_data_changed_frames_for_the_job_queue_and_files_at_once()
+    {
+        using var folders = new TemporaryFolder();
+        var watched = Directory.CreateDirectory(Path.Combine(folders.Path, "stream_watch")).FullName;
+        var output = Directory.CreateDirectory(Path.Combine(folders.Path, "stream_out")).FullName;
+        using var admin = await Server.CreateAdminClientAsync();
+        await JobsApi.SetMovieFoldersAsync(admin, watched, output);
+        using var stream = await admin.OpenStreamAsync(Stream);
+        await stream.NextEventNamedAsync("server.hello");
+
+        var queued = await admin.PostWithCsrfAsync(
+            $"{WeirClient.Api}/processing/jobs/file-remux-pass/enqueue", new JsonObject { ["relative_media_path"] = "movies/streamed.mkv" });
+        JobsApi.Expect(queued, HttpStatusCode.OK);
+
+        Assert.Equal(["files_at_once", "jobs"], await TopicsAnnouncedAsync(stream, "jobs", "files_at_once"));
+    }
+
+    [Fact]
+    public async Task Queuing_a_maintenance_sweep_sends_data_changed_frames_for_the_job_queue_and_the_maintenance_panel()
+    {
+        using var admin = await Server.CreateAdminClientAsync();
+        using var stream = await admin.OpenStreamAsync(Stream);
+        await stream.NextEventNamedAsync("server.hello");
+
+        var queued = await admin.PostWithCsrfAsync(
+            $"{WeirClient.Api}/processing/maintenance/run", new JsonObject { ["family"] = "work_temp_stale_sweep" });
+        JobsApi.Expect(queued, HttpStatusCode.OK);
+
+        Assert.Equal(["jobs", "maintenance"], await TopicsAnnouncedAsync(stream, "jobs", "maintenance"));
+    }
+
+    [Fact]
     public async Task Record_activity_event_does_not_prune_history_using_log_retention()
     {
         const string title = "Old Processing result that still backs overview history";
@@ -100,6 +168,19 @@ public sealed class ActivityStreamTests(ServerFixture fixture) : IClassFixture<S
         var items = response.Fields["items"]!.AsArray();
         Assert.Contains(title, items.Select(item => (string)item!["title"]!));
         Assert.Contains(items, item => (string)item!["module"]! == "auth");
+    }
+
+    /// <summary>The <c>data.changed</c> topics the stream sends until every one in <paramref name="expected"/> has come, sorted.</summary>
+    private static async Task<string[]> TopicsAnnouncedAsync(SseReader stream, params string[] expected)
+    {
+        var heard = new SortedSet<string>(StringComparer.Ordinal);
+        while (!expected.All(heard.Contains))
+        {
+            var frame = (await stream.NextEventNamedAsync("data.changed")).AsObject();
+            heard.Add((string)frame["topic"]!);
+        }
+
+        return [.. heard.Where(expected.Contains)];
     }
 
     private static async Task<long> LatestActivityIdAsync(WeirClient client)
