@@ -31,6 +31,16 @@ public static class WeirApi
         await EnsureOkAsync(response, $"Setting the pause to {paused}");
     }
 
+    /// <summary>Pauses Processing for `minutes`, after which the server resumes it by itself.</summary>
+    public static async Task SetPausedForAsync(IBrowserContext context, string baseUrl, int minutes)
+    {
+        var token = await CsrfTokenAsync(context, baseUrl);
+        await using var response = await context.APIRequest.PutAsync(
+            $"{baseUrl}/api/v1/pause",
+            new() { DataObject = new { csrf_token = token, paused = true, pause_for_minutes = minutes } });
+        await EnsureOkAsync(response, $"Pausing for {minutes} minutes");
+    }
+
     /// <summary>
     /// Keeps a failed file without processing it again, as the remove dialog's "Keep" does: the dialog's own request, confirmed
     /// with the file's details when Weir recorded none of its own.

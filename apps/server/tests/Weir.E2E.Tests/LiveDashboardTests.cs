@@ -59,6 +59,33 @@ public sealed class LiveDashboardTests(E2EServer server) : E2ETestBase(server)
         await AssertNotReloadedAsync(page);
     }
 
+    // The expiry task looks every 30 s, and a pause lasts at least a minute.
+    private const float TimedPauseMs = 100_000;
+
+    [E2EFact]
+    public async Task A_timed_pause_running_out_flips_the_header_back_to_running_by_itself()
+    {
+        var page = await NewPageAsync();
+        await page.RunAndWaitForResponseAsync(
+            () => Navigation.EnsureSignedInAsync(page, BaseUrl),
+            response => response.Url.EndsWith("/api/v1/activity/stream", StringComparison.Ordinal));
+        await Expect(page.GetByTestId("processing-page")).ToBeVisibleAsync();
+        await MarkPageAsync(page);
+        try
+        {
+            await WeirApi.SetPausedForAsync(page.Context, BaseUrl, minutes: 1);
+            await Expect(page.GetByTestId("pause-badge")).ToBeVisibleAsync(new() { Timeout = PushMs });
+
+            await Expect(page.GetByTestId("pause-badge")).ToHaveCountAsync(0, new() { Timeout = TimedPauseMs });
+            Assert.False(await WeirApi.IsPausedAsync(page.Context, BaseUrl));
+            await AssertNotReloadedAsync(page);
+        }
+        finally
+        {
+            await WeirApi.SetPausedAsync(page.Context, BaseUrl, paused: false);
+        }
+    }
+
     [E2EFact]
     public async Task A_file_handed_over_changes_the_Working_lane_and_the_Working_badge_without_a_reload()
     {
