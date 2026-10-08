@@ -28,7 +28,7 @@ shortcut, and starts Weir.
 
 ## 3. Answer two questions
 
-The first time Weir starts, it asks two things, one after the other.
+The first time Weir starts, it asks three things, one after the other.
 
 **"Allow Weir on your network?"** This is the Windows Firewall question. It decides who can reach Weir.
 
@@ -40,6 +40,9 @@ The first time Weir starts, it asks two things, one after the other.
 You can change your mind later, in either of two places. In Weir, open **System › About** and choose
 **Devices on my network** or **This PC only**. Or right-click the Weir icon in the system tray and choose
 **Allow other devices on your network...** or **Only allow this PC**. Weir restarts when you do.
+
+**"Start Weir when you sign in to Windows?"** Nothing starts with Windows unless you say yes. **No** (or a silent install)
+leaves it off. You can switch it any time with **Start with Windows** in the tray menu.
 
 **"Start Weir" and a port number.** Keep the default, **9347**, unless something else on the PC already uses
 it. In that case the window says so and suggests the next free port. Weir remembers your choice.
@@ -68,22 +71,26 @@ on every install. The [Quickstart](../docs-site/docs/quickstart.md#3-follow-the-
 The data folder is locked to your Windows account, so other accounts on the PC cannot read it.
 
 Weir runs as you, in your own sign-in session. It is not a Windows service. That is on purpose: a service
-cannot see mapped network drives, and a NAS is where most media lives. It starts with Windows when you sign
-in and does not open a browser window when it does.
+cannot see mapped network drives, and a NAS is where most media lives. If you chose to start it with Windows,
+it starts when you sign in and does not open a browser window when it does.
 
 ## The tray icon
 
 Weir lives in the system tray, next to the clock. If you do not see it, click the small arrow to show
-hidden icons. Click the icon to open Weir in your browser. Right-click it for the menu:
+hidden icons. Click the icon to open Weir in your browser. A small mark in the icon's corner appears only when
+something is different: a grey ring while Weir starts, two bars while processing is paused, a red dot when something
+needs you, a blue dot when an update is waiting. Hover over the icon to read the state. Right-click it for the menu:
 
-- **Open Weir**
-- **Open Data Folder**
-- **Change port**
-- **Allow other devices on your network...** (or **Only allow this PC**)
-- **Check for updates**
-- **Quit**
+- **Open Weir**, then a greyed line with the state
+- **Pause processing** (or **Resume processing**) and **Restart Weir**
+- **Copy address**, **Allow other devices on your network...** (or **Only allow this PC**) and **Change port**
+- **Open data folder**, **Open logs folder** and **Start with Windows**
+- **Check for updates**, the version, and **Report a problem...**
+- **Quit Weir**
 
-Quitting asks Weir to finish properly first, so running work and the database close in order.
+If Weir stops and cannot start again by itself, the icon turns red and says so; choose **Restart Weir**.
+Quitting asks Weir to finish properly first, so running work and the database close in order. The tray follows
+the [tray standard](tray-standard.md).
 
 ## Open Weir from another computer
 

@@ -61,7 +61,7 @@ You need 64-bit Windows 10 or 11. You do not need administrator rights to instal
 
 Your data lives outside the program folder on purpose, so updating the program never touches it. Weir runs as you, in your own sign-in session, and not as a Windows service. That way it can reach your mapped network drives.
 
-Click the tray icon to open Weir. Right-click it to open the data folder, change the port, allow other devices, check for updates or quit. The [Windows guide](docs/install-windows.md) has the details, including how to install Weir from a script.
+Click the tray icon to open Weir. Right-click it to pause processing, restart Weir, copy its address, open the data or logs folder, change the port, allow other devices, start Weir with Windows, check for updates or quit. The [Windows guide](docs/install-windows.md) has the details, including how to install Weir from a script.
 
 ## Install with Docker
 

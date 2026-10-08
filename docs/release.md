@@ -306,7 +306,7 @@ After installing:
 2. Weir starts in the user session, not as a Windows service.
 3. The .NET tray app (`Weir.exe`) launches the Weir server (`server\WeirServer.exe`) as a child process, watches it, and restarts it if it stops.
    Every deliberate stop (the LAN access toggle, Change port, Restart to update, Quit, and `--allow-lan` on a running Weir) asks the server to stop by setting its named event `Local\Weir-Stop-<server pid>` and waits up to 10 s for it to exit, so hosted services, running jobs and the database close in order. Only a server that does not exit in time, or cannot be asked, is killed. `tray-host.log` says which happened: `stopped cleanly in 0.3 s` or `did not stop in 10.0 s; killing it`. The event is per user and per Windows session; the server has no HTTP route that stops it.
-4. The tray icon opens the local app in the browser and exposes `Open Weir`, `Open Data Folder`, `Change port`, `Check for updates`, and `Quit`.
+4. The tray icon opens the local app in the browser and exposes the menu in [`tray-standard.md`](tray-standard.md): `Open Weir`, Pause or Resume processing, `Restart Weir`, `Copy address`, the LAN access items, `Change port`, the data and logs folders, `Start with Windows`, the update item, the version, `Report a problem...` and `Quit Weir`. The installer turns nothing on at sign-in by itself: the first run asks whether to start Weir with Windows, and Setup `--silent` never asks.
 5. Application binaries install under `%LocalAppData%\Weir` (per-user, no admin required).
 6. The local runtime root is created under `C:\ProgramData\Weir`.
 
