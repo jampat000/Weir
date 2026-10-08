@@ -121,25 +121,22 @@ describe("a check's few words", () => {
 
   it("says a drive that fills soon, or is low, in a few words", () => {
     const drive = (changes: Partial<SystemDrive>) =>
-      storageChecks(
-        [
-          {
-            name: "D:",
-            path: "D:\\",
-            total_bytes: 1000 * 1024 ** 3,
-            free_bytes: 500 * 1024 ** 3,
-            weir_bytes: 0,
-            keep_free_bytes: 20 * 1024 ** 3,
-            full_in_days: null,
-            read_bytes_per_sec: null,
-            write_bytes_per_sec: null,
-            busy_percent: null,
-            workflows: [],
-            ...changes,
-          },
-        ],
-        NOW,
-      )[0];
+      storageChecks([
+        {
+          name: "D:",
+          path: "D:\\",
+          total_bytes: 1000 * 1024 ** 3,
+          free_bytes: 500 * 1024 ** 3,
+          weir_bytes: 0,
+          keep_free_bytes: 20 * 1024 ** 3,
+          full_in_days: null,
+          read_bytes_per_sec: null,
+          write_bytes_per_sec: null,
+          busy_percent: null,
+          workflows: [],
+          ...changes,
+        },
+      ])[0];
 
     expect(drive({ full_in_days: 2 }).words).toBe(
       "500 GB free · full in ~2 days",
@@ -254,7 +251,7 @@ describe("storageChecks", () => {
   }
 
   it("fails a drive with less free than Weir keeps free, and links to a workflow that writes there", () => {
-    const [check] = storageChecks([drive({ free_bytes: 5_000_000_000 })], NOW);
+    const [check] = storageChecks([drive({ free_bytes: 5_000_000_000 })]);
     expect(check).toMatchObject({
       meaning: "attention",
       title: "D: is low on space",
@@ -263,7 +260,7 @@ describe("storageChecks", () => {
   });
 
   it("warns on a drive that fills within a week", () => {
-    const [check] = storageChecks([drive({ full_in_days: 3 })], NOW);
+    const [check] = storageChecks([drive({ full_in_days: 3 })]);
     expect(check).toMatchObject({
       meaning: "attention",
       title: "D: fills up soon",
@@ -272,13 +269,18 @@ describe("storageChecks", () => {
   });
 
   it("passes a drive with room, and says how much", () => {
-    const [check] = storageChecks([drive({})], NOW);
+    const [check] = storageChecks([drive({})]);
     expect(check.meaning).toBe("done");
     expect(check.why).toMatch(/free\.$/);
   });
 
+  it("gives a drive no time of its own, because it follows the stream", () => {
+    const [check] = storageChecks([drive({})]);
+    expect(check.checkedAt).toBeNull();
+  });
+
   it("has no checks while the drives have not been read", () => {
-    expect(storageChecks(null, null)).toEqual([]);
+    expect(storageChecks(null)).toEqual([]);
   });
 });
 

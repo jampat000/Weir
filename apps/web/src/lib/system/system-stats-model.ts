@@ -10,23 +10,30 @@ import type {
  * The stats with a frame's newest reading and history point added, and the points older than the window dropped,
  * by their own times: a history that was 10 seconds apart while nobody watched is trimmed the same way as one at
  * one second. A frame whose point is not newer than the last one (a replay after a reconnect, or the same second
- * twice) leaves the history as it is and only refreshes the reading.
+ * twice) leaves the history as it is and only refreshes the reading. Either way the machine's facts and the drives
+ * are the frame's, which are the newest the server has.
  */
 export function withFrame(
   stats: SystemStats,
   frame: SystemStatsFrame,
 ): SystemStats {
+  const current = {
+    ...stats,
+    now: frame.now,
+    machine: frame.machine,
+    drives: frame.drives,
+  };
   const newest = stats.history.at(-1);
   const at = parseAppTime(frame.point.at);
   const lastAt = newest ? parseAppTime(newest.at) : null;
   if (at === null || (lastAt !== null && at <= lastAt)) {
-    return { ...stats, now: frame.now };
+    return current;
   }
   const from = at - stats.window_s * 1000;
   const history = [...stats.history, frame.point].filter(
     (point) => (parseAppTime(point.at) ?? at) >= from,
   );
-  return { ...stats, now: frame.now, history };
+  return { ...current, history };
 }
 
 /**

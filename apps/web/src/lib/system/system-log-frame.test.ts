@@ -16,10 +16,15 @@ describe("parseSystemLogFrame", () => {
     });
   });
 
+  it("reads an information line as the log writes it", () => {
+    const data = JSON.stringify({ at: "x", level: "INFO", message: "m" });
+    expect(parseSystemLogFrame(data)?.level).toBe("INFO");
+  });
+
   it("is null for a level the log does not write to the stream", () => {
     expect(
       parseSystemLogFrame(
-        JSON.stringify({ at: "x", level: "INFO", message: "m" }),
+        JSON.stringify({ at: "x", level: "DEBUG", message: "m" }),
       ),
     ).toBeNull();
   });

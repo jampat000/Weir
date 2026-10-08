@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { pauseKeys } from "../pause/query-keys";
+import { processingKeys } from "../processing/query-keys";
 import {
   LIVE_TOPIC_QUERIES,
   parseDataChanged,
@@ -13,6 +14,7 @@ describe("LIVE_TOPIC_QUERIES", () => {
       "backups",
       "connections",
       "files_at_once",
+      "folder_checks",
       "jobs",
       "kept_files",
       "libraries",
@@ -27,6 +29,19 @@ describe("LIVE_TOPIC_QUERIES", () => {
     ];
 
     expect(Object.keys(LIVE_TOPIC_QUERIES).sort()).toEqual(topics);
+  });
+
+  it("reads every library's overview and files again when a scan changes", () => {
+    expect(LIVE_TOPIC_QUERIES.library_scan).toEqual([
+      processingKeys.allLibraryOverviews,
+      processingKeys.allLibraryFiles,
+    ]);
+  });
+
+  it("reads every workflow's folder check again when one answers differently", () => {
+    expect(LIVE_TOPIC_QUERIES.folder_checks).toEqual([
+      processingKeys.libraryFolderChains,
+    ]);
   });
 
   it("refreshes the pause queries when the pause changes", () => {

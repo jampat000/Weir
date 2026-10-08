@@ -27,7 +27,11 @@ export const LIVE_TOPIC_QUERIES: Readonly<
   files_at_once: [processingKeys.filesAtOnce],
   maintenance: [processingKeys.maintenance],
   libraries: [processingKeys.libraries],
-  library_scan: [],
+  library_scan: [
+    processingKeys.allLibraryOverviews,
+    processingKeys.allLibraryFiles,
+  ],
+  folder_checks: [processingKeys.libraryFolderChains],
   update: [
     settingsKeys.updateStatus,
     settingsKeys.updateSettings,

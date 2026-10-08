@@ -2,8 +2,10 @@ using Microsoft.Extensions.Logging;
 using Weir.Core.Activity;
 using Weir.Core.Jobs;
 using Weir.Core.Json;
+using Weir.Core.LibraryMode;
 using Weir.Core.Observability;
 using Weir.Core.Time;
+using Weir.Infrastructure.Activity;
 using Weir.Infrastructure.Scheduling;
 
 namespace Weir.Infrastructure.Jobs;
@@ -26,6 +28,7 @@ public sealed class ProcessingJobProcessor
     private readonly TimeProvider _time;
     private readonly ILogger _logger;
     private readonly PeriodicTaskRegistry? _tasks;
+    private readonly DataChangePublisher? _changes;
 
     public ProcessingJobProcessor(
         ProcessingJobStore queue,
@@ -35,7 +38,8 @@ public sealed class ProcessingJobProcessor
         IJobNotifications notifications,
         TimeProvider time,
         ILogger<ProcessingJobProcessor> logger,
-        PeriodicTaskRegistry? tasks = null)
+        PeriodicTaskRegistry? tasks = null,
+        DataChangePublisher? changes = null)
     {
         _queue = queue ?? throw new ArgumentNullException(nameof(queue));
         _handlers = handlers ?? throw new ArgumentNullException(nameof(handlers));
@@ -45,6 +49,7 @@ public sealed class ProcessingJobProcessor
         _time = time ?? throw new ArgumentNullException(nameof(time));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _tasks = tasks;
+        _changes = changes;
         Kinds = ClaimableKinds.For(handlers);
     }
 
@@ -176,6 +181,7 @@ public sealed class ProcessingJobProcessor
                 when,
                 "fail_claimed_processing_job failed after handler error job_id={JobId}").ConfigureAwait(false);
             _notifications.Dispatch("processing", "failed", context.Id, context.JobKind, willRetry);
+            PublishLibraryScanEnded(context.JobKind);
             return JobProcessOutcome.Processed;
         }
 
@@ -204,6 +210,7 @@ public sealed class ProcessingJobProcessor
         if (completeOk)
         {
             _notifications.Dispatch("processing", "completed", context.Id, context.JobKind);
+            PublishLibraryScanEnded(context.JobKind);
             return JobProcessOutcome.Processed;
         }
 
@@ -235,7 +242,20 @@ public sealed class ProcessingJobProcessor
             _logger.LogError(exception, "fail_leased_processing_job_after_complete_failure failed job_id={JobId}", context.Id);
         }
 
+        PublishLibraryScanEnded(context.JobKind);
         return JobProcessOutcome.Processed;
+    }
+
+    /// <summary>
+    /// A library scan that has ended, or failed and waits for its retry, changes what the Library screen shows. The scan says so
+    /// while it indexes its files, but only here is its job row final, so a screen that reads again now sees the scan as over.
+    /// </summary>
+    private void PublishLibraryScanEnded(string jobKind)
+    {
+        if (jobKind == LibraryModeJobKinds.ScanKind)
+        {
+            _changes?.Publish(DataTopics.LibraryScan);
+        }
     }
 
     private void ReportRunStarted(string? taskKey)

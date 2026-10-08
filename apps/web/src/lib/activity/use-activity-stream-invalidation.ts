@@ -21,12 +21,19 @@ import {
   SYSTEM_STATS_EVENT,
   parseSystemStatsFrame,
 } from "../system/system-stats-frame";
-import type { SystemStatsFrame } from "../system/system-stats-types";
+import type {
+  SystemOverview,
+  SystemStatsFrame,
+} from "../system/system-stats-types";
 import {
   SYSTEM_LOG_EVENT,
   parseSystemLogFrame,
   type SystemLogFrame,
 } from "../system/system-log-frame";
+import {
+  SYSTEM_OVERVIEW_EVENT,
+  parseSystemOverviewFrame,
+} from "../system/system-overview-frame";
 import {
   SYSTEM_TASKS_EVENT,
   parseSystemTasksFrame,
@@ -39,6 +46,7 @@ type LiveProgressSubscriber = () => void;
 type ConnectionActivitySubscriber = (frame: ConnectionActivityFrame) => void;
 type SystemStatsSubscriber = (frame: SystemStatsFrame) => void;
 type SystemTasksSubscriber = (tasks: SystemTask[]) => void;
+type SystemOverviewSubscriber = (overview: SystemOverview) => void;
 type SystemLogSubscriber = (frame: SystemLogFrame) => void;
 type LiveSignalSubscriber = (signal: LiveSignal) => void;
 
@@ -109,6 +117,7 @@ const progressSubscribers = new Set<LiveProgressSubscriber>();
 const connectionActivitySubscribers = new Set<ConnectionActivitySubscriber>();
 const systemStatsSubscribers = new Set<SystemStatsSubscriber>();
 const systemTasksSubscribers = new Set<SystemTasksSubscriber>();
+const systemOverviewSubscribers = new Set<SystemOverviewSubscriber>();
 const systemLogSubscribers = new Set<SystemLogSubscriber>();
 const liveSignalSubscribers = new Set<LiveSignalSubscriber>();
 /** The run of the server the stream last said hello from; null until it has. */
@@ -132,6 +141,7 @@ function hasSubscribers(): boolean {
     connectionActivitySubscribers.size > 0 ||
     systemStatsSubscribers.size > 0 ||
     systemTasksSubscribers.size > 0 ||
+    systemOverviewSubscribers.size > 0 ||
     systemLogSubscribers.size > 0 ||
     liveSignalSubscribers.size > 0
   );
@@ -355,6 +365,12 @@ function ensureActivityStream(): EventSource | null {
     const tasks = parseSystemTasksFrame((ev as MessageEvent<string>).data);
     if (tasks) systemTasksSubscribers.forEach((fn) => fn(tasks));
   });
+  source.addEventListener(SYSTEM_OVERVIEW_EVENT, (ev) => {
+    const overview = parseSystemOverviewFrame(
+      (ev as MessageEvent<string>).data,
+    );
+    if (overview) systemOverviewSubscribers.forEach((fn) => fn(overview));
+  });
   source.addEventListener(SYSTEM_LOG_EVENT, (ev) => {
     const frame = parseSystemLogFrame((ev as MessageEvent<string>).data);
     if (frame) systemLogSubscribers.forEach((fn) => fn(frame));
@@ -450,7 +466,24 @@ export function subscribeSystemTasks(
 }
 
 /**
- * Calls `subscriber` with every `system.log` frame, a warning or error as Weir writes it, on the one shared stream.
+ * Calls `subscriber` with the overview of Weir itself each time `system.overview` says one of its facts changed, on the one
+ * shared stream. A frame is a moment, so nothing is replayed to a late subscriber.
+ */
+export function subscribeSystemOverview(
+  subscriber: SystemOverviewSubscriber,
+): () => void {
+  systemOverviewSubscribers.add(subscriber);
+  watchBrowser();
+  ensureActivityStream();
+
+  return () => {
+    systemOverviewSubscribers.delete(subscriber);
+    closeIfNobodyIsWatching();
+  };
+}
+
+/**
+ * Calls `subscriber` with every `system.log` frame, a line as Weir writes it (a warning or error, or Weir's own information), on the one shared stream.
  * A frame is a moment, so nothing is replayed to a late subscriber.
  */
 export function subscribeSystemLog(

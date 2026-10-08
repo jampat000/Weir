@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using Weir.Core.Jobs;
 using Weir.Core.Json;
 using Weir.Core.LibraryMode;
+using Weir.Infrastructure.Activity;
 using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.Sqlite;
 
@@ -24,6 +25,11 @@ public sealed record LibraryScanOutcome(DateTimeOffset GeneratedAt, IReadOnlyLis
 /// </summary>
 public sealed class LibraryScanStore
 {
+    private readonly DataChangePublisher? _changes;
+
+    /// <param name="changes">Told when a scan is queued, so the screens showing scans follow it; null in a host with no live stream.</param>
+    public LibraryScanStore(DataChangePublisher? changes = null) => _changes = changes;
+
     /// <summary>
     /// Enqueues the scan on <paramref name="uow"/>'s own connection and transaction (<see cref="ProcessingJobStore.EnqueueOrGet"/>),
     /// not <see cref="ProcessingJobStore.EnqueueOrGetAsync"/>: that opens its own connection, which — called while an API
@@ -53,6 +59,7 @@ public sealed class LibraryScanStore
             JobQueueRules.DefaultMaxAttempts,
             0,
             LibraryModePriority.Low);
+        uow.OnCommitted(() => _changes?.Publish(DataTopics.LibraryScan));
         return Task.FromResult(job);
     }
 

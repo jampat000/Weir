@@ -111,6 +111,8 @@ Every screen follows Weir from one server-sent event stream, `GET /api/v1/activi
 
 - **Publish:** a component that changes data calls `DataChangePublisher.Publish(DataTopics.<Topic>)` in `Weir.Infrastructure.Activity` once the change has committed (`uow.OnCommitted`). Each open stream sends a `data.changed` frame, `{ "topic": "<snake_case_name>" }`.
 - **Consume:** `LIVE_TOPIC_QUERIES` in `apps/web/src/lib/live/live-topics.ts` says which queries each topic reads again. A screen adds its query keys to its topic and drops its `refetchInterval`.
+- **Frames:** what changes too often to read again each time, or arrives whole, travels in its own frame instead of a topic: `processing.progress`, `system.stats` (a reading a second, with the machine's facts and the drives), `system.overview` (the facts System shows about Weir, sent when one changes), `system.tasks` and `system.log` (warnings, errors and Weir's own information).
+- **Watching tasks:** what has no change to hook, such as a worker that stops or a folder that goes missing, is looked at by the server on a timer, only while a browser holds the stream, and published when the answer differs from last time (`readiness-changes`, `folder-checks`). A long-running job says so as it goes, at most once a second (`ThrottledDataChange`), and once more when its job row is final.
 - **Connection:** `server.hello` opens every stream with `{ "boot_id" }`, new on each server start. While the connection is lost the shell shows "Live updates paused", and when it is back every query is read again; a different `boot_id` after a reconnect also reloads the page if the server now serves a newer build.
 
 ## Job Lifecycle

@@ -96,8 +96,7 @@ export function libraryFolderChainOptions(
 ) {
   return {
     queryKey: [
-      "processing",
-      "library-folder-chain",
+      ...processingKeys.libraryFolderChains,
       libraryId,
       mediaType,
       watchedFolder,

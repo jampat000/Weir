@@ -16,7 +16,7 @@ public static class SystemStatsWire
         .Set("now", Now(snapshot.Now))
         .Set("history", new WireArray(snapshot.History.Select(point => (WireValue)Point(point))))
         .Set("machine", Machine(snapshot.Machine))
-        .Set("drives", new WireArray(snapshot.Drives.Select(drive => (WireValue)Drive(drive))));
+        .Set("drives", Drives(snapshot.Drives));
 
     public static WireObject Now(StatsNow now) => new WireObject()
         .Set("at", At(now.At))
@@ -46,10 +46,12 @@ public static class SystemStatsWire
         .Set("processing_write_bytes_per_sec", point.ProcessingWriteBytesPerSecond)
         .Set("processing_speed", point.ProcessingSpeed);
 
-    private static WireObject Machine(MachineFacts machine) => new WireObject()
+    public static WireObject Machine(MachineFacts machine) => new WireObject()
         .Set("os", machine.OperatingSystem)
         .Set("uptime_seconds", machine.UptimeSeconds)
         .Set("reboot_pending", machine.RebootPending is { } pending ? WireValue.Of(pending) : WireValue.Null);
+
+    public static WireArray Drives(IReadOnlyList<DriveReading> drives) => new(drives.Select(drive => (WireValue)Drive(drive)));
 
     private static WireObject Drive(DriveReading drive) => new WireObject()
         .Set("name", drive.Name)

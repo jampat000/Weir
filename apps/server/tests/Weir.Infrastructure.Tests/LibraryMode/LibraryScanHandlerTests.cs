@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Weir.Core.Jobs;
 using Weir.Core.LibraryMode;
 using Weir.Core.MediaManagers;
+using Weir.Infrastructure.Activity;
 using Weir.Infrastructure.LibraryMode;
 using Weir.Infrastructure.Media;
 using Weir.Infrastructure.Processing;
@@ -22,11 +23,14 @@ public sealed class LibraryScanHandlerTests : IDisposable
     private readonly MediaManagerFixture _fixture = new();
     private readonly TempDirectory _libraryFolder = new();
     private readonly FakeMediaRunner _media = new();
-    private readonly LibraryScanStore _scans = new();
+    private readonly DataChangePublisher _changes = new();
+    private readonly LibraryScanStore _scans;
     private readonly LibrarySettingsStore _librarySettings = new();
     private readonly LibraryFileMarksStore _fileMarks = new();
     private readonly LibraryViewStore _libraryView = new();
     private readonly LibraryStore _libraries = new();
+
+    public LibraryScanHandlerTests() => _scans = new LibraryScanStore(_changes);
 
     public void Dispose()
     {
@@ -47,7 +51,8 @@ public sealed class LibraryScanHandlerTests : IDisposable
         _libraryView,
         _libraries,
         _fixture.Store.Clock,
-        NullLogger<LibraryScanHandler>.Instance);
+        NullLogger<LibraryScanHandler>.Instance,
+        _changes);
 
     private async Task<long> LibraryAsync() =>
         Convert.ToInt64(await _fixture.Db(uow => uow.ExecuteScalarWriteAsync(
@@ -113,6 +118,49 @@ public sealed class LibraryScanHandlerTests : IDisposable
         Assert.Null(changing.ManagerTitle);
 
         Assert.Equal(["Scanned Movies library: 2 files, 1 would change, 0 could not be processed"], await ScanActivityTitlesAsync());
+    }
+
+    private static async Task<string> NextTopicAsync(BroadcastSubscription<string> subscription)
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        await foreach (var topic in subscription.ReadAllAsync(timeout.Token))
+        {
+            return topic;
+        }
+
+        throw new InvalidOperationException("The subscription ended.");
+    }
+
+    [Fact]
+    public async Task A_scan_that_is_queued_says_so_once_it_is_committed_and_not_before()
+    {
+        var library = await LibraryAsync();
+        using var subscription = _changes.Subscribe();
+
+        await _fixture.Store.WithUnitOfWork(
+            async uow => (await _scans.RequestScanAsync(uow, _fixture.Jobs, library, "manual")).Id, commit: false);
+        _changes.Publish(DataTopics.Settings);
+        Assert.Equal(DataTopics.Settings, await NextTopicAsync(subscription));
+
+        await EnqueueScanAsync(library);
+        Assert.Equal(DataTopics.LibraryScan, await NextTopicAsync(subscription));
+    }
+
+    [Fact]
+    public async Task A_scan_says_on_library_scan_as_it_indexes_its_files()
+    {
+        var library = await LibraryAsync();
+        await _fixture.Db(async uow => { await _librarySettings.SetAsync(uow, library, new LibrarySettings([_libraryFolder.Path], false)); return true; });
+        await File.WriteAllBytesAsync(_libraryFolder.Join("film.mkv"), [1, 2, 3]);
+        _media.Probes["film.mkv"] = FakeMediaRunner.EnglishOnly;
+        var jobId = await EnqueueScanAsync(library);
+        using var subscription = _changes.Subscribe();
+
+        await RunScanAsync(jobId);
+        _changes.Publish(DataTopics.Settings);
+
+        Assert.Equal(DataTopics.LibraryScan, await NextTopicAsync(subscription));
+        Assert.Equal(DataTopics.Settings, await NextTopicAsync(subscription));
     }
 
     [Fact]

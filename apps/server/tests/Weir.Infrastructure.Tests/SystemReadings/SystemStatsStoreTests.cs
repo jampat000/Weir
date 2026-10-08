@@ -77,6 +77,21 @@ public sealed class SystemStatsStoreTests
     }
 
     [Fact]
+    public async Task A_stream_gets_the_machine_and_the_drives_as_they_stand_with_the_reading()
+    {
+        var store = Store();
+        var drive = new DriveReading("D:", "D:\\", 10, 5, 1, 2, null, null, null, null, []);
+        store.SetMachine(new MachineFacts("Test OS", 99, false));
+        store.SetDrives([drive]);
+        store.Add(Sample(10));
+
+        var update = await store.NextAfterAsync(0, CancellationToken.None);
+
+        Assert.Equal(new MachineFacts("Test OS", 99, false), update.Machine);
+        Assert.Equal([drive], update.Drives);
+    }
+
+    [Fact]
     public async Task A_stream_asking_for_what_there_is_gets_the_newest_reading_at_once()
     {
         var store = Store();

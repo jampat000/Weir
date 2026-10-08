@@ -73,8 +73,14 @@ export const processingKeys = {
     ["processing", "library-files", libraryId] as const,
   libraryFileList: (libraryId: number, filters: LibraryFileFilters) =>
     ["processing", "library-files", libraryId, filters] as const,
+  /** Every library's files, whichever library and filters. */
+  allLibraryFiles: ["processing", "library-files"] as const,
   libraryOverview: (libraryId: number) =>
     ["processing", "library-overview", libraryId] as const,
+  /** Every library's overview. */
+  allLibraryOverviews: ["processing", "library-overview"] as const,
+  /** Every workflow's folder check, whichever folders it was asked about. */
+  libraryFolderChains: ["processing", "library-folder-chain"] as const,
   libraryFilePreview: (
     libraryId: number,
     path: string,

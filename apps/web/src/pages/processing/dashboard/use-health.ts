@@ -18,8 +18,6 @@ import {
 
 const NO_MANAGERS: MediaManagerConnection[] = [];
 const NO_CLIENTS: DownloadClientConnection[] = [];
-/** A folder check reads the disk and asks each manager, so it is repeated slowly. */
-const FOLDER_CHECK_REFRESH_MS = 120_000;
 
 export type WorkflowHealth = {
   workflow: ProcessingLibrary;
@@ -67,7 +65,8 @@ function inScope(
 }
 
 /**
- * Each enabled workflow's folder-chain verdict, the connections and the tools: every part loads on its own.
+ * Each enabled workflow's folder-chain verdict, the connections and the tools: every part loads on its own. The server checks
+ * the folders on its own while a browser watches and says on `folder_checks` when an answer changes.
  * Given a workflow, everything narrows to it: its chain, the managers it is linked to and the download
  * clients its chain names. The tools belong to Weir, so they stay.
  */
@@ -80,16 +79,15 @@ export function useHealth(
       workflow.enabled && (workflowId == null || workflow.id === workflowId),
   );
   const chains = useQueries({
-    queries: enabled.map((workflow) => ({
-      ...libraryFolderChainOptions(
+    queries: enabled.map((workflow) =>
+      libraryFolderChainOptions(
         workflow.id,
         workflow.watched_folder.trim(),
         workflow.work_folder.trim(),
         workflow.output_folder.trim(),
         workflow.media_type,
       ),
-      refetchInterval: FOLDER_CHECK_REFRESH_MS,
-    })),
+    ),
   });
   const managers = useMediaManagerConnectionsQuery();
   const downloadClients = useDownloadClientConnectionsQuery();

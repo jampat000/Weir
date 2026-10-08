@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using Weir.Core.Logs;
 
 namespace Weir.Infrastructure.Logging;
 
@@ -43,9 +44,13 @@ public sealed class WeirLogFileLoggerProvider : ILoggerProvider
             var now = provider._time.GetUtcNow();
             var message = formatter(state, exception);
             provider._file.WriteLine(LogLineFormat.JsonLine(now, logLevel, category, message, exception, LogContext.RequestId, LogContext.JobId));
-            if (logLevel >= LogLevel.Warning && message.Trim() is { Length: > 0 } alertText)
+            if (provider._alerts is { } alerts && logLevel >= LogLevel.Information && message.Trim() is { Length: > 0 } alertText)
             {
-                provider._alerts?.Publish(new LogAlert(now, LogLineFormat.LevelName(logLevel), alertText));
+                var levelName = LogLineFormat.LevelName(logLevel);
+                if (!SuiteLogFilter.IsLowValueNoise(levelName, category))
+                {
+                    alerts.Publish(new LogAlert(now, levelName, alertText));
+                }
             }
         }
     }

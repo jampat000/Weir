@@ -90,6 +90,49 @@ public sealed class LiveStreamApiTests
         Assert.Equal([DataTopics.Connections, DataTopics.Backups], [await NextTopicAsync(second), await NextTopicAsync(second)]);
     }
 
+    private static async Task<string> NewLibraryWithFoldersAsync(WeirTestServer server, ApiTestClient client)
+    {
+        var libraryId = await TestDatabase.ScalarAsync(
+            server,
+            "INSERT INTO libraries (name, media_type, watched_folder, output_folder, work_folder, display_order) " +
+            "VALUES ('Scanned', 'movie', '/in', '/out', '/work', 9) RETURNING id");
+        using var folders = await client.PutAsync(
+            $"/api/v1/processing/libraries/{libraryId}/library-settings",
+            new { library_folders = new[] { "/library/films" }, csrf_token = await client.CsrfAsync() });
+        Assert.Equal(System.Net.HttpStatusCode.OK, folders.StatusCode);
+        return $"/api/v1/processing/libraries/{libraryId}";
+    }
+
+    [Fact]
+    public async Task Asking_for_a_library_scan_reaches_an_open_stream_as_a_library_scan_change()
+    {
+        var (server, client) = await StartSignedInAsync();
+        await using var _server = server;
+        var library = await NewLibraryWithFoldersAsync(server, client);
+        using var reader = await OpenStreamAsync(server, client);
+        await NextFrameAsync(reader, "server.hello");
+
+        using var scan = await client.PostAsync($"{library}/library-scan", new { csrf_token = await client.CsrfAsync() });
+
+        Assert.Equal(System.Net.HttpStatusCode.OK, scan.StatusCode);
+        Assert.Equal(DataTopics.LibraryScan, await NextTopicAsync(reader));
+    }
+
+    [Fact]
+    public async Task Turning_the_scheduled_scan_on_reaches_an_open_stream_as_a_library_scan_change()
+    {
+        var (server, client) = await StartSignedInAsync();
+        await using var _server = server;
+        var library = await NewLibraryWithFoldersAsync(server, client);
+        using var reader = await OpenStreamAsync(server, client);
+        await NextFrameAsync(reader, "server.hello");
+
+        using var scheduled = await client.PostAsync($"{library}/library-schedule", new { enabled = true, csrf_token = await client.CsrfAsync() });
+
+        Assert.Equal(System.Net.HttpStatusCode.OK, scheduled.StatusCode);
+        Assert.Equal(DataTopics.LibraryScan, await NextTopicAsync(reader));
+    }
+
     [Fact]
     public async Task Pausing_and_resuming_through_the_api_reach_an_open_stream_as_pause_changes()
     {

@@ -56,13 +56,13 @@ public sealed class DataChangePublisherTests
     }
 
     [Fact]
-    public void The_topics_are_the_fourteen_snake_case_names_the_web_app_maps()
+    public void The_topics_are_the_snake_case_names_the_web_app_maps()
     {
         string[] topics = [.. typeof(DataTopics).GetFields().Select(field => (string)field.GetRawConstantValue()!)];
 
         Assert.Equal(
             [
-                "backups", "connections", "files_at_once", "jobs", "kept_files", "libraries", "library_scan",
+                "backups", "connections", "files_at_once", "folder_checks", "jobs", "kept_files", "libraries", "library_scan",
                 "maintenance", "metrics", "network_access", "pause", "readiness", "settings", "update",
             ],
             [.. topics.Order(StringComparer.Ordinal)]);

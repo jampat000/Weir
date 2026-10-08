@@ -93,7 +93,7 @@ export interface paths {
     };
     /**
      * Get Activity Stream
-     * @description Authenticated SSE stream for activity-backed pages. Frames: activity.latest (the newest Activity event id and revision), processing.progress (every file's live progress, at most once a second), connection.activity (one thing that happened on a media manager or download client connection: see ConnectionActivityFrame; each connection sends at most one frame per phase every 250 ms, and always the phase it ends on), system.stats (the machine's newest reading, once a second: see SystemStatsFrame), system.tasks (every scheduled task, each time a run starts or ends or a task comes or goes: see SystemTaskOut), system.log (one for each new warning or error Weir logs: see SystemLogFrame), server.hello (sent first when the stream opens, with the boot_id of this run of the server: see ServerHelloFrame) and data.changed (one for each time a kind of data changes, named by its topic: see DataChangedFrame).
+     * @description Authenticated SSE stream for activity-backed pages. Frames: activity.latest (the newest Activity event id and revision), processing.progress (every file's live progress, at most once a second), connection.activity (one thing that happened on a media manager or download client connection: see ConnectionActivityFrame; each connection sends at most one frame per phase every 250 ms, and always the phase it ends on), system.stats (the machine's newest reading, once a second: see SystemStatsFrame), system.tasks (every scheduled task, each time a run starts or ends or a task comes or goes: see SystemTaskOut), system.overview (the facts System shows about Weir, as GET /system/overview answers them, when the stream opens and whenever one changes: see SystemOverviewOut), system.log (one for each new warning, error or information line of Weir's own that Weir logs: see SystemLogFrame), server.hello (sent first when the stream opens, with the boot_id of this run of the server: see ServerHelloFrame) and data.changed (one for each time a kind of data changes, named by its topic: see DataChangedFrame).
      */
     get: operations["get_activity_stream_api_v1_activity_stream_get"];
     put?: never;
@@ -2770,13 +2770,14 @@ export interface components {
     DataChangedFrame: {
       /**
        * Topic
-       * @description Which data changed: pause (Processing paused, resumed, or a timed pause ran out), readiness, files_at_once, maintenance, libraries, library_scan, update, network_access, connections, settings, backups, kept_files, metrics or jobs.
+       * @description Which data changed: pause (Processing paused, resumed, or a timed pause ran out), readiness, files_at_once, maintenance, libraries, library_scan, folder_checks, update, network_access, connections, settings, backups, kept_files, metrics or jobs.
        * @enum {string}
        */
       topic:
         | "backups"
         | "connections"
         | "files_at_once"
+        | "folder_checks"
         | "jobs"
         | "kept_files"
         | "libraries"
@@ -7655,7 +7656,7 @@ export interface components {
     };
     /**
      * SystemLogFrame
-     * @description The data of a system.log frame on GET /activity/stream: one warning or error Weir just wrote to its log. GET /suite/logs has what was logged before the stream opened.
+     * @description The data of a system.log frame on GET /activity/stream: one line Weir just wrote to its log that the System log shows (a warning, an error, or information from Weir's own loggers). GET /suite/logs has what was logged before the stream opened.
      */
     SystemLogFrame: {
       /**
@@ -7669,7 +7670,7 @@ export interface components {
        * @description The level, as the log file names it.
        * @enum {string}
        */
-      level: "WARNING" | "ERROR" | "CRITICAL";
+      level: "INFO" | "WARNING" | "ERROR" | "CRITICAL";
       /**
        * Message
        * @description What the log line says.
@@ -8006,9 +8007,19 @@ export interface components {
     };
     /**
      * SystemStatsFrame
-     * @description The data of a system.stats frame on GET /activity/stream: the newest reading and the point to add to the traces.
+     * @description The data of a system.stats frame on GET /activity/stream: the newest reading, the point to add to the traces, and the machine's facts and the drives as they stand.
      */
     SystemStatsFrame: {
+      /**
+       * Drives
+       * @description Every drive that holds a workflow's watched, work or output folder, as last read (every 30 seconds).
+       */
+      drives: components["schemas"]["SystemStatsDriveOut"][];
+      /**
+       * Machine
+       * @description What changes slowly about the machine.
+       */
+      machine: components["schemas"]["SystemStatsMachineOut"];
       /**
        * Now
        * @description The newest reading.

@@ -85,6 +85,15 @@ describe("useSystemTasksQuery", () => {
     ).toBe(true);
   });
 
+  it("is not read again on a timer: the stream carries what changes", async () => {
+    const { client, result } = renderTasks();
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    const query = client.getQueryCache().find({ queryKey: systemKeys.tasks });
+
+    expect(query?.observers[0].options.refetchInterval).toBeFalsy();
+  });
+
   it("stops listening to the stream when it unmounts", () => {
     const { unmount } = renderTasks();
 

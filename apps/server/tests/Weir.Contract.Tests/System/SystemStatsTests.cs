@@ -230,7 +230,8 @@ public sealed class SystemStatsTests(ServerFixture fixture) : IClassFixture<Serv
 
         foreach (var frame in new[] { first, second })
         {
-            AssertKeys(["now", "point"], frame);
+            AssertKeys(["now", "point", "machine", "drives"], frame);
+            AssertKeys(MachineKeys, frame["machine"]);
             AssertKeys(NowKeys, frame["now"]);
             AssertKeys(PointKeys, frame["point"]);
             AssertReadingIsSane(frame["now"]);
@@ -252,7 +253,7 @@ public sealed class SystemStatsTests(ServerFixture fixture) : IClassFixture<Serv
         var schemas = schema["components"]!["schemas"]!;
         AssertKeys(NowKeys, schemas["SystemStatsNowOut"]!["properties"]);
         AssertKeys(PointKeys, schemas["SystemStatsPointOut"]!["properties"]);
-        AssertKeys(["now", "point"], schemas["SystemStatsFrame"]!["properties"]);
+        AssertKeys(["now", "point", "machine", "drives"], schemas["SystemStatsFrame"]!["properties"]);
     }
 
     [Fact]

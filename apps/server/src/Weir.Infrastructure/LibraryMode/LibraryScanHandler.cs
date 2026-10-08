@@ -33,6 +33,9 @@ namespace Weir.Infrastructure.LibraryMode;
 /// </remarks>
 public sealed class LibraryScanHandler : IJobHandler
 {
+    /// <summary>The most often the screens are told a scan has indexed more files, however fast the chunks land.</summary>
+    private static readonly TimeSpan IndexProgressInterval = TimeSpan.FromSeconds(1);
+
     private readonly SqliteDatabase _database;
     private readonly MediaTools _tools;
     private readonly MediaManagerConnectionService _connections;
@@ -45,6 +48,7 @@ public sealed class LibraryScanHandler : IJobHandler
     private readonly LibraryViewStore _libraryView;
     private readonly LibraryStore _libraries;
     private readonly TimeProvider _time;
+    private readonly DataChangePublisher? _changes;
 
     public LibraryScanHandler(
         SqliteDatabase database,
@@ -59,7 +63,8 @@ public sealed class LibraryScanHandler : IJobHandler
         LibraryViewStore libraryView,
         LibraryStore libraries,
         TimeProvider time,
-        ILogger<LibraryScanHandler> logger)
+        ILogger<LibraryScanHandler> logger,
+        DataChangePublisher? changes = null)
     {
         _database = database ?? throw new ArgumentNullException(nameof(database));
         _tools = tools ?? throw new ArgumentNullException(nameof(tools));
@@ -73,6 +78,7 @@ public sealed class LibraryScanHandler : IJobHandler
         _libraryView = libraryView ?? throw new ArgumentNullException(nameof(libraryView));
         _libraries = libraries ?? throw new ArgumentNullException(nameof(libraries));
         _time = time ?? throw new ArgumentNullException(nameof(time));
+        _changes = changes;
         // Kept in the constructor for DI symmetry with LibraryCleanHandler; nothing here logs yet.
         ArgumentNullException.ThrowIfNull(logger);
     }
@@ -169,7 +175,8 @@ public sealed class LibraryScanHandler : IJobHandler
                 .ConfigureAwait(false);
         }
 
-        await LibraryFileIndexWriter.ReplaceAsync(_database, libraryId, entries, cancellationToken).ConfigureAwait(false);
+        var indexProgress = new ThrottledDataChange(_changes, DataTopics.LibraryScan, IndexProgressInterval, _time);
+        await LibraryFileIndexWriter.ReplaceAsync(_database, libraryId, entries, cancellationToken, indexProgress.Publish).ConfigureAwait(false);
         await using (var recordUow = await UnitOfWork.OpenAsync(_database, cancellationToken).ConfigureAwait(false))
         {
             await _scans.RecordResultAsync(recordUow, context.Id, outcome, true, null).ConfigureAwait(false);
