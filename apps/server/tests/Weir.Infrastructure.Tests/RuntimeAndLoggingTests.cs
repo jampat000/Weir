@@ -209,6 +209,76 @@ public sealed class RuntimeAndLoggingTests
         Assert.Contains("\"during\"", ReadShared(file.Path)[2], StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task Lines_written_while_the_log_is_pruned_are_all_kept_in_order()
+    {
+        using var temp = new TempDirectory();
+        var path = temp.Join("weir.log");
+        var now = DateTimeOffset.UtcNow;
+        using var file = new WeirLogFile(path, TimeProvider.System);
+        for (var index = 0; index < 20_000; index++)
+        {
+            file.WriteLine(LogLineFormat.JsonLine(now.AddDays(-10), LogLevel.Information, "L", $"old {index}", null, null, null));
+        }
+
+        using var pruning = new ManualResetEventSlim();
+        var prune = Task.Run(() =>
+        {
+            pruning.Set();
+            return file.Prune(keepDays: 3);
+        });
+        pruning.Wait();
+        var written = 0;
+        while (!prune.IsCompleted)
+        {
+            file.WriteLine(LogLineFormat.JsonLine(now, LogLevel.Information, "L", $"live {written++}", null, null, null));
+        }
+
+        Assert.True(await prune);
+        file.WriteLine(LogLineFormat.JsonLine(now, LogLevel.Information, "L", $"live {written++}", null, null, null));
+
+        var lines = ReadShared(path);
+        Assert.Equal(written, lines.Length);
+        for (var index = 0; index < written; index++)
+        {
+            Assert.Contains($"\"live {index}\"", lines[index], StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public async Task A_snapshot_of_the_log_is_whole_lines_while_another_thread_keeps_logging()
+    {
+        using var temp = new TempDirectory();
+        var now = DateTimeOffset.UtcNow;
+        using var file = new WeirLogFile(temp.Join("weir.log"), TimeProvider.System);
+        for (var index = 0; index < 20_000; index++)
+        {
+            file.WriteLine(LogLineFormat.JsonLine(now, LogLevel.Information, "L", $"line {index}", null, null, null));
+        }
+
+        using var copying = new ManualResetEventSlim();
+        var snapshot = Task.Run(() =>
+        {
+            copying.Set();
+            return file.SnapshotTo(temp.Join("snapshot.log"));
+        });
+        copying.Wait();
+        var written = 20_000;
+        while (!snapshot.IsCompleted)
+        {
+            file.WriteLine(LogLineFormat.JsonLine(now, LogLevel.Information, "L", $"line {written++}", null, null, null));
+        }
+
+        Assert.True(await snapshot);
+        var lines = ReadShared(temp.Join("snapshot.log"));
+        Assert.InRange(lines.Length, 20_000, written);
+        for (var index = 0; index < lines.Length; index++)
+        {
+            Assert.Contains($"\"line {index}\"", lines[index], StringComparison.Ordinal);
+            Assert.EndsWith("}", lines[index], StringComparison.Ordinal);
+        }
+    }
+
     /// <summary>Read the log while the writer still holds it, as the Logs screen does.</summary>
     private static string[] ReadShared(string path)
     {

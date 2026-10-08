@@ -2,6 +2,7 @@ using Weir.Core.Json;
 using Weir.Core.Media;
 using Weir.Core.Processing.RemuxPass;
 using Weir.Core.Rules;
+using Weir.Infrastructure.Runtime;
 
 namespace Weir.Infrastructure.Processing.RemuxPass;
 
@@ -110,7 +111,7 @@ public sealed partial class RemuxPassRunner
             {
                 final = collision.Destination;
                 Directory.CreateDirectory(Path.GetDirectoryName(final)!);
-                FileLifecycle.SafeFinalizeFile(tmp, final, _ownership);
+                await BlockingWork.RunAsync(() => FileLifecycle.SafeFinalizeFile(tmp, final, _ownership)).ConfigureAwait(false);
             }
         }
         catch (MediaCompletenessException exception)

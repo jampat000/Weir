@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using Weir.Core.LibraryMode;
 using Weir.Infrastructure.Processing;
 using Weir.Infrastructure.Processing.RemuxPass;
+using Weir.Infrastructure.Runtime;
 
 namespace Weir.Infrastructure.LibraryMode;
 
@@ -287,7 +288,7 @@ public sealed partial class SafeSwap
         {
             if (keepDestination is not null)
             {
-                OriginalsMover.Fill(_files, backup, keepDestination);
+                await BlockingWork.RunAsync(() => OriginalsMover.Fill(_files, backup, keepDestination)).ConfigureAwait(false);
                 keptOriginalPath = keepDestination;
             }
             else

@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Weir.Infrastructure.Activity;
+using Weir.Infrastructure.Runtime;
 
 namespace Weir.Infrastructure.SystemReadings;
 
@@ -126,7 +127,7 @@ public sealed partial class SystemStatsSampler : BackgroundService
         try
         {
             _setup = await _work.ReadAsync(cancellationToken).ConfigureAwait(false);
-            _store.SetDrives(_drives.Read(_setup.Folders));
+            _store.SetDrives(await BlockingWork.RunAsync(() => _drives.Read(_setup.Folders)).ConfigureAwait(false));
         }
 #pragma warning disable CA1031 // The drives are only for a screen: whatever goes wrong reading them is logged and tried again, never a reason to stop Weir.
         catch (Exception exception) when (exception is not OperationCanceledException)
