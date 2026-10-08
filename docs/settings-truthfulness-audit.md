@@ -28,8 +28,8 @@ says where a setting lives and what actually happens when it is saved.
   setup) sends back every other setting as it was, so nothing else is reset.
 - Rejected files (a workflow's "When a file is rejected"): "Delete only the rejected file" applies to a file
   the workflow's own size, date or path settings turn away, to a file its rules find nothing in to
-  keep, to a file with no video, and to a file Weir cannot read at all (refused before any output is
-  written, never passed through). The minimum size is the workflow's own (50 MB for a new workflow), so it is the one the editor shows,
+  keep, and to a file with no video. A file Weir cannot read is refused after a wait, before any output
+  is written, never passed through and never deleted. The minimum size is the workflow's own (50 MB for a new workflow), so it is the one the editor shows,
   and deleting is tied to that value alone.
 - Writes files with (workflow editor, Workflows): "The best tool for each file" writes Matroska with
   mkvmerge when it is installed and everything else with FFmpeg, and writes a file again with FFmpeg

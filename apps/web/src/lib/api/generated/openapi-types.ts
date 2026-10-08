@@ -5554,7 +5554,7 @@ export interface components {
       ready_after_seconds: number;
       /**
        * Rejected File Action
-       * @description What to do with a settled file rejected by size/path rules, because it contains no video, or because Weir cannot read it at all (ffprobe cannot parse it, or finds no streams in it). Such a file is refused before any output is written, whatever the workflow does with files that need no change. delete_file removes only that file and then empty parent folders; it never removes a folder containing other files.
+       * @description What to do with a settled file rejected by size/path rules, because it contains no video, or because Weir cannot read it at all (ffprobe cannot parse it, or finds no streams in it). Such a file is looked at again after a wait in case it is still arriving, then refused before any output is written, whatever the workflow does with files that need no change. delete_file removes only that file and then empty parent folders; it never removes a folder containing other files, and never removes a file Weir could not read.
        * @default leave
        * @enum {string}
        */
@@ -6014,7 +6014,7 @@ export interface components {
       ready_after_seconds: number;
       /**
        * Rejected File Action
-       * @description What to do with a settled file rejected by size/path rules, because it contains no video, or because Weir cannot read it at all (ffprobe cannot parse it, or finds no streams in it). Such a file is refused before any output is written, whatever the workflow does with files that need no change. delete_file removes only that file and then empty parent folders; it never removes a folder containing other files.
+       * @description What to do with a settled file rejected by size/path rules, because it contains no video, or because Weir cannot read it at all (ffprobe cannot parse it, or finds no streams in it). Such a file is looked at again after a wait in case it is still arriving, then refused before any output is written, whatever the workflow does with files that need no change. delete_file removes only that file and then empty parent folders; it never removes a folder containing other files, and never removes a file Weir could not read.
        * @default leave
        * @enum {string}
        */
