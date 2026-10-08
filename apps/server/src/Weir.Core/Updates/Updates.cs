@@ -82,7 +82,7 @@ public static class ReleaseCatalog
     /// </summary>
     public const string ReleasesUrl = "https://api.github.com/repos/jampat000/Weir/releases?per_page=30";
 
-    /// <summary>The public release feed and download URLs: neither counts against the API allowance.</summary>
+    /// <summary>The public release feed: reading it does not count against the API allowance.</summary>
     public const string ReleasesFeedUrl = "https://github.com/jampat000/Weir/releases.atom";
     public const string WindowsInstallerAssetName = "Weir-win-Setup.exe";
     public const string LegacyWindowsInstallerAssetName = "WeirSetup.exe";
@@ -104,7 +104,7 @@ public static class ReleaseCatalog
         return stripped.Length == 0 ? null : stripped;
     }
 
-    public static string DownloadUrl(string tag, string assetName) => $"https://github.com/{Owner}/{Repo}/releases/download/{Uri.EscapeDataString(tag)}/{assetName}";
+    public static string TagUrl(string tag) => $"https://github.com/{Owner}/{Repo}/releases/tag/{Uri.EscapeDataString(tag)}";
 
     public static string TagForVersion(string version)
     {
@@ -237,14 +237,18 @@ public static class UpdateStatus
 
     /// <summary>
     /// GitHub is limiting update checks from this network until <paramref name="retryAt"/>. The newest release Weir knew
-    /// before that stays in the answer, and <paramref name="summary"/> says when the next check is.
+    /// before that stays in the answer, and <paramref name="summary"/> says when the next check is. <c>known_update_available</c>
+    /// says whether that release is newer than this install, so an update Weir already knew of stays on offer.
     /// </summary>
     public static WireObject RateLimited(string currentVersion, string installType, GitHubReleaseRecord? lastKnown, DateTimeOffset retryAt, string summary)
     {
-        var status = lastKnown is null
-            ? Unavailable(currentVersion, installType, RateLimitedStatus, summary)
-            : FromRelease(currentVersion, installType, lastKnown).Set("status", RateLimitedStatus).Set("summary", summary);
-        return status.Set("retry_at", Timestamp.FromDateTimeOffset(retryAt.ToUniversalTime()).ToWireText());
+        var known = lastKnown is null ? Unavailable(currentVersion, installType, RateLimitedStatus, summary) : FromRelease(currentVersion, installType, lastKnown);
+        var updateKnown = known.Get("status") is WireString { Value: "update_available" };
+        return known
+            .Set("status", RateLimitedStatus)
+            .Set("summary", summary)
+            .Set("known_update_available", updateKnown)
+            .Set("retry_at", Timestamp.FromDateTimeOffset(retryAt.ToUniversalTime()).ToWireText());
     }
 
     /// <summary>The sentence for a limit that lifts at <paramref name="retryAt"/>, with the time on the clock of <paramref name="timezoneName"/>.</summary>

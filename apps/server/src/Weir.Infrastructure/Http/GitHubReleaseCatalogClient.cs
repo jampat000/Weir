@@ -21,9 +21,11 @@ namespace Weir.Infrastructure.Http;
 public sealed class GitHubReleaseCatalogClient : IReleaseCatalogClient
 {
     private const string CacheFileName = "release-cache.json";
+    private const long MostFeedBytes = 2_000_000;
     private static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(5);
     private static readonly TimeSpan LeastWait = TimeSpan.FromMinutes(1);
     private static readonly TimeSpan MostWait = TimeSpan.FromHours(1);
+    private static readonly long MostUnixSeconds = DateTimeOffset.MaxValue.ToUnixTimeSeconds();
 
     private readonly WeirOptions _options;
     private readonly TimeProvider _time;
@@ -61,9 +63,9 @@ public sealed class GitHubReleaseCatalogClient : IReleaseCatalogClient
         using var request = Request(ReleaseCatalog.ReleasesUrl, currentVersion);
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
         request.Headers.Add("X-GitHub-Api-Version", "2022-11-28");
-        if (etag is not null && releases is not null)
+        if (etag is not null && releases is not null && EntityTagHeaderValue.TryParse(etag, out var entityTag))
         {
-            request.Headers.IfNoneMatch.Add(EntityTagHeaderValue.Parse(etag));
+            request.Headers.IfNoneMatch.Add(entityTag);
         }
 
         using var response = await client.SendAsync(request, cancellationToken).ConfigureAwait(false);
@@ -121,12 +123,12 @@ public sealed class GitHubReleaseCatalogClient : IReleaseCatalogClient
     {
         try
         {
-            using var client = new HttpClient(_handler, disposeHandler: false) { Timeout = RequestTimeout };
+            using var client = new HttpClient(_handler, disposeHandler: false) { Timeout = RequestTimeout, MaxResponseContentBufferSize = MostFeedBytes };
             using var request = Request(ReleaseCatalog.ReleasesFeedUrl, currentVersion);
             using var response = await client.SendAsync(request, cancellationToken).ConfigureAwait(false);
             response.EnsureSuccessStatusCode();
             var feed = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-            return ReleaseSelection.NewestFor(ReleaseFeed.Parse(feed), currentVersion);
+            return ReleaseSelection.NewestFor(WithApiRecords(ReleaseFeed.Parse(feed), known), currentVersion);
         }
         catch (Exception exception) when (exception is HttpRequestException or XmlException || (exception is TaskCanceledException && !cancellationToken.IsCancellationRequested))
         {
@@ -137,26 +139,37 @@ public sealed class GitHubReleaseCatalogClient : IReleaseCatalogClient
     }
 
     /// <summary>
+    /// The feed's releases, each replaced by the API's own record of it when the API has given one: the feed cannot say whether
+    /// GitHub marks a release as a pre-release or a draft, the API can.
+    /// </summary>
+    private static List<GitHubReleaseRecord> WithApiRecords(IReadOnlyList<GitHubReleaseRecord> fromFeed, IReadOnlyList<GitHubReleaseRecord>? known) =>
+        [.. fromFeed.Select(release => known?.FirstOrDefault(record => record.TagName == release.TagName) ?? release)];
+
+    /// <summary>
     /// When GitHub says the limit lifts: <c>Retry-After</c> when sent, otherwise <c>X-RateLimit-Reset</c> once no allowance is
-    /// left; null when the response is not a limit. Kept between a minute and an hour from now, so a skewed clock or an odd
-    /// value never makes Weir hammer GitHub or give up on it.
+    /// left; null when the response is not a limit. Both are worked out as a wait from GitHub's own <c>Date</c>, so a clock
+    /// that is off here changes nothing, and kept between a minute and an hour from now, so an odd value never makes Weir
+    /// hammer GitHub or give up on it.
     /// </summary>
     private DateTimeOffset? ResetOf(HttpResponseMessage response)
     {
         var now = _time.GetUtcNow();
-        DateTimeOffset? resetsAt = null;
-        if (response.Headers.RetryAfter is { } wait)
-        {
-            resetsAt = wait.Date ?? (wait.Delta is { } delta ? now + delta : null);
-        }
-        else if (HeaderOf(response, "X-RateLimit-Remaining") == "0" && long.TryParse(HeaderOf(response, "X-RateLimit-Reset"), CultureInfo.InvariantCulture, out var epoch))
-        {
-            resetsAt = DateTimeOffset.FromUnixTimeSeconds(epoch);
-        }
-
-        var (earliest, latest) = (now + LeastWait, now + MostWait);
-        return resetsAt is { } at ? (at < earliest ? earliest : at > latest ? latest : at) : null;
+        var theirNow = response.Headers.Date ?? now;
+        var wait = RetryAfterWait(response, theirNow) ?? ResetWait(response, theirNow);
+        return wait is { } until ? now + (until < LeastWait ? LeastWait : until > MostWait ? MostWait : until) : null;
     }
+
+    /// <summary>How long <c>Retry-After</c> asks to wait; a date in it is measured from GitHub's own clock, as sent in <c>Date</c>.</summary>
+    private static TimeSpan? RetryAfterWait(HttpResponseMessage response, DateTimeOffset theirNow) =>
+        response.Headers.RetryAfter is { } after ? after.Delta ?? (after.Date - theirNow) : null;
+
+    /// <summary>How long until <c>X-RateLimit-Reset</c> once no allowance is left; null for a missing or impossible value.</summary>
+    private static TimeSpan? ResetWait(HttpResponseMessage response, DateTimeOffset theirNow) =>
+        HeaderOf(response, "X-RateLimit-Remaining") == "0"
+        && long.TryParse(HeaderOf(response, "X-RateLimit-Reset"), CultureInfo.InvariantCulture, out var epoch)
+        && epoch is >= 0 && epoch <= MostUnixSeconds
+            ? DateTimeOffset.FromUnixTimeSeconds(epoch) - theirNow
+            : null;
 
     private static string? HeaderOf(HttpResponseMessage response, string name) =>
         response.Headers.TryGetValues(name, out var values) ? values.FirstOrDefault()?.Trim() : null;
@@ -195,10 +208,10 @@ public sealed class GitHubReleaseCatalogClient : IReleaseCatalogClient
                 && saved.Get("releases") is { } releases)
             {
                 _releases = ReleaseCatalog.CoerceReleaseListPayload(releases);
-                _etag = etag.Value;
+                _etag = EntityTagHeaderValue.TryParse(etag.Value, out _) ? etag.Value : null;
             }
         }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or WireJsonDecodeException or WireValueException or WireTypeException)
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or WireJsonDecodeException or WireValueException or WireTypeException or FormatException)
         {
             _logger.LogDebug(exception, "The saved release list could not be read, so the next check asks GitHub for it again.");
         }

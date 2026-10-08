@@ -6,22 +6,29 @@ namespace Weir.Core.Updates;
 
 /// <summary>
 /// Reads GitHub's public release feed (<see cref="ReleaseCatalog.ReleasesFeedUrl"/>) into releases. The feed names the tag, the
-/// title and the time of each published release, and nothing of its files, so the Windows installer is the download URL every
-/// release's installer has by name.
+/// title and the time each release was last updated, and nothing of its files, so these releases have no assets.
 /// </summary>
+/// <remarks>
+/// <see cref="GitHubReleaseRecord.PublishedAt"/> is the feed's updated time, which a later edit of the release moves. The feed
+/// has no pre-release or draft flag either: <see cref="GitHubReleaseRecord.Prerelease"/> follows the version's own pre-release
+/// part, so a stable-numbered tag that GitHub marks as a pre-release reads as stable. The API's record of a release, when
+/// Weir has one, is the better answer and replaces the feed's.
+/// </remarks>
 public static class ReleaseFeed
 {
     private const string TagLinkMarker = "/releases/tag/";
+    private const long MostCharacters = 2_000_000;
     private static readonly XNamespace Atom = "http://www.w3.org/2005/Atom";
 
     /// <summary>
     /// The feed's releases. An entry whose tag is not a version, such as the <c>untagged-…</c> address of a draft, is left out.
-    /// Throws <see cref="XmlException"/> when the text is not XML.
+    /// Throws <see cref="XmlException"/> when the text is not XML or is larger than a release feed can be.
     /// </summary>
     public static IReadOnlyList<GitHubReleaseRecord> Parse(string feed)
     {
         ArgumentNullException.ThrowIfNull(feed);
-        using var reader = XmlReader.Create(new StringReader(feed), new XmlReaderSettings { DtdProcessing = DtdProcessing.Prohibit, XmlResolver = null });
+        var settings = new XmlReaderSettings { DtdProcessing = DtdProcessing.Prohibit, XmlResolver = null, MaxCharactersInDocument = MostCharacters };
+        using var reader = XmlReader.Create(new StringReader(feed), settings);
         var releases = new List<GitHubReleaseRecord>();
         foreach (var entry in XDocument.Load(reader).Descendants(Atom + "entry"))
         {
@@ -49,13 +56,11 @@ public static class ReleaseFeed
         }
 
         var name = ((string?)entry.Element(Atom + "title"))?.Trim();
-        var installer = new GitHubReleaseAsset(
-            ReleaseCatalog.WindowsInstallerAssetName, string.Empty, ReleaseCatalog.DownloadUrl(tag, ReleaseCatalog.WindowsInstallerAssetName), 0, null);
         return new GitHubReleaseRecord(
-            tag, version, string.IsNullOrEmpty(name) ? null : name, link, PublishedAt(entry), Draft: false, parsed.IsPreRelease, [installer]);
+            tag, version, string.IsNullOrEmpty(name) ? null : name, ReleaseCatalog.TagUrl(tag), UpdatedAt(entry), Draft: false, parsed.IsPreRelease, []);
     }
 
-    private static Timestamp? PublishedAt(XElement entry) =>
+    private static Timestamp? UpdatedAt(XElement entry) =>
         ((string?)entry.Element(Atom + "updated"))?.Trim() is { Length: > 0 } updated
         && Timestamp.TryFromIsoFormat(updated.Replace("Z", "+00:00", StringComparison.Ordinal), out var parsed)
             ? parsed

@@ -25,10 +25,10 @@ public sealed class GitHubReleaseCatalogClientTests : IDisposable
     private GitHubReleaseCatalogClient NewClient() =>
         new(_fixture.Options, _fixture.Clock, NullLogger<GitHubReleaseCatalogClient>.Instance, _github);
 
-    private static string ReleaseList(string version) =>
+    private static string ReleaseList(string version, bool preRelease = false) =>
         $$"""
         [{"tag_name":"v{{version}}","name":"Weir {{version}}","html_url":"https://github.com/jampat000/Weir/releases/tag/v{{version}}",
-          "published_at":"2026-10-01T10:00:00Z","draft":false,"prerelease":false,
+          "published_at":"2026-10-01T10:00:00Z","draft":false,"prerelease":{{(preRelease ? "true" : "false")}},
           "assets":[{"name":"Weir-win-Setup.exe","url":"https://api.github.com/repos/jampat000/Weir/releases/assets/1",
                      "browser_download_url":"https://github.com/jampat000/Weir/releases/download/v{{version}}/Weir-win-Setup.exe",
                      "size":1000,"content_type":"application/octet-stream"}]}]
@@ -52,9 +52,10 @@ public sealed class GitHubReleaseCatalogClientTests : IDisposable
         return response;
     }
 
-    private static HttpResponseMessage Limited(HttpStatusCode status, DateTimeOffset resetsAt)
+    private static HttpResponseMessage Limited(HttpStatusCode status, DateTimeOffset resetsAt, DateTimeOffset? githubNow = null)
     {
         var response = new HttpResponseMessage(status);
+        response.Headers.Date = githubNow;
         response.Headers.Add("X-RateLimit-Remaining", "0");
         response.Headers.Add("X-RateLimit-Reset", resetsAt.ToUnixTimeSeconds().ToString(System.Globalization.CultureInfo.InvariantCulture));
         return response;
@@ -89,6 +90,23 @@ public sealed class GitHubReleaseCatalogClientTests : IDisposable
         Assert.Equal([null, "\"abc\""], _github.ApiIfNoneMatch);
     }
 
+    [Theory]
+    [InlineData("")]
+    [InlineData("abc")]
+    [InlineData("\"unterminated")]
+    public async Task A_stored_etag_that_is_not_one_is_not_sent_and_the_check_still_goes_through(string saved)
+    {
+        File.WriteAllText(
+            Path.Join(_fixture.Home.Path, "release-cache.json"),
+            "{\"etag\":" + System.Text.Json.JsonSerializer.Serialize(saved) + ",\"releases\":" + ReleaseList("3.3.0") + "}");
+        _github.Api = _ => Json(ReleaseList("3.4.0"), "\"def\"");
+
+        var latest = await NewClient().FetchLatestAsync(Running, CancellationToken.None);
+
+        Assert.Equal("3.4.0", latest?.Version);
+        Assert.Equal([null], _github.ApiIfNoneMatch);
+    }
+
     [Fact]
     public async Task A_list_that_changed_replaces_the_stored_copy()
     {
@@ -116,7 +134,8 @@ public sealed class GitHubReleaseCatalogClientTests : IDisposable
         var later = await _client.FetchLatestAsync(Running, CancellationToken.None);
 
         Assert.Equal("3.4.0", during?.Version);
-        Assert.Equal("https://github.com/jampat000/Weir/releases/download/v3.4.0/Weir-win-Setup.exe", during?.WindowsInstallerAsset()?.BrowserDownloadUrl);
+        Assert.Equal("https://github.com/jampat000/Weir/releases/tag/v3.4.0", during?.HtmlUrl);
+        Assert.Null(during?.WindowsInstallerAsset());
         Assert.Equal("3.4.0", later?.Version);
         Assert.Equal(1, _github.ApiCalls);
         Assert.Equal(2, _github.FeedCalls);
@@ -159,6 +178,70 @@ public sealed class GitHubReleaseCatalogClientTests : IDisposable
         var failure = await Assert.ThrowsAsync<ReleaseFetchException>(() => _client.FetchLatestAsync(Running, CancellationToken.None));
 
         Assert.Equal(now.AddMinutes(expectedMinutes), failure.RateLimit?.ResetsAt);
+    }
+
+    [Fact]
+    public async Task A_reset_is_a_wait_measured_on_githubs_clock_so_a_fast_local_clock_does_not_shorten_it()
+    {
+        var now = _fixture.Clock.GetUtcNow();
+        var githubNow = now.AddMinutes(-10);
+        _github.Api = _ => Limited(HttpStatusCode.Forbidden, githubNow.AddMinutes(20), githubNow);
+        _github.PublicFeed = _ => new HttpResponseMessage(HttpStatusCode.InternalServerError);
+
+        var failure = await Assert.ThrowsAsync<ReleaseFetchException>(() => _client.FetchLatestAsync(Running, CancellationToken.None));
+
+        Assert.Equal(now.AddMinutes(20), failure.RateLimit?.ResetsAt);
+    }
+
+    [Fact]
+    public async Task A_retry_after_date_is_measured_on_githubs_clock_too()
+    {
+        var now = _fixture.Clock.GetUtcNow();
+        var githubNow = now.AddMinutes(10);
+        _github.Api = _ =>
+        {
+            var response = new HttpResponseMessage(HttpStatusCode.TooManyRequests);
+            response.Headers.Date = githubNow;
+            response.Headers.RetryAfter = new System.Net.Http.Headers.RetryConditionHeaderValue(githubNow.AddMinutes(15));
+            return response;
+        };
+        _github.PublicFeed = _ => new HttpResponseMessage(HttpStatusCode.InternalServerError);
+
+        var failure = await Assert.ThrowsAsync<ReleaseFetchException>(() => _client.FetchLatestAsync(Running, CancellationToken.None));
+
+        Assert.Equal(now.AddMinutes(15), failure.RateLimit?.ResetsAt);
+    }
+
+    [Fact]
+    public async Task A_reset_too_large_to_be_a_time_leaves_the_feed_to_answer()
+    {
+        _github.Api = _ =>
+        {
+            var response = new HttpResponseMessage(HttpStatusCode.Forbidden);
+            response.Headers.Add("X-RateLimit-Remaining", "0");
+            response.Headers.Add("X-RateLimit-Reset", "99999999999999999");
+            return response;
+        };
+        _github.PublicFeed = _ => Json(Feed("v3.3.0"));
+
+        var latest = await _client.FetchLatestAsync(Running, CancellationToken.None);
+
+        Assert.Equal("3.3.0", latest?.Version);
+    }
+
+    [Fact]
+    public async Task A_release_the_api_marked_as_a_pre_release_stays_one_when_the_feed_answers()
+    {
+        var limited = false;
+        _github.Api = request => limited ? Limited(HttpStatusCode.Forbidden, _fixture.Clock.GetUtcNow().AddMinutes(20)) : Json(ReleaseList("3.3.0", preRelease: true), "\"abc\"");
+        _github.PublicFeed = _ => Json(Feed("v3.3.0", "v3.2.17"));
+        await _client.FetchLatestAsync(Running, CancellationToken.None);
+        _fixture.Clock.Advance(TimeSpan.FromMinutes(1));
+        limited = true;
+
+        var latest = await _client.FetchLatestAsync(Running, CancellationToken.None);
+
+        Assert.Equal("3.2.17", latest?.Version);
     }
 
     [Fact]

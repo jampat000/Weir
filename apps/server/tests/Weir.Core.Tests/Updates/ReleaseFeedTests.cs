@@ -26,13 +26,30 @@ public sealed class ReleaseFeedTests
     }
 
     [Fact]
-    public void The_windows_installer_is_the_download_url_every_release_has_by_name()
+    public void A_release_from_the_feed_has_no_installer_link_to_offer()
     {
         var release = Assert.Single(ReleaseFeed.Parse(Feed(Entry("v3.4.0"))));
 
-        Assert.Equal(
-            "https://github.com/jampat000/Weir/releases/download/v3.4.0/Weir-win-Setup.exe",
-            release.WindowsInstallerAsset()?.BrowserDownloadUrl);
+        Assert.Empty(release.Assets);
+        Assert.Null(release.WindowsInstallerAsset());
+    }
+
+    [Fact]
+    public void The_release_page_is_built_from_the_repository_and_the_tag_not_taken_from_the_feed()
+    {
+        const string Elsewhere = "<entry><updated>2026-10-05T08:30:00Z</updated><link rel=\"alternate\" href=\"https://elsewhere.example/releases/tag/v3.4.0\"/><title>Weir</title></entry>";
+
+        var release = Assert.Single(ReleaseFeed.Parse(Feed(Elsewhere)));
+
+        Assert.Equal("https://github.com/jampat000/Weir/releases/tag/v3.4.0", release.HtmlUrl);
+    }
+
+    [Fact]
+    public void A_feed_larger_than_any_release_feed_is_refused()
+    {
+        var huge = Feed(Entry("v3.4.0", title: new string('x', 2_100_000)));
+
+        Assert.ThrowsAny<System.Xml.XmlException>(() => ReleaseFeed.Parse(huge));
     }
 
     [Fact]
