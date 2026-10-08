@@ -1,5 +1,6 @@
 using System.Net;
 using Weir.Api.Tests.Platform;
+using Weir.Infrastructure.Tests;
 using static Weir.Api.Tests.Platform.ApiTestClient;
 
 namespace Weir.Api.Tests.MediaManagers;
@@ -239,13 +240,20 @@ public sealed class HandbackOutcomeApiTests : IDisposable
         var copy = await HandedBackAsync(server, library, "Film/film.mkv");
         await TestDatabase.ExecuteAsync(
             server,
-            "UPDATE media_manager_handoff_targets SET result = 'completed', output_file = $copy WHERE relative_path = 'Film/film.mkv' " +
+            "UPDATE media_manager_handoff_targets SET result = 'completed', output_file = $copy, " +
+            "output_written_at = (SELECT written_at FROM handbacks WHERE relative_path = 'Film/film.mkv') WHERE relative_path = 'Film/film.mkv' " +
             "AND handoff_row_id = (SELECT id FROM media_manager_handoffs WHERE source_key = 'deluno' AND handoff_id = $id)",
             ("$copy", copy),
             ("$id", handoffId));
         await TestDatabase.ExecuteAsync(
             server, "UPDATE media_manager_handoffs SET reported_status = 'completed' WHERE source_key = 'deluno' AND handoff_id = $id", ("$id", handoffId));
         return copy;
+    }
+
+    private static async Task RefuseAsync(WeirTestServer server)
+    {
+        using var refused = await PostOutcomeAsync(server, "h1", DelunoOutcome("not-imported", null, "The import dead-lettered."));
+        Assert.Equal(HttpStatusCode.OK, refused.StatusCode);
     }
 
     /// <summary>Exactly what Deluno's <c>ReportOutcomeAsync</c> sends: <c>JsonContent.Create</c>, web defaults, nulls kept.</summary>
@@ -388,7 +396,12 @@ public sealed class HandbackOutcomeApiTests : IDisposable
                 "AND imported_path = '/media/movies/Film (2020)/Film (2020).mkv' AND released_at IS NOT NULL AND settled_at IS NOT NULL " +
                 "AND release_note = 'Weir removed its copy from the hand-back folder, because Deluno has the file now.'"));
         Assert.Equal(1, await TestDatabase.ScalarAsync(server, "SELECT count(*) FROM activity_events WHERE title = 'Deluno will not import film.mkv'"));
-        Assert.Equal(1, await TestDatabase.ScalarAsync(server, "SELECT count(*) FROM activity_events WHERE title = 'Deluno imported film.mkv after all'"));
+        Assert.Equal(
+            1,
+            await TestDatabase.ScalarAsync(
+                server,
+                "SELECT count(*) FROM activity_events WHERE title = 'Deluno imported film.mkv after all' " +
+                "AND detail LIKE '%Deluno had said it would not import this file, and then imported it after all. Weir recorded that Deluno imported the file and released its copy.%'"));
 
         using (var repeat = await PostOutcomeAsync(server, "h1", DelunoOutcome("imported", "/media/movies/Film (2020)/Film (2020).mkv", null)))
         {
@@ -453,6 +466,141 @@ public sealed class HandbackOutcomeApiTests : IDisposable
             HttpMethod.Post, "/api/v1/intake/handoffs/sonarr/h1/outcome", headers: SecretHeader, content: DelunoOutcome("imported", "/tv/film.mkv", null));
 
         Assert.Equal(HttpStatusCode.NotFound, other.StatusCode);
+    }
+
+    [Fact]
+    public async Task A_refusal_and_an_import_sent_together_end_as_the_import_with_the_copy_released()
+    {
+        await using var server = await StartAsync();
+        var copy = await FinishedHandoffAsync(server);
+
+        var refusal = PostOutcomeAsync(server, "h1", DelunoOutcome("not-imported", null, "The import dead-lettered."));
+        var import = PostOutcomeAsync(server, "h1", DelunoOutcome("imported", "/media/movies/Film/film.mkv", null));
+        using var refused = await refusal;
+        using var imported = await import;
+
+        Assert.Equal(HttpStatusCode.OK, imported.StatusCode);
+        Assert.Contains(refused.StatusCode, new[] { HttpStatusCode.OK, HttpStatusCode.Conflict });
+        Assert.False(File.Exists(copy));
+        Assert.Equal(1, await TestDatabase.ScalarAsync(server, "SELECT count(*) FROM media_manager_handoffs WHERE outcome = 'imported' AND outcome_released = 1"));
+        Assert.Equal(
+            1,
+            await TestDatabase.ScalarAsync(
+                server, "SELECT count(*) FROM handbacks WHERE outcome = 'imported' AND released_at IS NOT NULL AND release_note LIKE 'Weir removed its copy%'"));
+    }
+
+    [Fact]
+    public async Task Two_imports_sent_together_after_a_refusal_release_the_copy_once()
+    {
+        await using var server = await StartAsync();
+        var copy = await FinishedHandoffAsync(server);
+        await RefuseAsync(server);
+
+        var first = PostOutcomeAsync(server, "h1", DelunoOutcome("imported", "/media/movies/Film/film.mkv", null));
+        var second = PostOutcomeAsync(server, "h1", DelunoOutcome("imported", "/media/movies/Film/film.mkv", null));
+        using var one = await first;
+        using var two = await second;
+
+        Assert.Equal((HttpStatusCode.OK, HttpStatusCode.OK), (one.StatusCode, two.StatusCode));
+        Assert.Equal(await one.Content.ReadAsStringAsync(), await two.Content.ReadAsStringAsync());
+        Assert.False(File.Exists(copy));
+        Assert.Equal(
+            1,
+            await TestDatabase.ScalarAsync(
+                server, "SELECT count(*) FROM handbacks WHERE released_at IS NOT NULL AND release_note LIKE 'Weir removed its copy%'"));
+        Assert.Equal(1, await TestDatabase.ScalarAsync(server, "SELECT count(*) FROM activity_events WHERE title = 'Deluno imported film.mkv after all'"));
+    }
+
+    /// <summary>
+    /// A later pass wrote a fresh copy for the same file, which the first hand-off's report never named. Whatever the manager
+    /// says about the first hand-off, that copy is not released.
+    /// </summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task A_copy_written_after_the_hand_off_was_reported_is_not_released(bool refusedFirst)
+    {
+        await using var server = await StartAsync();
+        var copy = await FinishedHandoffAsync(server);
+        if (refusedFirst)
+        {
+            await RefuseAsync(server);
+        }
+
+        await File.WriteAllTextAsync(copy, "the cleaned copy of a newer download");
+        var info = new FileInfo(copy);
+        await TestDatabase.ExecuteAsync(
+            server,
+            "UPDATE handbacks SET output_size = $s, output_mtime_ns = $m, written_at = '2026-09-25 10:00:00.000000', outcome = NULL, outcome_by = NULL, " +
+            "outcome_at = NULL, outcome_reason = NULL, imported_path = NULL, released_at = NULL, settled_at = NULL, release_note = NULL",
+            ("$s", info.Length),
+            ("$m", (info.LastWriteTimeUtc - DateTime.UnixEpoch).Ticks * 100));
+
+        using var imported = await PostOutcomeAsync(server, "h1", DelunoOutcome("imported", "/media/movies/Film/film.mkv", null));
+
+        Assert.Equal(HttpStatusCode.OK, imported.StatusCode);
+        Assert.True(File.Exists(copy));
+        Assert.Equal(1, await TestDatabase.ScalarAsync(server, "SELECT count(*) FROM handbacks WHERE outcome IS NULL AND released_at IS NULL AND settled_at IS NULL"));
+    }
+
+    [Fact]
+    public async Task Refused_then_imported_in_a_manager_linked_workflow_releases_only_Weirs_copy_and_never_the_original()
+    {
+        await using var server = await StartAsync();
+        var copy = await FinishedHandoffAsync(server);
+        await TestDatabase.ExecuteAsync(server, "INSERT INTO media_manager_connections (kind, name, base_url) VALUES ('deluno', 'Deluno', 'http://192.0.2.30:5000')");
+        await TestDatabase.ExecuteAsync(server, "INSERT INTO library_manager_links (library_id, connection_id) SELECT l.id, c.id FROM libraries l, media_manager_connections c WHERE l.media_type = 'movie'");
+        var original = Path.Join(Watched, "Film", "film.mkv");
+        var sidecar = Path.Join(Watched, "Film", "film.nfo");
+        await File.WriteAllTextAsync(sidecar, "the download's sidecar");
+        await RefuseAsync(server);
+
+        using var imported = await PostOutcomeAsync(server, "h1", DelunoOutcome("imported", "/media/movies/Film (2020)/Film (2020).mkv", null));
+
+        Assert.Equal(HttpStatusCode.OK, imported.StatusCode);
+        Assert.False(File.Exists(copy));
+        Assert.Equal("the original download", await File.ReadAllTextAsync(original));
+        Assert.True(File.Exists(sidecar));
+        Assert.True(Directory.Exists(Path.Join(Watched, "Film")));
+    }
+
+    [Fact]
+    public async Task A_copy_the_cleanup_job_already_settled_is_left_as_it_was()
+    {
+        await using var server = await StartAsync();
+        var copy = await FinishedHandoffAsync(server);
+        const string note = "No media manager imported it within 14 days, so Weir removed its copy.";
+        File.Delete(copy);
+        await TestDatabase.ExecuteAsync(
+            server,
+            "UPDATE handbacks SET released_at = '2026-10-01 10:00:00.000000', settled_at = '2026-10-01 10:00:00.000000', release_note = $note",
+            ("$note", note));
+
+        using var imported = await PostOutcomeAsync(server, "h1", DelunoOutcome("imported", "/media/movies/Film/film.mkv", null));
+
+        Assert.Equal(HttpStatusCode.OK, imported.StatusCode);
+        Assert.Equal(note, await TestDatabase.ScalarStringAsync(server, "SELECT release_note FROM handbacks WHERE outcome = 'imported'"));
+        Assert.Equal(1, await TestDatabase.ScalarAsync(server, "SELECT count(*) FROM handbacks WHERE released_at = '2026-10-01 10:00:00.000000'"));
+    }
+
+    [WindowsFact("FileShare.None only blocks a delete on Windows; POSIX has no equivalent share-mode lock.")]
+    public async Task A_copy_in_use_when_the_manager_imports_is_recorded_as_kept_with_the_reason()
+    {
+        await using var server = await StartAsync();
+        var copy = await FinishedHandoffAsync(server);
+        await RefuseAsync(server);
+
+        string message;
+        using (new FileStream(copy, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+        {
+            using var imported = await PostOutcomeAsync(server, "h1", DelunoOutcome("imported", "/media/movies/Film/film.mkv", null));
+            Assert.Equal(HttpStatusCode.OK, imported.StatusCode);
+            message = (await Json(imported))["message"]!.GetValue<string>();
+        }
+
+        Assert.StartsWith("Weir recorded that Deluno imported the file. Weir could not remove its copy (", message, StringComparison.Ordinal);
+        Assert.True(File.Exists(copy));
+        Assert.Equal(1, await TestDatabase.ScalarAsync(server, "SELECT count(*) FROM handbacks WHERE outcome = 'imported' AND released_at IS NULL AND settled_at IS NOT NULL"));
     }
 
     /// <summary>
