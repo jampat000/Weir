@@ -166,13 +166,6 @@ public static class WeirServer
                 "WEIR_CREDENTIALS_SECRET is not set — stored provider credentials will fall back to " +
                 "session-secret encryption. Set a dedicated credentials secret for stronger isolation.");
         }
-
-        if (options.TrustedBrowserOrigins.Count == 0 && options.Env == "production")
-        {
-            logger.LogWarning(
-                "WEIR_CORS_ORIGINS is not set — the Origin/Referer CSRF check on auth endpoints is " +
-                "disabled. Set WEIR_CORS_ORIGINS to the Weir URL to enable this defence.");
-        }
     }
 
     /// <summary>Notes this start, so System can say how often Weir restarted. A failure is logged and never stops the server.</summary>
