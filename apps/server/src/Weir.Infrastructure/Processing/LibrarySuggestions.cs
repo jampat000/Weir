@@ -46,6 +46,9 @@ public sealed class LibrarySuggestions
             if (Choose(scope, managers, clients) is not { } source)
             {
                 notes.AddRange(managers.Select(manager => manager.Problem).OfType<string>());
+                notes.AddRange(clients
+                    .Where(client => !string.IsNullOrEmpty(client.Folders.CompletedFolder))
+                    .Select(client => LibraryFolderSuggestionRules.SharedClientFolderNote(client.Row.Label, scope)));
                 continue;
             }
 
@@ -57,7 +60,10 @@ public sealed class LibrarySuggestions
 
             if (existing.FirstOrDefault(row => Overlap(row.WatchedFolder, source.Watched)) is { } watching)
             {
-                notes.Add($"{watching.Name} already watches {watching.WatchedFolder}, which overlaps the {source.Watched} that {source.Label} reports for {LibraryFolderSuggestionRules.LibraryName(scope)}, so Weir suggests no other workflow for it.");
+                var libraryName = LibraryFolderSuggestionRules.LibraryName(scope);
+                notes.Add(watching.MediaType == scope && SameFolder(watching.WatchedFolder, source.Watched)
+                    ? $"{watching.Name} already watches {watching.WatchedFolder}, the folder {source.Label} reports for {libraryName}, so there is nothing to add."
+                    : $"{watching.Name} already watches {watching.WatchedFolder}, which overlaps the {source.Watched} that {source.Label} reports for {libraryName}, so Weir suggests no other workflow for it.");
                 continue;
             }
 
@@ -102,6 +108,9 @@ public sealed class LibrarySuggestions
 
         return null;
     }
+
+    private static bool SameFolder(string first, string second) =>
+        LibraryRules.NormalizeFolder(first) == LibraryRules.NormalizeFolder(second);
 
     /// <summary>Whether two watched folders are the same or one is inside the other, which two workflows may not be.</summary>
     private static bool Overlap(string first, string second) =>

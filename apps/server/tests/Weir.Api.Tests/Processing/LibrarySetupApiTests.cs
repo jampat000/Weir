@@ -233,6 +233,14 @@ public sealed class LibrarySetupApiTests
         var suggested = await SuggestedAsync(client);
 
         Assert.Empty(suggested["libraries"]!.AsArray());
+        Assert.Equal(
+            [
+                "SABnzbd on 192.0.2.40 has no category folder for Movies, so it saves them with every other download and Weir can't tell them apart. " +
+                "Give Movies its own category folder in SABnzbd on 192.0.2.40, then add the workflow under Setup › Workflows.",
+                "SABnzbd on 192.0.2.40 has no category folder for TV, so it saves them with every other download and Weir can't tell them apart. " +
+                "Give TV its own category folder in SABnzbd on 192.0.2.40, then add the workflow under Setup › Workflows.",
+            ],
+            suggested["notes"]!.AsArray().Select(note => note!.GetValue<string>()));
     }
 
     [Fact]
@@ -254,8 +262,8 @@ public sealed class LibrarySetupApiTests
 
         Assert.Empty(suggested["libraries"]!.AsArray());
         var notes = suggested["notes"]!.AsArray().Select(note => note!.GetValue<string>()).ToList();
-        Assert.Equal(2, notes.Count);
-        Assert.All(notes, note => Assert.Contains("Set the downloads folder in Deluno on 192.0.2.10", note, StringComparison.Ordinal));
+        Assert.Equal(2, notes.Count(note => note.Contains("Set the downloads folder in Deluno on 192.0.2.10", StringComparison.Ordinal)));
+        Assert.Equal(2, notes.Count(note => note.Contains("Give", StringComparison.Ordinal) && note.Contains("its own category folder in SABnzbd on 192.0.2.40", StringComparison.Ordinal)));
     }
 
     [Fact]
@@ -302,7 +310,39 @@ public sealed class LibrarySetupApiTests
         var suggested = await SuggestedAsync(client);
 
         Assert.Equal("tv", Assert.Single(suggested["libraries"]!.AsArray())!["media_type"]!.GetValue<string>());
-        Assert.Contains("Films already watches", Assert.Single(suggested["notes"]!.AsArray())!.GetValue<string>(), StringComparison.Ordinal);
+        var note = Assert.Single(suggested["notes"]!.AsArray())!.GetValue<string>();
+        Assert.Contains("Films already watches", note, StringComparison.Ordinal);
+        Assert.Contains("so there is nothing to add", note, StringComparison.Ordinal);
+        Assert.DoesNotContain("overlap", note, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_folder_inside_one_a_saved_workflow_of_another_media_type_watches_is_called_an_overlap()
+    {
+        var (server, client, manager) = await StartAsync();
+        await using var _server = server;
+        using var folders = TempFolders.Create();
+        var watched = folders.Folder("downloads");
+        await ConnectManagerAsync(client, "deluno", "http://192.0.2.10:5099");
+        manager.Json(
+            HttpMethod.Get,
+            "/api/integrations/external/manifest",
+            DelunoManifest.Replace("/media/downloads/complete/movies", System.Text.Json.JsonEncodedText.Encode(watched).ToString(), StringComparison.Ordinal));
+        using (var created = await client.PostAsync("/api/v1/processing/libraries", new Dictionary<string, object?>
+        {
+            ["csrf_token"] = await client.CsrfAsync(),
+            ["name"] = "Shows",
+            ["media_type"] = "tv",
+            ["watched_folder"] = watched,
+            ["output_folder"] = folders.Folder("shows-out"),
+        }))
+        {
+            Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        }
+
+        var suggested = await SuggestedAsync(client);
+
+        Assert.Contains("which overlaps the", Assert.Single(suggested["notes"]!.AsArray(), note => note!.GetValue<string>().StartsWith("Shows already watches", StringComparison.Ordinal))!.GetValue<string>(), StringComparison.Ordinal);
     }
 
     [Fact]
