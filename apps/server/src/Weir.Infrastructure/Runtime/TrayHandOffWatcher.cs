@@ -12,12 +12,17 @@ namespace Weir.Infrastructure.Runtime;
 /// <see cref="LanAccessFile.FileName"/> after it has asked Windows for the firewall rule. When one of them is written, by
 /// the tray or by the server itself, the stream says the data it carries changed
 /// (<see cref="DataTopics.Update"/>, <see cref="DataTopics.NetworkAccess"/>), so System › About shows the tray's answer the
-/// moment it is given. A burst of writes (a file is written whole to a scratch file and renamed into place) is announced once.
+/// moment it is given. A burst of writes (a file is written whole to a scratch file and renamed into place) is announced once, after
+/// the folder has been quiet for <see cref="Settle"/>; a burst that never goes quiet is still announced every
+/// <see cref="MostWaited"/>, so the screens are never left a long way behind.
 /// </summary>
 public sealed class TrayHandOffWatcher : BackgroundService
 {
-    /// <summary>How long a burst of writes is given to finish before it is announced.</summary>
+    /// <summary>How long the folder must stay quiet before a burst of writes is announced.</summary>
     public static readonly TimeSpan Settle = TimeSpan.FromMilliseconds(150);
+
+    /// <summary>The longest a burst is held back, however steadily it keeps writing.</summary>
+    public static readonly TimeSpan MostWaited = TimeSpan.FromSeconds(2);
 
     private static readonly IReadOnlyDictionary<string, string> TopicByFile = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
     {
@@ -29,11 +34,13 @@ public sealed class TrayHandOffWatcher : BackgroundService
     private readonly WeirOptions _options;
     private readonly DataChangePublisher _changes;
     private readonly ILogger<TrayHandOffWatcher> _logger;
+    private readonly TimeSpan _settle;
     private readonly Channel<string> _written = Channel.CreateUnbounded<string>(new UnboundedChannelOptions { SingleReader = true });
     private FileSystemWatcher? _watcher;
 
-    public TrayHandOffWatcher(WeirOptions options, DataChangePublisher changes, ILogger<TrayHandOffWatcher> logger)
+    public TrayHandOffWatcher(WeirOptions options, DataChangePublisher changes, ILogger<TrayHandOffWatcher> logger, TimeSpan? settle = null)
     {
+        _settle = settle ?? Settle;
         _options = options ?? throw new ArgumentNullException(nameof(options));
         _changes = changes ?? throw new ArgumentNullException(nameof(changes));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -109,11 +116,7 @@ public sealed class TrayHandOffWatcher : BackgroundService
         await foreach (var first in _written.Reader.ReadAllAsync(stoppingToken).ConfigureAwait(false))
         {
             heard.Add(first);
-            await Task.Delay(Settle, stoppingToken).ConfigureAwait(false);
-            while (_written.Reader.TryRead(out var next))
-            {
-                heard.Add(next);
-            }
+            await SettleAsync(heard, stoppingToken).ConfigureAwait(false);
 
             foreach (var topic in TopicsFor(heard))
             {
@@ -122,6 +125,24 @@ public sealed class TrayHandOffWatcher : BackgroundService
 
             heard.Clear();
         }
+    }
+
+    /// <summary>Gathers what is written until the folder has been quiet for the settle time, or the most-waited time has passed.</summary>
+    private async Task SettleAsync(HashSet<string> heard, CancellationToken stoppingToken)
+    {
+        var started = Environment.TickCount64;
+        bool written;
+        do
+        {
+            await Task.Delay(_settle, stoppingToken).ConfigureAwait(false);
+            written = false;
+            while (_written.Reader.TryRead(out var next))
+            {
+                heard.Add(next);
+                written = true;
+            }
+        }
+        while (written && TimeSpan.FromMilliseconds(Environment.TickCount64 - started) < MostWaited);
     }
 
     private static IEnumerable<string> TopicsFor(HashSet<string> files) =>

@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Microsoft.Extensions.Logging.Abstractions;
 using Weir.Infrastructure.Activity;
 using Weir.Infrastructure.Runtime;
@@ -93,16 +94,25 @@ public sealed class TrayHandOffWatcherTests : IAsyncLifetime, IDisposable
     }
 
     [Fact]
-    public async Task A_burst_of_writes_is_announced_once()
+    public async Task A_burst_of_writes_that_outlasts_the_settle_time_is_still_announced_once()
     {
-        using var heard = _changes.Subscribe();
+        // The burst lasts longer than the settle time, but no gap inside it does, so it is one burst.
+        var settle = TimeSpan.FromMilliseconds(500);
+        var gap = TimeSpan.FromMilliseconds(50);
+        var changes = new DataChangePublisher();
+        using var watcher = new TrayHandOffWatcher(_store.Options, changes, NullLogger<TrayHandOffWatcher>.Instance, settle);
+        await watcher.StartAsync(CancellationToken.None);
+        using var heard = changes.Subscribe();
 
-        for (var write = 0; write < 5; write++)
+        var started = Stopwatch.StartNew();
+        for (var write = 0; started.Elapsed < settle + settle; write++)
         {
             await File.WriteAllTextAsync(Path.Join(Home, UpdateFiles.StateFileName), $"{{\"downloaded\": true, \"version\": \"9.9.{write}\"}}");
+            await Task.Delay(gap);
         }
 
         Assert.Equal([DataTopics.Update], await HeardAsync(heard, 1));
+        await watcher.StopAsync(CancellationToken.None);
     }
 
     [Fact]
