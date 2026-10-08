@@ -2765,12 +2765,12 @@ export interface components {
     };
     /**
      * DataChangedFrame
-     * @description The data of a data.changed frame on GET /activity/stream: one kind of data changed, so every screen showing it should read it again.
+     * @description The data of a data.changed frame on GET /activity/stream: one kind of data changed, so every screen showing it should read it again. A topic is published as the screens that show its data are converted, so not every topic listed is sent yet.
      */
     DataChangedFrame: {
       /**
        * Topic
-       * @description Which data changed: pause (Processing paused, resumed, or a timed pause ran out), readiness, files_at_once, maintenance, libraries, library_scan, update, network_access, connections, settings, backups, kept_files, metrics or jobs.
+       * @description Which data changed (a topic is named here before it is published): pause (Processing paused, resumed, or a timed pause ran out), readiness, files_at_once, maintenance, libraries, library_scan, update, network_access, connections, settings, backups, kept_files, metrics or jobs.
        * @enum {string}
        */
       topic:

@@ -16,7 +16,8 @@ export type LiveTopic = Schema<"DataChangedFrame">["topic"];
 
 /**
  * The queries to read again when the server says a kind of data changed. Every topic is named here, so a topic the
- * server adds fails the build until it says what it refreshes. A screen that starts showing data a topic
+ * server adds fails the build until it says what it refreshes. The server publishes a topic as the screens that show its
+ * data are converted, so a topic can be named here before anything publishes it. A screen that starts showing data a topic
  * covers adds its queries to that topic.
  */
 export const LIVE_TOPIC_QUERIES: Readonly<

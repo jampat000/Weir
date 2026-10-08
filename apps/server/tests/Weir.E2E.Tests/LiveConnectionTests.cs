@@ -11,6 +11,9 @@ public sealed class LiveConnectionTests(E2EServer server) : E2ETestBase(server)
     // The longest the page may take to notice: the 5 s the stream asks the browser to wait before it tries again.
     private const float ReconnectMs = 20_000;
 
+    // Long enough that a push or a fetch from the page, had one been possible, would have drawn the change by now.
+    private const int ObservationMs = 2_000;
+
     /// <summary>Signs in and waits until the page has its live stream open.</summary>
     private async Task<IPage> OpenLiveShellAsync()
     {
@@ -35,8 +38,10 @@ public sealed class LiveConnectionTests(E2EServer server) : E2ETestBase(server)
 
         await page.Context.SetOfflineAsync(true);
 
-        await Expect(banner).ToHaveTextAsync("Live updates paused: Weir isn't answering. Reconnecting…", new() { Timeout = ReconnectMs });
+        await Expect(banner).ToHaveTextAsync("Live updates paused: can't reach Weir. Reconnecting…", new() { Timeout = ReconnectMs });
         await WeirApi.SetPausedAsync(page.Context, BaseUrl, paused: true);
+        Assert.True(await WeirApi.IsPausedAsync(page.Context, BaseUrl), "The server did not take the pause.");
+        await page.WaitForTimeoutAsync(ObservationMs);
         await Expect(page.GetByTestId("pause-badge")).ToHaveCountAsync(0);
 
         await page.Context.SetOfflineAsync(false);

@@ -10,6 +10,18 @@ namespace Weir.E2E.Tests.Support;
 /// </summary>
 public static class WeirApi
 {
+    /// <summary>Whether the server says Processing is paused, asked as the signed-in person in the context.</summary>
+    public static async Task<bool> IsPausedAsync(IBrowserContext context, string baseUrl)
+    {
+        await using var response = await context.APIRequest.GetAsync($"{baseUrl}/api/v1/pause");
+        if (!response.Ok)
+        {
+            throw new InvalidOperationException($"Reading the pause answered {response.Status}: {await response.TextAsync()}");
+        }
+
+        return JsonDocument.Parse(await response.TextAsync()).RootElement.GetProperty("paused").GetBoolean();
+    }
+
     public static async Task SetPausedAsync(IBrowserContext context, string baseUrl, bool paused)
     {
         await using var csrf = await context.APIRequest.GetAsync($"{baseUrl}/api/v1/auth/csrf");

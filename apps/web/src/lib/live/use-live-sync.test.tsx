@@ -5,6 +5,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { pauseKeys } from "../pause/query-keys";
 import { processingKeys } from "../processing/query-keys";
+import { STREAM_SILENCE_LIMIT_MS } from "../activity/use-activity-stream-invalidation";
+import { authKeys } from "../auth/query-keys";
 import { getLiveConnection } from "./live-connection";
 import { useLiveSync } from "./use-live-sync";
 
@@ -165,20 +167,19 @@ describe("useLiveSync", () => {
     expect(invalidate).not.toHaveBeenCalled();
   });
 
-  it("treats a different boot id after a reconnect as a restart, and reads everything again", () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () => new Response("", { status: 502 })),
-    );
+  it("treats a different boot id after a reconnect as a restart, which checks the build but does not read everything a second time", async () => {
+    const check = vi.fn(async () => new Response("", { status: 502 }));
+    vi.stubGlobal("fetch", check);
     const { invalidate } = mountSync();
     current().open();
     current().hello("boot-1");
     current().drop();
     current().open();
-    invalidate.mockClear();
+    expect(invalidatedKeys(invalidate)).toEqual([[]]);
 
     current().hello("boot-2");
 
+    await vi.waitFor(() => expect(check).toHaveBeenCalledTimes(1));
     expect(invalidatedKeys(invalidate)).toEqual([[]]);
   });
 
@@ -241,7 +242,94 @@ describe("useLiveSync", () => {
 
     current().open();
     expect(getLiveConnection().status).toBe("live");
-    expect(invalidatedKeys(invalidate)).toEqual([[]]);
+    expect(invalidatedKeys(invalidate)).toEqual([authKeys.me, []]);
+  });
+
+  it("asks whether the session has ended when the server refuses the stream, and stops trying once the shell is gone", () => {
+    vi.useFakeTimers();
+    const { invalidate, unmount } = mountSync();
+    current().open();
+
+    current().refused();
+    expect(invalidatedKeys(invalidate)).toEqual([authKeys.me]);
+
+    unmount();
+    vi.advanceTimersByTime(60_000);
+
+    expect(FakeEventSource.instances).toHaveLength(1);
+  });
+
+  it("does not ask about the session when the browser merely loses the connection", () => {
+    const { invalidate } = mountSync();
+    current().open();
+
+    current().drop();
+
+    expect(invalidate).not.toHaveBeenCalled();
+  });
+
+  describe("when the stream goes silent", () => {
+    const hideTab = () =>
+      vi.spyOn(document, "visibilityState", "get").mockReturnValue("hidden");
+    const showTab = () => {
+      vi.spyOn(document, "visibilityState", "get").mockReturnValue("visible");
+      act(() => void document.dispatchEvent(new Event("visibilitychange")));
+    };
+
+    afterEach(() => vi.restoreAllMocks());
+
+    it("drops it once nothing has been heard for the limit, says so, and opens a fresh one", () => {
+      vi.useFakeTimers();
+      mountSync();
+      const first = current();
+      first.open();
+
+      act(() => void vi.advanceTimersByTime(STREAM_SILENCE_LIMIT_MS - 5_000));
+      expect(first.closed).toBe(false);
+      expect(getLiveConnection().status).toBe("live");
+
+      act(() => void vi.advanceTimersByTime(10_000));
+      expect(first.closed).toBe(true);
+      expect(getLiveConnection()).toEqual({
+        status: "lost",
+        hasBeenLive: true,
+      });
+
+      act(() => void vi.advanceTimersByTime(5_000));
+      expect(FakeEventSource.instances).toHaveLength(2);
+      expect(current().closed).toBe(false);
+    });
+
+    it("keeps a stream that keeps sending frames, whatever the frames are", () => {
+      vi.useFakeTimers();
+      mountSync();
+      current().open();
+
+      for (let i = 0; i < 20; i++) {
+        act(() => void vi.advanceTimersByTime(STREAM_SILENCE_LIMIT_MS / 2));
+        current().emit("system.stats", "not even json");
+      }
+
+      expect(FakeEventSource.instances).toHaveLength(1);
+      expect(current().closed).toBe(false);
+      expect(getLiveConnection().status).toBe("live");
+    });
+
+    it("does not judge a stream while the tab is hidden, and judges it the moment the tab is shown", () => {
+      vi.useFakeTimers();
+      mountSync();
+      const first = current();
+      first.open();
+      hideTab();
+
+      act(() => void vi.advanceTimersByTime(STREAM_SILENCE_LIMIT_MS * 3));
+      expect(first.closed).toBe(false);
+      expect(getLiveConnection().status).toBe("live");
+
+      showTab();
+      expect(first.closed).toBe(true);
+      expect(getLiveConnection().status).toBe("lost");
+    });
   });
 
   it("does not trust the stream once the browser says it is offline, and starts afresh when it is back", () => {

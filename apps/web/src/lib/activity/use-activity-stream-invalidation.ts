@@ -44,18 +44,33 @@ type LiveSignalSubscriber = (signal: LiveSignal) => void;
 
 /**
  * What the shared stream tells the app to catch up on: one kind of data changed, the connection came back after it was
- * lost, or the server restarted since this page last heard from it.
+ * lost, the server restarted since this page last heard from it, or the server refused the stream, which for a signed-in
+ * page means the session has ended.
  */
 export type LiveSignal =
   | { type: "changed"; topic: LiveTopic }
   | { type: "reconnected" }
-  | { type: "restarted" };
+  | { type: "restarted" }
+  | { type: "refused" };
 
 /** An EventSource whose readyState is this has given up for good and will not try again by itself. */
 const EVENT_SOURCE_CLOSED = 2;
 
 /** How long to wait before opening the stream again after the browser gave up on it; the server asks for the same. */
 const REOPEN_DELAY_MS = 5_000;
+
+/**
+ * How long the stream may stay silent while the tab is showing before it is taken to be dead. A connection can die without
+ * the browser noticing (a laptop that slept, a proxy that dropped it), and EventSource never reports that. The server sends
+ * `system.stats` every second to every open stream, so a frame normally arrives at least that often. Keepalive comments, sent
+ * every 16 s, are invisible to EventSource, which is why they cannot serve as the heartbeat. 40 s is more than twice the
+ * keepalive and forty times the stats pace, so a slow server is never mistaken for a dead stream, yet a dead one is
+ * noticed (within one {@link STREAM_WATCHDOG_TICK_MS} more) before what is on screen is long out of date.
+ */
+export const STREAM_SILENCE_LIMIT_MS = 40_000;
+
+/** How often the watchdog looks at how long the stream has been silent. */
+const STREAM_WATCHDOG_TICK_MS = 5_000;
 
 /**
  * Never cancel a query that is already mid-flight just because a newer activity event arrived: the
@@ -114,6 +129,9 @@ const liveSignalSubscribers = new Set<LiveSignalSubscriber>();
 /** The run of the server the stream last said hello from; null until it has. */
 let bootId: string | null = null;
 let reopenTimer: number | null = null;
+let watchdogTimer: number | null = null;
+/** When the stream last sent anything the app listens for, or was opened. */
+let lastFrameAt = 0;
 /** A progress frame arrived while the tab was hidden and has not been shown yet. */
 let progressChangedWhileHidden = false;
 
@@ -232,25 +250,49 @@ function emitLiveSignal(signal: LiveSignal): void {
   liveSignalSubscribers.forEach((subscriber) => subscriber(signal));
 }
 
-function closeActivityStream(): void {
+function stopWatchingStream(): void {
   source?.close();
   source = null;
+  if (watchdogTimer !== null) {
+    window.clearInterval(watchdogTimer);
+    watchdogTimer = null;
+  }
+}
+
+function closeActivityStream(): void {
+  stopWatchingStream();
   if (reopenTimer !== null) {
     window.clearTimeout(reopenTimer);
     reopenTimer = null;
   }
 }
 
-/** The stream dropped. The browser opens it again by itself, unless the server refused it outright. */
-function onStreamError(): void {
-  reportLiveConnection("dropped");
-  if (source?.readyState !== EVENT_SOURCE_CLOSED) return;
-  source.close();
-  source = null;
+function reopenActivityStreamSoon(): void {
   reopenTimer ??= window.setTimeout(() => {
     reopenTimer = null;
     if (hasSubscribers()) ensureActivityStream();
   }, REOPEN_DELAY_MS);
+}
+
+/**
+ * The stream dropped. The browser opens it again by itself, unless the server refused it outright; a refusal while signed
+ * out ends with the shell going away, which closes the stream and cancels the reopen.
+ */
+function onStreamError(): void {
+  reportLiveConnection("dropped");
+  if (source?.readyState !== EVENT_SOURCE_CLOSED) return;
+  stopWatchingStream();
+  emitLiveSignal({ type: "refused" });
+  reopenActivityStreamSoon();
+}
+
+/** Drops a stream that has gone quiet for too long while the tab is showing, and opens a fresh one shortly. */
+function dropStreamIfSilent(): void {
+  if (!source || tabIsHidden()) return;
+  if (Date.now() - lastFrameAt < STREAM_SILENCE_LIMIT_MS) return;
+  stopWatchingStream();
+  reportLiveConnection("dropped");
+  reopenActivityStreamSoon();
 }
 
 function onServerHello(data: string): void {
@@ -269,6 +311,7 @@ function onServerHello(data: string): void {
  */
 function onVisibilityChange(): void {
   if (tabIsHidden()) return;
+  dropStreamIfSilent();
   if (hasSubscribers()) {
     ensureActivityStream();
   }
@@ -302,6 +345,14 @@ function watchBrowser(): void {
   watchingBrowser = true;
 }
 
+/** Wraps a handler of a stream frame so that hearing the frame, however it parses, shows the stream is alive. */
+function hear(handler: (data: string) => void): (ev: Event) => void {
+  return (ev) => {
+    lastFrameAt = Date.now();
+    handler((ev as MessageEvent<string>).data);
+  };
+}
+
 function ensureActivityStream(): EventSource | null {
   if (source) {
     return source;
@@ -310,55 +361,79 @@ function ensureActivityStream(): EventSource | null {
     return null;
   }
   source = new EventSource("/api/v1/activity/stream");
+  lastFrameAt = Date.now();
+  watchdogTimer ??= window.setInterval(
+    dropStreamIfSilent,
+    STREAM_WATCHDOG_TICK_MS,
+  );
   source.addEventListener("open", () => {
     if (reportLiveConnection("opened").reconnected) {
       emitLiveSignal({ type: "reconnected" });
     }
   });
   source.addEventListener("error", onStreamError);
-  source.addEventListener(SERVER_HELLO_EVENT, (ev) =>
-    onServerHello((ev as MessageEvent<string>).data),
+  source.addEventListener(SERVER_HELLO_EVENT, hear(onServerHello));
+  source.addEventListener(
+    DATA_CHANGED_EVENT,
+    hear((data) => {
+      const topic = parseDataChanged(data);
+      if (topic) emitLiveSignal({ type: "changed", topic });
+    }),
   );
-  source.addEventListener(DATA_CHANGED_EVENT, (ev) => {
-    const topic = parseDataChanged((ev as MessageEvent<string>).data);
-    if (topic) emitLiveSignal({ type: "changed", topic });
-  });
-  source.addEventListener("activity.latest", (ev) => {
-    const payload = parseLatestPayload((ev as MessageEvent<string>).data);
-    if (!payload || !isNewActivity(payload)) {
-      return;
-    }
-    lastSeen = payload;
-    emitActivityLatest();
-  });
-  source.addEventListener("processing.progress", (ev) => {
-    const entries = parseProgressPayload((ev as MessageEvent<string>).data);
-    if (!entries) return;
-    const next: Record<string, LiveProgressEntry> = {};
-    for (const entry of entries) next[entry.relativePath] = entry;
-    liveProgressByPath = next;
-    if (tabIsHidden()) {
-      progressChangedWhileHidden = true;
-      return;
-    }
-    emitLiveProgress();
-  });
-  source.addEventListener(CONNECTION_ACTIVITY_EVENT, (ev) => {
-    const frame = parseConnectionActivity((ev as MessageEvent<string>).data);
-    if (frame) connectionActivitySubscribers.forEach((fn) => fn(frame));
-  });
-  source.addEventListener(SYSTEM_STATS_EVENT, (ev) => {
-    const frame = parseSystemStatsFrame((ev as MessageEvent<string>).data);
-    if (frame) systemStatsSubscribers.forEach((fn) => fn(frame));
-  });
-  source.addEventListener(SYSTEM_TASKS_EVENT, (ev) => {
-    const tasks = parseSystemTasksFrame((ev as MessageEvent<string>).data);
-    if (tasks) systemTasksSubscribers.forEach((fn) => fn(tasks));
-  });
-  source.addEventListener(SYSTEM_LOG_EVENT, (ev) => {
-    const frame = parseSystemLogFrame((ev as MessageEvent<string>).data);
-    if (frame) systemLogSubscribers.forEach((fn) => fn(frame));
-  });
+  source.addEventListener(
+    "activity.latest",
+    hear((data) => {
+      const payload = parseLatestPayload(data);
+      if (!payload || !isNewActivity(payload)) {
+        return;
+      }
+      lastSeen = payload;
+      emitActivityLatest();
+    }),
+  );
+  source.addEventListener(
+    "processing.progress",
+    hear((data) => {
+      const entries = parseProgressPayload(data);
+      if (!entries) return;
+      const next: Record<string, LiveProgressEntry> = {};
+      for (const entry of entries) next[entry.relativePath] = entry;
+      liveProgressByPath = next;
+      if (tabIsHidden()) {
+        progressChangedWhileHidden = true;
+        return;
+      }
+      emitLiveProgress();
+    }),
+  );
+  source.addEventListener(
+    CONNECTION_ACTIVITY_EVENT,
+    hear((data) => {
+      const frame = parseConnectionActivity(data);
+      if (frame) connectionActivitySubscribers.forEach((fn) => fn(frame));
+    }),
+  );
+  source.addEventListener(
+    SYSTEM_STATS_EVENT,
+    hear((data) => {
+      const frame = parseSystemStatsFrame(data);
+      if (frame) systemStatsSubscribers.forEach((fn) => fn(frame));
+    }),
+  );
+  source.addEventListener(
+    SYSTEM_TASKS_EVENT,
+    hear((data) => {
+      const tasks = parseSystemTasksFrame(data);
+      if (tasks) systemTasksSubscribers.forEach((fn) => fn(tasks));
+    }),
+  );
+  source.addEventListener(
+    SYSTEM_LOG_EVENT,
+    hear((data) => {
+      const frame = parseSystemLogFrame(data);
+      if (frame) systemLogSubscribers.forEach((fn) => fn(frame));
+    }),
+  );
   return source;
 }
 

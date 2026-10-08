@@ -8,6 +8,7 @@ import {
   reportLiveConnection,
   resetLiveConnection,
 } from "../lib/live/live-connection";
+import { LOST_CONNECTION_GRACE_MS } from "../lib/live/use-live-updates-paused";
 import { AppShell } from "./app-shell";
 
 const useLiveSync = vi.fn();
@@ -359,7 +360,10 @@ describe("AppShell", () => {
 });
 
 describe("the shell's header", () => {
-  afterEach(() => resetLiveConnection());
+  afterEach(() => {
+    resetLiveConnection();
+    vi.useRealTimers();
+  });
 
   beforeEach(() => {
     counts.working = 0;
@@ -484,6 +488,7 @@ describe("the shell's header", () => {
   });
 
   it("says live updates are paused while the connection is lost, under the header and above the page", () => {
+    vi.useFakeTimers();
     renderShell("/");
     act(() => void reportLiveConnection("opened"));
     expect(
@@ -491,6 +496,7 @@ describe("the shell's header", () => {
     ).not.toBeInTheDocument();
 
     act(() => void reportLiveConnection("dropped"));
+    act(() => void vi.advanceTimersByTime(LOST_CONNECTION_GRACE_MS));
 
     const banner = screen.getByTestId("live-connection-banner");
     expect(banner).toHaveTextContent("Live updates paused");
