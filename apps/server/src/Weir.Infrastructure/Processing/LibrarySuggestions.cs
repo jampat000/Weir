@@ -13,6 +13,8 @@ namespace Weir.Infrastructure.Processing;
 /// on a manager or download client is changed.
 /// </summary>
 /// <remarks>
+/// A folder is offered only when it is one library's own: never a download client's default completed folder, which every
+/// media type saves to, and never one that overlaps a workflow already set up or another offer.
 /// A new install starts with an empty Movies and an empty TV library, so an offer fills one of those in when its media
 /// type still has one with no folders, and is a new library only when the first library of that type is already in use.
 /// </remarks>
@@ -33,7 +35,8 @@ public sealed class LibrarySuggestions
     {
         ArgumentNullException.ThrowIfNull(uow);
         var clients = await _downloadClients.ReadAllAsync(uow, cancellationToken).ConfigureAwait(false);
-        var takenNames = (await _libraries.ListAsync(uow).ConfigureAwait(false)).Select(row => row.Name).ToHashSet(StringComparer.Ordinal);
+        var existing = await _libraries.ListAsync(uow).ConfigureAwait(false);
+        var takenNames = existing.Select(row => row.Name).ToHashSet(StringComparer.Ordinal);
         var libraries = new List<SuggestedLibrary>();
         var notes = new List<string>();
 
@@ -46,9 +49,15 @@ public sealed class LibrarySuggestions
                 continue;
             }
 
-            if (libraries.FirstOrDefault(library => SameFolder(library.WatchedFolder, source.Watched)) is { } sharing)
+            if (libraries.FirstOrDefault(library => Overlap(library.WatchedFolder, source.Watched)) is { } sharing)
             {
-                notes.Add($"{source.Label} saves {sharing.Name} and {LibraryFolderSuggestionRules.LibraryName(scope)} downloads to the same folder, so Weir suggests one workflow for them. Add another in Setup › Workflows once they are kept apart.");
+                notes.Add($"{source.Label} saves {sharing.Name} and {LibraryFolderSuggestionRules.LibraryName(scope)} downloads in the same folder, or one inside the other, so Weir suggests one workflow for them. Add another in Setup › Workflows once they are kept apart.");
+                continue;
+            }
+
+            if (existing.FirstOrDefault(row => Overlap(row.WatchedFolder, source.Watched)) is { } watching)
+            {
+                notes.Add($"{watching.Name} already watches {watching.WatchedFolder}, which overlaps the {source.Watched} that {source.Label} reports for {LibraryFolderSuggestionRules.LibraryName(scope)}, so Weir suggests no other workflow for it.");
                 continue;
             }
 
@@ -94,8 +103,11 @@ public sealed class LibrarySuggestions
         return null;
     }
 
-    private static bool SameFolder(string first, string second) =>
-        LibraryRules.NormalizeFolder(first) == LibraryRules.NormalizeFolder(second);
+    /// <summary>Whether two watched folders are the same or one is inside the other, which two workflows may not be.</summary>
+    private static bool Overlap(string first, string second) =>
+        LibraryRules.NormalizeFolder(first) is { } normalizedFirst
+        && LibraryRules.NormalizeFolder(second) is { } normalizedSecond
+        && LibraryRules.FoldersOverlap(normalizedFirst, normalizedSecond);
 
     private sealed record FolderSource(string Label, string Watched, string? Output);
 }

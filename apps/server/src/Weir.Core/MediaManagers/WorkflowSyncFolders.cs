@@ -54,6 +54,11 @@ public static class WorkflowSyncFolders
         $"{managerLabel} doesn't say where downloads for {libraryName} arrive. " +
         $"Set the downloads folder in {managerLabel} (or the clients' category folders) and Weir will pick it up.";
 
+    /// <summary>What to tell the person when the folder the manager gives for a library's downloads is also another library's, so it is no one's own.</summary>
+    public static string SharedDownloadsFolder(string managerLabel, string libraryName, string folder) =>
+        $"{managerLabel} gives {folder} for {libraryName}'s downloads, but another library's downloads arrive there too, so it is not {libraryName}'s own folder. " +
+        $"Give each library its own downloads folder in {managerLabel} (or its own category folder in the clients) and Weir will pick it up.";
+
     /// <summary>What to tell the person when the manager gives no folder to pick cleaned files up from.</summary>
     public static string NoOutputFolder(string managerLabel, string libraryName) =>
         $"{managerLabel} doesn't say where it picks up processed files for {libraryName}. " +

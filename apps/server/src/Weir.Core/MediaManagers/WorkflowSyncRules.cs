@@ -43,9 +43,12 @@ public enum WorkflowSyncKind
     Update,
 }
 
-/// <summary>One change the sync makes. <see cref="ChangesWatched"/> and <see cref="ChangesOutput"/> are what an <see cref="WorkflowSyncKind.Update"/> rewrites.</summary>
+/// <summary>
+/// One change the sync makes. <see cref="ChangesWatched"/> and <see cref="ChangesOutput"/> are what an <see cref="WorkflowSyncKind.Update"/> rewrites;
+/// <see cref="ClearsWatched"/> empties a watched folder the manager gives no folder of its own for and another workflow also holds.
+/// </summary>
 public sealed record WorkflowSyncAction(
-    WorkflowSyncKind Kind, SyncedLibrary Library, SyncWorkflow? Workflow, bool ChangesWatched, bool ChangesOutput);
+    WorkflowSyncKind Kind, SyncedLibrary Library, SyncWorkflow? Workflow, bool ChangesWatched, bool ChangesOutput, bool ClearsWatched = false);
 
 /// <summary>
 /// Keeping Weir's workflows in step with a manager that reports its own folders (Deluno): which manager library gets which
@@ -78,21 +81,27 @@ public static class WorkflowSyncRules
     /// <summary>
     /// The libraries that get a workflow: those set to Refine before import, each read with where its clients save and the
     /// path mappings when the manager published them (<paramref name="answer"/>). A library that does not process with Weir
-    /// is not in the list, and a workflow already linked to it is left as it is.
+    /// is not in the list, and a workflow already linked to it is left as it is. A downloads folder that is another listed
+    /// library's too, or holds its folder, is no library's own: it is not given to the library that holds the other's, and
+    /// <see cref="SyncedLibrary.Problem"/> says what to set.
     /// </summary>
     public static IReadOnlyList<SyncedLibrary> LibrariesOf(
         string managerLabel, IReadOnlyList<ManagerLibraryDescriptor> libraries, DelunoDestinationsAnswer answer)
     {
         ArgumentNullException.ThrowIfNull(libraries);
         ArgumentNullException.ThrowIfNull(answer);
-        return [.. libraries
+        var wanted = libraries
             .Where(library => library.ProcessesBeforeImport)
             .Select(library => LibraryOf(
                 managerLabel,
                 library,
                 answer.Status == DelunoDestinationsStatus.Read
                     ? answer.Libraries.FirstOrDefault(published => string.Equals(published.LibraryId, library.Key, StringComparison.OrdinalIgnoreCase))
-                    : null))];
+                    : null))
+            .ToList();
+        return [.. wanted.Select(library => library.WatchedFolder is { } folder && wanted.Any(other => other.Key != library.Key && Holds(folder, other.WatchedFolder))
+            ? library with { WatchedFolder = null, Problem = WorkflowSyncFolders.SharedDownloadsFolder(managerLabel, library.Name, folder) }
+            : library)];
     }
 
     /// <summary>
@@ -146,7 +155,7 @@ public static class WorkflowSyncRules
                 workflow.DiscoveredFromConnectionId == connectionId && workflow.DiscoveredLibraryKey == library.Key);
             if (linked is not null)
             {
-                if (linked.SyncsFoldersFrom && Update(library, linked) is { } update)
+                if (linked.SyncsFoldersFrom && Update(library, linked, workflows) is { } update)
                 {
                     actions.Add(update);
                 }
@@ -188,12 +197,24 @@ public static class WorkflowSyncRules
         && string.IsNullOrWhiteSpace(workflow.WatchedFolder)
         && string.IsNullOrWhiteSpace(workflow.OutputFolder);
 
-    private static WorkflowSyncAction? Update(SyncedLibrary library, SyncWorkflow workflow)
+    /// <summary>
+    /// A manager that gives a library no folder of its own leaves the workflow's watched folder as it is, unless another
+    /// workflow's watched folder is the same or inside it. A folder that holds another workflow's is no one workflow's own, and
+    /// the manager's folders never overlap, so it is cleared; the folder inside it is kept.
+    /// </summary>
+    private static WorkflowSyncAction? Update(SyncedLibrary library, SyncWorkflow workflow, IReadOnlyList<SyncWorkflow> workflows)
     {
         var watched = library.WatchedFolder is { } wantedWatched && !SameFolder(wantedWatched, workflow.WatchedFolder);
         var output = library.OutputFolder is { } wantedOutput && !SameFolder(wantedOutput, workflow.OutputFolder);
-        return watched || output ? new WorkflowSyncAction(WorkflowSyncKind.Update, library, workflow, watched, output) : null;
+        var clears = library.WatchedFolder is null && workflows.Any(other => other.Id != workflow.Id && Holds(workflow.WatchedFolder, other.WatchedFolder));
+        return watched || output || clears ? new WorkflowSyncAction(WorkflowSyncKind.Update, library, workflow, watched, output, clears) : null;
     }
+
+    /// <summary>Whether <paramref name="folder"/> is <paramref name="other"/> or has it inside it; false when either is blank.</summary>
+    private static bool Holds(string folder, string? other) =>
+        LibraryRules.NormalizeFolder(folder) is { } held
+        && LibraryRules.NormalizeFolder(other) is { } inner
+        && (held == inner || LibraryRules.IsAncestor(held, inner));
 
     /// <summary>The same folder, written either way round: case- and separator-insensitive, as a hand-off's path is compared.</summary>
     private static bool SameFolder(string first, string second) =>
@@ -223,6 +244,12 @@ public static class WorkflowSyncRules
         var which = watched && output ? "watched and output folders" : watched ? "watched folder" : "output folder";
         return $"{Possessive(workflowName)} {which} updated from {managerLabel}";
     }
+
+    public static string ClearedTitle(string workflowName) => $"{Possessive(workflowName)} watched folder cleared";
+
+    /// <summary>Why the watched folder was emptied, and what to set so Weir fills it in again.</summary>
+    public static string ClearedMessage(string workflowName, string managerLabel, string cleared, string problem) =>
+        $"{managerLabel} gives no folder of its own for {Possessive(workflowName)} downloads, and {cleared} is also another workflow's, so Weir cleared it. {problem}";
 
     /// <summary>"Movies'" and "Kids'" after an s, "TV's" after anything else.</summary>
     private static string Possessive(string name) => name.EndsWith('s') ? name + "'" : name + "'s";

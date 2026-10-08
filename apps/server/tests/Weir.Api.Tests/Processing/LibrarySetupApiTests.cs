@@ -223,7 +223,7 @@ public sealed class LibrarySetupApiTests
     }
 
     [Fact]
-    public async Task One_shared_download_folder_is_offered_once_with_a_sentence_saying_why()
+    public async Task A_download_clients_default_folder_is_never_offered_because_every_media_type_saves_to_it()
     {
         var (server, client, manager) = await StartAsync();
         await using var _server = server;
@@ -232,8 +232,77 @@ public sealed class LibrarySetupApiTests
 
         var suggested = await SuggestedAsync(client);
 
+        Assert.Empty(suggested["libraries"]!.AsArray());
+    }
+
+    [Fact]
+    public async Task A_Deluno_with_no_downloads_folders_and_a_client_saving_everything_to_one_folder_offers_nothing_and_says_what_to_set()
+    {
+        var (server, client, manager) = await StartAsync();
+        await using var _server = server;
+        await ConnectManagerAsync(client, "deluno", "http://192.0.2.10:5099");
+        manager.Json(
+            HttpMethod.Get,
+            "/api/integrations/external/manifest",
+            DelunoManifest
+                .Replace("\"downloadsPath\":\"/media/downloads/complete/movies\"", "\"downloadsPath\":\"\"", StringComparison.Ordinal)
+                .Replace("\"downloadsPath\":\"/media/downloads/complete/tv\"", "\"downloadsPath\":\"\"", StringComparison.Ordinal));
+        await ConnectDownloadClientAsync(client, "sabnzbd", "http://192.0.2.40:8080");
+        manager.Json(HttpMethod.Get, "/api", """{"config":{"misc":{"complete_dir":"/downloads/complete"},"categories":[]}}""");
+
+        var suggested = await SuggestedAsync(client);
+
+        Assert.Empty(suggested["libraries"]!.AsArray());
+        var notes = suggested["notes"]!.AsArray().Select(note => note!.GetValue<string>()).ToList();
+        Assert.Equal(2, notes.Count);
+        Assert.All(notes, note => Assert.Contains("Set the downloads folder in Deluno on 192.0.2.10", note, StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Two_libraries_whose_downloads_arrive_in_the_same_folder_are_offered_as_one_with_a_sentence_saying_why()
+    {
+        var (server, client, manager) = await StartAsync();
+        await using var _server = server;
+        await ConnectManagerAsync(client, "deluno", "http://192.0.2.10:5099");
+        manager.Json(
+            HttpMethod.Get,
+            "/api/integrations/external/manifest",
+            DelunoManifest.Replace("/media/downloads/complete/tv", "/media/downloads/complete/movies", StringComparison.Ordinal));
+
+        var suggested = await SuggestedAsync(client);
+
         Assert.Equal("movie", Assert.Single(suggested["libraries"]!.AsArray())!["media_type"]!.GetValue<string>());
-        Assert.Contains("saves Movies and TV downloads to the same folder", Assert.Single(suggested["notes"]!.AsArray())!.GetValue<string>(), StringComparison.Ordinal);
+        Assert.Contains("saves Movies and TV downloads in the same folder, or one inside the other", Assert.Single(suggested["notes"]!.AsArray())!.GetValue<string>(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_folder_a_saved_workflow_already_watches_is_not_offered_again()
+    {
+        var (server, client, manager) = await StartAsync();
+        await using var _server = server;
+        using var folders = TempFolders.Create();
+        var watched = folders.Folder("downloads");
+        await ConnectManagerAsync(client, "deluno", "http://192.0.2.10:5099");
+        manager.Json(
+            HttpMethod.Get,
+            "/api/integrations/external/manifest",
+            DelunoManifest.Replace("/media/downloads/complete/movies", System.Text.Json.JsonEncodedText.Encode(watched).ToString(), StringComparison.Ordinal));
+        using (var created = await client.PostAsync("/api/v1/processing/libraries", new Dictionary<string, object?>
+        {
+            ["csrf_token"] = await client.CsrfAsync(),
+            ["name"] = "Films",
+            ["media_type"] = "movie",
+            ["watched_folder"] = watched,
+            ["output_folder"] = folders.Folder("films-out"),
+        }))
+        {
+            Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        }
+
+        var suggested = await SuggestedAsync(client);
+
+        Assert.Equal("tv", Assert.Single(suggested["libraries"]!.AsArray())!["media_type"]!.GetValue<string>());
+        Assert.Contains("Films already watches", Assert.Single(suggested["notes"]!.AsArray())!.GetValue<string>(), StringComparison.Ordinal);
     }
 
     [Fact]
