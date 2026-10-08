@@ -5,8 +5,9 @@ using Weir.Infrastructure.Logging;
 namespace Weir.Api.Endpoints;
 
 /// <summary>
-/// The <c>system.log</c> side of the Activity stream: one frame for each warning or error Weir writes to its log, so the Log
-/// card gains a row the moment it happens. A stream gets nothing logged before it opened; <c>GET /suite/logs</c> has that.
+/// The <c>system.log</c> side of the Activity stream: one frame for each line Weir writes to its log that the System log shows
+/// (warnings, errors and Weir's own information), so the Log card gains a row the moment it happens. A stream gets nothing
+/// logged before it opened; <c>GET /suite/logs</c> has that.
 /// </summary>
 public sealed class SystemLogFrames
 {
@@ -24,7 +25,7 @@ public sealed class SystemLogFrames
         }
     }
 
-    /// <summary>The <c>system.log</c> SSE frame for one warning or error.</summary>
+    /// <summary>The <c>system.log</c> SSE frame for one logged line.</summary>
     public static string Frame(LogAlert alert)
     {
         ArgumentNullException.ThrowIfNull(alert);

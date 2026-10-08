@@ -28,10 +28,9 @@ vi.mock("../../../../lib/activity/use-activity-stream-invalidation", () => ({
   },
 }));
 
-function wrapper() {
-  const client = new QueryClient({
-    defaultOptions: { queries: { retry: false } },
-  });
+function wrapper(
+  client = new QueryClient({ defaultOptions: { queries: { retry: false } } }),
+) {
   return function Wrapper({ children }: { children: ReactNode }) {
     return (
       <QueryClientProvider client={client}>{children}</QueryClientProvider>
@@ -120,6 +119,44 @@ describe("useSystemLog", () => {
       arrivedAt: NOW,
     });
     expect(result.current.counts.errors).toBe(2);
+  });
+
+  it("puts an information line the stream pushes at the top, as it does a warning", async () => {
+    const { result } = renderHook(() => useSystemLog(), { wrapper: wrapper() });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    act(() => {
+      deliver?.({
+        at: "2026-10-02T11:59:59Z",
+        level: "INFO",
+        message: "Scan of Movies finished.",
+      });
+    });
+
+    expect(result.current.lines[0]).toMatchObject({
+      message: "Scan of Movies finished.",
+      level: "info",
+      arrivedAt: NOW,
+    });
+    expect(result.current.counts).toEqual({ errors: 1, warnings: 1 });
+  });
+
+  it("does not read the log again on a timer: the stream carries what is new", async () => {
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    const { result } = renderHook(() => useSystemLog(), {
+      wrapper: wrapper(client),
+    });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    const intervals = client
+      .getQueryCache()
+      .findAll({ queryKey: ["system", "log"] })
+      .map((query) => query.observers[0].options.refetchInterval);
+
+    expect(intervals).toHaveLength(3);
+    expect(intervals.every((interval) => !interval)).toBe(true);
   });
 
   it("lists a line once when the log later holds the one the stream pushed", async () => {

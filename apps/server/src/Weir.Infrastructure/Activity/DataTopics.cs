@@ -21,8 +21,11 @@ public static class DataTopics
     /// <summary>The workflows (libraries) and their settings.</summary>
     public const string Libraries = "libraries";
 
-    /// <summary>A workflow's scan started, found files, or finished.</summary>
+    /// <summary>A workflow's library scan was queued, indexed more files or ended, or its scheduled scan and clean changed.</summary>
     public const string LibraryScan = "library_scan";
+
+    /// <summary>A workflow's folder check gave a different answer: its own folders, or what its media managers and download clients say about them.</summary>
+    public const string FolderChecks = "folder_checks";
 
     /// <summary>The state of an update: available, downloading, ready.</summary>
     public const string Update = "update";

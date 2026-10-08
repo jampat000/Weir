@@ -33,7 +33,13 @@ export const LIVE_TOPIC_QUERIES: Readonly<
     processingKeys.ruleSets,
     processingKeys.allLibrarySuggestions,
   ],
-  library_scan: [processingKeys.libraries, processingKeys.files],
+  library_scan: [
+    processingKeys.libraries,
+    processingKeys.files,
+    processingKeys.allLibraryOverviews,
+    processingKeys.allLibraryFiles,
+  ],
+  folder_checks: [processingKeys.libraryFolderChains],
   update: [
     settingsKeys.updateStatus,
     settingsKeys.updateSettings,

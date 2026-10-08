@@ -304,6 +304,18 @@ public sealed class PlatformRulesTests
         Assert.Equal("2026-05-09T10:00:19Z", ((WireString)SuiteLogFilter.ToOut(result.Items[0])!["timestamp"]).Value);
     }
 
+    [Theory]
+    [InlineData("WARNING", "Some.Library", false)]
+    [InlineData("ERROR", "Some.Library", false)]
+    [InlineData("CRITICAL", "Some.Library", false)]
+    [InlineData("INFO", "weir.platform.activity", false)]
+    [InlineData("INFO", "Some.Library", true)]
+    [InlineData("INFO", "Weir.Capitalised", true)]
+    public void The_log_leaves_out_information_that_is_not_from_weirs_own_loggers(string level, string logger, bool noise)
+    {
+        Assert.Equal(noise, SuiteLogFilter.IsLowValueNoise(level, logger));
+    }
+
     [Fact]
     public void Release_versions_and_update_status_are_reported_exactly()
     {

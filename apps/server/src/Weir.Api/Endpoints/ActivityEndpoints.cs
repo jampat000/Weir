@@ -54,8 +54,9 @@ public static class ActivityEndpoints
     /// Authenticate once with a short-lived connection, then stream <c>activity.latest</c> frames and, once a second at
     /// most, a <c>processing.progress</c> frame with every file's live progress (#750), plus a
     /// <c>connection.activity</c> frame whenever a media manager or download client is asked, answers, fails or calls Weir,
-    /// a <c>server.hello</c> frame with the id of this run of the server and a <c>data.changed</c> frame whenever a component
-    /// publishes that a kind of data changed (see <c>LiveStreamFrames</c>), plus keepalives, without holding the database.
+    /// a <c>server.hello</c> frame with the id of this run of the server, a <c>data.changed</c> frame whenever a component
+    /// publishes that a kind of data changed (see <c>LiveStreamFrames</c>) and a <c>system.overview</c> frame whenever the facts
+    /// System shows about Weir change, plus keepalives, without holding the database.
     /// </summary>
     public static async IAsyncEnumerable<string> LatestFramesAsync(
         Func<CancellationToken, Task<long?>> readLatestId,
@@ -130,6 +131,7 @@ internal sealed class ActivityEndpointHandlers
     private readonly LiveStreamFrames _liveFrames;
     private readonly SystemStatsFrames _statsFrames;
     private readonly SystemTasksFrames _tasksFrames;
+    private readonly SystemOverviewFrames _overviewFrames;
     private readonly SystemLogFrames _logFrames;
     private readonly ActivityStreamClients _streamClients;
     private readonly IHostApplicationLifetime _lifetime;
@@ -143,6 +145,7 @@ internal sealed class ActivityEndpointHandlers
         LiveStreamFrames liveFrames,
         SystemStatsFrames statsFrames,
         SystemTasksFrames tasksFrames,
+        SystemOverviewFrames overviewFrames,
         SystemLogFrames logFrames,
         ActivityStreamClients streamClients,
         IHostApplicationLifetime lifetime,
@@ -155,6 +158,7 @@ internal sealed class ActivityEndpointHandlers
         _liveFrames = liveFrames ?? throw new ArgumentNullException(nameof(liveFrames));
         _statsFrames = statsFrames ?? throw new ArgumentNullException(nameof(statsFrames));
         _tasksFrames = tasksFrames ?? throw new ArgumentNullException(nameof(tasksFrames));
+        _overviewFrames = overviewFrames ?? throw new ArgumentNullException(nameof(overviewFrames));
         _logFrames = logFrames ?? throw new ArgumentNullException(nameof(logFrames));
         _streamClients = streamClients ?? throw new ArgumentNullException(nameof(streamClients));
         _lifetime = lifetime ?? throw new ArgumentNullException(nameof(lifetime));
@@ -301,6 +305,7 @@ internal sealed class ActivityEndpointHandlers
         var liveFrames = _liveFrames;
         var statsFrames = _statsFrames;
         var tasksFrames = _tasksFrames;
+        var overviewFrames = _overviewFrames;
         var logFrames = _logFrames;
         var streamClients = _streamClients;
         var time = request.Time;
@@ -355,8 +360,9 @@ internal sealed class ActivityEndpointHandlers
                 var connectionLoop = PumpAsync(connectionFrames.ForAsync(streamEndedToken));
                 var statsLoop = PumpAsync(statsFrames.ForAsync(streamEndedToken));
                 var tasksLoop = PumpAsync(tasksFrames.ForAsync(streamEndedToken));
+                var overviewLoop = PumpAsync(overviewFrames.ForAsync(streamEndedToken));
                 var logLoop = PumpAsync(logFrames.ForAsync(streamEndedToken));
-                await Task.WhenAll(activityLoop, liveLoop, progressLoop, connectionLoop, statsLoop, tasksLoop, logLoop).ConfigureAwait(false);
+                await Task.WhenAll(activityLoop, liveLoop, progressLoop, connectionLoop, statsLoop, tasksLoop, overviewLoop, logLoop).ConfigureAwait(false);
             }
             catch (OperationCanceledException) when (streamEndedToken.IsCancellationRequested)
             {

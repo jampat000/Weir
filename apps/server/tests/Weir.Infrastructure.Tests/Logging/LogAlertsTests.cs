@@ -4,7 +4,7 @@ using Weir.Infrastructure.Logging;
 
 namespace Weir.Infrastructure.Tests.Logging;
 
-/// <summary>The warnings and errors the System screen's log shows live: each one logged reaches the open streams, and nothing quieter does.</summary>
+/// <summary>The lines the System screen's log shows live: each warning, error and information line of Weir's own reaches the open streams, and nothing quieter or from elsewhere does.</summary>
 public sealed class LogAlertsTests : IDisposable
 {
     private readonly TempDirectory _temp = new();
@@ -51,12 +51,23 @@ public sealed class LogAlertsTests : IDisposable
     }
 
     [Fact]
-    public async Task Informational_lines_are_written_to_the_file_but_never_published()
+    public async Task Information_from_weirs_own_loggers_reaches_the_open_streams_too()
     {
         using var subscription = _alerts.Subscribe();
+
+        _provider.CreateLogger("weir.test").LogInformation("Scanned {Library}.", "Movies");
+
+        var alert = await NextAsync(subscription);
+        Assert.Equal(("INFO", "Scanned Movies."), (alert.Level, alert.Message));
+    }
+
+    [Fact]
+    public async Task Information_from_other_loggers_and_debug_lines_are_written_to_the_file_but_never_published()
+    {
+        using var subscription = _alerts.Subscribe();
+        _provider.CreateLogger("Some.Library.Chatter").LogInformation("Nothing to see.");
         var logger = _provider.CreateLogger("weir.test");
 
-        logger.LogInformation("Nothing to see.");
         logger.LogDebug("Nor here.");
         logger.LogWarning("This one needs a look.");
 

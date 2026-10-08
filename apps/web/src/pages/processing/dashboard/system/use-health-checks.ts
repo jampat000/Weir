@@ -30,8 +30,6 @@ import {
   type WeirFacts,
 } from "./health-checks";
 
-/** How often the drives are read again for the storage checks: the drives themselves are read this slowly. */
-const DRIVES_REFRESH_MS = 30_000;
 /** Backups are judged against hours, so a minute is as often as the time they are measured against needs to move. */
 const NOW_TICK_MS = 60_000;
 
@@ -64,8 +62,6 @@ export function useHealthChecks(
     queryKey: systemKeys.stats,
     queryFn: fetchSystemStats,
     select: (value) => value.drives,
-    staleTime: DRIVES_REFRESH_MS,
-    refetchInterval: DRIVES_REFRESH_MS,
   });
   const settings = useAppSettingsQuery();
   const backupList = useConfigurationBackupsQuery(true);
@@ -113,10 +109,7 @@ export function useHealthChecks(
         health.tools,
         tools.dataUpdatedAt > 0 ? tools.dataUpdatedAt : null,
       ),
-      ...storageChecks(
-        stats.data ?? null,
-        stats.dataUpdatedAt > 0 ? stats.dataUpdatedAt : null,
-      ),
+      ...storageChecks(stats.data ?? null),
       ...backupChecks(backups, now),
       ...weirChecks(weir),
     ],
@@ -126,7 +119,6 @@ export function useHealthChecks(
       health.tools,
       tools.dataUpdatedAt,
       stats.data,
-      stats.dataUpdatedAt,
       backups,
       now,
       weir,

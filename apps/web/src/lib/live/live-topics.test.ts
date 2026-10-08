@@ -18,6 +18,7 @@ describe("LIVE_TOPIC_QUERIES", () => {
       "backups",
       "connections",
       "files_at_once",
+      "folder_checks",
       "jobs",
       "kept_files",
       "libraries",
@@ -49,9 +50,20 @@ describe("LIVE_TOPIC_QUERIES", () => {
       processingKeys.maintenance,
     ]);
     expect(LIVE_TOPIC_QUERIES.libraries).toContain(processingKeys.libraries);
+  });
+
+  it("reads the libraries, files, every library overview and every library file list again when a scan changes", () => {
     expect(LIVE_TOPIC_QUERIES.library_scan).toEqual([
       processingKeys.libraries,
       processingKeys.files,
+      processingKeys.allLibraryOverviews,
+      processingKeys.allLibraryFiles,
+    ]);
+  });
+
+  it("reads every workflow's folder check again when one answers differently", () => {
+    expect(LIVE_TOPIC_QUERIES.folder_checks).toEqual([
+      processingKeys.libraryFolderChains,
     ]);
   });
 

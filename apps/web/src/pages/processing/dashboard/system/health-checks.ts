@@ -53,7 +53,7 @@ export type HealthCheck = {
   why: string;
   /** Why, in a few words, as the row says it on one line. */
   words: string;
-  /** When it was last looked at, in ms since the epoch. */
+  /** When it was last looked at, in ms since the epoch. Null before the first look, and for a check that follows the stream. */
   checkedAt: number | null;
   fix: CheckFix | null;
   /** What "Check again" looks at again: the check's area, and which one in it for a workflow or a connection. */
@@ -213,7 +213,7 @@ export function toolChecks(
   });
 }
 
-function driveCheck(drive: SystemDrive, checkedAt: number | null): HealthCheck {
+function driveCheck(drive: SystemDrive): HealthCheck {
   const free = formatBytes(drive.free_bytes);
   const first = drive.workflows[0];
   const fix = first
@@ -225,7 +225,7 @@ function driveCheck(drive: SystemDrive, checkedAt: number | null): HealthCheck {
   const base = {
     id: `drive:${drive.path}`,
     area: "storage" as const,
-    checkedAt,
+    checkedAt: null,
     again: { area: "storage" as const, key: null },
     workflowId: null,
   };
@@ -259,12 +259,14 @@ function driveCheck(drive: SystemDrive, checkedAt: number | null): HealthCheck {
   };
 }
 
-/** Each drive any workflow reads from or writes to. */
+/**
+ * Each drive any workflow reads from or writes to. A drive follows the stream, so it has no time of its own to show: it is
+ * as current as the connection is.
+ */
 export function storageChecks(
   drives: readonly SystemDrive[] | null,
-  checkedAt: number | null,
 ): HealthCheck[] {
-  return (drives ?? []).map((drive) => driveCheck(drive, checkedAt));
+  return (drives ?? []).map(driveCheck);
 }
 
 export type BackupFacts = {

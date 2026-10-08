@@ -1,7 +1,7 @@
 namespace Weir.Infrastructure.SystemReadings;
 
-/// <summary>A reading and its place in the order of readings taken.</summary>
-public sealed record StatsUpdate(long Version, StatsSample Sample);
+/// <summary>A reading and its place in the order of readings taken, with the machine's facts and the drives as they stood with it.</summary>
+public sealed record StatsUpdate(long Version, StatsSample Sample, MachineFacts Machine, IReadOnlyList<DriveReading> Drives);
 
 /// <summary>
 /// What the System view is built from, kept in memory for as long as Weir runs: a ring of the newest points, the latest
@@ -89,7 +89,7 @@ public sealed class SystemStatsStore(TimeProvider time, int cores)
             {
                 if (_latest is { } latest && _version != version)
                 {
-                    return new StatsUpdate(_version, latest);
+                    return new StatsUpdate(_version, latest, _machine, _drives);
                 }
 
                 changed = _changed.Task;

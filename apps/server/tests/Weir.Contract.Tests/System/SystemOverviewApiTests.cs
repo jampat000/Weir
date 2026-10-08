@@ -285,11 +285,32 @@ public sealed class SystemOverviewApiTests(ServerFixture fixture) : IClassFixtur
             await other.LoginAsync(password: "not-the-password", expected: HttpStatusCode.Unauthorized);
         }
 
-        var frame = await stream.NextEventNamedAsync("system.log");
+        // Information from Weir's own loggers reaches the stream too, so the frame wanted is the one about the failed sign-in.
+        JsonNode frame;
+        do
+        {
+            frame = await stream.NextEventNamedAsync("system.log");
+        }
+        while ((string?)frame["message"] != "auth event: login failed");
 
         Assert.Equal(["at", "level", "message"], KeysInOrder(frame));
         Assert.Equal("WARNING", (string?)frame["level"]);
-        Assert.Equal("auth event: login failed", (string?)frame["message"]);
         Assert.EndsWith("Z", (string)frame["at"]!, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_stream_that_opens_gets_the_overview_as_a_system_overview_frame()
+    {
+        using var admin = await Server.CreateAdminClientAsync();
+        using var stream = await SystemPartBStreams.OpenAsync(admin);
+
+        var frame = await stream.NextEventNamedAsync("system.overview");
+
+        var overview = await OverviewOfAsync(admin);
+        Assert.Equal(OverviewFields, KeysInOrder(frame));
+        Assert.Equal(KeysInOrder(overview), KeysInOrder(frame));
+        Assert.Equal((string?)overview["version"], (string?)frame["version"]);
+        Assert.Equal((string?)overview["started_at"], (string?)frame["started_at"]);
+        Assert.Equal(KeysInOrder(overview["checks"]), KeysInOrder(frame["checks"]));
     }
 }

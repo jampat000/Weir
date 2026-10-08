@@ -16,8 +16,6 @@ import {
   type LogLine,
 } from "./log-card-model";
 
-/** The log is read again this often, so lines the stream does not carry (information) and any it missed appear. */
-const LOG_REFRESH_MS = 60_000;
 /** Today's counts are worked out again this often, so they roll over at midnight. */
 const COUNTS_TICK_MS = 60_000;
 
@@ -34,8 +32,8 @@ function useLogLines(level: ReadLevel) {
       });
       return logs.items.flatMap((entry) => lineFromEntry(entry) ?? []);
     },
-    staleTime: LOG_REFRESH_MS,
-    refetchInterval: LOG_REFRESH_MS,
+    // Lines reach the card only while it is listening, so a card that opens reads the log again whatever it kept.
+    staleTime: 0,
     retry: false,
   });
 }
@@ -51,8 +49,9 @@ export type SystemLog = {
 };
 
 /**
- * Weir's log lines for the Log card: the first read of the log, kept current by the warnings and errors the stream
- * pushes as they are written, and today's count of each in the timezone chosen in Settings.
+ * Weir's log lines for the Log card: the first read of the log, kept current by the lines the stream pushes as they are
+ * written (warnings, errors and Weir's own information), and today's count of each in the timezone chosen in Settings.
+ * A stream that was away reads the log again when it is back.
  */
 export function useSystemLog(): SystemLog {
   const [live, setLive] = useState<LogLine[]>([]);
