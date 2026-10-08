@@ -3,6 +3,7 @@ using Weir.Core.Activity;
 using Weir.Core.Jobs;
 using Weir.Core.Json;
 using Weir.Core.LibraryMode;
+using Weir.Core.Media;
 using Weir.Core.Observability;
 using Weir.Core.Time;
 using Weir.Infrastructure.Activity;
@@ -161,13 +162,13 @@ public sealed class ProcessingJobProcessor
         catch (Exception exception)
 #pragma warning restore CA1031
         {
-            var failure = WorkerFailures.JobFailure(Module, FailureMessages.FromDotNet(exception), willRetry);
+            var failure = WorkerFailures.JobFailure(Module, FailureMessages.FromDotNet(exception), willRetry, ToolFailureText.KnownReason(exception));
             _logger.LogError(
-                "Job handler failed for job_id={JobId} kind={JobKind}: {Message} {Detail}",
+                exception,
+                "Job handler failed for job_id={JobId} kind={JobKind}: {Message}",
                 context.Id,
                 context.JobKind,
-                failure.Message,
-                failure.TechnicalDetail);
+                failure.Message);
             ReportRunEnded(taskKey, ok: false, failure.Why);
             if (exception is not AlreadyRecordedFailureException)
             {

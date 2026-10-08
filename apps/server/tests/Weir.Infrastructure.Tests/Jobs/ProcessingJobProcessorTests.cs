@@ -1,10 +1,13 @@
 using System.Text.Json;
+using Microsoft.Extensions.Logging;
 using Weir.Core.Activity;
 using Weir.Core.Jobs;
 using Weir.Core.LibraryMode;
+using Weir.Core.Media;
 using Weir.Infrastructure.Activity;
 using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.Scheduling;
+using Weir.Infrastructure.Tests.Media;
 
 namespace Weir.Infrastructure.Tests.Jobs;
 
@@ -183,6 +186,28 @@ public sealed class ProcessingJobProcessorTests : IDisposable
         Assert.Equal(
             "Weir job failed: The job hit an unexpected error. Weir will try this job again shortly. Technical detail: InvalidOperationException: boom",
             row.LastError);
+    }
+
+    [Fact]
+    public async Task A_handler_failure_is_logged_as_a_sentence_with_the_tools_text_only_in_the_exception()
+    {
+        await _db.Store.EnqueueOrGetAsync("u", "processing.test.unreadable.v1", maxAttempts: 1);
+        const string toolText = "[matroska,webm @ 000001534eaabd00] EBML header parsing failed";
+        var logger = new ListLogger<ProcessingJobProcessor>();
+        var processor = _db.Processor([new DelegateHandler("processing.test.unreadable.v1", _ => throw new MediaUnreadableException(toolText))], logger: logger);
+
+        await processor.ProcessOneAsync("w", now: T0);
+
+        var line = Assert.Single(logger.Entries, entry => entry.Level == LogLevel.Error);
+        Assert.StartsWith(
+            $"Job handler failed for job_id=1 kind=processing.test.unreadable.v1: Weir job failed: {ToolFailureText.UnreadableFile}",
+            line.Message,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain("unexpected error", line.Message, StringComparison.Ordinal);
+        Assert.Contains(ToolFailureText.UnreadableFile, (await _db.Store.GetAsync(1))!.LastError, StringComparison.Ordinal);
+        Assert.DoesNotContain("matroska", line.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("@ 0", line.Message, StringComparison.Ordinal);
+        Assert.Equal(toolText, Assert.Single(logger.Exceptions).Message);
     }
 
     [Fact]

@@ -8,7 +8,7 @@ Weir publishes an all-in-one container image with:
 
 Images are published for `linux/amd64` and `linux/arm64`:
 
-- `ghcr.io/jampat000/weir:X.Y.Z` (the Git tag is `vX.Y.Z`; the image tag has no `v`), for example `1.0.0-rc.8`
+- `ghcr.io/jampat000/weir:X.Y.Z` (the Git tag is `vX.Y.Z`; the image tag has no `v`), for example `1.0.0-rc.9`
 - `ghcr.io/jampat000/weir:X.Y` and `ghcr.io/jampat000/weir:latest`, which follow stable releases only. A release candidate is published under its version tag alone, so these arrive with 1.0.0.
 
 This page is the full reference — every variable Weir reads, plus the recipes for common setups.
@@ -22,7 +22,7 @@ Make a folder, save this as `compose.yaml` inside it:
 ```yaml
 services:
   weir:
-    image: ghcr.io/jampat000/weir:1.0.0-rc.8
+    image: ghcr.io/jampat000/weir:1.0.0-rc.9
     container_name: weir
     ports:
       - "9347:9347"
@@ -65,7 +65,7 @@ people want:
 ```yaml
 services:
   weir:
-    image: ghcr.io/jampat000/weir:1.0.0-rc.8
+    image: ghcr.io/jampat000/weir:1.0.0-rc.9
     container_name: weir
     ports:
       - "9347:9347"
@@ -92,7 +92,7 @@ When one app tells another where a file is, that path has to mean the same thing
 ```yaml
 services:
   weir:
-    image: ghcr.io/jampat000/weir:1.0.0-rc.8
+    image: ghcr.io/jampat000/weir:1.0.0-rc.9
     container_name: weir
     ports:
       - "9347:9347"
@@ -157,7 +157,7 @@ docker run --rm \
   -e PORT=9400 \
   -p 9400:9400 \
   -v weir-data:/data/weir \
-  ghcr.io/jampat000/weir:1.0.0-rc.8
+  ghcr.io/jampat000/weir:1.0.0-rc.9
 ```
 
 With `network_mode: host` there is no `-p` mapping, so `PORT` is how you move Weir off 9347.
@@ -165,11 +165,11 @@ With `network_mode: host` there is no `-p` mapping, so `PORT` is how you move We
 ## `docker run` instead of Compose
 
 ```bash
-docker pull ghcr.io/jampat000/weir:1.0.0-rc.8
+docker pull ghcr.io/jampat000/weir:1.0.0-rc.9
 docker run --rm \
   -p 9347:9347 \
   -v weir-data:/data/weir \
-  ghcr.io/jampat000/weir:1.0.0-rc.8
+  ghcr.io/jampat000/weir:1.0.0-rc.9
 ```
 
 If you want to override defaults with an env file instead of inline `environment:` entries, copy
@@ -182,7 +182,7 @@ If you want to override defaults with an env file instead of inline `environment
 | Variable | Purpose |
 |---|---|
 | `WEIR_SESSION_SECRET` | Signs session cookies and CSRF tokens. Optional — if you don't set it, the container generates a high-entropy secret on first start and keeps it at `$WEIR_HOME/session.secret`, so it survives restarts. Set your own with `openssl rand -hex 32` if you'd rather manage it yourself. Keep it stable across upgrades: changing it signs everyone out. |
-| `WEIR_CREDENTIALS_SECRET` | Encrypts saved provider credentials (Sonarr, Radarr, and similar). Set this to a long random value (`openssl rand -hex 32`), separate from `WEIR_SESSION_SECRET`, **before** you add those connections. Changing it later can require re-entering credentials that were encrypted with the old value. |
+| `WEIR_CREDENTIALS_SECRET` | Encrypts saved provider credentials (Sonarr, Radarr, and similar). Optional — if you don't set it, the container generates one on first start and keeps it at `$WEIR_HOME/credentials.secret`. To manage it yourself, set a long random value (`openssl rand -hex 32`), separate from `WEIR_SESSION_SECRET`, **before** you add those connections. If you set it after connections are saved, also list the generated secret from `credentials.secret` in `WEIR_PREVIOUS_CREDENTIALS_SECRETS`, so the keys saved under it still open. |
 
 ### Paths
 
@@ -197,7 +197,7 @@ If you want to override defaults with an env file instead of inline `environment
 | `WEIR_ENV` | Defaults to `production` (the image also sets it explicitly), which turns off ASP.NET's developer exception page. There is normally no reason to change this in Docker; `development` is for building Weir from source, not for a container. |
 | `WEIR_SESSION_COOKIE_SECURE` | Whether the session cookie is marked HTTPS-only. Defaults to `auto`: the cookie is HTTPS-only when the request arrives over HTTPS (directly, or through a proxy listed in `WEIR_TRUSTED_PROXY_IPS`), so plain `http://` LAN access keeps working. Set `true` to always require HTTPS, or `false` to never require it. |
 | `WEIR_TRUSTED_PROXY_IPS` | The IP or CIDR of your immediate reverse proxy. Weir only trusts `X-Forwarded-For` and `X-Forwarded-Proto` from these addresses. Set it when you put Weir behind a proxy. |
-| `WEIR_CORS_ORIGINS` | Allowed browser origins for credentialed cross-origin requests. Weir refuses to start with `WEIR_CORS_ORIGINS=*` — list real origins instead. |
+| `WEIR_CORS_ORIGINS` | Optional extra hardening. List the origins allowed to make browser requests, for example the address you reach Weir at, or a web app served from another origin; a browser post from any other origin is then refused. Without it Weir does not check where a post came from. Weir refuses to start with `WEIR_CORS_ORIGINS=*` — list real origins instead. |
 | `WEIR_ALLOWED_HOSTS` | Extra `Host` header values Weir accepts, beyond IP literals, `localhost`, single-label and local-network names, and the CORS/trusted-browser origins above. Set it to your reverse-proxy domain; a leading `*.` also allows its subdomains. |
 
 ### File ownership
@@ -232,8 +232,8 @@ that can already write to them.
   files to persist (every recipe above already does this).
 - if `WEIR_SESSION_SECRET` is not provided, the container generates one automatically and persists
   it to `$WEIR_HOME/session.secret`
-- set `WEIR_CREDENTIALS_SECRET` to a different long random value before saving Sonarr or Radarr
-  credentials
+- if `WEIR_CREDENTIALS_SECRET` is not provided, the container generates one the same way and persists
+  it to `$WEIR_HOME/credentials.secret`
 - changing `WEIR_SESSION_SECRET` can require re-entering any credentials that were still encrypted
   with the old session secret
 

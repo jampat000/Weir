@@ -28,6 +28,14 @@ public sealed partial class MediaTools
         var (ffprobe, _) = _resolver.Resolve();
         var argv = FfmpegCommands.BuildFfprobeArgv(ffprobe, path, probeSizeMb, analyzeDurationSeconds);
         var (exitCode, stdout, stderr) = await RunFfprobeAsync(path, argv, timeoutSeconds, cancellationToken).ConfigureAwait(false);
+        if (exitCode != 0)
+        {
+            // The headline is a sentence; the tool's own text rides along as the exception, which Logs shows as technical detail.
+            var failure = ProbeOutput.FailureFor(stdout, stderr);
+            LogFfprobeFailed(failure, MediaPathNames.Name(path, _windows), ToolFailureText.Plain(failure));
+            throw failure;
+        }
+
         return ProbeOutput.Interpret(exitCode, stdout, stderr);
     }
 
@@ -106,7 +114,7 @@ public sealed partial class MediaTools
         }
     }
 
-    /// <summary>One ffprobe run over a file that is there and not empty, logged as it goes. Throws on a timeout.</summary>
+    /// <summary>One ffprobe run over a file that is there and not empty, logged at debug as it goes. Throws on a timeout.</summary>
     private async Task<(int ExitCode, string Stdout, string Stderr)> RunFfprobeAsync(
         string path,
         IReadOnlyList<string> argv,
@@ -139,13 +147,6 @@ public sealed partial class MediaTools
         var stdout = ProbeOutput.CapturedText(result.Stdout);
         var stderr = ProbeOutput.CapturedText(result.Stderr);
         LogFfprobeResultDebug(ProbeOutput.ResultLogPayload(path, result.ExitCode, stdout, stderr));
-        if (result.ExitCode != 0)
-        {
-            // The headline is a sentence; the tool's own text rides along as the exception, which Logs shows as technical detail.
-            var failure = ProbeOutput.FailureFor(stdout, stderr);
-            LogFfprobeFailed(failure, MediaPathNames.Name(path, _windows), ToolFailureText.Plain(failure));
-        }
-
         return (result.ExitCode, stdout, stderr);
     }
 

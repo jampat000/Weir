@@ -57,4 +57,6 @@ out for the same reason.
 
 ## CORS
 
-Credentialed browser requests require explicit origins. `WEIR_CORS_ORIGINS=*` is rejected at startup.
+Credentialed browser requests require explicit origins. `WEIR_CORS_ORIGINS=*` is rejected at startup. Setting
+`WEIR_CORS_ORIGINS` to the address you reach Weir at is optional extra hardening: browser posts from any other origin
+are then refused.

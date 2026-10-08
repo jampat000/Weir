@@ -88,7 +88,7 @@ public sealed partial class MediaTools
                 // A file mkvmerge declined, or wrote in a shape the validation above rejected, is written again
                 // by ffmpeg and validated again. If this second attempt fails too, it throws and the outer catch
                 // cleans up, exactly as for a plain ffmpeg write. The temp file is overwritten in place.
-                LogWriterFellBack(chosen.Name, error.Message);
+                LogWriterFellBack(error, chosen.Name, ToolFailureText.ForFailure(error));
                 usedWriter = new FfmpegRemuxWriter(this);
                 await usedWriter.WriteAsync(request, cancellationToken).ConfigureAwait(false);
                 await ValidateStagedOutputAsync(tmpPath, src, sourceProbe, plan, sourceWarnings, cancellationToken).ConfigureAwait(false);
@@ -239,7 +239,7 @@ public sealed partial class MediaTools
         chosen is not FfmpegRemuxWriter && error is not OperationCanceledException;
 
     [LoggerMessage(Level = LogLevel.Information, Message = "{Writer} could not write this file, so ffmpeg is writing it instead: {Reason}")]
-    private partial void LogWriterFellBack(string writer, string reason);
+    private partial void LogWriterFellBack(Exception error, string writer, string reason);
 
     [LoggerMessage(Level = LogLevel.Debug, Message = "{Writer} wrote {Path}")]
     private partial void LogWriterUsed(string writer, string path);

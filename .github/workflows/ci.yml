@@ -206,6 +206,9 @@ jobs:
           node scripts/check-event-titles.mjs
           node --test scripts/check-event-titles.test.mjs
 
+      - name: Docker entrypoint keeps the server's umask
+        run: node --test scripts/docker-entrypoint.test.mjs
+
       - name: Release and CI gate rules
         run: |
           node scripts/check-release-workflow-gates.mjs

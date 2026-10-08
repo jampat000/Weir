@@ -187,7 +187,7 @@ public sealed partial class RemuxPassRunner
         {
             return FailBefore(
                 relativeMediaPath,
-                exception is MediaToolException or MediaToolTimeoutException ? ToolFailureText.Plain(exception) : ToolFailureText.Generic,
+                ToolFailureText.ForFailure(exception),
                 inspected,
                 new WireObject().Set("technical_detail", ToolFailureText.Technical(exception)));
         }

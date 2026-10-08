@@ -25,11 +25,17 @@ public sealed class UnreadableFileTests
         return bytes;
     }
 
-    private static void AssertPlain(string text)
+    private static void AssertNoToolText(string text)
     {
         Assert.DoesNotContain("@ 0", text, StringComparison.Ordinal);
         Assert.DoesNotContain("[matroska", text, StringComparison.Ordinal);
         Assert.DoesNotContain("EBML", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("misdetection", text, StringComparison.Ordinal);
+    }
+
+    private static void AssertPlain(string text)
+    {
+        AssertNoToolText(text);
         Assert.DoesNotContain(":\\", text, StringComparison.Ordinal);
         Assert.DoesNotContain("/tmp/", text, StringComparison.Ordinal);
     }
@@ -52,6 +58,36 @@ public sealed class UnreadableFileTests
                 {
                     AssertPlain(text);
                 }
+            }
+        }
+    }
+
+    /// <summary>
+    /// What a person reads in the Logs screen, the dashboard's log card and the export is plain: the tool's own text is only ever in an
+    /// entry's exception. The sentence for the file is there to find, so a log that said nothing would not pass.
+    /// </summary>
+    private static async Task AssertLogsArePlainAsync(Scenario scenario)
+    {
+        var suite = await scenario.Admin.GetAsync($"{WeirClient.Api}/suite/logs", ("limit", 250));
+        var lines = suite.Fields["items"]!.AsArray().OfType<JsonObject>().ToList();
+        Assert.Contains(lines, line => ((string)line["message"]!).Contains("film.mkv", StringComparison.Ordinal));
+        foreach (var line in lines)
+        {
+            AssertNoToolText((string)line["message"]!);
+        }
+
+        foreach (var line in lines.Where(line => ((string)line["message"]!).Contains("film.mkv", StringComparison.Ordinal)))
+        {
+            AssertPlain((string)line["message"]!);
+        }
+
+        var system = await scenario.Admin.GetAsync($"{WeirClient.Api}/system/log", ("limit", 100));
+        foreach (var row in system.Fields["items"]!.AsArray().OfType<JsonObject>())
+        {
+            AssertNoToolText((string)row["title"]!);
+            if (row["detail"] is JsonValue detail && detail.TryGetValue<string>(out var text))
+            {
+                AssertNoToolText(text);
             }
         }
     }
@@ -105,6 +141,7 @@ public sealed class UnreadableFileTests
         Assert.Equal(1, attempts.Count(job => (string)job["status"]! == "completed"));
         Assert.Equal(1, attempts.Count(job => (string)job["status"]! == "pending"));
         await AssertActivityIsPlainAsync(scenario);
+        await AssertLogsArePlainAsync(scenario);
     }
 
     [Fact]
@@ -123,6 +160,7 @@ public sealed class UnreadableFileTests
         Assert.Equal(NotReadableYet, (string)row["status_reason"]!);
         await AssertNothingHappenedAsync(scenario, fake, "handoff-junk-2", source, junk);
         await AssertActivityIsPlainAsync(scenario);
+        await AssertLogsArePlainAsync(scenario);
     }
 
     [Fact]

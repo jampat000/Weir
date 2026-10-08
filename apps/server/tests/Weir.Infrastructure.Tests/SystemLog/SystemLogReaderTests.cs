@@ -5,6 +5,7 @@ using Microsoft.Extensions.Time.Testing;
 using Weir.Core.Jobs;
 using Weir.Core.Json;
 using Weir.Core.Logs;
+using Weir.Core.Media;
 using Weir.Infrastructure.Logging;
 using Weir.Infrastructure.SystemLog;
 using Weir.Infrastructure.Tests.Platform;
@@ -280,7 +281,22 @@ public sealed partial class SystemLogReaderTests : IDisposable
         var withException = await Read(new SystemLogFilter { HasException = true });
 
         Assert.Equal(["It broke"], withException.Rows.Select(row => row.Title));
-        Assert.Contains("The pass broke.", withException.Rows[0].Detail);
+        Assert.Contains("The pass broke.", WireConvert.Str(withException.Rows[0].Record["traceback"]), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_file_that_cannot_be_read_is_a_plain_sentence_with_the_tools_text_only_in_its_exception()
+    {
+        const string toolText = "[matroska,webm @ 000001534eaabd00] EBML header parsing failed";
+        var sentence = $"Reading Film.mkv failed. {ToolFailureText.UnreadableFile}";
+        AddServerLine(minutesAgo: 5, LogLevel.Warning, "weir.infrastructure.media.mediatools", sentence, exception: new MediaUnreadableException(toolText));
+
+        var page = await Read(new SystemLogFilter());
+
+        var row = Assert.Single(page.Rows);
+        Assert.Equal(sentence, row.Title);
+        Assert.Null(row.Detail);
+        Assert.Contains(toolText, WireConvert.Str(row.Record["traceback"]), StringComparison.Ordinal);
     }
 
     [Fact]

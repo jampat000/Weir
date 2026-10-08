@@ -81,7 +81,7 @@ public static class ManualPlanSupport
         catch (Exception exception) when (exception is not OperationCanceledException)
 #pragma warning restore CA1031
         {
-            throw new ManualPlanEnqueueException(400, exception is MediaToolException or MediaToolTimeoutException ? ToolFailureText.Plain(exception) : ToolFailureText.Generic);
+            throw new ManualPlanEnqueueException(400, ToolFailureText.ForFailure(exception));
         }
 
         var rules = library.RuleSetId is { } ruleSetId && await libraries.GetRuleSetAsync(uow, ruleSetId).ConfigureAwait(false) is { } ruleSet

@@ -170,7 +170,8 @@ public static class FailureMessages
         FailureSubject exception,
         string? provider = null,
         bool recoverable = false,
-        string? continuation = null)
+        string? continuation = null,
+        string? reason = null)
     {
         ArgumentNullException.ThrowIfNull(exception);
         var kind = Classify(exception);
@@ -182,10 +183,11 @@ public static class FailureMessages
             : recoverable
                 ? "Weir will continue with the next available provider."
                 : "This job is marked failed so it does not look successful.";
-        var message = $"{module} {action}{where} {state}: {WhyForKind(kind, provider)} {happensNext}";
+        var why = reason ?? WhyForKind(kind, provider);
+        var message = $"{module} {action}{where} {state}: {why} {happensNext}";
         var detail = Diagnostics.SanitizeText("technical_detail", $"{exception.TypeName}: {exception.Message}");
         return new OperatorFailure(
-            module, action, kind, recoverable, message, WhyForKind(kind, provider), happensNext,
+            module, action, kind, recoverable, message, why, happensNext,
             NextActionForKind(kind, provider, recoverable),
             WireStrings.Slice(detail, 1000));
     }

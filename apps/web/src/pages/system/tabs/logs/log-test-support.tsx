@@ -96,7 +96,7 @@ export const SERVER_ROW: SystemLogRow = {
   category: "backups",
   workflow: null,
   title: "The backup folder is nearly full",
-  detail: "System.IO.IOException: Not enough space",
+  detail: null,
   event: null,
   job: null,
   server: {
