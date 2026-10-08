@@ -9,6 +9,10 @@
 # (including a cache hit) so a stale or tampered vendor folder is caught without trusting the stamp's
 # own say-so about what it contains.
 
+# Every download below goes through Save-PinnedDownload: the upstream URL first, then Weir's own
+# releases, which carry a copy of each archive, against the same pinned SHA-256.
+. "$PSScriptRoot\pinned-download.ps1"
+
 # Ignored by version control and reused between builds: Ensure-WindowsFfmpegRuntime downloads again
 # only when the vendored copy doesn't match the pin below (CI caches this folder too).
 #
@@ -29,6 +33,12 @@
 # candidate directory (apps/server/src/Weir.Infrastructure/Media/MediaToolResolver.cs), never their
 # internal linkage. ffplay.exe ships in the same zip but is never copied out: Weir has no use for it.
 #
+# BtbN deletes its dated releases after about two weeks, so a pin is downloadable from BtbN for only that
+# long. Every Weir release carries a copy of the archives it was built with (fetch-bundled-tool-sources.ps1),
+# and a build whose pinned file is gone from BtbN takes that copy instead (pinned-download.ps1). A bump
+# still takes the newest dated release, the one certain to be on BtbN, because the first release built
+# from a new pin has no copy of its archives on Weir's releases yet.
+#
 # To bump: browse https://github.com/BtbN/FFmpeg-Builds/releases, pick a dated
 # autobuild-YYYY-MM-DD-HH-MM tag (or a versioned "release" build such as n9.0.2 if BtbN has cut
 # one), and find the win64 LGPL **shared** zip in its assets — e.g. with
@@ -41,32 +51,33 @@
 # library — the versioned filenames such as avcodec-63.dll change across ffmpeg releases). Finally
 # delete packaging/windows/vendor/ffmpeg and re-run this script once to pick up and verify the
 # new build end to end.
-$ffmpegVersion = "n9.0.2 (BtbN autobuild-2026-09-23-14-55, shared)"
-$ffmpegReleaseTag = "autobuild-2026-09-23-14-55"
+$ffmpegVersion = "n9.0.2 (BtbN autobuild-2026-10-08-13-05, shared)"
+$ffmpegReleaseTag = "autobuild-2026-10-08-13-05"
 $ffmpegVendorDir = Join-Path $PSScriptRoot "vendor\\ffmpeg"
-$ffmpegArchiveName = "ffmpeg-n9.0.2-3-ga5923073bf-win64-lgpl-shared-9.0.zip"
+$ffmpegArchiveName = "ffmpeg-n9.0.2-23-g27b46f0fbc-win64-lgpl-shared-9.0.zip"
 $ffmpegArchiveUrl = "https://github.com/BtbN/FFmpeg-Builds/releases/download/$ffmpegReleaseTag/$ffmpegArchiveName"
-$ffmpegArchiveSha256 = "1db36dc94e379e3a7e974e995e278da05d46c14ebb6deb7da11bc8ad1a4a3e3e"
-$ffmpegExeSha256 = "6044d10e9eacdd9b8c71d4f900edb1e26fc9825b0792049ab4d157912830fc9f"
-$ffprobeExeSha256 = "b1d740b988e14c0522a4bf31a3e1310cdbb4f2920b9d83d34b5e47f1a7ff682c"
+$ffmpegArchiveSha256 = "a168ed7b315366354df532a755a93341b6e7e66b65834f56ce36b3ee8be0d6f0"
+$ffmpegExeSha256 = "3331a285282a2ece9d6f6002f200751fab1c4863ac48dfcd7854dc181d4f3b0e"
+$ffprobeExeSha256 = "4384bd5640215a35df01ea122376698929bb7dbfa29bffec1bf79a6bf4595e3e"
 # The libraries ffmpeg.exe/ffprobe.exe load from their own directory. Names carry the BtbN build's
 # so-version suffix (bumps only when that library's ABI changes upstream), verified the same way as
 # the exes above: re-hashed on every run, including a cache hit, never trusted from the stamp file.
 $ffmpegSharedLibrarySha256 = [ordered]@{
-  "avcodec-63.dll"    = "3097eeaff204934e1d9b5535465a86ec7aca89cbd7c7d8a26703a6f044c505da"
-  "avdevice-63.dll"   = "1b17db579dd5ccb343b77677ef1745fd06ed44ef1410f26a0fa5f82386d2ba6a"
-  "avfilter-12.dll"   = "5d17ac69edb24c3bb4f151a27bf35c306b6d26b45b870691b35bf7a018e334e8"
-  "avformat-63.dll"   = "43c9984ebf7d5e6ab72e9609571d51d4da119d9827bde906ff74313ee836b906"
-  "avutil-61.dll"     = "cd9fba6890d5b4cd992f3abe2b1c059df18b8d29f93dfa47b66f66720b7bb0cf"
-  "swresample-7.dll"  = "7ead1f572f8c0db2106cc74e6c829fcd15753f58b6baab96df4c9efeef77f4a4"
-  "swscale-10.dll"    = "420f146d39c7be6c45a1b51c39249800c0ccb0702b70bf9e5c45984f81afc756"
+  "avcodec-63.dll"    = "177d76dc53c234fe3df9e524f7f4315478829118fed01557860be33e82707d12"
+  "avdevice-63.dll"   = "443c74c662ead7ff8b73902494bf42047d8ba838f77eb3a761dce503aa7d1410"
+  "avfilter-12.dll"   = "3d7a491e91c6fd1ced6aa67c68767529d11b241ffe57d33771d6c48c7b5c25dc"
+  "avformat-63.dll"   = "42e0e9898f567597da237be9db95e1e1bc61d7ef79a1bcc47b27a8653c1c1873"
+  "avutil-61.dll"     = "4e170ffe8eba38ffad7ae4f15d4deaa536aa7e4ff2be9c584f57d435ce132307"
+  "swresample-7.dll"  = "3e7f341e5a6c096897cc8c3aaf3fbfd6f3043b850b58c05001e7ecef581952fd"
+  "swscale-10.dll"    = "4bd3bf170788b61a1027f616feaaa13184848a512b8252ea764c315863df3b50"
 }
 # The Linux CI jobs (contract suite, Docker smoke, release candidate) use the static LGPL linux64 build
 # of the same BtbN release (same FFmpeg commit as the Windows build above), so no job takes ffmpeg from a
 # package mirror. scripts/install-ffmpeg-linux.mjs reads these two lines; bump them with the Windows ones
 # and hash the tar.xz yourself in the same way.
-$ffmpegLinuxArchiveName = "ffmpeg-n9.0.2-3-ga5923073bf-linux64-lgpl-9.0.tar.xz"
-$ffmpegLinuxArchiveSha256 = "a7ee2de0d9d462f4bb7cd4e23255338089ac34bf8286b7e68ba8768363ac9de3"
+$ffmpegLinuxArchiveName = "ffmpeg-n9.0.2-23-g27b46f0fbc-linux64-lgpl-9.0.tar.xz"
+$ffmpegLinuxArchiveUrl = "https://github.com/BtbN/FFmpeg-Builds/releases/download/$ffmpegReleaseTag/$ffmpegLinuxArchiveName"
+$ffmpegLinuxArchiveSha256 = "d991116970e7eb350c5e49e502c3dc9b91b847f1494b7d1a8f02118c896f359b"
 # #548: MKVToolNix, for the mkvmerge writer (Weir.Infrastructure.Media.MkvmergeRemuxWriter). Vendored,
 # cached and pinned exactly like ffmpeg above, against MKVToolNix's own immutable per-version release
 # directories rather than BtbN's. Bumping means editing both lines below together — the checksum is
@@ -88,19 +99,19 @@ $mkvtoolnixArchiveUrl = "https://mkvtoolnix.download/windows/releases/$mkvtoolni
 # precise commit or version the corresponding binary pin was built from — update all three together
 # whenever $ffmpegArchiveName/$ffmpegReleaseTag/$mkvtoolnixVersion above are bumped.
 #
-# BtbN's build string ("n9.0.2 (BtbN autobuild-2026-09-23-14-55, shared)") names the FFmpeg git
-# describe output "n9.0.2-3-ga5923073bf": 3 commits after the n9.0.2 tag, at commit a5923073bf. That
+# BtbN's build string ("n9.0.2 (BtbN autobuild-2026-10-08-13-05, shared)") names the FFmpeg git
+# describe output "n9.0.2-23-g27b46f0fbc": 23 commits after the n9.0.2 tag, at commit 27b46f0fbc. That
 # exact commit, not the n9.0.2 tag, is what BtbN actually compiled, so it is what must be linked.
-$ffmpegSourceCommit = "a5923073bf"
+$ffmpegSourceCommit = "27b46f0fbc"
 $ffmpegSourceUrl = "https://github.com/FFmpeg/FFmpeg/archive/$ffmpegSourceCommit.tar.gz"
-$ffmpegSourceSha256 = "15c067b10c9a71fb3db9107284d75c53dd637c949d2ef7edacc3b0789f656499"
+$ffmpegSourceSha256 = "994cd93470473d910c2af6424637527dec1622bc34a0428cfec4f99cd93991f4"
 $ffmpegSourceFileName = "ffmpeg-source-$ffmpegSourceCommit.tar.gz"
 
 # BtbN/FFmpeg-Builds is both the release repo and the build-scripts repo: the release tag is a git
 # ref pointing at the exact commit its assets were built from, so a source archive of that tag is
 # the matching build-scripts commit, not just "whatever master happens to be now".
 $btbnBuildScriptsUrl = "https://github.com/BtbN/FFmpeg-Builds/archive/refs/tags/$ffmpegReleaseTag.tar.gz"
-$btbnBuildScriptsSha256 = "3ca96f4c3fb03531506f0b6c7b1a8786845354f6df02e3ad08f33040f49d44ef"
+$btbnBuildScriptsSha256 = "846f7222a102eeca27afaf83715f336f36087e24b16ec9fb924831c716a36d94"
 $btbnBuildScriptsFileName = "ffmpeg-build-scripts-$ffmpegReleaseTag.tar.gz"
 
 $mkvtoolnixSourceUrl = "https://mkvtoolnix.download/sources/mkvtoolnix-$mkvtoolnixVersion.tar.xz"
@@ -163,11 +174,7 @@ function Ensure-WindowsFfmpegRuntime {
     New-Item -ItemType Directory -Path $downloadRoot | Out-Null
     New-Item -ItemType Directory -Path $extractRoot | Out-Null
     Write-Host "Downloading Windows FFmpeg runtime ($ffmpegVersion)..."
-    Invoke-WebRequest -Uri $ffmpegArchiveUrl -OutFile $archivePath -UseBasicParsing
-    $actualSha256 = (Get-FileHash -LiteralPath $archivePath -Algorithm SHA256).Hash.ToLowerInvariant()
-    if ($actualSha256 -ne $ffmpegArchiveSha256) {
-      throw "Downloaded FFmpeg archive hash mismatch. Expected $ffmpegArchiveSha256 but got $actualSha256."
-    }
+    Save-PinnedDownload -Url $ffmpegArchiveUrl -OutFile $archivePath -ExpectedSha256 $ffmpegArchiveSha256 -Description "FFmpeg archive"
     Expand-Archive -LiteralPath $archivePath -DestinationPath $extractRoot -Force
     $binDir = Get-ChildItem -Path $extractRoot -Recurse -Directory |
       Where-Object {
@@ -227,11 +234,7 @@ function Ensure-WindowsMkvtoolnixRuntime {
     New-Item -ItemType Directory -Path $downloadRoot | Out-Null
     New-Item -ItemType Directory -Path $extractRoot | Out-Null
     Write-Host "Downloading MKVToolNix $mkvtoolnixVersion..."
-    Invoke-WebRequest -Uri $mkvtoolnixArchiveUrl -OutFile $archivePath -UseBasicParsing
-    $actualSha256 = (Get-FileHash -LiteralPath $archivePath -Algorithm SHA256).Hash.ToLowerInvariant()
-    if ($actualSha256 -ne $mkvtoolnixArchiveSha256) {
-      throw "Downloaded MKVToolNix archive hash mismatch. Expected $mkvtoolnixArchiveSha256 but got $actualSha256."
-    }
+    Save-PinnedDownload -Url $mkvtoolnixArchiveUrl -OutFile $archivePath -ExpectedSha256 $mkvtoolnixArchiveSha256 -Description "MKVToolNix archive"
     Expand-Archive -LiteralPath $archivePath -DestinationPath $extractRoot -Force
     # The archive nests everything under a "mkvtoolnix\" folder, but searching for the directory that
     # actually holds mkvmerge.exe (rather than hard-coding that name) means a future layout change

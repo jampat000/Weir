@@ -3,8 +3,8 @@ param(
   [string]$OutputDir,
 
   # Ignored by version control and reused between local builds, the same as the FFmpeg/MKVToolNix
-  # binary vendor folders in build-velopack-vendored-media-tools.ps1. A release downloads the three
-  # archives fresh: its caches are scoped to its own tag, so no other release could ever reuse them.
+  # binary vendor folders in build-velopack-vendored-media-tools.ps1. A release downloads the archives
+  # fresh: its caches are scoped to its own tag, so no other release could ever reuse them.
   [string]$CacheDir = ""
 )
 
@@ -22,9 +22,12 @@ if (-not $CacheDir) {
 
 # Downloads and hash-verifies the exact source of the FFmpeg and MKVToolNix binaries the
 # Windows package bundles (build-velopack-vendored-media-tools.ps1 vendors the binaries; this fetches
-# their source under the same pinned-hash discipline), so release.yml can attach them to the GitHub
-# Release. THIRD_PARTY_NOTICES.md points readers at "the GitHub Release" rather than a fixed URL for
-# exactly this reason: the pinned versions, and so these files, change release to release.
+# their source under the same pinned-hash discipline), together with the binary archives themselves
+# (the Windows FFmpeg and MKVToolNix archives the package is built from, and the Linux FFmpeg archive
+# the CI jobs install), so release.yml can attach them to the GitHub Release. THIRD_PARTY_NOTICES.md
+# points readers at "the GitHub Release" rather than a fixed URL for exactly this reason: the pinned
+# versions, and so these files, change release to release. The archives are also what later builds fall
+# back to when upstream no longer has them (pinned-download.ps1).
 . "$PSScriptRoot\build-velopack-vendored-media-tools.ps1"
 
 function Get-CachedVerifiedDownload {
@@ -46,12 +49,8 @@ function Get-CachedVerifiedDownload {
     Write-Host "Cached $Description is stale (have $cachedSha256, want $ExpectedSha256); refreshing."
   }
   Write-Host "Downloading $Description..."
-  Invoke-WebRequest -Uri $Url -OutFile $destinationPath -UseBasicParsing
-  $actualSha256 = (Get-FileHash -LiteralPath $destinationPath -Algorithm SHA256).Hash.ToLowerInvariant()
-  if ($actualSha256 -ne $ExpectedSha256) {
-    throw "$Description hash mismatch. Expected $ExpectedSha256 but got $actualSha256 from $Url. Upstream may have rewritten the tag/commit this pin names; re-verify before re-pinning."
-  }
-  Write-Host "Verified $Description ($actualSha256)."
+  Save-PinnedDownload -Url $Url -OutFile $destinationPath -ExpectedSha256 $ExpectedSha256 -Description $Description
+  Write-Host "Verified $Description ($ExpectedSha256)."
   New-Item -ItemType Directory -Path $CacheDir -Force | Out-Null
   Copy-Item -LiteralPath $destinationPath -Destination $cachedPath -Force
 }
@@ -72,3 +71,18 @@ Get-CachedVerifiedDownload -Url $mkvtoolnixSourceUrl `
   -FileName $mkvtoolnixSourceFileName `
   -ExpectedSha256 $mkvtoolnixSourceSha256 `
   -Description "MKVToolNix source ($mkvtoolnixVersion)"
+
+Get-CachedVerifiedDownload -Url $ffmpegArchiveUrl `
+  -FileName $ffmpegArchiveName `
+  -ExpectedSha256 $ffmpegArchiveSha256 `
+  -Description "FFmpeg Windows archive ($ffmpegReleaseTag)"
+
+Get-CachedVerifiedDownload -Url $ffmpegLinuxArchiveUrl `
+  -FileName $ffmpegLinuxArchiveName `
+  -ExpectedSha256 $ffmpegLinuxArchiveSha256 `
+  -Description "FFmpeg Linux archive ($ffmpegReleaseTag)"
+
+Get-CachedVerifiedDownload -Url $mkvtoolnixArchiveUrl `
+  -FileName $mkvtoolnixArchiveName `
+  -ExpectedSha256 $mkvtoolnixArchiveSha256 `
+  -Description "MKVToolNix Windows archive ($mkvtoolnixVersion)"
