@@ -165,9 +165,9 @@ public sealed partial class ManagerWorkflowSync
                 await RecordAsync(
                     ActivityEventTypes.ProcessingWorkflowSynced,
                     WorkflowSyncRules.ClearedTitle(workflow.Name),
-                    WorkflowSyncRules.ClearedMessage(workflow.Name, label, action.Workflow!.WatchedFolder, action.Library.Problem!),
-                    result: "success",
-                    nextAction: $"Set the downloads folder for {workflow.Name} in {label}.",
+                    WorkflowSyncRules.ClearedMessage(workflow.Name, action.Workflow!.WatchedFolder, action.SharedWith!, action.Library.Problem!),
+                    result: "warning",
+                    nextAction: WorkflowSyncRules.ProblemNextAction(action.Library, label),
                     workflow).ConfigureAwait(false);
             }
 
@@ -213,9 +213,9 @@ public sealed partial class ManagerWorkflowSync
             }
 
             await NoticeAsync(
-                $"{connection.Label} has not told Weir all of the folders for {library.Name} yet",
+                WorkflowSyncRules.ProblemTitle(library, connection.Label),
                 library.Problem!,
-                $"Set the folder in {connection.Label}.",
+                WorkflowSyncRules.ProblemNextAction(library, connection.Label),
                 library.MediaType,
                 workflow).ConfigureAwait(false);
         }

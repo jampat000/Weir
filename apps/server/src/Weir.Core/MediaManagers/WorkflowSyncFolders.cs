@@ -56,7 +56,7 @@ public static class WorkflowSyncFolders
 
     /// <summary>What to tell the person when the folder the manager gives for a library's downloads is also another library's, so it is no one's own.</summary>
     public static string SharedDownloadsFolder(string managerLabel, string libraryName, string folder) =>
-        $"{managerLabel} gives {folder} for {libraryName}'s downloads, but another library's downloads arrive there too, so it is not {libraryName}'s own folder. " +
+        $"{managerLabel} gives {folder} for {WorkflowSyncRules.Possessive(libraryName)} downloads, but another library's downloads arrive there too, so it is not {WorkflowSyncRules.Possessive(libraryName)} own folder. " +
         $"Give each library its own downloads folder in {managerLabel} (or its own category folder in the clients) and Weir will pick it up.";
 
     /// <summary>What to tell the person when the manager gives no folder to pick cleaned files up from.</summary>
