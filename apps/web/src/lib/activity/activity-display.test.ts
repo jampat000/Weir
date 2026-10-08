@@ -88,6 +88,25 @@ describe("eventDisplay for a repeat that was skipped", () => {
     expect(display.title).toBe("Skipped: already imported (Film.mkv)");
     expect(display.meaning).toBe("idle");
   });
+
+  it("is never routine, however long the server's detail is", () => {
+    const display = eventDisplay({
+      id: 4,
+      created_at: "2026-10-07T03:24:00",
+      event_type: SKIPPED_REPEAT_EVENT,
+      module: "processing",
+      title: "Skipped: already done (Film.mkv)",
+      detail: JSON.stringify({
+        result: "skipped",
+        user_message:
+          "Already done: cleaned on 2026-10-07 into D:\\Weir\\Output\\Film\\Film.mkv",
+        relative_media_path: "Film/Film.mkv",
+        cleaned_at: "2026-10-07T03:20:00.0000000+00:00",
+      }),
+    });
+
+    expect(display.compact).toBe(false);
+  });
 });
 
 describe("eventLabel", () => {

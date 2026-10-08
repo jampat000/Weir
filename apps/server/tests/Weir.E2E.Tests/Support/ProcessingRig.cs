@@ -83,7 +83,7 @@ public sealed class ProcessingRig : IAsyncDisposable
         }
     }
 
-    /// <summary>Points the seeded Movies workflow at folders that exist, with no wait and no minimum size.</summary>
+    /// <summary>Points the seeded Movies workflow at folders that exist, with no wait and no minimum size, and leaves originals where they are, as a manager-fed workflow does.</summary>
     private static async Task PrepareMoviesWorkflowAsync(WeirClient admin, string root)
     {
         var work = Directory.CreateDirectory(Path.Combine(root, "work")).FullName;
@@ -100,6 +100,7 @@ public sealed class ProcessingRig : IAsyncDisposable
         body["ready_after_seconds"] = 0;
         body["skip_access_tests"] = true;
         body["min_file_size_mb"] = 0;
+        body["remove_original_after_success"] = false;
         var saved = await admin.PutWithCsrfAsync($"{libraries}/{(long)movies["id"]!}", body);
         Assert.True(saved.Status == HttpStatusCode.OK, saved.ToString());
         var settings = await admin.PutWithCsrfAsync($"{WeirClient.Api}/processing/operator-settings", new JsonObject { ["minimum_free_disk_space_mb"] = 0 });
@@ -128,6 +129,9 @@ public sealed class ProcessingRig : IAsyncDisposable
         }, Secret);
         Assert.True(response.Status == HttpStatusCode.OK, response.ToString());
     }
+
+    /// <summary>How many times ffmpeg has written a cleaned copy since the rig started.</summary>
+    public int RemuxCount => _tools.Calls(tool: "ffmpeg", step: "remux").Count;
 
     /// <summary>Lets the pass on <paramref name="fileName"/> finish.</summary>
     public void ReleasePass(string fileName) => File.WriteAllText(ReleaseFileFor(fileName), string.Empty);

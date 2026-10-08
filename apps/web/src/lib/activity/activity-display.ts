@@ -154,7 +154,10 @@ function authDisplay(ev: ActivityEventItem): ActivityDisplay {
   };
 }
 
-/** Left alone, and nothing for anyone to do: the server's own title names the file and whether it was imported. */
+/**
+ * Left alone, and nothing for anyone to do: the server's own title names the file and whether it was imported. Never
+ * compact, whatever the length of its detail: a person who asked for the file again is waiting to see this line.
+ */
 function skippedRepeatDisplay(ev: ActivityEventItem): ActivityDisplay {
   return {
     title: ev.title || eventLabel(ev.event_type),
@@ -162,7 +165,7 @@ function skippedRepeatDisplay(ev: ActivityEventItem): ActivityDisplay {
     detail: ev.detail ?? null,
     chip: null,
     meaning: "idle",
-    compact: Boolean(ev.detail && ev.detail.length > 120),
+    compact: false,
   };
 }
 

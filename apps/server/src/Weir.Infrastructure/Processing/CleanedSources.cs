@@ -23,7 +23,17 @@ public static class CleanedSources
     /// What Weir already did with this source, or null when it should be processed: the file is not there to measure, it was
     /// not cleaned (or has changed since), or the copy it wrote is gone and nobody collected it.
     /// </summary>
-    public static async Task<CleanedEarlier?> FindAsync(UnitOfWork uow, long libraryId, string watchedFolder, string relativePath)
+    public static Task<CleanedEarlier?> FindAsync(UnitOfWork uow, long libraryId, string watchedFolder, string relativePath) =>
+        FindAsync(uow, libraryId, relativePath, recorded => SourceIsUnchanged(watchedFolder, relativePath, recorded));
+
+    /// <summary>
+    /// What Weir already did with a file whose original is no longer in the watched folder: there is no source to compare, and
+    /// nothing left to process, so the earlier cleaning is the answer whenever its copy is still there or a manager collected it.
+    /// </summary>
+    public static Task<CleanedEarlier?> FindForMissingOriginalAsync(UnitOfWork uow, long libraryId, string relativePath) =>
+        FindAsync(uow, libraryId, relativePath, recorded => recorded.Status == ProcessingFileStatuses.Processed);
+
+    private static async Task<CleanedEarlier?> FindAsync(UnitOfWork uow, long libraryId, string relativePath, Func<ProcessingFileRecord, bool> sourceIsUnchanged)
     {
         ArgumentNullException.ThrowIfNull(uow);
         var earlier = await uow.QuerySingleAsync(
@@ -47,7 +57,7 @@ public static class CleanedSources
             },
             ("$library", libraryId),
             ("$path", relativePath)).ConfigureAwait(false);
-        if (earlier is null || earlier.WrittenAt is not { } writtenAt || !SourceIsUnchanged(watchedFolder, relativePath, earlier.Record))
+        if (earlier is null || earlier.WrittenAt is not { } writtenAt || !sourceIsUnchanged(earlier.Record))
         {
             return null;
         }
