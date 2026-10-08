@@ -1,4 +1,5 @@
 using Weir.Core.Time;
+using Weir.Infrastructure.Activity;
 using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Infrastructure.Processing;
@@ -19,6 +20,14 @@ public sealed record KeptFileRow(long Id, long LibraryId, string LibraryName, st
 /// </summary>
 public sealed class FileSkipMarkerStore
 {
+    private readonly DataChangePublisher? _changes;
+
+    /// <param name="changes">Told, once a write commits, that the kept files changed, so every open screen reads them again.</param>
+    public FileSkipMarkerStore(DataChangePublisher? changes = null)
+    {
+        _changes = changes;
+    }
+
     public Task<Dictionary<string, FileSkipMarker>> ForLibraryAsync(UnitOfWork uow, long libraryId) =>
         uow.QueryAsync(
                 "SELECT relative_path, size_bytes, mtime_ns FROM file_skip_markers WHERE library_id = @lib",
@@ -45,18 +54,35 @@ public sealed class FileSkipMarkerStore
         return rows.Count > 0 ? rows[0] : null;
     }
 
-    public Task SetAsync(UnitOfWork uow, long libraryId, string relativePath, long sizeBytes, long mtimeNs) =>
-        uow.ExecuteAsync(
+    public async Task SetAsync(UnitOfWork uow, long libraryId, string relativePath, long sizeBytes, long mtimeNs)
+    {
+        await uow.ExecuteAsync(
             "INSERT INTO file_skip_markers (library_id, relative_path, size_bytes, mtime_ns) VALUES (@lib, @path, @size, @mtime) " +
             "ON CONFLICT (library_id, relative_path) DO UPDATE SET size_bytes = @size, mtime_ns = @mtime, created_at = CURRENT_TIMESTAMP",
-            ("@lib", libraryId), ("@path", relativePath), ("@size", sizeBytes), ("@mtime", mtimeNs));
+            ("@lib", libraryId), ("@path", relativePath), ("@size", sizeBytes), ("@mtime", mtimeNs)).ConfigureAwait(false);
+        Changed(uow);
+    }
 
-    public Task ClearAsync(UnitOfWork uow, long libraryId, string relativePath) =>
-        uow.ExecuteAsync(
+    public async Task ClearAsync(UnitOfWork uow, long libraryId, string relativePath)
+    {
+        var removed = await uow.ExecuteAsync(
             "DELETE FROM file_skip_markers WHERE library_id = @lib AND relative_path = @path",
-            ("@lib", libraryId), ("@path", relativePath));
+            ("@lib", libraryId), ("@path", relativePath)).ConfigureAwait(false);
+        if (removed > 0)
+        {
+            Changed(uow);
+        }
+    }
 
     /// <summary>Clears one marker by its own row id, for "Process again" on the Kept files list.</summary>
-    public Task ClearByIdAsync(UnitOfWork uow, long id) =>
-        uow.ExecuteAsync("DELETE FROM file_skip_markers WHERE id = @id", ("@id", id));
+    public async Task ClearByIdAsync(UnitOfWork uow, long id)
+    {
+        var removed = await uow.ExecuteAsync("DELETE FROM file_skip_markers WHERE id = @id", ("@id", id)).ConfigureAwait(false);
+        if (removed > 0)
+        {
+            Changed(uow);
+        }
+    }
+
+    private void Changed(UnitOfWork uow) => _changes?.PublishOnCommit(uow, DataTopics.KeptFiles);
 }

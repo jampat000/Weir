@@ -5,6 +5,7 @@ using Weir.Core.Configuration;
 using Weir.Core.Json;
 using Weir.Core.Settings;
 using Weir.Core.Time;
+using Weir.Infrastructure.Activity;
 using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Infrastructure.Settings;
@@ -25,14 +26,18 @@ public sealed class ConfigurationBackups
     private readonly ITimeZoneResolver _zones;
     private readonly SuiteSettingsStore _suiteSettings;
     private readonly ConfigurationBundleStore _bundle;
+    private readonly DataChangePublisher? _changes;
 
-    public ConfigurationBackups(WeirOptions options, TimeProvider time, ITimeZoneResolver zones, SuiteSettingsStore suiteSettings, ConfigurationBundleStore bundle)
+    /// <summary>Once a snapshot commits, <paramref name="changes"/> tells every open screen that the backups changed.</summary>
+    public ConfigurationBackups(
+        WeirOptions options, TimeProvider time, ITimeZoneResolver zones, SuiteSettingsStore suiteSettings, ConfigurationBundleStore bundle, DataChangePublisher? changes = null)
     {
         _options = options;
         _time = time;
         _zones = zones;
         _suiteSettings = suiteSettings ?? throw new ArgumentNullException(nameof(suiteSettings));
         _bundle = bundle ?? throw new ArgumentNullException(nameof(bundle));
+        _changes = changes;
     }
 
     /// <summary><c>{backup_dir}/suite-configuration</c>, resolved.</summary>
@@ -114,6 +119,7 @@ public sealed class ConfigurationBackups
             ("$name", fileName),
             ("$size", payload.LongLength)).ConfigureAwait(false);
         await PruneAsync(uow).ConfigureAwait(false);
+        _changes?.PublishOnCommit(uow, DataTopics.Backups);
         return new ConfigurationBackupRecord(Convert.ToInt64(id, CultureInfo.InvariantCulture), now, fileName, payload.LongLength);
     }
 

@@ -1,6 +1,7 @@
 using Weir.Core.Json;
 using Weir.Core.MediaManagers;
 using Weir.Core.Processing;
+using Weir.Infrastructure.Activity;
 using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Infrastructure.Processing;
@@ -23,6 +24,14 @@ public sealed partial class LibraryStore
         "priority, rule_set_id, discovered_from_connection_id, discovered_library_key, created_at, updated_at, " +
         // #548: appended, not inserted - ReadLibrary reads by position.
         "remux_writer, remove_original_after_success, minimum_free_disk_space_mb";
+
+    private readonly DataChangePublisher? _changes;
+
+    /// <param name="changes">Told, once a write commits, that the workflows changed, so every open screen reads them again.</param>
+    public LibraryStore(DataChangePublisher? changes = null)
+    {
+        _changes = changes;
+    }
 
     public async Task<List<ProcessingLibraryRecord>> ListAsync(UnitOfWork uow, bool enabledOnly = false)
     {
@@ -256,6 +265,7 @@ public sealed partial class LibraryStore
             "UPDATE libraries SET discovered_from_connection_id = NULL, discovered_library_key = NULL, " +
             "updated_at = CURRENT_TIMESTAMP WHERE id = @id",
             ("@id", row.Id)).ConfigureAwait(false);
+        Changed(uow);
         return await GetAsync(uow, row.Id).ConfigureAwait(false)
             ?? throw new InvalidOperationException("Workflow disappeared during unlink.");
     }
@@ -271,6 +281,7 @@ public sealed partial class LibraryStore
         }
 
         await uow.ExecuteAsync("DELETE FROM libraries WHERE id = @id", ("@id", row.Id)).ConfigureAwait(false);
+        Changed(uow);
     }
 
     public async Task<List<ProcessingLibraryRecord>> ReorderAsync(UnitOfWork uow, IReadOnlyList<long> orderedIds)
@@ -294,6 +305,8 @@ public sealed partial class LibraryStore
                 ("@order", (long)position), ("@id", orderedIds[position])).ConfigureAwait(false);
         }
 
+        Changed(uow);
+
         return await ListAsync(uow).ConfigureAwait(false);
     }
 
@@ -307,6 +320,7 @@ public sealed partial class LibraryStore
             await uow.ExecuteAsync(
                 "DELETE FROM library_manager_links WHERE library_id = @lib AND connection_id = @conn",
                 ("@lib", libraryId), ("@conn", stale)).ConfigureAwait(false);
+            Changed(uow);
         }
 
         foreach (var added in wanted.Except(existing))
@@ -314,8 +328,11 @@ public sealed partial class LibraryStore
             await uow.ExecuteAsync(
                 "INSERT INTO library_manager_links (library_id, connection_id) VALUES (@lib, @conn)",
                 ("@lib", libraryId), ("@conn", added)).ConfigureAwait(false);
+            Changed(uow);
         }
     }
+
+    private void Changed(UnitOfWork uow) => _changes?.PublishOnCommit(uow, DataTopics.Libraries);
 
     /// <summary>The watched and output folders of every library but <paramref name="excludeId"/>, for the overlap check.</summary>
     public async Task<List<OtherLibraryFolders>> OtherFoldersAsync(UnitOfWork uow, long? excludeId)

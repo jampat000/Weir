@@ -30,6 +30,7 @@ public sealed partial class LibraryStore
             "@priority, @rule_set_id, @discovered_from_connection_id, @discovered_library_key, @remux_writer, @remove_original_after_success, " +
             "@minimum_free_disk_space_mb)",
             LibraryParameters(row)).ConfigureAwait(false);
+        Changed(uow);
     }
 
     private async Task UpdateRowAsync(UnitOfWork uow, ProcessingLibraryRecord row)
@@ -53,6 +54,7 @@ public sealed partial class LibraryStore
             "remove_original_after_success=@remove_original_after_success, minimum_free_disk_space_mb=@minimum_free_disk_space_mb, " +
             "updated_at=CURRENT_TIMESTAMP WHERE id=@id",
             [.. LibraryParameters(row), ("@id", row.Id)]).ConfigureAwait(false);
+        Changed(uow);
     }
 
     private static (string, object?)[] LibraryParameters(ProcessingLibraryRecord row) =>

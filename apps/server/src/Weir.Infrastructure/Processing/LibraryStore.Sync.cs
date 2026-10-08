@@ -22,6 +22,7 @@ public sealed partial class LibraryStore
             ("@connection", connectionId),
             ("@key", libraryKey),
             ("@id", existing.Id)).ConfigureAwait(false);
+        Changed(uow);
         var linked = await ManagerConnectionIdsAsync(uow, existing.Id).ConfigureAwait(false);
         await SetManagerLinksAsync(uow, existing.Id, [.. linked.Append(connectionId).Distinct()]).ConfigureAwait(false);
         return await GetAsync(uow, existing.Id).ConfigureAwait(false) ?? throw new InvalidOperationException("Workflow disappeared during setup from a manager.");
@@ -36,6 +37,7 @@ public sealed partial class LibraryStore
             ("@watched", watchedFolder ?? existing.WatchedFolder),
             ("@output", outputFolder ?? existing.OutputFolder),
             ("@id", existing.Id)).ConfigureAwait(false);
+        Changed(uow);
         return await GetAsync(uow, existing.Id).ConfigureAwait(false) ?? throw new InvalidOperationException("Workflow disappeared during folder update.");
     }
 }
