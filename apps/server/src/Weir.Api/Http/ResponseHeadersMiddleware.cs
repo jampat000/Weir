@@ -56,12 +56,13 @@ public sealed class RequestContextMiddleware
         {
             await _next(context).ConfigureAwait(false);
         }
-        catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested)
+        catch (Exception exception) when (IsClientGone(exception, context))
         {
             // The browser left (a page change, a closed tab) while Weir was still working: nobody is waiting for an
-            // answer, and nothing failed, so it is neither an error in the log nor a 500 nobody will read.
+            // answer, and nothing failed, so it is neither an error in the log nor a 500 nobody will read. Its time
+            // says nothing about how fast Weir answers, so it stays out of the latency figures.
             LogClientLeft(requestId, context);
-            _metrics.RecordRequest(context.Request.Method, RouteLabelFor(context), ClientClosedRequest, _time.GetElapsedTime(started).TotalMilliseconds);
+            _metrics.RecordStreamRequest(context.Request.Method, RouteLabelFor(context), ClientClosedRequest, _time.GetElapsedTime(started).TotalMilliseconds);
             return;
         }
         catch (Exception exception) when (LogUnhandled(exception, requestId, context, started))
@@ -89,6 +90,13 @@ public sealed class RequestContextMiddleware
         ?? _routes.FirstPathMatch(context.Request.Path)?.Label
         ?? context.Request.Path.Value
         ?? string.Empty;
+
+    /// <summary>
+    /// Whether <paramref name="exception"/> is the connection going away rather than a fault: work that was cancelled, a body
+    /// that could no longer be read, or a write after the connection dropped, once the request has been aborted.
+    /// </summary>
+    private static bool IsClientGone(Exception exception, HttpContext context) =>
+        context.RequestAborted.IsCancellationRequested && exception is OperationCanceledException or IOException or BadHttpRequestException;
 
     private void LogClientLeft(string requestId, HttpContext context) =>
         _logger.LogDebug(
