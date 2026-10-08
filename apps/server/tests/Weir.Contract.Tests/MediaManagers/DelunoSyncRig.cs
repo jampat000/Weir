@@ -15,6 +15,8 @@ internal static class DelunoSyncRig
     public const string Manifest = "/api/integrations/external/manifest";
     public const string DestinationsPath = "/api/integrations/processors/download-destinations";
 
+    private const int SyncAttempts = 6;
+
     public static readonly IReadOnlyDictionary<string, string> SyncOn = new Dictionary<string, string> { [ServerEnvironment.WorkflowSync] = "1" };
 
     public static JsonObject Library(string id, string name, string mediaType, string output, string importWorkflow = "refine-before-import") => new()
@@ -80,6 +82,28 @@ internal static class DelunoSyncRig
     {
         var test = await client.PostWithCsrfAsync($"{ManagerConnections.Route}/{JsonFields.Id(connection)}/test", new JsonObject());
         Assert.True(test.Status == HttpStatusCode.OK, test.ToString());
+    }
+
+    /// <summary>
+    /// Tests the connection, which asks Weir to sync, and waits for <paramref name="probe"/> to find the result. One sync is one
+    /// look at the manager: if it read the manager just before a change, or found it not answering, nothing looks again until the
+    /// five-minute timer. So a test that waits on a sync tests the connection again if the result has not shown within a few
+    /// seconds, as a person would, rather than depending on the first look having worked.
+    /// </summary>
+    public static async Task<T> SyncUntilAsync<T>(WeirClient client, JsonObject connection, Func<Task<T?>> probe, string what)
+        where T : class
+    {
+        for (var attempt = 1; ; attempt++)
+        {
+            await TestConnectionAsync(client, connection);
+            try
+            {
+                return await Poll.UntilAsync(probe, what, TimeSpan.FromSeconds(10));
+            }
+            catch (Xunit.Sdk.XunitException) when (attempt < SyncAttempts)
+            {
+            }
+        }
     }
 
     public static async Task<JsonArray> SyncedAsync(WeirClient client, int expected = 2) =>
