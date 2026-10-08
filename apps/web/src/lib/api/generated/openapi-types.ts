@@ -7610,6 +7610,11 @@ export interface components {
        * @description windows, docker, or source
        */
       install_type: string;
+      /**
+       * Known Update Available
+       * @description Set only while status is rate_limited: whether the last release Weir knew of is newer than this install.
+       */
+      known_update_available?: boolean | null;
       /** Latest Name */
       latest_name?: string | null;
       /** Latest Version */

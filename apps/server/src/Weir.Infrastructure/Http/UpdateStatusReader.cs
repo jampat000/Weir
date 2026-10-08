@@ -25,7 +25,7 @@ public sealed class UpdateStatusReader
     private readonly SqliteDatabase _database;
     private readonly SuiteSettingsStore _suiteSettings;
     private readonly ILogger<UpdateStatusReader> _logger;
-    private DateTimeOffset? _loggedLimit;
+    private string? _lastIssue;
 
     public UpdateStatusReader(
         IReleaseCatalogClient releases, WeirOptions options, SqliteDatabase database, SuiteSettingsStore suiteSettings, ILogger<UpdateStatusReader> logger)
@@ -50,6 +50,7 @@ public sealed class UpdateStatusReader
         try
         {
             var release = await _releases.FetchLatestAsync(currentVersion, cancellationToken).ConfigureAwait(false);
+            Interlocked.Exchange(ref _lastIssue, null);
             return release is null
                 ? NotPublished(currentVersion, installType)
                 : UpdateStatus.FromRelease(currentVersion, installType, release);
@@ -57,11 +58,11 @@ public sealed class UpdateStatusReader
         catch (ReleaseFetchException exception) when (exception.RateLimit is { } limit)
         {
             var summary = UpdateStatus.RateLimitedSummary(limit.ResetsAt, await TimezoneAsync(cancellationToken).ConfigureAwait(false));
-            if (limit.ResetsAt != _loggedLimit)
-            {
-                _loggedLimit = limit.ResetsAt;
-                _logger.LogInformation("Update check: GitHub answered HTTP {Status} because it is limiting this network. {Summary}", exception.StatusCode, summary);
-            }
+            _logger.Log(
+                LevelFor($"limit until {limit.ResetsAt:O}"),
+                "Update check: GitHub answered HTTP {Status} because it is limiting this network. {Summary}",
+                exception.StatusCode,
+                summary);
 
             return UpdateStatus.RateLimited(currentVersion, installType, limit.LastKnown, limit.ResetsAt, summary);
         }
@@ -74,14 +75,21 @@ public sealed class UpdateStatusReader
 #pragma warning restore CA1031
         {
             var reason = ReasonFor(exception);
-            _logger.LogInformation("Update check failed: {Reason} ({Detail})", reason, exception.Message);
+            _logger.Log(LevelFor(reason), "Update check failed: {Reason} ({Detail})", reason, exception.Message);
             return UpdateStatus.Unavailable(currentVersion, installType, "unavailable", $"Could not check for updates right now. {reason}");
         }
     }
 
+    /// <summary>
+    /// Information when the problem is a new one, Debug while it goes on: screens ask again every few minutes, and the same
+    /// line over and over would bury the log.
+    /// </summary>
+    private LogLevel LevelFor(string issue) => Interlocked.Exchange(ref _lastIssue, issue) == issue ? LogLevel.Debug : LogLevel.Information;
+
     private static string ReasonFor(Exception exception) => exception switch
     {
-        ReleaseFetchException { StatusCode: { } status } => $"GitHub answered with an error (HTTP {status}).",
+        ReleaseFetchException { StatusCode: 403 or 429 } => "GitHub refused the check.",
+        ReleaseFetchException => "GitHub could not answer the check.",
         HttpRequestException or TaskCanceledException => "Weir could not reach GitHub.",
         _ => "GitHub sent an answer Weir could not read.",
     };

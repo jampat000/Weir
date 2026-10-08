@@ -10576,6 +10576,18 @@
             "title": "Install Type",
             "type": "string"
           },
+          "known_update_available": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Set only while status is rate_limited: whether the last release Weir knew of is newer than this install.",
+            "title": "Known Update Available"
+          },
           "latest_name": {
             "anyOf": [
               {

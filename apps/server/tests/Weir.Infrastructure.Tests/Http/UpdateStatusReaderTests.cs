@@ -44,6 +44,18 @@ public sealed class UpdateStatusReaderTests : IDisposable
         Assert.Equal("GitHub is limiting update checks from your network right now. Weir will check again at 11:35 pm.", TextOf(status, "summary"));
         Assert.Equal("2026-01-15T23:35:00Z", TextOf(status, "retry_at"));
         Assert.Equal("3.3.0", TextOf(status, "latest_version"));
+        Assert.Equal(WireBool.True, status["known_update_available"]);
+    }
+
+    [Fact]
+    public async Task A_limit_with_nothing_newer_known_offers_no_update()
+    {
+        var lastKnown = new GitHubReleaseRecord("v3.2.16", "3.2.16", null, null, null, false, false, []);
+        _failure = new ReleaseFetchException(403, new ReleaseRateLimit(LimitLifts, lastKnown));
+
+        var status = await _reader.ReadAsync(CancellationToken.None);
+
+        Assert.Equal(WireBool.False, status["known_update_available"]);
     }
 
     [Fact]
@@ -59,7 +71,7 @@ public sealed class UpdateStatusReaderTests : IDisposable
     }
 
     [Fact]
-    public async Task A_limit_is_logged_once_at_information_with_when_it_lifts()
+    public async Task A_limit_is_logged_at_information_with_when_it_lifts_and_a_repeat_only_at_debug()
     {
         _failure = new ReleaseFetchException(403, new ReleaseRateLimit(LimitLifts, null));
 
@@ -69,21 +81,46 @@ public sealed class UpdateStatusReaderTests : IDisposable
         var logged = Assert.Single(_log.At(LogLevel.Information));
         Assert.Contains("HTTP 403", logged, StringComparison.Ordinal);
         Assert.Contains("11:35 pm", logged, StringComparison.Ordinal);
-        Assert.Equal(1, _log.Count);
+        Assert.Single(_log.At(LogLevel.Debug));
+        Assert.Equal(2, _log.Count);
     }
 
     [Fact]
-    public async Task A_failed_check_gives_its_reason_in_the_status_and_one_information_line()
+    public async Task A_failed_check_gives_its_reason_in_plain_words_and_keeps_the_code_for_the_log()
     {
         _failure = new ReleaseFetchException(500);
 
         var status = await _reader.ReadAsync(CancellationToken.None);
 
         Assert.Equal("unavailable", TextOf(status, "status"));
-        Assert.Equal("Could not check for updates right now. GitHub answered with an error (HTTP 500).", TextOf(status, "summary"));
+        Assert.Equal("Could not check for updates right now. GitHub could not answer the check.", TextOf(status, "summary"));
         var logged = Assert.Single(_log.At(LogLevel.Information));
         Assert.Contains("HTTP 500", logged, StringComparison.Ordinal);
         Assert.Equal(1, _log.Count);
+    }
+
+    [Fact]
+    public async Task A_refused_check_says_so_without_the_status_code()
+    {
+        _failure = new ReleaseFetchException(403);
+
+        var status = await _reader.ReadAsync(CancellationToken.None);
+
+        Assert.Equal("Could not check for updates right now. GitHub refused the check.", TextOf(status, "summary"));
+    }
+
+    [Fact]
+    public async Task The_same_failure_again_is_logged_at_debug_and_a_different_one_at_information()
+    {
+        _failure = new HttpRequestException("No such host is known.");
+        await _reader.ReadAsync(CancellationToken.None);
+        await _reader.ReadAsync(CancellationToken.None);
+
+        _failure = new ReleaseFetchException(403);
+        await _reader.ReadAsync(CancellationToken.None);
+
+        Assert.Equal(2, _log.At(LogLevel.Information).Count);
+        Assert.Single(_log.At(LogLevel.Debug));
     }
 
     [Fact]
