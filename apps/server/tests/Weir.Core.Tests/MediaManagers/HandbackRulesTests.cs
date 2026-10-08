@@ -100,6 +100,9 @@ public sealed class HandbackRulesTests
             "Weir recorded that Deluno imported the file and released its copy.",
             HandbackRules.OutcomeMessage("Deluno", HandbackRules.Imported, removed: 1, gone: 0, kept: 0, firstKeptNote: null));
         Assert.Equal(
+            "Deluno had said it would not import this file, and then imported it after all. Weir recorded that Deluno imported the file and released its copy.",
+            HandbackRules.AfterAllMessage("Deluno", "Weir recorded that Deluno imported the file and released its copy."));
+        Assert.Equal(
             "Waiting for Radarr, which is not answering. Weir will tell it this file is ready when it answers.",
             ManagerWaitMessages.ReportWaiting("Radarr"));
         Assert.Contains("handoff-outcome", IntakeRules.HandoffCapabilities);

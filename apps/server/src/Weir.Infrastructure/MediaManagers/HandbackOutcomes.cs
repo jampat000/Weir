@@ -109,23 +109,35 @@ public sealed class HandbackOutcomes
                 }
 
                 await _handback.RecordOutcomeAsync(uow, copy.Id, outcome, manager, occurredAt, importedPath, reason).ConfigureAwait(false);
+                // Already settled (Cleanup removed it, Sonarr's own webhook got there first): keep what happened then. The one
+                // settling an import after all undoes is this manager's own "will not import".
+                var settled = copy.SettledAt is not null && !(afterAll && KeptByRefusal(copy, manager));
                 HandbackRelease release;
-                if (outcome == HandbackRules.NotImported)
+                if (settled)
                 {
-                    release = new HandbackRelease(HandbackReleaseKind.Kept, HandbackRules.NotImportedNote(manager, reason));
-                }
-                else if (copy.SettledAt is not null && !(afterAll && KeptByRefusal(copy, manager)))
-                {
-                    // Already settled (Sonarr's own webhook, say, got there first): keep what happened then.
                     release = new HandbackRelease(
                         copy.ReleasedAt is not null ? HandbackReleaseKind.Removed : HandbackReleaseKind.Kept, copy.ReleaseNote ?? HandbackRules.UnrecordedNote);
+                }
+                else if (outcome == HandbackRules.NotImported)
+                {
+                    release = new HandbackRelease(HandbackReleaseKind.Kept, HandbackRules.NotImportedNote(manager, reason));
                 }
                 else
                 {
                     release = HandbackStore.Release(copy, manager, importedPath);
+                    if (release.Kind == HandbackReleaseKind.InUse)
+                    {
+                        // The Cleanup job only looks after copies nobody has claimed, so nothing would try this one again:
+                        // it is recorded as kept, and its note tells the person to remove it by hand.
+                        release = release with { Kind = HandbackReleaseKind.Kept };
+                    }
                 }
 
-                await _handback.RecordReleaseAsync(uow, copy.Id, release, now).ConfigureAwait(false);
+                if (!settled)
+                {
+                    await _handback.RecordReleaseAsync(uow, copy.Id, release, now).ConfigureAwait(false);
+                }
+
                 switch (release.Kind)
                 {
                     case HandbackReleaseKind.Removed:
@@ -228,7 +240,7 @@ public sealed class HandbackOutcomes
             .Set("imported_path", importedPath)
             .Set("reason", reason)
             .Set("released", released)
-            .Set("user_message", message)
+            .Set("user_message", afterAll ? HandbackRules.AfterAllMessage(manager, message) : message)
             .Set("counts", new WireObject().Set("removed", released ? 1 : 0))
             .Set("module", "processing")
             .Set("action", "handback")

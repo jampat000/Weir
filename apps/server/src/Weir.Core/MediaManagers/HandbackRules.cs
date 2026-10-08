@@ -122,6 +122,10 @@ public static class HandbackRules
         : afterAll ? $"{manager} imported {fileName} after all"
         : $"{manager} imported {fileName}";
 
+    /// <summary>What Activity says when a manager imports a file it had said it would not: <paramref name="message"/> is what Weir did about it.</summary>
+    public static string AfterAllMessage(string manager, string message) =>
+        $"{manager} had said it would not import this file, and then imported it after all. {message}";
+
     public static string RemovedNote(string manager) =>
         $"Weir removed its copy from the hand-back folder, because {manager} has the file now.";
 
