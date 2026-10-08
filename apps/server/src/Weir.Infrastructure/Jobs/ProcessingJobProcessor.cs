@@ -163,11 +163,11 @@ public sealed class ProcessingJobProcessor
         {
             var failure = WorkerFailures.JobFailure(Module, FailureMessages.FromDotNet(exception), willRetry);
             _logger.LogError(
-                "Job handler failed for job_id={JobId} kind={JobKind}: {Message} {Detail}",
+                exception,
+                "Job handler failed for job_id={JobId} kind={JobKind}: {Message}",
                 context.Id,
                 context.JobKind,
-                failure.Message,
-                failure.TechnicalDetail);
+                failure.Message);
             ReportRunEnded(taskKey, ok: false, failure.Why);
             if (exception is not AlreadyRecordedFailureException)
             {

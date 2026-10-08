@@ -123,6 +123,61 @@ public sealed class MediaToolsTests : IDisposable
     }
 
     [Fact]
+    public async Task An_unreadable_file_is_one_plain_log_line_and_ffprobes_warnings_never_reach_the_log_above_debug()
+    {
+        var media = WriteFile("movie.mkv", "not-empty"u8.ToArray());
+        var logger = new ListLogger<MediaTools>();
+        var runner = new ScriptedRunner(_ => new ScriptedRun
+        {
+            ExitCode = 1,
+            Stderr = Encoding.UTF8.GetBytes(
+                "[matroska,webm @ 000001534eaabd00] Format matroska,webm detected only with low score of 1, misdetection possible!\n" +
+                "[matroska,webm @ 000001534eaabd00] EBML header parsing failed\n" +
+                "movie.mkv: Invalid data found when processing input"),
+        });
+
+        await Assert.ThrowsAsync<MediaUnreadableException>(() => Tools(runner, logger).ProbeWithWarningsAsync(media));
+
+        Assert.Equal(2, runner.Requests.Count);
+        var line = Assert.Single(logger.Entries, e => e.Level >= LogLevel.Information);
+        Assert.Equal(LogLevel.Warning, line.Level);
+        Assert.Equal($"Reading movie.mkv failed. {ToolFailureText.UnreadableFile}", line.Message);
+        var raw = Assert.Single(logger.Exceptions);
+        Assert.Contains("misdetection possible", raw.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_writer_that_hands_over_to_ffmpeg_says_why_in_plain_words_and_keeps_the_tools_text_as_the_exception()
+    {
+        var source = WriteFile("source.mkv", "source"u8.ToArray());
+        var workDir = Path.Combine(_root, "work-fallback");
+        var plan = new RemuxPlan { VideoIndices = [0], Audio = [new PlannedTrack { InputIndex = 1, LangLabel = "eng", Default = true }], Subtitles = [] };
+        var runner = new ScriptedRunner(request => request.Argv[0] == "ffprobe"
+            ? new ScriptedRun { Stdout = Encoding.UTF8.GetBytes(MatchingRemuxOutputJson) }
+            : new ScriptedRun());
+        var logger = new ListLogger<MediaTools>();
+        var tools = new MediaTools(runner, new FixedResolver(), logger, TimeProvider.System, p => new MediaFileState(p, true, true, 100, 0));
+        using var sourceDocument = JsonDocument.Parse(SourceWithKeptStreamDurationsJson);
+        const string toolText = "[matroska,webm @ 000001534eaabd00] EBML header parsing failed";
+
+        await tools.RemuxToTempFileAsync(source, workDir, plan, sourceDocument.RootElement, [], durationSeconds: 100.0, writer: new DecliningWriter(toolText));
+
+        var line = Assert.Single(logger.Entries, e => e.Level == LogLevel.Information);
+        Assert.Equal($"mkvmerge could not write this file, so ffmpeg is writing it instead: {ToolFailureText.UnreadableFile}", line.Message);
+        Assert.Equal(toolText, Assert.Single(logger.Exceptions).Message);
+    }
+
+    private sealed class DecliningWriter(string toolText) : IRemuxWriter
+    {
+        public string Name => "mkvmerge";
+
+        public bool CanWrite(string destination) => true;
+
+        public Task WriteAsync(RemuxWriteRequest request, CancellationToken cancellationToken = default) =>
+            throw new MediaToolException(toolText) { PlainMessage = ToolFailureText.ForToolText(toolText) };
+    }
+
+    [Fact]
     public async Task A_probe_with_its_own_window_reads_warnings_with_the_default_one()
     {
         var media = WriteFile("movie.mkv", new byte[64]);

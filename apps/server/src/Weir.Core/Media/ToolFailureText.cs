@@ -72,6 +72,16 @@ public static class ToolFailureText
         };
     }
 
+    /// <summary>
+    /// The words for any failure met while running a media tool: <see cref="Plain"/> for one the tools raised, and
+    /// <see cref="Generic"/> for anything else, whose own message may be a path or a system's text.
+    /// </summary>
+    public static string ForFailure(Exception exception)
+    {
+        ArgumentNullException.ThrowIfNull(exception);
+        return exception is MediaToolException or MediaToolTimeoutException or MkvmergeUnsupportedPlanException ? Plain(exception) : Generic;
+    }
+
     /// <summary>The failure's own message for technical detail: what the tool said, with secrets redacted and capped at 1000 characters.</summary>
     public static string Technical(Exception exception)
     {
