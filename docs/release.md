@@ -334,6 +334,17 @@ Once an update is downloaded in **Auto** mode the tray waits for Weir to be idle
 
 How the tray learns Weir is idle: while `update-state.json` says an update is downloaded, the server rewrites `work-state.json` in the data folder every 15 seconds with `busy` and the time it looked (`checkedAt`). Nothing is written when no update is waiting, so a Docker install never writes it. The tray installs only on a fresh answer of idle; a missing, unreadable or over-a-minute-old file (the server stopped, restarting or stuck) counts as not idle and restarts the 5 minutes. It is a file and not an HTTP route on purpose: the tray has no signed-in session, an unauthenticated route would be reachable from other devices whenever LAN access is on, and the data folder is readable only by the account running Weir. What counts as file work is decided by the same rules the worker slots use to lease a job (`ProcessingJobStore.HasFileWorkAsync`), so "could start" and "would start" cannot differ.
 
+How the tray learns what to show, and how it pauses Weir: two more files in the data folder, with the same reasoning as `work-state.json` (the tray has no signed-in session, and no route carries them).
+
+- `tray-status.json` is written by the server whenever its contents change, at most once a second, whole to a scratch file and then renamed into place, so the tray never reads half of it. It is written when the server starts and a last time, with `server_ok` false, when it stops cleanly; a server that was killed leaves `server_ok` true. Keys are snake_case:
+
+  ```json
+  {"paused":false,"paused_until":null,"needs_you":{"files":2,"managers_unreachable":["Deluno on RIG"]},"server_ok":true}
+  ```
+
+  `paused_until` is an ISO 8601 UTC time for a timed pause and null otherwise. `needs_you.files` counts the files that wait on a person, the same files as the sidebar badge (`FileStateStore.CountWaitingOnPersonAsync`). `managers_unreachable` names the enabled media managers whose last connection test, by the heartbeat or the Test button, got no answer.
+- `pause-request.json` is written by the tray: `{"paused": true, "requested_at": "<ISO 8601>"}`, or `false` to resume. The server applies it through `SuitePauseService` as "the tray": a pause lasts until it is resumed and leaves "keep looking for new files" as it stands. Activity records it like any other pause or resume, saying it was done by the tray, and the file is deleted. A request that is not that shape is ignored, noted in the log, and deleted. A request left while the server was down is answered when it starts.
+
 If an operator runs a manually staged copy without Velopack install metadata, the
 tray keeps `Check for updates` visible and sends it to the browser-based release check
 on **System › About**. It must not silently remove the update action.

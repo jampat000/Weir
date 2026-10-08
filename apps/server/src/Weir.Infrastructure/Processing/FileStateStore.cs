@@ -80,6 +80,21 @@ public sealed partial class FileStateStore
         return counts;
     }
 
+    /// <summary>
+    /// How many files wait on a person: failed, rejected, held with no clock on the hold, or skipped by one of the workflow's own
+    /// rules ("Skipped because ..."). The web app's <c>waitsOnAPerson</c> (<c>activity-entries.ts</c>) says the same, and its
+    /// badge, Needs you panel and Activity chip count the same files.
+    /// </summary>
+    public Task<long> CountWaitingOnPersonAsync(UnitOfWork uow) =>
+        uow.CountAsync(
+            "SELECT COUNT(*) FROM files WHERE status IN (@failed, @rejected) " +
+            "OR (status = @on_hold AND hold_until IS NULL) " +
+            "OR (status = @skipped AND status_reason LIKE 'skipped because%')",
+            ("@failed", ProcessingFileStatuses.ProcessingFailed),
+            ("@rejected", ProcessingFileStatuses.Rejected),
+            ("@on_hold", ProcessingFileStatuses.OnHold),
+            ("@skipped", ProcessingFileStatuses.Skipped));
+
     /// <summary>Removes Weir's record; never touches the file on disk.</summary>
     public Task ForgetAsync(UnitOfWork uow, long id) => uow.ExecuteAsync("DELETE FROM files WHERE id = @id", ("@id", id));
 

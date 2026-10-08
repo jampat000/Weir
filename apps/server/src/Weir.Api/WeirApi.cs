@@ -93,6 +93,9 @@ public static class WeirApi
         services.AddSingleton<IPeriodicTask, UpdateCheckTask>();
         // Hears the tray's answers (a downloaded update, the firewall prompt) so open screens show them at once.
         services.AddHostedService<TrayHandOffWatcher>();
+        // Tells the tray what it shows (the pause, files waiting on a person, managers not answering) and does the pause it asks for.
+        services.AddHostedService<TrayStatusWriter>();
+        services.AddHostedService<TrayPauseRequestWatcher>();
         services.AddWeirResponseCompression();
         services.AddRouting();
         return services;
