@@ -1,6 +1,7 @@
 using System.Text;
 using Microsoft.Extensions.Logging.Abstractions;
 using Weir.Core.Json;
+using Weir.Core.Media;
 using Weir.Core.MediaManagers;
 using Weir.Core.Processing;
 using Weir.Core.Processing.RemuxPass;
@@ -479,7 +480,8 @@ public sealed class RemuxPassRunnerTests : IDisposable
         Assert.False(Bool(result, "ok"));
         Assert.Equal(RemuxPassOutcomes.FailedDuringExecution, Str(result, "outcome"));
         Assert.Equal("ok", Str(result, "preflight_status"));
-        Assert.Contains("ffmpeg simulated failure", Str(result, "reason"), StringComparison.Ordinal);
+        Assert.Equal(ToolFailureText.Generic, Str(result, "reason"));
+        Assert.Contains("ffmpeg simulated failure", Str(result, "technical_detail"), StringComparison.Ordinal);
         Assert.True(result.ContainsKey("plan_summary"));
         Assert.True(File.Exists(source));
         Assert.Equal("failed", Str(_progress[^1], "status"));
@@ -632,20 +634,69 @@ public sealed class RemuxPassRunnerTests : IDisposable
 
         Assert.Equal(RemuxPassOutcomes.SourceNotReady, Str(result, "outcome"));
         Assert.True(Bool(result, "retryable_wait"));
+        Assert.Equal(ToolFailureText.IncompleteRead, Str(result, "reason"));
+        Assert.Contains("File ended prematurely", Str(result, "technical_detail"), StringComparison.Ordinal);
         Assert.False(File.Exists(_folders.Out("one.mkv")));
     }
 
     [Fact]
-    public async Task Unreadable_content_is_marked_as_evidence_of_a_bad_release()
+    public async Task An_unreadable_file_waits_in_plain_words_and_nothing_is_written()
     {
-        _folders.Source("bad.mkv");
-        _media.ProbeError = "[matroska,webm @ 0x1] EBML header parsing failed\nbad.mkv: Invalid data found when processing input";
+        var source = _folders.Source("bad.mkv");
+        _media.ProbeError = "[matroska,webm @ 000001b280590a00] EBML header parsing failed\nC:\\Weir\\Ready\\Movies\\bad.mkv: Invalid data found when processing input";
 
         var result = await Run("bad.mkv");
 
-        Assert.Equal(RemuxPassOutcomes.FailedBeforeExecution, Str(result, "outcome"));
-        Assert.True(Bool(result, "content_unusable"));
-        Assert.StartsWith("Weir could not read this file's contents, so the file itself looks damaged:", Str(result, "reason"), StringComparison.Ordinal);
+        Assert.False(Bool(result, "ok"));
+        Assert.Equal(RemuxPassOutcomes.SourceNotReady, Str(result, "outcome"));
+        Assert.True(Bool(result, "retryable_wait"));
+        Assert.Equal(RemuxPassRunner.UnreadableWait, Str(result, "not_ready_kind"));
+        Assert.False(result.ContainsKey("rejection_kind"));
+        Assert.Equal(ToolFailureText.NotReadableYet, Str(result, "reason"));
+        Assert.Contains("EBML header parsing failed", Str(result, "technical_detail"), StringComparison.Ordinal);
+        Assert.Empty(_media.Remuxes);
+        Assert.False(File.Exists(_folders.Out("bad.mkv")));
+        Assert.True(File.Exists(source));
+    }
+
+    [Fact]
+    public async Task A_file_ffprobe_finds_no_streams_in_waits_like_an_unreadable_one()
+    {
+        _folders.Source("empty-probe.mkv");
+        _media.DefaultProbe = """{"streams":[],"format":{"duration":"0"}}""";
+
+        var result = await Run("empty-probe.mkv");
+
+        Assert.Equal(RemuxPassOutcomes.SourceNotReady, Str(result, "outcome"));
+        Assert.Equal(RemuxPassRunner.UnreadableWait, Str(result, "not_ready_kind"));
+        Assert.Equal(ToolFailureText.NotReadableYet, Str(result, "reason"));
+        Assert.Empty(_media.Remuxes);
+        Assert.False(File.Exists(_folders.Out("empty-probe.mkv")));
+    }
+
+    [Fact]
+    public async Task A_readable_file_that_needs_no_change_still_passes_through_unchanged()
+    {
+        _folders.Source("fine.mkv");
+
+        var result = await Run("fine.mkv", passThrough: true);
+
+        Assert.True(Bool(result, "ok"));
+        Assert.False(result.ContainsKey("rejection_kind"));
+        Assert.True(File.Exists(_folders.Out("fine.mkv")));
+    }
+
+    [Fact]
+    public async Task A_tool_failure_while_probing_is_worded_for_a_person_with_the_tool_text_kept_as_detail()
+    {
+        _folders.Source("odd.mkv");
+        _media.ProbeError = "[h264 @ 0x55d0] some other ffprobe complaint";
+
+        var result = await Run("odd.mkv");
+
+        Assert.Equal(ToolFailureText.Generic, Str(result, "reason"));
+        Assert.Contains("0x55d0", Str(result, "technical_detail"), StringComparison.Ordinal);
+        Assert.False(result.ContainsKey("rejection_kind"));
     }
 
     [Fact]
@@ -751,7 +802,7 @@ public sealed class RemuxPassRunnerTests : IDisposable
         var probeFailure = await Run("bad.mkv");
 
         Assert.Equal(RemuxPassOutcomes.FailedBeforeExecution, Str(probeFailure, "outcome"));
-        Assert.Contains("ffprobe failed", Str(probeFailure, "preflight_reason"), StringComparison.Ordinal);
+        Assert.Equal(ToolFailureText.Generic, Str(probeFailure, "preflight_reason"));
         foreach (var key in new[] { "source_deleted_after_success", "source_folder_deleted", "movie_output_folder_deleted", "tv_output_season_folder_deleted", "output_file", "ffmpeg_argv" })
         {
             Assert.False(probeFailure.ContainsKey(key), key);

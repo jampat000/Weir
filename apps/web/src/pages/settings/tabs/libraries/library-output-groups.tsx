@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { Field } from "../../../../components/shared/field";
 import { QuietDisclosure } from "../../../../components/shared/quiet-section";
 import {
-  joinNames,
+  originalStaysReason,
   type WorkflowKind,
 } from "../../../../lib/processing/workflow-kind";
 import { useProcessingOperatorSettingsQuery } from "../../../../lib/processing/queries";
@@ -16,13 +16,6 @@ import {
 
 /** A blank "most files at once" is no limit of its own, which the server keeps as 0. */
 const NO_OWN_LIMIT = "0";
-
-/** A linked workflow never removes the original: the download client and the media manager own it. */
-function originalStaysReason(kind: WorkflowKind): string | undefined {
-  return kind.kind === "linked"
-    ? `Linked to ${joinNames(kind.managers.map((m) => m.name))}: the original stays with your download client, which may still be seeding.`
-    : undefined;
-}
 
 /** Sidecars, timestamps, and what happens when the destination already exists. */
 export function LibraryOutputGroup({

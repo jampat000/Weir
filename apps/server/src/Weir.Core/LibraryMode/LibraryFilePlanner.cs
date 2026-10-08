@@ -1,3 +1,4 @@
+using Weir.Core.Media;
 using Weir.Core.Rules;
 using Weir.Core.Text;
 
@@ -94,9 +95,9 @@ public static class LibraryFilePlanner
             split = RemuxRules.SplitStreams(probe);
             attachments = RemuxRules.AttachmentStreams(probe);
         }
-        catch (RulesInputException exception)
+        catch (RulesInputException)
         {
-            return LibraryFilePlanResult.CannotProcess($"Weir could not read this file's tracks: {exception.Message}");
+            return LibraryFilePlanResult.CannotProcess(ToolFailureText.UnusableTrackData);
         }
 
         if (split.Video.Count == 0)

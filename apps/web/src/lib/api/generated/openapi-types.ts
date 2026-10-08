@@ -525,7 +525,7 @@ export interface paths {
     put?: never;
     /**
      * Post Intake Handoff Outcome
-     * @description The manager says what became of the file Weir handed back. imported records it and releases Weir's copy when it is still exactly the file Weir wrote; not-imported records it and keeps the copy. 200 again for the same outcome; 404 never received; 409 not finished or a different outcome already recorded, with a code: outcome_already_recorded (final), handoff_not_finished or handoff_ended (worth sending again).
+     * @description The manager says what became of the file Weir handed back. imported records it and releases Weir's copy when it is still exactly the file Weir wrote; not-imported records it and keeps the copy, and a later imported replaces it. 200 again for the same outcome; 404 never received; 409 not finished or a different outcome already recorded, with a code: outcome_already_recorded (final), handoff_not_finished or handoff_ended (worth sending again).
      */
     post: operations["post_intake_handoff_outcome_api_v1_intake_handoffs__source_key___handoff_id__outcome_post"];
     delete?: never;
@@ -3098,7 +3098,7 @@ export interface components {
     HandoffOutcomeIn: {
       /**
        * Outcome
-       * @description imported, or not-imported. not-imported is final: never sent for a failure the manager will retry.
+       * @description imported, or not-imported. A not-imported is replaced only by a later imported; it is never sent for a failure the manager will retry.
        * @enum {string}
        */
       outcome: "imported" | "not-imported";
@@ -5554,7 +5554,7 @@ export interface components {
       ready_after_seconds: number;
       /**
        * Rejected File Action
-       * @description What to do with a settled file rejected by size/path rules or because it contains no video. delete_file removes only that file and then empty parent folders; it never removes a folder containing other files.
+       * @description What to do with a settled file rejected by size/path rules, because it contains no video, or because Weir cannot read it at all (ffprobe cannot parse it, or finds no streams in it). Such a file is looked at again after a wait in case it is still arriving, then refused before any output is written, whatever the workflow does with files that need no change. delete_file removes only that file and then empty parent folders; it never removes a folder containing other files, and never removes a file Weir could not read.
        * @default leave
        * @enum {string}
        */
@@ -6014,7 +6014,7 @@ export interface components {
       ready_after_seconds: number;
       /**
        * Rejected File Action
-       * @description What to do with a settled file rejected by size/path rules or because it contains no video. delete_file removes only that file and then empty parent folders; it never removes a folder containing other files.
+       * @description What to do with a settled file rejected by size/path rules, because it contains no video, or because Weir cannot read it at all (ffprobe cannot parse it, or finds no streams in it). Such a file is looked at again after a wait in case it is still arriving, then refused before any output is written, whatever the workflow does with files that need no change. delete_file removes only that file and then empty parent folders; it never removes a folder containing other files, and never removes a file Weir could not read.
        * @default leave
        * @enum {string}
        */

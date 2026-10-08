@@ -15,7 +15,10 @@ public static class HandbackRules
     /// </summary>
     public const string OutcomeCodesCapability = "handoff-outcome-codes";
 
-    /// <summary>409 code: a different outcome is already recorded for this hand-off. Final; sending it again never succeeds.</summary>
+    /// <summary>
+    /// 409 code: a different outcome is already recorded for this hand-off and cannot be replaced (see <see cref="Supersedes"/>).
+    /// Final; sending it again never succeeds.
+    /// </summary>
     public const string OutcomeAlreadyRecordedCode = "outcome_already_recorded";
 
     /// <summary>409 code: Weir is still working on the hand-off. Worth sending again later.</summary>
@@ -30,11 +33,18 @@ public static class HandbackRules
     /// <summary>The manager imported the file.</summary>
     public const string Imported = "imported";
 
-    /// <summary>The manager will never import the file. Final: a manager does not send it for a failure it will retry.</summary>
+    /// <summary>The manager will not import the file. A manager does not send it for a failure it will retry.</summary>
     public const string NotImported = "not-imported";
 
     /// <summary>The outcomes a manager may send, in the spelling agreed with Deluno.</summary>
     public static readonly IReadOnlyList<string> Outcomes = [Imported, NotImported];
+
+    /// <summary>
+    /// Whether <paramref name="outcome"/> replaces the <paramref name="recorded"/> outcome of the same manager for a hand-off.
+    /// Only a later "imported" replaces a "not imported", which changed nothing irreversible; an import is never undone by a
+    /// later refusal, and every other repeat keeps the first answer.
+    /// </summary>
+    public static bool Supersedes(string? recorded, string outcome) => recorded == NotImported && outcome == Imported;
 
     /// <summary>How long an unclaimed copy waits before the Cleanup job may remove it, unless a person changes it.</summary>
     public const int DefaultUnclaimedWindowDays = 14;
@@ -107,8 +117,14 @@ public static class HandbackRules
     // --- words ----------------------------------------------------------------------------------------------------------
 
     /// <summary>The Activity title for a manager's word on a file.</summary>
-    public static string OutcomeTitle(string manager, string outcome, string fileName) =>
-        outcome == NotImported ? $"{manager} will not import {fileName}" : $"{manager} imported {fileName}";
+    public static string OutcomeTitle(string manager, string outcome, string fileName, bool afterAll = false) =>
+        outcome == NotImported ? $"{manager} will not import {fileName}"
+        : afterAll ? $"{manager} imported {fileName} after all"
+        : $"{manager} imported {fileName}";
+
+    /// <summary>What Activity says when a manager imports a file it had said it would not: <paramref name="message"/> is what Weir did about it.</summary>
+    public static string AfterAllMessage(string manager, string message) =>
+        $"{manager} had said it would not import this file, and then imported it after all. {message}";
 
     public static string RemovedNote(string manager) =>
         $"Weir removed its copy from the hand-back folder, because {manager} has the file now.";

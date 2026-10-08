@@ -123,8 +123,8 @@ public sealed partial class RemuxPassRunner
                 .Set("inspected_source_path", context.Inspected)
                 .Set("media_scope", context.Scope)
                 .Set("message", "Weir is waiting for this file to finish downloading.")
-                .Set("reason", exception.Message));
-            return SourceNotReady(relativeMediaPath, exception.Message, context.Inspected);
+                .Set("reason", ToolFailureText.Plain(exception)));
+            return WithTechnicalDetail(SourceNotReady(relativeMediaPath, ToolFailureText.Plain(exception), context.Inspected), exception);
         }
 #pragma warning disable CA1031 // Any failure while writing becomes this file's recorded failure; the worker survives it.
         catch (Exception exception) when (exception is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
@@ -138,13 +138,13 @@ public sealed partial class RemuxPassRunner
                 .Set("inspected_source_path", context.Inspected)
                 .Set("media_scope", context.Scope)
                 .Set("message", "Weir could not finish this file.")
-                .Set("reason", exception.Message));
-            return new WireObject()
+                .Set("reason", ToolFailureText.Plain(exception)));
+            return WithTechnicalDetail(new WireObject()
                 .Set("ok", false)
                 .Set("outcome", RemuxPassOutcomes.FailedDuringExecution)
                 .Set("preflight_status", "ok")
                 .Set("preflight_reason", "ffprobe completed and remux plan was evaluated")
-                .Set("reason", exception.Message)
+                .Set("reason", ToolFailureText.Plain(exception))
                 .Set("relative_media_path", relativeMediaPath)
                 .Set("inspected_source_path", context.Inspected)
                 .Set("processing_watched_folder_resolved", context.WatchedRoot)
@@ -157,7 +157,7 @@ public sealed partial class RemuxPassRunner
                 .Set("remux_required", true)
                 .Set("ffmpeg_argv", StringList(argv))
                 .Set("audio_selection_notes", StringList(plan.AudioSelectionNotes))
-                .Set("after_track_lines_meaning", "Remux failed partway; lines above were computed before ffmpeg — output file was not committed.");
+                .Set("after_track_lines_meaning", "Remux failed partway; lines above were computed before ffmpeg — output file was not committed."), exception);
         }
 
         var resolvedFinal = RemuxPassPaths.Resolve(final);

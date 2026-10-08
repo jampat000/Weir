@@ -403,6 +403,39 @@ describe("first run: connect Deluno first", () => {
     expect(createLibrary).not.toHaveBeenCalled();
   });
 
+  it("says what to set in Deluno when it gives no folders, offers no overlapping workflow, and still lets setup finish", async () => {
+    scenario.managers = [managerConnection({})];
+    scenario.suggestions = {
+      libraries: [],
+      notes: [
+        "Deluno does not say where Movies' downloads arrive. Set the downloads folder in Deluno and Weir will pick it up.",
+        "Deluno does not say where TV's downloads arrive. Set the downloads folder in Deluno and Weir will pick it up.",
+      ],
+    };
+    renderWizard();
+
+    choose("Deluno");
+    const found = await foundLibraries();
+
+    expect(
+      found.getAllByText(/Set the downloads folder in Deluno/),
+    ).toHaveLength(2);
+    expect(found.queryByRole("textbox")).not.toBeInTheDocument();
+    expect(
+      found.getByRole("button", { name: "Pick the folders yourself" }),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Finish setup" }));
+
+    expect(
+      await screen.findByRole("heading", { name: "What's next" }),
+    ).toBeInTheDocument();
+    expect(createLibrary).not.toHaveBeenCalled();
+    expect(updateLibrary).not.toHaveBeenCalled();
+    expect(saveSettingsMock).toHaveBeenCalledWith(
+      expect.objectContaining({ setup_wizard_state: "completed" }),
+    );
+  });
+
   it("says plainly when Deluno cannot be reached, and lets the person go to typing the folders", async () => {
     scenario.managers = [
       managerConnection({

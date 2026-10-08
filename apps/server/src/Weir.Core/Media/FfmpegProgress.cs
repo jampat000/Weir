@@ -53,7 +53,7 @@ public sealed class FfmpegProgressTracker
         var elapsed = HigherOf(0.0, secondsSinceStart);
         if (_timeoutSeconds is { } timeout && elapsed > timeout)
         {
-            throw new MediaToolException("ffmpeg timed out");
+            throw new MediaToolException("ffmpeg timed out") { PlainMessage = ToolFailureText.TookTooLong };
         }
 
         var line = WireStrings.Strip(rawLine);
@@ -101,7 +101,10 @@ public sealed class FfmpegProgressTracker
         {
             throw new MediaToolException(
                 "ffmpeg was stopped because progress projected more than 12 hours remaining. "
-                + "The input may be malformed, mislabeled, or unreadable at a usable speed.");
+                + "The input may be malformed, mislabeled, or unreadable at a usable speed.")
+            {
+                PlainMessage = ToolFailureText.TooSlow,
+            };
         }
 
         return new FfmpegProgressUpdate

@@ -1,6 +1,7 @@
 using Weir.Core.Activity;
 using Weir.Core.Json;
 using Weir.Core.LibraryMode;
+using Weir.Core.Media;
 using Weir.Core.Processing;
 using Weir.Core.Rules;
 
@@ -32,9 +33,9 @@ public sealed partial class LibraryCleanHandler
         {
             split = RemuxRules.SplitStreams(probe);
         }
-        catch (RulesInputException exception)
+        catch (RulesInputException)
         {
-            return new ChosenPlan(null, (LibraryActivityEventTypes.FileFailed, $"Weir could not read this file's tracks: {exception.Message}"));
+            return new ChosenPlan(null, (LibraryActivityEventTypes.FileFailed, ToolFailureText.UnusableTrackData));
         }
 
         if (!ManualTrackPlan.TryValidate(choice, ManualTrackPlan.ClassifyIndices(split), out var invalid))

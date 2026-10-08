@@ -80,11 +80,14 @@ public sealed class MediaToolsGoldenTests
                 AssertError(expected.GetProperty("error"), error, name);
             }
 
-            var expectedLogs = expected.GetProperty("logs").EnumerateArray()
-                .Select(e => (e.GetProperty("level").GetString()!, GoldenDivergences.FfprobeCallLog(e.GetProperty("message").GetString()!)))
+            var recorded = expected.GetProperty("logs").EnumerateArray()
+                .Select(e => (Level: e.GetProperty("level").GetString()!, Message: GoldenDivergences.FfprobeCallLog(e.GetProperty("message").GetString()!)))
                 .ToList();
-            var actualLogs = logger.Entries.Select(e => (e.Level == LogLevel.Warning ? "warning" : "debug", e.Message)).ToList();
+            var expectedLogs = recorded.Select(e => ("debug", e.Message)).ToList();
+            var actualLogs = logger.Entries.Where(e => e.Level != LogLevel.Warning).Select(e => ("debug", e.Message)).ToList();
             Assert.Equal(expectedLogs, actualLogs);
+            // The recorded warning had the tool's own text as its headline; Weir's warning is a sentence, with that text carried as the exception.
+            Assert.Equal(recorded.Count(e => e.Level == "warning"), logger.Entries.Count(e => e.Level == LogLevel.Warning && e.Message.StartsWith("Reading ", StringComparison.Ordinal)));
         }
     }
 
@@ -339,7 +342,8 @@ public sealed class MediaToolsGoldenTests
 /// Deliberate divergences from the golden fixtures in <c>tests/Weir.Core.Tests/Media/golden</c> (shared with
 /// <c>Weir.Core.Tests</c>, which has its own copy of this patch for the argv-level fixtures): a deliberate bug fix
 /// makes the logs differ from the recorded output, and the fixtures stay as recorded. docs/archive/server-port-notes.md, "ffmpeg parity",
-/// describes the mechanism.
+/// describes the mechanism. #924 is the other kind: a failed probe's recorded warning, whose headline was the tool's own text,
+/// is compared as a debug line, and the warning in its place is a plain sentence (<c>Ffprobe_runs_log_and_fail_exactly_as_the_golden_files_record</c>).
 /// </summary>
 internal static class GoldenDivergences
 {

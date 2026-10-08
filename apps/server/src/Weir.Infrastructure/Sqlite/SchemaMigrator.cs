@@ -126,6 +126,7 @@ public sealed class SchemaMigrator
         new(37, "0072_server_starts", "Weir.Infrastructure.Migrations.0037_server_starts.sql"),
         new(38, "0073_library_change_reason", "Weir.Infrastructure.Migrations.0038_library_change_reason.sql"),
         new(39, "0074_schema_version_table", "Weir.Infrastructure.Migrations.0039_schema_version_table.sql"),
+        new(40, "0075_handoff_target_copy", "Weir.Infrastructure.Migrations.0040_handoff_target_copy.sql"),
     ];
 
     /// <summary>The first migration's revision: the oldest schema this build can start from.</summary>

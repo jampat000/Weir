@@ -84,8 +84,9 @@ public sealed class HandbackOutcomes
     /// A manager's outcome for one of its finished hand-offs: record it on the hand-off and on each of its files' copies
     /// that Weir's completion report actually named (<see cref="HandoffTargetStore.ReportedCopiesAsync"/>) — a file the
     /// hand-off covers but that never finished, or finished after the report went out, was never named to the manager, so
-    /// its copy is left untouched. <c>imported</c> releases each named copy by the shared rule; <c>not-imported</c> is
-    /// final and keeps every one.
+    /// its copy is left untouched. <c>imported</c> releases each named copy by the shared rule; <c>not-imported</c> keeps
+    /// every one. An <c>imported</c> that replaces an earlier <c>not-imported</c> (<see cref="HandbackRules.Supersedes"/>)
+    /// releases the copies that refusal kept by the same rule, and says in Activity that the manager imported it after all.
     /// </summary>
     public async Task<HandoffOutcomeResult> RecordHandoffOutcomeAsync(
         UnitOfWork uow, HandoffLedgerRow row, string manager, string outcome, DateTimeOffset occurredAt, string? importedPath, string? reason)
@@ -93,6 +94,7 @@ public sealed class HandbackOutcomes
         ArgumentNullException.ThrowIfNull(uow);
         ArgumentNullException.ThrowIfNull(row);
         var now = _time.GetUtcNow();
+        var afterAll = HandbackRules.Supersedes(row.Outcome, outcome);
         int removed = 0, gone = 0, kept = 0;
         string? firstKeptNote = null;
         if (row.LibraryId is { } libraryId)
@@ -107,23 +109,35 @@ public sealed class HandbackOutcomes
                 }
 
                 await _handback.RecordOutcomeAsync(uow, copy.Id, outcome, manager, occurredAt, importedPath, reason).ConfigureAwait(false);
+                // Already settled (Cleanup removed it, Sonarr's own webhook got there first): keep what happened then. The one
+                // settling an import after all undoes is this manager's own "will not import".
+                var settled = copy.SettledAt is not null && !(afterAll && KeptByRefusal(copy, manager));
                 HandbackRelease release;
-                if (outcome == HandbackRules.NotImported)
+                if (settled)
                 {
-                    release = new HandbackRelease(HandbackReleaseKind.Kept, HandbackRules.NotImportedNote(manager, reason));
-                }
-                else if (copy.SettledAt is not null)
-                {
-                    // Already settled (Sonarr's own webhook, say, got there first): keep what happened then.
                     release = new HandbackRelease(
                         copy.ReleasedAt is not null ? HandbackReleaseKind.Removed : HandbackReleaseKind.Kept, copy.ReleaseNote ?? HandbackRules.UnrecordedNote);
+                }
+                else if (outcome == HandbackRules.NotImported)
+                {
+                    release = new HandbackRelease(HandbackReleaseKind.Kept, HandbackRules.NotImportedNote(manager, reason));
                 }
                 else
                 {
                     release = HandbackStore.Release(copy, manager, importedPath);
+                    if (release.Kind == HandbackReleaseKind.InUse)
+                    {
+                        // The Cleanup job only looks after copies nobody has claimed, so nothing would try this one again:
+                        // it is recorded as kept, and its note tells the person to remove it by hand.
+                        release = release with { Kind = HandbackReleaseKind.Kept };
+                    }
                 }
 
-                await _handback.RecordReleaseAsync(uow, copy.Id, release, now).ConfigureAwait(false);
+                if (!settled)
+                {
+                    await _handback.RecordReleaseAsync(uow, copy.Id, release, now).ConfigureAwait(false);
+                }
+
                 switch (release.Kind)
                 {
                     case HandbackReleaseKind.Removed:
@@ -143,9 +157,14 @@ public sealed class HandbackOutcomes
         var released = outcome == HandbackRules.Imported && removed > 0 && kept == 0;
         var message = HandbackRules.OutcomeMessage(manager, outcome, removed, gone, kept, firstKeptNote);
         await _ledger.RecordManagerOutcomeAsync(uow, row.Id, outcome, occurredAt, message, released).ConfigureAwait(false);
-        await RecordActivityAsync(uow, manager, outcome, row.LibraryId, row.RelativePath, importedPath, reason, released, message, "webhook").ConfigureAwait(false);
+        await RecordActivityAsync(uow, manager, outcome, row.LibraryId, row.RelativePath, importedPath, reason, released, message, "webhook", afterAll)
+            .ConfigureAwait(false);
         return new HandoffOutcomeResult(released, message);
     }
+
+    /// <summary>The copy was kept by this manager's "will not import", the one settling an import after all undoes.</summary>
+    private static bool KeptByRefusal(HandbackRow copy, string manager) =>
+        copy.Outcome == HandbackRules.NotImported && string.Equals(copy.OutcomeBy, manager, StringComparison.Ordinal);
 
     /// <summary>
     /// The copy a manager's "imported" is about. First by <c>sourcePath</c>: Weir's own path for the copy, or a path that
@@ -211,7 +230,7 @@ public sealed class HandbackOutcomes
     }
 
     private static Task<long> RecordActivityAsync(
-        UnitOfWork uow, string manager, string outcome, long? libraryId, string relativePath, string? importedPath, string? reason, bool released, string message, string trigger)
+        UnitOfWork uow, string manager, string outcome, long? libraryId, string relativePath, string? importedPath, string? reason, bool released, string message, string trigger, bool afterAll = false)
     {
         var detail = new WireObject()
             .Set("relative_media_path", relativePath)
@@ -221,7 +240,7 @@ public sealed class HandbackOutcomes
             .Set("imported_path", importedPath)
             .Set("reason", reason)
             .Set("released", released)
-            .Set("user_message", message)
+            .Set("user_message", afterAll ? HandbackRules.AfterAllMessage(manager, message) : message)
             .Set("counts", new WireObject().Set("removed", released ? 1 : 0))
             .Set("module", "processing")
             .Set("action", "handback")
@@ -230,7 +249,7 @@ public sealed class HandbackOutcomes
         return SqliteActivityWriter.RecordAsync(uow, new ActivityEventDraft(
             ActivityEventTypes.ProcessingHandbackOutcome,
             "processing",
-            HandbackRules.OutcomeTitle(manager, outcome, MediaPathNames.Name(relativePath, OperatingSystem.IsWindows())),
+            HandbackRules.OutcomeTitle(manager, outcome, MediaPathNames.Name(relativePath, OperatingSystem.IsWindows()), afterAll),
             WireStrings.Slice(WireJsonWriter.Dumps(detail, WireJsonFormat.Compact), 10_000)));
     }
 }

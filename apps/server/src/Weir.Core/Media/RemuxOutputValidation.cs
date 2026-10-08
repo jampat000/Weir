@@ -46,7 +46,7 @@ public static partial class RemuxOutputValidation
         var outputFamily = ContainerFamily(outputFormatName);
         if (sourceFamily.Length > 0 && outputFamily.Length > 0 && sourceFamily != outputFamily)
         {
-            throw new MediaToolException(
+            throw Mismatch(
                 $"Planned to keep the {sourceFamily} container, but the output is {outputFamily} " +
                 $"({(outputFormatName is { Length: > 0 } name ? name : "unknown")}).");
         }
@@ -61,14 +61,14 @@ public static partial class RemuxOutputValidation
             var gotCount = actual.Count(t => t.CodecType == type);
             if (wantCount != gotCount)
             {
-                throw new MediaToolException(
+                throw Mismatch(
                     $"Planned {Plural.Of(wantCount, type + " track")}, output has {gotCount.ToString(CultureInfo.InvariantCulture)}.");
             }
         }
 
         if (actual.Count != expected.Count)
         {
-            throw new MediaToolException(
+            throw Mismatch(
                 $"Planned {Plural.Of(expected.Count, "track")}, output has {actual.Count.ToString(CultureInfo.InvariantCulture)}.");
         }
 
@@ -80,18 +80,18 @@ public static partial class RemuxOutputValidation
             var position = i.ToString(CultureInfo.InvariantCulture);
             if (want.CodecType != got.CodecType)
             {
-                throw new MediaToolException($"Planned output position {position} to be {want.CodecType}, output has {Describe(got.CodecType)}.");
+                throw Mismatch($"Planned output position {position} to be {want.CodecType}, output has {Describe(got.CodecType)}.");
             }
 
             if (want.Default is { } wantDefault && wantDefault != got.Default)
             {
-                throw new MediaToolException(
+                throw Mismatch(
                     $"Planned the {want.CodecType} track at position {position} to have default={BoolText(wantDefault)}, output has default={BoolText(got.Default)}.");
             }
 
             if (want.Forced is { } wantForced && wantForced != got.Forced)
             {
-                throw new MediaToolException(
+                throw Mismatch(
                     $"Planned the {want.CodecType} track at position {position} to have forced={BoolText(wantForced)}, output has forced={BoolText(got.Forced)}.");
             }
 
@@ -100,7 +100,7 @@ public static partial class RemuxOutputValidation
                 var gotLanguage = RemuxRules.NormalizeLang(got.Language);
                 if (gotLanguage != wantLanguage)
                 {
-                    throw new MediaToolException(
+                    throw Mismatch(
                         $"Planned the {want.CodecType} track at position {position} to be tagged '{wantLanguage}', output is tagged " +
                         $"'{(gotLanguage.Length > 0 ? gotLanguage : "und")}'.");
                 }
@@ -127,7 +127,7 @@ public static partial class RemuxOutputValidation
         var newWarnings = WarningsNewInOutput(sourceWarnings, outputWarnings);
         if (newWarnings.Count > 0)
         {
-            throw new MediaToolException(
+            throw Mismatch(
                 "ffprobe reported warnings on the output that the source did not have: " + string.Join(" | ", newWarnings));
         }
 
@@ -137,10 +137,14 @@ public static partial class RemuxOutputValidation
             var outputTitle = FormatTitle(outputProbe);
             if (!string.IsNullOrEmpty(outputTitle))
             {
-                throw new MediaToolException($"Planned to clear the container title, output still has '{outputTitle}'.");
+                throw Mismatch($"Planned to clear the container title, output still has '{outputTitle}'.");
             }
         }
     }
+
+    /// <summary>A way the output differs from the plan: named exactly for the log, worded for a person as a copy that was not published.</summary>
+    private static MediaToolException Mismatch(string message) =>
+        new(message) { PlainMessage = ToolFailureText.OutputNotPublishable };
 
     private static string Describe(string codecType) => codecType.Length > 0 ? codecType : "an untyped stream";
 

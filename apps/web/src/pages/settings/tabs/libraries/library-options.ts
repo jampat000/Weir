@@ -24,8 +24,10 @@ export const WRITER_HINTS: Record<RemuxWriter, string> = {
     "FFmpeg writes every file, both new downloads and files already in your library.",
 };
 
+export const LEAVE_REJECTED_FILE = "leave";
+
 export const REJECTED_FILE_OPTIONS: SettingOption[] = [
-  { value: "leave", label: "Leave the file in place" },
+  { value: LEAVE_REJECTED_FILE, label: "Leave the file in place" },
   { value: "delete_file", label: "Delete only the rejected file" },
 ];
 

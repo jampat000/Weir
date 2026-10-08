@@ -126,6 +126,19 @@ internal sealed partial class Scenario
         return accepted.Fields;
     }
 
+    /// <summary>The fake Deluno's word on what became of a finished hand-off: <c>imported</c> or <c>not-imported</c>.</summary>
+    public Task<WeirResponse> PostOutcomeAsync(string handoffId, string outcome, string? importedPath = null, string? reason = null) =>
+        Admin.PostAsync(
+            $"{Api}/intake/handoffs/deluno/{handoffId}/outcome",
+            new JsonObject
+            {
+                ["outcome"] = outcome,
+                ["occurredUtc"] = DateTimeOffset.UtcNow.ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", System.Globalization.CultureInfo.InvariantCulture),
+                ["importedPath"] = importedPath,
+                ["reason"] = reason,
+            },
+            SecretHeader);
+
     /// <summary>Asks to process one file now, as a person would from the Files page (no hand-off, no prior scan).</summary>
     public async Task EnqueueFilePassAsync(string relativeMediaPath, JsonObject library, bool passThroughUnchanged = false)
     {

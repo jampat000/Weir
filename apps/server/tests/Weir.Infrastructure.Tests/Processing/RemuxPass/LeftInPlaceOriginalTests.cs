@@ -2,6 +2,7 @@ using System.Globalization;
 using Microsoft.Extensions.Logging.Abstractions;
 using Weir.Core.Jobs;
 using Weir.Core.Json;
+using Weir.Core.Media;
 using Weir.Core.Processing;
 using Weir.Core.Processing.RemuxPass;
 using Weir.Infrastructure.Activity;
@@ -535,7 +536,7 @@ public sealed class LeftInPlaceOriginalTests : IDisposable
     }
 
     [Fact]
-    public async Task A_file_that_never_reads_to_the_end_stops_being_waited_for_and_the_failure_policy_runs()
+    public async Task A_file_that_never_reads_to_the_end_stops_being_waited_for_and_is_refused_not_handed_back()
     {
         await SetUpAsync("movie");
         _media.IntegrityError = "incomplete media data";
@@ -550,13 +551,93 @@ public sealed class LeftInPlaceOriginalTests : IDisposable
         }
 
         Assert.Equal(RemuxPassHandler.UnreadableWaitMinutes.Count + 1, IntegrityReads());
-        Assert.Equal("processing_failed", await StatusAsync("Film.2024/Film.2024.mkv"));
-        Assert.Contains(
-            "damaged or incomplete rather than still arriving",
-            await ReasonAsync("Film.2024/Film.2024.mkv"),
-            StringComparison.Ordinal);
-        // The library hands the original back rather than keeping it (its failure policy).
-        Assert.Equal(1, await _fixture.Store.Scalar("SELECT count(*) FROM jobs WHERE job_kind = 'processing.file.pass_through.v1'"));
+        Assert.Equal("rejected", await StatusAsync("Film.2024/Film.2024.mkv"));
+        Assert.Contains("It was refused before any output was written.", await ReasonAsync("Film.2024/Film.2024.mkv"), StringComparison.Ordinal);
+        // Refused, not handed back: a file Weir cannot read is not one it can vouch for, whatever the failure policy says.
+        Assert.Equal(0, await _fixture.Store.Scalar("SELECT count(*) FROM jobs WHERE job_kind = 'processing.file.pass_through.v1'"));
+        Assert.False(File.Exists(Path.Join(_folders.Output, "Film.2024", "Film.2024.mkv")));
+        Assert.True(File.Exists(Path.Join(_folders.Watched, "Film.2024", "Film.2024.mkv")));
+    }
+
+    // --- an unreadable file: waited for, never deleted ----------------------------------------------------------------
+
+    private const string UnreadableProbe =
+        "[mov,mp4,m4a,3gp,3g2,mj2 @ 000001b280590a00] moov atom not found\nC:\\Weir\\Ready\\Movies\\Film.2024.mkv: Invalid data found when processing input";
+
+    [Fact]
+    public async Task A_file_that_stays_unreadable_is_refused_after_the_looks_and_kept_even_when_the_workflow_deletes_rejected_files()
+    {
+        await SetUpAsync("movie");
+        await _fixture.Store.Execute("UPDATE libraries SET rejected_file_action = 'delete_file'");
+        _media.ProbeError = UnreadableProbe;
+        var source = _folders.Source(Path.Join("Film.2024", "Film.2024.mkv"));
+        const string rel = "Film.2024/Film.2024.mkv";
+
+        await ScanAndDrainAsync("movie");
+        foreach (var minutes in RemuxPassHandler.UnreadableWaitMinutes)
+        {
+            Assert.Equal("on_hold", await StatusAsync(rel));
+            Assert.True(File.Exists(source), "a file Weir cannot read yet is never deleted");
+            Assert.Contains(ToolFailureText.NotReadableYet, await ReasonAsync(rel), StringComparison.Ordinal);
+            Advance(minutes + 1);
+            await DrainAsync();
+        }
+
+        Assert.Equal("rejected", await StatusAsync(rel));
+        var reason = await ReasonAsync(rel);
+        Assert.Contains("It was refused before any output was written.", reason, StringComparison.Ordinal);
+        Assert.Contains(ToolFailureText.UnreadableKept, reason, StringComparison.Ordinal);
+        Assert.DoesNotContain("moov atom", reason, StringComparison.Ordinal);
+        Assert.DoesNotContain("@ 0", reason, StringComparison.Ordinal);
+        Assert.True(File.Exists(source), "an unreadable file is refused, never deleted");
+        Assert.False(File.Exists(Path.Join(_folders.Output, "Film.2024", "Film.2024.mkv")));
+        Assert.Equal(0, await _fixture.Store.Scalar("SELECT count(*) FROM jobs WHERE job_kind = 'processing.file.pass_through.v1'"));
+    }
+
+    [Fact]
+    public async Task A_file_unreadable_at_first_is_processed_once_it_reads_and_is_not_deleted_meanwhile()
+    {
+        await SetUpAsync("movie");
+        await _fixture.Store.Execute("UPDATE libraries SET rejected_file_action = 'delete_file'");
+        _media.ProbeError = UnreadableProbe;
+        var source = _folders.Source(Path.Join("Film.2024", "Film.2024.mkv"));
+        const string rel = "Film.2024/Film.2024.mkv";
+
+        await ScanAndDrainAsync("movie");
+
+        Assert.Equal("on_hold", await StatusAsync(rel));
+        Assert.True(File.Exists(source));
+        Assert.Empty(_media.Remuxes);
+
+        // The copy finished: the file reads on the next look.
+        _media.ProbeError = null;
+        Advance(RemuxPassHandler.UnreadableWaitMinutes[0] + 1);
+        await DrainAsync();
+
+        Assert.Equal("processed", await StatusAsync(rel));
+        Assert.True(File.Exists(Path.Join(_folders.Output, "Film.2024", "Film.2024.mkv")));
+    }
+
+    [Fact]
+    public async Task A_reject_workflow_does_not_reject_a_file_on_its_first_unreadable_look()
+    {
+        await SetUpAsync("movie");
+        await _fixture.Store.Execute("UPDATE libraries SET failure_policy = 'reject', retry_preflight_failures = 1");
+        _media.ProbeError = UnreadableProbe;
+        _folders.Source(Path.Join("Film.2024", "Film.2024.mkv"));
+        const string rel = "Film.2024/Film.2024.mkv";
+
+        await ScanAndDrainAsync("movie");
+
+        Assert.Equal("on_hold", await StatusAsync(rel));
+        Assert.Equal(0, await _fixture.Store.Scalar("SELECT count(*) FROM jobs WHERE job_kind = 'processing.file.reject.v1'"));
+
+        _media.ProbeError = null;
+        Advance(RemuxPassHandler.UnreadableWaitMinutes[0] + 1);
+        await DrainAsync();
+
+        Assert.Equal("processed", await StatusAsync(rel));
+        Assert.Equal(0, await _fixture.Store.Scalar("SELECT count(*) FROM jobs WHERE job_kind = 'processing.file.reject.v1'"));
     }
 
     [Fact]

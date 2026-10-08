@@ -117,7 +117,7 @@ public sealed partial class MediaTools
         LogFfprobeFileState(ProbeOutput.FileStateLogPayload(path, resolvedPath, exists, isFile, size, MediaPathNames.Suffix(path, _windows), mtime));
         if (!exists || !isFile || size == 0)
         {
-            throw new MediaToolException("file missing or empty at probe time");
+            throw new MediaToolException("file missing or empty at probe time") { PlainMessage = ToolFailureText.MissingOrEmpty };
         }
 
         LogFfprobeCall(ProbeOutput.CallLogPayload(path, argv));
@@ -138,14 +138,12 @@ public sealed partial class MediaTools
 
         var stdout = ProbeOutput.CapturedText(result.Stdout);
         var stderr = ProbeOutput.CapturedText(result.Stderr);
-        var payload = ProbeOutput.ResultLogPayload(path, result.ExitCode, stdout, stderr);
+        LogFfprobeResultDebug(ProbeOutput.ResultLogPayload(path, result.ExitCode, stdout, stderr));
         if (result.ExitCode != 0)
         {
-            LogFfprobeResultWarning(payload);
-        }
-        else
-        {
-            LogFfprobeResultDebug(payload);
+            // The headline is a sentence; the tool's own text rides along as the exception, which Logs shows as technical detail.
+            var failure = ProbeOutput.FailureFor(stdout, stderr);
+            LogFfprobeFailed(failure, MediaPathNames.Name(path, _windows), ToolFailureText.Plain(failure));
         }
 
         return (result.ExitCode, stdout, stderr);
@@ -160,8 +158,8 @@ public sealed partial class MediaTools
     [LoggerMessage(Level = LogLevel.Debug, Message = "PROCESSING_FFPROBE_RESULT: {Payload}")]
     private partial void LogFfprobeResultDebug(string payload);
 
-    [LoggerMessage(Level = LogLevel.Warning, Message = "PROCESSING_FFPROBE_RESULT: {Payload}")]
-    private partial void LogFfprobeResultWarning(string payload);
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Reading {File} failed. {Reason}")]
+    private partial void LogFfprobeFailed(Exception error, string file, string reason);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Weir could not read ffprobe's warnings for {Path}, so it compares the output against none.")]
     private partial void LogBaselineWarningsUnreadable(Exception error, string path);
