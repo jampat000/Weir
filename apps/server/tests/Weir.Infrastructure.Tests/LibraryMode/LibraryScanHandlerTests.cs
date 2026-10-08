@@ -24,13 +24,14 @@ public sealed class LibraryScanHandlerTests : IDisposable
     private readonly TempDirectory _libraryFolder = new();
     private readonly FakeMediaRunner _media = new();
     private readonly DataChangePublisher _changes = new();
+    private readonly LibraryScanProgress _progress = new();
     private readonly LibraryScanStore _scans;
     private readonly LibrarySettingsStore _librarySettings = new();
     private readonly LibraryFileMarksStore _fileMarks = new();
     private readonly LibraryViewStore _libraryView = new();
     private readonly LibraryStore _libraries = new();
 
-    public LibraryScanHandlerTests() => _scans = new LibraryScanStore(_changes);
+    public LibraryScanHandlerTests() => _scans = new LibraryScanStore(_changes, _progress);
 
     public void Dispose()
     {
@@ -50,6 +51,7 @@ public sealed class LibraryScanHandlerTests : IDisposable
         _fileMarks,
         _libraryView,
         _libraries,
+        _progress,
         _fixture.Store.Clock,
         NullLogger<LibraryScanHandler>.Instance,
         _changes);
@@ -78,6 +80,26 @@ public sealed class LibraryScanHandlerTests : IDisposable
         _fixture.Db(uow => uow.QueryAsync(
             "SELECT title FROM activity_events WHERE event_type = 'library.scan_completed' ORDER BY id",
             reader => SqliteValues.GetString(reader, 0)), commit: false);
+
+    [Fact]
+    public async Task A_running_scan_counts_the_files_it_has_looked_at_and_stops_counting_when_it_ends()
+    {
+        var library = await LibraryAsync();
+        await _fixture.Db(async uow => { await _librarySettings.SetAsync(uow, library, new LibrarySettings([_libraryFolder.Path], false)); return true; });
+        foreach (var name in new[] { "a.mkv", "b.mkv", "c.mkv" })
+        {
+            await File.WriteAllBytesAsync(_libraryFolder.Join(name), [1, 2, 3]);
+        }
+
+        var jobId = await EnqueueScanAsync(library);
+        var seenWhileProbing = new List<long?>();
+        _media.OnCall = () => seenWhileProbing.Add(_scans.FilesSeen(jobId));
+
+        await RunScanAsync(jobId);
+
+        Assert.Equal([null, 1L, 2L], seenWhileProbing);
+        Assert.Null(_scans.FilesSeen(jobId));
+    }
 
     [Fact]
     public async Task A_scan_classifies_files_and_writes_nothing_to_them()

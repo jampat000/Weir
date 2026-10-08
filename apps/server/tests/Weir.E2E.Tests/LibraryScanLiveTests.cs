@@ -11,10 +11,14 @@ namespace Weir.E2E.Tests;
 public sealed partial class LibraryScanLiveTests(E2EServer server) : E2ETestBase(server)
 {
     private const int FilesInLibrary = 40;
+    private const int FilesInLongLibrary = 150;
     private const float ScanMs = 90_000;
 
     [GeneratedRegex(@"^([\d,]+) files · ")]
     private static partial Regex FilesCount();
+
+    [GeneratedRegex(@"· ([\d,]+) files so far")]
+    private static partial Regex FilesSoFar();
 
     [E2EFact]
     public async Task A_scan_started_through_the_api_shows_as_checking_and_then_as_the_counts_it_found_without_a_reload()
@@ -62,6 +66,76 @@ public sealed partial class LibraryScanLiveTests(E2EServer server) : E2ETestBase
             await WeirApi.SetPausedAsync(context, BaseUrl, paused: false);
             await WeirWorkflowApi.DeleteAsync(context, BaseUrl, id);
         }
+    }
+
+    [E2EFact]
+    public async Task A_long_scan_counts_up_the_files_it_has_looked_at_before_it_reports_what_it_found()
+    {
+        using var folders = new TemporaryFolder();
+        var libraryFolder = Directory.CreateDirectory(Path.Join(folders.Path, "library")).FullName;
+        for (var index = 0; index < FilesInLongLibrary; index++)
+        {
+            await File.WriteAllBytesAsync(Path.Join(libraryFolder, $"Film {index:D4}.mkv"), [1, 2, 3, 4]);
+        }
+
+        var page = await NewPageAsync();
+        await Navigation.EnsureSignedInAsync(page, BaseUrl);
+        var context = page.Context;
+        var id = await WeirWorkflowApi.CreateAsync(
+            context,
+            BaseUrl,
+            "E2E long scan",
+            Directory.CreateDirectory(Path.Join(folders.Path, "watched")).FullName,
+            Directory.CreateDirectory(Path.Join(folders.Path, "output")).FullName);
+        try
+        {
+            await WeirWorkflowApi.SetLibraryFoldersAsync(context, BaseUrl, id, libraryFolder);
+            await page.GotoAsync($"{BaseUrl}/library?library={id}");
+            await page.EvaluateAsync("() => { window.__weirNotReloaded = true; }");
+            var scan = page.GetByTestId("library-scan");
+            await Expect(scan).ToContainTextAsync("not scanned yet", new() { Timeout = Navigation.UrlAssertMs });
+
+            await WeirWorkflowApi.StartLibraryScanAsync(context, BaseUrl, id);
+
+            var counted = await ObserveFilesSoFarUntilCheckedAsync(page);
+            Assert.True(counted.Count >= 3, $"The scan showed only {string.Join(", ", counted)} files so far.");
+            Assert.All(counted, seen => Assert.InRange(seen, 1, FilesInLongLibrary - 1));
+            Assert.Equal(counted.Order(), counted);
+            await Expect(page.GetByText(FilesCount())).ToContainTextAsync($"{FilesInLongLibrary:N0} files", new() { Timeout = ScanMs });
+            Assert.True(await page.EvaluateAsync<bool>("() => window.__weirNotReloaded === true"), "The page was reloaded.");
+        }
+        finally
+        {
+            await WeirWorkflowApi.DeleteAsync(context, BaseUrl, id);
+        }
+    }
+
+    /// <summary>Every distinct "files so far" count the scan line shows, in order, until the scan reports itself checked.</summary>
+    private static async Task<List<int>> ObserveFilesSoFarUntilCheckedAsync(Microsoft.Playwright.IPage page)
+    {
+        var seen = new List<int>();
+        var deadline = DateTime.UtcNow.AddMilliseconds(ScanMs);
+        var line = page.GetByTestId("library-scan");
+        while (DateTime.UtcNow < deadline)
+        {
+            var text = await line.InnerTextAsync();
+            if (FilesSoFar().Match(text) is { Success: true } match)
+            {
+                var shown = int.Parse(match.Groups[1].Value.Replace(",", string.Empty, StringComparison.Ordinal), CultureInfo.InvariantCulture);
+                if (seen.Count == 0 || seen[^1] != shown)
+                {
+                    seen.Add(shown);
+                }
+            }
+            else if (text.Contains("checked", StringComparison.Ordinal))
+            {
+                return seen;
+            }
+
+            await Task.Delay(50);
+        }
+
+        throw new TimeoutException($"The scan never finished; it showed {string.Join(", ", seen)} files so far.");
     }
 
     /// <summary>Every distinct file count the Files card shows, in the order it shows them, until it shows <paramref name="expected"/>.</summary>

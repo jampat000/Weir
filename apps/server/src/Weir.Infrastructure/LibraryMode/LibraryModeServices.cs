@@ -28,6 +28,7 @@ public static class LibraryModeServices
         // singleton is as cheap as a static class was and lets endpoints and handlers take them by constructor.
         services.TryAddSingleton<LibraryCleanHistoryStore>();
         services.TryAddSingleton<LibraryFileMarksStore>();
+        services.TryAddSingleton<LibraryScanProgress>();
         services.TryAddSingleton<LibraryScanStore>();
         services.TryAddSingleton<LibrarySettingsStore>();
         services.TryAddSingleton<LibraryViewStore>();

@@ -2927,6 +2927,18 @@
             "title": "Errors",
             "type": "array"
           },
+          "files_seen": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "How many files the running scan has looked at so far; null when it has not started walking or no scan is running.",
+            "title": "Files Seen"
+          },
           "generated_at": {
             "anyOf": [
               {
@@ -2960,6 +2972,7 @@
         },
         "required": [
           "errors",
+          "files_seen",
           "generated_at",
           "job_id",
           "running",

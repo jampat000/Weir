@@ -26,9 +26,18 @@ public sealed record LibraryScanOutcome(DateTimeOffset GeneratedAt, IReadOnlyLis
 public sealed class LibraryScanStore
 {
     private readonly DataChangePublisher? _changes;
+    private readonly LibraryScanProgress? _progress;
 
     /// <param name="changes">Told when a scan is queued, so the screens showing scans follow it; null in a host with no live stream.</param>
-    public LibraryScanStore(DataChangePublisher? changes = null) => _changes = changes;
+    /// <param name="progress">Where a running scan says how many files it has looked at; null reports none.</param>
+    public LibraryScanStore(DataChangePublisher? changes = null, LibraryScanProgress? progress = null)
+    {
+        _changes = changes;
+        _progress = progress;
+    }
+
+    /// <summary>How many files the running scan job has looked at so far, or null when it has not said.</summary>
+    public long? FilesSeen(long jobId) => _progress?.FilesSeen(jobId);
 
     /// <summary>
     /// Enqueues the scan on <paramref name="uow"/>'s own connection and transaction (<see cref="ProcessingJobStore.EnqueueOrGet(UnitOfWork, string, string, string?, int, int?, int, DateTimeOffset?)"/>),

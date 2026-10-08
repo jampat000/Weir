@@ -266,6 +266,7 @@ describe("LibraryPage", () => {
         job_id: 1,
         status: "completed",
         running: false,
+        files_seen: null,
         generated_at: Math.floor(Date.now() / 1000) - 120,
         errors: [],
       },
@@ -982,6 +983,27 @@ describe("LibraryPage", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Check again" }));
     expect(rescan).toHaveBeenCalled();
+  });
+
+  it("counts the files a running check has looked at so far, and says only that it is checking before it has looked at any", () => {
+    overviewResult = {
+      ...overviewResult,
+      scan: { ...overviewResult.scan!, running: true, files_seen: 1234 },
+    };
+    const counting = renderInShell();
+    expect(screen.getByTestId("library-scan")).toHaveTextContent(
+      "Checking this workflow now · 1,234 files so far",
+    );
+    counting.unmount();
+
+    overviewResult = {
+      ...overviewResult,
+      scan: { ...overviewResult.scan!, running: true, files_seen: null },
+    };
+    renderInShell();
+    expect(screen.getByTestId("library-scan")).toHaveTextContent(
+      /^Checking this workflow now$/,
+    );
   });
 
   it("has an All chip, selected to begin with, that clears the filter and is no part of the request", () => {

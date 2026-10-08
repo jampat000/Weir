@@ -3769,6 +3769,11 @@ export interface components {
     LibraryScanStateOut: {
       /** Errors */
       errors: string[];
+      /**
+       * Files Seen
+       * @description How many files the running scan has looked at so far; null when it has not started walking or no scan is running.
+       */
+      files_seen: number | null;
       /** Generated At */
       generated_at: number | null;
       /** Job Id */
