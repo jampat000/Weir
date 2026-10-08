@@ -35,6 +35,9 @@ public sealed class DataChangePublisher
         }
     }
 
+    /// <summary>Whether any stream is open, so work that only keeps open screens current can wait until one is.</summary>
+    public bool HasListeners => _feed.HasSubscribers;
+
     /// <summary>Starts a stream of every topic published from now on. Dispose it when the stream ends.</summary>
     public BroadcastSubscription<string> Subscribe() => _feed.Subscribe();
 }

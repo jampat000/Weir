@@ -52,7 +52,7 @@ export const LIVE_TOPIC_QUERIES: Readonly<
   backups: [settingsKeys.configurationBackups],
   kept_files: [processingKeys.keptFiles],
   metrics: [settingsKeys.metrics],
-  jobs: [processingKeys.jobs],
+  jobs: [processingKeys.jobs, systemKeys.logEntriesAll],
 };
 
 function isLiveTopic(value: unknown): value is LiveTopic {

@@ -4,6 +4,8 @@ import { downloadClientKeys } from "../download-clients/query-keys";
 import { mediaManagerKeys } from "../media-managers/query-keys";
 import { pauseKeys } from "../pause/query-keys";
 import { processingKeys } from "../processing/query-keys";
+import { settingsKeys } from "../settings/query-keys";
+import { systemKeys } from "../system/query-keys";
 import {
   LIVE_TOPIC_QUERIES,
   parseDataChanged,
@@ -66,6 +68,28 @@ describe("LIVE_TOPIC_QUERIES", () => {
       processingKeys.filesAtOnce,
       processingKeys.ruleSets,
       processingKeys.allLibrarySuggestions,
+    ]);
+  });
+
+  it("refreshes the jobs and the System log when a job changes", () => {
+    expect(LIVE_TOPIC_QUERIES.jobs).toEqual([
+      processingKeys.jobs,
+      systemKeys.logEntriesAll,
+    ]);
+  });
+
+  it("refreshes the server diagnostics when the counters move", () => {
+    expect(LIVE_TOPIC_QUERIES.metrics).toEqual([settingsKeys.metrics]);
+  });
+
+  it("refreshes the update notice and the tray's network answer when the server says they changed", () => {
+    expect(LIVE_TOPIC_QUERIES.update).toEqual([
+      settingsKeys.updateStatus,
+      settingsKeys.updateSettings,
+      settingsKeys.updateState,
+    ]);
+    expect(LIVE_TOPIC_QUERIES.network_access).toEqual([
+      settingsKeys.networkAccess,
     ]);
   });
 });

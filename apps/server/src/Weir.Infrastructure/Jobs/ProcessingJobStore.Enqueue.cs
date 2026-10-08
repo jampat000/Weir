@@ -1,5 +1,7 @@
 using Microsoft.Data.Sqlite;
 using Weir.Core.Jobs;
+using Weir.Infrastructure.Activity;
+using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Infrastructure.Jobs;
 
@@ -58,6 +60,39 @@ public sealed partial class ProcessingJobStore
                 return EnqueueOrGet(connection, transaction, dedupeKey, jobKind, payloadJson, JobQueueRules.DefaultMaxAttempts, runnerCost: null, priority: 0);
             },
             cancellationToken);
+    }
+
+    /// <summary>
+    /// <see cref="EnqueueOrGet(SqliteConnection, SqliteTransaction, string, string, string?, int, int?, int, DateTimeOffset?)"/> on the
+    /// caller's unit of work: commits nothing, and says the jobs changed once the unit commits.
+    /// </summary>
+    public ProcessingJob EnqueueOrGet(
+        UnitOfWork uow,
+        string dedupeKey,
+        string jobKind,
+        string? payloadJson,
+        int maxAttempts,
+        int? runnerCost,
+        int priority,
+        DateTimeOffset? notBefore = null)
+    {
+        ArgumentNullException.ThrowIfNull(uow);
+        var job = EnqueueOrGet(uow.Connection, uow.WriteTransaction(), dedupeKey, jobKind, payloadJson, maxAttempts, runnerCost, priority, notBefore);
+        AnnounceOnCommit(uow);
+        return job;
+    }
+
+    /// <summary>
+    /// Says the jobs changed once <paramref name="uow"/> commits, for a unit of work that writes job rows itself rather than
+    /// through <see cref="InTransactionAsync{T}"/>. A unit that writes several rows says it once.
+    /// </summary>
+    public void AnnounceOnCommit(UnitOfWork uow)
+    {
+        ArgumentNullException.ThrowIfNull(uow);
+        if (_changes is { } changes && uow.Items.TryAdd(AnnouncedKey, true))
+        {
+            uow.OnCommitted(() => changes.Publish(DataTopics.Jobs));
+        }
     }
 
     internal ProcessingJob EnqueueOrGet(

@@ -89,6 +89,10 @@ public static class WeirApi
         services.AddSingleton<IPeriodicTask>(provider => provider.GetRequiredService<ActivityLatestPollTask>());
         services.AddSingleton<IPeriodicTask, WorkStateTask>();
         services.AddSingleton<IPeriodicTask, SuitePauseExpiryTask>();
+        services.AddSingleton<IPeriodicTask, MetricsChangeTask>();
+        services.AddSingleton<IPeriodicTask, UpdateCheckTask>();
+        // Hears the tray's answers (a downloaded update, the firewall prompt) so open screens show them at once.
+        services.AddHostedService<TrayHandOffWatcher>();
         services.AddWeirResponseCompression();
         services.AddRouting();
         return services;

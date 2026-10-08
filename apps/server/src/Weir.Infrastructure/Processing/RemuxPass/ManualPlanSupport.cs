@@ -108,8 +108,7 @@ public static class ManualPlanSupport
             .Set("source_fingerprint", ManualPlanJson.ToPyDict(fingerprint));
 
         return jobs.EnqueueOrGet(
-            uow.Connection,
-            uow.WriteTransaction(),
+            uow,
             $"{RemuxPassOutcomes.JobKind}:manual-plan:{context.File.Id}:{Guid.NewGuid():N}",
             RemuxPassOutcomes.JobKind,
             WireJsonWriter.Dumps(payload, WireJsonFormat.Compact),

@@ -13,6 +13,9 @@ public sealed class RuntimeMetricsStore
     private static readonly string[] JobEvents = ["started", "completed", "failed"];
     private static readonly string[] StatusBuckets = ["2xx", "3xx", "4xx", "5xx"];
 
+    /// <summary>How a request for <c>GET /suite/metrics</c> is counted among the routes.</summary>
+    private const string SuiteMetricsRoute = "GET /suite/metrics";
+
     private const int MaxTimingSamples = 20_000;
     private const int MaxServerErrorsKept = 10_000;
     private const double SlowRequestFraction = 0.95;
@@ -190,6 +193,20 @@ public sealed class RuntimeMetricsStore
         IReadOnlyList<KeyValuePair<string, long>> ModuleQueueDepths,
         IReadOnlyList<KeyValuePair<string, long>> ModuleSavingsBytes,
         IReadOnlyDictionary<string, long> LogCounts);
+
+    /// <summary>
+    /// A number that grows whenever a figure of <see cref="SuiteMetricsOut"/> has moved, for telling screens to read it
+    /// again. Reads of those figures through <c>GET /suite/metrics</c> do not move it: a screen that read them again for
+    /// every read would never stop.
+    /// </summary>
+    public long ChangeStamp()
+    {
+        lock (_lock)
+        {
+            var ownReads = _routes.GetValueOrDefault(SuiteMetricsRoute).Count;
+            return _httpTotal - ownReads + _logCounts.GetValueOrDefault("ERROR") + _logCounts.GetValueOrDefault("CRITICAL");
+        }
+    }
 
     public Summary GetSummary()
     {
