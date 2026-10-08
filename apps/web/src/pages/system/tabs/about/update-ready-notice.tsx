@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 
+import { subscribeLiveSignals } from "../../../../lib/activity/use-activity-stream-invalidation";
 import { errorMessage } from "../../../../lib/api/error-message";
 import {
   useApplyUpdateMutation,
@@ -7,48 +8,20 @@ import {
 } from "../../../../lib/settings/queries";
 import { mmActionButtonClass } from "../../../../lib/ui/mm-control-roles";
 
-/** How long to let the tray actually start restarting before the first readiness check. */
-const RESTART_GRACE_MS = 2000;
-/** How often to check `/ready` while Weir is restarting. */
-const READY_POLL_MS = 1000;
-
-type ReadyPayload = { ready?: boolean };
-
 /**
- * Once the restart signal is sent, the tray kills and relaunches the server process: this browser tab
- * has no other way to learn when that finishes. Polling `/ready` and reloading is what turns "Restart
- * signal sent" into the page actually coming back on its own (#703).
+ * Once the restart signal is sent, the tray stops and starts the server. The page needs no check of its own to come back:
+ * the shared stream reconnects and hears a new boot id, which reloads every query and, when the server now serves a newer
+ * build, the page itself (`useLiveSync`). If the server came back and the update is still waiting, the notice goes back to
+ * offering the restart rather than saying one is under way for ever.
  */
-function useReloadWhenReady(active: boolean): void {
-  useEffect(() => {
-    if (!active) return undefined;
-    let cancelled = false;
-    let timer: number | undefined;
-
-    const poll = async () => {
-      try {
-        const response = await fetch("/ready", { cache: "no-store" });
-        const body = (await response
-          .json()
-          .catch(() => null)) as ReadyPayload | null;
-        if (!cancelled && body?.ready) {
-          window.location.reload();
-          return;
-        }
-      } catch {
-        // The server is mid-restart and not answering yet; keep waiting.
-      }
-      if (!cancelled) {
-        timer = window.setTimeout(() => void poll(), READY_POLL_MS);
-      }
-    };
-
-    timer = window.setTimeout(() => void poll(), RESTART_GRACE_MS);
-    return () => {
-      cancelled = true;
-      if (timer !== undefined) window.clearTimeout(timer);
-    };
-  }, [active]);
+function useForgetRestartWhenServerRestarted(forget: () => void): void {
+  useEffect(
+    () =>
+      subscribeLiveSignals((signal) => {
+        if (signal.type === "restarted") forget();
+      }),
+    [forget],
+  );
 }
 
 /** On Windows, a downloaded update waits for a restart; this says so and offers it. */
@@ -56,7 +29,7 @@ export function UpdateReadyNotice() {
   const updateStateQ = useUpdateStateQuery(true);
   const applyUpdate = useApplyUpdateMutation();
   const state = updateStateQ.data;
-  useReloadWhenReady(applyUpdate.isSuccess);
+  useForgetRestartWhenServerRestarted(applyUpdate.reset);
   if (!state?.downloaded) return null;
 
   return (

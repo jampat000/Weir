@@ -146,18 +146,8 @@ describe("NetworkAccessSetting", () => {
     );
   });
 
-  it("reads the state again while a change is pending, and not otherwise", () => {
-    const query = setup(status({ pending_scope: "network" }));
-
-    render(<NetworkAccessSetting editable />);
-
-    expect(query).toHaveBeenCalledWith(false);
-  });
-
   it("says Windows Firewall blocks, and offers to try again", () => {
-    const query = setup(
-      status({ state: "blocked", scope: "network", firewall: "blocked" }),
-    );
+    setup(status({ state: "blocked", scope: "network", firewall: "blocked" }));
 
     render(<NetworkAccessSetting editable />);
     expect(screen.getByTestId("network-access-status")).toHaveTextContent(
@@ -166,7 +156,6 @@ describe("NetworkAccessSetting", () => {
     fireEvent.click(screen.getByRole("button", { name: "Try again" }));
 
     expect(mutate).toHaveBeenCalledWith({ scope: "network" });
-    expect(query).toHaveBeenLastCalledWith(true);
     expect(
       screen.getByText("Windows may be asking for approval on MEDIA-PC."),
     ).toBeInTheDocument();

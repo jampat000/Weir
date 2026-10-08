@@ -25,9 +25,6 @@ export const LOG_PAGE_SIZE = 50;
 /** Slow enough that a burst of events does not read the log again for each one. */
 const LIVE_THROTTLE_MS = 3_000;
 
-/** The log is read again this often when no frame has said anything changed: jobs change without an event. */
-const BACKSTOP_MS = 30_000;
-
 const LOG_KEYS = [systemKeys.logEntriesAll] as const;
 
 type OlderRows = {
@@ -88,7 +85,6 @@ export function useLogEntries(query: SystemLogQuery, holding: boolean) {
     queryKey: systemKeys.logEntries(query),
     queryFn: () => fetchSystemLog({ ...query, limit: LOG_PAGE_SIZE }),
     placeholderData: keepPreviousData,
-    refetchInterval: BACKSTOP_MS,
     staleTime: LIVE_THROTTLE_MS,
   });
   const olderForQuery = older?.key === dataKey ? older : null;
