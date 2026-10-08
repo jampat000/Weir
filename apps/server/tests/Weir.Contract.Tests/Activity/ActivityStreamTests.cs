@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text.Json.Nodes;
 using Weir.Contract.Tests.Harness;
 
 namespace Weir.Contract.Tests.Activity;
@@ -65,6 +66,40 @@ public sealed class ActivityStreamTests(ServerFixture fixture) : IClassFixture<S
 
         Assert.Equal(latest, (long)data["latest_event_id"]!);
         Assert.True((long)data["activity_revision"]! > (long)first["activity_revision"]!);
+    }
+
+    [Fact]
+    public async Task Activity_stream_says_hello_with_the_id_of_this_run_of_the_server()
+    {
+        using var admin = await Server.CreateAdminClientAsync();
+        using var first = await admin.OpenStreamAsync(Stream);
+        using var second = await admin.OpenStreamAsync(Stream);
+
+        var hello = (await first.NextEventNamedAsync("server.hello")).AsObject();
+        var again = (await second.NextEventNamedAsync("server.hello")).AsObject();
+
+        Assert.Equal(["boot_id"], hello.Select(field => field.Key));
+        Assert.True(Guid.TryParse((string)hello["boot_id"]!, out _));
+        Assert.Equal((string)hello["boot_id"]!, (string)again["boot_id"]!);
+    }
+
+    [Fact]
+    public async Task Pausing_and_resuming_send_a_data_changed_frame_for_the_pause_topic_to_an_open_stream()
+    {
+        using var admin = await Server.CreateAdminClientAsync();
+        using var stream = await admin.OpenStreamAsync(Stream);
+        await stream.NextEventNamedAsync("server.hello");
+
+        var paused = await admin.PutWithCsrfAsync($"{WeirClient.Api}/pause", new JsonObject { ["paused"] = true });
+        Assert.True(paused.Status == HttpStatusCode.OK, paused.ToString());
+        var pausedFrame = (await stream.NextEventNamedAsync("data.changed")).AsObject();
+        var resumed = await admin.PutWithCsrfAsync($"{WeirClient.Api}/pause", new JsonObject { ["paused"] = false });
+        Assert.True(resumed.Status == HttpStatusCode.OK, resumed.ToString());
+        var resumedFrame = (await stream.NextEventNamedAsync("data.changed")).AsObject();
+
+        Assert.Equal(["topic"], pausedFrame.Select(field => field.Key));
+        Assert.Equal("pause", (string)pausedFrame["topic"]!);
+        Assert.Equal("pause", (string)resumedFrame["topic"]!);
     }
 
     [Fact]
