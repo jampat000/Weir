@@ -1,3 +1,4 @@
+using System.Globalization;
 using Weir.Core.Json;
 using Weir.Core.Observability;
 using Weir.Core.Rules;
@@ -11,10 +12,20 @@ namespace Weir.Core.Media;
 public static class ToolFailureText
 {
     /// <summary>A file the probe could not parse, or that has no streams at all.</summary>
-    public const string UnreadableFile = "Weir couldn't read this file: it isn't a video Weir recognises, or it is damaged.";
+    public const string UnreadableFile = "Weir couldn't read this file: it isn't a video Weir recognises, or it is damaged or incomplete.";
 
-    /// <summary>The sentence a pass records when it refuses an unreadable file, which it does before writing anything.</summary>
-    public const string UnreadableFileRefusal = UnreadableFile + " It was refused before any output was written.";
+    /// <summary>What a pass says of a file it cannot read yet, while it waits to see whether the file is only still arriving.</summary>
+    public const string NotReadableYet =
+        "Weir can't read this file yet. It may still be arriving, so Weir will look again later.";
+
+    /// <summary>What a pass says when it will not delete a file it could not read, whatever the workflow does with rejected files.</summary>
+    public const string UnreadableKept =
+        "Weir left the file where it is: it could not read it, so it cannot be sure the file is unwanted.";
+
+    /// <summary>The sentence a pass records when it refuses a file it still could not read after looking again, before writing anything.</summary>
+    public static string UnreadableFileRefusal(long looks, long minutes) =>
+        $"{UnreadableFile} Weir looked at it {looks.ToString(CultureInfo.InvariantCulture)} times over about " +
+        $"{minutes.ToString(CultureInfo.InvariantCulture)} minutes and it did not change. It was refused before any output was written.";
 
     /// <summary>A file that reads in part but not from start to finish.</summary>
     public const string IncompleteRead =
@@ -32,6 +43,15 @@ public static class ToolFailureText
 
     public const string OutputNotPublishable =
         "Weir wrote a cleaned copy, but its checks found a problem with it, so the copy was not published. The original is untouched.";
+
+    public const string TooSlow =
+        "Weir stopped writing this file because it would have taken more than 12 hours. The file may be damaged or mislabelled.";
+
+    public const string WriterMissing = "Weir could not find the tool it needs to write this file. Check that Weir's video tools are installed.";
+
+    /// <summary>What a person reads when the track details a probe returned cannot be made sense of.</summary>
+    public const string UnusableTrackData =
+        "Weir couldn't make sense of this file's track details, so it cannot plan anything for it. The file may be damaged.";
 
     public const string Generic =
         "Weir's media tools couldn't finish this file. Try it again; if it keeps happening, the file may be damaged.";
@@ -59,11 +79,27 @@ public static class ToolFailureText
         return WireStrings.Slice(Diagnostics.SanitizeText("technical_detail", exception.Message), 1000);
     }
 
+    /// <summary>
+    /// What each line of a tool's text says after the file it names: ffprobe and ffmpeg write <c>path: message</c>, and a file called
+    /// "The End of File.mkv" must not read as the tool saying so. A line with no <c>": "</c> is kept whole.
+    /// </summary>
+    public static string WithoutPaths(string toolText)
+    {
+        ArgumentNullException.ThrowIfNull(toolText);
+        return string.Join(
+            '\n',
+            toolText.Split('\n').Select(line =>
+            {
+                var colon = line.LastIndexOf(": ", StringComparison.Ordinal);
+                return colon < 0 ? line : line[(colon + 2)..];
+            }));
+    }
+
     /// <summary>The words for a tool's own failure text (stderr, a path, an address).</summary>
     public static string ForToolText(string toolText)
     {
         ArgumentNullException.ThrowIfNull(toolText);
-        var lowered = RulesJson.Lower(toolText);
+        var lowered = WithoutPaths(RulesJson.Lower(toolText));
         if (ProbeOutput.IsUnreadableMedia(lowered))
         {
             return UnreadableFile;

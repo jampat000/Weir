@@ -76,19 +76,15 @@ public sealed partial class RemuxPassRunner
     }
 
     /// <summary>
-    /// The result of a file Weir cannot read at all (ffprobe could not parse it, or found no streams in it): refused before any
-    /// output, the way a file with no video is. What the tool said stays in <c>technical_detail</c>.
+    /// The result of a file Weir cannot read at all (ffprobe could not parse it, or found no streams in it): not yet a verdict, because
+    /// a download that is still arriving reads the same way. It waits and is looked at again, and only a file that stays unreadable and
+    /// unchanged through those looks is refused (<see cref="RemuxPassHandler"/>, <c>SettleUnreadableSourceAsync</c>). What the tool said
+    /// stays in <c>technical_detail</c>.
     /// </summary>
-    private static WireObject RefuseUnreadable(string relativeMediaPath, string inspectedSourcePath, string scope, string watchedRoot, string technicalDetail) =>
-        FailBefore(
-            relativeMediaPath,
-            ToolFailureText.UnreadableFileRefusal,
-            inspectedSourcePath,
-            new WireObject()
-                .Set("rejection_kind", "unreadable_file")
-                .Set("technical_detail", technicalDetail)
-                .Set("media_scope", scope)
-                .Set("processing_watched_folder_resolved", watchedRoot));
+    private static WireObject WaitForReadable(string relativeMediaPath, string inspectedSourcePath, string technicalDetail) =>
+        SourceNotReady(relativeMediaPath, ToolFailureText.NotReadableYet, inspectedSourcePath)
+            .Set("not_ready_kind", UnreadableWait)
+            .Set("technical_detail", technicalDetail);
 
     /// <summary>
     /// Adds what a failed media tool said to <paramref name="result"/> as <c>technical_detail</c>, when the sentence a person reads

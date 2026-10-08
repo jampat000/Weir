@@ -2,6 +2,7 @@ using System.Globalization;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
 using Weir.Core.Json;
+using Weir.Core.Media;
 using Weir.Core.Processing.RemuxPass;
 using Weir.Core.Time;
 
@@ -10,15 +11,16 @@ namespace Weir.Infrastructure.Processing.RemuxPass;
 public sealed partial class RemuxPassHandler
 {
     /// <summary>
-    /// A file Weir could not read from start to finish is looked at again after a while, and only a few times (#646).
+    /// A file Weir could not read, whether ffprobe could not parse it or it would not read from start to finish, is looked at again
+    /// after a while, and only a few times (#646).
     /// </summary>
     /// <remarks>
-    /// Reading a file to the end is how Weir tells a download that is still arriving from one that is damaged, and it cannot
-    /// tell them apart from one look. So the look is repeated, further apart each time, while the file is still changing or
-    /// might be, and not for ever: otherwise every scan would reread the whole file, gigabytes of disk reads every few
-    /// minutes for a file nobody is ever told about. Once the file has sat unchanged through <see cref="UnreadableWaitMinutes"/>, it is
-    /// damaged, so this hands it to the library's failure policy with the evidence a reject needs (#471) — the same place a
-    /// file whose contents cannot be read at all ends up. A file that changes starts the count again.
+    /// Reading a file is how Weir tells a download that is still arriving from one that is damaged, and it cannot tell them apart
+    /// from one look. So the look is repeated, further apart each time, while the file is still changing or might be, and not
+    /// for ever: otherwise every scan would reread the whole file, gigabytes of disk reads every few minutes for a file nobody is
+    /// ever told about. Once the file has sat unchanged through <see cref="UnreadableWaitMinutes"/>, it is refused the way a file
+    /// with no video is: nothing is written, nothing is deleted, and the library's reject or leave choice applies with the
+    /// evidence a reject needs (#471). A file that changes starts the count again.
     /// </remarks>
     private async Task SettleUnreadableSourceAsync(long jobId, WireObject data, WireObject? origin, WireObject result, CancellationToken cancellationToken)
     {
@@ -46,20 +48,16 @@ public sealed partial class RemuxPassHandler
         var waited = UnreadableWaitMinutes.Take((int)Math.Min(looks - 1, UnreadableWaitMinutes.Count)).Sum();
         if (looks > UnreadableWaitMinutes.Count)
         {
-            var reason = result.Get("reason") is WireString said ? said.Value : "Weir could not read this file from start to finish.";
-            var sentence =
-                $"Weir looked at this file {looks.ToString(CultureInfo.InvariantCulture)} times over about " +
-                $"{waited.ToString(CultureInfo.InvariantCulture)} minutes and could not read it from start to finish, and it has not " +
-                $"changed since the first look. It is damaged or incomplete rather than still arriving. {reason}";
+            var sentence = ToolFailureText.UnreadableFileRefusal(looks, waited);
             result.Remove("retryable_wait");
             result.Remove("not_ready_kind");
+            // Refused as a file with no video is: nothing is written and nothing is deleted, and a library set to reject can act on it (#471).
             result.Set("outcome", RemuxPassOutcomes.FailedBeforeExecution)
                 .Set("preflight_status", "failed")
                 .Set("preflight_reason", sentence)
                 .Set("reason", sentence)
-                // Evidence the release is bad, so a library set to reject can act on it (#471).
-                .Set("content_unusable", true);
-            _logger.LogWarning("A file did not read to the end after {Looks} looks, so Weir stopped waiting for it: job {JobId}.", looks, jobId);
+                .Set("rejection_kind", "unreadable_file");
+            _logger.LogWarning("A file stayed unreadable after {Looks} looks, so Weir refused it: job {JobId}.", looks, jobId);
             return;
         }
 

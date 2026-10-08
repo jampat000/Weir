@@ -5,14 +5,15 @@ using Weir.Contract.Tests.Harness.Fakes;
 namespace Weir.Contract.Tests.Processing;
 
 /// <summary>
-/// A file ffprobe cannot read is not a video Weir can vouch for. Whatever the workflow does with files that need no change, it is refused
-/// before any output is written, in plain words: no tool text, memory address or folder path reaches Activity or the media manager.
+/// A file ffprobe cannot read is not a video Weir can vouch for, and not one it can condemn on one look either: a download still arriving
+/// reads the same way. Weir waits and looks again; whatever the workflow does with files that need no change, nothing is written, handed
+/// back, reported or deleted meanwhile, and no tool text, memory address or folder path reaches Activity or the media manager. The refusal
+/// after the last look is covered with a clock Weir can move on, in <c>LeftInPlaceOriginalTests</c>.
 /// </summary>
 [ContractArea("processing")]
 public sealed class UnreadableFileTests
 {
-    private const string UnreadableSentence =
-        "Weir couldn't read this file: it isn't a video Weir recognises, or it is damaged. It was refused before any output was written.";
+    private const string NotReadableYet = "Weir can't read this file yet. It may still be arriving, so Weir will look again later.";
 
     private const string ProbeFailure =
         "[matroska,webm @ 000001b280590a00] EBML header parsing failed\nC:\\Weir\\Ready\\Movies\\Reject.Film.mkv: Invalid data found when processing input";
@@ -33,11 +34,13 @@ public sealed class UnreadableFileTests
         Assert.DoesNotContain("/tmp/", text, StringComparison.Ordinal);
     }
 
+    /// <summary>Every sentence Activity shows for the file is plain; the tool's own text is only ever in <c>technical_detail</c>.</summary>
     private static async Task AssertActivityIsPlainAsync(Scenario scenario)
     {
         var recent = await scenario.Admin.GetAsync($"{WeirClient.Api}/activity/recent", ("limit", 100));
-        var items = recent.Fields["items"]!.AsArray().OfType<JsonObject>().ToList();
-        var failed = items.Where(item => ((string)item["title"]!).Contains("film.mkv", StringComparison.Ordinal)).ToList();
+        var failed = recent.Fields["items"]!.AsArray().OfType<JsonObject>()
+            .Where(item => ((string)item["title"]!).Contains("film.mkv", StringComparison.Ordinal))
+            .ToList();
         Assert.NotEmpty(failed);
         foreach (var item in failed)
         {
@@ -53,58 +56,72 @@ public sealed class UnreadableFileTests
         }
     }
 
+    private static async Task AssertNothingHappenedAsync(Scenario scenario, FakeManager fake, string handoffId, string source, byte[] junk)
+    {
+        // Long enough for a wrong verdict to reach the manager; the next look is minutes away. The manager may be told the file is held,
+        // in plain words; it must never be told the release is bad, nor be given the tool's text.
+        await Scenario.NeverWithinAsync(
+            () =>
+            {
+                foreach (var report in Scenario.Callbacks(fake, handoffId))
+                {
+                    Assert.Equal("failed", (string)report["status"]!);
+                    Assert.Equal("held", (string)report["disposition"]!);
+                    Assert.False((bool)report["sourceRemoved"]!);
+                    Assert.Equal(NotReadableYet, (string)report["message"]!);
+                    AssertPlain(report.ToJsonString());
+                }
+
+                return Task.FromResult(false);
+            },
+            TimeSpan.FromSeconds(4),
+            "Weir telling the manager anything but that it is waiting for a file it cannot read yet");
+        await Scenario.NeverWithinAsync(
+            async () => (await scenario.JobsAsync(Scenario.RejectKind)).Count > 0,
+            TimeSpan.FromSeconds(1),
+            "Weir queueing a rejection of a file it cannot read yet");
+        Assert.Empty(Directory.GetFileSystemEntries(scenario.Folders.Output));
+        Assert.Empty(await scenario.JobsAsync(Scenario.PassThroughKind));
+        Assert.Empty(scenario.FakeTools.Calls(tool: "ffmpeg", step: "remux"));
+        Assert.Equal(junk, await File.ReadAllBytesAsync(source));
+    }
+
     [Fact]
-    public async Task A_junk_file_handed_off_with_pass_through_on_is_refused_before_any_output_and_the_original_stays()
+    public async Task A_junk_file_handed_off_with_pass_through_on_waits_and_is_neither_written_handed_back_reported_nor_touched()
     {
         await using var scenario = await Scenario.StartAsync();
-        var (fake, library) = await scenario.DelunoSetupAsync(library: [("failure_policy", "pass_through"), ("max_attempts", 2)]);
+        var (fake, library) = await scenario.DelunoSetupAsync(library: [("failure_policy", "pass_through"), ("rejected_file_action", "delete_file")]);
         scenario.FakeTools.SetFileRule("film.mkv", new FileRule { ProbeError = ProbeFailure });
         var junk = Junk();
         var source = scenario.WriteRelease("Reject.Film.2013", "film.mkv", junk);
 
         await scenario.PostHandoffAsync("handoff-junk-1", source);
-        await scenario.WaitForHandoffStateAsync("handoff-junk-1", "failed");
+        var row = await scenario.WaitForFileStatusAsync(library, "Reject.Film.2013/film.mkv", "on_hold");
 
-        var report = Assert.Single(Scenario.Callbacks(fake, "handoff-junk-1"));
-        Assert.Equal("failed", (string)report["status"]!);
-        Assert.Equal(UnreadableSentence, (string)report["message"]!);
-        Assert.False((bool)report["sourceRemoved"]!);
-        Assert.True(string.IsNullOrEmpty((string?)report["outputPath"]));
-        AssertPlain(report.ToJsonString());
-        // Nothing was written, nothing was handed back, and a linked workflow's original is never touched.
-        Assert.Empty(Directory.GetFileSystemEntries(scenario.Folders.Output));
-        Assert.Empty(await scenario.JobsAsync(Scenario.PassThroughKind));
-        Assert.Empty(scenario.FakeTools.Calls(tool: "ffmpeg", step: "remux"));
-        Assert.Equal(junk, await File.ReadAllBytesAsync(source));
-        // It was refused, not retried: one attempt, no second.
-        Assert.Single(await scenario.JobsAsync(Scenario.RemuxKind));
-        var row = await scenario.FileRowAsync(library, "Reject.Film.2013/film.mkv");
-        Assert.NotNull(row);
-        Assert.Equal("skipped", (string)row["status"]!);
-        AssertPlain((string)row["status_reason"]!);
-        Assert.Contains(UnreadableSentence, (string)row["status_reason"]!, StringComparison.Ordinal);
+        Assert.Equal(NotReadableYet, (string)row["status_reason"]!);
+        await AssertNothingHappenedAsync(scenario, fake, "handoff-junk-1", source, junk);
+        // One look made, the next already booked: a wait, not a failure and not a retry.
+        var attempts = await scenario.JobsAsync(Scenario.RemuxKind);
+        Assert.Equal(1, attempts.Count(job => (string)job["status"]! == "completed"));
+        Assert.Equal(1, attempts.Count(job => (string)job["status"]! == "pending"));
         await AssertActivityIsPlainAsync(scenario);
     }
 
     [Fact]
-    public async Task A_junk_file_under_the_reject_policy_is_reported_rejected_in_plain_words()
+    public async Task A_junk_file_under_the_reject_policy_is_not_reported_rejected_on_the_first_look()
     {
         await using var scenario = await Scenario.StartAsync();
-        var (fake, _) = await scenario.DelunoSetupAsync(capabilities: ["processor-reject-regrab"], library: [("failure_policy", "reject")]);
+        var (fake, library) = await scenario.DelunoSetupAsync(
+            capabilities: ["processor-reject-regrab"], library: [("failure_policy", "reject"), ("retry_preflight_failures", true)]);
         scenario.FakeTools.SetFileRule("film.mkv", new FileRule { ProbeError = ProbeFailure });
-        var source = scenario.WriteRelease("Reject.Film.2013", "film.mkv", Junk());
+        var junk = Junk();
+        var source = scenario.WriteRelease("Reject.Film.2013", "film.mkv", junk);
 
         await scenario.PostHandoffAsync("handoff-junk-2", source);
-        await scenario.WaitForHandoffStateAsync("handoff-junk-2", "rejected");
+        var row = await scenario.WaitForFileStatusAsync(library, "Reject.Film.2013/film.mkv", "on_hold");
 
-        var report = Assert.Single(Scenario.Callbacks(fake, "handoff-junk-2"));
-        Assert.Equal("rejected", (string)report["disposition"]!);
-        Assert.Equal("preflight", (string)report["failureClass"]!);
-        Assert.False((bool)report["sourceRemoved"]!);
-        Assert.Contains(UnreadableSentence, (string)report["message"]!, StringComparison.Ordinal);
-        AssertPlain(report.ToJsonString());
-        Assert.True(File.Exists(source));
-        Assert.Empty(Directory.GetFileSystemEntries(scenario.Folders.Output));
+        Assert.Equal(NotReadableYet, (string)row["status_reason"]!);
+        await AssertNothingHappenedAsync(scenario, fake, "handoff-junk-2", source, junk);
         await AssertActivityIsPlainAsync(scenario);
     }
 

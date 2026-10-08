@@ -179,7 +179,7 @@ public sealed partial class RemuxPassRunner
         }
         catch (MediaUnreadableException exception)
         {
-            return RefuseUnreadable(relativeMediaPath, inspected, scope, RemuxPassPaths.Resolve(runtime.WatchedFolder), ToolFailureText.Technical(exception));
+            return WaitForReadable(relativeMediaPath, inspected, ToolFailureText.Technical(exception));
         }
 #pragma warning disable CA1031 // Any ffprobe failure fails this file before anything is written.
         catch (Exception exception) when (exception is not OperationCanceledException)
@@ -196,7 +196,7 @@ public sealed partial class RemuxPassRunner
         var watchedRoot = RemuxPassPaths.Resolve(runtime.WatchedFolder);
         if (probe.Streams.Count == 0)
         {
-            return RefuseUnreadable(relativeMediaPath, inspected, scope, watchedRoot, "ffprobe found no streams in this file.");
+            return WaitForReadable(relativeMediaPath, inspected, "ffprobe found no streams in this file.");
         }
 
         var (video, audio, subtitles) = RemuxRules.SplitStreams(probe);

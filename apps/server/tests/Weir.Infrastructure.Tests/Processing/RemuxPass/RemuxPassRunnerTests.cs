@@ -640,33 +640,36 @@ public sealed class RemuxPassRunnerTests : IDisposable
     }
 
     [Fact]
-    public async Task An_unreadable_file_is_refused_before_any_output_in_plain_words()
+    public async Task An_unreadable_file_waits_in_plain_words_and_nothing_is_written()
     {
-        _folders.Source("bad.mkv");
+        var source = _folders.Source("bad.mkv");
         _media.ProbeError = "[matroska,webm @ 000001b280590a00] EBML header parsing failed\nC:\\Weir\\Ready\\Movies\\bad.mkv: Invalid data found when processing input";
 
         var result = await Run("bad.mkv");
 
         Assert.False(Bool(result, "ok"));
-        Assert.Equal(RemuxPassOutcomes.FailedBeforeExecution, Str(result, "outcome"));
-        Assert.Equal("unreadable_file", Str(result, "rejection_kind"));
-        Assert.Equal(ToolFailureText.UnreadableFileRefusal, Str(result, "reason"));
-        Assert.Equal(ToolFailureText.UnreadableFileRefusal, Str(result, "preflight_reason"));
+        Assert.Equal(RemuxPassOutcomes.SourceNotReady, Str(result, "outcome"));
+        Assert.True(Bool(result, "retryable_wait"));
+        Assert.Equal(RemuxPassRunner.UnreadableWait, Str(result, "not_ready_kind"));
+        Assert.False(result.ContainsKey("rejection_kind"));
+        Assert.Equal(ToolFailureText.NotReadableYet, Str(result, "reason"));
         Assert.Contains("EBML header parsing failed", Str(result, "technical_detail"), StringComparison.Ordinal);
         Assert.Empty(_media.Remuxes);
         Assert.False(File.Exists(_folders.Out("bad.mkv")));
+        Assert.True(File.Exists(source));
     }
 
     [Fact]
-    public async Task A_file_ffprobe_finds_no_streams_in_is_refused_like_an_unreadable_one()
+    public async Task A_file_ffprobe_finds_no_streams_in_waits_like_an_unreadable_one()
     {
         _folders.Source("empty-probe.mkv");
         _media.DefaultProbe = """{"streams":[],"format":{"duration":"0"}}""";
 
         var result = await Run("empty-probe.mkv");
 
-        Assert.Equal("unreadable_file", Str(result, "rejection_kind"));
-        Assert.Equal(ToolFailureText.UnreadableFileRefusal, Str(result, "reason"));
+        Assert.Equal(RemuxPassOutcomes.SourceNotReady, Str(result, "outcome"));
+        Assert.Equal(RemuxPassRunner.UnreadableWait, Str(result, "not_ready_kind"));
+        Assert.Equal(ToolFailureText.NotReadableYet, Str(result, "reason"));
         Assert.Empty(_media.Remuxes);
         Assert.False(File.Exists(_folders.Out("empty-probe.mkv")));
     }

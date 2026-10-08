@@ -52,9 +52,14 @@ public static class ProbeOutput
             : new MediaToolException(message) { PlainMessage = ToolFailureText.ForToolText(message) };
     }
 
-    /// <summary>Whether lower-cased tool text carries one of <see cref="UnreadableMediaMarkers"/>.</summary>
-    public static bool IsUnreadableMedia(string lowered) =>
-        UnreadableMediaMarkers.Any(marker => MatchesUnreadableMarker(lowered, marker));
+    /// <summary>
+    /// Whether lower-cased tool text carries one of <see cref="UnreadableMediaMarkers"/> in what it says, not in the name of the file it names.
+    /// </summary>
+    public static bool IsUnreadableMedia(string lowered)
+    {
+        var said = ToolFailureText.WithoutPaths(lowered);
+        return UnreadableMediaMarkers.Any(marker => MatchesUnreadableMarker(said, marker));
+    }
 
     /// <summary>Whether <paramref name="lowered"/> carries <paramref name="marker"/>, narrowed for "end of file" (#539 item 5).</summary>
     private static bool MatchesUnreadableMarker(string lowered, string marker)
@@ -165,7 +170,7 @@ public static class ProbeOutput
         var streamsValue = data.ValueKind == JsonValueKind.Object ? RulesJson.Get(data, "streams") : null;
         if (RulesJson.Truthy(streamsValue) && !RulesJson.IsList(streamsValue))
         {
-            throw new MediaToolException("validation failed: invalid ffprobe output");
+            throw new MediaToolException("validation failed: invalid ffprobe output") { PlainMessage = ToolFailureText.OutputNotPublishable };
         }
 
         var audioCount = 0;
@@ -199,13 +204,13 @@ public static class ProbeOutput
 
         if (audioCount < 1)
         {
-            throw new MediaToolException("validation failed: output has no audio stream");
+            throw new MediaToolException("validation failed: output has no audio stream") { PlainMessage = ToolFailureText.OutputNotPublishable };
         }
 
         if (expectedAudio > 0 && audioCount != expectedAudio)
         {
             throw new MediaToolException(
-                $"validation failed: expected {Plural.Of(expectedAudio, "audio stream")}, got {audioCount.ToString(CultureInfo.InvariantCulture)}");
+                $"validation failed: expected {Plural.Of(expectedAudio, "audio stream")}, got {audioCount.ToString(CultureInfo.InvariantCulture)}") { PlainMessage = ToolFailureText.OutputNotPublishable };
         }
 
         if (expectedDurationSeconds is { } expected && expected > 0)
