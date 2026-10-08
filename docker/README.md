@@ -37,7 +37,10 @@ Then run:
 docker compose up -d
 ```
 
-Open `http://localhost:9347/` and create your account.
+Open `http://localhost:9347/` and create your account. If your browser is on another machine, Weir also
+asks for a setup code: run `docker logs weir` and look for the line that starts "Weir has no account yet".
+That line is logged at Information, so it shows at the default `WEIR_LOG_LEVEL` (`INFO`) and is hidden if you
+set the level to `WARNING` or above. The same code is in `weir-data/setup-code`.
 
 `./weir-data` holds Weir's database, settings, logs and backups. Keep it and you keep everything.
 No `.env` file or secrets are required to get started — Weir generates its own session secret on
