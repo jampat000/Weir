@@ -17,6 +17,8 @@ const WORKING_KEYS = [
   processingKeys.fileList(WORKING_FILES_QUERY),
   processingKeys.jobsInspectionList("active", ACTIVE_JOBS_LIMIT),
 ] as const;
+/** A running pass rewrites its progress several times a second and each write reaches the stream; a count needs no more than this. */
+const STREAM_THROTTLE_MS = 750;
 
 /**
  * How many files the Working lane is showing, for the sidebar. It reads the lane's own two lists and
@@ -28,7 +30,9 @@ const WORKING_KEYS = [
 export function useWorkingCount(): number {
   const files = useProcessingFilesQuery(WORKING_FILES_QUERY);
   const jobs = useProcessingJobsInspectionQuery("active", ACTIVE_JOBS_LIMIT);
-  useActivityStreamInvalidations(WORKING_KEYS);
+  useActivityStreamInvalidations(WORKING_KEYS, {
+    throttleMs: STREAM_THROTTLE_MS,
+  });
 
   return countWorking(files.data?.files ?? [], jobs.data?.jobs ?? []);
 }

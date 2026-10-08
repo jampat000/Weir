@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text.Json.Nodes;
 using Weir.Contract.Tests.Harness;
+using Weir.Contract.Tests.Jobs;
 
 namespace Weir.Contract.Tests.Activity;
 
@@ -103,6 +104,38 @@ public sealed class ActivityStreamTests(ServerFixture fixture) : IClassFixture<S
     }
 
     [Fact]
+    public async Task Queuing_a_file_pass_sends_data_changed_frames_for_the_job_queue_and_files_at_once()
+    {
+        using var folders = new TemporaryFolder();
+        var watched = Directory.CreateDirectory(Path.Combine(folders.Path, "stream_watch")).FullName;
+        var output = Directory.CreateDirectory(Path.Combine(folders.Path, "stream_out")).FullName;
+        using var admin = await Server.CreateAdminClientAsync();
+        await JobsApi.SetMovieFoldersAsync(admin, watched, output);
+        using var stream = await admin.OpenStreamAsync(Stream);
+        await stream.NextEventNamedAsync("server.hello");
+
+        var queued = await admin.PostWithCsrfAsync(
+            $"{WeirClient.Api}/processing/jobs/file-remux-pass/enqueue", new JsonObject { ["relative_media_path"] = "movies/streamed.mkv" });
+        JobsApi.Expect(queued, HttpStatusCode.OK);
+
+        Assert.Equal(["files_at_once", "jobs"], await TopicsAnnouncedAsync(stream, "jobs", "files_at_once"));
+    }
+
+    [Fact]
+    public async Task Queuing_a_maintenance_sweep_sends_data_changed_frames_for_the_job_queue_and_the_maintenance_panel()
+    {
+        using var admin = await Server.CreateAdminClientAsync();
+        using var stream = await admin.OpenStreamAsync(Stream);
+        await stream.NextEventNamedAsync("server.hello");
+
+        var queued = await admin.PostWithCsrfAsync(
+            $"{WeirClient.Api}/processing/maintenance/run", new JsonObject { ["family"] = "work_temp_stale_sweep" });
+        JobsApi.Expect(queued, HttpStatusCode.OK);
+
+        Assert.Equal(["jobs", "maintenance"], await TopicsAnnouncedAsync(stream, "jobs", "maintenance"));
+    }
+
+    [Fact]
     public async Task Record_activity_event_does_not_prune_history_using_log_retention()
     {
         const string title = "Old Processing result that still backs overview history";
@@ -135,6 +168,19 @@ public sealed class ActivityStreamTests(ServerFixture fixture) : IClassFixture<S
         var items = response.Fields["items"]!.AsArray();
         Assert.Contains(title, items.Select(item => (string)item!["title"]!));
         Assert.Contains(items, item => (string)item!["module"]! == "auth");
+    }
+
+    /// <summary>The <c>data.changed</c> topics the stream sends until every one in <paramref name="expected"/> has come, sorted.</summary>
+    private static async Task<string[]> TopicsAnnouncedAsync(SseReader stream, params string[] expected)
+    {
+        var heard = new SortedSet<string>(StringComparer.Ordinal);
+        while (!expected.All(heard.Contains))
+        {
+            var frame = (await stream.NextEventNamedAsync("data.changed")).AsObject();
+            heard.Add((string)frame["topic"]!);
+        }
+
+        return [.. heard.Where(expected.Contains)];
     }
 
     private static async Task<long> LatestActivityIdAsync(WeirClient client)

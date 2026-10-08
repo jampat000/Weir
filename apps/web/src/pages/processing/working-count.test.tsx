@@ -17,7 +17,8 @@ const lists = {
 const followStream = vi.fn();
 
 vi.mock("../../lib/activity/use-activity-stream-invalidation", () => ({
-  useActivityStreamInvalidations: (keys: unknown) => followStream(keys),
+  useActivityStreamInvalidations: (keys: unknown, options: unknown) =>
+    followStream(keys, options),
 }));
 vi.mock("../../lib/processing/files-queries", () => ({
   useProcessingFilesQuery: () => ({ data: { files: lists.files } }),
@@ -97,9 +98,12 @@ describe("useWorkingCount", () => {
   it("reads both lists again whenever the stream says a file or a job changed, with no timer", () => {
     renderHook(() => useWorkingCount());
 
-    expect(followStream).toHaveBeenCalledWith([
-      processingKeys.fileList(WORKING_FILES_QUERY),
-      processingKeys.jobsInspectionList("active", ACTIVE_JOBS_LIMIT),
-    ]);
+    expect(followStream).toHaveBeenCalledWith(
+      [
+        processingKeys.fileList(WORKING_FILES_QUERY),
+        processingKeys.jobsInspectionList("active", ACTIVE_JOBS_LIMIT),
+      ],
+      expect.objectContaining({ throttleMs: expect.any(Number) }),
+    );
   });
 });
