@@ -123,7 +123,7 @@ services:
     environment:
       WEIR_PUID: 1000
       WEIR_PGID: 1000
-      # Optional, but set it before you connect Deluno, Radarr or Sonarr.
+      # Optional: Weir makes its own. Set one to manage it yourself, before you connect Deluno, Radarr or Sonarr.
       # It encrypts the keys Weir saves. Make one with: openssl rand -hex 32
       # WEIR_CREDENTIALS_SECRET: <paste the value here>
     volumes:

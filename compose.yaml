@@ -35,7 +35,7 @@ services:
       # Optional. If omitted, the container generates and persists /data/weir/session.secret.
       # To provide your own value, generate one with: openssl rand -hex 32
       # WEIR_SESSION_SECRET: ${WEIR_SESSION_SECRET}
-      # Recommended before saving Sonarr/Radarr credentials:
+      # Optional. If omitted, the container generates and persists /data/weir/credentials.secret.
       # WEIR_CREDENTIALS_SECRET: ${WEIR_CREDENTIALS_SECRET}
       # Optional bearer token for Prometheus or other machine scrapes of /metrics:
       # WEIR_METRICS_BEARER_TOKEN: ${WEIR_METRICS_BEARER_TOKEN}

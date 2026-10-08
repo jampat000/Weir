@@ -181,11 +181,31 @@ if [ "${#WEIR_SESSION_SECRET}" -lt 32 ]; then
   fail "WEIR_SESSION_SECRET must be at least 32 characters (try: openssl rand -hex 32)"
 fi
 
+# Saved provider keys are encrypted with a secret of their own. A WEIR_CREDENTIALS_SECRET from the environment wins;
+# otherwise one is made on first start and kept next to the session secret. Keys saved before this file existed were
+# encrypted with the session secret, which Weir still reads them with.
+if [ -z "${WEIR_CREDENTIALS_SECRET:-}" ]; then
+  credentials_file="$WEIR_HOME/credentials.secret"
+  if [ -f "$credentials_file" ]; then
+    WEIR_CREDENTIALS_SECRET="$(cat "$credentials_file")"
+  else
+    WEIR_CREDENTIALS_SECRET="$(generate_secret)"
+    umask 077
+    printf '%s
+' "$WEIR_CREDENTIALS_SECRET" > "$credentials_file"
+    log_info "generated WEIR_CREDENTIALS_SECRET at $credentials_file"
+  fi
+  export WEIR_CREDENTIALS_SECRET
+fi
+
 if [ "$(id -u)" -eq 0 ]; then
   update_runtime_identity
   ensure_runtime_home_ownership
   if [ -f "$WEIR_HOME/session.secret" ]; then
     chown weir:weir "$WEIR_HOME/session.secret"
+  fi
+  if [ -f "$WEIR_HOME/credentials.secret" ]; then
+    chown weir:weir "$WEIR_HOME/credentials.secret"
   fi
   cd /opt/weir
   exec gosu weir ./Weir --port "${PORT:-9347}"

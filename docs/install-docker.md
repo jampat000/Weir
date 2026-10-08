@@ -67,7 +67,7 @@ services:
     environment:
       - WEIR_PUID=1000             # the user that owns your media folders
       - WEIR_PGID=1000             # that user's group
-      # Recommended: encrypts the Radarr, Sonarr and Deluno keys Weir saves.
+      # Optional: encrypts the Radarr, Sonarr and Deluno keys Weir saves. Weir makes its own if you leave this out.
       # Make one with:  openssl rand -hex 32   and keep it with your backups.
       # - WEIR_CREDENTIALS_SECRET=<paste the value here>
     volumes:
@@ -99,7 +99,7 @@ What each part means:
 | `/data/weir` | Where Weir keeps its data inside the container. Always mount something here, or your data disappears with the container. |
 | `/srv/media:/media` | Left is your media folder on the server, right is where Weir sees it. Change the left side. Use `/media/...` paths when you set up folders in Weir. |
 | `WEIR_PUID` / `WEIR_PGID` | The user and group Weir runs as, so it can read and write your files. Run `id <your-username>` on the server to find them. Synology is usually `1026` / `100`, Unraid `99` / `100`. `PUID` and `PGID` work too. Neither may be `0`: Weir refuses to run as root. |
-| `WEIR_CREDENTIALS_SECRET` | Optional, but set it before you add Radarr, Sonarr or Deluno. If you lose it later, you re-enter those keys. |
+| `WEIR_CREDENTIALS_SECRET` | Optional. Weir makes one on first start and keeps it in `weir-data`. Set your own before you add Radarr, Sonarr or Deluno if you want to manage it yourself. If you lose it later, you re-enter those keys. |
 
 **Time zone.** There is nothing to set on the container. Weir keeps its own time zone, which you choose in the
 setup wizard and can change under **System › About**. Schedules and dates follow that.
@@ -245,8 +245,8 @@ Weir has two kinds of backup.
   docker compose start weir
   ```
 
-  Keep the file somewhere other than the same disk. If you set `WEIR_CREDENTIALS_SECRET`, store it with the
-  backup, because without it the saved connection keys cannot be read.
+  Keep the file somewhere other than the same disk. If you set `WEIR_CREDENTIALS_SECRET` yourself, store it with the
+  backup, because without it the saved connection keys cannot be read. The one Weir makes is inside `weir-data`.
 
 To restore: stop Weir, put the folder back, start it.
 
