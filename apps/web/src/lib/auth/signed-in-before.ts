@@ -6,6 +6,17 @@
 
 const KEY = "mm:signed-in-before";
 
+/** Signing out on purpose is under way: the sign-in page it leads to has no session to say expired. */
+let signingOut = false;
+
+export function startSigningOut(): void {
+  signingOut = true;
+}
+
+export function finishSigningOut(): void {
+  signingOut = false;
+}
+
 function store(): Storage | null {
   // Private windows and blocked site data make this throw rather than return null.
   try {
@@ -41,5 +52,5 @@ export function wasSignedIn(): boolean {
 
 /** The sign-in page for someone who is signed out, saying a session expired only when this browser had one. */
 export function signedOutPath(): string {
-  return wasSignedIn() ? "/login?session=expired" : "/login";
+  return wasSignedIn() && !signingOut ? "/login?session=expired" : "/login";
 }

@@ -15,18 +15,19 @@ import {
 } from "../api/auth-api";
 import type { UserPublic } from "../api/types";
 import { markLoginSucceeded } from "./session-kept";
-import { clearSignedIn, markSignedIn } from "./signed-in-before";
+import {
+  clearSignedIn,
+  finishSigningOut,
+  markSignedIn,
+  startSigningOut,
+} from "./signed-in-before";
 import { activityKeys } from "../activity/query-keys";
 import { authKeys } from "./query-keys";
 
 export function useMeQuery() {
   return useQuery({
     queryKey: authKeys.me,
-    queryFn: async () => {
-      const user = await fetchMe();
-      if (user) markSignedIn();
-      return user;
-    },
+    queryFn: fetchMe,
     retry: false,
   });
 }
@@ -115,13 +116,15 @@ export function useLogoutMutation() {
   return useMutation({
     mutationFn: postLogout,
     onMutate: async () => {
-      clearSignedIn();
+      startSigningOut();
       await qc.cancelQueries({ queryKey: authKeys.me });
       await qc.cancelQueries({ queryKey: authKeys.session });
       qc.setQueryData(authKeys.me, null);
       qc.setQueryData(authKeys.session, null);
     },
+    onSuccess: clearSignedIn,
     onSettled: () => {
+      finishSigningOut();
       void qc.invalidateQueries({ queryKey: authKeys.me });
       void qc.invalidateQueries({ queryKey: authKeys.session });
       void qc.invalidateQueries({ queryKey: authKeys.bootstrap });
