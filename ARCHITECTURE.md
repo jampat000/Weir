@@ -111,6 +111,7 @@ Every screen follows Weir from one server-sent event stream, `GET /api/v1/activi
 
 - **Publish:** a component that changes data calls `DataChangePublisher.Publish(DataTopics.<Topic>)` in `Weir.Infrastructure.Activity` once the change has committed (`uow.OnCommitted`). Each open stream sends a `data.changed` frame, `{ "topic": "<snake_case_name>" }`.
 - **Consume:** `LIVE_TOPIC_QUERIES` in `apps/web/src/lib/live/live-topics.ts` says which queries each topic reads again. A screen adds its query keys to its topic and drops its `refetchInterval`.
+- **Not from the database:** data that changes outside a commit has a publisher of its own. `TrayHandOffWatcher` watches the files the Windows tray writes in the data folder (`update-state.json`, `update-settings.json`, `lan-access`) and publishes `update` and `network_access` when one is written, by the tray or by the server. `UpdateOutlook` publishes `update` when a release check finds something new, and `MetricsChangeTask` publishes `metrics` at most every five seconds while a stream is open. After "Restart to apply" the page needs no check of its own: the stream reconnects and the new `boot_id` reads every query again.
 - **Connection:** `server.hello` opens every stream with `{ "boot_id" }`, new on each server start. While the connection is lost the shell shows "Live updates paused", and when it is back every query is read again; a different `boot_id` after a reconnect also reloads the page if the server now serves a newer build.
 
 ## Job Lifecycle

@@ -25,7 +25,7 @@ public sealed record LibraryScanOutcome(DateTimeOffset GeneratedAt, IReadOnlyLis
 public sealed class LibraryScanStore
 {
     /// <summary>
-    /// Enqueues the scan on <paramref name="uow"/>'s own connection and transaction (<see cref="ProcessingJobStore.EnqueueOrGet"/>),
+    /// Enqueues the scan on <paramref name="uow"/>'s own connection and transaction (<see cref="ProcessingJobStore.EnqueueOrGet(UnitOfWork, string, string, string?, int, int?, int, DateTimeOffset?)"/>),
     /// not <see cref="ProcessingJobStore.EnqueueOrGetAsync"/>: that opens its own connection, which — called while an API
     /// endpoint's write <see cref="UnitOfWork"/> is still open, as here — can deadlock against it, exactly the trap
     /// <see cref="Weir.Infrastructure.Processing.RequeueStore"/> already documents for the same reason.
@@ -45,8 +45,7 @@ public sealed class LibraryScanStore
         }
 
         var job = jobs.EnqueueOrGet(
-            uow.Connection,
-            uow.WriteTransaction(),
+            uow,
             LibraryModeJobKinds.ScanDedupeKey(libraryId),
             LibraryModeJobKinds.ScanKind,
             WireJsonWriter.Dumps(payload, WireJsonFormat.Compact),
@@ -111,6 +110,7 @@ public sealed class LibraryScanStore
             parameters).ConfigureAwait(false);
 
         var transaction = uow.WriteTransaction();
+        jobs.AnnounceOnCommit(uow);
         return jobs.EnqueueOrGet(
             uow.Connection,
             transaction,

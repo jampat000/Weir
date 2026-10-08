@@ -29,6 +29,7 @@ public sealed class WeirServer : IAsyncDisposable
     private readonly Func<int> _pickPort;
     private readonly List<ServerLog> _logs = [];
     private Process? _process;
+    private int? _keptPort;
 
     private WeirServer(ServerBinary binary, string home, Dictionary<string, string> environment, Func<int> pickPort)
     {
@@ -90,7 +91,11 @@ public sealed class WeirServer : IAsyncDisposable
         return client;
     }
 
-    public async Task RestartAsync(IReadOnlyDictionary<string, string>? environmentChanges = null)
+    /// <summary>
+    /// Stops the server and starts it again on the same data. It comes back on a new port unless <paramref name="samePort"/> is
+    /// set, which a browser page that stays open across the restart needs: its address is the one it reconnects to.
+    /// </summary>
+    public async Task RestartAsync(IReadOnlyDictionary<string, string>? environmentChanges = null, bool samePort = false)
     {
         await StopAsync();
         foreach (var (name, value) in environmentChanges ?? new Dictionary<string, string>())
@@ -98,7 +103,15 @@ public sealed class WeirServer : IAsyncDisposable
             _environment[name] = value;
         }
 
-        await LaunchAsync();
+        _keptPort = samePort ? BaseUrl.Port : null;
+        try
+        {
+            await LaunchAsync();
+        }
+        finally
+        {
+            _keptPort = null;
+        }
     }
 
     /// <summary>Stops the server and what it started. The data folder stays.</summary>
@@ -174,7 +187,7 @@ public sealed class WeirServer : IAsyncDisposable
 
     private async Task StartOnNewPortAsync(string? note)
     {
-        var port = _pickPort();
+        var port = _keptPort ?? _pickPort();
         BaseUrl = new Uri($"http://127.0.0.1:{port}/");
         var log = new ServerLog(Path.Combine(Home, "contract-logs", $"server-{_logs.Count + 1}.log"));
         _logs.Add(log);

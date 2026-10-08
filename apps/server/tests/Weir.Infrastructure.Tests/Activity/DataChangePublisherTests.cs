@@ -41,6 +41,19 @@ public sealed class DataChangePublisherTests
     }
 
     [Fact]
+    public void It_knows_whether_any_stream_is_open()
+    {
+        var publisher = new DataChangePublisher();
+        Assert.False(publisher.HasListeners);
+
+        var stream = publisher.Subscribe();
+        Assert.True(publisher.HasListeners);
+
+        stream.Dispose();
+        Assert.False(publisher.HasListeners);
+    }
+
+    [Fact]
     public void Publishing_with_nobody_listening_is_harmless()
     {
         new DataChangePublisher().Publish(DataTopics.Metrics);

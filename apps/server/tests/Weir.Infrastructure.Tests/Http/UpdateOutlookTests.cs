@@ -1,4 +1,5 @@
 using Weir.Core.Updates;
+using Weir.Infrastructure.Activity;
 using Weir.Infrastructure.Http;
 using Weir.Infrastructure.Runtime;
 using Weir.Infrastructure.Tests.Platform;
@@ -10,12 +11,13 @@ public sealed class UpdateOutlookTests : IDisposable
 {
     private readonly StoreFixture _fixture = new(("WEIR_VERSION", "3.2.16"));
     private readonly ScriptedCatalog _catalog = new();
+    private readonly DataChangePublisher _changes = new();
     private readonly UpdateOutlook _outlook;
 
     public UpdateOutlookTests()
     {
         var files = new UpdateFiles(_fixture.Options);
-        _outlook = new UpdateOutlook(new UpdateStatusReader(_catalog, _fixture.Options), files, _fixture.Clock);
+        _outlook = new UpdateOutlook(new UpdateStatusReader(_catalog, _fixture.Options), files, _fixture.Clock, _changes);
     }
 
     public void Dispose() => _fixture.Dispose();
@@ -102,6 +104,48 @@ public sealed class UpdateOutlookTests : IDisposable
         Assert.Equal(new UpdateOutlookSnapshot(UpdateOutlook.Checking, null), _outlook.Current());
 
         _catalog.Answers(Release("3.3.0"));
+        await Eventually.ThatAsync(() => _outlook.Current().Status == "update_available");
+    }
+
+    private static async Task<string[]> HeardAsync(BroadcastSubscription<string> heard)
+    {
+        heard.Dispose();
+        var topics = new List<string>();
+        await foreach (var topic in heard.ReadAllAsync(CancellationToken.None))
+        {
+            topics.Add(topic);
+        }
+
+        return [.. topics];
+    }
+
+    [Fact]
+    public async Task A_check_that_finds_something_new_is_announced_and_one_that_finds_the_same_is_not()
+    {
+        _catalog.Answers(Release("3.3.0"));
+        using var heard = _changes.Subscribe();
+
+        await _outlook.CheckAsync(CancellationToken.None);
+        await _outlook.CheckAsync(CancellationToken.None);
+        _catalog.Answers(Release("3.4.0"));
+        await _outlook.CheckAsync(CancellationToken.None);
+
+        Assert.Equal([DataTopics.Update, DataTopics.Update], await HeardAsync(heard));
+    }
+
+    [Fact]
+    public async Task The_update_check_task_asks_only_while_a_stream_is_open()
+    {
+        _catalog.Answers(Release("3.3.0"));
+        var task = new UpdateCheckTask(_outlook, _changes);
+
+        await task.RunOnceAsync(CancellationToken.None);
+        Assert.Equal(0, _catalog.Calls);
+
+        using var heard = _changes.Subscribe();
+        await task.RunOnceAsync(CancellationToken.None);
+
+        await Eventually.ThatAsync(() => _catalog.Calls == 1);
         await Eventually.ThatAsync(() => _outlook.Current().Status == "update_available");
     }
 

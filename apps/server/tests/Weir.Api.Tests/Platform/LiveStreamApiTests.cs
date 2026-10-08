@@ -11,7 +11,7 @@ public sealed class LiveStreamApiTests
 {
     private static readonly TimeSpan Patience = TimeSpan.FromSeconds(10);
 
-    private static async Task<(WeirTestServer Server, ApiTestClient Client)> StartSignedInAsync()
+    internal static async Task<(WeirTestServer Server, ApiTestClient Client)> StartSignedInAsync()
     {
         var server = await StartServerAsync();
         await TestDatabase.SeedAdminAsync(server);
@@ -20,7 +20,7 @@ public sealed class LiveStreamApiTests
         return (server, client);
     }
 
-    private static async Task<StreamReader> OpenStreamAsync(WeirTestServer server, ApiTestClient client)
+    internal static async Task<StreamReader> OpenStreamAsync(WeirTestServer server, ApiTestClient client)
     {
         using var request = new HttpRequestMessage(HttpMethod.Get, "/api/v1/activity/stream");
         request.Headers.Add("Cookie", string.Join("; ", client.Cookies.Select(pair => $"{pair.Key}={pair.Value}")));
@@ -29,7 +29,7 @@ public sealed class LiveStreamApiTests
     }
 
     /// <summary>The data of the next frame named <paramref name="wanted"/>, skipping every other frame the stream sends.</summary>
-    private static async Task<JsonNode> NextFrameAsync(StreamReader reader, string wanted)
+    internal static async Task<JsonNode> NextFrameAsync(StreamReader reader, string wanted)
     {
         string? eventName = null;
         using var timeout = new CancellationTokenSource(Patience);
@@ -48,7 +48,7 @@ public sealed class LiveStreamApiTests
         throw new InvalidOperationException("The stream ended.");
     }
 
-    private static async Task<string> NextTopicAsync(StreamReader reader) =>
+    internal static async Task<string> NextTopicAsync(StreamReader reader) =>
         (await NextFrameAsync(reader, "data.changed"))["topic"]!.GetValue<string>();
 
     [Fact]

@@ -1,5 +1,7 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Microsoft.Playwright;
+using Weir.Contract.Tests.Harness;
 
 namespace Weir.E2E.Tests.Support;
 
@@ -12,12 +14,61 @@ public static class WeirApi
 {
     public static async Task SetPausedAsync(IBrowserContext context, string baseUrl, bool paused)
     {
-        await using var csrf = await context.APIRequest.GetAsync($"{baseUrl}/api/v1/auth/csrf");
-        var token = JsonDocument.Parse(await csrf.TextAsync()).RootElement.GetProperty("csrf_token").GetString();
+        var token = await CsrfTokenAsync(context, baseUrl);
         await using var response = await context.APIRequest.PutAsync($"{baseUrl}/api/v1/pause", new() { DataObject = new { csrf_token = token, paused } });
+        await EnsureOkAsync(response, $"Setting the pause to {paused}");
+    }
+
+    /// <summary>Points the first movie workflow at two folders, as the person does in Workflows.</summary>
+    public static async Task SetMovieFoldersAsync(IBrowserContext context, string baseUrl, string watchedFolder, string outputFolder)
+    {
+        await using var list = await context.APIRequest.GetAsync($"{baseUrl}/api/v1/processing/libraries");
+        await EnsureOkAsync(list, "Listing the workflows");
+        var movie = JsonNode.Parse(await list.TextAsync())!.AsArray()
+            .Select(library => library!.AsObject())
+            .Where(library => (string)library["media_type"]! == "movie")
+            .OrderBy(library => (int)library["display_order"]!)
+            .First();
+
+        var body = LibraryBodies.Unchanged(movie);
+        body["watched_folder"] = watchedFolder;
+        body["output_folder"] = outputFolder;
+        body["csrf_token"] = await CsrfTokenAsync(context, baseUrl);
+        await using var response = await context.APIRequest.PutAsync(
+            $"{baseUrl}/api/v1/processing/libraries/{(int)movie["id"]!}",
+            new() { DataObject = body });
+        await EnsureOkAsync(response, "Saving the movie workflow's folders");
+    }
+
+    /// <summary>Asks Weir to work on one file of the movie workflow's watched folder, which queues a job for it.</summary>
+    public static async Task EnqueueFileAsync(IBrowserContext context, string baseUrl, string relativeMediaPath)
+    {
+        var token = await CsrfTokenAsync(context, baseUrl);
+        await using var response = await context.APIRequest.PostAsync(
+            $"{baseUrl}/api/v1/processing/jobs/file-remux-pass/enqueue",
+            new() { DataObject = new { csrf_token = token, relative_media_path = relativeMediaPath } });
+        await EnsureOkAsync(response, $"Queueing {relativeMediaPath}");
+    }
+
+    /// <summary>"Restart to apply": asks the tray to install the update that was downloaded.</summary>
+    public static async Task ApplyUpdateAsync(IBrowserContext context, string baseUrl)
+    {
+        var token = await CsrfTokenAsync(context, baseUrl);
+        await using var response = await context.APIRequest.PostAsync($"{baseUrl}/api/v1/suite/apply-update", new() { DataObject = new { csrf_token = token } });
+        await EnsureOkAsync(response, "Applying the update");
+    }
+
+    private static async Task<string> CsrfTokenAsync(IBrowserContext context, string baseUrl)
+    {
+        await using var csrf = await context.APIRequest.GetAsync($"{baseUrl}/api/v1/auth/csrf");
+        return JsonDocument.Parse(await csrf.TextAsync()).RootElement.GetProperty("csrf_token").GetString()!;
+    }
+
+    private static async Task EnsureOkAsync(IAPIResponse response, string what)
+    {
         if (!response.Ok)
         {
-            throw new InvalidOperationException($"Setting the pause to {paused} answered {response.Status}: {await response.TextAsync()}");
+            throw new InvalidOperationException($"{what} answered {response.Status}: {await response.TextAsync()}");
         }
     }
 }

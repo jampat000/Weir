@@ -15,7 +15,7 @@ public sealed class PeriodicTasksStartupTests
         await using var server = await WeirTestServer.StartAsync();
 
         Assert.Equal(
-            ["activity-latest-poll", "artwork-resolver", "auth-session-cleanup", "connection-usage-flush", "media-manager-heartbeat", "media-manager-workflow-sync", "platform-job-rows-retention", "processing-file-log-retention", "processing-library-mode-schedule", "processing-vanished-file-sweep", "processing-watched-folder-remux-scan-dispatch-enqueue", "suite-configuration-backup", "suite-log-retention", "suite-pause-expiry", "update-work-state"],
+            ["activity-latest-poll", "artwork-resolver", "auth-session-cleanup", "connection-usage-flush", "media-manager-heartbeat", "media-manager-workflow-sync", "metrics-change", "platform-job-rows-retention", "processing-file-log-retention", "processing-library-mode-schedule", "processing-vanished-file-sweep", "processing-watched-folder-remux-scan-dispatch-enqueue", "suite-configuration-backup", "suite-log-retention", "suite-pause-expiry", "update-check", "update-work-state"],
             server.Services.GetServices<IPeriodicTask>().Select(task => task.Name).Order(StringComparer.Ordinal));
         var hosted = server.Services.GetServices<IHostedService>().ToList();
         Assert.Single(hosted.OfType<PeriodicTaskService>());

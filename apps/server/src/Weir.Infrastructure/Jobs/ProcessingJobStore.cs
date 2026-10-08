@@ -1,6 +1,7 @@
 using System.Globalization;
 using Microsoft.Data.Sqlite;
 using Weir.Core.Jobs;
+using Weir.Infrastructure.Activity;
 using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Infrastructure.Jobs;
@@ -28,17 +29,27 @@ public sealed partial class ProcessingJobStore
 {
     public const string MetricsModule = "processing";
 
+    /// <summary>The unit-of-work key marking that its commit already says the jobs changed.</summary>
+    private const string AnnouncedKey = "weir_jobs_change_announced";
+
     private readonly SqliteDatabase _database;
     private readonly TimeProvider _time;
     private readonly IJobQueueMetrics _metrics;
     private readonly WorkerWakeSignals? _wakeSignals;
+    private readonly DataChangePublisher? _changes;
 
-    public ProcessingJobStore(SqliteDatabase database, TimeProvider time, IJobQueueMetrics? metrics = null, WorkerWakeSignals? wakeSignals = null)
+    public ProcessingJobStore(
+        SqliteDatabase database,
+        TimeProvider time,
+        IJobQueueMetrics? metrics = null,
+        WorkerWakeSignals? wakeSignals = null,
+        DataChangePublisher? changes = null)
     {
         _database = database ?? throw new ArgumentNullException(nameof(database));
         _time = time ?? throw new ArgumentNullException(nameof(time));
         _metrics = metrics ?? NoJobQueueMetrics.Instance;
         _wakeSignals = wakeSignals;
+        _changes = changes;
     }
 
     public SqliteDatabase Database => _database;
@@ -48,7 +59,9 @@ public sealed partial class ProcessingJobStore
     /// synchronous helpers (<see cref="Execute"/>, <see cref="Scalar"/> and the static methods in the other
     /// partial files) take a raw connection and transaction rather than the async <see cref="UnitOfWork"/>
     /// API, so this hands them the ones <see cref="UnitOfWork"/> itself opened and committed: one
-    /// transaction mechanism server-wide, with this as the queue's calling convention on top of it.
+    /// transaction mechanism server-wide, with this as the queue's calling convention on top of it. A
+    /// transaction that changed any row says so once it commits (<see cref="DataTopics.Jobs"/>), so every open
+    /// screen showing jobs reads them again; one that only read says nothing, as an idle worker's claim does.
     /// </summary>
     public async Task<T> InTransactionAsync<T>(Func<SqliteConnection, SqliteTransaction, T> work, CancellationToken cancellationToken = default)
     {
@@ -57,12 +70,23 @@ public sealed partial class ProcessingJobStore
         await using (uow.ConfigureAwait(false))
         {
             var transaction = uow.WriteTransaction();
+            var changesBefore = TotalChanges(uow.Connection, transaction);
             var result = work(uow.Connection, transaction);
+            var changed = TotalChanges(uow.Connection, transaction) != changesBefore;
             await uow.CommitAsync().ConfigureAwait(false);
             Activity.ActivityNotifications.TransactionCommitted(_database, transaction);
+            if (changed)
+            {
+                _changes?.Publish(DataTopics.Jobs);
+            }
+
             return result;
         }
     }
+
+    /// <summary>How many rows this connection has inserted, updated or deleted since it opened, whichever table they are in.</summary>
+    private static long TotalChanges(SqliteConnection connection, SqliteTransaction transaction) =>
+        Convert.ToInt64(Scalar(connection, transaction, "SELECT total_changes()"), CultureInfo.InvariantCulture);
 
     /// <summary>
     /// Several reads that agree with each other, without the write lock (#636). Deferred: Microsoft.Data.Sqlite issues

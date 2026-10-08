@@ -23,6 +23,13 @@ public sealed class E2EServer : IAsyncLifetime
     /// <summary>The server's address without a trailing slash.</summary>
     public string BaseUrl => (_server ?? throw NotStarted()).BaseUrl.GetLeftPart(UriPartial.Authority);
 
+    /// <summary>
+    /// A server of its own, set up as the Windows package is (the About screen offers an update to install only there), for a
+    /// test that has to stop and start it: the shared server serves every other test and is left running.
+    /// </summary>
+    public static Task<WeirServer> StartWindowsInstallAsync() =>
+        WeirServer.StartNewAsync(Environment.With(("WEIR_RUNTIME", "windows")));
+
     public async Task InitializeAsync()
     {
         if (!E2EFactAttribute.IsEnabled)

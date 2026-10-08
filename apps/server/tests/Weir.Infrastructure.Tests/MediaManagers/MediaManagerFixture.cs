@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using Weir.Core.Security;
+using Weir.Infrastructure.Activity;
 using Weir.Infrastructure.Artwork;
 using Weir.Infrastructure.ConnectionTraffic;
 using Weir.Infrastructure.Jobs;
@@ -36,7 +37,7 @@ internal sealed class MediaManagerFixture : IDisposable
         Artwork = new ArtworkSubjects(new ArtworkLookupStore(), new ArtworkFileStore());
         Intake = new MediaManagerIntake(Store.Options, Connections, ConnectionStore, Ledger, Targets, Jobs, SkipMarkers, Reporter, Artwork, Store.Clock, Activity);
         OperatorSettings = new OperatorSettingsStore();
-        Cancellation = new PendingJobCancellation(Ledger, Reporter, Files);
+        Cancellation = new PendingJobCancellation(Ledger, Reporter, Files, Changes);
         WorkflowSync = new ManagerWorkflowSync(
             Store.Database, ConnectionStore, Connections, Http, Libraries, new ScanSettingsChanges(), Store.Options, Store.Clock, NullLogger<ManagerWorkflowSync>.Instance);
     }
@@ -78,6 +79,8 @@ internal sealed class MediaManagerFixture : IDisposable
     public HandoffCompletionReporter Reporter { get; }
 
     public OperatorSettingsStore OperatorSettings { get; }
+
+    public DataChangePublisher Changes { get; } = new();
 
     public PendingJobCancellation Cancellation { get; }
 
