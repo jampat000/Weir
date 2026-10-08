@@ -177,9 +177,9 @@ public sealed class LiveStreamApiTests
         await NextFrameAsync(reader, "server.hello");
 
         using var paused = await client.PutAsync("/api/v1/pause", new { csrf_token = await client.CsrfAsync(), paused = true });
-        Assert.Equal(DataTopics.Pause, await NextTopicAsync(reader));
+        await AssertTopicArrivesAsync(reader, DataTopics.Pause);
 
         using var resumed = await client.PutAsync("/api/v1/pause", new { csrf_token = await client.CsrfAsync(), paused = false });
-        Assert.Equal(DataTopics.Pause, await NextTopicAsync(reader));
+        await AssertTopicArrivesAsync(reader, DataTopics.Pause);
     }
 }
