@@ -1,6 +1,5 @@
 using System.ComponentModel;
 using System.Diagnostics;
-using System.Globalization;
 using System.Reflection;
 using System.Security.AccessControl;
 using Velopack;
@@ -59,7 +58,7 @@ static class Program
         using var mutex = new Mutex(false, MutexName, out bool createdNew);
         if (!createdNew)
         {
-            HandOverToRunningTray(args);
+            HandOverToRunningTray(args, () => SecondLaunchSignal.Raise());
             return 0;
         }
 
@@ -82,13 +81,12 @@ static class Program
             {
                 TrayLog.Write($"Velopack: after install v{v}");
                 KillRunningProcesses($"Velopack after install v{v}");
-                StartupRegistration.Register();
             })
             .OnBeforeUninstallFastCallback((v) =>
             {
                 TrayLog.Write($"Velopack: before uninstall v{v}");
                 KillRunningProcesses($"Velopack before uninstall v{v}");
-                StartupRegistration.Deregister();
+                StartupRegistration.ForThisUser().Disable();
                 FirewallInstallHooks.RemoveRuleIfElevated();
             })
             .OnBeforeUpdateFastCallback((v) =>
@@ -98,15 +96,19 @@ static class Program
             .OnAfterUpdateFastCallback((v) =>
             {
                 TrayLog.Write($"Velopack: after update to v{v}");
-                StartupRegistration.Register();
+                StartupRegistration.ForThisUser().RefreshIfEnabled();
             })
             // Unlike the FastCallback hooks above, OnFirstRun runs in-process as part of a normal app start and is
             // allowed to show UI (docs.velopack.io) — the one place Weir asks its one Windows admin (UAC) prompt
-            // for LAN access, per the owner's decision. --silent Setup skips Velopack's post-install app launch
-            // entirely (docs/release.md, #779), so this should never run during a silent install either way;
-            // AskOnFirstRun checks IsSilent and the interactive desktop itself too, rather than relying
-            // only on that.
-            .OnFirstRun((v) => FirewallInstallHooks.AskOnFirstRun(args));
+            // for LAN access, per the owner's decision, and whether to start with Windows. --silent Setup skips
+            // Velopack's post-install app launch entirely (docs/release.md, #779), so this should never run during a
+            // silent install either way; both questions check IsSilent and the interactive desktop themselves too,
+            // rather than relying only on that.
+            .OnFirstRun((v) =>
+            {
+                FirewallInstallHooks.AskOnFirstRun(args);
+                StartWithWindowsPrompt.AskOnFirstRun(args);
+            });
 
     // --configure-firewall, --remove-firewall and --allow-lan have no window to report to, so their outcome goes
     // to whatever console launched them (a script watching the exit code still wants a reason for it) as well as
@@ -117,17 +119,18 @@ static class Program
         Console.Error.WriteLine(message);
     }
 
-    // Weir is already running in this session: a second start only opens it, if the person asked for that.
-    private static void HandOverToRunningTray(string[] args)
+    // Weir is already running in this session: a second start opens nothing. The running tray says so from its own icon,
+    // unless the start was silent, which stays silent.
+    internal static void HandOverToRunningTray(string[] args, Action announceSecondLaunch)
     {
         TrayLog.Write("Tray host launch skipped: an existing Weir tray instance is already running.");
         if (PortChoice.SuppliedPort(args, Environment.GetEnvironmentVariable) is { } ignored)
         {
             TrayLog.Write($"Ignoring {ignored.Source} {ignored.Text}: Weir is already running. Use \"Change port\" from its tray menu, or quit it and start it again with the new port.");
         }
-        if (OpensBrowser(args))
+        if (!IsSilent(args))
         {
-            OpenExistingInstanceBrowser();
+            announceSecondLaunch();
         }
     }
 
@@ -166,7 +169,12 @@ static class Program
             var listenScope = LanAccessStartup.Resolve(runtimeHome, InstallProcesses.Root(), () => new ComFirewallPolicy(), TrayLog.Write);
             FirewallRuleWidening.AskInBackground(runtimeHome, listenScope, HasInteractiveDesktop(args, PortChoice.HasInteractiveDesktop));
 
-            using var app = new TrayApp(port.Value, listenScope, openBrowserOnReady: OpensBrowser(args), updateService, updateSettings);
+            using var app = new TrayApp(
+                port.Value,
+                listenScope,
+                new TrayStart(OpensBrowser(args), HasInteractiveDesktop(args, PortChoice.HasInteractiveDesktop)),
+                updateService,
+                updateSettings);
             return app.Run();
         }
         catch (Exception ex)
@@ -261,7 +269,11 @@ static class Program
     private static void StopOrphanedServers() =>
         InstallProcesses.StopOwn(InstallProcesses.Root(), sameSessionOnly: true, TrayLog.Write, "Startup (orphaned server check)");
 
-    internal static Icon LoadAppIcon()
+    /// <summary>The brand icon at its default size, for a window's title bar.</summary>
+    internal static Icon LoadAppIcon() => LoadAppIcon(null);
+
+    /// <summary>The brand icon's frame for <paramref name="size"/>, or the nearest one the icon file has.</summary>
+    internal static Icon LoadAppIcon(Size? size)
     {
         var assembly = Assembly.GetExecutingAssembly();
         var resourceName = assembly.GetManifestResourceNames()
@@ -270,7 +282,7 @@ static class Program
         if (resourceName is not null)
         {
             using var stream = assembly.GetManifestResourceStream(resourceName)!;
-            return new Icon(stream);
+            return size is { } wanted ? new Icon(stream, wanted) : new Icon(stream);
         }
 
         var fileCandidates = new[]
@@ -282,33 +294,11 @@ static class Program
         {
             if (File.Exists(path))
             {
-                return new Icon(path);
+                return size is { } wanted ? new Icon(path, wanted) : new Icon(path);
             }
         }
 
         return SystemIcons.Application;
-    }
-
-    // A second launch while Weir is running: open the running one, at the port its server is listening on.
-    private static void OpenExistingInstanceBrowser()
-    {
-        var portFile = Path.Combine(RuntimeHome(), ServerHost.CurrentPortFileName);
-        try
-        {
-            if (!File.Exists(portFile))
-            {
-                return;
-            }
-            var text = File.ReadAllText(portFile).Trim();
-            if (int.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out int port) && port is >= 1 and <= 65535)
-            {
-                OpenBrowser(port);
-            }
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            TrayLog.Write($"Could not read {portFile} to open the running Weir: {ex.Message}");
-        }
     }
 
     // Velopack's install and uninstall hooks: stop this install's own tray and server so their

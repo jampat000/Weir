@@ -12,10 +12,7 @@ namespace Weir.Tray;
 /// </summary>
 sealed class ServerHost : IServerListenScope, IDisposable
 {
-    /// <summary>
-    /// The port the server listens on at the moment, for a second launch that opens the running Weir
-    /// (Program.OpenExistingInstanceBrowser). The saved choice is port.txt (PortChoice).
-    /// </summary>
+    /// <summary>The port the server listens on at the moment. The saved choice is port.txt (PortChoice).</summary>
     internal const string CurrentPortFileName = "current-port.txt";
 
     private const string ServerExeName = "WeirServer.exe";
@@ -47,6 +44,7 @@ sealed class ServerHost : IServerListenScope, IDisposable
     private volatile Process? _process;
     private volatile int _port;
     private volatile ListenScope _scope;
+    private volatile ServerPhase _phase = ServerPhase.Starting;
     private Task? _watchdog;
     private Action? _onGaveUp;
     private CancellationToken _watchdogToken;
@@ -59,9 +57,25 @@ sealed class ServerHost : IServerListenScope, IDisposable
         _scope = scope;
     }
 
+    /// <summary>Raised, on whichever thread changed it, when <see cref="Phase"/> changes.</summary>
+    internal event Action? PhaseChanged;
+
     internal int Port => _port;
 
+    /// <summary>Where the server is: being started, answering, or stopped with nothing about to bring it back.</summary>
+    internal ServerPhase Phase => _phase;
+
     public ListenScope Scope => _scope;
+
+    private void SetPhase(ServerPhase phase)
+    {
+        if (_phase == phase)
+        {
+            return;
+        }
+        _phase = phase;
+        PhaseChanged?.Invoke();
+    }
 
     /// <summary>Sets what every server process is started with (ServerEnvironment).</summary>
     internal void PrepareEnvironment() => ServerEnvironment.Apply(_runtimeHome, FindServerExeDirectory());
@@ -77,10 +91,40 @@ sealed class ServerHost : IServerListenScope, IDisposable
         {
             StartProcess();
             await WaitForHealthAsync(cancellationToken).ConfigureAwait(false);
+            SetPhase(ServerPhase.Running);
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or TimeoutException or Win32Exception or FileNotFoundException)
+        {
+            SetPhase(ServerPhase.Stopped);
+            throw;
         }
         finally
         {
             _gate.Release();
+        }
+    }
+
+    /// <summary>
+    /// Stops the server cleanly and starts it again on the same port, for the same devices. This is also the way back once
+    /// the watchdog has given up. Returns whether the server is back and ready.
+    /// </summary>
+    internal async Task<bool> RestartNowAsync(CancellationToken cancellationToken)
+    {
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            TrayLog.Write($"Restart: restarting the server on port {_port} ({_scope.Describe()}).");
+            if (await TryStartOnAsync(_port, _scope, cancellationToken).ConfigureAwait(false))
+            {
+                return true;
+            }
+            SetPhase(ServerPhase.Stopped);
+            return false;
+        }
+        finally
+        {
+            _gate.Release();
+            RestartWatchdogIfStopped();
         }
     }
 
@@ -133,10 +177,12 @@ sealed class ServerHost : IServerListenScope, IDisposable
             if (failedRestarts >= MaxRestarts)
             {
                 TrayLog.Write("Exceeded max restart attempts — giving up.");
+                SetPhase(ServerPhase.Stopped);
                 onGaveUp();
                 return;
             }
 
+            SetPhase(ServerPhase.Starting);
             var delay = RestartBackoff[Math.Min(failedRestarts, RestartBackoff.Length - 1)];
             TrayLog.Write($"Waiting {delay.TotalMilliseconds:0}ms before restarting server...");
             await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
@@ -185,6 +231,7 @@ sealed class ServerHost : IServerListenScope, IDisposable
             StartProcess();
             exited.Dispose();
             await WaitForHealthAsync(cancellationToken).ConfigureAwait(false);
+            SetPhase(ServerPhase.Running);
             TrayLog.Write("Server restarted successfully.");
             return true;
         }
@@ -223,6 +270,10 @@ sealed class ServerHost : IServerListenScope, IDisposable
             {
                 WritePortFile();
             }
+            else
+            {
+                SetPhase(ServerPhase.Stopped);
+            }
             return false;
         }
         finally
@@ -252,7 +303,10 @@ sealed class ServerHost : IServerListenScope, IDisposable
                 return ScopeChange.Applied;
             }
             TrayLog.Write($"LAN access: the server did not start that way, so it goes back to how it was: {from.Describe()}.");
-            await TryStartOnAsync(_port, from, cancellationToken).ConfigureAwait(false);
+            if (!await TryStartOnAsync(_port, from, cancellationToken).ConfigureAwait(false))
+            {
+                SetPhase(ServerPhase.Stopped);
+            }
             return ScopeChange.Failed;
         }
         finally
@@ -265,6 +319,7 @@ sealed class ServerHost : IServerListenScope, IDisposable
     // Replaces the running server with one on this port for this scope. Called with the gate held.
     private async Task<bool> TryStartOnAsync(int port, ListenScope scope, CancellationToken cancellationToken)
     {
+        SetPhase(ServerPhase.Starting);
         await StopProcessAsync().ConfigureAwait(false);
         _port = port;
         _scope = scope;
@@ -272,6 +327,7 @@ sealed class ServerHost : IServerListenScope, IDisposable
         {
             StartProcess();
             await WaitForHealthAsync(cancellationToken).ConfigureAwait(false);
+            SetPhase(ServerPhase.Running);
             return true;
         }
         catch (Exception ex) when (ex is InvalidOperationException or TimeoutException or Win32Exception or FileNotFoundException)
