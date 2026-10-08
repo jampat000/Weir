@@ -305,9 +305,9 @@ public sealed class LibraryScanHandler : IJobHandler
         {
             classification = LibraryFilePlanner.Classify(ProbeResult.Parse(probeJson), rules);
         }
-        catch (Exception exception) when (exception is RulesInputException)
+        catch (RulesInputException)
         {
-            classification = LibraryFilePlanResult.CannotProcess($"Weir could not plan this file: {exception.Message}");
+            classification = LibraryFilePlanResult.CannotProcess(ToolFailureText.UnusableTrackData);
         }
 
         return new LibraryScanFileEntry(

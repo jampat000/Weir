@@ -298,6 +298,20 @@ public sealed class MediaManagerRulesTests
     }
 
     [Fact]
+    public void The_tools_own_text_never_reaches_the_report_to_the_manager()
+    {
+        var body = CompletionReports.BuildCompletionBody(
+            DelunoOrigin,
+            Dict("""{"ok":false,"outcome":"failed_before_execution","reason":"Weir can't read this file yet.","technical_detail":"[matroska,webm @ 000001b280590a00] EBML header parsing failed C:\\Media\\film.mkv","inspected_source_path":"C:\\Media\\film.mkv"}"""));
+
+        var text = WireJsonWriter.Dumps(body, WireJsonFormat.Compact);
+        Assert.Equal("Weir can't read this file yet.", ((WireString)body["message"]).Value);
+        Assert.DoesNotContain("technical_detail", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("EBML", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("C:\\\\Media", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void The_origin_is_read_from_the_job_payload()
     {
         Assert.Null(HandoffOrigin.FromPayload(Dict("""{"relative_media_path":"a/b.mkv"}""")));

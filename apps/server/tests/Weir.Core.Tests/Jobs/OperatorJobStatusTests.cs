@@ -1,4 +1,5 @@
 using Weir.Core.Jobs;
+using Weir.Core.Media;
 using Weir.Core.Processing;
 
 namespace Weir.Core.Tests.Jobs;
@@ -28,6 +29,18 @@ public sealed class OperatorJobStatusTests
         var status = OperatorJobStatus.Build("processing", "remux", "failed", "ffmpeg exited with code 1", payloadJson: null);
 
         Assert.Equal("Read the error below, fix the cause, then use Try again in Activity.", status.NextAction);
+    }
+
+    [Theory]
+    [InlineData(ToolFailureText.UnreadableFile)]
+    [InlineData(ToolFailureText.NotReadableYet)]
+    [InlineData(ToolFailureText.Generic)]
+    [InlineData("ffprobe failed: broken")]
+    public void A_job_that_failed_on_a_file_the_tools_could_not_read_says_so(string lastError)
+    {
+        var status = OperatorJobStatus.Build("processing", "remux", "failed", lastError, payloadJson: null);
+
+        Assert.StartsWith("Weir could not read this media file", status.Message, StringComparison.Ordinal);
     }
 
     [Theory]
