@@ -24,6 +24,10 @@ Windows shared build archive.
   `.github/workflows/release.yml`). The Debian/Ubuntu package used by the Docker image publishes its
   own source packages at https://packages.debian.org/source/stable/ffmpeg and
   https://packages.ubuntu.com/source/ffmpeg.
+- The BtbN archives themselves (the Windows and Linux builds, named in the same file) are attached to each
+  GitHub Release too, because BtbN removes its dated releases after a couple of weeks; a build whose
+  archive is gone from BtbN takes the copy from Weir's own releases and checks it against the same
+  SHA-256.
 
 ## MKVToolNix (mkvmerge)
 
@@ -41,6 +45,9 @@ MKVToolNix is a third-party project and is not owned by Weir. It is distributed 
   `packaging/windows/fetch-bundled-tool-sources.ps1` (called from `.github/workflows/release.yml`).
   The Debian/Ubuntu `mkvtoolnix` package used by the Docker image publishes its own source packages
   at https://packages.debian.org/source/stable/mkvtoolnix and https://packages.ubuntu.com/source/mkvtoolnix.
+- The portable Windows archive the bundled `mkvmerge.exe` comes from, `mkvtoolnix-64-bit-<version>.zip`, is
+  attached to each GitHub Release as well, as a copy a later build can fall back to if mkvtoolnix.download
+  ever drops it.
 
 ## Outfit font
 

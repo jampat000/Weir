@@ -23,6 +23,7 @@ runs:
       shell: bash
       env:
         FFMPEG_DIR: ${{ runner.temp }}/weir-ffmpeg
+        GITHUB_TOKEN: ${{ github.token }}
       run: |
         node scripts/install-ffmpeg-linux.mjs "$FFMPEG_DIR"
         echo "$FFMPEG_DIR" >> "$GITHUB_PATH"
