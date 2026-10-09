@@ -32,6 +32,9 @@ sealed class PortDialog : Form
     internal string? ErrorText => string.IsNullOrEmpty(_error.Text) ? null : _error.Text;
     internal void PressOk() => Accept();
 
+    /// <summary>The question comes from start-up, not from the menu: it stays in front, with a taskbar button, until it is answered.</summary>
+    internal bool MustBeSeen => _prompt.Reason != PortPromptReason.Change;
+
     internal PortDialog(PortPrompt prompt, Func<int, bool> isInUse, Icon? icon)
     {
         _prompt = prompt;
@@ -47,10 +50,10 @@ sealed class PortDialog : Form
         AutoSize = true;
         AutoSizeMode = AutoSizeMode.GrowAndShrink;
         Padding = new Padding(16, 14, 16, 12);
-        // Nothing else of Weir's is on screen when this appears at startup, so it has to be
-        // findable: in the taskbar and in front, not behind whatever the person was doing.
-        ShowInTaskbar = prompt.Reason != PortPromptReason.Change;
-        TopMost = prompt.Reason != PortPromptReason.Change;
+        // Weir is not running while this waits, and nothing else of Weir's is on screen, so it has to be findable: in the
+        // taskbar, and in front (made so again when it is shown) rather than behind whatever else is open.
+        ShowInTaskbar = MustBeSeen;
+        TopMost = MustBeSeen;
         if (icon is not null)
         {
             Icon = icon;
@@ -214,7 +217,14 @@ sealed class PortDialog : Form
         ok.Click += (_, _) => Accept();
         Shown += (_, _) =>
         {
-            Activate();
+            if (MustBeSeen)
+            {
+                ForegroundWindow.Bring(this);
+            }
+            else
+            {
+                Activate();
+            }
             if (_useCustom.Checked)
             {
                 _customPort.Focus();
