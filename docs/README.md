@@ -28,6 +28,7 @@ whose source is in [`../docs-site/docs`](../docs-site/docs).
 - [`release.md`](release.md) - the release procedure and what each release produces.
 - [`release-governance.md`](release-governance.md) - repository controls and the checks before and after a release.
 - [`ci-standard.md`](ci-standard.md) - the CI and release standard Weir shares, as an identical separate copy, with Deluno.
+- [`tray-standard.md`](tray-standard.md) - what the tray icon shows, its menu and its behaviour, the same in Weir and Deluno (a word-for-word copy).
 - [`golden-path.md`](golden-path.md) - the run that gates stable releases (and every Deluno tag), the same in Weir and Deluno: install on a clean VM, use it like a person, record the pass.
 - [`tray-standard.md`](tray-standard.md) - the Windows tray standard Weir and Deluno share, as an identical separate copy: icon marks, hover text, the common menu and notices.
 - [`release-notes/TEMPLATE.md`](release-notes/TEMPLATE.md) - the template for release notes.

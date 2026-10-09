@@ -10,7 +10,7 @@ Use the Velopack setup exe from the release being validated.
 2. Confirm application files install under `%LocalAppData%\Weir`.
 3. Confirm runtime data is created under `C:\ProgramData\Weir`.
 4. Launch Weir from the Start Menu shortcut.
-5. Confirm the tray icon appears and the browser opens the app on `http://localhost:9347/` (or the port shown in the tray's `Change port` item if 9347 was taken).
+5. Confirm the tray icon appears at once with a grey ring in its corner while Weir starts, and that the ring goes when Weir is ready. Confirm the first run asked "Start Weir when you sign in to Windows?" and that `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` has a `Weir` entry only if you said yes. Confirm a notice from the tray icon says Weir is running, that no browser window opened by itself, and that clicking the notice opens the app on `http://localhost:9347/` (or the port shown in the tray's `Change port` item if 9347 was taken).
 6. Confirm the **Create admin** screen appears when no user exists.
 7. Attempt a password shorter than 8 characters and confirm it is blocked.
 8. Create the first user with a valid password.
@@ -27,7 +27,7 @@ Use the Velopack setup exe from the release being validated.
 16. In System › Backups, use **Export or restore now** to download a configuration backup.
 17. Restore that backup and confirm the app remains usable.
 18. Confirm System › About › Updates shows a meaningful status, even when no update is available.
-19. Right-click the tray icon and confirm `Check for updates` is present and reaches the current release status.
+19. Right-click the tray icon and confirm the menu matches `docs/tray-standard.md` (including `Restart Weir`, `Copy address`, `Open logs folder`, `Start with Windows` and the version line), that the hover text says the state, and that `Check for updates` reaches the current release status. Choose `Pause processing` and confirm the two-bars mark and `Resume processing` appear; choose it again and confirm they go. Choose `Restart Weir` and confirm the ring shows and then goes.
 20. In Setup › Workflows, open a workflow's editor and use `Browse` on a folder field to pick a local folder. Confirm each row shows its kind (Weir only, or Linked to a media manager), its watched folder and the folder it cleans into in separate columns, and that `Add workflow` asks which kind first. Drag a row by its grip (or press Alt with the up or down arrow on the grip) and confirm the Priority numbers change and stay changed after a reload.
 21. Enter a UNC path (`\\<nas>\<share>\folder`) manually and confirm it saves; a missing folder is a warning, not a save blocker.
 22. Open Library, pick the library from the title and confirm `Check again` runs.

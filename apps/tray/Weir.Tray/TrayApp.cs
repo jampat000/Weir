@@ -1,49 +1,86 @@
 using System.ComponentModel;
-using System.Diagnostics;
+using System.Runtime.InteropServices;
 using Weir.Tray.Firewall;
 using Weir.Tray.LanAccess;
 
 namespace Weir.Tray;
 
+/// <summary>How this run was started.</summary>
+/// <param name="AnnounceOnReady">Whether a balloon tells the person Weir is running once its server is ready.</param>
+/// <param name="Interactive">Whether there is a person to tell when the server cannot start. A start with no one to tell exits instead.</param>
+readonly record struct TrayStart(bool AnnounceOnReady, bool Interactive);
+
 /// <summary>
 /// The tray icon and its menu. Everything that touches them runs on the UI thread: work on other threads (the
-/// server watchdog, update checks, a port change) hands its result back through <see cref="OnUi"/>.
+/// server watchdog, update checks, a port change) hands its result back through <see cref="OnUi"/>. The icon, its hover
+/// text and the menu are all drawn from one place, <see cref="Render"/>, from the state the tray keeps, so they cannot
+/// disagree.
 /// </summary>
 sealed class TrayApp : IDisposable
 {
-    private const int BalloonTimeoutMs = 8000;
-    private const double BrowserDebounceMs = 1250;
+    private static readonly TimeSpan BrowserDebounceWindow = TimeSpan.FromMilliseconds(1250);
 
     private readonly string _runtimeHome;
-    private readonly bool _openBrowserOnReady;
+    private readonly TrayStart _start;
     private readonly ServerHost _server;
     private readonly LanAccessSync _lanAccess;
     private readonly UpdateSettings _updateSettings;
     private readonly IUpdateService _updateService;
     private readonly TrayShutdown _shutdown;
+    private readonly SecondLaunchSignal _secondLaunch;
+    private readonly StartupRegistration _startup = StartupRegistration.ForThisUser();
+    private readonly TrayStatusGate _serverStatus;
+    private readonly WeirOpener _opener;
+    private readonly PauseControl _pause;
+    private readonly PortChange _portChange;
     private readonly CancellationTokenSource _cts = new();
-    private readonly Lock _browserLock = new();
 
     private SynchronizationContext? _ui;
     private NotifyIcon? _notifyIcon;
-    private ToolStripMenuItem? _updateMenuItem;
-    private ToolStripMenuItem? _portMenuItem;
+    private TrayIcons? _icons;
+    private TrayMenuView? _menu;
+    private TrayStatusWatcher? _statusWatcher;
     private TrayUpdates? _updates;
     private LanAccessMenu? _lanAccessMenu;
-    private long _lastBrowserOpenTicks = long.MinValue / 2;
+    private bool _watching;
     private Action? _balloonClick;
     private int _exitCode;
 
-    public TrayApp(int port, ListenScope listenScope, bool openBrowserOnReady, IUpdateService updateService, UpdateSettings updateSettings)
+    public TrayApp(
+        int port,
+        ListenScope listenScope,
+        TrayStart start,
+        IUpdateService updateService,
+        UpdateSettings updateSettings,
+        SecondLaunchSignal secondLaunch)
     {
         var installRoot = AppContext.BaseDirectory;
         _runtimeHome = Program.RuntimeHome();
-        _openBrowserOnReady = openBrowserOnReady;
+        _start = start;
+        _secondLaunch = secondLaunch;
         _server = new ServerHost(_runtimeHome, installRoot, port, listenScope);
         _lanAccess = new LanAccessSync(_runtimeHome, _server, new WindowsFirewallAccess(), TimeProvider.System);
         _updateSettings = updateSettings;
         _updateService = updateService;
         _shutdown = new TrayShutdown(StopServerAsync, updateService);
+        _serverStatus = new TrayStatusGate(() => _server.StartedAtUtc);
+        _opener = new WeirOpener(
+            () => _server.Phase,
+            () => _server.Port,
+            new Debounce(BrowserDebounceWindow, TimeProvider.System),
+            (openPort, path) => Program.OpenBrowser(openPort, relativePath: path),
+            ShowBalloon,
+            RestartObserved);
+        _pause = new PauseControl(_runtimeHome, TimeProvider.System, () => State().IsPaused, ShowBalloon, ShowTrayLog);
+        _portChange = new PortChange(
+            () => _server.Port,
+            prompt => PortDialog.Ask(prompt, PortChoice.IsInUse, _notifyIcon?.Icon),
+            _server.MoveToPortAsync,
+            ShowBalloon,
+            () => _opener.Open("port-change-balloon"),
+            ShowTrayLog,
+            Render,
+            _cts.Token);
 
         TrayLog.Write($"Starting tray host. installRoot={installRoot} runtimeHome={_runtimeHome}");
     }
@@ -60,6 +97,17 @@ sealed class TrayApp : IDisposable
         _server.PrepareEnvironment();
         _server.WritePortFile();
         TrayLog.Write($"Prepared runtime environment on port {_server.Port}");
+
+        // The icon is there from the first moment, marked Starting, not only once the server answers.
+        CreateTrayIcon();
+        _server.PhaseChanged += () =>
+        {
+            var phase = _server.Phase;
+            OnUi(() => ShowPhase(phase));
+        };
+        _statusWatcher = new TrayStatusWatcher(_runtimeHome, reading => OnUi(() => ShowServerStatus(reading)));
+        _statusWatcher.Start();
+        _secondLaunch.Subscribe(() => OnUi(ShowAlreadyRunning));
 
         // Start-up runs inside the message loop, so waiting for the server never blocks the UI thread.
         OnUi(() => BackgroundWork.Observe("Start-up", StartAsync()));
@@ -79,51 +127,98 @@ sealed class TrayApp : IDisposable
         catch (Exception ex) when (ex is TimeoutException or InvalidOperationException or FileNotFoundException or Win32Exception)
         {
             TrayLog.Write($"Fatal startup error:\n{ex}");
-            _exitCode = 1;
-            Application.ExitThread();
+            if (!_start.Interactive)
+            {
+                _exitCode = 1;
+                Application.ExitThread();
+                return;
+            }
+
+            // The person is there: say so, and keep the icon, whose Restart Weir is the way back.
+            ShowBalloon("Weir", TrayBalloons.CouldNotStartText, ToolTipIcon.Error, RestartObserved);
             return;
         }
         TrayLog.Write($"Weir is healthy on http://127.0.0.1:{_server.Port}/");
 
-        if (_openBrowserOnReady)
+        // A start never opens the browser; the balloon offers it, and a click opens it.
+        if (_start.AnnounceOnReady)
         {
-            OpenBrowserDebounced("startup");
+            ShowBalloon("Weir", TrayBalloons.RunningText(_server.Port), ToolTipIcon.Info, () => _opener.Open("start-balloon"));
         }
         else
         {
-            TrayLog.Write("Skipping browser auto-open (no-browser mode).");
+            TrayLog.Write("Skipping the start balloon (no-browser mode).");
         }
 
-        _server.Watch(() => OnUi(() => ShowBalloon("Weir", "Weir server failed repeatedly. Please restart Weir.", ToolTipIcon.Error)), _cts.Token);
+        BeginWatching();
+    }
 
-        _lanAccessMenu = new LanAccessMenu(_lanAccess, _server, ShowLanAccessNotice, _cts.Token);
+    // Once the server has been up: watch it, follow the LAN access choice and look for updates. Run once, whichever
+    // start, first or Restart Weir after a failed one, gets the server up.
+    private void BeginWatching()
+    {
+        if (_watching)
+        {
+            return;
+        }
+        _watching = true;
+
+        _server.Watch(() => OnUi(() => ShowBalloon("Weir", TrayBalloons.StoppedText, ToolTipIcon.Error, RestartObserved)), _cts.Token);
+
         _ = BackgroundWork.RunLoop(
             "LAN access watcher",
             ct => _lanAccess.WatchAsync(
                 new LanAccessWatch(
-                    () => OnUi(() => _lanAccessMenu?.OnWaitingForWindows()),
-                    applied => OnUi(() => _lanAccessMenu?.OnChangedElsewhere(applied))),
+                    () => OnUi(() => _lanAccessMenu!.OnWaitingForWindows()),
+                    applied => OnUi(() => _lanAccessMenu!.OnChangedElsewhere(applied))),
                 ct),
             _cts.Token);
 
-        _updates = new TrayUpdates(
-            _updateService,
-            _runtimeHome,
-            _updateSettings,
-            new UpdateCallbacks(
-                OnUi,
-                RefreshUpdateMenu,
-                ShowUpdateNotice,
-                () => BackgroundWork.Observe("Apply update", ApplyUpdateAndRestartAsync())),
-            TimeProvider.System,
-            _cts.Token);
-        _notifyIcon = CreateNotifyIcon();
-        _notifyIcon.Visible = true;
-        _updates.Start();
+        _updates!.Start();
     }
 
     /// <summary>Runs <paramref name="action"/> on the UI thread, after whatever it is doing at the moment.</summary>
     private void OnUi(Action action) => _ui!.Post(_ => action(), null);
+
+    // -- What the tray shows ------------------------------------------------
+
+    private TrayState State() =>
+        new(_server.Phase, _serverStatus.Current, _updates is { IsDownloaded: true } updates ? updates.PendingVersion : null, _server.Port);
+
+    // The icon's mark, the hover text and the menu, from the state as it is now.
+    private void Render()
+    {
+        if (_notifyIcon is null || _menu is null || _updates is null || _lanAccessMenu is null)
+        {
+            return;
+        }
+        var state = State();
+        _notifyIcon.Icon = _icons!.For(state.Badge);
+        _notifyIcon.Text = state.HoverText;
+        _menu.Show(TrayMenu.Describe(new TrayMenuInputs(
+            state,
+            _updates.MenuState(),
+            _lanAccessMenu.State,
+            _portChange.MovingTo,
+            _startup.IsEnabled,
+            AppVersion.Current)));
+    }
+
+    // A server that is starting has said nothing yet: what the one before it left in tray-status.json is not shown.
+    private void ShowPhase(ServerPhase phase)
+    {
+        if (phase == ServerPhase.Starting)
+        {
+            _serverStatus.ServerStarting();
+        }
+        Render();
+    }
+
+    private void ShowServerStatus(TrayStatusReading reading)
+    {
+        _serverStatus.Offer(reading);
+        Render();
+    }
 
     // -- Updates ------------------------------------------------------------
 
@@ -157,29 +252,18 @@ sealed class TrayApp : IDisposable
                     "Weir Update",
                     $"Version {version} is available. Open System › About in Weir to update.",
                     ToolTipIcon.Info,
-                    () => OpenBrowserDebounced("tray-update-balloon", Program.UpdateCheckPath));
+                    () => _opener.Open("tray-update-balloon", Program.UpdateCheckPath));
                 break;
         }
-        RefreshUpdateMenu();
+        Render();
     }
 
-    private void RefreshUpdateMenu()
-    {
-        if (_updateMenuItem is null || _updates is null)
-        {
-            return;
-        }
-        var state = _updates.MenuState();
-        _updateMenuItem.Text = state.Text;
-        _updateMenuItem.Enabled = state.Enabled;
-    }
-
-    private void OnUpdateMenuClick(object? sender, EventArgs e)
+    private void OnUpdateMenuClick()
     {
         switch (_updates?.MenuState().Action)
         {
             case UpdateMenuAction.OpenUpdatePage:
-                OpenBrowserDebounced("tray-update-settings", Program.UpdateCheckPath);
+                _opener.Open("tray-update-settings", Program.UpdateCheckPath);
                 break;
             case UpdateMenuAction.Check:
                 _updates.CheckInBackground();
@@ -217,63 +301,70 @@ sealed class TrayApp : IDisposable
 
     // -- Tray icon ----------------------------------------------------------
 
-    private NotifyIcon CreateNotifyIcon()
+    private void CreateTrayIcon()
     {
-        var menu = new ContextMenuStrip();
+        _lanAccessMenu = new LanAccessMenu(_lanAccess, _server, ShowLanAccessNotice, Render, _cts.Token);
+        _updates = new TrayUpdates(
+            _updateService,
+            _runtimeHome,
+            _updateSettings,
+            new UpdateCallbacks(
+                OnUi,
+                Render,
+                ShowUpdateNotice,
+                () => BackgroundWork.Observe("Apply update", ApplyUpdateAndRestartAsync())),
+            TimeProvider.System,
+            _cts.Token);
+        _icons = new TrayIcons(size => Program.LoadAppIcon(size), SystemInformation.SmallIconSize);
+        _menu = new TrayMenuView(MenuClicks(), staysOpen: [TrayMenuItem.StartWithWindows]);
+        _menu.Strip.Opening += (_, _) => Render();
 
-        var openItem = menu.Items.Add("Open Weir");
-        openItem.Font = new Font(openItem.Font, FontStyle.Bold);
-        openItem.Click += (_, _) => OpenBrowserDebounced("tray");
-
-        menu.Items.Add("Open Data Folder").Click += (_, _) => OpenDataFolder();
-
-        _portMenuItem = new ToolStripMenuItem(PortMenuText());
-        _portMenuItem.Click += (_, _) => BackgroundWork.Observe("Change port", ChangePortAsync());
-        menu.Items.Add(_portMenuItem);
-
-        _lanAccessMenu!.AddTo(menu.Items);
-
-        menu.Items.Add(new ToolStripSeparator());
-
-        _updateMenuItem = new ToolStripMenuItem();
-        _updateMenuItem.Click += OnUpdateMenuClick;
-        RefreshUpdateMenu();
-        menu.Items.Add(_updateMenuItem);
-
-        menu.Items.Add(new ToolStripSeparator());
-
-        menu.Items.Add("Quit").Click += (_, _) => BackgroundWork.Observe("Quit", QuitAsync());
-
-        var notifyIcon = new NotifyIcon
-        {
-            Icon = Program.LoadAppIcon(),
-            Text = "Weir",
-            ContextMenuStrip = menu,
-            Visible = false,
-        };
+        _notifyIcon = new NotifyIcon { ContextMenuStrip = _menu.Strip };
 
         // Clicking the icon is a person asking for Weir, so one click opens it (#638). A double-click still opens
         // one window: its second event falls inside the debounce.
-        notifyIcon.MouseClick += (_, e) =>
+        _notifyIcon.MouseClick += (_, e) =>
         {
             if (e.Button == MouseButtons.Left)
             {
-                OpenBrowserDebounced("tray-click");
+                _opener.OpenFromClick("tray-click");
             }
         };
-        notifyIcon.DoubleClick += (_, _) => OpenBrowserDebounced("tray-dblclick");
+        _notifyIcon.DoubleClick += (_, _) => _opener.OpenFromClick("tray-dblclick");
 
         // One handler for every balloon: a click does what the balloon on screen offered, and nothing for a balloon
         // that offered nothing.
-        notifyIcon.BalloonTipClicked += (_, _) =>
+        _notifyIcon.BalloonTipClicked += (_, _) =>
         {
             var onClick = _balloonClick;
             _balloonClick = null;
             onClick?.Invoke();
         };
 
-        return notifyIcon;
+        Render();
+        _notifyIcon.Visible = true;
     }
+
+    private Dictionary<TrayMenuItem, Action> MenuClicks() => new()
+    {
+        [TrayMenuItem.Open] = () => _opener.OpenFromClick("tray"),
+        [TrayMenuItem.Pause] = _pause.Toggle,
+        [TrayMenuItem.Restart] = RestartObserved,
+        [TrayMenuItem.CopyAddress] = CopyAddress,
+        [TrayMenuItem.AllowOtherDevices] = () => _lanAccessMenu!.Allow(),
+        [TrayMenuItem.OnlyThisPc] = () => _lanAccessMenu!.LimitToThisPc(),
+        [TrayMenuItem.ChangePort] = () => BackgroundWork.Observe("Change port", _portChange.RunAsync()),
+        [TrayMenuItem.OpenDataFolder] = () => RuntimeFolders.Open(_runtimeHome, "data folder"),
+        [TrayMenuItem.OpenLogsFolder] = () => RuntimeFolders.Open(LogsFolder(), "logs folder"),
+        [TrayMenuItem.StartWithWindows] = () =>
+        {
+            _startup.Toggle();
+            Render();
+        },
+        [TrayMenuItem.Update] = OnUpdateMenuClick,
+        [TrayMenuItem.ReportProblem] = () => ProblemReport.Open(LogsFolder()),
+        [TrayMenuItem.Quit] = () => BackgroundWork.Observe("Quit", QuitAsync()),
+    };
 
     private void ShowBalloon(string title, string text, ToolTipIcon icon, Action? onClick = null)
     {
@@ -282,25 +373,13 @@ sealed class TrayApp : IDisposable
             return;
         }
         _balloonClick = onClick;
-        _notifyIcon.ShowBalloonTip(BalloonTimeoutMs, title, text, icon);
+        _notifyIcon.ShowBalloonTip(TrayBalloons.TimeoutMs(icon), title, text, icon);
     }
 
-    private void OpenDataFolder()
-    {
-        try
-        {
-            Process.Start(new ProcessStartInfo { FileName = _runtimeHome, UseShellExecute = true })?.Dispose();
-        }
-        catch (Exception ex) when (ex is Win32Exception or InvalidOperationException or FileNotFoundException)
-        {
-            TrayLog.Write($"Could not open the data folder {_runtimeHome}: {ex.Message}");
-            MessageBox.Show(
-                $"Weir could not open its data folder. You can open it in File Explorer yourself:\n\n{_runtimeHome}",
-                "Weir",
-                MessageBoxButtons.OK,
-                MessageBoxIcon.Warning);
-        }
-    }
+    private string LogsFolder() => RuntimeFolders.Logs(_runtimeHome, Environment.GetEnvironmentVariable);
+
+    // The file a balloon about a failure names.
+    private void ShowTrayLog() => RuntimeFolders.Reveal(Path.Combine(_runtimeHome, TrayLog.FileName));
 
     private async Task QuitAsync()
     {
@@ -309,82 +388,67 @@ sealed class TrayApp : IDisposable
         Application.Exit();
     }
 
-    // -- LAN access ---------------------------------------------------------
+    // -- Restart, address -------------------------------------------------------
 
-    private void ShowLanAccessNotice(LanAccessNotice notice) =>
-        ShowBalloon("Weir", notice.Text, notice.IsWarning ? ToolTipIcon.Warning : ToolTipIcon.Info);
+    private void RestartObserved() => BackgroundWork.Observe("Restart Weir", RestartAsync());
 
-    // -- Port -------------------------------------------------------------
-
-    private string PortMenuText() => $"Change port ({_server.Port})...";
-
-    private async Task ChangePortAsync()
+    private async Task RestartAsync()
     {
-        var current = _server.Port;
-        var chosen = PortDialog.Ask(
-            new PortPrompt(PortPromptReason.Change, current, CurrentPortInUse: false, Suggested: current),
-            PortChoice.IsInUse,
-            _notifyIcon?.Icon);
-        if (chosen is not { } port || port == current)
-        {
-            TrayLog.Write("Change port: closed without a new port.");
-            return;
-        }
-
-        _portMenuItem!.Enabled = false;
-        _portMenuItem.Text = $"Moving to port {port}...";
+        TrayLog.Write("Restart Weir chosen.");
         try
         {
-            // Restarting waits up to a minute for the new server; the menu stays responsive meanwhile, and this
-            // method carries on here, on the UI thread, when it is done.
-            if (await _server.MoveToPortAsync(port, _cts.Token))
+            if (await _server.RestartNowAsync(_cts.Token))
             {
-                ShowBalloon("Weir", $"Weir is now at http://localhost:{port}/", ToolTipIcon.Info);
-                OpenBrowserDebounced("port-change");
+                BeginWatching();
             }
             else
             {
-                ShowBalloon(
-                    "Weir",
-                    $"Weir could not start on port {port}, so it is still at port {current}. See tray-host.log in the data folder.",
-                    ToolTipIcon.Warning);
+                ShowBalloon("Weir", TrayBalloons.CouldNotStartText, ToolTipIcon.Error, RestartObserved);
             }
         }
         catch (OperationCanceledException)
         {
-            TrayLog.Write($"Change port: stopped before port {port} was ready, because Weir is quitting or updating.");
-        }
-        finally
-        {
-            _portMenuItem.Enabled = true;
-            _portMenuItem.Text = PortMenuText();
+            TrayLog.Write("Restart Weir: stopped, because Weir is quitting or updating.");
         }
     }
 
-    // -- Browser ------------------------------------------------------------
-
-    private void OpenBrowserDebounced(string source, string relativePath = "/")
+    private void CopyAddress()
     {
-        var now = Environment.TickCount64;
-        lock (_browserLock)
+        var address = TrayState.AddressToCopy(_server.Scope, _server.Port, Environment.MachineName);
+        try
         {
-            if (now - _lastBrowserOpenTicks < BrowserDebounceMs)
-            {
-                TrayLog.Write($"Ignoring duplicate browser open request within debounce window (source={source}).");
-                return;
-            }
-            _lastBrowserOpenTicks = now;
+            Clipboard.SetText(address);
+            TrayLog.Write($"Copied {address} to the clipboard.");
         }
-        TrayLog.Write($"Opening Weir in browser on port {_server.Port} (source={source})");
-        Program.OpenBrowser(_server.Port, relativePath: relativePath);
+        catch (Exception ex) when (ex is ExternalException or ThreadStateException)
+        {
+            TrayLog.Write($"Could not copy {address} to the clipboard: {ex.Message}");
+        }
     }
+
+    // A second launch signalled: this copy is the one running.
+    private void ShowAlreadyRunning()
+    {
+        TrayLog.Write("Weir was started again; telling the person it is already running.");
+        _opener.ShowAlreadyRunning();
+    }
+
+    // The notices that point to tray-host.log show that file, selected.
+    private void ShowLanAccessNotice(LanAccessNotice notice) =>
+        ShowBalloon(
+            "Weir",
+            notice.Text,
+            notice.IsWarning ? ToolTipIcon.Warning : ToolTipIcon.Info,
+            notice.NamesLog ? ShowTrayLog : null);
 
     public void Dispose()
     {
         _cts.Cancel();
+        _statusWatcher?.Dispose();
         _server.Dispose();
         _notifyIcon?.Dispose();
-        _lanAccessMenu?.Dispose();
+        _menu?.Dispose();
+        _icons?.Dispose();
         _lanAccess.Dispose();
         _cts.Dispose();
     }

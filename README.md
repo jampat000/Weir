@@ -51,7 +51,7 @@ You need 64-bit Windows 10 or 11. You do not need administrator rights to instal
 3. Weir installs for your user account and starts. Its icon appears in the system tray, next to the clock.
 4. **Weir asks for a port.** Keep **9347** unless something else uses it.
 5. **Windows asks for permission once.** Weir answers on this PC only until you let other devices in, and the first start asks whether you want to. Say yes if you want to open Weir from your phone or another computer. Windows asks for administrator approval, and Weir adds one firewall rule named **Weir** that covers every network type. Say no if you only use Weir on this PC. You can change your mind later in **System › About**, by choosing **Devices on my network** or **This PC only**, or from the tray icon's menu.
-6. Your browser opens Weir at [http://localhost:9347](http://localhost:9347).
+6. A notice from the tray icon says Weir is running. Click it, or the icon, and your browser opens Weir at [http://localhost:9347](http://localhost:9347). Weir never opens a browser window by itself.
 
 | | |
 |--|--|
@@ -61,7 +61,7 @@ You need 64-bit Windows 10 or 11. You do not need administrator rights to instal
 
 Your data lives outside the program folder on purpose, so updating the program never touches it. Weir runs as you, in your own sign-in session, and not as a Windows service. That way it can reach your mapped network drives.
 
-Click the tray icon to open Weir. Right-click it to open the data folder, change the port, allow other devices, check for updates or quit. The [Windows guide](docs/install-windows.md) has the details, including how to install Weir from a script.
+Click the tray icon to open Weir. Right-click it to pause processing, restart Weir, copy its address, open the data or logs folder, change the port, allow other devices, start Weir with Windows, check for updates or quit. The [Windows guide](docs/install-windows.md) has the details, including how to install Weir from a script.
 
 ## Install with Docker
 
