@@ -92,7 +92,7 @@ public static class ManualPlanSupport
     }
 
     /// <summary>Enqueue a remux pass carrying the operator's choice and the fingerprint taken at submission. Commits nothing.</summary>
-    public static ProcessingJob EnqueueManualPlan(
+    public static async Task<ProcessingJob> EnqueueManualPlanAsync(
         UnitOfWork uow, ProcessingJobStore jobs, ManualPlanFileContext context, ManualPlanChoice choice, SourceFingerprint fingerprint)
     {
         ArgumentNullException.ThrowIfNull(uow);
@@ -108,13 +108,13 @@ public static class ManualPlanSupport
             .Set("manual_plan", ManualPlanJson.ToPyDict(choice))
             .Set("source_fingerprint", ManualPlanJson.ToPyDict(fingerprint));
 
-        return jobs.EnqueueOrGet(
+        return await jobs.EnqueueOrGetAsync(
             uow,
             $"{RemuxPassOutcomes.JobKind}:manual-plan:{context.File.Id}:{Guid.NewGuid():N}",
             RemuxPassOutcomes.JobKind,
             WireJsonWriter.Dumps(payload, WireJsonFormat.Compact),
             JobQueueRules.DefaultMaxAttempts,
             runnerCost: null,
-            priority: 0);
+            priority: 0).ConfigureAwait(false);
     }
 }

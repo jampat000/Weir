@@ -3,42 +3,36 @@ using Weir.Tray.Firewall;
 namespace Weir.Tray.LanAccess;
 
 /// <summary>
-/// The tray's two LAN access items, "Allow other devices on your network..." and "Only allow this PC", and what
-/// they do. Everything here runs on the UI thread: the menu handlers start it there, and the work that leaves it
-/// (the Windows admin prompt, the server restart) hands back to it when it finishes.
+/// What the tray's two LAN access items, "Allow other devices on your network..." and "Only allow this PC", do, and what
+/// they say while it happens. The tray draws <see cref="State"/> and calls <see cref="Allow"/> and
+/// <see cref="LimitToThisPc"/> from the items' clicks. Everything here runs on the UI thread: the menu handlers start it
+/// there, and the work that leaves it (the Windows admin prompt, the server restart) hands back to it when it finishes.
 /// </summary>
-sealed class LanAccessMenu : IDisposable
+sealed class LanAccessMenu
 {
     private readonly LanAccessSync _sync;
     private readonly ServerHost _server;
     private readonly Action<LanAccessNotice> _notify;
+    private readonly Action _changed;
     private readonly CancellationToken _cancellationToken;
-    private readonly ToolStripMenuItem _allowItem = new();
-    private readonly ToolStripMenuItem _thisPcOnlyItem = new();
+    private LanAccessActivity _activity = LanAccessActivity.Idle;
 
-    internal LanAccessMenu(LanAccessSync sync, ServerHost server, Action<LanAccessNotice> notify, CancellationToken cancellationToken)
+    // notify tells the person how a change went; changed is called when State changes, so the tray draws it again.
+    internal LanAccessMenu(LanAccessSync sync, ServerHost server, Action<LanAccessNotice> notify, Action changed, CancellationToken cancellationToken)
     {
         _sync = sync;
         _server = server;
         _notify = notify;
+        _changed = changed;
         _cancellationToken = cancellationToken;
-
-        _allowItem.Click += (_, _) => BackgroundWork.Observe("Allow other devices on your network", AllowAsync());
-        _thisPcOnlyItem.Click += (_, _) => BackgroundWork.Observe("Only allow this PC", LimitToThisPcAsync());
-        Show(LanAccessActivity.Idle);
     }
 
-    public void Dispose()
-    {
-        _allowItem.Dispose();
-        _thisPcOnlyItem.Dispose();
-    }
+    /// <summary>What the two items say and whether they can be clicked, now.</summary>
+    internal LanAccessMenuState State => LanAccessMenuState.Describe(_server.Scope, _activity);
 
-    internal void AddTo(ToolStripItemCollection items)
-    {
-        items.Add(_allowItem);
-        items.Add(_thisPcOnlyItem);
-    }
+    internal void Allow() => BackgroundWork.Observe("Allow other devices on your network", AllowAsync());
+
+    internal void LimitToThisPc() => BackgroundWork.Observe("Only allow this PC", LimitToThisPcAsync());
 
     /// <summary>Another process (the web page, <c>--allow-lan</c>) saved a choice that needs the Windows admin prompt.</summary>
     internal void OnWaitingForWindows() => Show(LanAccessActivity.WaitingForWindows);
@@ -111,10 +105,7 @@ sealed class LanAccessMenu : IDisposable
 
     private void Show(LanAccessActivity activity)
     {
-        var state = LanAccessMenuState.Describe(_server.Scope, activity);
-        _allowItem.Text = state.AllowText;
-        _allowItem.Enabled = state.AllowEnabled;
-        _thisPcOnlyItem.Text = state.ThisPcOnlyText;
-        _thisPcOnlyItem.Enabled = state.ThisPcOnlyEnabled;
+        _activity = activity;
+        _changed();
     }
 }

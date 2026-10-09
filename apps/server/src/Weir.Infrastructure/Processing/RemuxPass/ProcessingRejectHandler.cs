@@ -5,6 +5,7 @@ using Weir.Core.Json;
 using Weir.Core.Media;
 using Weir.Core.MediaManagers;
 using Weir.Core.Processing;
+using Weir.Core.Processing.RemuxPass;
 using Weir.Infrastructure.Activity;
 using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.MediaManagers;
@@ -24,6 +25,7 @@ namespace Weir.Infrastructure.Processing.RemuxPass;
 /// <para>
 /// <b>Anything short of certainty falls back to pass-through</b> — never to deleting a file nobody was told about, and
 /// never to silently doing nothing. The fallback is recorded in Activity with the reason.
+/// A file Weir could not read is the one exception: it is never handed back as if it were good, so it is left where it is, rejected.
 /// </para>
 /// <para>
 /// Fix #532: whichever way the attempt ends, a Files row is upserted (not merely updated) so a rejection that no scan
@@ -88,6 +90,7 @@ public sealed partial class ProcessingRejectHandler : IJobHandler
             ? reasonValue.Value
             : "Weir could not process this file.";
         var failureClass = payload.Get("failure_class") is WireString failureClassValue ? failureClassValue.Value : null;
+        var unreadable = payload.Get("rejection_kind") is WireString { Value: RejectionKinds.UnreadableFile };
         var origin = originRaw is not null ? HandoffOrigin.FromPayload(new WireObject().Set("origin", originRaw)) : null;
 
         // 1. Everything the attempt needs, read with the unit of work closed before any network call.
@@ -145,6 +148,13 @@ public sealed partial class ProcessingRejectHandler : IJobHandler
             attempt = new RejectRouteOutcome(false, "No linked media manager can take a rejection for this file, so Weir handed the original back instead.");
         }
 
+        // A manager that did not answer may answer the next time. Until the attempts run out the job is retried like any other
+        // transient failure; the file is left where it is only when no manager can take the rejection, or the last attempt failed too.
+        if (unreadable && !attempt.Done && attempt.Transient && context.AttemptCount < context.MaxAttempts)
+        {
+            throw new InvalidOperationException(attempt.Reason);
+        }
+
         // 3. Bookkeeping, and the fallback, in one short transaction.
         var now = _time.GetUtcNow();
         await LockedWrites.RunAsync(
@@ -188,12 +198,23 @@ public sealed partial class ProcessingRejectHandler : IJobHandler
                     eventType = ActivityEventTypes.ProcessingFileRejected;
                     title = $"{MediaPathNames.Name(relativePath, OperatingSystem.IsWindows())} was rejected so a different release can be found";
                 }
+                else if (unreadable)
+                {
+                    // A file Weir could not read is never handed on as if it were good: with no manager to take the rejection it stays where
+                    // it is, rejected, for a person to decide.
+                    var keptReason = WireStrings.Slice(WireStrings.Strip($"{reason} {ToolFailureText.UnreadableKept}"), 10_000);
+                    await RemuxPassFileState.UpsertRejectedAsync(uow, libraryId.Value, relativePath, keptReason, failureClass, File.Exists(source) ? source : null)
+                        .ConfigureAwait(false);
+                    eventType = ActivityEventTypes.ProcessingFileRejected;
+                    title = $"{MediaPathNames.Name(relativePath, OperatingSystem.IsWindows())} could not be reported as unwanted, so it was left where it is";
+                    detail.Set("next_action", "Check the file, and remove it yourself if you do not want it.");
+                }
                 else
                 {
                     var liveLibrary = await RemuxPassHandler.ResolveLibraryAsync(uow, _libraries, libraryId, null).ConfigureAwait(false);
                     if (liveLibrary is not null)
                     {
-                        EnqueuePassThroughFallback(uow, liveLibrary, relativePath, originRaw);
+                        await EnqueuePassThroughFallbackAsync(uow, liveLibrary, relativePath, originRaw).ConfigureAwait(false);
                     }
 
                     await RemuxPassFileState.MarkFileStatusAsync(
@@ -218,7 +239,7 @@ public sealed partial class ProcessingRejectHandler : IJobHandler
 
     /// <summary>Queues a pass-through, called unconditionally on any reject failure — the reject route never
     /// re-checks the library's failure policy: anything short of certainty always falls back to pass-through.</summary>
-    private void EnqueuePassThroughFallback(UnitOfWork uow, ProcessingLibraryRecord library, string relativePath, WireObject? origin)
+    private async Task EnqueuePassThroughFallbackAsync(UnitOfWork uow, ProcessingLibraryRecord library, string relativePath, WireObject? origin)
     {
         var body = new WireObject().Set("relative_media_path", relativePath).Set("library_id", library.Id).Set("trigger", "worker");
         if (origin is { IsTruthy: true })
@@ -231,13 +252,13 @@ public sealed partial class ProcessingRejectHandler : IJobHandler
         // evaluate left to right, so inlining this would put a remote stat inside the write lock
         // (#586 made that lock start at BEGIN). QueueingFailurePolicy.Enqueue's callers do the same.
         var dedupeKey = $"{IntakeRules.PassThroughJobKind}:{library.Id}:{relativePath}:{QueueingFailurePolicy.FingerprintTag(library, relativePath)}";
-        _jobs.EnqueueOrGet(
+        await _jobs.EnqueueOrGetAsync(
             uow,
             dedupeKey,
             IntakeRules.PassThroughJobKind,
             WireJsonWriter.Dumps(body, WireJsonFormat.Compact),
             JobQueueRules.DefaultMaxAttempts,
             0,
-            (int)Math.Clamp(library.Priority, int.MinValue, int.MaxValue));
+            (int)Math.Clamp(library.Priority, int.MinValue, int.MaxValue)).ConfigureAwait(false);
     }
 }

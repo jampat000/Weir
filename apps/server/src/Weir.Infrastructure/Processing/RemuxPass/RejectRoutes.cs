@@ -9,8 +9,10 @@ namespace Weir.Infrastructure.Processing.RemuxPass;
 public sealed record RejectDeliveryReport(HandoffReportTarget Target, WireObject Body, HandoffReportDelivery Delivery);
 
 /// <summary>What one reject attempt came to: whether the download is gone, the sentence to show for it, which
-/// manager (if any) was asked, extra detail for Activity, and the hand-off report to record, if one was sent.</summary>
-public sealed record RejectRouteOutcome(bool Done, string Reason, string? Manager = null, WireObject? Detail = null, RejectDeliveryReport? Report = null)
+/// manager (if any) was asked, extra detail for Activity, and the hand-off report to record, if one was sent. <c>Transient</c>
+/// says the manager was asked and did not answer, or failed on its own side, so asking again later may work.</summary>
+public sealed record RejectRouteOutcome(
+    bool Done, string Reason, string? Manager = null, WireObject? Detail = null, RejectDeliveryReport? Report = null, bool Transient = false)
 {
     public WireObject DetailOrEmpty => Detail ?? new WireObject();
 }
@@ -22,11 +24,11 @@ public sealed record RejectRouteOutcome(bool Done, string Reason, string? Manage
 /// no match, more than one match, a season pack sharing a download id, and a folder holding more than one video file
 /// all refuse rather than guess.
 /// </summary>
-public sealed record QueueMatch(ManagerConnection? Connection, WireObject? Row, string? RefusalReason, string? RefusalManager)
+public sealed record QueueMatch(ManagerConnection? Connection, WireObject? Row, string? RefusalReason, string? RefusalManager, bool RefusalTransient = false)
 {
     public bool Found => Connection is not null && Row is not null;
 
-    public static QueueMatch Refused(string reason, string? manager = null) => new(null, null, reason, manager);
+    public static QueueMatch Refused(string reason, string? manager = null, bool transient = false) => new(null, null, reason, manager, transient);
 
     public static QueueMatch Ok(ManagerConnection connection, WireObject row) => new(connection, row, null, null);
 }
@@ -60,7 +62,7 @@ public sealed class RejectRoutes
         var match = await MatchQueueItemAsync(connections, source, cancellationToken).ConfigureAwait(false);
         if (!match.Found)
         {
-            return new RejectRouteOutcome(false, match.RefusalReason!, match.RefusalManager);
+            return new RejectRouteOutcome(false, match.RefusalReason!, match.RefusalManager, Transient: match.RefusalTransient);
         }
 
         var connection = match.Connection!;
@@ -76,7 +78,8 @@ public sealed class RejectRoutes
         {
             return new RejectRouteOutcome(
                 false, $"{label} did not accept the rejection, so nothing was removed.", label,
-                new WireObject().Set("technical_detail", WireStrings.Slice(exception.Message, 500)));
+                new WireObject().Set("technical_detail", WireStrings.Slice(exception.Message, 500)),
+                Transient: true);
         }
 
         return new RejectRouteOutcome(
@@ -116,7 +119,8 @@ public sealed class RejectRoutes
                     signal.Status == SignalStatus.Unreachable
                         ? ManagerWaitMessages.RejectNotAnswering(connection.Label)
                         : signal.Detail ?? $"Weir could not read {connection.Label}'s queue.",
-                    connection.Label);
+                    connection.Label,
+                    transient: signal.Status == SignalStatus.Unreachable);
             }
 
             var rows = signal.Rows.Select(row => row.Payload).ToList();
@@ -213,7 +217,8 @@ public sealed class RejectRoutes
                 description.Status == SignalStatus.Unreachable
                     ? ManagerWaitMessages.RejectNotAnswering(label)
                     : description.Detail ?? $"Weir could not ask {label} what it can do.",
-                label);
+                label,
+                Transient: description.Status == SignalStatus.Unreachable);
         }
 
         if (description.AdvertisedCapabilities is null || !description.AdvertisedCapabilities.Contains(RejectSupportRules.RejectCapability))
@@ -237,13 +242,14 @@ public sealed class RejectRoutes
         var report = new RejectDeliveryReport(target, body, delivery);
         if (!delivery.Accepted)
         {
+            var transient = HandoffCompletionReporter.IsTransientFailure(delivery);
             if (HandoffCompletionReporter.IsNotAnswering(delivery))
             {
-                return new RejectRouteOutcome(false, $"{ManagerWaitMessages.RejectNotAnswering(label)} Weir kept the download.", label, null, report);
+                return new RejectRouteOutcome(false, $"{ManagerWaitMessages.RejectNotAnswering(label)} Weir kept the download.", label, null, report, transient);
             }
 
             var status = delivery.Status.StartsWith("failed: ", StringComparison.Ordinal) ? delivery.Status["failed: ".Length..] : delivery.Status;
-            return new RejectRouteOutcome(false, $"{label} did not accept the rejection ({status}), so Weir kept the download.", label, null, report);
+            return new RejectRouteOutcome(false, $"{label} did not accept the rejection ({status}), so Weir kept the download.", label, null, report, transient);
         }
 
         if (links.KeepsOriginals)

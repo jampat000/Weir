@@ -2,6 +2,7 @@ import { Navigate, Outlet } from "react-router-dom";
 import { PageLoading } from "../components/shared/page-loading";
 import { useMeQuery, useSetThemeMutation } from "../lib/auth/queries";
 import { sessionWasNotKept } from "../lib/auth/session-kept";
+import { clearSignedIn, signedOutPath } from "../lib/auth/signed-in-before";
 import { useAccountThemeSync } from "../lib/ui/use-account-theme-sync";
 
 /** Everything past sign-in: a signed-out visitor goes to the login page, with the reason when a session did not stick. */
@@ -21,9 +22,10 @@ export function RequireAuth() {
     // A sign-in that succeeded seconds ago and is already unauthenticated means the browser
     // rejected the session cookie. Redirecting silently makes that indistinguishable from a
     // wrong password, so carry the reason across (#453).
-    const to = sessionWasNotKept()
-      ? "/login?problem=session-not-kept"
-      : "/login";
+    const notKept = sessionWasNotKept();
+    // A cookie the browser dropped was never a session, so it must not read as one that expired later.
+    if (notKept) clearSignedIn();
+    const to = notKept ? "/login?problem=session-not-kept" : signedOutPath();
     return <Navigate to={to} replace />;
   }
   return <Outlet />;

@@ -6,13 +6,45 @@
 # does not keep files forever (BtbN prunes its dated autobuild releases after a couple of weeks), so when
 # the upstream download fails, the same-named file is taken from Weir's own GitHub releases, which carry a
 # copy of every archive they were built with (release.yml). The same pin applies to both sources: bytes
-# that do not match it are refused, wherever they came from. scripts/pinned-download.mjs does the same
-# for the Node scripts.
+# that do not match it are refused, wherever they came from. Weir's releases are found from the public
+# release feed and their download addresses, which do not count against GitHub's API allowance (60 an hour
+# without a token, shared by the whole network); the API's release list is asked only when those find
+# nothing. scripts/pinned-download.mjs does the same for the Node scripts.
 
 $weirReleasesUrl = "https://api.github.com/repos/jampat000/Weir/releases?per_page=30"
+$weirReleasesFeedUrl = "https://github.com/jampat000/Weir/releases.atom"
+
+function Save-WeirReleaseAsset {
+  # Downloads $FileName into $OutFile from the newest Weir release that carries it and returns where it came
+  # from: each release in the release feed is tried in turn, and the API's release list is asked only when
+  # the feed cannot be read or none of its releases has the file.
+  param(
+    [Parameter(Mandatory)][string]$FileName,
+    [Parameter(Mandatory)][string]$OutFile
+  )
+  $tags = @()
+  try {
+    $feed = (Invoke-WebRequest -Uri $weirReleasesFeedUrl -UseBasicParsing).Content
+    $tags = @([regex]::Matches($feed, 'href="[^"]*/releases/tag/([^"]+)"') | ForEach-Object { [uri]::UnescapeDataString($_.Groups[1].Value) })
+  } catch {
+    Write-Host "Weir's release feed could not be read ($($_.Exception.Message)); asking the API for the release list instead."
+  }
+  foreach ($tag in $tags) {
+    $source = "https://github.com/jampat000/Weir/releases/download/$([uri]::EscapeDataString($tag))/$([uri]::EscapeDataString($FileName))"
+    try {
+      Invoke-WebRequest -Uri $source -OutFile $OutFile -UseBasicParsing
+      return $source
+    } catch {
+      # This release does not carry the file; the next one may.
+    }
+  }
+  $source = Get-WeirReleaseAssetUrl -FileName $FileName
+  Invoke-WebRequest -Uri $source -OutFile $OutFile -UseBasicParsing
+  return $source
+}
 
 function Get-WeirReleaseAssetUrl {
-  # The download URL of the newest Weir release that has an asset named exactly $FileName.
+  # The download URL of the newest Weir release that has an asset named exactly $FileName, from the API's release list.
   param([Parameter(Mandatory)][string]$FileName)
   $headers = @{ "User-Agent" = "weir-build"; "Accept" = "application/vnd.github+json" }
   $token = if ($env:GITHUB_TOKEN) { $env:GITHUB_TOKEN } else { $env:GH_TOKEN }
@@ -40,8 +72,7 @@ function Save-PinnedDownload {
   } catch {
     Write-Host "Could not download $Description from $Url ($($_.Exception.Message)); looking for $fileName on Weir's own releases."
     try {
-      $source = Get-WeirReleaseAssetUrl -FileName $fileName
-      Invoke-WebRequest -Uri $source -OutFile $OutFile -UseBasicParsing
+      $source = Save-WeirReleaseAsset -FileName $fileName -OutFile $OutFile
     } catch {
       throw "Could not download $Description from $Url, nor from Weir's own releases: $($_.Exception.Message)"
     }

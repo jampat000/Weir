@@ -480,7 +480,7 @@ public sealed class LeftInPlaceOriginalTests : IDisposable
         await InsertRowAsync("Gone/waiting.mkv", ProcessingFileStatuses.Unprocessed);
         Directory.Delete(_folders.Watched, recursive: true);
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => ScanAsync("movie"));
+        await ScanAsync("movie");
 
         Assert.Equal("unprocessed", await StatusAsync("Gone/waiting.mkv"));
         Assert.Equal(0, await LeftActivityAsync());

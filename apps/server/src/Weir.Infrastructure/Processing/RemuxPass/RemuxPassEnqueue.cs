@@ -99,14 +99,14 @@ public static class RemuxPassEnqueue
             return pending with { PayloadJson = json };
         }
 
-        return jobs.EnqueueOrGet(
+        return await jobs.EnqueueOrGetAsync(
             uow,
             $"{RemuxPassOutcomes.JobKind}:{Guid.NewGuid():N}",
             RemuxPassOutcomes.JobKind,
             WireJsonWriter.Dumps(payload, WireJsonFormat.Compact),
             JobQueueRules.DefaultMaxAttempts,
             runnerCost: null,
-            priority: 0);
+            priority: 0).ConfigureAwait(false);
     }
 
     /// <summary>The oldest pending pass for this path.</summary>

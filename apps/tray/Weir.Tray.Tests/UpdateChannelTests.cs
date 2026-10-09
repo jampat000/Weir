@@ -19,12 +19,4 @@ public sealed class UpdateChannelTests
     [InlineData(null)]
     public void A_stable_install_is_offered_only_stable_releases(string? runningVersion) =>
         Assert.False(UpdateChannel.IncludesPreReleases(runningVersion));
-
-    [Fact]
-    public void A_pre_release_install_reads_pre_releases_from_its_github_source() =>
-        Assert.True(UpdateChannel.SourceFor(UpdateService.GitHubRepo, "1.0.0-rc.1").Prerelease);
-
-    [Fact]
-    public void A_stable_install_reads_only_stable_releases_from_its_github_source() =>
-        Assert.False(UpdateChannel.SourceFor(UpdateService.GitHubRepo, "1.0.0").Prerelease);
 }

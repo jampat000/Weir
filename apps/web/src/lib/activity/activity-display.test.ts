@@ -62,13 +62,13 @@ describe("eventDisplay for the pause", () => {
       eventDisplay(
         entry(
           "system.processing_paused",
-          "Processing was paused until you resume by alice.",
+          "alice paused processing until you resume it.",
         ),
       ).title,
     ).toBe("Processing paused");
     expect(
       eventDisplay(
-        entry("system.processing_resumed", "Processing was resumed by alice."),
+        entry("system.processing_resumed", "alice resumed processing."),
       ).title,
     ).toBe("Processing resumed");
   });
@@ -87,6 +87,33 @@ describe("eventDisplay for a repeat that was skipped", () => {
 
     expect(display.title).toBe("Skipped: already imported (Film.mkv)");
     expect(display.meaning).toBe("idle");
+  });
+
+  const skipFor = (trigger?: string) =>
+    eventDisplay({
+      id: 4,
+      created_at: "2026-10-07T03:24:00",
+      event_type: SKIPPED_REPEAT_EVENT,
+      module: "processing",
+      title: "Skipped: already done (Film.mkv)",
+      detail: JSON.stringify({
+        result: "skipped",
+        ...(trigger ? { trigger } : {}),
+        user_message:
+          "Already done: cleaned on 2026-10-07 into D:\\Weir\\Output\\Film\\Film.mkv",
+        relative_media_path: "Film/Film.mkv",
+        cleaned_at: "2026-10-07T03:20:00.0000000+00:00",
+      }),
+    });
+
+  it("is listed in full, however long the server's detail is, when the person asked for the file again", () => {
+    expect(skipFor("manual").compact).toBe(false);
+  });
+
+  it("is routine when a manager's resend or a scan caused it, so a flood of them cannot push real news away", () => {
+    expect(skipFor("webhook").compact).toBe(true);
+    expect(skipFor("scheduled").compact).toBe(true);
+    expect(skipFor().compact).toBe(true);
   });
 });
 

@@ -350,7 +350,7 @@ public sealed partial class MediaManagerIntake
             var dedupeKey = IntakeRules.DedupeKeyFor(baseKey, targets, target, relativePath);
             var payload = IntakeRules.Payload(importEvent, library, relativePath, target);
             var connection = uow.Connection;
-            var transaction = uow.WriteTransaction();
+            var transaction = await uow.WriteTransactionAsync().ConfigureAwait(false);
 
             // Folder detection may already have queued (or started) this very file under its own random key. One file
             // gets one pass: the hand-off takes over that pass rather than adding a second one. A resend of this same
@@ -367,7 +367,7 @@ public sealed partial class MediaManagerIntake
                 continue;
             }
 
-            _jobs.EnqueueOrGet(uow, dedupeKey, IntakeRules.RemuxPassJobKind, IntakeRules.PayloadJson(payload), JobQueueRules.DefaultMaxAttempts, runnerCost: null, priority: 0);
+            await _jobs.EnqueueOrGetAsync(uow, dedupeKey, IntakeRules.RemuxPassJobKind, IntakeRules.PayloadJson(payload), JobQueueRules.DefaultMaxAttempts, runnerCost: null, priority: 0).ConfigureAwait(false);
             covered.Add(target);
         }
 

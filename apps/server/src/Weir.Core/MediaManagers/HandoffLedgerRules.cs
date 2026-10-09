@@ -44,6 +44,13 @@ public static class HandoffLedgerRules
     public const string Rejected = "rejected";
     public const string Cancelled = "cancelled";
 
+    /// <summary>
+    /// A file the workflow's own rules left alone (under its minimum size, say). It is one file's result and never a hand-off's
+    /// state: <see cref="Combine"/> reads it as nothing wrong when another file was delivered, and as <see cref="Failed"/> when
+    /// nothing was.
+    /// </summary>
+    public const string Skipped = "skipped";
+
     /// <summary>States a hand-off does not leave.</summary>
     public static readonly IReadOnlySet<string> TerminalStates = new SortedSet<string>(StringComparer.Ordinal)
     {
@@ -82,7 +89,11 @@ public static class HandoffLedgerRules
         };
     }
 
-    /// <summary>A hand-off covering several files is as far along as its least finished file.</summary>
+    /// <summary>
+    /// A hand-off covering several files is as far along as its least finished file. A file the workflow's own rules left
+    /// alone (<see cref="Skipped"/>) does not fail a hand-off that delivered another file, because the manager imports what
+    /// was delivered; when nothing was delivered, it is why the hand-off failed.
+    /// </summary>
     public static string Combine(IReadOnlyCollection<string> states)
     {
         ArgumentNullException.ThrowIfNull(states);
@@ -92,6 +103,12 @@ public static class HandoffLedgerRules
             {
                 return waiting;
             }
+        }
+
+        var delivered = states.Contains(Completed) || states.Contains(PassedThrough);
+        if (states.Contains(Skipped) && !delivered)
+        {
+            return Failed;
         }
 
         foreach (var outcome in new[] { Failed, Rejected, PassedThrough })

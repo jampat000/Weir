@@ -19,6 +19,31 @@ public static class RemuxPassOutcomes
     public const string SourceNotReady = "source_not_ready";
     public const string FailedBeforeExecution = "failed_before_execution";
     public const string FailedDuringExecution = "failed_during_execution";
+
+    /// <summary>The file left the watched folder before the pass reached it: nothing failed and there is nothing to do.</summary>
+    public const string SourceGone = "source_gone";
+}
+
+/// <summary>Why a pass refused a file before writing anything (<c>rejection_kind</c>).</summary>
+public static class RejectionKinds
+{
+    /// <summary>A file Weir could not read, which it never deletes and never hands on.</summary>
+    public const string UnreadableFile = "unreadable_file";
+}
+
+/// <summary>The words for a file that is no longer where Weir was told to find it.</summary>
+public static class GoneSourceText
+{
+    public const string Reason = "This file is no longer in the watched folder, so there is nothing to do.";
+
+    /// <summary>What the file says while Weir waits to see whether it comes back, as a share that dropped for a moment would.</summary>
+    public const string HeldReason =
+        "This file is no longer in the watched folder. Weir will look again shortly, and stops listing it if it has not come back.";
+
+    /// <summary>What a file that was cleaned before says once it has gone: back to finished, as history.</summary>
+    public const string CleanedReason = "Finished processing this file. Its original is no longer in the watched folder.";
+
+    public static string Title(string name) => $"{name} is no longer there, so there is nothing to do";
 }
 
 /// <summary>Result keys that mark a rejection no media manager is involved in, and say why in a few words.</summary>
@@ -104,6 +129,7 @@ public static class RemuxPassVisibility
             RemuxPassOutcomes.LiveSkippedNotRequired => $"No changes needed for {name}",
             RemuxPassOutcomes.SkippedGuardrail => $"Skipped {name}",
             RemuxPassOutcomes.SourceNotReady => $"Waiting for {name}",
+            RemuxPassOutcomes.SourceGone => GoneSourceText.Title(name),
             RemuxPassOutcomes.FailedDuringExecution => $"{name} could not be processed",
             _ when outcome == RemuxPassOutcomes.FailedBeforeExecution || payload.Get("ok") is WireBool { Value: false } => $"{name} could not be checked",
             _ => "File processing finished",
@@ -124,7 +150,7 @@ public static class RemuxPassVisibility
         {
             result = "success";
         }
-        else if (outcome is RemuxPassOutcomes.SkippedGuardrail or RemuxPassOutcomes.SourceNotReady)
+        else if (outcome is RemuxPassOutcomes.SkippedGuardrail or RemuxPassOutcomes.SourceNotReady or RemuxPassOutcomes.SourceGone)
         {
             result = "skipped";
         }

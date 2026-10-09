@@ -82,7 +82,7 @@ public sealed class SqliteRemuxPassData : IRemuxPassFileFacts, IPostSuccessClean
                 if (facts.JobId is { } jobId)
                 {
                     RunnerCosts.RecordMeasured(
-                        uow.Connection, uow.WriteTransaction(), jobId, RunnerUnits.ResolutionClassForDimensions(facts.VideoWidth, facts.VideoHeight));
+                        uow.Connection, await uow.WriteTransactionAsync().ConfigureAwait(false), jobId, RunnerUnits.ResolutionClassForDimensions(facts.VideoWidth, facts.VideoHeight));
                 }
             },
             "measured media facts",

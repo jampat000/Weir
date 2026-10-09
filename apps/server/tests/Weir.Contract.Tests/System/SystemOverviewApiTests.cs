@@ -116,7 +116,9 @@ public sealed class SystemOverviewApiTests(ServerFixture fixture) : IClassFixtur
     public async Task The_overview_counts_every_browser_holding_the_stream_open()
     {
         using var admin = await Server.CreateAdminClientAsync();
-        Assert.Equal(0, (int)(await OverviewOfAsync(admin))["browsers_live"]!);
+        // Another test on this server may have just closed its stream, and a closed stream stops counting a moment later.
+        await Poll.UntilAsync(
+            async () => (int)(await OverviewOfAsync(admin))["browsers_live"]! == 0, "streams other tests closed to stop counting");
 
         using (var first = await SystemPartBStreams.OpenAsync(admin))
         {

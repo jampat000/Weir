@@ -73,6 +73,69 @@ public static class RemuxPassFileState
         return true;
     }
 
+    private const string UnfinishedStatuses = "$unprocessed, $processing, $held, $outside, $blocked, $failed, $cancelled";
+
+    private static (string Name, object? Value)[] UnfinishedStatusParameters() =>
+    [
+        ("$unprocessed", ProcessingFileStatuses.Unprocessed),
+        ("$processing", ProcessingFileStatuses.Processing),
+        ("$held", ProcessingFileStatuses.OnHold),
+        ("$outside", ProcessingFileStatuses.OutOfSchedule),
+        ("$blocked", ProcessingFileStatuses.BlockedUpstream),
+        ("$failed", ProcessingFileStatuses.ProcessingFailed),
+        ("$cancelled", ProcessingFileStatuses.Cancelled),
+    ];
+
+    /// <summary>
+    /// A file that was not there when its pass looked: held, with its reason, attempts and any hand-picked plan intact, until
+    /// <paramref name="holdUntil"/>. It might be a share that dropped for a moment. Only a file without an outcome changes; one that
+    /// is processed, passed through, rejected or skipped stays as history whether or not its original is still there.
+    /// </summary>
+    public static Task HoldGoneAsync(UnitOfWork uow, long libraryId, string relativePath, DateTimeOffset holdUntil)
+    {
+        ArgumentNullException.ThrowIfNull(uow);
+        return uow.ExecuteAsync(
+            $"UPDATE files SET status = $status, status_reason = $reason, hold_until = $until, updated_at = CURRENT_TIMESTAMP " +
+            $"WHERE library_id = $library AND relative_path = $path AND status IN ({UnfinishedStatuses})",
+            [
+                ("$status", ProcessingFileStatuses.OnHold),
+                ("$reason", GoneSourceText.HeldReason),
+                ("$until", TimestampColumns.Orm(holdUntil)),
+                ("$library", libraryId),
+                ("$path", relativePath),
+                .. UnfinishedStatusParameters(),
+            ]);
+    }
+
+    /// <summary>
+    /// A file that stayed gone through the hold has nothing left to wait for. A row that carries the source Weir last cleaned is
+    /// never deleted, because that is what stops the source being cleaned twice if the file comes back unchanged: it goes back to
+    /// the outcome it had (<see cref="RestoreProcessed"/>), history again, and is no longer counted as waiting on anyone. Every
+    /// other row is forgotten.
+    /// </summary>
+    public static async Task ForgetGoneAsync(UnitOfWork uow, long libraryId, string relativePath)
+    {
+        ArgumentNullException.ThrowIfNull(uow);
+        (string, object?)[] parameters = [("$library", libraryId), ("$path", relativePath), .. UnfinishedStatusParameters()];
+        await uow.ExecuteAsync(
+            $"UPDATE files SET {RestoreProcessed} WHERE library_id = $library AND relative_path = $path AND status IN ({UnfinishedStatuses}) AND {CarriesCleanedSource}",
+            parameters).ConfigureAwait(false);
+        await uow.ExecuteAsync(
+            $"DELETE FROM files WHERE library_id = $library AND relative_path = $path AND status IN ({UnfinishedStatuses}) AND NOT ({CarriesCleanedSource})",
+            parameters).ConfigureAwait(false);
+    }
+
+    /// <summary>Whether a <c>files</c> row records the source a pass last cleaned (<c>CleanedSources</c> reads these columns).</summary>
+    public const string CarriesCleanedSource = "(processed_source_size IS NOT NULL OR processed_source_mtime_ns IS NOT NULL)";
+
+    /// <summary>
+    /// The assignments that put a row whose file is gone back to its earlier outcome: processed, with the cleaned source kept and every
+    /// working field (attempts, reason, retry and look-again times) cleared.
+    /// </summary>
+    public static readonly string RestoreProcessed =
+        $"status = '{ProcessingFileStatuses.Processed}', status_reason = '{GoneSourceText.CleanedReason}', failure_class = NULL, failure_attempts = 0, " +
+        "next_retry_at = NULL, hold_until = NULL, blocked_by_connection = NULL, updated_at = CURRENT_TIMESTAMP";
+
     /// <summary>Keeps an on-hold file from being picked up again by a scan before <paramref name="lookAgainAt"/>, when its own next look is booked.</summary>
     public static Task HoldUntilAsync(UnitOfWork uow, long libraryId, string relativePath, DateTimeOffset lookAgainAt)
     {

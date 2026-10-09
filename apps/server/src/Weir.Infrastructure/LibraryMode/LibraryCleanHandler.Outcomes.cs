@@ -142,10 +142,9 @@ public sealed partial class LibraryCleanHandler
         {
             await LockedWrites.RunAsync(
                 _database,
-                uow =>
+                async uow =>
                 {
-                    RunnerCosts.RecordMeasured(uow.Connection, uow.WriteTransaction(), jobId, resolution);
-                    return Task.CompletedTask;
+                    RunnerCosts.RecordMeasured(uow.Connection, await uow.WriteTransactionAsync().ConfigureAwait(false), jobId, resolution);
                 },
                 _logger,
                 "library clean cost",

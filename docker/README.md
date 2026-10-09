@@ -8,7 +8,7 @@ Weir publishes an all-in-one container image with:
 
 Images are published for `linux/amd64` and `linux/arm64`:
 
-- `ghcr.io/jampat000/weir:X.Y.Z` (the Git tag is `vX.Y.Z`; the image tag has no `v`), for example `1.0.0-rc.10`
+- `ghcr.io/jampat000/weir:X.Y.Z` (the Git tag is `vX.Y.Z`; the image tag has no `v`), for example `1.0.0-rc.11`
 - `ghcr.io/jampat000/weir:X.Y` and `ghcr.io/jampat000/weir:latest`, which follow stable releases only. A release candidate is published under its version tag alone, so these arrive with 1.0.0.
 
 This page is the full reference — every variable Weir reads, plus the recipes for common setups.
@@ -22,7 +22,7 @@ Make a folder, save this as `compose.yaml` inside it:
 ```yaml
 services:
   weir:
-    image: ghcr.io/jampat000/weir:1.0.0-rc.10
+    image: ghcr.io/jampat000/weir:1.0.0-rc.11
     container_name: weir
     ports:
       - "9347:9347"
@@ -37,7 +37,10 @@ Then run:
 docker compose up -d
 ```
 
-Open `http://localhost:9347/` and create your account.
+Open `http://localhost:9347/` and create your account. If your browser is on another machine, Weir also
+asks for a setup code: run `docker logs weir` and look for the line that starts "Weir has no account yet".
+That line is logged at Information, so it shows at the default `WEIR_LOG_LEVEL` (`INFO`) and is hidden if you
+set the level to `WARNING` or above. The same code is in `weir-data/setup-code`.
 
 `./weir-data` holds Weir's database, settings, logs and backups. Keep it and you keep everything.
 No `.env` file or secrets are required to get started — Weir generates its own session secret on
@@ -65,7 +68,7 @@ people want:
 ```yaml
 services:
   weir:
-    image: ghcr.io/jampat000/weir:1.0.0-rc.10
+    image: ghcr.io/jampat000/weir:1.0.0-rc.11
     container_name: weir
     ports:
       - "9347:9347"
@@ -92,7 +95,7 @@ When one app tells another where a file is, that path has to mean the same thing
 ```yaml
 services:
   weir:
-    image: ghcr.io/jampat000/weir:1.0.0-rc.10
+    image: ghcr.io/jampat000/weir:1.0.0-rc.11
     container_name: weir
     ports:
       - "9347:9347"
@@ -157,7 +160,7 @@ docker run --rm \
   -e PORT=9400 \
   -p 9400:9400 \
   -v weir-data:/data/weir \
-  ghcr.io/jampat000/weir:1.0.0-rc.10
+  ghcr.io/jampat000/weir:1.0.0-rc.11
 ```
 
 With `network_mode: host` there is no `-p` mapping, so `PORT` is how you move Weir off 9347.
@@ -165,11 +168,11 @@ With `network_mode: host` there is no `-p` mapping, so `PORT` is how you move We
 ## `docker run` instead of Compose
 
 ```bash
-docker pull ghcr.io/jampat000/weir:1.0.0-rc.10
+docker pull ghcr.io/jampat000/weir:1.0.0-rc.11
 docker run --rm \
   -p 9347:9347 \
   -v weir-data:/data/weir \
-  ghcr.io/jampat000/weir:1.0.0-rc.10
+  ghcr.io/jampat000/weir:1.0.0-rc.11
 ```
 
 If you want to override defaults with an env file instead of inline `environment:` entries, copy

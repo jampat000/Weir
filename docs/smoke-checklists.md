@@ -10,7 +10,7 @@ Use the Velopack setup exe from the release being validated.
 2. Confirm application files install under `%LocalAppData%\Weir`.
 3. Confirm runtime data is created under `C:\ProgramData\Weir`.
 4. Launch Weir from the Start Menu shortcut.
-5. Confirm the tray icon appears and the browser opens the app on `http://localhost:9347/` (or the port shown in the tray's `Change port` item if 9347 was taken).
+5. Confirm the tray icon appears at once with a grey ring in its corner while Weir starts, and that the ring goes when Weir is ready. Confirm the first run asked "Start Weir when you sign in to Windows?" and that `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` has a `Weir` entry only if you said yes. Confirm a notice from the tray icon says Weir is running, that no browser window opened by itself, and that clicking the notice opens the app on `http://localhost:9347/` (or the port shown in the tray's `Change port` item if 9347 was taken).
 6. Confirm the **Create admin** screen appears when no user exists.
 7. Attempt a password shorter than 8 characters and confirm it is blocked.
 8. Create the first user with a valid password.
@@ -27,7 +27,7 @@ Use the Velopack setup exe from the release being validated.
 16. In System › Backups, use **Export or restore now** to download a configuration backup.
 17. Restore that backup and confirm the app remains usable.
 18. Confirm System › About › Updates shows a meaningful status, even when no update is available.
-19. Right-click the tray icon and confirm `Check for updates` is present and reaches the current release status.
+19. Right-click the tray icon and confirm the menu matches `docs/tray-standard.md` (including `Restart Weir`, `Copy address`, `Open logs folder`, `Start with Windows` and the version line), that the hover text says the state, and that `Check for updates` reaches the current release status. Choose `Pause processing` and confirm the two-bars mark and `Resume processing` appear; choose it again and confirm they go. Choose `Restart Weir` and confirm the ring shows and then goes.
 20. In Setup › Workflows, open a workflow's editor and use `Browse` on a folder field to pick a local folder. Confirm each row shows its kind (Weir only, or Linked to a media manager), its watched folder and the folder it cleans into in separate columns, and that `Add workflow` asks which kind first. Drag a row by its grip (or press Alt with the up or down arrow on the grip) and confirm the Priority numbers change and stay changed after a reload.
 21. Enter a UNC path (`\\<nas>\<share>\folder`) manually and confirm it saves; a missing folder is a warning, not a save blocker.
 22. Open Library, pick the library from the title and confirm `Check again` runs.
@@ -41,6 +41,8 @@ Use the Velopack setup exe from the release being validated.
     - Quit from the tray icon and confirm the log shows the server `stopped cleanly`, then `Applying update ... and exiting`, and that Weir is on the new version at its next start.
     - Repeat with **Restart to update** (tray menu, then System › About › **Restart to apply**) and confirm the server `stopped cleanly` before `Applying update ... and restarting`, and that Weir comes back on the new version with no browser window.
     - Download an update, then end the tray with `taskkill /PID <tray pid> /F` (the same as a Windows sign-out that does not run Quit). Start Weir and confirm `tray-host.log` shows `Update vX was left waiting to install. Installing it before the server starts.` before the `Velopack: before update` line, that the data folder now holds `update-start-attempt`, and that the new version is running. Velopack's own start-up install is off, so that line is the only way a waiting update installs at start; `velopack_Weir.log` must not say `Auto apply is true`.
+    - Run the next version's `Weir-win-Setup.exe --silent` over a **running** Weir, as Deluno's update does. Confirm Setup exits 0 within seconds, `tray-host.log` says `Weir was running before this install. It starts again once Setup`, and without starting it by hand Weir answers on `/ready` on the same port within a minute, on the new version, with no browser window and no balloon. Then Quit Weir and run `--silent` again over the stopped Weir, and confirm `tray-host.log` says `Weir was not running from this install before Setup, so it is left stopped.` and Weir stays stopped.
+    - Run the same Setup without `--silent` over a running Weir and confirm Velopack starts Weir once: one tray icon, `tray-host.log` showing no second start (a `Start after Setup: Weir is already running` line is the expected outcome of the extra start), and no `Weir is already running` notice from the tray.
 26. Uninstall and reinstall only when intentionally testing clean-install behavior.
 27. Confirm the automated packaged smoke reports that Processing placed a byte-identical
     pass-through file in the processed tree before removing its watched source.

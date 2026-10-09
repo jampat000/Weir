@@ -3,6 +3,7 @@ using Microsoft.Data.Sqlite;
 using Weir.Core.Jobs;
 using Weir.Core.Json;
 using Weir.Core.MediaManagers;
+using Weir.Core.Processing;
 using Weir.Core.Time;
 using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.Sqlite;
@@ -153,6 +154,7 @@ public sealed partial class HandoffLedgerStore
         {
             var jobs = await JobsForAsync(uow, row).ConfigureAwait(false);
             var files = await FileRowsAsync(uow, row).ConfigureAwait(false);
+            var targets = await _targets.ListAsync(uow, row.Id).ConfigureAwait(false);
             var states = new List<string>();
             var stamps = new List<DateTimeOffset>();
             var busyPaths = new HashSet<string>(StringComparer.Ordinal);
@@ -237,10 +239,14 @@ public sealed partial class HandoffLedgerStore
                 }
 
                 var (state, when) = HandoffLedgerRules.FileState(file.Status, file.NextRetryAt);
+                if (LeftAloneByTheWorkflow(file, targets))
+                {
+                    state = HandoffLedgerRules.Skipped;
+                }
 
                 // The same for a file row: a failure recorded before this hand-off arrived, and not touched since, is
                 // what became of an earlier hand-off of the path. A success from before still counts.
-                if (state is HandoffLedgerRules.Failed or HandoffLedgerRules.Rejected or HandoffLedgerRules.Cancelled &&
+                if (state is HandoffLedgerRules.Failed or HandoffLedgerRules.Skipped or HandoffLedgerRules.Rejected or HandoffLedgerRules.Cancelled &&
                     IsFromEarlierHandoff(row, file.UpdatedAt))
                 {
                     continue;
@@ -252,7 +258,7 @@ public sealed partial class HandoffLedgerStore
                     scheduledFor = scheduledFor is { } current ? Min(current, whenValue) : whenValue;
                 }
 
-                if (file.StatusReason.Length > 0 && (message is null || !HandoffLedgerRules.TerminalStates.Contains(state)))
+                if (file.StatusReason.Length > 0 && (message is null || !(HandoffLedgerRules.TerminalStates.Contains(state) || state == HandoffLedgerRules.Skipped)))
                 {
                     message = file.StatusReason;
                 }
@@ -325,9 +331,29 @@ public sealed partial class HandoffLedgerStore
             delivered ? ReportedOutputFiles(row) : null);
     }
 
+    /// <summary>
+    /// Whether the file is one the workflow's own rules left alone (a pass skipped it under the minimum size) and that may be
+    /// left alone without failing the hand-off. The stored result of the file's target says so, never the file's status, because
+    /// that status is also written for a rejected release, an unreadable file or a file with no video, which a person must see.
+    /// </summary>
+    private static bool LeftAloneByTheWorkflow(HandoffFileRow file, IReadOnlyList<HandoffTarget> targets)
+    {
+        var comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+        return file.Status == ProcessingFileStatuses.Skipped &&
+               targets.FirstOrDefault(target => string.Equals(target.RelativePath, file.RelativePath, comparison)) is { Result: HandoffLedgerRules.Skipped } target &&
+               FolderHandoffReports.MayBeLeftAlone(target, targets);
+    }
+
     /// <summary>The output files Weir reported; a hand-off reported before the list was kept named its one file.</summary>
     private static IReadOnlyList<string>? ReportedOutputFiles(HandoffLedgerRow row) =>
         row.OutputFiles ?? (row.OutputPath is { } single ? [single] : null);
+
+    /// <summary>Whether Weir's report to the manager named at least one output file, whatever else became of the hand-off.</summary>
+    public static bool HandedBackFile(HandoffLedgerRow row)
+    {
+        ArgumentNullException.ThrowIfNull(row);
+        return ReportedOutputFiles(row) is { Count: > 0 };
+    }
 
     /// <summary>
     /// The <c>relative_media_path</c> a job payload names, as a string (empty when missing or falsy); null for unreadable

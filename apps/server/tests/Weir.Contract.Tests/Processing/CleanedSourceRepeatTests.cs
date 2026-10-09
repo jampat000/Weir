@@ -1,3 +1,4 @@
+using System.Net;
 using System.Text.Json.Nodes;
 using Weir.Contract.Tests.Harness;
 using Weir.Contract.Tests.Harness.Fakes;
@@ -78,6 +79,35 @@ public sealed class CleanedSourceRepeatTests
         Assert.StartsWith("Already done: cleaned on ", reason, StringComparison.Ordinal);
         Assert.EndsWith($" into {output}", reason, StringComparison.Ordinal);
         Assert.Equal(2, (await scenario.ActivityAsync(SkippedRepeat)).Count);
+    }
+
+    [Fact]
+    public async Task Process_again_on_a_cleaned_file_is_skipped_says_so_and_writes_no_second_output()
+    {
+        await using var scenario = await Scenario.StartAsync();
+        var (_, library) = await scenario.DelunoSetupAsync();
+        const string relative = "Retryfilm.2017/film.mkv";
+        var source = scenario.WriteRelease("Retryfilm.2017", "film.mkv", FakeMedia.Bytes(FakeMedia.Probe(audioLanguages: ["eng", "fre"])));
+        var output = Path.Combine(scenario.Folders.Output, "Retryfilm.2017", "film.mkv");
+        await scenario.PostHandoffAsync("handoff-retry", source);
+        await scenario.WaitForHandoffStateAsync("handoff-retry", "completed");
+        var written = File.GetLastWriteTimeUtc(output);
+        var file = await scenario.WaitForFileStatusAsync(library, relative, "processed");
+
+        var requeued = await scenario.Admin.PostWithCsrfAsync($"{WeirClient.Api}/processing/files/{(int)file["id"]!}/requeue");
+
+        Assert.True(requeued.Status == HttpStatusCode.OK, requeued.ToString());
+        Assert.Equal(0, (int)requeued.Fields["requeued"]!);
+        Assert.Equal(1, (int)requeued.Fields["skipped"]!);
+        Assert.StartsWith("Weir already cleaned this file, so it skipped it. Already done: cleaned on ", (string)requeued.Fields["detail"]!, StringComparison.Ordinal);
+        var line = await WaitForSkipLineAsync(scenario, 1);
+        Assert.Equal("Skipped: already done (film.mkv)", (string)line["title"]!);
+        Assert.Equal("skipped", (string)line["result"]!);
+        Assert.Equal("manual", (string)line["trigger"]!);
+        Assert.Single(scenario.FakeTools.Calls(tool: "ffmpeg", step: "remux"));
+        Assert.Equal(written, File.GetLastWriteTimeUtc(output));
+        Assert.Single(await scenario.JobsAsync(Scenario.RemuxKind));
+        Assert.Equal("processed", (string)(await scenario.FileRowAsync(library, relative))!["status"]!);
     }
 
     [Fact]

@@ -23,7 +23,7 @@ public sealed partial class RemuxPassHandler
 
         var chosenDelete = string.Equals(WireStrings.Strip(library.RejectedFileAction ?? string.Empty), RejectedFileActions.DeleteFile, StringComparison.OrdinalIgnoreCase);
         // A file Weir could not read may be a good file it cannot read yet, or a share that hiccuped: Weir cannot vouch for it, so it never destroys it.
-        var unreadable = result.Get("rejection_kind") is WireString { Value: "unreadable_file" };
+        var unreadable = result.Get("rejection_kind") is WireString { Value: RejectionKinds.UnreadableFile };
         var deletes = chosenDelete
                       && !unreadable
                       // Under reject, the reject job removes the download, and only after the manager accepts.

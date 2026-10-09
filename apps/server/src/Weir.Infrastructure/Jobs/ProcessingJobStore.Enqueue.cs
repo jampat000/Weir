@@ -65,7 +65,7 @@ public sealed partial class ProcessingJobStore
     /// <see cref="EnqueueOrGet(SqliteConnection, SqliteTransaction, string, string, string?, int, int?, int, DateTimeOffset?)"/> on the
     /// caller's unit of work: commits nothing, and announces the new job once the unit commits.
     /// </summary>
-    public ProcessingJob EnqueueOrGet(
+    public async Task<ProcessingJob> EnqueueOrGetAsync(
         UnitOfWork uow,
         string dedupeKey,
         string jobKind,
@@ -76,7 +76,7 @@ public sealed partial class ProcessingJobStore
         DateTimeOffset? notBefore = null)
     {
         ArgumentNullException.ThrowIfNull(uow);
-        return EnqueueOrGet(uow.Connection, uow.WriteTransaction(), dedupeKey, jobKind, payloadJson, maxAttempts, runnerCost, priority, notBefore);
+        return EnqueueOrGet(uow.Connection, await uow.WriteTransactionAsync().ConfigureAwait(false), dedupeKey, jobKind, payloadJson, maxAttempts, runnerCost, priority, notBefore);
     }
 
     internal ProcessingJob EnqueueOrGet(

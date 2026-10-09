@@ -67,7 +67,7 @@ public sealed partial class ProcessingJobStore
         var uow = await UnitOfWork.OpenAsync(_database, cancellationToken).ConfigureAwait(false);
         await using (uow.ConfigureAwait(false))
         {
-            var transaction = uow.WriteTransaction();
+            var transaction = await uow.WriteTransactionAsync().ConfigureAwait(false);
             var result = work(uow.Connection, transaction);
             await uow.CommitAsync().ConfigureAwait(false);
             Activity.ActivityNotifications.TransactionCommitted(_database, transaction);
