@@ -40,7 +40,9 @@ public sealed class ProcessingRig : IAsyncDisposable
 
     private string Watched => Path.Combine(_folders.Path, "watched");
 
-    public static async Task<ProcessingRig> StartAsync()
+    /// <param name="minimumFileSizeMb">The Movies workflow's minimum size: a file smaller than this is left alone.</param>
+    /// <param name="holdFailures">A file that fails stays failed, for the person to try again, instead of being retried by itself.</param>
+    public static async Task<ProcessingRig> StartAsync(int minimumFileSizeMb = 0, bool holdFailures = false)
     {
         var tools = FakeFfmpeg.Install();
         var folders = new TemporaryFolder();
@@ -57,7 +59,7 @@ public sealed class ProcessingRig : IAsyncDisposable
             });
             admin = new WeirClient(server.BaseUrl);
             await admin.EnsureAdminAsync(Navigation.BootstrapUser, Navigation.BootstrapPassword);
-            await PrepareMoviesWorkflowAsync(admin, folders.Path);
+            await PrepareMoviesWorkflowAsync(admin, folders.Path, minimumFileSizeMb, holdFailures);
             var connection = await admin.PostWithCsrfAsync($"{WeirClient.Api}/media-managers/connections", new JsonObject
             {
                 ["kind"] = "deluno",
@@ -83,8 +85,8 @@ public sealed class ProcessingRig : IAsyncDisposable
         }
     }
 
-    /// <summary>Points the seeded Movies workflow at folders that exist, with no wait and no minimum size, and leaves originals where they are, as a manager-fed workflow does.</summary>
-    private static async Task PrepareMoviesWorkflowAsync(WeirClient admin, string root)
+    /// <summary>Points the seeded Movies workflow at folders that exist, with no wait, and leaves originals where they are, as a manager-fed workflow does.</summary>
+    private static async Task PrepareMoviesWorkflowAsync(WeirClient admin, string root, int minimumFileSizeMb, bool holdFailures)
     {
         var work = Directory.CreateDirectory(Path.Combine(root, "work")).FullName;
         var watched = Directory.CreateDirectory(Path.Combine(root, "watched")).FullName;
@@ -99,8 +101,14 @@ public sealed class ProcessingRig : IAsyncDisposable
         body["work_folder"] = work;
         body["ready_after_seconds"] = 0;
         body["skip_access_tests"] = true;
-        body["min_file_size_mb"] = 0;
+        body["min_file_size_mb"] = minimumFileSizeMb;
         body["remove_original_after_success"] = false;
+        if (holdFailures)
+        {
+            body["failure_policy"] = "hold";
+            body["max_attempts"] = 1;
+        }
+
         var saved = await admin.PutWithCsrfAsync($"{libraries}/{(long)movies["id"]!}", body);
         Assert.True(saved.Status == HttpStatusCode.OK, saved.ToString());
         var settings = await admin.PutWithCsrfAsync($"{WeirClient.Api}/processing/operator-settings", new JsonObject { ["minimum_free_disk_space_mb"] = 0 });
@@ -117,6 +125,31 @@ public sealed class ProcessingRig : IAsyncDisposable
         Directory.CreateDirectory(Path.GetDirectoryName(source)!);
         await File.WriteAllBytesAsync(source, FakeMedia.Bytes(FakeMedia.Probe()));
         _tools.SetFileRule(fileName, new FileRule { Probe = FakeMedia.Probe(), RemuxReleaseFile = ReleaseFileFor(fileName) });
+        await PostHandOffAsync(handoffId, source);
+    }
+
+    /// <summary>
+    /// Deluno hands over a release folder: the film, and an extra too small for the workflow's minimum size. The film's pass stays
+    /// under way until <see cref="ReleasePass"/>, or, when <paramref name="failFirstPass"/> is set, fails the first time and
+    /// succeeds at once after that.
+    /// </summary>
+    public async Task HandOffReleaseAsync(string handoffId, string film, string extra, bool failFirstPass = false)
+    {
+        var folder = Path.Combine(Watched, handoffId);
+        Directory.CreateDirectory(folder);
+        // The film is padded just past a megabyte so it clears the workflow's minimum, and the extra is not.
+        await File.WriteAllBytesAsync(Path.Combine(folder, film), FakeMedia.Bytes(FakeMedia.Probe(), padding: 1_100_000));
+        await File.WriteAllBytesAsync(Path.Combine(folder, extra), FakeMedia.Bytes(FakeMedia.Probe()));
+        _tools.SetFileRule(
+            film,
+            failFirstPass
+                ? new FileRule { Probe = FakeMedia.Probe(), RemuxError = "Conversion failed: the fake ffmpeg was told to fail", RemuxFailTimes = 1 }
+                : new FileRule { Probe = FakeMedia.Probe(), RemuxReleaseFile = ReleaseFileFor(film) });
+        await PostHandOffAsync(handoffId, folder);
+    }
+
+    private async Task PostHandOffAsync(string handoffId, string sourcePath)
+    {
         using var deluno = _server.CreateClient();
         var response = await deluno.PostAsync($"{WeirClient.Api}/intake/webhook/deluno", new JsonObject
         {
@@ -124,7 +157,7 @@ public sealed class ProcessingRig : IAsyncDisposable
             ["handoffId"] = handoffId,
             ["libraryId"] = "lib-1",
             ["mediaType"] = "movies",
-            ["sourcePath"] = source,
+            ["sourcePath"] = sourcePath,
             ["callbackPath"] = CallbackPath,
         }, Secret);
         Assert.True(response.Status == HttpStatusCode.OK, response.ToString());

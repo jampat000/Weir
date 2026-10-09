@@ -230,6 +230,75 @@ public sealed class ProcessingFilesApiTests
         Assert.Equal(1, await TestDatabase.ScalarAsync(server, "SELECT count(*) FROM jobs WHERE dedupe_key = $dedupe", ("$dedupe", dedupeKey)));
     }
 
+    private static async Task RecordPassAsync(WeirTestServer server, long libraryId, string relativePath, string title, bool ok)
+    {
+        var writer = server.Services.GetRequiredService<IActivityWriter>();
+        await writer.RecordAsync(new ActivityEventDraft(
+            ActivityEventTypes.ProcessingFileRemuxPassCompleted,
+            "processing",
+            title,
+            $"{{\"library_id\": {libraryId}, \"relative_media_path\": \"{relativePath}\", \"ok\": {(ok ? "true" : "false")}, \"outcome\": \"{(ok ? "live_output_written" : "failed_during_execution")}\"}}"));
+    }
+
+    private static async Task<string[]> PassTitlesAsync(ApiTestClient client, string query)
+    {
+        using var response = await client.GetAsync("/api/v1/activity/recent?event_type=" + ActivityEventTypes.ProcessingFileRemuxPassCompleted + query);
+        return [.. (await ApiTestClient.Json(response))!["items"]!.AsArray().Select(item => item!["title"]!.GetValue<string>())];
+    }
+
+    /// <summary>
+    /// A list of what finished asks for <c>current_only</c>, and sees each file as it stands now: a pass that a later pass of the
+    /// same file replaces, and a failure of a file that has since been processed, are left out, and a file that is still failed
+    /// keeps its failure. System's log never asks, and keeps every entry.
+    /// </summary>
+    [Fact]
+    public async Task The_current_list_shows_each_file_as_it_stands_now_and_the_log_keeps_every_entry()
+    {
+        await using var server = await ApiTestClient.StartServerAsync();
+        await TestDatabase.SeedAdminAsync(server);
+        var client = new ApiTestClient(server);
+        await client.SignInAsync();
+        var libraryId = await SeedLibraryAsync(server);
+        await SeedFileAsync(server, libraryId, "Retried/retried.mkv", "processed");
+        await SeedFileAsync(server, libraryId, "Settled/settled.mkv", "processed");
+        await SeedFileAsync(server, libraryId, "Broken/broken.mkv", "processing_failed");
+        await SeedFileAsync(server, libraryId, "Again/again.mkv", "processed");
+        await RecordPassAsync(server, libraryId, "Again/again.mkv", "Again first pass", ok: true);
+        await RecordPassAsync(server, libraryId, "Retried/retried.mkv", "Retried first try", ok: false);
+        await RecordPassAsync(server, libraryId, "Retried/retried.mkv", "Retried second try", ok: true);
+        await RecordPassAsync(server, libraryId, "Settled/settled.mkv", "Settled delivered", ok: true);
+        await RecordPassAsync(server, libraryId, "Settled/settled.mkv", "Settled reported failed", ok: false);
+        await RecordPassAsync(server, libraryId, "Broken/broken.mkv", "Broken failed", ok: false);
+
+        await RecordPassAsync(server, libraryId, "Again/again.mkv", "Again second pass", ok: true);
+
+        Assert.Equal(
+            ["Again second pass", "Broken failed", "Retried second try", "Settled delivered"],
+            (await PassTitlesAsync(client, "&current_only=true")).Order(StringComparer.Ordinal));
+        Assert.Equal(7, (await PassTitlesAsync(client, string.Empty)).Length);
+    }
+
+    /// <summary>
+    /// The list follows the file: once the file is processed, its recorded failure is no longer the answer, with nothing deleted.
+    /// </summary>
+    [Fact]
+    public async Task A_failure_stops_being_listed_once_the_file_is_processed_and_the_entry_is_still_in_the_log()
+    {
+        await using var server = await ApiTestClient.StartServerAsync();
+        await TestDatabase.SeedAdminAsync(server);
+        var client = new ApiTestClient(server);
+        await client.SignInAsync();
+        var libraryId = await SeedLibraryAsync(server);
+        await SeedFileAsync(server, libraryId, "Film/film.mkv", "processing_failed");
+        await RecordPassAsync(server, libraryId, "Film/film.mkv", "Film could not be processed", ok: false);
+        Assert.Equal(["Film could not be processed"], await PassTitlesAsync(client, "&current_only=true"));
+
+        await TestDatabase.ExecuteAsync(server, "UPDATE files SET status = 'processed' WHERE relative_path = 'Film/film.mkv'");
+
+        Assert.Empty(await PassTitlesAsync(client, "&current_only=true"));
+        Assert.Equal(["Film could not be processed"], await PassTitlesAsync(client, string.Empty));
+    }
+
     /// <summary>
     /// The overview's processed/failed counts, output-written total and space saved are lifetime statistics —
     /// "Weir has saved X GB" — the same kind of fact System › Logs keeps whether or not a title is still in

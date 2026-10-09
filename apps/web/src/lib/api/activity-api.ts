@@ -20,6 +20,12 @@ export type ActivityRecentFilters = {
    * lane, not for System › Logs or the export, which want the complete record and never set this.
    */
   known_files_only?: boolean;
+  /**
+   * Lists each file once, as it stands now: of the events about a file, only the newest that still describes it, so a
+   * failure the file has since got past does not outlive it. For a live list of what finished, not for the complete
+   * record.
+   */
+  current_only?: boolean;
 };
 
 /** The filters shared by the feed and the export, as query parameters. */
@@ -52,6 +58,9 @@ export function activityRecentPath(options?: ActivityRecentFilters): string {
   // Not in activityFilterParams: the export shares that helper, and always wants the complete record.
   if (options?.known_files_only) {
     q.set("known_files_only", "true");
+  }
+  if (options?.current_only) {
+    q.set("current_only", "true");
   }
   const qs = q.toString();
   return qs ? `/api/v1/activity/recent?${qs}` : "/api/v1/activity/recent";

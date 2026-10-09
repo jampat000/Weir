@@ -42,6 +42,16 @@ describe("the newest finished files", () => {
     expect(askedFor(PASSES).filters.library_id).toBeUndefined();
   });
 
+  it("asks for each download once, as it stands now, so a failure it has got past is not listed", () => {
+    renderHook(() => useFinishedFiles());
+
+    expect(askedFor(PASSES).filters).toMatchObject({
+      known_files_only: true,
+      current_only: true,
+    });
+    expect(askedFor(CLEANS).filters.current_only).toBeUndefined();
+  });
+
   it("asks only for new downloads' entries for new downloads", () => {
     renderHook(() => useFinishedFiles("download"));
 
