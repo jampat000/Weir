@@ -30,6 +30,7 @@ sealed class TrayApp : IDisposable
     private readonly SecondLaunchSignal _secondLaunch;
     private readonly StartupRegistration _startup = StartupRegistration.ForThisUser();
     private readonly TrayStatusGate _serverStatus;
+    private readonly TrayBlink _blink = new();
     private readonly WeirOpener _opener;
     private readonly PauseControl _pause;
     private readonly PortChange _portChange;
@@ -38,6 +39,7 @@ sealed class TrayApp : IDisposable
     private SynchronizationContext? _ui;
     private NotifyIcon? _notifyIcon;
     private TrayIcons? _icons;
+    private System.Windows.Forms.Timer? _blinkTimer;
     private TrayMenuView? _menu;
     private TrayStatusWatcher? _statusWatcher;
     private TrayUpdates? _updates;
@@ -185,7 +187,7 @@ sealed class TrayApp : IDisposable
     private TrayState State() =>
         new(_server.Phase, _serverStatus.Current, _updates is { IsDownloaded: true } updates ? updates.PendingVersion : null, _server.Port);
 
-    // The icon's mark, the hover text and the menu, from the state as it is now.
+    // The icon's dot and mark, the hover text and the menu, from the state as it is now.
     private void Render()
     {
         if (_notifyIcon is null || _menu is null || _updates is null || _lanAccessMenu is null)
@@ -193,7 +195,9 @@ sealed class TrayApp : IDisposable
             return;
         }
         var state = State();
-        _notifyIcon.Icon = _icons!.For(state.Badge);
+        _blink.Follow(state.Dot);
+        _blinkTimer!.Enabled = _blink.Active;
+        ShowIcon(state);
         _notifyIcon.Text = state.HoverText;
         _menu.Show(TrayMenu.Describe(new TrayMenuInputs(
             state,
@@ -203,6 +207,9 @@ sealed class TrayApp : IDisposable
             _startup.IsEnabled,
             AppVersion.Current)));
     }
+
+    // Only the icon: the blink swaps between icons already made, and leaves the hover text and the menu alone.
+    private void ShowIcon(TrayState state) => _notifyIcon!.Icon = _icons!.For(state.IconKey(_blink.Lit));
 
     // A server that is starting has said nothing yet: what the one before it left in tray-status.json is not shown.
     private void ShowPhase(ServerPhase phase)
@@ -316,6 +323,14 @@ sealed class TrayApp : IDisposable
             TimeProvider.System,
             _cts.Token);
         _icons = new TrayIcons(size => Program.LoadAppIcon(size), SystemInformation.SmallIconSize);
+        _blinkTimer = new System.Windows.Forms.Timer { Interval = (int)TrayBlink.Interval.TotalMilliseconds };
+        _blinkTimer.Tick += (_, _) =>
+        {
+            if (_blink.Tick())
+            {
+                ShowIcon(State());
+            }
+        };
         _menu = new TrayMenuView(MenuClicks(), staysOpen: [TrayMenuItem.StartWithWindows]);
         _menu.Strip.Opening += (_, _) => Render();
 
@@ -446,6 +461,7 @@ sealed class TrayApp : IDisposable
         _cts.Cancel();
         _statusWatcher?.Dispose();
         _server.Dispose();
+        _blinkTimer?.Dispose();
         _notifyIcon?.Dispose();
         _menu?.Dispose();
         _icons?.Dispose();

@@ -16,20 +16,37 @@ enum ServerPhase
     Stopped,
 }
 
-/// <summary>The one corner mark the tray icon carries, if any. No mark means all is well.</summary>
-enum TrayBadge
+/// <summary>The icon's dot, which shows the health of Weir and of what it is set up to talk to, and nothing else.</summary>
+enum TrayDot
+{
+    /// <summary>Not known yet: the dot blinks until it can be one of the others.</summary>
+    Starting,
+
+    /// <summary>Running, and everything Weir relies on answers.</summary>
+    Green,
+
+    /// <summary>Running, but a media manager or a folder does not answer.</summary>
+    Amber,
+
+    /// <summary>Stopped, crashed, or not coming back by itself.</summary>
+    Red,
+}
+
+/// <summary>The extra mark in the icon's opposite corner, if any. Pause bars win over the update arrow.</summary>
+enum TrayMark
 {
     None,
-    Starting,
     Paused,
-    NeedsYou,
     UpdateReady,
 }
 
+/// <summary>One icon the tray can show: its dot, or none while a blinking dot is off, and its mark.</summary>
+readonly record struct TrayIconKey(TrayDot? Dot, TrayMark Mark);
+
 /// <summary>
-/// What the tray says about Weir right now: its corner mark, its status line and its hover text. One mark shows at a time,
-/// by priority: needs you, then starting, then paused, then update ready. The status line is the same words as the hover
-/// text without the product name, so the menu and the hover never disagree.
+/// What the tray says about Weir right now: its dot, its mark and its hover text. The dot is the platform's health
+/// (<see cref="Dot"/>); the mark is pause, or else an update waiting. The menu's greyed status line is the hover text itself,
+/// so the two never disagree, and when the dot is amber or red it says what is wrong. Nothing here counts files.
 /// </summary>
 /// <param name="Phase">Where the server is.</param>
 /// <param name="Server">What tray-status.json says, or null when the server has written none. Used only while the server runs.</param>
@@ -47,15 +64,30 @@ sealed record TrayState(ServerPhase Phase, TrayStatus? Server, string? UpdateVer
 
     internal bool IsPaused => Reported is { Paused: true };
 
-    internal TrayBadge Badge =>
-        Phase == ServerPhase.Stopped || Reported is { NeedsYou: true } ? TrayBadge.NeedsYou
-        : Phase == ServerPhase.Starting ? TrayBadge.Starting
-        : IsPaused ? TrayBadge.Paused
-        : UpdateVersion is not null ? TrayBadge.UpdateReady
-        : TrayBadge.None;
+    /// <summary>Red when the server is stopped or stopping, amber when something it relies on does not answer, green otherwise; blinking until it can say.</summary>
+    internal TrayDot Dot =>
+        Phase == ServerPhase.Stopped || Reported is { ServerOk: false } ? TrayDot.Red
+        : Reported is not { } status ? TrayDot.Starting
+        : status.SomethingNotAnswering ? TrayDot.Amber
+        : TrayDot.Green;
 
-    /// <summary>The state in a line: what Weir is doing, then what needs the person.</summary>
-    internal string StatusLine => string.Join(" - ", [Headline, .. NeedsYouParts]);
+    internal TrayMark Mark =>
+        IsPaused ? TrayMark.Paused
+        : UpdateVersion is not null ? TrayMark.UpdateReady
+        : TrayMark.None;
+
+    /// <summary>The icon to show: a blinking dot is drawn only while <paramref name="blinkLit"/>.</summary>
+    internal TrayIconKey IconKey(bool blinkLit) => new(Dot == TrayDot.Starting && !blinkLit ? null : Dot, Mark);
+
+    /// <summary>The state in a line, without the product name: what Weir is doing, then what does not answer.</summary>
+    internal string StatusLine
+    {
+        get
+        {
+            var causes = Causes;
+            return string.Join(" - ", Headline(causes).Concat(causes));
+        }
+    }
 
     /// <summary>The icon's hover text: the product name and the status line, never over <see cref="HoverLimit"/> characters.</summary>
     internal string HoverText => Fit($"{Product} - {StatusLine}");
@@ -73,34 +105,39 @@ sealed record TrayState(ServerPhase Phase, TrayStatus? Server, string? UpdateVer
             ? string.Create(CultureInfo.InvariantCulture, $"http://{machineName}:{port}")
             : AddressFor(port);
 
-    private string Headline => this switch
+    // What is wrong stands in for "Running at ...": a running Weir that cannot reach Deluno is not simply running.
+    private IEnumerable<string> Headline(List<string> causes) => this switch
     {
-        { Phase: ServerPhase.Stopped } => "Stopped - choose Restart Weir",
-        { Phase: ServerPhase.Starting } => "Starting...",
-        { Reported.ServerOk: false } => "Needs attention - choose Open logs folder",
-        { IsPaused: true } => "Paused",
-        { UpdateVersion: { } version } => $"Update ready ({version})",
-        _ => $"Running at {Address}",
+        { Phase: ServerPhase.Stopped } => ["Stopped - choose Restart Weir"],
+        { Dot: TrayDot.Starting } => ["Starting..."],
+        { Reported.ServerOk: false } => ["Needs attention - choose Open logs folder"],
+        { IsPaused: true } => ["Paused"],
+        { UpdateVersion: { } version } => [$"Update ready ({version})"],
+        _ => causes.Count > 0 ? [] : [$"Running at {Address}"],
     };
 
-    private IEnumerable<string> NeedsYouParts
+    private List<string> Causes
     {
         get
         {
+            var causes = new List<string>();
             if (Reported is not { ServerOk: true } status)
             {
-                yield break;
-            }
-            if (status.FilesNeedingYou > 0)
-            {
-                yield return status.FilesNeedingYou == 1 ? "1 file needs a look" : $"{status.FilesNeedingYou} files need a look";
+                return causes;
             }
             if (status.ManagersUnreachable.Count > 0)
             {
-                yield return status.ManagersUnreachable.Count == 1
-                    ? $"{status.ManagersUnreachable[0]} can't be reached"
-                    : $"{status.ManagersUnreachable.Count} media managers can't be reached";
+                causes.Add(status.ManagersUnreachable.Count == 1
+                    ? $"{status.ManagersUnreachable[0]} isn't answering"
+                    : $"{status.ManagersUnreachable.Count} media managers aren't answering");
             }
+            if (status.FoldersUnreachable.Count > 0)
+            {
+                causes.Add(status.FoldersUnreachable.Count == 1
+                    ? $"{status.FoldersUnreachable[0]} can't be reached"
+                    : $"{status.FoldersUnreachable.Count} folders can't be reached");
+            }
+            return causes;
         }
     }
 

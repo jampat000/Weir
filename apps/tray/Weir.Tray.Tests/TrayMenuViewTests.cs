@@ -39,7 +39,7 @@ public sealed class TrayMenuViewTests
         view.Show(Describe(new TrayState(ServerPhase.Stopped, null, null, 9347), startsWithWindows: true));
 
         Assert.Equal(count, view.Strip.Items.Count);
-        Assert.Equal("Stopped - choose Restart Weir", view.Strip.Items[1].Text);
+        Assert.Equal("Weir - Stopped - choose Restart Weir", view.Strip.Items[1].Text);
         Assert.False(view.Strip.Items[3].Enabled);
         Assert.Contains(view.Strip.Items.OfType<ToolStripMenuItem>(), item => item.Text == "Start with Windows" && item.Checked);
     }
@@ -71,7 +71,7 @@ public sealed class TrayMenuViewTests
     [Fact]
     public void The_longest_hover_text_is_one_the_notification_area_accepts()
     {
-        var status = new TrayStatus(false, null, 99, ["A connection with a rather long name that goes on and on and on"], true);
+        var status = new TrayStatus(false, null, ["A connection with a rather long name that goes on and on and on"], ["The watched folder for a workflow with a long name too"], true);
         var hover = new TrayState(ServerPhase.Running, status, "1.0.0-rc.10", 9347).HoverText;
         using var icon = new NotifyIcon();
 

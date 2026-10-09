@@ -28,6 +28,14 @@ public interface IFolderProbe
     bool? SameFilesystem(string first, string second);
 }
 
+/// <summary>One of a workflow's own folders.</summary>
+public enum LocalFolder
+{
+    Watched,
+    Work,
+    Output,
+}
+
 /// <summary>
 /// Weir's own side of a library's folder chain: whether the watched, work and output folders exist and are
 /// usable, and whether a finished file can be moved from the work folder into the output folder or has to be copied
@@ -62,6 +70,38 @@ public static class LibraryFolderChainRules
         lines.AddRange(OutputFolderLines(output, probe));
         lines.Add(SameFilesystemLine(work, output, probe));
         return lines;
+    }
+
+    /// <summary>
+    /// The folders Weir cannot reach: one that does not exist, or that it cannot list. They are judged as
+    /// <see cref="CheckLocalFolders"/> judges them, but only for reachability. A blank folder is a workflow still being set up,
+    /// a default work folder that is not made yet is Weir's to make, and where a finished file can move is not a matter of reach.
+    /// </summary>
+    public static IReadOnlyList<LocalFolder> UnreachableFolders(
+        string watchedFolder, string workFolder, bool workFolderIsDefault, string outputFolder, IFolderProbe probe)
+    {
+        ArgumentNullException.ThrowIfNull(probe);
+        var watched = (watchedFolder ?? string.Empty).Trim();
+        var work = (workFolder ?? string.Empty).Trim();
+        var output = (outputFolder ?? string.Empty).Trim();
+
+        var unreachable = new List<LocalFolder>();
+        if (watched.Length > 0 && FolderReadLine("watched", watched, probe).State == SetupCheckLine.Problem)
+        {
+            unreachable.Add(LocalFolder.Watched);
+        }
+
+        if (work.Length > 0 && WorkFolderLine(work, workFolderIsDefault, probe).State == SetupCheckLine.Problem)
+        {
+            unreachable.Add(LocalFolder.Work);
+        }
+
+        if (output.Length > 0 && FolderReadLine("output", output, probe).State == SetupCheckLine.Problem)
+        {
+            unreachable.Add(LocalFolder.Output);
+        }
+
+        return unreachable;
     }
 
     /// <summary>

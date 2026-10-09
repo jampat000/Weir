@@ -358,4 +358,61 @@ public sealed class LibraryFolderChainRulesTests
 
         Assert.Equal(SetupCheckLine.Ok, line.State);
     }
+
+    private static IReadOnlyList<LocalFolder> Unreachable(
+        FakeFolderProbe probe, bool workIsDefault = false, string watched = Watched, string work = Work, string output = Output) =>
+        LibraryFolderChainRules.UnreachableFolders(watched, work, workIsDefault, output, probe);
+
+    [Fact]
+    public void Folders_that_exist_and_can_be_listed_are_all_reachable()
+    {
+        Assert.Empty(Unreachable(AllFoldersExist()));
+    }
+
+    [Fact]
+    public void Each_folder_that_is_missing_is_named_on_its_own()
+    {
+        var probe = AllFoldersExist();
+        probe.Existing.Remove(Watched);
+        Assert.Equal([LocalFolder.Watched], Unreachable(probe));
+
+        probe.Existing.Remove(Work);
+        probe.Existing.Remove(Output);
+        Assert.Equal([LocalFolder.Watched, LocalFolder.Work, LocalFolder.Output], Unreachable(probe));
+    }
+
+    [Fact]
+    public void A_folder_that_exists_but_cannot_be_listed_is_not_reachable()
+    {
+        var probe = AllFoldersExist();
+        probe.Unreadable.Add(Output);
+
+        Assert.Equal([LocalFolder.Output], Unreachable(probe));
+    }
+
+    [Fact]
+    public void An_output_folder_that_cannot_be_written_is_still_reachable_and_is_never_written_to()
+    {
+        var probe = AllFoldersExist();
+        probe.Unwritable.Add(Output);
+
+        Assert.Empty(Unreachable(probe));
+        Assert.Empty(probe.WriteProbed);
+    }
+
+    [Fact]
+    public void A_default_work_folder_that_is_not_made_yet_is_reachable_and_a_chosen_one_is_not()
+    {
+        var probe = AllFoldersExist();
+        probe.Existing.Remove(Work);
+
+        Assert.Empty(Unreachable(probe, workIsDefault: true));
+        Assert.Equal([LocalFolder.Work], Unreachable(probe, workIsDefault: false));
+    }
+
+    [Fact]
+    public void A_folder_not_set_yet_is_not_unreachable()
+    {
+        Assert.Empty(Unreachable(new FakeFolderProbe(), watched: " ", work: string.Empty, output: string.Empty));
+    }
 }

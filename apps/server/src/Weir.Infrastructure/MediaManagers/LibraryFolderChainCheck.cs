@@ -55,9 +55,7 @@ public sealed class LibraryFolderChainCheck
         ArgumentNullException.ThrowIfNull(uow);
         ArgumentNullException.ThrowIfNull(library);
 
-        var folderRow = new ProcessingLibraryFolderRow(library.Id, library.MediaType, (int)library.DisplayOrder, library.WorkFolder, library.OutputFolder);
-        var workFolder = ProcessingLibraryFolders.EffectiveWorkFolder(folderRow, _options.WeirHome);
-        var workFolderIsDefault = string.IsNullOrWhiteSpace(library.WorkFolder);
+        var (workFolder, workFolderIsDefault) = WorkFolderOf(library, _options.WeirHome);
         var localLines = LibraryFolderChainRules.CheckLocalFolders(library.WatchedFolder, workFolder, workFolderIsDefault, library.OutputFolder, _probe);
         var localReady = localLines.All(line => line.State != SetupCheckLine.Problem);
 
@@ -82,6 +80,24 @@ public sealed class LibraryFolderChainCheck
             .Set("managers", new WireArray(managers.Select(entry => (WireValue)entry)))
             .Set("download_clients", new WireArray(downloadClients.Select(entry => (WireValue)entry)))
             .Set("ready", localReady && managersReady && downloadClientsReady);
+    }
+
+    /// <summary>
+    /// Which of the library's own folders Weir cannot reach right now, by the same judgement as the chain's local lines but
+    /// without the media managers and download clients, so it stays cheap enough to ask often.
+    /// </summary>
+    public static IReadOnlyList<LocalFolder> UnreachableFolders(ProcessingLibraryRecord library, string weirHome, IFolderProbe probe)
+    {
+        ArgumentNullException.ThrowIfNull(library);
+        var (workFolder, workFolderIsDefault) = WorkFolderOf(library, weirHome);
+        return LibraryFolderChainRules.UnreachableFolders(library.WatchedFolder, workFolder, workFolderIsDefault, library.OutputFolder, probe);
+    }
+
+    /// <summary>The library's work folder, and whether that is Weir's own default because it set none.</summary>
+    private static (string Folder, bool IsDefault) WorkFolderOf(ProcessingLibraryRecord library, string weirHome)
+    {
+        var folderRow = new ProcessingLibraryFolderRow(library.Id, library.MediaType, (int)library.DisplayOrder, library.WorkFolder, library.OutputFolder);
+        return (ProcessingLibraryFolders.EffectiveWorkFolder(folderRow, weirHome), string.IsNullOrWhiteSpace(library.WorkFolder));
     }
 
     /// <summary>The Deluno library the workflow was created from, when it was created from one.</summary>
