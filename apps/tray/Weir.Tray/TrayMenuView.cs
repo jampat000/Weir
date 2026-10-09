@@ -61,7 +61,9 @@ sealed class TrayMenuView : IDisposable
                 Strip.Items.Add(new ToolStripSeparator());
                 continue;
             }
-            var item = new ToolStripMenuItem { Tag = key };
+            // A toggle is a real check item, so assistive technology and UI Automation see its state and a Toggle pattern; the
+            // description says what the state is, and Show sets it from that after every click.
+            var item = new ToolStripMenuItem { Tag = key, CheckOnClick = entry.Checked is not null };
             if (entry.Bold)
             {
                 item.Font = new Font(item.Font, FontStyle.Bold);
