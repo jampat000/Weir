@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Globalization;
 using Weir.Core.Media;
 using Weir.Infrastructure.Processes;
 
@@ -22,12 +23,15 @@ public sealed class RealFfmpegFixtures : IDisposable
 
     public void Dispose() => Directory.Delete(_root, recursive: true);
 
-    /// <summary>Runs ffmpeg (or another tool) for a test, failing with a message that says what was being made and why it stopped.</summary>
-    internal static async Task RunAsync(string what, IReadOnlyList<string> argv)
+    /// <summary>
+    /// Runs ffmpeg (or another tool) for a test, failing with a message that says what was being made and why it stopped.
+    /// <paramref name="exitCodeWarnings"/> is for mkvmerge, whose exit code 1 is "succeeded with warnings".
+    /// </summary>
+    internal static async Task RunAsync(string what, IReadOnlyList<string> argv, bool exitCodeWarnings = false)
     {
         var result = await new ProcessRunner().RunAsync(new ProcessRequest { Argv = argv, Timeout = GenerationLimit }).ConfigureAwait(false);
         Assert.False(result.TimedOut, $"{what} did not finish within {GenerationLimit.TotalMinutes:0} minutes; the machine is probably overloaded.");
-        Assert.True(result.ExitCode == 0, $"{what} failed: " + ProbeOutput.TailText(result.Stderr));
+        Assert.True(result.ExitCode == 0 || (exitCodeWarnings && result.ExitCode == 1), $"{what} failed (exit {result.ExitCode}): " + ProbeOutput.TailText(result.Stderr));
     }
 
     /// <summary>ffmpeg with the options every fixture and test command starts with.</summary>
@@ -131,6 +135,82 @@ public sealed class RealFfmpegFixtures : IDisposable
             "-metadata:s:a:0", "_STATISTICS_TAGS=BPS DURATION NUMBER_OF_FRAMES NUMBER_OF_BYTES",
             path));
 
+    /// <summary>Three seconds: mpeg4 video, English and French AAC tracks, English and French SubRip tracks.</summary>
+    public Task<string> WithAudioAndSubtitleLanguagesAsync() => GenerateAsync(
+        "audio-and-subtitle-languages.mkv",
+        path =>
+        {
+            var english = Path.ChangeExtension(path, ".en.srt");
+            var french = Path.ChangeExtension(path, ".fr.srt");
+            File.WriteAllText(english, "1\n00:00:00,000 --> 00:00:02,000\nEnglish line\n");
+            File.WriteAllText(french, "1\n00:00:00,000 --> 00:00:02,000\nLigne francaise\n");
+            return Ffmpeg(
+                "-f", "lavfi", "-i", "testsrc=duration=3:size=160x120:rate=10",
+                "-f", "lavfi", "-i", "sine=frequency=440:duration=3",
+                "-f", "lavfi", "-i", "sine=frequency=880:duration=3",
+                "-i", english, "-i", french,
+                "-map", "0:v", "-map", "1:a", "-map", "2:a", "-map", "3:s", "-map", "4:s",
+                "-c:v", "mpeg4", "-c:a", "aac", "-c:s", "srt",
+                "-metadata:s:a:0", "language=eng", "-metadata:s:a:1", "language=fre",
+                "-metadata:s:s:0", "language=eng", "-metadata:s:s:1", "language=fre",
+                path);
+        });
+
+    /// <summary>
+    /// <see cref="WithAudioAndSubtitleLanguagesAsync"/> with attachments added by mkvmerge itself: a <c>cover.jpg</c>, which
+    /// Matroska stores as an attachment and ffprobe reports as an extra video stream flagged <c>attached_pic</c>, and a font,
+    /// which it does not. This is the shape measured on a real library file.
+    /// </summary>
+    public Task<string> WithMkvmergeAttachmentsAsync() => GenerateAsync(
+        "attached.mkv",
+        async path =>
+        {
+            var plain = await WithAudioAndSubtitleLanguagesAsync().ConfigureAwait(false);
+            var cover = Path.ChangeExtension(path, ".jpg");
+            await RunAsync("Making the cover picture", Ffmpeg("-f", "lavfi", "-i", "color=c=blue:s=120x120:d=1", "-frames:v", "1", cover)).ConfigureAwait(false);
+            var font = Path.ChangeExtension(path, ".ttf");
+            await File.WriteAllTextAsync(font, "not really a font, but an attachment that is not cover art").ConfigureAwait(false);
+            return
+            [
+                RealMkvmerge.Tool!, "--output", path,
+                // These describe the *next* --attach-file, so the order matters.
+                "--attachment-mime-type", "image/jpeg", "--attachment-name", "cover.jpg", "--attach-file", cover,
+                "--attachment-mime-type", "font/ttf", "--attachment-name", "TestFont.ttf", "--attach-file", font,
+                plain,
+            ];
+        },
+        exitCodeWarnings: true);
+
+    /// <summary>
+    /// Three seconds: mpeg4 video and one AAC track per language, in order, the first marked default. Copy it before a test
+    /// changes it: the pass under test moves its source.
+    /// </summary>
+    public Task<string> WithAudioLanguagesAsync(params string[] languages) => GenerateAsync(
+        "audio-" + string.Join('-', languages) + ".mkv",
+        path =>
+        {
+            var argv = new List<string> { "-f", "lavfi", "-i", "testsrc=duration=3:size=160x120:rate=10" };
+            foreach (var (_, i) in languages.Select((language, i) => (language, i)))
+            {
+                argv.AddRange(["-f", "lavfi", "-i", $"sine=frequency={440 * (i + 1)}:duration=3"]);
+            }
+
+            argv.AddRange(["-map", "0"]);
+            for (var i = 0; i < languages.Length; i++)
+            {
+                argv.AddRange(["-map", (i + 1).ToString(CultureInfo.InvariantCulture)]);
+            }
+
+            argv.AddRange(["-c:v", "mpeg4", "-c:a", "aac"]);
+            for (var i = 0; i < languages.Length; i++)
+            {
+                argv.AddRange([$"-metadata:s:a:{i}", $"language={languages[i]}", $"-disposition:a:{i}", i == 0 ? "default" : "0"]);
+            }
+
+            argv.Add(path);
+            return Ffmpeg([.. argv]);
+        });
+
     private static string[] StandardArguments(string path) =>
         Ffmpeg(
             "-f", "lavfi", "-i", "testsrc=duration=3:size=160x120:rate=10",
@@ -143,12 +223,15 @@ public sealed class RealFfmpegFixtures : IDisposable
 
     /// <summary>The file at <paramref name="name"/>, made by <paramref name="argvFor"/> (given its path) on first use.</summary>
     private Task<string> GenerateAsync(string name, Func<string, string[]> argvFor) =>
+        GenerateAsync(name, path => Task.FromResult(argvFor(path)));
+
+    private Task<string> GenerateAsync(string name, Func<string, Task<string[]>> argvFor, bool exitCodeWarnings = false) =>
         _generated.GetOrAdd(
             name,
             _ => new Lazy<Task<string>>(async () =>
             {
                 var path = Path.Combine(_root, name);
-                await RunAsync($"Generating the fixture {name}", argvFor(path)).ConfigureAwait(false);
+                await RunAsync($"Generating the fixture {name}", await argvFor(path).ConfigureAwait(false), exitCodeWarnings).ConfigureAwait(false);
                 return path;
             })).Value;
 }
