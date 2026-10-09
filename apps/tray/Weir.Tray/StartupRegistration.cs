@@ -67,8 +67,8 @@ sealed class StartupRegistration(string runKeyPath, StartWithWindowsAnswer answe
         }
     }
 
-    /// <summary>Stops Weir starting when the person signs in.</summary>
-    internal void Disable()
+    /// <summary>Stops Weir starting when the person signs in. Returns whether it is now off.</summary>
+    internal bool Disable()
     {
         try
         {
@@ -80,10 +80,12 @@ sealed class StartupRegistration(string runKeyPath, StartWithWindowsAnswer answe
             {
                 TrayLog.Write("Removed startup folder shortcut.");
             }
+            return true;
         }
         catch (Exception ex) when (ex is SecurityException or UnauthorizedAccessException or IOException)
         {
             TrayLog.Write($"Could not stop Weir starting with Windows: {ex.Message}");
+            return false;
         }
     }
 
@@ -95,18 +97,16 @@ sealed class StartupRegistration(string runKeyPath, StartWithWindowsAnswer answe
     /// </summary>
     internal bool IsSetWithoutAnswer => IsEnabled && !IsAnswered;
 
-    /// <summary>The person's answer to the question: yes turns it on, no turns it off, and either way it is not asked again.</summary>
+    /// <summary>
+    /// The person's answer to the question: yes turns it on, no turns it off, and either way it is not asked again. An answer
+    /// that could not be carried out is not recorded, so the question comes back rather than leave a choice unmade.
+    /// </summary>
     internal void Choose(bool startWithWindows)
     {
-        if (startWithWindows)
+        if (startWithWindows ? Enable() : Disable())
         {
-            Enable();
+            answer.Record();
         }
-        else
-        {
-            Disable();
-        }
-        answer.Record();
     }
 
     /// <summary>Switches it: off if it is on, on if it is off. This is the tray menu's "Start with Windows", and it is an answer.</summary>

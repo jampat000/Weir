@@ -49,13 +49,22 @@ sealed class StartWithWindowsAnswer(string keyPath)
         }
     }
 
-    /// <summary>Forgets the answer, so a later install asks again.</summary>
+    /// <summary>Forgets the answer, so a later install asks again, and removes the key if nothing else is in it.</summary>
     internal void Forget()
     {
         try
         {
-            using var key = Registry.CurrentUser.OpenSubKey(keyPath, writable: true);
-            key?.DeleteValue(ValueName, throwOnMissingValue: false);
+            using (var key = Registry.CurrentUser.OpenSubKey(keyPath, writable: true))
+            {
+                key?.DeleteValue(ValueName, throwOnMissingValue: false);
+            }
+
+            using var left = Registry.CurrentUser.OpenSubKey(keyPath);
+            if (left is { ValueCount: 0, SubKeyCount: 0 })
+            {
+                left.Close();
+                Registry.CurrentUser.DeleteSubKey(keyPath, throwOnMissingSubKey: false);
+            }
         }
         catch (Exception ex) when (ex is SecurityException or UnauthorizedAccessException or IOException)
         {

@@ -52,7 +52,8 @@ readonly record struct TrayIconKey(TrayDot? Dot, TrayMark Mark);
 /// <param name="Server">What tray-status.json says, or null when the server has written none. Used only while the server runs.</param>
 /// <param name="UpdateVersion">The version of an update that is downloaded and waiting to install, or null.</param>
 /// <param name="Port">The port the server is on.</param>
-sealed record TrayState(ServerPhase Phase, TrayStatus? Server, string? UpdateVersion, int Port)
+/// <param name="StatusOverdue">A running server has gone past the deadline without a readable status (<see cref="TrayStatusDeadline"/>).</param>
+sealed record TrayState(ServerPhase Phase, TrayStatus? Server, string? UpdateVersion, int Port, bool StatusOverdue = false)
 {
     /// <summary>The longest text a notification-area icon can show on Windows.</summary>
     internal const int HoverLimit = 127;
@@ -64,12 +65,19 @@ sealed record TrayState(ServerPhase Phase, TrayStatus? Server, string? UpdateVer
 
     internal bool IsPaused => Reported is { Paused: true };
 
-    /// <summary>Red when the server is stopped or stopping, amber when something it relies on does not answer, green otherwise; blinking until it can say.</summary>
+    /// <summary>
+    /// Red only when the server is stopped for good (the watchdog gave up, or it could not start). Amber when something it
+    /// relies on does not answer, or when a running server has no readable status past the deadline. Green otherwise. Blinking
+    /// until it can say: while it starts, and while a server that says it is stopping on its own is started again.
+    /// </summary>
     internal TrayDot Dot =>
-        Phase == ServerPhase.Stopped || Reported is { ServerOk: false } ? TrayDot.Red
-        : Reported is not { } status ? TrayDot.Starting
+        Phase == ServerPhase.Stopped ? TrayDot.Red
+        : Reported is not { } status ? (IsStatusOverdue ? TrayDot.Amber : TrayDot.Starting)
+        : !status.ServerOk ? TrayDot.Starting
         : status.SomethingNotAnswering ? TrayDot.Amber
         : TrayDot.Green;
+
+    private bool IsStatusOverdue => Phase == ServerPhase.Running && StatusOverdue;
 
     internal TrayMark Mark =>
         IsPaused ? TrayMark.Paused
@@ -109,8 +117,8 @@ sealed record TrayState(ServerPhase Phase, TrayStatus? Server, string? UpdateVer
     private IEnumerable<string> Headline(List<string> causes) => this switch
     {
         { Phase: ServerPhase.Stopped } => ["Stopped - choose Restart Weir"],
+        { IsStatusOverdue: true, Reported: null } => ["Can't read its status"],
         { Dot: TrayDot.Starting } => ["Starting..."],
-        { Reported.ServerOk: false } => ["Needs attention - choose Open logs folder"],
         { IsPaused: true } => ["Paused"],
         { UpdateVersion: { } version } => [$"Update ready ({version})"],
         _ => causes.Count > 0 ? [] : [$"Running at {Address}"],

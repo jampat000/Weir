@@ -45,18 +45,41 @@ public sealed class TrayStateTests
     }
 
     [Fact]
-    public void A_server_that_says_it_is_stopping_is_red()
+    public void A_server_that_says_it_is_stopping_blinks_instead_of_flashing_red_while_it_is_started_again()
     {
-        Assert.Equal(TrayDot.Red, Running(AllWell with { ServerOk = false }).Dot);
+        var stopping = AllWell with { ServerOk = false, ManagersUnreachable = ["Deluno"] };
+
+        Assert.Equal(TrayDot.Starting, Running(stopping).Dot);
+        Assert.Equal("Weir - Starting...", Running(stopping).HoverText);
     }
 
     [Fact]
-    public void Red_wins_over_amber()
+    public void Red_is_for_a_server_that_is_stopped_for_good_whatever_it_last_said()
     {
         var everything = new TrayStatus(false, null, ["Deluno"], ["The watched folder for Movies"], ServerOk: false);
 
-        Assert.Equal(TrayDot.Red, Running(everything).Dot);
         Assert.Equal(TrayDot.Red, Stopped(everything).Dot);
+        Assert.Equal(TrayDot.Red, Stopped(AllWell).Dot);
+    }
+
+    [Fact]
+    public void A_running_server_with_no_readable_status_blinks_until_the_deadline_and_then_is_amber()
+    {
+        var waiting = new TrayState(ServerPhase.Running, null, null, 9347);
+        var overdue = new TrayState(ServerPhase.Running, null, null, 9347, StatusOverdue: true);
+
+        Assert.Equal(TrayDot.Starting, waiting.Dot);
+        Assert.Equal("Weir - Starting...", waiting.HoverText);
+        Assert.Equal(TrayDot.Amber, overdue.Dot);
+        Assert.Equal("Weir - Can't read its status", overdue.HoverText);
+    }
+
+    [Fact]
+    public void Being_overdue_changes_nothing_once_the_server_has_said_how_it_is_or_when_it_is_not_running()
+    {
+        Assert.Equal(TrayDot.Green, new TrayState(ServerPhase.Running, AllWell, null, 9347, StatusOverdue: true).Dot);
+        Assert.Equal(TrayDot.Starting, new TrayState(ServerPhase.Starting, null, null, 9347, StatusOverdue: true).Dot);
+        Assert.Equal(TrayDot.Red, new TrayState(ServerPhase.Stopped, null, null, 9347, StatusOverdue: true).Dot);
     }
 
     [Fact]
@@ -192,14 +215,6 @@ public sealed class TrayStateTests
         Assert.Equal(
             "Weir - Update ready (2.0.0) - The watched folder for Movies can't be reached",
             Running(AllWell with { FoldersUnreachable = ["The watched folder for Movies"] }, update: "2.0.0").HoverText);
-    }
-
-    [Fact]
-    public void A_server_that_is_not_well_points_to_the_logs()
-    {
-        Assert.Equal(
-            "Weir - Needs attention - choose Open logs folder",
-            Running(AllWell with { ServerOk = false, ManagersUnreachable = ["Deluno"] }).HoverText);
     }
 
     [Fact]

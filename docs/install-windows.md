@@ -42,9 +42,11 @@ You can change your mind later, in either of two places. In Weir, open **System 
 **Allow other devices on your network...** or **Only allow this PC**. Weir restarts when you do.
 
 **"Start Weir when you sign in to Windows?"** Nothing starts with Windows unless you say yes. **No** (or a silent install)
-leaves it off. You can switch it any time with **Start with Windows** in the tray menu. An older version set it at
-install without asking; if you update from one and nobody has answered, Weir asks the same question once, the next time you
-start it yourself (never at sign-in, during a silent start, or with no desktop). Yes keeps it, No removes it.
+leaves it off. You can switch it any time with **Start with Windows** in the tray menu. Versions up to
+1.0.0-rc.10 registered it at install without asking. When Weir finds that entry and no answer has been recorded (the answer
+is recorded when you answer the question or tick or untick the menu item), it asks the same question once, after its icon is
+up, the next time you start Weir yourself (never at sign-in, during a silent start, or with no desktop). Yes keeps the entry,
+No removes it.
 
 **"Start Weir" and a port number.** Keep the default, **9347**, unless something else on the PC already uses
 it. In that case the window says so and suggests the next free port. Weir remembers your choice.

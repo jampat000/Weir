@@ -190,9 +190,6 @@ static class Program
                 return 0;
             }
 
-            // An entry an older version set at install, with nobody asked, is asked about once, on a start the person made.
-            StartWithWindowsPrompt.AskIfSetWithoutAnswer(args);
-
             var port = ResolvePort(args, runtimeHome);
             if (port is null)
             {

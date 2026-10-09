@@ -22,22 +22,21 @@ static class StartWithWindowsPrompt
         startup.Choose(ask());
     }
 
-    internal static void AskIfSetWithoutAnswer(string[] args) =>
-        AskIfSetWithoutAnswer(args, PortChoice.HasInteractiveDesktop, AskInMessageBox, StartupRegistration.ForThisUser());
-
     /// <summary>
-    /// Asks, once, about an entry nobody chose. Only a start the person made themselves qualifies: not a silent one, one with
-    /// no desktop, or one with <see cref="Program.NoBrowserArgument"/>, which is how the entry itself starts Weir at sign-in
-    /// (and how an update restart and Deluno start it), none of which should put a question on the screen. A start that does
-    /// not qualify changes nothing; the next one that does asks.
+    /// Asks, once, about an entry nobody chose. Versions up to 1.0.0-rc.10 registered it at install without asking, and the
+    /// standard needs a Yes from the person, so an entry with no recorded answer is asked about like any other first time. Only
+    /// a start the person made themselves qualifies (<see cref="TrayStart.StartedByPerson"/>): not a silent one, one with no
+    /// desktop, or one with <see cref="Program.NoBrowserArgument"/>, which is how the entry itself starts Weir at sign-in (and
+    /// how an update restart and Deluno start it), none of which should put a question on the screen. A start that does not
+    /// qualify changes nothing; the next one that does asks. The tray calls this once its icon is up.
     /// </summary>
-    internal static void AskIfSetWithoutAnswer(IEnumerable<string> args, Func<bool> desktopCheck, Func<bool> ask, StartupRegistration startup)
+    internal static void AskIfSetWithoutAnswer(bool startedByPerson, Func<bool> ask, StartupRegistration startup)
     {
         if (!startup.IsSetWithoutAnswer)
         {
             return;
         }
-        if (!Program.HasInteractiveDesktop(args, desktopCheck) || args.Contains(Program.NoBrowserArgument))
+        if (!startedByPerson)
         {
             TrayLog.Write("Start-with-Windows question for an entry nobody chose is waiting for a start the person makes themselves.");
             return;
@@ -46,6 +45,6 @@ static class StartWithWindowsPrompt
         startup.Choose(ask());
     }
 
-    private static bool AskInMessageBox() =>
+    internal static bool AskInMessageBox() =>
         MessageBox.Show(Question, "Weir", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes;
 }

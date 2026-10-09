@@ -208,8 +208,8 @@ public sealed class StartWithWindowsTests : IDisposable
         var asked = 0;
 
         Assert.True(Registration().IsSetWithoutAnswer);
-        StartWithWindowsPrompt.AskIfSetWithoutAnswer([], () => true, () => { asked++; return true; }, Registration());
-        StartWithWindowsPrompt.AskIfSetWithoutAnswer([], () => true, () => { asked++; return true; }, Registration());
+        StartWithWindowsPrompt.AskIfSetWithoutAnswer(true, () => { asked++; return true; }, Registration());
+        StartWithWindowsPrompt.AskIfSetWithoutAnswer(true, () => { asked++; return true; }, Registration());
 
         Assert.Equal(1, asked);
         Assert.True(Registration().IsEnabled);
@@ -223,8 +223,8 @@ public sealed class StartWithWindowsTests : IDisposable
         Registration().Enable();
         var asked = 0;
 
-        StartWithWindowsPrompt.AskIfSetWithoutAnswer([], () => true, () => { asked++; return false; }, Registration());
-        StartWithWindowsPrompt.AskIfSetWithoutAnswer([], () => true, () => { asked++; return true; }, Registration());
+        StartWithWindowsPrompt.AskIfSetWithoutAnswer(true, () => { asked++; return false; }, Registration());
+        StartWithWindowsPrompt.AskIfSetWithoutAnswer(true, () => { asked++; return true; }, Registration());
 
         Assert.Equal(1, asked);
         Assert.False(Registration().IsEnabled);
@@ -239,31 +239,64 @@ public sealed class StartWithWindowsTests : IDisposable
         var asked = 0;
         bool Ask() { asked++; return true; }
 
-        StartWithWindowsPrompt.AskIfSetWithoutAnswer(["--silent"], () => true, Ask, Registration());
-        StartWithWindowsPrompt.AskIfSetWithoutAnswer([], () => false, Ask, Registration());
-        StartWithWindowsPrompt.AskIfSetWithoutAnswer(["--no-browser"], () => true, Ask, Registration());
+        StartWithWindowsPrompt.AskIfSetWithoutAnswer(false, Ask, Registration());
 
         Assert.Equal(0, asked);
         Assert.True(Registration().IsEnabled);
         Assert.False(Registration().IsAnswered);
 
-        StartWithWindowsPrompt.AskIfSetWithoutAnswer([], () => true, Ask, Registration());
+        StartWithWindowsPrompt.AskIfSetWithoutAnswer(true, Ask, Registration());
 
         Assert.Equal(1, asked);
         Assert.True(Registration().IsAnswered);
     }
 
+    private static bool StartedByPerson(string[] args, bool desktop) =>
+        new TrayStart(Program.AnnouncesStart(args), Program.HasInteractiveDesktop(args, () => desktop)).StartedByPerson;
+
     [Fact]
-    public void The_start_the_entry_itself_makes_at_sign_in_never_asks()
+    public void Only_a_start_the_person_makes_themselves_may_ask()
     {
         Registration().Enable();
         var signInArguments = RunValue()!.Split(' ', 2)[1].Split(' ');
-        var asked = false;
 
-        StartWithWindowsPrompt.AskIfSetWithoutAnswer(signInArguments, () => true, () => { asked = true; return true; }, Registration());
+        Assert.True(StartedByPerson([], desktop: true));
+        Assert.False(StartedByPerson(["--silent"], desktop: true));
+        Assert.False(StartedByPerson([], desktop: false));
+        Assert.False(StartedByPerson(["--no-browser"], desktop: true));
+        Assert.False(StartedByPerson(signInArguments, desktop: true));
+    }
 
-        Assert.False(asked);
-        Assert.True(Registration().IsEnabled);
+    [Fact]
+    public void An_answer_that_could_not_be_carried_out_is_not_recorded_so_the_question_comes_back()
+    {
+        Registration(executable: null).Choose(startWithWindows: true);
+
+        Assert.False(Registration().IsAnswered);
+        Assert.False(Registration().IsEnabled);
+    }
+
+    [Fact]
+    public void Forgetting_the_answer_leaves_no_empty_key_behind_and_keeps_a_key_that_holds_something_else()
+    {
+        Registration().Choose(startWithWindows: true);
+
+        Registration().Uninstall();
+        using (var gone = Registry.CurrentUser.OpenSubKey(_answerKey))
+        {
+            Assert.Null(gone);
+        }
+
+        using (var key = Registry.CurrentUser.CreateSubKey(_answerKey))
+        {
+            key.SetValue("Other", 1);
+        }
+
+        Registration().Choose(startWithWindows: true);
+        Registration().Uninstall();
+        using var kept = Registry.CurrentUser.OpenSubKey(_answerKey);
+        Assert.NotNull(kept);
+        Assert.Null(kept.GetValue("StartWithWindowsAnswered"));
     }
 
     [Fact]
@@ -272,7 +305,7 @@ public sealed class StartWithWindowsTests : IDisposable
         var asked = false;
 
         StartWithWindowsPrompt.AskOnFirstRun(["--silent"], () => true, () => { asked = true; return true; }, Registration());
-        StartWithWindowsPrompt.AskIfSetWithoutAnswer([], () => true, () => { asked = true; return true; }, Registration());
+        StartWithWindowsPrompt.AskIfSetWithoutAnswer(true, () => { asked = true; return true; }, Registration());
 
         Assert.False(asked);
         Assert.False(Registration().IsEnabled);
@@ -285,7 +318,7 @@ public sealed class StartWithWindowsTests : IDisposable
         Registration().Choose(startWithWindows: true);
         var asked = false;
 
-        StartWithWindowsPrompt.AskIfSetWithoutAnswer([], () => true, () => { asked = true; return false; }, Registration());
+        StartWithWindowsPrompt.AskIfSetWithoutAnswer(true, () => { asked = true; return false; }, Registration());
 
         Assert.False(asked);
         Assert.True(Registration().IsEnabled);

@@ -242,9 +242,10 @@ still pass it.
 ## Starting with Windows
 
 Weir does not start with Windows until you say so. The first time Weir starts it asks "Start Weir when you sign
-in to Windows?"; a silent install (`--silent`) never asks and leaves it off. An older version registered it at install
-without asking; if Weir finds such an entry and your answer was never recorded, it asks once, the next time you start it
-yourself (not at sign-in, not during a silent start): Yes keeps the entry, No removes it. The **Start with Windows** tick in the
+in to Windows?"; a silent install (`--silent`) never asks and leaves it off. Versions up to 1.0.0-rc.10 registered it at install
+without asking. If Weir finds such an entry and no answer has been recorded (an answer is recorded when you answer the
+question or tick or untick the menu item), it asks once, after its icon is up, the next time you start Weir yourself (not at
+sign-in, not during a silent start): Yes keeps the entry, No removes it. The **Start with Windows** tick in the
 tray menu shows the current choice and switches it at any time. When it is on, Weir has a `Weir` entry under
 `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`. That start passes `--no-browser`, so signing in doesn't open
 a browser window. If there is a `Weir.lnk` shortcut in your Startup folder, turning it on removes it so there is only

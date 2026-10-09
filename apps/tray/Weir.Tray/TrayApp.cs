@@ -8,7 +8,11 @@ namespace Weir.Tray;
 /// <summary>How this run was started.</summary>
 /// <param name="AnnounceOnReady">Whether a balloon tells the person Weir is running once its server is ready.</param>
 /// <param name="Interactive">Whether there is a person to tell when the server cannot start. A start with no one to tell exits instead.</param>
-readonly record struct TrayStart(bool AnnounceOnReady, bool Interactive);
+readonly record struct TrayStart(bool AnnounceOnReady, bool Interactive)
+{
+    /// <summary>Whether the person started Weir themselves: not silent, not at sign-in or by another program (both pass --no-browser), and with a desktop.</summary>
+    internal bool StartedByPerson => AnnounceOnReady && Interactive;
+}
 
 /// <summary>
 /// The tray icon and its menu. Everything that touches them runs on the UI thread: work on other threads (the
@@ -31,6 +35,7 @@ sealed class TrayApp : IDisposable
     private readonly StartupRegistration _startup = StartupRegistration.ForThisUser();
     private readonly TrayStatusGate _serverStatus;
     private readonly TrayBlink _blink = new();
+    private readonly TrayStatusDeadline _statusDeadline = new(TimeProvider.System.GetUtcNow);
     private readonly WeirOpener _opener;
     private readonly PauseControl _pause;
     private readonly PortChange _portChange;
@@ -113,6 +118,10 @@ sealed class TrayApp : IDisposable
 
         // Start-up runs inside the message loop, so waiting for the server never blocks the UI thread.
         OnUi(() => BackgroundWork.Observe("Start-up", StartAsync()));
+
+        // The icon is up and the server is starting before anything is asked: an entry an older version set at install, with
+        // nobody asked, is asked about once, on a start the person made.
+        OnUi(AskAboutStartWithWindows);
         TrayLog.Write("Starting tray icon event loop");
         Application.Run();
         TrayLog.Write("Tray icon event loop ended.");
@@ -184,8 +193,20 @@ sealed class TrayApp : IDisposable
 
     // -- What the tray shows ------------------------------------------------
 
-    private TrayState State() =>
-        new(_server.Phase, _serverStatus.Current, _updates is { IsDownloaded: true } updates ? updates.PendingVersion : null, _server.Port);
+    private TrayState State()
+    {
+        var phase = _server.Phase;
+        var status = _serverStatus.Current;
+        _statusDeadline.Follow(waiting: phase == ServerPhase.Running && status is null);
+        return new TrayState(
+            phase, status, _updates is { IsDownloaded: true } updates ? updates.PendingVersion : null, _server.Port, _statusDeadline.Overdue);
+    }
+
+    private void AskAboutStartWithWindows()
+    {
+        StartWithWindowsPrompt.AskIfSetWithoutAnswer(_start.StartedByPerson, StartWithWindowsPrompt.AskInMessageBox, _startup);
+        Render();
+    }
 
     // The icon's dot and mark, the hover text and the menu, from the state as it is now.
     private void Render()
@@ -326,9 +347,15 @@ sealed class TrayApp : IDisposable
         _blinkTimer = new System.Windows.Forms.Timer { Interval = (int)TrayBlink.Interval.TotalMilliseconds };
         _blinkTimer.Tick += (_, _) =>
         {
-            if (_blink.Tick())
+            // A status that has not come in time ends the blink, and that changes more than the icon.
+            var state = State();
+            if (state.Dot != TrayDot.Starting)
             {
-                ShowIcon(State());
+                Render();
+            }
+            else if (_blink.Tick())
+            {
+                ShowIcon(state);
             }
         };
         _menu = new TrayMenuView(MenuClicks(), staysOpen: [TrayMenuItem.StartWithWindows]);
