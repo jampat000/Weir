@@ -64,24 +64,25 @@ public sealed partial class MediaTools
         var tracker = new FfmpegProgressTracker(durationSeconds, timeoutSeconds);
         var started = _timeProvider.GetTimestamp();
         var result = await _runner.RunAsync(
-            new ProcessRequest
-            {
-                Argv = progressArgv,
-                // The runner enforces the limit even for an ffmpeg that goes silent, and kills the whole tree.
-                Timeout = timeout,
-                Stdin = ProcessInput.Null,
-                Stderr = ProcessOutput.Tail,
-                TailBytes = FfmpegCommands.FfmpegStderrTailBytes,
-                IdleTimeout = SilenceLimit,
-                OnStdoutLine = line =>
+            WithProgressWatch(
+                new ProcessRequest
                 {
-                    var update = tracker.Feed(line, _timeProvider.GetElapsedTime(started).TotalSeconds);
-                    if (update is not null)
+                    Argv = progressArgv,
+                    // The runner enforces the limit even for an ffmpeg that goes silent, and kills the whole tree.
+                    Timeout = timeout,
+                    Stdin = ProcessInput.Null,
+                    Stderr = ProcessOutput.Tail,
+                    TailBytes = FfmpegCommands.FfmpegStderrTailBytes,
+                    OnStdoutLine = line =>
                     {
-                        progressCallback(update);
-                    }
+                        var update = tracker.Feed(line, _timeProvider.GetElapsedTime(started).TotalSeconds);
+                        if (update is not null)
+                        {
+                            progressCallback(update);
+                        }
+                    },
                 },
-            },
+                new FfmpegProgressAdvance()),
             cancellationToken).ConfigureAwait(false);
         switch (result.Timeout)
         {
@@ -89,6 +90,10 @@ public sealed partial class MediaTools
                 throw new MediaToolException("ffmpeg timed out") { PlainMessage = ToolFailureText.TookTooLong };
             case ProcessTimeoutKind.Idle:
                 throw new MediaToolException("the media tool stopped reporting progress") { PlainMessage = ToolFailureText.Stalled };
+            case ProcessTimeoutKind.NotExitedAfterFinish:
+                // The output is complete; the callers check it as they would any other. Its exit code is the kill's.
+                LogFfmpegFinishedWithoutExiting();
+                return;
             case ProcessTimeoutKind.None:
             default:
                 break;

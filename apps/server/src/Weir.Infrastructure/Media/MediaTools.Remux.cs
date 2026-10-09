@@ -183,18 +183,26 @@ public sealed partial class MediaTools
         ArgumentNullException.ThrowIfNull(plan);
         var (_, ffmpeg) = _resolver.Resolve();
         var argv = FfmpegCommands.WithProgress(FfmpegCommands.BuildKeptStreamsDemuxArgv(ffmpeg, sourcePath, plan));
+        var progress = new StdoutLines();
         var result = await _runner.RunAsync(
-            new ProcessRequest
-            {
-                Argv = argv,
-                Timeout = TimeSpan.FromSeconds(ToolTimeLimits.OverallSeconds(SizeOfFile(sourcePath))),
-                IdleTimeout = SilenceLimit,
-                Stdin = ProcessInput.Null,
-                Stdout = ProcessOutput.Capture,
-                Stderr = ProcessOutput.Discard,
-            },
+            WithProgressWatch(
+                new ProcessRequest
+                {
+                    Argv = argv,
+                    Timeout = TimeSpan.FromSeconds(ToolTimeLimits.OverallSeconds(SizeOfFile(sourcePath))),
+                    Stdin = ProcessInput.Null,
+                    Stdout = ProcessOutput.Discard,
+                    Stderr = ProcessOutput.Discard,
+                    OnStdoutLine = progress.Add,
+                },
+                new FfmpegProgressAdvance()),
             cancellationToken).ConfigureAwait(false);
-        return result.TimedOut ? null : ProbeOutput.LastProgressOutTimeSeconds(ProbeOutput.CapturedText(result.Stdout));
+        if (result.Timeout == ProcessTimeoutKind.NotExitedAfterFinish)
+        {
+            LogFfmpegFinishedWithoutExiting();
+        }
+
+        return result.Timeout is ProcessTimeoutKind.Overall or ProcessTimeoutKind.Idle ? null : ProbeOutput.LastProgressOutTimeSeconds(progress.Text);
     }
 
     /// <summary>A new file named prefix + 8 random characters + suffix, created exclusively so no other writer shares it.</summary>

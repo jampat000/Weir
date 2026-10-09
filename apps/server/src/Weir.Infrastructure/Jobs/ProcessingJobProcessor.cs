@@ -8,6 +8,7 @@ using Weir.Core.Media;
 using Weir.Core.Observability;
 using Weir.Core.Time;
 using Weir.Infrastructure.Activity;
+using Weir.Infrastructure.Processing.RemuxPass;
 using Weir.Infrastructure.Scheduling;
 
 namespace Weir.Infrastructure.Jobs;
@@ -152,10 +153,18 @@ public sealed class ProcessingJobProcessor
         {
             using (_logger.BeginScope(new Dictionary<string, object> { ["job_id"] = context.Id }))
             {
-                await RunHandlerWithLeaseRenewalAsync(handler, context, leaseSeconds, cancellationToken).ConfigureAwait(false);
+                await RunHandlerWithLeaseRenewalAsync(handler, context, leaseSeconds, leaseUntil, cancellationToken).ConfigureAwait(false);
             }
 
             ReportRunEnded(taskKey, ok: true, why: null);
+        }
+        catch (LeaseLostException lost)
+        {
+            // The row is left as it is: its lease has run out, so recovery or another worker takes the job from here, and this
+            // worker has stopped running it. Failing or completing it now could only be refused or undo that worker's claim.
+            _logger.LogWarning("{Message} The job was stopped and is left for recovery. job_id={JobId}", lost.Message, context.Id);
+            ReportRunEnded(taskKey, ok: false, why: "lease_lost");
+            return JobProcessOutcome.Processed;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -286,15 +295,23 @@ public sealed class ProcessingJobProcessor
     /// it and start a second ffmpeg process on the same file. Completion and failure verify the lease owner
     /// themselves (<see cref="ProcessingJobStore.CompleteClaimedAsync"/> and
     /// <see cref="ProcessingJobStore.FailClaimedAsync"/>); this only keeps the lease alive while the
-    /// handler is still running.
+    /// handler is still running. When renewals fail against a busy database until the lease has run out, the handler is
+    /// cancelled and <see cref="LeaseLostException"/> is thrown, because another worker may claim the job from that moment.
     /// </summary>
-    private async Task RunHandlerWithLeaseRenewalAsync(IJobHandler handler, JobWorkContext context, int leaseSeconds, CancellationToken cancellationToken)
+    private async Task RunHandlerWithLeaseRenewalAsync(
+        IJobHandler handler, JobWorkContext context, int leaseSeconds, DateTimeOffset leaseUntil, CancellationToken cancellationToken)
     {
+        using var handlerCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         using var renewalCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        var heartbeat = RenewLeaseHeartbeatAsync(context.Id, context.LeaseOwner, leaseSeconds, renewalCts.Token);
+        using var expiry = new LeaseExpiry(_time, leaseUntil, handlerCts);
+        var heartbeat = RenewLeaseHeartbeatAsync(context.Id, context.LeaseOwner, leaseSeconds, expiry, renewalCts.Token);
         try
         {
-            await handler.HandleAsync(context, cancellationToken).ConfigureAwait(false);
+            await handler.HandleAsync(context, handlerCts.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (expiry.Lost && !cancellationToken.IsCancellationRequested)
+        {
+            throw new LeaseLostException(context.Id);
         }
         finally
         {
@@ -303,8 +320,48 @@ public sealed class ProcessingJobProcessor
         }
     }
 
+    /// <summary>The job's lease ran out while its renewals could not reach a busy database, so another worker may now hold it.</summary>
+    private sealed class LeaseLostException(long jobId) : Exception($"The lease on job {jobId} ran out before it could be renewed.");
+
+    /// <summary>
+    /// Cancels the handler once the last lease the database confirmed has run out. A timer on the clock, not a check in the
+    /// renewal loop, because a renewal waiting on a busy database can itself outlast the lease.
+    /// </summary>
+    private sealed class LeaseExpiry : IDisposable
+    {
+        private readonly TimeProvider _time;
+        private readonly ITimer _timer;
+        private volatile bool _lost;
+
+        public LeaseExpiry(TimeProvider time, DateTimeOffset expiry, CancellationTokenSource handler)
+        {
+            _time = time;
+            _timer = time.CreateTimer(
+                _ =>
+                {
+                    _lost = true;
+                    handler.Cancel();
+                },
+                null,
+                Until(expiry),
+                Timeout.InfiniteTimeSpan);
+        }
+
+        public bool Lost => _lost;
+
+        /// <summary>The database confirmed a lease that runs to <paramref name="expiry"/>.</summary>
+        public void Confirmed(DateTimeOffset expiry) => _timer.Change(Until(expiry), Timeout.InfiniteTimeSpan);
+
+        /// <summary>The lease is no longer ours to watch: it was taken, or renewing failed for a reason other than a busy database.</summary>
+        public void Disarm() => _timer.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
+
+        public void Dispose() => _timer.Dispose();
+
+        private TimeSpan Until(DateTimeOffset expiry) => TimeSpan.FromTicks(Math.Max(0, (expiry - _time.GetUtcNow()).Ticks));
+    }
+
     /// <summary>The lease-renewal heartbeat itself: sleep, renew, repeat, until cancelled.</summary>
-    private async Task RenewLeaseHeartbeatAsync(long jobId, string leaseOwner, int leaseSeconds, CancellationToken cancellationToken)
+    private async Task RenewLeaseHeartbeatAsync(long jobId, string leaseOwner, int leaseSeconds, LeaseExpiry leaseExpiry, CancellationToken cancellationToken)
     {
         var interval = TimeSpan.FromSeconds(Math.Max(0.05, leaseSeconds / 3.0));
         try
@@ -323,16 +380,22 @@ public sealed class ProcessingJobProcessor
                         ? await RenewOverride(jobId, leaseOwner, expiry).ConfigureAwait(false)
                         : await _queue.RenewLeaseAsync(jobId, leaseOwner, expiry, now, CancellationToken.None).ConfigureAwait(false);
                 }
-                catch (SqliteException exception)
+                catch (SqliteException exception) when (LockedWrites.IsLock(exception))
                 {
                     // A busy database must not end the renewals of a job that may run for hours: the lease has two more
-                    // intervals to run, and the next renewal tries again.
+                    // intervals to run, and the next renewal tries again. If the last confirmed lease runs out first, the
+                    // expiry timer stops the handler.
                     _logger.LogWarning(exception, "Lease renewal could not reach the database job_id={JobId} owner={Owner}; trying again.", jobId, leaseOwner);
                     continue;
                 }
 
-                if (!renewed)
+                if (renewed)
                 {
+                    leaseExpiry.Confirmed(now + TimeSpan.FromSeconds(leaseSeconds));
+                }
+                else
+                {
+                    leaseExpiry.Disarm();
                     _logger.LogWarning(
                         "Lease renewal found the lease no longer held job_id={JobId} owner={Owner}; no longer renewing.",
                         jobId,
@@ -349,6 +412,7 @@ public sealed class ProcessingJobProcessor
         catch (Exception exception)
 #pragma warning restore CA1031
         {
+            leaseExpiry.Disarm();
             _logger.LogError(exception, "Lease renewal loop crashed job_id={JobId} owner={Owner}", jobId, leaseOwner);
         }
     }

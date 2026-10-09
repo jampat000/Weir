@@ -37,8 +37,17 @@ public enum ProcessTimeoutKind
     /// <summary><see cref="ProcessRequest.Timeout"/> elapsed.</summary>
     Overall,
 
-    /// <summary>The process wrote nothing to stdout or stderr for <see cref="ProcessRequest.IdleTimeout"/>.</summary>
+    /// <summary>
+    /// The process made no progress for <see cref="ProcessRequest.IdleTimeout"/>: it wrote nothing, or, with
+    /// <see cref="ProcessRequest.MarksProgress"/>, nothing that counted.
+    /// </summary>
     Idle,
+
+    /// <summary>
+    /// The process printed its <see cref="ProcessRequest.IsFinalLine"/> and was still running <see cref="ProcessRequest.ExitAfterFinalLine"/>
+    /// later. Its work is done; it was killed only for not exiting.
+    /// </summary>
+    NotExitedAfterFinish,
 }
 
 /// <summary>One child process to run, argv token for token (no shell).</summary>
@@ -67,11 +76,23 @@ public sealed record ProcessRequest
     public Action<string>? OnStdoutLine { get; init; }
 
     /// <summary>
-    /// How long the process may write nothing, to stdout or stderr, before it is taken to have stopped and its process
-    /// tree is killed. A liveness limit for a tool that reports progress, in place of guessing how long the work takes;
-    /// it also bounds the wait for exit once the output has closed.
+    /// How long the process may make no progress before it is taken to have stopped and its process tree is killed. A liveness
+    /// limit for a tool that reports progress, in place of guessing how long the work takes. Any output on stdout or stderr is
+    /// progress unless <see cref="MarksProgress"/> says which lines are; it also bounds the wait for exit once the output has closed.
     /// </summary>
     public TimeSpan? IdleTimeout { get; init; }
+
+    /// <summary>
+    /// With <see cref="IdleTimeout"/> and <see cref="OnStdoutLine"/>: decides whether a stdout line is progress. Only such a line
+    /// restarts the idle clock, and nothing on stderr does, for a tool that keeps reporting while it is stuck.
+    /// </summary>
+    public Func<string, bool>? MarksProgress { get; init; }
+
+    /// <summary>With <see cref="ExitAfterFinalLine"/> and <see cref="OnStdoutLine"/>: whether a stdout line is the last the tool writes before it exits.</summary>
+    public Func<string, bool>? IsFinalLine { get; init; }
+
+    /// <summary>With <see cref="IsFinalLine"/>: how long the process is given to exit after that line before it is killed.</summary>
+    public TimeSpan? ExitAfterFinalLine { get; init; }
 
     /// <summary>
     /// Called with the child's process id as soon as it has started, before anything is read from it. It must not throw: the
@@ -131,6 +152,11 @@ public sealed partial class ProcessRunner(ILogger<ProcessRunner>? logger = null,
             throw new ArgumentException("A process needs an executable.", nameof(request));
         }
 
+        if (request.OnStdoutLine is null && (request.MarksProgress is not null || request.IsFinalLine is not null))
+        {
+            throw new ArgumentException("Telling progress or the final line apart needs OnStdoutLine to read the lines.", nameof(request));
+        }
+
         var startInfo = new ProcessStartInfo
         {
             FileName = request.Argv[0],
@@ -162,7 +188,10 @@ public sealed partial class ProcessRunner(ILogger<ProcessRunner>? logger = null,
 
         using var timeoutSource = request.Timeout is { } timeout ? new CancellationTokenSource(timeout) : new CancellationTokenSource();
         using var idle = new IdleWatch(request.IdleTimeout);
-        using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutSource.Token, idle.Token);
+        using var lateExit = new CancellationTokenSource();
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutSource.Token, idle.Token, lateExit.Token);
+        var anyOutputIsProgress = request.MarksProgress is null;
+        Action onOutput = anyOutputIsProgress ? idle.Activity : static () => { };
 
         Exception? callbackError = null;
         var stdoutSink = new OutputSink(request.OnStdoutLine is null ? request.Stdout : ProcessOutput.Discard, request.TailBytes);
@@ -179,6 +208,15 @@ public sealed partial class ProcessRunner(ILogger<ProcessRunner>? logger = null,
                 try
                 {
                     request.OnStdoutLine(line);
+                    if (request.MarksProgress?.Invoke(line) == true)
+                    {
+                        idle.Activity();
+                    }
+
+                    if (request.ExitAfterFinalLine is { } grace && request.IsFinalLine?.Invoke(line) == true)
+                    {
+                        lateExit.CancelAfter(grace);
+                    }
                 }
 #pragma warning disable CA1031 // The callback's exception is rethrown to the caller after the kill.
                 catch (Exception error)
@@ -189,8 +227,8 @@ public sealed partial class ProcessRunner(ILogger<ProcessRunner>? logger = null,
                 }
             });
 
-        var stdoutTask = PumpAsync(process.StandardOutput.BaseStream, stdoutSink, lines, idle.Activity);
-        var stderrTask = PumpAsync(process.StandardError.BaseStream, stderrSink, null, idle.Activity);
+        var stdoutTask = PumpAsync(process.StandardOutput.BaseStream, stdoutSink, lines, onOutput);
+        var stderrTask = PumpAsync(process.StandardError.BaseStream, stderrSink, null, onOutput);
         var timedOut = ProcessTimeoutKind.None;
 
         try
@@ -207,7 +245,9 @@ public sealed partial class ProcessRunner(ILogger<ProcessRunner>? logger = null,
             KillTree(process);
             await DrainAsync(process, stdoutTask, stderrTask).ConfigureAwait(false);
             cancellationToken.ThrowIfCancellationRequested();
-            timedOut = timeoutSource.IsCancellationRequested ? ProcessTimeoutKind.Overall : ProcessTimeoutKind.Idle;
+            timedOut = timeoutSource.IsCancellationRequested ? ProcessTimeoutKind.Overall
+                : lateExit.IsCancellationRequested ? ProcessTimeoutKind.NotExitedAfterFinish
+                : ProcessTimeoutKind.Idle;
         }
 
         await DrainAsync(process, stdoutTask, stderrTask).ConfigureAwait(false);

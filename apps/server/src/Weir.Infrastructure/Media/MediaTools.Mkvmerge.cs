@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Json;
 using Weir.Core.Media;
 using Weir.Infrastructure.Processes;
@@ -62,35 +63,48 @@ public sealed partial class MediaTools
         LogFfmpegDebug(MkvmergeCommands.DebugSummary(argv));
         var started = _timeProvider.GetTimestamp();
         var timeoutSeconds = ToolTimeLimits.OverallSeconds(sourceBytes);
+        var furthest = -1.0;
+        var diagnostics = new StdoutLines();
         var result = await _runner.RunAsync(
             new ProcessRequest
             {
                 Argv = argv,
                 Timeout = TimeSpan.FromSeconds(timeoutSeconds),
-                // --gui-mode reports at every percent, so a write that says nothing for this long has stopped.
-                IdleTimeout = SilenceLimit,
+                // --gui-mode reports whole percents, and only a percent further than the last is progress. A source this large
+                // takes longer than the usual silence limit to get from one percent to the next at the slowest rate a write is
+                // allowed, so the limit grows with it.
+                IdleTimeout = TimeSpan.FromSeconds(Math.Max(SilenceLimit.TotalSeconds, ToolTimeLimits.PercentStepSeconds(sourceBytes))),
+                MarksProgress = line =>
+                {
+                    if (MkvmergeCommands.TryParseProgressPercent(line) is not { } percent || percent <= furthest)
+                    {
+                        return false;
+                    }
+
+                    furthest = percent;
+                    return true;
+                },
                 Stdin = ProcessInput.Null,
-                // mkvmerge writes its diagnostics to stdout as well as its progress, so the tail that a failure
-                // message needs is collected from the lines as they arrive rather than from Stderr alone.
-                Stdout = progressCallback is null ? ProcessOutput.Capture : ProcessOutput.Discard,
+                Stdout = ProcessOutput.Discard,
                 Stderr = ProcessOutput.Tail,
                 TailBytes = MkvmergeCommands.StderrTailBytes,
-                OnStdoutLine = progressCallback is null
-                    ? null
-                    : line =>
+                OnStdoutLine = line =>
+                {
+                    if (MkvmergeCommands.TryParseProgressPercent(line) is not { } percent)
                     {
-                        if (MkvmergeCommands.TryParseProgressPercent(line) is not { } percent)
-                        {
-                            return;
-                        }
+                        // mkvmerge writes its diagnostics to stdout as well as its progress, so the tail that a failure
+                        // message needs is collected from the lines as they arrive rather than from Stderr alone.
+                        diagnostics.Add(line);
+                        return;
+                    }
 
-                        progressCallback(new FfmpegProgressUpdate
-                        {
-                            Percent = percent,
-                            ElapsedSeconds = (long)_timeProvider.GetElapsedTime(started).TotalSeconds,
-                            Progress = percent >= 100 ? "end" : "continue",
-                        });
-                    },
+                    progressCallback?.Invoke(new FfmpegProgressUpdate
+                    {
+                        Percent = percent,
+                        ElapsedSeconds = (long)_timeProvider.GetElapsedTime(started).TotalSeconds,
+                        Progress = percent >= 100 ? "end" : "continue",
+                    });
+                },
             },
             cancellationToken).ConfigureAwait(false);
         ThrowIfStopped(result, argv, timeoutSeconds);
@@ -100,7 +114,7 @@ public sealed partial class MediaTools
             var detail = ProbeOutput.TailText(result.Stderr);
             if (detail.Length == 0)
             {
-                detail = ProbeOutput.TailText(result.Stdout);
+                detail = ProbeOutput.TailText(Encoding.UTF8.GetBytes(diagnostics.Text));
             }
 
             throw new MediaToolException("mkvmerge failed: " + detail) { PlainMessage = ToolFailureText.ForToolText(detail) };

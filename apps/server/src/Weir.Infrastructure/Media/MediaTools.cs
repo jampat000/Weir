@@ -49,6 +49,36 @@ public sealed partial class MediaTools
     /// <summary>How long a tool that reports progress may say nothing before it is stopped; settable so tests need not wait it out.</summary>
     internal TimeSpan SilenceLimit { get; init; } = TimeSpan.FromSeconds(ToolTimeLimits.SilenceSeconds);
 
+    /// <summary>How long ffmpeg is given to exit after <c>progress=end</c>; settable so tests need not wait it out.</summary>
+    internal TimeSpan FinishedExitGrace { get; init; } = TimeSpan.FromSeconds(ToolTimeLimits.FinishedExitSeconds);
+
+    /// <summary>
+    /// The request fields that make a run of ffmpeg with <c>-progress pipe:1</c> stop only when it stops getting anywhere: the idle
+    /// clock restarts when the output time, output size or frame count grows, not on every block ffmpeg prints, and a process that has
+    /// printed its final block but does not exit is stopped after <see cref="FinishedExitGrace"/>.
+    /// </summary>
+    private ProcessRequest WithProgressWatch(ProcessRequest request, FfmpegProgressAdvance advance) =>
+        request with
+        {
+            IdleTimeout = SilenceLimit,
+            MarksProgress = advance.Feed,
+            IsFinalLine = FfmpegProgressAdvance.IsEnd,
+            ExitAfterFinalLine = FinishedExitGrace,
+        };
+
+    /// <summary>The stdout lines of a run that reads them as they arrive, kept to be read as one text when it ends.</summary>
+    private sealed class StdoutLines
+    {
+        private readonly System.Text.StringBuilder _text = new();
+
+        public string Text => _text.ToString();
+
+        public void Add(string line) => _text.Append(line).Append('\n');
+    }
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "ffmpeg finished but did not exit; Weir stopped it and is checking the file it wrote as usual.")]
+    private partial void LogFfmpegFinishedWithoutExiting();
+
     /// <summary>
     /// <c>logger.debug</c>'s one-line summary of an argv about to run, shared by the ffmpeg and mkvmerge remux
     /// writes (<see cref="FfmpegCommands.DebugSummary"/> and <see cref="MkvmergeCommands.DebugSummary"/>).

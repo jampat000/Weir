@@ -12,6 +12,9 @@ const string CloseStdoutThenLinger = "close-stdout-then-linger";
 const string Chatter = "chatter";
 const string ChatterThenStall = "chatter-then-stall";
 const string TickLine = "tick";
+const string ProgressStuck = "progress-stuck";
+const string ProgressAdvancing = "progress-advancing";
+const string FinishThenLinger = "finish-then-linger";
 const string AnnouncementLine = "ready";
 const string FinishedLine = "done";
 
@@ -76,9 +79,44 @@ switch (args.FirstOrDefault())
 
         break;
 
+    case ProgressStuck:
+    case ProgressAdvancing:
+        // An ffmpeg's `-progress pipe:1` stream: a block every <period> milliseconds, <count> blocks. A stuck one reports the same
+        // output time every time, as ffmpeg 9 does while it waits on a read that never returns; an advancing one moves on, and
+        // ends with the block that says it has finished.
+        for (var block = 0; block < int.Parse(args[^1], CultureInfo.InvariantCulture); block++)
+        {
+            WriteProgressBlock(args[0] == ProgressAdvancing ? block + 1 : 1, final: false);
+            await Task.Delay(TimeSpan.FromMilliseconds(double.Parse(args[1], CultureInfo.InvariantCulture)));
+        }
+
+        if (args[0] == ProgressAdvancing)
+        {
+            WriteProgressBlock(int.Parse(args[^1], CultureInfo.InvariantCulture) + 1, final: true);
+        }
+
+        break;
+
+    case FinishThenLinger:
+        // An ffmpeg that has written its output and printed the end of its progress, and then does not exit. The last argument is
+        // how many seconds it stays.
+        WriteProgressBlock(1, final: true);
+        await Task.Delay(TimeSpan.FromSeconds(double.Parse(args[^1], CultureInfo.InvariantCulture)));
+        break;
+
     default:
-        Console.Error.WriteLine($"Unknown mode. Use {Hold}, {AnnounceAndHold}, {HoldThroughChild}, {CloseStdoutThenLinger}, {Chatter} or {ChatterThenStall}.");
+        Console.Error.WriteLine($"Unknown mode. Use {Hold}, {AnnounceAndHold}, {HoldThroughChild}, {CloseStdoutThenLinger}, {Chatter}, {ChatterThenStall}, {ProgressStuck}, {ProgressAdvancing} or {FinishThenLinger}.");
         return 2;
 }
 
 return 0;
+
+static void WriteProgressBlock(int step, bool final)
+{
+    Console.Out.WriteLine($"frame={step.ToString(CultureInfo.InvariantCulture)}");
+    Console.Out.WriteLine("total_size=N/A");
+    Console.Out.WriteLine($"out_time_us={(step * 500_000L).ToString(CultureInfo.InvariantCulture)}");
+    Console.Out.WriteLine($"out_time_ms={(step * 500_000L).ToString(CultureInfo.InvariantCulture)}");
+    Console.Out.WriteLine(final ? "progress=end" : "progress=continue");
+    Console.Out.Flush();
+}
