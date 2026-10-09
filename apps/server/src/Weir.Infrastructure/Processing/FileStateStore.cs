@@ -98,12 +98,13 @@ public sealed partial class FileStateStore
         uow.CountAsync(
             "SELECT COUNT(*) FROM files WHERE status IN (@failed, @rejected) " +
             "OR (status = @on_hold AND hold_until IS NULL) " +
-            "OR (status = @skipped AND status_reason LIKE 'skipped because%' AND coalesce(skip_kind, '') <> @below_minimum)",
+            "OR (status = @skipped AND status_reason LIKE 'skipped because%' AND coalesce(skip_kind, '') NOT IN (@below_minimum, @below_minimum_removed))",
             ("@failed", ProcessingFileStatuses.ProcessingFailed),
             ("@rejected", ProcessingFileStatuses.Rejected),
             ("@on_hold", ProcessingFileStatuses.OnHold),
             ("@skipped", ProcessingFileStatuses.Skipped),
-            ("@below_minimum", SkipKinds.BelowMinimumSize));
+            ("@below_minimum", SkipKinds.BelowMinimumSize),
+            ("@below_minimum_removed", SkipKinds.BelowMinimumSizeRemoved));
 
     /// <summary>Removes Weir's record; never touches the file on disk.</summary>
     public async Task ForgetAsync(UnitOfWork uow, long id)

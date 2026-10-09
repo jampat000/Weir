@@ -43,6 +43,7 @@ public sealed class ScanRejectedFileDeletionTests
         Assert.False(File.Exists(sample));
         var recorded = await RecordedAsync(store, libraryId, "Film.2024.mkv");
         Assert.Equal(ProcessingFileStatuses.Skipped, recorded!.Status);
+        Assert.Equal(SkipKinds.BelowMinimumSizeRemoved, recorded.SkipKind);
     }
 
     [Fact]

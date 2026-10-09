@@ -90,7 +90,12 @@ function passDisplay(ev: ActivityEventItem): ActivityDisplay {
       title: ev.title,
       summary: asString(parsed?.reason) ?? "Weir did not process this file",
       detail: ev.detail ?? null,
-      chip: outcome === "source_not_ready" ? "Waiting" : "Skipped",
+      chip:
+        asString(parsed?.skip_kind) === "below_minimum_size"
+          ? "Under the minimum size"
+          : outcome === "source_not_ready"
+            ? "Waiting"
+            : "Skipped",
       meaning: "idle",
       compact: false,
     };

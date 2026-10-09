@@ -89,7 +89,7 @@ it("says a cleaned copy no media manager has taken yet is waiting for it, and on
   expect(within(weirOnly).getByText("Done")).toBeInTheDocument();
 });
 
-it("says a file the workflow's minimum size skipped was left alone, and any other skip was skipped", () => {
+it("says a file the workflow's minimum size skipped was skipped, and one it removed was removed", () => {
   const extra = {
     ...download,
     id: 4,
@@ -97,6 +97,11 @@ it("says a file the workflow's minimum size skipped was left alone, and any othe
     skip_kind: "below_minimum_size",
     status_reason:
       "Skipped because this file is 12.1 MB, under the 50 MB minimum.",
+  } as ProcessingFile;
+  const removed = {
+    ...extra,
+    id: 6,
+    skip_kind: "below_minimum_size_removed",
   } as ProcessingFile;
   const excluded = {
     ...download,
@@ -108,7 +113,11 @@ it("says a file the workflow's minimum size skipped was left alone, and any othe
   render(
     <WithWorkflows>
       <ListWithColumns
-        entries={[downloadEntry(extra), downloadEntry(excluded)]}
+        entries={[
+          downloadEntry(extra),
+          downloadEntry(removed),
+          downloadEntry(excluded),
+        ]}
         selectedKey={null}
         now={NOW}
         onPick={vi.fn()}
@@ -116,9 +125,10 @@ it("says a file the workflow's minimum size skipped was left alone, and any othe
     </WithWorkflows>,
   );
 
-  const [left, skipped] = screen.getAllByRole("row").slice(1);
-  expect(within(left).getByText("Left alone")).toBeInTheDocument();
-  expect(within(skipped).getByText("Skipped")).toBeInTheDocument();
+  const [kept, gone, other] = screen.getAllByRole("row").slice(1);
+  expect(within(kept).getByText("Skipped")).toBeInTheDocument();
+  expect(within(gone).getByText("Removed")).toBeInTheDocument();
+  expect(within(other).getByText("Skipped")).toBeInTheDocument();
 });
 
 it("shows the title's small poster at the start of a download's row", () => {

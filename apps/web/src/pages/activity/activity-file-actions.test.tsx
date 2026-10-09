@@ -403,3 +403,34 @@ describe("ActivityFileActions check again", () => {
     expect(screen.queryByRole("button", { name: "Check again" })).toBeNull();
   });
 });
+
+describe("ActivityFileActions for a file the workflow removed", () => {
+  beforeEach(() => {
+    handedOffNote.mockReset().mockReturnValue(null);
+  });
+
+  const skip = { status: "skipped", failure_class: null } as const;
+
+  it("offers nothing that needs the file, only Remove from list", () => {
+    renderActions({ ...skip, skip_kind: "below_minimum_size_removed" });
+
+    for (const name of [
+      "Pass through unchanged",
+      "Process again",
+      "Check again",
+    ]) {
+      expect(screen.queryByRole("button", { name })).toBeNull();
+    }
+    expect(
+      screen.getByRole("button", { name: "Remove from list" }),
+    ).toBeInTheDocument();
+  });
+
+  it("still offers to pass through a file the minimum size only skipped", () => {
+    renderActions({ ...skip, skip_kind: "below_minimum_size" });
+
+    expect(
+      screen.getByRole("button", { name: "Pass through unchanged" }),
+    ).toBeInTheDocument();
+  });
+});

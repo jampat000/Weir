@@ -26,6 +26,8 @@ export type ActivityRecentFilters = {
    * record.
    */
   current_only?: boolean;
+  /** False leaves out the count of every matching entry, which a list that shows none does not need. */
+  with_total?: boolean;
 };
 
 /** The filters shared by the feed and the export, as query parameters. */
@@ -61,6 +63,9 @@ export function activityRecentPath(options?: ActivityRecentFilters): string {
   }
   if (options?.current_only) {
     q.set("current_only", "true");
+  }
+  if (options?.with_total === false) {
+    q.set("with_total", "false");
   }
   const qs = q.toString();
   return qs ? `/api/v1/activity/recent?${qs}` : "/api/v1/activity/recent";

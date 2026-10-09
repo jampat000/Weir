@@ -18,6 +18,7 @@ public sealed class QueryIndexesMigrationTests : IDisposable
         "ix_activity_events_event_type_created_at",
         "ix_activity_events_library_id_created_at",
         "ix_activity_events_about_weir_created_at",
+        "ix_activity_events_current",
         "ix_files_last_seen_at_id",
         "ix_files_library_id_last_seen_at",
         "ix_jobs_updated_at",
@@ -136,6 +137,21 @@ public sealed class QueryIndexesMigrationTests : IDisposable
 
         Assert.Contains("ix_activity_events_about_weir_created_at", pagePlan, StringComparison.Ordinal);
         Assert.DoesNotContain(TempSort, pagePlan, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Each_file_as_it_stands_now_probes_the_index_for_a_newer_event_instead_of_walking_the_files_events()
+    {
+        SeedMixedActivity();
+        var filter = new ActivityFilter(EventType: ActivityEventTypes.ProcessingFileRemuxPassCompleted, CurrentOnly: true);
+        var (pageSql, pageParameters) = ActivityHistoryStore.PageQuery(filter, cursor: null, pageSize: 24);
+
+        var plan = Plan(pageSql, pageParameters);
+
+        Assert.Contains(
+            "SEARCH newer USING INDEX ix_activity_events_current (event_type=? AND relative_path=? AND library_id=? AND id>?)",
+            plan,
+            StringComparison.Ordinal);
     }
 
     [Fact]

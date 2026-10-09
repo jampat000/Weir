@@ -25,10 +25,25 @@ describe("what a person can do about a skipped file", () => {
     );
 
     expect(guidance.title).toBe(
-      "Left alone because it is under the workflow's minimum size.",
+      "This is the workflow's minimum size doing its job.",
     );
     expect(guidance.next).toMatch(/nothing to do/i);
+    expect(guidance.next).toMatch(/pass through unchanged/i);
     expect(guidance.next).not.toMatch(/change the named workflow rule/i);
+  });
+
+  it("is nothing, and offers no file to pass through, for a file the workflow removed", () => {
+    const guidance = fileGuidance(
+      skipped(
+        "Skipped because this file is 12.1 MB, under the 50 MB minimum.",
+        "below_minimum_size_removed",
+      ),
+      false,
+    );
+
+    expect(guidance.next).toMatch(/removed from the watched folder/i);
+    expect(guidance.next).toMatch(/nothing to do/i);
+    expect(guidance.next).not.toMatch(/pass through/i);
   });
 
   it("is to change the rule, or pass the file through, for any other rule's skip", () => {

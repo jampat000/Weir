@@ -110,12 +110,14 @@ public sealed class TrayStatusWriterTests : IAsyncLifetime, IDisposable
             ("rejected", "Nothing was left to keep.", false),
             ("on_hold", "Waiting for a decision.", false),
             ("skipped", "Skipped because Weir leaves files like this alone.", false),
+            ("skipped", "Skipped because this file is 3.0 MB, under the 10 MB minimum. Weir deleted it.", false),
             ("skipped", "Skipped because this file is 90.0 MB and exceeds the 50 MB workflow maximum.", false),
             ("on_hold", "Waiting until the file stops changing.", true),
             ("skipped", "Already in the format you keep.", false),
             ("processed", "Finished processing this file.", false));
         // The code, not the sentence, says this skip is the workflow's minimum size doing its job.
         await _store.Execute($"UPDATE files SET skip_kind = '{SkipKinds.BelowMinimumSize}' WHERE status_reason = 'Skipped because Weir leaves files like this alone.'");
+        await _store.Execute($"UPDATE files SET skip_kind = '{SkipKinds.BelowMinimumSizeRemoved}' WHERE status_reason LIKE '%Weir deleted it.'");
         _changes.Publish(DataTopics.Jobs);
 
         await UntilAsync(status => status.GetProperty("needs_you").GetProperty("files").GetInt64() == 4);

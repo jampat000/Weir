@@ -24,19 +24,33 @@ const PROCESSING_FILE_STATUS_LABELS: Record<ProcessingFileStatus, string> = {
 /** How the server marks a rejection by the rules themselves, where no media manager was asked for another copy. */
 export const REJECTED_BY_RULES = "rules";
 
-/** The code the server records for a skip under the workflow's minimum size (`SkipKinds.BelowMinimumSize`). */
+/** The codes the server records for a skip under the workflow's minimum size (`SkipKinds`), and for one whose file it then removed. */
 const BELOW_MINIMUM_SIZE = "below_minimum_size";
+const BELOW_MINIMUM_SIZE_REMOVED = "below_minimum_size_removed";
 
-/** Whether the workflow's minimum size left the file alone: that is the minimum doing its job, and needs nobody. */
+/** Whether the workflow's minimum size skipped the file: that is the minimum doing its job, and needs nobody. */
 export function isBelowMinimumSize(
   file: Pick<ProcessingFile, "status" | "skip_kind">,
 ): boolean {
-  return file.status === "skipped" && file.skip_kind === BELOW_MINIMUM_SIZE;
+  return (
+    file.status === "skipped" &&
+    (file.skip_kind === BELOW_MINIMUM_SIZE ||
+      file.skip_kind === BELOW_MINIMUM_SIZE_REMOVED)
+  );
+}
+
+/** Whether the workflow, set to delete rejected files, removed the file for being under its minimum size: there is nothing left to act on. */
+export function wasRemovedBelowMinimumSize(
+  file: Pick<ProcessingFile, "status" | "skip_kind">,
+): boolean {
+  return (
+    file.status === "skipped" && file.skip_kind === BELOW_MINIMUM_SIZE_REMOVED
+  );
 }
 
 /**
  * The plain word for a file's state. A rejection no media manager was asked about is just "Rejected", and a file
- * under the minimum size is "Left alone".
+ * removed for being under the minimum size is "Removed".
  */
 export function processingFileStatusLabel(
   file: Pick<ProcessingFile, "status" | "failure_class" | "skip_kind">,
@@ -44,7 +58,7 @@ export function processingFileStatusLabel(
   if (file.status === "rejected" && file.failure_class === REJECTED_BY_RULES) {
     return "Rejected";
   }
-  if (isBelowMinimumSize(file)) return "Left alone";
+  if (wasRemovedBelowMinimumSize(file)) return "Removed";
   return PROCESSING_FILE_STATUS_LABELS[file.status] ?? file.status;
 }
 
@@ -56,8 +70,12 @@ export function processingFileLead(
   >,
 ): string {
   const label = processingFileStatusLabel(file);
+  if (wasRemovedBelowMinimumSize(file)) {
+    return `${label}: under the workflow's minimum size.`;
+  }
   if (!file.status_reason) return label;
-  return file.status_reason.startsWith(`${label}:`)
+  // A reason that opens with the state's own word ("Rejected: …", "Skipped because …") stands alone.
+  return file.status_reason.toLowerCase().startsWith(label.toLowerCase())
     ? file.status_reason
     : `${label}. ${file.status_reason}`;
 }

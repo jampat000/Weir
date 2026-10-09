@@ -51,7 +51,7 @@ export function useRecentWork(now: number): RecentWork | undefined {
   });
   const date_from = recentSince(now);
   const passes = useActivityWindowQuery(
-    { event_type: REMUX_PASS_COMPLETED_EVENT, date_from },
+    { event_type: REMUX_PASS_COMPLETED_EVENT, date_from, current_only: true },
     ONE_PAGE,
   ).data;
   const cleans = useActivityWindowQuery(
@@ -63,8 +63,6 @@ export function useRecentWork(now: number): RecentWork | undefined {
     const finished = passes.items
       .map(finishedFileFromEvent)
       .filter((file): file is FinishedFile => file !== null);
-    // A pass that finished nothing (a skip) is in the server's count but not among the finished files fetched.
-    const finishedNothing = passes.items.length - finished.length;
-    return recentWorkOf(finished, passes.total - finishedNothing, cleans.total);
+    return recentWorkOf(finished, passes.total, cleans.total);
   }, [passes, cleans]);
 }

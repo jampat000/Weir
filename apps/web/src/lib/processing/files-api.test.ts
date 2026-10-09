@@ -4,6 +4,7 @@ import {
   isBelowMinimumSize,
   processingFileLead,
   processingFileStatusLabel,
+  wasRemovedBelowMinimumSize,
   type ProcessingFile,
 } from "./files-api";
 
@@ -49,13 +50,33 @@ describe("a file under the workflow's minimum size", () => {
     ).toBe(false);
   });
 
-  it("reads as left alone, and any other skip as skipped", () => {
-    const left = file("skipped", UNDER_MINIMUM, "below_minimum_size");
+  it("is a skipped file with one label and its plain reason, never two words for it", () => {
+    const skipped = file("skipped", UNDER_MINIMUM, "below_minimum_size");
 
-    expect(processingFileStatusLabel(left)).toBe("Left alone");
-    expect(processingFileLead(left)).toBe(`Left alone. ${UNDER_MINIMUM}`);
+    expect(processingFileStatusLabel(skipped)).toBe("Skipped");
+    expect(processingFileLead(skipped)).toBe(UNDER_MINIMUM);
+    expect(processingFileLead(file("skipped", "Not a video file."))).toBe(
+      "Skipped. Not a video file.",
+    );
+  });
+
+  it("is removed, and says so, once the workflow deleted the file it skipped", () => {
+    const removed = file(
+      "skipped",
+      UNDER_MINIMUM,
+      "below_minimum_size_removed",
+    );
+
+    expect(isBelowMinimumSize(removed)).toBe(true);
+    expect(wasRemovedBelowMinimumSize(removed)).toBe(true);
     expect(
-      processingFileStatusLabel(file("skipped", "Not a video file.")),
-    ).toBe("Skipped");
+      wasRemovedBelowMinimumSize(
+        file("skipped", UNDER_MINIMUM, "below_minimum_size"),
+      ),
+    ).toBe(false);
+    expect(processingFileStatusLabel(removed)).toBe("Removed");
+    expect(processingFileLead(removed)).toBe(
+      "Removed: under the workflow's minimum size.",
+    );
   });
 });

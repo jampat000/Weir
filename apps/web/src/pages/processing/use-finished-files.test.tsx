@@ -52,6 +52,12 @@ describe("the newest finished files", () => {
     expect(askedFor(CLEANS).filters.current_only).toBeUndefined();
   });
 
+  it("asks for no count of what it lists, which it does not show", () => {
+    renderHook(() => useFinishedFiles());
+
+    expect(askedFor(PASSES).filters.with_total).toBe(false);
+  });
+
   it("asks only for new downloads' entries for new downloads", () => {
     renderHook(() => useFinishedFiles("download"));
 

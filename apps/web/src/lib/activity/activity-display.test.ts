@@ -53,6 +53,18 @@ describe("eventDisplay for a finished pass", () => {
     },
   );
 
+  it("names a skip under the workflow's minimum size by its code", () => {
+    const display = eventDisplay(
+      passEvent({
+        outcome: "skipped_guardrail",
+        ok: true,
+        skip_kind: "below_minimum_size",
+      }),
+    );
+
+    expect(display.chip).toBe("Under the minimum size");
+  });
+
   it("shows a real failure as one", () => {
     const display = eventDisplay(passEvent({}));
 

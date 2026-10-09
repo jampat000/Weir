@@ -36,6 +36,7 @@ export function useFinishedFiles(
       event_type: REMUX_PASS_COMPLETED_EVENT,
       known_files_only: true,
       current_only: true,
+      with_total: false,
       ...workflow,
     },
     { enabled: withPasses },

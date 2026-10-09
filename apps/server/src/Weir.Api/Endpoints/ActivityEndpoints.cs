@@ -188,14 +188,16 @@ internal sealed class ActivityEndpointHandlers
             FieldRules.TryBool(new WireString(rawKnownFilesOnly), ["query", "known_files_only"], issues, out var parsedKnownFilesOnly) && parsedKnownFilesOnly;
         var currentOnly = request.Query("current_only") is { } rawCurrentOnly &&
             FieldRules.TryBool(new WireString(rawCurrentOnly), ["query", "current_only"], issues, out var parsedCurrentOnly) && parsedCurrentOnly;
+        var withTotal = request.Query("with_total") is not { } rawWithTotal ||
+            FieldRules.TryBool(new WireString(rawWithTotal), ["query", "with_total"], issues, out var parsedWithTotal) && parsedWithTotal;
         issues.ThrowIfAny();
 
         var filter = new ActivityFilter(module, eventType, search, ParseWhen(dateFrom, "date_from"), ParseWhen(dateTo, "date_to"), trigger, result, libraryId, file, about, knownFilesOnly, currentOnly);
         var uow = await request.DbAsync().ConfigureAwait(false);
         var page = await _history.ListRecentAsync(uow, filter, limit, beforeId).ConfigureAwait(false);
         // Only the first page is counted: a count walks every matching row, and later pages know whether more
-        // remain from the page itself (#714).
-        long? total = beforeId is null ? await _history.CountAsync(uow, filter).ConfigureAwait(false) : null;
+        // remain from the page itself (#714). A list that shows no count asks for none with `with_total=false`.
+        long? total = beforeId is null && withTotal ? await _history.CountAsync(uow, filter).ConfigureAwait(false) : null;
         var settings = await _suiteSettings.EnsureAsync(uow).ConfigureAwait(false);
         var oldest = await _history.OldestCreatedAtAsync(uow).ConfigureAwait(false);
         var posters = await _posters.ForFilesAsync(uow, FilesOf(page.Items)).ConfigureAwait(false);

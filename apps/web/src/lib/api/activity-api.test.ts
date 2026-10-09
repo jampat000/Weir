@@ -30,6 +30,15 @@ describe("activity-api paths", () => {
     expect(asked(activityExportPath("csv", { current_only: true }))).toBeNull();
   });
 
+  it("leaves out the count only when told to", () => {
+    const sent = (path: string) =>
+      new URL(path, "http://x").searchParams.get("with_total");
+
+    expect(sent(activityRecentPath({ with_total: false }))).toBe("false");
+    expect(sent(activityRecentPath({}))).toBeNull();
+    expect(sent(activityRecentPath({ with_total: true }))).toBeNull();
+  });
+
   it("exports the same filters without paging", () => {
     const path = activityExportPath("json", {
       limit: 100,

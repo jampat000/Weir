@@ -83,6 +83,7 @@ public sealed class HandoffExtraLiveTests(E2EServer server) : E2ETestBase(server
         // The film is the one file that finished: the extra, left alone, is no tile and no "cleaned" line.
         await Expect(shelf.GetByRole(AriaRole.Button)).ToHaveCountAsync(1);
         await Expect(page.GetByRole(AriaRole.Region, new() { Name = "Activity" })).Not.ToContainTextAsync("Gallery");
+        await Expect(page.GetByRole(AriaRole.Region, new() { Name = "Today" })).ToContainTextAsync("1 file finished in the last 2 hours", new() { Timeout = PushMs });
         await Expect(needs).ToContainTextAsync("All clear", new() { Timeout = PushMs });
         await Expect(page.GetByTestId("nav-activity-needs-you")).ToHaveCountAsync(0);
         await Expect(page.GetByRole(AriaRole.Button, new() { NameRegex = new("need a look") })).ToHaveCountAsync(0);

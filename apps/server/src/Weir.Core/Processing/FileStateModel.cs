@@ -114,6 +114,12 @@ public static class SkipKinds
 {
     /// <summary>The file is smaller than the workflow's minimum size: the minimum doing its job, which skips samples and extras.</summary>
     public const string BelowMinimumSize = "below_minimum_size";
+
+    /// <summary>The same, in a workflow set to delete rejected files: the file was removed from the watched folder, so nothing can be done with it.</summary>
+    public const string BelowMinimumSizeRemoved = "below_minimum_size_removed";
+
+    /// <summary>The kind of a skip once Weir has removed the file it skipped.</summary>
+    public static string? AfterRemoval(string? kind) => kind == BelowMinimumSize ? BelowMinimumSizeRemoved : kind;
 }
 
 /// <summary>What a cancelled file says on the Files screen (#643).</summary>
