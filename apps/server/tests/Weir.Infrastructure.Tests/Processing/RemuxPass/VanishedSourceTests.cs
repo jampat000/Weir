@@ -125,7 +125,10 @@ public sealed class VanishedSourceTests : IDisposable
 
     private ProcessingWatchedFolderScanDispatchJobHandler ScanHandler(ILogger<ProcessingWatchedFolderScanDispatchJobHandler>? logger = null) => new(
         _fixture.Store.Database, _fixture.Store.Clock, _fixture.Store.Options, _fixture.Jobs, _fixture.Connections,
-        new SuiteSettingsStore(new AuthStore()), _fixture.Libraries, _fixture.Files, new FileSkipMarkerStore(), logger: logger);
+        new SuiteSettingsStore(new AuthStore()), _fixture.Libraries, _fixture.Files, new FileSkipMarkerStore(), logger: logger)
+    {
+        GoneLookAgain = _ => Task.CompletedTask,
+    };
 
     private async Task ScanAsync(ProcessingWatchedFolderScanDispatchJobHandler? handler = null)
     {
@@ -282,6 +285,7 @@ public sealed class VanishedSourceTests : IDisposable
         Assert.Equal(0, await FailedOrRetriedJobsAsync());
         Assert.Equal(0, await ErrorsAndWarningsAsync());
         Assert.Equal(0, await PassThroughJobsAsync());
+        Assert.Equal(1, await GoneRowsAsync());
     }
 
     [Fact]
@@ -307,6 +311,7 @@ public sealed class VanishedSourceTests : IDisposable
 
         Assert.Equal(0, await FilesAsync());
         Assert.Equal(0, await ErrorsAndWarningsAsync());
+        Assert.Equal(1, await GoneRowsAsync());
     }
 
     [Fact]
@@ -460,6 +465,116 @@ public sealed class VanishedSourceTests : IDisposable
         Assert.Equal(0, await ErrorsAndWarningsAsync());
         Assert.Equal(1, await GoneRowsAsync());
         Assert.Equal("on_hold", await StatusAsync(Rel));
+
+        Advance((int)GoneSources.LookAgainAfter.TotalMinutes + 1);
+        await DrainAsync();
+
+        Assert.Null(await StatusAsync(Rel));
+        Assert.Equal(1, await GoneRowsAsync());
+    }
+
+    [Fact]
+    public async Task A_handed_back_file_the_scan_already_found_gone_is_not_said_to_be_gone_a_second_time()
+    {
+        await SetUpAsync();
+        await _fixture.Store.Execute(
+            $"INSERT INTO files (library_id, relative_path, status, status_reason, last_seen_at) " +
+            $"VALUES ({_libraryId}, '{Rel}', 'on_hold', 'Waiting: the output drive has less than 5.0 GB free.', '{Ago(1)}')");
+        var payload = new WireObject().Set("relative_media_path", Rel).Set("library_id", _libraryId).Set("trigger", "worker");
+        await ScanAsync();
+        Assert.Equal(GoneSourceText.HeldReason, await ReasonAsync(Rel));
+        Assert.Equal(1, await GoneRowsAsync());
+
+        await _fixture.Jobs.EnqueueOrGetAsync("pass-through-1", IntakeRules.PassThroughJobKind, WireJsonWriter.Dumps(payload, WireJsonFormat.Compact));
+        await DrainAsync();
+
+        Assert.Equal("on_hold", await StatusAsync(Rel));
+        Assert.Equal(1, await GoneRowsAsync());
+    }
+
+    private Task InsertWaitingRowAsync() =>
+        _fixture.Store.Execute(
+            $"INSERT INTO files (library_id, relative_path, status, status_reason, last_seen_at) " +
+            $"VALUES ({_libraryId}, '{Rel}', 'on_hold', 'Weir is confirming that nothing is still writing to this file.', '{Ago(1)}')");
+
+    [Fact]
+    public async Task A_pass_that_finds_a_file_the_scan_already_held_as_gone_does_not_say_so_again()
+    {
+        await SetUpAsync();
+        await InsertWaitingRowAsync();
+        await ScanAsync();
+        Assert.Equal(1, await GoneRowsAsync());
+        var payload = new WireObject().Set("relative_media_path", Rel).Set("library_id", _libraryId).Set("media_scope", "movie").Set("trigger", "manual");
+
+        await _fixture.Jobs.EnqueueOrGetAsync("process-gone", RemuxPassOutcomes.JobKind, WireJsonWriter.Dumps(payload, WireJsonFormat.Compact));
+        await DrainAsync();
+
+        Assert.Equal(GoneSourceText.HeldReason, await ReasonAsync(Rel));
+        Assert.Equal(1, await GoneRowsAsync());
+        Assert.Equal(0, await ErrorsAndWarningsAsync());
+    }
+
+    [Fact]
+    public async Task The_manager_is_told_a_download_is_gone_exactly_once_after_the_scan_held_it()
+    {
+        await SetUpAsync();
+        await _fixture.AddConnectionAsync("deluno", "http://192.0.2.30:5099", "k1");
+        await _fixture.Db(async uow => { await _fixture.Ledger.RecordReceivedAsync(uow, "deluno", "hscan", _libraryId, Rel); return 0; });
+        const string events = "/api/integrations/processors/events";
+        await InsertWaitingRowAsync();
+        await ScanAsync();
+        Assert.Equal(1, await GoneRowsAsync());
+        var payload = new WireObject()
+            .Set("relative_media_path", Rel)
+            .Set("library_id", _libraryId)
+            .Set("trigger", "worker")
+            .Set("origin", new WireObject().Set("source_key", "deluno").Set("handoff_id", "hscan").Set("callback_path", events));
+
+        await _fixture.Jobs.EnqueueOrGetAsync("pass-through-held", IntakeRules.PassThroughJobKind, WireJsonWriter.Dumps(payload, WireJsonFormat.Compact));
+        await DrainAsync();
+        Assert.Empty(_fixture.Http.RequestsTo(HttpMethod.Post, events));
+
+        Advance((int)GoneSources.LookAgainAfter.TotalMinutes + 1);
+        await DrainAsync();
+
+        var post = Assert.Single(_fixture.Http.RequestsTo(HttpMethod.Post, events));
+        Assert.Equal("source_gone", WireConvert.Str(((WireObject)post.Json!)["failureClass"]));
+        Assert.Equal(1, await GoneRowsAsync());
+    }
+
+    [Fact]
+    public async Task A_pass_whose_file_is_back_at_the_last_look_and_then_vanishes_mid_write_leaves_no_progress_row_behind()
+    {
+        await SetUpAsync();
+        var source = _folders.Source(Path.Join("Film.2024", "Film.2024.mkv"));
+        _media.RemuxError = "Error writing trailer";
+        _media.OnCall = () =>
+        {
+            string[] last;
+            lock (_media.Calls)
+            {
+                last = [.. _media.Calls[^1]];
+            }
+
+            if (last[0] == "ffmpeg" && last.Contains("-map") && !last.Contains("null"))
+            {
+                File.Delete(source);
+            }
+        };
+        var payload = new WireObject()
+            .Set("relative_media_path", Rel)
+            .Set("library_id", _libraryId)
+            .Set("media_scope", "movie")
+            .Set("trigger", "manual")
+            .Set("gone_looks", 1);
+
+        await _fixture.Jobs.EnqueueOrGetAsync("process-last-look", RemuxPassOutcomes.JobKind, WireJsonWriter.Dumps(payload, WireJsonFormat.Compact));
+        await DrainAsync();
+
+        Assert.Equal(0, await _fixture.Store.Scalar("SELECT count(*) FROM activity_events WHERE event_type = 'processing.file_processing_progress'"));
+        Assert.Equal(0, await _fixture.Store.Scalar("SELECT count(*) FROM activity_events WHERE result = 'running'"));
+        Assert.Equal(1, await GoneRowsAsync());
+        Assert.Equal(0, await FailedOrRetriedJobsAsync());
     }
 
     // --- scanning ------------------------------------------------------------------------------------------------------

@@ -168,6 +168,7 @@ export function incomingWords(item: ArrivingItem, now: number): CardWords {
 /** What an arriving file waits for, in a few words: a media manager still importing it, or the kind of hold it is on. */
 function waitingWords(item: ArrivingItem): string {
   if (item.upstream) return "Still importing";
+  if (item.file.source_gone) return "No longer there";
   return item.note ? holdWords(item.note) : "Waiting";
 }
 

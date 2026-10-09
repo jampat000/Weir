@@ -1,6 +1,7 @@
 using System.Net;
 using Microsoft.Extensions.DependencyInjection;
 using Weir.Core.Activity;
+using Weir.Core.Processing.RemuxPass;
 using Weir.Infrastructure.Processing;
 using Weir.Infrastructure.Processing.RemuxPass;
 
@@ -91,6 +92,27 @@ public sealed class ProcessingFilesApiTests
         var body = await ApiTestClient.Json(response);
         var statuses = body!["files"]!.AsArray().Select(file => file!["status"]!.GetValue<string>()).Order(StringComparer.Ordinal);
         Assert.Equal(["processing", "unprocessed"], statuses);
+    }
+
+    [Fact]
+    public async Task Only_a_file_held_for_being_gone_says_its_source_is_gone()
+    {
+        await using var server = await ApiTestClient.StartServerAsync();
+        await TestDatabase.SeedAdminAsync(server);
+        var client = new ApiTestClient(server);
+        await client.SignInAsync();
+        var libraryId = await SeedLibraryAsync(server);
+        await TestDatabase.ExecuteAsync(
+            server,
+            "INSERT INTO files (library_id, relative_path, status, status_reason) VALUES ($lib, 'Film/gone.mkv', 'on_hold', $reason), ($lib, 'Film/settling.mkv', 'on_hold', 'Weir is confirming that nothing is still writing to this file.')",
+            ("$lib", libraryId), ("$reason", GoneSourceText.HeldReason));
+
+        using var response = await client.GetAsync("/api/v1/processing/files");
+
+        var body = await ApiTestClient.Json(response);
+        var files = body!["files"]!.AsArray().ToDictionary(file => file!["relative_path"]!.GetValue<string>());
+        Assert.True(files["Film/gone.mkv"]!["source_gone"]!.GetValue<bool>());
+        Assert.False(files["Film/settling.mkv"]!["source_gone"]!.GetValue<bool>());
     }
 
     [Fact]

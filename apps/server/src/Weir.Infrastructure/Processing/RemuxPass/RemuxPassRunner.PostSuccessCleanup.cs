@@ -114,7 +114,7 @@ public sealed partial class RemuxPassRunner
         {
             output.Set("source_folder_skip_reason", "The video file sits directly in the watched folder root, so Weir does not remove a release folder here.");
             output.Set("source_deleted_after_success", false);
-            _logger.LogWarning("Movies cleanup: immediate parent is watched root ({Root}).", watched);
+            _logger.LogDebug("Movies cleanup: {Path} sits directly in the watched folder {Root}, so there is no release folder to remove.", src, watched);
             return;
         }
 

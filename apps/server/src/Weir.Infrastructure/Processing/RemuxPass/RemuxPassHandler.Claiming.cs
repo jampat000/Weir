@@ -17,7 +17,8 @@ public sealed partial class RemuxPassHandler
         ProcessingRulesConfig? Rules = null,
         ProcessingPathRuntime? Runtime = null,
         string? RulesProfileName = null,
-        bool Superseded = false);
+        bool Superseded = false,
+        bool GoneListed = false);
 
     /// <summary>
     /// Read what the pass needs and mark the file as being processed, then commit: no ffprobe or ffmpeg work runs while the
@@ -62,6 +63,8 @@ public sealed partial class RemuxPassHandler
                     return new Claim(null, Superseded: true);
                 }
 
+                // Read before the claim rewrites the row: a file already held as gone has been recorded as gone.
+                var goneListed = library is not null && await RemuxPassFileState.IsHeldAsGoneAsync(uow, library.Id, rel).ConfigureAwait(false);
                 if (library is not null)
                 {
                     if (await RemuxPassFileState.MarkFileStatusAsync(uow, library.Id, rel, ProcessingFileStatuses.Processing, "Weir has claimed this file and is checking it now.", _time.GetUtcNow())
@@ -73,7 +76,7 @@ public sealed partial class RemuxPassHandler
                     }
                 }
 
-                return new Claim(null, operatorSettings, library, rules, runtime, rulesProfileName);
+                return new Claim(null, operatorSettings, library, rules, runtime, rulesProfileName, GoneListed: goneListed);
             },
             _logger,
             "claim processing file",

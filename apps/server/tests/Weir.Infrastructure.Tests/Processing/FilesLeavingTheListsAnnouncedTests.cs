@@ -125,7 +125,7 @@ public sealed class FilesLeavingTheListsAnnouncedTests : IDisposable
             "INSERT INTO files (library_id, relative_path, status, status_reason, last_seen_at) " +
             $"VALUES ({libraryId}, 'Gone/film.mkv', 'processing_failed', 'It went wrong.', '2000-01-01 00:00:00')");
         using var heard = _changes.Subscribe();
-        var sweep = new VanishedFileSweepTask(_store.Database, _store.Options, _libraries, _store.Clock, NullLogger<VanishedFileSweepTask>.Instance, _changes);
+        var sweep = new VanishedFileSweepTask(_store.Database, _store.Options, _libraries, _store.Clock, NullLogger<VanishedFileSweepTask>.Instance, _changes) { GoneLookAgain = _ => Task.CompletedTask };
 
         await sweep.RunOnceAsync(CancellationToken.None);
 

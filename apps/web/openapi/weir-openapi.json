@@ -5430,6 +5430,11 @@
             "description": "When this file's size last changed, as observed across scans.",
             "title": "Size Changed At"
           },
+          "source_gone": {
+            "description": "True while Weir holds a file that is no longer in the watched folder, before it stops listing it. Nothing that needs the file can be done to it.",
+            "title": "Source Gone",
+            "type": "boolean"
+          },
           "status": {
             "enum": [
               "unprocessed",

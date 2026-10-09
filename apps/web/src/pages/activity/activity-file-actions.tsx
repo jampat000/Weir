@@ -135,6 +135,8 @@ export function ActivityFileActions({
   }
 
   const status = file.status;
+  // A file Weir has found gone has nothing to choose tracks for, check again or pass through: only forgetting it is left.
+  const hasFile = file.source_gone !== true;
   const queueAgain = () =>
     void run(
       async () => (await requeue.mutateAsync(file.id)).detail,
@@ -215,7 +217,7 @@ export function ActivityFileActions({
               },
             )
           : null}
-        {status === "on_hold"
+        {status === "on_hold" && hasFile
           ? button(
               "Choose tracks",
               "Reads this file's tracks again and lets you pick which to keep, instead of the saved rules.",
@@ -224,6 +226,7 @@ export function ActivityFileActions({
           : null}
         {/* Weir never scans a workflow a media manager hands its downloads to, so there is nothing to check again. */}
         {handedOff === null &&
+        hasFile &&
         (status === "on_hold" ||
           status === "blocked_upstream" ||
           status === "skipped" ||
@@ -242,7 +245,7 @@ export function ActivityFileActions({
               { pending: checkAgain.isPending, pendingLabel: "Checking…" },
             )
           : null}
-        {status === "blocked_upstream" || status === "on_hold"
+        {(status === "blocked_upstream" || status === "on_hold") && hasFile
           ? button(
               "Why is this held?",
               "Asks every media manager covering this workflow what it is doing with this file, right now.",
@@ -262,7 +265,8 @@ export function ActivityFileActions({
           : null}
         {status !== "processing" &&
         status !== "processed" &&
-        status !== "disabled"
+        status !== "disabled" &&
+        hasFile
           ? button(
               "Pass through unchanged",
               "Skips your track rules, places a checked, unchanged copy in the output folder, then tidies the original as after any finished file.",

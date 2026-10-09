@@ -222,7 +222,9 @@ export function buildLanes(
     const key = `file-${file.id}`;
     switch (file.status) {
       case "on_hold": {
-        const holdUntil = parseAppTime(file.hold_until);
+        // A file Weir has found gone waits for nothing: no clock, and no look at its workflow to count down to.
+        const gone = file.source_gone === true;
+        const holdUntil = gone ? null : parseAppTime(file.hold_until);
         const since =
           parseAppTime(file.size_changed_at) ?? parseAppTime(file.updated_at);
         const readyAfter = readyAfterByLibrary.get(file.library_id) ?? null;
@@ -241,7 +243,7 @@ export function buildLanes(
           holdTotal,
           upstream: false,
           nextLook:
-            holdUntil == null
+            holdUntil == null && !gone
               ? (nextLookByLibrary.get(file.library_id) ?? null)
               : null,
         });
