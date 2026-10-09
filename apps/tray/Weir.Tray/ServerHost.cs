@@ -18,7 +18,12 @@ sealed class ServerHost : IServerListenScope, IDisposable
     private const string ServerExeName = "WeirServer.exe";
     private const int MaxRestarts = 5;
 
-    private static readonly TimeSpan HealthTimeout = TimeSpan.FromSeconds(60);
+    /// <summary>
+    /// How long a server that is running but not yet ready is waited for. One that exits is noticed at once, so this bounds only a
+    /// server that never finishes starting; a slow start, such as a large database migrated on a busy PC, must not be reported
+    /// as a failure while it is still going to succeed.
+    /// </summary>
+    private static readonly TimeSpan HealthTimeout = TimeSpan.FromMinutes(5);
     private static readonly TimeSpan WatchInterval = TimeSpan.FromSeconds(3);
 
     /// <summary>How long a stop waits for a restart or port change in progress to let go of the server.</summary>

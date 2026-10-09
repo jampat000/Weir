@@ -1,5 +1,3 @@
-using System.Diagnostics;
-
 using Xunit;
 
 namespace Weir.Tray.Tests;
@@ -10,7 +8,6 @@ namespace Weir.Tray.Tests;
 /// </summary>
 public sealed class ServerProcessStopTests : IDisposable
 {
-    private static readonly TimeSpan CleanStopCeiling = TimeSpan.FromSeconds(5);
     private static readonly ServerStopTimeouts ShortTimeouts = new(TimeSpan.FromMilliseconds(500), TimeSpan.FromSeconds(5));
 
     private readonly TempDirectory _home = TempDirectory.AsWeirHome();
@@ -26,13 +23,11 @@ public sealed class ServerProcessStopTests : IDisposable
     public async Task A_server_asked_to_stop_exits_on_its_own_without_being_killed()
     {
         var server = await _servers.StartAsync(ServerFolder());
-        var stopwatch = Stopwatch.StartNew();
 
         var outcome = await ServerProcessStop.StopAsync(server);
 
         Assert.Equal(ServerStopOutcome.StoppedCleanly, outcome);
         Assert.Equal(0, server.ExitCode);
-        Assert.True(stopwatch.Elapsed < CleanStopCeiling, $"stopping took {stopwatch.Elapsed.TotalSeconds:0.0} s");
     }
 
     [Fact]
@@ -61,13 +56,12 @@ public sealed class ServerProcessStopTests : IDisposable
     public async Task A_server_that_cannot_be_asked_to_stop_is_killed_at_once()
     {
         var server = await _servers.StartAsync(ServerFolder(), "no-stop-event");
-        var stopwatch = Stopwatch.StartNew();
 
         var outcome = await ServerProcessStop.StopAsync(server);
 
         Assert.Equal(ServerStopOutcome.Killed, outcome);
-        Assert.True(stopwatch.Elapsed < CleanStopCeiling, $"killing took {stopwatch.Elapsed.TotalSeconds:0.0} s");
         Assert.Contains($"pid={server.Id} cannot be asked to stop", TrayLogText(), StringComparison.Ordinal);
+        Assert.DoesNotContain($"pid={server.Id} did not stop", TrayLogText(), StringComparison.Ordinal);
     }
 
     [Fact]

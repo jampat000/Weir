@@ -22,7 +22,8 @@ static class RestartAfterSetup
     /// </summary>
     internal const string Argument = "--after-setup";
 
-    private static readonly TimeSpan SetupCeiling = TimeSpan.FromMinutes(2);
+    /// <summary>How long the restart waits for Setup to exit; a Setup on a slow PC can take far longer than a couple of minutes.</summary>
+    private static readonly TimeSpan SetupCeiling = TimeSpan.FromMinutes(30);
 
     /// <summary>
     /// Arranges for Weir to start once Setup has exited, when the install's own tray was running before and Setup ended it.

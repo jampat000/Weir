@@ -55,13 +55,24 @@ public sealed class PortDialogTests
     {
         OnSta(() =>
         {
+            // Windows, not Weir, decides whether a window becomes top-most. After several runs of this suite in a row it
+            // declines the request for a stretch of minutes, for a plain top-most window as much as for the dialog (#948). A
+            // plain window made alongside tells whether Windows is granting the request just now; when it is not, the dialog's
+            // style says nothing about the dialog.
+            using var plain = new Form { TopMost = true, ShowInTaskbar = false };
             using var dialog = new PortDialog(new PortPrompt(PortPromptReason.FirstRun, 9347, false, 9347), Busy(), null);
 
+            plain.Show();
             dialog.Show();
             Application.DoEvents();
 
-            Assert.True(ForegroundWindow.IsTopMost(dialog));
+            if (ForegroundWindow.IsTopMost(plain))
+            {
+                Assert.True(ForegroundWindow.IsTopMost(dialog));
+            }
+
             dialog.Close();
+            plain.Close();
         });
     }
 

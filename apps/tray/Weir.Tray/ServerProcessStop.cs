@@ -22,7 +22,11 @@ enum ServerStopOutcome
 /// <summary>How long a stop waits for the server to exit on its own, and then for a kill to take effect.</summary>
 readonly record struct ServerStopTimeouts(TimeSpan Graceful, TimeSpan AfterKill)
 {
-    internal static ServerStopTimeouts Default { get; } = new(TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(5));
+    /// <summary>
+    /// The graceful wait outlasts the 30 seconds the server's host allows its workers to finish when asked to stop, so a busy
+    /// PC is never killed in the middle of a shutdown that is going to complete.
+    /// </summary>
+    internal static ServerStopTimeouts Default { get; } = new(TimeSpan.FromSeconds(45), TimeSpan.FromSeconds(5));
 }
 
 /// <summary>
