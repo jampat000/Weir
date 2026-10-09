@@ -13,6 +13,8 @@ import {
   fetchUpdateSettings,
   fetchUpdateState,
   postApplyUpdate,
+  postCheckUpdate,
+  postDownloadUpdate,
   putAppSettings,
   putUpdateSettings,
   resetOperationalHistory,
@@ -25,6 +27,7 @@ import type {
   NetworkAccessPutBody,
   NotificationChannelIn,
   UpdateSettingsPutBody,
+  UpdateStateOut,
 } from "./types";
 
 export function useAppSettingsQuery() {
@@ -96,15 +99,25 @@ export function useUpdateStateQuery(enabled = true) {
   });
 }
 
-export function useApplyUpdateMutation() {
+/** An update step the tray is asked for: what it answers is the step under way, which the page shows at once. */
+function useUpdateStepMutation(ask: () => Promise<UpdateStateOut>) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: () => postApplyUpdate(),
+    mutationFn: ask,
     onSuccess: (data) => {
       qc.setQueryData(settingsKeys.updateState, data);
     },
   });
 }
+
+export const useCheckUpdateMutation = () =>
+  useUpdateStepMutation(postCheckUpdate);
+
+export const useDownloadUpdateMutation = () =>
+  useUpdateStepMutation(postDownloadUpdate);
+
+export const useApplyUpdateMutation = () =>
+  useUpdateStepMutation(postApplyUpdate);
 
 export function useUpdateSettingsQuery(enabled = true) {
   return useQuery({

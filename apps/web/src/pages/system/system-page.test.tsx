@@ -673,7 +673,7 @@ describe("SystemPage", () => {
       directory: "C:/Weir/backups/suite-configuration",
       items: [],
     });
-    qc.setQueryData(settingsKeys.updateStatus, windowsUpdateAvailableStatus);
+    qc.setQueryData(settingsKeys.updateStatus, minimalUpdateStatus);
     qc.setQueryData(settingsKeys.metrics, minimalMetrics);
 
     render(wrap(<SystemPage />, qc));
@@ -745,13 +745,15 @@ describe("SystemPage", () => {
       qc.setQueryData(settingsKeys.updateState, {
         downloaded: false,
         pending_version: null,
+        state: "idle",
+        failure: null,
       });
     }
     qc.setQueryData(settingsKeys.metrics, minimalMetrics);
     return qc;
   }
 
-  it("gives Notify-only a clear Update button once an update is available", () => {
+  it("offers Download update in Notify-only mode too, and keeps the installer as a small link", () => {
     const qc = seededUpdateClient({
       updateStatus: windowsUpdateAvailableStatus,
       updateSettings: {
@@ -765,7 +767,10 @@ describe("SystemPage", () => {
     fireEvent.click(screen.getByRole("tab", { name: "About" }));
 
     expect(
-      screen.getByRole("link", { name: "Download the update" }),
+      screen.getByRole("button", { name: "Download update" }),
+    ).toBeEnabled();
+    expect(
+      screen.getByRole("link", { name: "Download installer →" }),
     ).toHaveAttribute(
       "href",
       windowsUpdateAvailableStatus.windows_installer_url,

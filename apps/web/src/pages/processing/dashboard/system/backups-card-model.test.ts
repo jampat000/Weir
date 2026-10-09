@@ -130,7 +130,12 @@ describe("updateFacts", () => {
     expect(
       updateFacts(
         { ...status, status: "update_available" },
-        { downloaded: true, pending_version: "3.3.0" },
+        {
+          downloaded: true,
+          pending_version: "3.3.0",
+          state: "downloaded",
+          failure: null,
+        },
       ),
     ).toMatchObject({ state: "Downloaded and ready", meaning: "todo" });
   });

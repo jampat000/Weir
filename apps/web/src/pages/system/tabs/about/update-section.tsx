@@ -3,17 +3,13 @@ import { useState } from "react";
 import { Chip } from "../../../../components/panels/chip";
 import { Panel } from "../../../../components/panels/panel";
 import { errorMessage } from "../../../../lib/api/error-message";
-import {
-  useUpdateSettingsQuery,
-  useUpdateStatusQuery,
-} from "../../../../lib/settings/queries";
+import { useUpdateStatusQuery } from "../../../../lib/settings/queries";
 import type { UpdateStatus } from "../../../../lib/settings/types";
 import { updateMeaning } from "../../../../lib/settings/update-status";
-import { mmActionButtonClass } from "../../../../lib/ui/mm-control-roles";
 import { useAppDateFormatter } from "../../../../lib/ui/mm-format-date";
-import { updateStatusLabel } from "./update-words";
+import { UpdateActions } from "./update-actions";
 import { UpdatePreferences } from "./update-preferences";
-import { UpdateReadyNotice } from "./update-ready-notice";
+import { updateStatusLabel } from "./update-words";
 
 const COPIED_MS = 2000;
 
@@ -70,7 +66,6 @@ function ReleaseStatus({
   checking,
   isWindows,
   dockerCommand,
-  showUpdateButton,
   onCheck,
 }: {
   status: UpdateStatus;
@@ -78,8 +73,6 @@ function ReleaseStatus({
   isWindows: boolean;
   /** The command a Docker install runs to take the update, when there is an update and it is one. */
   dockerCommand: string | null;
-  /** Notify-only mode never downloads anything itself, so the installer link needs to read as the action, not a footnote. */
-  showUpdateButton: boolean;
   onCheck: () => void;
 }) {
   const links = [
@@ -97,14 +90,16 @@ function ReleaseStatus({
       dataTestId="suite-settings-upgrade-tab"
       aside={
         <>
-          <button
-            type="button"
-            className="mm-quiet-link"
-            disabled={checking}
-            onClick={onCheck}
-          >
-            {checking ? "Checking..." : "Check again →"}
-          </button>
+          {isWindows ? null : (
+            <button
+              type="button"
+              className="mm-quiet-link"
+              disabled={checking}
+              onClick={onCheck}
+            >
+              {checking ? "Checking..." : "Check again →"}
+            </button>
+          )}
           {links.map((link) => (
             <a
               key={link.label}
@@ -119,7 +114,6 @@ function ReleaseStatus({
         </>
       }
     >
-      {isWindows ? <UpdateReadyNotice /> : null}
       <p
         className="mm-status-line"
         title={status.summary}
@@ -131,16 +125,7 @@ function ReleaseStatus({
         <span>{version ?? status.summary}</span>
       </p>
       <LastKnownRelease status={status} />
-      {showUpdateButton && status.windows_installer_url ? (
-        <a
-          href={status.windows_installer_url}
-          target="_blank"
-          rel="noreferrer"
-          className={`${mmActionButtonClass({ variant: "primary" })} mm-sys-btn mt-3 inline-flex`}
-        >
-          Download the update
-        </a>
-      ) : null}
+      {isWindows ? <UpdateActions status={status} /> : null}
       {isWindows ? <UpdatePreferences /> : null}
       {dockerCommand ? <DockerUpgradeSteps command={dockerCommand} /> : null}
     </Panel>
@@ -177,8 +162,6 @@ export function UpdateSection() {
   const updateStatusQ = useUpdateStatusQuery();
   const status = updateStatusQ.data;
   const isWindows = status?.install_type === "windows";
-  const updateSettingsQ = useUpdateSettingsQuery(isWindows);
-  const notifyOnly = isWindows && updateSettingsQ.data?.mode === "NotifyOnly";
   const updateAvailable =
     status?.status === "update_available" ||
     status?.known_update_available === true;
@@ -212,7 +195,6 @@ export function UpdateSection() {
           ? (status.docker_update_command ?? null)
           : null
       }
-      showUpdateButton={Boolean(notifyOnly && updateAvailable)}
       onCheck={() => void updateStatusQ.refetch()}
     />
   );

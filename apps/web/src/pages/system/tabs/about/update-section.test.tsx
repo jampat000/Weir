@@ -6,16 +6,16 @@ import { UpdateSection } from "./update-section";
 
 const mocks = vi.hoisted(() => ({
   useUpdateStatusQuery: vi.fn(),
-  useUpdateSettingsQuery: vi.fn(),
 }));
 
 vi.mock("../../../../lib/settings/queries", () => ({
   useUpdateStatusQuery: () => mocks.useUpdateStatusQuery(),
-  useUpdateSettingsQuery: () => mocks.useUpdateSettingsQuery(),
   useAppSettingsQuery: () => ({ data: { app_timezone: "UTC" } }),
 }));
 
-vi.mock("./update-ready-notice", () => ({ UpdateReadyNotice: () => null }));
+vi.mock("./update-actions", () => ({
+  UpdateActions: () => <div data-testid="update-actions" />,
+}));
 vi.mock("./update-preferences", () => ({ UpdatePreferences: () => null }));
 
 const LIMITED =
@@ -56,7 +56,6 @@ function showStatus(update: UpdateStatus) {
 describe("UpdateSection while GitHub limits update checks", () => {
   beforeEach(() => {
     mocks.useUpdateStatusQuery.mockReset();
-    mocks.useUpdateSettingsQuery.mockReturnValue({ data: undefined });
   });
 
   it("says plainly when Weir will check again", () => {
@@ -107,10 +106,7 @@ describe("UpdateSection while GitHub limits update checks", () => {
     ).toBeInTheDocument();
   });
 
-  it("still offers the update Weir already knew of: the download link in notify-only mode", () => {
-    mocks.useUpdateSettingsQuery.mockReturnValue({
-      data: { mode: "NotifyOnly" },
-    });
+  it("keeps the installer as a small link on Windows, where the update buttons take the update", () => {
     showStatus(
       status(
         {
@@ -124,8 +120,19 @@ describe("UpdateSection while GitHub limits update checks", () => {
     );
 
     expect(
-      screen.getByRole("link", { name: "Download the update" }),
+      screen.getByRole("link", { name: "Download installer →" }),
     ).toHaveAttribute("href", "https://example.test/Weir-win-Setup.exe");
+    expect(screen.getByTestId("update-actions")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: "Download the update" }),
+    ).toBeNull();
+    expect(screen.queryByRole("button", { name: "Check again →" })).toBeNull();
+  });
+
+  it("offers the update buttons on Windows only", () => {
+    showStatus(status({ summary: LIMITED }, "docker"));
+
+    expect(screen.queryByTestId("update-actions")).toBeNull();
   });
 
   it("offers no update when the last release it knew of is not newer", () => {

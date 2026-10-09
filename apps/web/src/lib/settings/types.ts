@@ -31,9 +31,15 @@ export type UpdateSettingsOut = Schema<"UpdateSettingsOut">;
 export type UpdateMode = UpdateSettingsOut["mode"];
 export type UpdateSettingsPutBody = RequestBody<"UpdateSettingsPutIn">;
 
+/** Where the tray is with an update: `idle` also covers an update it found and has not downloaded. */
+export type UpdateStep = Schema<"UpdateStateOut">["state"];
+
 export type UpdateStateOut = {
   downloaded: boolean;
   pending_version: string | null;
+  state: UpdateStep;
+  /** In plain words, when `state` is `failed`. */
+  failure: string | null;
 };
 
 export type HistoryResetResult = Schema<"SuiteOperationalHistoryResetOut">;
