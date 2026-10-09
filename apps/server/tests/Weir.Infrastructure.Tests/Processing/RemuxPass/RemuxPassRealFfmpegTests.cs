@@ -15,7 +15,7 @@ namespace Weir.Infrastructure.Tests.Processing.RemuxPass;
 /// The whole pass against real ffprobe and ffmpeg (<c>WEIR_FFMPEG_DIR</c> or PATH) on tiny generated files: a remux that drops a
 /// language, a file already in shape, and the damaged inputs of #494 and #539.
 /// </summary>
-public sealed class RemuxPassRealFfmpegTests : IDisposable
+public sealed class RemuxPassRealFfmpegTests(RealFfmpegFixtures fixtures) : IDisposable, IClassFixture<RealFfmpegFixtures>
 {
     private readonly PassFolders _folders = new();
     private readonly RecordingFacts _facts = new();
@@ -41,35 +41,12 @@ public sealed class RemuxPassRealFfmpegTests : IDisposable
             TimeProvider.System,
             NullLogger<RemuxPassRunner>.Instance);
 
+    /// <summary>A copy of the shared file with these audio languages, placed where the pass is told to look: the pass moves its source.</summary>
     private async Task<string> GenerateAsync(string relative, params string[] languages)
     {
         var path = Path.Join(_folders.Watched, relative);
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        var argv = new List<string>
-        {
-            RealFfmpeg.Tools!.Value.Ffmpeg, "-hide_banner", "-loglevel", "error", "-nostdin", "-y",
-            "-f", "lavfi", "-i", "testsrc=duration=3:size=160x120:rate=10",
-        };
-        foreach (var (_, i) in languages.Select((language, i) => (language, i)))
-        {
-            argv.AddRange(["-f", "lavfi", "-i", $"sine=frequency={440 * (i + 1)}:duration=3"]);
-        }
-
-        argv.AddRange(["-map", "0"]);
-        for (var i = 0; i < languages.Length; i++)
-        {
-            argv.AddRange(["-map", (i + 1).ToString(System.Globalization.CultureInfo.InvariantCulture)]);
-        }
-
-        argv.AddRange(["-c:v", "mpeg4", "-c:a", "aac"]);
-        for (var i = 0; i < languages.Length; i++)
-        {
-            argv.AddRange([$"-metadata:s:a:{i}", $"language={languages[i]}", $"-disposition:a:{i}", i == 0 ? "default" : "0"]);
-        }
-
-        argv.Add(path);
-        var result = await new ProcessRunner().RunAsync(new ProcessRequest { Argv = argv, Timeout = TimeSpan.FromMinutes(1) });
-        Assert.True(result.ExitCode == 0, "fixture generation failed: " + ProbeOutput.TailText(result.Stderr));
+        File.Copy(await fixtures.WithAudioLanguagesAsync(languages), path);
         return path;
     }
 

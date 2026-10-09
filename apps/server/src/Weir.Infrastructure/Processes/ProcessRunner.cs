@@ -69,6 +69,12 @@ public sealed record ProcessRequest
     /// <summary>With <see cref="OnStdoutLine"/>: how long to wait for exit once stdout closes.</summary>
     public TimeSpan? ExitTimeoutAfterStdoutClosed { get; init; }
 
+    /// <summary>
+    /// Called with the child's process id as soon as it has started, before anything is read from it. It must not throw: the
+    /// child is already running.
+    /// </summary>
+    public Action<int>? OnStarted { get; init; }
+
     public string? WorkingDirectory { get; init; }
 
     /// <summary>
@@ -143,6 +149,7 @@ public sealed partial class ProcessRunner(ILogger<ProcessRunner>? logger = null,
         using var process = new Process { StartInfo = startInfo };
         process.Start();
         using var toolUse = tools?.Track(process);
+        request.OnStarted?.Invoke(process.Id);
         SetPriority(process, request.Priority, request.Argv[0]);
         if (request.Stdin == ProcessInput.Null)
         {

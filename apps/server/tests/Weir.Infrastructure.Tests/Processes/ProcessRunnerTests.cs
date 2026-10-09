@@ -1,5 +1,5 @@
 using System.ComponentModel;
-using System.Diagnostics;
+using System.Globalization;
 using System.Text;
 using Weir.Infrastructure.Processes;
 
@@ -12,8 +12,8 @@ public sealed class ProcessRunnerTests
 
     private const string StandInName = "Weir.TestChild";
 
-    /// <summary>Long enough for the stand-in to have started its own child, so a kill always finds the whole tree.</summary>
-    private static readonly TimeSpan KillAfter = TimeSpan.FromSeconds(2);
+    /// <summary>Long enough for the stand-in to have started its own child, unless the machine is starved, so a kill finds the whole tree.</summary>
+    private static readonly TimeSpan KillAfter = TimeSpan.FromSeconds(5);
 
     private static string StandInPath { get; } = Path.Combine(AppContext.BaseDirectory, OperatingSystem.IsWindows() ? StandInName + ".exe" : StandInName);
 
@@ -25,11 +25,30 @@ public sealed class ProcessRunnerTests
 
     /// <summary>
     /// A tool that starts a slow child of its own and waits for it, so killing only the tool would leave the child
-    /// holding the pipes. It prints a line only after that child ends.
+    /// holding the pipes. It prints a line only after that child ends, and writes the child's process id to
+    /// <paramref name="childIdFile"/>.
     /// </summary>
-    private static string[] ToolWithSlowChild() => [StandInPath, "hold-through-child"];
+    private static string[] ToolWithSlowChild(string childIdFile) => [StandInPath, "hold-through-child", childIdFile];
 
-    private static int RunningStandIns() => Process.GetProcessesByName(StandInName).Length;
+    /// <summary>
+    /// Runs <see cref="ToolWithSlowChild"/> with <paramref name="configure"/> applied, remembering the tool and its child
+    /// so the caller can check both are gone. Counting stand-ins by name would count the ones other tests run at the same time.
+    /// A tool that a starved machine was too slow to let start its child before the limit has no child to leave behind.
+    /// </summary>
+    private static async Task<ProcessResult> RunWithSlowChildAsync(StartedProcesses started, Func<ProcessRequest, ProcessRequest> configure)
+    {
+        using var temp = new TempDirectory();
+        var childIdFile = temp.Join("child.pid");
+
+        var result = await Runner.RunAsync(configure(new ProcessRequest { Argv = ToolWithSlowChild(childIdFile), OnStarted = started.Remember }));
+
+        if (File.Exists(childIdFile))
+        {
+            started.Remember(int.Parse(await File.ReadAllTextAsync(childIdFile), CultureInfo.InvariantCulture));
+        }
+
+        return result;
+    }
 
     [Fact]
     public async Task Stdout_stderr_and_exit_code_are_captured()
@@ -95,13 +114,14 @@ public sealed class ProcessRunnerTests
     [Fact]
     public async Task A_timeout_kills_the_whole_tree_and_returns_promptly()
     {
-        var before = RunningStandIns();
+        using var started = new StartedProcesses();
 
-        var result = await Runner.RunAsync(new ProcessRequest { Argv = ToolWithSlowChild(), Timeout = KillAfter });
+        var result = await RunWithSlowChildAsync(started, request => request with { Timeout = KillAfter });
 
         Assert.Equal(ProcessTimeoutKind.Overall, result.Timeout);
         Assert.DoesNotContain("done", Encoding.UTF8.GetString(result.Stdout), StringComparison.Ordinal);
-        await Eventually.ThatAsync(() => RunningStandIns() <= before);
+        Assert.NotEqual(0, started.Count);
+        await started.AllHaveEndedAsync();
     }
 
     [Fact]
@@ -112,26 +132,23 @@ public sealed class ProcessRunnerTests
         // Here the tool writes nothing until its child ends, which is long after the timeout; the timeout is still
         // enforced, on the wall-clock timer alone.
         var lines = new List<string>();
-        var before = RunningStandIns();
+        using var started = new StartedProcesses();
 
-        var result = await Runner.RunAsync(new ProcessRequest
-        {
-            Argv = ToolWithSlowChild(),
-            OnStdoutLine = lines.Add,
-            Timeout = KillAfter,
-        });
+        var result = await RunWithSlowChildAsync(started, request => request with { OnStdoutLine = lines.Add, Timeout = KillAfter });
 
         Assert.Equal(ProcessTimeoutKind.Overall, result.Timeout);
         Assert.Empty(lines);
-        await Eventually.ThatAsync(() => RunningStandIns() <= before);
+        Assert.NotEqual(0, started.Count);
+        await started.AllHaveEndedAsync();
     }
 
     [Fact]
     public async Task Cancellation_kills_the_tree_and_throws()
     {
+        using var temp = new TempDirectory();
         using var cancel = new CancellationTokenSource(KillAfter);
 
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => Runner.RunAsync(new ProcessRequest { Argv = ToolWithSlowChild() }, cancel.Token));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => Runner.RunAsync(new ProcessRequest { Argv = ToolWithSlowChild(temp.Join("child.pid")) }, cancel.Token));
     }
 
     [Fact]
@@ -158,6 +175,24 @@ public sealed class ProcessRunnerTests
         });
 
         Assert.True(result.TimedOut);
+    }
+
+    [Fact]
+    public async Task A_process_that_takes_a_while_to_exit_after_closing_stdout_is_waited_for_within_the_grace()
+    {
+        var lines = new List<string>();
+
+        var result = await Runner.RunAsync(new ProcessRequest
+        {
+            Argv = [StandInPath, "close-stdout-then-linger", "1"],
+            OnStdoutLine = lines.Add,
+            ExitTimeoutAfterStdoutClosed = TimeSpan.FromSeconds(30),
+            Timeout = TimeSpan.FromSeconds(60),
+        });
+
+        Assert.Equal(ProcessTimeoutKind.None, result.Timeout);
+        Assert.Equal(0, result.ExitCode);
+        Assert.Equal(["ready"], lines);
     }
 
     [Fact]

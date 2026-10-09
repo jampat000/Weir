@@ -363,6 +363,21 @@ public sealed class MediaToolsTests : IDisposable
         Assert.Equal(ProcessOutput.Tail, Assert.Single(runner.Requests).Stderr);
     }
 
+    [Fact]
+    public async Task A_progress_run_waits_for_an_ffmpeg_that_is_slow_to_exit_after_its_progress_closes()
+    {
+        // A busy machine can keep a finished ffmpeg tearing down for longer than the old five-second wait, and killing it
+        // then failed a remux whose output was complete. The stand-in closes its stdout and exits a little later.
+        var standIn = Path.Combine(AppContext.BaseDirectory, OperatingSystem.IsWindows() ? "Weir.TestChild.exe" : "Weir.TestChild");
+        var tools = Tools(new ProcessRunner());
+
+        var error = await Record.ExceptionAsync(() => tools.RunFfmpegAsync(
+            [standIn, "close-stdout-then-linger", "6"],
+            progressCallback: _ => { }));
+
+        Assert.Null(error);
+    }
+
     // --- tool resolution -------------------------------------------------------------------
 
     [Fact]
