@@ -28,6 +28,15 @@ public static class E2EDatabase
         transaction.Commit();
     }
 
+    /// <summary>Ends every signed-in session while keeping the accounts, as an expiry does: the next request from a browser is unauthenticated.</summary>
+    public static void EndAllSessions(string databasePath)
+    {
+        using var connection = Open(databasePath);
+        using var transaction = connection.BeginTransaction();
+        SeedSql.Execute(connection, "DELETE FROM user_sessions");
+        transaction.Commit();
+    }
+
     /// <summary>One <c>activity_events</c> row, stamped now in the stored shape (<c>YYYY-MM-DD HH:MM:SS.ffffff</c>, UTC).</summary>
     public static void InsertActivityEvent(string databasePath, string eventType, string module, string title, string? detail = null)
     {

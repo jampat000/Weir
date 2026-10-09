@@ -2,6 +2,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { type ReactNode, useEffect } from "react";
 import { setUnauthorizedHandler } from "../lib/api/client";
 import { authKeys } from "../lib/auth/query-keys";
+import { signedOutPath } from "../lib/auth/signed-in-before";
 import { queryClient } from "./query-client";
 
 export function AppProviders({ children }: { children: ReactNode }) {
@@ -15,7 +16,7 @@ export function AppProviders({ children }: { children: ReactNode }) {
         window.location.pathname !== "/login" &&
         window.location.pathname !== "/setup"
       ) {
-        window.history.replaceState(null, "", "/login?session=expired");
+        window.history.replaceState(null, "", signedOutPath());
         window.dispatchEvent(new PopStateEvent("popstate"));
       }
     });

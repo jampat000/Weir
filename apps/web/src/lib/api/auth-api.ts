@@ -1,3 +1,4 @@
+import { markSignedIn } from "../auth/signed-in-before";
 import { apiFetch, readJson, requireOk } from "./client";
 import type { AppTheme } from "../ui/app-theme";
 import type {
@@ -25,6 +26,7 @@ export async function fetchMe(): Promise<UserPublic | null> {
   }
   await requireOk(path, r, "Could not load the current user");
   const data = await readJson<{ user: UserPublic }>(r);
+  markSignedIn();
   return data.user;
 }
 
