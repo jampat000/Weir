@@ -73,6 +73,26 @@ public static class RemuxPassFileState
         return true;
     }
 
+    /// <summary>
+    /// A file that left the watched folder before Weir reached an outcome for it has nothing left to wait for, so Weir stops listing it. A
+    /// file with an outcome (processed, passed through, rejected, skipped) stays as history, whether or not its original is still there.
+    /// </summary>
+    public static Task ForgetGoneAsync(UnitOfWork uow, long libraryId, string relativePath)
+    {
+        ArgumentNullException.ThrowIfNull(uow);
+        return uow.ExecuteAsync(
+            "DELETE FROM files WHERE library_id = $library AND relative_path = $path AND status IN ($unprocessed, $processing, $held, $outside, $blocked, $failed, $cancelled)",
+            ("$library", libraryId),
+            ("$path", relativePath),
+            ("$unprocessed", ProcessingFileStatuses.Unprocessed),
+            ("$processing", ProcessingFileStatuses.Processing),
+            ("$held", ProcessingFileStatuses.OnHold),
+            ("$outside", ProcessingFileStatuses.OutOfSchedule),
+            ("$blocked", ProcessingFileStatuses.BlockedUpstream),
+            ("$failed", ProcessingFileStatuses.ProcessingFailed),
+            ("$cancelled", ProcessingFileStatuses.Cancelled));
+    }
+
     /// <summary>Keeps an on-hold file from being picked up again by a scan before <paramref name="lookAgainAt"/>, when its own next look is booked.</summary>
     public static Task HoldUntilAsync(UnitOfWork uow, long libraryId, string relativePath, DateTimeOffset lookAgainAt)
     {

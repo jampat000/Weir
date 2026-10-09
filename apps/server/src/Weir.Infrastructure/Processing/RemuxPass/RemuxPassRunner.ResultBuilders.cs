@@ -118,6 +118,24 @@ public sealed partial class RemuxPassRunner
         return result;
     }
 
+    /// <summary>The result of a pass whose file left the watched folder: nothing failed, and there is nothing to do.</summary>
+    public static WireObject SourceGone(string relativeMediaPath, string? inspectedSourcePath)
+    {
+        var result = new WireObject()
+            .Set("ok", true)
+            .Set("outcome", RemuxPassOutcomes.SourceGone)
+            .Set("preflight_status", "skipped")
+            .Set("preflight_reason", GoneSourceText.Reason)
+            .Set("reason", GoneSourceText.Reason)
+            .Set("relative_media_path", relativeMediaPath);
+        if (!string.IsNullOrEmpty(inspectedSourcePath))
+        {
+            result.Set("inspected_source_path", inspectedSourcePath);
+        }
+
+        return result;
+    }
+
     /// <summary>The result of a pass a guardrail skipped.</summary>
     public static WireObject SkipGuardrail(string relativeMediaPath, string reason, string guardrail, string? inspectedSourcePath, WireObject extra)
     {

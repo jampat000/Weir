@@ -154,20 +154,30 @@ public static class WatchedFolderListing
         return new WatchedFolderScanCandidates(found, rejected, [.. rejectedSuffixes]);
     }
 
-    /// <summary>Every file under the root, followed through symbolic links the way a path lookup follows them.</summary>
-    private static IEnumerable<FileInfo> Walk(string root, bool topLevelOnly)
+    /// <summary>
+    /// Every file under the root, followed through symbolic links the way a path lookup follows them. The listing is read as it is
+    /// walked, so a folder deleted while the walk is under way ends the walk there with what it found: the files in it are gone, and
+    /// the scan the deletion queues finds the rest. A folder Weir may not read still fails the scan, which is a real problem.
+    /// </summary>
+    private static List<FileInfo> Walk(string root, bool topLevelOnly)
     {
-        IEnumerable<FileSystemInfo> entries;
+        var found = new List<FileInfo>();
         try
         {
-            entries = new DirectoryInfo(root).EnumerateFileSystemInfos("*", topLevelOnly ? SearchOption.TopDirectoryOnly : SearchOption.AllDirectories);
+            foreach (var entry in new DirectoryInfo(root).EnumerateFileSystemInfos("*", topLevelOnly ? SearchOption.TopDirectoryOnly : SearchOption.AllDirectories))
+            {
+                if ((entry as FileInfo ?? LinkedFile(entry)) is { } file)
+                {
+                    found.Add(file);
+                }
+            }
         }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        catch (DirectoryNotFoundException)
         {
-            return [];
+            // The folder was deleted under the walk.
         }
 
-        return entries.Select(entry => entry is FileInfo file ? file : LinkedFile(entry)).OfType<FileInfo>();
+        return found;
     }
 
     /// <summary>A directory entry that is a symbolic link to a file counts as that file, as <see cref="File.Exists"/> treats it.</summary>

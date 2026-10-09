@@ -39,7 +39,8 @@ public sealed partial class RemuxPassHandler
                     {
                         var rejectionReason = WireStrings.Slice(CollapseWhitespace(TextOr(result.Get("reason"), "Weir rejected this file before processing.")), 1200);
                         var cleanupDetail = TextOr(result.Get("rejected_cleanup_detail"), "The saved rejected-file action has not run yet.");
-                        if (await _failurePolicy.RejectBadReleaseAsync(uow, library, rel, rejectionReason, origin).ConfigureAwait(false))
+                        var rejectionKind = result.Get("rejection_kind") is WireString kind ? kind.Value : null;
+                        if (await _failurePolicy.RejectBadReleaseAsync(uow, library, rel, rejectionReason, rejectionKind, origin).ConfigureAwait(false))
                         {
                             updates.Set("reject_queued", true);
                             cleanupDetail = "Weir is telling your media manager this release is bad so it can find a different one, " +
@@ -75,6 +76,13 @@ public sealed partial class RemuxPassHandler
                         }
 
                         updates.Set("retry_scheduled", false).Set("failure_next_retry_at", WireNull.Instance).Set("failure_operator_message", reason);
+                        return;
+                    }
+
+                    if (result.Get("outcome") is WireString { Value: RemuxPassOutcomes.SourceGone })
+                    {
+                        await RemuxPassFileState.ForgetGoneAsync(uow, library.Id, rel).ConfigureAwait(false);
+                        updates.Set("retry_scheduled", false).Set("failure_next_retry_at", WireNull.Instance);
                         return;
                     }
 

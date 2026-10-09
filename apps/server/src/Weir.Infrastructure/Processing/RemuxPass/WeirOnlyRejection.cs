@@ -48,7 +48,7 @@ public static class WeirOnlyRejection
                 case WireString { Value: "no_video_stream" }:
                     result.Set(RejectionResultKeys.Summary, "it has no video");
                     break;
-                case WireString { Value: "unreadable_file" }:
+                case WireString { Value: RejectionKinds.UnreadableFile }:
                     result.Set(RejectionResultKeys.Summary, "Weir couldn't read it");
                     break;
             }

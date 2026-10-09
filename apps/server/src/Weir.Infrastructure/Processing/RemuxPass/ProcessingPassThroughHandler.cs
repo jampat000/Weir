@@ -4,7 +4,9 @@ using Weir.Core.Jobs;
 using Weir.Core.Json;
 using Weir.Core.Media;
 using Weir.Core.MediaManagers;
+using Weir.Core.Observability;
 using Weir.Core.Processing;
+using Weir.Core.Processing.RemuxPass;
 using Weir.Infrastructure.Activity;
 using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.MediaManagers;
@@ -89,6 +91,14 @@ public sealed class ProcessingPassThroughHandler : IJobHandler
         {
             result = await PassThroughDelivery.DeliverUnchangedAsync(delivery, relativePath, _ownership).ConfigureAwait(false);
         }
+#pragma warning disable CA1031 // Whatever the copy raised, a file that is gone has nothing left to deliver.
+        catch (Exception) when (GoneSources.HasLeft(delivery.WatchedFolder, relativePath))
+#pragma warning restore CA1031
+        {
+            // Deleted before the copy began or while it ran: whatever the copy said, there is no original left to hand back.
+            await SettleGoneAsync(context.Id, delivery.LibraryId, relativePath, cancellationToken).ConfigureAwait(false);
+            return;
+        }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or PassThroughIntegrityException or FileNotFoundException or InvalidOperationException)
         {
             _logger.LogWarning(exception, "Pass-through could not deliver {Path}.", relativePath);
@@ -157,6 +167,31 @@ public sealed class ProcessingPassThroughHandler : IJobHandler
 
             _logger.LogInformation("Pass-through hand-off report: {Status}", status);
         }
+    }
+
+    /// <summary>A file deleted before it could be handed back: it is dropped from the list and Activity says so once, plainly.</summary>
+    private async Task SettleGoneAsync(long jobId, long libraryId, string relativePath, CancellationToken cancellationToken)
+    {
+        var name = MediaPathNames.Name(relativePath, OperatingSystem.IsWindows());
+        await LockedWrites.RunAsync(
+            _database,
+            async uow =>
+            {
+                await RemuxPassFileState.ForgetGoneAsync(uow, libraryId, relativePath).ConfigureAwait(false);
+                var detail = OperatorMessages.ActivityDetailEnvelope("processing", "pass_through", "worker", "skipped", userMessage: GoneSourceText.Reason)
+                    .Set("job_id", jobId)
+                    .Set("relative_media_path", relativePath)
+                    .Set("library_id", libraryId);
+                await SqliteActivityWriter.RecordAsync(uow, new ActivityEventDraft(
+                    ActivityEventTypes.ProcessingFileLeftWatchedFolder,
+                    "processing",
+                    GoneSourceText.Title(name),
+                    WireJsonWriter.Dumps(detail, WireJsonFormat.Compact))).ConfigureAwait(false);
+            },
+            _logger,
+            "pass-through of a file that is gone",
+            cancellationToken).ConfigureAwait(false);
+        _logger.LogInformation("{Path} is no longer in the watched folder, so there is nothing to hand back.", relativePath);
     }
 
     /// <summary>

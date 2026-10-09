@@ -23,7 +23,9 @@ namespace Weir.Infrastructure.Processing;
 /// <b>Overflow/error → full scan and restart.</b> <see cref="FileSystemWatcher"/> can report a lost-events
 /// overflow (or another OS-level error) through its <c>Error</c> event. On that event this immediately enqueues
 /// a scan for the affected library (bypassing the debounce — events may have been lost, so waiting for another
-/// one is not safe) and replaces that library's watcher, exactly as though it were only just being scheduled.
+/// one is not safe) and replaces that library's watcher, exactly as though it were only just being scheduled. Only a lost-events
+/// overflow, or a watched folder that is itself gone, is worth a warning (and a gone folder queues no scan, as there is nothing to
+/// scan): a folder removed from inside the watched one interrupts the watch and loses nothing, so it is an information line.
 /// </item>
 /// <item>
 /// <b>Reacts to library create/update/delete without a restart.</b> This re-reads the enabled libraries and their
@@ -287,11 +289,38 @@ public class ProcessingWatchedFolderWatcherService : BackgroundService
             watcher.Renamed += (sender, e) => OnEvent(sender, e);
             watcher.Error += (sender, e) =>
             {
-                _logger.LogWarning(
-                    e.GetException(),
-                    "The filesystem watcher for {Library} reported an error; queuing a full scan and restarting the watcher.",
-                    library.Name);
-                immediateScans.Enqueue(libraryId);
+                var error = e.GetException();
+                if (!Directory.Exists(folder))
+                {
+                    // The watched folder itself is gone, which is a real problem and no scan can help; the restart records that Weir can
+                    // no longer watch it.
+                    _logger.LogWarning(
+                        error,
+                        "Weir can no longer see {Folder}, the watched folder for {Library}. It may have been deleted or its drive disconnected. Check that the folder exists and that Weir can reach it.",
+                        folder,
+                        library.Name);
+                }
+                else
+                {
+                    if (error is InternalBufferOverflowException)
+                    {
+                        _logger.LogWarning(
+                            error,
+                            "The filesystem watcher for {Library} reported an error; queuing a full scan and restarting the watcher.",
+                            library.Name);
+                    }
+                    else
+                    {
+                        // A folder inside the watched folder was deleted or moved: it interrupts the watch but loses nothing.
+                        _logger.LogInformation(
+                            "The filesystem watcher for {Library} was interrupted, most likely because a folder inside {Folder} was removed. Weir is checking the folder again and restarting the watcher.",
+                            library.Name,
+                            folder);
+                    }
+
+                    immediateScans.Enqueue(libraryId);
+                }
+
                 restarts.Enqueue(libraryId);
             };
 

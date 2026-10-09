@@ -153,6 +153,17 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandler : IJobHandler
                 return null;
             }
 
+            if (library.WatchedFolder.Trim() is { Length: > 0 } saved && !Directory.Exists(ProcessingLibraryFolders.ExpandForFilesystem(saved)))
+            {
+                // Not a failed job to retry: the folder is gone (deleted, or its drive unmounted) and a retry would find the same. This is a
+                // real problem, so it is a warning in plain words, and the next scan looks again.
+                _logger?.LogWarning(
+                    "Did not scan {Library}: Weir can't see its watched folder {Folder}. It may have been deleted or its drive disconnected. Check that the folder exists and that Weir can reach it.",
+                    library.Name,
+                    saved);
+                return null;
+            }
+
             var (paths, pathError) = WatchedFolderScanOps.ResolvePathRuntimeForLibrary(library, _options.WeirHome);
             if (paths is null)
             {

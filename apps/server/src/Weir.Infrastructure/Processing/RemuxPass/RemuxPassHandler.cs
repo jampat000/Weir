@@ -209,6 +209,13 @@ public sealed partial class RemuxPassHandler : IJobHandler
             payloadJson = WireJsonWriter.Dumps(data.Copy().Set("origin", adopted), WireJsonFormat.Compact);
         }
 
+        // Whatever the pass made of a file that has since left the watched folder, it is not a failure: there is nothing to do.
+        if (result.Get("ok") is WireBool { Value: false } && GoneSources.HasLeft(request.Runtime.WatchedFolder, rel))
+        {
+            result = RemuxPassRunner.SourceGone(rel, result.Get("inspected_source_path") is WireString inspected ? inspected.Value : null);
+            _logger.LogInformation("{Path} is no longer in the watched folder, so there is nothing to do.", rel);
+        }
+
         result.Set("job_id", context.Id);
         result.Set("library_id", claim.Library?.Id ?? libraryId);
         // Before the rejection is acted on: a file that stays unreadable through the looks is refused here, and only then.

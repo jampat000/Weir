@@ -76,21 +76,49 @@ public sealed class ProcessingPassThroughHandlerTests : IDisposable
     }
 
     [Fact]
-    public async Task Nothing_half_written_is_left_when_the_source_vanishes_mid_flight()
+    public async Task A_file_deleted_before_it_could_be_handed_back_settles_as_nothing_to_do()
     {
         var library = await LibraryAsync();
         await FileRowAsync(library, "gone.mkv");
         var payload = $$"""{"relative_media_path":"gone.mkv","library_id":{{library}},"trigger":"worker"}""";
 
-        var exception = await Assert.ThrowsAsync<AlreadyRecordedFailureException>(
-            () => Handler().HandleAsync(Context(2, payload), CancellationToken.None));
+        await Handler().HandleAsync(Context(2, payload), CancellationToken.None);
 
-        Assert.Contains("no longer in the watched folder", exception.Message, StringComparison.Ordinal);
         Assert.False(File.Exists(_folders.Out("gone.mkv")));
-        Assert.Equal(1, await _fixture.Store.Scalar("SELECT count(*) FROM activity_events WHERE event_type = 'processing.file_pass_through_failed'"));
-        var detail = (WireObject)WireJsonParser.Parse(await ScalarText("SELECT detail FROM activity_events WHERE event_type = 'processing.file_pass_through_failed'"));
-        Assert.True(((WireBool)detail["source_kept"]).Value);
-        Assert.Equal("failed", WireConvert.Str(detail["result"]));
+        Assert.Equal(0, await _fixture.Store.Scalar("SELECT count(*) FROM activity_events WHERE event_type = 'processing.file_pass_through_failed'"));
+        Assert.Equal(0, await _fixture.Store.Scalar("SELECT count(*) FROM files"));
+        Assert.Equal(1, await _fixture.Store.Scalar("SELECT count(*) FROM activity_events"));
+        Assert.Equal("skipped", await ScalarText("SELECT result FROM activity_events"));
+        Assert.Equal("gone.mkv is no longer there, so there is nothing to do", await ScalarText("SELECT title FROM activity_events"));
+    }
+
+    [Fact]
+    public async Task A_file_whose_folder_was_deleted_settles_the_same_way()
+    {
+        var library = await LibraryAsync();
+        _folders.Source(Path.Join("Release", "film.mkv"));
+        Directory.Delete(Path.Join(_folders.Watched, "Release"), recursive: true);
+        await FileRowAsync(library, "Release/film.mkv");
+        var payload = $$"""{"relative_media_path":"Release/film.mkv","library_id":{{library}},"trigger":"worker"}""";
+
+        await Handler().HandleAsync(Context(5, payload), CancellationToken.None);
+
+        Assert.Equal(0, await _fixture.Store.Scalar("SELECT count(*) FROM files"));
+        Assert.Equal("skipped", await ScalarText("SELECT result FROM activity_events"));
+    }
+
+    [Fact]
+    public async Task A_missing_watched_folder_is_still_a_failure_not_a_file_that_is_gone()
+    {
+        var library = await LibraryAsync();
+        await FileRowAsync(library, "file.mkv");
+        Directory.Delete(_folders.Watched, recursive: true);
+        var payload = $$"""{"relative_media_path":"file.mkv","library_id":{{library}},"trigger":"worker"}""";
+
+        await Assert.ThrowsAsync<AlreadyRecordedFailureException>(() => Handler().HandleAsync(Context(6, payload), CancellationToken.None));
+
+        Assert.Equal(1, await _fixture.Store.Scalar("SELECT count(*) FROM files"));
+        Assert.Equal("failed", await ScalarText("SELECT result FROM activity_events"));
     }
 
     [Fact]
