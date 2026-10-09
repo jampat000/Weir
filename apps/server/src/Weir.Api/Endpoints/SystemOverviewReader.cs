@@ -104,9 +104,20 @@ internal sealed class SystemOverviewReader
             .Set("last_update_backup", UpdateBackupOut(PreUpdateBackup.Latest(_options.BackupDir)));
     }
 
-    private static WireValue UpdateBackupOut(PreUpdateBackupFile? backup) => backup is null
+    private WireValue UpdateBackupOut(PreUpdateBackupFile? backup) => backup is null
         ? WireNull.Instance
-        : new WireObject().Set("path", backup.DatabasePath).Set("taken_at", Timestamp.FromDateTimeOffset(backup.TakenAt).ToWireText());
+        : new WireObject()
+            .Set("path", backup.DatabasePath)
+            .Set("taken_at", Timestamp.FromDateTimeOffset(backup.TakenAt).ToWireText())
+            .Set("from_version", backup.FromVersion)
+            .Set("to_version", backup.ToVersion)
+            .Set("in_data_folder", IsInDataFolder(backup.DatabasePath));
+
+    private bool IsInDataFolder(string path)
+    {
+        var relative = Path.GetRelativePath(_options.WeirHome, path);
+        return relative != ".." && !relative.StartsWith(".." + Path.DirectorySeparatorChar, StringComparison.Ordinal) && !Path.IsPathRooted(relative);
+    }
 
     /// <summary>
     /// Where a browser reaches Weir: this PC's own name when it listens on every interface, <c>localhost</c> when only this PC

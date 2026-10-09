@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.Json;
 using Weir.Core.Configuration;
 using Weir.Core.Json;
 using Weir.Core.Updates;
@@ -11,6 +12,9 @@ public sealed class UpdateFiles
     public const string SettingsFileName = "update-settings.json";
     public const string StateFileName = "update-state.json";
     public const string ApplyFlagFileName = "update-apply-now";
+
+    /// <summary>The tray's record of an update it held back for want of a copy of Weir's data: <c>{ "version": …, "reason": … }</c>.</summary>
+    public const string NotAppliedFileName = "update-not-applied.json";
 
     /// <summary>What the tray reads to learn whether Weir is idle; written only while an update waits to install (#875).</summary>
     public const string WorkStateFileName = "work-state.json";
@@ -72,8 +76,22 @@ public sealed class UpdateFiles
         return UpdateStatus.UpdateSettingsOut(mode, checkOnStartup, checkIntervalMinutes);
     }
 
-    /// <summary>Read the update state the tray writes; a missing or unreadable file reads as the default state.</summary>
+    /// <summary>
+    /// Read the update state the tray writes; a missing or unreadable file reads as the default state. While the tray holds an
+    /// update back because it could not save a copy of Weir's data first (<see cref="NotAppliedFileName"/>), the state also says why.
+    /// </summary>
     public WireObject ReadState()
+    {
+        var state = ParseState();
+        if (ReadNotAppliedReason() is { } reason)
+        {
+            state.Set("not_updated_reason", reason);
+        }
+
+        return state;
+    }
+
+    private WireObject ParseState()
     {
         var path = Path.Join(_options.WeirHome, StateFileName);
         if (!File.Exists(path))
@@ -88,6 +106,24 @@ public sealed class UpdateFiles
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or DecoderFallbackException)
         {
             return UpdateStatus.ParseUpdateState(null);
+        }
+    }
+
+    private string? ReadNotAppliedReason()
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(File.ReadAllText(Path.Join(_options.WeirHome, NotAppliedFileName)));
+            return document.RootElement.ValueKind == JsonValueKind.Object
+                && document.RootElement.TryGetProperty("reason", out var reason)
+                && reason.ValueKind == JsonValueKind.String
+                && reason.GetString() is { Length: > 0 } text
+                    ? text
+                    : null;
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or JsonException)
+        {
+            return null;
         }
     }
 

@@ -4,7 +4,10 @@ import { Chip } from "../../../../components/panels/chip";
 import { Panel } from "../../../../components/panels/panel";
 import type { RunsAs } from "../../../../lib/system/system-stats-types";
 import { useSystemOverviewQuery } from "../../../../lib/system/use-system-stats";
-import { useUpdateStatusQuery } from "../../../../lib/settings/queries";
+import {
+  useUpdateStateQuery,
+  useUpdateStatusQuery,
+} from "../../../../lib/settings/queries";
 import { useAppDateFormatter } from "../../../../lib/ui/mm-format-date";
 import type { AppSettings } from "../../../../lib/settings/types";
 import { updateMeaning } from "../../../../lib/settings/update-status";
@@ -45,6 +48,8 @@ export function ThisWeirSection({ settings }: { settings: AppSettings }) {
   const update = useUpdateStatusQuery().data;
   const overview = useSystemOverviewQuery().data;
   const formatDate = useAppDateFormatter();
+  const notUpdated = useUpdateStateQuery().data?.not_updated_reason;
+  const backup = overview?.last_update_backup;
   const wizardState = (settings.setup_wizard_state || "pending")
     .trim()
     .toLowerCase();
@@ -114,14 +119,26 @@ export function ThisWeirSection({ settings }: { settings: AppSettings }) {
           </>
         ) : null}
       </dl>
-      {overview?.last_update_backup ? (
+      {notUpdated ? (
         <p
-          className="mm-sys-note"
-          title={`Saved ${formatDate(overview.last_update_backup.taken_at)}`}
-          data-testid="about-update-backup"
+          className="mm-status-text mm-sys-note"
+          data-status="attention"
+          data-testid="about-not-updated"
         >
-          Before updating, Weir saved a copy of its data at{" "}
-          <code>{overview.last_update_backup.path}</code>.
+          Weir didn&apos;t update because it couldn&apos;t save a copy of its
+          data: {notUpdated}
+        </p>
+      ) : null}
+      {backup ? (
+        <p className="mm-sys-note" data-testid="about-update-backup">
+          Before updating
+          {backup.from_version ? ` from ${backup.from_version}` : ""} to{" "}
+          {backup.to_version} on {formatDate(backup.taken_at)}, Weir saved a
+          copy of its data at <code>{backup.path}</code>
+          {overview?.runs_as === "docker" && backup.in_data_folder
+            ? ", inside the WEIR_HOME volume"
+            : ""}
+          .
         </p>
       ) : null}
       {machine?.machine_name_looks_generated ? (

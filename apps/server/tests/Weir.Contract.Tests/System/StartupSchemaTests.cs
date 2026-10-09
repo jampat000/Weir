@@ -156,6 +156,12 @@ public sealed class StartupSchemaTests(StartupSchemaTests.HeadSchemaFixture fixt
         Assert.Contains("Weir couldn't save a copy of its data before updating, so it didn't change anything:", error.Message, StringComparison.Ordinal);
         Assert.False(server.IsRunning);
 
+        // The reason is left for the tray, which shows it instead of a bare "couldn't start".
+        var note = (await File.ReadAllTextAsync(Path.Combine(server.Home, "startup-error.txt"))).Split('\n', 2);
+        Assert.Equal("Couldn't save a copy of its data before updating", note[0]);
+        Assert.StartsWith("Weir couldn't save a copy of its data before updating, so it didn't change anything:", note[1], StringComparison.Ordinal);
+        Assert.False(File.Exists(Path.Combine(server.Home, "startup-progress.txt")));
+
         await using (var after = await server.StopForDatabaseAsync(restart: false))
         {
             Assert.Equal(PreviousRevision, (string?)SeedSql.Scalar(after.Connection, "SELECT version_num FROM alembic_version"));
@@ -166,6 +172,7 @@ public sealed class StartupSchemaTests(StartupSchemaTests.HeadSchemaFixture fixt
         await server.RestartAsync();
         using var client = server.CreateClient();
         Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/health")).Status);
+        Assert.False(File.Exists(Path.Combine(server.Home, "startup-error.txt")));
     }
 
     /// <summary>A revision this build has never heard of is refused whichever table holds it, and the file is left as it was.</summary>

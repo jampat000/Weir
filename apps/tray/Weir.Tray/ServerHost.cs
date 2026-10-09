@@ -45,7 +45,9 @@ sealed class ServerHost : IServerListenScope, IDisposable
     private volatile int _port;
     private volatile ListenScope _scope;
     private volatile ServerPhase _phase = ServerPhase.Starting;
+    private volatile StartupError? _startupError;
     private long _startedAtTicks;
+    private bool _waitingForSave;
     private Task? _watchdog;
     private Action? _onGaveUp;
     private CancellationToken _watchdogToken;
@@ -63,6 +65,9 @@ sealed class ServerHost : IServerListenScope, IDisposable
 
     internal int Port => _port;
 
+    /// <summary>Whether a server process this host started is running, ready or not.</summary>
+    internal bool IsRunning => _process is { HasExited: false };
+
     /// <summary>Where the server is: being started, answering, or stopped with nothing about to bring it back.</summary>
     internal ServerPhase Phase => _phase;
 
@@ -71,12 +76,19 @@ sealed class ServerHost : IServerListenScope, IDisposable
     /// <summary>When the server process this host last started began, or null if it has started none.</summary>
     internal DateTime? StartedAtUtc => Volatile.Read(ref _startedAtTicks) is > 0 and var ticks ? new DateTime(ticks, DateTimeKind.Utc) : null;
 
+    /// <summary>
+    /// Why the server could not start, in its own words, while <see cref="Phase"/> is Stopped and the server said why
+    /// (StartupNotes); null otherwise.
+    /// </summary>
+    internal StartupError? StartupError => _startupError;
+
     private void SetPhase(ServerPhase phase)
     {
         if (_phase == phase)
         {
             return;
         }
+        _startupError = phase == ServerPhase.Stopped ? StartupNotes.ReadError(_runtimeHome, StartedAtUtc) : null;
         _phase = phase;
         PhaseChanged?.Invoke();
     }
@@ -191,6 +203,14 @@ sealed class ServerHost : IServerListenScope, IDisposable
             TrayLog.Write($"Waiting {delay.TotalMilliseconds:0}ms before restarting server...");
             await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
             failedRestarts = await RestartAsync(exited, cancellationToken).ConfigureAwait(false) ? 0 : failedRestarts + 1;
+            if (failedRestarts > 0 && StartupNotes.ReadError(_runtimeHome, StartedAtUtc) is { } reason)
+            {
+                // The server said why it cannot start. One more try has been made; another would fail the same way.
+                TrayLog.Write($"The server said why it cannot start, so it is not tried again: {reason.Detail}");
+                SetPhase(ServerPhase.Stopped);
+                onGaveUp();
+                return;
+            }
         }
     }
 
@@ -411,8 +431,25 @@ sealed class ServerHost : IServerListenScope, IDisposable
             _http,
             new Uri($"http://127.0.0.1:{_port}/ready"),
             () => process is { HasExited: true } ? process.ExitCode : null,
-            new ServerHealth.Timing(HealthTimeout, ServerHealth.RetryDelay, TimeProvider.System),
+            new ServerHealth.Timing(HealthTimeout, ServerHealth.RetryDelay, TimeProvider.System, () => IsSavingBeforeUpdate(process)),
             cancellationToken);
+    }
+
+    // A server that is alive and has said it is busy before it can answer (saving a copy of the data before an update) is
+    // waited for, however long that takes within StartupNotes.LongestBusy; one that says nothing gets HealthTimeout.
+    private bool IsSavingBeforeUpdate(Process? process)
+    {
+        if (process is not { HasExited: false } || !StartupNotes.IsBusy(_runtimeHome, StartedAtUtc, DateTime.UtcNow))
+        {
+            _waitingForSave = false;
+            return false;
+        }
+        if (!_waitingForSave)
+        {
+            _waitingForSave = true;
+            TrayLog.Write("The server is saving a copy of Weir's data before updating; waiting for it to finish.");
+        }
+        return true;
     }
 
     private string FindServerExeDirectory()

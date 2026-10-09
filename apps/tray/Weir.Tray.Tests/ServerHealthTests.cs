@@ -69,6 +69,28 @@ public sealed class ServerHealthTests
     }
 
     [Fact(Timeout = TestTimeoutMs)]
+    public async Task A_server_that_has_said_it_is_busy_is_waited_for_past_the_timeout_and_given_up_on_once_it_is_not()
+    {
+        var clock = new DelayWatchingTimeProvider();
+        var handler = new ScriptedHandler(_ => HttpStatusCode.ServiceUnavailable);
+        using var client = new HttpClient(handler);
+        var busy = true;
+        var timing = new ServerHealth.Timing(Pause * 2, Pause, clock, () => busy);
+
+        var waiting = ServerHealth.WaitUntilReadyAsync(client, ReadyUrl, () => null, timing, CancellationToken.None);
+        for (var i = 0; i < 20; i++)
+        {
+            Assert.NotSame(waiting, await Task.WhenAny(waiting, clock.NextDelay()));
+            clock.Advance(Pause);
+        }
+
+        Assert.False(waiting.IsCompleted);
+        busy = false;
+        await DriveUntilDone(waiting, clock);
+        await Assert.ThrowsAsync<TimeoutException>(() => waiting);
+    }
+
+    [Fact(Timeout = TestTimeoutMs)]
     public async Task Nothing_listening_ends_in_a_timeout_not_a_network_error()
     {
         var clock = new DelayWatchingTimeProvider();

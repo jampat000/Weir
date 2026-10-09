@@ -7950,6 +7950,16 @@ export interface components {
      */
     SystemOverviewUpdateBackupOut: {
       /**
+       * From Version
+       * @description The version of Weir that was running when the copy was taken; null when the server that took it did not know (a copy taken as the new version started).
+       */
+      from_version: string | null;
+      /**
+       * In Data Folder
+       * @description Whether the copy is inside Weir's data folder (in Docker, the WEIR_HOME volume).
+       */
+      in_data_folder: boolean;
+      /**
        * Path
        * @description Where the copy of the database is, on the computer Weir runs on.
        */
@@ -7960,6 +7970,11 @@ export interface components {
        * @description When the copy was taken.
        */
       taken_at: string;
+      /**
+       * To Version
+       * @description The version of Weir the update was to.
+       */
+      to_version: string;
     };
     /**
      * SystemOverviewUpdateOut
@@ -8427,6 +8442,11 @@ export interface components {
        * @default false
        */
       downloaded: boolean;
+      /**
+       * Not Updated Reason
+       * @description Present only while the tray holds the downloaded update back because it could not save a copy of Weir's data first: why, in plain words, and what to do.
+       */
+      not_updated_reason?: string;
       /** Pending Version */
       pending_version?: string | null;
     };

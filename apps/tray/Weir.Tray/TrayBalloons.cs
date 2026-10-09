@@ -14,6 +14,12 @@ static class TrayBalloons
     /// <summary>Weir could not start, or could not start again from Restart Weir. A click tries again.</summary>
     internal const string CouldNotStartText = "Weir couldn't start. Click to try again.";
 
+    /// <summary>Weir could not start and said why, in its own words. A click tries again.</summary>
+    internal static string CouldNotStartBecause(StartupError why) => $"Weir couldn't start. {why.Detail} Click to try again.";
+
+    /// <summary>The server exited and could not be brought back, and said why. A click restarts it.</summary>
+    internal static string StoppedBecause(StartupError why) => $"Weir stopped. {why.Detail} Click to try again.";
+
     /// <summary>The person clicked the icon or Open Weir while the server was starting.</summary>
     internal const string StillStartingText = "Weir is still starting. Try again in a moment.";
 

@@ -34,6 +34,7 @@ export type UpdateSettingsPutBody = RequestBody<"UpdateSettingsPutIn">;
 export type UpdateStateOut = {
   downloaded: boolean;
   pending_version: string | null;
+  not_updated_reason?: string;
 };
 
 export type HistoryResetResult = Schema<"SuiteOperationalHistoryResetOut">;

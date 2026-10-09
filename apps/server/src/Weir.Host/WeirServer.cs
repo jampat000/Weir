@@ -195,16 +195,18 @@ public static class WeirServer
     private static void OpenDatabase(WebApplication app, WeirOptions options, ILogger logger)
     {
         var database = app.Services.GetRequiredService<SqliteDatabase>();
+        StartupNotes.ClearStale(options.WeirHome);
         var backup = new PreUpdateBackup(
             options.BackupDir,
             options.WeirHome,
             WeirVersion.Resolve(options.VersionOverride),
             app.Services.GetRequiredService<TimeProvider>(),
-            logger);
+            logger,
+            saving: sentence => StartupNotes.WriteProgress(options.WeirHome, sentence));
         SchemaStartupOutcome outcome;
         try
         {
-            outcome = new SchemaMigrator(database).EnsureAtHead(backup.Take);
+            outcome = new SchemaMigrator(database).EnsureAtHead((connection, revision) => backup.Save(connection, revision));
         }
         catch (DatabaseSchemaMismatchException exception)
         {
@@ -214,7 +216,12 @@ public static class WeirServer
         catch (PreUpdateBackupException exception)
         {
             logger.LogCritical("{Message}", exception.Message);
+            StartupNotes.WriteError(options.WeirHome, PreUpdateBackupException.Headline, exception.Message);
             throw;
+        }
+        finally
+        {
+            StartupNotes.ClearProgress(options.WeirHome);
         }
 
         if (outcome == SchemaStartupOutcome.Created)

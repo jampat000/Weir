@@ -96,6 +96,8 @@ public static class WeirApi
         // Tells the tray what it shows (the pause, managers and folders not answering) and does the pause it asks for.
         services.AddHostedService<TrayStatusWriter>();
         services.AddHostedService<TrayPauseRequestWatcher>();
+        // Saves the copy of Weir's data the tray asks for just before it applies an update.
+        services.AddHostedService<TrayUpdateBackupWatcher>();
         services.AddWeirResponseCompression();
         services.AddRouting();
         return services;

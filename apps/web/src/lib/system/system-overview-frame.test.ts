@@ -21,6 +21,9 @@ const overview = {
   last_update_backup: {
     path: "C:\\ProgramData\\Weir\\backups\\pre-update\\weir-0076-to-1.0.0-20261010T090000Z.db",
     taken_at: "2026-10-10T09:00:00Z",
+    from_version: "1.0.0-rc.12",
+    to_version: "1.0.0-rc.13",
+    in_data_folder: true,
   },
 };
 

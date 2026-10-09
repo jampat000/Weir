@@ -20,6 +20,11 @@ static class UpdateOnStart
         {
             return false;
         }
+        if (UpdateBackupHook.FailedFor(runtimeHome, version))
+        {
+            TrayLog.Write($"Update v{version} is waiting, but Weir could not save a copy of its data before applying it, and the server that starts after the update would fail the same way. Starting Weir as it is; the next update check tries again.");
+            return false;
+        }
         if (WasAttempted(runtimeHome, version))
         {
             TrayLog.Write($"Update v{version} is waiting, but installing it at start-up was tried before and did not finish. Starting Weir as it is.");

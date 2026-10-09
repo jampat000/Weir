@@ -19,7 +19,12 @@ function hasNumbers(value: unknown, keys: readonly string[]): boolean {
 function isUpdateBackup(value: unknown): boolean {
   return (
     value === null ||
-    (isRecord(value) && isText(value.path) && isText(value.taken_at))
+    (isRecord(value) &&
+      isText(value.path) &&
+      isText(value.taken_at) &&
+      isText(value.to_version) &&
+      (value.from_version === null || isText(value.from_version)) &&
+      typeof value.in_data_folder === "boolean")
   );
 }
 

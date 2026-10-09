@@ -69,7 +69,14 @@ sealed class TrayApp : IDisposable
         _lanAccess = new LanAccessSync(_runtimeHome, _server, new WindowsFirewallAccess(), TimeProvider.System);
         _updateSettings = updateSettings;
         _updateService = updateService;
-        _shutdown = new TrayShutdown(StopServerAsync, updateService);
+        _shutdown = new TrayShutdown(
+            StopServerAsync,
+            updateService,
+            new UpdateBackupHook(
+                new UpdateBackupRequest(_runtimeHome, TimeProvider.System, () => _server.IsRunning).AskAsync,
+                _runtimeHome,
+                () => _server.IsRunning,
+                reason => OnUi(() => ShowNotUpdated(reason))));
         _serverStatus = new TrayStatusGate(() => _server.StartedAtUtc);
         _opener = new WeirOpener(
             () => _server.Phase,
@@ -101,6 +108,7 @@ sealed class TrayApp : IDisposable
         }
         _ui = SynchronizationContext.Current;
 
+        UpdateBackupHook.ForgetReason(_runtimeHome);
         _server.PrepareEnvironment();
         _server.WritePortFile();
         TrayLog.Write($"Prepared runtime environment on port {_server.Port}");
@@ -146,7 +154,7 @@ sealed class TrayApp : IDisposable
             }
 
             // The person is there: say so, and keep the icon, whose Restart Weir is the way back.
-            ShowBalloon("Weir", TrayBalloons.CouldNotStartText, ToolTipIcon.Error, RestartObserved);
+            ShowBalloon("Weir", CouldNotStartText(), ToolTipIcon.Error, RestartObserved);
             return;
         }
         TrayLog.Write($"Weir is healthy on http://127.0.0.1:{_server.Port}/");
@@ -174,7 +182,13 @@ sealed class TrayApp : IDisposable
         }
         _watching = true;
 
-        _server.Watch(() => OnUi(() => ShowBalloon("Weir", TrayBalloons.StoppedText, ToolTipIcon.Error, RestartObserved)), _cts.Token);
+        _server.Watch(
+            () => OnUi(() => ShowBalloon(
+                "Weir",
+                _server.StartupError is { } why ? TrayBalloons.StoppedBecause(why) : TrayBalloons.StoppedText,
+                ToolTipIcon.Error,
+                RestartObserved)),
+            _cts.Token);
 
         _ = BackgroundWork.RunLoop(
             "LAN access watcher",
@@ -199,8 +213,17 @@ sealed class TrayApp : IDisposable
         var status = _serverStatus.Current;
         _statusDeadline.Follow(waiting: phase == ServerPhase.Running && status is null);
         return new TrayState(
-            phase, status, _updates is { IsDownloaded: true } updates ? updates.PendingVersion : null, _server.Port, _statusDeadline.Overdue);
+            phase,
+            status,
+            _updates is { IsDownloaded: true } updates ? updates.PendingVersion : null,
+            _server.Port,
+            _statusDeadline.Overdue,
+            _server.StartupError);
     }
+
+    // The server's own reason when it said one (a copy of the data it could not save before updating), else the general text.
+    private string CouldNotStartText() =>
+        _server.StartupError is { } why ? TrayBalloons.CouldNotStartBecause(why) : TrayBalloons.CouldNotStartText;
 
     private void AskAboutStartWithWindows()
     {
@@ -316,6 +339,17 @@ sealed class TrayApp : IDisposable
         }
         TrayLog.Write("Applying the downloaded update and restarting.");
         await _shutdown.RestartToUpdateAsync();
+    }
+
+    // The update stays downloaded and the old version keeps running; the next scheduled check, or a click, tries again.
+    private void ShowNotUpdated(string reason)
+    {
+        ShowBalloon(
+            "Weir Update",
+            $"Weir didn't update because it couldn't save a copy of its data: {reason}",
+            ToolTipIcon.Warning,
+            () => _opener.Open("tray-update-not-applied", Program.UpdateCheckPath));
+        Render();
     }
 
     // The server is stopped through ServerProcessStop before anything else happens, so nothing that follows, an
@@ -445,7 +479,7 @@ sealed class TrayApp : IDisposable
             }
             else
             {
-                ShowBalloon("Weir", TrayBalloons.CouldNotStartText, ToolTipIcon.Error, RestartObserved);
+                ShowBalloon("Weir", CouldNotStartText(), ToolTipIcon.Error, RestartObserved);
             }
         }
         catch (OperationCanceledException)
