@@ -130,7 +130,7 @@ public sealed class QueueChangeAnnouncementTests : IDisposable
     public async Task A_unit_of_work_that_queues_several_passes_announces_once_after_it_commits()
     {
         await using var unit = await UnitOfWork.OpenAsync(_db.Database);
-        var transaction = unit.WriteTransaction();
+        var transaction = await unit.WriteTransactionAsync();
         foreach (var key in new[] { "a", "b", "c" })
         {
             _store.EnqueueOrGet(unit.Connection, transaction, key, FilePass, payloadJson: null, maxAttempts: 3, runnerCost: 0, priority: 0);
@@ -148,7 +148,7 @@ public sealed class QueueChangeAnnouncementTests : IDisposable
     {
         await using (var unit = await UnitOfWork.OpenAsync(_db.Database))
         {
-            _store.EnqueueOrGet(unit.Connection, unit.WriteTransaction(), "undone", FilePass, payloadJson: null, maxAttempts: 3, runnerCost: 0, priority: 0);
+            _store.EnqueueOrGet(unit.Connection, await unit.WriteTransactionAsync(), "undone", FilePass, payloadJson: null, maxAttempts: 3, runnerCost: 0, priority: 0);
             await unit.RollbackAsync();
         }
 

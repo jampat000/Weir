@@ -70,7 +70,7 @@ public sealed partial class UnclaimedHandbackCleanupHandler : IJobHandler
                 _store.Database,
                 async uow =>
                 {
-                    uow.BeginImmediate();
+                    await uow.BeginImmediateAsync().ConfigureAwait(false);
                     var decided = HandbackStore.Release(row, "a media manager");
                     decided = decided.Kind switch
                     {

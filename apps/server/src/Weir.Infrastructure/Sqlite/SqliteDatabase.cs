@@ -11,7 +11,9 @@ namespace Weir.Infrastructure.Sqlite;
 /// foreign keys on, a 30 second busy timeout and <c>synchronous=NORMAL</c>, plus the cache and journal
 /// settings in <see cref="TuningPragmas"/>.
 /// </summary>
+#pragma warning disable CA1001 // The write gate's SemaphoreSlim never creates a wait handle, so it owns nothing that needs disposing.
 public sealed class SqliteDatabase
+#pragma warning restore CA1001
 {
     /// <summary>
     /// Processing writes progress in short transactions; a transient writer collision should wait for
@@ -59,6 +61,18 @@ public sealed class SqliteDatabase
     /// <summary>SQLite's result code for a database file that cannot be opened (<c>SQLITE_CANTOPEN</c>).</summary>
     private const int SqliteCantOpen = 14;
 
+    /// <summary>SQLite's result code for a database that stays locked past the busy timeout (<c>SQLITE_BUSY</c>).</summary>
+    private const int SqliteBusy = 5;
+
+    /// <summary>
+    /// Weir's own writers queue here, one at a time, before they ask SQLite for its write lock. SQLite makes a writer that
+    /// finds the lock taken sleep and retry inside <c>BEGIN IMMEDIATE</c> for up to the busy timeout, and
+    /// Microsoft.Data.Sqlite runs even its async calls synchronously, so every waiting writer held a thread-pool thread
+    /// for as long as it waited. Waiting here costs no thread, and the queue is first come, first served. The busy timeout
+    /// still covers a writer outside this process, such as a backup tool. Readers never come here (WAL).
+    /// </summary>
+    private readonly SemaphoreSlim _writeGate = new(1, 1);
+
     /// <summary>
     /// Connection strings whose pool has been filled with at least one connection, keyed the same way as
     /// <see cref="PoolGates"/>. <c>Mode=ReadWriteCreate</c> may only conjure the database file into existence on
@@ -104,7 +118,7 @@ public sealed class SqliteDatabase
             // statement that answers SQLITE_BUSY until this expires, and SQLITE_BUSY_SNAPSHOT (a
             // read-then-write upgrade on a snapshot another connection has already overtaken) answers
             // exactly that while never being able to succeed, wasting the whole thirty seconds. Units of
-            // work take the write lock at BEGIN (UnitOfWork.EnsureTransaction), so no transaction here can
+            // work take the write lock at BEGIN (UnitOfWork.EnsureTransactionAsync), so no transaction here can
             // hold a stale snapshot (#586).
             DefaultTimeout = _busyTimeoutMilliseconds / 1000,
         }.ToString();
@@ -153,6 +167,21 @@ public sealed class SqliteDatabase
             throw;
         }
     }
+
+    /// <summary>
+    /// Takes the place at the head of the write queue, waiting for it without holding a thread. Gives up as SQLite would,
+    /// with <c>SQLITE_BUSY</c>, once the busy timeout has passed. Whoever takes it releases it with <see cref="ReleaseWriteGate"/>
+    /// when the write lock is free again.
+    /// </summary>
+    internal async Task AcquireWriteGateAsync(CancellationToken cancellationToken)
+    {
+        if (!await _writeGate.WaitAsync(_busyTimeoutMilliseconds, cancellationToken).ConfigureAwait(false))
+        {
+            throw new SqliteException("database is locked", SqliteBusy);
+        }
+    }
+
+    internal void ReleaseWriteGate() => _writeGate.Release();
 
     public SqliteConnection Open()
     {
