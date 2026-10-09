@@ -33,8 +33,13 @@ public static class FfmpegCommands
     /// <summary>How much of ffmpeg's stderr a failure message keeps.</summary>
     public const int FfmpegStderrTailBytes = 32 * 1024;
 
-    /// <summary>The ffmpeg wait after its progress stream closes.</summary>
-    public const int ProgressExitWaitSeconds = 5;
+    /// <summary>
+    /// The ffmpeg wait after its progress stream closes. The stream closes while ffmpeg tears down, after the output is
+    /// complete, and ffmpeg runs below normal priority, so a busy machine can take far longer than a few seconds to let it
+    /// exit; cutting it off then would fail a good remux. Only an ffmpeg that hangs there is killed, and the run's overall
+    /// time limit still bounds it.
+    /// </summary>
+    public const int ProgressExitWaitSeconds = 60;
 
     /// <summary>A double so a timeout message prints it as <c>10.0</c>, as the golden files expect.</summary>
     public const double HwaccelTimeoutSeconds = 10.0;
