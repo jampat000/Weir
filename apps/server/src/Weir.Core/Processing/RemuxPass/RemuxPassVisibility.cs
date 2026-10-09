@@ -40,6 +40,9 @@ public static class GoneSourceText
     public const string HeldReason =
         "This file is no longer in the watched folder. Weir will look again shortly, and stops listing it if it has not come back.";
 
+    /// <summary>What a file that was cleaned before says once it has gone: back to finished, as history.</summary>
+    public const string CleanedReason = "Finished processing this file. Its original is no longer in the watched folder.";
+
     public static string Title(string name) => $"{name} is no longer there, so there is nothing to do";
 }
 

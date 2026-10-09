@@ -4,6 +4,7 @@ using Weir.Core.Media;
 using Weir.Core.Processing;
 using Weir.Infrastructure.Activity;
 using Weir.Infrastructure.Processing;
+using Weir.Infrastructure.Processing.RemuxPass;
 using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Infrastructure.Jobs;
@@ -13,8 +14,9 @@ namespace Weir.Infrastructure.Jobs;
 /// client removed it, a person deleted it, or the manager took it. The scan walks only files on disk, so nothing else would
 /// ever judge that row again, and it would stay listed for ever. It is forgotten, as Forget does, with one Activity entry
 /// saying why. A file with a pass queued or running is left to that pass, and a path that is now a folder on disk is kept.
-/// Outcomes Weir reached (processed, passed through, rejected, skipped) stay as history, and so does a row carrying the source Weir
-/// last cleaned: it is what stops that source being cleaned twice if the file comes back unchanged.
+/// Outcomes Weir reached (processed, passed through, rejected, skipped) stay as history. A row carrying the source Weir last cleaned
+/// is not forgotten either, because it is what stops that source being cleaned twice if the file comes back unchanged: it goes back
+/// to processed and stops waiting on anyone.
 /// </summary>
 /// <remarks>
 /// <para>Rows no scan has seen are included, and so are cancelled ones: a media manager's hand-off records its file on receipt,
@@ -113,13 +115,16 @@ public static class VanishedFiles
             return false;
         }
 
-        var deleted = await uow.ExecuteAsync(
-            "DELETE FROM files WHERE id = @id AND status = @status AND coalesce(last_seen_at, updated_at, created_at) = @seen " +
-            "AND processed_source_size IS NULL AND processed_source_mtime_ns IS NULL",
-            ("@id", row.Id),
-            ("@status", row.Status),
-            ("@seen", row.LastSeenStored)).ConfigureAwait(false);
-        if (deleted == 0)
+        const string unchanged = "id = @id AND status = @status AND coalesce(last_seen_at, updated_at, created_at) = @seen";
+        var parameters = new (string, object?)[] { ("@id", row.Id), ("@status", row.Status), ("@seen", row.LastSeenStored) };
+        var forgotten = await uow.ExecuteAsync(
+            $"DELETE FROM files WHERE {unchanged} AND NOT {RemuxPassFileState.CarriesCleanedSource}", parameters).ConfigureAwait(false);
+        // A row that carries the source Weir last cleaned is what stops that source being cleaned twice, so it is not deleted: it goes
+        // back to finished, as history, and no longer waits on anyone.
+        var restored = forgotten == 0
+            ? await uow.ExecuteAsync($"UPDATE files SET {RemuxPassFileState.RestoreProcessed} WHERE {unchanged} AND {RemuxPassFileState.CarriesCleanedSource}", parameters).ConfigureAwait(false)
+            : 0;
+        if (forgotten + restored == 0)
         {
             return false;
         }

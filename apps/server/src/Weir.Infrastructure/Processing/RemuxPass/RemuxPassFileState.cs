@@ -108,21 +108,33 @@ public static class RemuxPassFileState
     }
 
     /// <summary>
-    /// A file that stayed gone through the hold has nothing left to wait for, so Weir stops listing it. A row that carries the
-    /// source Weir last cleaned is kept: it is what stops that source being cleaned twice if the file comes back unchanged.
+    /// A file that stayed gone through the hold has nothing left to wait for. A row that carries the source Weir last cleaned is
+    /// never deleted, because that is what stops the source being cleaned twice if the file comes back unchanged: it goes back to
+    /// the outcome it had (<see cref="RestoreProcessed"/>), history again, and is no longer counted as waiting on anyone. Every
+    /// other row is forgotten.
     /// </summary>
-    public static Task ForgetGoneAsync(UnitOfWork uow, long libraryId, string relativePath)
+    public static async Task ForgetGoneAsync(UnitOfWork uow, long libraryId, string relativePath)
     {
         ArgumentNullException.ThrowIfNull(uow);
-        return uow.ExecuteAsync(
-            $"DELETE FROM files WHERE library_id = $library AND relative_path = $path AND status IN ({UnfinishedStatuses}) " +
-            "AND processed_source_size IS NULL AND processed_source_mtime_ns IS NULL",
-            [
-                ("$library", libraryId),
-                ("$path", relativePath),
-                .. UnfinishedStatusParameters(),
-            ]);
+        (string, object?)[] parameters = [("$library", libraryId), ("$path", relativePath), .. UnfinishedStatusParameters()];
+        await uow.ExecuteAsync(
+            $"UPDATE files SET {RestoreProcessed} WHERE library_id = $library AND relative_path = $path AND status IN ({UnfinishedStatuses}) AND {CarriesCleanedSource}",
+            parameters).ConfigureAwait(false);
+        await uow.ExecuteAsync(
+            $"DELETE FROM files WHERE library_id = $library AND relative_path = $path AND status IN ({UnfinishedStatuses}) AND NOT ({CarriesCleanedSource})",
+            parameters).ConfigureAwait(false);
     }
+
+    /// <summary>Whether a <c>files</c> row records the source a pass last cleaned (<c>CleanedSources</c> reads these columns).</summary>
+    public const string CarriesCleanedSource = "(processed_source_size IS NOT NULL OR processed_source_mtime_ns IS NOT NULL)";
+
+    /// <summary>
+    /// The assignments that put a row whose file is gone back to its earlier outcome: processed, with the cleaned source kept and every
+    /// working field (attempts, reason, retry and look-again times) cleared.
+    /// </summary>
+    public static readonly string RestoreProcessed =
+        $"status = '{ProcessingFileStatuses.Processed}', status_reason = '{GoneSourceText.CleanedReason}', failure_class = NULL, failure_attempts = 0, " +
+        "next_retry_at = NULL, hold_until = NULL, blocked_by_connection = NULL, updated_at = CURRENT_TIMESTAMP";
 
     /// <summary>Keeps an on-hold file from being picked up again by a scan before <paramref name="lookAgainAt"/>, when its own next look is booked.</summary>
     public static Task HoldUntilAsync(UnitOfWork uow, long libraryId, string relativePath, DateTimeOffset lookAgainAt)

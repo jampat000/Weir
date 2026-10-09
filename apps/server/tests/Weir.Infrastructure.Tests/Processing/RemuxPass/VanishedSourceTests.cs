@@ -355,17 +355,57 @@ public sealed class VanishedSourceTests : IDisposable
     }
 
     [Fact]
-    public async Task A_row_that_carries_the_source_weir_cleaned_is_never_forgotten_when_its_file_is_gone()
+    public async Task A_cleaned_row_whose_file_is_gone_goes_back_to_processed_when_the_sweep_finds_it()
     {
         await SetUpAsync();
-        await _fixture.Store.Execute(
-            $"INSERT INTO files (library_id, relative_path, status, status_reason, size_bytes, processed_source_size, processed_source_mtime_ns, last_seen_at, created_at, updated_at) " +
-            $"VALUES ({_libraryId}, '{Rel}', 'on_hold', 'held', 2000, 2000, 1700000000000000000, '{Ago(60)}', '{Ago(60)}', '{Ago(60)}')");
+        await InsertCleanedRowAsync("processing_failed");
 
         await ScanAndDrainAsync();
 
+        await AssertBackToHistoryAsync();
+        Assert.Equal(1, await _fixture.Store.Scalar("SELECT count(*) FROM activity_events WHERE event_type = 'processing.file_left_watched_folder'"));
+    }
+
+    [Fact]
+    public async Task A_cleaned_row_whose_file_is_gone_goes_back_to_processed_at_the_passs_final_look()
+    {
+        await SetUpAsync();
+        await InsertCleanedRowAsync("processing_failed");
+        var payload = new WireObject().Set("relative_media_path", Rel).Set("library_id", _libraryId).Set("media_scope", "movie").Set("trigger", "manual");
+        await _fixture.Jobs.EnqueueOrGetAsync("process-again", RemuxPassOutcomes.JobKind, WireJsonWriter.Dumps(payload, WireJsonFormat.Compact));
+
+        // The first look holds it: it might only be a share that dropped.
+        await DrainAsync();
         Assert.Equal("on_hold", await StatusAsync(Rel));
-        Assert.Equal(0, await _fixture.Store.Scalar("SELECT count(*) FROM activity_events WHERE event_type = 'processing.file_left_watched_folder'"));
+
+        Advance((int)GoneSources.LookAgainAfter.TotalMinutes + 1);
+        await DrainAsync();
+
+        await AssertBackToHistoryAsync();
+        Assert.Equal(0, await ErrorsAndWarningsAsync());
+    }
+
+    /// <summary>A file a person pressed Process again on: its row is back in a working status but still carries the source Weir cleaned.</summary>
+    private Task InsertCleanedRowAsync(string status) =>
+        _fixture.Store.Execute(
+            $"INSERT INTO files (library_id, relative_path, status, status_reason, size_bytes, failure_class, failure_attempts, next_retry_at, " +
+            $"processed_source_size, processed_source_mtime_ns, last_seen_at, created_at, updated_at) " +
+            $"VALUES ({_libraryId}, '{Rel}', '{status}', 'failed again', 2000, 'execution', 2, '{Ago(-30)}', 2000, 1700000000000000000, '{Ago(60)}', '{Ago(60)}', '{Ago(60)}')");
+
+    /// <summary>Finished again, with the cleaned source kept and nothing left that makes the row wait on anyone.</summary>
+    private async Task AssertBackToHistoryAsync()
+    {
+        Assert.Equal("processed", await StatusAsync(Rel));
+        Assert.Equal(1, await _fixture.Store.Scalar($"SELECT count(*) FROM files WHERE processed_source_size = 2000 AND processed_source_mtime_ns = 1700000000000000000"));
+        Assert.Equal(1, await _fixture.Store.Scalar("SELECT count(*) FROM files WHERE failure_class IS NULL AND failure_attempts = 0 AND next_retry_at IS NULL AND hold_until IS NULL"));
+        Assert.DoesNotContain("failed again", await ReasonAsync(Rel), StringComparison.Ordinal);
+
+        var counts = await _fixture.Db(uow => _fixture.Files.StatusCountsAsync(uow, _libraryId));
+        Assert.Equal(1, counts[ProcessingFileStatuses.Processed]);
+        Assert.Equal(
+            0,
+            counts.Where(count => ProcessingFileMeanings.OfStatus.GetValueOrDefault(count.Key) is ProcessingFileMeaning.Attention or ProcessingFileMeaning.Broken or ProcessingFileMeaning.Todo or ProcessingFileMeaning.Doing)
+                .Sum(count => count.Value));
     }
 
     private string Ago(int minutes) =>
