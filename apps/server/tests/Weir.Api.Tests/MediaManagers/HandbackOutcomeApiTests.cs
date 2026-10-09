@@ -344,6 +344,69 @@ public sealed class HandbackOutcomeApiTests : IDisposable
 
     private static async Task<string?> Code(HttpResponseMessage response) => (await Json(response))["code"]?.GetValue<string>();
 
+    /// <summary>
+    /// Makes the hand-off one of the release folder, with an extra beside the film: the file row and the target row the extra's
+    /// pass would have left.
+    /// </summary>
+    private static async Task AddExtraAsync(WeirTestServer server, string fileStatus, string targetResult, string reason)
+    {
+        await TestDatabase.ExecuteAsync(server, "UPDATE media_manager_handoffs SET relative_path = 'Film' WHERE handoff_id = 'h1'");
+        await TestDatabase.ExecuteAsync(
+            server,
+            "INSERT INTO files (library_id, relative_path, status, status_reason, updated_at) " +
+            "VALUES ((SELECT id FROM libraries WHERE media_type = 'movie' ORDER BY id LIMIT 1), 'Film/Gallery.mkv', $status, $reason, '2099-01-01 00:00:00.000000')",
+            ("$status", fileStatus),
+            ("$reason", reason));
+        await TestDatabase.ExecuteAsync(
+            server,
+            "INSERT INTO media_manager_handoff_targets (handoff_row_id, relative_path, result, message) " +
+            "VALUES ((SELECT id FROM media_manager_handoffs WHERE handoff_id = 'h1'), 'Film/Gallery.mkv', $result, $reason)",
+            ("$result", targetResult),
+            ("$reason", reason));
+    }
+
+    [Fact]
+    public async Task An_extra_the_workflows_rules_left_alone_does_not_fail_the_hand_off_so_the_import_settles_the_film()
+    {
+        await using var server = await StartAsync();
+        var copy = await FinishedHandoffAsync(server);
+        await AddExtraAsync(server, "skipped", "skipped", "Skipped because this file is 15.6 MB, under the 50 MB minimum.");
+
+        using (var status = await new ApiTestClient(server).GetAsync("/api/v1/intake/handoffs/deluno/h1", SecretHeader))
+        {
+            Assert.Equal("completed", (await Json(status))["state"]!.GetValue<string>());
+        }
+
+        using var response = await PostOutcomeAsync(server, "h1", DelunoOutcome("imported", "/media/movies/Film/film.mkv", null));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("\"released\":true", await response.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+        Assert.False(File.Exists(copy));
+    }
+
+    [Fact]
+    public async Task An_import_is_accepted_for_a_hand_off_that_ended_failed_once_Weir_handed_back_a_file()
+    {
+        await using var server = await StartAsync();
+        var copy = await FinishedHandoffAsync(server);
+        await AddExtraAsync(server, "processing_failed", "failed", "The extra could not be processed.");
+        await TestDatabase.ExecuteAsync(
+            server,
+            "UPDATE media_manager_handoffs SET state = 'failed', reported_status = 'failed', output_files_json = $files WHERE handoff_id = 'h1'",
+            ("$files", System.Text.Json.JsonSerializer.Serialize(new[] { copy })));
+
+        using (var status = await new ApiTestClient(server).GetAsync("/api/v1/intake/handoffs/deluno/h1", SecretHeader))
+        {
+            Assert.Equal("failed", (await Json(status))["state"]!.GetValue<string>());
+        }
+
+        using var response = await PostOutcomeAsync(server, "h1", DelunoOutcome("imported", "/media/movies/Film/film.mkv", null));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("\"released\":true", await response.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+        Assert.False(File.Exists(copy));
+    }
+
     [Fact]
     public async Task Not_imported_records_the_reason_and_keeps_the_copy()
     {

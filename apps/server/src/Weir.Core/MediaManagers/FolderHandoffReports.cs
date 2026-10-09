@@ -1,5 +1,6 @@
 using Weir.Core.Json;
 using Weir.Core.Media;
+using Weir.Core.Processing.RemuxPass;
 using Weir.Core.Text;
 
 namespace Weir.Core.MediaManagers;
@@ -7,7 +8,7 @@ namespace Weir.Core.MediaManagers;
 /// <summary>
 /// One file a hand-off covers and what its pass came to. <see cref="Result"/> is null until the file has a final result,
 /// then one of <see cref="HandoffLedgerRules.Completed"/>, <see cref="HandoffLedgerRules.PassedThrough"/>,
-/// <see cref="HandoffLedgerRules.Failed"/> or <see cref="HandoffLedgerRules.Cancelled"/>.
+/// <see cref="HandoffLedgerRules.Failed"/>, <see cref="HandoffLedgerRules.Skipped"/> or <see cref="HandoffLedgerRules.Cancelled"/>.
 /// <see cref="OutputFile"/> is the copy Weir wrote, as Weir sees it, and <see cref="OutputWrittenAt"/> when that copy was written
 /// (null when the report did not record it).
 /// </summary>
@@ -51,10 +52,15 @@ public static class HandoffOutputFiles
 /// </summary>
 public static class FolderHandoffReports
 {
-    /// <summary>What one pass's result means for its file: delivered, handed back unchanged, or failed.</summary>
+    /// <summary>What one pass's result means for its file: delivered, handed back unchanged, left alone by the workflow's rules, or failed.</summary>
     public static string TargetResult(WireObject result)
     {
         ArgumentNullException.ThrowIfNull(result);
+        if (result.Get("outcome") is WireString { Value: RemuxPassOutcomes.SkippedGuardrail })
+        {
+            return HandoffLedgerRules.Skipped;
+        }
+
         if (!CompletionReports.IsSucceeded(result))
         {
             return HandoffLedgerRules.Failed;
@@ -71,15 +77,17 @@ public static class FolderHandoffReports
     }
 
     /// <summary>
-    /// The report body. Every file delivered is <c>completed</c>; any file that failed makes it <c>failed</c>, and the
-    /// message says how many succeeded and what went wrong with the rest, while <c>outputFiles</c> still lists the ones
-    /// that were delivered.
+    /// The report body. Every file delivered is <c>completed</c>, and a file the workflow's rules left alone is named in the
+    /// message without failing it; any file that failed makes it <c>failed</c>, and the message says how many succeeded and
+    /// what went wrong with the rest, while <c>outputFiles</c> still lists the ones that were delivered. When nothing was
+    /// delivered, the files left alone are why it failed.
     /// </summary>
     public static WireObject BuildBody(HandoffOrigin origin, IReadOnlyList<HandoffTarget> targets, string? outputFolder, IReadOnlyList<string> outputFiles)
     {
         ArgumentNullException.ThrowIfNull(targets);
         ArgumentNullException.ThrowIfNull(outputFiles);
-        var failed = targets.Where(target => target.Result == HandoffLedgerRules.Failed).ToList();
+        var delivered = targets.Any(target => target.Delivered);
+        var failed = targets.Where(target => target.Result == HandoffLedgerRules.Failed || (target.Result == HandoffLedgerRules.Skipped && !delivered)).ToList();
         var body = CompletionReports.ReportHeader(origin, failed.Count == 0 ? "completed" : "failed");
         if (failed.Count == 0)
         {
@@ -105,6 +113,7 @@ public static class FolderHandoffReports
         var delivered = targets.Count(target => target.Delivered);
         var passedThrough = targets.Count(target => target.Result == HandoffLedgerRules.PassedThrough);
         var cancelled = targets.Count(target => target.Result == HandoffLedgerRules.Cancelled);
+        var skipped = targets.Where(target => target.Result == HandoffLedgerRules.Skipped).ToList();
         var message = $"Weir finished {Plural.Of(delivered, "file")}, ready to import from the output folder.";
         if (passedThrough > 0)
         {
@@ -116,14 +125,21 @@ public static class FolderHandoffReports
             message += $" {Plural.Of(cancelled, "file")} {Plural.Noun(cancelled, "was", "were")} cancelled in Weir.";
         }
 
+        if (skipped.Count > 0)
+        {
+            message += $" Weir left {Plural.Of(skipped.Count, "file")} alone under this workflow's rules: {Reasons(skipped)}.";
+        }
+
         return message;
     }
 
     private static string FailureMessage(IReadOnlyList<HandoffTarget> targets, List<HandoffTarget> failed)
     {
         var delivered = targets.Count(target => target.Delivered);
-        var reasons = failed.Select(target => $"{MediaPathNames.Name(target.RelativePath, windows: false)}: {WireStrings.Strip(target.Message ?? string.Empty).TrimEnd('.')}");
         return $"Weir finished {delivered.ToString(System.Globalization.CultureInfo.InvariantCulture)} of {Plural.Of(targets.Count, "file")}. " +
-               $"It could not process {Plural.Of(failed.Count, "file")}: {string.Join("; ", reasons)}.";
+               $"It could not process {Plural.Of(failed.Count, "file")}: {Reasons(failed)}.";
     }
+
+    private static string Reasons(IEnumerable<HandoffTarget> targets) =>
+        string.Join("; ", targets.Select(target => $"{MediaPathNames.Name(target.RelativePath, windows: false)}: {WireStrings.Strip(target.Message ?? string.Empty).TrimEnd('.')}"));
 }

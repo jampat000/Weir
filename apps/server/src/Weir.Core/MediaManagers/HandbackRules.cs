@@ -25,7 +25,7 @@ public static class HandbackRules
     public const string HandoffNotFinishedCode = "handoff_not_finished";
 
     /// <summary>
-    /// 409 code: the hand-off ended without a file to import (failed, rejected or cancelled). Weir works out a hand-off's
+    /// 409 code: the hand-off ended without handing back a file to import (failed, rejected or cancelled). Weir works out a hand-off's
     /// state from its jobs and files each time it is asked, so this can still change; a manager may send the outcome again.
     /// </summary>
     public const string HandoffEndedCode = "handoff_ended";

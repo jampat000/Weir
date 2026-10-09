@@ -240,7 +240,7 @@ public sealed partial class HandoffLedgerStore
 
                 // The same for a file row: a failure recorded before this hand-off arrived, and not touched since, is
                 // what became of an earlier hand-off of the path. A success from before still counts.
-                if (state is HandoffLedgerRules.Failed or HandoffLedgerRules.Rejected or HandoffLedgerRules.Cancelled &&
+                if (state is HandoffLedgerRules.Failed or HandoffLedgerRules.Skipped or HandoffLedgerRules.Rejected or HandoffLedgerRules.Cancelled &&
                     IsFromEarlierHandoff(row, file.UpdatedAt))
                 {
                     continue;
@@ -252,7 +252,7 @@ public sealed partial class HandoffLedgerStore
                     scheduledFor = scheduledFor is { } current ? Min(current, whenValue) : whenValue;
                 }
 
-                if (file.StatusReason.Length > 0 && (message is null || !HandoffLedgerRules.TerminalStates.Contains(state)))
+                if (file.StatusReason.Length > 0 && (message is null || !(HandoffLedgerRules.TerminalStates.Contains(state) || state == HandoffLedgerRules.Skipped)))
                 {
                     message = file.StatusReason;
                 }
@@ -328,6 +328,13 @@ public sealed partial class HandoffLedgerStore
     /// <summary>The output files Weir reported; a hand-off reported before the list was kept named its one file.</summary>
     private static IReadOnlyList<string>? ReportedOutputFiles(HandoffLedgerRow row) =>
         row.OutputFiles ?? (row.OutputPath is { } single ? [single] : null);
+
+    /// <summary>Whether Weir's report to the manager named at least one output file, whatever else became of the hand-off.</summary>
+    public static bool HandedBackFile(HandoffLedgerRow row)
+    {
+        ArgumentNullException.ThrowIfNull(row);
+        return ReportedOutputFiles(row) is { Count: > 0 };
+    }
 
     /// <summary>
     /// The <c>relative_media_path</c> a job payload names, as a string (empty when missing or falsy); null for unreadable

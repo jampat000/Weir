@@ -143,7 +143,7 @@ public sealed class HandoffTargetStore
             return new HandoffTargetFinish(HandoffTargetProgress.Waiting, row, targets);
         }
 
-        var status = targets.Any(target => target.Result == HandoffLedgerRules.Failed) ? HandoffLedgerRules.Failed : HandoffLedgerRules.Completed;
+        var status = FolderHandoffReports.State(targets) == HandoffLedgerRules.Failed ? HandoffLedgerRules.Failed : HandoffLedgerRules.Completed;
         var claimed = await uow.ExecuteAsync(
             "UPDATE media_manager_handoffs SET reported_status = $status WHERE id = $row " +
             "AND (reported_status IS NULL OR (reported_status = $failed AND $status <> $failed))",

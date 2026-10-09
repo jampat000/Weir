@@ -330,10 +330,10 @@ internal sealed class MediaManagerIntakeEndpointHandlers
         }
 
         var status = await _intake.Ledger.CurrentStatusAsync(uow, row).ConfigureAwait(false);
-        if (status.State is not (HandoffLedgerRules.Completed or HandoffLedgerRules.PassedThrough))
+        var ended = HandoffLedgerRules.TerminalStates.Contains(status.State);
+        if (status.State is not (HandoffLedgerRules.Completed or HandoffLedgerRules.PassedThrough) && !(ended && HandoffLedgerStore.HandedBackFile(row)))
         {
             await request.CommitAsync().ConfigureAwait(false);
-            var ended = HandoffLedgerRules.TerminalStates.Contains(status.State);
             throw new ApiException(
                 StatusCodes.Status409Conflict,
                 ended

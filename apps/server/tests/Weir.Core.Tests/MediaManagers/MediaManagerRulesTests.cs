@@ -343,7 +343,7 @@ public sealed class MediaManagerRulesTests
     [InlineData("processing_failed", "failed")]
     [InlineData("out_of_schedule", "scheduled")]
     [InlineData("processing", "working")]
-    [InlineData("skipped", "failed")]
+    [InlineData("skipped", "skipped")]
     [InlineData("blocked_upstream", "queued")]
     [InlineData("unprocessed", "queued")]
     public void File_states_map_to_the_agreed_vocabulary(string status, string state) =>
@@ -373,6 +373,59 @@ public sealed class MediaManagerRulesTests
         Assert.Equal("failed", HandoffLedgerRules.Combine(["passed-through", "failed", "rejected"]));
         Assert.Equal("passed-through", HandoffLedgerRules.Combine(["completed", "passed-through"]));
         Assert.Equal("completed", HandoffLedgerRules.Combine(["completed"]));
+    }
+
+    [Fact]
+    public void A_file_the_workflows_rules_left_alone_fails_its_hand_off_only_when_nothing_else_was_delivered()
+    {
+        Assert.Equal("completed", HandoffLedgerRules.Combine(["completed", "skipped"]));
+        Assert.Equal("passed-through", HandoffLedgerRules.Combine(["passed-through", "skipped"]));
+        Assert.Equal("failed", HandoffLedgerRules.Combine(["skipped"]));
+        Assert.Equal("failed", HandoffLedgerRules.Combine(["skipped", "cancelled"]));
+        Assert.Equal("failed", HandoffLedgerRules.Combine(["completed", "skipped", "failed"]));
+        Assert.Equal("working", HandoffLedgerRules.Combine(["completed", "skipped", "working"]));
+    }
+
+    [Fact]
+    public void A_folder_report_names_the_files_left_alone_without_failing_when_another_file_was_delivered()
+    {
+        var origin = new HandoffOrigin("deluno", "h1", "/cb", "Film.2020", "lib-1");
+        var main = new HandoffTarget("Film.2020/film.mkv", "completed", "/out/Film.2020/film.mkv", "Remux finished.");
+        var extra = new HandoffTarget("Film.2020/Gallery.mkv", "skipped", null, "Skipped because this file is 15.6 MB, under the 50 MB minimum.");
+
+        var body = FolderHandoffReports.BuildBody(origin, [main, extra], "/out/Film.2020", ["/out/Film.2020/film.mkv"]);
+
+        Assert.Equal("completed", ((WireString)body["status"]).Value);
+        Assert.Equal("/out/Film.2020", ((WireString)body["outputPath"]).Value);
+        Assert.Equal(
+            "Weir finished 1 file, ready to import from the output folder. " +
+            "Weir left 1 file alone under this workflow's rules: Gallery.mkv: Skipped because this file is 15.6 MB, under the 50 MB minimum.",
+            ((WireString)body["message"]).Value);
+        Assert.Equal("completed", FolderHandoffReports.State([main, extra]));
+    }
+
+    [Fact]
+    public void A_folder_report_with_nothing_delivered_and_a_file_left_alone_is_failed_and_says_why()
+    {
+        var origin = new HandoffOrigin("deluno", "h1", "/cb", "Film.2020", "lib-1");
+        var extra = new HandoffTarget("Film.2020/Gallery.mkv", "skipped", null, "Skipped because this file is 15.6 MB, under the 50 MB minimum.");
+
+        var body = FolderHandoffReports.BuildBody(origin, [extra], null, []);
+
+        Assert.Equal("failed", ((WireString)body["status"]).Value);
+        Assert.Equal("held", ((WireString)body["disposition"]).Value);
+        Assert.Contains("Gallery.mkv: Skipped because this file is 15.6 MB", ((WireString)body["message"]).Value, StringComparison.Ordinal);
+        Assert.Equal("failed", FolderHandoffReports.State([extra]));
+    }
+
+    [Fact]
+    public void A_pass_a_guardrail_skipped_is_a_file_left_alone_not_a_failure()
+    {
+        var skipped = Dict("""{"ok": true, "outcome": "skipped_guardrail", "reason": "Skipped because this file is 15.6 MB, under the 50 MB minimum."}""");
+        var failed = Dict("""{"ok": false, "outcome": "failed_execution", "reason": "ffmpeg died"}""");
+
+        Assert.Equal("skipped", FolderHandoffReports.TargetResult(skipped));
+        Assert.Equal("failed", FolderHandoffReports.TargetResult(failed));
     }
 
     [Fact]
