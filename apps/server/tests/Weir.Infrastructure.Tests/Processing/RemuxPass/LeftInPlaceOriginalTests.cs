@@ -33,6 +33,7 @@ public sealed class LeftInPlaceOriginalTests : IDisposable
     private readonly MediaManagerFixture _fixture = new();
     private readonly PassFolders _folders = new();
     private readonly FakeMediaRunner _media = new();
+    private readonly ListLogger<RemuxPassRunner> _runnerLog = new();
     private long _libraryId;
 
     public LeftInPlaceOriginalTests()
@@ -81,7 +82,7 @@ public sealed class LeftInPlaceOriginalTests : IDisposable
             new FakeOriginalLanguage(),
             new RemuxPassSettings(),
             _fixture.Store.Clock,
-            NullLogger<RemuxPassRunner>.Instance);
+            _runnerLog);
         return new RemuxPassHandler(
             _fixture.Store.Database,
             _fixture.Store.Options,
@@ -110,7 +111,10 @@ public sealed class LeftInPlaceOriginalTests : IDisposable
     {
         var scan = new ProcessingWatchedFolderScanDispatchJobHandler(
             _fixture.Store.Database, _fixture.Store.Clock, _fixture.Store.Options, _fixture.Jobs, _fixture.Connections,
-            new SuiteSettingsStore(new AuthStore()), _fixture.Libraries, _fixture.Files, new FileSkipMarkerStore());
+            new SuiteSettingsStore(new AuthStore()), _fixture.Libraries, _fixture.Files, new FileSkipMarkerStore())
+        {
+            GoneSettle = TimeSpan.Zero,
+        };
         var payload = new WireObject().Set("enqueue_remux_jobs", true).Set("scan_trigger", "watcher").Set("media_scope", mediaType).Set("library_id", _libraryId);
         var job = await _fixture.Jobs.EnqueueOrGetAsync(
             $"scan-{Guid.NewGuid():N}", ProcessingWatchedFolderScanDispatchJobKinds.ScanDispatch, WireJsonWriter.Dumps(payload, WireJsonFormat.Compact));
@@ -234,6 +238,21 @@ public sealed class LeftInPlaceOriginalTests : IDisposable
     }
 
     [Fact]
+    public async Task A_movie_directly_in_the_watched_root_is_left_alone_without_a_warning()
+    {
+        await SetUpAsync("movie");
+        var source = _folders.Source("Film.2024.mkv");
+        File.SetLastWriteTimeUtc(source, DateTime.UtcNow.AddDays(-3));
+
+        await ScanAndDrainAsync("movie");
+
+        Assert.Equal("processed", await StatusAsync("Film.2024.mkv"));
+        Assert.True(File.Exists(source), "there is no release folder to remove, and the file is not Weir's to delete");
+        Assert.DoesNotContain(_runnerLog.Entries, entry => entry.Level >= Microsoft.Extensions.Logging.LogLevel.Warning);
+        Assert.Contains(_runnerLog.Entries, entry => entry.Message.Contains("no release folder to remove", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task A_movie_left_in_the_watched_root_is_not_cleaned_again_once_its_output_is_imported()
     {
         await SetUpAsync("movie");
@@ -344,17 +363,25 @@ public sealed class LeftInPlaceOriginalTests : IDisposable
     // --- #645 ---------------------------------------------------------------------------------------------------------
 
     [Fact]
-    public async Task A_held_file_that_leaves_the_watched_folder_is_forgotten_with_one_activity_entry()
+    public async Task A_held_file_that_leaves_the_watched_folder_says_so_at_once_and_is_forgotten_later_with_no_second_entry()
     {
         await SetUpAsync("movie", readyAfterSeconds: 3600);
         var source = _folders.Source(Path.Join("Film.2024", "Film.2024.mkv"));
 
         await ScanAsync("movie");
         Assert.Equal("on_hold", await StatusAsync("Film.2024/Film.2024.mkv"));
+        Assert.NotEqual(GoneSourceText.HeldReason, await ReasonAsync("Film.2024/Film.2024.mkv"));
 
         File.Delete(source);
         await ScanAsync("movie");
         Assert.Equal("on_hold", await StatusAsync("Film.2024/Film.2024.mkv"));
+        Assert.Equal(GoneSourceText.HeldReason, await ReasonAsync("Film.2024/Film.2024.mkv"));
+        Assert.Equal(1, await LeftActivityAsync());
+
+        // Looked at again before the grace is over: still listed, still one entry.
+        await ScanAsync("movie");
+        Assert.Equal("on_hold", await StatusAsync("Film.2024/Film.2024.mkv"));
+        Assert.Equal(1, await LeftActivityAsync());
 
         // Gone for longer than a download client takes to move a file.
         _fixture.Store.Clock.Set(_fixture.Store.Clock.GetUtcNow().AddMinutes(11));
@@ -392,17 +419,103 @@ public sealed class LeftInPlaceOriginalTests : IDisposable
     }
 
     [Fact]
-    public async Task A_row_seen_or_written_moments_ago_is_kept()
+    public async Task A_row_seen_moments_ago_is_held_as_gone_and_a_hand_off_row_written_moments_ago_is_kept()
     {
         await SetUpAsync("movie");
         await InsertRowAsync("Gone/just-seen.mkv", ProcessingFileStatuses.Unprocessed, lastSeenMinutesAgo: 2);
+        await InsertRowAsync("Gone/just-failed.mkv", ProcessingFileStatuses.ProcessingFailed, lastSeenMinutesAgo: 2);
         await InsertRowAsync("Gone/just-handed-off.mkv", ProcessingFileStatuses.Unprocessed, lastSeenMinutesAgo: null, writtenMinutesAgo: 2);
 
         await ScanAsync("movie");
 
-        Assert.Equal("unprocessed", await StatusAsync("Gone/just-seen.mkv"));
+        Assert.Equal("on_hold", await StatusAsync("Gone/just-seen.mkv"));
+        Assert.Equal(GoneSourceText.HeldReason, await ReasonAsync("Gone/just-seen.mkv"));
+        Assert.NotNull(await HoldUntilAsync("Gone/just-seen.mkv"));
+        Assert.Equal("processing_failed", await StatusAsync("Gone/just-failed.mkv"));
         Assert.Equal("unprocessed", await StatusAsync("Gone/just-handed-off.mkv"));
+        Assert.Equal(1, await LeftActivityAsync());
+    }
+
+    [Fact]
+    public async Task A_file_waiting_outside_its_hours_or_for_a_manager_that_leaves_the_watched_folder_is_held_as_gone()
+    {
+        await SetUpAsync("movie");
+        await InsertRowAsync("Gone/outside.mkv", ProcessingFileStatuses.OutOfSchedule, lastSeenMinutesAgo: 1);
+        await InsertRowAsync("Gone/importing.mkv", ProcessingFileStatuses.BlockedUpstream, lastSeenMinutesAgo: 1);
+        await _fixture.Store.Execute("UPDATE files SET status_reason = 'The Library workflow only runs inside its scheduled hours, and now is outside them.' WHERE relative_path = 'Gone/outside.mkv'");
+        await _fixture.Store.Execute("UPDATE files SET blocked_by_connection = 'Deluno' WHERE relative_path = 'Gone/importing.mkv'");
+
+        await ScanAsync("movie");
+        await ScanAsync("movie");
+
+        foreach (var path in new[] { "Gone/outside.mkv", "Gone/importing.mkv" })
+        {
+            Assert.Equal("on_hold", await StatusAsync(path));
+            Assert.Equal(GoneSourceText.HeldReason, await ReasonAsync(path));
+        }
+
+        Assert.Equal(0, await _fixture.Store.Scalar("SELECT count(*) FROM files WHERE blocked_by_connection IS NOT NULL"));
+        Assert.Equal(2, await LeftActivityAsync());
+    }
+
+    [Fact]
+    public async Task A_file_that_is_back_when_the_scan_looks_again_is_not_held_as_gone()
+    {
+        await SetUpAsync("movie", readyAfterSeconds: 3600);
+        var source = _folders.Source(Path.Join("Film.2024", "Film.2024.mkv"));
+        await ScanAsync("movie");
+        File.Move(source, source + ".away");
+        var scan = new ProcessingWatchedFolderScanDispatchJobHandler(
+            _fixture.Store.Database, _fixture.Store.Clock, _fixture.Store.Options, _fixture.Jobs, _fixture.Connections,
+            new SuiteSettingsStore(new AuthStore()), _fixture.Libraries, _fixture.Files, new FileSkipMarkerStore())
+        {
+            GoneSettle = TimeSpan.FromSeconds(1.5),
+        };
+        var payload = new WireObject().Set("enqueue_remux_jobs", true).Set("scan_trigger", "watcher").Set("media_scope", "movie").Set("library_id", _libraryId);
+        var job = await _fixture.Jobs.EnqueueOrGetAsync(
+            $"scan-{Guid.NewGuid():N}", ProcessingWatchedFolderScanDispatchJobKinds.ScanDispatch, WireJsonWriter.Dumps(payload, WireJsonFormat.Compact));
+
+        var scanning = scan.HandleAsync(new JobWorkContext(job.Id, job.JobKind, job.PayloadJson, "scan-owner"), CancellationToken.None);
+        await Task.Delay(300);
+        File.Move(source + ".away", source);
+        await scanning;
+
+        Assert.NotEqual(GoneSourceText.HeldReason, await ReasonAsync("Film.2024/Film.2024.mkv"));
         Assert.Equal(0, await LeftActivityAsync());
+    }
+
+    [Fact]
+    public async Task Nothing_is_held_as_gone_when_the_watched_folder_itself_is_missing()
+    {
+        await SetUpAsync("movie");
+        await InsertRowAsync("Gone/waiting.mkv", ProcessingFileStatuses.Unprocessed, lastSeenMinutesAgo: 1);
+        Directory.Delete(_folders.Watched, recursive: true);
+
+        await new VanishedFileSweepTask(_fixture.Store.Database, _fixture.Store.Options, _fixture.Libraries, _fixture.Store.Clock, NullLogger<VanishedFileSweepTask>.Instance) { GoneSettle = TimeSpan.Zero }
+            .RunOnceAsync(CancellationToken.None);
+
+        Assert.Equal("unprocessed", await StatusAsync("Gone/waiting.mkv"));
+        Assert.Equal(0, await LeftActivityAsync());
+    }
+
+    [Fact]
+    public async Task The_sweep_says_a_gone_file_is_gone_once_and_forgets_it_later_without_saying_so_again()
+    {
+        await SetUpAsync("movie");
+        await InsertRowAsync("Gone/waiting.mkv", ProcessingFileStatuses.OnHold, lastSeenMinutesAgo: 1);
+        var sweep = new VanishedFileSweepTask(_fixture.Store.Database, _fixture.Store.Options, _fixture.Libraries, _fixture.Store.Clock, NullLogger<VanishedFileSweepTask>.Instance) { GoneSettle = TimeSpan.Zero };
+
+        await sweep.RunOnceAsync(CancellationToken.None);
+        await sweep.RunOnceAsync(CancellationToken.None);
+
+        Assert.Equal(GoneSourceText.HeldReason, await ReasonAsync("Gone/waiting.mkv"));
+        Assert.Equal(1, await LeftActivityAsync());
+
+        Advance(11);
+        await sweep.RunOnceAsync(CancellationToken.None);
+
+        Assert.Null(await StatusAsync("Gone/waiting.mkv"));
+        Assert.Equal(1, await LeftActivityAsync());
     }
 
     [Fact]
@@ -435,7 +548,8 @@ public sealed class LeftInPlaceOriginalTests : IDisposable
         await InsertRowAsync("Still.Here/Still.Here.mkv", ProcessingFileStatuses.Unprocessed, lastSeenMinutesAgo: null);
 
         var log = new ListLogger<VanishedFileSweepTask>();
-        await new VanishedFileSweepTask(_fixture.Store.Database, _fixture.Store.Options, _fixture.Libraries, _fixture.Store.Clock, log).RunOnceAsync(CancellationToken.None);
+        await new VanishedFileSweepTask(_fixture.Store.Database, _fixture.Store.Options, _fixture.Libraries, _fixture.Store.Clock, log) { GoneSettle = TimeSpan.Zero }
+            .RunOnceAsync(CancellationToken.None);
 
         Assert.Null(await StatusAsync("Film.1/Film.mkv"));
         Assert.Null(await StatusAsync("Film"));

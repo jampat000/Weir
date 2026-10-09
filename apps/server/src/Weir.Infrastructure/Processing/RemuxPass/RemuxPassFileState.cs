@@ -89,12 +89,20 @@ public static class RemuxPassFileState
     /// <summary>
     /// A file that was not there when its pass looked: held, with its reason, attempts and any hand-picked plan intact, until
     /// <paramref name="holdUntil"/>. It might be a share that dropped for a moment. Only a file without an outcome changes; one that
-    /// is processed, passed through, rejected or skipped stays as history whether or not its original is still there.
+    /// is processed, passed through, rejected or skipped stays as history whether or not its original is still there. False when the
+    /// file was already held for being gone, so a caller that says so does not say it twice.
     /// </summary>
-    public static Task HoldGoneAsync(UnitOfWork uow, long libraryId, string relativePath, DateTimeOffset holdUntil)
+    public static async Task<bool> HoldGoneAsync(UnitOfWork uow, long libraryId, string relativePath, DateTimeOffset holdUntil)
     {
         ArgumentNullException.ThrowIfNull(uow);
-        return uow.ExecuteAsync(
+        var alreadyHeld = await uow.QueryAsync(
+            "SELECT 1 FROM files WHERE library_id = $library AND relative_path = $path AND status = $status AND status_reason = $reason LIMIT 1",
+            reader => reader.GetInt64(0),
+            ("$library", libraryId),
+            ("$path", relativePath),
+            ("$status", ProcessingFileStatuses.OnHold),
+            ("$reason", GoneSourceText.HeldReason)).ConfigureAwait(false);
+        await uow.ExecuteAsync(
             $"UPDATE files SET status = $status, status_reason = $reason, hold_until = $until, updated_at = CURRENT_TIMESTAMP " +
             $"WHERE library_id = $library AND relative_path = $path AND status IN ({UnfinishedStatuses})",
             [
@@ -104,7 +112,8 @@ public static class RemuxPassFileState
                 ("$library", libraryId),
                 ("$path", relativePath),
                 .. UnfinishedStatusParameters(),
-            ]);
+            ]).ConfigureAwait(false);
+        return alreadyHeld.Count == 0;
     }
 
     /// <summary>

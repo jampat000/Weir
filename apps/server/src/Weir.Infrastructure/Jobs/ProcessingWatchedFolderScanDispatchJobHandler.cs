@@ -8,6 +8,7 @@ using Weir.Core.Settings;
 using Weir.Infrastructure.Activity;
 using Weir.Infrastructure.MediaManagers;
 using Weir.Infrastructure.Processing;
+using Weir.Infrastructure.Processing.RemuxPass;
 using Weir.Infrastructure.Runtime;
 using Weir.Infrastructure.Settings;
 using Weir.Infrastructure.Sqlite;
@@ -75,6 +76,9 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandler : IJobHandler
         _changes = changes;
     }
 
+    /// <summary>Test seam: how long a file that was not there is given to come back before Weir believes it is gone.</summary>
+    internal TimeSpan GoneSettle { get; init; } = GoneSources.DefaultSettle;
+
     public string JobKind => ProcessingWatchedFolderScanDispatchJobKinds.ScanDispatch;
 
     public async Task HandleAsync(JobWorkContext context, CancellationToken cancellationToken)
@@ -107,11 +111,11 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandler : IJobHandler
             var run = new WatchedFolderScanRun(_database, _jobStore, _files, scan, lookups, reads, new ScanPassRequest(context.Id, request.Trigger));
             await run.RunAsync(candidates.Entries, cancellationToken).ConfigureAwait(false);
 
-            // #645: a file that left the watched folder before Weir finished with it stops being listed. Only while the watched
-            // folder itself can be read, so an unmounted share never empties the list.
+            // #645: a file that left the watched folder before Weir finished with it says so at once and stops being listed after a
+            // while. Only while the watched folder itself can be read, so an unmounted share never empties the list.
             if (Directory.Exists(scan.Paths.WatchedFolder))
             {
-                await VanishedFiles.ForgetAsync(_database, scan.Library.Id, scan.Paths.WatchedFolder, scan.MediaScope, scan.Now, "scan", cancellationToken)
+                await VanishedFiles.SettleAsync(_database, scan.Library.Id, scan.Paths.WatchedFolder, scan.MediaScope, scan.Now, "scan", GoneSettle, cancellationToken)
                     .ConfigureAwait(false);
             }
 

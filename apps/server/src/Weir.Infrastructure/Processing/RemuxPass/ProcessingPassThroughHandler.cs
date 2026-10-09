@@ -207,8 +207,8 @@ public sealed class ProcessingPassThroughHandler : IJobHandler
 
     /// <summary>
     /// A file deleted before it could be handed back. The first time it is held, not forgotten, with a look booked for after the
-    /// scan's grace for a vanished file; Activity says once, plainly, that there is nothing to do. That look finds the file back, and
-    /// hands it back, or still gone, and forgets it and tells the manager that handed it over.
+    /// scan's grace for a vanished file; Activity says once, plainly, that there is nothing to do, unless the scan already did. That
+    /// look finds the file back, and hands it back, or still gone, and forgets it and tells the manager that handed it over.
     /// </summary>
     private async Task SettleGoneAsync(
         JobWorkContext context, WireObject payload, PassThroughDeliverySettings delivery, string relativePath, CancellationToken cancellationToken)
@@ -225,10 +225,12 @@ public sealed class ProcessingPassThroughHandler : IJobHandler
                 if (final)
                 {
                     await RemuxPassFileState.ForgetGoneAsync(uow, delivery.LibraryId, relativePath).ConfigureAwait(false);
+                    return;
                 }
-                else
+
+                if (!await RemuxPassFileState.HoldGoneAsync(uow, delivery.LibraryId, relativePath, lookAgainAt).ConfigureAwait(false))
                 {
-                    await RemuxPassFileState.HoldGoneAsync(uow, delivery.LibraryId, relativePath, lookAgainAt).ConfigureAwait(false);
+                    return;
                 }
 
                 var detail = OperatorMessages.ActivityDetailEnvelope("processing", "pass_through", "worker", "skipped", userMessage: GoneSourceText.Reason)

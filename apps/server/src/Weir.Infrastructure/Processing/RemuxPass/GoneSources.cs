@@ -23,7 +23,7 @@ internal static class GoneSources
             var source = RemuxPassPaths.ResolveMediaFileUnderRoot(watchedFolder, relativePath);
             return !File.Exists(source) && !Directory.Exists(source);
         }
-        catch (ArgumentException)
+        catch (Exception exception) when (exception is ArgumentException or NotSupportedException or PathTooLongException)
         {
             return false;
         }

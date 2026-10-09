@@ -105,6 +105,38 @@ public sealed class ProcessingWatchedFolderWatcherServiceTests
 
     [Trait("Category", "Integration")]
     [Fact]
+    public async Task A_file_deleted_from_a_watched_folder_queues_a_scan_so_a_file_that_left_is_found()
+    {
+        using var store = new StoreFixture(
+            ("WEIR_CREDENTIALS_SECRET", "watcher-tests-secret-3"),
+            ("WEIR_PROCESSING_WATCHER_DEBOUNCE_SECONDS", "1"));
+        var watched = store.Home.Join("watch");
+        var output = store.Home.Join("out");
+        Directory.CreateDirectory(watched);
+        Directory.CreateDirectory(output);
+        var file = Path.Combine(watched, "Gate Test 2001.mkv");
+        await File.WriteAllBytesAsync(file, new byte[2048]);
+        var libraryId = await CreateLibraryAsync(store, watched, output);
+
+        var state = new WatcherStateStore();
+        var service = Service(store, state);
+        await service.StartAsync(CancellationToken.None);
+        try
+        {
+            await Eventually.ThatAsync(() => state.Reports().Any(r => r.LibraryId == libraryId && r.Status == WatcherStatus.Watching));
+            File.Delete(file);
+
+            await Eventually.ThatAsync(() => ScanJobPayloads(store).Count > 0);
+            Assert.Single(ScanJobPayloads(store));
+        }
+        finally
+        {
+            await service.StopAsync(CancellationToken.None);
+        }
+    }
+
+    [Trait("Category", "Integration")]
+    [Fact]
     public async Task A_file_moved_into_a_watched_folder_becomes_a_candidate()
     {
         // The common shape: a download client writes elsewhere and moves the finished file in.

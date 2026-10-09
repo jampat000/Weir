@@ -125,7 +125,10 @@ public sealed class VanishedSourceTests : IDisposable
 
     private ProcessingWatchedFolderScanDispatchJobHandler ScanHandler(ILogger<ProcessingWatchedFolderScanDispatchJobHandler>? logger = null) => new(
         _fixture.Store.Database, _fixture.Store.Clock, _fixture.Store.Options, _fixture.Jobs, _fixture.Connections,
-        new SuiteSettingsStore(new AuthStore()), _fixture.Libraries, _fixture.Files, new FileSkipMarkerStore(), logger: logger);
+        new SuiteSettingsStore(new AuthStore()), _fixture.Libraries, _fixture.Files, new FileSkipMarkerStore(), logger: logger)
+    {
+        GoneSettle = TimeSpan.Zero,
+    };
 
     private async Task ScanAsync(ProcessingWatchedFolderScanDispatchJobHandler? handler = null)
     {
@@ -282,6 +285,7 @@ public sealed class VanishedSourceTests : IDisposable
         Assert.Equal(0, await FailedOrRetriedJobsAsync());
         Assert.Equal(0, await ErrorsAndWarningsAsync());
         Assert.Equal(0, await PassThroughJobsAsync());
+        Assert.Equal(1, await GoneRowsAsync());
     }
 
     [Fact]
@@ -307,6 +311,7 @@ public sealed class VanishedSourceTests : IDisposable
 
         Assert.Equal(0, await FilesAsync());
         Assert.Equal(0, await ErrorsAndWarningsAsync());
+        Assert.Equal(1, await GoneRowsAsync());
     }
 
     [Fact]
@@ -460,6 +465,31 @@ public sealed class VanishedSourceTests : IDisposable
         Assert.Equal(0, await ErrorsAndWarningsAsync());
         Assert.Equal(1, await GoneRowsAsync());
         Assert.Equal("on_hold", await StatusAsync(Rel));
+
+        Advance((int)GoneSources.LookAgainAfter.TotalMinutes + 1);
+        await DrainAsync();
+
+        Assert.Null(await StatusAsync(Rel));
+        Assert.Equal(1, await GoneRowsAsync());
+    }
+
+    [Fact]
+    public async Task A_handed_back_file_the_scan_already_found_gone_is_not_said_to_be_gone_a_second_time()
+    {
+        await SetUpAsync();
+        await _fixture.Store.Execute(
+            $"INSERT INTO files (library_id, relative_path, status, status_reason, last_seen_at) " +
+            $"VALUES ({_libraryId}, '{Rel}', 'on_hold', 'Waiting: the output drive has less than 5.0 GB free.', '{Ago(1)}')");
+        var payload = new WireObject().Set("relative_media_path", Rel).Set("library_id", _libraryId).Set("trigger", "worker");
+        await ScanAsync();
+        Assert.Equal(GoneSourceText.HeldReason, await ReasonAsync(Rel));
+        Assert.Equal(1, await GoneRowsAsync());
+
+        await _fixture.Jobs.EnqueueOrGetAsync("pass-through-1", IntakeRules.PassThroughJobKind, WireJsonWriter.Dumps(payload, WireJsonFormat.Compact));
+        await DrainAsync();
+
+        Assert.Equal("on_hold", await StatusAsync(Rel));
+        Assert.Equal(1, await GoneRowsAsync());
     }
 
     // --- scanning ------------------------------------------------------------------------------------------------------

@@ -4,18 +4,19 @@ using Weir.Core.Jobs;
 using Weir.Core.Processing;
 using Weir.Infrastructure.Activity;
 using Weir.Infrastructure.Processing;
+using Weir.Infrastructure.Processing.RemuxPass;
 using Weir.Infrastructure.Scheduling;
 using Weir.Infrastructure.Sqlite;
 
 namespace Weir.Infrastructure.Jobs;
 
 /// <summary>
-/// <c>processing-vanished-file-sweep</c>: every five minutes, forget the rows of files that have left each library's watched
-/// folder (#645), whether or not that library's watched-folder scan runs.
+/// <c>processing-vanished-file-sweep</c>: every five minutes, say so for the rows of files that have left each library's watched
+/// folder and forget them once they have been gone a while (#645), whether or not that library's watched-folder scan runs.
 /// </summary>
 /// <remarks>
 /// A library fed by a media manager's hand-offs often has its periodic scan off, so a rule that ran only inside a scan would
-/// never clear its rows. This runs the same rule on its own clock. It only forgets; it never queues work, so it cannot pick up a stray file a scan
+/// never clear its rows. This runs the same rule on its own clock. It never queues work, so it cannot pick up a stray file a scan
 /// would have processed. A library whose watched folder cannot be read is skipped, so an unmounted share never empties the list.
 /// </remarks>
 public sealed partial class VanishedFileSweepTask : IPeriodicTask
@@ -36,6 +37,9 @@ public sealed partial class VanishedFileSweepTask : IPeriodicTask
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _changes = changes;
     }
+
+    /// <summary>Test seam: how long a file that was not there is given to come back before Weir believes it is gone.</summary>
+    internal TimeSpan GoneSettle { get; init; } = GoneSources.DefaultSettle;
 
     public string Name => "processing-vanished-file-sweep";
 
@@ -67,18 +71,32 @@ public sealed partial class VanishedFileSweepTask : IPeriodicTask
                 continue;
             }
 
-            var forgotten = await VanishedFiles.ForgetAsync(
-                _database, library.Id, runtime.WatchedFolder, ProcessingMediaScopes.Normalize(library.MediaType), now, "sweep", cancellationToken).ConfigureAwait(false);
-            if (forgotten.Count > 0)
+            var changes = await VanishedFiles.SettleAsync(
+                _database, library.Id, runtime.WatchedFolder, ProcessingMediaScopes.Normalize(library.MediaType), now, "sweep", GoneSettle, cancellationToken).ConfigureAwait(false);
+            if (!changes.Any)
             {
-                // In the server log as well as Activity, so it can be checked on a machine where nobody signs in.
-                LogForgotten(forgotten.Count, library.Name, string.Join(", ", forgotten));
-
-                // A failed or held file that left the folder is no longer waiting on a person; no job moved to say so.
-                _changes?.Publish(DataTopics.Jobs);
+                continue;
             }
+
+            // In the server log as well as Activity, so it can be checked on a machine where nobody signs in.
+            if (changes.Held.Count > 0)
+            {
+                LogHeld(changes.Held.Count, library.Name, string.Join(", ", changes.Held));
+            }
+
+            if (changes.Forgotten.Count > 0)
+            {
+                LogForgotten(changes.Forgotten.Count, library.Name, string.Join(", ", changes.Forgotten));
+            }
+
+            // A file that left the folder no longer says it is waiting, or waits on a person; no job moved to say so.
+            _changes?.Publish(DataTopics.Jobs);
+            _changes?.Publish(DataTopics.LibraryScan);
         }
     }
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "{Count} file(s) of workflow {Library} are no longer in the watched folder and are listed until they have been gone a while: {Paths}")]
+    private partial void LogHeld(int count, string library, string paths);
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Forgot {Count} file(s) that left the watched folder of workflow {Library}: {Paths}")]
     private partial void LogForgotten(int count, string library, string paths);

@@ -1,4 +1,5 @@
 using Weir.Core.Processing;
+using Weir.Core.Processing.RemuxPass;
 using Weir.Infrastructure.Processing;
 using Weir.Infrastructure.Sqlite;
 using Weir.Infrastructure.Tests.Platform;
@@ -86,6 +87,33 @@ public sealed class ScanWhilePausedTests
         await ProcessingWatchedFolderScanDispatchJobHandlerTests.RunScanAsync(handler, jobs, libraryId, enqueueRemuxJobs: true);
 
         Assert.Equal(1, await store.Scalar(RemuxJobs));
+    }
+
+    [Fact]
+    public async Task A_file_waiting_through_a_pause_that_is_deleted_is_held_as_gone_once_the_scan_sees_it()
+    {
+        var (store, jobs, handler) = await ProcessingWatchedFolderScanDispatchJobHandlerTests.BuildAsync();
+        using var _ = store;
+        var watched = store.Home.Join("watch");
+        var output = store.Home.Join("out");
+        Directory.CreateDirectory(watched);
+        Directory.CreateDirectory(output);
+        var source = Path.Combine(watched, "Film.2024.mkv");
+        await File.WriteAllBytesAsync(source, "a new download"u8.ToArray());
+        var libraryId = await ProcessingWatchedFolderScanDispatchJobHandlerTests.CreateLibraryAsync(store, watched, output);
+        await SetPausedAsync(store, true);
+        await ProcessingWatchedFolderScanDispatchJobHandlerTests.RunScanAsync(handler, jobs, libraryId, enqueueRemuxJobs: true);
+        Assert.Equal(ProcessingFileStatuses.OutOfSchedule, (await RowAsync(store, libraryId, "Film.2024.mkv"))!.Status);
+
+        File.Delete(source);
+        await ProcessingWatchedFolderScanDispatchJobHandlerTests.RunScanAsync(handler, jobs, libraryId, enqueueRemuxJobs: true);
+        await ProcessingWatchedFolderScanDispatchJobHandlerTests.RunScanAsync(handler, jobs, libraryId, enqueueRemuxJobs: true);
+
+        var gone = await RowAsync(store, libraryId, "Film.2024.mkv");
+        Assert.True(GoneSourceText.IsHeld(gone!.Status, gone.StatusReason));
+        Assert.NotNull(gone.HoldUntil);
+        Assert.Equal(1, await store.Scalar("SELECT COUNT(*) FROM activity_events WHERE event_type = 'processing.file_left_watched_folder'"));
+        Assert.Equal(0, await store.Scalar(RemuxJobs));
     }
 
     [Fact]

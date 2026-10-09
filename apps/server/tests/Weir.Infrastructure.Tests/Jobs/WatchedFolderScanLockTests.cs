@@ -153,7 +153,7 @@ public sealed class WatchedFolderScanLockTests : IDisposable
             await _jobs.EnqueueOrGetAsync($"queued-{index}", "processing.file.remux_pass.v1", WireJsonWriter.Dumps(payload, WireJsonFormat.Compact));
         }
 
-        var sweep = new VanishedFileSweepTask(_store.Database, _store.Options, _libraries, _store.Clock, NullLogger<VanishedFileSweepTask>.Instance);
+        var sweep = new VanishedFileSweepTask(_store.Database, _store.Options, _libraries, _store.Clock, NullLogger<VanishedFileSweepTask>.Instance) { GoneSettle = TimeSpan.Zero };
 
         var (longest, alongside) = await WriteAlongsideAsync(Task.Run(() => sweep.RunOnceAsync(CancellationToken.None)));
 
