@@ -1,3 +1,4 @@
+using System.Net;
 using System.Xml;
 using System.Xml.Linq;
 using Velopack;
@@ -38,42 +39,51 @@ sealed class ReleaseFeedSource : IUpdateSource
 
     public async Task<VelopackAssetFeed> GetReleaseFeed(IVelopackLogger logger, string? appId, string channel, Guid? stagingId = null, VelopackAsset? latestLocalRelease = null)
     {
-        IUpdateSource source;
+        IReadOnlyList<string> tags;
         try
         {
-            var feed = await _downloader.DownloadString($"{_repoUrl}/releases.atom").ConfigureAwait(false);
-            if (NewestTag(feed, _includePreReleases) is not { } tag)
-            {
-                return new VelopackAssetFeed();
-            }
-
-            source = new SimpleWebSource($"{_repoUrl}/releases/download/{Uri.EscapeDataString(tag)}/", _downloader);
+            tags = TagsNewestFirst(await _downloader.DownloadString($"{_repoUrl}/releases.atom").ConfigureAwait(false), _includePreReleases);
         }
         catch (Exception exception) when (exception is HttpRequestException or XmlException or OperationCanceledException)
         {
             logger.Warn($"The release feed could not be read ({exception.Message}), so GitHub's API is asked for the release list.");
-            source = _api;
+            _serving = _api;
+            return await _api.GetReleaseFeed(logger, appId, channel, stagingId, latestLocalRelease).ConfigureAwait(false);
         }
 
-        _serving = source;
-        return await source.GetReleaseFeed(logger, appId, channel, stagingId, latestLocalRelease).ConfigureAwait(false);
+        foreach (var tag in tags)
+        {
+            var source = new SimpleWebSource($"{_repoUrl}/releases/download/{Uri.EscapeDataString(tag)}/", _downloader);
+            try
+            {
+                var feed = await source.GetReleaseFeed(logger, appId, channel, stagingId, latestLocalRelease).ConfigureAwait(false);
+                _serving = source;
+                return feed;
+            }
+            catch (HttpRequestException exception) when (exception.StatusCode == HttpStatusCode.NotFound)
+            {
+                // The release feed lists a tag before its Windows files are attached, as the Windows and Docker jobs publish separately.
+                logger.Info($"{tag} has no Windows update files yet, so the next older release is tried.");
+            }
+        }
+
+        return new VelopackAssetFeed();
     }
 
     public Task DownloadReleaseEntry(IVelopackLogger logger, VelopackAsset releaseEntry, string localFile, Action<int> progress, CancellationToken cancelToken = default) =>
         (_serving ?? _api).DownloadReleaseEntry(logger, releaseEntry, localFile, progress, cancelToken);
 
     /// <summary>
-    /// The tag of the newest release in the release feed by SemVer precedence, counting pre-releases only when asked; null
-    /// when none qualifies. The feed has no pre-release flag, so a release is a pre-release when its tag has a semver
-    /// pre-release suffix (<c>-rc.1</c>). An entry whose tag is not a version, such as the <c>untagged-…</c> address of a
-    /// draft, is left out. Throws <see cref="XmlException"/> when the text is not XML or is larger than a release feed can be.
+    /// The tags of the releases in the release feed, newest first by SemVer precedence, counting pre-releases only when asked.
+    /// The feed has no pre-release flag, so a release is a pre-release when its tag has a semver pre-release suffix
+    /// (<c>-rc.1</c>). An entry whose tag is not a version, such as the <c>untagged-…</c> address of a draft, is left out.
+    /// Throws <see cref="XmlException"/> when the text is not XML or is larger than a release feed can be.
     /// </summary>
-    internal static string? NewestTag(string feed, bool includePreReleases)
+    internal static IReadOnlyList<string> TagsNewestFirst(string feed, bool includePreReleases)
     {
         var settings = new XmlReaderSettings { DtdProcessing = DtdProcessing.Prohibit, XmlResolver = null, MaxCharactersInDocument = MostCharacters };
         using var reader = XmlReader.Create(new StringReader(feed), settings);
-        string? newestTag = null;
-        SemanticVersion? newest = null;
+        var found = new List<(string Tag, SemanticVersion Version)>();
         foreach (var entry in XDocument.Load(reader).Descendants(Atom + "entry"))
         {
             var link = entry.Elements(Atom + "link").Select(element => (string?)element.Attribute("href")).FirstOrDefault(href => href?.Contains(TagLinkMarker, StringComparison.Ordinal) == true);
@@ -88,13 +98,9 @@ sealed class ReleaseFeedSource : IUpdateSource
                 continue;
             }
 
-            if (newest is null || version > newest)
-            {
-                newestTag = tag;
-                newest = version;
-            }
+            found.Add((tag, version));
         }
 
-        return newestTag;
+        return [.. found.OrderByDescending(release => release.Version).Select(release => release.Tag)];
     }
 }

@@ -25,33 +25,32 @@ public sealed class ReleaseFeedSourceTests
     private static string VelopackFeed(string version) =>
         $$"""{"Assets":[{"PackageId":"Weir","Version":"{{version}}","Type":"Full","FileName":"Weir-{{version}}-full.nupkg","SHA1":"C33E643DDB836DBC23C195F2F91F5E23D4250B05","SHA256":"C7C368EBE5BC6DC6CB2B3AE045E97DA38C4034D2A9074FA3D3FAD22F288C9A59","Size":179244524}]}""";
 
-    [Theory]
-    [InlineData(false, "v0.9.5")]
-    [InlineData(true, "v1.0.0-rc.10")]
-    public void The_newest_tag_is_found_by_version_precedence_not_by_its_place_in_the_feed(bool includePreReleases, string expected)
+    [Fact]
+    public void Tags_are_ordered_by_version_precedence_not_by_their_place_in_the_feed_and_a_stable_install_gets_no_pre_release()
     {
         var feed = Feed("v1.0.0-rc.2", "v1.0.0-rc.10", "v0.9.4", "untagged-1b2c3d4e", "nightly", "v0.9.5");
 
-        Assert.Equal(expected, ReleaseFeedSource.NewestTag(feed, includePreReleases));
+        Assert.Equal(["v1.0.0-rc.10", "v1.0.0-rc.2", "v0.9.5", "v0.9.4"], ReleaseFeedSource.TagsNewestFirst(feed, includePreReleases: true));
+        Assert.Equal(["v0.9.5", "v0.9.4"], ReleaseFeedSource.TagsNewestFirst(feed, includePreReleases: false));
     }
 
     [Fact]
     public void A_stable_release_is_newer_than_its_own_release_candidates()
     {
-        Assert.Equal("v1.0.0", ReleaseFeedSource.NewestTag(Feed("v1.0.0-rc.3", "v1.0.0", "v0.9.0"), includePreReleases: true));
+        Assert.Equal(["v1.0.0", "v1.0.0-rc.3", "v0.9.0"], ReleaseFeedSource.TagsNewestFirst(Feed("v1.0.0-rc.3", "v1.0.0", "v0.9.0"), includePreReleases: true));
     }
 
     [Fact]
     public void No_qualifying_tag_is_none()
     {
-        Assert.Null(ReleaseFeedSource.NewestTag(Feed("v1.0.0-rc.1", "untagged-abc"), includePreReleases: false));
-        Assert.Null(ReleaseFeedSource.NewestTag(Feed(), includePreReleases: true));
+        Assert.Empty(ReleaseFeedSource.TagsNewestFirst(Feed("v1.0.0-rc.1", "untagged-abc"), includePreReleases: false));
+        Assert.Empty(ReleaseFeedSource.TagsNewestFirst(Feed(), includePreReleases: true));
     }
 
     [Fact]
     public void Text_that_is_not_a_feed_is_refused()
     {
-        Assert.ThrowsAny<XmlException>(() => ReleaseFeedSource.NewestTag("<html>not a feed", includePreReleases: true));
+        Assert.ThrowsAny<XmlException>(() => ReleaseFeedSource.TagsNewestFirst("<html>not a feed", includePreReleases: true));
     }
 
     [Fact]
@@ -62,8 +61,37 @@ public sealed class ReleaseFeedSourceTests
         Assert.Equal("v1.0.0-rc.2", NewestFor("1.0.0-rc.1", feed));
         Assert.Equal("v0.9.5", NewestFor("0.9.4", feed));
 
-        static string? NewestFor(string running, string feed) =>
-            ReleaseFeedSource.NewestTag(feed, UpdateChannel.IncludesPreReleases(running));
+        static string NewestFor(string running, string feed) =>
+            ReleaseFeedSource.TagsNewestFirst(feed, UpdateChannel.IncludesPreReleases(running))[0];
+    }
+
+    [Fact]
+    public async Task A_newest_release_whose_windows_files_are_not_attached_yet_gives_way_to_the_next_older_one()
+    {
+        var web = new FakeWeb
+        {
+            [Atom] = Feed("v1.0.0-rc.10", "v1.0.0-rc.9", "v1.0.0-rc.8"),
+            [Repo + "/releases/download/v1.0.0-rc.9/releases.win.json"] = VelopackFeed("1.0.0-rc.9"),
+        };
+        var source = UpdateChannel.SourceFor(Repo, "1.0.0-rc.8", web);
+
+        var feed = await source.GetReleaseFeed(NullVelopackLogger.Instance, "Weir", "win");
+        await source.DownloadReleaseEntry(NullVelopackLogger.Instance, feed.Assets[0], "package.nupkg", _ => { });
+
+        Assert.Equal("1.0.0-rc.9", Assert.Single(feed.Assets).Version.ToString());
+        Assert.Equal(Repo + "/releases/download/v1.0.0-rc.9/Weir-1.0.0-rc.9-full.nupkg", Assert.Single(web.Downloaded));
+        Assert.DoesNotContain(web.Asked, url => url.StartsWith("https://api.github.com/", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task When_no_release_has_its_windows_files_the_feed_is_empty_and_the_api_is_not_asked()
+    {
+        var web = new FakeWeb { [Atom] = Feed("v1.0.0-rc.10", "v1.0.0-rc.9") };
+
+        var feed = await UpdateChannel.SourceFor(Repo, "1.0.0-rc.8", web).GetReleaseFeed(NullVelopackLogger.Instance, "Weir", "win");
+
+        Assert.Empty(feed.Assets);
+        Assert.DoesNotContain(web.Asked, url => url.StartsWith("https://api.github.com/", StringComparison.Ordinal));
     }
 
     [Fact]
