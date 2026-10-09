@@ -612,6 +612,11 @@ try {
   }
   Write-Host "Confirmed: --silent installed Weir without starting it."
 
+  # This build is 0.0.1-dev, so an installed tray left on Auto would download and install the newest published release
+  # after its idle minutes. Notify only downloads nothing, so no step below ever installs a published release.
+  New-Item -ItemType Directory -Path $defaultRuntimeHome -Force | Out-Null
+  Set-Content -LiteralPath (Join-Path $defaultRuntimeHome "update-settings.json") -Value '{ "mode": "NotifyOnly" }' -Encoding ASCII
+
   Write-Host "Starting the installed Weir.exe --silent, its output piped the same way..."
   $weirPsi = New-Object System.Diagnostics.ProcessStartInfo
   $weirPsi.FileName = $installedTrayExe
@@ -704,7 +709,22 @@ try {
   Write-Host "Starting the installed Weir.exe, then running Setup.exe --silent over it..."
   $runningProc = Start-Process -FilePath $installedTrayExe -ArgumentList @("--port", [string]$Port, "--no-browser", "--silent") -PassThru -WindowStyle Hidden
   Wait-ForInstalledReady -ReadyPort $Port -TimeoutSeconds $installedHealthTimeoutSeconds -What "The installed Weir before the second Setup"
-  $overInstallProc = Start-Process -FilePath $setupExePath -ArgumentList @("--silent") -PassThru -Wait -WindowStyle Hidden
+  # Setup runs with its output piped, as Deluno runs it, and is waited for on its own: Start-Process -Wait in Windows
+  # PowerShell also waits for everything Setup's hook starts, which here includes the Weir that comes back.
+  $overInstallPsi = New-Object System.Diagnostics.ProcessStartInfo
+  $overInstallPsi.FileName = $setupExePath
+  $overInstallPsi.Arguments = "--silent"
+  $overInstallPsi.UseShellExecute = $false
+  $overInstallPsi.RedirectStandardOutput = $true
+  $overInstallPsi.RedirectStandardError = $true
+  $overInstallPsi.CreateNoWindow = $true
+  $overInstallProc = [System.Diagnostics.Process]::Start($overInstallPsi)
+  $overInstallStdoutTask = $overInstallProc.StandardOutput.ReadToEndAsync()
+  $overInstallStderrTask = $overInstallProc.StandardError.ReadToEndAsync()
+  if (-not $overInstallProc.WaitForExit($setupTimeoutSeconds * 1000)) {
+    Stop-Process -Id $overInstallProc.Id -Force -ErrorAction SilentlyContinue
+    throw "Weir-win-Setup.exe --silent over a running Weir did not exit within $setupTimeoutSeconds s."
+  }
   if ($overInstallProc.ExitCode -ne 0) {
     throw "Weir-win-Setup.exe --silent over a running Weir exited with code $($overInstallProc.ExitCode)."
   }
@@ -717,6 +737,11 @@ try {
     throw "Expected one new Weir.exe from the install after the silent Setup; found: $($restarted.Id -join ', ')."
   }
   Write-Host "Setup.exe --silent over a running Weir: it came back by itself (pid $($restarted[0].Id)) and answers /ready."
+
+  # Weir is running again, so a pipe that reaches end-of-file now is not held open by the helper that restarted it or
+  # by Weir itself: a caller capturing Setup's output, as Deluno does, is not kept waiting for as long as Weir runs.
+  Wait-ForPipeEndOfFile -Tasks @($overInstallStdoutTask, $overInstallStderrTask) -TimeoutSeconds 15 -What "Setup.exe's piped output while the restarted Weir runs"
+  Write-Host "Setup.exe's piped stdout and stderr reached end-of-file while the restarted Weir keeps running."
 
   Write-Host "Uninstalling with the Velopack uninstaller..."
   if (-not (Test-Path -LiteralPath $updateExe)) {

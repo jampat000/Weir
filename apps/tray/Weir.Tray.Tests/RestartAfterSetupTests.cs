@@ -137,14 +137,14 @@ public sealed class RestartAfterSetupTests : IDisposable
     }
 
     [Fact]
-    public void The_helper_runs_PowerShell_from_System32_without_a_window()
+    public void The_helper_runs_PowerShell_from_System32_without_a_window_or_inherited_handles()
     {
         var helper = RestartAfterSetup.HelperStart(SetupId, Executable);
 
         Assert.StartsWith(Environment.SystemDirectory, helper.FileName, StringComparison.OrdinalIgnoreCase);
         Assert.True(File.Exists(helper.FileName));
-        Assert.True(helper.CreateNoWindow);
-        Assert.False(helper.UseShellExecute);
+        Assert.Equal(ProcessWindowStyle.Hidden, helper.WindowStyle);
+        Assert.True(helper.UseShellExecute, "a start through the shell hands the helper none of Setup's pipe handles");
     }
 
     [Fact]
