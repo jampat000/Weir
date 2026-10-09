@@ -12,6 +12,7 @@ function state(overrides: Partial<UpdateStateOut> = {}): UpdateStateOut {
     pending_version: null,
     state: "idle",
     failure: null,
+    tray_running: true,
     ...overrides,
   };
 }
@@ -186,5 +187,26 @@ describe("updateButtons", () => {
         { status: "update_available" },
       ),
     ).toEqual([false, false, true]);
+  });
+
+  it("offers nothing when there is no tray to answer, however much is waiting", () => {
+    const downloaded = updateButtons(
+      state({
+        state: "downloaded",
+        downloaded: true,
+        pending_version: "1.1.0",
+        tray_running: false,
+      }),
+      status({ status: "update_available" }),
+      idle,
+    );
+    const found = updateButtons(
+      state({ pending_version: "1.1.0", tray_running: false }),
+      status({ status: "update_available" }),
+      idle,
+    );
+
+    expect(enabled(downloaded)).toEqual([false, false, false]);
+    expect(enabled(found)).toEqual([false, false, false]);
   });
 });

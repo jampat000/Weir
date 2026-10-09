@@ -5,7 +5,7 @@ import type {
   UpdateStateOut,
   UpdateStatus,
 } from "../../../../lib/settings/types";
-import { UpdateActions } from "./update-actions";
+import { RESTART_WAIT_MS, UpdateActions } from "./update-actions";
 
 type Signal = { type: "changed"; topic: "update" } | { type: "restarted" };
 
@@ -65,6 +65,7 @@ function tray(overrides: Partial<UpdateStateOut> = {}) {
       pending_version: null,
       state: "idle",
       failure: null,
+      tray_running: true,
       ...overrides,
     },
   });
@@ -191,6 +192,20 @@ describe("UpdateActions", () => {
     expect(download.reset).toHaveBeenCalled();
   });
 
+  it("turns every button off and says why when there is no tray to answer", () => {
+    tray({ tray_running: false, pending_version: "1.1.0" });
+    render(
+      <UpdateActions status={{ ...STATUS, status: "update_available" }} />,
+    );
+
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "The Weir tray isn't running, so Weir can't update itself from here.",
+    );
+    for (const name of ["Check now", "Download update", "Restart and apply"]) {
+      expect(button(name)).toBeDisabled();
+    }
+  });
+
   describe("once the restart is signalled", () => {
     beforeEach(() => {
       tray({ state: "downloaded", downloaded: true, pending_version: "2.0.8" });
@@ -241,6 +256,62 @@ describe("UpdateActions", () => {
       unmount();
 
       expect(unsubscribe).toHaveBeenCalledTimes(1);
+    });
+
+    describe("when the server does not come back", () => {
+      beforeEach(() => {
+        vi.useFakeTimers();
+        apply.reset.mockImplementation(() => {
+          apply.isSuccess = false;
+        });
+      });
+
+      it("keeps saying the restart is under way for two minutes", () => {
+        render(<UpdateActions status={STATUS} />);
+
+        act(() => {
+          vi.advanceTimersByTime(RESTART_WAIT_MS - 1);
+        });
+
+        expect(apply.reset).not.toHaveBeenCalled();
+        expect(screen.queryByText(/has not restarted/)).toBeNull();
+      });
+
+      it("then says it has not restarted and offers the restart again", () => {
+        render(<UpdateActions status={STATUS} />);
+
+        act(() => {
+          vi.advanceTimersByTime(RESTART_WAIT_MS);
+        });
+
+        expect(apply.reset).toHaveBeenCalledTimes(1);
+        expect(
+          screen.getByText(/Weir has not restarted after two minutes/),
+        ).toBeInTheDocument();
+      });
+
+      it("takes the note away when the restart is asked for again", () => {
+        render(<UpdateActions status={STATUS} />);
+        act(() => {
+          vi.advanceTimersByTime(RESTART_WAIT_MS);
+        });
+
+        fireEvent.click(button("Restart and apply"));
+
+        expect(screen.queryByText(/has not restarted/)).toBeNull();
+        expect(apply.mutate).toHaveBeenCalledTimes(1);
+      });
+
+      it("stops waiting when the page goes away", () => {
+        const { unmount } = render(<UpdateActions status={STATUS} />);
+        unmount();
+
+        act(() => {
+          vi.advanceTimersByTime(RESTART_WAIT_MS);
+        });
+
+        expect(apply.reset).not.toHaveBeenCalled();
+      });
     });
   });
 });

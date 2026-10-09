@@ -99,7 +99,10 @@ export function useUpdateStateQuery(enabled = true) {
   });
 }
 
-/** An update step the tray is asked for: what it answers is the step under way, which the page shows at once. */
+/**
+ * An update step the tray is asked for: what it answers is the step under way, which the page shows at once. A refusal
+ * (the tray has gone quiet, the update is already downloaded) is the page being behind, so the state is read again.
+ */
 function useUpdateStepMutation(ask: () => Promise<UpdateStateOut>) {
   const qc = useQueryClient();
   return useMutation({
@@ -107,6 +110,7 @@ function useUpdateStepMutation(ask: () => Promise<UpdateStateOut>) {
     onSuccess: (data) => {
       qc.setQueryData(settingsKeys.updateState, data);
     },
+    onError: () => qc.invalidateQueries({ queryKey: settingsKeys.updateState }),
   });
 }
 

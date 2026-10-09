@@ -40,6 +40,8 @@ export type UpdateStateOut = {
   state: UpdateStep;
   /** In plain words, when `state` is `failed`. */
   failure: string | null;
+  /** Whether a tray is there to take a request: not on Docker or source, and not once the tray has gone quiet. */
+  tray_running: boolean;
 };
 
 export type HistoryResetResult = Schema<"SuiteOperationalHistoryResetOut">;

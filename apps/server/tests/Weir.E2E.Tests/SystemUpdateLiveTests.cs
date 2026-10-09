@@ -22,9 +22,10 @@ public sealed class SystemUpdateLiveTests(E2EServer server) : E2ETestBase(server
     private const string RestartingNote = "Weir is restarting to finish the update.";
     private const string Version = "9.9.9";
 
-    /// <summary>Signs in to <paramref name="own"/> and opens System › About with the live stream open.</summary>
+    /// <summary>Signs in to <paramref name="own"/> and opens System › About with the live stream open, its tray alive.</summary>
     private async Task<IPage> OpenAboutAsync(WeirServer own)
     {
+        TrayFiles.WriteHeartbeat(own.Home);
         var baseUrl = own.BaseUrl.GetLeftPart(UriPartial.Authority);
         var page = await NewPageAsync();
         await page.RunAndWaitForResponseAsync(
@@ -144,6 +145,25 @@ public sealed class SystemUpdateLiveTests(E2EServer server) : E2ETestBase(server
         await Expect(Notice(page)).ToHaveCountAsync(0, new() { Timeout = RecoverMs });
         await Expect(Button(page, "Check now")).ToBeEnabledAsync(new() { Timeout = RecoverMs });
         await AssertNotReloadedAsync(page);
+    }
+
+    [E2EFact]
+    public async Task With_no_tray_to_answer_the_buttons_are_off_and_say_why()
+    {
+        await using var own = await E2EServer.StartWindowsInstallAsync();
+        var baseUrl = own.BaseUrl.GetLeftPart(UriPartial.Authority);
+        var page = await NewPageAsync();
+        await page.RunAndWaitForResponseAsync(
+            () => Navigation.EnsureSignedInAsync(page, baseUrl),
+            response => response.Url.EndsWith("/api/v1/activity/stream", StringComparison.Ordinal));
+        TrayFiles.WriteUpdateStep(own.Home, "idle", Version);
+        await Navigation.OpenTabAsync(page, "System", "About");
+
+        await Expect(page.GetByText("The Weir tray isn't running, so Weir can't update itself from here.", new() { Exact = true })).ToBeVisibleAsync(new() { Timeout = NoticeMs });
+        foreach (var name in new[] { "Check now", "Download update", "Restart and apply" })
+        {
+            await Expect(Button(page, name)).ToBeDisabledAsync();
+        }
     }
 
     [E2EFact]

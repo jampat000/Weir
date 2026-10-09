@@ -17,6 +17,11 @@ public static class TrayFiles
     public const string ApplyRequest = "update-apply-now";
 
     private const string UpdateState = "update-state.json";
+    private const string Heartbeat = "tray-heartbeat.json";
+
+    /// <summary>The tray says it is alive, <paramref name="ago"/> ago: the server offers the update buttons only while that is recent.</summary>
+    public static void WriteHeartbeat(string home, TimeSpan? ago = null) =>
+        File.WriteAllText(Path.Join(home, Heartbeat), JsonSerializer.Serialize(new { at = DateTimeOffset.UtcNow - (ago ?? TimeSpan.Zero) }));
 
     public static void WriteUpdateState(string home, bool downloaded, string version) =>
         Replace(home, string.Create(CultureInfo.InvariantCulture, $"{{\"downloaded\": {(downloaded ? "true" : "false")}, \"version\": \"{version}\"}}"));

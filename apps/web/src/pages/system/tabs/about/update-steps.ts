@@ -26,7 +26,7 @@ export type UpdateAsks = {
 
 /**
  * Which buttons apply, following the tray menu's update item: Check for updates, then Checking, then Download update, then
- * Downloading, then Restart to update. The next step is the primary button: the download while an update waits to be
+ * Downloading, then Restart to update. With no tray to answer, nothing applies. The next step is the primary button: the download while an update waits to be
  * downloaded, the restart once it is; Check now never is. Nothing applies while a step is under way or before the tray's state is known, and
  * once the update is downloaded only the restart does. The download is offered for any update Weir knows of, found by the
  * tray or by Weir's own look at the releases: the tray finds it first when it has not looked yet.
@@ -40,6 +40,7 @@ export function updateButtons(
   const downloaded = state?.downloaded === true;
   const busy =
     state === undefined ||
+    state.tray_running === false ||
     asking ||
     restarting ||
     step === "checking" ||
