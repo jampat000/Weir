@@ -2,6 +2,24 @@ using System.Runtime.InteropServices;
 
 namespace Weir.Tray;
 
+/// <summary>What <see cref="ForegroundWindow"/> asks of Windows, so the order of its requests can be tested without a desktop that grants them.</summary>
+interface IWindowSystem
+{
+    /// <summary>Asks for the window to be top-most.</summary>
+    void PutOnTop(IntPtr window);
+
+    /// <summary>Asks for the window to be the foreground window; whether Windows allowed it.</summary>
+    bool SetForeground(IntPtr window);
+
+    /// <summary>Asks again by joining the input of the thread that holds the foreground, which Windows allows.</summary>
+    void TakeForegroundThroughTheHolder(IntPtr window);
+
+    IntPtr Foreground();
+
+    /// <summary>Flashes the window's taskbar button until the person comes to it.</summary>
+    void Flash(IntPtr window);
+}
+
 /// <summary>
 /// Puts a window the person must answer in front of whatever else is open. Windows only lets the process that owns the
 /// foreground hand it on, and a tray started by hand or at sign-in does not own it, so a plain <see cref="Form.Activate"/>
@@ -11,6 +29,30 @@ namespace Weir.Tray;
 /// </summary>
 static class ForegroundWindow
 {
+    /// <summary>Makes <paramref name="form"/> top-most and the foreground window, or flashes its taskbar button when Windows will not allow that.</summary>
+    internal static void Bring(Form form) => Bring(form, Win32Windows.Instance);
+
+    internal static void Bring(Form form, IWindowSystem windows)
+    {
+        var handle = form.Handle;
+        windows.PutOnTop(handle);
+        form.Activate();
+        if (!windows.SetForeground(handle))
+        {
+            windows.TakeForegroundThroughTheHolder(handle);
+        }
+        if (windows.Foreground() != handle)
+        {
+            windows.Flash(handle);
+        }
+    }
+}
+
+/// <summary>Windows itself.</summary>
+sealed class Win32Windows : IWindowSystem
+{
+    internal static readonly Win32Windows Instance = new();
+
     private static readonly IntPtr TopMost = new(-1);
     private const uint NoMove = 0x0002;
     private const uint NoSize = 0x0001;
@@ -18,29 +60,13 @@ static class ForegroundWindow
     private const uint FlashAll = 0x0003;
     private const uint FlashUntilForeground = 0x000C;
 
-    /// <summary>Whether the window is top-most right now, as Windows sees it.</summary>
-    internal static bool IsTopMost(Form form) => (GetWindowLong(form.Handle, ExStyle) & TopMostStyle) != 0;
+    public void PutOnTop(IntPtr window) => SetWindowPos(window, TopMost, 0, 0, 0, 0, NoMove | NoSize | ShowWindow);
 
-    private const int ExStyle = -20;
-    private const int TopMostStyle = 0x00000008;
+    public bool SetForeground(IntPtr window) => SetForegroundWindow(window);
 
-    /// <summary>Makes <paramref name="form"/> top-most and the foreground window, or flashes its taskbar button when Windows will not allow that.</summary>
-    internal static void Bring(Form form)
-    {
-        var handle = form.Handle;
-        SetWindowPos(handle, TopMost, 0, 0, 0, 0, NoMove | NoSize | ShowWindow);
-        form.Activate();
-        if (!SetForegroundWindow(handle))
-        {
-            TakeForegroundThroughTheHolder(handle);
-        }
-        if (GetForegroundWindow() != handle)
-        {
-            Flash(handle);
-        }
-    }
+    public IntPtr Foreground() => GetForegroundWindow();
 
-    private static void TakeForegroundThroughTheHolder(IntPtr handle)
+    public void TakeForegroundThroughTheHolder(IntPtr window)
     {
         var holderThread = GetWindowThreadProcessId(GetForegroundWindow(), out _);
         var thisThread = GetCurrentThreadId();
@@ -50,7 +76,7 @@ static class ForegroundWindow
         }
         try
         {
-            SetForegroundWindow(handle);
+            SetForegroundWindow(window);
         }
         finally
         {
@@ -58,9 +84,9 @@ static class ForegroundWindow
         }
     }
 
-    private static void Flash(IntPtr handle)
+    public void Flash(IntPtr window)
     {
-        var info = new FlashInfo { Size = (uint)Marshal.SizeOf<FlashInfo>(), Window = handle, Flags = FlashAll | FlashUntilForeground, Count = uint.MaxValue };
+        var info = new FlashInfo { Size = (uint)Marshal.SizeOf<FlashInfo>(), Window = window, Flags = FlashAll | FlashUntilForeground, Count = uint.MaxValue };
         FlashWindowEx(ref info);
     }
 
@@ -95,9 +121,6 @@ static class ForegroundWindow
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool FlashWindowEx(ref FlashInfo info);
-
-    [DllImport("user32.dll", EntryPoint = "GetWindowLongW")]
-    private static extern int GetWindowLong(IntPtr window, int index);
 
     [DllImport("kernel32.dll")]
     private static extern uint GetCurrentThreadId();

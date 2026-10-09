@@ -35,10 +35,32 @@ sealed class PortDialog : Form
     /// <summary>The question comes from start-up, not from the menu: it stays in front, with a taskbar button, until it is answered.</summary>
     internal bool MustBeSeen => _prompt.Reason != PortPromptReason.Change;
 
-    internal PortDialog(PortPrompt prompt, Func<int, bool> isInUse, Icon? icon)
+    private const int TopMostStyle = 0x00000008;
+
+    private readonly IWindowSystem _windows;
+
+    /// <summary>The window style the dialog asks Windows for when it is created: top-most for a question that must be seen.</summary>
+    internal int RequestedExtendedStyle => CreateParams.ExStyle;
+
+    protected override CreateParams CreateParams
+    {
+        get
+        {
+            var parameters = base.CreateParams;
+            // Read once by the base constructor, before the prompt is known; the window is created later, with the prompt.
+            if (_prompt is not null && MustBeSeen)
+            {
+                parameters.ExStyle |= TopMostStyle;
+            }
+            return parameters;
+        }
+    }
+
+    internal PortDialog(PortPrompt prompt, Func<int, bool> isInUse, Icon? icon, IWindowSystem? windows = null)
     {
         _prompt = prompt;
         _isInUse = isInUse;
+        _windows = windows ?? Win32Windows.Instance;
 
         Text = "Weir";
         Font = SystemFonts.MessageBoxFont ?? SystemFonts.DefaultFont;
@@ -219,7 +241,7 @@ sealed class PortDialog : Form
         {
             if (MustBeSeen)
             {
-                ForegroundWindow.Bring(this);
+                ForegroundWindow.Bring(this, _windows);
             }
             else
             {
