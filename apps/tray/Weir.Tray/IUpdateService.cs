@@ -17,9 +17,11 @@ interface IUpdateService
 
     string? PendingVersion { get; }
 
-    Task<bool> CheckForUpdateAsync();
+    /// <summary>Looks for a newer release. A failure is reported in the outcome, never thrown.</summary>
+    Task<UpdateOutcome> CheckForUpdateAsync();
 
-    Task<bool> DownloadUpdateAsync();
+    /// <summary>Downloads the update the last check found. A failure is reported in the outcome, never thrown.</summary>
+    Task<UpdateOutcome> DownloadUpdateAsync();
 
     /// <summary>
     /// The version of an update that an earlier run downloaded and never installed, kept on disk by Velopack, or null.
