@@ -83,7 +83,7 @@ static class Program
     private static void MarkRunning()
     {
         var mark = TrayRunningMark.ForThisUser();
-        mark.Set(Environment.ProcessId);
+        mark.Set(TrayRun.ThisProcess());
         AppDomain.CurrentDomain.ProcessExit += (_, _) => mark.Clear(Environment.ProcessId);
     }
 
@@ -104,7 +104,8 @@ static class Program
                 KillRunningProcesses($"Velopack after install v{v}");
                 RestartAfterSetup.Schedule(
                     TrayRunningMark.ForThisUser(),
-                    Environment.ProcessPath ?? Path.Combine(InstallProcesses.Root(), "Weir.exe"),
+                    InstalledTray(),
+                    run => run.IsRunning(),
                     ParentProcess.Id,
                     info => Process.Start(info)?.Dispose(),
                     TrayLog.Write);
@@ -113,6 +114,7 @@ static class Program
             {
                 TrayLog.Write($"Velopack: before uninstall v{v}");
                 KillRunningProcesses($"Velopack before uninstall v{v}");
+                TrayRunningMark.ForThisUser().Forget(InstalledTray());
                 StartupRegistration.ForThisUser().Disable();
                 FirewallInstallHooks.RemoveRuleIfElevated();
             })
@@ -339,6 +341,9 @@ static class Program
     // files can be replaced or removed. Only this install's — see InstallProcesses.
     private static void KillRunningProcesses(string why) =>
         InstallProcesses.StopOwn(InstallProcesses.Root(), sameSessionOnly: false, TrayLog.Write, why);
+
+    // The Weir.exe these hooks run from: the install's own tray, which is what a mark must name to count for the install.
+    private static string InstalledTray() => Environment.ProcessPath ?? Path.Combine(InstallProcesses.Root(), "Weir.exe");
 
     internal static string RuntimeHome()
     {

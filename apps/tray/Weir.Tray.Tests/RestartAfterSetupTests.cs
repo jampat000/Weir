@@ -31,13 +31,15 @@ public sealed class RestartAfterSetupTests : IDisposable
 
     private TrayRunningMark Mark() => new(_keyPath);
 
-    private void Schedule(Func<int?>? setupProcessId = null) =>
-        RestartAfterSetup.Schedule(Mark(), Executable, setupProcessId ?? (() => SetupId), _started.Add, _log.Add);
+    private static TrayRun Run(int processId, string executable = Executable) => new(processId, 100, executable);
+
+    private void Schedule(Func<int?>? setupProcessId = null, bool stillRunning = false) =>
+        RestartAfterSetup.Schedule(Mark(), Executable, _ => stillRunning, setupProcessId ?? (() => SetupId), _started.Add, _log.Add);
 
     [Fact]
     public void A_tray_that_was_running_is_started_again_once_Setup_has_exited()
     {
-        Mark().Set(1234);
+        Mark().Set(Run(1234));
 
         Schedule();
 
@@ -57,11 +59,44 @@ public sealed class RestartAfterSetupTests : IDisposable
         Assert.Contains(_log, line => line.Contains("left stopped"));
     }
 
+    [Theory]
+    [InlineData(@"C:\Users\someone\Downloads\Weir-portable\Weir.exe")]
+    [InlineData(@"D:\a\Weir\Weir\dist\windows\pack\Weir.exe")]
+    public void A_tray_run_from_somewhere_other_than_the_install_starts_nothing(string executable)
+    {
+        Mark().Set(Run(1234, executable));
+
+        Schedule();
+
+        Assert.Empty(_started);
+    }
+
+    [Fact]
+    public void A_first_install_starts_nothing_even_when_an_earlier_install_left_a_mark()
+    {
+        Mark().Set(Run(1234));
+        Mark().Forget(Executable);
+
+        Schedule();
+
+        Assert.Empty(_started);
+    }
+
+    [Fact]
+    public void A_tray_that_is_still_running_is_not_started_again()
+    {
+        Mark().Set(Run(1234));
+
+        Schedule(stillRunning: true);
+
+        Assert.Empty(_started);
+    }
+
     [Fact]
     public void A_tray_that_quit_in_order_is_left_stopped()
     {
         var mark = Mark();
-        mark.Set(1234);
+        mark.Set(Run(1234));
         mark.Clear(1234);
 
         Schedule();
@@ -72,7 +107,7 @@ public sealed class RestartAfterSetupTests : IDisposable
     [Fact]
     public void One_install_restarts_Weir_once()
     {
-        Mark().Set(1234);
+        Mark().Set(Run(1234));
 
         Schedule();
         Schedule();
@@ -83,7 +118,7 @@ public sealed class RestartAfterSetupTests : IDisposable
     [Fact]
     public void A_tray_that_cannot_find_Setup_says_so_and_starts_nothing()
     {
-        Mark().Set(1234);
+        Mark().Set(Run(1234));
 
         Schedule(setupProcessId: () => null);
 
@@ -94,9 +129,9 @@ public sealed class RestartAfterSetupTests : IDisposable
     [Fact]
     public void A_start_that_fails_is_logged_and_does_not_fail_the_install()
     {
-        Mark().Set(1234);
+        Mark().Set(Run(1234));
 
-        RestartAfterSetup.Schedule(Mark(), Executable, () => SetupId, _ => throw new InvalidOperationException("no PowerShell"), _log.Add);
+        RestartAfterSetup.Schedule(Mark(), Executable, _ => false, () => SetupId, _ => throw new InvalidOperationException("no PowerShell"), _log.Add);
 
         Assert.Contains(_log, line => line.Contains("could not be started again") && line.Contains("no PowerShell"));
     }

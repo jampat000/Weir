@@ -25,19 +25,21 @@ static class RestartAfterSetup
     private static readonly TimeSpan SetupCeiling = TimeSpan.FromMinutes(2);
 
     /// <summary>
-    /// Arranges for Weir to start once Setup has exited, when it was running before. Nothing is arranged when it was not:
-    /// an install must not start a Weir that was stopped.
+    /// Arranges for Weir to start once Setup has exited, when the install's own tray was running before and Setup ended it.
+    /// Nothing is arranged otherwise: an install must not start a Weir that was stopped, and a first install, or a tray
+    /// run from anywhere but <paramref name="executable"/>, has no running Weir to bring back.
     /// </summary>
     internal static void Schedule(
-        TrayRunningMark wasRunning,
+        TrayRunningMark mark,
         string executable,
+        Func<TrayRun, bool> isRunning,
         Func<int?> setupProcessId,
         Action<ProcessStartInfo> start,
         Action<string> log)
     {
-        if (!wasRunning.Take())
+        if (!mark.TakeLeftBy(executable, isRunning))
         {
-            log("Weir was not running before this install, so it is left stopped.");
+            log("Weir was not running from this install before Setup, so it is left stopped.");
             return;
         }
 
