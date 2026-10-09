@@ -83,7 +83,7 @@ public static class HandoffLedgerRules
             "rejected" => (Rejected, null),
             "cancelled" => (Cancelled, null),
             "processing_failed" => nextRetryAt is { } retryAt ? (Scheduled, retryAt) : (Failed, null),
-            "skipped" => (Skipped, null),
+            "skipped" => (Failed, null),
             "out_of_schedule" => (Scheduled, null),
             _ => (Queued, null),
         };

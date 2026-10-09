@@ -53,7 +53,7 @@ public sealed class PartialHandoffTests
         Assert.Equal(("imported", "Deluno"), ((string)handback["outcome"]!, (string)handback["outcome_by"]!));
         Assert.NotNull(handback["released_at"]);
         Assert.Contains(
-            $"Deluno imported {Release}",
+            "Deluno imported film.mkv",
             (await scenario.ActivityAsync("processing.handback_outcome")).Select(entry => (string)entry["title"]!));
     }
 

@@ -62,13 +62,17 @@ public sealed class HandoffTargetStore
     {
         ArgumentNullException.ThrowIfNull(uow);
         return uow.QueryAsync(
-            "SELECT relative_path, result, output_file, message, output_written_at FROM media_manager_handoff_targets WHERE handoff_row_id = $row ORDER BY relative_path",
+            "SELECT t.relative_path, t.result, t.output_file, t.message, t.output_written_at, " +
+            "(SELECT NULLIF(f.size_bytes, 0) FROM files f WHERE f.library_id = h.library_id AND f.relative_path = t.relative_path) " +
+            "FROM media_manager_handoff_targets t JOIN media_manager_handoffs h ON h.id = t.handoff_row_id " +
+            "WHERE t.handoff_row_id = $row ORDER BY t.relative_path",
             reader => new HandoffTarget(
                 SqliteValues.GetString(reader, 0),
                 SqliteValues.GetStringOrNull(reader, 1),
                 SqliteValues.GetStringOrNull(reader, 2),
                 SqliteValues.GetStringOrNull(reader, 3),
-                TimestampColumns.Parse(reader.GetValue(4))),
+                TimestampColumns.Parse(reader.GetValue(4)),
+                reader.IsDBNull(5) ? null : reader.GetInt64(5)),
             ("$row", handoffRowId));
     }
 
