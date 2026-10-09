@@ -17,6 +17,74 @@ public sealed class TrayMenuViewTests
 
     private static readonly TrayState Running = new(ServerPhase.Running, null, null, 9347);
 
+    private static ToolStripMenuItem StartWithWindowsItem(TrayMenuView view) =>
+        view.Strip.Items.OfType<ToolStripMenuItem>().Single(item => item.Text == "Start with Windows");
+
+    // What UI Automation reads from the item, which Windows Forms keeps internal: whether it offers the Toggle pattern (10015)
+    // and what that pattern's ToggleState says.
+    private static (bool Supported, string? State) Toggle(AccessibleObject accessible)
+    {
+        const int togglePattern = 10015;
+        var flags = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public;
+        var supports = accessible.GetType().GetMethod("IsPatternSupported", flags)!;
+        var supported = (bool)supports.Invoke(accessible, [Enum.ToObject(supports.GetParameters()[0].ParameterType, togglePattern)])!;
+        return (supported, accessible.GetType().GetProperty("ToggleState", flags)?.GetValue(accessible)?.ToString());
+    }
+
+    [Fact]
+    public void Start_with_Windows_is_a_real_check_item_whose_accessible_state_follows_the_description()
+    {
+        using var view = new TrayMenuView([], []);
+
+        view.Show(Describe(Running, startsWithWindows: true));
+        var item = StartWithWindowsItem(view);
+
+        Assert.True(item.CheckOnClick);
+        Assert.True(item.Checked);
+        Assert.Equal(CheckState.Checked, item.CheckState);
+        Assert.True(item.AccessibilityObject.State.HasFlag(AccessibleStates.Checked));
+
+        view.Show(Describe(Running, startsWithWindows: false));
+
+        Assert.False(item.Checked);
+        Assert.False(item.AccessibilityObject.State.HasFlag(AccessibleStates.Checked));
+    }
+
+    [Fact]
+    public void Start_with_Windows_offers_the_Toggle_pattern_and_reports_its_toggle_state_to_UI_Automation()
+    {
+        using var view = new TrayMenuView([], []);
+        view.Show(Describe(Running, startsWithWindows: true));
+        var accessible = StartWithWindowsItem(view).AccessibilityObject;
+
+        Assert.Equal((true, "ToggleState_On"), Toggle(accessible));
+
+        view.Show(Describe(Running, startsWithWindows: false));
+
+        Assert.Equal((true, "ToggleState_Off"), Toggle(accessible));
+    }
+
+    [Fact]
+    public void A_plain_item_offers_no_Toggle_pattern()
+    {
+        using var view = new TrayMenuView([], []);
+        view.Show(Describe(Running));
+
+        var restart = view.Strip.Items.OfType<ToolStripMenuItem>().Single(item => item.Text == "Restart Weir");
+
+        Assert.False(Toggle(restart.AccessibilityObject).Supported);
+    }
+
+    [Fact]
+    public void Only_the_toggle_is_a_check_item()
+    {
+        using var view = new TrayMenuView([], []);
+
+        view.Show(Describe(Running));
+
+        Assert.Equal(["Start with Windows"], view.Strip.Items.OfType<ToolStripMenuItem>().Where(item => item.CheckOnClick).Select(item => item.Text));
+    }
+
     [Fact]
     public void The_menu_on_screen_has_the_described_items_in_order()
     {
@@ -39,7 +107,7 @@ public sealed class TrayMenuViewTests
         view.Show(Describe(new TrayState(ServerPhase.Stopped, null, null, 9347), startsWithWindows: true));
 
         Assert.Equal(count, view.Strip.Items.Count);
-        Assert.Equal("Stopped - choose Restart Weir", view.Strip.Items[1].Text);
+        Assert.Equal("Weir - Stopped - choose Restart Weir", view.Strip.Items[1].Text);
         Assert.False(view.Strip.Items[3].Enabled);
         Assert.Contains(view.Strip.Items.OfType<ToolStripMenuItem>(), item => item.Text == "Start with Windows" && item.Checked);
     }
@@ -71,7 +139,7 @@ public sealed class TrayMenuViewTests
     [Fact]
     public void The_longest_hover_text_is_one_the_notification_area_accepts()
     {
-        var status = new TrayStatus(false, null, 99, ["A connection with a rather long name that goes on and on and on"], true);
+        var status = new TrayStatus(false, null, ["A connection with a rather long name that goes on and on and on"], ["The watched folder for a workflow with a long name too"], true);
         var hover = new TrayState(ServerPhase.Running, status, "1.0.0-rc.10", 9347).HoverText;
         using var icon = new NotifyIcon();
 

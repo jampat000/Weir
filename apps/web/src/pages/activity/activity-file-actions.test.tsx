@@ -382,6 +382,46 @@ describe("ActivityFileActions remove dialog", () => {
   });
 });
 
+describe("ActivityFileActions for a file that is no longer in the watched folder", () => {
+  beforeEach(() => {
+    handedOffNote.mockReset().mockReturnValue(null);
+  });
+
+  it("offers only Remove from list, since nothing else can be done without the file", () => {
+    renderActions({
+      status: "on_hold",
+      source_gone: true,
+      hold_until: "2026-09-01T00:10:00Z",
+    });
+
+    expect(
+      screen.getByRole("button", { name: "Remove from list" }),
+    ).toBeInTheDocument();
+    for (const name of [
+      "Choose tracks",
+      "Check again",
+      "Why is this held?",
+      "Pass through unchanged",
+    ]) {
+      expect(screen.queryByRole("button", { name })).toBeNull();
+    }
+  });
+
+  it("still offers every action for a file held for another reason", () => {
+    renderActions({ status: "on_hold", source_gone: false });
+
+    for (const name of [
+      "Choose tracks",
+      "Check again",
+      "Why is this held?",
+      "Pass through unchanged",
+      "Remove from list",
+    ]) {
+      expect(screen.getByRole("button", { name })).toBeInTheDocument();
+    }
+  });
+});
+
 describe("ActivityFileActions check again", () => {
   beforeEach(() => {
     handedOffNote.mockReset().mockReturnValue(null);
@@ -401,5 +441,36 @@ describe("ActivityFileActions check again", () => {
     renderActions({ status: "on_hold" });
 
     expect(screen.queryByRole("button", { name: "Check again" })).toBeNull();
+  });
+});
+
+describe("ActivityFileActions for a file the workflow removed", () => {
+  beforeEach(() => {
+    handedOffNote.mockReset().mockReturnValue(null);
+  });
+
+  const skip = { status: "skipped", failure_class: null } as const;
+
+  it("offers nothing that needs the file, only Remove from list", () => {
+    renderActions({ ...skip, skip_kind: "below_minimum_size_removed" });
+
+    for (const name of [
+      "Pass through unchanged",
+      "Process again",
+      "Check again",
+    ]) {
+      expect(screen.queryByRole("button", { name })).toBeNull();
+    }
+    expect(
+      screen.getByRole("button", { name: "Remove from list" }),
+    ).toBeInTheDocument();
+  });
+
+  it("still offers to pass through a file the minimum size only skipped", () => {
+    renderActions({ ...skip, skip_kind: "below_minimum_size" });
+
+    expect(
+      screen.getByRole("button", { name: "Pass through unchanged" }),
+    ).toBeInTheDocument();
   });
 });

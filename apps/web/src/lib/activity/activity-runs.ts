@@ -75,6 +75,7 @@ function entryOutcome(ev: ActivityEventItem): RunOutcome | null {
     return "passed through";
   if (type === "processing.file_rejected") return "rejected";
   if (ev.result === "failed") return "failed";
+  if (ev.result === "skipped") return "skipped";
   if (type === "processing.file_remux_pass_completed") {
     const detail = parseActivityDetail(ev.detail) ?? {};
     if (detail.pass_through_unchanged === true) return "passed through";
@@ -82,7 +83,6 @@ function entryOutcome(ev: ActivityEventItem): RunOutcome | null {
       return "no changes needed";
     return "processed";
   }
-  if (ev.result === "skipped") return "skipped";
   return null;
 }
 

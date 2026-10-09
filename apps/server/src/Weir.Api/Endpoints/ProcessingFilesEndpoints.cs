@@ -6,6 +6,7 @@ using Weir.Core.Auth;
 using Weir.Core.Jobs;
 using Weir.Core.Json;
 using Weir.Core.Processing;
+using Weir.Core.Processing.RemuxPass;
 using Weir.Core.Validation;
 using Weir.Infrastructure.Artwork;
 using Weir.Infrastructure.Jobs;
@@ -89,6 +90,7 @@ internal sealed class ProcessingFilesEndpointHandlers
             .Set("poster_url", posterUrl)
             .Set("status", row.Status)
             .Set("status_reason", row.StatusReason)
+            .Set("source_gone", GoneSourceText.IsHeld(row.Status, row.StatusReason))
             .Set("blocked_by_connection", row.BlockedByConnection)
             .Set("size_bytes", row.SizeBytes)
             .Set("video_codec", row.VideoCodec)
@@ -114,6 +116,7 @@ internal sealed class ProcessingFilesEndpointHandlers
             .Set("progress_removed_audio", progress is null ? WireValue.Null : new WireArray(progress.RemovedAudio.Select(t => (WireValue)WireValue.Of(t))))
             .Set("progress_removed_subtitles", progress is null ? WireValue.Null : new WireArray(progress.RemovedSubtitles.Select(t => (WireValue)WireValue.Of(t))))
             .Set("failure_class", row.FailureClass)
+            .Set("skip_kind", row.SkipKind)
             .Set("failure_attempts", row.FailureAttempts)
             .Set("next_retry_at", row.NextRetryAt?.ToWireText())
             .Set("output_collision_policy", row.OutputCollisionPolicy)

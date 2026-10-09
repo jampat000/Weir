@@ -69,24 +69,30 @@ function rejectionSentence(detail: ActivityDetail): string {
   });
 }
 
-/** What became of a finished pass, most telling first: a rejection is a decision, so it never reads as a failure. */
+/**
+ * What became of a finished pass, most telling first: a rejection is a decision, so it never reads as a failure. A pass that
+ * neither wrote an output nor checked that none was needed (a skip, a wait for the file, a file that was gone) finished
+ * nothing, and is null whatever its reason.
+ */
 function finishedKind(outcome: {
   passed: boolean;
   rejected: boolean;
   failed: boolean;
   already: boolean;
-}): FinishedKind {
+  written: boolean;
+}): FinishedKind | null {
   if (outcome.passed) return "passed";
   if (outcome.rejected) return "rejected";
   if (outcome.failed) return "failed";
-  return outcome.already ? "already" : "cleaned";
+  if (outcome.already) return "already";
+  return outcome.written ? "cleaned" : null;
 }
 
 function count(value: unknown): number {
   return Array.isArray(value) ? value.length : 0;
 }
 
-/** The finished file an Activity entry describes, or null for any other kind of entry. */
+/** The finished file an Activity entry describes, or null for any other kind of entry, and for a pass that finished nothing. */
 export function finishedFileFromEvent(
   ev: ActivityEventItem,
 ): FinishedFile | null {
@@ -99,12 +105,20 @@ export function finishedFileFromEvent(
     const already =
       outcome === "live_skipped_not_required" ||
       detail?.remux_required === false;
+    const kind = finishedKind({
+      passed,
+      rejected,
+      failed,
+      already,
+      written: outcome === "live_output_written",
+    });
+    if (kind === null) return null;
     const source = asNumber(detail?.source_size_bytes);
     const output = asNumber(detail?.output_size_bytes);
     return {
       id: ev.id,
       source: "download",
-      kind: finishedKind({ passed, rejected, failed, already }),
+      kind,
       relativePath:
         asString(detail?.relative_media_path) ??
         ev.relative_path ??

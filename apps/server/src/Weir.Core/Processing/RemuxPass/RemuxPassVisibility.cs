@@ -40,6 +40,12 @@ public static class GoneSourceText
     public const string HeldReason =
         "This file is no longer in the watched folder. Weir will look again shortly, and stops listing it if it has not come back.";
 
+    /// <summary>Whether a file is held for that reason, which is how every route that finds a file gone leaves it until it is forgotten.</summary>
+    public static bool IsHeld(string status, string? reason) => status == ProcessingFileStatuses.OnHold && reason == HeldReason;
+
+    /// <summary>What a file held as gone says when it is back before Weir has stopped listing it.</summary>
+    public const string BackReason = "This file is back in the watched folder, so Weir will look at it again.";
+
     /// <summary>What a file that was cleaned before says once it has gone: back to finished, as history.</summary>
     public const string CleanedReason = "Finished processing this file. Its original is no longer in the watched folder.";
 

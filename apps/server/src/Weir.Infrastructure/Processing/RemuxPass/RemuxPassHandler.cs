@@ -233,7 +233,8 @@ public sealed partial class RemuxPassHandler : IJobHandler
         await ApplyFileOutcomeStateAsync(result, libraryId, mediaScope, origin).ConfigureAwait(false);
         await DeferUntilOldEnoughAsync(context.Id, data, origin, result, cancellationToken).ConfigureAwait(false);
         await LookAgainForGoneFileAsync(context.Id, data, origin, result, cancellationToken).ConfigureAwait(false);
-        await RecordAsync(result, progress.ActivityId).ConfigureAwait(false);
+        await RecordAsync(result, progress.ActivityId, newEntry: AddsGoneEntry(result, claim.GoneListed)).ConfigureAwait(false);
+
         await FinishRejectedInputCleanupAsync(result, claim.Library, libraryId, mediaScope, origin).ConfigureAwait(false);
         await ReportBackAsync(payloadJson, result).ConfigureAwait(false);
         await DownloadedScanAsync(result, mediaScope, origin).ConfigureAwait(false);

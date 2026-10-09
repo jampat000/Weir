@@ -28,12 +28,15 @@ export function useFinishedFiles(
   const withPasses = shownBy(filter, { source: "download" });
   const withCleans = shownBy(filter, { source: "library" });
   // A download whose title the owner has since removed from Activity drops out here; a library clean has no
-  // such removal, and library files are not in known_files_only's reckoning, so its query never asks for it.
+  // such removal, and library files are not in known_files_only's reckoning, so its query never asks for it. A file
+  // is listed once, as it stands now: a failure it has since got past, or an earlier pass of the same file, is left out.
   const passes = useActivityRecentQuery(
     {
       limit: RECENT_PASSES,
       event_type: REMUX_PASS_COMPLETED_EVENT,
       known_files_only: true,
+      current_only: true,
+      with_total: false,
       ...workflow,
     },
     { enabled: withPasses },

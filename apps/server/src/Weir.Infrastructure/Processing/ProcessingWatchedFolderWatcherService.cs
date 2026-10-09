@@ -279,9 +279,8 @@ public class ProcessingWatchedFolderWatcherService : BackgroundService
             var libraryId = library.Id;
             void OnEvent(object sender, FileSystemEventArgs e)
             {
-                // A directory event is always accompanied by the file event that matters, and Deletions
-                // are not work appearing — this only subscribes Created/Changed/Renamed, so a delete never
-                // reaches here at all.
+                // A directory event is always accompanied by the file event that matters. A delete is not work appearing, but the
+                // scan it brings is what finds a file that left before Weir started on it, and says so.
                 if (Directory.Exists(e.FullPath))
                 {
                     return;
@@ -292,6 +291,7 @@ public class ProcessingWatchedFolderWatcherService : BackgroundService
 
             watcher.Created += OnEvent;
             watcher.Changed += OnEvent;
+            watcher.Deleted += OnEvent;
             watcher.Renamed += (sender, e) => OnEvent(sender, e);
             watcher.Error += (sender, e) =>
             {

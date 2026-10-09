@@ -2,41 +2,43 @@
 
 Both apps keep an icon in the Windows notification area. This page is the one standard for what that icon shows, what its menu holds and how it behaves. Deluno and Weir each keep a word-for-word copy, and each app builds and tests its own tray. Nothing is shared in code, so neither app depends on the other.
 
-Decided by the owner on 9 Oct 2026, from the side-by-side audit of both trays.
+Decided by the owner on 9 Oct 2026, from the side-by-side audit of both trays. The icon and hover text were revised the same day: they show the platform's own health only.
 
 ## What the icon shows
 
-Each app keeps its own brand icon, so you always know which is which. A small corner mark appears only when something is different. With no mark, all is well.
+Each app keeps its own brand icon, so you always know which is which. A coloured dot in the corner always shows the health of the platform itself: the app, and the things it is set up to talk to.
 
-| Mark | Meaning |
+| Dot | Meaning |
 |---|---|
-| none | Running, nothing needs you |
-| grey ring | Starting |
-| two bars | Paused (Deluno: automation; Weir: processing) |
-| red dot | Needs you |
-| blue dot | An update is ready |
+| green | The app is running, and everything it relies on answers |
+| amber | The app is running, but something it relies on does not answer |
+| red | The app itself is stopped, has crashed, or keeps failing to start |
+| blinking | Starting: the dot blinks until the app can say green, amber or red |
 
-- **The red dot means either the app is in trouble or something is waiting on you:**
-  - the server stopped, or keeps failing;
-  - something it relies on can't be reached (a download client, an indexer, Weir, Deluno);
-  - items wait on you: Deluno's bell count, or Weir's files on hold or failed.
-- **When two marks apply, one shows.** The order is red dot, then grey ring, then two bars, then blue dot.
-- **There is no mark for being busy.** Downloading and processing are normal, and a mark that is on most of the day stops meaning anything.
+- **What counts as "something it relies on":**
+  - Deluno: a download client, an indexer, its processor (Weir), the metadata service, or a library folder or disk.
+  - Weir: Deluno, or its watched, work or output folders.
+- **The dot never reflects downloads, files or things waiting on you.** Those stay in each app's own screens and bell. A failed download or a file on hold is not a platform problem.
+- **Two extra marks**, in the opposite corner, on top of the colour:
+  - **pause bars** while automation (Deluno) or processing (Weir) is paused;
+  - **a blue arrow** when an update is ready to install.
+  - When both apply, the pause bars show.
+- **No mark for being busy.** Downloading and processing are normal.
 - **How it is drawn:** at the shell's small-icon size, with a thin outline so it reads on light and dark taskbars. The icon file carries 16, 20, 24, 32, 40, 48, 64, 128 and 256 px frames.
-- **When it appears:** at once, in the Starting state. Never only after the server is up.
+- **When it appears:** at once, blinking while it starts. Never only after the server is up.
 
 ## What the hover text says
 
-`<App> - <status>`. When something needs you, it also says what, so the reason for the red dot is never hidden. Examples:
+`<App> - <status>`: the platform's status, and when it is amber or red, what is wrong, so the reason for the colour is never hidden. No counts of downloads or items waiting. Examples:
 
-- `Deluno - Running at http://localhost:7879 - 2 things need a look`
+- `Deluno - Running at http://localhost:7879`
+- `Deluno - SABnzbd isn't answering`
 - `Deluno - Paused`
 - `Weir - Starting...`
-- `Weir - Update ready (1.0.0-rc.10)`
+- `Weir - Update ready (1.0.0-rc.11)`
 - `Weir - Stopped - choose Restart Weir`
 
 It is kept short but never cut mid-word. It changes as the state changes, with no timer.
-
 ## The menu
 
 ```
@@ -82,4 +84,4 @@ Quit <App>                                   (hover text says what it stops)
 - **A second launch** shows a balloon from the running copy, "<App> is already running", with the address.
 - **Balloons:**
   - a click does what the balloon offers: open Updates, Restart, open the logs folder, Try again;
-  - Windows decides how long a notice stays: it ignores the time an app asks for. So a notice is never the only place a problem shows. Anything you must act on also shows in the red dot, the hover text and the menu's status line, until it is dealt with.
+  - Windows decides how long a notice stays: it ignores the time an app asks for. So a notice is never the only place a problem shows. A platform problem also shows in the dot's colour, the hover text and the menu's status line, until it is dealt with.

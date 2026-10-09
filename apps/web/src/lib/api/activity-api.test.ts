@@ -21,6 +21,24 @@ describe("activity-api paths", () => {
     expect(url.searchParams.get("limit")).toBe("100");
   });
 
+  it("asks for each file as it stands now only when told to, and never for the export", () => {
+    const asked = (path: string) =>
+      new URL(path, "http://x").searchParams.get("current_only");
+
+    expect(asked(activityRecentPath({ current_only: true }))).toBe("true");
+    expect(asked(activityRecentPath({}))).toBeNull();
+    expect(asked(activityExportPath("csv", { current_only: true }))).toBeNull();
+  });
+
+  it("leaves out the count only when told to", () => {
+    const sent = (path: string) =>
+      new URL(path, "http://x").searchParams.get("with_total");
+
+    expect(sent(activityRecentPath({ with_total: false }))).toBe("false");
+    expect(sent(activityRecentPath({}))).toBeNull();
+    expect(sent(activityRecentPath({ with_total: true }))).toBeNull();
+  });
+
   it("exports the same filters without paging", () => {
     const path = activityExportPath("json", {
       limit: 100,

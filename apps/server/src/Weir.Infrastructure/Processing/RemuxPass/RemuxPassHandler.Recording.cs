@@ -12,9 +12,10 @@ public sealed partial class RemuxPassHandler
 {
     /// <summary>
     /// Writes the processing record and the Activity row together so they cannot disagree. A progress row
-    /// already started for the pass becomes the completed row.
+    /// already started for the pass becomes the completed row. With <paramref name="newEntry"/> false (the file is already listed as
+    /// gone) the processing record is still written and a started progress row still finished, but no entry is added.
     /// </summary>
-    internal async Task RecordAsync(WireObject payload, long? activityId = null)
+    internal async Task RecordAsync(WireObject payload, long? activityId = null, bool newEntry = true)
     {
         var detail = RemuxPassVisibility.ActivityDetail(payload);
         var title = RemuxPassVisibility.ActivityTitle(payload);
@@ -42,6 +43,11 @@ public sealed partial class RemuxPassHandler
 
                     if (activityId is { } id &&
                         await SqliteActivityWriter.UpdateAsync(uow, id, ActivityEventTypes.ProcessingFileRemuxPassCompleted, title, detail).ConfigureAwait(false))
+                    {
+                        return;
+                    }
+
+                    if (!newEntry)
                     {
                         return;
                     }

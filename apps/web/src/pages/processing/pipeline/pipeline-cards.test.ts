@@ -241,6 +241,25 @@ describe("what a card says", () => {
     expect(heldFor("")).toBe("Waiting");
   });
 
+  it("replaces the wait of a file Weir has found gone with 'No longer there', and counts down to nothing", () => {
+    const [card] = cardsFor([
+      aFile(1, "on_hold", {
+        status_reason:
+          "This file is no longer in the watched folder. Weir will look again shortly.",
+        source_gone: true,
+        hold_until: new Date(NOW + 300_000).toISOString(),
+      }),
+    ]);
+
+    expect(card.status).toMatchObject({
+      text: "No longer there",
+      pulse: false,
+    });
+    expect(card.bar).toBeNull();
+    expect(written(card)).not.toContain("ready in");
+    expect(written(card)).not.toContain("looks again in");
+  });
+
   it("says Weir is checking an arriving file once its wait is over", () => {
     const [card] = cardsFor([
       aFile(1, "on_hold", {

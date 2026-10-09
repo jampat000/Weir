@@ -42,6 +42,7 @@ public sealed partial class RemuxPassRunner
                     new WireObject()
                         .Set("source_size_bytes", sourceSize)
                         .Set("source_size_mb", Math.Round(sourceMb, 1, MidpointRounding.ToEven))
+                        .Set("skip_kind", SkipKinds.BelowMinimumSize)
                         .Set("minimum_input_file_size_mb", minSizeMb)
                         .Set("media_scope", scope)), 0);
             }

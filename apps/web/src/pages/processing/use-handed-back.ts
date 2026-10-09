@@ -39,7 +39,12 @@ export function useHandedBack(
     .replace("Z", "+00:00");
   const workflow = workflowId === null ? {} : { library_id: workflowId };
   const passes = useActivityWindowQuery(
-    { event_type: REMUX_PASS_COMPLETED_EVENT, date_from: since, ...workflow },
+    {
+      event_type: REMUX_PASS_COMPLETED_EVENT,
+      date_from: since,
+      current_only: true,
+      ...workflow,
+    },
     HANDED_BACK_PAGES,
   );
   const cleans = useActivityWindowQuery(
