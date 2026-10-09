@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Microsoft.Data.Sqlite;
 using Weir.Infrastructure.Sqlite;
 using Weir.Infrastructure.Tests.Jobs;
@@ -5,15 +6,20 @@ using Weir.Infrastructure.Tests.Jobs;
 namespace Weir.Infrastructure.Tests.Sqlite;
 
 /// <summary>
-/// Weir's own writers queue for the write lock without holding a thread, one at a time and in the order they asked, and a
-/// unit of work gives its turn back however it ends.
+/// Weir's own writers queue for the write lock without holding a thread, one at a time, and a unit of work gives its turn back
+/// however it ends. Every database here has a short busy timeout and every wait a limit, so a broken gate fails a test
+/// instead of hanging it.
 /// </summary>
 public sealed class UnitOfWorkWriteGateTests
 {
     private const string InsertJob =
         "INSERT INTO jobs (dedupe_key, job_kind, status, max_attempts) VALUES (@dedupe, 'processing.remux_pass', 'pending', 3)";
 
-    private static readonly TimeSpan Generous = TimeSpan.FromSeconds(20);
+    private const int BusyTimeoutMilliseconds = 2000;
+
+    private static readonly TimeSpan Limit = TimeSpan.FromSeconds(10);
+
+    private static SqliteDatabase ShortTimeout(JobsTestDatabase db) => new(db.DbPath, busyTimeoutMilliseconds: BusyTimeoutMilliseconds);
 
     private static async Task WriteAsync(SqliteDatabase database, string dedupeKey, CancellationToken cancellationToken = default)
     {
@@ -40,48 +46,78 @@ public sealed class UnitOfWorkWriteGateTests
                 await uow.CommitAsync();
             }
         });
-        await holding.Task.WaitAsync(Generous);
+        await holding.Task.WaitAsync(Limit);
         return holder;
     }
 
+    /// <summary>Waits for tasks to end, however they end, so nothing is still using a database when a test lets go of it.</summary>
+    private static async Task SettleAsync(IEnumerable<Task> tasks)
+    {
+        try
+        {
+            await Task.WhenAll(tasks).WaitAsync(Limit);
+        }
+#pragma warning disable CA1031 // Only waiting for the tasks to end; the test asserts what they ended with.
+        catch (Exception)
+#pragma warning restore CA1031
+        {
+        }
+    }
+
+    /// <summary>
+    /// Whether the thread pool still runs work promptly, asked from a thread of its own so that a pool with no free thread cannot
+    /// stop the question being put.
+    /// </summary>
+    private static Task<bool> PoolRunsWorkPromptlyAsync() =>
+        Task.Factory.StartNew(
+            () => Task.Run(() => 42).Wait(TimeSpan.FromSeconds(1)),
+            CancellationToken.None,
+            TaskCreationOptions.LongRunning,
+            TaskScheduler.Default);
+
     [Fact]
-    public async Task Writers_waiting_for_the_lock_hold_no_threads_and_go_in_the_order_they_asked()
+    public async Task Writers_waiting_for_the_lock_hold_no_threads_and_all_get_their_turn()
     {
         using var db = new JobsTestDatabase();
+        var database = ShortTimeout(db);
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var holder = await HoldTheLockAsync(db.Database, "holder", release);
+        var holder = await HoldTheLockAsync(database, "holder", release);
 
         // More than the pool's minimum: threads blocked in SQLite's busy handler would stall everything else.
         var waiting = Enumerable.Range(0, Environment.ProcessorCount * 4 + 8).ToArray();
-        var writers = waiting.Select(index => WriteAsync(db.Database, $"waiting-{index}")).ToArray();
-
-        Assert.Equal(42, await Task.Run(() => 42).WaitAsync(TimeSpan.FromSeconds(5)));
-        Assert.All(writers, writer => Assert.False(writer.IsCompleted));
-
-        release.SetResult();
-        await Task.WhenAll(writers.Append(holder)).WaitAsync(Generous);
-
-        var order = new List<string>();
-        await using (var read = await UnitOfWork.OpenAsync(db.Database))
+        var writers = waiting.Select(index => Task.Run(() => WriteAsync(database, $"waiting-{index}"))).ToArray();
+        try
         {
-            order.AddRange(await read.QueryAsync("SELECT dedupe_key FROM jobs ORDER BY id", reader => reader.GetString(0)));
-        }
+            // Long enough for every writer to have asked for its turn.
+            await Task.Delay(500);
+            Assert.True(await PoolRunsWorkPromptlyAsync().WaitAsync(Limit), "the thread pool had no thread to spare");
+            Assert.All(writers, writer => Assert.False(writer.IsCompleted));
 
-        Assert.Equal(waiting.Select(index => $"waiting-{index}").Prepend("holder"), order);
+            release.SetResult();
+            await Task.WhenAll(writers.Append(holder)).WaitAsync(Limit);
+
+            Assert.Equal(waiting.Length + 1L, db.Count("SELECT count(DISTINCT dedupe_key) FROM jobs"));
+        }
+        finally
+        {
+            release.TrySetResult();
+            await SettleAsync(writers.Append(holder));
+        }
     }
 
     [Fact]
     public async Task A_unit_that_fails_gives_its_turn_to_the_next_writer()
     {
         using var db = new JobsTestDatabase();
+        var database = ShortTimeout(db);
 
         await Assert.ThrowsAsync<SqliteException>(async () =>
         {
-            await using var uow = await UnitOfWork.OpenAsync(db.Database);
+            await using var uow = await UnitOfWork.OpenAsync(database);
             await uow.ExecuteAsync("INSERT INTO no_such_table VALUES (1)");
-        });
+        }).WaitAsync(Limit);
 
-        await WriteAsync(db.Database, "next").WaitAsync(Generous);
+        await WriteAsync(database, "next").WaitAsync(Limit);
         Assert.Equal(1L, db.Count("SELECT count(*) FROM jobs"));
     }
 
@@ -89,12 +125,13 @@ public sealed class UnitOfWorkWriteGateTests
     public async Task A_unit_disposed_without_committing_gives_its_turn_to_the_next_writer()
     {
         using var db = new JobsTestDatabase();
-        await using (var uow = await UnitOfWork.OpenAsync(db.Database))
+        var database = ShortTimeout(db);
+        await using (var uow = await UnitOfWork.OpenAsync(database))
         {
             await uow.ExecuteAsync(InsertJob, ("@dedupe", "abandoned"));
         }
 
-        await WriteAsync(db.Database, "next").WaitAsync(Generous);
+        await WriteAsync(database, "next").WaitAsync(Limit);
         Assert.Equal(1L, db.Count("SELECT count(*) FROM jobs"));
     }
 
@@ -102,15 +139,28 @@ public sealed class UnitOfWorkWriteGateTests
     public async Task A_unit_that_commits_gives_its_turn_up_before_its_after_commit_callbacks_run()
     {
         using var db = new JobsTestDatabase();
-        Task? nextWriter = null;
-        await using (var uow = await UnitOfWork.OpenAsync(db.Database))
+        var database = ShortTimeout(db);
+        bool? writtenFromCallback = null;
+        await using (var uow = await UnitOfWork.OpenAsync(database))
         {
             await uow.ExecuteAsync(InsertJob, ("@dedupe", "first"));
-            uow.OnCommitted(() => nextWriter = WriteAsync(db.Database, "from-the-callback"));
+
+            // The callback waits for another writer, which can only get in if the commit has already let go of the turn.
+            uow.OnCommitted(() =>
+            {
+                try
+                {
+                    writtenFromCallback = WriteAsync(database, "from-the-callback").Wait(TimeSpan.FromSeconds(5));
+                }
+                catch (AggregateException)
+                {
+                    writtenFromCallback = false;
+                }
+            });
             await uow.CommitAsync();
         }
 
-        await nextWriter!.WaitAsync(Generous);
+        Assert.True(writtenFromCallback, "the writer in the callback was still waiting for the committed unit's turn");
         Assert.Equal(2L, db.Count("SELECT count(*) FROM jobs"));
     }
 
@@ -118,14 +168,15 @@ public sealed class UnitOfWorkWriteGateTests
     public async Task A_unit_cancelled_after_it_wrote_gives_its_turn_to_the_next_writer()
     {
         using var db = new JobsTestDatabase();
+        var database = ShortTimeout(db);
         using var cancel = new CancellationTokenSource();
-        await using (var uow = await UnitOfWork.OpenAsync(db.Database, cancel.Token))
+        await using (var uow = await UnitOfWork.OpenAsync(database, cancel.Token))
         {
             await uow.ExecuteAsync(InsertJob, ("@dedupe", "cancelled"));
             await cancel.CancelAsync();
         }
 
-        await WriteAsync(db.Database, "next").WaitAsync(Generous);
+        await WriteAsync(database, "next").WaitAsync(Limit);
         Assert.Equal(1L, db.Count("SELECT count(*) FROM jobs"));
     }
 
@@ -133,49 +184,65 @@ public sealed class UnitOfWorkWriteGateTests
     public async Task A_writer_cancelled_while_it_waits_leaves_the_queue_without_taking_a_turn()
     {
         using var db = new JobsTestDatabase();
+        var database = ShortTimeout(db);
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var holder = await HoldTheLockAsync(db.Database, "holder", release);
+        var holder = await HoldTheLockAsync(database, "holder", release);
         using var cancel = new CancellationTokenSource();
-        var cancelled = WriteAsync(db.Database, "cancelled", cancel.Token);
-        var next = WriteAsync(db.Database, "next");
+        var cancelled = WriteAsync(database, "cancelled", cancel.Token);
+        var next = WriteAsync(database, "next");
+        try
+        {
+            await cancel.CancelAsync();
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => cancelled).WaitAsync(Limit);
 
-        await cancel.CancelAsync();
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => cancelled);
-        release.SetResult();
-        await Task.WhenAll(holder, next).WaitAsync(Generous);
-
-        Assert.Equal(2L, db.Count("SELECT count(*) FROM jobs"));
+            release.SetResult();
+            await Task.WhenAll(holder, next).WaitAsync(Limit);
+            Assert.Equal(2L, db.Count("SELECT count(*) FROM jobs"));
+        }
+        finally
+        {
+            release.TrySetResult();
+            await SettleAsync([holder, cancelled, next]);
+        }
     }
 
     [Fact]
     public async Task A_writer_still_waiting_when_the_busy_timeout_passes_fails_as_SQLite_would()
     {
         using var db = new JobsTestDatabase();
-        var database = new SqliteDatabase(db.DbPath, busyTimeoutMilliseconds: 300);
+        var database = ShortTimeout(db);
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var holder = await HoldTheLockAsync(database, "holder", release);
+        try
+        {
+            var refused = await Assert.ThrowsAsync<SqliteException>(() => WriteAsync(database, "too-late")).WaitAsync(Limit);
+            Assert.Equal(5, refused.SqliteErrorCode);
 
-        var refused = await Assert.ThrowsAsync<SqliteException>(() => WriteAsync(database, "too-late"));
-        Assert.Equal(5, refused.SqliteErrorCode);
-
-        release.SetResult();
-        await holder.WaitAsync(Generous);
-        await WriteAsync(database, "after").WaitAsync(Generous);
-        Assert.Equal(2L, db.Count("SELECT count(*) FROM jobs"));
+            release.SetResult();
+            await holder.WaitAsync(Limit);
+            await WriteAsync(database, "after").WaitAsync(Limit);
+            Assert.Equal(2L, db.Count("SELECT count(*) FROM jobs"));
+        }
+        finally
+        {
+            release.TrySetResult();
+            await SettleAsync([holder]);
+        }
     }
 
     [Fact]
     public async Task A_second_unit_opened_after_the_first_commits_is_not_held_up()
     {
         using var db = new JobsTestDatabase();
-        var outer = await UnitOfWork.OpenAsync(db.Database);
+        var database = ShortTimeout(db);
+        var outer = await UnitOfWork.OpenAsync(database);
         await using (outer.ConfigureAwait(false))
         {
             await outer.CountAsync("SELECT count(*) FROM jobs");
             await outer.ExecuteAsync(InsertJob, ("@dedupe", "outer"));
             await outer.CommitAsync();
 
-            await WriteAsync(db.Database, "inner").WaitAsync(Generous);
+            await WriteAsync(database, "inner").WaitAsync(Limit);
         }
 
         Assert.Equal(2L, db.Count("SELECT count(*) FROM jobs"));
@@ -189,18 +256,54 @@ public sealed class UnitOfWorkWriteGateTests
     public async Task A_second_unit_that_writes_while_the_first_holds_the_lock_is_refused_not_hung()
     {
         using var db = new JobsTestDatabase();
-        var database = new SqliteDatabase(db.DbPath, busyTimeoutMilliseconds: 300);
+        var database = ShortTimeout(db);
         var outer = await UnitOfWork.OpenAsync(database);
         await using (outer.ConfigureAwait(false))
         {
             await outer.ExecuteAsync(InsertJob, ("@dedupe", "outer"));
 
-            var refused = await Assert.ThrowsAsync<SqliteException>(() => WriteAsync(database, "inner").WaitAsync(Generous));
+            var refused = await Assert.ThrowsAsync<SqliteException>(() => WriteAsync(database, "inner")).WaitAsync(Limit);
             Assert.Equal(5, refused.SqliteErrorCode);
 
             await outer.CommitAsync();
         }
 
         Assert.Equal(1L, db.Count("SELECT count(*) FROM jobs"));
+    }
+
+    /// <summary>
+    /// After waiting for the gate, a writer waits for a writer outside Weir only for what is left of one busy timeout, so a refusal
+    /// never takes the timeout twice.
+    /// </summary>
+    [Fact]
+    public async Task The_wait_for_an_outside_writer_is_what_is_left_of_one_busy_timeout()
+    {
+        using var db = new JobsTestDatabase();
+        var database = new SqliteDatabase(db.DbPath, busyTimeoutMilliseconds: 4000);
+        await using var outsider = new SqliteConnection(database.ConnectionString);
+        await outsider.OpenAsync();
+        await using (var begin = outsider.CreateCommand())
+        {
+            begin.CommandText = "BEGIN IMMEDIATE";
+            await begin.ExecuteNonQueryAsync();
+        }
+
+        try
+        {
+            await using var connection = await database.OpenAsync();
+            var started = Stopwatch.StartNew();
+
+            var refused = await Assert.ThrowsAsync<SqliteException>(
+                () => database.BeginWriteTransactionAsync(connection, TimeSpan.FromMilliseconds(2500), CancellationToken.None)).WaitAsync(Limit);
+
+            Assert.Equal(5, refused.SqliteErrorCode);
+            Assert.InRange(started.Elapsed, TimeSpan.FromMilliseconds(1000), TimeSpan.FromMilliseconds(3500));
+        }
+        finally
+        {
+            await using var rollback = outsider.CreateCommand();
+            rollback.CommandText = "ROLLBACK";
+            await rollback.ExecuteNonQueryAsync();
+        }
     }
 }

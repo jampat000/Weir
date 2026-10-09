@@ -1,4 +1,7 @@
 using System.Collections.Concurrent;
+using System.Data;
+using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
@@ -11,9 +14,11 @@ namespace Weir.Infrastructure.Sqlite;
 /// foreign keys on, a 30 second busy timeout and <c>synchronous=NORMAL</c>, plus the cache and journal
 /// settings in <see cref="TuningPragmas"/>.
 /// </summary>
-#pragma warning disable CA1001 // The write gate's SemaphoreSlim never creates a wait handle, so it owns nothing that needs disposing.
+[SuppressMessage(
+    "Design",
+    "CA1001:Types that own disposable fields should be disposable",
+    Justification = "The write gate's SemaphoreSlim never creates a wait handle, so it owns nothing that needs disposing.")]
 public sealed class SqliteDatabase
-#pragma warning restore CA1001
 {
     /// <summary>
     /// Processing writes progress in short transactions; a transient writer collision should wait for
@@ -68,8 +73,9 @@ public sealed class SqliteDatabase
     /// Weir's own writers queue here, one at a time, before they ask SQLite for its write lock. SQLite makes a writer that
     /// finds the lock taken sleep and retry inside <c>BEGIN IMMEDIATE</c> for up to the busy timeout, and
     /// Microsoft.Data.Sqlite runs even its async calls synchronously, so every waiting writer held a thread-pool thread
-    /// for as long as it waited. Waiting here costs no thread, and the queue is first come, first served. The busy timeout
-    /// still covers a writer outside this process, such as a backup tool. Readers never come here (WAL).
+    /// for as long as it waited. Waiting here costs no thread, and writers are served in roughly the order they asked
+    /// (SemaphoreSlim does not promise it). The busy timeout still covers a writer outside this process, such as a backup
+    /// tool. Readers never come here (WAL).
     /// </summary>
     private readonly SemaphoreSlim _writeGate = new(1, 1);
 
@@ -169,19 +175,52 @@ public sealed class SqliteDatabase
     }
 
     /// <summary>
-    /// Takes the place at the head of the write queue, waiting for it without holding a thread. Gives up as SQLite would,
-    /// with <c>SQLITE_BUSY</c>, once the busy timeout has passed. Whoever takes it releases it with <see cref="ReleaseWriteGate"/>
-    /// when the write lock is free again.
+    /// Takes a turn at the write gate, waiting for it without holding a thread, and says how long that took. Gives up as
+    /// SQLite would, with <c>SQLITE_BUSY</c>, once the busy timeout has passed. Whoever takes a turn gives it back with
+    /// <see cref="ReleaseWriteGate"/> when the write lock is free again.
     /// </summary>
-    internal async Task AcquireWriteGateAsync(CancellationToken cancellationToken)
+    internal async Task<TimeSpan> AcquireWriteGateAsync(CancellationToken cancellationToken)
     {
+        var started = Stopwatch.GetTimestamp();
         if (!await _writeGate.WaitAsync(_busyTimeoutMilliseconds, cancellationToken).ConfigureAwait(false))
         {
             throw new SqliteException("database is locked", SqliteBusy);
         }
+
+        return Stopwatch.GetElapsedTime(started);
     }
 
     internal void ReleaseWriteGate() => _writeGate.Release();
+
+    /// <summary>
+    /// Begins a write transaction (<c>BEGIN IMMEDIATE</c>) on a connection whose caller has the write gate, waiting for a
+    /// writer outside this process for no longer than what is left of one busy timeout after <paramref name="waitedForGate"/>,
+    /// so a refusal never takes twice the timeout. Microsoft.Data.Sqlite retries a busy statement until the command timeout,
+    /// in whole seconds and at least one, so SQLite's own busy wait is switched off meanwhile and the command timeout is
+    /// the time left, rounded up to the second. Both are set back afterwards.
+    /// </summary>
+    internal async Task<SqliteTransaction> BeginWriteTransactionAsync(SqliteConnection connection, TimeSpan waitedForGate, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(connection);
+        if (waitedForGate < TimeSpan.FromMilliseconds(10))
+        {
+            return connection.BeginTransaction(IsolationLevel.Serializable, deferred: false);
+        }
+
+        var remaining = (int)Math.Max(1, _busyTimeoutMilliseconds - waitedForGate.TotalMilliseconds);
+        var commandTimeout = connection.DefaultTimeout;
+        await ExecuteAsync(connection, "PRAGMA busy_timeout=0", cancellationToken).ConfigureAwait(false);
+        connection.DefaultTimeout = Math.Max(1, (remaining + 999) / 1000);
+        try
+        {
+            return connection.BeginTransaction(IsolationLevel.Serializable, deferred: false);
+        }
+        finally
+        {
+            connection.DefaultTimeout = commandTimeout;
+            await ExecuteAsync(connection, $"PRAGMA busy_timeout={_busyTimeoutMilliseconds}", CancellationToken.None).ConfigureAwait(false);
+        }
+    }
 
     public SqliteConnection Open()
     {

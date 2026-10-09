@@ -308,11 +308,11 @@ public sealed class UnitOfWork : IAsyncDisposable
         // SQLite's busy handler, for a writer outside this process (see SqliteDatabase.AcquireWriteGateAsync). A unit that
         // holds its turn while another unit of the same flow waits for one of its own would wait out the busy timeout, as
         // two connections always have: such a flow commits the first unit before it opens the second.
-        await Database.AcquireWriteGateAsync(_cancellationToken).ConfigureAwait(false);
+        var waited = await Database.AcquireWriteGateAsync(_cancellationToken).ConfigureAwait(false);
         _holdsWriteGate = true;
         try
         {
-            _transaction = Connection.BeginTransaction(IsolationLevel.Serializable, deferred: false);
+            _transaction = await Database.BeginWriteTransactionAsync(Connection, waited, _cancellationToken).ConfigureAwait(false);
             Owners.Add(_transaction, this);
         }
         catch
