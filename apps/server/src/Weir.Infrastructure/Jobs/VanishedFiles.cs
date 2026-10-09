@@ -1,6 +1,7 @@
 using Weir.Core.Activity;
 using Weir.Core.Json;
 using Weir.Core.Media;
+using Weir.Core.Observability;
 using Weir.Core.Processing;
 using Weir.Core.Processing.RemuxPass;
 using Weir.Infrastructure.Activity;
@@ -20,7 +21,9 @@ namespace Weir.Infrastructure.Jobs;
 /// its label is replaced at once: the file is looked for again after a few seconds first, as a share that drops for a moment would
 /// leave its mount point behind, empty. It stays listed until it has been gone for <see cref="Grace"/> since a scan last saw it, and
 /// is then forgotten, as Forget does, without saying so a second time. Any other row whose file is gone for that long is forgotten,
-/// with the one entry.</para>
+/// with the one entry. No row is held or forgotten on a single look: every change waits for the second.</para>
+/// <para>A held row whose file is back is released to unprocessed, so a workflow whose files are never scanned (a manager hands them
+/// over) does not keep telling a file that is there that it is gone.</para>
 /// <para>A file with a pass queued or running is left to that pass, and a path that is now a folder on disk is kept. A watched folder
 /// that cannot be read is never taken to mean its files left (<see cref="GoneSources.HasLeft"/>). Outcomes Weir reached (processed,
 /// passed through, rejected, skipped) stay as history. A row carrying the source Weir last cleaned is never forgotten, because it is
@@ -30,7 +33,8 @@ namespace Weir.Infrastructure.Jobs;
 /// its file on receipt, before any scan sees it, and a cancelled hand-off is one Weir never started. Such a row counts from when it was
 /// last written, so it gets the same grace before it is judged.</para>
 /// <para>Every file is looked for with no transaction open; only the rows whose files are gone are then changed, a batch per short
-/// transaction (#708). A row that changed in between (seen again, or moved on by a hand-off or a pass) is kept.</para>
+/// transaction (#708). A row that changed in between (seen again, or moved on by a hand-off, a pass or another look) is kept, so two
+/// looks at once change a row once.</para>
 /// </remarks>
 public static class VanishedFiles
 {
@@ -61,39 +65,51 @@ public static class VanishedFiles
         Hold,
         Forget,
         ForgetQuietly,
+        Release,
     }
 
     private sealed record WaitingRow(
         long Id, string RelativePath, string Status, string Reason, object LastSeenStored, DateTimeOffset? LastSeen, bool SeenByScan);
 
-    /// <summary>The relative paths of the files held for being gone, and of the files forgotten.</summary>
-    public sealed record Changes(IReadOnlyList<string> Held, IReadOnlyList<string> Forgotten)
+    /// <summary>The relative paths of the files held for being gone, forgotten, and released because they are back.</summary>
+    public sealed record Changes(IReadOnlyList<string> Held, IReadOnlyList<string> Forgotten, IReadOnlyList<string> Released)
     {
-        public bool Any => Held.Count + Forgotten.Count > 0;
+        public bool Any => Held.Count + Forgotten.Count + Released.Count > 0;
     }
 
     /// <summary>
-    /// Holds the library's rows whose files left the watched folder, and forgets those that have been gone long enough.
-    /// <paramref name="settle"/> is how long a file that was not there is given to come back.
+    /// Holds the library's rows whose files left the watched folder, forgets those that have been gone long enough, and releases
+    /// those held whose files are back. <paramref name="lookAgain"/> waits between the first look at a file and the look that
+    /// acts on it; it is only called when some file needs one.
     /// </summary>
     public static async Task<Changes> SettleAsync(
-        SqliteDatabase database, long libraryId, string watchedRoot, string mediaScope, DateTimeOffset now, string trigger, TimeSpan settle, CancellationToken cancellationToken)
+        SqliteDatabase database,
+        long libraryId,
+        string watchedRoot,
+        string mediaScope,
+        DateTimeOffset now,
+        string trigger,
+        Func<CancellationToken, Task> lookAgain,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(database);
+        ArgumentNullException.ThrowIfNull(lookAgain);
         var cutoff = now - Grace;
-        var pending = (await WaitingRowsAsync(database, libraryId, cancellationToken).ConfigureAwait(false))
-            .Where(row => GoneSources.HasLeft(watchedRoot, row.RelativePath))
-            .Select(row => (Row: row, Step: Decide(row, cutoff)))
+        var (rows, queued) = await ReadAsync(database, libraryId, mediaScope, cancellationToken).ConfigureAwait(false);
+        var pending = rows
+            .Where(row => !queued.Contains(row.RelativePath))
+            .Select(row => (Row: row, Step: Decide(row, cutoff, watchedRoot)))
             .Where(item => item.Step != Step.None)
             .ToList();
-        if (pending.Any(item => item.Step != Step.ForgetQuietly))
+        if (pending.Count > 0)
         {
-            await Task.Delay(settle, cancellationToken).ConfigureAwait(false);
-            pending = [.. pending.Where(item => item.Step == Step.ForgetQuietly || GoneSources.HasLeft(watchedRoot, item.Row.RelativePath))];
+            await lookAgain(cancellationToken).ConfigureAwait(false);
+            pending = [.. pending.Where(item => Decide(item.Row, cutoff, watchedRoot) == item.Step)];
         }
 
         var held = new List<string>();
         var forgotten = new List<string>();
+        var released = new List<string>();
         foreach (var batch in pending.Chunk(BatchSize))
         {
             await WriteLockTurns.TakeAsync(
@@ -104,16 +120,18 @@ public static class VanishedFiles
                     {
                         foreach (var (row, step) in batch)
                         {
-                            if (step == Step.Hold)
+                            switch (step)
                             {
-                                if (await HoldOneAsync(uow, libraryId, mediaScope, row, trigger).ConfigureAwait(false))
-                                {
+                                case Step.Hold when await HoldOneAsync(uow, libraryId, mediaScope, row, trigger).ConfigureAwait(false):
                                     held.Add(row.RelativePath);
-                                }
-                            }
-                            else if (await ForgetOneAsync(uow, libraryId, mediaScope, row, trigger, record: step == Step.Forget).ConfigureAwait(false))
-                            {
-                                forgotten.Add(row.RelativePath);
+                                    break;
+                                case Step.Release when await ReleaseOneAsync(uow, mediaScope, libraryId, row).ConfigureAwait(false):
+                                    released.Add(row.RelativePath);
+                                    break;
+                                case Step.Forget or Step.ForgetQuietly
+                                    when await ForgetOneAsync(uow, libraryId, mediaScope, row, trigger, record: step == Step.Forget).ConfigureAwait(false):
+                                    forgotten.Add(row.RelativePath);
+                                    break;
                             }
                         }
 
@@ -123,18 +141,23 @@ public static class VanishedFiles
                 cancellationToken).ConfigureAwait(false);
         }
 
-        return new Changes(held, forgotten);
+        return new Changes(held, forgotten, released);
     }
 
-    /// <summary>What to do with a row whose file is gone, by how long it has been and what the row already says.</summary>
-    private static Step Decide(WaitingRow row, DateTimeOffset cutoff)
+    /// <summary>What to do with a row, by whether its file is gone, how long it has been and what the row already says.</summary>
+    private static Step Decide(WaitingRow row, DateTimeOffset cutoff, string watchedRoot)
     {
-        if (row.LastSeen is not { } seen)
+        var held = GoneSourceText.IsHeld(row.Status, row.Reason);
+        if (held && GoneSources.IsBack(watchedRoot, row.RelativePath))
+        {
+            return Step.Release;
+        }
+
+        if (row.LastSeen is not { } seen || !GoneSources.HasLeft(watchedRoot, row.RelativePath))
         {
             return Step.None;
         }
 
-        var held = GoneSourceText.IsHeld(row.Status, row.Reason);
         if (seen <= cutoff)
         {
             return held ? Step.ForgetQuietly : Step.Forget;
@@ -143,13 +166,15 @@ public static class VanishedFiles
         return !held && row.SeenByScan && HoldableStatuses.Contains(row.Status) ? Step.Hold : Step.None;
     }
 
-    private static async Task<List<WaitingRow>> WaitingRowsAsync(SqliteDatabase database, long libraryId, CancellationToken cancellationToken)
+    /// <summary>The library's waiting rows, and the files that have a pass pending or leased, which are left to it.</summary>
+    private static async Task<(List<WaitingRow> Rows, HashSet<string> Queued)> ReadAsync(
+        SqliteDatabase database, long libraryId, string mediaScope, CancellationToken cancellationToken)
     {
         var uow = await UnitOfWork.OpenAsync(database, cancellationToken).ConfigureAwait(false);
         await using (uow.ConfigureAwait(false))
         {
             var statuses = WaitingStatuses.Select((status, index) => ($"@s{index}", (object?)status));
-            return await uow.QueryAsync(
+            var rows = await uow.QueryAsync(
                 "SELECT id, relative_path, status, status_reason, coalesce(last_seen_at, updated_at, created_at), last_seen_at IS NOT NULL FROM files " +
                 $"WHERE library_id = @lib AND status IN ({string.Join(", ", WaitingStatuses.Select((_, index) => $"@s{index}"))})",
                 reader => new WaitingRow(
@@ -161,13 +186,14 @@ public static class VanishedFiles
                     TimestampColumns.Parse(reader.GetValue(4)),
                     reader.GetInt64(5) != 0),
                 [("@lib", libraryId), .. statuses]).ConfigureAwait(false);
+            return (rows, await ActiveRemuxPasses.PathsAsync(uow, mediaScope, libraryId).ConfigureAwait(false));
         }
     }
 
     private static (string, object?)[] UnchangedParameters(WaitingRow row) =>
         [("@id", row.Id), ("@status", row.Status), ("@seen", row.LastSeenStored)];
 
-    /// <summary>Holds one row for being gone, unless a pass now owns the file or the row changed since it was read.</summary>
+    /// <summary>Holds one row for being gone, unless a pass now owns the file, the row changed since it was read, or another look held it first.</summary>
     private static async Task<bool> HoldOneAsync(UnitOfWork uow, long libraryId, string mediaScope, WaitingRow row, string trigger)
     {
         if (await ActiveRemuxPasses.ExistsForRelativePathAsync(uow, row.RelativePath, mediaScope, libraryId).ConfigureAwait(false))
@@ -178,7 +204,7 @@ public static class VanishedFiles
         // The hold ends when the row is forgotten, so the file shows a clock and does not read as a wait on a person.
         var held = await uow.ExecuteAsync(
             "UPDATE files SET status = @held, status_reason = @reason, blocked_by_connection = NULL, hold_until = @until, updated_at = CURRENT_TIMESTAMP " +
-            $"WHERE {Unchanged}",
+            $"WHERE {Unchanged} AND coalesce(status_reason, '') <> @reason",
             [
                 ("@held", ProcessingFileStatuses.OnHold),
                 ("@reason", GoneSourceText.HeldReason),
@@ -192,6 +218,26 @@ public static class VanishedFiles
 
         await RecordGoneAsync(uow, libraryId, row, trigger).ConfigureAwait(false);
         return true;
+    }
+
+    /// <summary>Releases one held row whose file is back, unless a pass now owns the file or the row changed since it was read.</summary>
+    private static async Task<bool> ReleaseOneAsync(UnitOfWork uow, string mediaScope, long libraryId, WaitingRow row)
+    {
+        if (await ActiveRemuxPasses.ExistsForRelativePathAsync(uow, row.RelativePath, mediaScope, libraryId).ConfigureAwait(false))
+        {
+            return false;
+        }
+
+        var released = await uow.ExecuteAsync(
+            "UPDATE files SET status = @unprocessed, status_reason = @back, hold_until = NULL, updated_at = CURRENT_TIMESTAMP " +
+            $"WHERE {Unchanged} AND status_reason = @held",
+            [
+                ("@unprocessed", ProcessingFileStatuses.Unprocessed),
+                ("@back", GoneSourceText.BackReason),
+                ("@held", GoneSourceText.HeldReason),
+                .. UnchangedParameters(row),
+            ]).ConfigureAwait(false);
+        return released > 0;
     }
 
     /// <summary>Forgets one row, unless a pass now owns the file or the row changed since it was read.</summary>
@@ -229,12 +275,9 @@ public static class VanishedFiles
             "processing",
             GoneSourceText.Title(MediaPathNames.Name(row.RelativePath, OperatingSystem.IsWindows())),
             WireJsonWriter.Dumps(
-                new WireObject()
+                OperatorMessages.ActivityDetailEnvelope("processing", "scan", trigger, "skipped", userMessage: GoneSourceText.Reason)
                     .Set("relative_media_path", row.RelativePath)
                     .Set("library_id", libraryId)
-                    .Set("last_status", row.Status)
-                    .Set("trigger", trigger)
-                    .Set("result", "skipped")
-                    .Set("user_message", GoneSourceText.Reason),
+                    .Set("last_status", row.Status),
                 WireJsonFormat.Compact)));
 }

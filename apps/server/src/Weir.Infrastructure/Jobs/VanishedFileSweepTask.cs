@@ -38,8 +38,8 @@ public sealed partial class VanishedFileSweepTask : IPeriodicTask
         _changes = changes;
     }
 
-    /// <summary>Test seam: how long a file that was not there is given to come back before Weir believes it is gone.</summary>
-    internal TimeSpan GoneSettle { get; init; } = GoneSources.DefaultSettle;
+    /// <summary>Test seam: the wait between the first look at a file that was not there and the look that believes it is gone.</summary>
+    internal Func<CancellationToken, Task> GoneLookAgain { get; init; } = cancellationToken => Task.Delay(GoneSources.DefaultSettle, cancellationToken);
 
     public string Name => "processing-vanished-file-sweep";
 
@@ -72,7 +72,7 @@ public sealed partial class VanishedFileSweepTask : IPeriodicTask
             }
 
             var changes = await VanishedFiles.SettleAsync(
-                _database, library.Id, runtime.WatchedFolder, ProcessingMediaScopes.Normalize(library.MediaType), now, "sweep", GoneSettle, cancellationToken).ConfigureAwait(false);
+                _database, library.Id, runtime.WatchedFolder, ProcessingMediaScopes.Normalize(library.MediaType), now, "scheduled", GoneLookAgain, cancellationToken).ConfigureAwait(false);
             if (!changes.Any)
             {
                 continue;
@@ -89,6 +89,11 @@ public sealed partial class VanishedFileSweepTask : IPeriodicTask
                 LogForgotten(changes.Forgotten.Count, library.Name, string.Join(", ", changes.Forgotten));
             }
 
+            if (changes.Released.Count > 0)
+            {
+                LogReleased(changes.Released.Count, library.Name, string.Join(", ", changes.Released));
+            }
+
             // A file that left the folder no longer says it is waiting, or waits on a person; no job moved to say so.
             _changes?.Publish(DataTopics.Jobs);
             _changes?.Publish(DataTopics.LibraryScan);
@@ -97,6 +102,9 @@ public sealed partial class VanishedFileSweepTask : IPeriodicTask
 
     [LoggerMessage(Level = LogLevel.Information, Message = "{Count} file(s) of workflow {Library} are no longer in the watched folder and are listed until they have been gone a while: {Paths}")]
     private partial void LogHeld(int count, string library, string paths);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "{Count} file(s) of workflow {Library} that were no longer in the watched folder are back: {Paths}")]
+    private partial void LogReleased(int count, string library, string paths);
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Forgot {Count} file(s) that left the watched folder of workflow {Library}: {Paths}")]
     private partial void LogForgotten(int count, string library, string paths);

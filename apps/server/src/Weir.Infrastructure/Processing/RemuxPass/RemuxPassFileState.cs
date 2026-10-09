@@ -95,13 +95,7 @@ public static class RemuxPassFileState
     public static async Task<bool> HoldGoneAsync(UnitOfWork uow, long libraryId, string relativePath, DateTimeOffset holdUntil)
     {
         ArgumentNullException.ThrowIfNull(uow);
-        var alreadyHeld = await uow.QueryAsync(
-            "SELECT 1 FROM files WHERE library_id = $library AND relative_path = $path AND status = $status AND status_reason = $reason LIMIT 1",
-            reader => reader.GetInt64(0),
-            ("$library", libraryId),
-            ("$path", relativePath),
-            ("$status", ProcessingFileStatuses.OnHold),
-            ("$reason", GoneSourceText.HeldReason)).ConfigureAwait(false);
+        var alreadyHeld = await IsHeldAsGoneAsync(uow, libraryId, relativePath).ConfigureAwait(false);
         await uow.ExecuteAsync(
             $"UPDATE files SET status = $status, status_reason = $reason, hold_until = $until, updated_at = CURRENT_TIMESTAMP " +
             $"WHERE library_id = $library AND relative_path = $path AND status IN ({UnfinishedStatuses})",
@@ -113,7 +107,21 @@ public static class RemuxPassFileState
                 ("$path", relativePath),
                 .. UnfinishedStatusParameters(),
             ]).ConfigureAwait(false);
-        return alreadyHeld.Count == 0;
+        return !alreadyHeld;
+    }
+
+    /// <summary>Whether the file is held for being gone, which means it has been recorded as no longer there.</summary>
+    public static async Task<bool> IsHeldAsGoneAsync(UnitOfWork uow, long libraryId, string relativePath)
+    {
+        ArgumentNullException.ThrowIfNull(uow);
+        var held = await uow.QueryAsync(
+            "SELECT 1 FROM files WHERE library_id = $library AND relative_path = $path AND status = $status AND status_reason = $reason LIMIT 1",
+            reader => reader.GetInt64(0),
+            ("$library", libraryId),
+            ("$path", relativePath),
+            ("$status", ProcessingFileStatuses.OnHold),
+            ("$reason", GoneSourceText.HeldReason)).ConfigureAwait(false);
+        return held.Count > 0;
     }
 
     /// <summary>

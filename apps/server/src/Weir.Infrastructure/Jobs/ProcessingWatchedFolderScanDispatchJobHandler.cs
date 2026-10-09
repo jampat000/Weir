@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using Microsoft.Extensions.Logging;
+using Weir.Core.Activity;
 using Weir.Core.Configuration;
 using Weir.Core.Jobs;
 using Weir.Core.Json;
@@ -76,8 +77,8 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandler : IJobHandler
         _changes = changes;
     }
 
-    /// <summary>Test seam: how long a file that was not there is given to come back before Weir believes it is gone.</summary>
-    internal TimeSpan GoneSettle { get; init; } = GoneSources.DefaultSettle;
+    /// <summary>Test seam: the wait between the first look at a file that was not there and the look that believes it is gone.</summary>
+    internal Func<CancellationToken, Task> GoneLookAgain { get; init; } = cancellationToken => Task.Delay(GoneSources.DefaultSettle, cancellationToken);
 
     public string JobKind => ProcessingWatchedFolderScanDispatchJobKinds.ScanDispatch;
 
@@ -111,14 +112,6 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandler : IJobHandler
             var run = new WatchedFolderScanRun(_database, _jobStore, _files, scan, lookups, reads, new ScanPassRequest(context.Id, request.Trigger));
             await run.RunAsync(candidates.Entries, cancellationToken).ConfigureAwait(false);
 
-            // #645: a file that left the watched folder before Weir finished with it says so at once and stops being listed after a
-            // while. Only while the watched folder itself can be read, so an unmounted share never empties the list.
-            if (Directory.Exists(scan.Paths.WatchedFolder))
-            {
-                await VanishedFiles.SettleAsync(_database, scan.Library.Id, scan.Paths.WatchedFolder, scan.MediaScope, scan.Now, "scan", GoneSettle, cancellationToken)
-                    .ConfigureAwait(false);
-            }
-
             // A second after the first hold ends, so the look finds it over. A pass booked for later (#646) carries its own
             // start time and needs no look; this is for files the scan itself holds and for failed files waiting on a retry.
             if (run.EarliestHoldEnds is { } firstEnds)
@@ -127,6 +120,16 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandler : IJobHandler
             }
 
             await run.RemoveRejectedFilesAsync(cancellationToken).ConfigureAwait(false);
+        }
+
+        // #645: a file that left the watched folder before Weir finished with it says so at once and stops being listed after a
+        // while. Only while the watched folder itself can be read, so an unmounted share never empties the list. Done with no
+        // transaction open, because a file that is gone is looked at again after a few seconds.
+        if (Directory.Exists(scan.Paths.WatchedFolder))
+        {
+            await VanishedFiles.SettleAsync(
+                _database, scan.Library.Id, scan.Paths.WatchedFolder, scan.MediaScope, scan.Now, ActivityProvenance.ScanTriggerToTrigger[request.Trigger], GoneLookAgain, cancellationToken)
+                .ConfigureAwait(false);
         }
 
         // A look that finds a file still held, or held for a new reason, changes no status and writes no Activity, so only this

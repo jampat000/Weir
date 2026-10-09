@@ -39,7 +39,7 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandlerTests
         var handler = new ProcessingWatchedFolderScanDispatchJobHandler(
             store.Database, store.Clock, store.Options, jobs, connections, new SuiteSettingsStore(new AuthStore()), Libraries, Files, SkipMarkers, changes: changes)
         {
-            GoneSettle = TimeSpan.Zero,
+            GoneLookAgain = _ => Task.CompletedTask,
         };
         // Libraries these tests create wait for nothing and take any size (see CreateLibraryAsync), so they assert scan dispatch
         // itself, not the settling and hold-timer gates a freshly written test file would otherwise trip.
