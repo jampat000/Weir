@@ -75,8 +75,9 @@ When the optional ownership settings (`WEIR_CHOWN_OUTPUT`, `WEIR_FILE_MODE_OUTPU
 ## Deletion rules
 
 - Missing files are already absent, not success with hidden work.
+- A file, or a folder holding it, that is deleted while Weir has work queued for it is nothing to do, not a failure. The remux pass (`RemuxPassHandler`), pass-through (`ProcessingPassThroughHandler`) and the scan settle it with one Information row ("… is no longer there, so there is nothing to do"), stop listing the file, and raise no error, warning, retry or failed job. Only a watched folder that is itself missing is a real problem (`GoneSources.HasLeft` is false for it): the scan and the watcher warn in plain words and queue nothing.
 - Locked or in-use files must produce an operator-readable skipped or failed reason.
-- A file Weir could not read is never deleted as a rejected file (`rejection_kind: unreadable_file`; `RemuxPassHandler.ApplyRejectedFileAction`). Weir cannot tell a damaged file from one that is still arriving or a share that hiccuped, so it waits, looks again, and only then refuses it, leaving the original where it is.
+- A file Weir could not read is never deleted as a rejected file (`rejection_kind: unreadable_file`; `RemuxPassHandler.ApplyRejectedFileAction`). Weir cannot tell a damaged file from one that is still arriving or a share that hiccuped, so it waits, looks again, and only then refuses it, leaving the original where it is. No route hands such a file on: under the reject policy the reject job carries `rejection_kind: unreadable_file`, and when no manager can take the rejection it leaves the file rejected where it is instead of falling back to pass-through (`ProcessingRejectHandler`).
 
 ## Originals that belong to a media manager
 
