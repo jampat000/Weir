@@ -386,10 +386,11 @@ public static class UpdateStatus
     }
 
     /// <summary>
-    /// <paramref name="state"/> as read, but saying the tray is at <paramref name="step"/> (<see cref="StateChecking"/> or
-    /// <see cref="StateDownloading"/>): a person has asked for it and the tray has not yet taken it up.
+    /// <paramref name="state"/> as read, but saying the tray is at <paramref name="step"/>: <see cref="StateChecking"/> or
+    /// <see cref="StateDownloading"/> when a person has asked for it and the tray has not yet taken it up, or
+    /// <see cref="StateIdle"/> when the tray that said it was at one has gone.
     /// </summary>
-    public static WireObject WithRequestedStep(WireObject state, string step)
+    public static WireObject WithStep(WireObject state, string step)
     {
         ArgumentNullException.ThrowIfNull(state);
         return StateOut(false, state.Get("pending_version") is WireString { Value.Length: > 0 } version ? version.Value : null, step, null);

@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text;
 using Weir.Core.Configuration;
 using Weir.Core.Json;
@@ -17,14 +18,50 @@ public sealed class UpdateFiles
     public const string CheckFlagFileName = "update-check-now";
     public const string DownloadFlagFileName = "update-download-now";
 
+    /// <summary>What the tray rewrites every 30 s to say it is alive.</summary>
+    public const string TrayHeartbeatFileName = "tray-heartbeat.json";
+
+    /// <summary>How old the tray's heartbeat may be and still count: three beats.</summary>
+    public static readonly TimeSpan TrayHeartbeatMaxAge = TimeSpan.FromSeconds(90);
+
+    /// <summary>How old a check or download flag may be and still read as under way: the tray takes one up within a second.</summary>
+    public static readonly TimeSpan RequestMaxAge = TimeSpan.FromMinutes(2);
+
     /// <summary>What the tray reads to learn whether Weir is idle; written only while an update waits to install (#875).</summary>
     public const string WorkStateFileName = "work-state.json";
 
     private readonly WeirOptions _options;
+    private readonly TimeProvider _time;
 
-    public UpdateFiles(WeirOptions options)
+    public UpdateFiles(WeirOptions options, TimeProvider? time = null)
     {
         _options = options;
+        _time = time ?? TimeProvider.System;
+    }
+
+    /// <summary>
+    /// Whether there is a tray to answer a request: this is the Windows install, and the tray has said it is alive lately. A
+    /// Docker or source install has no tray, and a flag left for one that has quit or died is never taken up.
+    /// </summary>
+    public bool TrayIsRunning()
+    {
+        if (DetectInstallType(_options.RuntimeKind) != "windows")
+        {
+            return false;
+        }
+
+        try
+        {
+            var text = File.ReadAllText(Path.Join(_options.WeirHome, TrayHeartbeatFileName), new UTF8Encoding(false, throwOnInvalidBytes: true));
+            return WireJsonParser.Parse(text) is WireObject beat
+                && beat.Get("at") is WireString at
+                && DateTimeOffset.TryParse(at.Value, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var when)
+                && _time.GetUtcNow() - when <= TrayHeartbeatMaxAge;
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or DecoderFallbackException or WireJsonDecodeException)
+        {
+            return false;
+        }
     }
 
     /// <summary>Read the update settings, with <paramref name="warn"/> called when the file is unreadable.</summary>
@@ -79,24 +116,42 @@ public sealed class UpdateFiles
 
     /// <summary>
     /// Read the update state the tray writes; a missing or unreadable file reads as the default state. A check or download that
-    /// was asked for and not yet taken up by the tray reads as under way, so the person sees their click at once.
+    /// was asked for and not yet taken up by the tray reads as under way, so the person sees their click at once, and
+    /// <c>tray_running</c> says whether there is a tray to answer.
     /// </summary>
     public WireObject ReadState()
     {
-        var written = ReadStateFile();
-        if (written.Get("state") is not WireString { Value: UpdateStatus.StateIdle or UpdateStatus.StateFailed })
+        var alive = TrayIsRunning();
+        return StateAsShown(ReadStateFile(), alive).Set("tray_running", alive);
+    }
+
+    // A step the tray says it is at, when no tray is there, is a step nobody is taking: it reads as idle. A request the tray
+    // has not taken up reads as under way only while there is a tray and the flag is recent.
+    private WireObject StateAsShown(WireObject written, bool trayIsRunning)
+    {
+        var name = (written.Get("state") as WireString)?.Value;
+        if (name is UpdateStatus.StateChecking or UpdateStatus.StateDownloading)
+        {
+            return trayIsRunning ? written : UpdateStatus.WithStep(written, UpdateStatus.StateIdle);
+        }
+
+        if (!trayIsRunning || name is not (UpdateStatus.StateIdle or UpdateStatus.StateFailed))
         {
             return written;
         }
 
-        if (File.Exists(Path.Join(_options.WeirHome, CheckFlagFileName)))
+        if (RequestIsFresh(CheckFlagFileName))
         {
-            return UpdateStatus.WithRequestedStep(written, UpdateStatus.StateChecking);
+            return UpdateStatus.WithStep(written, UpdateStatus.StateChecking);
         }
 
-        return File.Exists(Path.Join(_options.WeirHome, DownloadFlagFileName))
-            ? UpdateStatus.WithRequestedStep(written, UpdateStatus.StateDownloading)
-            : written;
+        return RequestIsFresh(DownloadFlagFileName) ? UpdateStatus.WithStep(written, UpdateStatus.StateDownloading) : written;
+    }
+
+    private bool RequestIsFresh(string flagFileName)
+    {
+        var path = Path.Join(_options.WeirHome, flagFileName);
+        return File.Exists(path) && _time.GetUtcNow() - File.GetLastWriteTimeUtc(path) <= RequestMaxAge;
     }
 
     private WireObject ReadStateFile()

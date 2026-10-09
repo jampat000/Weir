@@ -92,6 +92,7 @@ internal sealed class SuiteUpdateEndpointHandlers
     private async Task<ApiResult> AskTrayAsync(ApiRequest request, string step, Action ask)
     {
         await RequireConfirmedAdminAsync(request).ConfigureAwait(false);
+        RequireTray();
         var state = _files.ReadState();
         if (state.Get("downloaded")?.IsTruthy ?? false)
         {
@@ -112,12 +113,13 @@ internal sealed class SuiteUpdateEndpointHandlers
         }
 
         ask();
-        return ApiRoutes.Ok(UpdateStatus.WithRequestedStep(state, step));
+        return ApiRoutes.Ok(UpdateStatus.WithStep(state, step).Set("tray_running", true));
     }
 
     public async Task<ApiResult> PostApplyUpdateAsync(ApiRequest request)
     {
         await RequireConfirmedAdminAsync(request).ConfigureAwait(false);
+        RequireTray();
         var state = _files.ReadState();
         if (!(state.Get("downloaded")?.IsTruthy ?? false))
         {
@@ -126,6 +128,15 @@ internal sealed class SuiteUpdateEndpointHandlers
 
         _files.WriteApplyFlag();
         return ApiRoutes.Ok(state);
+    }
+
+    /// <summary>A flag is answered only by a tray: a Docker or source install has none, and one that quit or died answers nothing.</summary>
+    private void RequireTray()
+    {
+        if (!_files.TrayIsRunning())
+        {
+            throw new ApiException(StatusCodes.Status409Conflict, "The Weir tray isn't running, so Weir can't update itself from here.");
+        }
     }
 
     /// <summary>An update step is for an administrator, and carries the confirmation token and nothing else.</summary>

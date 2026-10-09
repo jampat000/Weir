@@ -8455,7 +8455,7 @@ export interface components {
     };
     /**
      * UpdateStateOut
-     * @description Where the tray is with an update: idle (an update it found and did not download is named in pending_version), checking, downloading, downloaded (waiting to be applied) or failed (failure says why). Read from update-state.json.
+     * @description Where the tray is with an update: idle (an update it found and did not download is named in pending_version), checking, downloading, downloaded (waiting to be applied) or failed (failure says why). Read from update-state.json. tray_running says whether a tray is there to take a request: false on a Docker or source install and when the tray has not said it is alive lately.
      */
     UpdateStateOut: {
       /**
@@ -8473,6 +8473,11 @@ export interface components {
        * @enum {string}
        */
       state: "idle" | "checking" | "downloading" | "downloaded" | "failed";
+      /**
+       * Tray Running
+       * @default false
+       */
+      tray_running: boolean;
     };
     /** UserPublic */
     UserPublic: {

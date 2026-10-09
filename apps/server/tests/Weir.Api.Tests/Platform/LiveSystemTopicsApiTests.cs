@@ -14,9 +14,9 @@ public sealed class LiveSystemTopicsApiTests
 {
     private const string Enqueue = "/api/v1/processing/jobs/file-remux-pass/enqueue";
 
-    private static async Task<(WeirTestServer Server, ApiTestClient Client, StreamReader Stream)> StartListeningAsync()
+    private static async Task<(WeirTestServer Server, ApiTestClient Client, StreamReader Stream)> StartListeningAsync(params (string Name, string Value)[] variables)
     {
-        var (server, client) = await StartSignedInAsync();
+        var (server, client) = await StartSignedInAsync(variables);
         var stream = await OpenStreamAsync(server, client);
         await NextFrameAsync(stream, "server.hello");
         return (server, client, stream);
@@ -126,9 +126,10 @@ public sealed class LiveSystemTopicsApiTests
     [InlineData("failed", "Weir could not reach GitHub to look for an update. Check the internet connection and try again.")]
     public async Task Each_step_the_tray_takes_reaches_an_open_stream_as_an_update_change_and_shows_in_the_update_state(string step, string? failure)
     {
-        var (server, client, stream) = await StartListeningAsync();
+        var (server, client, stream) = await StartListeningAsync(("WEIR_RUNTIME", "windows"));
         await using var _server = server;
         using var _stream = stream;
+        await File.WriteAllTextAsync(Path.Join(server.Home, "tray-heartbeat.json"), $"{{\"at\": \"{DateTimeOffset.UtcNow:O}\"}}");
         var failureJson = failure is null ? "null" : $"\"{failure}\"";
 
         await File.WriteAllTextAsync(Path.Join(server.Home, "update-state.json"), $"{{\"state\": \"{step}\", \"downloaded\": false, \"version\": null, \"failure\": {failureJson}}}");

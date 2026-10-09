@@ -11,9 +11,9 @@ public sealed class LiveStreamApiTests
 {
     private static readonly TimeSpan Patience = TimeSpan.FromSeconds(10);
 
-    internal static async Task<(WeirTestServer Server, ApiTestClient Client)> StartSignedInAsync()
+    internal static async Task<(WeirTestServer Server, ApiTestClient Client)> StartSignedInAsync(params (string Name, string Value)[] variables)
     {
-        var server = await StartServerAsync();
+        var server = await StartServerAsync(variables);
         await TestDatabase.SeedAdminAsync(server);
         var client = new ApiTestClient(server);
         await client.SignInAsync();

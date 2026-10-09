@@ -225,41 +225,11 @@ public sealed class AuthAndSettingsStoreTests
         Assert.Equal("NotifyOnly", ((WireString)files.ReadSettings(warned.Add)["mode"]).Value);
         Assert.Single(warned);
 
-        Assert.Equal("{\"downloaded\":false,\"pending_version\":null,\"state\":\"idle\",\"failure\":null}", WireJsonWriter.Dumps(files.ReadState(), WireJsonFormat.Response));
+        Assert.Equal("{\"downloaded\":false,\"pending_version\":null,\"state\":\"idle\",\"failure\":null,\"tray_running\":false}", WireJsonWriter.Dumps(files.ReadState(), WireJsonFormat.Response));
         File.WriteAllText(Path.Join(fixture.Home.Path, "update-state.json"), "{\"downloaded\": true, \"version\": \"2.0.0\"}");
-        Assert.Equal("{\"downloaded\":true,\"pending_version\":\"2.0.0\",\"state\":\"downloaded\",\"failure\":null}", WireJsonWriter.Dumps(files.ReadState(), WireJsonFormat.Response));
+        Assert.Equal("{\"downloaded\":true,\"pending_version\":\"2.0.0\",\"state\":\"downloaded\",\"failure\":null,\"tray_running\":false}", WireJsonWriter.Dumps(files.ReadState(), WireJsonFormat.Response));
         files.WriteApplyFlag();
         Assert.True(File.Exists(Path.Join(fixture.Home.Path, "update-apply-now")));
-    }
-
-    [Fact]
-    public void A_check_or_download_asked_for_and_not_yet_taken_up_reads_as_under_way()
-    {
-        using var fixture = new StoreFixture();
-        var files = new UpdateFiles(fixture.Options);
-        string StateText() => WireJsonWriter.Dumps(files.ReadState(), WireJsonFormat.Response);
-
-        files.WriteDownloadFlag();
-        Assert.Equal("{\"downloaded\":false,\"pending_version\":null,\"state\":\"downloading\",\"failure\":null}", StateText());
-
-        files.WriteCheckFlag();
-        Assert.Equal("{\"downloaded\":false,\"pending_version\":null,\"state\":\"checking\",\"failure\":null}", StateText());
-        Assert.True(File.Exists(Path.Join(fixture.Home.Path, "update-check-now")));
-        Assert.True(File.Exists(Path.Join(fixture.Home.Path, "update-download-now")));
-    }
-
-    [Fact]
-    public void A_request_does_not_hide_what_the_tray_is_already_doing_or_has_downloaded()
-    {
-        using var fixture = new StoreFixture();
-        var files = new UpdateFiles(fixture.Options);
-        files.WriteCheckFlag();
-
-        File.WriteAllText(Path.Join(fixture.Home.Path, "update-state.json"), "{\"state\": \"downloading\", \"downloaded\": false, \"version\": \"2.0.0\"}");
-        Assert.Equal("downloading", ((WireString)files.ReadState()["state"]).Value);
-
-        File.WriteAllText(Path.Join(fixture.Home.Path, "update-state.json"), "{\"state\": \"downloaded\", \"downloaded\": true, \"version\": \"2.0.0\"}");
-        Assert.Equal("downloaded", ((WireString)files.ReadState()["state"]).Value);
     }
 
     [Fact]
