@@ -14,6 +14,9 @@ enum ServerPhase
 
     /// <summary>Not running and not coming back by itself: it could not start, or the watchdog gave up.</summary>
     Stopped,
+
+    /// <summary>Asked to stop and finishing its running jobs, which can take most of a minute; on its way to <see cref="Stopped"/>.</summary>
+    Stopping,
 }
 
 /// <summary>The icon's dot, which shows the health of Weir and of what it is set up to talk to, and nothing else.</summary>
@@ -117,6 +120,7 @@ sealed record TrayState(ServerPhase Phase, TrayStatus? Server, string? UpdateVer
     private IEnumerable<string> Headline(List<string> causes) => this switch
     {
         { Phase: ServerPhase.Stopped } => ["Stopped - choose Restart Weir"],
+        { Phase: ServerPhase.Stopping } => ["Stopping..."],
         { IsStatusOverdue: true, Reported: null } => ["Can't read its status"],
         { Dot: TrayDot.Starting } => ["Starting..."],
         { IsPaused: true } => ["Paused"],

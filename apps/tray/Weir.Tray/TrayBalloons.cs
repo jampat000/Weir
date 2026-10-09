@@ -17,6 +17,9 @@ static class TrayBalloons
     /// <summary>The person clicked the icon or Open Weir while the server was starting.</summary>
     internal const string StillStartingText = "Weir is still starting. Try again in a moment.";
 
+    /// <summary>The person clicked the icon or Open Weir while the server was finishing its jobs to stop.</summary>
+    internal const string StoppingText = "Weir is stopping. It finishes the work it is doing first.";
+
     /// <summary>The person clicked the icon or Open Weir while the server was stopped.</summary>
     internal const string NotRunningText = "Weir isn't running. Click to restart it.";
 

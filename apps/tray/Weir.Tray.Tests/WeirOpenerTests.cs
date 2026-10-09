@@ -106,6 +106,19 @@ public sealed class WeirOpenerTests : IDisposable
     }
 
     [Fact]
+    public void While_the_server_stops_a_click_says_so_and_does_not_offer_a_restart()
+    {
+        _phase = ServerPhase.Stopping;
+
+        Opener().OpenFromClick("tray-click");
+
+        Assert.Empty(_browser);
+        var balloon = Assert.Single(_balloons);
+        Assert.Equal(TrayBalloons.StoppingText, balloon.Text);
+        Assert.Null(balloon.Click);
+    }
+
+    [Fact]
     public void When_the_server_is_stopped_a_click_offers_the_restart_and_opens_nothing()
     {
         _phase = ServerPhase.Stopped;

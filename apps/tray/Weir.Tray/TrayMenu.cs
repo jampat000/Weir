@@ -62,7 +62,7 @@ static class TrayMenu
             new(TrayMenuItem.Status, state.HoverText, Enabled: false),
             TrayMenuEntry.Separator,
             new(TrayMenuItem.Pause, state.IsPaused ? "Resume processing" : "Pause processing", Enabled: running),
-            new(TrayMenuItem.Restart, "Restart Weir", Enabled: state.Phase != ServerPhase.Starting),
+            new(TrayMenuItem.Restart, "Restart Weir", Enabled: state.Phase is not (ServerPhase.Starting or ServerPhase.Stopping)),
             TrayMenuEntry.Separator,
             new(TrayMenuItem.CopyAddress, "Copy address"),
             new(TrayMenuItem.AllowOtherDevices, inputs.Lan.AllowText, inputs.Lan.AllowEnabled),

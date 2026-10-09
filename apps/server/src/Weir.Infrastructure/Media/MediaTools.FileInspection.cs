@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Logging;
+
 namespace Weir.Infrastructure.Media;
 
 /// <summary>The file facts <see cref="MediaTools.FfprobeJsonAsync"/> logs and checks: resolved path, existence, size and mtime (seconds since the epoch).</summary>
@@ -42,6 +44,21 @@ public sealed partial class MediaTools
 
         return new MediaFileState(resolvedPath, exists, isFile, size, mtime);
     }
+
+    /// <summary>The size of a file a tool is about to read, which sizes how long the tool is given; 0 when it cannot be read.</summary>
+    internal long SizeOfFile(string path)
+    {
+        if (_inspectFile(path) is { IsFile: true, SizeBytes: > 0 } state)
+        {
+            return state.SizeBytes;
+        }
+
+        LogSizeUnknown(path);
+        return 0;
+    }
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Weir could not read the size of {Path}, so its media tool is given the least time instead of a time sized to the file.")]
+    private partial void LogSizeUnknown(string path);
 
     private static string ResolvePath(string path)
     {

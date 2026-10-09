@@ -18,7 +18,17 @@ sealed class ServerHost : IServerListenScope, IDisposable
     private const string ServerExeName = "WeirServer.exe";
     private const int MaxRestarts = 5;
 
-    private static readonly TimeSpan HealthTimeout = TimeSpan.FromSeconds(60);
+    /// <summary>
+    /// How long a server that has not answered at all is waited for: a server that cannot listen, or a port something else holds,
+    /// shows within a minute. One that exits is noticed at once.
+    /// </summary>
+    internal static readonly TimeSpan DefaultNothingAnswersTimeout = TimeSpan.FromSeconds(60);
+
+    /// <summary>
+    /// How long a server that has answered "not ready" is waited for. It is alive and starting; a slow start, such as a large
+    /// database migrated on a busy PC, must not be reported as a failure while it is still going to succeed.
+    /// </summary>
+    internal static readonly TimeSpan DefaultStartingTimeout = TimeSpan.FromMinutes(5);
     private static readonly TimeSpan WatchInterval = TimeSpan.FromSeconds(3);
 
     /// <summary>How long a stop waits for a restart or port change in progress to let go of the server.</summary>
@@ -50,13 +60,29 @@ sealed class ServerHost : IServerListenScope, IDisposable
     private Action? _onGaveUp;
     private CancellationToken _watchdogToken;
 
-    internal ServerHost(string runtimeHome, string installRoot, int port, ListenScope scope)
+    private readonly TimeSpan _nothingAnswersTimeout;
+    private readonly TimeSpan _startingTimeout;
+
+    // The two timeouts are how long to wait for a server that has not answered at all and for one that has answered "not ready"; the
+    // defaults when null. Tests shorten them.
+    internal ServerHost(
+        string runtimeHome,
+        string installRoot,
+        int port,
+        ListenScope scope,
+        TimeSpan? nothingAnswersTimeout = null,
+        TimeSpan? startingTimeout = null)
     {
         _runtimeHome = runtimeHome;
         _installRoot = installRoot;
         _port = port;
         _scope = scope;
+        _nothingAnswersTimeout = nothingAnswersTimeout ?? DefaultNothingAnswersTimeout;
+        _startingTimeout = startingTimeout ?? DefaultStartingTimeout;
     }
+
+    /// <summary>Whether the server process this host started is still running.</summary>
+    internal bool ServerIsRunning => _process is { HasExited: false };
 
     /// <summary>Raised, on whichever thread changed it, when <see cref="Phase"/> changes.</summary>
     internal event Action? PhaseChanged;
@@ -347,7 +373,10 @@ sealed class ServerHost : IServerListenScope, IDisposable
         var entered = await _gate.WaitAsync(StopGateWait).ConfigureAwait(false);
         try
         {
+            // The icon says so while the server finishes its jobs, which can take most of a minute.
+            SetPhase(ServerPhase.Stopping);
             await StopProcessAsync().ConfigureAwait(false);
+            SetPhase(ServerPhase.Stopped);
         }
         finally
         {
@@ -404,15 +433,30 @@ sealed class ServerHost : IServerListenScope, IDisposable
         }
     }
 
-    private Task WaitForHealthAsync(CancellationToken cancellationToken)
+    private async Task WaitForHealthAsync(CancellationToken cancellationToken)
     {
         var process = _process;
-        return ServerHealth.WaitUntilReadyAsync(
-            _http,
-            new Uri($"http://127.0.0.1:{_port}/ready"),
-            () => process is { HasExited: true } ? process.ExitCode : null,
-            new ServerHealth.Timing(HealthTimeout, ServerHealth.RetryDelay, TimeProvider.System),
-            cancellationToken);
+        try
+        {
+            await ServerHealth.WaitUntilReadyAsync(
+                _http,
+                new Uri($"http://127.0.0.1:{_port}/ready"),
+                () => process is { HasExited: true } ? process.ExitCode : null,
+                new ServerHealth.Timing(_nothingAnswersTimeout, ServerHealth.RetryDelay, TimeProvider.System, _startingTimeout),
+                cancellationToken).ConfigureAwait(false);
+        }
+        catch (TimeoutException ex)
+        {
+            // A server that never became ready is not left running behind a tray that says it has stopped. Its process is kept, exited,
+            // so the watchdog sees it and starts it again like any other that exited.
+            TrayLog.Write($"{ex.Message} Stopping it.");
+            if (process is { HasExited: false })
+            {
+                await ServerProcessStop.StopAsync(process, ServerStopTimeouts.Orphan).ConfigureAwait(false);
+            }
+
+            throw;
+        }
     }
 
     private string FindServerExeDirectory()

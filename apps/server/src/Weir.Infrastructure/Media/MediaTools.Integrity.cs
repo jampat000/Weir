@@ -41,23 +41,31 @@ public sealed partial class MediaTools
         var baseArgv = FfmpegCommands.BuildIntegrityArgv(ffmpeg, path);
         var wantsProgress = expectedDurationSeconds is > 0;
         var argv = wantsProgress ? FfmpegCommands.WithProgress(baseArgv) : baseArgv;
-        var result = await _runner.RunAsync(
-            new ProcessRequest
-            {
-                Argv = argv,
-                Timeout = TimeSpan.FromSeconds(FfmpegCommands.FfmpegTimeoutSeconds),
-                Stdin = ProcessInput.Null,
-                Stdout = wantsProgress ? ProcessOutput.Capture : ProcessOutput.Discard,
-                Stderr = ProcessOutput.Capture,
-            },
-            cancellationToken).ConfigureAwait(false);
-        if (result.TimedOut)
+        var timeoutSeconds = ToolTimeLimits.OverallSeconds(SizeOfFile(path));
+        var progress = new StdoutLines();
+        var request = new ProcessRequest
         {
-            throw new MediaToolTimeoutException(ProbeOutput.TimeoutMessage(argv, FfmpegCommands.FfmpegTimeoutSeconds));
-        }
+            Argv = argv,
+            Timeout = TimeSpan.FromSeconds(timeoutSeconds),
+            Stdin = ProcessInput.Null,
+            Stdout = ProcessOutput.Discard,
+            Stderr = ProcessOutput.Capture,
+        };
+        // Only a run that reports progress says anything while it reads; the others have the size-based limit alone.
+        var result = await _runner.RunAsync(
+            wantsProgress ? WithProgressWatch(request with { OnStdoutLine = progress.Add }, new FfmpegProgressAdvance()) : request,
+            cancellationToken).ConfigureAwait(false);
+        ThrowIfStopped(result, argv, timeoutSeconds);
 
         var stderrText = ProbeOutput.CapturedText(result.Stderr);
-        if (result.ExitCode != 0)
+        var finishedButStayed = result.Timeout == ProcessTimeoutKind.NotExitedAfterFinish;
+        if (finishedButStayed)
+        {
+            // It printed the end of its progress, so it read the whole file; stopping it is not a verdict on the file.
+            LogFfmpegFinishedWithoutExiting();
+        }
+
+        if (result.ExitCode != 0 && !finishedButStayed)
         {
             throw ProbeOutput.IntegrityFailure(stderrText);
         }
@@ -68,7 +76,7 @@ public sealed partial class MediaTools
         }
 
         if (expectedDurationSeconds is { } expected && expected > 0
-            && ProbeOutput.LastProgressOutTimeSeconds(ProbeOutput.CapturedText(result.Stdout)) is { } decoded)
+            && ProbeOutput.LastProgressOutTimeSeconds(progress.Text) is { } decoded)
         {
             var tolerance = Math.Max(5.0, expected * 0.01);
             if (decoded < expected - tolerance)

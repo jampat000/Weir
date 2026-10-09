@@ -45,6 +45,15 @@ public sealed class TrayStateTests
     }
 
     [Fact]
+    public void A_server_that_is_finishing_its_jobs_to_stop_blinks_and_says_so()
+    {
+        var stopping = new TrayState(ServerPhase.Stopping, AllWell, null, 9347);
+
+        Assert.Equal(TrayDot.Starting, stopping.Dot);
+        Assert.Equal("Weir - Stopping...", stopping.HoverText);
+    }
+
+    [Fact]
     public void A_server_that_says_it_is_stopping_blinks_instead_of_flashing_red_while_it_is_started_again()
     {
         var stopping = AllWell with { ServerOk = false, ManagersUnreachable = ["Deluno"] };

@@ -163,22 +163,191 @@ public sealed class ProcessRunnerTests
         Assert.Equal("stop", error.Message);
     }
 
-    [PosixFact("cmd.exe cannot close its own stdout while the child keeps running; this proves the exit-after-close grace.")]
-    public async Task A_process_that_lingers_after_closing_stdout_is_killed_after_the_grace()
+    [Fact]
+    public async Task A_process_that_goes_silent_is_killed_once_it_has_said_nothing_for_the_idle_limit()
     {
+        using var started = new StartedProcesses();
+
         var result = await Runner.RunAsync(new ProcessRequest
         {
-            Argv = ["/bin/sh", "-c", "exec 1>&-; sleep 60"],
-            OnStdoutLine = _ => { },
-            ExitTimeoutAfterStdoutClosed = TimeSpan.FromMilliseconds(300),
-            Timeout = TimeSpan.FromSeconds(30),
+            Argv = TalkativeSlowTool(),
+            OnStarted = started.Remember,
+            IdleTimeout = TimeSpan.FromMilliseconds(500),
+            Timeout = TimeSpan.FromMinutes(5),
         });
 
+        Assert.Equal(ProcessTimeoutKind.Idle, result.Timeout);
         Assert.True(result.TimedOut);
+        Assert.Equal(1, started.Count);
+        await started.AllHaveEndedAsync();
     }
 
     [Fact]
-    public async Task A_process_that_takes_a_while_to_exit_after_closing_stdout_is_waited_for_within_the_grace()
+    public async Task A_process_that_keeps_talking_is_left_to_run_for_longer_than_the_idle_limit()
+    {
+        var lines = new List<string>();
+
+        // 40 lines 100 ms apart run for about four seconds, over the three-second limit, but never fall silent for it.
+        var result = await Runner.RunAsync(new ProcessRequest
+        {
+            Argv = [StandInPath, "chatter", "100", "40"],
+            OnStdoutLine = lines.Add,
+            IdleTimeout = TimeSpan.FromSeconds(3),
+            Timeout = TimeSpan.FromMinutes(5),
+        });
+
+        Assert.Equal(ProcessTimeoutKind.None, result.Timeout);
+        Assert.Equal(0, result.ExitCode);
+        Assert.Equal(40, lines.Count);
+    }
+
+    [Fact]
+    public async Task A_process_that_stops_talking_part_way_is_killed_by_the_idle_limit_and_what_it_said_is_kept()
+    {
+        var lines = new List<string>();
+        using var started = new StartedProcesses();
+
+        var result = await Runner.RunAsync(new ProcessRequest
+        {
+            Argv = [StandInPath, "chatter-then-stall", "50", "5"],
+            OnStarted = started.Remember,
+            OnStdoutLine = lines.Add,
+            IdleTimeout = TimeSpan.FromSeconds(2),
+            Timeout = TimeSpan.FromMinutes(5),
+        });
+
+        Assert.Equal(ProcessTimeoutKind.Idle, result.Timeout);
+        Assert.Equal(5, lines.Count);
+        await started.AllHaveEndedAsync();
+    }
+
+    [Fact]
+    public async Task A_process_that_keeps_printing_lines_that_are_not_progress_is_killed_by_the_idle_limit()
+    {
+        var lines = new List<string>();
+        using var started = new StartedProcesses();
+
+        // Lines arrive every 100 ms for a minute; none of them is progress, so the limit runs from the start.
+        var result = await Runner.RunAsync(new ProcessRequest
+        {
+            Argv = [StandInPath, "chatter", "100", "600"],
+            OnStarted = started.Remember,
+            OnStdoutLine = lines.Add,
+            MarksProgress = _ => false,
+            IdleTimeout = TimeSpan.FromSeconds(1),
+            Timeout = TimeSpan.FromMinutes(5),
+        });
+
+        Assert.Equal(ProcessTimeoutKind.Idle, result.Timeout);
+        Assert.True(lines.Count < 600);
+        await started.AllHaveEndedAsync();
+    }
+
+    [Fact]
+    public async Task A_process_whose_progress_lines_advance_is_left_to_run_past_the_idle_limit()
+    {
+        var advance = new Weir.Core.Media.FfmpegProgressAdvance();
+        var lines = new List<string>();
+
+        // Forty blocks 100 ms apart run for about four seconds, over the three-second limit, and each moves on.
+        var result = await Runner.RunAsync(new ProcessRequest
+        {
+            Argv = [StandInPath, "progress-advancing", "100", "40"],
+            OnStdoutLine = lines.Add,
+            MarksProgress = advance.Feed,
+            IdleTimeout = TimeSpan.FromSeconds(3),
+            Timeout = TimeSpan.FromMinutes(5),
+        });
+
+        Assert.Equal(ProcessTimeoutKind.None, result.Timeout);
+        Assert.Equal(0, result.ExitCode);
+    }
+
+    [Fact]
+    public async Task A_process_that_keeps_printing_the_same_progress_block_is_killed_by_the_idle_limit()
+    {
+        var advance = new Weir.Core.Media.FfmpegProgressAdvance();
+        using var started = new StartedProcesses();
+
+        var result = await Runner.RunAsync(new ProcessRequest
+        {
+            Argv = [StandInPath, "progress-stuck", "50", "1200"],
+            OnStarted = started.Remember,
+            OnStdoutLine = _ => { },
+            MarksProgress = advance.Feed,
+            IdleTimeout = TimeSpan.FromSeconds(1),
+            Timeout = TimeSpan.FromMinutes(5),
+        });
+
+        Assert.Equal(ProcessTimeoutKind.Idle, result.Timeout);
+        await started.AllHaveEndedAsync();
+    }
+
+    [Fact]
+    public async Task A_process_that_does_not_exit_after_its_final_line_is_killed_and_says_so()
+    {
+        using var started = new StartedProcesses();
+
+        var result = await Runner.RunAsync(new ProcessRequest
+        {
+            Argv = [StandInPath, "finish-then-linger", "60"],
+            OnStarted = started.Remember,
+            OnStdoutLine = _ => { },
+            IsFinalLine = Weir.Core.Media.FfmpegProgressAdvance.IsEnd,
+            ExitAfterFinalLine = TimeSpan.FromMilliseconds(300),
+            Timeout = TimeSpan.FromMinutes(5),
+        });
+
+        Assert.Equal(ProcessTimeoutKind.NotExitedAfterFinish, result.Timeout);
+        await started.AllHaveEndedAsync();
+    }
+
+    [Fact]
+    public async Task A_process_that_exits_within_the_wait_after_its_final_line_is_not_killed()
+    {
+        var result = await Runner.RunAsync(new ProcessRequest
+        {
+            Argv = [StandInPath, "progress-advancing", "50", "3"],
+            OnStdoutLine = _ => { },
+            IsFinalLine = Weir.Core.Media.FfmpegProgressAdvance.IsEnd,
+            ExitAfterFinalLine = TimeSpan.FromSeconds(30),
+            Timeout = TimeSpan.FromMinutes(5),
+        });
+
+        Assert.Equal(ProcessTimeoutKind.None, result.Timeout);
+        Assert.Equal(0, result.ExitCode);
+    }
+
+    [Fact]
+    public async Task Telling_progress_apart_needs_the_lines_to_be_read()
+    {
+        await Assert.ThrowsAsync<ArgumentException>(() => Runner.RunAsync(new ProcessRequest
+        {
+            Argv = [StandInPath, "chatter", "100", "1"],
+            MarksProgress = _ => true,
+        }));
+    }
+
+    [Fact]
+    public async Task A_process_that_lingers_after_closing_stdout_is_killed_once_it_has_been_silent_for_the_idle_limit()
+    {
+        using var started = new StartedProcesses();
+
+        var result = await Runner.RunAsync(new ProcessRequest
+        {
+            Argv = [StandInPath, "close-stdout-then-linger", "60"],
+            OnStarted = started.Remember,
+            OnStdoutLine = _ => { },
+            IdleTimeout = TimeSpan.FromMilliseconds(500),
+            Timeout = TimeSpan.FromMinutes(5),
+        });
+
+        Assert.Equal(ProcessTimeoutKind.Idle, result.Timeout);
+        await started.AllHaveEndedAsync();
+    }
+
+    [Fact]
+    public async Task A_process_that_takes_a_while_to_exit_after_closing_stdout_is_waited_for_within_the_idle_limit()
     {
         var lines = new List<string>();
 
@@ -186,7 +355,7 @@ public sealed class ProcessRunnerTests
         {
             Argv = [StandInPath, "close-stdout-then-linger", "1"],
             OnStdoutLine = lines.Add,
-            ExitTimeoutAfterStdoutClosed = TimeSpan.FromSeconds(30),
+            IdleTimeout = TimeSpan.FromSeconds(30),
             Timeout = TimeSpan.FromSeconds(60),
         });
 
