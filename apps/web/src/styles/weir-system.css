@@ -131,6 +131,18 @@
   background: color-mix(in srgb, var(--mm-st) 12%, transparent);
 }
 
+/* Where a Windows update's installer and release notes sit: small text links under the buttons, not controls in the header. */
+.mm-update-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin-top: 10px;
+}
+
+.mm-update-links:empty {
+  display: none;
+}
+
 /* Where a Windows update's mode, startup check and interval sit under the status line. */
 .mm-panel__body > .mm-setgroup__rows {
   margin-top: 8px;

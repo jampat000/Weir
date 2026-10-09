@@ -31,6 +31,7 @@ function status(
       | "known_update_available"
       | "docker_update_command"
       | "windows_installer_url"
+      | "release_url"
     >,
   installType = "source",
 ): UpdateStatus {
@@ -155,5 +156,51 @@ describe("UpdateSection while GitHub limits update checks", () => {
     showStatus(status({ summary: LIMITED }));
 
     expect(screen.getByRole("button", { name: "Check again →" })).toBeEnabled();
+  });
+
+  describe("when an update is available on Windows", () => {
+    function showAvailable() {
+      showStatus({
+        ...status(
+          {
+            summary: "Weir 9.9.9 is available.",
+            latest_version: "9.9.9",
+            windows_installer_url: "https://example.test/Weir-win-Setup.exe",
+            release_url: "https://example.test/release",
+          },
+          "windows",
+        ),
+        status: "update_available",
+      });
+    }
+
+    it("says it is available, not ready, and says which version in a sentence", () => {
+      showAvailable();
+
+      const line = screen.getByTestId("suite-settings-release-status");
+      expect(line).toHaveTextContent("Update available");
+      expect(line).not.toHaveTextContent("Update ready");
+      expect(line).toHaveTextContent(
+        "Weir v9.9.9 is available (you have v3.2.16)",
+      );
+    });
+
+    it("keeps the installer and the release notes as quiet links under the buttons, not controls in the header", () => {
+      showAvailable();
+
+      for (const name of ["Download installer →", "Release notes →"]) {
+        const link = screen.getByRole("link", { name });
+        expect(link).toHaveClass("mm-quiet-link");
+        expect(link.closest(".mm-panel__aside")).toBeNull();
+      }
+    });
+  });
+
+  it("says which version is running when Weir is up to date", () => {
+    showStatus({ ...status({ summary: "" }, "windows"), status: "up_to_date" });
+
+    expect(
+      screen.getByTestId("suite-settings-release-status"),
+    ).toHaveTextContent("You have Weir v3.2.16");
   });
 });

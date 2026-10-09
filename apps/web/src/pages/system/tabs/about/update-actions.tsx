@@ -13,7 +13,7 @@ import type {
   UpdateStatus,
 } from "../../../../lib/settings/types";
 import { mmActionButtonClass } from "../../../../lib/ui/mm-control-roles";
-import { updateButtons } from "./update-steps";
+import { type UpdateButton, updateButtons } from "./update-steps";
 
 /**
  * Once the restart signal is sent, the tray stops and starts the server. The page needs no check of its own to come back:
@@ -109,6 +109,8 @@ export function UpdateActions({ status }: { status: UpdateStatus }) {
     download.reset();
     step.mutate();
   };
+  const buttonClass = (button: UpdateButton) =>
+    `${mmActionButtonClass({ variant: button.primary ? "primary" : "secondary" })} mm-sys-btn`;
 
   return (
     <div className="mt-3" data-testid="suite-settings-update-actions">
@@ -116,7 +118,7 @@ export function UpdateActions({ status }: { status: UpdateStatus }) {
       <div className="flex flex-wrap gap-2">
         <button
           type="button"
-          className={`${mmActionButtonClass({ variant: "secondary" })} mm-sys-btn`}
+          className={buttonClass(buttons.check)}
           disabled={!buttons.check.enabled}
           onClick={() => ask(check)}
         >
@@ -124,7 +126,7 @@ export function UpdateActions({ status }: { status: UpdateStatus }) {
         </button>
         <button
           type="button"
-          className={`${mmActionButtonClass({ variant: "secondary" })} mm-sys-btn`}
+          className={buttonClass(buttons.download)}
           disabled={!buttons.download.enabled}
           onClick={() => ask(download)}
         >
@@ -132,7 +134,7 @@ export function UpdateActions({ status }: { status: UpdateStatus }) {
         </button>
         <button
           type="button"
-          className={`${mmActionButtonClass({ variant: "primary" })} mm-sys-btn`}
+          className={buttonClass(buttons.apply)}
           disabled={!buttons.apply.enabled}
           onClick={() => apply.mutate()}
         >

@@ -153,4 +153,38 @@ describe("updateButtons", () => {
 
     expect(enabled(buttons)).toEqual([false, false, false]);
   });
+
+  it("makes the next step the primary button, and Check now never", () => {
+    const primary = (
+      state: UpdateStateOut,
+      overrides: Partial<UpdateStatus> = {},
+    ) => {
+      const buttons = updateButtons(state, status(overrides), idle);
+      return [
+        buttons.check.primary,
+        buttons.download.primary,
+        buttons.apply.primary,
+      ];
+    };
+
+    expect(primary(state())).toEqual([false, false, false]);
+    expect(primary(state({ pending_version: "1.1.0" }))).toEqual([
+      false,
+      true,
+      false,
+    ]);
+    expect(
+      primary(state({ state: "downloading", pending_version: "1.1.0" })),
+    ).toEqual([false, true, false]);
+    expect(
+      primary(
+        state({
+          state: "downloaded",
+          downloaded: true,
+          pending_version: "1.1.0",
+        }),
+        { status: "update_available" },
+      ),
+    ).toEqual([false, false, true]);
+  });
 });

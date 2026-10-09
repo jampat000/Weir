@@ -36,12 +36,13 @@ function CopyCommandButton({ command }: { command: string }) {
   );
 }
 
-/** The version the status is about: the new one when there is one, otherwise the one running. */
-function statusVersion(status: UpdateStatus): string | null {
-  if (status.status === "update_available")
-    return status.latest_version ?? null;
-  if (status.status === "up_to_date") return status.current_version;
-  return null;
+/** The line beside the status pill, as a sentence: the new version and the one running, or the one running, else the server's own summary. */
+function statusText(status: UpdateStatus): string {
+  if (status.status === "update_available" && status.latest_version)
+    return `Weir v${status.latest_version} is available (you have v${status.current_version})`;
+  if (status.status === "up_to_date")
+    return `You have Weir v${status.current_version}`;
+  return status.summary;
 }
 
 /** While GitHub is limiting the checks, the newest release Weir had learned of before that. */
@@ -78,8 +79,19 @@ function ReleaseStatus({
   const links = [
     { label: "Download installer →", href: status.windows_installer_url },
     { label: "Release notes →", href: status.release_url },
-  ].filter((link) => link.href);
-  const version = statusVersion(status);
+  ]
+    .filter((link) => link.href)
+    .map((link) => (
+      <a
+        key={link.label}
+        className="mm-quiet-link"
+        href={link.href ?? undefined}
+        target="_blank"
+        rel="noreferrer"
+      >
+        {link.label}
+      </a>
+    ));
 
   return (
     <Panel
@@ -89,8 +101,8 @@ function ReleaseStatus({
       padded
       dataTestId="suite-settings-upgrade-tab"
       aside={
-        <>
-          {isWindows ? null : (
+        isWindows ? undefined : (
+          <>
             <button
               type="button"
               className="mm-quiet-link"
@@ -99,19 +111,9 @@ function ReleaseStatus({
             >
               {checking ? "Checking..." : "Check again →"}
             </button>
-          )}
-          {links.map((link) => (
-            <a
-              key={link.label}
-              className="mm-quiet-link"
-              href={link.href ?? undefined}
-              target="_blank"
-              rel="noreferrer"
-            >
-              {link.label}
-            </a>
-          ))}
-        </>
+            {links}
+          </>
+        )
       }
     >
       <p
@@ -122,10 +124,15 @@ function ReleaseStatus({
         <Chip meaning={updateMeaning(status.status)}>
           {updateStatusLabel(status.status)}
         </Chip>
-        <span>{version ?? status.summary}</span>
+        <span>{statusText(status)}</span>
       </p>
       <LastKnownRelease status={status} />
-      {isWindows ? <UpdateActions status={status} /> : null}
+      {isWindows ? (
+        <>
+          <UpdateActions status={status} />
+          <p className="mm-update-links">{links}</p>
+        </>
+      ) : null}
       {isWindows ? <UpdatePreferences /> : null}
       {dockerCommand ? <DockerUpgradeSteps command={dockerCommand} /> : null}
     </Panel>

@@ -3,8 +3,12 @@ import type {
   UpdateStatus,
 } from "../../../../lib/settings/types";
 
-/** One of the three update buttons: its words and whether it applies right now. */
-export type UpdateButton = { label: string; enabled: boolean };
+/** One of the three update buttons: its words, whether it applies right now, and whether it is the next step to take. */
+export type UpdateButton = {
+  label: string;
+  enabled: boolean;
+  primary: boolean;
+};
 
 export type UpdateButtons = {
   check: UpdateButton;
@@ -22,7 +26,8 @@ export type UpdateAsks = {
 
 /**
  * Which buttons apply, following the tray menu's update item: Check for updates, then Checking, then Download update, then
- * Downloading, then Restart to update. Nothing applies while a step is under way or before the tray's state is known, and
+ * Downloading, then Restart to update. The next step is the primary button: the download while an update waits to be
+ * downloaded, the restart once it is; Check now never is. Nothing applies while a step is under way or before the tray's state is known, and
  * once the update is downloaded only the restart does. The download is offered for any update Weir knows of, found by the
  * tray or by Weir's own look at the releases: the tray finds it first when it has not looked yet.
  */
@@ -47,14 +52,17 @@ export function updateButtons(
     check: {
       label: step === "checking" ? "Checking…" : "Check now",
       enabled: !busy && !downloaded,
+      primary: false,
     },
     download: {
       label: step === "downloading" ? "Downloading update…" : "Download update",
       enabled: !busy && !downloaded && updateKnown,
+      primary: !downloaded && updateKnown,
     },
     apply: {
       label: restarting ? "Restarting…" : "Restart and apply",
       enabled: !busy && downloaded,
+      primary: downloaded,
     },
   };
 }
