@@ -11171,6 +11171,17 @@
           "jobs_today": {
             "$ref": "#/components/schemas/SystemOverviewJobsOut"
           },
+          "last_update_backup": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SystemOverviewUpdateBackupOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The copy of Weir's data taken before the latest update changed it; null when no update has made one."
+          },
           "requests": {
             "$ref": "#/components/schemas/SystemOverviewRequestsOut"
           },
@@ -11223,7 +11234,8 @@
           "requests",
           "jobs_today",
           "restarts_this_week",
-          "checks"
+          "checks",
+          "last_update_backup"
         ],
         "title": "SystemOverviewOut",
         "type": "object"
@@ -11256,6 +11268,28 @@
           "errors_today"
         ],
         "title": "SystemOverviewRequestsOut",
+        "type": "object"
+      },
+      "SystemOverviewUpdateBackupOut": {
+        "description": "A copy of Weir's data taken before an update changed it.",
+        "properties": {
+          "path": {
+            "description": "Where the copy of the database is, on the computer Weir runs on.",
+            "title": "Path",
+            "type": "string"
+          },
+          "taken_at": {
+            "description": "When the copy was taken.",
+            "format": "date-time",
+            "title": "Taken At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "taken_at"
+        ],
+        "title": "SystemOverviewUpdateBackupOut",
         "type": "object"
       },
       "SystemOverviewUpdateOut": {

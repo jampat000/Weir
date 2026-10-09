@@ -5,6 +5,7 @@ import { Panel } from "../../../../components/panels/panel";
 import type { RunsAs } from "../../../../lib/system/system-stats-types";
 import { useSystemOverviewQuery } from "../../../../lib/system/use-system-stats";
 import { useUpdateStatusQuery } from "../../../../lib/settings/queries";
+import { useAppDateFormatter } from "../../../../lib/ui/mm-format-date";
 import type { AppSettings } from "../../../../lib/settings/types";
 import { updateMeaning } from "../../../../lib/settings/update-status";
 import { useSystemReadinessQuery } from "../../../../lib/system/readiness-queries";
@@ -43,6 +44,7 @@ export function ThisWeirSection({ settings }: { settings: AppSettings }) {
   const machine = useSystemReadinessQuery().data;
   const update = useUpdateStatusQuery().data;
   const overview = useSystemOverviewQuery().data;
+  const formatDate = useAppDateFormatter();
   const wizardState = (settings.setup_wizard_state || "pending")
     .trim()
     .toLowerCase();
@@ -112,6 +114,16 @@ export function ThisWeirSection({ settings }: { settings: AppSettings }) {
           </>
         ) : null}
       </dl>
+      {overview?.last_update_backup ? (
+        <p
+          className="mm-sys-note"
+          title={`Saved ${formatDate(overview.last_update_backup.taken_at)}`}
+          data-testid="about-update-backup"
+        >
+          Before updating, Weir saved a copy of its data at{" "}
+          <code>{overview.last_update_backup.path}</code>.
+        </p>
+      ) : null}
       {machine?.machine_name_looks_generated ? (
         <p
           className="mm-status-text mm-sys-note"

@@ -7890,6 +7890,9 @@ export interface components {
        */
       data_bytes: number;
       jobs_today: components["schemas"]["SystemOverviewJobsOut"];
+      /** @description The copy of Weir's data taken before the latest update changed it; null when no update has made one. */
+      last_update_backup:
+        components["schemas"]["SystemOverviewUpdateBackupOut"] | null;
       requests: components["schemas"]["SystemOverviewRequestsOut"];
       /**
        * Restarts This Week
@@ -7940,6 +7943,23 @@ export interface components {
        * @description The time within which nineteen answers in twenty came, over the last fifteen minutes, in milliseconds; zero when nothing was asked.
        */
       p95_ms: number;
+    };
+    /**
+     * SystemOverviewUpdateBackupOut
+     * @description A copy of Weir's data taken before an update changed it.
+     */
+    SystemOverviewUpdateBackupOut: {
+      /**
+       * Path
+       * @description Where the copy of the database is, on the computer Weir runs on.
+       */
+      path: string;
+      /**
+       * Taken At
+       * Format: date-time
+       * @description When the copy was taken.
+       */
+      taken_at: string;
     };
     /**
      * SystemOverviewUpdateOut

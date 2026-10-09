@@ -28,6 +28,9 @@ This checklist defines the current practical hardening baseline for Weir.
   accounts: on Windows the tray locks it to its owner on every start; in Docker the entrypoint writes secrets
   with `umask 077` and runs the server as a non-root user; a bare source install should restrict `WEIR_HOME`
   itself (for example `chmod 700`).
+- The copy of the database taken before an update (`backups/pre-update`) holds sessions and saved connection
+  secrets, so it is protected like the database: owner-only on Linux and in Docker (folder `700`, files `600`), and on
+  Windows it inherits the data folder's owner-only access list.
 - Real `.env` files must never be committed.
 - Runtime SQLite databases must never be committed.
 - Logs, backups, media paths, API keys, provider tokens, and session secrets must never be committed.

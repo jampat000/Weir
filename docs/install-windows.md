@@ -122,7 +122,10 @@ A release candidate is offered the next release candidate as well as stable rele
 ever offered stable ones. You can also download the new `Weir-win-Setup.exe` from the Releases page and run it.
 It installs over the old one. Your data is not touched.
 
-Before a big upgrade, take a backup under **System › Backups**.
+When a new version has to change Weir's database, it first saves a copy of your data in
+`C:\ProgramData\Weir\backups\pre-update` (the newest five are kept), and does not change anything if it cannot.
+**System › About** says where the latest copy is. Before a big upgrade you can also take a backup under
+**System › Backups**.
 
 ## Uninstall
 

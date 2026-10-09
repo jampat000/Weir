@@ -6,6 +6,7 @@ using Weir.Api.Endpoints;
 using Weir.Core.Configuration;
 using Weir.Infrastructure.Activity;
 using Weir.Infrastructure.Logging;
+using Weir.Infrastructure.Runtime;
 using Weir.Infrastructure.Scheduling;
 using Weir.Infrastructure.Sqlite;
 using static Weir.Api.Tests.Platform.ApiTestClient;
@@ -95,8 +96,9 @@ public sealed class SystemOverviewApiTests
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var json = (JsonObject)await Json(response);
         Assert.Equal(
-            ["version", "update", "uptime_seconds", "started_at", "runs_as", "address", "data_bytes", "browsers_live", "requests", "jobs_today", "restarts_this_week", "checks"],
+            ["version", "update", "uptime_seconds", "started_at", "runs_as", "address", "data_bytes", "browsers_live", "requests", "jobs_today", "restarts_this_week", "checks", "last_update_backup"],
             json.Select(pair => pair.Key));
+        Assert.Null(json["last_update_backup"]);
         Assert.Equal(["status", "latest_version"], ((JsonObject)json["update"]!).Select(pair => pair.Key));
         Assert.Equal(["median_ms", "p95_ms", "errors_today"], ((JsonObject)json["requests"]!).Select(pair => pair.Key));
         Assert.Equal(["run", "failed"], ((JsonObject)json["jobs_today"]!).Select(pair => pair.Key));
@@ -153,6 +155,60 @@ public sealed class SystemOverviewApiTests
 
         // Three days ago was the first start of this install, yesterday was a restart, and this start is another.
         Assert.Equal(2, json["restarts_this_week"]!.GetValue<long>());
+    }
+
+    [Fact]
+    public async Task A_start_that_updates_the_database_saves_a_copy_first_and_the_overview_says_where()
+    {
+        var (server, client) = await StartAsync(prepareHome: SeedDatabaseAtBaseline);
+        await using var _server = server;
+
+        var json = await Json(await client.GetAsync(Overview));
+
+        var backup = (JsonObject)json["last_update_backup"]!;
+        Assert.Equal(["path", "taken_at"], backup.Select(pair => pair.Key));
+        var path = backup["path"]!.GetValue<string>();
+        Assert.Equal(Path.Join(server.Home, "backups", "pre-update"), Path.GetDirectoryName(path));
+        Assert.Matches(@"^weir-0036-to-.+-\d{8}T\d{6}Z\.db$", Path.GetFileName(path));
+        Assert.True(File.Exists(path));
+        Assert.EndsWith("Z", backup["taken_at"]!.GetValue<string>(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_start_that_cannot_save_the_copy_does_not_update_the_database()
+    {
+        var home = Path.Join(Path.GetTempPath(), "weir-api-tests-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var error = await Assert.ThrowsAsync<PreUpdateBackupException>(() => WeirTestServer.StartAsync(
+                home: home,
+                prepareHome: path =>
+                {
+                    SeedDatabaseAtBaseline(path);
+                    Directory.CreateDirectory(Path.Join(path, "backups"));
+                    File.WriteAllText(Path.Join(path, "backups", "pre-update"), "in the way");
+                }));
+
+            Assert.StartsWith("Weir couldn't save a copy of its data before updating, so it didn't change anything: ", error.Message, StringComparison.Ordinal);
+            using var connection = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={Path.Join(home, "data", "weir.sqlite3")};Pooling=False");
+            connection.Open();
+            using var command = connection.CreateCommand();
+            command.CommandText = "SELECT version_num FROM alembic_version";
+            Assert.Equal("0036_drop_pruner_tables", command.ExecuteScalar());
+        }
+        finally
+        {
+            new SqliteDatabase(Path.Join(home, "data", "weir.sqlite3")).ClearPool();
+            Directory.Delete(home, recursive: true);
+        }
+    }
+
+    private static void SeedDatabaseAtBaseline(string home)
+    {
+        var database = new SqliteDatabase(Path.Join(home, "data", "weir.sqlite3"));
+        Directory.CreateDirectory(Path.GetDirectoryName(database.DatabasePath)!);
+        new SchemaMigrator(database).EnsureAtBaseline();
+        database.ClearPool();
     }
 
     private static void SeedTwoEarlierStarts(string home)

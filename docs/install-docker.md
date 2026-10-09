@@ -228,7 +228,9 @@ docker stop weir && docker rm weir
 ```
 
 Your data is in `weir-data`, so it carries over. Take a backup first (below). Going back to an older version
-after an upgrade is only safe from a backup made before it.
+after an upgrade is only safe from a backup made before it. When the new version has to change the database, it first
+saves a copy in `weir-data/backups/pre-update` (the newest five are kept) and does not start if it cannot;
+**System › About** says where the latest copy is.
 
 ## Back up
 

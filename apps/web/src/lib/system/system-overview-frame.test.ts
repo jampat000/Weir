@@ -18,6 +18,10 @@ const overview = {
   jobs_today: { run: 40, failed: 2 },
   restarts_this_week: 1,
   checks: { passing: 8, total: 9 },
+  last_update_backup: {
+    path: "C:\\ProgramData\\Weir\\backups\\pre-update\\weir-0076-to-1.0.0-20261010T090000Z.db",
+    taken_at: "2026-10-10T09:00:00Z",
+  },
 };
 
 describe("the system.overview frame", () => {
@@ -30,6 +34,14 @@ describe("the system.overview frame", () => {
     expect(frame?.checks).toEqual({ passing: 8, total: 9 });
     expect(frame?.jobs_today.failed).toBe(2);
     expect(frame?.update.latest_version).toBe("1.0.1");
+    expect(frame?.last_update_backup?.taken_at).toBe("2026-10-10T09:00:00Z");
+  });
+
+  it("reads an overview of a Weir that has not updated, with no copy to point to", () => {
+    const frame = parseSystemOverviewFrame(
+      JSON.stringify({ ...overview, last_update_backup: null }),
+    );
+    expect(frame?.last_update_backup).toBeNull();
   });
 
   it("is nothing for text that is not JSON, or JSON that is not an overview", () => {
@@ -47,6 +59,7 @@ describe("the system.overview frame", () => {
       "update",
       "requests",
       "checks",
+      "last_update_backup",
     ]) {
       expect(parseSystemOverviewFrame(without(key))).toBeNull();
     }

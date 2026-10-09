@@ -16,6 +16,13 @@ function hasNumbers(value: unknown, keys: readonly string[]): boolean {
   return isRecord(value) && keys.every((key) => isNumber(value[key]));
 }
 
+function isUpdateBackup(value: unknown): boolean {
+  return (
+    value === null ||
+    (isRecord(value) && isText(value.path) && isText(value.taken_at))
+  );
+}
+
 function isOverview(value: unknown): value is SystemOverview {
   return (
     isRecord(value) &&
@@ -31,7 +38,8 @@ function isOverview(value: unknown): value is SystemOverview {
     isText(value.update.status) &&
     hasNumbers(value.requests, ["median_ms", "p95_ms", "errors_today"]) &&
     hasNumbers(value.jobs_today, ["run", "failed"]) &&
-    hasNumbers(value.checks, ["passing", "total"])
+    hasNumbers(value.checks, ["passing", "total"]) &&
+    isUpdateBackup(value.last_update_backup)
   );
 }
 
