@@ -155,26 +155,36 @@ public static class WatchedFolderListing
     }
 
     /// <summary>
-    /// Every file under the root, followed through symbolic links the way a path lookup follows them. The listing is read as it is
-    /// walked, so a folder deleted while the walk is under way ends the walk there with what it found: the files in it are gone, and
-    /// the scan the deletion queues finds the rest. A folder Weir may not read still fails the scan, which is a real problem.
+    /// Every file under the root, followed through symbolic links the way a path lookup follows them. One folder at a time, so a
+    /// folder deleted while the walk is under way costs only itself: its files are gone, and the rest of the tree is still listed.
+    /// A folder Weir may not read still fails the scan, which is a real problem. <paramref name="list"/> is the test seam that
+    /// reads one folder.
     /// </summary>
-    private static List<FileInfo> Walk(string root, bool topLevelOnly)
+    internal static List<FileInfo> Walk(string root, bool topLevelOnly, Func<DirectoryInfo, IEnumerable<FileSystemInfo>>? list = null)
     {
+        list ??= folder => folder.EnumerateFileSystemInfos();
         var found = new List<FileInfo>();
-        try
+        var pending = new Stack<DirectoryInfo>([new DirectoryInfo(root)]);
+        while (pending.TryPop(out var folder))
         {
-            foreach (var entry in new DirectoryInfo(root).EnumerateFileSystemInfos("*", topLevelOnly ? SearchOption.TopDirectoryOnly : SearchOption.AllDirectories))
+            try
             {
-                if ((entry as FileInfo ?? LinkedFile(entry)) is { } file)
+                foreach (var entry in list(folder))
                 {
-                    found.Add(file);
+                    if ((entry as FileInfo ?? LinkedFile(entry)) is { } file)
+                    {
+                        found.Add(file);
+                    }
+                    else if (entry is DirectoryInfo subfolder && !topLevelOnly)
+                    {
+                        pending.Push(subfolder);
+                    }
                 }
             }
-        }
-        catch (DirectoryNotFoundException)
-        {
-            // The folder was deleted under the walk.
+            catch (DirectoryNotFoundException)
+            {
+                // This folder was deleted under the walk.
+            }
         }
 
         return found;

@@ -432,12 +432,52 @@ public sealed class ProcessingWatchedFolderWatcherServiceTests
             await Eventually.ThatAsync(() => service.CreatedFor(watched).Count == 1);
             Directory.Delete(Path.Combine(watched, "Release"));
 
-            service.CreatedFor(watched)[0].RaiseError(new IOException("Access is denied."));
+            var removed = new DirectoryNotFoundException("Could not find a part of the path.");
+            service.CreatedFor(watched)[0].RaiseError(removed);
 
             await Eventually.ThatAsync(() => service.CreatedFor(watched).Count == 2);
             await Eventually.ThatAsync(() => ScanJobPayloads(store).Count > 0);
             Assert.DoesNotContain(log.Entries, entry => entry.Level >= Microsoft.Extensions.Logging.LogLevel.Warning);
             Assert.Contains(log.Entries, entry => entry.Level == Microsoft.Extensions.Logging.LogLevel.Information && entry.Message.Contains("a folder inside", StringComparison.Ordinal));
+            Assert.Contains(removed, log.Exceptions);
+        }
+        finally
+        {
+            await service.StopAsync(CancellationToken.None);
+        }
+    }
+
+    [Fact]
+    public async Task An_access_denied_error_and_a_repeated_removal_are_warnings_even_with_the_watched_folder_there()
+    {
+        using var store = new StoreFixture(("WEIR_CREDENTIALS_SECRET", "watcher-tests-secret-11"));
+        var watched = store.Home.Join("watch");
+        var output = store.Home.Join("out");
+        Directory.CreateDirectory(watched);
+        Directory.CreateDirectory(output);
+        await CreateLibraryAsync(store, watched, output);
+        var log = new ListLogger<ProcessingWatchedFolderWatcherService>();
+
+        var service = new FakeWatcherService(store.Database, store.Options, new ProcessingJobStore(store.Database, TimeProvider.System),
+            new WatcherStateStore(), Libraries, TimeProvider.System, log);
+        await service.StartAsync(CancellationToken.None);
+        try
+        {
+            await Eventually.ThatAsync(() => service.CreatedFor(watched).Count == 1);
+            service.CreatedFor(watched)[0].RaiseError(new System.ComponentModel.Win32Exception(5, "Access is denied."));
+
+            await Eventually.ThatAsync(() => log.Entries.Any(entry => entry.Level == Microsoft.Extensions.Logging.LogLevel.Warning));
+            await Eventually.ThatAsync(() => service.CreatedFor(watched).Count == 2);
+
+            service.CreatedFor(watched)[1].RaiseError(new DirectoryNotFoundException("first"));
+            await Eventually.ThatAsync(() => service.CreatedFor(watched).Count == 3);
+            Assert.Single(log.Entries, entry => entry.Level == Microsoft.Extensions.Logging.LogLevel.Information && entry.Message.Contains("a folder inside", StringComparison.Ordinal));
+
+            service.CreatedFor(watched)[2].RaiseError(new DirectoryNotFoundException("second"));
+            await Eventually.ThatAsync(() => service.CreatedFor(watched).Count == 4);
+            var warnings = log.Entries.Where(entry => entry.Level == Microsoft.Extensions.Logging.LogLevel.Warning).ToList();
+            Assert.Equal(2, warnings.Count);
+            Assert.Contains("keeps being interrupted", warnings[1].Message, StringComparison.Ordinal);
         }
         finally
         {

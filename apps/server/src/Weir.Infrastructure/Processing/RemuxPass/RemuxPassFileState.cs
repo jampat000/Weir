@@ -73,24 +73,55 @@ public static class RemuxPassFileState
         return true;
     }
 
+    private const string UnfinishedStatuses = "$unprocessed, $processing, $held, $outside, $blocked, $failed, $cancelled";
+
+    private static (string Name, object? Value)[] UnfinishedStatusParameters() =>
+    [
+        ("$unprocessed", ProcessingFileStatuses.Unprocessed),
+        ("$processing", ProcessingFileStatuses.Processing),
+        ("$held", ProcessingFileStatuses.OnHold),
+        ("$outside", ProcessingFileStatuses.OutOfSchedule),
+        ("$blocked", ProcessingFileStatuses.BlockedUpstream),
+        ("$failed", ProcessingFileStatuses.ProcessingFailed),
+        ("$cancelled", ProcessingFileStatuses.Cancelled),
+    ];
+
     /// <summary>
-    /// A file that left the watched folder before Weir reached an outcome for it has nothing left to wait for, so Weir stops listing it. A
-    /// file with an outcome (processed, passed through, rejected, skipped) stays as history, whether or not its original is still there.
+    /// A file that was not there when its pass looked: held, with its reason, attempts and any hand-picked plan intact, until
+    /// <paramref name="holdUntil"/>. It might be a share that dropped for a moment. Only a file without an outcome changes; one that
+    /// is processed, passed through, rejected or skipped stays as history whether or not its original is still there.
+    /// </summary>
+    public static Task HoldGoneAsync(UnitOfWork uow, long libraryId, string relativePath, DateTimeOffset holdUntil)
+    {
+        ArgumentNullException.ThrowIfNull(uow);
+        return uow.ExecuteAsync(
+            $"UPDATE files SET status = $status, status_reason = $reason, hold_until = $until, updated_at = CURRENT_TIMESTAMP " +
+            $"WHERE library_id = $library AND relative_path = $path AND status IN ({UnfinishedStatuses})",
+            [
+                ("$status", ProcessingFileStatuses.OnHold),
+                ("$reason", GoneSourceText.HeldReason),
+                ("$until", TimestampColumns.Orm(holdUntil)),
+                ("$library", libraryId),
+                ("$path", relativePath),
+                .. UnfinishedStatusParameters(),
+            ]);
+    }
+
+    /// <summary>
+    /// A file that stayed gone through the hold has nothing left to wait for, so Weir stops listing it. A row that carries the
+    /// source Weir last cleaned is kept: it is what stops that source being cleaned twice if the file comes back unchanged.
     /// </summary>
     public static Task ForgetGoneAsync(UnitOfWork uow, long libraryId, string relativePath)
     {
         ArgumentNullException.ThrowIfNull(uow);
         return uow.ExecuteAsync(
-            "DELETE FROM files WHERE library_id = $library AND relative_path = $path AND status IN ($unprocessed, $processing, $held, $outside, $blocked, $failed, $cancelled)",
-            ("$library", libraryId),
-            ("$path", relativePath),
-            ("$unprocessed", ProcessingFileStatuses.Unprocessed),
-            ("$processing", ProcessingFileStatuses.Processing),
-            ("$held", ProcessingFileStatuses.OnHold),
-            ("$outside", ProcessingFileStatuses.OutOfSchedule),
-            ("$blocked", ProcessingFileStatuses.BlockedUpstream),
-            ("$failed", ProcessingFileStatuses.ProcessingFailed),
-            ("$cancelled", ProcessingFileStatuses.Cancelled));
+            $"DELETE FROM files WHERE library_id = $library AND relative_path = $path AND status IN ({UnfinishedStatuses}) " +
+            "AND processed_source_size IS NULL AND processed_source_mtime_ns IS NULL",
+            [
+                ("$library", libraryId),
+                ("$path", relativePath),
+                .. UnfinishedStatusParameters(),
+            ]);
     }
 
     /// <summary>Keeps an on-hold file from being picked up again by a scan before <paramref name="lookAgainAt"/>, when its own next look is booked.</summary>

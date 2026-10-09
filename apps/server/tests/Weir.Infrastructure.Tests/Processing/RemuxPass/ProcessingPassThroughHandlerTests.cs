@@ -26,7 +26,10 @@ public sealed class ProcessingPassThroughHandlerTests : IDisposable
     }
 
     private ProcessingPassThroughHandler Handler() =>
-        new(_fixture.Store.Database, TimeProvider.System, NullLogger<ProcessingPassThroughHandler>.Instance, _fixture.Handback, _fixture.Libraries, _fixture.Jobs, _fixture.Reporter);
+        new(_fixture.Store.Database, TimeProvider.System, NullLogger<ProcessingPassThroughHandler>.Instance, _fixture.Handback, _fixture.Libraries, _fixture.Jobs, _fixture.Reporter)
+        {
+            GoneSettle = TimeSpan.Zero,
+        };
 
     private async Task<long> LibraryAsync(string collision = "replace")
     {
@@ -86,10 +89,77 @@ public sealed class ProcessingPassThroughHandlerTests : IDisposable
 
         Assert.False(File.Exists(_folders.Out("gone.mkv")));
         Assert.Equal(0, await _fixture.Store.Scalar("SELECT count(*) FROM activity_events WHERE event_type = 'processing.file_pass_through_failed'"));
-        Assert.Equal(0, await _fixture.Store.Scalar("SELECT count(*) FROM files"));
         Assert.Equal(1, await _fixture.Store.Scalar("SELECT count(*) FROM activity_events"));
         Assert.Equal("skipped", await ScalarText("SELECT result FROM activity_events"));
         Assert.Equal("gone.mkv is no longer there, so there is nothing to do", await ScalarText("SELECT title FROM activity_events"));
+
+        // Held, not forgotten, in case a share only dropped for a moment: the row keeps its place and a later look is booked.
+        Assert.Equal("on_hold", await ScalarText("SELECT status FROM files"));
+        Assert.Contains("look again", await ScalarText("SELECT status_reason FROM files"), StringComparison.Ordinal);
+        Assert.Equal(1, await _fixture.Store.Scalar($"SELECT count(*) FROM jobs WHERE job_kind = '{IntakeRules.PassThroughJobKind}' AND not_before IS NOT NULL"));
+    }
+
+    [Fact]
+    public async Task A_file_still_gone_at_the_later_look_is_forgotten_and_the_manager_is_told_it_is_no_longer_there()
+    {
+        var library = await LibraryAsync();
+        await FileRowAsync(library, "gone.mkv");
+        await _fixture.AddConnectionAsync("deluno", "http://192.0.2.30:5099", "k1");
+        await _fixture.Db(async uow => { await _fixture.Ledger.RecordReceivedAsync(uow, "deluno", "hgone", library, "gone.mkv"); return 0; });
+        var origin = "\"origin\":{\"source_key\":\"deluno\",\"handoff_id\":\"hgone\",\"callback_path\":\"" + EventsPath + "\"}";
+        var first = $$"""{"relative_media_path":"gone.mkv","library_id":{{library}},"trigger":"worker",{{origin}}}""";
+
+        await Handler().HandleAsync(Context(7, first), CancellationToken.None);
+
+        // Not final: the manager hears nothing on the first absence.
+        Assert.Empty(_fixture.Http.Requests);
+
+        var later = $$"""{"relative_media_path":"gone.mkv","library_id":{{library}},"trigger":"worker","gone_looks":1,{{origin}}}""";
+        await Handler().HandleAsync(Context(8, later), CancellationToken.None);
+
+        Assert.Equal(0, await _fixture.Store.Scalar("SELECT count(*) FROM files"));
+        var post = Assert.Single(_fixture.Http.RequestsTo(HttpMethod.Post, EventsPath));
+        var body = (WireObject)post.Json!;
+        Assert.Equal("failed", WireConvert.Str(body["status"]));
+        Assert.Equal("source_gone", WireConvert.Str(body["failureClass"]));
+        Assert.False(((WireBool)body["sourceRemoved"]).Value);
+        Assert.False(body.ContainsKey("disposition"));
+        Assert.Equal("The download is no longer there, so Weir had nothing to do.", WireConvert.Str(body["message"]));
+    }
+
+    [Fact]
+    public async Task A_file_that_is_back_at_the_later_look_is_handed_back_normally()
+    {
+        var library = await LibraryAsync();
+        await FileRowAsync(library, "back.mkv");
+        _folders.Source("back.mkv");
+        var payload = $$"""{"relative_media_path":"back.mkv","library_id":{{library}},"trigger":"worker","gone_looks":1}""";
+
+        await Handler().HandleAsync(Context(9, payload), CancellationToken.None);
+
+        Assert.True(File.Exists(_folders.Out("back.mkv")));
+        Assert.Equal("passed_through", await ScalarText("SELECT status FROM files"));
+    }
+
+    [Fact]
+    public async Task A_file_that_comes_back_while_the_copy_settles_is_handed_back()
+    {
+        var library = await LibraryAsync();
+        await FileRowAsync(library, "blip.mkv");
+        var payload = $$"""{"relative_media_path":"blip.mkv","library_id":{{library}},"trigger":"worker"}""";
+        var handler = new ProcessingPassThroughHandler(
+            _fixture.Store.Database, TimeProvider.System, NullLogger<ProcessingPassThroughHandler>.Instance, _fixture.Handback, _fixture.Libraries, _fixture.Jobs, _fixture.Reporter)
+        {
+            GoneSettle = TimeSpan.FromSeconds(1.5),
+        };
+
+        var handling = handler.HandleAsync(Context(10, payload), CancellationToken.None);
+        await Task.Delay(300);
+        _folders.Source("blip.mkv");
+        await handling;
+
+        Assert.True(File.Exists(_folders.Out("blip.mkv")), "a file that was only briefly missing is still handed back");
+        Assert.Equal("passed_through", await ScalarText("SELECT status FROM files"));
     }
 
     [Fact]
@@ -103,7 +173,7 @@ public sealed class ProcessingPassThroughHandlerTests : IDisposable
 
         await Handler().HandleAsync(Context(5, payload), CancellationToken.None);
 
-        Assert.Equal(0, await _fixture.Store.Scalar("SELECT count(*) FROM files"));
+        Assert.Equal("on_hold", await ScalarText("SELECT status FROM files"));
         Assert.Equal("skipped", await ScalarText("SELECT result FROM activity_events"));
     }
 

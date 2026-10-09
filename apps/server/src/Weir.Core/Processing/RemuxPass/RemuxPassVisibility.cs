@@ -36,6 +36,10 @@ public static class GoneSourceText
 {
     public const string Reason = "This file is no longer in the watched folder, so there is nothing to do.";
 
+    /// <summary>What the file says while Weir waits to see whether it comes back, as a share that dropped for a moment would.</summary>
+    public const string HeldReason =
+        "This file is no longer in the watched folder. Weir will look again shortly, and stops listing it if it has not come back.";
+
     public static string Title(string name) => $"{name} is no longer there, so there is nothing to do";
 }
 

@@ -69,6 +69,9 @@ public sealed partial class RemuxPassHandler : IJobHandler
         _scanWakeups = scanWakeups;
     }
 
+    /// <summary>Test seam: how long a file that was not there is given to come back before Weir believes it is gone.</summary>
+    internal TimeSpan GoneSettle { get; init; } = GoneSources.DefaultSettle;
+
     /// <summary>
     /// How many times a file that is only waiting out the minimum file age is looked at again before Weir stops
     /// looking (#632). Each look is a minute or so apart, so this is about half an hour of a file that never stops
@@ -194,6 +197,7 @@ public sealed partial class RemuxPassHandler : IJobHandler
         try
         {
             result = await _runner.RunAsync(request, cancellationToken).ConfigureAwait(false);
+            result = await SettleVanishedAsync(request, result, cancellationToken).ConfigureAwait(false);
         }
         finally
         {
@@ -209,10 +213,9 @@ public sealed partial class RemuxPassHandler : IJobHandler
             payloadJson = WireJsonWriter.Dumps(data.Copy().Set("origin", adopted), WireJsonFormat.Compact);
         }
 
-        // Whatever the pass made of a file that has since left the watched folder, it is not a failure: there is nothing to do.
-        if (result.Get("ok") is WireBool { Value: false } && GoneSources.HasLeft(request.Runtime.WatchedFolder, rel))
+        if (result.Get("outcome") is WireString { Value: RemuxPassOutcomes.SourceGone })
         {
-            result = RemuxPassRunner.SourceGone(rel, result.Get("inspected_source_path") is WireString inspected ? inspected.Value : null);
+            result.Set(GoneLooksKey, data.Get(GoneLooksKey) is WireInteger looked ? (long)looked.Value : 0);
             _logger.LogInformation("{Path} is no longer in the watched folder, so there is nothing to do.", rel);
         }
 
@@ -229,6 +232,7 @@ public sealed partial class RemuxPassHandler : IJobHandler
         Merge(result, provenance);
         await ApplyFileOutcomeStateAsync(result, libraryId, mediaScope, origin).ConfigureAwait(false);
         await DeferUntilOldEnoughAsync(context.Id, data, origin, result, cancellationToken).ConfigureAwait(false);
+        await LookAgainForGoneFileAsync(context.Id, data, origin, result, cancellationToken).ConfigureAwait(false);
         await RecordAsync(result, progress.ActivityId).ConfigureAwait(false);
         await FinishRejectedInputCleanupAsync(result, claim.Library, libraryId, mediaScope, origin).ConfigureAwait(false);
         await ReportBackAsync(payloadJson, result).ConfigureAwait(false);

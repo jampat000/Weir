@@ -128,6 +128,25 @@ public static class ProcessingWatchedFolderScanDispatchEnqueue
         return (error is null, error);
     }
 
+    /// <summary>
+    /// What to tell a person who asks for a scan now when the saved watched folder is not on disk, or null when it is. The scheduled
+    /// scan says the same thing in Logs; a person who clicked is told where they clicked.
+    /// </summary>
+    public static async Task<string?> MissingWatchedFolderMessageAsync(UnitOfWork uow, LibraryStore libraries, string mediaScope, long? libraryId)
+    {
+        ArgumentNullException.ThrowIfNull(libraries);
+        var library = libraryId is { } id ? await libraries.GetAsync(uow, id).ConfigureAwait(false) : null;
+        library ??= await libraries.SeededForScopeAsync(uow, mediaScope).ConfigureAwait(false);
+        var saved = library?.WatchedFolder.Trim();
+        if (library is null || string.IsNullOrEmpty(saved) || Directory.Exists(ProcessingLibraryFolders.ExpandForFilesystem(saved)))
+        {
+            return null;
+        }
+
+        return $"Weir can't see the watched folder {saved} for {library.Name}. It may have been deleted or its drive disconnected. " +
+               "Check that the folder exists and that Weir can reach it, then scan again.";
+    }
+
     /// <summary>Insert one scan job with a unique dedupe key. Caller commits.</summary>
     public static Task<ProcessingJob> EnqueueScanDispatchJobAsync(
         UnitOfWork uow, ProcessingJobStore jobStore, bool enqueueRemuxJobs, string scanTrigger, string mediaScope, long? libraryId)

@@ -148,6 +148,13 @@ public sealed partial class ProcessingRejectHandler : IJobHandler
             attempt = new RejectRouteOutcome(false, "No linked media manager can take a rejection for this file, so Weir handed the original back instead.");
         }
 
+        // A manager that did not answer may answer the next time. Until the attempts run out the job is retried like any other
+        // transient failure; the file is left where it is only when no manager can take the rejection, or the last attempt failed too.
+        if (unreadable && !attempt.Done && attempt.Transient && context.AttemptCount < context.MaxAttempts)
+        {
+            throw new InvalidOperationException(attempt.Reason);
+        }
+
         // 3. Bookkeeping, and the fallback, in one short transaction.
         var now = _time.GetUtcNow();
         await LockedWrites.RunAsync(
@@ -195,7 +202,7 @@ public sealed partial class ProcessingRejectHandler : IJobHandler
                 {
                     // A file Weir could not read is never handed on as if it were good: with no manager to take the rejection it stays where
                     // it is, rejected, for a person to decide.
-                    var keptReason = WireStrings.Slice(WireStrings.Strip($"{reason} {attempt.Reason} {ToolFailureText.UnreadableKept}"), 10_000);
+                    var keptReason = WireStrings.Slice(WireStrings.Strip($"{reason} {ToolFailureText.UnreadableKept}"), 10_000);
                     await RemuxPassFileState.UpsertRejectedAsync(uow, libraryId.Value, relativePath, keptReason, failureClass, File.Exists(source) ? source : null)
                         .ConfigureAwait(false);
                     eventType = ActivityEventTypes.ProcessingFileRejected;

@@ -81,7 +81,15 @@ public sealed partial class RemuxPassHandler
 
                     if (result.Get("outcome") is WireString { Value: RemuxPassOutcomes.SourceGone })
                     {
-                        await RemuxPassFileState.ForgetGoneAsync(uow, library.Id, rel).ConfigureAwait(false);
+                        if (result.Get(GoneLooksKey) is WireInteger { Value: var looks } && looks > 0)
+                        {
+                            await RemuxPassFileState.ForgetGoneAsync(uow, library.Id, rel).ConfigureAwait(false);
+                        }
+                        else
+                        {
+                            await RemuxPassFileState.HoldGoneAsync(uow, library.Id, rel, now + GoneSources.LookAgainAfter).ConfigureAwait(false);
+                        }
+
                         updates.Set("retry_scheduled", false).Set("failure_next_retry_at", WireNull.Instance);
                         return;
                     }

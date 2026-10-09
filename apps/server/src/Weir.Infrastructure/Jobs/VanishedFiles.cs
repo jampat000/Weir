@@ -13,7 +13,8 @@ namespace Weir.Infrastructure.Jobs;
 /// client removed it, a person deleted it, or the manager took it. The scan walks only files on disk, so nothing else would
 /// ever judge that row again, and it would stay listed for ever. It is forgotten, as Forget does, with one Activity entry
 /// saying why. A file with a pass queued or running is left to that pass, and a path that is now a folder on disk is kept.
-/// Outcomes Weir reached (processed, passed through, rejected, skipped) stay as history.
+/// Outcomes Weir reached (processed, passed through, rejected, skipped) stay as history, and so does a row carrying the source Weir
+/// last cleaned: it is what stops that source being cleaned twice if the file comes back unchanged.
 /// </summary>
 /// <remarks>
 /// <para>Rows no scan has seen are included, and so are cancelled ones: a media manager's hand-off records its file on receipt,
@@ -113,7 +114,8 @@ public static class VanishedFiles
         }
 
         var deleted = await uow.ExecuteAsync(
-            "DELETE FROM files WHERE id = @id AND status = @status AND coalesce(last_seen_at, updated_at, created_at) = @seen",
+            "DELETE FROM files WHERE id = @id AND status = @status AND coalesce(last_seen_at, updated_at, created_at) = @seen " +
+            "AND processed_source_size IS NULL AND processed_source_mtime_ns IS NULL",
             ("@id", row.Id),
             ("@status", row.Status),
             ("@seen", row.LastSeenStored)).ConfigureAwait(false);
