@@ -12,8 +12,8 @@ namespace Weir.E2E.Tests;
 public sealed partial class LibraryScanLiveTests(E2EServer server) : E2ETestBase(server)
 {
     private const int FilesInLibrary = 40;
-    private const int FilesInLongLibrary = 30;
-    private const double ProbeSeconds = 0.3;
+    private const int FilesInLongLibrary = 6;
+    private const double ProbeSeconds = 1.5;
     private const float ScanMs = 90_000;
 
     [GeneratedRegex(@"^([\d,]+) files · ")]
@@ -80,7 +80,8 @@ public sealed partial class LibraryScanLiveTests(E2EServer server) : E2ETestBase
             await File.WriteAllBytesAsync(Path.Join(libraryFolder, $"Film {index:D4}.mkv"), [1, 2, 3, 4]);
         }
 
-        // Each file takes the fake ffprobe a set time to answer, so the walk lasts several progress intervals on any machine.
+        // Each file takes the fake ffprobe a set time to answer, so the walk lasts several progress intervals on any machine. There are
+        // few files and each takes long, because a busy machine takes seconds to start each probe and the walk has to end inside ScanMs.
         using var tools = FakeFfmpeg.Install();
         tools.SetFileRule("*.mkv", new FileRule { ProbeDelaySeconds = ProbeSeconds });
         await using var own = await E2EServer.StartWithFakeToolsAsync(tools);
