@@ -49,7 +49,7 @@ it. In that case the window says so and suggests the next free port. Weir rememb
 
 ## 4. Create your account
 
-Your browser opens Weir at `http://localhost:9347/`. It asks for a username and password. This creates the
+A notice from the tray icon says Weir is running. Click it, or the icon, and your browser opens Weir at `http://localhost:9347/`. Weir never opens a browser window by itself. It asks for a username and password. This creates the
 admin account, and there is no separate sign-up.
 
 Because you are on the same PC, Weir does not ask for a setup code. If you create the account from another

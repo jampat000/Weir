@@ -61,7 +61,7 @@ The tray app installs updates itself, using Velopack:
 - No admin privileges required for updates
 - **System › About** shows the running version, the latest release and its release notes, and has
   the **Update mode** setting: **Auto**, **Download only** or **Notify only**. Auto is the default.
-- Weir starts again after an update without opening your browser, so an update never leaves a window behind on a computer nobody is watching. Starting Weir yourself still opens it.
+- Weir starts again after an update without opening your browser, so an update never leaves a window behind on a computer nobody is watching. Starting Weir yourself shows a notice from the tray icon instead, and clicking it opens Weir. No start ever opens a browser window by itself.
 
 ## Firewall and LAN access
 
@@ -160,7 +160,7 @@ on, so the tray asks instead, the first time it starts:
 Your choice is saved in `C:\ProgramData\Weir\port.txt` and used on every start after that. Weir
 never moves to a different port on its own: if the saved port is busy on a later start, it tells you
 which port is busy and asks again. To move Weir later, use **Change port** in the tray menu; Weir
-restarts on the new port and opens it in your browser. If the server cannot start on the new port,
+restarts on the new port and offers the new address in a notice; clicking the notice opens it. If the server cannot start on the new port,
 Weir goes back to the old one and says so.
 
 ### Installing Weir from another program
