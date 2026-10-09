@@ -26,12 +26,26 @@ public sealed class ReleaseFeedTests
     }
 
     [Fact]
-    public void A_release_from_the_feed_has_no_installer_link_to_offer()
+    public void A_release_from_the_feed_offers_the_installer_at_its_download_address()
     {
         var release = Assert.Single(ReleaseFeed.Parse(Feed(Entry("v3.4.0"))));
 
-        Assert.Empty(release.Assets);
-        Assert.Null(release.WindowsInstallerAsset());
+        var installer = Assert.Single(release.Assets);
+        Assert.Same(installer, release.WindowsInstallerAsset());
+        Assert.Equal("Weir-win-Setup.exe", installer.Name);
+        Assert.Equal("https://github.com/jampat000/Weir/releases/download/v3.4.0/Weir-win-Setup.exe", installer.BrowserDownloadUrl);
+        Assert.Null(installer.ApiUrl);
+    }
+
+    [Theory]
+    [InlineData("v3.4.0", false)]
+    [InlineData("v3.4.0-rc.1", true)]
+    [InlineData("v1.0.0-beta.2", true)]
+    public void A_release_is_a_pre_release_when_its_tag_has_a_pre_release_suffix(string tag, bool preRelease)
+    {
+        var release = Assert.Single(ReleaseFeed.Parse(Feed(Entry(tag))));
+
+        Assert.Equal(preRelease, release.Prerelease);
     }
 
     [Fact]

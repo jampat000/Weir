@@ -7,13 +7,13 @@ namespace Weir.Tray;
 static class UpdateChannel
 {
     /// <summary>
-    /// The release source for an install running <paramref name="runningVersion"/>. Velopack's GitHub source skips
-    /// pre-releases unless asked, so an install on <c>1.0.0-rc.1</c> would never see <c>1.0.0-rc.2</c>.
+    /// The release source for an install running <paramref name="runningVersion"/>. An install on <c>1.0.0-rc.1</c> is offered
+    /// pre-releases, or it would never see <c>1.0.0-rc.2</c>.
     /// </summary>
-    internal static GithubSource SourceFor(string repoUrl, string? runningVersion) =>
-        new(repoUrl, accessToken: null, prerelease: IncludesPreReleases(runningVersion));
+    internal static ReleaseFeedSource SourceFor(string repoUrl, string? runningVersion, IFileDownloader? downloader = null) =>
+        new(repoUrl, IncludesPreReleases(runningVersion), downloader);
 
-    internal static GithubSource SourceForThisBuild(string repoUrl) =>
+    internal static ReleaseFeedSource SourceForThisBuild(string repoUrl) =>
         SourceFor(repoUrl, typeof(UpdateChannel).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion);
 
     /// <summary>

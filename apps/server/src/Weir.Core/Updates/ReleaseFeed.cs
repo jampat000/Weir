@@ -6,13 +6,13 @@ namespace Weir.Core.Updates;
 
 /// <summary>
 /// Reads GitHub's public release feed (<see cref="ReleaseCatalog.ReleasesFeedUrl"/>) into releases. The feed names the tag, the
-/// title and the time each release was last updated, and nothing of its files, so these releases have no assets.
+/// title and the time each release was last updated, and nothing of its files: each release is given the Windows installer
+/// every release carries, at its download address.
 /// </summary>
 /// <remarks>
 /// <see cref="GitHubReleaseRecord.PublishedAt"/> is the feed's updated time, which a later edit of the release moves. The feed
 /// has no pre-release or draft flag either: <see cref="GitHubReleaseRecord.Prerelease"/> follows the version's own pre-release
-/// part, so a stable-numbered tag that GitHub marks as a pre-release reads as stable. The API's record of a release, when
-/// Weir has one, is the better answer and replaces the feed's.
+/// part, so a stable-numbered tag that GitHub marks as a pre-release reads as stable.
 /// </remarks>
 public static class ReleaseFeed
 {
@@ -56,8 +56,12 @@ public static class ReleaseFeed
         }
 
         var name = ((string?)entry.Element(Atom + "title"))?.Trim();
+        var installer = new GitHubReleaseAsset(
+            ReleaseCatalog.WindowsInstallerAssetName, ApiUrl: null, ReleaseCatalog.DownloadUrl(tag, ReleaseCatalog.WindowsInstallerAssetName), SizeBytes: 0, ContentType: null);
+
+        // The feed has no pre-release flag, so a release is a pre-release when its tag has a semver pre-release suffix (-rc.1).
         return new GitHubReleaseRecord(
-            tag, version, string.IsNullOrEmpty(name) ? null : name, ReleaseCatalog.TagUrl(tag), UpdatedAt(entry), Draft: false, parsed.IsPreRelease, []);
+            tag, version, string.IsNullOrEmpty(name) ? null : name, ReleaseCatalog.TagUrl(tag), UpdatedAt(entry), Draft: false, parsed.IsPreRelease, [installer]);
     }
 
     private static Timestamp? UpdatedAt(XElement entry) =>

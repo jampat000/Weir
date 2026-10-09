@@ -1,46 +1,38 @@
 using System.Globalization;
 using System.Net;
 using System.Net.Http.Headers;
-using System.Text;
 using System.Xml;
 using Microsoft.Extensions.Logging;
-using Weir.Core.Configuration;
 using Weir.Core.Json;
 using Weir.Core.Updates;
-using Weir.Infrastructure.Runtime;
 
 namespace Weir.Infrastructure.Http;
 
 /// <summary>
-/// Finds the newest release on GitHub while spending as little of its unauthenticated allowance as possible: the last answer's
-/// <c>ETag</c> goes back as <c>If-None-Match</c> so an unchanged list (a 304) is free and is served from the stored copy, which
-/// is kept in <c>WEIR_HOME</c> so a restart does not lose it. When GitHub limits the network (403 or 429 with no allowance
-/// left, or a <c>Retry-After</c>) the API is left alone until it says the limit lifts, and the public release feed answers in
-/// the meantime, as that does not count against the allowance.
+/// Finds the newest release on GitHub without spending its unauthenticated API allowance, which every Weir, tray and other
+/// GitHub client on a network shares: the public release feed answers, and so do the download addresses, as neither counts
+/// against it. Only when the feed cannot be read is the API asked. When GitHub then limits the network (403 or 429 with no
+/// allowance left, or a <c>Retry-After</c>) the API is left alone until it says the limit lifts. A conditional request would
+/// not help: GitHub counts an unchanged answer (a 304) against the allowance too.
 /// </summary>
 public sealed class GitHubReleaseCatalogClient : IReleaseCatalogClient
 {
-    private const string CacheFileName = "release-cache.json";
     private const long MostFeedBytes = 2_000_000;
     private static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(5);
     private static readonly TimeSpan LeastWait = TimeSpan.FromMinutes(1);
     private static readonly TimeSpan MostWait = TimeSpan.FromHours(1);
     private static readonly long MostUnixSeconds = DateTimeOffset.MaxValue.ToUnixTimeSeconds();
 
-    private readonly WeirOptions _options;
     private readonly TimeProvider _time;
     private readonly ILogger<GitHubReleaseCatalogClient> _logger;
     private readonly HttpMessageHandler _handler;
     private readonly Lock _gate = new();
-    private bool _cacheLoaded;
-    private string? _etag;
-    private IReadOnlyList<GitHubReleaseRecord>? _releases;
+    private IReadOnlyList<GitHubReleaseRecord>? _lastKnown;
     private (int Status, DateTimeOffset ResetsAt)? _limit;
 
     /// <summary>The <paramref name="handler"/> carries the requests; the default connects to loopback first and follows redirects.</summary>
-    public GitHubReleaseCatalogClient(WeirOptions options, TimeProvider time, ILogger<GitHubReleaseCatalogClient> logger, HttpMessageHandler? handler = null)
+    public GitHubReleaseCatalogClient(TimeProvider time, ILogger<GitHubReleaseCatalogClient> logger, HttpMessageHandler? handler = null)
     {
-        _options = options ?? throw new ArgumentNullException(nameof(options));
         _time = time ?? throw new ArgumentNullException(nameof(time));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _handler = handler ?? new SocketsHttpHandler
@@ -53,58 +45,18 @@ public sealed class GitHubReleaseCatalogClient : IReleaseCatalogClient
 
     public async Task<GitHubReleaseRecord?> FetchLatestAsync(string currentVersion, CancellationToken cancellationToken)
     {
-        var (etag, releases, limit) = Known();
-        if (limit is { } active && active.ResetsAt > _time.GetUtcNow())
+        try
         {
-            return await FromFeedAsync(currentVersion, active.Status, active.ResetsAt, releases, cancellationToken).ConfigureAwait(false);
+            var fromFeed = await ReadFeedAsync(currentVersion, cancellationToken).ConfigureAwait(false);
+            Remember(fromFeed);
+            return ReleaseSelection.NewestFor(fromFeed, currentVersion);
+        }
+        catch (Exception exception) when (exception is HttpRequestException or XmlException || (exception is TaskCanceledException && !cancellationToken.IsCancellationRequested))
+        {
+            _logger.LogDebug(exception, "The public release feed could not be read, so GitHub's API is asked for the release list.");
         }
 
-        using var client = new HttpClient(_handler, disposeHandler: false) { Timeout = RequestTimeout };
-        using var request = Request(ReleaseCatalog.ReleasesUrl, currentVersion);
-        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
-        request.Headers.Add("X-GitHub-Api-Version", "2022-11-28");
-        if (etag is not null && releases is not null && EntityTagHeaderValue.TryParse(etag, out var entityTag))
-        {
-            request.Headers.IfNoneMatch.Add(entityTag);
-        }
-
-        using var response = await client.SendAsync(request, cancellationToken).ConfigureAwait(false);
-        if (response.StatusCode == HttpStatusCode.NotModified && releases is not null)
-        {
-            Remember(etag, releases);
-            return ReleaseSelection.NewestFor(releases, currentVersion);
-        }
-
-        var status = (int)response.StatusCode;
-        if (status >= 400)
-        {
-            if (response.StatusCode is not (HttpStatusCode.Forbidden or HttpStatusCode.TooManyRequests))
-            {
-                throw new ReleaseFetchException(status);
-            }
-
-            var resetsAt = ResetOf(response);
-            if (resetsAt is { } limitedUntil)
-            {
-                lock (_gate)
-                {
-                    _limit = (status, limitedUntil);
-                }
-            }
-
-            return await FromFeedAsync(currentVersion, status, resetsAt, releases, cancellationToken).ConfigureAwait(false);
-        }
-
-        var bytes = await response.Content.ReadAsByteArrayAsync(cancellationToken).ConfigureAwait(false);
-        var fetched = ReleaseCatalog.CoerceReleaseListPayload(WireJsonParser.ParseBytes(bytes));
-        var fetchedEtag = response.Headers.ETag?.ToString();
-        Remember(fetchedEtag, fetched);
-        if (fetchedEtag is not null)
-        {
-            Save(fetchedEtag, bytes);
-        }
-
-        return ReleaseSelection.NewestFor(fetched, currentVersion);
+        return await ReadApiAsync(currentVersion, cancellationToken).ConfigureAwait(false);
     }
 
     private static HttpRequestMessage Request(string url, string currentVersion)
@@ -114,36 +66,62 @@ public sealed class GitHubReleaseCatalogClient : IReleaseCatalogClient
         return request;
     }
 
-    /// <summary>
-    /// The newest release from the public feed. When the feed cannot answer either, the failure is GitHub's: a limit when its
-    /// end is known (with the newest release the API last gave), otherwise the API's own error status.
-    /// </summary>
-    private async Task<GitHubReleaseRecord?> FromFeedAsync(
-        string currentVersion, int status, DateTimeOffset? resetsAt, IReadOnlyList<GitHubReleaseRecord>? known, CancellationToken cancellationToken)
+    private async Task<IReadOnlyList<GitHubReleaseRecord>> ReadFeedAsync(string currentVersion, CancellationToken cancellationToken)
     {
-        try
-        {
-            using var client = new HttpClient(_handler, disposeHandler: false) { Timeout = RequestTimeout, MaxResponseContentBufferSize = MostFeedBytes };
-            using var request = Request(ReleaseCatalog.ReleasesFeedUrl, currentVersion);
-            using var response = await client.SendAsync(request, cancellationToken).ConfigureAwait(false);
-            response.EnsureSuccessStatusCode();
-            var feed = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-            return ReleaseSelection.NewestFor(WithApiRecords(ReleaseFeed.Parse(feed), known), currentVersion);
-        }
-        catch (Exception exception) when (exception is HttpRequestException or XmlException || (exception is TaskCanceledException && !cancellationToken.IsCancellationRequested))
-        {
-            throw resetsAt is { } until
-                ? new ReleaseFetchException(status, new ReleaseRateLimit(until, known is null ? null : ReleaseSelection.NewestFor(known, currentVersion)))
-                : new ReleaseFetchException(status);
-        }
+        using var client = new HttpClient(_handler, disposeHandler: false) { Timeout = RequestTimeout, MaxResponseContentBufferSize = MostFeedBytes };
+        using var request = Request(ReleaseCatalog.ReleasesFeedUrl, currentVersion);
+        using var response = await client.SendAsync(request, cancellationToken).ConfigureAwait(false);
+        response.EnsureSuccessStatusCode();
+        return ReleaseFeed.Parse(await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false));
     }
 
     /// <summary>
-    /// The feed's releases, each replaced by the API's own record of it when the API has given one: the feed cannot say whether
-    /// GitHub marks a release as a pre-release or a draft, the API can.
+    /// The newest release from the API, which the feed could not give. A limit is a <see cref="ReleaseFetchException"/> that
+    /// says when it lifts, with the newest release Weir last knew; until then the API is not asked again.
     /// </summary>
-    private static List<GitHubReleaseRecord> WithApiRecords(IReadOnlyList<GitHubReleaseRecord> fromFeed, IReadOnlyList<GitHubReleaseRecord>? known) =>
-        [.. fromFeed.Select(release => known?.FirstOrDefault(record => record.TagName == release.TagName) ?? release)];
+    private async Task<GitHubReleaseRecord?> ReadApiAsync(string currentVersion, CancellationToken cancellationToken)
+    {
+        var (known, limit) = Known();
+        if (limit is { } active && active.ResetsAt > _time.GetUtcNow())
+        {
+            throw Limited(active.Status, active.ResetsAt, known, currentVersion);
+        }
+
+        using var client = new HttpClient(_handler, disposeHandler: false) { Timeout = RequestTimeout };
+        using var request = Request(ReleaseCatalog.ReleasesUrl, currentVersion);
+        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
+        request.Headers.Add("X-GitHub-Api-Version", "2022-11-28");
+        using var response = await client.SendAsync(request, cancellationToken).ConfigureAwait(false);
+
+        var status = (int)response.StatusCode;
+        if (status >= 400)
+        {
+            if (response.StatusCode is not (HttpStatusCode.Forbidden or HttpStatusCode.TooManyRequests) || ResetOf(response) is not { } resetsAt)
+            {
+                throw new ReleaseFetchException(status);
+            }
+
+            lock (_gate)
+            {
+                _limit = (status, resetsAt);
+            }
+
+            throw Limited(status, resetsAt, known, currentVersion);
+        }
+
+        var bytes = await response.Content.ReadAsByteArrayAsync(cancellationToken).ConfigureAwait(false);
+        var fetched = ReleaseCatalog.CoerceReleaseListPayload(WireJsonParser.ParseBytes(bytes));
+        Remember(fetched);
+        lock (_gate)
+        {
+            _limit = null;
+        }
+
+        return ReleaseSelection.NewestFor(fetched, currentVersion);
+    }
+
+    private static ReleaseFetchException Limited(int status, DateTimeOffset resetsAt, IReadOnlyList<GitHubReleaseRecord>? known, string currentVersion) =>
+        new(status, new ReleaseRateLimit(resetsAt, known is null ? null : ReleaseSelection.NewestFor(known, currentVersion)));
 
     /// <summary>
     /// When GitHub says the limit lifts: <c>Retry-After</c> when sent, otherwise <c>X-RateLimit-Reset</c> once no allowance is
@@ -174,59 +152,19 @@ public sealed class GitHubReleaseCatalogClient : IReleaseCatalogClient
     private static string? HeaderOf(HttpResponseMessage response, string name) =>
         response.Headers.TryGetValues(name, out var values) ? values.FirstOrDefault()?.Trim() : null;
 
-    private (string? Etag, IReadOnlyList<GitHubReleaseRecord>? Releases, (int Status, DateTimeOffset ResetsAt)? Limit) Known()
+    private (IReadOnlyList<GitHubReleaseRecord>? Releases, (int Status, DateTimeOffset ResetsAt)? Limit) Known()
     {
         lock (_gate)
         {
-            if (!_cacheLoaded)
-            {
-                _cacheLoaded = true;
-                Load();
-            }
-
-            return (_etag, _releases, _limit);
+            return (_lastKnown, _limit);
         }
     }
 
-    private void Remember(string? etag, IReadOnlyList<GitHubReleaseRecord> releases)
+    private void Remember(IReadOnlyList<GitHubReleaseRecord> releases)
     {
         lock (_gate)
         {
-            _etag = etag;
-            _releases = releases;
-            _limit = null;
-        }
-    }
-
-    /// <summary>Reads the copy saved by an earlier run; one that cannot be read is dropped, and the next answer replaces it.</summary>
-    private void Load()
-    {
-        try
-        {
-            if (WireJsonParser.ParseBytes(File.ReadAllBytes(Path.Join(_options.WeirHome, CacheFileName))) is WireObject saved
-                && saved.Get("etag") is WireString etag
-                && saved.Get("releases") is { } releases)
-            {
-                _releases = ReleaseCatalog.CoerceReleaseListPayload(releases);
-                _etag = EntityTagHeaderValue.TryParse(etag.Value, out _) ? etag.Value : null;
-            }
-        }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or WireJsonDecodeException or WireValueException or WireTypeException or FormatException)
-        {
-            _logger.LogDebug(exception, "The saved release list could not be read, so the next check asks GitHub for it again.");
-        }
-    }
-
-    private void Save(string etag, byte[] body)
-    {
-        try
-        {
-            var saved = new WireObject().Set("etag", etag).Set("releases", WireJsonParser.ParseBytes(body));
-            AtomicFileWriter.Replace(_options.WeirHome, CacheFileName, Encoding.UTF8.GetBytes(WireJsonWriter.Dumps(saved, WireJsonFormat.Compact)));
-        }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
-        {
-            _logger.LogDebug(exception, "The release list could not be saved, so a restart asks GitHub for it again.");
+            _lastKnown = releases;
         }
     }
 }

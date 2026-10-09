@@ -162,11 +162,19 @@ breaking changes.
 
 ### Which version an install is offered
 
-Weir's own update check reads the GitHub release list (not `/releases/latest`, which never returns a
-pre-release) and offers the newest release by SemVer precedence, skipping drafts. An install running a
-pre-release is offered pre-releases and stable releases; an install running a stable version is offered stable
-releases only. The tray's Velopack update source follows the same rule. Docker installs are never updated in
-place: System › About names the newest tag and the pull command.
+Weir's own update check reads the public release feed (`https://github.com/jampat000/Weir/releases.atom`) and
+offers the newest release by SemVer precedence, skipping drafts. An install running a pre-release is offered
+pre-releases and stable releases; an install running a stable version is offered stable releases only. The feed
+has no pre-release flag, so a release is a pre-release when its tag has a pre-release suffix (`-rc.1`). The
+tray's Velopack update source follows the same rule: it takes the newest tag from the feed and reads
+`releases.win.json` and the packages from that release's `releases/download/<tag>/` folder.
+
+Neither the feed nor the download folder counts against GitHub's API allowance (60 an hour without a token,
+shared by every Weir, tray and other GitHub client on a network, and a conditional request that answers 304
+still costs one). The API's release list (not `/releases/latest`, which never returns a pre-release) is asked
+only when the feed cannot be read; if GitHub is limiting the network by then, System › About says when Weir
+will check again. Docker installs are never updated in place: System › About names the newest tag and the pull
+command.
 
 Local Docker is not required for this release path. Docker build, publish,
 manifest verification, and container smoke testing all run on GitHub-hosted
