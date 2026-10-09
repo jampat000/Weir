@@ -4565,6 +4565,11 @@ export interface components {
        * @description True while the media manager the workflow was set up from owns its watched and output folders, so a person changes them there, not in Weir.
        */
       folders_from_manager: boolean;
+      /**
+       * Minimum File Size Bytes
+       * @description The workflow's minimum file size in bytes, so a media manager can leave smaller files out of a hand-off instead of sending them for Weir to refuse. Null when the workflow has no minimum.
+       */
+      minimum_file_size_bytes?: number | null;
     };
     /** ReadinessResponse */
     ReadinessResponse: {
