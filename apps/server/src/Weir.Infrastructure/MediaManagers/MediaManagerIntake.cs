@@ -261,7 +261,6 @@ public sealed partial class MediaManagerIntake
             return [relativePath];
         }
 
-        var windows = OperatingSystem.IsWindows();
         var folder = Path.Join(library.WatchedFolder, relativePath);
         List<IReadOnlyList<string>> videos;
         try
@@ -285,10 +284,19 @@ public sealed partial class MediaManagerIntake
             return [relativePath];
         }
 
-        var chosen = IntakeRules.ChooseFolderVideos(videos, windows);
+        return ChosenVideos(relativePath, videos, IntakeRules.NoVideoInFolderDetail(relativePath));
+    }
+
+    /// <summary>
+    /// Which of a folder's videos a hand-off means (samples left out, unless every video is one), as paths in the library.
+    /// <paramref name="videos"/> are parts relative to the folder; <paramref name="noVideoDetail"/> is the refusal when none is left.
+    /// </summary>
+    private static List<string> ChosenVideos(string relativePath, List<IReadOnlyList<string>> videos, string noVideoDetail)
+    {
+        var chosen = IntakeRules.ChooseFolderVideos(videos, OperatingSystem.IsWindows());
         if (chosen.Count == 0)
         {
-            throw new IntakeRefusedException(400, IntakeRules.NoVideoInFolderDetail(relativePath));
+            throw new IntakeRefusedException(400, noVideoDetail);
         }
 
         var prefix = relativePath.Replace('\\', '/').TrimEnd('/');

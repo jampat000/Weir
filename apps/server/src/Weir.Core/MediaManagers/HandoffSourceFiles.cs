@@ -80,6 +80,8 @@ public static class HandoffSourceFiles
 
     public const string NoPathDetail = "The hand-off lists a file with no path. Nothing was queued.";
 
+    public const string NoVideoDetail = "None of the files the hand-off lists is a video file Weir processes. Nothing was queued.";
+
     /// <summary>Names only the file, as <see cref="HandoffPaths"/> does, so a refusal never discloses the layout of Weir's own disk.</summary>
     public static string OutsideDetail(string path) =>
         $"The hand-off lists {WireStrings.Repr(NameOf(path))}, which is not inside the folder the hand-off names. Nothing was queued.";

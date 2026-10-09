@@ -71,10 +71,12 @@ manager link.
   sends it when a release folder holds files under the workflow's minimum file
   size (`minimum_file_size_bytes` in `GET /api/v1/intake/library-folders`), and
   lists only the files at or above it. When it is present and not empty, the
-  hand-off means those files and nothing else in the folder: Weir still applies
-  the workflow's own rules (minimum size, patterns and so on) to each one, but
-  the files that are not listed are not recorded, shown, reported as skipped or
-  touched, so they stay in the download folder for seeding. A listed path that
+  hand-off means those files and nothing else in the folder. Each listed file is
+  taken the way a file in a folder hand-off is: a sample or a file that is not a
+  video is left out, and the workflow's own rules then apply to it as they do to
+  any handed-over file (minimum size and so on). The files that are not listed
+  are not recorded, shown, reported as skipped or touched, so they stay in the
+  download folder for seeding. A listed path that
   is outside `sourcePath` (after `.` and `..` are settled, ignoring case on
   Windows), or a file that is not there, refuses the whole hand-off with
   status 400 and a plain reason naming the file; Weir does not fall back to the

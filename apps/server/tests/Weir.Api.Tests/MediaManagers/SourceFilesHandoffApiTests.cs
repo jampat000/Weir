@@ -89,6 +89,38 @@ public sealed class SourceFilesHandoffApiTests : IDisposable
         Assert.Equal(["Film.2020/film.mkv"], await TargetsAsync(server));
     }
 
+    [Fact]
+    public async Task A_listed_sample_or_non_video_is_left_out_as_it_is_in_a_folder_hand_off()
+    {
+        await using var server = await StartWithReleaseAsync();
+        var sample = Path.Join(Release, "sample.mkv");
+        var notes = Path.Join(Release, "film.nfo");
+        await File.WriteAllTextAsync(sample, "a sample clip");
+        await File.WriteAllTextAsync(notes, "notes");
+
+        using var response = await HandOffAsync(server, new[] { Film, sample, notes });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(["Film.2020/film.mkv"], await TargetsAsync(server));
+        Assert.Equal(1, await TestDatabase.ScalarAsync(server, RemuxJobs));
+        Assert.Equal(0, await TestDatabase.ScalarAsync(server, "SELECT count(*) FROM jobs WHERE payload_json LIKE '%sample%' OR payload_json LIKE '%.nfo%'"));
+        Assert.Equal("a sample clip", await File.ReadAllTextAsync(sample));
+    }
+
+    [Fact]
+    public async Task A_list_with_no_video_in_it_refuses_the_hand_off()
+    {
+        await using var server = await StartWithReleaseAsync();
+        var notes = Path.Join(Release, "film.nfo");
+        await File.WriteAllTextAsync(notes, "notes");
+
+        using var response = await HandOffAsync(server, new[] { notes });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal("None of the files the hand-off lists is a video file Weir processes. Nothing was queued.", await Detail(response));
+        Assert.Equal(0, await TestDatabase.ScalarAsync(server, RemuxJobs));
+    }
+
     [Theory]
     [InlineData("absent")]
     [InlineData("null")]
